@@ -1,140 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Jan 2018 08:48:54 +0100
-Subject: [PATCH 4/4 v7] drm/pl111: Support handling bridge timings
-In-Reply-To: <20180112074854.9560-1-linus.walleij@linaro.org>
-References: <20180112074854.9560-1-linus.walleij@linaro.org>
-Message-ID: <20180112074854.9560-4-linus.walleij@linaro.org>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 12 Jan 2018 08:51:26 +0100
+Subject: [PATCH net-next v5 0/4] net: mvpp2: 1000BaseX and 2500BaseX support
+Message-ID: <20180112075130.30890-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the bridge has a too strict setup time for the incoming
-signals, we may not be fast enough and then we need to
-compensate by outputting the signal on the inverse clock
-edge so it is for sure stable when the bridge samples it.
+Hi all,
 
-Since bridges in difference to panels does not expose their
-connectors, make the connector optional in the display
-setup code.
+This series adds 1000BaseX and 2500BaseX support to the Marvell PPv2
+driver. In order to use it, the 2.5 SGMII mode is added in the Marvell
+common PHY driver (cp110-comphy).
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v6->v7:
-- Collect Eric's ACK.
-ChangeLog v5->v6:
-- Collect Laurent's ACK.
-ChangeLog v4->v5:
-- Use the new bridge timings setup method.
----
- drivers/gpu/drm/pl111/Kconfig         |  1 +
- drivers/gpu/drm/pl111/pl111_display.c | 35 +++++++++++++++++++++++++++++++----
- drivers/gpu/drm/pl111/pl111_drv.c     | 20 +++++++++++---------
- 3 files changed, 43 insertions(+), 13 deletions(-)
+This was tested on a mcbin.
 
-diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
-index e5e2abd66491..82cb3e60ddc8 100644
---- a/drivers/gpu/drm/pl111/Kconfig
-+++ b/drivers/gpu/drm/pl111/Kconfig
-@@ -8,6 +8,7 @@ config DRM_PL111
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_BRIDGE
- 	select DRM_PANEL_BRIDGE
-+	select DRM_DUMB_VGA_DAC
- 	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
- 	help
- 	  Choose this option for DRM support for the PL111 CLCD controller.
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 06c4bf756b69..7fe4040aea46 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -94,6 +94,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	const struct drm_display_mode *mode = &cstate->mode;
- 	struct drm_framebuffer *fb = plane->state->fb;
- 	struct drm_connector *connector = priv->connector;
-+	struct drm_bridge *bridge = priv->bridge;
- 	u32 cntl;
- 	u32 ppl, hsw, hfp, hbp;
- 	u32 lpp, vsw, vfp, vbp;
-@@ -143,11 +144,37 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
- 		tim2 |= TIM2_IVS;
- 
--	if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
--		tim2 |= TIM2_IOE;
-+	if (connector) {
-+		if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
-+			tim2 |= TIM2_IOE;
- 
--	if (connector->display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
--		tim2 |= TIM2_IPC;
-+		if (connector->display_info.bus_flags &
-+		    DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-+			tim2 |= TIM2_IPC;
-+	}
-+
-+	if (bridge) {
-+		const struct drm_bridge_timings *btimings = bridge->timings;
-+
-+		/*
-+		 * Here is when things get really fun. Sometimes the bridge
-+		 * timings are such that the signal out from PL11x is not
-+		 * stable before the receiving bridge (such as a dumb VGA DAC
-+		 * or similar) samples it. If that happens, we compensate by
-+		 * the only method we have: output the data on the opposite
-+		 * edge of the clock so it is for sure stable when it gets
-+		 * sampled.
-+		 *
-+		 * The PL111 manual does not contain proper timining diagrams
-+		 * or data for these details, but we know from experiments
-+		 * that the setup time is more than 3000 picoseconds (3 ns).
-+		 * If we have a bridge that requires the signal to be stable
-+		 * earlier than 3000 ps before the clock pulse, we have to
-+		 * output the data on the opposite edge to avoid flicker.
-+		 */
-+		if (btimings && btimings->setup_time_ps >= 3000)
-+			tim2 ^= TIM2_IPC;
-+	}
- 
- 	tim2 |= cpl << 16;
- 	writel(tim2, priv->regs + CLCD_TIM2);
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 201d57d5cb54..101a9c7db6ff 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -107,11 +107,17 @@ static int pl111_modeset_init(struct drm_device *dev)
- 			ret = PTR_ERR(bridge);
- 			goto out_config;
- 		}
--		/*
--		 * TODO: when we are using a different bridge than a panel
--		 * (such as a dumb VGA connector) we need to devise a different
--		 * method to get the connector out of the bridge.
--		 */
-+	} else if (bridge) {
-+		dev_info(dev->dev, "Using non-panel bridge\n");
-+	} else {
-+		dev_err(dev->dev, "No bridge, exiting\n");
-+		return -ENODEV;
-+	}
-+
-+	priv->bridge = bridge;
-+	if (panel) {
-+		priv->panel = panel;
-+		priv->connector = panel->connector;
- 	}
- 
- 	ret = pl111_display_init(dev);
-@@ -125,10 +131,6 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	if (ret)
- 		return ret;
- 
--	priv->bridge = bridge;
--	priv->panel = panel;
--	priv->connector = panel->connector;
--
- 	ret = drm_vblank_init(dev, 1);
- 	if (ret != 0) {
- 		dev_err(dev->dev, "Failed to init vblank\n");
+All patches should probably go through net-next as patch 4/4 depends on
+patch 1/4 to build and work.
+
+Please note the two mvpp2 patches do not conflict with the ACPI series
+v2 Marcin sent a few days ago, and the two series can be processed in
+parallel. (Marcin is aware of me sending this series).
+
+Thanks!
+Antoine
+
+Since v4:
+  - Fixed a compilation warning which was a real error in the code.
+
+Since v3:
+  - Stopped setting the MII_SPEED bit in the GMAC AN register, as the
+    GMII_SPEED bit takes over anyway.
+  - Added Andrew's Reviewed-by on patch 4/4.
+
+Since v2:
+  - Added a comment before mvpp22_comphy_init() about the different PHY modes
+    used and why they differ between the PPv2 driver and the COMPHY one.
+
+Since v1:
+  - s/PHY_MODE_SGMII_2_5G/PHY_MODE_2500SGMII/
+  - Fixed a build error in 'net: mvpp2: 1000baseX support' (which was solved in
+    the 2500baseX support one, but the bisection was broken).
+  - Removed the dt patches, as the fourth network interface on the mcbin also
+    needs PHYLINK support in the PPv2 driver to be correctly supported.
+
+Antoine Tenart (4):
+  phy: add 2.5G SGMII mode to the phy_mode enum
+  phy: cp110-comphy: 2.5G SGMII mode
+  net: mvpp2: 1000baseX support
+  net: mvpp2: 2500baseX support
+
+ drivers/net/ethernet/marvell/mvpp2.c         | 74 ++++++++++++++++++++++++----
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 17 +++++--
+ include/linux/phy/phy.h                      |  1 +
+ 3 files changed, 79 insertions(+), 13 deletions(-)
+
 -- 
 2.14.3
