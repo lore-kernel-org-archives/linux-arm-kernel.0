@@ -1,55 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 12 Jan 2018 09:51:34 +0100
-Subject: [linux-sunxi] [PATCH 1/7] pinctrl: sunxi: add support for pin
- controllers without bus gate
-In-Reply-To: <3A97A26E-0774-4279-B7B9-8312225E2C72@aosc.io>
-References: <20180106042326.46519-1-icenowy@aosc.io>
- <ef82983f-6f91-46c2-1f67-7d4efc10c905@arm.com>
- <3A97A26E-0774-4279-B7B9-8312225E2C72@aosc.io>
-Message-ID: <20180112085134.dcsikciujsxuuwhx@flea.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Jan 2018 09:56:40 +0100
+Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
+In-Reply-To: <CAOesGMggU73asY1SEUDD_BsWcrGYR___o8e5omjziOPEwJgqBQ@mail.gmail.com>
+References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
+ <20180112020711.6gp2pnsxxjzelidq@localhost> <20180112032223.GK3626@vireshk-i7>
+ <CAOesGMggU73asY1SEUDD_BsWcrGYR___o8e5omjziOPEwJgqBQ@mail.gmail.com>
+Message-ID: <CAK8P3a2SO4=YKBE3L_AKsyfNe77YR7a8F=dvbS=ic03=6NK8MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;5002;0c
-On Thu, Jan 11, 2018 at 09:21:06PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> ? 2018?1?11? GMT+08:00 ??7:48:40, Andre Przywara <andre.przywara@arm.com> ??:
-> >Hi,
-> >
-> >another take to avoid this patch at all, I just remembered this from an
-> >IRC discussion before:
-> >
-> >On 06/01/18 04:23, Icenowy Zheng wrote:
-> >> The Allwinner H6 pin controllers (both the main one and the CPUs one)
-> >> have no bus gate clocks.
-> >
-> >I don't think this is true. The pin controller *needs* an APB clock,
-> >it's just not gate-able or not exposed or documented.
-> >The "system bus tree" on page 90 in the manual shows that the "GPIO"
-> >block is located on the APB1 bus.
-> >So can't we just reference this apb clock directly? That would be much
-> >cleaner, "more" correct and require less changes: "The best patch is no
-> >patch":
-> 
-> I can accept this. (In fact I have considered this, but
-> I don't dare to directly use bus clock in a device, as it's not
-> exported before.
-> 
-> Maxime, Chen-Yu, can you agree the following code?
+On Fri, Jan 12, 2018 at 4:23 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Jan 11, 2018 at 7:22 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> On 11-01-18, 18:07, Olof Johansson wrote:
+>>> On Thu, Jan 11, 2018 at 11:28:51AM +0530, Viresh Kumar wrote:
+>>> > The interrupt-parent of rtc was missing, add it.
+>>> >
+>>> > Fixes: 8113ba917dfa ("ARM: SPEAr: DT: Update device nodes")
+>>> > Cc: stable at vger.kernel.org # v3.8+
+>>> > Reported-by: Arnd Bergmann <arnd@arndb.de>
+>>> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>
+>>> Applied to next/dt. Is stable really needed on this? It's been broken since
+>>> pretty much forever, and nobody has complained... :)
+>>
+>> Not sure. Just thought it may be useful for someone somewhere :)
+>
+> Ok. Left the tags there, but didn't merge into fixes since we're late
+> in -rc and this didn't seem critical at this time.
 
-Yes, that works for me.
+My plan was to have these in the fixes branch in the hope of making
+it to a clean build for 4.15 after all, they fix warnings that got introduced
+by the updated dtc checks in 4.15-rc1.
 
-Maxime
+We are getting fairly close, but it seems we still miss a few, so we
+might as well give up at this point. The remaining fixes should be easy
+to backport into v4.15.y if we decide to do it, of further back even.
+For v4.14 and before, the in-kernel copy of dtc won't warn, but mainline
+dtc will.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/6f3306e5/attachment-0001.sig>
+Greg, let me know your thoughts on this for the upcoming 4.15.y
+release. We had hundreds of dtc warnings in 4.15-rc1, many of them
+about important bugs, now we're down to a couple of warnings
+for platforms we don't care about much, and I expect the last of
+these fixes to land in 4.16-rc1 or maybe -rc2. Shall we backport
+them all to get a clean 4.15.y release?
+
+Note: there was at least one dtc warning fix that caused a serious
+regression in code that relied on a device probe to fail because of
+an invalid node (a fix is still in the works for 4.15), though generally
+the fixes are really harmless and can only make things better.
+
+      Arnd
