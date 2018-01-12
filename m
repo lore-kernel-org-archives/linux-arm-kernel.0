@@ -1,82 +1,114 @@
 From: konrad@darnok.org (Konrad Rzeszutek Wilk)
-Date: Fri, 12 Jan 2018 08:39:41 -0500
-Subject: [PATCH 06/22] swiotlb: rename swiotlb_free to swiotlb_exit
-In-Reply-To: <20180110080932.14157-7-hch@lst.de>
-References: <20180110080932.14157-1-hch@lst.de>
- <20180110080932.14157-7-hch@lst.de>
-Message-ID: <20180112133939.GF26900@localhost.localdomain>
+Date: Fri, 12 Jan 2018 08:17:28 -0500
+Subject: [PATCH 21/33] dma-mapping: add an arch_dma_supported hook
+In-Reply-To: <20180110080027.13879-22-hch@lst.de>
+References: <20180110080027.13879-1-hch@lst.de>
+ <20180110080027.13879-22-hch@lst.de>
+Message-ID: <20180112131727.GB26900@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 09:09:16AM +0100, Christoph Hellwig wrote:
-
-OK?
+On Wed, Jan 10, 2018 at 09:00:15AM +0100, Christoph Hellwig wrote:
+> To implement the x86 forbid_dac and iommu_sac_force we want an arch hook
+> so that it can apply the global options across all dma_map_ops
+> implementations.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
 Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->  arch/powerpc/kernel/dma-swiotlb.c | 2 +-
->  arch/x86/kernel/pci-swiotlb.c     | 2 +-
->  include/linux/swiotlb.h           | 4 ++--
->  lib/swiotlb.c                     | 2 +-
->  4 files changed, 5 insertions(+), 5 deletions(-)
+>  arch/x86/include/asm/dma-mapping.h |  3 +++
+>  arch/x86/kernel/pci-dma.c          | 19 ++++++++++++-------
+>  include/linux/dma-mapping.h        | 11 +++++++++++
+>  3 files changed, 26 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/powerpc/kernel/dma-swiotlb.c b/arch/powerpc/kernel/dma-swiotlb.c
-> index 506ac4fafac5..88f3963ca30f 100644
-> --- a/arch/powerpc/kernel/dma-swiotlb.c
-> +++ b/arch/powerpc/kernel/dma-swiotlb.c
-> @@ -121,7 +121,7 @@ static int __init check_swiotlb_enabled(void)
->  	if (ppc_swiotlb_enable)
->  		swiotlb_print_info();
->  	else
-> -		swiotlb_free();
-> +		swiotlb_exit();
->  
->  	return 0;
+> diff --git a/arch/x86/include/asm/dma-mapping.h b/arch/x86/include/asm/dma-mapping.h
+> index dfdc9357a349..6277c83c0eb1 100644
+> --- a/arch/x86/include/asm/dma-mapping.h
+> +++ b/arch/x86/include/asm/dma-mapping.h
+> @@ -30,6 +30,9 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+>  	return dma_ops;
 >  }
-> diff --git a/arch/x86/kernel/pci-swiotlb.c b/arch/x86/kernel/pci-swiotlb.c
-> index 0d77603c2f50..0ee0f8f34251 100644
-> --- a/arch/x86/kernel/pci-swiotlb.c
-> +++ b/arch/x86/kernel/pci-swiotlb.c
-> @@ -120,7 +120,7 @@ void __init pci_swiotlb_late_init(void)
->  {
->  	/* An IOMMU turned us off. */
->  	if (!swiotlb)
-> -		swiotlb_free();
-> +		swiotlb_exit();
->  	else {
->  		printk(KERN_INFO "PCI-DMA: "
->  		       "Using software bounce buffering for IO (SWIOTLB)\n");
-> diff --git a/include/linux/swiotlb.h b/include/linux/swiotlb.h
-> index 24ed817082ee..606375e35d87 100644
-> --- a/include/linux/swiotlb.h
-> +++ b/include/linux/swiotlb.h
-> @@ -115,10 +115,10 @@ extern int
->  swiotlb_dma_supported(struct device *hwdev, u64 mask);
 >  
->  #ifdef CONFIG_SWIOTLB
-> -extern void __init swiotlb_free(void);
-> +extern void __init swiotlb_exit(void);
->  unsigned int swiotlb_max_segment(void);
->  #else
-> -static inline void swiotlb_free(void) { }
-> +static inline void swiotlb_exit(void) { }
->  static inline unsigned int swiotlb_max_segment(void) { return 0; }
+> +int arch_dma_supported(struct device *dev, u64 mask);
+> +#define arch_dma_supported arch_dma_supported
+> +
+>  bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp);
+>  #define arch_dma_alloc_attrs arch_dma_alloc_attrs
+>  
+> diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
+> index 61a8f1cb3829..df7ab02f959f 100644
+> --- a/arch/x86/kernel/pci-dma.c
+> +++ b/arch/x86/kernel/pci-dma.c
+> @@ -215,7 +215,7 @@ static __init int iommu_setup(char *p)
+>  }
+>  early_param("iommu", iommu_setup);
+>  
+> -int x86_dma_supported(struct device *dev, u64 mask)
+> +int arch_dma_supported(struct device *dev, u64 mask)
+>  {
+>  #ifdef CONFIG_PCI
+>  	if (mask > 0xffffffff && forbid_dac > 0) {
+> @@ -224,12 +224,6 @@ int x86_dma_supported(struct device *dev, u64 mask)
+>  	}
 >  #endif
 >  
-> diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-> index 125c1062119f..cf5311908fa9 100644
-> --- a/lib/swiotlb.c
-> +++ b/lib/swiotlb.c
-> @@ -417,7 +417,7 @@ swiotlb_late_init_with_tbl(char *tlb, unsigned long nslabs)
->  	return -ENOMEM;
+> -	/* Copied from i386. Doesn't make much sense, because it will
+> -	   only work for pci_alloc_coherent.
+> -	   The caller just has to use GFP_DMA in this case. */
+> -	if (mask < DMA_BIT_MASK(24))
+> -		return 0;
+> -
+>  	/* Tell the device to use SAC when IOMMU force is on.  This
+>  	   allows the driver to use cheaper accesses in some cases.
+>  
+> @@ -249,6 +243,17 @@ int x86_dma_supported(struct device *dev, u64 mask)
+>  
+>  	return 1;
+>  }
+> +EXPORT_SYMBOL(arch_dma_supported);
+> +
+> +int x86_dma_supported(struct device *dev, u64 mask)
+> +{
+> +	/* Copied from i386. Doesn't make much sense, because it will
+> +	   only work for pci_alloc_coherent.
+> +	   The caller just has to use GFP_DMA in this case. */
+> +	if (mask < DMA_BIT_MASK(24))
+> +		return 0;
+> +	return 1;
+> +}
+>  
+>  static int __init pci_iommu_init(void)
+>  {
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index 88bcb1a8211d..d67742dad904 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -576,6 +576,14 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+>  	return 0;
 >  }
 >  
-> -void __init swiotlb_free(void)
-> +void __init swiotlb_exit(void)
+> +/*
+> + * This is a hack for the legacy x86 forbid_dac and iommu_sac_force. Please
+> + * don't use this is new code.
+> + */
+> +#ifndef arch_dma_supported
+> +#define arch_dma_supported(dev, mask)	(1)
+> +#endif
+> +
+>  static inline void dma_check_mask(struct device *dev, u64 mask)
 >  {
->  	if (!io_tlb_orig_addr)
->  		return;
+>  	if (sme_active() && (mask < (((u64)sme_get_me_mask() << 1) - 1)))
+> @@ -588,6 +596,9 @@ static inline int dma_supported(struct device *dev, u64 mask)
+>  
+>  	if (!ops)
+>  		return 0;
+> +	if (!arch_dma_supported(dev, mask))
+> +		return 0;
+> +
+>  	if (!ops->dma_supported)
+>  		return 1;
+>  	return ops->dma_supported(dev, mask);
 > -- 
 > 2.14.2
 > 
