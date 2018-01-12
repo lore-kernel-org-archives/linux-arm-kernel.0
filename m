@@ -1,135 +1,63 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 12 Jan 2018 09:33:25 +0100
-Subject: [PATCH] arm64: dts: rockchip: add roc-rk3328-cc board
-In-Reply-To: <20180111203033.mnap7tijbfsvr5pa@rob-hp-laptop>
-References: <20180106094538.15568-1-djw@t-chip.com.cn>
- <20180111203033.mnap7tijbfsvr5pa@rob-hp-laptop>
-Message-ID: <10243464.nJpoDBzbVB@phil>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 12 Jan 2018 09:37:49 +0100
+Subject: [linux-sunxi] Re: [PATCH v5 2/2] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <20180112095114.b2414fe44cff7bf7cf6f8822@magewell.com>
+References: <1515639966-35902-1-git-send-email-yong.deng@magewell.com>
+ <20180111132844.mok7upqjycpx3bqm@flea.lan>
+ <20180112095114.b2414fe44cff7bf7cf6f8822@magewell.com>
+Message-ID: <20180112083749.syxtwiigxafxw4zq@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Am Donnerstag, 11. Januar 2018, 14:30:33 CET schrieb Rob Herring:
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-> > new file mode 100644
-> > index 0000000..2134baf
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-> > @@ -0,0 +1,313 @@
-> > +/*
-> > + * Copyright (c) 2017 T-Chip Intelligent Technology Co., Ltd
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This library is free software; you can redistribute it and/or
-> > + *     modify it under the terms of the GNU General Public License as
-> > + *     published by the Free Software Foundation; either version 2 of the
-> > + *     License, or (at your option) any later version.
-> > + *
-> > + *     This library is distributed in the hope that it will be useful,
-> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *     GNU General Public License for more details.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall be
-> > + *     included in all copies or substantial portions of the Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
+On Fri, Jan 12, 2018 at 09:51:14AM +0800, Yong wrote:
+> Hi Maxime,
 > 
-> Use SPDX license tag.
-
-It looks like Thomas' SPDX documentation patches are not yet merged
-and there were smaller protests about SPDX information only being
-available on some external website, so just for my understanding, SPDX
-is the agreed standard now, right?
-
-And judging by the SPDX conversion for Rockchip dts I have in my inbox
-the correct tags should probably be
-	// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-due to the
-"All devicetrees claim to be either GPL or X11 while the actual license
-text is MIT. Therefore we use MIT for the SPDX tag as X11 is clearly
-wrong."
-
-
-> > +
-> > +/dts-v1/;
-> > +#include "rk3328.dtsi"
-> > +
-> > +/ {
-> > +	model = "Firefly roc-rk3328-cc";
-> > +	compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial2:1500000n8";
+> On Thu, 11 Jan 2018 14:28:44 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> Just checking, 1.5Mbps for console?
-
-yep, that's correct. Most newer Rockchip socs drive the debug uart
-with 1.5MBps as default these days.
-
-
-> > +&i2c1 {
-> > +	status = "okay";
-> > +
-> > +	rk805: rk805 at 18 {
+> > Hi Yong,
+> > 
+> > On Thu, Jan 11, 2018 at 11:06:06AM +0800, Yong Deng wrote:
+> > > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > > interface and CSI1 is used for parallel interface. This is not
+> > > documented in datasheet but by test and guess.
+> > > 
+> > > This patch implement a v4l2 framework driver for it.
+> > > 
+> > > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > > ISP's support are not included in this patch.
+> > > 
+> > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > 
+> > I've needed this patch in order to fix a NULL pointer dereference:
+> > http://code.bulix.org/oz6gmb-257359?raw
+> > 
+> > This is needed because while it's ok to have a NULL pointer to
+> > v4l2_subdev_pad_config when you call the subdev set_fmt with
+> > V4L2_SUBDEV_FORMAT_ACTIVE, it's not with V4L2_SUBDEV_FORMAT_TRY, and
+> > sensors will assume taht it's a valid pointer.
+> > 
+> > Otherwise,
+> > Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> pmic at 18
+> I revisit some code of subdevs and you are right.
 > 
-> > +		compatible = "rockchip,rk805";
-> > +		reg = <0x18>;
-> > +		interrupt-parent = <&gpio1>;
-> > +		interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
-> > +		#clock-cells = <1>;
-> > +		clock-output-names = "xin32k", "rk805-clkout2";
-> > +		gpio-controller;
-> > +		#gpio-cells = <2>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pmic_int_l>;
-> > +		rockchip,system-power-controller;
-> > +		wakeup-source;
-> > +
-> > +		vcc1-supply = <&vcc_sys>;
-> > +		vcc2-supply = <&vcc_sys>;
-> > +		vcc3-supply = <&vcc_sys>;
-> > +		vcc4-supply = <&vcc_sys>;
-> > +		vcc5-supply = <&vcc_io>;
-> > +		vcc6-supply = <&vcc_io>;
-> > +
-> > +		regulators {
-> > +			vdd_logic: DCDC_REG1 {
-> 
-> Don't use '_' in node names.
+> Squash your patch into my driver patch and add your Tested-by in
+> commit. Is it right?
 
-The driver binds against the node names including the underscores.
-(with regulator-compatible being deprecated)
+Yep, that's perfect :)
 
-See drivers/regulator/rk808-regulator.c and
-Documentation/devicetree/bindings/mfd/rk808.txt
+Maxime
 
-
-Heiko
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/573b9c41/attachment.sig>
