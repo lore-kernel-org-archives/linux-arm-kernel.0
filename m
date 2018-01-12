@@ -1,50 +1,40 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Fri, 12 Jan 2018 14:27:49 +1300
-Subject: [PATCH v4 2/8] ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
-In-Reply-To: <20180112012755.20495-1-chris.packham@alliedtelesis.co.nz>
-References: <20180112012755.20495-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20180112012755.20495-3-chris.packham@alliedtelesis.co.nz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Jan 2018 17:32:57 -0800
+Subject: PM regression in next
+In-Reply-To: <20180112012019.GA4059@atomide.com>
+References: <20180112000037.GA3875@atomide.com>
+ <20180111161837.f1c1d891a1b80d97e30a9b1b@linux-foundation.org>
+ <20180112002322.GB3875@atomide.com>
+ <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
+ <20180112012019.GA4059@atomide.com>
+Message-ID: <20180112013257.GB4059@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+* Tony Lindgren <tony@atomide.com> [180111 17:20]:
+> Well I tried to measure suspend power consumption and noticed
+> that system suspend fails too hand hangs the network device:
+> 
+> # echo mem > /sys/power/state
+> [   32.577850] PM: suspend entry (deep)
+> [   32.582031] PM: Syncing filesystems ... done.
+> [   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
+> [   32.608398] OOM killer disabled.
+> [   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+> [   32.622192] Suspending console(s) (use no_console_suspend to debug)
+> [   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
+> [   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
+> [   32.653289] PM: Some devices failed to suspend, or early wake event detected
+> [   32.685455] OOM killer enabled.
+> [   32.688629] Restarting tasks ... done.
+> [   32.695983] PM: suspend exit
+> ash: write error: Bad address
+> 
+> That too works just fine at commit 70286688e5ad.
 
-The macro name is too generic, so add a AURORA_ prefix.
+Suspend fails at commit e2d7fe89e8ae though, so looks like we
+have two separate issues. I'll try to bisect that separately.
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/include/asm/hardware/cache-aurora-l2.h | 2 +-
- arch/arm/mm/cache-l2x0.c                        | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Regards,
 
-diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-index c86124769831..dc5c479ec4c3 100644
---- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
-+++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-@@ -41,7 +41,7 @@
- #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
- 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
- 
--#define MAX_RANGE_SIZE		1024
-+#define AURORA_MAX_RANGE_SIZE	1024
- 
- #define AURORA_WAY_SIZE_SHIFT	2
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a00d6f7fd34c..7d2d2a3c67d0 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1364,8 +1364,8 @@ static unsigned long aurora_range_end(unsigned long start, unsigned long end)
- 	 * since cache range operations stall the CPU pipeline
- 	 * until completion.
- 	 */
--	if (end > start + MAX_RANGE_SIZE)
--		end = start + MAX_RANGE_SIZE;
-+	if (end > start + AURORA_MAX_RANGE_SIZE)
-+		end = start + AURORA_MAX_RANGE_SIZE;
- 
- 	/*
- 	 * Cache range operations can't straddle a page boundary.
--- 
-2.15.1
+Tony
