@@ -1,24 +1,25 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 11 Jan 2018 20:22:58 -0600
-Subject: [PATCH 1/2] ARM: dts: da850-lego-ev3: Add node for reboot modes
-In-Reply-To: <1515723685-19286-2-git-send-email-david@lechnology.com>
-References: <1515723685-19286-1-git-send-email-david@lechnology.com>
- <1515723685-19286-2-git-send-email-david@lechnology.com>
-Message-ID: <203bb1f1-e4d4-ca2f-4b66-386f29873861@lechnology.com>
+Date: Thu, 11 Jan 2018 20:29:49 -0600
+Subject: [PATCH v2 0/2] Add reboot modes for LEGO MINDSTORMS EV3
+Message-ID: <1515724191-30499-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2018 08:21 PM, David Lechner wrote:
-> This adds a new node for reboot modes on LEGO MINDSTORMS EV3. The EV3's
-> bootloader looks for a magic number in the ARM local RAM and if found,
-> it will boot into a special firmware update mode where the flash memory
-> can be written via USB.
-> 
-> This has been testing working using the command:
-> 
->      # systemctl reboot loader
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
+This series adds a new device tree node to declare a special memory
+address that is used by the I2C bootloader on LEGO MINDSTORMS EV3
+to boot into a special firmware update mode and enables the required
+module to use it.
 
-Doh. I forgot to rebase, so this won't apply cleanly. V2 coming right up.
+v2 changes:
+* rebase on linux-davinci/master
+
+David Lechner (2):
+  ARM: dts: da850-lego-ev3: Add node for reboot modes
+  ARM: davinci_all_defconfig: enable SYSCON_REBOOT_MODE
+
+ arch/arm/boot/dts/da850-lego-ev3.dts   | 17 +++++++++++++++++
+ arch/arm/configs/davinci_all_defconfig |  1 +
+ 2 files changed, 18 insertions(+)
+
+-- 
+2.7.4
