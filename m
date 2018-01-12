@@ -1,131 +1,69 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 12 Jan 2018 10:35:13 -0800
-Subject: [PATCH v2 01/16] drivers: pwm: core: use a single of xlate
- function
-In-Reply-To: <1515766983-15151-2-git-send-email-claudiu.beznea@microchip.com>
-References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
- <1515766983-15151-2-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20180112183512.GB102880@google.com>
+From: andreas@kemnade.info (Andreas Kemnade)
+Date: Fri, 12 Jan 2018 19:40:35 +0100
+Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
+ receiver) power control driver
+In-Reply-To: <20180112144647.GA5992@localhost>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost> <20180109184347.28ba0a6e@aktux>
+ <20180112144647.GA5992@localhost>
+Message-ID: <20180112194022.7da1e726@kemnade.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 12 Jan 2018 15:46:47 +0100
+Johan Hovold <johan@kernel.org> wrote:
 
-On Fri, Jan 12, 2018 at 04:22:48PM +0200, Claudiu Beznea wrote:
-> Remove of_pwm_simple_xlate() and of_pwm_xlate_with_flags() functions
-> and add of_pwm_xlate() which is used in all cases no mather if the OF
-> bindings are with PWM flags or not. This should not affect the old
-> behavior since the xlate will be based on #pwm-cells property of the
-> PWM controller. Based on #pwm-cells property the xlate will consider
-> the flags or not. This will permit the addition of other inputs to OF
-> xlate by just adding proper code at the end of of_pwm_xlate() and a new
-> input to enum pwm_args_xlate_options. With this changes there will be
-> no need to fill of_xlate and of_pwm_n_cells of struct pwm_chip from
-> the drivers probe methods. References in drives to references to of_xlate
-> and of_pwm_n_cells were removed. Drivers which used private of_xlate
-> functions switched to the generic of_pwm_xlate() function which fits
-> for it but with little changes in device trees (these drivers translated
-> differently the "pwms" bindings; the "pwms" bindings now are generic to
-> all drivers and all drivers should provide them in the format described
-> in pwm documentation).
+> On Tue, Jan 09, 2018 at 06:43:47PM +0100, Andreas Kemnade wrote:
+> > On Fri, 22 Dec 2017 13:44:27 +0100
+> > Johan Hovold <johan@kernel.org> wrote:
+> > 
+> > [...]  
+> > > I'd suggest reiterating the problem you're trying to solve and
+> > > enumerating the previously discussed potential solutions in order to
+> > > find a proper abstraction level for this (before getting lost in
+> > > implementation details).
+> > >   
+> > The main point here is in short words: Having a device powered on or off
+> > when the uart it is attached to, is used or not used anymore,
+> > so the already available userspace applications do not need to be changed.  
 > 
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Mike Dunn <mikedunn@newsguy.com>
-> Cc: Brian Norris <briannorris@chromium.org>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
+> So we'd end up with something in-between a kernel driver and a
+> user-space solution. What about devices that need to be (partially)
+> powered also when the port isn't open? A pure user-space solution would
+> be able to handle all variants.
 > 
-> This patch (and the next 7) could be applied independetly by this series, if
-> any, but I choosed to have it here since it makes easy the PWM modes parsing.
-> If you feel it could be independently of this series I could send a new version.
-> 
-> Also, Thierry, Mike, Brian, Shiyan, please take an extra look over pwm-pxa.c,
-> pwm-cros-ec.c and pwm-clps711x.c since these were moved to use the generic
-> pwms (minimum 2 pwm-cells).
-> 
->  drivers/pwm/core.c             | 56 +++++++++++-------------------------------
->  drivers/pwm/pwm-atmel-hlcdc.c  |  2 --
->  drivers/pwm/pwm-atmel-tcb.c    |  2 --
->  drivers/pwm/pwm-atmel.c        |  6 -----
->  drivers/pwm/pwm-bcm-iproc.c    |  2 --
->  drivers/pwm/pwm-bcm-kona.c     |  2 --
->  drivers/pwm/pwm-bcm2835.c      |  2 --
->  drivers/pwm/pwm-berlin.c       |  2 --
->  drivers/pwm/pwm-clps711x.c     | 11 ---------
->  drivers/pwm/pwm-cros-ec.c      | 20 ---------------
+Well partly powered devices are at many places, And they hide that problem
+from userspace, just get the open()/get() and close()/put() from there and power the
+device accordingly. 
 
-For pwm-cros-ec.c:
+So the question still remains why should the kernel hide some things and some
+it should not.
+If it all is in userspace, then there is still something needed in the devicetree
+(if I understand correctly, every information about hardware which cannot be
+auto-probed belongs into device tree) so that the userspace knows what kind of
+device is at that port. So there can be a daemon powering on and off devices.
+But that would break existing applications which just expect that they just need
+to open/close the device. 
 
-Nacked-by: Brian Norris <briannorris@chromium.org>
+Or you need to have some inotify handler in userspace and attach it there to
+react on close() and open() of that device.
+But this thing needs to have two kind of information:
 
-This is a fiat change of the documented binding, which breaks the RK3399
-Kevin board. That's not how we do device tree.
+1. the type of chip available to do the right powerup sequence. 
 
-You can extend the binding if you want, so you can represent the period
-in the device tree if you'd like (though the value won't mean anything;
-it can't be changed by the kernel), but don't break existing device
-trees.
+2. how the chip is wired up to the cpu. 
 
->  drivers/pwm/pwm-fsl-ftm.c      |  2 --
->  drivers/pwm/pwm-hibvt.c        |  2 --
->  drivers/pwm/pwm-imx.c          |  8 ------
->  drivers/pwm/pwm-lpc18xx-sct.c  |  2 --
->  drivers/pwm/pwm-meson.c        |  2 --
->  drivers/pwm/pwm-omap-dmtimer.c |  2 --
->  drivers/pwm/pwm-pxa.c          | 19 --------------
->  drivers/pwm/pwm-renesas-tpu.c  |  2 --
->  drivers/pwm/pwm-rockchip.c     |  5 ----
->  drivers/pwm/pwm-samsung.c      |  3 ---
->  drivers/pwm/pwm-sun4i.c        |  2 --
->  drivers/pwm/pwm-tiecap.c       |  2 --
->  drivers/pwm/pwm-tiehrpwm.c     |  2 --
->  drivers/pwm/pwm-vt8500.c       |  2 --
->  drivers/pwm/pwm-zx.c           |  2 --
->  include/linux/pwm.h            | 23 ++++++++++-------
->  26 files changed, 29 insertions(+), 156 deletions(-)
-> 
-...
+So to avoid having hardware information spread all over the table at least
+these information would need to be in devicetree. But that also all feels
+like a hack and hard to maintain.
 
-> diff --git a/drivers/pwm/pwm-cros-ec.c b/drivers/pwm/pwm-cros-ec.c
-> index 9c13694eaa24..692298693768 100644
-> --- a/drivers/pwm/pwm-cros-ec.c
-> +++ b/drivers/pwm/pwm-cros-ec.c
-> @@ -133,24 +133,6 @@ static void cros_ec_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
->  	state->duty_cycle = ret;
->  }
->  
-> -static struct pwm_device *
-> -cros_ec_pwm_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
-> -{
-> -	struct pwm_device *pwm;
-> -
-> -	if (args->args[0] >= pc->npwm)
-> -		return ERR_PTR(-EINVAL);
-> -
-> -	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-> -	if (IS_ERR(pwm))
-> -		return pwm;
-> -
-> -	/* The EC won't let us change the period */
-> -	pwm->args.period = EC_PWM_MAX_DUTY;
-> -
-> -	return pwm;
-> -}
-> -
->  static const struct pwm_ops cros_ec_pwm_ops = {
->  	.get_state	= cros_ec_pwm_get_state,
->  	.apply		= cros_ec_pwm_apply,
-> @@ -207,8 +189,6 @@ static int cros_ec_pwm_probe(struct platform_device *pdev)
->  	/* PWM chip */
->  	chip->dev = dev;
->  	chip->ops = &cros_ec_pwm_ops;
-> -	chip->of_xlate = cros_ec_pwm_xlate;
-> -	chip->of_pwm_n_cells = 1;
->  	chip->base = -1;
->  	ret = cros_ec_num_pwms(ec);
->  	if (ret < 0) {
-
-...
-
-Brian
+Regards,
+Andreas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/516f978d/attachment.sig>
