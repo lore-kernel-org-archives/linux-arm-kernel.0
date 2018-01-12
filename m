@@ -1,73 +1,95 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Jan 2018 17:58:54 +0000
-Subject: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
- any reservation
-In-Reply-To: <DB5PR0401MB1733C9CB0DCDF94FCF3E4E1286130@DB5PR0401MB1733.eurprd04.prod.outlook.com>
-References: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
- <5A4F5C45.3090006@arm.com>
- <DB5PR0401MB1733C9CB0DCDF94FCF3E4E1286130@DB5PR0401MB1733.eurprd04.prod.outlook.com>
-Message-ID: <5A58F75E.8030106@arm.com>
+Date: Fri, 12 Jan 2018 18:05:31 +0000
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <CAMj-D2CwHWNpXzeNMEVKGTveAwuJvja219NF6PZ7xqYMUY17Kw@mail.gmail.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com>
+ <CAMj-D2CwHWNpXzeNMEVKGTveAwuJvja219NF6PZ7xqYMUY17Kw@mail.gmail.com>
+Message-ID: <5A58F8EB.9080909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Poonam,
+Hi gengdongjiu,
 
-On 08/01/18 04:31, Poonam Aggrwal wrote:
-> James Morse wrote:
->> On 04/01/18 15:34, Poonam Aggrwal wrote:
->>> Address for both crashkernel memory and elfcorehdr can be assigned
->>> statically. For crashkernel memory it is via crashkernel=SIZE at ADDRESS
->>> and elfcorehdr_addr via by kexec-utils in dump kernel device tree.
+On 16/12/17 04:47, gengdongjiu wrote:
+> [...]
 >>
->> There are some crashkernel=SIZE at ADDRESS values that the user can supply that
->> we must reject. The obvious one is if it overlaps with the kernel text. (this patch
->> won't spot this). We need to read the hardware's reserved regions from the DT
->> before we allocate the crashkernel region, for example if the bootloader
->> reserved a chunk of memory for a frame-buffer, I shouldn't be able to use that
->> as crashkernel memory.
+>>> +     case ESR_ELx_AET_UER:   /* The error has not been propagated */
+>>> +             /*
+>>> +              * Userspace only handle the guest SError Interrupt(SEI) if the
+>>> +              * error has not been propagated
+>>> +              */
+>>> +             run->exit_reason = KVM_EXIT_EXCEPTION;
+>>> +             run->ex.exception = ESR_ELx_EC_SERROR;
+>>> +             run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
+>>> +             return 0;
 >>
->> (you shouldn't need to specify an address, doing so prevents the kernel from
->> picking memory it can use)
->>
->>
->>> So memory should be reserved for both the above areas before any other
->>> memory reservations are done. Otherwise overlaps may happen and memory
->>> allocations will fail leading to failure in booting the dump capture
->>> kernel.
+>> We should not pass RAS notifications to user space. The kernel either handles
+>> them, or it panics(). User space shouldn't even know if the kernel supports RAS
+> 
+> For the  ESR_ELx_AET_UER(Recoverable error), let us see its definition
+> below, which get from [0]
 
->>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
->>> 00e7b90..24ce15d 100644
->>> --- a/arch/arm64/mm/init.c
->>> +++ b/arch/arm64/mm/init.c
->>> @@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
+[..]
 
->>> +	reserve_elfcorehdr();
->>
->> (Moving reserve_elfcorehdr() makes sense, but..)
->>
->>
->>> +	reserve_crashkernel();
->>
->> reserve_crashkernel() does the allocation for the crashkernels reserved memory.
->> I expect this to always fail in the kdump kernel because there isn't enough
->> memory. (fdt_enforce_memory_region() at the top of this function calls
->> memblock_cap_memory_range()).
->>
->> Moving this allocation above the early_init_fdt_scan_reserved_mem() below
->> means we may allocate memory for the crashdump that is in use by
->> firmware/hardware and described as reserved in the DT.
+> so we can see the  exception is precise and PE can recover execution
+> from the preferred return address of the exception, 
 
-> Yeah, this is a good point. So ideally the address of the crash kernel should
-> be diligently provided by the user based on the system.
+> so let guest handling it is
+> better, for example, if it is guest application RAS error, we can kill
+> the guest application instead of panic whole OS; if it is guest kernel
+> RAS error, guest will panic.
 
-Even better: the region to store the crash kernel in should be chosen by the kernel.
-When using kdump I boot with 'crashkernel=1G', the kernel chooses where to place
-the reserved region. Even if I specified a reasonable physical address, the
-efistub may relocate the kernel over the top during boot as part of its KASLR work.
+If the kernel takes an unhandled RAS error it should panic - we don't know where
+the error is.
 
-(Why does anyone ever need to specify an offset here?)
+I understand you want to kill-off guest tasks as a result of RAS errors, but
+this needs to go through the whole APEI->memory_failure()->sigbus machinery so
+that the kernel knows the kernel can keep running.
+
+This saves us signalling user-space when we don't need to. An example:
+code-corruption. Linux can happily re-read affected user-space executables from
+disk, there is absolutely nothing user-space can do about it.
+Handling errors first in the kernel allows us to do recovery for all the
+affected processes, not just the one that happens to be running right now.
 
 
-Thanks,
+> Host does not know which application of guest has error, so host can
+> not handle it,
+
+It has to work this out, otherwise the errors we can handle never get a chance.
+
+This kernel is expected to look at the error description, (which for some reason
+we aren't talking about here), e.g. the CPER records, and determine what
+recovery action is necessary for this error.
+For memory errors this may be re-reading from disk, or at the worst case,
+unmapping from all user-space users (including KVM's stage2) and raining signals
+on all affected processes.
+
+For a memory error the important piece of information is the physical address.
+Only the kernel can do anything with this, it determines who owns the affected
+memory and what needs doing to recover from the error.
+
+If you pass the notification to user-space, all it can do is signal the guest to
+"stop doing whatever it is you're doing". The guest may have been able to
+re-read pages from disk, or otherwise handle the error.
+Has the error been handled? No: The error remains latent in the system.
+
+
+> panic OS is not a good choice for the Recoverable error.
+
+If we don't know where the error is, and we can't make progress, its the only
+sane choice.
+
+This code is never expected to run! (why are we arguing about it?) We should get
+RAS errors as GHES notifications from firmware via some mechanism. If those are
+NOTIFY_SEI then APEI should claim the notification and kick off the appropriate
+handling based on the CPER records. If/when we get kernel-first, that can claim
+the SError. What we're left with is RAS notifications that no-one claimed
+because there was no error-description found.
+
+
 
 James
