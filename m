@@ -1,114 +1,73 @@
-From: konrad@darnok.org (Konrad Rzeszutek Wilk)
-Date: Fri, 12 Jan 2018 08:17:28 -0500
-Subject: [PATCH 21/33] dma-mapping: add an arch_dma_supported hook
-In-Reply-To: <20180110080027.13879-22-hch@lst.de>
-References: <20180110080027.13879-1-hch@lst.de>
- <20180110080027.13879-22-hch@lst.de>
-Message-ID: <20180112131727.GB26900@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Jan 2018 05:52:03 -0800
+Subject: PM regression in next
+In-Reply-To: <20180112131623.GA29734@lunn.ch>
+References: <20180112000037.GA3875@atomide.com>
+ <20180112013257.GB4059@atomide.com>
+ <4913146.sVL6sFxzC8@aspire.rjw.lan>
+ <4745593.FguGN2uIkX@aspire.rjw.lan>
+ <e7a673e1-b28d-f84e-c6c1-c5b896e92aeb@metafoo.de>
+ <20180112131623.GA29734@lunn.ch>
+Message-ID: <20180112135203.GA4821@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 09:00:15AM +0100, Christoph Hellwig wrote:
-> To implement the x86 forbid_dac and iommu_sac_force we want an arch hook
-> so that it can apply the global options across all dma_map_ops
-> implementations.
+* Andrew Lunn <andrew@lunn.ch> [180112 13:16]:
+> On Fri, Jan 12, 2018 at 02:01:14PM +0100, Lars-Peter Clausen wrote:
+> > On 01/12/2018 01:30 PM, Rafael J. Wysocki wrote:
+> > > On Friday, January 12, 2018 1:23:54 PM CET Rafael J. Wysocki wrote:
+> > >> On Friday, January 12, 2018 2:32:57 AM CET Tony Lindgren wrote:
+> > >>> * Tony Lindgren <tony@atomide.com> [180111 17:20]:
+> > >>>> Well I tried to measure suspend power consumption and noticed
+> > >>>> that system suspend fails too hand hangs the network device:
+> > >>>>
+> > >>>> # echo mem > /sys/power/state
+> > >>>> [   32.577850] PM: suspend entry (deep)
+> > >>>> [   32.582031] PM: Syncing filesystems ... done.
+> > >>>> [   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
+> > >>>> [   32.608398] OOM killer disabled.
+> > >>>> [   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+> > >>>> [   32.622192] Suspending console(s) (use no_console_suspend to debug)
+> > >>>> [   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
+> > >>>> [   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
+> > >>
+> > >> This looks totally bogus.
+> > >>
+> > >> First, "error" should be a negative number and we print it as int.
+> > >>
+> > >> Second, error codes are not in this range anyway.
+> > >>
+> > >>>> [   32.653289] PM: Some devices failed to suspend, or early wake event detected
+> > >>>> [   32.685455] OOM killer enabled.
+> > >>>> [   32.688629] Restarting tasks ... done.
+> > >>>> [   32.695983] PM: suspend exit
+> > >>>> ash: write error: Bad address
+> > >>>>
+> > >>>> That too works just fine at commit 70286688e5ad.
+> > >>>
+> > >>> Suspend fails at commit e2d7fe89e8ae though, so looks like we
+> > >>> have two separate issues. I'll try to bisect that separately.
+> > > 
+> > > I guess what may happen is that something started to return positive numbers
+> > > which confuse things all over when passed along by its callers as error codes.
+> > 
+> > 
+> > I guess it this: https://patchwork.kernel.org/patch/10151763/
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Hi Tony, 
+> 
+> Please try:
+> 
+> https://patchwork.ozlabs.org/patch/859297/
+> 
+> Hopefully we will get this into net-next soon.
 
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> ---
->  arch/x86/include/asm/dma-mapping.h |  3 +++
->  arch/x86/kernel/pci-dma.c          | 19 ++++++++++++-------
->  include/linux/dma-mapping.h        | 11 +++++++++++
->  3 files changed, 26 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/x86/include/asm/dma-mapping.h b/arch/x86/include/asm/dma-mapping.h
-> index dfdc9357a349..6277c83c0eb1 100644
-> --- a/arch/x86/include/asm/dma-mapping.h
-> +++ b/arch/x86/include/asm/dma-mapping.h
-> @@ -30,6 +30,9 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
->  	return dma_ops;
->  }
->  
-> +int arch_dma_supported(struct device *dev, u64 mask);
-> +#define arch_dma_supported arch_dma_supported
-> +
->  bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp);
->  #define arch_dma_alloc_attrs arch_dma_alloc_attrs
->  
-> diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
-> index 61a8f1cb3829..df7ab02f959f 100644
-> --- a/arch/x86/kernel/pci-dma.c
-> +++ b/arch/x86/kernel/pci-dma.c
-> @@ -215,7 +215,7 @@ static __init int iommu_setup(char *p)
->  }
->  early_param("iommu", iommu_setup);
->  
-> -int x86_dma_supported(struct device *dev, u64 mask)
-> +int arch_dma_supported(struct device *dev, u64 mask)
->  {
->  #ifdef CONFIG_PCI
->  	if (mask > 0xffffffff && forbid_dac > 0) {
-> @@ -224,12 +224,6 @@ int x86_dma_supported(struct device *dev, u64 mask)
->  	}
->  #endif
->  
-> -	/* Copied from i386. Doesn't make much sense, because it will
-> -	   only work for pci_alloc_coherent.
-> -	   The caller just has to use GFP_DMA in this case. */
-> -	if (mask < DMA_BIT_MASK(24))
-> -		return 0;
-> -
->  	/* Tell the device to use SAC when IOMMU force is on.  This
->  	   allows the driver to use cheaper accesses in some cases.
->  
-> @@ -249,6 +243,17 @@ int x86_dma_supported(struct device *dev, u64 mask)
->  
->  	return 1;
->  }
-> +EXPORT_SYMBOL(arch_dma_supported);
-> +
-> +int x86_dma_supported(struct device *dev, u64 mask)
-> +{
-> +	/* Copied from i386. Doesn't make much sense, because it will
-> +	   only work for pci_alloc_coherent.
-> +	   The caller just has to use GFP_DMA in this case. */
-> +	if (mask < DMA_BIT_MASK(24))
-> +		return 0;
-> +	return 1;
-> +}
->  
->  static int __init pci_iommu_init(void)
->  {
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index 88bcb1a8211d..d67742dad904 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -576,6 +576,14 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
->  	return 0;
->  }
->  
-> +/*
-> + * This is a hack for the legacy x86 forbid_dac and iommu_sac_force. Please
-> + * don't use this is new code.
-> + */
-> +#ifndef arch_dma_supported
-> +#define arch_dma_supported(dev, mask)	(1)
-> +#endif
-> +
->  static inline void dma_check_mask(struct device *dev, u64 mask)
->  {
->  	if (sme_active() && (mask < (((u64)sme_get_me_mask() << 1) - 1)))
-> @@ -588,6 +596,9 @@ static inline int dma_supported(struct device *dev, u64 mask)
->  
->  	if (!ops)
->  		return 0;
-> +	if (!arch_dma_supported(dev, mask))
-> +		return 0;
-> +
->  	if (!ops->dma_supported)
->  		return 1;
->  	return ops->dma_supported(dev, mask);
-> -- 
-> 2.14.2
-> 
+Thanks that fixes the suspend error. And I was able to confirm
+that the suspend power consumption is OK.
+
+That still leaves the mystery of the runtime idle power consumption
+being much higher with commit e130bc1d00a4.
+
+Regards,
+
+Tony
