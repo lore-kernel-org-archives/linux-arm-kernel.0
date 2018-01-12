@@ -1,105 +1,218 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 12 Jan 2018 09:52:03 -0800
-Subject: [PATCH v3] rcutorture: Add basic ARM64 support to run scripts
-In-Reply-To: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
-References: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
-Message-ID: <20180112175203.GX9671@linux.vnet.ibm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Fri, 12 Jan 2018 11:58:55 -0600
+Subject: [PATCH v3 12/13] arm64: Implement branch predictor hardening for
+ Falkor
+In-Reply-To: <1515432758-26440-13-git-send-email-will.deacon@arm.com>
+References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
+ <1515432758-26440-13-git-send-email-will.deacon@arm.com>
+Message-ID: <d814560b-8b2b-8a8c-22a4-954451db97a8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 06:11:32PM +0800, lianglihao at huawei.com wrote:
-> From: Lihao Liang <lianglihao@huawei.com>
+
+Hi Will,
+ 
+
+This patch is the right one for variant2, checks QDF2400 part numbers QCOM_FALKOR and FALKOR_V1
+but unfortunately it got modified and merged to linux-next branch causing confusion.Please revert
+and merge [V2] patch to fix the problem.
+ 
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm64?h=next-20180112&id=ec82b567a74fbdffdf418d4bb381d55f6a9096af
+
+[v2] https://www.spinics.net/lists/arm-kernel/msg627364.html
+
+
+Thanks,
+Shanker
+
+On 01/08/2018 11:32 AM, Will Deacon wrote:
+> From: Shanker Donthineni <shankerd@codeaurora.org>
 > 
-> This commit adds support of the qemu command qemu-system-aarch64
-> to rcutorture.
+> Falkor is susceptible to branch predictor aliasing and can
+> theoretically be attacked by malicious code. This patch
+> implements a mitigation for these attacks, preventing any
+> malicious entries from affecting other victim contexts.
 > 
-> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
-
-This is to replace your previous patch, not to apply on top of it,
-correct?  (Either way is fine, just please let me know.)
-
-							Thanx, Paul
-
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> [will: fix label name when !CONFIG_KVM]
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
+>  arch/arm64/include/asm/cpucaps.h |  3 ++-
+>  arch/arm64/include/asm/kvm_asm.h |  2 ++
+>  arch/arm64/kernel/bpi.S          |  8 +++++++
+>  arch/arm64/kernel/cpu_errata.c   | 49 ++++++++++++++++++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/entry.S       | 12 ++++++++++
+>  arch/arm64/kvm/hyp/switch.c      | 10 ++++++++
+>  6 files changed, 81 insertions(+), 3 deletions(-)
 > 
-> Comparing to the previous version, this patch lifts the limitation of
-> maximum 8 CPUs of option "-M virt" by adding "gic-version=host" to it.
-> This allows qemu to use the maximum CPU number supported by the actual
-> hardware.
-> 
-> This commit is against RCU's git branch rcu/dev
-> 
-> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
-> 
-> 
->  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-> index 07a1377..65f6655 100644
-> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
-> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-> @@ -136,6 +136,9 @@ identify_boot_image () {
->  		qemu-system-x86_64|qemu-system-i386)
->  			echo arch/x86/boot/bzImage
->  			;;
-> +		qemu-system-aarch64)
-> +			echo arch/arm64/boot/Image
-> +			;;
->  		*)
->  			echo vmlinux
->  			;;
-> @@ -158,6 +161,9 @@ identify_qemu () {
->  	elif echo $u | grep -q "Intel 80386"
->  	then
->  		echo qemu-system-i386
-> +	elif echo $u | grep -q aarch64
-> +	then
-> +		echo qemu-system-aarch64
->  	elif uname -a | grep -q ppc64
->  	then
->  		echo qemu-system-ppc64
-> @@ -176,16 +182,20 @@ identify_qemu () {
->  # Output arguments for the qemu "-append" string based on CPU type
->  # and the TORTURE_QEMU_INTERACTIVE environment variable.
->  identify_qemu_append () {
-> +	local console=ttyS0
->  	case "$1" in
->  	qemu-system-x86_64|qemu-system-i386)
->  		echo noapic selinux=0 initcall_debug debug
->  		;;
-> +	qemu-system-aarch64)
-> +		console=ttyAMA0
-> +		;;
->  	esac
->  	if test -n "$TORTURE_QEMU_INTERACTIVE"
->  	then
->  		echo root=/dev/sda
->  	else
-> -		echo console=ttyS0
-> +		echo console=$console
->  	fi
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index 51616e77fe6b..7049b4802587 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -43,7 +43,8 @@
+>  #define ARM64_SVE				22
+>  #define ARM64_UNMAP_KERNEL_AT_EL0		23
+>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+> +#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>  
+> -#define ARM64_NCAPS				25
+> +#define ARM64_NCAPS				26
+>  
+>  #endif /* __ASM_CPUCAPS_H */
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index ab4d0a926043..24961b732e65 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -68,6 +68,8 @@ extern u32 __kvm_get_mdcr_el2(void);
+>  
+>  extern u32 __init_stage2_translation(void);
+>  
+> +extern void __qcom_hyp_sanitize_btac_predictors(void);
+> +
+>  #endif
+>  
+>  #endif /* __ARM_KVM_ASM_H__ */
+> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+> index dec95bd82e31..76225c2611ea 100644
+> --- a/arch/arm64/kernel/bpi.S
+> +++ b/arch/arm64/kernel/bpi.S
+> @@ -77,3 +77,11 @@ ENTRY(__psci_hyp_bp_inval_start)
+>  	ldp	x0, x1, [sp, #(16 * 8)]
+>  	add	sp, sp, #(8 * 18)
+>  ENTRY(__psci_hyp_bp_inval_end)
+> +
+> +ENTRY(__qcom_hyp_sanitize_link_stack_start)
+> +	stp     x29, x30, [sp, #-16]!
+> +	.rept	16
+> +	bl	. + 4
+> +	.endr
+> +	ldp	x29, x30, [sp], #16
+> +ENTRY(__qcom_hyp_sanitize_link_stack_end)
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index cb0fb3796bb8..7b4efde087fc 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -54,6 +54,8 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>  
+>  #ifdef CONFIG_KVM
+>  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+> +extern char __qcom_hyp_sanitize_link_stack_start[];
+> +extern char __qcom_hyp_sanitize_link_stack_end[];
+>  
+>  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>  				const char *hyp_vecs_end)
+> @@ -96,8 +98,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>  	spin_unlock(&bp_lock);
 >  }
+>  #else
+> -#define __psci_hyp_bp_inval_start	NULL
+> -#define __psci_hyp_bp_inval_end		NULL
+> +#define __psci_hyp_bp_inval_start		NULL
+> +#define __psci_hyp_bp_inval_end			NULL
+> +#define __qcom_hyp_sanitize_link_stack_start	NULL
+> +#define __qcom_hyp_sanitize_link_stack_end	NULL
+>  
+>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>  				      const char *hyp_vecs_start,
+> @@ -138,6 +142,29 @@ static int enable_psci_bp_hardening(void *data)
+>  
+>  	return 0;
+>  }
+> +
+> +static void qcom_link_stack_sanitization(void)
+> +{
+> +	u64 tmp;
+> +
+> +	asm volatile("mov	%0, x30		\n"
+> +		     ".rept	16		\n"
+> +		     "bl	. + 4		\n"
+> +		     ".endr			\n"
+> +		     "mov	x30, %0		\n"
+> +		     : "=&r" (tmp));
+> +}
+> +
+> +static int qcom_enable_link_stack_sanitization(void *data)
+> +{
+> +	const struct arm64_cpu_capabilities *entry = data;
+> +
+> +	install_bp_hardening_cb(entry, qcom_link_stack_sanitization,
+> +				__qcom_hyp_sanitize_link_stack_start,
+> +				__qcom_hyp_sanitize_link_stack_end);
+> +
+> +	return 0;
+> +}
+>  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+>  
+>  #define MIDR_RANGE(model, min, max) \
+> @@ -302,6 +329,24 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>  		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+>  		.enable = enable_psci_bp_hardening,
+>  	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+> +		.enable = qcom_enable_link_stack_sanitization,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+> +		.enable = qcom_enable_link_stack_sanitization,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+> +	},
+>  #endif
+>  	{
+>  	}
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 12ee62d6d410..9c45c6af1f58 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -196,3 +196,15 @@ alternative_endif
+>  
+>  	eret
+>  ENDPROC(__fpsimd_guest_restore)
+> +
+> +ENTRY(__qcom_hyp_sanitize_btac_predictors)
+> +	/**
+> +	 * Call SMC64 with Silicon provider serviceID 23<<8 (0xc2001700)
+> +	 * 0xC2000000-0xC200FFFF: assigned to SiP Service Calls
+> +	 * b15-b0: contains SiP functionID
+> +	 */
+> +	movz    x0, #0x1700
+> +	movk    x0, #0xc200, lsl #16
+> +	smc     #0
+> +	ret
+> +ENDPROC(__qcom_hyp_sanitize_btac_predictors)
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 4d273f6d0e69..7e373791fad1 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -406,6 +406,16 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  		/* 0 falls through to be handled out of EL2 */
+>  	}
+>  
+> +	if (cpus_have_const_cap(ARM64_HARDEN_BP_POST_GUEST_EXIT)) {
+> +		u32 midr = read_cpuid_id();
+> +
+> +		/* Apply BTAC predictors mitigation to all Falkor chips */
+> +		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+> +		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
+> +			__qcom_hyp_sanitize_btac_predictors();
+> +		}
+> +	}
+> +
+>  	fp_enabled = __fpsimd_enabled();
+>  
+>  	__sysreg_save_guest_state(guest_ctxt);
 > 
-> @@ -197,6 +207,9 @@ identify_qemu_args () {
->  	case "$1" in
->  	qemu-system-x86_64|qemu-system-i386)
->  		;;
-> +	qemu-system-aarch64)
-> +		echo -machine virt,gic-version=host -cpu host
-> +		;;
->  	qemu-system-ppc64)
->  		echo -enable-kvm -M pseries -nodefaults
->  		echo -device spapr-vscsi
-> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
->  		echo $2
->  	else
->  		case "$1" in
-> -		qemu-system-x86_64|qemu-system-i386)
-> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
->  			echo $2 -smp $3
->  			;;
->  		qemu-system-ppc64)
-> -- 
-> 2.7.4
-> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
