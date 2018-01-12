@@ -1,89 +1,112 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 12 Jan 2018 15:41:57 +0000
-Subject: [PATCH v5 06/20] firmware: arm_scmi: add initial support for
- performance protocol
-In-Reply-To: <CALW4P+L-YJRNZ_qv1SohM7vCWekBf+KKZos7FuZE0Tu1Yh8i-g@mail.gmail.com>
-References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
- <1514904162-11201-7-git-send-email-sudeep.holla@arm.com>
- <CALW4P+L-YJRNZ_qv1SohM7vCWekBf+KKZos7FuZE0Tu1Yh8i-g@mail.gmail.com>
-Message-ID: <8f9853e7-ef8a-2bee-0760-7659aa919f8c@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 12 Jan 2018 16:46:44 +0100
+Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
+ MAX payload size
+In-Reply-To: <20180112144024.GB113206@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
+ <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20180109163918.5e46c1a1@windsurf.lan>
+ <20180109221436.GE31640@bhelgaas-glaptop.roam.corp.google.com>
+ <20180112111448.00feb9f8@windsurf.lan>
+ <20180112144024.GB113206@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180112164644.5611fe3b@windsurf.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Bjorn,
 
+Thanks again for this discussion!
 
-On 12/01/18 14:55, Alexey Klimov wrote:
-> On Tue, Jan 2, 2018 at 2:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> The performance protocol is intended for the performance management of
->> group(s) of device(s) that run in the same performance domain. It
->> includes even the CPUs. A performance domain is defined by a set of
->> devices that always have to run at the same performance level.
->> For example, a set of CPUs that share a voltage domain, and have a
->> common frequency control, is said to be in the same performance domain.
->>
->> The commands in this protocol provide functionality to describe the
->> protocol version, describe various attribute flags, set and get the
->> performance level of a domain. It also supports discovery of the list
->> of performance levels supported by a performance domain, and the
->> properties of each performance level.
->>
->> This patch adds basic support for the performance protocol.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/firmware/arm_scmi/Makefile |   2 +-
->>  drivers/firmware/arm_scmi/common.h |   1 +
->>  drivers/firmware/arm_scmi/perf.c   | 527 +++++++++++++++++++++++++++++++++++++
->>  include/linux/scmi_protocol.h      |  34 +++
->>  4 files changed, 563 insertions(+), 1 deletion(-)
+On Fri, 12 Jan 2018 08:40:24 -0600, Bjorn Helgaas wrote:
+
+> Sorry, I didn't mean that commit would fix your problem.  It's just an
+> example of another case where generic code incorrectly assumed a Root
+> Port would always be present.
+
+OK, understood.
+
+> > I.e, there is no Root Port. Therefore, I don't see how the kernel
+> > can know what is the maximum allowed payload size of the PCIe
+> > controller, nor how to adjust the payload size to use. Same for the L0s
+> > configuration.  
 > 
-> [...]
+> The Device Control MPS field defaults to 128 bytes.  Generic software
+> can only change that default if it knows that every element that might
+> receive a packet from the device can handle it.  In this case, we have
+> no information about what the invisible Root Port can handle, so I
+> would argue that we cannot change MPS.
 > 
+> In the lspci above, MPS is set to 256 bytes.  If that was done by
+> firmware, it might be safe because it knows things about the Root Port
+> that Linux doesn't.  But I don't think the Linux PCI core could set it
+> to 256.
 
-[..]
+So you're suspecting that the firmware/bootloader has configured the
+MPS on the E1000E device to 256 bytes ?
 
->> +
->> +static int scmi_perf_limits_notify_enable(const struct scmi_handle *handle,
->> +                                         u32 domain, bool enable)
->> +{
->> +       return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LIMITS,
->> +                                        domain, enable);
->> +}
->> +
->> +static int scmi_perf_level_notify_enable(const struct scmi_handle *handle,
->> +                                        u32 domain, bool enable)
->> +{
->> +       return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LEVEL,
->> +                                        domain, enable);
->> +}
->> +
+Isn't it dangerous for the kernel to rely on the firmware/bootloader
+configuration ? Indeed, the firmware/bootloader might have configured
+MPS to X bytes on the endpoint, but when the kernel boots and
+initializes the PCIe controller, its sets the PCIe controller MPS to Y
+bytes, with Y > X.
+
+> ASPM L0s is similar.  We should only enable L0s if we can tell that
+> both ends of the link support it.  If there's no Root Port, we don't
+> have any ASPM capability information for the upstream end of the link,
+> so we shouldn't enable ASPM at all.
+
+Well, even without the Root Port, we are able to use the endpoint
+configuration space to figure out whether it supports L0s, and adjust
+the root complex configuration accordingly. This is what our patch is
+doing for MPS, and which could be done similarly for L0s, no?
+
 > 
-> Do you have any support to correctly handle notifications without
-> errors/warnings?
-
-Good catch.
-
-> It looks like this two functions are accessible to some user through
-> perf_ops. But are you sure that notifications will be correctly
-> handled by transport, mailbox framework and scmi protocol?
+> > This is why we need those changes, one to update the PCIe controller
+> > MPS according to the Maximum Payload Size acceptable by the endpoint,
+> > and one to disable L0s entirely to avoid issues with non-L0s compliant
+> > devices.  
 > 
-
-Indeed, it slipeed through the cracks. I have some rudimentary notifier
-support with I have not put it as part of this series due to lack of
-firmware to test.
-
-> The reason I ask is that it looks like it's better to return
-> -EOPNOTSUPP or -ENODEV, maybe -EINVAL here.
-
-I agree, will change it.
-
-> When you add notifications support you can allow these operations when
-> it's safe to do it.
+> The generic core code should perform minimal, guaranteed-to-work
+> configuration using the least information and fewest assumptions
+> possible.  That may not lead to optimal performance, but it should at
+> least be functional.  This should work even if there is no Root Port.
 > 
+> Once we have that figured out, then we can worry about whether we can
+> or should do platform-specific tweaks to improve performance, e.g.,
+> increase MPS if we know Root Port capabilities implicitly.
+> 
+> I had the impression that these patches were required for correct
+> functionality, not just to improve performance.  But maybe I
+> misunderstood?
 
-Yes, sounds like that's good plan.
+I don't myself have the device that wasn't working, and that this patch
+got to work, so I can't double check myself. However, indeed, I was
+told that without this fix, some devices would not work.
 
+One question: is it valid/working to have the root complex configured
+with MPS = 128 bytes but the endpoint configured with MPS = 256 or 512
+bytes ? Or should the MPS value be strictly equal on both sides ?
+
+Depending on your answer, there are two options:
+
+ - It is a valid situation to have a root complex MPS lower than the
+   endpoint MPS. In this case, we could for now simply unconditionally
+   set the MPS to 128 bytes in the root complex, as a fix to get all
+   devices working. And then separately, work on improving performance
+   by increasing the MPS according to the endpoint capabilities.
+
+ - It is not valid for the root complex MPS to be different than the
+   endpoint MPS. In this case, then I don't see how we can do things
+   differently than the proposed patch: we have to see what the
+   endpoint MPS is, and adjust the root complex MPS accordingly.
+   Indeed, the bootloader/firmware might have changed the endpoint MPS
+   so that it is no longer the default of 128 bytes.
+
+Best regards,
+
+Thomas
 -- 
-Regards,
-Sudeep
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
