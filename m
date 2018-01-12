@@ -1,52 +1,60 @@
-From: weiyongjun1@huawei.com (weiyongjun (A))
-Date: Fri, 12 Jan 2018 01:37:20 +0000
-Subject: [PATCH -next] IIO: ADC: fix return value check in
- stm32_dfsdm_adc_probe()
-In-Reply-To: <20180111212837.minmnjkvhudstafs@mwanda>
-References: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
- <20180111212837.minmnjkvhudstafs@mwanda>
-Message-ID: <6AADFAC011213A4C87B956458587ADB40132A0E3@dggemi507-mbx.china.huawei.com>
+From: yong.deng@magewell.com (Yong)
+Date: Fri, 12 Jan 2018 09:51:14 +0800
+Subject: [linux-sunxi] Re: [PATCH v5 2/2] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <20180111132844.mok7upqjycpx3bqm@flea.lan>
+References: <1515639966-35902-1-git-send-email-yong.deng@magewell.com>
+ <20180111132844.mok7upqjycpx3bqm@flea.lan>
+Message-ID: <20180112095114.b2414fe44cff7bf7cf6f8822@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
+
+On Thu, 11 Jan 2018 14:28:44 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> Hi Yong,
 > 
-> On Thu, Jan 11, 2018 at 11:12:41AM +0000, Wei Yongjun wrote:
-> > In case of error, the function devm_iio_device_alloc() returns NULL
-> > pointer not ERR_PTR(). The IS_ERR() test in the return value check
-> > should be replaced with NULL test.
-> >
-> > Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC
-> support")
-> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> > ---
-> >  drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-
-> dfsdm-adc.c
-> > index e628d04..5e87140 100644
-> > --- a/drivers/iio/adc/stm32-dfsdm-adc.c
-> > +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
-> > @@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct
-> platform_device *pdev)
-> >  	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
-> >
-> >  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
-> > -	if (IS_ERR(iio)) {
-> > +	if (!iio) {
-> >  		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
-> > -		return PTR_ERR(iio);
-> > +		return -ENOMEM;
-> >  	}
-> >
-> >  	adc = iio_priv(iio);
->         ^^^^^^^^^^^^^^^^^^
-> This one doesn't return an error pointer either.  The check causes a
-> static check warning for me.  (It can't actually fail, though so maybe
-> it will return an error pointer in the future?)
+> On Thu, Jan 11, 2018 at 11:06:06AM +0800, Yong Deng wrote:
+> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > interface and CSI1 is used for parallel interface. This is not
+> > documented in datasheet but by test and guess.
+> > 
+> > This patch implement a v4l2 framework driver for it.
+> > 
+> > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > ISP's support are not included in this patch.
+> > 
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> 
+> I've needed this patch in order to fix a NULL pointer dereference:
+> http://code.bulix.org/oz6gmb-257359?raw
+> 
+> This is needed because while it's ok to have a NULL pointer to
+> v4l2_subdev_pad_config when you call the subdev set_fmt with
+> V4L2_SUBDEV_FORMAT_ACTIVE, it's not with V4L2_SUBDEV_FORMAT_TRY, and
+> sensors will assume taht it's a valid pointer.
+> 
+> Otherwise,
+> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-It seems that we can simply remove the check since 'adc' can never
-be an invalid address here.
+I revisit some code of subdevs and you are right.
 
-Regards,
-Yongjun Wei
+Squash your patch into my driver patch and add your Tested-by in
+commit. Is it right?
+
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+
+Thanks,
+Yong
