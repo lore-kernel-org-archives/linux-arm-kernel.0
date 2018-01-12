@@ -1,52 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Jan 2018 17:28:47 -0800
-Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
-In-Reply-To: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
-References: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
-Message-ID: <20180112012847.iqol2xb2iro6wauk@localhost>
+Date: Thu, 11 Jan 2018 17:36:02 -0800
+Subject: [GIT PULL] TI DaVinci SoC updates for v4.16 (part 2)
+In-Reply-To: <20180110112505.13633-1-nsekhar@ti.com>
+References: <20180110112505.13633-1-nsekhar@ti.com>
+Message-ID: <20180112013602.q2sm25s6o3oebkbj@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 02:02:18PM +0100, Michal Simek wrote:
-> Hi guys,
+On Wed, Jan 10, 2018 at 04:55:05PM +0530, Sekhar Nori wrote:
+> The following changes since commit 23bbeaef90ab7607d03428bbb708efe44f43c761:
 > 
-> please consider to pull these 3 patches to your tree. I have discussed
-> it with Arnd that this could be probably fine even it is a little bit late.
-> 
-> Thanks,
-> Michal
-> 
-> 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-> 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>   ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-4.16
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc-p2
 > 
-> for you to fetch changes up to cee8113a295acfc4cd25728d7c3d44e6bc3bbff9:
+> for you to fetch changes up to 0808d3260456aaba061fe06ead31d578c8bdc936:
 > 
->   soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
-> (2018-01-08 13:42:47 +0100)
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx ZynqMP SoC patches for v4.16
-> 
-> - Create drivers/soc/xilinx folder structure
-> - Add ZynqMP vcu init driver
+>   ARM: davinci: remove watchdog reset (2018-01-10 14:38:07 +0530)
 > 
 > ----------------------------------------------------------------
-> Dhaval Shah (2):
->       dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
->       soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
-> 
-> Michal Simek (1):
->       soc: xilinx: Create folder structure for soc specific drivers
-> 
+> A patch to shift to using watchdog timer for DaVinci restart functionality.
+> The driver support is present in linux-next as 71d1f058844d "watchdog:
+> davinci_wdt: add restart function"
 
-Merged, but you should probably add a platform config option for Xilinx
-and use that instead of obj-y to descend into the directory?
+Hi,
+
+So if this is merged before the driver is merged, what happens? Might
+be better to hold off a release to avoid regressions?
 
 
 -Olof
