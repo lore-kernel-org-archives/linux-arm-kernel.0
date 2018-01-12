@@ -1,189 +1,58 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Fri, 12 Jan 2018 16:42:35 +0000
-Subject: [patch v15 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <13433849-cb7d-e2c0-4ce9-d91a6012d7d7@gmail.com>
-References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
- <1514202808-29747-2-git-send-email-oleksandrs@mellanox.com>
- <13433849-cb7d-e2c0-4ce9-d91a6012d7d7@gmail.com>
-Message-ID: <AM4PR0501MB2194A5EF09E5F3140F2C211CB1170@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+From: york.sun@nxp.com (York Sun)
+Date: Fri, 12 Jan 2018 16:48:05 +0000
+Subject: EDAC driver for ARMv8 L1/L2 cache
+References: <VI1PR04MB2078DBC9381EA574CE5DA4B09A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180109214332.ejiak6f35tnhbpke@pd.tnic>
+ <VI1PR04MB20788AC2E71A3CFFC37B85BB9A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <bc8d7450-3f58-95c2-42c2-d16b2f7a76e4@linux.intel.com>
+Message-ID: <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
-> Sent: 26 ??????? 2017 ?. 1:09
-> To: Oleksandr Shamray <oleksandrs@mellanox.com>;
-> gregkh at linuxfoundation.org; arnd at arndb.de
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; openbmc at lists.ozlabs.org; joel at jms.id.au;
-> jiri at resnulli.us; tklauser at distanz.ch; linux-serial at vger.kernel.org; Vadim
-> Pasternak <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
-> level at mellanox.com>; robh+dt at kernel.org; openocd-devel-
-> owner at lists.sourceforge.net; linux-api at vger.kernel.org;
-> davem at davemloft.net; mchehab at kernel.org; Jiri Pirko
-> <jiri@mellanox.com>
-> Subject: Re: [patch v15 1/4] drivers: jtag: Add JTAG core driver
+On 01/12/2018 08:35 AM, Thor Thayer wrote:
+> On 01/09/2018 03:51 PM, York Sun wrote:
+>> On 01/09/2018 01:43 PM, Borislav Petkov wrote:
+>>> Adding some more people to CC.
+>>>
+>>> On Tue, Jan 09, 2018 at 08:48:43PM +0000, York Sun wrote:
+>>>> Borislav,
+>>>>
+>>>> Are you aware of any existing (or in development) EDAC driver for ARMv8
+>>>> L1/L2 cache? I am thinking to write one if not available yet.
+>>>
+>>> no I'm not but I see two EDAC drivers for ARM64: thunderx and xgene.
+>>>
+>>> Please synchronize with their authors and ARM people what would be the
+>>> best thing to do and try extracting shared functionality from them
+>>> into a common compilation unit instead of duplicating it. I don't want
+>>> separate drivers per functional unit.
+>>>
+>>
+>> Thanks for the pointer. Thunderx and xgene's drivers have different
+>> implementation on the hardware. I found one patch closer to what I
+>> expect, https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatchwork.kernel.org%2Fpatch%2F7513231%2F&data=02%7C01%7Cyork.sun%40nxp.com%7C29cd81c44431418e2a6308d559da7d3b%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636513717317947616&sdata=flIZL8mxGc4VWbTpl5nPjkRXaB8uNjcc382HcXO08qE%3D&reserved=0. I don't see
+>> activities after 2015. I will reach out to the author.
+>>
+>> York
+>>
 > 
+> Hi York,
 > 
+> I'll be adding EDAC support for our Stratix10 (Quad ARM Cortex A-53) at 
+> some point but I'm not sure when it is scheduled - probably in the next 
+> few months. I'll be going through the same process of comparing our 
+> architecture to others. Below are links to the Stratix10.
+>
 
-[snip]
+I see Stratix10 has A53 core. I am concerned on reading the
+CPUMERRSR_EL1 and L2MERRSR_EL1. The are IMPLEMENTATION DEFINED
+registers. They may not be available on all SoCs, or all time. The
+CPUMERRSR_EL1 needs to be read on each core, the L2MERRSR_EL1 needs to
+be read on each cluster. I am not sure how to handle them in EDAC driver
+yet. I am hoping Mark Rutland can shed some light as he commented on
+similar patches [1][2] before.
 
-> > +
-> > +	case JTAG_IOCXFER:
-> > +		if (copy_from_user(&xfer, (void *)arg,
-> > +				   sizeof(struct jtag_xfer)))
-> > +			return -EFAULT;
-> > +
-> > +		if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
-> > +			return -EINVAL;
-> > +
-> > +		if (xfer.type > JTAG_SDR_XFER)
-> > +			return -EINVAL;
-> > +
-> > +		if (xfer.direction > JTAG_WRITE_XFER)
-> > +			return -EINVAL;
-> > +
-> > +		if (xfer.endstate > JTAG_STATE_PAUSEDR)
-> > +			return -EINVAL;
-> > +
-> > +		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
-> > +		xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio),
-> data_size);
-> > +
-> > +		if (!xfer_data)
-> > +			return -EFAULT;
-> > +
-> > +		if (jtag->ops->xfer) {
-> > +			err = jtag->ops->xfer(jtag, &xfer, xfer_data);
-> > +		} else {
-> > +			kfree(xfer_data);
-> > +			return -EOPNOTSUPP;
-> > +		}
-> 
-> Why don't you move all of the code here into a function which will make the
-> error handling consistent? Also, checking whether the jtag adapter
+York
 
-Greg KH <gregkh@linuxfoundation.org> Say to move all of this insight ioctl 
-
-> implements ops->xfer should probably be done before you do the
-> memdup_user().
-
-Yes
-
-> > +		if (err) {
-> > +			kfree(xfer_data);
-> > +			return -EFAULT;
-> > +		}
-> > +
-> > +		if (jtag->ops->mode_set)
-> > +			err = jtag->ops->mode_set(jtag, value);
-> > +		else
-> > +			err = -EOPNOTSUPP;
-> > +		break;
-> 
-> Same here, this can be checked before get_user().
-> 
-
-Yes
-
-> > +	if (jtag->opened) {
-> > +		mutex_unlock(&jtag->open_lock);
-> > +		return -EINVAL;
-> 
-> -EBUSY maybe?
-> 
-
-Yes
-
-
-> > +
-> > +	jtag = kzalloc(sizeof(*jtag) + round_up(priv_size,
-> ARCH_DMA_MINALIGN),
-> > +		       GFP_KERNEL);
-> > +	if (!jtag)
-> > +		return NULL;
-> 
-> If you set ARCH_DMA_MINALIGN to 1 when not defined, what is this
-> achieving that kmalloc() is not already doing?
-> 
-
-Removed ARCH_DMA_MINALIGN
-
-> > +
-> > +	jtag->ops = ops;
-> > +	return jtag;
-> > +}
-> > +EXPORT_SYMBOL_GPL(jtag_alloc);
-> > +
-> > +void jtag_free(struct jtag *jtag)
-> > +{
-> > +	kfree(jtag);
-> > +}
-> > +EXPORT_SYMBOL_GPL(jtag_free);
-> > +
-> > +int jtag_register(struct jtag *jtag)
-> > +{
-> > +	char *name;
-> > +	int err;
-> > +	int id;
-> > +
-> > +	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
-> > +	if (id < 0)
-> > +		return id;
-> > +
-> > +	jtag->id = id;
-> > +
-> > +	name = kzalloc(MAX_JTAG_NAME_LEN, GFP_KERNEL);
-> > +	if (!name) {
-> > +		err = -ENOMEM;
-> > +		goto err_jtag_alloc;
-> > +	}
-> 
-> Can't you use jtag->miscdev.dev here to simplify the allocation error
-> handling?
-> 
-
-How, what you mean?
-
-> > +#ifndef ARCH_DMA_MINALIGN
-> > +#define ARCH_DMA_MINALIGN 1
-> > +#endif
-> 
-> Why?
-> 
-
-Not used now, Deleted
-
-> > +#endif /* __JTAG_H */
-> > diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h new
-> > file mode 100644 index 0000000..cda2520
-> > --- /dev/null
-> > +++ b/include/uapi/linux/jtag.h
-> 
-> [snip]
-> 
-> > +struct jtag_xfer {
-> > +	__u8	type;
-> > +	__u8	direction;
-> 
-> Can these two be an enum referring to what you defined earlier?
-> 
-
-Greg KH <gregkh@linuxfoundation.org> say:
-
-"All structures that cross the user/kernel boundry have to use the __ type variables.
-No "unsigned char", it has to be "__u8", no "unsigned short", it has to be "__u16", and so on.
-Also, watch out for your enumerated types, what's the packing end up looking like on these structures?  Have you verified it works with a 64bit kernel and 32bit userspace all correctly?"
-
-So I use __u8 type instead of enum to avoid errors while crossing 64bit kernel and 32bit userspace.
-
-> > +	__u8	endstate;
-> > +	__u32	length;
-> > +	__u64	tdio;
-> > +};
-> --
-> Florian
-
-Thaks.
+[1] https://patchwork.kernel.org/patch/7460391/
+[2] https://patchwork.kernel.org/patch/7513231/
