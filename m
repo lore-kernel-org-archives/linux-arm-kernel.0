@@ -1,54 +1,87 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 12 Jan 2018 10:18:38 -0800
-Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
-In-Reply-To: <CAK8P3a0JwAW2ZhQAQ6A3o9KC9sXe7qRJT7ZM+rZxGXX9dk0ADg@mail.gmail.com>
-References: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
- <20180112012847.iqol2xb2iro6wauk@localhost>
- <011f77e4-040b-a864-168f-bc198a523536@monstr.eu>
- <CAK8P3a0JwAW2ZhQAQ6A3o9KC9sXe7qRJT7ZM+rZxGXX9dk0ADg@mail.gmail.com>
-Message-ID: <CAOesGMgGXbLCfrwqrY9=GoT4d1-UzX0svt-pYohXhJq7AdmODQ@mail.gmail.com>
+Date: Fri, 12 Jan 2018 10:19:38 -0800
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+In-Reply-To: <419d5b97-9d8e-dcbe-3984-006f1e261161@arm.com>
+References: <20180109145409.11612-1-thierry.reding@gmail.com>
+ <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+ <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
+ <20180112125828.GB19999@ulmo> <419d5b97-9d8e-dcbe-3984-006f1e261161@arm.com>
+Message-ID: <CAOesGMgtUcWhn+PqCnCKBmSm-tihP31GmfFHO7+hL9HWkwk2JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 12:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Jan 12, 2018 at 7:44 AM, Michal Simek <monstr@monstr.eu> wrote:
->> On 12.1.2018 02:28, Olof Johansson wrote:
->>> On Mon, Jan 08, 2018 at 02:02:18PM +0100, Michal Simek wrote:
+On Fri, Jan 12, 2018 at 7:27 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
->>>> ----------------------------------------------------------------
->>>> Dhaval Shah (2):
->>>>       dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
->>>>       soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+>
+> On 12/01/18 12:58, Thierry Reding wrote:
+>> On Fri, Jan 12, 2018 at 12:12:11PM +0000, Sudeep Holla wrote:
+>>>
+>>>
+>>> On 12/01/18 11:39, Sudeep Holla wrote:
 >>>>
->>>> Michal Simek (1):
->>>>       soc: xilinx: Create folder structure for soc specific drivers
+>>>>
+>>>> On 09/01/18 14:54, Thierry Reding wrote:
+>>>>> From: Thierry Reding <treding@nvidia.com>
+>>>>>
+>>>>> After moving the SoC device initialization to an early initcall in
+>>>>> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+>>>>> the Broadcom STB SoC device is registered on all platforms if support
+>>>>> for the device is enabled in the kernel configuration.
+>>>>>
+>>>>> This causes an additional SoC device to appear on platforms that already
+>>>>> register a native one. In case of Tegra the STB SoC device is registered
+>>>>> as soc0 (with totally meaningless content in the sysfs attributes) and
+>>>>> causes various scripts and programs to fail because they don't know how
+>>>>> to parse that data.
+>>>>>
+>>>>> To fix this, duplicate the check from brcmstb_soc_device_early_init()
+>>>>> that already prevents the code from doing anything nonsensical on non-
+>>>>> STB platforms.
+>>>>>
+>>>>> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+>>>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>>>>> ---
+>>>>>  drivers/soc/bcm/brcmstb/common.c | 5 +++++
+>>>>>  1 file changed, 5 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+>>>>> index 781ada62d0a3..4fe1cb73b39a 100644
+>>>>> --- a/drivers/soc/bcm/brcmstb/common.c
+>>>>> +++ b/drivers/soc/bcm/brcmstb/common.c
+>>>>> @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
+>>>>>  static int __init brcmstb_soc_device_init(void)
+>>>>>  {
+>>>>>    struct soc_device_attribute *soc_dev_attr;
+>>>>> +  struct device_node *sun_top_ctrl;
+>>>>>    struct soc_device *soc_dev;
+>>>>>
+>>>>> +  sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+>>>>> +  if (!sun_top_ctrl)
+>>>>> +          return -ENODEV;
+>>>>> +
+>>>>
+>>>> missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
 >>>>
 >>>
->>> Merged, but you should probably add a platform config option for Xilinx
->>> and use that instead of obj-y to descend into the directory?
->
-> I don't see it in arm-soc yet, did you forget to push the latest branches?
-
-Hm, not sure what happened there. Fixing now.
-
->
->> Do you think change like this?
+>>> Further, I still the error messags on my Juno with this patch applied. I
+>>> fail to see how this patch prevents brcmstb_biuctrl_init which is
+>>> early_initcall in drivers/soc/bcm/brcmstb/biuctrl.c getting called ?
 >>
->> -obj-y                          += xilinx/
->> +obj-$(CONFIG_ARCH_ZYNQMP)      += xilinx/
->>
->> Just a note. This folder is supposed to be used by arm64/arm32 and
->> microblaze that's why I didn't put there any single config because it
->> doesn't exist. If you suggest to introduce new config option to label
->> xilinx platforms we can talk about it.
->> Argument against it could be also using these drivers by openrisc or
->> mips (mipsfpga) which are also fpga based.
->> Anyway I am happy to hear what you suggest.
+>> I'm not sure I understand. There's no way we can prevent the early
+>> initcall from running. The point here is to prevent it from running code
+>> that shouldn't be run on a platform.
 >>
 >
-> I think obj-y is fine in this case, the cost is minimal.
+> Sorry for missing the context, I was referring [1]
+>
+> --
+> Regards,
+> Sudeep
+>
+> [1] [1] https://marc.info/?l=linux-kernel&m=151568158127806&w=2
 
-Yeah, if it's across platforms/architectures like this it's fine.
+
+Do we have an incremental patch coming, or should I revert this?
 
 
 -Olof
