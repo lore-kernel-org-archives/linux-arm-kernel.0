@@ -1,120 +1,65 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 12 Jan 2018 13:15:56 +0100
-Subject: [PATCH 02/14] mmc: mmci: Don't pretend all variants to have
- MCI_STARBITERR flag
-In-Reply-To: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1515759368-16946-3-git-send-email-patrice.chotard@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 12 Jan 2018 12:12:11 +0000
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+In-Reply-To: <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+References: <20180109145409.11612-1-thierry.reding@gmail.com>
+ <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+Message-ID: <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
 
-This patch prepares for supporting the STM32 variant that
-has no such bit in the status register.
 
-Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- drivers/mmc/host/mmci.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+On 12/01/18 11:39, Sudeep Holla wrote:
+> 
+> 
+> On 09/01/18 14:54, Thierry Reding wrote:
+>> From: Thierry Reding <treding@nvidia.com>
+>>
+>> After moving the SoC device initialization to an early initcall in
+>> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+>> the Broadcom STB SoC device is registered on all platforms if support
+>> for the device is enabled in the kernel configuration.
+>>
+>> This causes an additional SoC device to appear on platforms that already
+>> register a native one. In case of Tegra the STB SoC device is registered
+>> as soc0 (with totally meaningless content in the sysfs attributes) and
+>> causes various scripts and programs to fail because they don't know how
+>> to parse that data.
+>>
+>> To fix this, duplicate the check from brcmstb_soc_device_early_init()
+>> that already prevents the code from doing anything nonsensical on non-
+>> STB platforms.
+>>
+>> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>> ---
+>>  drivers/soc/bcm/brcmstb/common.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+>> index 781ada62d0a3..4fe1cb73b39a 100644
+>> --- a/drivers/soc/bcm/brcmstb/common.c
+>> +++ b/drivers/soc/bcm/brcmstb/common.c
+>> @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
+>>  static int __init brcmstb_soc_device_init(void)
+>>  {
+>>  	struct soc_device_attribute *soc_dev_attr;
+>> +	struct device_node *sun_top_ctrl;
+>>  	struct soc_device *soc_dev;
+>>  
+>> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+>> +	if (!sun_top_ctrl)
+>> +		return -ENODEV;
+>> +
+> 
+> missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
+> 
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 3125dc0..7e56f85 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -83,6 +83,8 @@
-  * @qcom_dml: enables qcom specific dma glue for dma transfers.
-  * @reversed_irq_handling: handle data irq before cmd irq.
-  * @mmcimask1: true if variant have a MMCIMASK1 register.
-+ * @start_err: true is the variant has STARTBITERR bit inside MMCISTATUS
-+ *	       register.
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -113,6 +115,7 @@ struct variant_data {
- 	bool			qcom_dml;
- 	bool			reversed_irq_handling;
- 	bool			mmcimask1;
-+	bool			start_err;
- };
- 
- static struct variant_data variant_arm = {
-@@ -123,6 +126,7 @@ struct variant_data {
- 	.f_max			= 100000000,
- 	.reversed_irq_handling	= true,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_arm_extended_fifo = {
-@@ -132,6 +136,7 @@ struct variant_data {
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_arm_extended_fifo_hwfc = {
-@@ -142,6 +147,7 @@ struct variant_data {
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_u300 = {
-@@ -158,6 +164,7 @@ struct variant_data {
- 	.pwrreg_clkgate		= true,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_nomadik = {
-@@ -175,6 +182,7 @@ struct variant_data {
- 	.pwrreg_clkgate		= true,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_ux500 = {
-@@ -198,6 +206,7 @@ struct variant_data {
- 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_ux500v2 = {
-@@ -223,6 +232,7 @@ struct variant_data {
- 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- static struct variant_data variant_qcom = {
-@@ -242,6 +252,7 @@ struct variant_data {
- 	.qcom_fifo		= true,
- 	.qcom_dml		= true,
- 	.mmcimask1		= true,
-+	.start_err		= true,
- };
- 
- /* Busy detection for the ST Micro variant */
-@@ -935,8 +946,9 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 		return;
- 
- 	/* First check for errors */
--	if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_STARTBITERR|
--		      MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
-+	if (status & (MCI_DATACRCFAIL | MCI_DATATIMEOUT |
-+		      (host->variant->start_err ? MCI_STARTBITERR : 0) |
-+		      MCI_TXUNDERRUN | MCI_RXOVERRUN)) {
- 		u32 remain, success;
- 
- 		/* Terminate the DMA transfer */
+Further, I still the error messags on my Juno with this patch applied. I
+fail to see how this patch prevents brcmstb_biuctrl_init which is
+early_initcall in drivers/soc/bcm/brcmstb/biuctrl.c getting called ?
+
 -- 
-1.9.1
+Regards,
+Sudeep
