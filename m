@@ -1,24 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Jan 2018 16:51:04 -0800
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.16, round 3
-In-Reply-To: <7hh8rz25of.fsf@baylibre.com>
-References: <7hh8rz25of.fsf@baylibre.com>
-Message-ID: <20180112005104.q2e2kqnrodziw4ae@localhost>
+Date: Thu, 11 Jan 2018 16:55:42 -0800
+Subject: [GIT PULL] Allwinner DT changes for 4.16, step 2
+In-Reply-To: <CAK8P3a09eNwCZbjxxDad8hANmm8m_a_eeGK2bB+1N_Q9152Z1w@mail.gmail.com>
+References: <20180105102203.braqydzlkoy5tk3v@flea.lan>
+ <CAK8P3a09eNwCZbjxxDad8hANmm8m_a_eeGK2bB+1N_Q9152Z1w@mail.gmail.com>
+Message-ID: <20180112005542.zvw5laoa4qv4ldku@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 05, 2018 at 04:26:40PM -0800, Kevin Hilman wrote:
-> Arnd, Olof,
+On Fri, Jan 05, 2018 at 05:51:35PM +0100, Arnd Bergmann wrote:
+> On Fri, Jan 5, 2018 at 11:22 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Arnd, Olof,
+> >
+> > Happy new year :)
+> >
+> > Here is the second bunch of changes we talked about in our first PR.
+> >
+> > There's one fix for 4.16, and the other patches have been around for
+> > quite a while that I'm feeling confident that we should merge them.
 > 
-> A final round of 64-bit DT changes for Amlogic SoCs.
-> 
-> These were just waiting for the clock dependencies to land in the clock
-> tree which they now have.  I've merged the same tag into this branch to
-> avoid any dependency issues.
-> 
-> Thanks,
+> Pulled into next/dt
 
-Thanks, merged.
+Looks like this went into fixes instead of next/dt, so I've moved it over.
+
+> > On a side note, my GPG key changed recently. The new fingerprint is
+> > 2BA0E943D27E3D2094B10B24D824ECA89C346DCE, and you'll find that it has
+> > been signed by a bunch of kernel developpers already. The old one is
+> > superseeded, but has not been compromised.
+> 
+> Ok.
+
+Thanks for the heads up!
 
 
 -Olof
