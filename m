@@ -1,26 +1,81 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 12 Jan 2018 14:55:26 +0100
-Subject: PM regression in next
-In-Reply-To: <20180112135203.GA4821@atomide.com>
-References: <20180112000037.GA3875@atomide.com>
- <20180112013257.GB4059@atomide.com>
- <4913146.sVL6sFxzC8@aspire.rjw.lan>
- <4745593.FguGN2uIkX@aspire.rjw.lan>
- <e7a673e1-b28d-f84e-c6c1-c5b896e92aeb@metafoo.de>
- <20180112131623.GA29734@lunn.ch>
- <20180112135203.GA4821@atomide.com>
-Message-ID: <20180112135526.GC29734@lunn.ch>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 12 Jan 2018 15:08:46 +0100
+Subject: [PATCH v2] MAINTAINERS: mtd/nand: update Microchip nand entry
+In-Reply-To: <20180111162659.740-1-nicolas.ferre@microchip.com>
+References: <20180111162659.740-1-nicolas.ferre@microchip.com>
+Message-ID: <20180112150846.3b74ad67@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Thanks that fixes the suspend error. And I was able to confirm
-> that the suspend power consumption is OK.
+On Thu, 11 Jan 2018 17:26:59 +0100
+Nicolas Ferre <nicolas.ferre@microchip.com> wrote:
+
+> Update Wenyou Yang email address.
+> Take advantage of this update to move this entry to the MICROCHIP / ATMEL
+> location and add the DT binding documentation link.
 > 
-> That still leaves the mystery of the runtime idle power consumption
-> being much higher with commit e130bc1d00a4.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Acked-by: Wenyou Yang <wenyou.yang@microchip.com>
 
-Did you re-measure the runtime power? Do you have an unused PHY? It
-could be it is not getting shut down. 1G PHYs can be quite power
-hungry.
+Applied.
 
-	Andrew
+Thanks,
+
+Boris
+
+> ---
+> v2: - patch agains 09ec417b0ea8 ("mtd: nand: samsung: Disable subpage
+>       writes on E-die NAND") of 
+>       http://git.infradead.org/linux-mtd.git/shortlog/refs/heads/nand/next
+>     - Ack by Wenyou added
+> 
+> 
+> Hi,
+> 
+> v1 patch was part of a series because it was conflicting with the previous one
+> named:
+> "[PATCH 1/2] MAINTAINERS: linux-media: update Microchip ISI and ISC entries"
+> Boris asked me to rebase it so that they are independent.
+> So, if this first one goes upstream through another tree, conflicts will have
+> to be resolved at one point.
+> 
+> Best regards,
+>   Nicolas
+> 
+> 
+>  MAINTAINERS | 15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index aa71ab52fd76..37ee5ae4bae2 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2382,13 +2382,6 @@ F:	Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+>  F:	drivers/input/touchscreen/atmel_mxt_ts.c
+>  F:	include/linux/platform_data/atmel_mxt_ts.h
+>  
+> -ATMEL NAND DRIVER
+> -M:	Wenyou Yang <wenyou.yang@atmel.com>
+> -M:	Josh Wu <rainyfeeling@outlook.com>
+> -L:	linux-mtd at lists.infradead.org
+> -S:	Supported
+> -F:	drivers/mtd/nand/atmel/*
+> -
+>  ATMEL SAMA5D2 ADC DRIVER
+>  M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+>  L:	linux-iio at vger.kernel.org
+> @@ -9045,6 +9038,14 @@ F:	drivers/media/platform/atmel/atmel-isc.c
+>  F:	drivers/media/platform/atmel/atmel-isc-regs.h
+>  F:	devicetree/bindings/media/atmel-isc.txt
+>  
+> +MICROCHIP / ATMEL NAND DRIVER
+> +M:	Wenyou Yang <wenyou.yang@microchip.com>
+> +M:	Josh Wu <rainyfeeling@outlook.com>
+> +L:	linux-mtd at lists.infradead.org
+> +S:	Supported
+> +F:	drivers/mtd/nand/atmel/*
+> +F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> +
+>  MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
+>  M:	Woojung Huh <Woojung.Huh@microchip.com>
+>  M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
