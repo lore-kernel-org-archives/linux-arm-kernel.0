@@ -1,40 +1,26 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 11 Jan 2018 20:36:16 -0600
-Subject: [GIT PULL] TI DaVinci SoC updates for v4.16 (part 2)
-In-Reply-To: <20180112013602.q2sm25s6o3oebkbj@localhost>
-References: <20180110112505.13633-1-nsekhar@ti.com>
- <20180112013602.q2sm25s6o3oebkbj@localhost>
-Message-ID: <db68cbec-a3e2-9c9e-e09c-f3d9a9972636@lechnology.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 12 Jan 2018 08:52:23 +0530
+Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
+In-Reply-To: <20180112020711.6gp2pnsxxjzelidq@localhost>
+References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
+ <20180112020711.6gp2pnsxxjzelidq@localhost>
+Message-ID: <20180112032223.GK3626@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2018 07:36 PM, Olof Johansson wrote:
-> On Wed, Jan 10, 2018 at 04:55:05PM +0530, Sekhar Nori wrote:
->> The following changes since commit 23bbeaef90ab7607d03428bbb708efe44f43c761:
->>
->>    ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.16/soc-p2
->>
->> for you to fetch changes up to 0808d3260456aaba061fe06ead31d578c8bdc936:
->>
->>    ARM: davinci: remove watchdog reset (2018-01-10 14:38:07 +0530)
->>
->> ----------------------------------------------------------------
->> A patch to shift to using watchdog timer for DaVinci restart functionality.
->> The driver support is present in linux-next as 71d1f058844d "watchdog:
->> davinci_wdt: add restart function"
+On 11-01-18, 18:07, Olof Johansson wrote:
+> On Thu, Jan 11, 2018 at 11:28:51AM +0530, Viresh Kumar wrote:
+> > The interrupt-parent of rtc was missing, add it.
+> > 
+> > Fixes: 8113ba917dfa ("ARM: SPEAr: DT: Update device nodes")
+> > Cc: stable at vger.kernel.org # v3.8+
+> > Reported-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> Hi,
-> 
-> So if this is merged before the driver is merged, what happens?
+> Applied to next/dt. Is stable really needed on this? It's been broken since
+> pretty much forever, and nobody has complained... :)
 
-Then reboot hangs.
+Not sure. Just thought it may be useful for someone somewhere :)
 
-> Might
-> be better to hold off a release to avoid regressions?
-> 
-
-I'll let Sekhar answer this one.
+-- 
+viresh
