@@ -1,60 +1,52 @@
-From: yong.deng@magewell.com (Yong)
-Date: Fri, 12 Jan 2018 09:51:14 +0800
-Subject: [linux-sunxi] Re: [PATCH v5 2/2] media: V3s: Add support for
- Allwinner CSI.
-In-Reply-To: <20180111132844.mok7upqjycpx3bqm@flea.lan>
-References: <1515639966-35902-1-git-send-email-yong.deng@magewell.com>
- <20180111132844.mok7upqjycpx3bqm@flea.lan>
-Message-ID: <20180112095114.b2414fe44cff7bf7cf6f8822@magewell.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Jan 2018 17:28:47 -0800
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
+In-Reply-To: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
+References: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
+Message-ID: <20180112012847.iqol2xb2iro6wauk@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Thu, 11 Jan 2018 14:28:44 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> Hi Yong,
+On Mon, Jan 08, 2018 at 02:02:18PM +0100, Michal Simek wrote:
+> Hi guys,
 > 
-> On Thu, Jan 11, 2018 at 11:06:06AM +0800, Yong Deng wrote:
-> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > interface and CSI1 is used for parallel interface. This is not
-> > documented in datasheet but by test and guess.
-> > 
-> > This patch implement a v4l2 framework driver for it.
-> > 
-> > Currently, the driver only support the parallel interface. MIPI-CSI2,
-> > ISP's support are not included in this patch.
-> > 
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> please consider to pull these 3 patches to your tree. I have discussed
+> it with Arnd that this could be probably fine even it is a little bit late.
 > 
-> I've needed this patch in order to fix a NULL pointer dereference:
-> http://code.bulix.org/oz6gmb-257359?raw
+> Thanks,
+> Michal
 > 
-> This is needed because while it's ok to have a NULL pointer to
-> v4l2_subdev_pad_config when you call the subdev set_fmt with
-> V4L2_SUBDEV_FORMAT_ACTIVE, it's not with V4L2_SUBDEV_FORMAT_TRY, and
-> sensors will assume taht it's a valid pointer.
 > 
-> Otherwise,
-> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-I revisit some code of subdevs and you are right.
-
-Squash your patch into my driver patch and add your Tested-by in
-commit. Is it right?
-
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> are available in the git repository at:
+> 
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-4.16
+> 
+> for you to fetch changes up to cee8113a295acfc4cd25728d7c3d44e6bc3bbff9:
+> 
+>   soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+> (2018-01-08 13:42:47 +0100)
+> 
+> ----------------------------------------------------------------
+> arm: Xilinx ZynqMP SoC patches for v4.16
+> 
+> - Create drivers/soc/xilinx folder structure
+> - Add ZynqMP vcu init driver
+> 
+> ----------------------------------------------------------------
+> Dhaval Shah (2):
+>       dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
+>       soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+> 
+> Michal Simek (1):
+>       soc: xilinx: Create folder structure for soc specific drivers
+> 
+
+Merged, but you should probably add a platform config option for Xilinx
+and use that instead of obj-y to descend into the directory?
 
 
-Thanks,
-Yong
+-Olof
