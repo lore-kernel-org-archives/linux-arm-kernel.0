@@ -1,95 +1,34 @@
-From: lianglihao@huawei.com (lianglihao at huawei.com)
-Date: Fri, 12 Jan 2018 18:11:32 +0800
-Subject: [PATCH v3] rcutorture: Add basic ARM64 support to run scripts
-Message-ID: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 12 Jan 2018 10:21:48 +0000
+Subject: [PATCH v1 01/16] virtio: Validate queue pfn for 32bit transports
+In-Reply-To: <2aacb81b-0efb-87b9-f70c-a61e66dd0331@arm.com>
+References: <20180109190414.4017-1-suzuki.poulose@arm.com>
+ <20180109190414.4017-2-suzuki.poulose@arm.com>
+ <20180110012429-mutt-send-email-mst@kernel.org>
+ <f53478fc-c0c1-7502-1b8c-c23e332cae9c@arm.com>
+ <20180110130230-mutt-send-email-mst@kernel.org>
+ <CAFEAcA9VJ41vPBOwYSVHmBGtjdA4jL2b2mHAUZ09aym_JynMzw@mail.gmail.com>
+ <2aacb81b-0efb-87b9-f70c-a61e66dd0331@arm.com>
+Message-ID: <CAFEAcA9KMWkTOd4w-QD8fsFs4UQJaNC4PMwPtHVS54ZLhHT72A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lihao Liang <lianglihao@huawei.com>
+On 10 January 2018 at 11:25, Jean-Philippe Brucker
+<jean-philippe.brucker@arm.com> wrote:
+> Hi Peter,
+>
+> On 10/01/18 11:19, Peter Maydell wrote:
+>> Are there uses that make it worthwhile to get virtio-1
+>> support added to virtio-mmio, rather than just getting
+>> people to move over to virtio-pci instead ?
+>
+> virtio-iommu uses virtio-mmio transport. It makes little sense to have an
+> IOMMU presented as a PCI endpoint.
 
-This commit adds support of the qemu command qemu-system-aarch64
-to rcutorture.
+Having an entire transport just for the IOMMU doesn't make
+a great deal of sense either though :-) If we didn't already
+have virtio-mmio kicking around would we really have designed
+it that way?
 
-Signed-off-by: Lihao Liang <lianglihao@huawei.com>
----
-
-Comparing to the previous version, this patch lifts the limitation of
-maximum 8 CPUs of option "-M virt" by adding "gic-version=host" to it.
-This allows qemu to use the maximum CPU number supported by the actual
-hardware.
-
-This commit is against RCU's git branch rcu/dev
-
-commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
-
-
- tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
-index 07a1377..65f6655 100644
---- a/tools/testing/selftests/rcutorture/bin/functions.sh
-+++ b/tools/testing/selftests/rcutorture/bin/functions.sh
-@@ -136,6 +136,9 @@ identify_boot_image () {
- 		qemu-system-x86_64|qemu-system-i386)
- 			echo arch/x86/boot/bzImage
- 			;;
-+		qemu-system-aarch64)
-+			echo arch/arm64/boot/Image
-+			;;
- 		*)
- 			echo vmlinux
- 			;;
-@@ -158,6 +161,9 @@ identify_qemu () {
- 	elif echo $u | grep -q "Intel 80386"
- 	then
- 		echo qemu-system-i386
-+	elif echo $u | grep -q aarch64
-+	then
-+		echo qemu-system-aarch64
- 	elif uname -a | grep -q ppc64
- 	then
- 		echo qemu-system-ppc64
-@@ -176,16 +182,20 @@ identify_qemu () {
- # Output arguments for the qemu "-append" string based on CPU type
- # and the TORTURE_QEMU_INTERACTIVE environment variable.
- identify_qemu_append () {
-+	local console=ttyS0
- 	case "$1" in
- 	qemu-system-x86_64|qemu-system-i386)
- 		echo noapic selinux=0 initcall_debug debug
- 		;;
-+	qemu-system-aarch64)
-+		console=ttyAMA0
-+		;;
- 	esac
- 	if test -n "$TORTURE_QEMU_INTERACTIVE"
- 	then
- 		echo root=/dev/sda
- 	else
--		echo console=ttyS0
-+		echo console=$console
- 	fi
- }
- 
-@@ -197,6 +207,9 @@ identify_qemu_args () {
- 	case "$1" in
- 	qemu-system-x86_64|qemu-system-i386)
- 		;;
-+	qemu-system-aarch64)
-+		echo -machine virt,gic-version=host -cpu host
-+		;;
- 	qemu-system-ppc64)
- 		echo -enable-kvm -M pseries -nodefaults
- 		echo -device spapr-vscsi
-@@ -254,7 +267,7 @@ specify_qemu_cpus () {
- 		echo $2
- 	else
- 		case "$1" in
--		qemu-system-x86_64|qemu-system-i386)
-+		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
- 			echo $2 -smp $3
- 			;;
- 		qemu-system-ppc64)
--- 
-2.7.4
+thanks
+-- PMM
