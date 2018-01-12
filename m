@@ -1,37 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Jan 2018 16:55:42 -0800
-Subject: [GIT PULL] Allwinner DT changes for 4.16, step 2
-In-Reply-To: <CAK8P3a09eNwCZbjxxDad8hANmm8m_a_eeGK2bB+1N_Q9152Z1w@mail.gmail.com>
-References: <20180105102203.braqydzlkoy5tk3v@flea.lan>
- <CAK8P3a09eNwCZbjxxDad8hANmm8m_a_eeGK2bB+1N_Q9152Z1w@mail.gmail.com>
-Message-ID: <20180112005542.zvw5laoa4qv4ldku@localhost>
+Date: Thu, 11 Jan 2018 17:01:30 -0800
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+In-Reply-To: <20180109145409.11612-1-thierry.reding@gmail.com>
+References: <20180109145409.11612-1-thierry.reding@gmail.com>
+Message-ID: <20180112010130.3tz7hnmzs74trwhw@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 05, 2018 at 05:51:35PM +0100, Arnd Bergmann wrote:
-> On Fri, Jan 5, 2018 at 11:22 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Arnd, Olof,
-> >
-> > Happy new year :)
-> >
-> > Here is the second bunch of changes we talked about in our first PR.
-> >
-> > There's one fix for 4.16, and the other patches have been around for
-> > quite a while that I'm feeling confident that we should merge them.
+On Tue, Jan 09, 2018 at 03:54:09PM +0100, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Pulled into next/dt
-
-Looks like this went into fixes instead of next/dt, so I've moved it over.
-
-> > On a side note, my GPG key changed recently. The new fingerprint is
-> > 2BA0E943D27E3D2094B10B24D824ECA89C346DCE, and you'll find that it has
-> > been signed by a bunch of kernel developpers already. The old one is
-> > superseeded, but has not been compromised.
+> After moving the SoC device initialization to an early initcall in
+> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+> the Broadcom STB SoC device is registered on all platforms if support
+> for the device is enabled in the kernel configuration.
 > 
-> Ok.
+> This causes an additional SoC device to appear on platforms that already
+> register a native one. In case of Tegra the STB SoC device is registered
+> as soc0 (with totally meaningless content in the sysfs attributes) and
+> causes various scripts and programs to fail because they don't know how
+> to parse that data.
+> 
+> To fix this, duplicate the check from brcmstb_soc_device_early_init()
+> that already prevents the code from doing anything nonsensical on non-
+> STB platforms.
+> 
+> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
 
-Thanks for the heads up!
+
+Thanks, applied.
 
 
 -Olof
