@@ -1,225 +1,182 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Jan 2018 13:07:12 +0100
-Subject: [PATCH v3 06/41] KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
+Date: Fri, 12 Jan 2018 13:07:19 +0100
+Subject: [PATCH v3 13/41] KVM: arm64: Factor out fault info population and gic
+ workarounds
 In-Reply-To: <20180112120747.27999-1-christoffer.dall@linaro.org>
 References: <20180112120747.27999-1-christoffer.dall@linaro.org>
-Message-ID: <20180112120747.27999-7-christoffer.dall@linaro.org>
+Message-ID: <20180112120747.27999-14-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have a separate read-modify-write of the HCR_EL2 on entry
-to the guest for the sole purpose of setting the VF and VI bits, if set.
-Since this is most rarely the case (only when using userspace IRQ chip
-and interrupts are in flight), let's get rid of this operation and
-instead modify the bits in the vcpu->arch.hcr[_el2] directly when
-needed.
+The current world-switch function has functionality to detect a number
+of cases where we need to fixup some part of the exit condition and
+possibly run the guest again, before having restored the host state.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+This includes populating missing fault info, emulating GICv2 CPU
+interface accesses when mapped at unaligned addresses, and emulating
+the GICv3 CPU interface on systems that need it.
+
+As we are about to have an alternative switch function for VHE systems,
+but VHE systems still need the same early fixup logic, factor out this
+logic into a separate function that can be shared by both switch
+functions.
+
+No functional change.
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_emulate.h   |  9 ++-------
- arch/arm/include/asm/kvm_host.h      |  3 ---
- arch/arm/kvm/emulate.c               |  2 +-
- arch/arm/kvm/hyp/switch.c            |  2 +-
- arch/arm64/include/asm/kvm_emulate.h |  9 ++-------
- arch/arm64/include/asm/kvm_host.h    |  3 ---
- arch/arm64/kvm/hyp/switch.c          |  6 ------
- arch/arm64/kvm/inject_fault.c        |  2 +-
- virt/kvm/arm/arm.c                   | 11 ++++++-----
- virt/kvm/arm/mmu.c                   |  6 +++---
- 10 files changed, 16 insertions(+), 37 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 99 ++++++++++++++++++++++++---------------------
+ 1 file changed, 54 insertions(+), 45 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 3d22eb87f919..d5e1b8bf6422 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -92,14 +92,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 	vcpu->arch.hcr = HCR_GUEST_MASK;
- }
- 
--static inline unsigned long vcpu_get_hcr(const struct kvm_vcpu *vcpu)
-+static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
- {
--	return vcpu->arch.hcr;
--}
--
--static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
--{
--	vcpu->arch.hcr = hcr;
-+	return (unsigned long *)&vcpu->arch.hcr;
- }
- 
- static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 6394fb99da7f..7f96b3541939 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -155,9 +155,6 @@ struct kvm_vcpu_arch {
- 	/* HYP trapping configuration */
- 	u32 hcr;
- 
--	/* Interrupt related fields */
--	u32 irq_lines;		/* IRQ and FIQ levels */
--
- 	/* Exception Information */
- 	struct kvm_vcpu_fault_info fault;
- 
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index cdff963f133a..fa501bf437f3 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -174,5 +174,5 @@ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
-  */
- void kvm_inject_vabt(struct kvm_vcpu *vcpu)
- {
--	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VA);
-+	*vcpu_hcr(vcpu) |= HCR_VA;
- }
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 330c9ce34ba5..c3b9799e2e13 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -43,7 +43,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc_host)
- 		isb();
- 	}
- 
--	write_sysreg(vcpu->arch.hcr | vcpu->arch.irq_lines, HCR);
-+	write_sysreg(vcpu->arch.hcr, HCR);
- 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
- 	write_sysreg(HSTR_T(15), HSTR);
- 	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 8ff5aef44656..b36aaa1fe332 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -62,14 +62,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 		vcpu->arch.hcr_el2 |= HCR_TID3;
- }
- 
--static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
-+static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
- {
--	return vcpu->arch.hcr_el2;
--}
--
--static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
--{
--	vcpu->arch.hcr_el2 = hcr;
-+	return (unsigned long *)&vcpu->arch.hcr_el2;
- }
- 
- static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 6ce0b428a4db..59150c75f9a5 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -269,9 +269,6 @@ struct kvm_vcpu_arch {
- 	/* IO related fields */
- 	struct kvm_decode mmio_decode;
- 
--	/* Interrupt related fields */
--	u64 irq_lines;		/* IRQ and FIQ levels */
--
- 	/* Cache some mmu pages needed inside spinlock regions */
- 	struct kvm_mmu_memory_cache mmu_page_cache;
- 
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index f6189d08753e..11ec1c6f3b84 100644
+index 63284647ed11..55ca2e3d42eb 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -171,12 +171,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
- 
- static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
- {
--	u64 val;
--
--	val = read_sysreg(hcr_el2);
--	val |= vcpu->arch.irq_lines;
--	write_sysreg(val, hcr_el2);
--
- 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		__vgic_v3_restore_state(vcpu);
- 	else
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 8ecbcb40e317..2d38ede2eff0 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -173,5 +173,5 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
-  */
- void kvm_inject_vabt(struct kvm_vcpu *vcpu)
- {
--	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
-+	*vcpu_hcr(vcpu) |= HCR_VSE;
- }
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 360df72692ee..46c125f1da56 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -419,7 +419,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
-  */
- int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
- {
--	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
-+	bool irq_lines = *vcpu_hcr(v) & (HCR_VI | HCR_VF);
-+	return ((irq_lines || kvm_vgic_vcpu_pending_irq(v))
- 		&& !v->arch.power_off && !v->arch.pause);
- }
- 
-@@ -806,18 +807,18 @@ static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
- {
- 	int bit_index;
- 	bool set;
--	unsigned long *ptr;
-+	unsigned long *hcr;
- 
- 	if (number == KVM_ARM_IRQ_CPU_IRQ)
- 		bit_index = __ffs(HCR_VI);
- 	else /* KVM_ARM_IRQ_CPU_FIQ */
- 		bit_index = __ffs(HCR_VF);
- 
--	ptr = (unsigned long *)&vcpu->arch.irq_lines;
-+	hcr = vcpu_hcr(vcpu);
- 	if (level)
--		set = test_and_set_bit(bit_index, ptr);
-+		set = test_and_set_bit(bit_index, hcr);
- 	else
--		set = test_and_clear_bit(bit_index, ptr);
-+		set = test_and_clear_bit(bit_index, hcr);
- 
- 	/*
- 	 * If we didn't change anything, no need to wake up or kick other CPUs
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b36945d49986..d93d56d4cc5b 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1987,7 +1987,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
-  */
- void kvm_set_way_flush(struct kvm_vcpu *vcpu)
- {
--	unsigned long hcr = vcpu_get_hcr(vcpu);
-+	unsigned long hcr = *vcpu_hcr(vcpu);
- 
- 	/*
- 	 * If this is the first time we do a S/W operation
-@@ -2002,7 +2002,7 @@ void kvm_set_way_flush(struct kvm_vcpu *vcpu)
- 		trace_kvm_set_way_flush(*vcpu_pc(vcpu),
- 					vcpu_has_cache_enabled(vcpu));
- 		stage2_flush_vm(vcpu->kvm);
--		vcpu_set_hcr(vcpu, hcr | HCR_TVM);
-+		*vcpu_hcr(vcpu) = hcr | HCR_TVM;
+@@ -270,50 +270,24 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
  	}
  }
  
-@@ -2020,7 +2020,7 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
+-int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
++/*
++ * Return true when we were able to fixup the guest exit and should return to
++ * the guest, false when we should restore the host state and return to the
++ * main run loop.
++ */
++static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+ {
+-	struct kvm_cpu_context *host_ctxt;
+-	struct kvm_cpu_context *guest_ctxt;
+-	u64 exit_code;
+-
+-	vcpu = kern_hyp_va(vcpu);
+-
+-	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+-	host_ctxt->__hyp_running_vcpu = vcpu;
+-	guest_ctxt = &vcpu->arch.ctxt;
+-
+-	__sysreg_save_host_state(host_ctxt);
+-
+-	__activate_traps(vcpu);
+-	__activate_vm(vcpu);
+-
+-	__vgic_restore_state(vcpu);
+-	__timer_enable_traps(vcpu);
+-
+-	/*
+-	 * We must restore the 32-bit state before the sysregs, thanks
+-	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+-	 */
+-	__sysreg32_restore_state(vcpu);
+-	__sysreg_restore_guest_state(guest_ctxt);
+-	__debug_switch_to_guest(vcpu);
+-
+-	/* Jump in the fire! */
+-again:
+-	exit_code = __guest_enter(vcpu, host_ctxt);
+-	/* And we're baaack! */
+-
+ 	/*
+ 	 * We're using the raw exception code in order to only process
+ 	 * the trap if no SError is pending. We will come back to the
+ 	 * same PC once the SError has been injected, and replay the
+ 	 * trapping instruction.
+ 	 */
+-	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+-		goto again;
++	if (*exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
++		return true;
  
- 	/* Caches are now on, stop trapping VM ops (until a S/W op) */
- 	if (now_enabled)
--		vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) & ~HCR_TVM);
-+		*vcpu_hcr(vcpu) &= ~HCR_TVM;
+ 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+-	    exit_code == ARM_EXCEPTION_TRAP) {
++	    *exit_code == ARM_EXCEPTION_TRAP) {
+ 		bool valid;
  
- 	trace_kvm_toggle_cache(*vcpu_pc(vcpu), was_enabled, now_enabled);
- }
+ 		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
+@@ -327,9 +301,9 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 
+ 			if (ret == 1) {
+ 				if (__skip_instr(vcpu))
+-					goto again;
++					return true;
+ 				else
+-					exit_code = ARM_EXCEPTION_TRAP;
++					*exit_code = ARM_EXCEPTION_TRAP;
+ 			}
+ 
+ 			if (ret == -1) {
+@@ -341,29 +315,64 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 				 */
+ 				if (!__skip_instr(vcpu))
+ 					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+-				exit_code = ARM_EXCEPTION_EL1_SERROR;
++				*exit_code = ARM_EXCEPTION_EL1_SERROR;
+ 			}
+-
+-			/* 0 falls through to be handler out of EL2 */
+ 		}
+ 	}
+ 
+ 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
+-	    exit_code == ARM_EXCEPTION_TRAP &&
++	    *exit_code == ARM_EXCEPTION_TRAP &&
+ 	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SYS64 ||
+ 	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_CP15_32)) {
+ 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+ 
+ 		if (ret == 1) {
+ 			if (__skip_instr(vcpu))
+-				goto again;
++				return true;
+ 			else
+-				exit_code = ARM_EXCEPTION_TRAP;
++				*exit_code = ARM_EXCEPTION_TRAP;
+ 		}
+-
+-		/* 0 falls through to be handled out of EL2 */
+ 	}
+ 
++	/* Return to the host kernel and handle the exit */
++	return false;
++}
++
++int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
++{
++	struct kvm_cpu_context *host_ctxt;
++	struct kvm_cpu_context *guest_ctxt;
++	u64 exit_code;
++
++	vcpu = kern_hyp_va(vcpu);
++
++	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++	host_ctxt->__hyp_running_vcpu = vcpu;
++	guest_ctxt = &vcpu->arch.ctxt;
++
++	__sysreg_save_host_state(host_ctxt);
++
++	__activate_traps(vcpu);
++	__activate_vm(vcpu);
++
++	__vgic_restore_state(vcpu);
++	__timer_enable_traps(vcpu);
++
++	/*
++	 * We must restore the 32-bit state before the sysregs, thanks
++	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
++	 */
++	__sysreg32_restore_state(vcpu);
++	__sysreg_restore_guest_state(guest_ctxt);
++	__debug_switch_to_guest(vcpu);
++
++	do {
++		/* Jump in the fire! */
++		exit_code = __guest_enter(vcpu, host_ctxt);
++
++		/* And we're baaack! */
++	} while (fixup_guest_exit(vcpu, &exit_code));
++
+ 	__sysreg_save_guest_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
+ 	__timer_disable_traps(vcpu);
 -- 
 2.14.2
