@@ -1,161 +1,118 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 12 Jan 2018 09:42:11 +0100
-Subject: [PATCH 13/34] dma-mapping: move dma_mark_clean to dma-direct.h
+Date: Fri, 12 Jan 2018 09:42:03 +0100
+Subject: [PATCH 05/34] arc: remove CONFIG_ARC_PLAT_NEEDS_PHYS_TO_DMA
 In-Reply-To: <20180112084232.2857-1-hch@lst.de>
 References: <20180112084232.2857-1-hch@lst.de>
-Message-ID: <20180112084232.2857-14-hch@lst.de>
+Message-ID: <20180112084232.2857-6-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And unlike the other helpers we don't require a <asm/dma-direct.h> as
-this helper is a special case for ia64 only, and this keeps it as
-simple as possible.
+We always use the stub definitions, so remove the unused other code.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
+Acked-by: Vineet Gupta <vgupta@synopsys.com>
 ---
- arch/arm/include/asm/dma-mapping.h       | 2 --
- arch/arm64/include/asm/dma-mapping.h     | 4 ----
- arch/ia64/Kconfig                        | 1 +
- arch/ia64/include/asm/dma.h              | 2 --
- arch/mips/include/asm/dma-mapping.h      | 2 --
- arch/powerpc/include/asm/swiotlb.h       | 2 --
- arch/tile/include/asm/dma-mapping.h      | 2 --
- arch/unicore32/include/asm/dma-mapping.h | 2 --
- arch/x86/include/asm/swiotlb.h           | 2 --
- include/linux/dma-direct.h               | 9 +++++++++
- 10 files changed, 10 insertions(+), 18 deletions(-)
+ arch/arc/Kconfig                   |  3 ---
+ arch/arc/include/asm/dma-mapping.h |  7 -------
+ arch/arc/mm/dma.c                  | 14 +++++++-------
+ 3 files changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5fb1b7fbdfbe..e5d9020c9ee1 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -109,8 +109,6 @@ static inline bool is_device_dma_coherent(struct device *dev)
- 	return dev->archdata.dma_coherent;
+diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
+index 9d5fd00d9e91..f3a80cf164cc 100644
+--- a/arch/arc/Kconfig
++++ b/arch/arc/Kconfig
+@@ -463,9 +463,6 @@ config ARCH_PHYS_ADDR_T_64BIT
+ config ARCH_DMA_ADDR_T_64BIT
+ 	bool
+ 
+-config ARC_PLAT_NEEDS_PHYS_TO_DMA
+-	bool
+-
+ config ARC_KVADDR_SIZE
+ 	int "Kernel Virtual Address Space size (MB)"
+ 	range 0 512
+diff --git a/arch/arc/include/asm/dma-mapping.h b/arch/arc/include/asm/dma-mapping.h
+index 94285031c4fb..7a16824bfe98 100644
+--- a/arch/arc/include/asm/dma-mapping.h
++++ b/arch/arc/include/asm/dma-mapping.h
+@@ -11,13 +11,6 @@
+ #ifndef ASM_ARC_DMA_MAPPING_H
+ #define ASM_ARC_DMA_MAPPING_H
+ 
+-#ifndef CONFIG_ARC_PLAT_NEEDS_PHYS_TO_DMA
+-#define plat_dma_to_phys(dev, dma_handle) ((phys_addr_t)(dma_handle))
+-#define plat_phys_to_dma(dev, paddr) ((dma_addr_t)(paddr))
+-#else
+-#include <plat/dma.h>
+-#endif
+-
+ extern const struct dma_map_ops arc_dma_ops;
+ 
+ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+diff --git a/arch/arc/mm/dma.c b/arch/arc/mm/dma.c
+index e9d93604ad0f..1dcc404b5aec 100644
+--- a/arch/arc/mm/dma.c
++++ b/arch/arc/mm/dma.c
+@@ -60,7 +60,7 @@ static void *arc_dma_alloc(struct device *dev, size_t size,
+ 	/* This is linear addr (0x8000_0000 based) */
+ 	paddr = page_to_phys(page);
+ 
+-	*dma_handle = plat_phys_to_dma(dev, paddr);
++	*dma_handle = paddr;
+ 
+ 	/* This is kernel Virtual address (0x7000_0000 based) */
+ 	if (need_kvaddr) {
+@@ -92,7 +92,7 @@ static void *arc_dma_alloc(struct device *dev, size_t size,
+ static void arc_dma_free(struct device *dev, size_t size, void *vaddr,
+ 		dma_addr_t dma_handle, unsigned long attrs)
+ {
+-	phys_addr_t paddr = plat_dma_to_phys(dev, dma_handle);
++	phys_addr_t paddr = dma_handle;
+ 	struct page *page = virt_to_page(paddr);
+ 	int is_non_coh = 1;
+ 
+@@ -111,7 +111,7 @@ static int arc_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ {
+ 	unsigned long user_count = vma_pages(vma);
+ 	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+-	unsigned long pfn = __phys_to_pfn(plat_dma_to_phys(dev, dma_addr));
++	unsigned long pfn = __phys_to_pfn(dma_addr);
+ 	unsigned long off = vma->vm_pgoff;
+ 	int ret = -ENXIO;
+ 
+@@ -175,7 +175,7 @@ static dma_addr_t arc_dma_map_page(struct device *dev, struct page *page,
+ 	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+ 		_dma_cache_sync(paddr, size, dir);
+ 
+-	return plat_phys_to_dma(dev, paddr);
++	return paddr;
  }
  
--static inline void dma_mark_clean(void *addr, size_t size) { }
--
- /**
-  * arm_dma_alloc - allocate consistent memory for DMA
-  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 400fa67d3b5a..b7847eb8a7bb 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -50,9 +50,5 @@ static inline bool is_device_dma_coherent(struct device *dev)
- 	return dev->archdata.dma_coherent;
+ /*
+@@ -190,7 +190,7 @@ static void arc_dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 			       size_t size, enum dma_data_direction dir,
+ 			       unsigned long attrs)
+ {
+-	phys_addr_t paddr = plat_dma_to_phys(dev, handle);
++	phys_addr_t paddr = handle;
+ 
+ 	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+ 		_dma_cache_sync(paddr, size, dir);
+@@ -224,13 +224,13 @@ static void arc_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
+ static void arc_dma_sync_single_for_cpu(struct device *dev,
+ 		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
+ {
+-	_dma_cache_sync(plat_dma_to_phys(dev, dma_handle), size, DMA_FROM_DEVICE);
++	_dma_cache_sync(dma_handle, size, DMA_FROM_DEVICE);
  }
  
--static inline void dma_mark_clean(void *addr, size_t size)
--{
--}
--
- #endif	/* __KERNEL__ */
- #endif	/* __ASM_DMA_MAPPING_H */
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 49583c5a5d44..4d18fca885ee 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -33,6 +33,7 @@ config IA64
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP
- 	select HAVE_VIRT_CPU_ACCOUNTING
-+	select ARCH_HAS_DMA_MARK_CLEAN
- 	select ARCH_HAS_SG_CHAIN
- 	select VIRT_TO_BUS
- 	select ARCH_DISCARD_MEMBLOCK
-diff --git a/arch/ia64/include/asm/dma.h b/arch/ia64/include/asm/dma.h
-index 186850eec934..23604d6a2cb2 100644
---- a/arch/ia64/include/asm/dma.h
-+++ b/arch/ia64/include/asm/dma.h
-@@ -20,6 +20,4 @@ extern unsigned long MAX_DMA_ADDRESS;
- 
- #define free_dma(x)
- 
--void dma_mark_clean(void *addr, size_t size);
--
- #endif /* _ASM_IA64_DMA_H */
-diff --git a/arch/mips/include/asm/dma-mapping.h b/arch/mips/include/asm/dma-mapping.h
-index 676c14cfc580..886e75a383f2 100644
---- a/arch/mips/include/asm/dma-mapping.h
-+++ b/arch/mips/include/asm/dma-mapping.h
-@@ -17,8 +17,6 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- 	return mips_dma_map_ops;
+ static void arc_dma_sync_single_for_device(struct device *dev,
+ 		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
+ {
+-	_dma_cache_sync(plat_dma_to_phys(dev, dma_handle), size, DMA_TO_DEVICE);
++	_dma_cache_sync(dma_handle, size, DMA_TO_DEVICE);
  }
  
--static inline void dma_mark_clean(void *addr, size_t size) {}
--
- #define arch_setup_dma_ops arch_setup_dma_ops
- static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
- 				      u64 size, const struct iommu_ops *iommu,
-diff --git a/arch/powerpc/include/asm/swiotlb.h b/arch/powerpc/include/asm/swiotlb.h
-index 01d45a5fd00b..9341ee804d19 100644
---- a/arch/powerpc/include/asm/swiotlb.h
-+++ b/arch/powerpc/include/asm/swiotlb.h
-@@ -15,8 +15,6 @@
- 
- extern const struct dma_map_ops swiotlb_dma_ops;
- 
--static inline void dma_mark_clean(void *addr, size_t size) {}
--
- extern unsigned int ppc_swiotlb_enable;
- int __init swiotlb_setup_bus_notifier(void);
- 
-diff --git a/arch/tile/include/asm/dma-mapping.h b/arch/tile/include/asm/dma-mapping.h
-index 75b8aaa4e70b..d25fce101fc0 100644
---- a/arch/tile/include/asm/dma-mapping.h
-+++ b/arch/tile/include/asm/dma-mapping.h
-@@ -44,8 +44,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
- 	dev->archdata.dma_offset = off;
- }
- 
--static inline void dma_mark_clean(void *addr, size_t size) {}
--
- #define HAVE_ARCH_DMA_SET_MASK 1
- int dma_set_mask(struct device *dev, u64 mask);
- 
-diff --git a/arch/unicore32/include/asm/dma-mapping.h b/arch/unicore32/include/asm/dma-mapping.h
-index 5cb250bf2d8c..f2bfec273aa7 100644
---- a/arch/unicore32/include/asm/dma-mapping.h
-+++ b/arch/unicore32/include/asm/dma-mapping.h
-@@ -25,7 +25,5 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- 	return &swiotlb_dma_map_ops;
- }
- 
--static inline void dma_mark_clean(void *addr, size_t size) {}
--
- #endif /* __KERNEL__ */
- #endif
-diff --git a/arch/x86/include/asm/swiotlb.h b/arch/x86/include/asm/swiotlb.h
-index bdf9aed40403..1c6a6cb230ff 100644
---- a/arch/x86/include/asm/swiotlb.h
-+++ b/arch/x86/include/asm/swiotlb.h
-@@ -28,8 +28,6 @@ static inline void pci_swiotlb_late_init(void)
- }
- #endif
- 
--static inline void dma_mark_clean(void *addr, size_t size) {}
--
- extern void *x86_swiotlb_alloc_coherent(struct device *hwdev, size_t size,
- 					dma_addr_t *dma_handle, gfp_t flags,
- 					unsigned long attrs);
-diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
-index 2cc1b6558944..10e924b7cba7 100644
---- a/include/linux/dma-direct.h
-+++ b/include/linux/dma-direct.h
-@@ -29,4 +29,13 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
- 	return addr + size - 1 <= *dev->dma_mask;
- }
- #endif /* !CONFIG_ARCH_HAS_PHYS_TO_DMA */
-+
-+#ifdef CONFIG_ARCH_HAS_DMA_MARK_CLEAN
-+void dma_mark_clean(void *addr, size_t size);
-+#else
-+static inline void dma_mark_clean(void *addr, size_t size)
-+{
-+}
-+#endif /* CONFIG_ARCH_HAS_DMA_MARK_CLEAN */
-+
- #endif /* _LINUX_DMA_DIRECT_H */
+ static void arc_dma_sync_sg_for_cpu(struct device *dev,
 -- 
 2.14.2
