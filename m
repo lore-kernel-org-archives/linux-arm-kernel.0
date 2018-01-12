@@ -1,93 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Jan 2018 20:45:55 +0100
-Subject: [PATCH] usb: dwc2: Fix endless deferral probe
-In-Reply-To: <20180112155107.39b9d765@vento.lan>
-References: <1515526134-2148-1-git-send-email-stefan.wahren@i2se.com>
- <CAK8P3a3eggC=XWLxr-A+pdaXj-0kMZ4aoX3hRyg5tLUknoDeBA@mail.gmail.com>
- <7ef21b99-67c8-b246-cc9a-b7202264a7a0@i2se.com>
- <CAK8P3a3GdHvBBPR3D_qO5+Zjr1CUBMLOAvjTiMQEMO1NtKjb3w@mail.gmail.com>
- <277384ef-b30c-fb5a-5ffe-1efc15c500bb@i2se.com>
- <CAK8P3a3yZKnBM9gD-0YiHdMuHXUV=11vxGgFsZvQSkbM=B5Mxw@mail.gmail.com>
- <20180112155107.39b9d765@vento.lan>
-Message-ID: <CAK8P3a3V+R9LKQZm3_cKCy26zmU_YqifD8ctbQ5awt1EHEDnKg@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 12 Jan 2018 13:54:32 -0600
+Subject: [PATCH] phy: work around 'phys' references to usb-nop-xceiv
+ devices
+In-Reply-To: <20180112101223.3661181-1-arnd@arndb.de>
+References: <20180112101223.3661181-1-arnd@arndb.de>
+Message-ID: <CAL_JsqKi30aUiJUdjnen+sty_2horaTVs5LFaFJdxACsvEQpkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 6:51 PM, Mauro Carvalho Chehab
-<mchehab@s-opensource.com> wrote:
-> Em Fri, 12 Jan 2018 10:18:59 +0100
-> Arnd Bergmann <arnd@arndb.de> escreveu:
+On Fri, Jan 12, 2018 at 4:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Stefan Wahren reports a problem with a warning fix that was merged
+> for v4.15: we had lots of device nodes with a 'phys' property pointing
+> to a device node that is not compliant with the binding documented in
+> Documentation/devicetree/bindings/phy/phy-bindings.txt
 >
->> On Fri, Jan 12, 2018 at 9:06 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->> > Am 12.01.2018 um 00:32 schrieb Arnd Bergmann:
->> >> On Wed, Jan 10, 2018 at 1:15 PM, Stefan Wahren <stefan.wahren@i2se.com>
->>
->> >> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->> >> index b4964b067aec..93b55fb71d54 100644
->> >> --- a/drivers/phy/phy-core.c
->> >> +++ b/drivers/phy/phy-core.c
->> >> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node
->> >> *np, int index)
->> >>          if (ret)
->> >>                  return ERR_PTR(-ENODEV);
->> >>
->> >> +       /* This phy type handled by the usb-phy subsystem for now */
->> >> +       if (of_device_is_compatible(np, "usb-nop-xceiv"))
->> >> +               return ERR_PTR(-ENODEV);
->> >> +
->> >>          mutex_lock(&phy_provider_mutex);
->> >>          phy_provider = of_phy_provider_lookup(args.np);
->> >>          if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner))
->> >> {
->> >
->> >
->> > I tried this, but it doesn't work. "np" is the node of the USB controller,
->> > not of the phy?
->>
->> Correct, that was a really dumb mistake on my end, I'm glad I asked
->> you to try it first.
->>
->> I'll fix it up and send the right version with a proper changelog right away.
+> This generally works because USB HCD drivers that support both the generic
+> phy subsystem and the older usb-phy subsystem ignore most errors from
+> phy_get() and related calls and then use the usb-phy driver instead.
 >
-> I suspect you meant to do, instead:
+> However, it turns out that making the usb-nop-xceiv device compatible with
+> the generic-phy binding changes the phy_get() return code from -EINVAL to
+> -EPROBE_DEFER, and the dwc2 usb controller driver for bcm2835 now returns
+> -EPROBE_DEFER from its probe function rather than ignoring the failure,
+> breaking all USB support on raspberry-pi when CONFIG_GENERIC_PHY is
+> enabled. The same code is used in the dwc3 driver and the usb_add_hcd()
+> function, so a reasonable assumption would be that many other platforms
+> are affected as well.
 >
+> I have reviewed all the related patches and concluded that "usb-nop-xceiv"
+> is the only USB phy that is affected by the change, and since it is by far
+> the most commonly referenced phy, all the other USB phy drivers appear
+> to be used in ways that are are either safe in DT (they don't use the
+> 'phys' property), or in the driver (they already ignore -EPROBE_DEFER
+> from generic-phy when usb-phy is available).
 >
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index b4964b067aec..584cc1469f7d 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
->         if (ret)
->                 return ERR_PTR(-ENODEV);
+> To work around the problem, this adds a special case to _of_phy_get()
+> so we ignore any PHY node that is compatible with "usb-nop-xceiv",
+> as we know that this can never load no matter how much we defer. In the
+> future, we might implement a generic-phy driver for "usb-nop-xceiv"
+> and then remove this workaround.
 >
-> +       /* This phy type handled by the usb-phy subsystem for now */
-> +       if (of_device_is_compatible(args.np, "usb-nop-xceiv"))
-> +               return ERR_PTR(-ENODEV);
-> +
->         mutex_lock(&phy_provider_mutex);
->         phy_provider = of_phy_provider_lookup(args.np);
->         if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+> Since we generally want older kernels to also want to work with the
+> fixed devicetree files, it would be good to backport the patch into
+> stable kernels as well (3.13+ are possibly affected), even though they
+> don't contain any of the patches that may have caused regressions.
 >
+> Fixes: 014d6da6cb25 ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells
+> Fixes: c5bbf358b790 arm: dts: nspire: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: 44e5dced2ef6 arm: dts: marvell: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: f568f6f554b8 ARM: dts: omap: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: d745d5f277bf ARM: dts: imx51-zii-rdu1: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: 915fbe59cbf2 ARM: dts: imx: Add missing #phy-cells to usb-nop-xceiv
+> Link: https://marc.info/?l=linux-usb&m=151518314314753&w=2
+> Link: https://patchwork.kernel.org/patch/10158145/
+> Cc: stable at vger.kernel.org
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Hans tested the earlier version of this patch, I'd like one more
+> confirmation from Hans or Stefan (or anyone else) that this version
+> addresses the regression as well before this gets merged.
 >
-> (e. g. args.np, instead of np).
->
-> The above works for me on RPi3:
->
-> $ uname -a
-> Linux raspberrypi 4.15.0-rc7-mcc+ #28 SMP Fri Jan 12 12:35:19 EST 2018 armv7l GNU/Linux
->
-> $ lsusb
-> Bus 001 Device 005: ID 045e:0750 Microsoft Corp. Wired Keyboard 600
-> Bus 001 Device 004: ID 0572:960c Conexant Systems (Rockwell), Inc. DVBSky S960C DVB-S2 tuner
-> Bus 001 Device 003: ID 0424:ec00 Standard Microsystems Corp. SMSC9512/9514 Fast Ethernet Adapter
-> Bus 001 Device 002: ID 0424:9514 Standard Microsystems Corp. SMC9514 Hub
-> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->
-> So, if you change np -> args.np, feel free to add my:
->
-> Tested-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> Greg, can you pick this up into usb-linus for v4.15 once the fix
+> has been confirmed, or should I merge it through arm-soc?
+> ---
+>  drivers/phy/phy-core.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-Thanks a lot for testing, args.np is what the version I sent today has after
-Stefan pointed out the mistake earlier.
+Thanks for fixing this.
 
-         Arnd
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
