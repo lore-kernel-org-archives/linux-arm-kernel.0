@@ -1,43 +1,135 @@
-From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Fri, 12 Jan 2018 09:25:23 +0100
-Subject: [PATCH 0/2] tee: optee: report OP-TEE revision information
-In-Reply-To: <cover.1511533457.git.jerome.forissier@linaro.org>
-References: <cover.1511533457.git.jerome.forissier@linaro.org>
-Message-ID: <daa86c94-765b-98dc-c5c7-7f192c3e89e6@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 12 Jan 2018 09:33:25 +0100
+Subject: [PATCH] arm64: dts: rockchip: add roc-rk3328-cc board
+In-Reply-To: <20180111203033.mnap7tijbfsvr5pa@rob-hp-laptop>
+References: <20180106094538.15568-1-djw@t-chip.com.cn>
+ <20180111203033.mnap7tijbfsvr5pa@rob-hp-laptop>
+Message-ID: <10243464.nJpoDBzbVB@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
+
+Am Donnerstag, 11. Januar 2018, 14:30:33 CET schrieb Rob Herring:
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+> > new file mode 100644
+> > index 0000000..2134baf
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+> > @@ -0,0 +1,313 @@
+> > +/*
+> > + * Copyright (c) 2017 T-Chip Intelligent Technology Co., Ltd
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This library is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This library is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> 
+> Use SPDX license tag.
+
+It looks like Thomas' SPDX documentation patches are not yet merged
+and there were smaller protests about SPDX information only being
+available on some external website, so just for my understanding, SPDX
+is the agreed standard now, right?
+
+And judging by the SPDX conversion for Rockchip dts I have in my inbox
+the correct tags should probably be
+	// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+due to the
+"All devicetrees claim to be either GPL or X11 while the actual license
+text is MIT. Therefore we use MIT for the SPDX tag as X11 is clearly
+wrong."
 
 
-On 11/24/2017 03:47 PM, Jerome Forissier wrote:
-> Hi,
+> > +
+> > +/dts-v1/;
+> > +#include "rk3328.dtsi"
+> > +
+> > +/ {
+> > +	model = "Firefly roc-rk3328-cc";
+> > +	compatible = "firefly,roc-rk3328-cc", "rockchip,rk3328";
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial2:1500000n8";
 > 
-> This patchset updates the OP-TEE driver to report the version of the
-> secure OS upon initialization. To further facilitate troubleshooting,
-> an optional build ID is introduced in the response to the
-> OPTEE_SMC_CALL_GET_OS_REVISION request. Upstream OP-TEE uses this field
-> to report its Git SHA1 since commit 29cff5cf09aa ("core: GET_OS_REVISION:
-> return SHA1 of current Git commit").
-> 
-> Typical boot log (>> is introduced by this patchset):
-> 
->     optee: probing for conduit method from DT.
->  >> optee: revision 2.6 (947cfeec)
->     optee: initialized driver
-> 
-> ...or, if the build ID is not set by the TEE or set to zero:
-> 
->     optee: probing for conduit method from DT.
->  >> optee: revision 2.6
->     optee: initialized driver
-> 
-> Jerome Forissier (2):
->   tee: optee: GET_OS_REVISION: document a2 as a build identifier
->   tee: optee: report OP-TEE revision information
-> 
->  drivers/tee/optee/core.c      | 23 +++++++++++++++++++++++
->  drivers/tee/optee/optee_smc.h | 10 +++++++++-
->  2 files changed, 32 insertions(+), 1 deletion(-)
-> 
+> Just checking, 1.5Mbps for console?
 
-Ping?
+yep, that's correct. Most newer Rockchip socs drive the debug uart
+with 1.5MBps as default these days.
+
+
+> > +&i2c1 {
+> > +	status = "okay";
+> > +
+> > +	rk805: rk805 at 18 {
+> 
+> pmic at 18
+> 
+> > +		compatible = "rockchip,rk805";
+> > +		reg = <0x18>;
+> > +		interrupt-parent = <&gpio1>;
+> > +		interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
+> > +		#clock-cells = <1>;
+> > +		clock-output-names = "xin32k", "rk805-clkout2";
+> > +		gpio-controller;
+> > +		#gpio-cells = <2>;
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pmic_int_l>;
+> > +		rockchip,system-power-controller;
+> > +		wakeup-source;
+> > +
+> > +		vcc1-supply = <&vcc_sys>;
+> > +		vcc2-supply = <&vcc_sys>;
+> > +		vcc3-supply = <&vcc_sys>;
+> > +		vcc4-supply = <&vcc_sys>;
+> > +		vcc5-supply = <&vcc_io>;
+> > +		vcc6-supply = <&vcc_io>;
+> > +
+> > +		regulators {
+> > +			vdd_logic: DCDC_REG1 {
+> 
+> Don't use '_' in node names.
+
+The driver binds against the node names including the underscores.
+(with regulator-compatible being deprecated)
+
+See drivers/regulator/rk808-regulator.c and
+Documentation/devicetree/bindings/mfd/rk808.txt
+
+
+Heiko
