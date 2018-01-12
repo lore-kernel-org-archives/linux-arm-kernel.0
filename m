@@ -1,34 +1,36 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 12 Jan 2018 11:14:24 -0300
-Subject: [PATCH v4] perf tools: Add ARM Statistical Profiling Extensions
- (SPE) support
-In-Reply-To: <0a07a10c-fc0c-3f97-ac01-59429aab0937@intel.com>
-References: <20171121173302.bead17a1178ed4583e68014e@arm.com>
- <0a07a10c-fc0c-3f97-ac01-59429aab0937@intel.com>
-Message-ID: <20180112141423.GA9655@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 12 Jan 2018 06:14:56 -0800
+Subject: PM regression in next
+In-Reply-To: <20180112135526.GC29734@lunn.ch>
+References: <20180112000037.GA3875@atomide.com>
+ <20180112013257.GB4059@atomide.com>
+ <4913146.sVL6sFxzC8@aspire.rjw.lan>
+ <4745593.FguGN2uIkX@aspire.rjw.lan>
+ <e7a673e1-b28d-f84e-c6c1-c5b896e92aeb@metafoo.de>
+ <20180112131623.GA29734@lunn.ch>
+ <20180112135203.GA4821@atomide.com>
+ <20180112135526.GC29734@lunn.ch>
+Message-ID: <20180112141456.GB4821@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, Jan 11, 2018 at 04:17:51PM +0200, Adrian Hunter escreveu:
-> On 22/11/17 01:33, Kim Phillips wrote:
-> > - technically both cs-etm and spe can be used simultaneously, however
-> >   disabled for simplicity in this release
-
-> > Signed-off-by: Kim Phillips <kim.phillips@arm.com>
- 
-> For what is there now, it looks fine from the auxtrace point of view.  There
-> are a couple of minor points below but nevertheless:
+* Andrew Lunn <andrew@lunn.ch> [180112 13:55]:
+> > Thanks that fixes the suspend error. And I was able to confirm
+> > that the suspend power consumption is OK.
+> > 
+> > That still leaves the mystery of the runtime idle power consumption
+> > being much higher with commit e130bc1d00a4.
 > 
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+> Did you re-measure the runtime power? Do you have an unused PHY? It
+> could be it is not getting shut down. 1G PHYs can be quite power
+> hungry.
 
-Hi Kim,
+Yes this is a different issue, the increase in runtime PM
+consumption measurement I'm measuring is for a SoM board.
+It contains the SoC + memory + PMIC and few devices. The
+Ethernet controller is on a separate optional base board
+and not related to the runtime PM issue.
 
-	Please address the comments made by Adrian so that we can get
-this merged,
+Regards,
 
-	Adrian, thanks a lot for taking the time to review this, much
-appreciated!
-
-Thanks,
-
-- Arnaldo
+Tony
