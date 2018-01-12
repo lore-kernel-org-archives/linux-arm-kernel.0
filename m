@@ -1,52 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Jan 2018 18:05:47 -0800
-Subject: [GIT PULL] tee dynamic shm fixes for v4.16
-In-Reply-To: <20180111124456.2fziqy4sdxq5wdlz@jax>
-References: <20180111124456.2fziqy4sdxq5wdlz@jax>
-Message-ID: <20180112020547.7vkatughmu6af6d7@localhost>
+Date: Thu, 11 Jan 2018 18:02:17 -0800
+Subject: [GIT PULL] updates to soc/fsl drivers for v4.16
+In-Reply-To: <1515628596-4715-1-git-send-email-leoyang.li@nxp.com>
+References: <1515628596-4715-1-git-send-email-leoyang.li@nxp.com>
+Message-ID: <20180112020217.tqdjt3voqimr3ptx@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 01:44:56PM +0100, Jens Wiklander wrote:
-> Hello arm-soc maintainers,
+On Wed, Jan 10, 2018 at 05:56:36PM -0600, Li Yang wrote:
+> Hi arm-soc maintainer,
 > 
-> Please pull these fixes for the previous tee-drv-dynamic-shm-for-v4.16
-> pull request that is currently kept in the drivers/tee-2 branch in the
-> arm-soc git.
-> 
-> This pull request addresses the question about registering memory that
-> isn't regular memory. I posted those patches some time ago with no feedback
-> so far.
-> 
-> There's also three small fixes to the dynamic shm patches that I've
-> picked up from the mailing lists.
+> Please merge the following tag to get updates to the soc/fsl/guts driver
+> for support of additional SoCs and more error path handling.
 > 
 > Thanks,
-> Jens
+> Leo
 > 
 > 
-> The following changes since commit ef8e08d24ca84846ce639b835ebd2f15a943f42b:
+> The following changes since commit b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d:
 > 
->   tee: shm: inline tee_shm_get_id() (2017-12-15 13:36:21 +0100)
+>   Linux 4.15-rc7 (2018-01-07 14:22:41 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://git.linaro.org/people/jens.wiklander/linux-tee.git tee-drv-dynamic-shm+fixes-for-v4.16
+>   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-4.16
 > 
-> for you to fetch changes up to 2490cdf6435b1d3cac0dbf710cd752487c67c296:
+> for you to fetch changes up to 00ce0a2304014c73c2b7915215c7b3c73e2a25aa:
 > 
->   tee: shm: Potential NULL dereference calling tee_shm_register() (2018-01-09 14:34:00 +0100)
-> 
-> ----------------------------------------------------------------
-> This pull request updates the previous tee-drv-dynamic-shm-for-v4.16 pull
-> request with five new patches fixing review comments and errors.
-> 
-> Apart from three small fixes there's two larger patches that in the end
-> checks that memory to be registered really is normal cached memory.
+>   soc: fsl: guts: Add a NULL check for devm_kasprintf() (2018-01-10 16:54:26 -0600)
 
-Merged into next/drivers. I noticed git.linaro.org is really slow though,
-maybe you should look into getting a kernel.org account instead? It took about
-a minute for the pull request to complete.
+1) This is based on much too new a release
+2) the fact that it's based on this new a release makes me suspect it hasn't
+   been sitting in linux-next either, at least not since before -rc7.
+
+
+Conclusion: Please resend post merge window and we'll queue it up for the
+next release. If the bugfix should go in sooner than that, I can cherry-pick
+that into our fixes. Let me know.
 
 
 -Olof
