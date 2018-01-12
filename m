@@ -1,134 +1,60 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 12 Jan 2018 17:21:04 +1100
-Subject: [PATCH 1/2 v2] ARM: dts: Add Aspeed SoC USB controllers to device-tree
-Message-ID: <1515738064.31850.100.camel@kernel.crashing.org>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 12 Jan 2018 12:00:16 +0530
+Subject: [PATCH v4 1/3] regulator: axp20x: add drivevbus support for axp803
+Message-ID: <1515738618-3617-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the USB controllers to the DT template of the
-AST24xx and AST25xx SoCs.
+Like axp221, axp223, axp813 the axp803 is also supporting external
+regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
 
-This patch doesn't enable them by default on any board specific
-.dts yet. This will be done when we have the necessary clock/reset
-and pinmux support. In the meantime though, this will work if
-u-boot configures things properly.
+Add support for it.
 
-For the AST2400 I only added pinmux definition for port 1
-which is dual USB1/USB2. There are additional USB1 only ports
-that might require more work but I don't have HW to test at
-hand so I'm leaving that to whoever cares.
-
-Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
+Changes for v4:
+- rebase on master
+Changes for v3:
+- Update drivevbus in table of regulators
 
-v2: Previous patch was missing actually adding the nodes
-    (which was an old patch in my tree I had forgotten to
-    merge).
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 3 ++-
+ drivers/regulator/axp20x-regulator.c             | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/aspeed-g4.dtsi | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+)
-
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index b0d8431a3700..e55f2ad5de59 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -103,6 +103,23 @@
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 9455503..d1762f3 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -43,7 +43,7 @@ Optional properties:
+ 			  regulator to drive the OTG VBus, rather then
+ 			  as an input pin which signals whether the
+ 			  board is driving OTG VBus or not.
+-			  (axp221 / axp223 / axp813 only)
++			  (axp221 / axp223 / axp803/ axp813 only)
  
-+		ehci0: usb at 1e6a1000 {
-+			compatible = "aspeed,ast2400-ehci", "generic-ehci";
-+			reg = <0x1e6a1000 0x100>;
-+			interrupts = <5>;
-+			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-+			status = "disabled";
-+		};
-+
-+		uhci: usb at 1e6b0000 {
-+			compatible = "aspeed,ast2400-uhci", "generic-uhci";
-+			reg = <0x1e6b0000 0x100>;
-+			interrupts = <14>;
-+			#ports = <3>;
-+			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
-+			status = "disabled";
-+		};
-+
- 		apb {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -1227,6 +1244,16 @@
- 		groups = "USBCKI";
- 	};
+ - x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
+ 			wired for master mode. The default is slave mode.
+@@ -132,6 +132,7 @@ FLDO2		: LDO		: fldoin-supply		: shared supply
+ LDO_IO0		: LDO		: ips-supply		: GPIO 0
+ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
++DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
  
-+	pinctrl_usb2h_default: usb2h_default {
-+		function = "USB2H1";
-+		groups = "USB2H1";
-+	};
-+
-+	pinctrl_usb2d_default: usb2d_default {
-+		function = "USB2D1";
-+		groups = "USB2D1";
-+	};
-+
- 	pinctrl_vgabios_rom_default: vgabios_rom_default {
- 		function = "VGABIOS_ROM";
- 		groups = "VGABIOS_ROM";
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 40de3b66c33f..655258edee24 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -138,6 +138,31 @@
- 			status = "disabled";
- 		};
+ AXP806 regulators, type, and corresponding input supply names:
  
-+		ehci0: usb at 1e6a1000 {
-+			compatible = "aspeed,ast2500-ehci", "generic-ehci";
-+			reg = <0x1e6a1000 0x100>;
-+			interrupts = <5>;
-+			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-+			status = "disabled";
-+		};
-+
-+		ehci1: usb at 1e6a3000 {
-+			compatible = "aspeed,ast2500-ehci", "generic-ehci";
-+			reg = <0x1e6a3000 0x100>;
-+			interrupts = <13>;
-+			clocks = <&syscon ASPEED_CLK_GATE_USBPORT2CLK>;
-+			status = "disabled";
-+		};
-+
-+		uhci: usb at 1e6b0000 {
-+			compatible = "aspeed,ast2500-uhci", "generic-uhci";
-+			reg = <0x1e6b0000 0x100>;
-+			interrupts = <14>;
-+			#ports = <2>;
-+			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
-+			status = "disabled";
-+		};
-+
- 		apb {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -1358,6 +1383,21 @@
- 		groups = "USBCKI";
- 	};
- 
-+	pinctrl_usb2ah_default: usb2ah_default {
-+		function = "USB2AH";
-+		groups = "USB2AH";
-+	};
-+
-+	pinctrl_usb11bhid_default: usb11bhid_default {
-+		function = "USB11BHID";
-+		groups = "USB11BHID";
-+	};
-+
-+	pinctrl_usb2bh_default: usb2bh_default {
-+		function = "USB2BH";
-+		groups = "USB2BH";
-+	};
-+
- 	pinctrl_vgabiosrom_default: vgabiosrom_default {
- 		function = "VGABIOSROM";
- 		groups = "VGABIOSROM";
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 181622b..91b8ff8 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -721,6 +721,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	case AXP803_ID:
+ 		regulators = axp803_regulators;
+ 		nregulators = AXP803_REG_ID_MAX;
++		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
++						  "x-powers,drive-vbus-en");
+ 		break;
+ 	case AXP806_ID:
+ 		regulators = axp806_regulators;
+-- 
+2.7.4
