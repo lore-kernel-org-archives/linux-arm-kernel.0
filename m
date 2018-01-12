@@ -1,44 +1,37 @@
 From: konrad@darnok.org (Konrad Rzeszutek Wilk)
-Date: Fri, 12 Jan 2018 08:25:34 -0500
-Subject: [PATCH 05/22] x86: rename swiotlb_dma_ops
-In-Reply-To: <20180110080932.14157-6-hch@lst.de>
-References: <20180110080932.14157-1-hch@lst.de>
- <20180110080932.14157-6-hch@lst.de>
-Message-ID: <20180112132534.GE26900@localhost.localdomain>
+Date: Fri, 12 Jan 2018 08:16:48 -0500
+Subject: [PATCH 19/33] dma-mapping: warn when there is no coherent_dma_mask
+In-Reply-To: <20180110080027.13879-20-hch@lst.de>
+References: <20180110080027.13879-1-hch@lst.de>
+ <20180110080027.13879-20-hch@lst.de>
+Message-ID: <20180112131646.GA26900@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 09:09:15AM +0100, Christoph Hellwig wrote:
-> We'll need that name for a generic implementation soon.
+On Wed, Jan 10, 2018 at 09:00:13AM +0100, Christoph Hellwig wrote:
+> These days all devices should have a DMA coherent mask, and most dma_ops
+> implementations rely on that fact.  But just to be sure add an assert to
+> ring the warning bell if that is not the case.
 > 
 > Signed-off-by: Christoph Hellwig <hch@lst.de>
+
 Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 > ---
->  arch/x86/kernel/pci-swiotlb.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  include/linux/dma-mapping.h | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/x86/kernel/pci-swiotlb.c b/arch/x86/kernel/pci-swiotlb.c
-> index 9d3e35c33d94..0d77603c2f50 100644
-> --- a/arch/x86/kernel/pci-swiotlb.c
-> +++ b/arch/x86/kernel/pci-swiotlb.c
-> @@ -48,7 +48,7 @@ void x86_swiotlb_free_coherent(struct device *dev, size_t size,
->  		dma_generic_free_coherent(dev, size, vaddr, dma_addr, attrs);
->  }
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index d84951865be7..9f28b2fa329e 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -513,6 +513,7 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
+>  	void *cpu_addr;
 >  
-> -static const struct dma_map_ops swiotlb_dma_ops = {
-> +static const struct dma_map_ops x86_swiotlb_dma_ops = {
->  	.mapping_error = swiotlb_dma_mapping_error,
->  	.alloc = x86_swiotlb_alloc_coherent,
->  	.free = x86_swiotlb_free_coherent,
-> @@ -112,7 +112,7 @@ void __init pci_swiotlb_init(void)
->  {
->  	if (swiotlb) {
->  		swiotlb_init(0);
-> -		dma_ops = &swiotlb_dma_ops;
-> +		dma_ops = &x86_swiotlb_dma_ops;
->  	}
->  }
+>  	BUG_ON(!ops);
+> +	WARN_ON_ONCE(!dev->coherent_dma_mask);
 >  
+>  	if (dma_alloc_from_dev_coherent(dev, size, dma_handle, &cpu_addr))
+>  		return cpu_addr;
 > -- 
 > 2.14.2
 > 
