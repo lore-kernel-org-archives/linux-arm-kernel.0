@@ -1,170 +1,444 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 12 Jan 2018 14:48:45 +0000
-Subject: [PATCH v12 0/3] iommu/smmu-v3: Workaround for hisilicon
- 161010801 erratum(reserve HW MSI)
-References: <20171214160957.13716-1-shameerali.kolothum.thodi@huawei.com> 
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838639372@FRAEML521-MBX.china.huawei.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Fri, 12 Jan 2018 14:55:02 +0000
+Subject: [PATCH v5 06/20] firmware: arm_scmi: add initial support for
+ performance protocol
+In-Reply-To: <1514904162-11201-7-git-send-email-sudeep.holla@arm.com>
+References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
+ <1514904162-11201-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CALW4P+L-YJRNZ_qv1SohM7vCWekBf+KKZos7FuZE0Tu1Yh8i-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 2, 2018 at 2:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> The performance protocol is intended for the performance management of
+> group(s) of device(s) that run in the same performance domain. It
+> includes even the CPUs. A performance domain is defined by a set of
+> devices that always have to run at the same performance level.
+> For example, a set of CPUs that share a voltage domain, and have a
+> common frequency control, is said to be in the same performance domain.
+>
+> The commands in this protocol provide functionality to describe the
+> protocol version, describe various attribute flags, set and get the
+> performance level of a domain. It also supports discovery of the list
+> of performance levels supported by a performance domain, and the
+> properties of each performance level.
+>
+> This patch adds basic support for the performance protocol.
+>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/firmware/arm_scmi/Makefile |   2 +-
+>  drivers/firmware/arm_scmi/common.h |   1 +
+>  drivers/firmware/arm_scmi/perf.c   | 527 +++++++++++++++++++++++++++++++++++++
+>  include/linux/scmi_protocol.h      |  34 +++
+>  4 files changed, 563 insertions(+), 1 deletion(-)
 
-> -----Original Message-----
-> From: Shameerali Kolothum Thodi
-> Sent: Friday, December 15, 2017 3:01 PM
-> To: lorenzo.pieralisi at arm.com; robin.murphy at arm.com;
-> marc.zyngier at arm.com; will.deacon at arm.com
-> Cc: joro at 8bytes.org; John Garry <john.garry@huawei.com>; xuwei (O)
-> <xuwei5@hisilicon.com>; Guohanjun (Hanjun Guo) <guohanjun@huawei.com>;
-> iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
-> <linuxarm@huawei.com>
-> Subject: RE: [PATCH v12 0/3] iommu/smmu-v3: Workaround for hisilicon
-> 161010801 erratum(reserve HW MSI)
-> 
-> Hi Lorenzo/Robin/Will,
-> 
-> Since this has all the necessary reviewed-by from all concerned now(Thanks to
-> all),
-> just wondering how this will be picked up? through iort or iommu?
-> 
-> Please let me know.
-> 
+[...]
 
-A gentle ping on this series...
+> diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
+> new file mode 100644
+> index 000000000000..a1f5cf136748
+> --- /dev/null
+> +++ b/drivers/firmware/arm_scmi/perf.c
+> @@ -0,0 +1,527 @@
+> +/*
+> + * System Control and Management Interface (SCMI) Performance Protocol
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/sort.h>
+> +
+> +#include "common.h"
+> +
+> +enum scmi_performance_protocol_cmd {
+> +       PERF_DOMAIN_ATTRIBUTES = 0x3,
+> +       PERF_DESCRIBE_LEVELS = 0x4,
+> +       PERF_LIMITS_SET = 0x5,
+> +       PERF_LIMITS_GET = 0x6,
+> +       PERF_LEVEL_SET = 0x7,
+> +       PERF_LEVEL_GET = 0x8,
+> +       PERF_NOTIFY_LIMITS = 0x9,
+> +       PERF_NOTIFY_LEVEL = 0xa,
+> +};
+> +
+> +struct scmi_opp {
+> +       u32 perf;
+> +       u32 power;
+> +       u32 trans_latency_us;
+> +};
+> +
+> +struct scmi_msg_resp_perf_attributes {
+> +       __le16 num_domains;
+> +       __le16 flags;
+> +#define POWER_SCALE_IN_MILLIWATT(x)    ((x) & BIT(0))
+> +       __le32 stats_addr_low;
+> +       __le32 stats_addr_high;
+> +       __le32 stats_size;
+> +};
+> +
+> +struct scmi_msg_resp_perf_domain_attributes {
+> +       __le32 flags;
+> +#define SUPPORTS_SET_LIMITS(x)         ((x) & BIT(31))
+> +#define SUPPORTS_SET_PERF_LVL(x)       ((x) & BIT(30))
+> +#define SUPPORTS_PERF_LIMIT_NOTIFY(x)  ((x) & BIT(29))
+> +#define SUPPORTS_PERF_LEVEL_NOTIFY(x)  ((x) & BIT(28))
+> +       __le32 rate_limit_us;
+> +       __le32 sustained_freq_khz;
+> +       __le32 sustained_perf_level;
+> +           u8 name[SCMI_MAX_STR_SIZE];
+> +};
+> +
+> +struct scmi_msg_perf_describe_levels {
+> +       __le32 domain;
+> +       __le32 level_index;
+> +};
+> +
+> +struct scmi_perf_set_limits {
+> +       __le32 domain;
+> +       __le32 max_level;
+> +       __le32 min_level;
+> +};
+> +
+> +struct scmi_perf_get_limits {
+> +       __le32 max_level;
+> +       __le32 min_level;
+> +};
+> +
+> +struct scmi_perf_set_level {
+> +       __le32 domain;
+> +       __le32 level;
+> +};
+> +
+> +struct scmi_perf_notify_level_or_limits {
+> +       __le32 domain;
+> +       __le32 notify_enable;
+> +};
+> +
+> +struct scmi_msg_resp_perf_describe_levels {
+> +       __le16 num_returned;
+> +       __le16 num_remaining;
+> +       struct {
+> +               __le32 perf_val;
+> +               __le32 power;
+> +               __le16 transition_latency_us;
+> +               __le16 reserved;
+> +       } opp[0];
+> +};
+> +
+> +struct perf_dom_info {
+> +       bool set_limits;
+> +       bool set_perf;
+> +       bool perf_limit_notify;
+> +       bool perf_level_notify;
+> +       u32 opp_count;
+> +       u32 sustained_freq_khz;
+> +       u32 sustained_perf_level;
+> +       u32 mult_factor;
+> +       char name[SCMI_MAX_STR_SIZE];
+> +       struct scmi_opp opp[MAX_OPPS];
+> +};
+> +
+> +struct scmi_perf_info {
+> +       int num_domains;
+> +       bool power_scale_mw;
+> +       u64 stats_addr;
+> +       u32 stats_size;
+> +       struct perf_dom_info *dom_info;
+> +};
+> +
+> +static int scmi_perf_attributes_get(const struct scmi_handle *handle,
+> +                                   struct scmi_perf_info *pi)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +       struct scmi_msg_resp_perf_attributes *attr;
+> +
+> +       ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
+> +                                SCMI_PROTOCOL_PERF, 0, sizeof(*attr), &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       attr = t->rx.buf;
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +       if (!ret) {
+> +               u16 flags = le16_to_cpu(attr->flags);
+> +
+> +               pi->num_domains = le16_to_cpu(attr->num_domains);
+> +               pi->power_scale_mw = POWER_SCALE_IN_MILLIWATT(flags);
+> +               pi->stats_addr = le32_to_cpu(attr->stats_addr_low) |
+> +                               (u64)le32_to_cpu(attr->stats_addr_high) << 32;
+> +               pi->stats_size = le32_to_cpu(attr->stats_size);
+> +       }
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int
+> +scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
+> +                               struct perf_dom_info *dom_info)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +       struct scmi_msg_resp_perf_domain_attributes *attr;
+> +
+> +       ret = scmi_one_xfer_init(handle, PERF_DOMAIN_ATTRIBUTES,
+> +                                SCMI_PROTOCOL_PERF, sizeof(domain),
+> +                                sizeof(*attr), &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       *(__le32 *)t->tx.buf = cpu_to_le32(domain);
+> +       attr = t->rx.buf;
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +       if (!ret) {
+> +               u32 flags = le32_to_cpu(attr->flags);
+> +
+> +               dom_info->set_limits = SUPPORTS_SET_LIMITS(flags);
+> +               dom_info->set_perf = SUPPORTS_SET_PERF_LVL(flags);
+> +               dom_info->perf_limit_notify = SUPPORTS_PERF_LIMIT_NOTIFY(flags);
+> +               dom_info->perf_level_notify = SUPPORTS_PERF_LEVEL_NOTIFY(flags);
+> +               dom_info->sustained_freq_khz =
+> +                                       le32_to_cpu(attr->sustained_freq_khz);
+> +               dom_info->sustained_perf_level =
+> +                                       le32_to_cpu(attr->sustained_perf_level);
+> +               dom_info->mult_factor = (dom_info->sustained_freq_khz * 1000) /
+> +                                       dom_info->sustained_perf_level;
+> +               memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
+> +       }
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int opp_cmp_func(const void *opp1, const void *opp2)
+> +{
+> +       const struct scmi_opp *t1 = opp1, *t2 = opp2;
+> +
+> +       return t1->perf - t2->perf;
+> +}
+> +
+> +static int
+> +scmi_perf_describe_levels_get(const struct scmi_handle *handle, u32 domain,
+> +                             struct perf_dom_info *perf_dom)
+> +{
+> +       int ret, cnt;
+> +       u32 tot_opp_cnt = 0;
+> +       u16 num_returned, num_remaining;
+> +       struct scmi_xfer *t;
+> +       struct scmi_opp *opp;
+> +       struct scmi_msg_perf_describe_levels *dom_info;
+> +       struct scmi_msg_resp_perf_describe_levels *level_info;
+> +
+> +       ret = scmi_one_xfer_init(handle, PERF_DESCRIBE_LEVELS,
+> +                                SCMI_PROTOCOL_PERF, sizeof(*dom_info), 0, &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       dom_info = t->tx.buf;
+> +       level_info = t->rx.buf;
+> +
+> +       do {
+> +               dom_info->domain = cpu_to_le32(domain);
+> +               /* Set the number of OPPs to be skipped/already read */
+> +               dom_info->level_index = cpu_to_le32(tot_opp_cnt);
+> +
+> +               ret = scmi_do_xfer(handle, t);
+> +               if (ret)
+> +                       break;
+> +
+> +               num_returned = le16_to_cpu(level_info->num_returned);
+> +               num_remaining = le16_to_cpu(level_info->num_remaining);
+> +               if (tot_opp_cnt + num_returned > MAX_OPPS) {
+> +                       dev_err(handle->dev, "No. of OPPs exceeded MAX_OPPS");
+> +                       break;
+> +               }
+> +
+> +               opp = &perf_dom->opp[tot_opp_cnt];
+> +               for (cnt = 0; cnt < num_returned; cnt++, opp++) {
+> +                       opp->perf = le32_to_cpu(level_info->opp[cnt].perf_val);
+> +                       opp->power = le32_to_cpu(level_info->opp[cnt].power);
+> +                       opp->trans_latency_us = le16_to_cpu(
+> +                               level_info->opp[cnt].transition_latency_us);
+> +
+> +                       dev_dbg(handle->dev, "Level %d Power %d Latency %dus\n",
+> +                               opp->perf, opp->power, opp->trans_latency_us);
+> +               }
+> +
+> +               tot_opp_cnt += num_returned;
+> +               /*
+> +                * check for both returned and remaining to avoid infinite
+> +                * loop due to buggy firmware
+> +                */
+> +       } while (num_returned && num_remaining);
+> +
+> +       perf_dom->opp_count = tot_opp_cnt;
+> +       scmi_one_xfer_put(handle, t);
+> +
+> +       sort(perf_dom->opp, tot_opp_cnt, sizeof(*opp), opp_cmp_func, NULL);
+> +       return ret;
+> +}
+> +
+> +static int scmi_perf_limits_set(const struct scmi_handle *handle, u32 domain,
+> +                               u32 max_perf, u32 min_perf)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +       struct scmi_perf_set_limits *limits;
+> +
+> +       ret = scmi_one_xfer_init(handle, PERF_LIMITS_SET, SCMI_PROTOCOL_PERF,
+> +                                sizeof(*limits), 0, &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       limits = t->tx.buf;
+> +       limits->domain = cpu_to_le32(domain);
+> +       limits->max_level = cpu_to_le32(max_perf);
+> +       limits->min_level = cpu_to_le32(min_perf);
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int scmi_perf_limits_get(const struct scmi_handle *handle, u32 domain,
+> +                               u32 *max_perf, u32 *min_perf)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +       struct scmi_perf_get_limits *limits;
+> +
+> +       ret = scmi_one_xfer_init(handle, PERF_LIMITS_GET, SCMI_PROTOCOL_PERF,
+> +                                sizeof(__le32), 0, &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       *(__le32 *)t->tx.buf = cpu_to_le32(domain);
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +       if (!ret) {
+> +               limits = t->rx.buf;
+> +
+> +               *max_perf = le32_to_cpu(limits->max_level);
+> +               *min_perf = le32_to_cpu(limits->min_level);
+> +       }
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int
+> +scmi_perf_level_set(const struct scmi_handle *handle, u32 domain, u32 level)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +       struct scmi_perf_set_level *lvl;
+> +
+> +       ret = scmi_one_xfer_init(handle, PERF_LEVEL_SET, SCMI_PROTOCOL_PERF,
+> +                                sizeof(*lvl), 0, &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       lvl = t->tx.buf;
+> +       lvl->domain = cpu_to_le32(domain);
+> +       lvl->level = cpu_to_le32(level);
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int
+> +scmi_perf_level_get(const struct scmi_handle *handle, u32 domain, u32 *level)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +
+> +       ret = scmi_one_xfer_init(handle, PERF_LEVEL_GET, SCMI_PROTOCOL_PERF,
+> +                                sizeof(u32), sizeof(u32), &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       *(__le32 *)t->tx.buf = cpu_to_le32(domain);
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +       if (!ret)
+> +               *level = le32_to_cpu(*(__le32 *)t->rx.buf);
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int __scmi_perf_notify_enable(const struct scmi_handle *handle, u32 cmd,
+> +                                    u32 domain, bool enable)
+> +{
+> +       int ret;
+> +       struct scmi_xfer *t;
+> +       struct scmi_perf_notify_level_or_limits *notify;
+> +
+> +       ret = scmi_one_xfer_init(handle, cmd, SCMI_PROTOCOL_PERF,
+> +                                sizeof(*notify), 0, &t);
+> +       if (ret)
+> +               return ret;
+> +
+> +       notify = t->tx.buf;
+> +       notify->domain = cpu_to_le32(domain);
+> +       notify->notify_enable = cpu_to_le32(enable & BIT(0));
+> +
+> +       ret = scmi_do_xfer(handle, t);
+> +
+> +       scmi_one_xfer_put(handle, t);
+> +       return ret;
+> +}
+> +
+> +static int scmi_perf_limits_notify_enable(const struct scmi_handle *handle,
+> +                                         u32 domain, bool enable)
+> +{
+> +       return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LIMITS,
+> +                                        domain, enable);
+> +}
+> +
+> +static int scmi_perf_level_notify_enable(const struct scmi_handle *handle,
+> +                                        u32 domain, bool enable)
+> +{
+> +       return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LEVEL,
+> +                                        domain, enable);
+> +}
+> +
 
-Thanks,
-Shameer
+Do you have any support to correctly handle notifications without
+errors/warnings?
+It looks like this two functions are accessible to some user through
+perf_ops. But are you sure that notifications will be correctly
+handled by transport, mailbox framework and scmi protocol?
 
-> 
-> > -----Original Message-----
-> > From: Shameerali Kolothum Thodi
-> > Sent: Thursday, December 14, 2017 4:10 PM
-> > To: lorenzo.pieralisi at arm.com; robin.murphy at arm.com;
-> > marc.zyngier at arm.com; will.deacon at arm.com
-> > Cc: joro at 8bytes.org; John Garry <john.garry@huawei.com>; xuwei (O)
-> > <xuwei5@hisilicon.com>; Guohanjun (Hanjun Guo)
-> <guohanjun@huawei.com>;
-> > iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org;
-> linux-
-> > acpi at vger.kernel.org; devicetree at vger.kernel.org; Linuxarm
-> > <linuxarm@huawei.com>; Shameerali Kolothum Thodi
-> > <shameerali.kolothum.thodi@huawei.com>
-> > Subject: [PATCH v12 0/3] iommu/smmu-v3: Workaround for hisilicon
-> > 161010801 erratum(reserve HW MSI)
-> >
-> > On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
-> > deviates from the standard implementation and this breaks PCIe MSI
-> > functionality when SMMU is enabled.
-> >
-> > The HiSilicon erratum 161010801 describes this limitation of certain
-> > HiSilicon platforms to support the SMMU mappings for MSI transactions.
-> > On these platforms GICv3 ITS translator is presented with the deviceID
-> > by extending the MSI payload data to 64 bits to include the deviceID.
-> > Hence, the PCIe controller on this platforms has to differentiate the MSI
-> > payload against other DMA payload and has to modify the MSI payload.
-> > This basically makes it difficult for this platforms to have a SMMU
-> > translation for MSI.
-> >
-> > This patch implements an ACPI based quirk to reserve the hw msi regions
-> > in the smmu-v3 driver which means these address regions will not be
-> > translated and will be excluded from iova allocations.
-> >
-> > To implement this quirk, the following changes are incorporated:
-> > 1. Added a generic helper function to IORT code to retrieve and reserve
-> >    the associated ITS base address from a device IORT node. The function
-> >    has a check for smmu model to determine whether the platform requires
-> >    the HW MSI reservation or not.
-> > 2. Added smmu node entries and explicitly disabled them in hip06/hip07
-> >     dts files so that users are warned about the non-DT support for this
-> >     erratum.
-> >
-> > Changelog:
-> >
-> > v11--> v12
-> > -Thanks to Lorenzo, Fixed !CONFIG_IOMMU_API compile error(patch #1).
-> >
-> > v10 --> v11
-> > -Addressed comments from Lorenzo(patch#1)
-> > -Added Robin's Reviewed-by to patch #2
-> >
-> > v9 --> v10
-> > Addressed comments:
-> > -Moved smmu model check to iort helper function to selectively apply
-> >  the msi reservation which will make the fn call generic from iommu-dma.
-> > -Removed PCI blacklisting patch, instead added smmu nodes(disabled)
-> >  with comments to hip06/hip07 dts file.
-> >
-> > v8 --> v9
-> > -Thanks to Marc, fixed IORT helper function to reserve the ITS
-> >  translater region only.
-> > -Removed the DT support for MSI reservation and blacklisted
-> >  HiSilicon PCIe controllers on DT based systems when SMMUv3 is
-> >  enabled.
-> >
-> > v7 --> v8
-> > Addressed comments from Rob and Lorenzo:
-> >  -Modified to use DT compatible string for errata.
-> >  -Changed logic to retrieve the msi-parent for DT case.
-> >
-> > v6 --> v7
-> > Addressed request from Will to add DT support for the erratum:
-> >  - added bt binding
-> >  - add of_iommu_msi_get_resv_regions()
-> > New arm64 silicon errata entry
-> > Rename iort_iommu_{its->msi}_get_resv_regions
-> >
-> > v5 --> v6
-> > Addressed comments from Robin and Lorenzo:
-> > -No change to patch#1 .
-> > -Reverted v5 patch#2 as this might break the platforms where this quirk
-> >   is not applicable. Provided a generic function in iommu code and added
-> >   back the quirk implementation in SMMU v3 driver(patch#3)
-> >
-> > v4 --> v5
-> > Addressed comments from Robin and Lorenzo:
-> > -Added a comment to make it clear that, for now, only straightforward
-> >   HW topologies are handled while reserving ITS regions(patch #1).
-> >
-> > v3 --> v4
-> > Rebased on 4.13-rc1.
-> > Addressed comments from Robin, Will and Lorenzo:
-> > -As suggested by Robin, moved the ITS msi reservation into
-> >   iommu_dma_get_resv_regions().
-> > -Added its_count != resv region failure case(patch #1).
-> >
-> > v2 --> v3
-> > Addressed comments from Lorenzo and Robin:
-> > -Removed dev_is_pci() check in smmuV3 driver.
-> > -Don't treat device not having an ITS mapping as an error in
-> >   iort helper function.
-> >
-> > v1 --> v2
-> > -patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
-> >
-> > RFCv2 -->PATCH
-> > -Incorporated Lorenzo's review comments.
-> >
-> > RFC v1 --> RFC v2
-> > Based on Robin's review comments,
-> > -Removed  the generic erratum framework.
-> > -Using IORT/MADT tables to retrieve the ITS base addr instead
-> >  of vendor specific CSRT table.
-> >
-> > Shameer Kolothum (3):
-> >   ACPI/IORT: Add msi address regions reservation helper
-> >   iommu/dma: Add HW MSI(GICv3 ITS) address regions reservation
-> >   arm64:dts:hisilicon Disable hisilicon smmu node on hip06/hip07
-> >
-> >  arch/arm64/boot/dts/hisilicon/hip06.dtsi |  56 ++++++++++++++++
-> >  arch/arm64/boot/dts/hisilicon/hip07.dtsi |  25 +++++++
-> >  drivers/acpi/arm64/iort.c                | 111
-> ++++++++++++++++++++++++++++++-
-> >  drivers/iommu/dma-iommu.c                |   8 ++-
-> >  drivers/irqchip/irq-gic-v3-its.c         |   3 +-
-> >  include/linux/acpi_iort.h                |   7 +-
-> >  6 files changed, 204 insertions(+), 6 deletions(-)
-> >
-> > --
-> > 1.9.1
-> >
+The reason I ask is that it looks like it's better to return
+-EOPNOTSUPP or -ENODEV, maybe -EINVAL here.
+When you add notifications support you can allow these operations when
+it's safe to do it.
+
+[..]
+
+Best regards,
+Alexey Klimov
