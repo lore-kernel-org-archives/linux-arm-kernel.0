@@ -1,65 +1,112 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Fri, 12 Jan 2018 19:28:03 +0000
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.16
-In-Reply-To: <20180112020217.tqdjt3voqimr3ptx@localhost>
-References: <1515628596-4715-1-git-send-email-leoyang.li@nxp.com>
- <20180112020217.tqdjt3voqimr3ptx@localhost>
-Message-ID: <AM4PR0401MB1699179D81FBB37456325AEA8F170@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 12 Jan 2018 13:39:59 -0600
+Subject: [PATCH v2 3/7] PCI: aardvark: set host and device to the same
+ MAX payload size
+In-Reply-To: <20180112164644.5611fe3b@windsurf.lan>
+References: <20170928125838.11887-1-thomas.petazzoni@free-electrons.com>
+ <20170928125838.11887-4-thomas.petazzoni@free-electrons.com>
+ <20171005173102.GR25517@bhelgaas-glaptop.roam.corp.google.com>
+ <20180109163918.5e46c1a1@windsurf.lan>
+ <20180109221436.GE31640@bhelgaas-glaptop.roam.corp.google.com>
+ <20180112111448.00feb9f8@windsurf.lan>
+ <20180112144024.GB113206@bhelgaas-glaptop.roam.corp.google.com>
+ <20180112164644.5611fe3b@windsurf.lan>
+Message-ID: <20180112193959.GA205469@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 12, 2018 at 04:46:44PM +0100, Thomas Petazzoni wrote:
+> On Fri, 12 Jan 2018 08:40:24 -0600, Bjorn Helgaas wrote:
 
-
-> -----Original Message-----
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Thursday, January 11, 2018 8:02 PM
-> To: Leo Li <leoyang.li@nxp.com>
-> Cc: arm at kernel.org; shawnguo at kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [GIT PULL] updates to soc/fsl drivers for v4.16
+> > The Device Control MPS field defaults to 128 bytes.  Generic software
+> > can only change that default if it knows that every element that might
+> > receive a packet from the device can handle it.  In this case, we have
+> > no information about what the invisible Root Port can handle, so I
+> > would argue that we cannot change MPS.
+> > 
+> > In the lspci above, MPS is set to 256 bytes.  If that was done by
+> > firmware, it might be safe because it knows things about the Root Port
+> > that Linux doesn't.  But I don't think the Linux PCI core could set it
+> > to 256.
 > 
-> On Wed, Jan 10, 2018 at 05:56:36PM -0600, Li Yang wrote:
-> > Hi arm-soc maintainer,
-> >
-> > Please merge the following tag to get updates to the soc/fsl/guts
-> > driver for support of additional SoCs and more error path handling.
-> >
-> > Thanks,
-> > Leo
-> >
-> >
-> > The following changes since commit
-> b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d:
-> >
-> >   Linux 4.15-rc7 (2018-01-07 14:22:41 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
-> > tags/soc-fsl-for-4.16
-> >
-> > for you to fetch changes up to
-> 00ce0a2304014c73c2b7915215c7b3c73e2a25aa:
-> >
-> >   soc: fsl: guts: Add a NULL check for devm_kasprintf() (2018-01-10
-> > 16:54:26 -0600)
+> So you're suspecting that the firmware/bootloader has configured the
+> MPS on the E1000E device to 256 bytes ?
+
+I didn't word that very well.  It looks like *something* set it to
+256, but I don't know what.  It's possible Linux did, but I think that
+would be a bug and should be fixed.  We'd have to instrument the code
+or analyze it more closely than I have.
+
+> Isn't it dangerous for the kernel to rely on the firmware/bootloader
+> configuration ? Indeed, the firmware/bootloader might have configured
+> MPS to X bytes on the endpoint, but when the kernel boots and
+> initializes the PCIe controller, its sets the PCIe controller MPS to Y
+> bytes, with Y > X.
 > 
-> 1) This is based on much too new a release
-
-The branch was created and the first patch was applied quite a while ago.  The second patch is relatively new but very straightforward.  I rebased the branch to -rc7 just before sending the pull request thinking it would be easier for you to merge.  If that is not a preferred action, I will not do that again in the future.
-
-> 2) the fact that it's based on this new a release makes me suspect it hasn't
->    been sitting in linux-next either, at least not since before -rc7.
-
-My tree is not being merged by the Linux-next right now.  So you think we should ask Linux-next to add my tree too?
-
+> > ASPM L0s is similar.  We should only enable L0s if we can tell that
+> > both ends of the link support it.  If there's no Root Port, we don't
+> > have any ASPM capability information for the upstream end of the link,
+> > so we shouldn't enable ASPM at all.
 > 
+> Well, even without the Root Port, we are able to use the endpoint
+> configuration space to figure out whether it supports L0s, and adjust
+> the root complex configuration accordingly. This is what our patch is
+> doing for MPS, and which could be done similarly for L0s, no?
+
+Yes, this is where it would get machine-specific.  I don't know how
+that should be structured, or even whether it's really worthwhile.  I
+think the core should make it *work* with the least-common-denominator
+approach, but I'm not convinced that a lot of effort should be put
+into optimizing a topology that doesn't follow the spec.  A driver
+could do this outside the core, but I think it would be better to put
+the effort into making the topology more standard.
+
+Why exactly *doesn't* Aardvark expose the Root Port?  I assume it does
+actually exist, since there is actually a link leading to the slot,
+and there has to be *something* at the upstream end of that link.
+
+> > I had the impression that these patches were required for correct
+> > functionality, not just to improve performance.  But maybe I
+> > misunderstood?
 > 
-> Conclusion: Please resend post merge window and we'll queue it up for the
-> next release. If the bugfix should go in sooner than that, I can cherry-pick
-> that into our fixes. Let me know.
+> I don't myself have the device that wasn't working, and that this patch
+> got to work, so I can't double check myself. However, indeed, I was
+> told that without this fix, some devices would not work.
+> 
+> One question: is it valid/working to have the root complex configured
+> with MPS = 128 bytes but the endpoint configured with MPS = 256 or 512
+> bytes ? Or should the MPS value be strictly equal on both sides ?
 
-I know the pull request is coming a little bit late.  But the two small patches are really simple and straightforward.  They are not technically a fix but it will be really helpful if you can take it in this merge window.  And going forward, what is your preferred time frame to send pull request to for-next?
+Per PCIe r4.0, sec 2.2.2, a device cannot transmit a TLP with a
+payload larger than its MPS.  A device receiving a TLP with a payload
+larger than its MPS must treat the TLP as malformed.
 
-Regards,
-Leo
+I think that means MPS really should be set the same on both sides so
+the device can do both DMA reads and writes safely.
+
+> Depending on your answer, there are two options:
+> 
+>  - It is a valid situation to have a root complex MPS lower than the
+>    endpoint MPS. In this case, we could for now simply unconditionally
+>    set the MPS to 128 bytes in the root complex, as a fix to get all
+>    devices working. And then separately, work on improving performance
+>    by increasing the MPS according to the endpoint capabilities.
+> 
+>  - It is not valid for the root complex MPS to be different than the
+>    endpoint MPS. In this case, then I don't see how we can do things
+>    differently than the proposed patch: we have to see what the
+>    endpoint MPS is, and adjust the root complex MPS accordingly.
+>    Indeed, the bootloader/firmware might have changed the endpoint MPS
+>    so that it is no longer the default of 128 bytes.
+
+All devices are guaranteed to support MPS = 128 bytes, so if you set
+the Root Port to that in the driver, we should be able to make the PCI
+core leave (or set, if necessary) all devices with MPS = 128.
+
+I think we should start with that first, then worry about performance
+optimizations separately.  I guess I'm still just shaking my head over
+the invisible Root Port mystery.  I think the other cases I know about
+are related to virtualization, where I can sort of understand why the
+Root Port is missing, but I don't think that's the situation here.
+
+Bjorn
