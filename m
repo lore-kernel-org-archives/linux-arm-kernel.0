@@ -1,154 +1,67 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Fri, 12 Jan 2018 14:55:44 +0530
-Subject: [PATCH 4/4 v7] drm/pl111: Support handling bridge timings
-In-Reply-To: <20180112074854.9560-4-linus.walleij@linaro.org>
-References: <20180112074854.9560-1-linus.walleij@linaro.org>
- <20180112074854.9560-4-linus.walleij@linaro.org>
-Message-ID: <1a2f8244-5436-5c65-7e9e-cfe2aa257d2e@codeaurora.org>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Fri, 12 Jan 2018 10:37:32 +0100
+Subject: [PATCH -next] IIO: ADC: fix return value check in
+ stm32_dfsdm_adc_probe()
+In-Reply-To: <6AADFAC011213A4C87B956458587ADB40132A0E3@dggemi507-mbx.china.huawei.com>
+References: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
+ <20180111212837.minmnjkvhudstafs@mwanda>
+ <6AADFAC011213A4C87B956458587ADB40132A0E3@dggemi507-mbx.china.huawei.com>
+Message-ID: <bd342999-d205-51fc-6f3d-4a2e69bf6a6a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 01/12/2018 01:18 PM, Linus Walleij wrote:
-> If the bridge has a too strict setup time for the incoming
-> signals, we may not be fast enough and then we need to
-> compensate by outputting the signal on the inverse clock
-> edge so it is for sure stable when the bridge samples it.
+On 01/12/2018 02:37 AM, weiyongjun (A) wrote:
+>>
+>> On Thu, Jan 11, 2018 at 11:12:41AM +0000, Wei Yongjun wrote:
+>>> In case of error, the function devm_iio_device_alloc() returns NULL
+>>> pointer not ERR_PTR(). The IS_ERR() test in the return value check
+>>> should be replaced with NULL test.
+>>>
+>>> Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC
+>> support")
+>>> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+>>> ---
+>>>  drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-
+>> dfsdm-adc.c
+>>> index e628d04..5e87140 100644
+>>> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+>>> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+>>> @@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct
+>> platform_device *pdev)
+>>>  	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
+>>>
+>>>  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
+>>> -	if (IS_ERR(iio)) {
+>>> +	if (!iio) {
+>>>  		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
+>>> -		return PTR_ERR(iio);
+>>> +		return -ENOMEM;
+>>>  	}
+>>>
+>>>  	adc = iio_priv(iio);
+>>         ^^^^^^^^^^^^^^^^^^
+>> This one doesn't return an error pointer either.  The check causes a
+>> static check warning for me.  (It can't actually fail, though so maybe
+>> it will return an error pointer in the future?)
 > 
-> Since bridges in difference to panels does not expose their
-> connectors, make the connector optional in the display
-> setup code.
+> It seems that we can simply remove the check since 'adc' can never
+> be an invalid address here.
+
+Agree, i'm preparing patches for all issue you highlight,
+
+Thanks for all your remarks
+Arnaud
 > 
-
-Since Eric has already Ack'ed it, queued to drm-misc-next so that
-the commits stay together.
-
-Thanks,
-Archit
-
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v6->v7:
-> - Collect Eric's ACK.
-> ChangeLog v5->v6:
-> - Collect Laurent's ACK.
-> ChangeLog v4->v5:
-> - Use the new bridge timings setup method.
-> ---
->   drivers/gpu/drm/pl111/Kconfig         |  1 +
->   drivers/gpu/drm/pl111/pl111_display.c | 35 +++++++++++++++++++++++++++++++----
->   drivers/gpu/drm/pl111/pl111_drv.c     | 20 +++++++++++---------
->   3 files changed, 43 insertions(+), 13 deletions(-)
+> Regards,
+> Yongjun Wei
 > 
-> diff --git a/drivers/gpu/drm/pl111/Kconfig b/drivers/gpu/drm/pl111/Kconfig
-> index e5e2abd66491..82cb3e60ddc8 100644
-> --- a/drivers/gpu/drm/pl111/Kconfig
-> +++ b/drivers/gpu/drm/pl111/Kconfig
-> @@ -8,6 +8,7 @@ config DRM_PL111
->   	select DRM_GEM_CMA_HELPER
->   	select DRM_BRIDGE
->   	select DRM_PANEL_BRIDGE
-> +	select DRM_DUMB_VGA_DAC
->   	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE
->   	help
->   	  Choose this option for DRM support for the PL111 CLCD controller.
-> diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-> index 06c4bf756b69..7fe4040aea46 100644
-> --- a/drivers/gpu/drm/pl111/pl111_display.c
-> +++ b/drivers/gpu/drm/pl111/pl111_display.c
-> @@ -94,6 +94,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
->   	const struct drm_display_mode *mode = &cstate->mode;
->   	struct drm_framebuffer *fb = plane->state->fb;
->   	struct drm_connector *connector = priv->connector;
-> +	struct drm_bridge *bridge = priv->bridge;
->   	u32 cntl;
->   	u32 ppl, hsw, hfp, hbp;
->   	u32 lpp, vsw, vfp, vbp;
-> @@ -143,11 +144,37 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
->   	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
->   		tim2 |= TIM2_IVS;
->   
-> -	if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
-> -		tim2 |= TIM2_IOE;
-> +	if (connector) {
-> +		if (connector->display_info.bus_flags & DRM_BUS_FLAG_DE_LOW)
-> +			tim2 |= TIM2_IOE;
->   
-> -	if (connector->display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-> -		tim2 |= TIM2_IPC;
-> +		if (connector->display_info.bus_flags &
-> +		    DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-> +			tim2 |= TIM2_IPC;
-> +	}
-> +
-> +	if (bridge) {
-> +		const struct drm_bridge_timings *btimings = bridge->timings;
-> +
-> +		/*
-> +		 * Here is when things get really fun. Sometimes the bridge
-> +		 * timings are such that the signal out from PL11x is not
-> +		 * stable before the receiving bridge (such as a dumb VGA DAC
-> +		 * or similar) samples it. If that happens, we compensate by
-> +		 * the only method we have: output the data on the opposite
-> +		 * edge of the clock so it is for sure stable when it gets
-> +		 * sampled.
-> +		 *
-> +		 * The PL111 manual does not contain proper timining diagrams
-> +		 * or data for these details, but we know from experiments
-> +		 * that the setup time is more than 3000 picoseconds (3 ns).
-> +		 * If we have a bridge that requires the signal to be stable
-> +		 * earlier than 3000 ps before the clock pulse, we have to
-> +		 * output the data on the opposite edge to avoid flicker.
-> +		 */
-> +		if (btimings && btimings->setup_time_ps >= 3000)
-> +			tim2 ^= TIM2_IPC;
-> +	}
->   
->   	tim2 |= cpl << 16;
->   	writel(tim2, priv->regs + CLCD_TIM2);
-> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-> index 201d57d5cb54..101a9c7db6ff 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drv.c
-> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-> @@ -107,11 +107,17 @@ static int pl111_modeset_init(struct drm_device *dev)
->   			ret = PTR_ERR(bridge);
->   			goto out_config;
->   		}
-> -		/*
-> -		 * TODO: when we are using a different bridge than a panel
-> -		 * (such as a dumb VGA connector) we need to devise a different
-> -		 * method to get the connector out of the bridge.
-> -		 */
-> +	} else if (bridge) {
-> +		dev_info(dev->dev, "Using non-panel bridge\n");
-> +	} else {
-> +		dev_err(dev->dev, "No bridge, exiting\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	priv->bridge = bridge;
-> +	if (panel) {
-> +		priv->panel = panel;
-> +		priv->connector = panel->connector;
->   	}
->   
->   	ret = pl111_display_init(dev);
-> @@ -125,10 +131,6 @@ static int pl111_modeset_init(struct drm_device *dev)
->   	if (ret)
->   		return ret;
->   
-> -	priv->bridge = bridge;
-> -	priv->panel = panel;
-> -	priv->connector = panel->connector;
-> -
->   	ret = drm_vblank_init(dev, 1);
->   	if (ret != 0) {
->   		dev_err(dev->dev, "Failed to init vblank\n");
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
