@@ -1,97 +1,198 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Jan 2018 13:07:45 +0100
-Subject: [PATCH v3 39/41] KVM: arm/arm64: Handle VGICv3 save/restore from the
- main VGIC code on VHE
+Date: Fri, 12 Jan 2018 13:07:39 +0100
+Subject: [PATCH v3 33/41] KVM: arm64: Configure FPSIMD traps on vcpu load/put
 In-Reply-To: <20180112120747.27999-1-christoffer.dall@linaro.org>
 References: <20180112120747.27999-1-christoffer.dall@linaro.org>
-Message-ID: <20180112120747.27999-40-christoffer.dall@linaro.org>
+Message-ID: <20180112120747.27999-34-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like we can program the GICv2 hypervisor control interface directly
-from the core vgic code, we can do the same for the GICv3 hypervisor
-control interface on VHE systems.
-
-We do this by simply calling the save/restore functions when we have VHE
-and we can then get rid of the save/restore function calls from the VHE
-world switch function.
-
-One caveat is that we now write GICv3 system register state before the
-potential early exit path in the run loop, and because we sync back
-state in the early exit path, we have to ensure that we read a
-consistent GIC state from the sync path, even though we have never
-actually run the guest with the newly written GIC state.  We solve this
-by inserting an ISB in the early exit path.
+There is no need to enable/disable traps to FP registers on every switch
+to/from the VM, because the host kernel does not use this resource
+without calling vcpu_put.  We can therefore move things around enough
+that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
+only program these during vcpu load/put.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/switch.c | 3 ---
- virt/kvm/arm/arm.c          | 1 +
- virt/kvm/arm/vgic/vgic.c    | 5 +++++
- 3 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h |  6 +++++
+ arch/arm64/kvm/hyp/switch.c      | 51 +++++++++++++++++++++++++++++-----------
+ arch/arm64/kvm/hyp/sysreg-sr.c   | 12 ++++++++--
+ 3 files changed, 53 insertions(+), 16 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 3f54c55f77a1..ffd62e31f134 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -148,6 +148,12 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+ void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+ bool __fpsimd_enabled(void);
+ 
++void __activate_traps_nvhe_load(struct kvm_vcpu *vcpu);
++void __deactivate_traps_nvhe_put(void);
++
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
++void deactivate_traps_vhe_put(void);
++
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
+ 
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 74b7d7598a51..9187afca181a 100644
+index c01bcfc3fb52..d14ab9650f81 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -395,8 +395,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	activate_traps_vhe(vcpu);
- 	__activate_vm(vcpu->kvm);
+@@ -24,22 +24,25 @@
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
  
--	__vgic_restore_state(vcpu);
--
- 	sysreg_restore_guest_state_vhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
-@@ -408,7 +406,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
- 	sysreg_save_guest_state_vhe(guest_ctxt);
--	__vgic_save_state(vcpu);
- 
- 	deactivate_traps_vhe(vcpu);
- 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 6bce8f9c55db..7aad3aa43dc9 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -716,6 +716,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
- 		    kvm_request_pending(vcpu)) {
- 			vcpu->mode = OUTSIDE_GUEST_MODE;
-+			isb(); /* Ensure work in x_flush_hwstate is committed */
- 			kvm_pmu_sync_hwstate(vcpu);
- 			if (static_branch_unlikely(&userspace_irqchip_in_use))
- 				kvm_timer_sync_hwstate(vcpu);
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 12e2a28f437e..d0a19a8c196a 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -19,6 +19,7 @@
- #include <linux/list_sort.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <asm/kvm_hyp.h>
- 
- #include "vgic.h"
- 
-@@ -753,6 +754,8 @@ static inline void vgic_save_state(struct kvm_vcpu *vcpu)
+-static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
++static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
  {
- 	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		vgic_v2_save_state(vcpu);
-+	else if (has_vhe())
-+		__vgic_v3_save_state(vcpu);
+ 	/*
+-	 * We are about to set CPTR_EL2.TFP to trap all floating point
+-	 * register accesses to EL2, however, the ARM ARM clearly states that
+-	 * traps are only taken to EL2 if the operation would not otherwise
+-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+-	 * it will cause an exception.
++	 * We are about to trap all floating point register accesses to EL2,
++	 * however, traps are only taken to EL2 if the operation would not
++	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
++	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
++	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
++	 * any access to it will cause an exception.
+ 	 */
+ 	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
+ 	    !vcpu->arch.guest_vfp_loaded) {
+ 		write_sysreg(1 << 30, fpexc32_el2);
+ 		isb();
+ 	}
++}
++
++static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
++{
+ 	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+ 
+ 	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+@@ -61,10 +64,12 @@ static void __hyp_text __deactivate_traps_common(void)
+ 	write_sysreg(0, pmuserenr_el0);
  }
  
- /* Sync back the hardware VGIC state into our emulation after a guest's run. */
-@@ -777,6 +780,8 @@ static inline void vgic_restore_state(struct kvm_vcpu *vcpu)
+-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
  {
- 	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
- 		vgic_v2_restore_state(vcpu);
-+	else if (has_vhe())
-+		__vgic_v3_restore_state(vcpu);
+ 	u64 val;
+ 
++	__activate_traps_fpsimd32(vcpu);
++
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+ 	val &= ~CPACR_EL1_ZEN;
+@@ -73,14 +78,26 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+ 	else
+ 		val &= ~CPACR_EL1_FPEN;
+ 	write_sysreg(val, cpacr_el1);
++}
+ 
++void deactivate_traps_vhe_put(void)
++{
++	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
++}
++
++static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++{
+ 	write_sysreg(__kvm_hyp_vector, vbar_el1);
  }
  
- /* Flush our emulation state into the GIC hardware before entering the guest. */
+-static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
++void __hyp_text __activate_traps_nvhe_load(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
++	vcpu = kern_hyp_va(vcpu);
++
++	__activate_traps_fpsimd32(vcpu);
++
+ 	val = CPTR_EL2_DEFAULT;
+ 	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+ 	if (vcpu->arch.guest_vfp_loaded)
+@@ -90,6 +107,15 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ 	write_sysreg(val, cptr_el2);
+ }
+ 
++void __hyp_text __deactivate_traps_nvhe_put(void)
++{
++	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
++}
++
++static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
++{
++}
++
+ static hyp_alternate_select(__activate_traps_arch,
+ 			    __activate_traps_nvhe, __activate_traps_vhe,
+ 			    ARM64_HAS_VIRT_HOST_EXTN);
+@@ -111,12 +137,10 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ 
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+-	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+ 
+-static void __hyp_text __deactivate_traps_nvhe(void)
+-{
++static void __hyp_text __deactivate_traps_nvhe(void) {
+ 	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+ 
+ 	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
+@@ -124,7 +148,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
+ 
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_RW, hcr_el2);
+-	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+ }
+ 
+ static hyp_alternate_select(__deactivate_traps_arch,
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index d225f5797651..7943d5b4dbcb 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -237,8 +237,10 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+ 	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+ 	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+ 
+-	if (!has_vhe())
++	if (!has_vhe()) {
++		kvm_call_hyp(__activate_traps_nvhe_load, vcpu);
+ 		return;
++	}
+ 
+ 	__sysreg_save_user_state(host_ctxt);
+ 
+@@ -253,6 +255,8 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+ 	__sysreg_restore_el1_state(guest_ctxt);
+ 
+ 	vcpu->arch.sysregs_loaded_on_cpu = true;
++
++	activate_traps_vhe_load(vcpu);
+ }
+ 
+ /**
+@@ -282,8 +286,12 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+ 		vcpu->arch.guest_vfp_loaded = 0;
+ 	}
+ 
+-	if (!has_vhe())
++	if (!has_vhe()) {
++		kvm_call_hyp(__deactivate_traps_nvhe_put);
+ 		return;
++	}
++
++	deactivate_traps_vhe_put();
+ 
+ 	__sysreg_save_el1_state(guest_ctxt);
+ 	__sysreg_save_user_state(guest_ctxt);
 -- 
 2.14.2
