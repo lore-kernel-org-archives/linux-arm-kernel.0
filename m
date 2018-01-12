@@ -1,88 +1,105 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Fri, 12 Jan 2018 15:51:07 -0200
-Subject: [PATCH] usb: dwc2: Fix endless deferral probe
-In-Reply-To: <CAK8P3a3yZKnBM9gD-0YiHdMuHXUV=11vxGgFsZvQSkbM=B5Mxw@mail.gmail.com>
-References: <1515526134-2148-1-git-send-email-stefan.wahren@i2se.com>
- <CAK8P3a3eggC=XWLxr-A+pdaXj-0kMZ4aoX3hRyg5tLUknoDeBA@mail.gmail.com>
- <7ef21b99-67c8-b246-cc9a-b7202264a7a0@i2se.com>
- <CAK8P3a3GdHvBBPR3D_qO5+Zjr1CUBMLOAvjTiMQEMO1NtKjb3w@mail.gmail.com>
- <277384ef-b30c-fb5a-5ffe-1efc15c500bb@i2se.com>
- <CAK8P3a3yZKnBM9gD-0YiHdMuHXUV=11vxGgFsZvQSkbM=B5Mxw@mail.gmail.com>
-Message-ID: <20180112155107.39b9d765@vento.lan>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 12 Jan 2018 09:52:03 -0800
+Subject: [PATCH v3] rcutorture: Add basic ARM64 support to run scripts
+In-Reply-To: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
+References: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
+Message-ID: <20180112175203.GX9671@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 12 Jan 2018 10:18:59 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
-
-> On Fri, Jan 12, 2018 at 9:06 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > Am 12.01.2018 um 00:32 schrieb Arnd Bergmann:  
-> >> On Wed, Jan 10, 2018 at 1:15 PM, Stefan Wahren <stefan.wahren@i2se.com>  
+On Fri, Jan 12, 2018 at 06:11:32PM +0800, lianglihao at huawei.com wrote:
+> From: Lihao Liang <lianglihao@huawei.com>
 > 
-> >> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> >> index b4964b067aec..93b55fb71d54 100644
-> >> --- a/drivers/phy/phy-core.c
-> >> +++ b/drivers/phy/phy-core.c
-> >> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node
-> >> *np, int index)
-> >>          if (ret)
-> >>                  return ERR_PTR(-ENODEV);
-> >>
-> >> +       /* This phy type handled by the usb-phy subsystem for now */
-> >> +       if (of_device_is_compatible(np, "usb-nop-xceiv"))
-> >> +               return ERR_PTR(-ENODEV);
-> >> +
-> >>          mutex_lock(&phy_provider_mutex);
-> >>          phy_provider = of_phy_provider_lookup(args.np);
-> >>          if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner))
-> >> {  
-> >
-> >
-> > I tried this, but it doesn't work. "np" is the node of the USB controller,
-> > not of the phy?  
+> This commit adds support of the qemu command qemu-system-aarch64
+> to rcutorture.
 > 
-> Correct, that was a really dumb mistake on my end, I'm glad I asked
-> you to try it first.
+> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
+
+This is to replace your previous patch, not to apply on top of it,
+correct?  (Either way is fine, just please let me know.)
+
+							Thanx, Paul
+
+> ---
 > 
-> I'll fix it up and send the right version with a proper changelog right away.
-
-I suspect you meant to do, instead:
-
-
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index b4964b067aec..584cc1469f7d 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
- 	if (ret)
- 		return ERR_PTR(-ENODEV);
- 
-+       /* This phy type handled by the usb-phy subsystem for now */
-+       if (of_device_is_compatible(args.np, "usb-nop-xceiv"))
-+		return ERR_PTR(-ENODEV);
-+
- 	mutex_lock(&phy_provider_mutex);
- 	phy_provider = of_phy_provider_lookup(args.np);
- 	if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
-
-
-(e. g. args.np, instead of np).
-
-The above works for me on RPi3:
-
-$ uname -a
-Linux raspberrypi 4.15.0-rc7-mcc+ #28 SMP Fri Jan 12 12:35:19 EST 2018 armv7l GNU/Linux
-
-$ lsusb
-Bus 001 Device 005: ID 045e:0750 Microsoft Corp. Wired Keyboard 600
-Bus 001 Device 004: ID 0572:960c Conexant Systems (Rockwell), Inc. DVBSky S960C DVB-S2 tuner
-Bus 001 Device 003: ID 0424:ec00 Standard Microsystems Corp. SMSC9512/9514 Fast Ethernet Adapter
-Bus 001 Device 002: ID 0424:9514 Standard Microsystems Corp. SMC9514 Hub
-Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-
-So, if you change np -> args.np, feel free to add my:
-
-Tested-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-
-Regards,
-Mauro
+> Comparing to the previous version, this patch lifts the limitation of
+> maximum 8 CPUs of option "-M virt" by adding "gic-version=host" to it.
+> This allows qemu to use the maximum CPU number supported by the actual
+> hardware.
+> 
+> This commit is against RCU's git branch rcu/dev
+> 
+> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
+> 
+> 
+>  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
+> index 07a1377..65f6655 100644
+> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
+> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
+> @@ -136,6 +136,9 @@ identify_boot_image () {
+>  		qemu-system-x86_64|qemu-system-i386)
+>  			echo arch/x86/boot/bzImage
+>  			;;
+> +		qemu-system-aarch64)
+> +			echo arch/arm64/boot/Image
+> +			;;
+>  		*)
+>  			echo vmlinux
+>  			;;
+> @@ -158,6 +161,9 @@ identify_qemu () {
+>  	elif echo $u | grep -q "Intel 80386"
+>  	then
+>  		echo qemu-system-i386
+> +	elif echo $u | grep -q aarch64
+> +	then
+> +		echo qemu-system-aarch64
+>  	elif uname -a | grep -q ppc64
+>  	then
+>  		echo qemu-system-ppc64
+> @@ -176,16 +182,20 @@ identify_qemu () {
+>  # Output arguments for the qemu "-append" string based on CPU type
+>  # and the TORTURE_QEMU_INTERACTIVE environment variable.
+>  identify_qemu_append () {
+> +	local console=ttyS0
+>  	case "$1" in
+>  	qemu-system-x86_64|qemu-system-i386)
+>  		echo noapic selinux=0 initcall_debug debug
+>  		;;
+> +	qemu-system-aarch64)
+> +		console=ttyAMA0
+> +		;;
+>  	esac
+>  	if test -n "$TORTURE_QEMU_INTERACTIVE"
+>  	then
+>  		echo root=/dev/sda
+>  	else
+> -		echo console=ttyS0
+> +		echo console=$console
+>  	fi
+>  }
+> 
+> @@ -197,6 +207,9 @@ identify_qemu_args () {
+>  	case "$1" in
+>  	qemu-system-x86_64|qemu-system-i386)
+>  		;;
+> +	qemu-system-aarch64)
+> +		echo -machine virt,gic-version=host -cpu host
+> +		;;
+>  	qemu-system-ppc64)
+>  		echo -enable-kvm -M pseries -nodefaults
+>  		echo -device spapr-vscsi
+> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
+>  		echo $2
+>  	else
+>  		case "$1" in
+> -		qemu-system-x86_64|qemu-system-i386)
+> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
+>  			echo $2 -smp $3
+>  			;;
+>  		qemu-system-ppc64)
+> -- 
+> 2.7.4
+> 
