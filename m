@@ -1,118 +1,46 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 12 Jan 2018 16:22:53 +0200
-Subject: [PATCH v2 06/16] ARM: dts: pxa: update pwm-cells
+Date: Fri, 12 Jan 2018 16:22:54 +0200
+Subject: [PATCH v2 07/16] arm64: dts: rockchip: update pwm-cells
 In-Reply-To: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1515766983-15151-7-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1515766983-15151-8-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Update pwm-cells to 2 to allow initialization of channel number an period.
 
+Cc: Brian Norris <briannorris@chromium.org>
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- arch/arm/boot/dts/pxa25x.dtsi | 4 ++--
- arch/arm/boot/dts/pxa27x.dtsi | 8 ++++----
- arch/arm/boot/dts/pxa3xx.dtsi | 8 ++++----
- 3 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 2 +-
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
-index 95d59be97213..8c55b3552c42 100644
---- a/arch/arm/boot/dts/pxa25x.dtsi
-+++ b/arch/arm/boot/dts/pxa25x.dtsi
-@@ -70,14 +70,14 @@
- 		pwm0: pwm at 40b00000 {
- 			compatible = "marvell,pxa250-pwm";
- 			reg = <0x40b00000 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM0>;
- 		};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index 0384e3121f18..0c790ec387eb 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -77,7 +77,7 @@
  
- 		pwm1: pwm at 40b00010 {
- 			compatible = "marvell,pxa250-pwm";
- 			reg = <0x40b00010 0x10>;
+ 	backlight: backlight {
+ 		compatible = "pwm-backlight";
+-		pwms = <&cros_ec_pwm 1>;
++		pwms = <&cros_ec_pwm 1 65535>;
+ 		brightness-levels = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+ 				     17 18 19 20 21 22 23 24 25 26 27 28 29 30
+ 				     31 32 33 34 35 36 37 38 39 40 41 42 43 44
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index 5772c52fbfd3..aa377f9ae6ad 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -853,7 +853,7 @@ ap_i2c_audio: &i2c8 {
+ 
+ 		cros_ec_pwm: ec-pwm {
+ 			compatible = "google,cros-ec-pwm";
 -			#pwm-cells = <1>;
 +			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM1>;
  		};
  	};
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 747f750f675d..e3db171cfeb1 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -46,28 +46,28 @@
- 		pwm0: pwm at 40b00000 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40b00000 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM0>;
- 		};
- 
- 		pwm1: pwm at 40b00010 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40b00010 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM1>;
- 		};
- 
- 		pwm2: pwm at 40c00000 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40c00000 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM0>;
- 		};
- 
- 		pwm3: pwm at 40c00010 {
- 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
- 			reg = <0x40c00010 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM1>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index 55c75b67351c..1f37295b05a3 100644
---- a/arch/arm/boot/dts/pxa3xx.dtsi
-+++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -200,7 +200,7 @@
- 		pwm0: pwm at 40b00000 {
- 			compatible = "marvell,pxa270-pwm";
- 			reg = <0x40b00000 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM0>;
- 			status = "disabled";
- 		};
-@@ -208,7 +208,7 @@
- 		pwm1: pwm at 40b00010 {
- 			compatible = "marvell,pxa270-pwm";
- 			reg = <0x40b00010 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM1>;
- 			status = "disabled";
- 		};
-@@ -216,7 +216,7 @@
- 		pwm2: pwm at 40c00000 {
- 			compatible = "marvell,pxa270-pwm";
- 			reg = <0x40c00000 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM0>;
- 			status = "disabled";
- 		};
-@@ -224,7 +224,7 @@
- 		pwm3: pwm at 40c00010 {
- 			compatible = "marvell,pxa270-pwm";
- 			reg = <0x40c00010 0x10>;
--			#pwm-cells = <1>;
-+			#pwm-cells = <2>;
- 			clocks = <&clks CLK_PWM1>;
- 			status = "disabled";
- 		};
+ };
 -- 
 2.7.4
