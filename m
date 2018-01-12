@@ -1,91 +1,82 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 12 Jan 2018 14:38:13 +0100
-Subject: [PATCH 3/3] soc: brcmstb: Avoid error messages on non-STB platforms
-In-Reply-To: <20180112133813.3716-1-thierry.reding@gmail.com>
-References: <20180112133813.3716-1-thierry.reding@gmail.com>
-Message-ID: <20180112133813.3716-3-thierry.reding@gmail.com>
+From: konrad@darnok.org (Konrad Rzeszutek Wilk)
+Date: Fri, 12 Jan 2018 08:39:41 -0500
+Subject: [PATCH 06/22] swiotlb: rename swiotlb_free to swiotlb_exit
+In-Reply-To: <20180110080932.14157-7-hch@lst.de>
+References: <20180110080932.14157-1-hch@lst.de>
+ <20180110080932.14157-7-hch@lst.de>
+Message-ID: <20180112133939.GF26900@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Wed, Jan 10, 2018 at 09:09:16AM +0100, Christoph Hellwig wrote:
 
-Move the check for STB platforms up into the early initcall so that the
-code can abort early (and without an error) if it runs on non-STB
-platforms.
+OK?
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/soc/bcm/brcmstb/biuctrl.c | 29 +++++++++++++----------------
- 1 file changed, 13 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/soc/bcm/brcmstb/biuctrl.c b/drivers/soc/bcm/brcmstb/biuctrl.c
-index 2b23ae7b5e9b..1044cc6c3ffc 100644
---- a/drivers/soc/bcm/brcmstb/biuctrl.c
-+++ b/drivers/soc/bcm/brcmstb/biuctrl.c
-@@ -162,22 +162,15 @@ static void __init mcp_b53_set(void)
- 	cbc_writel(reg, CPU_WRITEBACK_CTRL_REG);
- }
- 
--static int __init setup_hifcpubiuctrl_regs(void)
-+static int __init setup_hifcpubiuctrl_regs(struct device_node *np)
- {
--	struct device_node *np, *cpu_dn;
-+	struct device_node *cpu_dn;
- 	int ret = 0;
- 
--	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
--	if (!np) {
--		pr_err("missing BIU control node\n");
--		return -ENODEV;
--	}
--
- 	cpubiuctrl_base = of_iomap(np, 0);
- 	if (!cpubiuctrl_base) {
- 		pr_err("failed to remap BIU control base\n");
--		ret = -ENOMEM;
--		goto out;
-+		return -ENOMEM;
- 	}
- 
- 	mcp_wr_pairing_en = of_property_read_bool(np, "brcm,write-pairing");
-@@ -185,8 +178,7 @@ static int __init setup_hifcpubiuctrl_regs(void)
- 	cpu_dn = of_get_cpu_node(0, NULL);
- 	if (!cpu_dn) {
- 		pr_err("failed to obtain CPU device node\n");
--		ret = -ENODEV;
--		goto out;
-+		return -ENODEV;
- 	}
- 
- 	if (of_device_is_compatible(cpu_dn, "brcm,brahma-b15"))
-@@ -201,9 +193,8 @@ static int __init setup_hifcpubiuctrl_regs(void)
- 
- 	if (BRCM_ID(brcmstb_get_family_id()) == 0x7260)
- 		cpubiuctrl_regs = b53_cpubiuctrl_no_wb_regs;
--out:
--	of_node_put(np);
--	return ret;
-+
-+	return 0;
- }
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -242,9 +233,15 @@ static struct syscore_ops brcmstb_cpu_credit_syscore_ops = {
- 
- static int __init brcmstb_biuctrl_init(void)
- {
-+	struct device_node *np;
- 	int ret;
- 
--	setup_hifcpubiuctrl_regs();
-+	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
-+	if (!np)
-+		return 0;
-+
-+	setup_hifcpubiuctrl_regs(np);
-+	of_node_put(np);
- 
- 	ret = mcp_write_pairing_set();
- 	if (ret) {
--- 
-2.15.1
+Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/powerpc/kernel/dma-swiotlb.c | 2 +-
+>  arch/x86/kernel/pci-swiotlb.c     | 2 +-
+>  include/linux/swiotlb.h           | 4 ++--
+>  lib/swiotlb.c                     | 2 +-
+>  4 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/powerpc/kernel/dma-swiotlb.c b/arch/powerpc/kernel/dma-swiotlb.c
+> index 506ac4fafac5..88f3963ca30f 100644
+> --- a/arch/powerpc/kernel/dma-swiotlb.c
+> +++ b/arch/powerpc/kernel/dma-swiotlb.c
+> @@ -121,7 +121,7 @@ static int __init check_swiotlb_enabled(void)
+>  	if (ppc_swiotlb_enable)
+>  		swiotlb_print_info();
+>  	else
+> -		swiotlb_free();
+> +		swiotlb_exit();
+>  
+>  	return 0;
+>  }
+> diff --git a/arch/x86/kernel/pci-swiotlb.c b/arch/x86/kernel/pci-swiotlb.c
+> index 0d77603c2f50..0ee0f8f34251 100644
+> --- a/arch/x86/kernel/pci-swiotlb.c
+> +++ b/arch/x86/kernel/pci-swiotlb.c
+> @@ -120,7 +120,7 @@ void __init pci_swiotlb_late_init(void)
+>  {
+>  	/* An IOMMU turned us off. */
+>  	if (!swiotlb)
+> -		swiotlb_free();
+> +		swiotlb_exit();
+>  	else {
+>  		printk(KERN_INFO "PCI-DMA: "
+>  		       "Using software bounce buffering for IO (SWIOTLB)\n");
+> diff --git a/include/linux/swiotlb.h b/include/linux/swiotlb.h
+> index 24ed817082ee..606375e35d87 100644
+> --- a/include/linux/swiotlb.h
+> +++ b/include/linux/swiotlb.h
+> @@ -115,10 +115,10 @@ extern int
+>  swiotlb_dma_supported(struct device *hwdev, u64 mask);
+>  
+>  #ifdef CONFIG_SWIOTLB
+> -extern void __init swiotlb_free(void);
+> +extern void __init swiotlb_exit(void);
+>  unsigned int swiotlb_max_segment(void);
+>  #else
+> -static inline void swiotlb_free(void) { }
+> +static inline void swiotlb_exit(void) { }
+>  static inline unsigned int swiotlb_max_segment(void) { return 0; }
+>  #endif
+>  
+> diff --git a/lib/swiotlb.c b/lib/swiotlb.c
+> index 125c1062119f..cf5311908fa9 100644
+> --- a/lib/swiotlb.c
+> +++ b/lib/swiotlb.c
+> @@ -417,7 +417,7 @@ swiotlb_late_init_with_tbl(char *tlb, unsigned long nslabs)
+>  	return -ENOMEM;
+>  }
+>  
+> -void __init swiotlb_free(void)
+> +void __init swiotlb_exit(void)
+>  {
+>  	if (!io_tlb_orig_addr)
+>  		return;
+> -- 
+> 2.14.2
+> 
