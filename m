@@ -1,197 +1,86 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Fri, 12 Jan 2018 18:59:59 +0100
-Subject: [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps receiver) power
- control driver
-In-Reply-To: <20180112153903.GB5992@localhost>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost>
-Message-ID: <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 12 Jan 2018 18:00:48 +0000
+Subject: EDAC driver for ARMv8 L1/L2 cache
+In-Reply-To: <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+References: <VI1PR04MB2078DBC9381EA574CE5DA4B09A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180109214332.ejiak6f35tnhbpke@pd.tnic>
+ <VI1PR04MB20788AC2E71A3CFFC37B85BB9A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <bc8d7450-3f58-95c2-42c2-d16b2f7a76e4@linux.intel.com>
+ <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112171251.4ricaz3lzditr7pi@pd.tnic>
+ <VI1PR04MB2078B4491702765BA546C5539A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
+ <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+Message-ID: <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Johan,
-
-> Am 12.01.2018 um 16:39 schrieb Johan Hovold <johan@kernel.org>:
+On Fri, Jan 12, 2018 at 05:44:56PM +0000, York Sun wrote:
+> On 01/12/2018 09:38 AM, Mark Rutland wrote:
+> > On Fri, Jan 12, 2018 at 05:17:54PM +0000, York Sun wrote:
+> >> On 01/12/2018 09:13 AM, Borislav Petkov wrote:
+> >>> On Fri, Jan 12, 2018 at 04:48:05PM +0000, York Sun wrote:
+> >>>> I see Stratix10 has A53 core. I am concerned on reading the
+> >>>> CPUMERRSR_EL1 and L2MERRSR_EL1. The are IMPLEMENTATION DEFINED
+> >>>> registers. They may not be available on all SoCs, or all time.
+> >>>
+> >>> Is there something like CPUID on x86, on ARM64 which denotes presence of
+> >>> a certain feature?
+> >>>
+> >>> Or is that thing devicetree?
+> >>
+> >> This feature is available on the SoC I am working on (NXP LS1046A). It
+> >> seems always there. I don't know if there is any register denoting the
+> >> existence of such feature.
+> > 
+> > There is no architectural register describing this.
+> > 
+> > Judging by the Cortex-A53 TRM, there is no IMP DEF / auxilliary register
+> > describing this.
+> > 
+> > Regardless, a DT binding is necessary due to potential interactions with
+> > FW, hypervisors, etc.
+> > 
+> >> I guess we can use device tree if this feature exists. Not sure if
+> >> big.LITTLE is a concern here.
+> > 
+> > There are big.LITTLE systems with Cortex-A53, so we definitely care
+> > about big.LITTLE here.
+> > 
 > 
->> Let's restart this discussion and focus on the main roadblock (others
->> are minor details which can be sorted out later).
->> 
->> If it feels like a hack, the key issue seems to me to be the choice of
->> the API to present the GPS data to user space. Right?
-> 
-> Or even more fundamentally, does this belong in the kernel at all?
+> For a given system, for example A72-A53 big.LITTLE configuration, the
+> feature is known and can be described in DT. We have to detect which
+> core is running to determine if this feature is available. Does this
+> sound right?
 
-Yes, that can be questioned of course. It was questioned and discussed
-several times and I thought the answer was a clear yes. But let's reiterate.
+The binding will need to explicitly describe the set of CPUs the feature
+is usable on.
 
-> 
-> Also it seems at least part of your specific problem is that you have
-> failed to wire up the WAKEUP pin of the W2SG0004/84 properly,
+On a big.LITTLE system, I'd expect multiple nodes in the DT, similar to
+what we have for PMUs. Even if all CPUs have some EDAC functionality, it
+will differ across microarchitectures.
 
-The w2sg0004 has no wakeup pin. At least I can't find one in the data sheet.
+e.g. we'd have something like:
 
-The two pins you refer to from the 0084 data sheet are called BootSelect0/1
-in the 0004 and have a different function.
+edac-a72 {
+	compatible = "arm,cortex-a72-edac";
+	cpus = <&cpu0>, <&cpu 1>;
+	...
+};
 
-To be clear, we did not fail to wire it up. We did the design before the
-0084 was announced and available. We just had to swap in the 0084 into
-existing PCBs during production because the 0004 became EOL. Otherwise
-we would probably still use the 0004 without WAKEUP output.
+edac-a53 {
+	compatible = "arm,cortex-a53-edac";
+	cpus = <&cpu2>, <&cpu 3>;
+	...
+};
 
-To make it worse, we have no documentation for an individual board if
-an 0004 or 0084 chip is installed and there is no means how a software
-can find out which one it is talking to (especially before properly
-powering on). Therefore we can not even provide two different device
-trees or drivers or whatever, unless we ask people to open their device
-and look on the chip. Quite crazy wrt. user-friendlyness of software
-installation in 2018...
+... and it may get more complicated from there on. There may be other
+users like FW or Secure OSs that we have to interact with, this might
+get arbitrarily reset across idle, etc.
 
-Therefore, a driver must be capable to handle both chips in the same way,
-with minimalistic assumptions, even if the 0084 could provide a direct
-signal to make it easier than using serdev to monitor the data stream.
+The Cortex-A53 TRM doesn't use the term EDAC at all, and refers
+separately to "CPU Memory Error" functionality an "L2 Memory Error"
+functionality. I don't know if those are expected to be used separately.
 
->  which then
-> forces you to look at the data stream to determine the power state of
-> the chip. Judging from a quick look at the GTA04 schematics it seems
-> you've even connected the WAKEUP output to the 1V8_OUT output?!
-
-No. You failed to see that this is an optional 0R, which is not installed.
-The 0R on pin 7 (BootSelect1) to GND was removed when we did switch from
-0004 to 0084. Pin 6 (BootSelect0/WAKEUP) was never connected.
-
-> The kernel is probably not the place to be working around issues like
-> that,
-
-You appear to assume this our only motivation is to make a workaround for
-a hardware design flaw but that isn't.
-
-The purpose of the driver is to provide power management for the GPS
-subsystem which happens to be based on a chip with limited functionality.
-
-And the serdev thing is the solution, not the requirement...
-
-> even if serdev at least allows for such hacks to be fairly
-> isolated in drivers (unlike some of the earlier proposals touching core
-> code).
-
-Please tell me why there are so many hacks for hardware issues in certain
-drivers. Any why those are good and this one (if it is one at all) is not.
-
-Some picks random fgrep -iR hack drivers
-
-drivers/char/random.c: * Hack to deal with crazy userspace progams when they are all trying
-drivers/clk/meson/meson8b.c:	 * a new clk_hw, and this hack will no longer work. Releasing the ccr
-drivers/clk/samsung/clk-exynos3250.c:	/* HACK: fin_pll hardcoded to xusbxti until detection is implemented. */
-drivers/gpu/drm/amd/amdkfd/kfd_events.c:	 * This hack is wrong, but nobody is likely to notice.
-drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:		 * HACK: IGT tests expect that each plane can only have one
-drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:	/* It's a hack for s3 since in 4.9 kernel filter out cursor buffer
-drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:		/* TODO This hack should go away */
-drivers/gpu/drm/amd/display/dc/core/dc_link.c:	/* A hack to avoid failing any modes for EDID override feature on
-
-What I can learn from your discussion is that it might be considerable
-to add an optional gpio for the 0084 WAKEUP and add some logic to
-support users who have or will have that pin connected.
-
-But even then we would need a driver to handle this gpio and issue
-an on/off impulse on the other to switch states. It would be a different
-driver (variant - maybe some CONFIG option or handled by code), but not
-"no driver".
-
-> 
->> I see three reasonable options how this presentation can be done:
->> 
->> 1. char device
->> 2. tty device
->> 3. some new gps interface API (similar to network, bluetooth interfaces)
->> 4. no driver and use the UART tty directly
->> 
->> Pros and cons:
-> 
->> 4. no driver and use UART directly
->> + a non-solution seems to be attractive
->> - must turn on/off chip by gpio hacks from user-space
-> 
-> I'm not sure that would amount to more of hack then doing it in the
-> kernel would.
-
-It might not be big effort in the user-space code/scripts.
-
-But much effort to convince all the plethora of user-space client maintainers
-to integrate something. And have them roll out. And have distributions take it.
-And have users upgrade to it. 5 years later...
-
-Do you think it is easier to convince them than you? They usually assume a
-power management issue should be solved by the kernel driver.
-
-That is what Andreas did remark as motivation: provide a solution
-for *existing* user spaces.
-
-> 
->> - can not guarantee (!) to power off the chip if the last user-space
->> process using it is killed (which is essential for power-management of
->> a handheld, battery operated device)
-> 
-> That depends on how you implement things (extending gpsd, wrapper
-> script, pty daemon, ...).
-
-No. You can of course cover all standard cases but there is one fundamental
-issue which is IMHO a problem of any user-space implementation:
-
-	How can you guarantee that the chip is powered off if no
-	user-space process is using it or if the last process doing
-	this is killed by *whatever* reason?
-
-E.g. after a kill -9. Or if someone deinstalls gpsd or whatever and assumes
-(and wants a guarantee) that GPS is now turned off and never turned on drawing
-precious milliamps from the battery for no use.
-
-As it is well known, a user-space process can't protect itself against kill -9.
-Or has this recently been changed and I am not aware of?
-
-This is the fundamental reason why we need a kernel driver to provide
-reliable, repeatable and trustable power management of this chip.
-
-It is equally fundamental as a hard disk should spin down after the last
-file is closed. Even if this process ends by a kill -9.
-
-A second almost equally fundamental aspect to be considered is how you want
-to automatically and reliably turn off the chip by pure user-space code when
-entering suspend.
-
-> 
-> 
->> I would clearly prefer 3 over 2 over 1 over 4.
->> 
->> So do you see a chance that the kernel core team provides something useable
->> (not perfect) for variant 3 in reasonable time (let's say 3-6 months)?
-> 
-> No, I'm afraid not. At least not if we're talking about a framework
-> that would replace gpsd.
-
-This confirms my assumption that there is nothing really good to expect
-soon to implement a driver for variant 3.
-
-> 
->> If not, I want to suggest to accept the second-best choice 2. for now and we
->> will update the driver as soon as 3. appears. IMHO it would be a good test case
->> for a new subsystem.
-> 
-> Getting the interface right from the start is quite important, as
-> otherwise we may end up having to support a superseded one for a long
-> time.
-
-This seems to contradict your argument that user-space can very easily
-adapt to everything. If the latter were true there would be no need to
-keep old interfaces supported for a long time.
-
-So can you agree to that a battery powered portable device must have
-reliable and trustable power management? And if it provable can't be
-implemented in user-space (a single counter example suffices) it must
-be a kernel driver?
-
-BR,
-Nikolaus
+Thanks,
+Mark.
