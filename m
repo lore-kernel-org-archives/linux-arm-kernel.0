@@ -1,67 +1,21 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 12 Jan 2018 10:37:32 +0100
-Subject: [PATCH -next] IIO: ADC: fix return value check in
- stm32_dfsdm_adc_probe()
-In-Reply-To: <6AADFAC011213A4C87B956458587ADB40132A0E3@dggemi507-mbx.china.huawei.com>
-References: <1515669161-125426-1-git-send-email-weiyongjun1@huawei.com>
- <20180111212837.minmnjkvhudstafs@mwanda>
- <6AADFAC011213A4C87B956458587ADB40132A0E3@dggemi507-mbx.china.huawei.com>
-Message-ID: <bd342999-d205-51fc-6f3d-4a2e69bf6a6a@st.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 12 Jan 2018 15:11:02 +0530
+Subject: [PATCH v5 03/44] clk: davinci: Add platform information for TI
+ DA830 PLL
+In-Reply-To: <1515377863-20358-4-git-send-email-david@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-4-git-send-email-david@lechnology.com>
+Message-ID: <61565f45-3017-b5fb-badb-be43e415fb78@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/12/2018 02:37 AM, weiyongjun (A) wrote:
->>
->> On Thu, Jan 11, 2018 at 11:12:41AM +0000, Wei Yongjun wrote:
->>> In case of error, the function devm_iio_device_alloc() returns NULL
->>> pointer not ERR_PTR(). The IS_ERR() test in the return value check
->>> should be replaced with NULL test.
->>>
->>> Fixes: e2e6771c6462 ("IIO: ADC: add STM32 DFSDM sigma delta ADC
->> support")
->>> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
->>> ---
->>>  drivers/iio/adc/stm32-dfsdm-adc.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c b/drivers/iio/adc/stm32-
->> dfsdm-adc.c
->>> index e628d04..5e87140 100644
->>> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
->>> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
->>> @@ -1100,9 +1100,9 @@ static int stm32_dfsdm_adc_probe(struct
->> platform_device *pdev)
->>>  	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
->>>
->>>  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
->>> -	if (IS_ERR(iio)) {
->>> +	if (!iio) {
->>>  		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
->>> -		return PTR_ERR(iio);
->>> +		return -ENOMEM;
->>>  	}
->>>
->>>  	adc = iio_priv(iio);
->>         ^^^^^^^^^^^^^^^^^^
->> This one doesn't return an error pointer either.  The check causes a
->> static check warning for me.  (It can't actually fail, though so maybe
->> it will return an error pointer in the future?)
+On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+> This adds platform-specific declarations for the PLL clocks on TI DA830/
+> OMAP-L137/AM17XX SoCs.
 > 
-> It seems that we can simply remove the check since 'adc' can never
-> be an invalid address here.
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-Agree, i'm preparing patches for all issue you highlight,
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 
-Thanks for all your remarks
-Arnaud
-> 
-> Regards,
-> Yongjun Wei
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Thanks,
+Sekhar
