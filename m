@@ -1,27 +1,35 @@
 From: william.wu@rock-chips.com (William Wu)
-Date: Fri, 12 Jan 2018 18:08:23 +0800
-Subject: [PATCH 2/3] arm64: dts: rockchip: add USB3 OTG reset for Type-C PHY
- on rk3399
+Date: Fri, 12 Jan 2018 18:08:22 +0800
+Subject: [PATCH 1/3] dt-bindings: phy: phy-rockchip-typec: add usb3 otg reset
 In-Reply-To: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
 References: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1515751704-13213-3-git-send-email-william.wu@rock-chips.com>
+Message-ID: <1515751704-13213-2-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB3 OTG reset for Type-C PHY. It can be used to hold the USB3
-OTG controller in reset state before initializing the Type-C PHY.
+This patch adds USB3 OTG reset property for rk3399 Type-C PHY
+to hold the USB3 controller in reset state.
 
 Signed-off-by: William Wu <william.wu@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index d340b58a..4e89d00 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1377,8 +1377,9 @@
- 		power-domains = <&power RK3399_PD_TCPD0>;
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+index 6ea867e..db2902e 100644
+--- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+@@ -13,7 +13,7 @@ Required properties:
+  - assigned-clock-rates : the phy core clk frequency, shall be: 50000000
+  - resets : a list of phandle + reset specifier pairs
+  - reset-names : string reset name, must be:
+-		 "uphy", "uphy-pipe", "uphy-tcphy"
++		 "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg"
+  - extcon : extcon specifier for the Power Delivery
+ 
+ Note, there are 2 type-c phys for RK3399, and they are almost identical, except
+@@ -56,8 +56,9 @@ Example:
+ 		assigned-clock-rates = <50000000>;
  		resets = <&cru SRST_UPHY0>,
  			 <&cru SRST_UPHY0_PIPE_L00>,
 -			 <&cru SRST_P_UPHY0_TCPHY>;
@@ -29,11 +37,11 @@ index d340b58a..4e89d00 100644
 +			 <&cru SRST_P_UPHY0_TCPHY>,
 +			 <&cru SRST_A_USB3_OTG0>;
 +		reset-names = "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg";
- 		rockchip,grf = <&grf>;
  		rockchip,typec-conn-dir = <0xe580 0 16>;
  		rockchip,usb3tousb2-en = <0xe580 3 19>;
-@@ -1406,8 +1407,9 @@
- 		power-domains = <&power RK3399_PD_TCPD1>;
+ 		rockchip,external-psm = <0xe588 14 30>;
+@@ -84,8 +85,9 @@ Example:
+ 		assigned-clock-rates = <50000000>;
  		resets = <&cru SRST_UPHY1>,
  			 <&cru SRST_UPHY1_PIPE_L00>,
 -			 <&cru SRST_P_UPHY1_TCPHY>;
@@ -41,8 +49,8 @@ index d340b58a..4e89d00 100644
 +			 <&cru SRST_P_UPHY1_TCPHY>,
 +			 <&cru SRST_A_USB3_OTG1>;
 +		reset-names = "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg";
- 		rockchip,grf = <&grf>;
  		rockchip,typec-conn-dir = <0xe58c 0 16>;
  		rockchip,usb3tousb2-en = <0xe58c 3 19>;
+ 		rockchip,external-psm = <0xe594 14 30>;
 -- 
 2.0.0
