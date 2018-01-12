@@ -1,61 +1,48 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Jan 2018 13:33:34 +0100
-Subject: [PULL 2/2] KVM: arm64: Fix GICv4 init when called from vgic_its_create
+Date: Fri, 12 Jan 2018 13:33:33 +0100
+Subject: [PULL 1/2] KVM: arm/arm64: Check pagesize when allocating a hugepage
+ at Stage 2
 In-Reply-To: <20180112123334.28687-1-christoffer.dall@linaro.org>
 References: <20180112123334.28687-1-christoffer.dall@linaro.org>
-Message-ID: <20180112123334.28687-3-christoffer.dall@linaro.org>
+Message-ID: <20180112123334.28687-2-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3d1ad640f8c94 ("KVM: arm/arm64: Fix GICv4 ITS initialization
-issues") moved the vgic_supports_direct_msis() check in vgic_v4_init().
-However when vgic_v4_init is called from vgic_its_create(), the has_its
-field is not yet set. Hence vgic_supports_direct_msis returns false and
-vgic_v4_init does nothing.
+From: Punit Agrawal <punit.agrawal@arm.com>
 
-The gic/its init sequence is a bit messy, so let's be specific about the
-prerequisite checks in the various call paths instead of relying on a
-common wrapper.
+KVM only supports PMD hugepages at stage 2 but doesn't actually check
+that the provided hugepage memory pagesize is PMD_SIZE before populating
+stage 2 entries.
 
-Fixes: 3d1ad640f8c94 ("KVM: arm/arm64: Fix GICv4 ITS initialization issues")
-Reported-by: Eric Auger <eric.auger@redhat.com>
+In cases where the backing hugepage size is smaller than PMD_SIZE (such
+as when using contiguous hugepages), KVM can end up creating stage 2
+mappings that extend beyond the supplied memory.
+
+Fix this by checking for the pagesize of userspace vma before creating
+PMD hugepage at stage 2.
+
+Fixes: 66b3923a1a0f77a ("arm64: hugetlb: add support for PTE contiguous bit")
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: <stable@vger.kernel.org> # v4.5+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-init.c | 8 +++++---
- virt/kvm/arm/vgic/vgic-v4.c   | 2 +-
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ virt/kvm/arm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 62310122ee78..743ca5cb05ef 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -285,9 +285,11 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b4b69c2d1012..9dea96380339 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1310,7 +1310,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
  
--	ret = vgic_v4_init(kvm);
--	if (ret)
--		goto out;
-+	if (vgic_has_its(kvm)) {
-+		ret = vgic_v4_init(kvm);
-+		if (ret)
-+			goto out;
-+	}
- 
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_enable(vcpu);
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index 4a37292855bc..bc4265154bac 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -118,7 +118,7 @@ int vgic_v4_init(struct kvm *kvm)
- 	struct kvm_vcpu *vcpu;
- 	int i, nr_vcpus, ret;
- 
--	if (!vgic_supports_direct_msis(kvm))
-+	if (!kvm_vgic_global_state.has_gicv4)
- 		return 0; /* Nothing to see here... move along. */
- 
- 	if (dist->its_vm.vpes)
+-	if (is_vm_hugetlb_page(vma) && !logging_active) {
++	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
 -- 
 2.14.2
