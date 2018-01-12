@@ -1,444 +1,932 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Fri, 12 Jan 2018 14:55:02 +0000
-Subject: [PATCH v5 06/20] firmware: arm_scmi: add initial support for
- performance protocol
-In-Reply-To: <1514904162-11201-7-git-send-email-sudeep.holla@arm.com>
-References: <1514904162-11201-1-git-send-email-sudeep.holla@arm.com>
- <1514904162-11201-7-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CALW4P+L-YJRNZ_qv1SohM7vCWekBf+KKZos7FuZE0Tu1Yh8i-g@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 12 Jan 2018 16:00:44 +0100
+Subject: [rfc] Sound support for n9
+Message-ID: <20180112150044.GA31446@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 2, 2018 at 2:42 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> The performance protocol is intended for the performance management of
-> group(s) of device(s) that run in the same performance domain. It
-> includes even the CPUs. A performance domain is defined by a set of
-> devices that always have to run at the same performance level.
-> For example, a set of CPUs that share a voltage domain, and have a
-> common frequency control, is said to be in the same performance domain.
->
-> The commands in this protocol provide functionality to describe the
-> protocol version, describe various attribute flags, set and get the
-> performance level of a domain. It also supports discovery of the list
-> of performance levels supported by a performance domain, and the
-> properties of each performance level.
->
-> This patch adds basic support for the performance protocol.
->
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/arm_scmi/Makefile |   2 +-
->  drivers/firmware/arm_scmi/common.h |   1 +
->  drivers/firmware/arm_scmi/perf.c   | 527 +++++++++++++++++++++++++++++++++++++
->  include/linux/scmi_protocol.h      |  34 +++
->  4 files changed, 563 insertions(+), 1 deletion(-)
+Hi!
 
-[...]
+Binding documentation is pending, and code will need to be updated to
+match it.
 
-> diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
-> new file mode 100644
-> index 000000000000..a1f5cf136748
-> --- /dev/null
-> +++ b/drivers/firmware/arm_scmi/perf.c
-> @@ -0,0 +1,527 @@
-> +/*
-> + * System Control and Management Interface (SCMI) Performance Protocol
-> + *
-> + * Copyright (C) 2017 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program. If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/sort.h>
-> +
-> +#include "common.h"
-> +
-> +enum scmi_performance_protocol_cmd {
-> +       PERF_DOMAIN_ATTRIBUTES = 0x3,
-> +       PERF_DESCRIBE_LEVELS = 0x4,
-> +       PERF_LIMITS_SET = 0x5,
-> +       PERF_LIMITS_GET = 0x6,
-> +       PERF_LEVEL_SET = 0x7,
-> +       PERF_LEVEL_GET = 0x8,
-> +       PERF_NOTIFY_LIMITS = 0x9,
-> +       PERF_NOTIFY_LEVEL = 0xa,
-> +};
-> +
-> +struct scmi_opp {
-> +       u32 perf;
-> +       u32 power;
-> +       u32 trans_latency_us;
-> +};
-> +
-> +struct scmi_msg_resp_perf_attributes {
-> +       __le16 num_domains;
-> +       __le16 flags;
-> +#define POWER_SCALE_IN_MILLIWATT(x)    ((x) & BIT(0))
-> +       __le32 stats_addr_low;
-> +       __le32 stats_addr_high;
-> +       __le32 stats_size;
-> +};
-> +
-> +struct scmi_msg_resp_perf_domain_attributes {
-> +       __le32 flags;
-> +#define SUPPORTS_SET_LIMITS(x)         ((x) & BIT(31))
-> +#define SUPPORTS_SET_PERF_LVL(x)       ((x) & BIT(30))
-> +#define SUPPORTS_PERF_LIMIT_NOTIFY(x)  ((x) & BIT(29))
-> +#define SUPPORTS_PERF_LEVEL_NOTIFY(x)  ((x) & BIT(28))
-> +       __le32 rate_limit_us;
-> +       __le32 sustained_freq_khz;
-> +       __le32 sustained_perf_level;
-> +           u8 name[SCMI_MAX_STR_SIZE];
-> +};
-> +
-> +struct scmi_msg_perf_describe_levels {
-> +       __le32 domain;
-> +       __le32 level_index;
-> +};
-> +
-> +struct scmi_perf_set_limits {
-> +       __le32 domain;
-> +       __le32 max_level;
-> +       __le32 min_level;
-> +};
-> +
-> +struct scmi_perf_get_limits {
-> +       __le32 max_level;
-> +       __le32 min_level;
-> +};
-> +
-> +struct scmi_perf_set_level {
-> +       __le32 domain;
-> +       __le32 level;
-> +};
-> +
-> +struct scmi_perf_notify_level_or_limits {
-> +       __le32 domain;
-> +       __le32 notify_enable;
-> +};
-> +
-> +struct scmi_msg_resp_perf_describe_levels {
-> +       __le16 num_returned;
-> +       __le16 num_remaining;
-> +       struct {
-> +               __le32 perf_val;
-> +               __le32 power;
-> +               __le16 transition_latency_us;
-> +               __le16 reserved;
-> +       } opp[0];
-> +};
-> +
-> +struct perf_dom_info {
-> +       bool set_limits;
-> +       bool set_perf;
-> +       bool perf_limit_notify;
-> +       bool perf_level_notify;
-> +       u32 opp_count;
-> +       u32 sustained_freq_khz;
-> +       u32 sustained_perf_level;
-> +       u32 mult_factor;
-> +       char name[SCMI_MAX_STR_SIZE];
-> +       struct scmi_opp opp[MAX_OPPS];
-> +};
-> +
-> +struct scmi_perf_info {
-> +       int num_domains;
-> +       bool power_scale_mw;
-> +       u64 stats_addr;
-> +       u32 stats_size;
-> +       struct perf_dom_info *dom_info;
-> +};
-> +
-> +static int scmi_perf_attributes_get(const struct scmi_handle *handle,
-> +                                   struct scmi_perf_info *pi)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +       struct scmi_msg_resp_perf_attributes *attr;
-> +
-> +       ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
-> +                                SCMI_PROTOCOL_PERF, 0, sizeof(*attr), &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       attr = t->rx.buf;
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +       if (!ret) {
-> +               u16 flags = le16_to_cpu(attr->flags);
-> +
-> +               pi->num_domains = le16_to_cpu(attr->num_domains);
-> +               pi->power_scale_mw = POWER_SCALE_IN_MILLIWATT(flags);
-> +               pi->stats_addr = le32_to_cpu(attr->stats_addr_low) |
-> +                               (u64)le32_to_cpu(attr->stats_addr_high) << 32;
-> +               pi->stats_size = le32_to_cpu(attr->stats_size);
-> +       }
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int
-> +scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
-> +                               struct perf_dom_info *dom_info)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +       struct scmi_msg_resp_perf_domain_attributes *attr;
-> +
-> +       ret = scmi_one_xfer_init(handle, PERF_DOMAIN_ATTRIBUTES,
-> +                                SCMI_PROTOCOL_PERF, sizeof(domain),
-> +                                sizeof(*attr), &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       *(__le32 *)t->tx.buf = cpu_to_le32(domain);
-> +       attr = t->rx.buf;
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +       if (!ret) {
-> +               u32 flags = le32_to_cpu(attr->flags);
-> +
-> +               dom_info->set_limits = SUPPORTS_SET_LIMITS(flags);
-> +               dom_info->set_perf = SUPPORTS_SET_PERF_LVL(flags);
-> +               dom_info->perf_limit_notify = SUPPORTS_PERF_LIMIT_NOTIFY(flags);
-> +               dom_info->perf_level_notify = SUPPORTS_PERF_LEVEL_NOTIFY(flags);
-> +               dom_info->sustained_freq_khz =
-> +                                       le32_to_cpu(attr->sustained_freq_khz);
-> +               dom_info->sustained_perf_level =
-> +                                       le32_to_cpu(attr->sustained_perf_level);
-> +               dom_info->mult_factor = (dom_info->sustained_freq_khz * 1000) /
-> +                                       dom_info->sustained_perf_level;
-> +               memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
-> +       }
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int opp_cmp_func(const void *opp1, const void *opp2)
-> +{
-> +       const struct scmi_opp *t1 = opp1, *t2 = opp2;
-> +
-> +       return t1->perf - t2->perf;
-> +}
-> +
-> +static int
-> +scmi_perf_describe_levels_get(const struct scmi_handle *handle, u32 domain,
-> +                             struct perf_dom_info *perf_dom)
-> +{
-> +       int ret, cnt;
-> +       u32 tot_opp_cnt = 0;
-> +       u16 num_returned, num_remaining;
-> +       struct scmi_xfer *t;
-> +       struct scmi_opp *opp;
-> +       struct scmi_msg_perf_describe_levels *dom_info;
-> +       struct scmi_msg_resp_perf_describe_levels *level_info;
-> +
-> +       ret = scmi_one_xfer_init(handle, PERF_DESCRIBE_LEVELS,
-> +                                SCMI_PROTOCOL_PERF, sizeof(*dom_info), 0, &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       dom_info = t->tx.buf;
-> +       level_info = t->rx.buf;
-> +
-> +       do {
-> +               dom_info->domain = cpu_to_le32(domain);
-> +               /* Set the number of OPPs to be skipped/already read */
-> +               dom_info->level_index = cpu_to_le32(tot_opp_cnt);
-> +
-> +               ret = scmi_do_xfer(handle, t);
-> +               if (ret)
-> +                       break;
-> +
-> +               num_returned = le16_to_cpu(level_info->num_returned);
-> +               num_remaining = le16_to_cpu(level_info->num_remaining);
-> +               if (tot_opp_cnt + num_returned > MAX_OPPS) {
-> +                       dev_err(handle->dev, "No. of OPPs exceeded MAX_OPPS");
-> +                       break;
-> +               }
-> +
-> +               opp = &perf_dom->opp[tot_opp_cnt];
-> +               for (cnt = 0; cnt < num_returned; cnt++, opp++) {
-> +                       opp->perf = le32_to_cpu(level_info->opp[cnt].perf_val);
-> +                       opp->power = le32_to_cpu(level_info->opp[cnt].power);
-> +                       opp->trans_latency_us = le16_to_cpu(
-> +                               level_info->opp[cnt].transition_latency_us);
-> +
-> +                       dev_dbg(handle->dev, "Level %d Power %d Latency %dus\n",
-> +                               opp->perf, opp->power, opp->trans_latency_us);
-> +               }
-> +
-> +               tot_opp_cnt += num_returned;
-> +               /*
-> +                * check for both returned and remaining to avoid infinite
-> +                * loop due to buggy firmware
-> +                */
-> +       } while (num_returned && num_remaining);
-> +
-> +       perf_dom->opp_count = tot_opp_cnt;
-> +       scmi_one_xfer_put(handle, t);
-> +
-> +       sort(perf_dom->opp, tot_opp_cnt, sizeof(*opp), opp_cmp_func, NULL);
-> +       return ret;
-> +}
-> +
-> +static int scmi_perf_limits_set(const struct scmi_handle *handle, u32 domain,
-> +                               u32 max_perf, u32 min_perf)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +       struct scmi_perf_set_limits *limits;
-> +
-> +       ret = scmi_one_xfer_init(handle, PERF_LIMITS_SET, SCMI_PROTOCOL_PERF,
-> +                                sizeof(*limits), 0, &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       limits = t->tx.buf;
-> +       limits->domain = cpu_to_le32(domain);
-> +       limits->max_level = cpu_to_le32(max_perf);
-> +       limits->min_level = cpu_to_le32(min_perf);
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int scmi_perf_limits_get(const struct scmi_handle *handle, u32 domain,
-> +                               u32 *max_perf, u32 *min_perf)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +       struct scmi_perf_get_limits *limits;
-> +
-> +       ret = scmi_one_xfer_init(handle, PERF_LIMITS_GET, SCMI_PROTOCOL_PERF,
-> +                                sizeof(__le32), 0, &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       *(__le32 *)t->tx.buf = cpu_to_le32(domain);
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +       if (!ret) {
-> +               limits = t->rx.buf;
-> +
-> +               *max_perf = le32_to_cpu(limits->max_level);
-> +               *min_perf = le32_to_cpu(limits->min_level);
-> +       }
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int
-> +scmi_perf_level_set(const struct scmi_handle *handle, u32 domain, u32 level)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +       struct scmi_perf_set_level *lvl;
-> +
-> +       ret = scmi_one_xfer_init(handle, PERF_LEVEL_SET, SCMI_PROTOCOL_PERF,
-> +                                sizeof(*lvl), 0, &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       lvl = t->tx.buf;
-> +       lvl->domain = cpu_to_le32(domain);
-> +       lvl->level = cpu_to_le32(level);
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int
-> +scmi_perf_level_get(const struct scmi_handle *handle, u32 domain, u32 *level)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +
-> +       ret = scmi_one_xfer_init(handle, PERF_LEVEL_GET, SCMI_PROTOCOL_PERF,
-> +                                sizeof(u32), sizeof(u32), &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       *(__le32 *)t->tx.buf = cpu_to_le32(domain);
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +       if (!ret)
-> +               *level = le32_to_cpu(*(__le32 *)t->rx.buf);
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int __scmi_perf_notify_enable(const struct scmi_handle *handle, u32 cmd,
-> +                                    u32 domain, bool enable)
-> +{
-> +       int ret;
-> +       struct scmi_xfer *t;
-> +       struct scmi_perf_notify_level_or_limits *notify;
-> +
-> +       ret = scmi_one_xfer_init(handle, cmd, SCMI_PROTOCOL_PERF,
-> +                                sizeof(*notify), 0, &t);
-> +       if (ret)
-> +               return ret;
-> +
-> +       notify = t->tx.buf;
-> +       notify->domain = cpu_to_le32(domain);
-> +       notify->notify_enable = cpu_to_le32(enable & BIT(0));
-> +
-> +       ret = scmi_do_xfer(handle, t);
-> +
-> +       scmi_one_xfer_put(handle, t);
-> +       return ret;
-> +}
-> +
-> +static int scmi_perf_limits_notify_enable(const struct scmi_handle *handle,
-> +                                         u32 domain, bool enable)
-> +{
-> +       return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LIMITS,
-> +                                        domain, enable);
-> +}
-> +
-> +static int scmi_perf_level_notify_enable(const struct scmi_handle *handle,
-> +                                        u32 domain, bool enable)
-> +{
-> +       return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LEVEL,
-> +                                        domain, enable);
-> +}
-> +
+I guess burst_bclkdiv should be handled as int, not as u8?
 
-Do you have any support to correctly handle notifications without
-errors/warnings?
-It looks like this two functions are accessible to some user through
-perf_ops. But are you sure that notifications will be correctly
-handled by transport, mailbox framework and scmi protocol?
+SPDX is modern these days.
 
-The reason I ask is that it looks like it's better to return
--EOPNOTSUPP or -ENODEV, maybe -EINVAL here.
-When you add notifications support you can allow these operations when
-it's safe to do it.
-
-[..]
+Anything else that needs to be fixed?
 
 Best regards,
-Alexey Klimov
+								Pavel
+
+
+diff --git a/include/sound/n9.h b/include/sound/n9.h
+new file mode 100644
+index 0000000..b14ddf0
+--- /dev/null
++++ b/include/sound/n9.h
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright (C) 2009 Nokia
++
++#ifndef _N9_H_
++#define _N9_H_
++
++struct dfl61audio_hsmic_event {
++	void *private;
++	void (*event)(void *priv, bool on);
++};
++
++void dfl61_jack_report(int status);
++int dfl61_request_hsmicbias(bool enable);
++void dfl61_register_hsmic_event_cb(struct dfl61audio_hsmic_event *event);
++int dfl61_request_hp_enable(bool enable);
++#endif
+diff --git a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
+index 5b94a15..3823bcc 100644
+--- a/sound/soc/codecs/tlv320dac33.c
++++ b/sound/soc/codecs/tlv320dac33.c
+@@ -30,6 +32,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/gpio.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/of_gpio.h>
+ #include <linux/slab.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+@@ -1484,16 +1487,11 @@ static struct snd_soc_dai_driver dac33_dai = {
+ static int dac33_i2c_probe(struct i2c_client *client,
+ 			   const struct i2c_device_id *id)
+ {
+-	struct tlv320dac33_platform_data *pdata;
++	struct tlv320dac33_platform_data *pdata = client->dev.platform_data;
+ 	struct tlv320dac33_priv *dac33;
++	struct device_node *np = client->dev.of_node;
+ 	int ret, i;
+ 
+-	if (client->dev.platform_data == NULL) {
+-		dev_err(&client->dev, "Platform data not set\n");
+-		return -ENODEV;
+-	}
+-	pdata = client->dev.platform_data;
+-
+ 	dac33 = devm_kzalloc(&client->dev, sizeof(struct tlv320dac33_priv),
+ 			     GFP_KERNEL);
+ 	if (dac33 == NULL)
+@@ -1505,10 +1503,26 @@ static int dac33_i2c_probe(struct i2c_client *client,
+ 
+ 	i2c_set_clientdata(client, dac33);
+ 
+-	dac33->power_gpio = pdata->power_gpio;
+-	dac33->burst_bclkdiv = pdata->burst_bclkdiv;
+-	dac33->keep_bclk = pdata->keep_bclk;
+-	dac33->mode1_latency = pdata->mode1_latency;
++	if (pdata) {
++		dac33->power_gpio = pdata->power_gpio;
++		dac33->burst_bclkdiv = pdata->burst_bclkdiv;
++		dac33->keep_bclk = pdata->keep_bclk;
++		dac33->mode1_latency = pdata->mode1_latency;
++	} else if (np) {
++		ret = of_get_named_gpio(np, "power-gpio", 0);
++		if (ret >= 0)
++			dac33->power_gpio = ret;
++		else
++			dac33->power_gpio = -1;
++
++		if (of_property_read_bool(np, "keep-bclk"))
++			dac33->keep_bclk = true;
++
++		of_property_read_u8(np, "burst-bclkdiv", &dac33->burst_bclkdiv);
++	} else {
++		dev_err(&client->dev, "Platform data not set\n");
++		return -ENODEV;
++	}
+ 	if (!dac33->mode1_latency)
+ 		dac33->mode1_latency = 10000; /* 10ms */
+ 	dac33->irq = client->irq;
+@@ -1574,9 +1588,16 @@ static const struct i2c_device_id tlv320dac33_i2c_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, tlv320dac33_i2c_id);
+ 
++static const struct of_device_id tlv320dac33_of_match[] = {
++	{ .compatible = "ti,tlv320dac33", },
++	{},
++};
++MODULE_DEVICE_TABLE(i2c, tlv320dac33_of_match);
++
+ static struct i2c_driver tlv320dac33_i2c_driver = {
+ 	.driver = {
+ 		.name = "tlv320dac33-codec",
++		.of_match_table = of_match_ptr(tlv320dac33_of_match),
+ 	},
+ 	.probe		= dac33_i2c_probe,
+ 	.remove		= dac33_i2c_remove,
+diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
+index f5451c7..2772414 100644
+--- a/sound/soc/omap/Kconfig
++++ b/sound/soc/omap/Kconfig
+@@ -47,6 +47,18 @@ config SND_OMAP_SOC_RX51
+ 	  Say Y if you want to add support for SoC audio on Nokia N900
+ 	  cellphone.
+ 
++config SND_OMAP_SOC_N9
++	tristate "SoC Audio support for Nokia N9/N950"
++	depends on SND_OMAP_SOC && ARM && I2C
++	select SND_OMAP_SOC_MCBSP
++	select SND_SOC_TWL4030
++	select SND_SOC_TLV320DAC33
++	select SND_SOC_TPA6130A2
++	select SND_SOC_WL1273 if MFD_WL1273_CORE
++	depends on GPIOLIB
++	help
++	  Say Y if you want to add support for SoC audio on Nokia N9/N950.
++
+ config SND_OMAP_SOC_AMS_DELTA
+ 	tristate "SoC Audio support for Amstrad E3 (Delta) videophone"
+ 	depends on SND_OMAP_SOC && MACH_AMS_DELTA && TTY
+diff --git a/sound/soc/omap/Makefile b/sound/soc/omap/Makefile
+index a6785dc..07efd21 100644
+--- a/sound/soc/omap/Makefile
++++ b/sound/soc/omap/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_SND_OMAP_SOC_HDMI_AUDIO) += snd-soc-omap-hdmi-audio.o
+ # OMAP Machine Support
+ snd-soc-n810-objs := n810.o
+ snd-soc-rx51-objs := rx51.o
++snd-soc-n9-objs := n9.o
+ snd-soc-ams-delta-objs := ams-delta.o
+ snd-soc-osk5912-objs := osk5912.o
+ snd-soc-am3517evm-objs := am3517evm.o
+@@ -24,6 +25,7 @@ snd-soc-omap3pandora-objs := omap3pandora.o
+ 
+ obj-$(CONFIG_SND_OMAP_SOC_N810) += snd-soc-n810.o
+ obj-$(CONFIG_SND_OMAP_SOC_RX51) += snd-soc-rx51.o
++obj-$(CONFIG_SND_OMAP_SOC_N9) += snd-soc-n9.o
+ obj-$(CONFIG_SND_OMAP_SOC_AMS_DELTA) += snd-soc-ams-delta.o
+ obj-$(CONFIG_SND_OMAP_SOC_OSK5912) += snd-soc-osk5912.o
+ obj-$(CONFIG_SND_OMAP_SOC_AM3517EVM) += snd-soc-am3517evm.o
+diff --git a/sound/soc/omap/n9.c b/sound/soc/omap/n9.c
+new file mode 100644
+index 0000000..db61463
+--- /dev/null
++++ b/sound/soc/omap/n9.c
+@@ -0,0 +1,748 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// n9.c  --  SoC audio for Nokia N9/N950
++//
++// Copyright (C) 2008 - 2009 Nokia Corporation
++//
++// Contact: Peter Ujfalusi <peter.ujfalusi@ti.com>
++//          Eduardo Valentin <eduardo.valentin@nokia.com>
++//          Jarkko Nikula <jarkko.nikula@bitmer.com>
++//
++
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/platform_device.h>
++#include <linux/gpio/consumer.h>
++#include <linux/module.h>
++#include <sound/core.h>
++#include <sound/jack.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <linux/platform_data/asoc-ti-mcbsp.h>
++#include <linux/mfd/twl4030-audio.h>
++#include "../codecs/tlv320dac33.h"
++#include "../codecs/tpa6130a2.h"
++#include "../codecs/wl1273.h"
++
++#include <asm/mach-types.h>
++
++#include <sound/n9.h>
++#include "omap-mcbsp.h"
++#include "mcbsp.h"
++
++#define JACK_REPORT_MASK	(SND_JACK_MECHANICAL | SND_JACK_AVOUT | \
++							 SND_JACK_HEADSET)
++
++struct dfl61wl1273_audio_pdata {
++	struct gpio_desc *power_gpio;
++};
++
++struct dfl61twl_audio_pdata {
++	struct gpio_desc *speaker_amp_gpio;
++};
++
++static int dfl61dac33_interconnect_enable(int);
++static struct snd_soc_card dfl61dac33_sound_card;
++static struct snd_soc_card dfl61twl_sound_card;
++static struct snd_soc_jack dfl61_jack;
++static struct dfl61audio_hsmic_event *hsmic_event;
++
++static struct snd_soc_component *find_component(struct snd_soc_card *card) {
++	struct snd_soc_component *component;
++
++	if (list_empty(&card->component_dev_list)) {
++		pr_err("Can't find codec for %s\n", card->name);
++		return NULL;
++	}
++
++	component = list_entry(card->component_dev_list.next,
++			       struct snd_soc_component, card_list);
++
++	return component;
++}
++
++/* TWL4030 */
++void dfl61_jack_report(int status)
++{
++	if (dfl61_jack.card)
++		snd_soc_jack_report(&dfl61_jack, status, JACK_REPORT_MASK);
++	else
++		pr_err("twl4030: Cannot report jack status");
++}
++EXPORT_SYMBOL_GPL(dfl61_jack_report);
++
++int dfl61_request_hsmicbias(bool enable)
++{
++	struct snd_soc_component *component;
++	struct snd_soc_dapm_context *dapm;
++	bool lock = false;
++	int ret;
++
++	if (!dfl61twl_sound_card.instantiated) {
++		pr_warn("twl4030: sound card not instantiated yet");
++		return -EPROBE_DEFER;
++	}
++
++	component = find_component(&dfl61twl_sound_card);
++	if (!component)
++		return -ENODEV;
++
++	dapm = snd_soc_component_get_dapm(component);
++	if (!dapm) {
++		pr_err("twl4030: Cannot set hsmicbias yet");
++		return -ENODEV;
++	}
++
++	mutex_lock(&dfl61twl_sound_card.dapm_mutex);
++	lock = true;
++
++	if (enable)
++		snd_soc_dapm_force_enable_pin_unlocked(dapm, "Headset Mic Bias");
++	else
++		snd_soc_dapm_disable_pin_unlocked(dapm, "Headset Mic Bias");
++
++	ret = snd_soc_dapm_sync_unlocked(dapm);
++
++	if (lock)
++		mutex_unlock(&dfl61twl_sound_card.dapm_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL(dfl61_request_hsmicbias);
++
++void dfl61_register_hsmic_event_cb(struct dfl61audio_hsmic_event *event)
++{
++	hsmic_event = event;
++}
++EXPORT_SYMBOL(dfl61_register_hsmic_event_cb);
++
++static int dfl61twl_hw_params(struct snd_pcm_substream *substream,
++	struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	unsigned int fmt;
++	int r;
++
++	switch (params_channels(params)) {
++	case 2: /* Stereo I2S mode */
++		fmt =	SND_SOC_DAIFMT_I2S |
++			SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBM_CFM;
++	case 4: /* Four channel TDM mode */
++		fmt =	SND_SOC_DAIFMT_DSP_A |
++			SND_SOC_DAIFMT_IB_NF |
++			SND_SOC_DAIFMT_CBM_CFM;
++		break;
++	default:
++		return -EINVAL;
++	}
++	/* Set codec DAI configuration */
++	r = snd_soc_dai_set_fmt(rtd->codec_dai, fmt);
++	if (r < 0) {
++		pr_err("Can't set codec DAI configuration for twl4030: %d\n", r);
++		return r;
++	}
++
++	/* Set cpu DAI configuration */
++	r = snd_soc_dai_set_fmt(rtd->cpu_dai, fmt);
++	if (r < 0) {
++		pr_err("Can't set cpu DAI configuration for twl4030: %d\n", r);
++		return r;
++	}
++
++	return 0;
++}
++
++static int dfl61twl_spk_event(struct snd_soc_dapm_widget *w,
++			  struct snd_kcontrol *k, int event)
++{
++	struct snd_soc_dapm_context *dapm = w->dapm;
++	struct snd_soc_card *card = dapm->card;
++	struct dfl61twl_audio_pdata *pdata = snd_soc_card_get_drvdata(card);
++
++	gpiod_set_raw_value_cansleep(pdata->speaker_amp_gpio,
++				     !!SND_SOC_DAPM_EVENT_ON(event));
++
++	return 0;
++}
++
++static int dfl61twl_tlv320dac33_event(struct snd_soc_dapm_widget *w,
++			  struct snd_kcontrol *k, int event)
++{
++	int r;
++
++	if (SND_SOC_DAPM_EVENT_ON(event))
++		r = dfl61dac33_interconnect_enable(1);
++	else
++		r = dfl61dac33_interconnect_enable(0);
++
++	return r;
++}
++
++static int dfl61twl_hsmic_event(struct snd_soc_dapm_widget *w,
++				struct snd_kcontrol *k, int event)
++{
++	if (!hsmic_event || !hsmic_event->event)
++		return 0;
++
++	if (SND_SOC_DAPM_EVENT_ON(event))
++		hsmic_event->event(hsmic_event->private, 1);
++	else
++		hsmic_event->event(hsmic_event->private, 0);
++
++	return 0;
++}
++
++/* DAPM widgets and routing for TWL4030 */
++static const struct snd_soc_dapm_widget dfl61twl_dapm_widgets[] = {
++	SND_SOC_DAPM_SPK("Ext Spk", dfl61twl_spk_event),
++	SND_SOC_DAPM_SPK("Earpiece", NULL),
++	SND_SOC_DAPM_SPK("HAC", NULL),
++	SND_SOC_DAPM_SPK("Vibra", NULL),
++	SND_SOC_DAPM_SPK("DAC33 interconnect", dfl61twl_tlv320dac33_event),
++
++	SND_SOC_DAPM_MIC("Digital Mic", NULL),
++	SND_SOC_DAPM_MIC("Headset Mic", dfl61twl_hsmic_event),
++
++	SND_SOC_DAPM_LINE("FMRX Left Line-in", NULL),
++	SND_SOC_DAPM_LINE("FMRX Right Line-in", NULL),
++};
++
++static const struct snd_soc_dapm_route dfl61twl_audio_map[] = {
++	{"Ext Spk", NULL, "PREDRIVER"},
++	{"Earpiece", NULL, "EARPIECE"},
++	{"HAC", NULL, "HFL"},
++	{"Vibra", NULL, "VIBRA"},
++	{"DAC33 interconnect", NULL, "PREDRIVEL"},
++
++	{"DIGIMIC0", NULL, "Digital Mic"},
++	{"Digital Mic", NULL, "Mic Bias 1"},
++
++	{"HSMIC", NULL, "Headset Mic"},
++	{"Headset Mic", NULL, "Headset Mic Bias"},
++
++	{"AUXL", NULL, "FMRX Left Line-in"},
++	{"AUXR", NULL, "FMRX Right Line-in"},
++};
++
++/* Pre DAC routings for the twl4030 codec */
++static const char *twl4030_predacl1_texts[] = {
++	"SDRL1", "SDRM1", "SDRL2", "SDRM2",
++};
++static const char *twl4030_predacr1_texts[] = {
++	"SDRR1", "SDRM1", "SDRR2", "SDRM2"
++};
++static const char *twl4030_predacl2_texts[] = {"SDRL2", "SDRM2"};
++static const char *twl4030_predacr2_texts[] = {"SDRR2", "SDRM2"};
++
++static const struct soc_enum twl4030_predacl1_enum =
++	SOC_ENUM_SINGLE(TWL4030_REG_RX_PATH_SEL, 2,
++			ARRAY_SIZE(twl4030_predacl1_texts),
++			twl4030_predacl1_texts);
++
++static const struct soc_enum twl4030_predacr1_enum =
++	SOC_ENUM_SINGLE(TWL4030_REG_RX_PATH_SEL, 0,
++			ARRAY_SIZE(twl4030_predacr1_texts),
++			twl4030_predacr1_texts);
++
++static const struct soc_enum twl4030_predacl2_enum =
++	SOC_ENUM_SINGLE(TWL4030_REG_RX_PATH_SEL, 5,
++			ARRAY_SIZE(twl4030_predacl2_texts),
++			twl4030_predacl2_texts);
++
++static const struct soc_enum twl4030_predacr2_enum =
++	SOC_ENUM_SINGLE(TWL4030_REG_RX_PATH_SEL, 4,
++			ARRAY_SIZE(twl4030_predacr2_texts),
++			twl4030_predacr2_texts);
++
++static const struct snd_kcontrol_new dfl61twl_controls[] = {
++	/* Mux controls before the DACs */
++	SOC_ENUM("DACL1 Playback Mux", twl4030_predacl1_enum),
++	SOC_ENUM("DACR1 Playback Mux", twl4030_predacr1_enum),
++	SOC_ENUM("DACL2 Playback Mux", twl4030_predacl2_enum),
++	SOC_ENUM("DACR2 Playback Mux", twl4030_predacr2_enum),
++};
++
++static int dfl61twl_init(struct snd_soc_pcm_runtime *rtd)
++{
++	struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	int r;
++
++	/* Create jack for accessory reporting */
++	r = snd_soc_card_jack_new(&dfl61twl_sound_card, "Jack",
++				JACK_REPORT_MASK , &dfl61_jack, NULL, 0);
++	if (r) {
++		pr_err("Failed to add Jack\n");
++		return r;
++	}
++
++	snd_soc_add_codec_controls(rtd->codec, dfl61twl_controls,
++				ARRAY_SIZE(dfl61twl_controls));
++
++	if (omap_mcbsp_st_add_controls(rtd, 3))
++		dev_dbg(rtd->codec->dev, "Unable to set Sidetone for McBSP3\n");
++
++	mcbsp->dma_op_mode = MCBSP_DMA_MODE_THRESHOLD;
++
++	return 0;
++}
++
++static struct snd_soc_ops dfl61twl_ops = {
++	.hw_params = dfl61twl_hw_params,
++};
++
++/* TLV320DAC33 */
++static int dfl61dac33_hw_params(struct snd_pcm_substream *substream,
++	struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	int r;
++
++	/* Set codec DAI configuration */
++	r = snd_soc_dai_set_fmt(rtd->codec_dai,
++				SND_SOC_DAIFMT_LEFT_J |
++				SND_SOC_DAIFMT_NB_NF |
++				SND_SOC_DAIFMT_CBM_CFM);
++	if (r < 0) {
++		pr_err("Can't set codec DAI configuration for tlv320dac33: %d\n", r);
++		return r;
++	}
++
++	/* Set cpu DAI configuration */
++	r = snd_soc_dai_set_fmt(rtd->cpu_dai,
++				SND_SOC_DAIFMT_LEFT_J |
++				SND_SOC_DAIFMT_NB_NF |
++				SND_SOC_DAIFMT_CBM_CFM);
++	if (r < 0) {
++		pr_err("Can't set cpu DAI configuration for tlv320dac33: %d\n", r);
++		return r;
++	}
++
++	/* Set the codec system clock for DAC and ADC */
++	r = snd_soc_dai_set_sysclk(rtd->codec_dai, TLV320DAC33_SLEEPCLK, 32768,
++					    SND_SOC_CLOCK_IN);
++	if (r < 0) {
++		pr_err("Can't set codec system clock for tlv320dac33\n");
++		return r;
++	}
++
++	return 0;
++}
++
++static int dfl61dac33_interconnect_enable(int enable)
++{
++	struct snd_soc_component *component =
++		find_component(&dfl61dac33_sound_card);
++	struct snd_soc_dapm_context *dapm;
++	bool lock = false;
++
++	if (!component)
++		return -ENODEV;
++
++	dapm = snd_soc_component_get_dapm(component);
++
++	mutex_lock(&dapm->card->dapm_mutex);
++		lock = true;
++
++	if (enable)
++		snd_soc_dapm_enable_pin_unlocked(dapm, "twl4030 interconnect");
++	else
++		snd_soc_dapm_disable_pin_unlocked(dapm, "twl4030 interconnect");
++
++	snd_soc_dapm_sync_unlocked(dapm);
++
++	if (lock)
++		mutex_unlock(&dapm->card->dapm_mutex);
++
++	return 0;
++}
++
++static void dfl61dac33_hp_enable(struct snd_soc_component *component, int enable)
++{
++	struct snd_soc_dapm_context *dapm =
++		snd_soc_component_get_dapm(component);
++
++	snd_soc_dapm_mutex_lock(dapm);
++
++	if (enable) {
++		snd_soc_dapm_enable_pin_unlocked(dapm, "Headphone");
++	} else {
++		snd_soc_dapm_disable_pin_unlocked(dapm, "Headphone");
++	}
++
++	snd_soc_dapm_sync_unlocked(dapm);
++
++	snd_soc_dapm_mutex_unlock(dapm);
++}
++
++int dfl61_request_hp_enable(bool enable)
++{
++	struct snd_soc_component *component =
++		find_component(&dfl61dac33_sound_card);
++
++	if (!component) {
++		pr_err("dfl61-request_hp_enable");
++		return -ENODEV;
++	}
++
++	dfl61dac33_hp_enable(component, enable);
++
++	return 0;
++}
++EXPORT_SYMBOL(dfl61_request_hp_enable);
++
++static const struct snd_kcontrol_new dfl61dac33_controls[] = {
++	SOC_DAPM_PIN_SWITCH("Headphone"),
++};
++
++static const struct snd_soc_dapm_widget dfl61dac33_dapm_widgets[] = {
++	/* Outputs */
++	SND_SOC_DAPM_LINE("FMTX_L Line Out", NULL),
++	SND_SOC_DAPM_LINE("FMTX_R Line Out", NULL),
++	SND_SOC_DAPM_HP("Headphone", NULL),
++	/* Inputs */
++	SND_SOC_DAPM_LINE("twl4030 interconnect", NULL),
++};
++
++static const struct snd_soc_dapm_route dfl61dac33_audio_map[] = {
++	{"Headphone", NULL, "TPA6140A2 HPLEFT"},
++	{"Headphone", NULL, "TPA6140A2 HPRIGHT"},
++	{"TPA6140A2 HPLEFT", NULL, "LEFT_LO"},
++	{"TPA6140A2 HPRIGHT", NULL, "RIGHT_LO"},
++
++	{"FMTX_L Line Out", NULL, "LEFT_LO"},
++	{"FMTX_R Line Out", NULL, "RIGHT_LO"},
++
++	{"LINER", NULL, "twl4030 interconnect"},
++	{"LINEL", NULL, "twl4030 interconnect"},
++};
++
++static int dfl61dac33_init(struct snd_soc_pcm_runtime *rtd)
++{
++	struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(rtd->codec);
++
++	snd_soc_limit_volume(rtd->card, "TPA6140A2 Headphone Playback Volume", 21);
++
++	snd_soc_dapm_disable_pin(dapm, "twl4030 interconnect");
++
++	if (omap_mcbsp_st_add_controls(rtd, 2))
++		dev_dbg(rtd->codec->dev, "Unable to set Sidetone for McBSP2\n");
++
++	mcbsp->dma_op_mode = MCBSP_DMA_MODE_THRESHOLD;
++
++	return 0;
++}
++
++static struct snd_soc_ops dfl61dac33_ops = {
++	.hw_params = dfl61dac33_hw_params,
++};
++
++/* WL1273 */
++static int dfl61wl1273_init(struct snd_soc_pcm_runtime *rtd)
++{
++	struct omap_mcbsp *mcbsp = snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	mcbsp->dma_op_mode = MCBSP_DMA_MODE_THRESHOLD;
++
++	return 0;
++}
++
++static int dfl61wl1273_startup(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	unsigned int fmt;
++	int r;
++
++	r = wl1273_get_format(rtd->codec, &fmt);
++	if (r < 0) {
++		pr_err("Can't get fmt for wl1273: %d\n", r);
++		return r;
++	}
++
++	/* Set cpu DAI configuration */
++	r = snd_soc_dai_set_fmt(rtd->cpu_dai, fmt);
++	if (r < 0) {
++		pr_err("Can't set cpu DAI configuration for wl1273: %d\n", r);
++		return r;
++	}
++	return 0;
++}
++
++static struct snd_soc_ops dfl61wl1273_ops = {
++	.startup = dfl61wl1273_startup,
++};
++
++static int dfl61wl1273_card_probe(struct snd_soc_card *card)
++{
++	struct dfl61wl1273_audio_pdata *pdata = snd_soc_card_get_drvdata(card);
++
++	gpiod_set_value(pdata->power_gpio, 1);
++	return 0;
++}
++
++
++static int dfl61wl1273_card_remove(struct snd_soc_card *card)
++{
++	struct dfl61wl1273_audio_pdata *pdata = snd_soc_card_get_drvdata(card);
++
++	gpiod_set_value(pdata->power_gpio, 0);
++	return 0;
++}
++
++/* Digital audio interface glue - connects codec <--> CPU */
++static struct snd_soc_dai_link dfl61twl_dai[] = {
++	{
++		.name = "TWL4030",
++		.stream_name = "TWL4030",
++		.cpu_dai_name = "omap-mcbsp.3",
++		.codec_dai_name = "twl4030-hifi",
++		.platform_name = "omap-pcm-audio",
++		.codec_name = "twl4030-codec",
++		.dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_IB_NF |
++					SND_SOC_DAIFMT_CBM_CFM,
++		.init = dfl61twl_init,
++		.ops = &dfl61twl_ops,
++	},
++};
++
++static struct snd_soc_dai_link dfl61dac33_dai[] = {
++	{
++		.name = "TLV320DAC33",
++		.stream_name = "DAC33",
++		.cpu_dai_name = "omap-mcbsp.2",
++		.codec_dai_name = "tlv320dac33-hifi",
++		.platform_name = "omap-pcm-audio",
++		.codec_name = "tlv320dac33-codec.1-0019",
++		.init = dfl61dac33_init,
++		.ops = &dfl61dac33_ops,
++	},
++};
++
++static struct snd_soc_aux_dev dfl61dac33_aux_dev[] = {
++	{
++		.name = "TPA6140A2",
++		.codec_name = "tpa6130a2.1-0060",
++	},
++};
++
++static struct snd_soc_codec_conf dfl61dac33_codec_conf[] = {
++	{
++		.dev_name = "tpa6130a2.2-0060",
++		.name_prefix = "TPA6140A2",
++	},
++};
++
++static struct snd_soc_dai_link dfl61wl1273_dai[] = {
++	{
++		.name = "BT/FM PCM",
++		.stream_name = "BT/FM Stream",
++		.cpu_dai_name = "omap-mcbsp.4",
++		.codec_dai_name = "wl1273-fm",
++		.platform_name = "omap-pcm-audio",
++		.codec_name = "wl1273-codec",
++		.init = dfl61wl1273_init,
++		.ops = &dfl61wl1273_ops,
++	},
++};
++
++/* Audio cards */
++static struct snd_soc_card dfl61twl_sound_card = {
++	.name = "dfl61-twl4030",
++	.owner = THIS_MODULE,
++	.dai_link = dfl61twl_dai,
++	.num_links = ARRAY_SIZE(dfl61twl_dai),
++	.fully_routed = true,
++	.dapm_widgets = dfl61twl_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(dfl61twl_dapm_widgets),
++	.dapm_routes = dfl61twl_audio_map,
++	.num_dapm_routes = ARRAY_SIZE(dfl61twl_audio_map),
++};
++
++static struct snd_soc_card dfl61dac33_sound_card = {
++	.name = "dfl61-dac33",
++	.owner = THIS_MODULE,
++	.dai_link = dfl61dac33_dai,
++	.num_links = ARRAY_SIZE(dfl61dac33_dai),
++	.aux_dev = dfl61dac33_aux_dev,
++	.num_aux_devs = ARRAY_SIZE(dfl61dac33_aux_dev),
++	.codec_conf = dfl61dac33_codec_conf,
++	.num_configs = ARRAY_SIZE(dfl61dac33_codec_conf),
++	.fully_routed = true,
++	.controls = dfl61dac33_controls,
++	.num_controls = ARRAY_SIZE(dfl61dac33_controls),
++	.dapm_widgets = dfl61dac33_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(dfl61dac33_dapm_widgets),
++	.dapm_routes = dfl61dac33_audio_map,
++	.num_dapm_routes = ARRAY_SIZE(dfl61dac33_audio_map),
++};
++
++static struct snd_soc_card dfl61wl1273_sound_card = {
++	.name = "dfl61-wl1273",
++	.owner = THIS_MODULE,
++	.probe = dfl61wl1273_card_probe,
++	.remove = dfl61wl1273_card_remove,
++	.dai_link = dfl61wl1273_dai,
++	.num_links = ARRAY_SIZE(dfl61wl1273_dai),
++	.fully_routed = true,
++};
++
++static int n9_soc_probe(struct platform_device *pdev)
++{
++	struct dfl61twl_audio_pdata *pdata_twl;
++	struct dfl61wl1273_audio_pdata *pdata_wl1273;
++	struct device_node *np = pdev->dev.of_node;
++	struct snd_soc_card *card_twl = &dfl61twl_sound_card;
++	struct snd_soc_card *card_dac33 = &dfl61dac33_sound_card;
++	struct snd_soc_card *card_wl1273 = &dfl61wl1273_sound_card;
++	int err;
++
++	if (!(machine_is_nokia_rm696() || machine_is_nokia_rm680())
++		&& !(of_machine_is_compatible("nokia,omap3-n9")
++		|| of_machine_is_compatible("nokia,omap3-n950")))
++		return -ENODEV;
++
++	card_twl->dev = &pdev->dev;
++	card_dac33->dev = &pdev->dev;
++	card_wl1273->dev = &pdev->dev;
++
++	if (np) {
++		struct device_node *dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,twl4030-cpu-dai", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "McBSP node for TWL4030 is not provided\n");
++			return -EINVAL;
++		}
++		dfl61twl_dai[0].cpu_dai_name = NULL;
++		dfl61twl_dai[0].platform_name = NULL;
++		dfl61twl_dai[0].cpu_of_node = dai_node;
++		dfl61twl_dai[0].platform_of_node = dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,tlv320dac33-cpu-dai", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "McBSP node for TLV320DAC33 is not provided\n");
++			return -EINVAL;
++		}
++		dfl61dac33_dai[0].cpu_dai_name = NULL;
++		dfl61dac33_dai[0].platform_name = NULL;
++		dfl61dac33_dai[0].cpu_of_node = dai_node;
++		dfl61dac33_dai[0].platform_of_node = dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,wl1273-cpu-dai", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "McBSP node for WL1273 is not provided\n");
++			return -EINVAL;
++		}
++		dfl61wl1273_dai[0].cpu_dai_name = NULL;
++		dfl61wl1273_dai[0].platform_name = NULL;
++		dfl61wl1273_dai[0].cpu_of_node = dai_node;
++		dfl61wl1273_dai[0].platform_of_node = dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,twl4030-codec", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "TWL4030 codec node is not provided\n");
++			return -EINVAL;
++		}
++		dfl61twl_dai[0].codec_name = NULL;
++		dfl61twl_dai[0].codec_of_node = dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,tlv320dac33-codec", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "TLV320DAC33 codec node is not provided\n");
++			return -EINVAL;
++		}
++		dfl61dac33_dai[0].codec_name = NULL;
++		dfl61dac33_dai[0].codec_of_node = dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,headphone-amplifier", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "Headphone amplifier node is not provided\n");
++			return -EINVAL;
++		}
++		dfl61dac33_aux_dev[0].codec_name = NULL;
++		dfl61dac33_aux_dev[0].codec_of_node = dai_node;
++		dfl61dac33_codec_conf[0].dev_name = NULL;
++		dfl61dac33_codec_conf[0].of_node = dai_node;
++
++		dai_node = of_parse_phandle(np, "nokia,wl1273-codec", 0);
++		if (!dai_node) {
++			dev_err(&pdev->dev, "WL1273 codec node is not provided\n");
++			return -EINVAL;
++		}
++		dfl61wl1273_dai[0].codec_name = NULL;
++		dfl61wl1273_dai[0].codec_of_node = dai_node;
++	}
++
++	pdata_twl = devm_kzalloc(&pdev->dev, sizeof(*pdata_twl), GFP_KERNEL);
++	if (pdata_twl == NULL) {
++		dev_err(card_twl->dev, "failed to create private data for twl4030\n");
++		return -ENOMEM;
++	}
++	snd_soc_card_set_drvdata(card_twl, pdata_twl);
++
++	pdata_twl->speaker_amp_gpio = devm_gpiod_get(card_twl->dev,
++						     "speaker-amplifier",
++						     GPIOD_OUT_LOW);
++	if (IS_ERR(pdata_twl->speaker_amp_gpio)) {
++		dev_err(card_twl->dev, "could not get speaker enable gpio\n");
++		return PTR_ERR(pdata_twl->speaker_amp_gpio);
++	}
++
++	pdata_wl1273 = devm_kzalloc(&pdev->dev, sizeof(*pdata_wl1273), GFP_KERNEL);
++	if (pdata_wl1273 == NULL) {
++		dev_err(card_wl1273->dev, "failed to create private data for wl1273\n");
++		return -ENOMEM;
++	}
++	snd_soc_card_set_drvdata(card_wl1273, pdata_wl1273);
++
++	pdata_wl1273->power_gpio = devm_gpiod_get(card_wl1273->dev,
++						  "wl1273-power",
++						  GPIOD_OUT_LOW);
++	if (IS_ERR(pdata_wl1273->power_gpio)) {
++		dev_err(card_wl1273->dev, "could not get wl1273 enable gpio\n");
++		return PTR_ERR(pdata_wl1273->power_gpio);
++	}
++
++	err = devm_snd_soc_register_card(&pdev->dev, card_twl);
++	if (err < 0) {
++		dev_err(card_twl->dev, "failed to register twl4030 card: %d\n", err);
++		return err;
++	}
++
++	err = devm_snd_soc_register_card(&pdev->dev, card_dac33);
++	if (err < 0) {
++		dev_err(card_dac33->dev, "failed to register tlv320dac33 card: %d\n", err);
++		return err;
++	}
++
++
++
++	err = devm_snd_soc_register_card(&pdev->dev, card_wl1273);
++	if (err < 0) {
++		dev_err(card_wl1273->dev, "failed to register wl1273 card\n");
++		return err;
++	}
++
++	return 0;
++}
++
++static const struct of_device_id n9_audio_of_match[] = {
++	{ .compatible = "nokia,n9-audio", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, n9_audio_of_match);
++
++static struct platform_driver n9_soc_driver = {
++	.driver = {
++		.name = "n9-audio",
++		.of_match_table = of_match_ptr(n9_audio_of_match),
++	},
++	.probe = n9_soc_probe,
++};
++
++module_platform_driver(n9_soc_driver);
++
++MODULE_AUTHOR("Nokia Corporation");
++MODULE_DESCRIPTION("ALSA SoC Nokia N9/N950");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:n9-audio");
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/d4ae8582/attachment-0001.sig>
