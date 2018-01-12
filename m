@@ -1,54 +1,142 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 12 Jan 2018 13:15:59 +0100
-Subject: [PATCH 05/14] ARM: dts: stm32: Add SDIO controller for stm32f746
-In-Reply-To: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1515759368-16946-6-git-send-email-patrice.chotard@st.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 12 Jan 2018 13:07:40 +0100
+Subject: [PATCH v3 34/41] KVM: arm64: Configure c15, PMU,
+ and debug register traps on cpu load/put for VHE
+In-Reply-To: <20180112120747.27999-1-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+Message-ID: <20180112120747.27999-35-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+We do not have to change the c15 trap setting on each switch to/from the
+guest on VHE systems, because this setting only affects EL0.
 
-stm32f746 embeds ARM_PL180 sdio IP, adds SDIO controller
-nodes to allow MMC support.
+The PMU and debug trap configuration can also be done on vcpu load/put
+instead, because they don't affect how the host kernel can access the
+debug registers while executing KVM kernel code and KVM doesn't use
+floating point itself.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/boot/dts/stm32f746.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm64/kvm/hyp/switch.c | 37 +++++++++++++++++++++++++++----------
+ 1 file changed, 27 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 5f66d15..cffe1b1 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -429,6 +429,28 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d14ab9650f81..6ff9fab4233e 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -43,8 +43,6 @@ static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
  
-+		sdio2: sdio2 at 40011c00 {
-+			compatible = "arm,pl180", "arm,primecell";
-+			arm,primecell-periphid = <0x00880180>;
-+			reg = <0x40011c00 0x400>;
-+			clocks = <&rcc 0 167>;
-+			clock-names = "apb_pclk";
-+			interrupts = <103>;
-+			max-frequency = <48000000>;
-+			status = "disabled";
-+		};
+ static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
+ {
+-	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+-
+ 	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+ 	/*
+@@ -64,12 +62,15 @@ static void __hyp_text __deactivate_traps_common(void)
+ 	write_sysreg(0, pmuserenr_el0);
+ }
+ 
++/* Activate the traps we can during vcpu_load with VHE */
+ void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
++	/* Make sure 32-bit guests trap VFP */
+ 	__activate_traps_fpsimd32(vcpu);
+ 
++	/* Trap VFP accesses on a VHE system */
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+ 	val &= ~CPACR_EL1_ZEN;
+@@ -78,11 +79,28 @@ void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
+ 	else
+ 		val &= ~CPACR_EL1_FPEN;
+ 	write_sysreg(val, cpacr_el1);
 +
-+		sdio: sdio at 40012c00 {
-+			compatible = "arm,pl180", "arm,primecell";
-+			arm,primecell-periphid = <0x00880180>;
-+			reg = <0x40012c00 0x400>;
-+			clocks = <&rcc 0 171>;
-+			clock-names = "apb_pclk";
-+			interrupts = <49>;
-+			max-frequency = <48000000>;
-+			status = "disabled";
-+		};
++	/* Activate traps on impdef sysregs, PMU, and debug */
++	__activate_traps_common(vcpu);
+ }
+ 
++/* Deactivate the traps we can during vcpu_put with VHE */
+ void deactivate_traps_vhe_put(void)
+ {
++	u64 mdcr_el2;
 +
- 		syscfg: system-config at 40013800 {
- 			compatible = "syscon";
- 			reg = <0x40013800 0x400>;
++	/* Re-enable host VFP and SVE access */
+ 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
++
++	/* Re-enable host access to impdef sysregs and the PMU */
++	__deactivate_traps_common();
++
++	/* Re-enable host access to the debug regs */
++	mdcr_el2 = read_sysreg(mdcr_el2);
++	mdcr_el2 &= MDCR_EL2_HPMN_MASK |
++		    MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT |
++		    MDCR_EL2_TPMS;
++	write_sysreg(mdcr_el2, mdcr_el2);
+ }
+ 
+ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+@@ -96,8 +114,10 @@ void __hyp_text __activate_traps_nvhe_load(struct kvm_vcpu *vcpu)
+ 
+ 	vcpu = kern_hyp_va(vcpu);
+ 
++	/* Make sure 32-bit guests trap VFP */
+ 	__activate_traps_fpsimd32(vcpu);
+ 
++	/* Trap VFP accesses on a non-VHE system */
+ 	val = CPTR_EL2_DEFAULT;
+ 	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+ 	if (vcpu->arch.guest_vfp_loaded)
+@@ -114,6 +134,8 @@ void __hyp_text __deactivate_traps_nvhe_put(void)
+ 
+ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ {
++	/* Activate traps on impdef sysregs, PMU, and debug */
++	__activate_traps_common(vcpu);
+ }
+ 
+ static hyp_alternate_select(__activate_traps_arch,
+@@ -122,20 +144,14 @@ static hyp_alternate_select(__activate_traps_arch,
+ 
+ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ {
+-	__activate_traps_common(vcpu);
+ 	__activate_traps_arch()(vcpu);
++	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+ }
+ 
+ static void __hyp_text __deactivate_traps_vhe(void)
+ {
+ 	extern char vectors[];	/* kernel exception vectors */
+-	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+-
+-	mdcr_el2 &= MDCR_EL2_HPMN_MASK |
+-		    MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT |
+-		    MDCR_EL2_TPMS;
+ 
+-	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+@@ -143,6 +159,8 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ static void __hyp_text __deactivate_traps_nvhe(void) {
+ 	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+ 
++	__deactivate_traps_common();
++
+ 	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
+ 	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
+ 
+@@ -165,7 +183,6 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	if (vcpu->arch.hcr_el2 & HCR_VSE)
+ 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ 
+-	__deactivate_traps_common();
+ 	__deactivate_traps_arch()();
+ }
+ 
 -- 
-1.9.1
+2.14.2
