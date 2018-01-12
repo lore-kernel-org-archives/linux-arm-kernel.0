@@ -1,180 +1,46 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 12 Jan 2018 09:42:31 +0100
-Subject: [PATCH 33/34] cris: use dma-direct
-In-Reply-To: <20180112084232.2857-1-hch@lst.de>
-References: <20180112084232.2857-1-hch@lst.de>
-Message-ID: <20180112084232.2857-34-hch@lst.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 12 Jan 2018 09:44:44 +0100
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
+In-Reply-To: <011f77e4-040b-a864-168f-bc198a523536@monstr.eu>
+References: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
+ <20180112012847.iqol2xb2iro6wauk@localhost>
+ <011f77e4-040b-a864-168f-bc198a523536@monstr.eu>
+Message-ID: <CAK8P3a0JwAW2ZhQAQ6A3o9KC9sXe7qRJT7ZM+rZxGXX9dk0ADg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cris currently has an incomplete direct mapping dma_map_ops implementation
-if PCI support is enabled.  Replace it with the fully feature generic
-dma-direct implementation.
+On Fri, Jan 12, 2018 at 7:44 AM, Michal Simek <monstr@monstr.eu> wrote:
+> On 12.1.2018 02:28, Olof Johansson wrote:
+>> On Mon, Jan 08, 2018 at 02:02:18PM +0100, Michal Simek wrote:
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
----
- arch/cris/Kconfig                       |  4 ++
- arch/cris/arch-v32/drivers/pci/Makefile |  2 +-
- arch/cris/arch-v32/drivers/pci/dma.c    | 77 ---------------------------------
- arch/cris/include/asm/Kbuild            |  1 +
- arch/cris/include/asm/dma-mapping.h     | 20 ---------
- 5 files changed, 6 insertions(+), 98 deletions(-)
- delete mode 100644 arch/cris/arch-v32/drivers/pci/dma.c
- delete mode 100644 arch/cris/include/asm/dma-mapping.h
+>>> ----------------------------------------------------------------
+>>> Dhaval Shah (2):
+>>>       dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
+>>>       soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+>>>
+>>> Michal Simek (1):
+>>>       soc: xilinx: Create folder structure for soc specific drivers
+>>>
+>>
+>> Merged, but you should probably add a platform config option for Xilinx
+>> and use that instead of obj-y to descend into the directory?
 
-diff --git a/arch/cris/Kconfig b/arch/cris/Kconfig
-index 54d3f426763b..cd5a0865c97f 100644
---- a/arch/cris/Kconfig
-+++ b/arch/cris/Kconfig
-@@ -33,6 +33,9 @@ config GENERIC_CALIBRATE_DELAY
- config NO_IOPORT_MAP
- 	def_bool y if !PCI
- 
-+config NO_DMA
-+	def_bool y if !PCI
-+
- config FORCE_MAX_ZONEORDER
- 	int
- 	default 6
-@@ -72,6 +75,7 @@ config CRIS
- 	select GENERIC_SCHED_CLOCK if ETRAX_ARCH_V32
- 	select HAVE_DEBUG_BUGVERBOSE if ETRAX_ARCH_V32
- 	select HAVE_NMI
-+	select DMA_DIRECT_OPS if PCI
- 
- config HZ
- 	int
-diff --git a/arch/cris/arch-v32/drivers/pci/Makefile b/arch/cris/arch-v32/drivers/pci/Makefile
-index bff7482f2444..93c8be6170b1 100644
---- a/arch/cris/arch-v32/drivers/pci/Makefile
-+++ b/arch/cris/arch-v32/drivers/pci/Makefile
-@@ -2,4 +2,4 @@
- # Makefile for Etrax cardbus driver
- #
- 
--obj-$(CONFIG_ETRAX_CARDBUS)        += bios.o dma.o
-+obj-$(CONFIG_ETRAX_CARDBUS)        += bios.o
-diff --git a/arch/cris/arch-v32/drivers/pci/dma.c b/arch/cris/arch-v32/drivers/pci/dma.c
-deleted file mode 100644
-index 8c3802244ef3..000000000000
---- a/arch/cris/arch-v32/drivers/pci/dma.c
-+++ /dev/null
-@@ -1,77 +0,0 @@
--// SPDX-License-Identifier: GPL-2.0
--/*
-- * Dynamic DMA mapping support.
-- *
-- * On cris there is no hardware dynamic DMA address translation,
-- * so consistent alloc/free are merely page allocation/freeing.
-- * The rest of the dynamic DMA mapping interface is implemented
-- * in asm/pci.h.
-- *
-- * Borrowed from i386.
-- */
--
--#include <linux/types.h>
--#include <linux/mm.h>
--#include <linux/string.h>
--#include <linux/pci.h>
--#include <linux/gfp.h>
--#include <asm/io.h>
--
--static void *v32_dma_alloc(struct device *dev, size_t size,
--		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
--{
--	void *ret;
--
--	if (dev == NULL || (dev->coherent_dma_mask < 0xffffffff))
--		gfp |= GFP_DMA;
--
--	ret = (void *)__get_free_pages(gfp,  get_order(size));
--
--	if (ret != NULL) {
--		memset(ret, 0, size);
--		*dma_handle = virt_to_phys(ret);
--	}
--	return ret;
--}
--
--static void v32_dma_free(struct device *dev, size_t size, void *vaddr,
--		dma_addr_t dma_handle, unsigned long attrs)
--{
--	free_pages((unsigned long)vaddr, get_order(size));
--}
--
--static inline dma_addr_t v32_dma_map_page(struct device *dev,
--		struct page *page, unsigned long offset, size_t size,
--		enum dma_data_direction direction, unsigned long attrs)
--{
--	return page_to_phys(page) + offset;
--}
--
--static inline int v32_dma_map_sg(struct device *dev, struct scatterlist *sg,
--		int nents, enum dma_data_direction direction,
--		unsigned long attrs)
--{
--	printk("Map sg\n");
--	return nents;
--}
--
--static inline int v32_dma_supported(struct device *dev, u64 mask)
--{
--        /*
--         * we fall back to GFP_DMA when the mask isn't all 1s,
--         * so we can't guarantee allocations that must be
--         * within a tighter range than GFP_DMA..
--         */
--        if (mask < 0x00ffffff)
--                return 0;
--	return 1;
--}
--
--const struct dma_map_ops v32_dma_ops = {
--	.alloc			= v32_dma_alloc,
--	.free			= v32_dma_free,
--	.map_page		= v32_dma_map_page,
--	.map_sg                 = v32_dma_map_sg,
--	.dma_supported		= v32_dma_supported,
--};
--EXPORT_SYMBOL(v32_dma_ops);
-diff --git a/arch/cris/include/asm/Kbuild b/arch/cris/include/asm/Kbuild
-index 460349cb147f..8cf45ac30c1b 100644
---- a/arch/cris/include/asm/Kbuild
-+++ b/arch/cris/include/asm/Kbuild
-@@ -5,6 +5,7 @@ generic-y += cmpxchg.h
- generic-y += current.h
- generic-y += device.h
- generic-y += div64.h
-+generic-y += dma-mapping.h
- generic-y += emergency-restart.h
- generic-y += exec.h
- generic-y += extable.h
-diff --git a/arch/cris/include/asm/dma-mapping.h b/arch/cris/include/asm/dma-mapping.h
-deleted file mode 100644
-index 1553bdb30a0c..000000000000
---- a/arch/cris/include/asm/dma-mapping.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/* SPDX-License-Identifier: GPL-2.0 */
--#ifndef _ASM_CRIS_DMA_MAPPING_H
--#define _ASM_CRIS_DMA_MAPPING_H
--
--#ifdef CONFIG_PCI
--extern const struct dma_map_ops v32_dma_ops;
--
--static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
--{
--	return &v32_dma_ops;
--}
--#else
--static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
--{
--	BUG();
--	return NULL;
--}
--#endif
--
--#endif
--- 
-2.14.2
+I don't see it in arm-soc yet, did you forget to push the latest branches?
+
+> Do you think change like this?
+>
+> -obj-y                          += xilinx/
+> +obj-$(CONFIG_ARCH_ZYNQMP)      += xilinx/
+>
+> Just a note. This folder is supposed to be used by arm64/arm32 and
+> microblaze that's why I didn't put there any single config because it
+> doesn't exist. If you suggest to introduce new config option to label
+> xilinx platforms we can talk about it.
+> Argument against it could be also using these drivers by openrisc or
+> mips (mipsfpga) which are also fpga based.
+> Anyway I am happy to hear what you suggest.
+>
+
+I think obj-y is fine in this case, the cost is minimal.
+
+      Arnd
