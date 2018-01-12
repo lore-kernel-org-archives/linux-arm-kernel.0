@@ -1,91 +1,86 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 12 Jan 2018 15:25:54 +0000
-Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
-In-Reply-To: <20180112131508.GC19999@ulmo>
-References: <20180109145409.11612-1-thierry.reding@gmail.com>
- <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
- <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com> <20180112125828.GB19999@ulmo>
- <20180112131508.GC19999@ulmo>
-Message-ID: <de6b302b-7368-72ff-6643-c585c2118050@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 12 Jan 2018 16:25:51 +0100
+Subject: [PATCH v2 0/3] ARM: mvebu: dts: updates to enable EDAC
+In-Reply-To: <d2460bc23c4d4ff2adbd05821e86aea9@svr-chch-ex1.atlnz.lc> (Chris
+ Packham's message of "Thu, 11 Jan 2018 20:06:01 +0000")
+References: <20180111015903.11322-1-chris.packham@alliedtelesis.co.nz>
+ <87a7xk7o5t.fsf@free-electrons.com>
+ <d2460bc23c4d4ff2adbd05821e86aea9@svr-chch-ex1.atlnz.lc>
+Message-ID: <87shbb5cao.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chris,
+ 
+ On jeu., janv. 11 2018, Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
+
+> On 11/01/18 22:14, Gregory CLEMENT wrote:
+>> Hi Chris,
+>>   
+>>   On jeu., janv. 11 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>> 
+>>> I've split this off from my earlier series[1] this is just the dts changes that
+>>> will enable support for the EDAC series when it lands.
+>>>
+>>> The Armada 38x as well as the 98dx3236 and similar switch chips with integrated
+>>> CPUs use the same SDRAM controller block as the Armada XP. The key difference
+>>> is the width of the DDR interface.
+>>>
+>>> [1] - https://marc.info/?l=linux-kernel&m=151545124505964&w=2
+>> 
+>> The series is looks good now. For patch 1 I still wait for that
+>> the "marvell,,ecc-enable" property was accepted before merging it.
+>> 
+>> So I can either wait for that it was accepted before applying the series,
+>> or just applying patch 2 and 3 for now, as you want.
+>
+> I'm happy either way. If it's easier for you to keep the 3 patches 
+> together that's fine by me.
+
+So I will apply all of them in the same time.
 
 
-On 12/01/18 13:15, Thierry Reding wrote:
-> On Fri, Jan 12, 2018 at 01:58:28PM +0100, Thierry Reding wrote:
->> On Fri, Jan 12, 2018 at 12:12:11PM +0000, Sudeep Holla wrote:
->>>
->>>
->>> On 12/01/18 11:39, Sudeep Holla wrote:
->>>>
->>>>
->>>> On 09/01/18 14:54, Thierry Reding wrote:
->>>>> From: Thierry Reding <treding@nvidia.com>
->>>>>
->>>>> After moving the SoC device initialization to an early initcall in
->>>>> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
->>>>> the Broadcom STB SoC device is registered on all platforms if support
->>>>> for the device is enabled in the kernel configuration.
->>>>>
->>>>> This causes an additional SoC device to appear on platforms that already
->>>>> register a native one. In case of Tegra the STB SoC device is registered
->>>>> as soc0 (with totally meaningless content in the sysfs attributes) and
->>>>> causes various scripts and programs to fail because they don't know how
->>>>> to parse that data.
->>>>>
->>>>> To fix this, duplicate the check from brcmstb_soc_device_early_init()
->>>>> that already prevents the code from doing anything nonsensical on non-
->>>>> STB platforms.
->>>>>
->>>>> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
->>>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
->>>>> ---
->>>>>  drivers/soc/bcm/brcmstb/common.c | 5 +++++
->>>>>  1 file changed, 5 insertions(+)
->>>>>
->>>>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
->>>>> index 781ada62d0a3..4fe1cb73b39a 100644
->>>>> --- a/drivers/soc/bcm/brcmstb/common.c
->>>>> +++ b/drivers/soc/bcm/brcmstb/common.c
->>>>> @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
->>>>>  static int __init brcmstb_soc_device_init(void)
->>>>>  {
->>>>>  	struct soc_device_attribute *soc_dev_attr;
->>>>> +	struct device_node *sun_top_ctrl;
->>>>>  	struct soc_device *soc_dev;
->>>>>  
->>>>> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
->>>>> +	if (!sun_top_ctrl)
->>>>> +		return -ENODEV;
->>>>> +
->>>>
->>>> missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
->>>>
->>>
->>> Further, I still the error messags on my Juno with this patch applied. I
->>> fail to see how this patch prevents brcmstb_biuctrl_init which is
->>> early_initcall in drivers/soc/bcm/brcmstb/biuctrl.c getting called ?
->>
->> I'm not sure I understand. There's no way we can prevent the early
->> initcall from running. The point here is to prevent it from running code
->> that shouldn't be run on a platform.
->>
->> That said, perhaps an even better thing would be to return 0 in order to
->> avoid marking this as failure, since it really isn't an error if this
->> happens.
-> 
-> Oh, I see the errors you mentioned now. They're in the biuctrl code,
-> which I hadn't noticed before since they don't cause any weird behaviour
-> other than the error messages in the boot log. Let me fix that up while
-> I'm on it.
+Thanks,
 
-Sorry for missing context. I posted a patch[1] to fix the error messages
-I mentioned, but Florian directed me to his patch instead and hence the
-above question was for him as your patch was addressing a different issue.
+Gregory
+
+
+>
+>> 
+>> Thanks,
+>> 
+>> Gregory
+>> 
+>> 
+>>>
+>>> Changes in v2:
+>>> - update commit message
+>>> - add labels to dts
+>>>
+>>> Chris Packham (3):
+>>>    ARM: dts: armada-xp: enable L2 cache parity and ecc on db-xc3-24g4xg
+>>>    ARM: dts: armada-xp: add label to sdram-controller node
+>>>    ARM: dts: mvebu: add sdram controller node to Armada-38x
+>>>
+>>>   arch/arm/boot/dts/armada-38x.dtsi             | 5 +++++
+>>>   arch/arm/boot/dts/armada-xp-98dx3236.dtsi     | 2 +-
+>>>   arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 5 +++++
+>>>   arch/arm/boot/dts/armada-xp.dtsi              | 2 +-
+>>>   4 files changed, 12 insertions(+), 2 deletions(-)
+>>>
+>>> -- 
+>>> 2.15.1
+>>>
+>> 
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Regards,
-Sudeep
-
-[1] https://marc.info/?l=linux-kernel&m=151568158127806&w=2
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
