@@ -1,145 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 12 Jan 2018 16:55:21 +0100
-Subject: [PATCH v3 0/7] Marvell NAND controller rework with ->exec_op()
-In-Reply-To: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
-References: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
-Message-ID: <20180112165521.28d17a20@bbrezillon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Jan 2018 15:58:53 +0000
+Subject: [PATCH v3 00/13] arm64 kpti hardening and variant 2 workarounds
+In-Reply-To: <904afc66-7936-d430-f056-6aa6e64ca0a9@suse.com>
+References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
+ <20180108185353.sung5ovk65au3kge@armageddon.cambridge.arm.com>
+ <904afc66-7936-d430-f056-6aa6e64ca0a9@suse.com>
+Message-ID: <20180112155853.bsgyppcryshzpwyw@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  9 Jan 2018 11:36:30 +0100
-Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On Tue, Jan 09, 2018 at 03:07:28PM +0100, Matthias Brugger wrote:
+> On 01/08/2018 07:53 PM, Catalin Marinas wrote:
+> > On Mon, Jan 08, 2018 at 05:32:25PM +0000, Will Deacon wrote:
+> >> Jayachandran C (1):
+> >>   arm64: cputype: Add MIDR values for Cavium ThunderX2 CPUs
+> >>
+> >> Marc Zyngier (3):
+> >>   arm64: Move post_ttbr_update_workaround to C code
+> >>   arm64: KVM: Use per-CPU vector when BP hardening is enabled
+> >>   arm64: KVM: Make PSCI_VERSION a fast path
+> >>
+> >> Shanker Donthineni (1):
+> >>   arm64: Implement branch predictor hardening for Falkor
+> >>
+> >> Will Deacon (8):
+> >>   arm64: use RET instruction for exiting the trampoline
+> >>   arm64: Kconfig: Reword UNMAP_KERNEL_AT_EL0 kconfig entry
+> >>   arm64: Take into account ID_AA64PFR0_EL1.CSV3
+> >>   arm64: cpufeature: Pass capability structure to ->enable callback
+> >>   drivers/firmware: Expose psci_get_version through psci_ops structure
+> >>   arm64: Add skeleton to harden the branch predictor against aliasing
+> >>     attacks
+> >>   arm64: cputype: Add missing MIDR values for Cortex-A72 and Cortex-A75
+> >>   arm64: Implement branch predictor hardening for affected Cortex-A CPUs
+> > 
+> > I'm queuing these into the arm64 for-next/core (after some overnight
+> > testing). Any additional fixes should be done on top.
+> 
+> I see these patches are not yet pushed to:
+> git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+> 
+> Did you hit any problems in the overnight tests?
 
-> Hi,
-> 
-> After the addition of the NAND framework ->exec_op() interface (see [1]
-> for the series preparing it and [2] for the last version of the
-> core-side implementation of ->exec_op() itself), this series replaces
-> the current Marvell NAND controller driver pxa3xx_nand.c with a rework
-> called marvell_nand.c.
-> 
-> Aside the fact that it drops the big state machine, improves the overall
-> speed and implements raw accesses, it is the first driver-side
-> implementation of the ->exec_op() interface and may be used as reference
-> for latter reworks of the same type.
-> 
-> One may find more detail about why a completely new driver is needed in
-> the commit log of:
-> 
->     "mtd: nand: add reworked Marvell NAND controller driver"
-> 
-> Device tree NAND node definition for all platforms referring to the
-> Marvell driver using the new bindings have already been accepted by the
-> MVEBU DT maintainers and will be merged after the driver. They are more
-> hierarchical and fit the real organization of the hardware, by having
-> NAND partitions that are part of NAND chip nodes, themselves part of the
-> NAND controller node.
-> 
-> These changes have been tested on:
->    - PXA3xx platform with a CM-X300 board (2kiB page NAND, 1b/512B
->      strength, Hamming ECC engine) [32 bits]
->    - Armada 385 DB AP (4kiB page NAND, 4b/512B, BCH ECC engine) [32 bits]
->    - Armada 398 DB (4kiB page NAND, 8b/512B, BCH ECC engine using a layout
->      with a last chunk different than the others) [32 bits]
->    - Armada 7040 DB and Armada 8040 DB (4kiB page NAND, 4b/512B, BCH ECC
->      engine) [64 bits]
->    - Triax dvb-tc board (2kiB page NAND, 4b/512B, BCH ECC engine) [32 bits]
-> 
-> This version is known not to be stable yet with a Zylonite based setup but
-> otherwise looks good for Marvell EBU platforms.
-> 
-> For people who would like to test it easily, a branch ready to be tested
-> is available at [3]. It is based on nand/next and has all the changes
-> brought by the previously mentionned series as well as this one.
-> 
-> Thank you,
-> Miqu?l
-> 
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg619633.html
-> [2] http://lists.infradead.org/pipermail/linux-mtd/2017-December/077965.html
-> [3] https://github.com/miquelraynal/linux/tree/marvell/nand-next/nfc
-> 
-> 
-> Changes since v2:
->   - Added a patch to create the nand-rb property in the Documentation
->   - Rewording in the Documentation according to Rob's comments
->   - Moved from marvell,rb to nand-rb property in the code
->   - Disociated using this driver with Marvell EBU platforms than using
->     it with PXA ones
->   - Fixed the handling of 16-bit buses
->   - Fixed SPDX comment style
->   - Reorganized registers offsets/bit fields definitions as requested
->   - Moved to Kernel doc
->   - Changed the logic in ->select_chip() to use a prepared value of NDCR
->     only instead of recalculating it
->   - Fixed the presence of the SPARE_EN bit, reworked a bit the
->     hmg_do_read/write() helpers
->   - Fixed the OOB layouts that were unusable (all spare data first, then
->     all ECC bytes)
->   - Additional check on mtd->writesize when using NFCv1 (all sizes not
->     supported)
->   - Various typos/rewording
-> 
-> Changes since v1:
->   - Rewording
->   - Fixed BCH ->read/write_page() hooks for 2kiB pages NAND chips
->   - Removed license text, used SPDX tag instead
->   - Removed read_page_data()
->   - Enhanced the DT bindings document with the label property and the
->     deprecated bindings.
->   - Simplified the read_chunk() helper (OOB always read).
->   - Simplified the ->bch_read_page() hook by removing the addition raw
->     read to get ECC bytes.
->   - Fixed the ->correct() function that did not check for bitflips in
->     ECC bytes in erased pages.
-> 
-> 
-> Miquel Raynal (7):
->   dt-bindings: mtd: document new nand-rb property
->   dt-bindings: mtd: add Marvell NAND controller documentation
->   mtd: nand: add reworked Marvell NAND controller driver
->   mtd: nand: use reworked NAND controller driver with Marvell EBU SoCs
+Yes, I did, but they were not related to these patches but rather the
+original kpti. See:
 
-Applied patches 1 to 4.
+https://marc.info/?l=linux-arm-kernel&m=151576029908809
 
-Can you please send a patch to add a new entry in MAINTAINERS for this
-driver?
+They are pushed now.
 
-Thanks,
-
-Boris
-
->   mtd: nand: use Marvell reworked NAND controller driver with all
->     platforms
->   dt-bindings: mtd: remove pxa3xx NAND controller documentation
->   mtd: nand: remove useless fields from pxa3xx NAND platform data
-> 
->  .../devicetree/bindings/mtd/marvell-nand.txt       |  123 +
->  Documentation/devicetree/bindings/mtd/nand.txt     |    1 +
->  .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   50 -
->  arch/arm/configs/cm_x300_defconfig                 |    2 +-
->  arch/arm/configs/mvebu_v7_defconfig                |    2 +-
->  arch/arm/configs/pxa3xx_defconfig                  |    3 +-
->  arch/arm/configs/pxa_defconfig                     |    2 +-
->  arch/arm/configs/raumfeld_defconfig                |    2 +-
->  arch/arm/mach-mmp/ttc_dkb.c                        |    4 +-
->  arch/arm/mach-pxa/cm-x300.c                        |    8 +-
->  arch/arm/mach-pxa/colibri-pxa3xx.c                 |    8 +-
->  arch/arm/mach-pxa/colibri.h                        |    2 +-
->  arch/arm/mach-pxa/littleton.c                      |   10 +-
->  arch/arm/mach-pxa/mxm8x10.c                        |   10 +-
->  arch/arm/mach-pxa/raumfeld.c                       |    6 +-
->  arch/arm/mach-pxa/zylonite.c                       |   10 +-
->  arch/arm64/configs/defconfig                       |    2 +-
->  drivers/mtd/nand/Kconfig                           |   18 +-
->  drivers/mtd/nand/Makefile                          |    2 +-
->  drivers/mtd/nand/marvell_nand.c                    | 2896 ++++++++++++++++++++
->  drivers/mtd/nand/pxa3xx_nand.c                     | 2104 --------------
->  include/linux/platform_data/mtd-nand-pxa3xx.h      |   43 +-
->  22 files changed, 3072 insertions(+), 2236 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
->  delete mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
->  create mode 100644 drivers/mtd/nand/marvell_nand.c
->  delete mode 100644 drivers/mtd/nand/pxa3xx_nand.c
-> 
+-- 
+Catalin
