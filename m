@@ -1,29 +1,30 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 12 Jan 2018 09:42:00 +0100
-Subject: [PATCH 02/34] hexagon: remove unused flush_write_buffers definition
+Date: Fri, 12 Jan 2018 09:42:02 +0100
+Subject: [PATCH 04/34] powerpc: remove unused flush_write_buffers definition
 In-Reply-To: <20180112084232.2857-1-hch@lst.de>
 References: <20180112084232.2857-1-hch@lst.de>
-Message-ID: <20180112084232.2857-3-hch@lst.de>
+Message-ID: <20180112084232.2857-5-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/hexagon/include/asm/io.h | 2 --
- 1 file changed, 2 deletions(-)
+ arch/powerpc/include/asm/dma-mapping.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
-index 66f5e9a61efc..9e8621d94ee9 100644
---- a/arch/hexagon/include/asm/io.h
-+++ b/arch/hexagon/include/asm/io.h
-@@ -330,8 +330,6 @@ static inline void outsl(unsigned long port, const void *buffer, int count)
- 	}
+diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
+index 5a6cbe11db6f..592c7f418aa0 100644
+--- a/arch/powerpc/include/asm/dma-mapping.h
++++ b/arch/powerpc/include/asm/dma-mapping.h
+@@ -107,9 +107,6 @@ static inline void set_dma_offset(struct device *dev, dma_addr_t off)
+ 		dev->archdata.dma_offset = off;
  }
  
--#define flush_write_buffers() do { } while (0)
+-/* this will be removed soon */
+-#define flush_write_buffers()
 -
- #endif /* __KERNEL__ */
+ #define HAVE_ARCH_DMA_SET_MASK 1
+ extern int dma_set_mask(struct device *dev, u64 dma_mask);
  
- #endif
 -- 
 2.14.2
