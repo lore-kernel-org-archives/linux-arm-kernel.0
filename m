@@ -1,23 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 12 Jan 2018 14:12:16 +0800
-Subject: [PATCH v2 05/12] drm/bridge/synopsys: dw-hdmi: Add deinit callback
-In-Reply-To: <20180110192512.19684-6-jernej.skrabec@siol.net>
-References: <20180110192512.19684-1-jernej.skrabec@siol.net>
- <20180110192512.19684-6-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v677HxKD2d+Jqsu7U5OuOCtFGf0u-1r=ewMrD3pu8B8YFQ@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 12 Jan 2018 17:21:11 +1100
+Subject: [PATCH 2/2] dts: ARM: Aspeed: Enable USB ports on ast2500 eval board
+Message-ID: <1515738071.31850.101.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 3:25 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> Some SoCs, like Allwinner A83T, have to do additional cleanup when
-> HDMI driver unloads. When using DW HDMI through DRM bridge API, there is
-> no place to store driver's private data so it can be accessed in unbind
-> function. Because of that, add deinit function which is called at the
-> very end, so drivers can do a proper cleanup.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+This enables both USB ports as host with EHCI and UHCI
+attached to them.
 
-8242ecbd597d ("drm/bridge/synopsys: stop clobbering drvdata"), which is
-already in drm-misc-next, is a much saner solution. :)
+Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
 
-ChenYu
+v2: Unchanged (except subject)
+
+ arch/arm/boot/dts/aspeed-ast2500-evb.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+index 6946c8610c4c..0c3f14d05046 100644
+--- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
++++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+@@ -80,3 +80,21 @@
+ 		reg = <0x4d>;
+ 	};
+ };
++
++&ehci0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb2ah_default>;
++};
++
++&ehci1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb2bh_default>;
++};
++
++&uhci {
++	status = "okay";
++
++	/* No pinctrl, this follows the above EHCI settings */
++};
