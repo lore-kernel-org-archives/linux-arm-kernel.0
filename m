@@ -1,67 +1,75 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 12 Jan 2018 16:23:00 +0200
-Subject: [PATCH v2 13/16] drivers: pwm: core: add push-pull mode support
+Date: Fri, 12 Jan 2018 16:23:02 +0200
+Subject: [PATCH v2 15/16] pwm: add documentation for pwm push-pull mode
 In-Reply-To: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1515766983-15151-14-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1515766983-15151-16-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add push-pull mode support in PWM code. In push-pull mode the channels
-outputs has same polarity and the edges are complementary delayed for one
-period.
+Add documentation for PWM push-pull mode.
 
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/pwm/sysfs.c | 2 ++
- include/linux/pwm.h | 9 +++++++--
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/pwm/pwm.txt |  8 +++++++-
+ Documentation/pwm.txt                         | 18 ++++++++++++++++++
+ 2 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index 7d111ab17e43..5052bdec7ad6 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -249,6 +249,8 @@ static ssize_t mode_store(struct device *child,
- 		mode = PWM_MODE_NORMAL;
- 	else if (sysfs_streq(buf, pwm_get_mode_desc(PWM_MODE_COMPLEMENTARY)))
- 		mode = PWM_MODE_COMPLEMENTARY;
-+	else if (sysfs_streq(buf, pwm_get_mode_desc(PWM_MODE_PUSH_PULL)))
-+		mode = PWM_MODE_PUSH_PULL;
- 	else
- 		return -EINVAL;
+diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+index fdff25bad1db..a4562af3577c 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+@@ -58,15 +58,21 @@ Example with optional PWM specifier for inverse polarity
+ - PWM_MODE_NORMAL: for all PWM controllers
+ - PWM_MODE_COMPLEMENTARY: for PWM controllers with more than one output per
+ PWM channel
++- PWM_MODE_PUSH_PULL: for PWM controllers with more than one output per channel,
++in push-pull mode
  
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 2e8dfc3ea516..a4ad3b7a5317 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -29,13 +29,16 @@ enum pwm_polarity {
-  * enum pwm_mode - PWM working modes
-  * PWM_MODE_NORMAL: PWM has one output per channel
-  * PWM_MODE_COMPLEMENTARY: PWM has 2 outputs per channel with opposite polarity
-+ * PWM_MODE_PUSH_PULL: PWM has 2 outputs per channel with same polarity and
-+ * the edges are complementary delayed for one period
-  * PWM_MODE_MAX: Used to get the defined PWM modes mask (PWM_MODE_MAX - 1)
-  * phase-shifted
-  */
- enum pwm_mode {
- 	PWM_MODE_NORMAL		= BIT(0),
- 	PWM_MODE_COMPLEMENTARY	= BIT(1),
--	PWM_MODE_MAX		= BIT(2),
-+	PWM_MODE_PUSH_PULL	= BIT(2),
-+	PWM_MODE_MAX		= BIT(3),
- };
+ Example with PWM modes:
  
- /**
-@@ -478,7 +481,9 @@ static inline void pwm_disable(struct pwm_device *pwm)
+ 	bl: blacklight {
+ 		pwms = <&pwm 0 5000000 PWM_POLARITY_INVERTED
+-			PWM_DTMODE_NORMAL | PWM_DTMODE_COMPLEMENTARY>;
++			PWM_DTMODE_NORMAL | PWM_DTMODE_COMPLEMENTARY |
++			PWM_DTMODE_PUSH_PULL>;
+ 		pwm-names = "backlight";
+ 	};
  
- static inline const char * const pwm_get_mode_desc(enum pwm_mode mode)
- {
--	static const char * const modes[] = { "normal", "complementary" };
-+	static const char * const modes[] = {
-+		"normal", "complementary", "push-pull"
-+	};
++If all the available modes are given as argument of pwms binding only the first
++valid one will be considered (first valid LSB bit of mode field).
++
+ 2) PWM controller nodes
+ -----------------------
  
- 	return mode ? modes[ffs(mode) - 1] : "invalid";
- }
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index 58c9bd55f021..71b538239519 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -135,6 +135,24 @@ channel that was exported. The following properties will then be available:
+ 
+     Where T is the signal period.
+ 
++    Push-pull mode - for PWM chips with mode than one output per PWM channel;
++        output waveform for a PWM controller with 2 outputs per PWM channel, in
++	push-pull mode, with normal polarity looks like this:
++            __          __
++    PWMH __|  |________|  |________
++                  __          __
++    PWML ________|  |________|  |__
++           <--T-->
++
++    If polarity is inversed:
++         __    ________    ________
++    PWMH   |__|        |__|
++         ________    ________    __
++    PWML         |__|        |__|
++           <--T-->
++
++    Where T is the signal period.
++
+ Implementing a PWM driver
+ -------------------------
+ 
 -- 
 2.7.4
