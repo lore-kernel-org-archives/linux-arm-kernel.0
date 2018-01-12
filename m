@@ -1,175 +1,88 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Fri, 12 Jan 2018 21:42:12 +0100
-Subject: [PATCH v2 04/12] drm/bridge/synopsys: dw-hdmi: Export some PHY
- related functions
-In-Reply-To: <20180110192512.19684-5-jernej.skrabec@siol.net>
-References: <20180110192512.19684-1-jernej.skrabec@siol.net>
- <20180110192512.19684-5-jernej.skrabec@siol.net>
-Message-ID: <2850049.ORu4oj41BJ@jernej-laptop>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 12 Jan 2018 14:45:46 -0600
+Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
+In-Reply-To: <CAOesGMgcf9FovbzhPkKnrG4ETRFP3dsSJnTYNfp1wECMFeFOGA@mail.gmail.com>
+References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
+ <20180112020711.6gp2pnsxxjzelidq@localhost> <20180112032223.GK3626@vireshk-i7>
+ <CAOesGMggU73asY1SEUDD_BsWcrGYR___o8e5omjziOPEwJgqBQ@mail.gmail.com>
+ <CAK8P3a2SO4=YKBE3L_AKsyfNe77YR7a8F=dvbS=ic03=6NK8MA@mail.gmail.com>
+ <CAOesGMgcf9FovbzhPkKnrG4ETRFP3dsSJnTYNfp1wECMFeFOGA@mail.gmail.com>
+Message-ID: <CAL_JsqJVWLazDRB1me2OubqqMhdsqsR+cLSHR+K0OY3dZHcE-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Jan 12, 2018 at 12:23 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Jan 12, 2018 at 12:56 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Fri, Jan 12, 2018 at 4:23 AM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Thu, Jan 11, 2018 at 7:22 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>>>> On 11-01-18, 18:07, Olof Johansson wrote:
+>>>>> On Thu, Jan 11, 2018 at 11:28:51AM +0530, Viresh Kumar wrote:
+>>>>> > The interrupt-parent of rtc was missing, add it.
+>>>>> >
+>>>>> > Fixes: 8113ba917dfa ("ARM: SPEAr: DT: Update device nodes")
+>>>>> > Cc: stable at vger.kernel.org # v3.8+
+>>>>> > Reported-by: Arnd Bergmann <arnd@arndb.de>
+>>>>> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>>>
+>>>>> Applied to next/dt. Is stable really needed on this? It's been broken since
+>>>>> pretty much forever, and nobody has complained... :)
+>>>>
+>>>> Not sure. Just thought it may be useful for someone somewhere :)
+>>>
+>>> Ok. Left the tags there, but didn't merge into fixes since we're late
+>>> in -rc and this didn't seem critical at this time.
+>>
+>> My plan was to have these in the fixes branch in the hope of making
+>> it to a clean build for 4.15 after all, they fix warnings that got introduced
+>> by the updated dtc checks in 4.15-rc1.
+>>
+>> We are getting fairly close, but it seems we still miss a few, so we
+>> might as well give up at this point. The remaining fixes should be easy
+>> to backport into v4.15.y if we decide to do it, of further back even.
+>> For v4.14 and before, the in-kernel copy of dtc won't warn, but mainline
+>> dtc will.
+>>
+>> Greg, let me know your thoughts on this for the upcoming 4.15.y
+>> release. We had hundreds of dtc warnings in 4.15-rc1, many of them
+>> about important bugs, now we're down to a couple of warnings
+>> for platforms we don't care about much, and I expect the last of
+>> these fixes to land in 4.16-rc1 or maybe -rc2. Shall we backport
+>> them all to get a clean 4.15.y release?
+>
+> I think it makes more sense to disable the warnings than to backport a
+> bunch of warning fixes this late. The code is working, has worked for
+> a long time it's just that Rob enabled the warnings by default. We can
+> keep them enabled for 4.16.
 
-Dne sreda, 10. januar 2018 ob 20:25:04 CET je Jernej Skrabec napisal(a):
-> Parts of PHY code could be useful also for custom PHYs. For example,
-> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
-> with few additional memory mapped registers, so most of the Synopsys PHY
-> related code could be reused.
-> 
-> Functions exported here are actually not specific to Synopsys PHYs but
-> to DWC HDMI controller PHY interface. This means that even if the PHY is
-> completely custom, i.e. not designed by Synopsys, exported functions can
-> be useful.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 44
-> +++++++++++++++++++++---------- include/drm/bridge/dw_hdmi.h              |
-> 11 ++++++++
->  2 files changed, 41 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
-> 7ca14d7325b5..7d80f4b56683 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -1037,19 +1037,21 @@ static void dw_hdmi_phy_enable_svsret(struct dw_hdmi
-> *hdmi, u8 enable) HDMI_PHY_CONF0_SVSRET_MASK);
->  }
-> 
-> -static void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
-> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
->  {
->  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
->  			 HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET,
->  			 HDMI_PHY_CONF0_GEN2_PDDQ_MASK);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_pddq);
-> 
-> -static void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
-> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
->  {
->  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
->  			 HDMI_PHY_CONF0_GEN2_TXPWRON_OFFSET,
->  			 HDMI_PHY_CONF0_GEN2_TXPWRON_MASK);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_txpwron);
-> 
->  static void dw_hdmi_phy_sel_data_en_pol(struct dw_hdmi *hdmi, u8 enable)
->  {
-> @@ -1065,6 +1067,22 @@ static void dw_hdmi_phy_sel_interface_control(struct
-> dw_hdmi *hdmi, u8 enable) HDMI_PHY_CONF0_SELDIPIF_MASK);
->  }
-> 
-> +void dw_hdmi_phy_reset(struct dw_hdmi *hdmi)
-> +{
-> +	/* PHY reset. The reset signal is active high on Gen2 PHYs. */
-> +	hdmi_writeb(hdmi, HDMI_MC_PHYRSTZ_PHYRSTZ, HDMI_MC_PHYRSTZ);
-> +	hdmi_writeb(hdmi, 0, HDMI_MC_PHYRSTZ);
-> +}
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_reset);
+In some cases "working" was what's in the DT is unused by the kernel
+because the DT is broken. That's why this round was not off by
+default.
 
-I just noticed that meson dw hdmi driver uses function with the same name, 
-which break compilation. Is it ok if I rename meson specific reset to 
-meson_dw_hdmi_phy_reset()?
+It looks to me to be somewhere less than 5 fixes remaining (BTW, why
+is there no arm32 allmodconfig build on kernelci.org? That or
+allyesconfig are the only ways to build all dtbs). It would also be an
+exception to the the stable process because that patch would not be in
+Linus' tree.
 
-Best regards,
-Jernej
+>> Note: there was at least one dtc warning fix that caused a serious
+>> regression in code that relied on a device probe to fail because of
+>> an invalid node (a fix is still in the works for 4.15), though generally
+>> the fixes are really harmless and can only make things better.
+>
+> Exactly why picking up warning fixes this late is probably not a great idea.
 
-> +
-> +void dw_hdmi_phy_i2c_set_addr(struct dw_hdmi *hdmi, u8 address)
-> +{
-> +	hdmi_phy_test_clear(hdmi, 1);
-> +	hdmi_writeb(hdmi, address, HDMI_PHY_I2CM_SLAVE_ADDR);
-> +	hdmi_phy_test_clear(hdmi, 0);
-> +}
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_i2c_set_addr);
-> +
->  static void dw_hdmi_phy_power_off(struct dw_hdmi *hdmi)
->  {
->  	const struct dw_hdmi_phy_data *phy = hdmi->phy.data;
-> @@ -1203,16 +1221,11 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi)
->  	if (phy->has_svsret)
->  		dw_hdmi_phy_enable_svsret(hdmi, 1);
-> 
-> -	/* PHY reset. The reset signal is active high on Gen2 PHYs. */
-> -	hdmi_writeb(hdmi, HDMI_MC_PHYRSTZ_PHYRSTZ, HDMI_MC_PHYRSTZ);
-> -	hdmi_writeb(hdmi, 0, HDMI_MC_PHYRSTZ);
-> +	dw_hdmi_phy_reset(hdmi);
-> 
->  	hdmi_writeb(hdmi, HDMI_MC_HEACPHY_RST_ASSERT, HDMI_MC_HEACPHY_RST);
-> 
-> -	hdmi_phy_test_clear(hdmi, 1);
-> -	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
-> -		    HDMI_PHY_I2CM_SLAVE_ADDR);
-> -	hdmi_phy_test_clear(hdmi, 0);
-> +	dw_hdmi_phy_i2c_set_addr(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
-> 
->  	/* Write to the PHY as configured by the platform */
->  	if (pdata->configure_phy)
-> @@ -1251,15 +1264,16 @@ static void dw_hdmi_phy_disable(struct dw_hdmi
-> *hdmi, void *data) dw_hdmi_phy_power_off(hdmi);
->  }
-> 
-> -static enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
-> -						      void *data)
-> +enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
-> +					       void *data)
->  {
->  	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
->  		connector_status_connected : connector_status_disconnected;
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_read_hpd);
-> 
-> -static void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
-> -				   bool force, bool disabled, bool rxsense)
-> +void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
-> +			    bool force, bool disabled, bool rxsense)
->  {
->  	u8 old_mask = hdmi->phy_mask;
-> 
-> @@ -1271,8 +1285,9 @@ static void dw_hdmi_phy_update_hpd(struct dw_hdmi
-> *hdmi, void *data, if (old_mask != hdmi->phy_mask)
->  		hdmi_writeb(hdmi, hdmi->phy_mask, HDMI_PHY_MASK0);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_update_hpd);
-> 
-> -static void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
-> +void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
->  {
->  	/*
->  	 * Configure the PHY RX SENSE and HPD interrupts polarities and clear
-> @@ -1291,6 +1306,7 @@ static void dw_hdmi_phy_setup_hpd(struct dw_hdmi
-> *hdmi, void *data) hdmi_writeb(hdmi, ~(HDMI_IH_PHY_STAT0_HPD |
-> HDMI_IH_PHY_STAT0_RX_SENSE), HDMI_IH_MUTE_PHY_STAT0);
->  }
-> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_setup_hpd);
-> 
->  static const struct dw_hdmi_phy_ops dw_hdmi_synopsys_phy_ops = {
->  	.init = dw_hdmi_phy_init,
-> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-> index 182f83283e24..4a35e5065f6f 100644
-> --- a/include/drm/bridge/dw_hdmi.h
-> +++ b/include/drm/bridge/dw_hdmi.h
-> @@ -157,7 +157,18 @@ void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
->  void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
-> 
->  /* PHY configuration */
-> +void dw_hdmi_phy_i2c_set_addr(struct dw_hdmi *hdmi, u8 address);
->  void dw_hdmi_phy_i2c_write(struct dw_hdmi *hdmi, unsigned short data,
->  			   unsigned char addr);
-> 
-> +enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
-> +					       void *data);
-> +void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
-> +			    bool force, bool disabled, bool rxsense);
-> +void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data);
-> +
-> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable);
-> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable);
-> +void dw_hdmi_phy_reset(struct dw_hdmi *hdmi);
-> +
->  #endif /* __IMX_HDMI_H__ */
-> --
-> 2.15.1
+Applying them now for 4.15 would be late, but tagging them as fixes in
+4.16 would not be late (other than the normal problem that things get
+applied to stable before sufficient testing in master).
+
+
+I have more dtc checks in the works (nothing for 4.16 :) ). I'd like
+the process to work better. I'm not going to fix all the warnings. I
+don't think Arnd should either. Turning them off by default hasn't
+worked great either. For some, I'm not sure we can ever get to warning
+free, but I'd like new stuff to have warnings enabled and no one
+builds with W=1. We could put together tooling to just show new
+warnings, but someone has to run it and enforce it. I could stick dtc
+updates into linux-next for multiple cycles before sending to Linus.
+
+Rob
