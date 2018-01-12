@@ -1,90 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Jan 2018 13:07:30 +0100
-Subject: [PATCH v3 24/41] KVM: arm64: Change 32-bit handling of VM system
- registers
-In-Reply-To: <20180112120747.27999-1-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
-Message-ID: <20180112120747.27999-25-christoffer.dall@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 12 Jan 2018 13:56:43 +0100
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+In-Reply-To: <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+References: <20180109145409.11612-1-thierry.reding@gmail.com>
+ <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+Message-ID: <20180112125643.GA19999@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently handle 32-bit accesses to trapped VM system registers using
-the 32-bit index into the coproc array on the vcpu structure, which is a
-union of the coproc array and the sysreg array.
+On Fri, Jan 12, 2018 at 11:39:30AM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 09/01/18 14:54, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > After moving the SoC device initialization to an early initcall in
+> > commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+> > the Broadcom STB SoC device is registered on all platforms if support
+> > for the device is enabled in the kernel configuration.
+> > 
+> > This causes an additional SoC device to appear on platforms that already
+> > register a native one. In case of Tegra the STB SoC device is registered
+> > as soc0 (with totally meaningless content in the sysfs attributes) and
+> > causes various scripts and programs to fail because they don't know how
+> > to parse that data.
+> > 
+> > To fix this, duplicate the check from brcmstb_soc_device_early_init()
+> > that already prevents the code from doing anything nonsensical on non-
+> > STB platforms.
+> > 
+> > Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/soc/bcm/brcmstb/common.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+> > index 781ada62d0a3..4fe1cb73b39a 100644
+> > --- a/drivers/soc/bcm/brcmstb/common.c
+> > +++ b/drivers/soc/bcm/brcmstb/common.c
+> > @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
+> >  static int __init brcmstb_soc_device_init(void)
+> >  {
+> >  	struct soc_device_attribute *soc_dev_attr;
+> > +	struct device_node *sun_top_ctrl;
+> >  	struct soc_device *soc_dev;
+> >  
+> > +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+> > +	if (!sun_top_ctrl)
+> > +		return -ENODEV;
+> > +
+> 
+> missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
 
-Since all the 32-bit coproc indices are created to correspond to the
-architectural mapping between 64-bit system registers and 32-bit
-coprocessor registers, and because the AArch64 system registers are the
-double in size of the AArch32 coprocessor registers, we can always find
-the system register entry that we must update by dividing the 32-bit
-coproc index by 2.
+Hm... you're right. I was blindly copying this from
+brcmstb_soc_device_early() which doesn't have the of_node_put() either.
+Let me fix this up with another couple of patches.
 
-This is going to make our lives much easier when we have to start
-accessing system registers that use deferred save/restore and might
-have to be read directly from the physical CPU.
-
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/include/asm/kvm_host.h |  8 --------
- arch/arm64/kvm/sys_regs.c         | 20 +++++++++++++++-----
- 2 files changed, 15 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 9e23bc968668..4a1b0bab6baf 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -292,14 +292,6 @@ struct kvm_vcpu_arch {
- #define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
- #define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
- 
--#ifdef CONFIG_CPU_BIG_ENDIAN
--#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r))
--#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r) + 1)
--#else
--#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r) + 1)
--#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r))
--#endif
--
- struct kvm_vm_stat {
- 	ulong remote_tlb_flush;
- };
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 1830ebc227d1..b20c26e0d6b9 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -121,16 +121,26 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
- 			  const struct sys_reg_desc *r)
- {
- 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
-+	u64 val;
-+	int reg = r->reg;
- 
- 	BUG_ON(!p->is_write);
- 
--	if (!p->is_aarch32) {
--		vcpu_sys_reg(vcpu, r->reg) = p->regval;
-+	/* See the 32bit mapping in kvm_host.h */
-+	if (p->is_aarch32)
-+		reg = r->reg / 2;
-+
-+	if (!p->is_aarch32 || !p->is_32bit) {
-+		val = p->regval;
- 	} else {
--		if (!p->is_32bit)
--			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
--		vcpu_cp15_64_low(vcpu, r->reg) = lower_32_bits(p->regval);
-+		val = vcpu_sys_reg(vcpu, reg);
-+		if (r->reg % 2)
-+			val = (p->regval << 32) | (u64)lower_32_bits(val);
-+		else
-+			val = ((u64)upper_32_bits(val) << 32) |
-+				lower_32_bits(p->regval);
- 	}
-+	vcpu_sys_reg(vcpu, reg) = val;
- 
- 	kvm_toggle_cache(vcpu, was_enabled);
- 	return true;
--- 
-2.14.2
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/4a4e350e/attachment-0001.sig>
