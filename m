@@ -1,89 +1,189 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 12 Jan 2018 17:35:32 +0100
-Subject: [PATCH 1/2] MAINTAINERS: linux-media: update Microchip ISI and
- ISC entries
-In-Reply-To: <eb6b3cbe8e48faee7e88eca0649e42cbde91ffa6.1515503733.git.nicolas.ferre@microchip.com>
-References: <eb6b3cbe8e48faee7e88eca0649e42cbde91ffa6.1515503733.git.nicolas.ferre@microchip.com>
-Message-ID: <701274f4-8006-132b-37ee-22cb374c6f62@microchip.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Fri, 12 Jan 2018 16:42:35 +0000
+Subject: [patch v15 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <13433849-cb7d-e2c0-4ce9-d91a6012d7d7@gmail.com>
+References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
+ <1514202808-29747-2-git-send-email-oleksandrs@mellanox.com>
+ <13433849-cb7d-e2c0-4ce9-d91a6012d7d7@gmail.com>
+Message-ID: <AM4PR0501MB2194A5EF09E5F3140F2C211CB1170@AM4PR0501MB2194.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2018 at 14:46, Nicolas Ferre wrote:
-> These two image capture interface drivers are now handled
-> by Wenyou Yang.
-> I benefit from this change to update the two entries by correcting the
-> binding documentation link for ISC and moving the ISI to the new
-> MICROCHIP / ATMEL location.
+
+
+> -----Original Message-----
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
+> Sent: 26 ??????? 2017 ?. 1:09
+> To: Oleksandr Shamray <oleksandrs@mellanox.com>;
+> gregkh at linuxfoundation.org; arnd at arndb.de
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; openbmc at lists.ozlabs.org; joel at jms.id.au;
+> jiri at resnulli.us; tklauser at distanz.ch; linux-serial at vger.kernel.org; Vadim
+> Pasternak <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
+> level at mellanox.com>; robh+dt at kernel.org; openocd-devel-
+> owner at lists.sourceforge.net; linux-api at vger.kernel.org;
+> davem at davemloft.net; mchehab at kernel.org; Jiri Pirko
+> <jiri@mellanox.com>
+> Subject: Re: [patch v15 1/4] drivers: jtag: Add JTAG core driver
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> ---
-> Hi,
-> 
-> Patch against next-20180109.
-> Note that I didn't find it useful to have several patches for these changes.
-> Tell me if you feel differently.
-> 
-> I would like to have the Ack from Ludovic and Wenyou obviously. I don't know if
-> Songjun can answer as he's not with Microchip anymore.
-
-Update on this patch:
-
-Boris took the second patch of the series through NAND/MTD tree so this
-one can go alone upstream through the linux-media tree.
-I also have the 2 required Ack.
-
-So, do you want me to re-send this one independently or should we wait
-for 4.16-rc1?
-
-Best regards,
-  Nicolas
-
->  MAINTAINERS | 19 ++++++++++---------
->  1 file changed, 10 insertions(+), 9 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a7d10a2bb980..65c4b59b582f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2353,13 +2353,6 @@ L:	linux-i2c at vger.kernel.org
->  S:	Supported
->  F:	drivers/i2c/busses/i2c-at91.c
->  
-> -ATMEL ISI DRIVER
-> -M:	Ludovic Desroches <ludovic.desroches@microchip.com>
-> -L:	linux-media at vger.kernel.org
-> -S:	Supported
-> -F:	drivers/media/platform/atmel/atmel-isi.c
-> -F:	include/media/atmel-isi.h
-> -
->  ATMEL LCDFB DRIVER
->  M:	Nicolas Ferre <nicolas.ferre@microchip.com>
->  L:	linux-fbdev at vger.kernel.org
-> @@ -9102,12 +9095,20 @@ S:	Maintained
->  F:	drivers/crypto/atmel-ecc.*
->  
->  MICROCHIP / ATMEL ISC DRIVER
-> -M:	Songjun Wu <songjun.wu@microchip.com>
-> +M:	Wenyou Yang <wenyou.yang@microchip.com>
->  L:	linux-media at vger.kernel.org
->  S:	Supported
->  F:	drivers/media/platform/atmel/atmel-isc.c
->  F:	drivers/media/platform/atmel/atmel-isc-regs.h
-> -F:	devicetree/bindings/media/atmel-isc.txt
-> +F:	Documentation/devicetree/bindings/media/atmel-isc.txt
-> +
-> +MICROCHIP / ATMEL ISI DRIVER
-> +M:	Wenyou Yang <wenyou.yang@microchip.com>
-> +L:	linux-media at vger.kernel.org
-> +S:	Supported
-> +F:	drivers/media/platform/atmel/atmel-isi.c
-> +F:	include/media/atmel-isi.h
-> +F:	Documentation/devicetree/bindings/media/atmel-isi.txt
->  
->  MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
->  M:	Woojung Huh <Woojung.Huh@microchip.com>
 > 
 
+[snip]
 
--- 
-Nicolas Ferre
+> > +
+> > +	case JTAG_IOCXFER:
+> > +		if (copy_from_user(&xfer, (void *)arg,
+> > +				   sizeof(struct jtag_xfer)))
+> > +			return -EFAULT;
+> > +
+> > +		if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
+> > +			return -EINVAL;
+> > +
+> > +		if (xfer.type > JTAG_SDR_XFER)
+> > +			return -EINVAL;
+> > +
+> > +		if (xfer.direction > JTAG_WRITE_XFER)
+> > +			return -EINVAL;
+> > +
+> > +		if (xfer.endstate > JTAG_STATE_PAUSEDR)
+> > +			return -EINVAL;
+> > +
+> > +		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
+> > +		xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio),
+> data_size);
+> > +
+> > +		if (!xfer_data)
+> > +			return -EFAULT;
+> > +
+> > +		if (jtag->ops->xfer) {
+> > +			err = jtag->ops->xfer(jtag, &xfer, xfer_data);
+> > +		} else {
+> > +			kfree(xfer_data);
+> > +			return -EOPNOTSUPP;
+> > +		}
+> 
+> Why don't you move all of the code here into a function which will make the
+> error handling consistent? Also, checking whether the jtag adapter
+
+Greg KH <gregkh@linuxfoundation.org> Say to move all of this insight ioctl 
+
+> implements ops->xfer should probably be done before you do the
+> memdup_user().
+
+Yes
+
+> > +		if (err) {
+> > +			kfree(xfer_data);
+> > +			return -EFAULT;
+> > +		}
+> > +
+> > +		if (jtag->ops->mode_set)
+> > +			err = jtag->ops->mode_set(jtag, value);
+> > +		else
+> > +			err = -EOPNOTSUPP;
+> > +		break;
+> 
+> Same here, this can be checked before get_user().
+> 
+
+Yes
+
+> > +	if (jtag->opened) {
+> > +		mutex_unlock(&jtag->open_lock);
+> > +		return -EINVAL;
+> 
+> -EBUSY maybe?
+> 
+
+Yes
+
+
+> > +
+> > +	jtag = kzalloc(sizeof(*jtag) + round_up(priv_size,
+> ARCH_DMA_MINALIGN),
+> > +		       GFP_KERNEL);
+> > +	if (!jtag)
+> > +		return NULL;
+> 
+> If you set ARCH_DMA_MINALIGN to 1 when not defined, what is this
+> achieving that kmalloc() is not already doing?
+> 
+
+Removed ARCH_DMA_MINALIGN
+
+> > +
+> > +	jtag->ops = ops;
+> > +	return jtag;
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_alloc);
+> > +
+> > +void jtag_free(struct jtag *jtag)
+> > +{
+> > +	kfree(jtag);
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_free);
+> > +
+> > +int jtag_register(struct jtag *jtag)
+> > +{
+> > +	char *name;
+> > +	int err;
+> > +	int id;
+> > +
+> > +	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
+> > +	if (id < 0)
+> > +		return id;
+> > +
+> > +	jtag->id = id;
+> > +
+> > +	name = kzalloc(MAX_JTAG_NAME_LEN, GFP_KERNEL);
+> > +	if (!name) {
+> > +		err = -ENOMEM;
+> > +		goto err_jtag_alloc;
+> > +	}
+> 
+> Can't you use jtag->miscdev.dev here to simplify the allocation error
+> handling?
+> 
+
+How, what you mean?
+
+> > +#ifndef ARCH_DMA_MINALIGN
+> > +#define ARCH_DMA_MINALIGN 1
+> > +#endif
+> 
+> Why?
+> 
+
+Not used now, Deleted
+
+> > +#endif /* __JTAG_H */
+> > diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h new
+> > file mode 100644 index 0000000..cda2520
+> > --- /dev/null
+> > +++ b/include/uapi/linux/jtag.h
+> 
+> [snip]
+> 
+> > +struct jtag_xfer {
+> > +	__u8	type;
+> > +	__u8	direction;
+> 
+> Can these two be an enum referring to what you defined earlier?
+> 
+
+Greg KH <gregkh@linuxfoundation.org> say:
+
+"All structures that cross the user/kernel boundry have to use the __ type variables.
+No "unsigned char", it has to be "__u8", no "unsigned short", it has to be "__u16", and so on.
+Also, watch out for your enumerated types, what's the packing end up looking like on these structures?  Have you verified it works with a 64bit kernel and 32bit userspace all correctly?"
+
+So I use __u8 type instead of enum to avoid errors while crossing 64bit kernel and 32bit userspace.
+
+> > +	__u8	endstate;
+> > +	__u32	length;
+> > +	__u64	tdio;
+> > +};
+> --
+> Florian
+
+Thaks.
