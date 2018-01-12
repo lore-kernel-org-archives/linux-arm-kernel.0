@@ -1,65 +1,66 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 12 Jan 2018 13:16:02 +0100
-Subject: [PATCH 08/14] ARM: dts: stm32: Enable SDIO controller on stm32f469
- disco board
-In-Reply-To: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1515759368-16946-9-git-send-email-patrice.chotard@st.com>
+Date: Fri, 12 Jan 2018 13:15:54 +0100
+Subject: [PATCH 00/14] Add MMCI support for STM32F SoCs family
+Message-ID: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrea Merello <andrea.merello@gmail.com>
+From: Patrice Chotard <patrice.chotard@st.com>
 
-This patch adds SDIO-related DT nodes required by stm32f469 board
+This series reworks patches submitted one year ago by Andrea Merello [1] 
+but without succeed to merged it.
 
-There is a hardware issue on these boards, it misses a pullup on
-the GPIO line used as card detect to allow correct SD card
-detection. To allow correct card detection "broken-cd" property
-is used.
+STM32F4 and STM32F7 SoCs families embeds a variant of the ARM PrimeCell 
+PL18x SD host controller, for which the mmci driver exists. 
+This series adds support for these SoCs to the mmci driver.
 
-Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- arch/arm/boot/dts/stm32f469-disco.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+As other variants, this one need some specific quirks, that this 
+series address. 
 
-diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-index 318fb12..ebb97c3 100644
---- a/arch/arm/boot/dts/stm32f469-disco.dts
-+++ b/arch/arm/boot/dts/stm32f469-disco.dts
-@@ -66,6 +66,13 @@
- 		serial0 = &usart3;
- 	};
- 
-+	mmc_vcard: mmc_vcard {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc_vcard";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
- 	soc {
- 		dma-ranges = <0xc0000000 0x0 0x10000000>;
- 	};
-@@ -120,6 +127,18 @@
- 	};
- };
- 
-+&sdio {
-+	status = "okay";
-+	vmmc-supply = <&mmc_vcard>;
-+	cd-gpios = <&gpiog 2 0>;
-+	cd-inverted;
-+	broken-cd;
-+	pinctrl-names = "default", "opendrain";
-+	pinctrl-0 = <&sdio_pins>;
-+	pinctrl-1 = <&sdio_pins_od>;
-+	bus-width = <4>;
-+};
-+
- &usart3 {
- 	pinctrl-0 = <&usart3_pins_a>;
- 	pinctrl-names = "default";
+This series has been tested on following boards :
+	_ stm32f429-eval
+	_ stm32f469-disco
+	_ stm32f746-eval
+	_ stm32f769-disco
+
+DT update for stm32f7 pinctrl, stm32f746-eval and stm32f769-disco boards
+will be sent later to avoid conflict with pending stm32f7 series [1] which
+is not yet merged on kernel mainline.
+
+[1] https://www.spinics.net/lists/linux-mmc/msg41616.html
+[2] https://patchwork.kernel.org/patch/10104447/
+
+
+Andrea Merello (2):
+  ARM: dts: stm32: Add pin map for SDIO controller on stm32f4
+  ARM: dts: stm32: Enable SDIO controller on stm32f469 disco board
+
+Patrice Chotard (12):
+  mmc: mmci: Don't pretend all variants to have MMCIMASK1 register
+  mmc: mmci: Don't pretend all variants to have MCI_STARBITERR flag
+  mmc: mmci: Add support for setting pad type via pinctrl
+  mmc: mmci: Add STM32 variant
+  ARM: dts: stm32: Add SDIO controller for stm32f746
+  ARM: dts: stm32: Add SDIO controller for stm32f429
+  ARM: dts: stm32: Enable SDIO controller on stm32429i-eval board
+  ARM: stm32: Add AMBA support for STM32F4 and STM32F7 SoCs
+  ARM: configs: stm32: Enable MMC_ARMMMCI support
+  ARM: configs: stm32: Enable EXT3_FS support
+  clk: stm32: Add clk entry for SDMMC2 on stm32F769
+  gpio: stmpe: i2c transfer are forbiden in atomic context
+
+ arch/arm/boot/dts/stm32429i-eval.dts   |  19 ++++++
+ arch/arm/boot/dts/stm32f4-pinctrl.dtsi |  31 +++++++++
+ arch/arm/boot/dts/stm32f429.dtsi       |  11 +++
+ arch/arm/boot/dts/stm32f469-disco.dts  |  19 ++++++
+ arch/arm/boot/dts/stm32f746.dtsi       |  22 ++++++
+ arch/arm/configs/stm32_defconfig       |   3 +
+ arch/arm/mach-stm32/Kconfig            |   3 +
+ drivers/clk/clk-stm32f4.c              |   3 +-
+ drivers/gpio/gpio-stmpe.c              |  20 +++---
+ drivers/mmc/host/mmci.c                | 120 ++++++++++++++++++++++++++++-----
+ drivers/mmc/host/mmci.h                |   6 ++
+ 11 files changed, 231 insertions(+), 26 deletions(-)
+
 -- 
 1.9.1
