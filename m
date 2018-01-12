@@ -1,104 +1,133 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 12 Jan 2018 11:42:33 +0100
-Subject: [PATCH] spi: orion: Fix clock resource by adding an optional bus clock
-Message-ID: <20180112104233.4952-1-gregory.clement@free-electrons.com>
+From: jmarchan@redhat.com (Jerome Marchand)
+Date: Fri, 12 Jan 2018 11:48:32 +0100
+Subject: [PATCH v3] arm64: fix unwind_frame() for filtered out fn for function
+ graph tracing
+Message-ID: <20180112104832.9417-1-jmarchan@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-is optional because not all the SoCs need them but at least for Armada
-7K/8K it is actually mandatory.
+From: Pratyush Anand <panand@redhat.com>
 
-The binding documentation is updating accordingly as well as mentioning
-the mandatory clock which was also missing.
+Change since v2:
+- Set frame.graph = current->curr_ret_stack in profile_pc
+- Check that frame->graph != -1 in unwind_frame
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+do_task_stat() calls get_wchan(), which further does unwind_frame().
+unwind_frame() restores frame->pc to original value in case function
+graph tracer has modified a return address (LR) in a stack frame to hook
+a function return. However, if function graph tracer has hit a filtered
+function, then we can't unwind it as ftrace_push_return_trace() has
+biased the index(frame->graph) with a 'huge negative'
+offset(-FTRACE_NOTRACE_DEPTH).
+
+Moreover, arm64 stack walker defines index(frame->graph) as unsigned
+int, which can not compare a -ve number.
+
+Similar problem we can have with calling of walk_stackframe() from
+save_stack_trace_tsk() or dump_backtrace().
+
+This patch fixes unwind_frame() to test the index for -ve value and
+restore index accordingly before we can restore frame->pc.
+
+Reproducer:
+
+cd /sys/kernel/debug/tracing/
+echo schedule > set_graph_notrace
+echo 1 > options/display-graph
+echo wakeup > current_tracer
+ps -ef | grep -i agent
+
+Above commands result in:
+Unable to handle kernel paging request at virtual address ffff801bd3d1e000
+pgd = ffff8003cbe97c00
+[ffff801bd3d1e000] *pgd=0000000000000000, *pud=0000000000000000
+Internal error: Oops: 96000006 [#1] SMP
+[...]
+CPU: 5 PID: 11696 Comm: ps Not tainted 4.11.0+ #33
+[...]
+task: ffff8003c21ba000 task.stack: ffff8003cc6c0000
+PC is at unwind_frame+0x12c/0x180
+LR is at get_wchan+0xd4/0x134
+pc : [<ffff00000808892c>] lr : [<ffff0000080860b8>] pstate: 60000145
+sp : ffff8003cc6c3ab0
+x29: ffff8003cc6c3ab0 x28: 0000000000000001
+x27: 0000000000000026 x26: 0000000000000026
+x25: 00000000000012d8 x24: 0000000000000000
+x23: ffff8003c1c04000 x22: ffff000008c83000
+x21: ffff8003c1c00000 x20: 000000000000000f
+x19: ffff8003c1bc0000 x18: 0000fffffc593690
+x17: 0000000000000000 x16: 0000000000000001
+x15: 0000b855670e2b60 x14: 0003e97f22cf1d0f
+x13: 0000000000000001 x12: 0000000000000000
+x11: 00000000e8f4883e x10: 0000000154f47ec8
+x9 : 0000000070f367c0 x8 : 0000000000000000
+x7 : 00008003f7290000 x6 : 0000000000000018
+x5 : 0000000000000000 x4 : ffff8003c1c03cb0
+x3 : ffff8003c1c03ca0 x2 : 00000017ffe80000
+x1 : ffff8003cc6c3af8 x0 : ffff8003d3e9e000
+
+Process ps (pid: 11696, stack limit = 0xffff8003cc6c0000)
+Stack: (0xffff8003cc6c3ab0 to 0xffff8003cc6c4000)
+[...]
+[<ffff00000808892c>] unwind_frame+0x12c/0x180
+[<ffff000008305008>] do_task_stat+0x864/0x870
+[<ffff000008305c44>] proc_tgid_stat+0x3c/0x48
+[<ffff0000082fde0c>] proc_single_show+0x5c/0xb8
+[<ffff0000082b27e0>] seq_read+0x160/0x414
+[<ffff000008289e6c>] __vfs_read+0x58/0x164
+[<ffff00000828b164>] vfs_read+0x88/0x144
+[<ffff00000828c2e8>] SyS_read+0x60/0xc0
+[<ffff0000080834a0>] __sys_trace_return+0x0/0x4
+
+fixes: 20380bb390a4 (arm64: ftrace: fix a stack tracer's output under function graph tracer)
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Jerome Marchand <jmarchan@redhat.com>
 ---
- Documentation/devicetree/bindings/spi/spi-orion.txt |  9 +++++++++
- drivers/spi/spi-orion.c                             | 14 ++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm64/include/asm/stacktrace.h | 2 +-
+ arch/arm64/kernel/stacktrace.c      | 4 ++++
+ arch/arm64/kernel/time.c            | 2 +-
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-index df8ec31f2f07..8434a65fc12a 100644
---- a/Documentation/devicetree/bindings/spi/spi-orion.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-@@ -18,8 +18,17 @@ Required properties:
- 	The eight register sets following the control registers refer to
- 	chip-select lines 0 through 7 respectively.
- - cell-index : Which of multiple SPI controllers is this.
-+- clocks : pointers to the reference clocks for this device, the first
-+	   one is the one used for the clock on the spi bus, the
-+	   second one is optional and is the clock used for the
-+	   functional part of the controller
-+
- Optional properties:
- - interrupts : Is currently not used.
-+- clock-names : names of used clocks, mandatory if the second clock is
-+		used, the name must be "core", and "axi" (the latter
-+		is only for Armada 7K/8K).
-+
- 
- Example:
-        spi at 10600 {
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 8974bb340b3a..482a0cf3b7aa 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -94,6 +94,7 @@ struct orion_spi {
- 	struct spi_master	*master;
- 	void __iomem		*base;
- 	struct clk              *clk;
-+	struct clk              *axi_clk;
- 	const struct orion_spi_dev *devdata;
- 
- 	struct orion_direct_acc	direct_access[ORION_NUM_CHIPSELECTS];
-@@ -634,6 +635,14 @@ static int orion_spi_probe(struct platform_device *pdev)
- 	if (status)
- 		goto out;
- 
-+	/* The following clock is only used by some SoCs */
-+	spi->axi_clk = devm_clk_get(&pdev->dev, "axi");
-+	if (IS_ERR(spi->axi_clk) &&
-+	    PTR_ERR(spi->axi_clk) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+	if (!IS_ERR(spi->axi_clk))
-+		clk_prepare_enable(spi->axi_clk);
-+
- 	tclk_hz = clk_get_rate(spi->clk);
- 
- 	/*
-@@ -725,6 +734,7 @@ static int orion_spi_probe(struct platform_device *pdev)
- out_rel_pm:
- 	pm_runtime_disable(&pdev->dev);
- out_rel_clk:
-+	clk_disable_unprepare(spi->axi_clk);
- 	clk_disable_unprepare(spi->clk);
- out:
- 	spi_master_put(master);
-@@ -738,6 +748,7 @@ static int orion_spi_remove(struct platform_device *pdev)
- 	struct orion_spi *spi = spi_master_get_devdata(master);
- 
- 	pm_runtime_get_sync(&pdev->dev);
-+	clk_disable_unprepare(spi->axi_clk);
- 	clk_disable_unprepare(spi->clk);
- 
- 	spi_unregister_master(master);
-@@ -754,6 +765,7 @@ static int orion_spi_runtime_suspend(struct device *dev)
- 	struct spi_master *master = dev_get_drvdata(dev);
- 	struct orion_spi *spi = spi_master_get_devdata(master);
- 
-+	clk_disable_unprepare(spi->axi_clk);
- 	clk_disable_unprepare(spi->clk);
- 	return 0;
- }
-@@ -763,6 +775,8 @@ static int orion_spi_runtime_resume(struct device *dev)
- 	struct spi_master *master = dev_get_drvdata(dev);
- 	struct orion_spi *spi = spi_master_get_devdata(master);
- 
-+	if (!IS_ERR(spi->axi_clk))
-+		clk_prepare_enable(spi->axi_clk);
- 	return clk_prepare_enable(spi->clk);
- }
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 6ad30776e984..99390755c0c4 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -27,7 +27,7 @@ struct stackframe {
+ 	unsigned long fp;
+ 	unsigned long pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	unsigned int graph;
++	int graph;
  #endif
+ };
+ 
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 76809ccd309c..5a528c58ef68 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -59,6 +59,10 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	if (tsk->ret_stack &&
+ 			(frame->pc == (unsigned long)return_to_handler)) {
++		WARN_ON(frame->graph == -1);
++		if (frame->graph < -1)
++			frame->graph += FTRACE_NOTRACE_DEPTH;
++
+ 		/*
+ 		 * This is a case where function graph tracer has
+ 		 * modified a return address (LR) in a stack frame
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index a4391280fba9..f258636273c9 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -52,7 +52,7 @@ unsigned long profile_pc(struct pt_regs *regs)
+ 	frame.fp = regs->regs[29];
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = -1; /* no task info */
++	frame.graph = current->curr_ret_stack;
+ #endif
+ 	do {
+ 		int ret = unwind_frame(NULL, &frame);
 -- 
-2.15.1
+2.13.6
