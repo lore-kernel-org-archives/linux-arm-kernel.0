@@ -1,212 +1,86 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 12 Jan 2018 13:07:26 +0100
-Subject: [PATCH v3 20/41] KVM: arm64: Introduce separate VHE/non-VHE sysreg
- save/restore functions
+Date: Fri, 12 Jan 2018 13:07:29 +0100
+Subject: [PATCH v3 23/41] KVM: arm64: Don't save the host ELR_EL2 and SPSR_EL2
+ on VHE systems
 In-Reply-To: <20180112120747.27999-1-christoffer.dall@linaro.org>
 References: <20180112120747.27999-1-christoffer.dall@linaro.org>
-Message-ID: <20180112120747.27999-21-christoffer.dall@linaro.org>
+Message-ID: <20180112120747.27999-24-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to handle system registers quite differently between VHE
-and non-VHE systems.  In preparation for that, we need to split some of
-the handling functions between VHE and non-VHE functionality.
+On non-VHE systems we need to save the ELR_EL2 and SPSR_EL2 so that we can
+return to the host in EL1 in the same state and location where we issued a
+hypercall to EL2, but on VHE ELR_EL2 and SPSR_EL2 are not useful because we
+never enter a guest as a result of an exception entry that would be directly
+handled by KVM. The kernel entry code already saves ELR_EL1/SPSR_EL1 on
+exception entry, which is enough.  Therefore, factor out these registers into
+separate save/restore functions, making it easy to exclude them from the VHE
+world-switch path later on.
 
-For now, we simply copy the non-VHE functions, but we do change the use
-of static keys for VHE and non-VHE functionality now that we have
-separate functions.
-
-Reviewed-by: Andrew Jones <drjones@redhat.com>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_hyp.h | 12 ++++++++----
- arch/arm64/kvm/hyp/switch.c      | 20 ++++++++++----------
- arch/arm64/kvm/hyp/sysreg-sr.c   | 40 ++++++++++++++++++++++++++++++++--------
- 3 files changed, 50 insertions(+), 22 deletions(-)
+ arch/arm64/kvm/hyp/sysreg-sr.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index a0e5a7038237..998152da9b66 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -132,10 +132,14 @@ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
- void __timer_enable_traps(struct kvm_vcpu *vcpu);
- void __timer_disable_traps(struct kvm_vcpu *vcpu);
- 
--void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
--void __sysreg_save_guest_state(struct kvm_cpu_context *ctxt);
--void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt);
-+void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt);
-+void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt);
- void __sysreg32_save_state(struct kvm_vcpu *vcpu);
- void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
- 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 6175fcb33ed2..42e0123ecd69 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -348,7 +348,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
--	__sysreg_save_host_state(host_ctxt);
-+	sysreg_save_host_state_vhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(vcpu->kvm);
-@@ -360,7 +360,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
-+	sysreg_restore_guest_state_vhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	do {
-@@ -370,13 +370,13 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
--	__sysreg_save_guest_state(guest_ctxt);
-+	sysreg_save_guest_state_vhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__vgic_save_state(vcpu);
- 
- 	__deactivate_traps(vcpu);
- 
--	__sysreg_restore_host_state(host_ctxt);
-+	sysreg_restore_host_state_vhe(host_ctxt);
- 
- 	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
-@@ -400,7 +400,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
--	__sysreg_save_host_state(host_ctxt);
-+	__sysreg_save_host_state_nvhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
- 	__activate_vm(kern_hyp_va(vcpu->kvm));
-@@ -413,7 +413,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
- 	 */
- 	__sysreg32_restore_state(vcpu);
--	__sysreg_restore_guest_state(guest_ctxt);
-+	__sysreg_restore_guest_state_nvhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
- 	do {
-@@ -423,7 +423,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
--	__sysreg_save_guest_state(guest_ctxt);
-+	__sysreg_save_guest_state_nvhe(guest_ctxt);
- 	__sysreg32_save_state(vcpu);
- 	__timer_disable_traps(vcpu);
- 	__vgic_save_state(vcpu);
-@@ -431,7 +431,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	__deactivate_traps(vcpu);
- 	__deactivate_vm(vcpu);
- 
--	__sysreg_restore_host_state(host_ctxt);
-+	__sysreg_restore_host_state_nvhe(host_ctxt);
- 
- 	/*
- 	 * This must come after restoring the host sysregs, since a non-VHE
-@@ -456,7 +456,7 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
- 		__timer_disable_traps(vcpu);
- 		__deactivate_traps(vcpu);
- 		__deactivate_vm(vcpu);
--		__sysreg_restore_host_state(__host_ctxt);
-+		__sysreg_restore_host_state_nvhe(__host_ctxt);
- 	}
- 
- 	/*
-@@ -479,7 +479,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
- 	vcpu = host_ctxt->__hyp_running_vcpu;
- 
- 	__deactivate_traps(vcpu);
--	__sysreg_restore_host_state(host_ctxt);
-+	sysreg_restore_host_state_vhe(host_ctxt);
- 
- 	panic(__hyp_panic_string,
- 	      spsr,  elr,
 diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 72cdbc1f678b..5cbde1016303 100644
+index baa243a010b3..1f2d5e9343b0 100644
 --- a/arch/arm64/kvm/hyp/sysreg-sr.c
 +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -75,15 +75,27 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+@@ -71,6 +71,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+ 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+ 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
++}
++
++static void __hyp_text __sysreg_save_el2_return_state(struct kvm_cpu_context *ctxt)
++{
+ 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
  	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
  }
- 
--void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_save_host_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_el1_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_save_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_save_el1_state(ctxt);
-+	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
-+}
-+
-+void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
--	if (!has_vhe())
--		__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_user_state(ctxt);
- }
- 
--void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
-+void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
+@@ -80,6 +84,7 @@ void __hyp_text __sysreg_save_state_nvhe(struct kvm_cpu_context *ctxt)
  	__sysreg_save_el1_state(ctxt);
  	__sysreg_save_common_state(ctxt);
-@@ -136,15 +148,27 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+ 	__sysreg_save_user_state(ctxt);
++	__sysreg_save_el2_return_state(ctxt);
+ }
+ 
+ void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
+@@ -93,6 +98,7 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_save_el1_state(ctxt);
+ 	__sysreg_save_common_state(ctxt);
+ 	__sysreg_save_user_state(ctxt);
++	__sysreg_save_el2_return_state(ctxt);
+ }
+ 
+ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+@@ -137,6 +143,11 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+ 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+ 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
++}
++
++static void __hyp_text
++__sysreg_restore_el2_return_state(struct kvm_cpu_context *ctxt)
++{
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
  	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
  }
- 
--void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
-+void __hyp_text __sysreg_restore_host_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_el1_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
-+}
-+
-+void __hyp_text __sysreg_restore_guest_state_nvhe(struct kvm_cpu_context *ctxt)
-+{
-+	__sysreg_restore_el1_state(ctxt);
-+	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
-+}
-+
-+void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
--	if (!has_vhe())
--		__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_user_state(ctxt);
- }
- 
--void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
-+void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
+@@ -146,6 +157,7 @@ void __hyp_text __sysreg_restore_state_nvhe(struct kvm_cpu_context *ctxt)
  	__sysreg_restore_el1_state(ctxt);
  	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_restore_user_state(ctxt);
++	__sysreg_restore_el2_return_state(ctxt);
+ }
+ 
+ void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
+@@ -159,6 +171,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
+ 	__sysreg_restore_el1_state(ctxt);
+ 	__sysreg_restore_common_state(ctxt);
+ 	__sysreg_restore_user_state(ctxt);
++	__sysreg_restore_el2_return_state(ctxt);
+ }
+ 
+ static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
 -- 
 2.14.2
