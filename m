@@ -1,70 +1,91 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Fri, 12 Jan 2018 11:39:26 -0600
-Subject: EDAC driver for ARMv8 L1/L2 cache
-In-Reply-To: <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
-References: <VI1PR04MB2078DBC9381EA574CE5DA4B09A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180109214332.ejiak6f35tnhbpke@pd.tnic>
- <VI1PR04MB20788AC2E71A3CFFC37B85BB9A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <bc8d7450-3f58-95c2-42c2-d16b2f7a76e4@linux.intel.com>
- <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
-Message-ID: <99991349-955c-8114-f396-75a9b476ab90@linux.intel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 12 Jan 2018 18:37:13 +0100 (CET)
+Subject: [PATCH] phy: work around 'phys' references to usb-nop-xceiv
+ devices
+In-Reply-To: <20180112101223.3661181-1-arnd@arndb.de>
+References: <20180112101223.3661181-1-arnd@arndb.de>
+Message-ID: <971903888.21300.1515778633323@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2018 10:48 AM, York Sun wrote:
-> On 01/12/2018 08:35 AM, Thor Thayer wrote:
->> On 01/09/2018 03:51 PM, York Sun wrote:
->>> On 01/09/2018 01:43 PM, Borislav Petkov wrote:
->>>> Adding some more people to CC.
->>>>
->>>> On Tue, Jan 09, 2018 at 08:48:43PM +0000, York Sun wrote:
->>>>> Borislav,
->>>>>
->>>>> Are you aware of any existing (or in development) EDAC driver for ARMv8
->>>>> L1/L2 cache? I am thinking to write one if not available yet.
->>>>
->>>> no I'm not but I see two EDAC drivers for ARM64: thunderx and xgene.
->>>>
->>>> Please synchronize with their authors and ARM people what would be the
->>>> best thing to do and try extracting shared functionality from them
->>>> into a common compilation unit instead of duplicating it. I don't want
->>>> separate drivers per functional unit.
->>>>
->>>
->>> Thanks for the pointer. Thunderx and xgene's drivers have different
->>> implementation on the hardware. I found one patch closer to what I
->>> expect, https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatchwork.kernel.org%2Fpatch%2F7513231%2F&data=02%7C01%7Cyork.sun%40nxp.com%7C29cd81c44431418e2a6308d559da7d3b%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636513717317947616&sdata=flIZL8mxGc4VWbTpl5nPjkRXaB8uNjcc382HcXO08qE%3D&reserved=0. I don't see
->>> activities after 2015. I will reach out to the author.
->>>
->>> York
->>>
->>
->> Hi York,
->>
->> I'll be adding EDAC support for our Stratix10 (Quad ARM Cortex A-53) at
->> some point but I'm not sure when it is scheduled - probably in the next
->> few months. I'll be going through the same process of comparing our
->> architecture to others. Below are links to the Stratix10.
->>
-> 
-> I see Stratix10 has A53 core. I am concerned on reading the
-> CPUMERRSR_EL1 and L2MERRSR_EL1. The are IMPLEMENTATION DEFINED
-> registers. They may not be available on all SoCs, or all time. The
-> CPUMERRSR_EL1 needs to be read on each core, the L2MERRSR_EL1 needs to
-> be read on each cluster. I am not sure how to handle them in EDAC driver
-> yet. I am hoping Mark Rutland can shed some light as he commented on
-> similar patches [1][2] before.
-> 
-> York
-> 
-> [1] https://patchwork.kernel.org/patch/7460391/
-> [2] https://patchwork.kernel.org/patch/7513231/
+[add some potential testers]
 
-I haven't started digging into EDAC for the Stratix10 yet so I don't 
-have a comment but I'll check out your links. Thanks!
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-edac" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Arnd Bergmann <arnd@arndb.de> hat am 12. Januar 2018 um 11:12 geschrieben:
 > 
+> 
+> Stefan Wahren reports a problem with a warning fix that was merged
+> for v4.15: we had lots of device nodes with a 'phys' property pointing
+> to a device node that is not compliant with the binding documented in
+> Documentation/devicetree/bindings/phy/phy-bindings.txt
+> 
+> This generally works because USB HCD drivers that support both the generic
+> phy subsystem and the older usb-phy subsystem ignore most errors from
+> phy_get() and related calls and then use the usb-phy driver instead.
+> 
+> However, it turns out that making the usb-nop-xceiv device compatible with
+> the generic-phy binding changes the phy_get() return code from -EINVAL to
+> -EPROBE_DEFER, and the dwc2 usb controller driver for bcm2835 now returns
+> -EPROBE_DEFER from its probe function rather than ignoring the failure,
+> breaking all USB support on raspberry-pi when CONFIG_GENERIC_PHY is
+> enabled. The same code is used in the dwc3 driver and the usb_add_hcd()
+> function, so a reasonable assumption would be that many other platforms
+> are affected as well.
+> 
+> I have reviewed all the related patches and concluded that "usb-nop-xceiv"
+> is the only USB phy that is affected by the change, and since it is by far
+> the most commonly referenced phy, all the other USB phy drivers appear
+> to be used in ways that are are either safe in DT (they don't use the
+> 'phys' property), or in the driver (they already ignore -EPROBE_DEFER
+> from generic-phy when usb-phy is available).
+> 
+> To work around the problem, this adds a special case to _of_phy_get()
+> so we ignore any PHY node that is compatible with "usb-nop-xceiv",
+> as we know that this can never load no matter how much we defer. In the
+> future, we might implement a generic-phy driver for "usb-nop-xceiv"
+> and then remove this workaround.
+> 
+> Since we generally want older kernels to also want to work with the
+> fixed devicetree files, it would be good to backport the patch into
+> stable kernels as well (3.13+ are possibly affected), even though they
+> don't contain any of the patches that may have caused regressions.
+> 
+> Fixes: 014d6da6cb25 ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells
+> Fixes: c5bbf358b790 arm: dts: nspire: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: 44e5dced2ef6 arm: dts: marvell: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: f568f6f554b8 ARM: dts: omap: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: d745d5f277bf ARM: dts: imx51-zii-rdu1: Add missing #phy-cells to usb-nop-xceiv
+> Fixes: 915fbe59cbf2 ARM: dts: imx: Add missing #phy-cells to usb-nop-xceiv
+> Link: https://marc.info/?l=linux-usb&m=151518314314753&w=2
+> Link: https://patchwork.kernel.org/patch/10158145/
+> Cc: stable at vger.kernel.org
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+
+> ---
+>  drivers/phy/phy-core.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index b4964b067aec..8f6e8e28996d 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -410,6 +410,10 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
+>  	if (ret)
+>  		return ERR_PTR(-ENODEV);
+>  
+> +	/* This phy type handled by the usb-phy subsystem for now */
+> +	if (of_device_is_compatible(args.np, "usb-nop-xceiv"))
+> +		return ERR_PTR(-ENODEV);
+> +
+>  	mutex_lock(&phy_provider_mutex);
+>  	phy_provider = of_phy_provider_lookup(args.np);
+>  	if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+> -- 
+> 2.9.0
+>
