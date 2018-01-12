@@ -1,63 +1,65 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 12 Jan 2018 13:15:58 +0100
-Subject: [PATCH 04/14] mmc: mmci: Add STM32 variant
+Date: Fri, 12 Jan 2018 13:16:02 +0100
+Subject: [PATCH 08/14] ARM: dts: stm32: Enable SDIO controller on stm32f469
+ disco board
 In-Reply-To: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
 References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1515759368-16946-5-git-send-email-patrice.chotard@st.com>
+Message-ID: <1515759368-16946-9-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+From: Andrea Merello <andrea.merello@gmail.com>
 
-STM32F4 and STM32F7 MCUs has a SDIO controller that looks like
-an ARM pl810.
-This patch adds the STM32 variant so that mmci driver supports it.
+This patch adds SDIO-related DT nodes required by stm32f469 board
+
+There is a hardware issue on these boards, it misses a pullup on
+the GPIO line used as card detect to allow correct SD card
+detection. To allow correct card detection "broken-cd" property
+is used.
 
 Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- drivers/mmc/host/mmci.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/stm32f469-disco.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 38e8c20..9fb5035 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -245,6 +245,23 @@ struct variant_data {
- 	.opendrain		= true,
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index 318fb12..ebb97c3 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -66,6 +66,13 @@
+ 		serial0 = &usart3;
+ 	};
+ 
++	mmc_vcard: mmc_vcard {
++		compatible = "regulator-fixed";
++		regulator-name = "mmc_vcard";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	soc {
+ 		dma-ranges = <0xc0000000 0x0 0x10000000>;
+ 	};
+@@ -120,6 +127,18 @@
+ 	};
  };
  
-+static struct variant_data variant_stm32 = {
-+	.fifosize		= 32 * 4,
-+	.fifohalfsize		= 8 * 4,
-+	.clkreg			= MCI_CLK_ENABLE,
-+	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
-+	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
-+	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
-+	.datalength_bits	= 24,
-+	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
-+	.st_sdio		= true,
-+	.st_clkdiv		= true,
-+	.pwrreg_powerup		= MCI_PWR_ON,
-+	.f_max			= 48000000,
-+	.pwrreg_clkgate		= true,
-+	.pwrreg_nopower		= true,
++&sdio {
++	status = "okay";
++	vmmc-supply = <&mmc_vcard>;
++	cd-gpios = <&gpiog 2 0>;
++	cd-inverted;
++	broken-cd;
++	pinctrl-names = "default", "opendrain";
++	pinctrl-0 = <&sdio_pins>;
++	pinctrl-1 = <&sdio_pins_od>;
++	bus-width = <4>;
 +};
 +
- static struct variant_data variant_qcom = {
- 	.fifosize		= 16 * 4,
- 	.fifohalfsize		= 8 * 4,
-@@ -2019,6 +2036,11 @@ static int mmci_runtime_resume(struct device *dev)
- 		.mask   = 0xf0ffffff,
- 		.data	= &variant_ux500v2,
- 	},
-+	{
-+		.id     = 0x00880180,
-+		.mask   = 0x00ffffff,
-+		.data	= &variant_stm32,
-+	},
- 	/* Qualcomm variants */
- 	{
- 		.id     = 0x00051180,
+ &usart3 {
+ 	pinctrl-0 = <&usart3_pins_a>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
