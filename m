@@ -1,75 +1,51 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Fri, 12 Jan 2018 16:23:02 +0200
-Subject: [PATCH v2 15/16] pwm: add documentation for pwm push-pull mode
-In-Reply-To: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1515766983-15151-16-git-send-email-claudiu.beznea@microchip.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 12 Jan 2018 15:46:47 +0100
+Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
+ receiver) power control driver
+In-Reply-To: <20180109184347.28ba0a6e@aktux>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost> <20180109184347.28ba0a6e@aktux>
+Message-ID: <20180112144647.GA5992@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for PWM push-pull mode.
+On Tue, Jan 09, 2018 at 06:43:47PM +0100, Andreas Kemnade wrote:
+> On Fri, 22 Dec 2017 13:44:27 +0100
+> Johan Hovold <johan@kernel.org> wrote:
+> 
+> [...]
+> > I'd suggest reiterating the problem you're trying to solve and
+> > enumerating the previously discussed potential solutions in order to
+> > find a proper abstraction level for this (before getting lost in
+> > implementation details).
+> > 
+> The main point here is in short words: Having a device powered on or off
+> when the uart it is attached to, is used or not used anymore,
+> so the already available userspace applications do not need to be changed.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- Documentation/devicetree/bindings/pwm/pwm.txt |  8 +++++++-
- Documentation/pwm.txt                         | 18 ++++++++++++++++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+So we'd end up with something in-between a kernel driver and a
+user-space solution. What about devices that need to be (partially)
+powered also when the port isn't open? A pure user-space solution would
+be able to handle all variants.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
-index fdff25bad1db..a4562af3577c 100644
---- a/Documentation/devicetree/bindings/pwm/pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm.txt
-@@ -58,15 +58,21 @@ Example with optional PWM specifier for inverse polarity
- - PWM_MODE_NORMAL: for all PWM controllers
- - PWM_MODE_COMPLEMENTARY: for PWM controllers with more than one output per
- PWM channel
-+- PWM_MODE_PUSH_PULL: for PWM controllers with more than one output per channel,
-+in push-pull mode
- 
- Example with PWM modes:
- 
- 	bl: blacklight {
- 		pwms = <&pwm 0 5000000 PWM_POLARITY_INVERTED
--			PWM_DTMODE_NORMAL | PWM_DTMODE_COMPLEMENTARY>;
-+			PWM_DTMODE_NORMAL | PWM_DTMODE_COMPLEMENTARY |
-+			PWM_DTMODE_PUSH_PULL>;
- 		pwm-names = "backlight";
- 	};
- 
-+If all the available modes are given as argument of pwms binding only the first
-+valid one will be considered (first valid LSB bit of mode field).
-+
- 2) PWM controller nodes
- -----------------------
- 
-diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
-index 58c9bd55f021..71b538239519 100644
---- a/Documentation/pwm.txt
-+++ b/Documentation/pwm.txt
-@@ -135,6 +135,24 @@ channel that was exported. The following properties will then be available:
- 
-     Where T is the signal period.
- 
-+    Push-pull mode - for PWM chips with mode than one output per PWM channel;
-+        output waveform for a PWM controller with 2 outputs per PWM channel, in
-+	push-pull mode, with normal polarity looks like this:
-+            __          __
-+    PWMH __|  |________|  |________
-+                  __          __
-+    PWML ________|  |________|  |__
-+           <--T-->
-+
-+    If polarity is inversed:
-+         __    ________    ________
-+    PWMH   |__|        |__|
-+         ________    ________    __
-+    PWML         |__|        |__|
-+           <--T-->
-+
-+    Where T is the signal period.
-+
- Implementing a PWM driver
- -------------------------
- 
--- 
-2.7.4
+> I digged out a bit around:
+> alternative aproaches were:
+> adding hooks to the uart/tty layer:
+> https://marc.info/?l=linux-kernel&m=143333222014616&w=2
+> https://marc.info/?l=devicetree&m=143130955414580&w=2
+
+Thanks for the pointers, I remember those threads...
+
+> I do not find it right now in my archive:
+> adding a virtual gpio for dtr to the omap_serial driver.
+> The driver behind the virtual io would then handle pm. One reason it was
+> rejected was that the devicetree should only contain real hardware and
+> not virtual stuff.
+
+Oh, yeah, I think something like that made it in briefly before getting
+reverted again.
+
+I'll respond to Nikolaus mail as well.
+
+Johan
