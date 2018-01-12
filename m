@@ -1,88 +1,54 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Fri, 12 Jan 2018 09:22:06 +0800
-Subject: [PATCH 1/9] iommu/of: Drop early initialisation hooks
-In-Reply-To: <faeccc75-79e9-ddb6-446d-88ab63fe4e1f@arm.com>
-References: <20180111082229.24011-1-jeffy.chen@rock-chips.com>
- <CGME20180111082537epcas3p274f6bfeb31f10742e8129dc0c877745e@epcas3p2.samsung.com>
- <20180111082229.24011-2-jeffy.chen@rock-chips.com>
- <60fdd375-ca74-0fea-c598-39a68b9e7735@samsung.com>
- <5A57471E.7020304@rock-chips.com>
- <faeccc75-79e9-ddb6-446d-88ab63fe4e1f@arm.com>
-Message-ID: <5A580DBE.8000301@rock-chips.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri, 12 Jan 2018 14:27:52 +1300
+Subject: [PATCH v4 5/8] ARM: l2x0: add marvell,ecc-enable property for aurora
+In-Reply-To: <20180112012755.20495-1-chris.packham@alliedtelesis.co.nz>
+References: <20180112012755.20495-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20180112012755.20495-6-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
+which can be used to enable this.
 
-Thnaks for your reply.
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+---
+ Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+ arch/arm/mm/cache-l2x0.c                         | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
-On 01/11/2018 08:24 PM, Robin Murphy wrote:
-> Hi Jeffy,
->
-> On 11/01/18 11:14, JeffyChen wrote:
->> Hi Marek,
->>
->> Thanks for your reply.
->>
->> On 01/11/2018 05:40 PM, Marek Szyprowski wrote:
->>> Hi Jeffy,
->>>
->>> On 2018-01-11 09:22, Jeffy Chen wrote:
->>>> With the probe-deferral mechanism, early initialisation hooks are no
->>>> longer needed.
->>>>
->>>> Suggested-by: Robin Murphy <robin.murphy@arm.com>
->
-> In fact, shortly after I said that I had a "how hard can it be?" moment
-> and took a crack at it myself - sorry, I should probably have cc'd you
-> on that series[1].
-
-hmmm, i'll drop this patch in the next version.
-
-and maybe rebase my patch[9] (iommu/rockchip: Use OF_IOMMU to attach 
-devices automatically) on that series
->
->>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>>> ---
->>>>
->>>>   drivers/iommu/arm-smmu-v3.c  |  2 +-
->>>>   drivers/iommu/arm-smmu.c     | 12 ++++++------
->>>>   drivers/iommu/exynos-iommu.c |  2 +-
->>>
->>> For Exynos IOMMU:
->>> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>
->>> IPMMU and MSM IOMMU are no longer multi-platform safe after this patch.
->>> It breaks them in the same way as my commit 928055a01b3f ("iommu/exynos:
->>> Remove custom platform device registration code") broke Exynos IOMMU.
->>>
->>> You need a similar fix for them:
->>> https://www.spinics.net/lists/arm-kernel/msg627648.html
->>
->> hmmm, right, i did saw this fix in the rockchip iommu driver too.
->>
->> and there're also some other iommu drivers put bus_set_iommu in their
->> probe() to avoid that.
->>
->> maybe we can do it in the iommu framework?
->>
->> for example:
->> 1/ add a bus type member to struct iommu_device
->> 2/ and a iommu_device_set_bus()
->> 3/ do the bus_set_iommu stuff in iommu_device_register()
->> 4/ undo bus_set_iommu in iommu_device_unregister()
->
-> Ultimately we'd like to get rid of the bus relationship altogether, so I
-> don't think it's really worth adding more infrastructure around it.
-> Having of-iommu-based drivers set bus ops at probe time, and others
-> conditionally from an initcall, is pretty clean and simple, so I'd
-> rather stick with that approach for now.
-ok, make sense:)
->
-> Robin.
->
-> [1]
-> https://lists.linuxfoundation.org/pipermail/iommu/2018-January/025395.html
->
->
->
+diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+index fbe6cb21f4cf..15a84f0ba9f1 100644
+--- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
++++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
+@@ -76,6 +76,8 @@ Optional properties:
+   specified to indicate that such transforms are precluded.
+ - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+ - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
++- marvell,ecc-enable : enable ECC protection on the L2 cache
++- marvell,ecc-disable : disable ECC protection on the L2 cache
+ - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
+   Some core tiles, especially ARM PB11MPCore have a faulty L220 cache that
+   will randomly hang unless outer sync operations are disabled.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b70bee74750d..644f786e4fa9 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
+ 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
+ 	}
+ 
++	if (of_property_read_bool(np, "marvell,ecc-enable")) {
++		mask |= AURORA_ACR_ECC_EN;
++		val |= AURORA_ACR_ECC_EN;
++	} else if (of_property_read_bool(np, "marvell,ecc-disable")) {
++		mask |= AURORA_ACR_ECC_EN;
++	}
++
+ 	if (of_property_read_bool(np, "arm,parity-enable")) {
+ 		mask |= AURORA_ACR_PARITY_EN;
+ 		val |= AURORA_ACR_PARITY_EN;
+-- 
+2.15.1
