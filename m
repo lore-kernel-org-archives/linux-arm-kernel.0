@@ -1,48 +1,39 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 12 Jan 2018 13:30:32 +0100
-Subject: PM regression in next
-In-Reply-To: <4913146.sVL6sFxzC8@aspire.rjw.lan>
-References: <20180112000037.GA3875@atomide.com>
- <20180112013257.GB4059@atomide.com> <4913146.sVL6sFxzC8@aspire.rjw.lan>
-Message-ID: <4745593.FguGN2uIkX@aspire.rjw.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 12 Jan 2018 13:33:32 +0100
+Subject: [PULL 0/2] KVM/ARM Fixes for v4.15 - Round 3
+Message-ID: <20180112123334.28687-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 12, 2018 1:23:54 PM CET Rafael J. Wysocki wrote:
-> On Friday, January 12, 2018 2:32:57 AM CET Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [180111 17:20]:
-> > > Well I tried to measure suspend power consumption and noticed
-> > > that system suspend fails too hand hangs the network device:
-> > > 
-> > > # echo mem > /sys/power/state
-> > > [   32.577850] PM: suspend entry (deep)
-> > > [   32.582031] PM: Syncing filesystems ... done.
-> > > [   32.598083] Freezing user space processes ... (elapsed 0.002 seconds) done.
-> > > [   32.608398] OOM killer disabled.
-> > > [   32.611846] Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-> > > [   32.622192] Suspending console(s) (use no_console_suspend to debug)
-> > > [   32.651123] dpm_run_callback(): mdio_bus_suspend+0x0/0x24 returns 4352
-> > > [   32.651428] PM: Device 2c000000.ethernet-ffffffff:01 failed to suspend: error 4352
-> 
-> This looks totally bogus.
-> 
-> First, "error" should be a negative number and we print it as int.
-> 
-> Second, error codes are not in this range anyway.
-> 
-> > > [   32.653289] PM: Some devices failed to suspend, or early wake event detected
-> > > [   32.685455] OOM killer enabled.
-> > > [   32.688629] Restarting tasks ... done.
-> > > [   32.695983] PM: suspend exit
-> > > ash: write error: Bad address
-> > > 
-> > > That too works just fine at commit 70286688e5ad.
-> > 
-> > Suspend fails at commit e2d7fe89e8ae though, so looks like we
-> > have two separate issues. I'll try to bisect that separately.
+Hi Paolo and Radim,
 
-I guess what may happen is that something started to return positive numbers
-which confuse things all over when passed along by its callers as error codes.
+This is the third round of fixes for KVM/ARM for v4.15, including two more
+fixes for v4.15 fixing incorrect huge page mappings on systems using the
+contiguous hint for hugetlbfs and supporting an alternative GICv4 init
+sequence.
+
+The following changes since commit 0eb7c33cadf6b2f1a94e58ded8b0eb89b4eba382:
+
+  KVM: arm/arm64: Fix timer enable flow (2017-12-18 10:53:24 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.15-3
+
+for you to fetch changes up to f8f85dc00b7427de6222ea3955c52512315d13cd:
+
+  KVM: arm64: Fix GICv4 init when called from vgic_its_create (2018-01-12 11:40:21 +0100)
 
 Thanks,
-Rafael
+-Christoffer
+
+Christoffer Dall (1):
+      KVM: arm64: Fix GICv4 init when called from vgic_its_create
+
+Punit Agrawal (1):
+      KVM: arm/arm64: Check pagesize when allocating a hugepage at Stage 2
+
+ virt/kvm/arm/mmu.c            | 2 +-
+ virt/kvm/arm/vgic/vgic-init.c | 8 +++++---
+ virt/kvm/arm/vgic/vgic-v4.c   | 2 +-
+ 3 files changed, 7 insertions(+), 5 deletions(-)
