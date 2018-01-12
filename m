@@ -1,95 +1,116 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 12 Jan 2018 18:05:31 +0000
+Date: Fri, 12 Jan 2018 18:05:23 +0000
 Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
  categorization
-In-Reply-To: <CAMj-D2CwHWNpXzeNMEVKGTveAwuJvja219NF6PZ7xqYMUY17Kw@mail.gmail.com>
+In-Reply-To: <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com>
 References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
  <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
- <5A0B1334.7060500@arm.com>
- <CAMj-D2CwHWNpXzeNMEVKGTveAwuJvja219NF6PZ7xqYMUY17Kw@mail.gmail.com>
-Message-ID: <5A58F8EB.9080909@arm.com>
+ <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+ <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
+ <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com>
+Message-ID: <5A58F8E3.5060002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi gengdongjiu,
 
-On 16/12/17 04:47, gengdongjiu wrote:
-> [...]
+On 15/12/17 03:30, gengdongjiu wrote:
+> On 2017/12/7 14:37, gengdongjiu wrote:
+>>> We need to tackle (1) and (3) separately. For (3) we need some API that lets
+>>> Qemu _trigger_ an SError in the guest, with a specified ESR. But, we don't have
+>>> a way of migrating pending SError yet... which is where I got stuck last time I
+>>> was looking at this.
+>> I understand you most idea.
 >>
->>> +     case ESR_ELx_AET_UER:   /* The error has not been propagated */
->>> +             /*
->>> +              * Userspace only handle the guest SError Interrupt(SEI) if the
->>> +              * error has not been propagated
->>> +              */
->>> +             run->exit_reason = KVM_EXIT_EXCEPTION;
->>> +             run->ex.exception = ESR_ELx_EC_SERROR;
->>> +             run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
->>> +             return 0;
+>> But In the Qemu one signal type can only correspond to one behavior, can not correspond to two behaviors,
+>> otherwise Qemu will do not know how to do.
 >>
->> We should not pass RAS notifications to user space. The kernel either handles
->> them, or it panics(). User space shouldn't even know if the kernel supports RAS
+>> For the Qemu, if it receives the SIGBUS_MCEERR_AR signal, it will populate the CPER
+>> records and inject a SEA to guest through KVM IOCTL "KVM_SET_ONE_REG"; if receives the SIGBUS_MCEERR_AO
+>> signal, it will record the CPER and trigger a IRQ to notify guest, as shown below:
+>>
+>> SIGBUS_MCEERR_AR trigger Synchronous External Abort.
+>> SIGBUS_MCEERR_AO trigger GPIO IRQ.
+>>
+>> For the SIGBUS_MCEERR_AO and SIGBUS_MCEERR_AR, we have already specify trigger method, which all
+>>
+>> not involve _trigger_ an SError.
+>>
+>> so there is no chance for Qemu to trigger the SError when gets the SIGBUS_MCEERR_A{O,R}.
 > 
-> For the  ESR_ELx_AET_UER(Recoverable error), let us see its definition
-> below, which get from [0]
+> As I explained above:
+> 
+> If Qemu received SIGBUS_MCEERR_AR, it will record CPER and trigger Synchronous External Abort;
+> If Qemu received SIGBUS_MCEERR_AO, it will record CPER and trigger GPIO IRQ;
 
-[..]
+> So Qemu does not know when to _trigger_ an SError.
 
-> so we can see the  exception is precise and PE can recover execution
-> from the preferred return address of the exception, 
+There is no answer to this. How the CPU decides is specific to the CPU design.
+How Qemu decides is going to be specific to the machine it emulates.
 
-> so let guest handling it is
-> better, for example, if it is guest application RAS error, we can kill
-> the guest application instead of panic whole OS; if it is guest kernel
-> RAS error, guest will panic.
+My understanding is there is some overlap for which RAS errors are reported as
+synchronous external abort, and which use SError. (Obviously the imprecise ones
+are all SError). Which one the CPU uses depends on how the CPU is designed.
 
-If the kernel takes an unhandled RAS error it should panic - we don't know where
-the error is.
+When you take an SIGBUS_MCEERR_AR from KVM, its because KVM can't complete a
+stage2 fault because the page is marked with PG_poisoned. These started out as a
+synchronous exception, but you could still report these with SError.
 
-I understand you want to kill-off guest tasks as a result of RAS errors, but
-this needs to go through the whole APEI->memory_failure()->sigbus machinery so
-that the kernel knows the kernel can keep running.
-
-This saves us signalling user-space when we don't need to. An example:
-code-corruption. Linux can happily re-read affected user-space executables from
-disk, there is absolutely nothing user-space can do about it.
-Handling errors first in the kernel allows us to do recovery for all the
-affected processes, not just the one that happens to be running right now.
+We don't have a way to signal user-space about imprecise exceptions, this isn't
+a KVM specific problem.
 
 
-> Host does not know which application of guest has error, so host can
-> not handle it,
+> so here I "return a error" to Qemu if ghes_notify_sei() return failure in [1], if you opposed KVM "return error",
+> do you have a better idea about it? thanks
 
-It has to work this out, otherwise the errors we can handle never get a chance.
+If ghes_notify_sei() fails to claim the error, we should drop through to
+kernel-first-handling. We don't have that yet, just the stub that ignores errors
+where we can make progress.
 
-This kernel is expected to look at the error description, (which for some reason
-we aren't talking about here), e.g. the CPER records, and determine what
-recovery action is necessary for this error.
-For memory errors this may be re-reading from disk, or at the worst case,
-unmapping from all user-space users (including KVM's stage2) and raining signals
-on all affected processes.
-
-For a memory error the important piece of information is the physical address.
-Only the kernel can do anything with this, it determines who owns the affected
-memory and what needs doing to recover from the error.
-
-If you pass the notification to user-space, all it can do is signal the guest to
-"stop doing whatever it is you're doing". The guest may have been able to
-re-read pages from disk, or otherwise handle the error.
-Has the error been handled? No: The error remains latent in the system.
+If neither firmware-first nor kernel-first claim a RAS error, we're in trouble.
+I'd like to panic() as we got a RAS notification but no description of the
+error. We can't do this until we have kernel-first support, hence that stub.
 
 
-> panic OS is not a good choice for the Recoverable error.
+> About the way of migrating pending SError, I think it is a separate case, because Qemu still does not know
+> how and when to trigger the SError.
 
-If we don't know where the error is, and we can't make progress, its the only
-sane choice.
+I agree, but I think we should fix this first before we add another user of this
+unmigratable hypervisor state.
 
-This code is never expected to run! (why are we arguing about it?) We should get
-RAS errors as GHES notifications from firmware via some mechanism. If those are
-NOTIFY_SEI then APEI should claim the notification and kick off the appropriate
-handling based on the CPER records. If/when we get kernel-first, that can claim
-the SError. What we're left with is RAS notifications that no-one claimed
-because there was no error-description found.
+(I recall someone saying migration is needed for any new KVM/cpu features, but I
+can't find the thread)
 
 
+> [1]:
+> static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> {
+>         .......................
+> +       case ESR_ELx_AET_UER:   /* The error has not been propagated */
+> +               /*
+> +                * Userspace only handle the guest SError Interrupt(SEI) if the
+> +                * error has not been propagated
+> +                */
+> +               run->exit_reason = KVM_EXIT_EXCEPTION;
+> +               run->ex.exception = ESR_ELx_EC_SERROR;
+
+I'm against telling user space RAS errors ever happened, only the final
+user-visible error when the kernel can't fix it.
+
+This is inventing something new for RAS errors not claimed by firmware-first.
+If we have kernel-first too, this will never happen. (unless your system is
+losing the error description).
+
+
+Your system has firmware-first, why isn't it claiming the notification?
+If its not finding CPER records written by firmware, check firmware and the UEFI
+memory map agree on the attributes to be used when read/writing that area.
+
+
+> +               run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
+> +               return 0;
+
+
+Thanks,
 
 James
