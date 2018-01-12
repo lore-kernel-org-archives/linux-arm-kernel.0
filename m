@@ -1,43 +1,140 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Jan 2018 13:08:44 -0800
-Subject: [PATCH, v3] arm: omap2: timer: fix a kmemleak caused in
- omap_get_timer_dt
-In-Reply-To: <7dd12934-862c-c7ad-5f43-43e4c6b08199@ti.com>
-References: <1515646483-24199-1-git-send-email-qi.hou@windriver.com>
- <7dd12934-862c-c7ad-5f43-43e4c6b08199@ti.com>
-Message-ID: <20180112210844.GF4821@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Jan 2018 21:09:56 +0000
+Subject: Applied "spi: orion: Fix clock resource by adding an optional bus
+ clock" to the spi tree
+In-Reply-To: <20180112104233.4952-1-gregory.clement@free-electrons.com>
+Message-ID: <E1ea6aK-0003Ko-VL@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [180112 20:36]:
-> Hi
-> 
-> On 01/10/2018 10:54 PM, Qi Hou wrote:
-> > When more than one GP timers are used as kernel system timers and the
-> > corresponding nodes in device-tree are marked with the same "disabled"
-> > property, then the "attr" field of the property will be initialized
-> > more than once as the property being added to sys file system via
-> > __of_add_property_sysfs().
-> > 
-> > In __of_add_property_sysfs(), the "name" field of pp->attr.attr is set
-> > directly to the return value of safe_name(), without taking care of
-> > whether it's already a valid pointer to a memory block. If it is, its
-> > old value will always be overwritten by the new one and the memory block
-> > allocated before will a "ghost", then a kmemleak happened.
-> > 
-> > That the same "disabled" property being added to different nodes of device
-> > tree would cause that kind of kmemleak overhead, at leat once.
-> > 
-> > To fix it, allocate the property dynamically, and delete static one.
-> 
-> Does it in sync with Keerthy's work [1]
+The patch
 
-First fixes, then new stuff! Keerthy's work will have to
-wait for v4.17, we want that series sitting in Linux next
-for several weeks.
+   spi: orion: Fix clock resource by adding an optional bus clock
 
-Regards,
+has been applied to the spi tree at
 
-Tony
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-> [1] https://www.spinics.net/lists/linux-omap/msg141100.html
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 92ae112e477ac412decc3fdd5c1eeb6c90c266b4 Mon Sep 17 00:00:00 2001
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Fri, 12 Jan 2018 11:42:33 +0100
+Subject: [PATCH] spi: orion: Fix clock resource by adding an optional bus
+ clock
+
+On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
+is optional because not all the SoCs need them but at least for Armada
+7K/8K it is actually mandatory.
+
+The binding documentation is updating accordingly as well as mentioning
+the mandatory clock which was also missing.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/spi/spi-orion.txt |  9 +++++++++
+ drivers/spi/spi-orion.c                             | 14 ++++++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
+index df8ec31f2f07..8434a65fc12a 100644
+--- a/Documentation/devicetree/bindings/spi/spi-orion.txt
++++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
+@@ -18,8 +18,17 @@ Required properties:
+ 	The eight register sets following the control registers refer to
+ 	chip-select lines 0 through 7 respectively.
+ - cell-index : Which of multiple SPI controllers is this.
++- clocks : pointers to the reference clocks for this device, the first
++	   one is the one used for the clock on the spi bus, the
++	   second one is optional and is the clock used for the
++	   functional part of the controller
++
+ Optional properties:
+ - interrupts : Is currently not used.
++- clock-names : names of used clocks, mandatory if the second clock is
++		used, the name must be "core", and "axi" (the latter
++		is only for Armada 7K/8K).
++
+ 
+ Example:
+        spi at 10600 {
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 8974bb340b3a..482a0cf3b7aa 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -94,6 +94,7 @@ struct orion_spi {
+ 	struct spi_master	*master;
+ 	void __iomem		*base;
+ 	struct clk              *clk;
++	struct clk              *axi_clk;
+ 	const struct orion_spi_dev *devdata;
+ 
+ 	struct orion_direct_acc	direct_access[ORION_NUM_CHIPSELECTS];
+@@ -634,6 +635,14 @@ static int orion_spi_probe(struct platform_device *pdev)
+ 	if (status)
+ 		goto out;
+ 
++	/* The following clock is only used by some SoCs */
++	spi->axi_clk = devm_clk_get(&pdev->dev, "axi");
++	if (IS_ERR(spi->axi_clk) &&
++	    PTR_ERR(spi->axi_clk) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++	if (!IS_ERR(spi->axi_clk))
++		clk_prepare_enable(spi->axi_clk);
++
+ 	tclk_hz = clk_get_rate(spi->clk);
+ 
+ 	/*
+@@ -725,6 +734,7 @@ static int orion_spi_probe(struct platform_device *pdev)
+ out_rel_pm:
+ 	pm_runtime_disable(&pdev->dev);
+ out_rel_clk:
++	clk_disable_unprepare(spi->axi_clk);
+ 	clk_disable_unprepare(spi->clk);
+ out:
+ 	spi_master_put(master);
+@@ -738,6 +748,7 @@ static int orion_spi_remove(struct platform_device *pdev)
+ 	struct orion_spi *spi = spi_master_get_devdata(master);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
++	clk_disable_unprepare(spi->axi_clk);
+ 	clk_disable_unprepare(spi->clk);
+ 
+ 	spi_unregister_master(master);
+@@ -754,6 +765,7 @@ static int orion_spi_runtime_suspend(struct device *dev)
+ 	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct orion_spi *spi = spi_master_get_devdata(master);
+ 
++	clk_disable_unprepare(spi->axi_clk);
+ 	clk_disable_unprepare(spi->clk);
+ 	return 0;
+ }
+@@ -763,6 +775,8 @@ static int orion_spi_runtime_resume(struct device *dev)
+ 	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct orion_spi *spi = spi_master_get_devdata(master);
+ 
++	if (!IS_ERR(spi->axi_clk))
++		clk_prepare_enable(spi->axi_clk);
+ 	return clk_prepare_enable(spi->clk);
+ }
+ #endif
+-- 
+2.15.1
