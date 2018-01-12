@@ -1,119 +1,68 @@
-From: lianglihao@huawei.com (Lihao Liang)
-Date: Sat, 13 Jan 2018 02:32:20 +0800
-Subject: [PATCH v3] rcutorture: Add basic ARM64 support to run scripts
-In-Reply-To: <20180112175203.GX9671@linux.vnet.ibm.com>
-References: <1515751892-37470-1-git-send-email-lianglihao@huawei.com>
- <20180112175203.GX9671@linux.vnet.ibm.com>
-Message-ID: <ed0d4ad9-dd62-16dd-7e34-c913349480a9@huawei.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 12 Jan 2018 10:34:24 -0800
+Subject: [PATCH] soc: brcmstb: Only register SoC device on STB platforms
+In-Reply-To: <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
+References: <20180109145409.11612-1-thierry.reding@gmail.com>
+ <cc470686-374e-0c71-d797-62cffd76bb82@arm.com>
+ <973b2445-48ca-87a9-b4c2-21d8bfec76dd@arm.com>
+Message-ID: <89ce7223-8ae5-061b-911c-d10f12b9517b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/12/2018 04:12 AM, Sudeep Holla wrote:
+> 
+> 
+> On 12/01/18 11:39, Sudeep Holla wrote:
+>>
+>>
+>> On 09/01/18 14:54, Thierry Reding wrote:
+>>> From: Thierry Reding <treding@nvidia.com>
+>>>
+>>> After moving the SoC device initialization to an early initcall in
+>>> commit f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall"),
+>>> the Broadcom STB SoC device is registered on all platforms if support
+>>> for the device is enabled in the kernel configuration.
+>>>
+>>> This causes an additional SoC device to appear on platforms that already
+>>> register a native one. In case of Tegra the STB SoC device is registered
+>>> as soc0 (with totally meaningless content in the sysfs attributes) and
+>>> causes various scripts and programs to fail because they don't know how
+>>> to parse that data.
+>>>
+>>> To fix this, duplicate the check from brcmstb_soc_device_early_init()
+>>> that already prevents the code from doing anything nonsensical on non-
+>>> STB platforms.
+>>>
+>>> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
+>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>>> ---
+>>>  drivers/soc/bcm/brcmstb/common.c | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+>>> index 781ada62d0a3..4fe1cb73b39a 100644
+>>> --- a/drivers/soc/bcm/brcmstb/common.c
+>>> +++ b/drivers/soc/bcm/brcmstb/common.c
+>>> @@ -89,8 +89,13 @@ early_initcall(brcmstb_soc_device_early_init);
+>>>  static int __init brcmstb_soc_device_init(void)
+>>>  {
+>>>  	struct soc_device_attribute *soc_dev_attr;
+>>> +	struct device_node *sun_top_ctrl;
+>>>  	struct soc_device *soc_dev;
+>>>  
+>>> +	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+>>> +	if (!sun_top_ctrl)
+>>> +		return -ENODEV;
+>>> +
+>>
+>> missing of_node_put(sun_top_ctrl) ? or am I missing to see that elsewhere ?
+>>
+> 
+> Further, I still the error messags on my Juno with this patch applied. I
+> fail to see how this patch prevents brcmstb_biuctrl_init which is
+> early_initcall in drivers/soc/bcm/brcmstb/biuctrl.c getting called ?
 
-
-On 2018/1/13 1:52, Paul E. McKenney wrote:
-> On Fri, Jan 12, 2018 at 06:11:32PM +0800, lianglihao at huawei.com wrote:
->> From: Lihao Liang <lianglihao@huawei.com>
->>
->> This commit adds support of the qemu command qemu-system-aarch64
->> to rcutorture.
->>
->> Signed-off-by: Lihao Liang <lianglihao@huawei.com>
-> 
-> This is to replace your previous patch, not to apply on top of it,
-> correct?  (Either way is fine, just please let me know.)
-> 
-
-Please replace the previous one.
-
-Thanks,
-Lihao.
-
-> 							Thanx, Paul
-> 
->> ---
->>
->> Comparing to the previous version, this patch lifts the limitation of
->> maximum 8 CPUs of option "-M virt" by adding "gic-version=host" to it.
->> This allows qemu to use the maximum CPU number supported by the actual
->> hardware.
->>
->> This commit is against RCU's git branch rcu/dev
->>
->> commit 505b61b2ec1d ("EXP: rcu: Add debugging info to other assertion")
->>
->>
->>  tools/testing/selftests/rcutorture/bin/functions.sh | 17 +++++++++++++++--
->>  1 file changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/tools/testing/selftests/rcutorture/bin/functions.sh b/tools/testing/selftests/rcutorture/bin/functions.sh
->> index 07a1377..65f6655 100644
->> --- a/tools/testing/selftests/rcutorture/bin/functions.sh
->> +++ b/tools/testing/selftests/rcutorture/bin/functions.sh
->> @@ -136,6 +136,9 @@ identify_boot_image () {
->>  		qemu-system-x86_64|qemu-system-i386)
->>  			echo arch/x86/boot/bzImage
->>  			;;
->> +		qemu-system-aarch64)
->> +			echo arch/arm64/boot/Image
->> +			;;
->>  		*)
->>  			echo vmlinux
->>  			;;
->> @@ -158,6 +161,9 @@ identify_qemu () {
->>  	elif echo $u | grep -q "Intel 80386"
->>  	then
->>  		echo qemu-system-i386
->> +	elif echo $u | grep -q aarch64
->> +	then
->> +		echo qemu-system-aarch64
->>  	elif uname -a | grep -q ppc64
->>  	then
->>  		echo qemu-system-ppc64
->> @@ -176,16 +182,20 @@ identify_qemu () {
->>  # Output arguments for the qemu "-append" string based on CPU type
->>  # and the TORTURE_QEMU_INTERACTIVE environment variable.
->>  identify_qemu_append () {
->> +	local console=ttyS0
->>  	case "$1" in
->>  	qemu-system-x86_64|qemu-system-i386)
->>  		echo noapic selinux=0 initcall_debug debug
->>  		;;
->> +	qemu-system-aarch64)
->> +		console=ttyAMA0
->> +		;;
->>  	esac
->>  	if test -n "$TORTURE_QEMU_INTERACTIVE"
->>  	then
->>  		echo root=/dev/sda
->>  	else
->> -		echo console=ttyS0
->> +		echo console=$console
->>  	fi
->>  }
->>
->> @@ -197,6 +207,9 @@ identify_qemu_args () {
->>  	case "$1" in
->>  	qemu-system-x86_64|qemu-system-i386)
->>  		;;
->> +	qemu-system-aarch64)
->> +		echo -machine virt,gic-version=host -cpu host
->> +		;;
->>  	qemu-system-ppc64)
->>  		echo -enable-kvm -M pseries -nodefaults
->>  		echo -device spapr-vscsi
->> @@ -254,7 +267,7 @@ specify_qemu_cpus () {
->>  		echo $2
->>  	else
->>  		case "$1" in
->> -		qemu-system-x86_64|qemu-system-i386)
->> +		qemu-system-x86_64|qemu-system-i386|qemu-system-aarch64)
->>  			echo $2 -smp $3
->>  			;;
->>  		qemu-system-ppc64)
->> -- 
->> 2.7.4
->>
-> 
-> 
-> .
-> 
+I read your patch too quickly, yours is needed, and so is Thierry's, I
+will send an incremental fix to Olof shortly, sorry about the mess.
+-- 
+Florian
