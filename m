@@ -1,218 +1,197 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri, 12 Jan 2018 11:58:55 -0600
-Subject: [PATCH v3 12/13] arm64: Implement branch predictor hardening for
- Falkor
-In-Reply-To: <1515432758-26440-13-git-send-email-will.deacon@arm.com>
-References: <1515432758-26440-1-git-send-email-will.deacon@arm.com>
- <1515432758-26440-13-git-send-email-will.deacon@arm.com>
-Message-ID: <d814560b-8b2b-8a8c-22a4-954451db97a8@codeaurora.org>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Fri, 12 Jan 2018 18:59:59 +0100
+Subject: [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps receiver) power
+ control driver
+In-Reply-To: <20180112153903.GB5992@localhost>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost>
+ <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
+ <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+ <20180112153903.GB5992@localhost>
+Message-ID: <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Johan,
 
-Hi Will,
- 
-
-This patch is the right one for variant2, checks QDF2400 part numbers QCOM_FALKOR and FALKOR_V1
-but unfortunately it got modified and merged to linux-next branch causing confusion.Please revert
-and merge [V2] patch to fix the problem.
- 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/arm64?h=next-20180112&id=ec82b567a74fbdffdf418d4bb381d55f6a9096af
-
-[v2] https://www.spinics.net/lists/arm-kernel/msg627364.html
-
-
-Thanks,
-Shanker
-
-On 01/08/2018 11:32 AM, Will Deacon wrote:
-> From: Shanker Donthineni <shankerd@codeaurora.org>
+> Am 12.01.2018 um 16:39 schrieb Johan Hovold <johan@kernel.org>:
 > 
-> Falkor is susceptible to branch predictor aliasing and can
-> theoretically be attacked by malicious code. This patch
-> implements a mitigation for these attacks, preventing any
-> malicious entries from affecting other victim contexts.
+>> Let's restart this discussion and focus on the main roadblock (others
+>> are minor details which can be sorted out later).
+>> 
+>> If it feels like a hack, the key issue seems to me to be the choice of
+>> the API to present the GPS data to user space. Right?
 > 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> [will: fix label name when !CONFIG_KVM]
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/cpucaps.h |  3 ++-
->  arch/arm64/include/asm/kvm_asm.h |  2 ++
->  arch/arm64/kernel/bpi.S          |  8 +++++++
->  arch/arm64/kernel/cpu_errata.c   | 49 ++++++++++++++++++++++++++++++++++++++--
->  arch/arm64/kvm/hyp/entry.S       | 12 ++++++++++
->  arch/arm64/kvm/hyp/switch.c      | 10 ++++++++
->  6 files changed, 81 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index 51616e77fe6b..7049b4802587 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -43,7 +43,8 @@
->  #define ARM64_SVE				22
->  #define ARM64_UNMAP_KERNEL_AT_EL0		23
->  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
-> +#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
->  
-> -#define ARM64_NCAPS				25
-> +#define ARM64_NCAPS				26
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index ab4d0a926043..24961b732e65 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -68,6 +68,8 @@ extern u32 __kvm_get_mdcr_el2(void);
->  
->  extern u32 __init_stage2_translation(void);
->  
-> +extern void __qcom_hyp_sanitize_btac_predictors(void);
-> +
->  #endif
->  
->  #endif /* __ARM_KVM_ASM_H__ */
-> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-> index dec95bd82e31..76225c2611ea 100644
-> --- a/arch/arm64/kernel/bpi.S
-> +++ b/arch/arm64/kernel/bpi.S
-> @@ -77,3 +77,11 @@ ENTRY(__psci_hyp_bp_inval_start)
->  	ldp	x0, x1, [sp, #(16 * 8)]
->  	add	sp, sp, #(8 * 18)
->  ENTRY(__psci_hyp_bp_inval_end)
-> +
-> +ENTRY(__qcom_hyp_sanitize_link_stack_start)
-> +	stp     x29, x30, [sp, #-16]!
-> +	.rept	16
-> +	bl	. + 4
-> +	.endr
-> +	ldp	x29, x30, [sp], #16
-> +ENTRY(__qcom_hyp_sanitize_link_stack_end)
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index cb0fb3796bb8..7b4efde087fc 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -54,6 +54,8 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
->  
->  #ifdef CONFIG_KVM
->  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-> +extern char __qcom_hyp_sanitize_link_stack_start[];
-> +extern char __qcom_hyp_sanitize_link_stack_end[];
->  
->  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
->  				const char *hyp_vecs_end)
-> @@ -96,8 +98,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->  	spin_unlock(&bp_lock);
->  }
->  #else
-> -#define __psci_hyp_bp_inval_start	NULL
-> -#define __psci_hyp_bp_inval_end		NULL
-> +#define __psci_hyp_bp_inval_start		NULL
-> +#define __psci_hyp_bp_inval_end			NULL
-> +#define __qcom_hyp_sanitize_link_stack_start	NULL
-> +#define __qcom_hyp_sanitize_link_stack_end	NULL
->  
->  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->  				      const char *hyp_vecs_start,
-> @@ -138,6 +142,29 @@ static int enable_psci_bp_hardening(void *data)
->  
->  	return 0;
->  }
-> +
-> +static void qcom_link_stack_sanitization(void)
-> +{
-> +	u64 tmp;
-> +
-> +	asm volatile("mov	%0, x30		\n"
-> +		     ".rept	16		\n"
-> +		     "bl	. + 4		\n"
-> +		     ".endr			\n"
-> +		     "mov	x30, %0		\n"
-> +		     : "=&r" (tmp));
-> +}
-> +
-> +static int qcom_enable_link_stack_sanitization(void *data)
-> +{
-> +	const struct arm64_cpu_capabilities *entry = data;
-> +
-> +	install_bp_hardening_cb(entry, qcom_link_stack_sanitization,
-> +				__qcom_hyp_sanitize_link_stack_start,
-> +				__qcom_hyp_sanitize_link_stack_end);
-> +
-> +	return 0;
-> +}
->  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
->  
->  #define MIDR_RANGE(model, min, max) \
-> @@ -302,6 +329,24 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
->  		.enable = enable_psci_bp_hardening,
->  	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-> +		.enable = qcom_enable_link_stack_sanitization,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-> +		.enable = qcom_enable_link_stack_sanitization,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-> +	},
->  #endif
->  	{
->  	}
-> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> index 12ee62d6d410..9c45c6af1f58 100644
-> --- a/arch/arm64/kvm/hyp/entry.S
-> +++ b/arch/arm64/kvm/hyp/entry.S
-> @@ -196,3 +196,15 @@ alternative_endif
->  
->  	eret
->  ENDPROC(__fpsimd_guest_restore)
-> +
-> +ENTRY(__qcom_hyp_sanitize_btac_predictors)
-> +	/**
-> +	 * Call SMC64 with Silicon provider serviceID 23<<8 (0xc2001700)
-> +	 * 0xC2000000-0xC200FFFF: assigned to SiP Service Calls
-> +	 * b15-b0: contains SiP functionID
-> +	 */
-> +	movz    x0, #0x1700
-> +	movk    x0, #0xc200, lsl #16
-> +	smc     #0
-> +	ret
-> +ENDPROC(__qcom_hyp_sanitize_btac_predictors)
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 4d273f6d0e69..7e373791fad1 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -406,6 +406,16 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  		/* 0 falls through to be handled out of EL2 */
->  	}
->  
-> +	if (cpus_have_const_cap(ARM64_HARDEN_BP_POST_GUEST_EXIT)) {
-> +		u32 midr = read_cpuid_id();
-> +
-> +		/* Apply BTAC predictors mitigation to all Falkor chips */
-> +		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-> +		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
-> +			__qcom_hyp_sanitize_btac_predictors();
-> +		}
-> +	}
-> +
->  	fp_enabled = __fpsimd_enabled();
->  
->  	__sysreg_save_guest_state(guest_ctxt);
-> 
+> Or even more fundamentally, does this belong in the kernel at all?
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Yes, that can be questioned of course. It was questioned and discussed
+several times and I thought the answer was a clear yes. But let's reiterate.
+
+> 
+> Also it seems at least part of your specific problem is that you have
+> failed to wire up the WAKEUP pin of the W2SG0004/84 properly,
+
+The w2sg0004 has no wakeup pin. At least I can't find one in the data sheet.
+
+The two pins you refer to from the 0084 data sheet are called BootSelect0/1
+in the 0004 and have a different function.
+
+To be clear, we did not fail to wire it up. We did the design before the
+0084 was announced and available. We just had to swap in the 0084 into
+existing PCBs during production because the 0004 became EOL. Otherwise
+we would probably still use the 0004 without WAKEUP output.
+
+To make it worse, we have no documentation for an individual board if
+an 0004 or 0084 chip is installed and there is no means how a software
+can find out which one it is talking to (especially before properly
+powering on). Therefore we can not even provide two different device
+trees or drivers or whatever, unless we ask people to open their device
+and look on the chip. Quite crazy wrt. user-friendlyness of software
+installation in 2018...
+
+Therefore, a driver must be capable to handle both chips in the same way,
+with minimalistic assumptions, even if the 0084 could provide a direct
+signal to make it easier than using serdev to monitor the data stream.
+
+>  which then
+> forces you to look at the data stream to determine the power state of
+> the chip. Judging from a quick look at the GTA04 schematics it seems
+> you've even connected the WAKEUP output to the 1V8_OUT output?!
+
+No. You failed to see that this is an optional 0R, which is not installed.
+The 0R on pin 7 (BootSelect1) to GND was removed when we did switch from
+0004 to 0084. Pin 6 (BootSelect0/WAKEUP) was never connected.
+
+> The kernel is probably not the place to be working around issues like
+> that,
+
+You appear to assume this our only motivation is to make a workaround for
+a hardware design flaw but that isn't.
+
+The purpose of the driver is to provide power management for the GPS
+subsystem which happens to be based on a chip with limited functionality.
+
+And the serdev thing is the solution, not the requirement...
+
+> even if serdev at least allows for such hacks to be fairly
+> isolated in drivers (unlike some of the earlier proposals touching core
+> code).
+
+Please tell me why there are so many hacks for hardware issues in certain
+drivers. Any why those are good and this one (if it is one at all) is not.
+
+Some picks random fgrep -iR hack drivers
+
+drivers/char/random.c: * Hack to deal with crazy userspace progams when they are all trying
+drivers/clk/meson/meson8b.c:	 * a new clk_hw, and this hack will no longer work. Releasing the ccr
+drivers/clk/samsung/clk-exynos3250.c:	/* HACK: fin_pll hardcoded to xusbxti until detection is implemented. */
+drivers/gpu/drm/amd/amdkfd/kfd_events.c:	 * This hack is wrong, but nobody is likely to notice.
+drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:		 * HACK: IGT tests expect that each plane can only have one
+drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:	/* It's a hack for s3 since in 4.9 kernel filter out cursor buffer
+drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:		/* TODO This hack should go away */
+drivers/gpu/drm/amd/display/dc/core/dc_link.c:	/* A hack to avoid failing any modes for EDID override feature on
+
+What I can learn from your discussion is that it might be considerable
+to add an optional gpio for the 0084 WAKEUP and add some logic to
+support users who have or will have that pin connected.
+
+But even then we would need a driver to handle this gpio and issue
+an on/off impulse on the other to switch states. It would be a different
+driver (variant - maybe some CONFIG option or handled by code), but not
+"no driver".
+
+> 
+>> I see three reasonable options how this presentation can be done:
+>> 
+>> 1. char device
+>> 2. tty device
+>> 3. some new gps interface API (similar to network, bluetooth interfaces)
+>> 4. no driver and use the UART tty directly
+>> 
+>> Pros and cons:
+> 
+>> 4. no driver and use UART directly
+>> + a non-solution seems to be attractive
+>> - must turn on/off chip by gpio hacks from user-space
+> 
+> I'm not sure that would amount to more of hack then doing it in the
+> kernel would.
+
+It might not be big effort in the user-space code/scripts.
+
+But much effort to convince all the plethora of user-space client maintainers
+to integrate something. And have them roll out. And have distributions take it.
+And have users upgrade to it. 5 years later...
+
+Do you think it is easier to convince them than you? They usually assume a
+power management issue should be solved by the kernel driver.
+
+That is what Andreas did remark as motivation: provide a solution
+for *existing* user spaces.
+
+> 
+>> - can not guarantee (!) to power off the chip if the last user-space
+>> process using it is killed (which is essential for power-management of
+>> a handheld, battery operated device)
+> 
+> That depends on how you implement things (extending gpsd, wrapper
+> script, pty daemon, ...).
+
+No. You can of course cover all standard cases but there is one fundamental
+issue which is IMHO a problem of any user-space implementation:
+
+	How can you guarantee that the chip is powered off if no
+	user-space process is using it or if the last process doing
+	this is killed by *whatever* reason?
+
+E.g. after a kill -9. Or if someone deinstalls gpsd or whatever and assumes
+(and wants a guarantee) that GPS is now turned off and never turned on drawing
+precious milliamps from the battery for no use.
+
+As it is well known, a user-space process can't protect itself against kill -9.
+Or has this recently been changed and I am not aware of?
+
+This is the fundamental reason why we need a kernel driver to provide
+reliable, repeatable and trustable power management of this chip.
+
+It is equally fundamental as a hard disk should spin down after the last
+file is closed. Even if this process ends by a kill -9.
+
+A second almost equally fundamental aspect to be considered is how you want
+to automatically and reliably turn off the chip by pure user-space code when
+entering suspend.
+
+> 
+> 
+>> I would clearly prefer 3 over 2 over 1 over 4.
+>> 
+>> So do you see a chance that the kernel core team provides something useable
+>> (not perfect) for variant 3 in reasonable time (let's say 3-6 months)?
+> 
+> No, I'm afraid not. At least not if we're talking about a framework
+> that would replace gpsd.
+
+This confirms my assumption that there is nothing really good to expect
+soon to implement a driver for variant 3.
+
+> 
+>> If not, I want to suggest to accept the second-best choice 2. for now and we
+>> will update the driver as soon as 3. appears. IMHO it would be a good test case
+>> for a new subsystem.
+> 
+> Getting the interface right from the start is quite important, as
+> otherwise we may end up having to support a superseded one for a long
+> time.
+
+This seems to contradict your argument that user-space can very easily
+adapt to everything. If the latter were true there would be no need to
+keep old interfaces supported for a long time.
+
+So can you agree to that a battery powered portable device must have
+reliable and trustable power management? And if it provable can't be
+implemented in user-space (a single counter example suffices) it must
+be a kernel driver?
+
+BR,
+Nikolaus
