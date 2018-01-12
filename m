@@ -1,140 +1,48 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Jan 2018 21:09:56 +0000
-Subject: Applied "spi: orion: Fix clock resource by adding an optional bus
- clock" to the spi tree
-In-Reply-To: <20180112104233.4952-1-gregory.clement@free-electrons.com>
-Message-ID: <E1ea6aK-0003Ko-VL@debutante>
+Date: Fri, 12 Jan 2018 21:15:35 +0000
+Subject: PM regression in next
+In-Reply-To: <20180112210706.GE4821@atomide.com>
+References: <20180112000037.GA3875@atomide.com>
+ <20180111161837.f1c1d891a1b80d97e30a9b1b@linux-foundation.org>
+ <20180112002322.GB3875@atomide.com>
+ <20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>
+ <20180112012019.GA4059@atomide.com>
+ <20180112190046.GD4821@atomide.com>
+ <20180112191251.GE21458@sirena.org.uk>
+ <20180112210706.GE4821@atomide.com>
+Message-ID: <20180112211535.GH21458@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Fri, Jan 12, 2018 at 01:07:06PM -0800, Tony Lindgren wrote:
 
-   spi: orion: Fix clock resource by adding an optional bus clock
+> (twl4030_dummy_read [snd_soc_twl4030]) from [<bf1cc3b4>]
+>   (snd_soc_codec_drv_read+0x1c/0x28 [snd_soc_core])
+> (snd_soc_codec_drv_read [snd_soc_core]) from [<bf1da1cc>]
+>   (snd_soc_dapm_new_widgets+0x29c/0x578 [snd_soc_core])
+> (snd_soc_dapm_new_widgets [snd_soc_core]) from [<bf1d2f30>]
+>   (snd_soc_register_card+0xad0/0xe30 [snd_soc_core])
+> (snd_soc_register_card [snd_soc_core]) from [<bf1e1850>]
+>   (devm_snd_soc_register_card+0x30/0x70 [snd_soc_core])
+> (devm_snd_soc_register_card [snd_soc_core]) from [<bf234364>]
+>   (omap_twl4030_probe+0x100/0x1d0 [snd_soc_omap_twl4030])
+> (omap_twl4030_probe [snd_soc_omap_twl4030]) from [<c0606660>]
+>   (platform_drv_probe+0x50/0xb0)
 
-has been applied to the spi tree at
+So does the read not happen otherwise?  Or is it failing somehow and the
+error getting ignored?
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+> So probably there are other asoc drivers broken too with these
+> kind of patches until snd_soc_codec_drv_write() and
+> snd_soc_codec_drv_read() are fixed?
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 92ae112e477ac412decc3fdd5c1eeb6c90c266b4 Mon Sep 17 00:00:00 2001
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Fri, 12 Jan 2018 11:42:33 +0100
-Subject: [PATCH] spi: orion: Fix clock resource by adding an optional bus
- clock
-
-On Armada 7K/8K we need to explicitly enable the bus clock. The bus clock
-is optional because not all the SoCs need them but at least for Armada
-7K/8K it is actually mandatory.
-
-The binding documentation is updating accordingly as well as mentioning
-the mandatory clock which was also missing.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/spi/spi-orion.txt |  9 +++++++++
- drivers/spi/spi-orion.c                             | 14 ++++++++++++++
- 2 files changed, 23 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-index df8ec31f2f07..8434a65fc12a 100644
---- a/Documentation/devicetree/bindings/spi/spi-orion.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-@@ -18,8 +18,17 @@ Required properties:
- 	The eight register sets following the control registers refer to
- 	chip-select lines 0 through 7 respectively.
- - cell-index : Which of multiple SPI controllers is this.
-+- clocks : pointers to the reference clocks for this device, the first
-+	   one is the one used for the clock on the spi bus, the
-+	   second one is optional and is the clock used for the
-+	   functional part of the controller
-+
- Optional properties:
- - interrupts : Is currently not used.
-+- clock-names : names of used clocks, mandatory if the second clock is
-+		used, the name must be "core", and "axi" (the latter
-+		is only for Armada 7K/8K).
-+
- 
- Example:
-        spi at 10600 {
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 8974bb340b3a..482a0cf3b7aa 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -94,6 +94,7 @@ struct orion_spi {
- 	struct spi_master	*master;
- 	void __iomem		*base;
- 	struct clk              *clk;
-+	struct clk              *axi_clk;
- 	const struct orion_spi_dev *devdata;
- 
- 	struct orion_direct_acc	direct_access[ORION_NUM_CHIPSELECTS];
-@@ -634,6 +635,14 @@ static int orion_spi_probe(struct platform_device *pdev)
- 	if (status)
- 		goto out;
- 
-+	/* The following clock is only used by some SoCs */
-+	spi->axi_clk = devm_clk_get(&pdev->dev, "axi");
-+	if (IS_ERR(spi->axi_clk) &&
-+	    PTR_ERR(spi->axi_clk) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+	if (!IS_ERR(spi->axi_clk))
-+		clk_prepare_enable(spi->axi_clk);
-+
- 	tclk_hz = clk_get_rate(spi->clk);
- 
- 	/*
-@@ -725,6 +734,7 @@ static int orion_spi_probe(struct platform_device *pdev)
- out_rel_pm:
- 	pm_runtime_disable(&pdev->dev);
- out_rel_clk:
-+	clk_disable_unprepare(spi->axi_clk);
- 	clk_disable_unprepare(spi->clk);
- out:
- 	spi_master_put(master);
-@@ -738,6 +748,7 @@ static int orion_spi_remove(struct platform_device *pdev)
- 	struct orion_spi *spi = spi_master_get_devdata(master);
- 
- 	pm_runtime_get_sync(&pdev->dev);
-+	clk_disable_unprepare(spi->axi_clk);
- 	clk_disable_unprepare(spi->clk);
- 
- 	spi_unregister_master(master);
-@@ -754,6 +765,7 @@ static int orion_spi_runtime_suspend(struct device *dev)
- 	struct spi_master *master = dev_get_drvdata(dev);
- 	struct orion_spi *spi = spi_master_get_devdata(master);
- 
-+	clk_disable_unprepare(spi->axi_clk);
- 	clk_disable_unprepare(spi->clk);
- 	return 0;
- }
-@@ -763,6 +775,8 @@ static int orion_spi_runtime_resume(struct device *dev)
- 	struct spi_master *master = dev_get_drvdata(dev);
- 	struct orion_spi *spi = spi_master_get_devdata(master);
- 
-+	if (!IS_ERR(spi->axi_clk))
-+		clk_prepare_enable(spi->axi_clk);
- 	return clk_prepare_enable(spi->clk);
- }
- #endif
--- 
-2.15.1
+I rather suspect someone would've noticed by now TBH - I suspect this is
+more likely to be an issue with the rather baroque code that the TWL
+drivers have possibly coupled with the whole multiple I2C devices issue.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180112/f7329e49/attachment.sig>
