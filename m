@@ -1,98 +1,54 @@
-From: york.sun@nxp.com (York Sun)
-Date: Fri, 12 Jan 2018 18:16:11 +0000
-Subject: EDAC driver for ARMv8 L1/L2 cache
-References: <VI1PR04MB2078DBC9381EA574CE5DA4B09A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180109214332.ejiak6f35tnhbpke@pd.tnic>
- <VI1PR04MB20788AC2E71A3CFFC37B85BB9A100@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <bc8d7450-3f58-95c2-42c2-d16b2f7a76e4@linux.intel.com>
- <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180112171251.4ricaz3lzditr7pi@pd.tnic>
- <VI1PR04MB2078B4491702765BA546C5539A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
- <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
-Message-ID: <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 12 Jan 2018 10:18:38 -0800
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP SoC patches for v4.16
+In-Reply-To: <CAK8P3a0JwAW2ZhQAQ6A3o9KC9sXe7qRJT7ZM+rZxGXX9dk0ADg@mail.gmail.com>
+References: <84cfd3d5-f0e7-23dc-0e33-430a1f2dbdb0@monstr.eu>
+ <20180112012847.iqol2xb2iro6wauk@localhost>
+ <011f77e4-040b-a864-168f-bc198a523536@monstr.eu>
+ <CAK8P3a0JwAW2ZhQAQ6A3o9KC9sXe7qRJT7ZM+rZxGXX9dk0ADg@mail.gmail.com>
+Message-ID: <CAOesGMgGXbLCfrwqrY9=GoT4d1-UzX0svt-pYohXhJq7AdmODQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2018 10:01 AM, Mark Rutland wrote:
-> On Fri, Jan 12, 2018 at 05:44:56PM +0000, York Sun wrote:
->> On 01/12/2018 09:38 AM, Mark Rutland wrote:
->>> On Fri, Jan 12, 2018 at 05:17:54PM +0000, York Sun wrote:
->>>> On 01/12/2018 09:13 AM, Borislav Petkov wrote:
->>>>> On Fri, Jan 12, 2018 at 04:48:05PM +0000, York Sun wrote:
->>>>>> I see Stratix10 has A53 core. I am concerned on reading the
->>>>>> CPUMERRSR_EL1 and L2MERRSR_EL1. The are IMPLEMENTATION DEFINED
->>>>>> registers. They may not be available on all SoCs, or all time.
->>>>>
->>>>> Is there something like CPUID on x86, on ARM64 which denotes presence of
->>>>> a certain feature?
->>>>>
->>>>> Or is that thing devicetree?
+On Fri, Jan 12, 2018 at 12:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Jan 12, 2018 at 7:44 AM, Michal Simek <monstr@monstr.eu> wrote:
+>> On 12.1.2018 02:28, Olof Johansson wrote:
+>>> On Mon, Jan 08, 2018 at 02:02:18PM +0100, Michal Simek wrote:
+>
+>>>> ----------------------------------------------------------------
+>>>> Dhaval Shah (2):
+>>>>       dt-bindings: soc: xilinx: Add DT bindings to xlnx_vcu driver
+>>>>       soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
 >>>>
->>>> This feature is available on the SoC I am working on (NXP LS1046A). It
->>>> seems always there. I don't know if there is any register denoting the
->>>> existence of such feature.
+>>>> Michal Simek (1):
+>>>>       soc: xilinx: Create folder structure for soc specific drivers
+>>>>
 >>>
->>> There is no architectural register describing this.
->>>
->>> Judging by the Cortex-A53 TRM, there is no IMP DEF / auxilliary register
->>> describing this.
->>>
->>> Regardless, a DT binding is necessary due to potential interactions with
->>> FW, hypervisors, etc.
->>>
->>>> I guess we can use device tree if this feature exists. Not sure if
->>>> big.LITTLE is a concern here.
->>>
->>> There are big.LITTLE systems with Cortex-A53, so we definitely care
->>> about big.LITTLE here.
->>>
+>>> Merged, but you should probably add a platform config option for Xilinx
+>>> and use that instead of obj-y to descend into the directory?
+>
+> I don't see it in arm-soc yet, did you forget to push the latest branches?
+
+Hm, not sure what happened there. Fixing now.
+
+>
+>> Do you think change like this?
 >>
->> For a given system, for example A72-A53 big.LITTLE configuration, the
->> feature is known and can be described in DT. We have to detect which
->> core is running to determine if this feature is available. Does this
->> sound right?
-> 
-> The binding will need to explicitly describe the set of CPUs the feature
-> is usable on.
-> 
-> On a big.LITTLE system, I'd expect multiple nodes in the DT, similar to
-> what we have for PMUs. Even if all CPUs have some EDAC functionality, it
-> will differ across microarchitectures.
-> 
-> e.g. we'd have something like:
-> 
-> edac-a72 {
-> 	compatible = "arm,cortex-a72-edac";
-> 	cpus = <&cpu0>, <&cpu 1>;
-> 	...
-> };
-> 
-> edac-a53 {
-> 	compatible = "arm,cortex-a53-edac";
-> 	cpus = <&cpu2>, <&cpu 3>;
-> 	...
-> };
-> 
-> ... and it may get more complicated from there on. There may be other
-> users like FW or Secure OSs that we have to interact with, this might
-> get arbitrarily reset across idle, etc.
-> 
-> The Cortex-A53 TRM doesn't use the term EDAC at all, and refers
-> separately to "CPU Memory Error" functionality an "L2 Memory Error"
-> functionality. I don't know if those are expected to be used separately.
-> 
+>> -obj-y                          += xilinx/
+>> +obj-$(CONFIG_ARCH_ZYNQMP)      += xilinx/
+>>
+>> Just a note. This folder is supposed to be used by arm64/arm32 and
+>> microblaze that's why I didn't put there any single config because it
+>> doesn't exist. If you suggest to introduce new config option to label
+>> xilinx platforms we can talk about it.
+>> Argument against it could be also using these drivers by openrisc or
+>> mips (mipsfpga) which are also fpga based.
+>> Anyway I am happy to hear what you suggest.
+>>
+>
+> I think obj-y is fine in this case, the cost is minimal.
 
-Mark,
+Yeah, if it's across platforms/architectures like this it's fine.
 
-Thanks a lot for the guidance. I now have a better idea to deal with
-big.LITTLE systems.
 
-Can you explain more about the IMPLEMENTATION DEFINED registers? I
-consulted our design team and was told there isn't a build parameter to
-opt in or out these registers. So they are always available in our SoCs.
-Under what condition these IMPLEMENTATION DEFINED registers would not be
-available?
-
-York
+-Olof
