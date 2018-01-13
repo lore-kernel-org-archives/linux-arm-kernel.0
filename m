@@ -1,104 +1,18 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 12 Jan 2018 18:59:19 -0600
-Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU topology
-In-Reply-To: <20180113005920.28658-1-jeremy.linton@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
-Message-ID: <20180113005920.28658-12-jeremy.linton@arm.com>
+From: mkelly@xevo.com (Martin Kelly)
+Date: Fri, 12 Jan 2018 17:06:20 -0800
+Subject: Status of NanoPi NEO Air WiFi dts patch
+Message-ID: <88e92469-2c31-7514-13fa-4ff617c86e66@xevo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Propagate the topology information from the PPTT tree to the
-cpu_topology array. We can get the thread id, core_id and
-cluster_id by assuming certain levels of the PPTT tree correspond
-to those concepts. The package_id is flagged in the tree and can be
-found by calling find_acpi_cpu_topology_package() which terminates
-its search when it finds an ACPI node flagged as the physical
-package. If the tree doesn't contain enough levels to represent
-all of the requested levels then the root node will be returned
-for all subsequent levels.
+Hi,
 
-Cc: Juri Lelli <juri.lelli@arm.com>
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 45 insertions(+), 1 deletion(-)
+While trying to get WiFi to work on the NanoPi NEO Air, I came across 
+this patch, which appears not to have been merged:
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 7b06e263fdd1..ce8ec7fd6b32 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -11,6 +11,7 @@
-  * for more details.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/arch_topology.h>
- #include <linux/cpu.h>
- #include <linux/cpumask.h>
-@@ -22,6 +23,7 @@
- #include <linux/sched.h>
- #include <linux/sched/topology.h>
- #include <linux/slab.h>
-+#include <linux/smp.h>
- #include <linux/string.h>
- 
- #include <asm/cpu.h>
-@@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
- 	}
- }
- 
-+#ifdef CONFIG_ACPI
-+/*
-+ * Propagate the topology information of the processor_topology_node tree to the
-+ * cpu_topology array.
-+ */
-+static int __init parse_acpi_topology(void)
-+{
-+	bool is_threaded;
-+	int cpu, topology_id;
-+
-+	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
-+
-+	for_each_possible_cpu(cpu) {
-+		topology_id = find_acpi_cpu_topology(cpu, 0);
-+		if (topology_id < 0)
-+			return topology_id;
-+
-+		if (is_threaded) {
-+			cpu_topology[cpu].thread_id = topology_id;
-+			topology_id = find_acpi_cpu_topology(cpu, 1);
-+			cpu_topology[cpu].core_id   = topology_id;
-+			topology_id = find_acpi_cpu_topology_package(cpu);
-+			cpu_topology[cpu].package_id = topology_id;
-+		} else {
-+			cpu_topology[cpu].thread_id  = -1;
-+			cpu_topology[cpu].core_id    = topology_id;
-+			topology_id = find_acpi_cpu_topology_package(cpu);
-+			cpu_topology[cpu].package_id = topology_id;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+#else
-+static inline int __init parse_acpi_topology(void)
-+{
-+	return -EINVAL;
-+}
-+#endif
- 
- void __init init_cpu_topology(void)
- {
-@@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
- 	 * Discard anything that was parsed if we hit an error so we
- 	 * don't use partial information.
- 	 */
--	if (of_have_populated_dt() && parse_dt_topology())
-+	if ((!acpi_disabled) && parse_acpi_topology())
-+		reset_cpu_topology();
-+	else if (of_have_populated_dt() && parse_dt_topology())
- 		reset_cpu_topology();
- }
--- 
-2.13.5
+https://patchwork.kernel.org/patch/9642071/
+
+Are there any plans to get this patch merged?
+
+Thanks,
+Martin
