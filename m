@@ -1,56 +1,34 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 13 Jan 2018 11:44:22 +0100 (CET)
-Subject: [PATCH v2 4/4] ARM: dts: bcm2837-rpi-3-b: add GPIO expander
-In-Reply-To: <1cb81e3d7a1b1f7ccf374952fa7e8d2147c186fb.1515698418.git.baruch@tkos.co.il>
-References: <cover.1515698418.git.baruch@tkos.co.il>
- <1cb81e3d7a1b1f7ccf374952fa7e8d2147c186fb.1515698418.git.baruch@tkos.co.il>
-Message-ID: <2079522989.43372.1515840262445@email.1und1.de>
+Date: Sat, 13 Jan 2018 11:57:02 +0100 (CET)
+Subject: bcm2835: device tree regression in 4.15.0-rc7
+In-Reply-To: <6809C455-9989-409C-9AB8-DDA8FDD04EB3@martin.sperl.org>
+References: <6809C455-9989-409C-9AB8-DDA8FDD04EB3@martin.sperl.org>
+Message-ID: <826239869.43494.1515841022132@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Hi Martin,
 
-> Baruch Siach <baruch@tkos.co.il> hat am 11. Januar 2018 um 20:44 geschrieben:
+> kernel at martin.sperl.org hat am 13. Januar 2018 um 11:05 geschrieben:
 > 
 > 
-> Add a description of the RPi3 GPIO expander that the VC4 firmware controls.
+> Hi!
+> ...
 > 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
-> v2:
->   * Move GPIO expander node out of the soc container
->   * Rename compatible string
->   * Add gpio-line-names property
-> ---
->  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> and network does not
+> come up so ssh access is not possible?
+> DHCP-Networking does not come up either!
 > 
-> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> index b44b3b5af00d..24555e8a43ec 100644
-> --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> @@ -23,6 +23,16 @@
->  			gpios = <&gpio 47 0>;
->  		};
->  	};
-> +
-> +	expgpio: gpio-expander {
-> +		compatible = "raspberrypi,firmware-gpio";
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		firmware = <&firmware>;
-> +		gpio-line-names = "BT_ON", "WL_ON", "STATUS_LED", "LAN_RUN",
-> +			"HPD_N", "CAM_GPIO0", "CAM_GPIO1", "PWR_LOW_N";
+> After reapplying the patch for CM3-dt and rebuilding it boots fine.
+> 
+> As far as I understand older, formerly functional DTs should always continue to work.
 
-please one GPIO name per line like in the other files. This makes it easier to review changes and add comments.
+please apply "drm/vc4: Move IRQ enable to PM path" to get the rid off this warning and
+"phy: work around 'phys' references to usb-nop-xceiv devices" to fix dwc2.
 
 Stefan
 
-> +		status = "okay";
-> +	};
->  };
->  
->  /* uart0 communicates with the BT module */
-> -- 
-> 2.15.1
+
+> 
+> Martin
 >
