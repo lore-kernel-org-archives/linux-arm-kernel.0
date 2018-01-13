@@ -1,560 +1,121 @@
-From: kyan@codeaurora.org (Kyle Yan)
-Date: Fri, 12 Jan 2018 16:50:26 -0800
-Subject: [PATCH v1] EDAC,
- armv8: Add Cache Error Reporting driver for ARMv8 processors
-Message-ID: <1515804626-21254-1-git-send-email-kyan@codeaurora.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 12 Jan 2018 18:59:11 -0600
+Subject: [PATCH v6 03/12] cacheinfo: rename of_node to fw_unique
+In-Reply-To: <20180113005920.28658-1-jeremy.linton@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+Message-ID: <20180113005920.28658-4-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Interrupt based EDAC driver for ARMv8 processors that implement
-RAS for error detection of CPU caches and lso allows optional polling
-of error syndrome registers if interrupts are not supported.
+Rename and change the type of of_node to indicate
+it is a generic pointer which is generally only used
+for comparison purposes. In a later patch we will apply
+an ACPI/PPTT "token" pointer in fw_unique so that
+the code which builds the shared cpu masks can be reused.
 
-Signed-off-by: Kyle Yan <kyan@codeaurora.org>
+Cc: Palmer Dabbelt <palmer@sifive.com>
+Cc: Albert Ou <albert@sifive.com>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/edac/Kconfig      |  21 ++
- drivers/edac/Makefile     |   1 +
- drivers/edac/armv8_edac.c | 489 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 511 insertions(+)
- create mode 100644 drivers/edac/armv8_edac.c
+ arch/riscv/kernel/cacheinfo.c |  2 +-
+ drivers/base/cacheinfo.c      | 16 +++++++++-------
+ include/linux/cacheinfo.h     |  8 +++-----
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-index 96afb2a..47a68e3 100644
---- a/drivers/edac/Kconfig
-+++ b/drivers/edac/Kconfig
-@@ -457,4 +457,25 @@ config EDAC_XGENE
- 	  Support for error detection and correction on the
- 	  APM X-Gene family of SOCs.
+diff --git a/arch/riscv/kernel/cacheinfo.c b/arch/riscv/kernel/cacheinfo.c
+index 6f4500233cf8..6b0219af88d4 100644
+--- a/arch/riscv/kernel/cacheinfo.c
++++ b/arch/riscv/kernel/cacheinfo.c
+@@ -20,7 +20,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+ 			 struct device_node *node,
+ 			 enum cache_type type, unsigned int level)
+ {
+-	this_leaf->of_node = node;
++	this_leaf->fw_unique = node;
+ 	this_leaf->level = level;
+ 	this_leaf->type = type;
+ 	/* not a sector cache */
+diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
+index fc0d42bbd9eb..217aa90fb036 100644
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -47,7 +47,7 @@ struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu)
+ static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
+ 					   struct cacheinfo *sib_leaf)
+ {
+-	return sib_leaf->of_node == this_leaf->of_node;
++	return sib_leaf->fw_unique == this_leaf->fw_unique;
+ }
  
-+config EDAC_ARMV8
-+	depends on (ARM || ARM64)
-+	tristate "ARMv8 L1/L2/L3/SCU Caches ECC"
-+	help
-+	   Support for error detection and correction on ARMv8 cores
-+	   supporting RAS features. Reports errors caught by ARMv8
-+	   ECC mechanism.
-+	   For debugging issues having to do with stability and overall system
-+	   health, you should probably say 'Y' here.
-+
-+config EDAC_ARMV8_POLL
-+	depends on EDAC_ARMV8
-+	bool "Poll on ARMv8 ECC registers"
-+	help
-+	   This option chooses whether or not you want to poll on the Kryo3xx
-+	   ECC registers. When this is enabled, the polling rate can be set as
-+	   a module parameter. By default, it will call the polling function
-+	   every second.
-+	   This option should only be used if the associated interrupt lines
-+	   are not enabled.
-+
- endif # EDAC
-diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
-index 0fd9ffa..57113ba 100644
---- a/drivers/edac/Makefile
-+++ b/drivers/edac/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_EDAC_IE31200)		+= ie31200_edac.o
- obj-$(CONFIG_EDAC_X38)			+= x38_edac.o
- obj-$(CONFIG_EDAC_I82860)		+= i82860_edac.o
- obj-$(CONFIG_EDAC_R82600)		+= r82600_edac.o
-+obj-$(CONFIG_EDAC_ARMV8)		+= armv8_edac.o
+ /* OF properties to query for a given cache type */
+@@ -178,9 +178,10 @@ static int cache_setup_of_node(unsigned int cpu)
+ 	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+ 	unsigned int index = 0;
  
- amd64_edac_mod-y := amd64_edac.o
- amd64_edac_mod-$(CONFIG_EDAC_DEBUG) += amd64_edac_dbg.o
-diff --git a/drivers/edac/armv8_edac.c b/drivers/edac/armv8_edac.c
-new file mode 100644
-index 0000000..d986c47
---- /dev/null
-+++ b/drivers/edac/armv8_edac.c
-@@ -0,0 +1,489 @@
-+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/edac.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/smp.h>
-+#include <linux/cpu.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_irq.h>
-+
-+#include "edac_mc.h"
-+#include "edac_device.h"
-+
-+static int poll_msec = 1000;
-+module_param(poll_msec, int, 0444);
-+
-+static bool panic_on_ue = 0;
-+module_param_named(panic_on_ue, panic_on_ue, bool, 0664);
-+
-+#define L1 0x0
-+#define L2 0x1
-+#define L3 0x2
-+
-+#define EDAC_CPU	"armv8_edac"
-+
-+#define ERRXSTATUS_VALID(a)	((a >> 30) & 0x1)
-+#define ERRXSTATUS_UE(a)	((a >> 29) & 0x1)
-+#define ERRXSTATUS_SERR(a)	(a & 0xFF)
-+
-+#define ERRXMISC_LVL(a)		((a >> 1) & 0x7)
-+#define ERRXMISC_WAY(a)		((a >> 28) & 0xF)
-+
-+#define ERRXCTLR_ENABLE		0x10f
-+#define ERRXMISC_OVERFLOW	0x7F7F00000000ULL
-+
-+static inline void set_errxctlr_el1(void)
-+{
-+	asm volatile("msr s3_0_c5_c4_1, %0" : : "r" (ERRXCTLR_ENABLE));
-+}
-+
-+static inline void set_errxmisc_overflow(void)
-+{
-+	asm volatile("msr s3_0_c5_c5_0, %0" : : "r" (ERRXMISC_OVERFLOW));
-+}
-+
-+static inline void write_errselr_el1(u64 val)
-+{
-+	asm volatile("msr s3_0_c5_c3_1, %0" : : "r" (val));
-+}
-+
-+static inline u64 read_errxstatus_el1(void)
-+{
-+	u64 val;
-+
-+	asm volatile("mrs %0, s3_0_c5_c4_2" : "=r" (val));
-+	return val;
-+}
-+
-+static inline u64 read_errxmisc_el1(void)
-+{
-+	u64 val;
-+
-+	asm volatile("mrs %0, s3_0_c5_c5_0" : "=r" (val));
-+	return val;
-+}
-+
-+static inline void clear_errxstatus_valid(u64 val)
-+{
-+	asm volatile("msr s3_0_c5_c4_2, %0" : : "r" (val));
-+}
-+
-+struct errors_edac {
-+	const char * const msg;
-+	void (*func)(struct edac_device_ctl_info *edac_dev,
-+			int inst_nr, int block_nr, const char *msg);
-+};
-+
-+static const struct errors_edac errors[] = {
-+	{ "L1 Correctable Error", edac_device_handle_ce },
-+	{ "L1 Uncorrectable Error", edac_device_handle_ue },
-+	{ "L2 Correctable Error", edac_device_handle_ce },
-+	{ "L2 Uncorrectable Error", edac_device_handle_ue },
-+	{ "L3 Correctable Error", edac_device_handle_ce },
-+	{ "L3 Uncorrectable Error", edac_device_handle_ue },
-+};
-+
-+#define L1_CE 0
-+#define L1_UE 1
-+#define L2_CE 2
-+#define L2_UE 3
-+#define L3_CE 4
-+#define L3_UE 5
-+
-+#define DATA_BUF_ERR		0x2
-+#define CACHE_DATA_ERR		0x6
-+#define CACHE_TAG_DIRTY_ERR	0x7
-+#define TLB_PARITY_ERR_DATA	0x8
-+#define TLB_PARITY_ERR_TAG	0x9
-+#define BUS_ERROR		0x12
-+
-+struct erp_drvdata {
-+	struct edac_device_ctl_info *edev_ctl;
-+	struct erp_drvdata __percpu **erp_cpu_drvdata;
-+	struct notifier_block nb_pm;
-+	int ppi;
-+};
-+
-+static struct erp_drvdata *panic_handler_drvdata;
-+
-+static DEFINE_SPINLOCK(armv8_edac_lock);
-+
-+static void l1_l2_irq_enable(void *info)
-+{
-+	int irq = *(int *)info;
-+
-+	enable_percpu_irq(irq, IRQ_TYPE_LEVEL_HIGH);
-+}
-+
-+static int request_erp_irq(struct platform_device *pdev, const char *propname,
-+			const char *desc, irq_handler_t handler,
-+			void *ed, int percpu)
-+{
-+	int rc;
-+	struct resource *r;
-+	struct erp_drvdata *drv = ed;
-+
-+	r = platform_get_resource_byname(pdev, IORESOURCE_IRQ, propname);
-+
-+	if (!r) {
-+		pr_err("ARMv8 CPU ERP: Could not find <%s> IRQ property. Proceeding anyway.\n",
-+			propname);
-+		goto out;
+-	/* skip if of_node is already populated */
+-	if (this_cpu_ci->info_list->of_node)
++	/* skip if fw_unique is already populated */
++	if (this_cpu_ci->info_list->fw_unique) {
+ 		return 0;
 +	}
-+
-+	if (!percpu) {
-+		rc = devm_request_threaded_irq(&pdev->dev, r->start, NULL,
-+					       handler,
-+					       IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
-+					       desc,
-+					       ed);
-+
-+		if (rc) {
-+			pr_err("ARMv8 CPU ERP: Failed to request IRQ %d: %d (%s / %s). Proceeding anyway.\n",
-+			       (int) r->start, rc, propname, desc);
-+			goto out;
-+		}
-+
-+	} else {
-+		drv->erp_cpu_drvdata = alloc_percpu(struct erp_drvdata *);
-+		if (!drv->erp_cpu_drvdata) {
-+			pr_err("Failed to allocate percpu erp data\n");
-+			goto out;
-+		}
-+
-+		*raw_cpu_ptr(drv->erp_cpu_drvdata) = drv;
-+		rc = request_percpu_irq(r->start, handler, desc,
-+				drv->erp_cpu_drvdata);
-+
-+		if (rc) {
-+			pr_err("ARMv8 CPU ERP: Failed to request IRQ %d: %d (%s / %s). Proceeding anyway.\n",
-+			       (int) r->start, rc, propname, desc);
-+			goto out_free;
-+		}
-+
-+		drv->ppi = r->start;
-+		on_each_cpu(l1_l2_irq_enable, &(r->start), 1);
-+	}
-+
-+	return 0;
-+
-+out_free:
-+	free_percpu(drv->erp_cpu_drvdata);
-+	drv->erp_cpu_drvdata = NULL;
-+out:
-+	return 1;
-+}
-+
-+static void dump_err_reg(int errorcode, int level, u64 errxstatus, u64 errxmisc,
-+	struct edac_device_ctl_info *edev_ctl)
-+{
-+	edac_printk(KERN_CRIT, EDAC_CPU, "ERRXSTATUS_EL1: %llx\n", errxstatus);
-+	edac_printk(KERN_CRIT, EDAC_CPU, "ERRXMISC_EL1: %llx\n", errxmisc);
-+	edac_printk(KERN_CRIT, EDAC_CPU, "Cache level: L%d\n", level+1);
-+
-+	switch (ERRXSTATUS_SERR(errxstatus)) {
-+	case DATA_BUF_ERR:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from internal data buffer\n");
-+		break;
-+
-+	case CACHE_DATA_ERR:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from cache data RAM\n");
-+		break;
-+
-+	case CACHE_TAG_DIRTY_ERR:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from cache tag or dirty RAM\n");
-+		break;
-+
-+	case TLB_PARITY_ERR_DATA:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "Parity error on TLB DATA RAM\n");
-+		break;
-+
-+	case TLB_PARITY_ERR_TAG:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "Parity error on TLB TAG RAM\n");
-+		break;
-+
-+	case BUS_ERROR:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "Bus Error\n");
-+		break;
-+	}
-+
-+	if (level == L3)
-+		edac_printk(KERN_CRIT, EDAC_CPU,
-+			"Way: %d\n", (int) ERRXMISC_WAY(errxmisc));
-+	else
-+		edac_printk(KERN_CRIT, EDAC_CPU,
-+			"Way: %d\n", (int) ERRXMISC_WAY(errxmisc) >> 2);
-+
-+	edev_ctl->panic_on_ue = panic_on_ue;
-+	errors[errorcode].func(edev_ctl, smp_processor_id(),
-+				level, errors[errorcode].msg);
-+}
-+
-+static void armv8_parse_l1_l2_cache_error(u64 errxstatus, u64 errxmisc,
-+	struct edac_device_ctl_info *edev_ctl)
-+{
-+	switch (ERRXMISC_LVL(errxmisc)) {
-+	case L1:
-+		if (ERRXSTATUS_UE(errxstatus))
-+			dump_err_reg(L1_UE, L1, errxstatus, errxmisc,
-+					edev_ctl);
-+		else
-+			dump_err_reg(L1_CE, L1, errxstatus, errxmisc,
-+					edev_ctl);
-+		break;
-+	case L2:
-+		if (ERRXSTATUS_UE(errxstatus))
-+			dump_err_reg(L2_UE, L2, errxstatus, errxmisc,
-+					edev_ctl);
-+		else
-+			dump_err_reg(L2_CE, L2, errxstatus, errxmisc,
-+					edev_ctl);
-+		break;
-+	default:
-+		edac_printk(KERN_CRIT, EDAC_CPU, "Unknown ERRXMISC_LVL value\n");
-+	}
-+}
-+
-+static bool armv8_check_l1_l2_ecc(void *info)
-+{
-+	struct edac_device_ctl_info *edev_ctl = info;
-+	u64 errxstatus;
-+	u64 errxmisc;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&armv8_edac_lock, flags);
-+	write_errselr_el1(0);
-+	errxstatus = read_errxstatus_el1();
-+
-+	if (ERRXSTATUS_VALID(errxstatus)) {
-+		errxmisc = read_errxmisc_el1();
-+		edac_printk(KERN_CRIT, EDAC_CPU,
-+		"CPU%d detected a L1/L2 cache error\n",
-+		smp_processor_id());
-+
-+		armv8_parse_l1_l2_cache_error(errxstatus, errxmisc, edev_ctl);
-+		clear_errxstatus_valid(errxstatus);
-+		spin_unlock_irqrestore(&armv8_edac_lock, flags);
-+		return true;
-+	}
-+	spin_unlock_irqrestore(&armv8_edac_lock, flags);
-+	return false;
-+}
-+
-+static bool armv8_check_l3_scu_error(struct edac_device_ctl_info *edev_ctl)
-+{
-+	u64 errxstatus = 0;
-+	u64 errxmisc = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&armv8_edac_lock, flags);
-+	write_errselr_el1(1);
-+	errxstatus = read_errxstatus_el1();
-+	errxmisc = read_errxmisc_el1();
-+
-+	if (ERRXSTATUS_VALID(errxstatus) &&
-+		ERRXMISC_LVL(errxmisc) == L3) {
-+		if (ERRXSTATUS_UE(errxstatus)) {
-+			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 uncorrectable error\n");
-+			dump_err_reg(L3_UE, L3, errxstatus, errxmisc,
-+				edev_ctl);
-+		} else {
-+			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 correctable error\n");
-+			dump_err_reg(L3_CE, L3, errxstatus, errxmisc,
-+				edev_ctl);
-+		}
-+
-+		clear_errxstatus_valid(errxstatus);
-+		spin_unlock_irqrestore(&armv8_edac_lock, flags);
-+		return true;
-+	}
-+	spin_unlock_irqrestore(&armv8_edac_lock, flags);
-+	return false;
-+}
-+
-+static void armv8_check_l1_l2_ecc_helper(void *info)
-+{
-+	armv8_check_l1_l2_ecc(info);
-+}
-+
-+void armv8_poll_cache_errors(struct edac_device_ctl_info *edev_ctl)
-+{
-+	int cpu;
-+
-+	if (!edev_ctl)
-+		edev_ctl = panic_handler_drvdata->edev_ctl;
-+
-+	armv8_check_l3_scu_error(edev_ctl);
-+	for_each_possible_cpu(cpu) {
-+		smp_call_function_single(cpu, armv8_check_l1_l2_ecc_helper,
-+			edev_ctl, 0);
-+	}
-+}
-+
-+static irqreturn_t armv8_l1_l2_handler(int irq, void *drvdata)
-+{
-+	if (armv8_check_l1_l2_ecc(panic_handler_drvdata->edev_ctl))
-+		return IRQ_HANDLED;
-+	return IRQ_NONE;
-+}
-+
-+static irqreturn_t armv8_l3_scu_handler(int irq, void *drvdata)
-+{
-+	struct erp_drvdata *drv = drvdata;
-+	struct edac_device_ctl_info *edev_ctl = drv->edev_ctl;
-+
-+	if (armv8_check_l3_scu_error(edev_ctl))
-+		return IRQ_HANDLED;
-+	return IRQ_NONE;
-+}
-+
-+static void initialize_registers(void *info)
-+{
-+	set_errxctlr_el1();
-+	set_errxmisc_overflow();
-+}
-+
-+static void init_regs_on_cpu(bool all_cpus)
-+{
-+	int cpu;
-+
-+	write_errselr_el1(0);
-+	if (all_cpus) {
-+		for_each_possible_cpu(cpu)
-+			smp_call_function_single(cpu, initialize_registers,
-+						NULL, 1);
-+	} else {
-+		initialize_registers(NULL);
-+	}
-+
-+	write_errselr_el1(1);
-+	initialize_registers(NULL);
-+}
-+
-+static int armv8_pmu_cpu_pm_notify(struct notifier_block *self,
-+				unsigned long action, void *v)
-+{
-+	switch (action) {
-+	case CPU_PM_EXIT:
-+		init_regs_on_cpu(false);
-+		armv8_check_l3_scu_error(panic_handler_drvdata->edev_ctl);
-+		armv8_check_l1_l2_ecc(panic_handler_drvdata->edev_ctl);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static int armv8_cpu_erp_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct erp_drvdata *drv;
-+	int rc = 0;
-+	int fail = 0;
-+
-+	init_regs_on_cpu(true);
-+
-+	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
-+
-+	if (!drv)
-+		return -ENOMEM;
-+
-+	drv->edev_ctl = edac_device_alloc_ctl_info(0, "cpu",
-+					num_possible_cpus(), "L", 3, 1, NULL, 0,
-+					edac_device_alloc_index());
-+
-+	if (!drv->edev_ctl)
-+		return -ENOMEM;
-+
-+	if (IS_ENABLED(CONFIG_EDAC_ARMV8_POLL)) {
-+		drv->edev_ctl->edac_check = armv8_poll_cache_errors;
-+		drv->edev_ctl->poll_msec = poll_msec;
-+	}
-+
-+	drv->edev_ctl->dev = dev;
-+	drv->edev_ctl->mod_name = dev_name(dev);
-+	drv->edev_ctl->dev_name = dev_name(dev);
-+	drv->edev_ctl->ctl_name = "cache";
-+	drv->edev_ctl->panic_on_ue = panic_on_ue;
-+	drv->nb_pm.notifier_call = armv8_pmu_cpu_pm_notify;
-+	platform_set_drvdata(pdev, drv);
-+
-+	rc = edac_device_add_device(drv->edev_ctl);
-+	if (rc)
-+		goto out_mem;
-+
-+	panic_handler_drvdata = drv;
-+
-+	if (!IS_ENABLED(CONFIG_EDAC_ARMV8_POLL)) {
-+		fail += request_erp_irq(pdev, "l1-l2-irq",
-+				"l1_l2_irq",
-+				armv8_l1_l2_handler, drv, 1);
-+
-+		fail += request_erp_irq(pdev, "l3-scu-irq",
-+				"l3_scu_irq",
-+				armv8_l3_scu_handler, drv, 0);
-+
-+		if (fail == of_irq_count(dev->of_node)) {
-+			pr_err("ERP: Could not request any IRQs. Giving up.\n");
-+			rc = -ENODEV;
-+			goto out_dev;
-+		}
-+	}
-+
-+	cpu_pm_register_notifier(&(drv->nb_pm));
-+
-+	return 0;
-+
-+out_dev:
-+	edac_device_del_device(dev);
-+out_mem:
-+	edac_device_free_ctl_info(drv->edev_ctl);
-+	return rc;
-+}
-+
-+static int armv8_cpu_erp_remove(struct platform_device *pdev)
-+{
-+	struct erp_drvdata *drv = dev_get_drvdata(&pdev->dev);
-+	struct edac_device_ctl_info *edac_ctl = drv->edev_ctl;
-+
-+	if (drv->erp_cpu_drvdata) {
-+		free_percpu_irq(drv->ppi, drv->erp_cpu_drvdata);
-+		free_percpu(drv->erp_cpu_drvdata);
-+	}
-+
-+	edac_device_del_device(edac_ctl->dev);
-+	edac_device_free_ctl_info(edac_ctl);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id armv8_cpu_erp_match_table[] = {
-+	{ .compatible = "arm,armv8-cpu-erp" },
-+	{ }
-+};
-+
-+static struct platform_driver armv8_cpu_erp_driver = {
-+	.probe = armv8_cpu_erp_probe,
-+	.remove = armv8_cpu_erp_remove,
-+	.driver = {
-+		.name = "armv8_cpu_cache_erp",
-+		.of_match_table = of_match_ptr(armv8_cpu_erp_match_table),
-+	},
-+};
-+module_platform_driver(armv8_cpu_erp_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("ARMv8 EDAC driver");
+ 
+ 	if (!cpu_dev) {
+ 		pr_err("No cpu device for CPU %d\n", cpu);
+@@ -201,7 +202,7 @@ static int cache_setup_of_node(unsigned int cpu)
+ 		if (!np)
+ 			break;
+ 		cache_of_set_props(this_leaf, np);
+-		this_leaf->of_node = np;
++		this_leaf->fw_unique = np;
+ 		index++;
+ 	}
+ 
+@@ -289,7 +290,7 @@ static void cache_shared_cpu_map_remove(unsigned int cpu)
+ 			cpumask_clear_cpu(cpu, &sib_leaf->shared_cpu_map);
+ 			cpumask_clear_cpu(sibling, &this_leaf->shared_cpu_map);
+ 		}
+-		of_node_put(this_leaf->of_node);
++		of_node_put(this_leaf->fw_unique);
+ 	}
+ }
+ 
+@@ -334,8 +335,9 @@ static int detect_cache_attributes(unsigned int cpu)
+ 	if (ret)
+ 		goto free_ci;
+ 	/*
+-	 * For systems using DT for cache hierarchy, of_node and shared_cpu_map
+-	 * will be set up here only if they are not populated already
++	 * For systems using DT for cache hierarchy, fw_unique
++	 * and shared_cpu_map will be set up here only if they are
++	 * not populated already
+ 	 */
+ 	ret = cache_shared_cpu_map_setup(cpu);
+ 	if (ret) {
+diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
+index d35299a590a4..6f2e6c87b64c 100644
+--- a/include/linux/cacheinfo.h
++++ b/include/linux/cacheinfo.h
+@@ -34,9 +34,8 @@ enum cache_type {
+  * @shared_cpu_map: logical cpumask representing all the cpus sharing
+  *	this cache node
+  * @attributes: bitfield representing various cache attributes
+- * @of_node: if devicetree is used, this represents either the cpu node in
+- *	case there's no explicit cache node or the cache node itself in the
+- *	device tree
++ * @fw_unique: Unique value used to determine if different cacheinfo
++ *	structures represent a single hardware cache instance.
+  * @disable_sysfs: indicates whether this node is visible to the user via
+  *	sysfs or not
+  * @priv: pointer to any private data structure specific to particular
+@@ -65,8 +64,7 @@ struct cacheinfo {
+ #define CACHE_ALLOCATE_POLICY_MASK	\
+ 	(CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
+ #define CACHE_ID		BIT(4)
+-
+-	struct device_node *of_node;
++	void *fw_unique;
+ 	bool disable_sysfs;
+ 	void *priv;
+ };
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.13.5
