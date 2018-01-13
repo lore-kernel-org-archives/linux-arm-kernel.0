@@ -1,166 +1,169 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 12 Jan 2018 18:59:17 -0600
-Subject: [PATCH v6 09/12] ACPI/PPTT: Add topology parsing code
+Date: Fri, 12 Jan 2018 18:59:18 -0600
+Subject: [PATCH v6 10/12] arm64: topology: rename cluster_id
 In-Reply-To: <20180113005920.28658-1-jeremy.linton@arm.com>
 References: <20180113005920.28658-1-jeremy.linton@arm.com>
-Message-ID: <20180113005920.28658-10-jeremy.linton@arm.com>
+Message-ID: <20180113005920.28658-11-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PPTT can be used to determine the groupings of CPU's at
-given levels in the system. Lets add a few routines to the PPTT
-parsing code to return a unique id for each unique level in the
-processor hierarchy. This can then be matched to build
-thread/core/cluster/die/package/etc mappings for each processing
-element in the system.
+Lets match the name of the arm64 topology field
+to the kernel macro that uses it.
 
+Cc: Vincent Guittot <vincent.guittot@linaro.org>
+Cc: Dietmar Eggemann <dietmar.eggemann@arm.com>
+Cc: Juri Lelli <juri.lelli@arm.com>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- drivers/acpi/pptt.c  | 115 +++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi.h |   3 ++
- 2 files changed, 118 insertions(+)
+ arch/arm64/include/asm/topology.h |  4 ++--
+ arch/arm64/kernel/topology.c      | 27 ++++++++++++++-------------
+ 2 files changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
-index 4f5ab19c3a08..83d89d683f16 100644
---- a/drivers/acpi/pptt.c
-+++ b/drivers/acpi/pptt.c
-@@ -412,6 +412,79 @@ static void cache_setup_acpi_cpu(struct acpi_table_header *table,
+diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+index c4f2d50491eb..6b10459e6905 100644
+--- a/arch/arm64/include/asm/topology.h
++++ b/arch/arm64/include/asm/topology.h
+@@ -7,14 +7,14 @@
+ struct cpu_topology {
+ 	int thread_id;
+ 	int core_id;
+-	int cluster_id;
++	int package_id;
+ 	cpumask_t thread_sibling;
+ 	cpumask_t core_sibling;
+ };
+ 
+ extern struct cpu_topology cpu_topology[NR_CPUS];
+ 
+-#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
++#define topology_physical_package_id(cpu)	(cpu_topology[cpu].package_id)
+ #define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+ #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
+ #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 8d48b233e6ce..7b06e263fdd1 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -51,7 +51,7 @@ static int __init get_cpu_for_node(struct device_node *node)
+ 	return -1;
+ }
+ 
+-static int __init parse_core(struct device_node *core, int cluster_id,
++static int __init parse_core(struct device_node *core, int package_id,
+ 			     int core_id)
+ {
+ 	char name[10];
+@@ -67,7 +67,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+ 			leaf = false;
+ 			cpu = get_cpu_for_node(t);
+ 			if (cpu >= 0) {
+-				cpu_topology[cpu].cluster_id = cluster_id;
++				cpu_topology[cpu].package_id = package_id;
+ 				cpu_topology[cpu].core_id = core_id;
+ 				cpu_topology[cpu].thread_id = i;
+ 			} else {
+@@ -89,7 +89,7 @@ static int __init parse_core(struct device_node *core, int cluster_id,
+ 			return -EINVAL;
+ 		}
+ 
+-		cpu_topology[cpu].cluster_id = cluster_id;
++		cpu_topology[cpu].package_id = package_id;
+ 		cpu_topology[cpu].core_id = core_id;
+ 	} else if (leaf) {
+ 		pr_err("%pOF: Can't get CPU for leaf core\n", core);
+@@ -105,7 +105,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+ 	bool leaf = true;
+ 	bool has_cores = false;
+ 	struct device_node *c;
+-	static int cluster_id __initdata;
++	static int package_id __initdata;
+ 	int core_id = 0;
+ 	int i, ret;
+ 
+@@ -144,7 +144,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+ 			}
+ 
+ 			if (leaf) {
+-				ret = parse_core(c, cluster_id, core_id++);
++				ret = parse_core(c, package_id, core_id++);
+ 			} else {
+ 				pr_err("%pOF: Non-leaf cluster with core %s\n",
+ 				       cluster, name);
+@@ -162,7 +162,7 @@ static int __init parse_cluster(struct device_node *cluster, int depth)
+ 		pr_warn("%pOF: empty cluster\n", cluster);
+ 
+ 	if (leaf)
+-		cluster_id++;
++		package_id++;
+ 
+ 	return 0;
+ }
+@@ -198,7 +198,7 @@ static int __init parse_dt_topology(void)
+ 	 * only mark cores described in the DT as possible.
+ 	 */
+ 	for_each_possible_cpu(cpu)
+-		if (cpu_topology[cpu].cluster_id == -1)
++		if (cpu_topology[cpu].package_id == -1)
+ 			ret = -EINVAL;
+ 
+ out_map:
+@@ -228,7 +228,7 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	for_each_possible_cpu(cpu) {
+ 		cpu_topo = &cpu_topology[cpu];
+ 
+-		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
++		if (cpuid_topo->package_id != cpu_topo->package_id)
+ 			continue;
+ 
+ 		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+@@ -249,7 +249,7 @@ void store_cpu_topology(unsigned int cpuid)
+ 	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
+ 	u64 mpidr;
+ 
+-	if (cpuid_topo->cluster_id != -1)
++	if (cpuid_topo->package_id != -1)
+ 		goto topology_populated;
+ 
+ 	mpidr = read_cpuid_mpidr();
+@@ -263,19 +263,19 @@ void store_cpu_topology(unsigned int cpuid)
+ 		/* Multiprocessor system : Multi-threads per core */
+ 		cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+-		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
++		cpuid_topo->package_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
+ 					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
+ 	} else {
+ 		/* Multiprocessor system : Single-thread per core */
+ 		cpuid_topo->thread_id  = -1;
+ 		cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+-		cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
++		cpuid_topo->package_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
+ 					 MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
+ 					 MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+ 	}
+ 
+ 	pr_debug("CPU%u: cluster %d core %d thread %d mpidr %#016llx\n",
+-		 cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
++		 cpuid, cpuid_topo->package_id, cpuid_topo->core_id,
+ 		 cpuid_topo->thread_id, mpidr);
+ 
+ topology_populated:
+@@ -291,7 +291,7 @@ static void __init reset_cpu_topology(void)
+ 
+ 		cpu_topo->thread_id = -1;
+ 		cpu_topo->core_id = 0;
+-		cpu_topo->cluster_id = -1;
++		cpu_topo->package_id = -1;
+ 
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+@@ -300,6 +300,7 @@ static void __init reset_cpu_topology(void)
  	}
  }
  
-+/* Passing level values greater than this will result in search termination */
-+#define PPTT_ABORT_PACKAGE 0xFF
 +
-+/*
-+ * Given an acpi_pptt_processor node, walk up until we identify the
-+ * package that the node is associated with, or we run out of levels
-+ * to request or the search is terminated with a flag match
-+ * The level parameter also serves to limit possible loops within the tree.
-+ */
-+static struct acpi_pptt_processor *acpi_find_processor_package_id(
-+	struct acpi_table_header *table_hdr,
-+	struct acpi_pptt_processor *cpu,
-+	int level, int flag)
-+{
-+	struct acpi_pptt_processor *prev_node;
-+
-+	while (cpu && level) {
-+		if (cpu->flags & flag)
-+			break;
-+		pr_debug("level %d\n", level);
-+		prev_node = fetch_pptt_node(table_hdr, cpu->parent);
-+		if (prev_node == NULL)
-+			break;
-+		cpu = prev_node;
-+		level--;
-+	}
-+	return cpu;
-+}
-+
-+/*
-+ * Get a unique value given a cpu, and a topology level, that can be
-+ * matched to determine which cpus share common topological features
-+ * at that level.
-+ */
-+static int topology_get_acpi_cpu_tag(struct acpi_table_header *table,
-+				     unsigned int cpu, int level, int flag)
-+{
-+	struct acpi_pptt_processor *cpu_node;
-+	u32 acpi_cpu_id = get_acpi_id_for_cpu(cpu);
-+
-+	cpu_node = acpi_find_processor_node(table, acpi_cpu_id);
-+	if (cpu_node) {
-+		cpu_node = acpi_find_processor_package_id(table, cpu_node,
-+							  level, flag);
-+		/* Only the first level has a guaranteed id */
-+		if (level == 0)
-+			return cpu_node->acpi_processor_id;
-+		return (int)((u8 *)cpu_node - (u8 *)table);
-+	}
-+	pr_err_once("PPTT table found, but unable to locate core for %d\n",
-+		    cpu);
-+	return -ENOENT;
-+}
-+
-+static int find_acpi_cpu_topology_tag(unsigned int cpu, int level, int flag)
-+{
-+	struct acpi_table_header *table;
-+	acpi_status status;
-+	int retval;
-+
-+	status = acpi_get_table(ACPI_SIG_PPTT, 0, &table);
-+	if (ACPI_FAILURE(status)) {
-+		pr_err_once("No PPTT table found, cpu topology may be inaccurate\n");
-+		return -ENOENT;
-+	}
-+	retval = topology_get_acpi_cpu_tag(table, cpu, level, flag);
-+	pr_debug("Topology Setup ACPI cpu %d, level %d ret = %d\n",
-+		 cpu, level, retval);
-+	acpi_put_table(table);
-+
-+	return retval;
-+}
-+
- /**
-  * acpi_find_last_cache_level() - Determines the number of cache levels for a PE
-  * @cpu: Kernel logical cpu number
-@@ -475,3 +548,45 @@ int cache_setup_acpi(unsigned int cpu)
- 
- 	return status;
- }
-+
-+/**
-+ * find_acpi_cpu_topology() - Determine a unique topology value for a given cpu
-+ * @cpu: Kernel logical cpu number
-+ * @level: The topological level for which we would like a unique ID
-+ *
-+ * Determine a topology unique ID for each thread/core/cluster/mc_grouping
-+ * /socket/etc. This ID can then be used to group peers, which will have
-+ * matching ids.
-+ *
-+ * The search terminates when either the requested level is found or
-+ * we reach a root node. Levels beyond the termination point will return the
-+ * same unique ID. The unique id for level 0 is the acpi processor id. All
-+ * other levels beyond this use a generated value to uniquely identify
-+ * a topological feature.
-+ *
-+ * Return: -ENOENT if the PPTT doesn't exist, or the cpu cannot be found.
-+ * Otherwise returns a value which represents a unique topological feature.
-+ */
-+int find_acpi_cpu_topology(unsigned int cpu, int level)
-+{
-+	return find_acpi_cpu_topology_tag(cpu, level, 0);
-+}
-+
-+/**
-+ * find_acpi_cpu_topology_package() - Determine a unique cpu package value
-+ * @cpu: Kernel logical cpu number
-+ *
-+ * Determine a topology unique package ID for the given cpu.
-+ * This ID can then be used to group peers, which will have matching ids.
-+ *
-+ * The search terminates when either a level is found with the PHYSICAL_PACKAGE
-+ * flag set or we reach a root node.
-+ *
-+ * Return: -ENOENT if the PPTT doesn't exist, or the cpu cannot be found.
-+ * Otherwise returns a value which represents the package for this cpu.
-+ */
-+int find_acpi_cpu_topology_package(unsigned int cpu)
-+{
-+	return find_acpi_cpu_topology_tag(cpu, PPTT_ABORT_PACKAGE,
-+					  ACPI_PPTT_PHYSICAL_PACKAGE);
-+}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index dc1ebfeeb5ec..117d13934487 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -1266,4 +1266,7 @@ static inline int lpit_read_residency_count_address(u64 *address)
- }
- #endif
- 
-+int find_acpi_cpu_topology(unsigned int cpu, int level);
-+int find_acpi_cpu_topology_package(unsigned int cpu);
-+
- #endif	/*_LINUX_ACPI_H*/
+ void __init init_cpu_topology(void)
+ {
+ 	reset_cpu_topology();
 -- 
 2.13.5
