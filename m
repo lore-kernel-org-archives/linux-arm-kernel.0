@@ -1,42 +1,37 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 13 Jan 2018 12:00:31 +0000
-Subject: [PATCH v6 11/16] firmware: arm_sdei: Add support for CPU and
- system power states
-In-Reply-To: <20180108172226.GC2530@red-moon>
-References: <20180108153818.22743-1-james.morse@arm.com>
- <20180108153818.22743-12-james.morse@arm.com>
- <20180108172226.GC2530@red-moon>
-Message-ID: <20180113120031.5m6eykwzqnioyb33@armageddon.cambridge.arm.com>
+Date: Sat, 13 Jan 2018 12:10:26 +0000
+Subject: [PATCH v3] arm64: cpu_errata: Add Kryo to Falkor 1003 errata
+In-Reply-To: <20180109212212.GD21040@codeaurora.org>
+References: <20171213221937.28065-1-sboyd@codeaurora.org>
+ <20171214151858.GH4527@arm.com>
+ <20180109212212.GD21040@codeaurora.org>
+Message-ID: <20180113121026.4gywnkjlxy5wjaga@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 05:22:26PM +0000, Lorenzo Pieralisi wrote:
-> On Mon, Jan 08, 2018 at 03:38:13PM +0000, James Morse wrote:
+On Tue, Jan 09, 2018 at 01:22:12PM -0800, Stephen Boyd wrote:
+> On 12/14, Will Deacon wrote:
+> > On Wed, Dec 13, 2017 at 02:19:37PM -0800, Stephen Boyd wrote:
+> > > The Kryo CPUs are also affected by the Falkor 1003 errata, so
+> > > we need to do the same workaround on Kryo CPUs. The MIDR is
+> > > slightly more complicated here, where the PART number is not
+> > > always the same when looking at all the bits from 15 to 4. Drop
+> > > the lower 8 bits and just look at the top 4 to see if it's '2'
+> > > and then consider those as Kryo CPUs. This covers all the
+> > > combinations without having to list them all out.
+> > > 
+> > > Fixes: 38fd94b0275c ("arm64: Work around Falkor erratum 1003")
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > ---
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Thanks for respinning this. Catalin -- can you take this for 4.16, please?
 > 
-> [...]
-> 
-> > +/* When entering idle, mask/unmask events for this cpu */
-> 
-> Just mentioning (since I know you know), this notifier is called also
-> through syscore_ops so it is not just idle (CPUidle or Suspend-to-idle).
-> 
-> > +static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
-> > +			    void *data)
-> > +{
-> > +	int rv;
-> > +
-> > +	switch (action) {
-> > +	case CPU_PM_ENTER:
-> > +		rv = sdei_mask_local_cpu();
-> > +		break;
-> > +	case CPU_PM_EXIT:
-> > +		rv = sdei_unmask_local_cpu();
-> 
-> You should handle CPU_PM_ENTER_FAILED here for correctness,
-> in case the notifier chain fails.
+> Can this get picked up? I don't see it in linux-next yet.
 
-So, just to confirm, the CPU_PM_ENTER_FAILED case goes together with
-CPU_PM_EXIT so that we unmask the SDE again for the CPU.
+I picked it up now but I'll push it tomorrow or Monday (still running
+some tests on the unpushed patches).
 
 -- 
 Catalin
