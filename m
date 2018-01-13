@@ -1,63 +1,36 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 13 Jan 2018 11:06:02 +0100 (CET)
-Subject: [PATCH v2 2/4] dt-bindings: gpio: add raspberry pi GPIO
- expander binding
-In-Reply-To: <a93ba9ec4d3d3ff6d1e2a79f4f813a2f86c4086b.1515698418.git.baruch@tkos.co.il>
-References: <cover.1515698418.git.baruch@tkos.co.il>
- <a93ba9ec4d3d3ff6d1e2a79f4f813a2f86c4086b.1515698418.git.baruch@tkos.co.il>
-Message-ID: <553468547.42989.1515837962934@email.1und1.de>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 13 Jan 2018 11:09:27 +0100
+Subject: [PATCH] pinctrl/nomadik/abx500: Use seq_putc() in
+ abx500_gpio_dbg_show()
+Message-ID: <88354751-0a61-4893-35ad-9a7c7337ebce@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sat, 13 Jan 2018 11:04:29 +0100
 
-> Baruch Siach <baruch@tkos.co.il> hat am 11. Januar 2018 um 20:44 geschrieben:
-> 
-> 
-> The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
-> I2C. The firmware mailbox interface allows the ARM core to control the
-> GPIO lines.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
-> v2:
->   * Rename compatible string to raspberrypi,firmware-gpio
-> ---
->  .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-> new file mode 100644
-> index 000000000000..8faf269cf541
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-> @@ -0,0 +1,24 @@
-> +Raspberry Pi GPIO expander
-> +
-> +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
-> +firmware exposes a mailbox interface that allows the ARM core to control the
-> +GPIO lines on the expander.
-> +
-> +Required properties:
-> +
-> +- compatible : Should be "raspberrypi,firmware-gpio"
-> +- gpio-controller : Marks the device node as a gpio controller
-> +- #gpio-cells : Should be two.  The first cell is the pin number, and
-> +  the second cell is used to specify the gpio polarity:
-> +  0 = active high
-> +  1 = active low
-> +- firmware : Reference to the RPi firmware device node
-> +
-> +Example:
-> +
-> +expgpio: expgpio {
+A single character (line break) should be put into a sequence.
+Thus use the corresponding function "seq_putc".
 
-just a nit, please change this to
+This issue was detected by using the Coccinelle software.
 
-expgpio: gpio-expander {
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/pinctrl/nomadik/pinctrl-abx500.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-just like in patch #4
-
-
-Thanks Stefan
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index b32c0d602024..ed47ae5b0682 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -633,7 +633,7 @@ static void abx500_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	for (i = 0; i < chip->ngpio; i++, gpio++) {
+ 		/* On AB8500, there is no GPIO0, the first is the GPIO 1 */
+ 		abx500_gpio_dbg_show_one(s, pctldev, chip, i + 1, gpio);
+-		seq_printf(s, "\n");
++		seq_putc(s, '\n');
+ 	}
+ }
+ 
+-- 
+2.15.1
