@@ -1,56 +1,95 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sun, 14 Jan 2018 22:50:36 +0900
-Subject: [RESEND PATCH 2/2] selftest: ftrace: Fix to add 256 kprobe events
- correctly
-In-Reply-To: <151593777761.23875.10360397710751679883.stgit@devbox>
-References: <151593777761.23875.10360397710751679883.stgit@devbox>
-Message-ID: <151593783656.23875.14563972262086825681.stgit@devbox>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 14 Jan 2018 13:56:21 +0000
+Subject: [PATCH v2 00/16] add support for AXP813 ADC and battery power
+ supply
+In-Reply-To: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
+References: <cover.1e46d70f7931be8154b450a2fcdf066450a1aa6f.1515486346.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20180114135621.6c83cb1d@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current multiple-kprobe testcase only tries to add
-kprobe events on first 256 text symbols. However
-kprobes fails to probe on some text symbols (like
-blacklisted symbols). Thus in the worst case,
-the test can not add any kprobe events.
+On Tue,  9 Jan 2018 10:33:31 +0100
+Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
 
-To avoid that, continue to try adding kprobe events
-until 256 events. Also it confirms the number of
-registered kprobe events.
+> The AXP813 PMIC is relatively close to the already supported AXP20X and
+> AXP22X. It provides three different power outputs: battery, AC and USB, and
+> measures a few different things: temperature, power supply status, current
+> current and voltage supplied, maximum current limit, battery capacity, min
+> and max voltage limits.
+> 
+> One of its two GPIOs can be used as an ADC.
+> 
+> There are a few differences with AXP20X/AXP22X PMICs though:
+>   - a different constant charge current formula,
+>   - battery temperature, GPIO0 and battery voltages are the only voltages
+>   measurable,
+>   - all data are stored on 12 bits (AXP20X/AXP22X had one type of data that
+>   was stored on 13 bits),
+>   - different scales and offsets,
+>   - a different ADC rate formula and register,
+> 
+> This patch series adds support for the PMIC's ADC and battery power supply
+> in the existing drivers.
+> 
+> Make the axp20x MFD automatically probe the ADC driver, add the battery
+> power supply node in axp81x node and enable it for the TBS A711 since it
+> has a soldered battery.
+> 
+> v2:
+>   - introduce data structure instead of ID for variant specific code in
+>   battery driver,
+>   - add DT binding for ADC driver,
+>   - make mfd probe the ADC driver via DT as well so that its IIO channels
+>   can be consumed by other drivers via DT mapping,
+Other than that minor comment on V1 about churn risk in the dt binding
+that Rob pointed out hadn't been addressed (I'd completely forgotten about it :)
 
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
----
- .../ftrace/test.d/kprobe/multiple_kprobes.tc       |   19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+I'm happy once the points others have raised have been addressed.
 
-diff --git a/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc b/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc
-index e297bd7a2e79..ce361b9d62cf 100644
---- a/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc
-+++ b/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc
-@@ -12,9 +12,24 @@ case `uname -m` in
-   *) OFFS=0;;
- esac
- 
--echo "Setup up kprobes on first 256 text symbols"
-+if [ -d events/kprobes ]; then
-+  echo 0 > events/kprobes/enable
-+  echo > kprobe_events
-+fi
-+
-+N=0
-+echo "Setup up kprobes on first available 256 text symbols"
- grep -i " t " /proc/kallsyms | cut -f3 -d" " | grep -v .*\\..* | \
--head -n 256 | while read i; do echo p ${i}+${OFFS} ; done > kprobe_events ||:
-+while read i; do
-+  echo p ${i}+${OFFS} >> kprobe_events && N=$((N+1)) ||:
-+  test $N -eq 256 && break
-+done
-+
-+L=`wc -l kprobe_events`
-+if [ $L -ne $N ]; then
-+  echo "The number of kprobes events ($L) is not $N"
-+  exit_fail
-+fi
- 
- echo 1 > events/kprobes/enable
- echo 0 > events/kprobes/enable
+My assumption is that this will ultimately go through the IIO tree so
+I'll be needing a good selection of Acks to take it.
+
+The dts bits should be fine to go via normal paths though once the
+driver is in place.
+
+If it's going via mfd which might make sense in a 'logical' way rather
+than amount of code, let me know and I'll give tags for v3 iio parts.
+
+Jonathan
+
+> 
+> Thanks,
+> Quentin
+> 
+> Quentin Schulz (16):
+>   iio: adc: axp20x_adc: put ADC rate setting in a per-variant function
+>   dt-bindings: iio: adc: add binding for X-Powers AXP PMICs ADC
+>   iio: adc: axp20x_adc: make it possible to probe from DT
+>   ARM: dtsi: axp209: add node for ADC
+>   ARM: dtsi: axp22x: add node for ADC
+>   mfd: axp20x: make AXP209/22x cells probe their ADC via DT
+>   dt-bindings: iio: adc: axp20x_adc: add AXP813 variant
+>   iio: adc: axp20x_adc: add support for AXP813 ADC
+>   ARM: dtsi: axp81x: add node for ADC
+>   mfd: axp20x: probe axp20x_adc driver for AXP813
+>   power: supply: axp20x_battery: use data structure instead of ID for variant specific code
+>   dt-bindings: power: supply: axp20x: add AXP813 battery DT binding
+>   power: supply: axp20x_battery: add support for AXP813
+>   mfd: axp20x: add battery power supply cell for AXP813
+>   ARM: dtsi: axp81x: add battery power supply subnode
+>   ARM: dtsi: sun8i: a711: enable battery power supply subnode
+> 
+>  Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt          |  48 ++++++++++++++++++++++-
+>  Documentation/devicetree/bindings/power/supply/axp20x_battery.txt |   8 ++--
+>  arch/arm/boot/dts/axp209.dtsi                                     |   5 ++-
+>  arch/arm/boot/dts/axp22x.dtsi                                     |   5 ++-
+>  arch/arm/boot/dts/axp81x.dtsi                                     |  10 +++++-
+>  arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts                         |   4 ++-
+>  drivers/iio/adc/axp20x_adc.c                                      | 160 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----
+>  drivers/mfd/axp20x.c                                              |  13 +++++-
+>  drivers/power/supply/axp20x_battery.c                             | 134 ++++++++++++++++++++++++++++++++++++++++++++++--------------
+>  include/linux/mfd/axp20x.h                                        |   2 +-
+>  10 files changed, 345 insertions(+), 44 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
+> 
+> base-commit: 895c0dde398510a5b5ded60e5064c11b94bd30ca
