@@ -1,41 +1,47 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sun, 14 Jan 2018 21:42:06 +0100
-Subject: [PATCH 1/3] mfd/abx500-core: Delete an error message for a failed
- memory allocation in abx500_register_ops()
+Date: Sun, 14 Jan 2018 21:43:27 +0100
+Subject: [PATCH 2/3] mfd/abx500-core: Improve two size determinations in
+ abx500_register_ops()
 In-Reply-To: <d1862d7a-412e-9aaf-8200-bb2070ee402a@users.sourceforge.net>
 References: <d1862d7a-412e-9aaf-8200-bb2070ee402a@users.sourceforge.net>
-Message-ID: <f5fc286f-88c4-d857-33f7-de81076168ce@users.sourceforge.net>
+Message-ID: <777a907c-49b6-287f-3ce6-a31ae1b84abd@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 14 Jan 2018 21:08:27 +0100
+Date: Sun, 14 Jan 2018 21:19:10 +0100
 
-Omit an extra message for a memory allocation failure in this function.
+Replace the specification of two data structures by pointer dereferences
+as the parameter for the operator "sizeof" to make the corresponding size
+determination a bit safer according to the Linux coding style convention.
 
 This issue was detected by using the Coccinelle software.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/mfd/abx500-core.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/mfd/abx500-core.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mfd/abx500-core.c b/drivers/mfd/abx500-core.c
-index 0d3846a4767c..c8c9d41abcaa 100644
+index c8c9d41abcaa..17176e91cbd0 100644
 --- a/drivers/mfd/abx500-core.c
 +++ b/drivers/mfd/abx500-core.c
-@@ -40,10 +40,9 @@ int abx500_register_ops(struct device *dev, struct abx500_ops *ops)
- 	dev_entry = devm_kzalloc(dev,
- 				 sizeof(struct abx500_device_entry),
- 				 GFP_KERNEL);
--	if (!dev_entry) {
--		dev_err(dev, "register_ops kzalloc failed");
-+	if (!dev_entry)
- 		return -ENOMEM;
--	}
-+
- 	dev_entry->dev = dev;
- 	memcpy(&dev_entry->ops, ops, sizeof(struct abx500_ops));
+@@ -37,14 +37,12 @@ int abx500_register_ops(struct device *dev, struct abx500_ops *ops)
+ {
+ 	struct abx500_device_entry *dev_entry;
  
+-	dev_entry = devm_kzalloc(dev,
+-				 sizeof(struct abx500_device_entry),
+-				 GFP_KERNEL);
++	dev_entry = devm_kzalloc(dev, sizeof(*dev_entry), GFP_KERNEL);
+ 	if (!dev_entry)
+ 		return -ENOMEM;
+ 
+ 	dev_entry->dev = dev;
+-	memcpy(&dev_entry->ops, ops, sizeof(struct abx500_ops));
++	memcpy(&dev_entry->ops, ops, sizeof(*ops));
+ 
+ 	list_add_tail(&dev_entry->list, &abx500_list);
+ 	return 0;
 -- 
 2.15.1
