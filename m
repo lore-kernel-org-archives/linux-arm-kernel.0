@@ -1,49 +1,64 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 15 Jan 2018 04:57:24 +0800
-Subject: [arm-platforms:kvm-arm/pmuv3-32bit 2/5]
- include/linux/perf/arm_pmuv3.h:20:10: fatal error: asm/arm_pmuv3.h: No such
- file or directory
-Message-ID: <201801150423.0vFrmCmM%fengguang.wu@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 14 Jan 2018 23:27:20 +0000
+Subject: [PATCH 1/7] arm64: kernel: avoid executable literal pools
+In-Reply-To: <20180110121142.18291-2-ard.biesheuvel@linaro.org>
+References: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
+ <20180110121142.18291-2-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8D5Zxfjbj21J9-e2Z+kVdDv4KmFhrOf-SinGM_1zh36g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm/pmuv3-32bit
-head:   283a7dae09aff137f0525917d750b62b1d135cae
-commit: d7793b5299f56651ac99ee59e7c51b375b0e7d9c [2/5] arm64: perf: Abstract system register accesses away
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d7793b5299f56651ac99ee59e7c51b375b0e7d9c
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 10 January 2018 at 12:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Recent versions of GCC will emit literals into a separate .rodata section
+> rather than interspersed with the instruction stream. We disabled this
+> in commit 67dfa1751ce71 ("arm64: errata: Add -mpc-relative-literal-loads
+> to build flags"), because it uses adrp/add pairs to reference these
+> literals even when building with -mcmodel=large, which breaks module
+> loading when we have the mitigation for Cortex-A53 erratum #843419
+> enabled.
+>
+> However, due to the recent discoveries regarding speculative execution,
+> we should avoid putting data into executable sections, to prevent
+> creating speculative gadgets inadvertently.
+>
+> So set -mpc-relative-literal-loads only for modules, and only if the
+> A53 erratum is enabled.
+>
 
-Note: the arm-platforms/kvm-arm/pmuv3-32bit HEAD 283a7dae09aff137f0525917d750b62b1d135cae builds fine.
-      It only hurts bisectibility.
+This appears not to help: even with the command line option removed,
+the literals are still emitted into the .text section, even though the
+references are emitted using adrp/ldr pairs. AFAICT, the reason for
+this feature was very large functions (>1 MB), even though I am pretty
+sure I discussed the ROP gadget use case with Ramana at some point.
 
-All errors (new ones prefixed by >>):
 
-   In file included from include/kvm/arm_pmu.h:22:0,
-                    from arch/arm/kvm/../../../virt/kvm/arm/arm.c:33:
->> include/linux/perf/arm_pmuv3.h:20:10: fatal error: asm/arm_pmuv3.h: No such file or directory
-    #include <asm/arm_pmuv3.h>
-             ^~~~~~~~~~~~~~~~~
-   compilation terminated.
-
-vim +20 include/linux/perf/arm_pmuv3.h
-
-    19	
-  > 20	#include <asm/arm_pmuv3.h>
-    21	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/dccb8773/attachment-0001.gz>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Makefile | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index b481b4a7c011..bd7cb205e28a 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -26,7 +26,8 @@ ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+>    ifeq ($(call ld-option, --fix-cortex-a53-843419),)
+>  $(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
+>    else
+> -LDFLAGS_vmlinux        += --fix-cortex-a53-843419
+> +LDFLAGS_vmlinux                += --fix-cortex-a53-843419
+> +KBUILD_CFLAGS_MODULE   += $(call cc-option, -mpc-relative-literal-loads)
+>    endif
+>  endif
+>
+> @@ -51,7 +52,6 @@ endif
+>
+>  KBUILD_CFLAGS  += -mgeneral-regs-only $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS  += -fno-asynchronous-unwind-tables
+> -KBUILD_CFLAGS  += $(call cc-option, -mpc-relative-literal-loads)
+>  KBUILD_AFLAGS  += $(lseinstr) $(brokengasinst)
+>
+>  KBUILD_CFLAGS  += $(call cc-option,-mabi=lp64)
+> --
+> 2.11.0
+>
