@@ -1,45 +1,133 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 14 Jan 2018 12:20:03 +0100
-Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
-In-Reply-To: <CAK8P3a3MZX-ZsxX9h1-8kVQhn9hqY=c8L1+=e3uTfjEjBCYuPg@mail.gmail.com>
-References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
- <20180112020711.6gp2pnsxxjzelidq@localhost> <20180112032223.GK3626@vireshk-i7>
- <CAOesGMggU73asY1SEUDD_BsWcrGYR___o8e5omjziOPEwJgqBQ@mail.gmail.com>
- <CAK8P3a2SO4=YKBE3L_AKsyfNe77YR7a8F=dvbS=ic03=6NK8MA@mail.gmail.com>
- <CAOesGMgcf9FovbzhPkKnrG4ETRFP3dsSJnTYNfp1wECMFeFOGA@mail.gmail.com>
- <CAL_JsqJVWLazDRB1me2OubqqMhdsqsR+cLSHR+K0OY3dZHcE-w@mail.gmail.com>
- <CAOesGMiyfpRyoe4dxQeNMF5invysVBEy+J5OwUhuop=JyAvZoQ@mail.gmail.com>
- <CAK8P3a3KTz0sOSbO9+sAY1Sv95hZF4Yg1qMzOaXPAZ_1pOgGpg@mail.gmail.com>
- <CAOesGMiHeitS_j9r0DsPf3k1jVJT9_z-bHyrhbB7fQ__LjjaqA@mail.gmail.com>
- <CAK8P3a3MZX-ZsxX9h1-8kVQhn9hqY=c8L1+=e3uTfjEjBCYuPg@mail.gmail.com>
-Message-ID: <CACRpkdag317LU2_3H-PPV_0xoX2RDLxBX5r4a3jpbn9LTvhkcA@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 14 Jan 2018 12:07:16 +0000
+Subject: [PATCH] IIO: ADC: stm32-dfsdm: avoid unused-variable warning
+In-Reply-To: <838ace12-2722-33aa-0ed8-2e8e7494b2ae@st.com>
+References: <20180111103510.1408292-1-arnd@arndb.de>
+ <866335ff-d9a8-99c0-0946-82b3f207f266@arm.com>
+ <838ace12-2722-33aa-0ed8-2e8e7494b2ae@st.com>
+Message-ID: <20180114120716.320526c1@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 11:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, 11 Jan 2018 18:38:49 +0100
+Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
->      arch/arm/boot/dts/ste-nomadik-nhk15.dtb: Warning
-> (interrupts_property): Missing interrupt-parent for
-> /amba/clcd at 10120000
->      arch/arm/boot/dts/ste-nomadik-s8815.dtb: Warning
-> (interrupts_property): Missing interrupt-parent for
-> /amba/clcd at 10120000
-(...)
-> I hope Linus Walleij can find out what the right interrupt-parent
-> should be on the
-> nomadik machine, that is otherwise the last remaining warning.
+> On 01/11/2018 03:27 PM, Robin Murphy wrote:
+> > On 11/01/18 10:34, Arnd Bergmann wrote:  
+> >> Building with CONFIG_OF disabled produces a compiler warning:
+> >>
+> >> drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
+> >> drivers/iio/adc/stm32-dfsdm-core.c:245:22: error: unused variable
+> >> 'pnode' [-Werror=unused-variable]
+> >>
+> >> This removes the variable and open-codes it in the only place
+> >> it gets used to avoid that warning.
+> >>
+> >> Fixes: bed73904e76f ("IIO: ADC: add stm32 DFSDM core support")
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> ---
+> >> ? drivers/iio/adc/stm32-dfsdm-core.c | 3 +--
+> >> ? 1 file changed, 1 insertion(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c
+> >> b/drivers/iio/adc/stm32-dfsdm-core.c
+> >> index 72427414db7f..6cd655f8239b 100644
+> >> --- a/drivers/iio/adc/stm32-dfsdm-core.c
+> >> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
+> >> @@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
+> >> ? static int stm32_dfsdm_probe(struct platform_device *pdev)
+> >> ? {
+> >> ????? struct dfsdm_priv *priv;
+> >> -??? struct device_node *pnode = pdev->dev.of_node;
+> >> ????? const struct of_device_id *of_id;
+> >> ????? const struct stm32_dfsdm_dev_data *dev_data;
+> >> ????? struct stm32_dfsdm *dfsdm;
+> >> @@ -254,7 +253,7 @@ static int stm32_dfsdm_probe(struct
+> >> platform_device *pdev)
+> >> ? ????? priv->pdev = pdev;
+> >> ? -??? of_id = of_match_node(stm32_dfsdm_of_match, pnode);
+> >> +??? of_id = of_match_node(stm32_dfsdm_of_match, pdev->dev.of_node);
+> >> ????? if (!of_id->data) {
+> >> ????????? dev_err(&pdev->dev, "Data associated to device is missing\n");
+> >> ????????? return -EINVAL;  
+> > 
+> > FWIW, it looks like this whole lot could be cleaned up by using
+> > of_device_get_match_data().
+> >   
+> Right, and test of the return now seems to me an overprotection as data
+> structure is defined in the driver...
+> 
+> Same optimization could be applied to stm32_dfsdm_adc_probe function.
+> 
+> Here is the patch I tested:
 
-OK I will look into it.
+This looks like a good solution to me.
 
-> Apparently the
-> clcd driver doesn't actually need its interrupt, so we could decide to
-> just comment
-> out that line if we don't know which controller it's connected to.
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 
-I am migrating it to the new DRM driver which uses the IRQ to
-sync screen output to avoid tearing so it would be unfortunate.
+(given this should probably go on Mark's immutable branch).
 
-I will look into it.
+Jonathan
 
-Yours,
-Linus Walleij
+> 
+> ---
+>  drivers/iio/adc/stm32-dfsdm-adc.c  | 9 +--------
+>  drivers/iio/adc/stm32-dfsdm-core.c | 9 +--------
+>  2 files changed, 2 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stm32-dfsdm-adc.c
+> b/drivers/iio/adc/stm32-dfsdm-adc.c
+> index b03ca3f..01836c9 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-adc.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-adc.c
+> @@ -1087,18 +1087,11 @@ static int stm32_dfsdm_adc_probe(struct
+> platform_device *pdev)
+>  	struct device_node *np = dev->of_node;
+>  	const struct stm32_dfsdm_dev_data *dev_data;
+>  	struct iio_dev *iio;
+> -	const struct of_device_id *of_id;
+>  	char *name;
+>  	int ret, irq, val;
+> 
+> -	of_id = of_match_node(stm32_dfsdm_adc_match, np);
+> -	if (!of_id->data) {
+> -		dev_err(&pdev->dev, "Data associated to device is missing\n");
+> -		return -EINVAL;
+> -	}
+> -
+> -	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
+> 
+> +	dev_data = of_device_get_match_data(dev);
+>  	iio = devm_iio_device_alloc(dev, sizeof(*adc));
+>  	if (IS_ERR(iio)) {
+>  		dev_err(dev, "%s: Failed to allocate IIO\n", __func__);
+> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c
+> b/drivers/iio/adc/stm32-dfsdm-core.c
+> index 7242741..6290332 100644
+> --- a/drivers/iio/adc/stm32-dfsdm-core.c
+> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
+> @@ -242,8 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
+>  static int stm32_dfsdm_probe(struct platform_device *pdev)
+>  {
+>  	struct dfsdm_priv *priv;
+> -	struct device_node *pnode = pdev->dev.of_node;
+> -	const struct of_device_id *of_id;
+>  	const struct stm32_dfsdm_dev_data *dev_data;
+>  	struct stm32_dfsdm *dfsdm;
+>  	int ret;
+> @@ -254,13 +252,8 @@ static int stm32_dfsdm_probe(struct platform_device
+> *pdev)
+> 
+>  	priv->pdev = pdev;
+> 
+> -	of_id = of_match_node(stm32_dfsdm_of_match, pnode);
+> -	if (!of_id->data) {
+> -		dev_err(&pdev->dev, "Data associated to device is missing\n");
+> -		return -EINVAL;
+> -	}
+> +	dev_data = of_device_get_match_data(&pdev->dev);
+> 
+> -	dev_data = (const struct stm32_dfsdm_dev_data *)of_id->data;
+>  	dfsdm = &priv->dfsdm;
+>  	dfsdm->fl_list = devm_kcalloc(&pdev->dev, dev_data->num_filters,
+>  				      sizeof(*dfsdm->fl_list), GFP_KERNEL);
