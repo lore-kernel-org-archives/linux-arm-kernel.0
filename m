@@ -1,25 +1,68 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 13 Jan 2018 19:49:30 +0100
-Subject: [PATCH 1/3] ARM: dts: rockchip: drop veyron's nonstandard
- 'backlight-boot-off'
-In-Reply-To: <20180106004757.8239-1-briannorris@chromium.org>
-References: <20180106004757.8239-1-briannorris@chromium.org>
-Message-ID: <3929059.IgKPAvtPnp@phil>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 14 Jan 2018 08:08:40 +0200
+Subject: [PATCH v2 3/4] gpio: raspberrypi-exp: Driver for RPi3 GPIO
+ expander via mailbox service
+In-Reply-To: <1313448378.43279.1515839595810@email.1und1.de>
+References: <cover.1515698418.git.baruch@tkos.co.il>
+ <35b07d1aae959c357d671f5530311320d0f10cc8.1515698418.git.baruch@tkos.co.il>
+ <1313448378.43279.1515839595810@email.1und1.de>
+Message-ID: <20180114060840.ychhndc7ukulrbpe@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 5. Januar 2018, 16:47:55 CET schrieb Brian Norris:
-> This was used out-of-tree as a hack for resolving issues where some
-> systems expect the backlight to turn on automatically at boot, while
-> others expect to manage the backlight status via a DRM/panel driver.
-> Those issues have since been fixed upstream in pwm_bl.c without device
-> tree hacks, and so this un-documented property should no longer be
-> useful.
+Hi Stefan,
+
+Thanks for reviewing. Please find below a few questions.
+
+On Sat, Jan 13, 2018 at 11:33:15AM +0100, Stefan Wahren wrote: 
+> > +	default RASPBERRYPI_FIRMWARE
+> > +	depends on OF_GPIO && RASPBERRYPI_FIRMWARE && \
+> > +		(ARCH_BCM2835 || COMPILE_TEST)
 > 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Since this is default on RASPBERRYPI_FIRMWARE, we could remove it from the dependencies.
 
-applied (for 4.17 though)
+This driver does not work when RASPBERRYPI_FIRMWARE is not enabled. So the 
+driver should not be selectable, regardless of its default enable/disable 
+state.
 
+> > +	help
+> > +	  Turn on GPIO support for the expander on Raspberry Pi 3 boards, using
+> > +	  the firmware mailbox to communicate with VideoCore on BCM283x chips.
+> > +
 
-Thanks
-Heiko
+[...]
+
+> > --- /dev/null
+> > +++ b/drivers/gpio/gpio-raspberrypi-exp.c
+> > @@ -0,0 +1,258 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + *  Raspberry Pi 3 expander GPIO driver
+> > + *
+> > + *  Uses the firmware mailbox service to communicate with the
+> > + *  GPIO expander on the VPU.
+> > + *
+> > + *  Copyright (C) 2017 Raspberry Pi Trading Ltd.
+> 
+> 2018?
+
+Why? Raspberry Pi Trading Ltd added no code to this driver in 2018.
+
+[...]
+
+> > +static struct platform_driver rpi_exp_gpio_driver = {
+> > +	.driver	= {
+> > +		.name		= MODULE_NAME,
+> > +		.owner		= THIS_MODULE,
+> 
+> Please drop this, too.
+
+Why? Recent GPIO drivers include this line. I have seen no commits removing 
+.owner from GPIO drivers in mainline or in current development tree.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
