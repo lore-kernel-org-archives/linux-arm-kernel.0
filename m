@@ -1,46 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sun, 14 Jan 2018 12:20:37 +0000
-Subject: [PATCH v6 11/16] firmware: arm_sdei: Add support for CPU and
- system power states
-In-Reply-To: <20180113120031.5m6eykwzqnioyb33@armageddon.cambridge.arm.com>
-References: <20180108153818.22743-1-james.morse@arm.com>
- <20180108153818.22743-12-james.morse@arm.com>
- <20180108172226.GC2530@red-moon>
- <20180113120031.5m6eykwzqnioyb33@armageddon.cambridge.arm.com>
-Message-ID: <20180114122037.GA18073@red-moon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 14 Jan 2018 14:17:24 +0100
+Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
+In-Reply-To: <CACRpkdYtzWewTWrtWTaPWspHzRY6Y7MBNfm1wmy6yvLD_J8hFg@mail.gmail.com>
+References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
+ <20180112020711.6gp2pnsxxjzelidq@localhost>
+ <CACRpkdYtzWewTWrtWTaPWspHzRY6Y7MBNfm1wmy6yvLD_J8hFg@mail.gmail.com>
+Message-ID: <20180114131724.GN2678@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 13, 2018 at 12:00:31PM +0000, Catalin Marinas wrote:
-> On Mon, Jan 08, 2018 at 05:22:26PM +0000, Lorenzo Pieralisi wrote:
-> > On Mon, Jan 08, 2018 at 03:38:13PM +0000, James Morse wrote:
-> > 
-> > [...]
-> > 
-> > > +/* When entering idle, mask/unmask events for this cpu */
-> > 
-> > Just mentioning (since I know you know), this notifier is called also
-> > through syscore_ops so it is not just idle (CPUidle or Suspend-to-idle).
-> > 
-> > > +static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
-> > > +			    void *data)
-> > > +{
-> > > +	int rv;
-> > > +
-> > > +	switch (action) {
-> > > +	case CPU_PM_ENTER:
-> > > +		rv = sdei_mask_local_cpu();
-> > > +		break;
-> > > +	case CPU_PM_EXIT:
-> > > +		rv = sdei_unmask_local_cpu();
-> > 
-> > You should handle CPU_PM_ENTER_FAILED here for correctness,
-> > in case the notifier chain fails.
+Hi,
+
+On 14/01/2018 at 12:17:23 +0100, Linus Walleij wrote:
+> On Fri, Jan 12, 2018 at 3:07 AM, Olof Johansson <olof@lixom.net> wrote:
+> > On Thu, Jan 11, 2018 at 11:28:51AM +0530, Viresh Kumar wrote:
+> >> The interrupt-parent of rtc was missing, add it.
+> >>
+> >> Fixes: 8113ba917dfa ("ARM: SPEAr: DT: Update device nodes")
+> >> Cc: stable at vger.kernel.org # v3.8+
+> >> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >
+> > Applied to next/dt. Is stable really needed on this? It's been broken since
+> > pretty much forever, and nobody has complained... :)
 > 
-> So, just to confirm, the CPU_PM_ENTER_FAILED case goes together with
-> CPU_PM_EXIT so that we unmask the SDE again for the CPU.
+> The SPEAr architecture is widely used (in modified variants) by
+> a large industrial automation company, 20+ years of support cycle.
+> 
+> However I think they have a forked both kernel and hardware, so they
+> will not notice any time soon, and when they eventually upgrade they
+> can simply pick the latest I guess.
+> 
 
-Yes, that's correct (I do not think that's a problem with current
-mainline but that ought to be handled correctly anyway).
+We have a customer using mainline v4.14 on their Spear600 based
+products.
 
-Lorenzo
+I guess the reason why nobody complained is simply because nobody is
+using the SoC RTC ;)
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
