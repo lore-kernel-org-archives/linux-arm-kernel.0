@@ -1,42 +1,46 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Sun, 14 Jan 2018 15:07:46 +0800
-Subject: [PATCH v1 3/4] ARM: dts: add pwm pins for r40.
-In-Reply-To: <20180111124701.g52kjm3hozn72je5@flea.lan>
-References: <20180111113323.GA21976@arx-s1>
- <20180111124701.g52kjm3hozn72je5@flea.lan>
-Message-ID: <CAJeuY7-FeiEtSkg=udnEx_==3SS=dinyk7fKqhLwdXcKE3510g@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 14 Jan 2018 17:09:56 +0800
+Subject: [arm-soc:xlnx/soc 3/3] collect2: error: ld returned 1 exit status
+Message-ID: <201801141754.lROQHRMR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-11 20:47 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> On Thu, Jan 11, 2018 at 07:33:23PM +0800, hao_zhang wrote:
->> This patch add pwm pins for r40.
->>
->> Signed-off-by: hao_zhang <hao5781286@gmail.com>
->
-> You should order your patches differently. We try to be as bisectable
-> as possible, and if we just apply this patch the DT will not compile
-> anymore.
->
-> Your patch 4 should come before this one.
->
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git xlnx/soc
+head:   cee8113a295acfc4cd25728d7c3d44e6bc3bbff9
+commit: cee8113a295acfc4cd25728d7c3d44e6bc3bbff9 [3/3] soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver
+config: um-allyesconfig (attached as .config)
+compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
+reproduce:
+        git checkout cee8113a295acfc4cd25728d7c3d44e6bc3bbff9
+        # save the attached .config to linux build tree
+        make ARCH=um 
 
-Do you mean that the order of patch be applied is from the first to
-the last in the patch set ?
-because you apply the last patch first also break the DT compile...
+All errors (new ones prefixed by >>):
 
-Thinks :)
-Hao Zhang
+   arch/um/drivers/vde.o: In function `vde_open_real':
+   (.text+0x951): warning: Using 'getgrnam' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   (.text+0x79c): warning: Using 'getpwuid' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   (.text+0xab5): warning: Using 'getaddrinfo' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   arch/um/drivers/pcap.o: In function `pcap_nametoaddr':
+   (.text+0xdee5): warning: Using 'gethostbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   arch/um/drivers/pcap.o: In function `pcap_nametonetaddr':
+   (.text+0xdf85): warning: Using 'getnetbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   arch/um/drivers/pcap.o: In function `pcap_nametoproto':
+   (.text+0xe1a5): warning: Using 'getprotobyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   arch/um/drivers/pcap.o: In function `pcap_nametoport':
+   (.text+0xdfd7): warning: Using 'getservbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+   drivers/soc/xilinx/xlnx_vcu.o: In function `xvcu_probe':
+   xlnx_vcu.c:(.text+0x116): undefined reference to `devm_ioremap_nocache'
+   xlnx_vcu.c:(.text+0x1ae): undefined reference to `devm_ioremap_nocache'
+>> collect2: error: ld returned 1 exit status
 
-> Your commit title and log doesn't seem to match the content of the
-> patch either.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 19866 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180114/7a8275cf/attachment-0001.gz>
