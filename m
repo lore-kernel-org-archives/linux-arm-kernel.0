@@ -1,31 +1,45 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 14 Jan 2018 12:17:23 +0100
+Date: Sun, 14 Jan 2018 12:20:03 +0100
 Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
-In-Reply-To: <20180112020711.6gp2pnsxxjzelidq@localhost>
+In-Reply-To: <CAK8P3a3MZX-ZsxX9h1-8kVQhn9hqY=c8L1+=e3uTfjEjBCYuPg@mail.gmail.com>
 References: <a062d9ed0d3365b578156a780202fa533e725374.1515650104.git.viresh.kumar@linaro.org>
- <20180112020711.6gp2pnsxxjzelidq@localhost>
-Message-ID: <CACRpkdYtzWewTWrtWTaPWspHzRY6Y7MBNfm1wmy6yvLD_J8hFg@mail.gmail.com>
+ <20180112020711.6gp2pnsxxjzelidq@localhost> <20180112032223.GK3626@vireshk-i7>
+ <CAOesGMggU73asY1SEUDD_BsWcrGYR___o8e5omjziOPEwJgqBQ@mail.gmail.com>
+ <CAK8P3a2SO4=YKBE3L_AKsyfNe77YR7a8F=dvbS=ic03=6NK8MA@mail.gmail.com>
+ <CAOesGMgcf9FovbzhPkKnrG4ETRFP3dsSJnTYNfp1wECMFeFOGA@mail.gmail.com>
+ <CAL_JsqJVWLazDRB1me2OubqqMhdsqsR+cLSHR+K0OY3dZHcE-w@mail.gmail.com>
+ <CAOesGMiyfpRyoe4dxQeNMF5invysVBEy+J5OwUhuop=JyAvZoQ@mail.gmail.com>
+ <CAK8P3a3KTz0sOSbO9+sAY1Sv95hZF4Yg1qMzOaXPAZ_1pOgGpg@mail.gmail.com>
+ <CAOesGMiHeitS_j9r0DsPf3k1jVJT9_z-bHyrhbB7fQ__LjjaqA@mail.gmail.com>
+ <CAK8P3a3MZX-ZsxX9h1-8kVQhn9hqY=c8L1+=e3uTfjEjBCYuPg@mail.gmail.com>
+Message-ID: <CACRpkdag317LU2_3H-PPV_0xoX2RDLxBX5r4a3jpbn9LTvhkcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 3:07 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Jan 11, 2018 at 11:28:51AM +0530, Viresh Kumar wrote:
->> The interrupt-parent of rtc was missing, add it.
->>
->> Fixes: 8113ba917dfa ("ARM: SPEAr: DT: Update device nodes")
->> Cc: stable at vger.kernel.org # v3.8+
->> Reported-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Applied to next/dt. Is stable really needed on this? It's been broken since
-> pretty much forever, and nobody has complained... :)
+On Fri, Jan 12, 2018 at 11:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-The SPEAr architecture is widely used (in modified variants) by
-a large industrial automation company, 20+ years of support cycle.
+>      arch/arm/boot/dts/ste-nomadik-nhk15.dtb: Warning
+> (interrupts_property): Missing interrupt-parent for
+> /amba/clcd at 10120000
+>      arch/arm/boot/dts/ste-nomadik-s8815.dtb: Warning
+> (interrupts_property): Missing interrupt-parent for
+> /amba/clcd at 10120000
+(...)
+> I hope Linus Walleij can find out what the right interrupt-parent
+> should be on the
+> nomadik machine, that is otherwise the last remaining warning.
 
-However I think they have a forked both kernel and hardware, so they
-will not notice any time soon, and when they eventually upgrade they
-can simply pick the latest I guess.
+OK I will look into it.
+
+> Apparently the
+> clcd driver doesn't actually need its interrupt, so we could decide to
+> just comment
+> out that line if we don't know which controller it's connected to.
+
+I am migrating it to the new DRM driver which uses the IRQ to
+sync screen output to avoid tearing so it would be unfortunate.
+
+I will look into it.
 
 Yours,
 Linus Walleij
