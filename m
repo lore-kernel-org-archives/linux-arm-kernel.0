@@ -1,67 +1,50 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Jan 2018 09:41:23 +0100
-Subject: [PATCH 1/3] arm64: dts: renesas: v3msk: Remove renesas,
- no-ether-link property
-In-Reply-To: <20180115084125.8112-1-horms+renesas@verge.net.au>
-References: <20180115084125.8112-1-horms+renesas@verge.net.au>
-Message-ID: <20180115084125.8112-2-horms+renesas@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Jan 2018 08:42:51 +0000
+Subject: [PATCH v4 03/19] arm64: asm-offsets: Remove potential circular
+ dependency
+In-Reply-To: <20180115083449.GD21403@cbox>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-4-marc.zyngier@arm.com> <20180115083449.GD21403@cbox>
+Message-ID: <cbe5c186-1adc-ef3e-e52e-5d60548c352a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regarding Salvator-X and ULCB boards, Bogdan Mirea says:
+On 15/01/18 08:34, Christoffer Dall wrote:
+> On Thu, Jan 04, 2018 at 06:43:18PM +0000, Marc Zyngier wrote:
+>> So far, we've been lucky enough that none of the include files
+>> that asm-offsets.c requires include asm-offsets.h. This is
+>> about to change, and would introduce a nasty circular dependency...
+>>
+>> Let's now guard the inclusion of asm-offsets.h so that it never
+>> gets pulled from asm-offsets.c. The same issue exists between
+>> bounce.c and include/generated/bounds.h, and is worked around
+>> by using the existing guard symbol.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/asm-offsets.h | 2 ++
+>>  arch/arm64/kernel/asm-offsets.c      | 2 ++
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
+>> index d370ee36a182..7d6531a81eb3 100644
+>> --- a/arch/arm64/include/asm/asm-offsets.h
+>> +++ b/arch/arm64/include/asm/asm-offsets.h
+>> @@ -1 +1,3 @@
+>> +#if !defined(__GENERATING_ASM_OFFSETS_H) && !defined(__GENERATING_BOUNDS_H)
+> 
+> I don't understand why we need to check __GENERATING_BOUNDS_H here?
+> What is the interaction between asm-offsets and bounds?
 
-    The present change is a bug fix for AVB link iteratively up/down.
+bound.c ends up including asm-offsets.h as well once you start adding
+the dependency between it and alternatives.h. See the report there:
 
-    Steps to reproduce:
-    - start AVB TX stream (Using aplay via MSE),
-    - disconnect+reconnect the eth cable,
-    - after a reconnection the eth connection goes iteratively up/down
-      without user interaction,
-    - this may heal after some seconds or even stay for minutes.
+https://www.spinics.net/lists/arm-kernel/msg623723.html
 
-    As the documentation specifies, the "renesas,no-ether-link" option
-    should be used when a board does not provide a proper AVB_LINK signal.
-    There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
-    and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+which this check addresses.
 
-    Choosing to keep or remove the "renesas,no-ether-link" option will
-    have impact on the code flow in the following ways:
-    - keeping this option enabled may lead to unexpected behavior since
-      the RX & TX are enabled/disabled directly from adjust_link function
-      without any HW interrogation,
-    - removing this option, the RX & TX will only be enabled/disabled after
-      HW interrogation. The HW check is made through the LMON pin in PSR
-      register which specifies AVB_LINK signal value (0 - at low level;
-      1 - at high level).
+Thanks,
 
-    In conclusion, the present change is also a safety improvement because
-    it removes the "renesas,no-ether-link" option leading to a proper way
-    of detecting the link state based on HW interrogation and not on
-    software heuristic.
-
-On examination of the documentation for the V3M Starter Kit (v3msk) this
-change seems necessary as AVB0_LINK is documented as being connected.
-
-Fixes: a6b1b7359074 ("arm64: dts: renesas: v3msk: add EtherAVB support")
-Cc: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-index 8624ca87d6b2..d166d61f7ab3 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-@@ -32,7 +32,6 @@
- };
- 
- &avb {
--	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
- 	status = "okay";
- 
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
