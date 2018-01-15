@@ -1,64 +1,52 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 15 Jan 2018 12:24:59 +0000
-Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for
- hardened usercopy
-In-Reply-To: <1515636190-24061-34-git-send-email-keescook@chromium.org>
-References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
- <1515636190-24061-34-git-send-email-keescook@chromium.org>
-Message-ID: <20180115122458.GI12608@e103592.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 15 Jan 2018 13:32:14 +0100
+Subject: [PATCH 02/14] mmc: mmci: Don't pretend all variants to have
+ MCI_STARBITERR flag
+In-Reply-To: <1515759368-16946-3-git-send-email-patrice.chotard@st.com>
+References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
+ <1515759368-16946-3-git-send-email-patrice.chotard@st.com>
+Message-ID: <CAPDyKFpqENchQs7c1BSJnorTgidbwHFAHByHJU3t9TV6uHurxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 02:03:05AM +0000, Kees Cook wrote:
-> This whitelists the FPU register state portion of the thread_struct for
-> copying to userspace, instead of the default entire structure.
+On 12 January 2018 at 13:15,  <patrice.chotard@st.com> wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
 >
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: zijun_hu <zijun_hu@htc.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+> This patch prepares for supporting the STM32 variant that
+> has no such bit in the status register.
+>
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 > ---
->  arch/arm64/Kconfig                 | 1 +
->  arch/arm64/include/asm/processor.h | 8 ++++++++
->  2 files changed, 9 insertions(+)
+>  drivers/mmc/host/mmci.c | 16 ++++++++++++++--
+>  1 file changed, 14 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index a93339f5178f..c84477e6a884 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -90,6 +90,7 @@ config ARM64
->       select HAVE_ARCH_MMAP_RND_BITS
->       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->       select HAVE_ARCH_SECCOMP_FILTER
-> +     select HAVE_ARCH_THREAD_STRUCT_WHITELIST
->       select HAVE_ARCH_TRACEHOOK
->       select HAVE_ARCH_TRANSPARENT_HUGEPAGE
->       select HAVE_ARCH_VMAP_STACK
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index 023cacb946c3..e58a5864ec89 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -113,6 +113,14 @@ struct thread_struct {
->       struct debug_info       debug;          /* debugging */
->  };
->
-> +/* Whitelist the fpsimd_state for copying to userspace. */
-> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
-> +                                             unsigned long *size)
-> +{
-> +     *offset = offsetof(struct thread_struct, fpsimd_state);
-> +     *size = sizeof(struct fpsimd_state);
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 3125dc0..7e56f85 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -83,6 +83,8 @@
+>   * @qcom_dml: enables qcom specific dma glue for dma transfers.
+>   * @reversed_irq_handling: handle data irq before cmd irq.
+>   * @mmcimask1: true if variant have a MMCIMASK1 register.
+> + * @start_err: true is the variant has STARTBITERR bit inside MMCISTATUS
+> + *            register.
+>   */
+>  struct variant_data {
+>         unsigned int            clkreg;
+> @@ -113,6 +115,7 @@ struct variant_data {
+>         bool                    qcom_dml;
+>         bool                    reversed_irq_handling;
+>         bool                    mmcimask1;
+> +       bool                    start_err;
 
-This should be fpsimd_state.user_fpsimd (fpsimd_state.cpu is important
-for correctly context switching and not supposed to be user-accessible.
-A user copy that encompasses that is definitely a bug).
+To be consistent with how we implement support for similar variant
+variations, I would prefer to have this being a u32. Something along
+the lines of how the "busy_detect_flag" is being used.
 
-Cheers
----Dave
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Otherwise this looks good to me.
+
+[...]
+
+Kind regards
+Uffe
