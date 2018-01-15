@@ -1,23 +1,39 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Mon, 15 Jan 2018 19:35:11 +0300
-Subject: [PATCH v2 2/2] kasan: clean up KASAN_SHADOW_SCALE_SHIFT usage
-In-Reply-To: <34937ca3b90736eaad91b568edf5684091f662e3.1515775666.git.andreyknvl@google.com>
-References: <cover.1515775666.git.andreyknvl@google.com>
- <34937ca3b90736eaad91b568edf5684091f662e3.1515775666.git.andreyknvl@google.com>
-Message-ID: <b3d59ebe-9bdd-46a2-377d-8f242ccef426@virtuozzo.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 15 Jan 2018 17:37:08 +0100
+Subject: [PATCH] ARM: dts: nomadik: add interrupt-parent for clcd
+Message-ID: <20180115163719.1736753-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The clcd device is lacking an interrupt-parent property, which makes
+the interrupt unusable and shows up as a warning with the latest
+dtc version:
 
+arch/arm/boot/dts/ste-nomadik-s8815.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
+arch/arm/boot/dts/ste-nomadik-nhk15.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
 
-On 01/12/2018 07:49 PM, Andrey Konovalov wrote:
-> Right now the fact that KASAN uses a single shadow byte for 8 bytes of
-> memory is scattered all over the code.
-> 
-> This change defines KASAN_SHADOW_SCALE_SHIFT early in asm include files
-> and makes use of this constant where necessary.
-> 
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
+I looked up the old board files and found that this interrupt has
+the same irqchip as all the other on-chip device, it just needs one
+extra line.
 
-Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Fixes: 17470b7da11c ("ARM: dts: add the CLCD LCD display to the NHK15")
+Cc: stable at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index 68aab50a73ab..733678b75b88 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -750,6 +750,7 @@
+ 			reg = <0x10120000 0x1000>;
+ 			interrupt-names = "combined";
+ 			interrupts = <14>;
++			interrupt-parent = <&vica>;
+ 			clocks = <&clcdclk>, <&hclkclcd>;
+ 			clock-names = "clcdclk", "apb_pclk";
+ 			status = "disabled";
+-- 
+2.9.0
