@@ -1,36 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Jan 2018 10:06:26 -0800
-Subject: PM regression in next
-In-Reply-To: <20180115175626.GC12018@sirena.org.uk>
-References: <20180112211535.GH21458@sirena.org.uk>
- <20180112215010.GG4821@atomide.com>
- <20180112221126.GK21458@sirena.org.uk>
- <20180112224959.GH4821@atomide.com>
- <20180112225947.GL21458@sirena.org.uk>
- <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
- <20180115165050.GJ4821@atomide.com>
- <20180115171917.GB12018@sirena.org.uk>
- <20180115175220.GK4821@atomide.com>
- <20180115175626.GC12018@sirena.org.uk>
-Message-ID: <20180115180626.GL4821@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Jan 2018 16:06:22 -0200
+Subject: [PATCH v2] ARM: vfp: Go back to clearing vfp_current_hw_state[]
+Message-ID: <1516039582-5905-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@kernel.org> [180115 17:56]:
-> On Mon, Jan 15, 2018 at 09:52:20AM -0800, Tony Lindgren wrote:
-> > * Mark Brown <broonie@kernel.org> [180115 17:19]:
-> 
-> > > Did anyone actually try testing the fix I posted yet?
-> 
-> > Hmm I don't seem to have anything in my inbox. What might
-> > be the subject for it?
-> 
-> Sorry, I didn't actually post it - just suggested adding the
-> snd_soc_codec_set_regmap() call.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Oh I see. Yeah that seems like a good long term solution after
-the regressions are fixed.
+Commit 384b38b66947 ("ARM: 7873/1: vfp: clear vfp_current_hw_state
+for dying cpu") fixed the cpu dying notifier by clearing
+vfp_current_hw_state[]. However commit e5b61bafe704 ("arm: Convert VFP
+hotplug notifiers to state machine") incorrectly used the original
+vfp_force_reload() function in the cpu dying notifier.
 
-Regards,
+Fix it by going back to clearing vfp_current_hw_state[].
 
-Tony
+Fixes: e5b61bafe704 ("arm: Convert VFP hotplug notifiers to state machine")
+Cc: linux-stable <stable@vger.kernel.org>
+Reported-by: Kohji Okuno <okuno.kohji@jp.panasonic.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Improve the commit message
+
+ arch/arm/vfp/vfpmodule.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index a71a48e..aa7496b 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -648,7 +648,7 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
+  */
+ static int vfp_dying_cpu(unsigned int cpu)
+ {
+-	vfp_force_reload(cpu, current_thread_info());
++	vfp_current_hw_state[cpu] = NULL;
+ 	return 0;
+ }
+ 
+-- 
+2.7.4
