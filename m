@@ -1,75 +1,508 @@
 From: aleksey.makarov@cavium.com (Aleksey Makarov)
-Date: Mon, 15 Jan 2018 18:44:55 +0600
-Subject: [PATCH net-next v6 0/2] net: thunderx: add support for PTP clock
-Message-ID: <20180115124500.14872-1-aleksey.makarov@cavium.com>
+Date: Mon, 15 Jan 2018 18:44:56 +0600
+Subject: [PATCH net-next v6 1/2] net: add support for Cavium PTP coprocessor
+In-Reply-To: <20180115124500.14872-1-aleksey.makarov@cavium.com>
+References: <20180115124500.14872-1-aleksey.makarov@cavium.com>
+Message-ID: <20180115124500.14872-2-aleksey.makarov@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for IEEE 1588 Precision Time Protocol
-to Cavium ethernet driver.
+From: Radoslaw Biernacki <rad@semihalf.com>
 
-The first patch adds support for the Precision Time Protocol Clocks and
-Timestamping coprocessor (PTP) found on Cavium processors.
-It registers a new PTP clock in the PTP core and provides functions
-to use the counter in BGX, TNS, GTI, and NIC blocks.
+This patch adds support for the Precision Time Protocol
+Clocks and Timestamping hardware found on Cavium ThunderX
+processors.
 
-The second patch introduces support for the PTP protocol to the
-Cavium ThunderX ethernet driver.
-
-v6:
-- check if ptp_clock_register() returns NULL (Richard Cochran)
-- fix doc comment for cavium_ptp_enable() (Richard Cochran)
-- fix a function call formatting; use defined constant (Richard Cochran)
-- add comments for `tx_ptp_skbs` and `ptp_skb` (Richard Cochran)
-- use adjfine() instead of adjfreq() (Richard Cochran)
-- add Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
-
-v5: https://lkml.kernel.org/r/20171211141435.2915-1-aleksey.makarov at cavium.com
-- fix the file headers (add SPDX tags, remove advertisment) (Philippe Ombredanne)
-- use "imply" instead of "select" (Richard Cochran)
-- add some code in cavium_ptp_get() for the case when the PTP driver has not been
-  registered with the PTP core
-
-v4: https://lkml.kernel.org/r/20171208103442.19354-1-aleksey.makarov at cavium.com
-- use IS_ENABLED. This fixes compilation of the ptp as a module (David Miller)
-- select PTP_1588_CLOCK, not depend on it.  This fixes a build warning.
-- change u64 to __be64.  This fixes the sparse warning
-  "warning: cast to restricted __be64"
-- make nicvf_config_hwtstamp() static. This fixes the sparse warning
-  "warning: symbol 'nicvf_config_hwtstamp' was not declared. Should it be static?"
-
-v3: https://lkml.kernel.org/r/20171206133100.26436-1-aleksey.makarov at cavium.com
-- rebase to net-next
-
-v2: https://lkml.kernel.org/r/20171117134909.8954-1-aleksey.makarov at cavium.com
-- use readq()/writeq() in place of cavium_ptp_reg_read()/cavium_ptp_reg_write(),
-  don't use readq_relaxed()/writeq_relaxed() (David Daney)
-
-v1: https://lkml.kernel.org/r/20171107190704.15458-1-aleksey.makarov at cavium.com
-
-Radoslaw Biernacki (1):
-  net: add support for Cavium PTP coprocessor
-
-Sunil Goutham (1):
-  net: thunderx: add timestamping support
-
- drivers/net/ethernet/cavium/Kconfig                |  13 +
- drivers/net/ethernet/cavium/Makefile               |   1 +
- drivers/net/ethernet/cavium/common/Makefile        |   1 +
- drivers/net/ethernet/cavium/common/cavium_ptp.c    | 353 +++++++++++++++++++++
- drivers/net/ethernet/cavium/common/cavium_ptp.h    |  70 ++++
- drivers/net/ethernet/cavium/thunder/nic.h          |  36 +++
- drivers/net/ethernet/cavium/thunder/nic_main.c     |  56 +++-
- drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |  29 +-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 169 +++++++++-
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  26 ++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  29 ++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   4 +
- 13 files changed, 782 insertions(+), 6 deletions(-)
+Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@cavium.com>
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+---
+ drivers/net/ethernet/cavium/Kconfig             |  12 +
+ drivers/net/ethernet/cavium/Makefile            |   1 +
+ drivers/net/ethernet/cavium/common/Makefile     |   1 +
+ drivers/net/ethernet/cavium/common/cavium_ptp.c | 353 ++++++++++++++++++++++++
+ drivers/net/ethernet/cavium/common/cavium_ptp.h |  70 +++++
+ 5 files changed, 437 insertions(+)
  create mode 100644 drivers/net/ethernet/cavium/common/Makefile
  create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
  create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
 
+diff --git a/drivers/net/ethernet/cavium/Kconfig b/drivers/net/ethernet/cavium/Kconfig
+index 63be75eb34d2..96586c0b4490 100644
+--- a/drivers/net/ethernet/cavium/Kconfig
++++ b/drivers/net/ethernet/cavium/Kconfig
+@@ -50,6 +50,18 @@ config	THUNDER_NIC_RGX
+ 	  This driver supports configuring XCV block of RGX interface
+ 	  present on CN81XX chip.
+ 
++config CAVIUM_PTP
++	tristate "Cavium PTP coprocessor as PTP clock"
++	depends on 64BIT
++	imply PTP_1588_CLOCK
++	default y
++	---help---
++	  This driver adds support for the Precision Time Protocol Clocks and
++	  Timestamping coprocessor (PTP) found on Cavium processors.
++	  PTP provides timestamping mechanism that is suitable for use in IEEE 1588
++	  Precision Time Protocol or other purposes.  Timestamps can be used in
++	  BGX, TNS, GTI, and NIC blocks.
++
+ config LIQUIDIO
+ 	tristate "Cavium LiquidIO support"
+ 	depends on 64BIT
+diff --git a/drivers/net/ethernet/cavium/Makefile b/drivers/net/ethernet/cavium/Makefile
+index 872da9f7c31a..946bba84e81d 100644
+--- a/drivers/net/ethernet/cavium/Makefile
++++ b/drivers/net/ethernet/cavium/Makefile
+@@ -1,6 +1,7 @@
+ #
+ # Makefile for the Cavium ethernet device drivers.
+ #
++obj-$(CONFIG_NET_VENDOR_CAVIUM) += common/
+ obj-$(CONFIG_NET_VENDOR_CAVIUM) += thunder/
+ obj-$(CONFIG_NET_VENDOR_CAVIUM) += liquidio/
+ obj-$(CONFIG_NET_VENDOR_CAVIUM) += octeon/
+diff --git a/drivers/net/ethernet/cavium/common/Makefile b/drivers/net/ethernet/cavium/common/Makefile
+new file mode 100644
+index 000000000000..dd8561b8060b
+--- /dev/null
++++ b/drivers/net/ethernet/cavium/common/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_CAVIUM_PTP) += cavium_ptp.o
+diff --git a/drivers/net/ethernet/cavium/common/cavium_ptp.c b/drivers/net/ethernet/cavium/common/cavium_ptp.c
+new file mode 100644
+index 000000000000..c87c9c684a33
+--- /dev/null
++++ b/drivers/net/ethernet/cavium/common/cavium_ptp.c
+@@ -0,0 +1,353 @@
++// SPDX-License-Identifier: GPL-2.0
++/* cavium_ptp.c - PTP 1588 clock on Cavium hardware
++ * Copyright (c) 2003-2015, 2017 Cavium, Inc.
++ */
++
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/timecounter.h>
++#include <linux/pci.h>
++
++#include "cavium_ptp.h"
++
++#define DRV_NAME	"Cavium PTP Driver"
++
++#define PCI_DEVICE_ID_CAVIUM_PTP	0xA00C
++#define PCI_DEVICE_ID_CAVIUM_RST	0xA00E
++
++#define PCI_PTP_BAR_NO	0
++#define PCI_RST_BAR_NO	0
++
++#define PTP_CLOCK_CFG		0xF00ULL
++#define  PTP_CLOCK_CFG_PTP_EN	BIT(0)
++#define PTP_CLOCK_LO		0xF08ULL
++#define PTP_CLOCK_HI		0xF10ULL
++#define PTP_CLOCK_COMP		0xF18ULL
++
++#define RST_BOOT	0x1600ULL
++#define CLOCK_BASE_RATE	50000000ULL
++
++static u64 ptp_cavium_clock_get(void)
++{
++	struct pci_dev *pdev;
++	void __iomem *base;
++	u64 ret = CLOCK_BASE_RATE * 16;
++
++	pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM,
++			      PCI_DEVICE_ID_CAVIUM_RST, NULL);
++	if (!pdev)
++		goto error;
++
++	base = pci_ioremap_bar(pdev, PCI_RST_BAR_NO);
++	if (!base)
++		goto error_put_pdev;
++
++	ret = CLOCK_BASE_RATE * ((readq(base + RST_BOOT) >> 33) & 0x3f);
++
++	iounmap(base);
++
++error_put_pdev:
++	pci_dev_put(pdev);
++
++error:
++	return ret;
++}
++
++struct cavium_ptp *cavium_ptp_get(void)
++{
++	struct cavium_ptp *ptp;
++	struct pci_dev *pdev;
++
++	pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM,
++			      PCI_DEVICE_ID_CAVIUM_PTP, NULL);
++	if (!pdev)
++		return ERR_PTR(-ENODEV);
++
++	ptp = pci_get_drvdata(pdev);
++	if (!ptp)
++		ptp = ERR_PTR(-EPROBE_DEFER);
++	if (IS_ERR(ptp))
++		pci_dev_put(pdev);
++
++	return ptp;
++}
++EXPORT_SYMBOL(cavium_ptp_get);
++
++void cavium_ptp_put(struct cavium_ptp *ptp)
++{
++	pci_dev_put(ptp->pdev);
++}
++EXPORT_SYMBOL(cavium_ptp_put);
++
++/**
++ * cavium_ptp_adjfine() - Adjust ptp frequency
++ * @ptp: PTP clock info
++ * @scaled_ppm: how much to adjust by, in parts per million, but with a
++ *              16 bit binary fractional field
++ */
++static int cavium_ptp_adjfine(struct ptp_clock_info *ptp_info, long scaled_ppm)
++{
++	struct cavium_ptp *clock =
++		container_of(ptp_info, struct cavium_ptp, ptp_info);
++	unsigned long flags;
++	u64 comp;
++	u64 adj;
++	bool neg_adj = false;
++
++	if (scaled_ppm < 0) {
++		neg_adj = true;
++		scaled_ppm = -scaled_ppm;
++	}
++
++	/* The hardware adds the clock compensation value to the PTP clock
++	 * on every coprocessor clock cycle. Typical convention is that it
++	 * represent number of nanosecond betwen each cycle. In this
++	 * convention compensation value is in 64 bit fixed-point
++	 * representation where upper 32 bits are number of nanoseconds
++	 * and lower is fractions of nanosecond.
++	 * The scaled_ppm represent the ratio in "parts per bilion" by which the
++	 * compensation value should be corrected.
++	 * To calculate new compenstation value we use 64bit fixed point
++	 * arithmetic on following formula
++	 * comp = tbase + tbase * scaled_ppm / (1M * 2^16)
++	 * where tbase is the basic compensation value calculated initialy
++	 * in cavium_ptp_init() -> tbase = 1/Hz. Then we use endian
++	 * independent structure definition to write data to PTP register.
++	 */
++	comp = ((u64)1000000000ull << 32) / clock->clock_rate;
++	adj = comp * scaled_ppm;
++	adj >>= 16;
++	adj = div_u64(adj, 1000000ull);
++	comp = neg_adj ? comp - adj : comp + adj;
++
++	spin_lock_irqsave(&clock->spin_lock, flags);
++	writeq(comp, clock->reg_base + PTP_CLOCK_COMP);
++	spin_unlock_irqrestore(&clock->spin_lock, flags);
++
++	return 0;
++}
++
++/**
++ * cavium_ptp_adjtime() - Adjust ptp time
++ * @ptp:   PTP clock info
++ * @delta: how much to adjust by, in nanosecs
++ */
++static int cavium_ptp_adjtime(struct ptp_clock_info *ptp_info, s64 delta)
++{
++	struct cavium_ptp *clock =
++		container_of(ptp_info, struct cavium_ptp, ptp_info);
++	unsigned long flags;
++
++	spin_lock_irqsave(&clock->spin_lock, flags);
++	timecounter_adjtime(&clock->time_counter, delta);
++	spin_unlock_irqrestore(&clock->spin_lock, flags);
++
++	/* Sync, for network driver to get latest value */
++	smp_mb();
++
++	return 0;
++}
++
++/**
++ * cavium_ptp_gettime() - Get hardware clock time with adjustment
++ * @ptp: PTP clock info
++ * @ts:  timespec
++ */
++static int cavium_ptp_gettime(struct ptp_clock_info *ptp_info,
++			      struct timespec64 *ts)
++{
++	struct cavium_ptp *clock =
++		container_of(ptp_info, struct cavium_ptp, ptp_info);
++	unsigned long flags;
++	u64 nsec;
++
++	spin_lock_irqsave(&clock->spin_lock, flags);
++	nsec = timecounter_read(&clock->time_counter);
++	spin_unlock_irqrestore(&clock->spin_lock, flags);
++
++	*ts = ns_to_timespec64(nsec);
++
++	return 0;
++}
++
++/**
++ * cavium_ptp_settime() - Set hardware clock time. Reset adjustment
++ * @ptp: PTP clock info
++ * @ts:  timespec
++ */
++static int cavium_ptp_settime(struct ptp_clock_info *ptp_info,
++			      const struct timespec64 *ts)
++{
++	struct cavium_ptp *clock =
++		container_of(ptp_info, struct cavium_ptp, ptp_info);
++	unsigned long flags;
++	u64 nsec;
++
++	nsec = timespec64_to_ns(ts);
++
++	spin_lock_irqsave(&clock->spin_lock, flags);
++	timecounter_init(&clock->time_counter, &clock->cycle_counter, nsec);
++	spin_unlock_irqrestore(&clock->spin_lock, flags);
++
++	return 0;
++}
++
++/**
++ * cavium_ptp_enable() - Request to enable or disable an ancillary feature.
++ * @ptp: PTP clock info
++ * @rq:  request
++ * @on:  is it on
++ */
++static int cavium_ptp_enable(struct ptp_clock_info *ptp_info,
++			     struct ptp_clock_request *rq, int on)
++{
++	return -EOPNOTSUPP;
++}
++
++static u64 cavium_ptp_cc_read(const struct cyclecounter *cc)
++{
++	struct cavium_ptp *clock =
++		container_of(cc, struct cavium_ptp, cycle_counter);
++
++	return readq(clock->reg_base + PTP_CLOCK_HI);
++}
++
++static int cavium_ptp_probe(struct pci_dev *pdev,
++			    const struct pci_device_id *ent)
++{
++	struct device *dev = &pdev->dev;
++	struct cavium_ptp *clock;
++	struct cyclecounter *cc;
++	u64 clock_cfg;
++	u64 clock_comp;
++	int err;
++
++	clock = devm_kzalloc(dev, sizeof(*clock), GFP_KERNEL);
++	if (!clock) {
++		err = -ENOMEM;
++		goto error;
++	}
++
++	clock->pdev = pdev;
++
++	err = pcim_enable_device(pdev);
++	if (err)
++		goto error_free;
++
++	err = pcim_iomap_regions(pdev, 1 << PCI_PTP_BAR_NO, pci_name(pdev));
++	if (err)
++		goto error_free;
++
++	clock->reg_base = pcim_iomap_table(pdev)[PCI_PTP_BAR_NO];
++
++	spin_lock_init(&clock->spin_lock);
++
++	cc = &clock->cycle_counter;
++	cc->read = cavium_ptp_cc_read;
++	cc->mask = CYCLECOUNTER_MASK(64);
++	cc->mult = 1;
++	cc->shift = 0;
++
++	timecounter_init(&clock->time_counter, &clock->cycle_counter,
++			 ktime_to_ns(ktime_get_real()));
++
++	clock->clock_rate = ptp_cavium_clock_get();
++
++	clock->ptp_info = (struct ptp_clock_info) {
++		.owner		= THIS_MODULE,
++		.name		= "ThunderX PTP",
++		.max_adj	= 1000000000ull,
++		.n_ext_ts	= 0,
++		.n_pins		= 0,
++		.pps		= 0,
++		.adjfine	= cavium_ptp_adjfine,
++		.adjtime	= cavium_ptp_adjtime,
++		.gettime64	= cavium_ptp_gettime,
++		.settime64	= cavium_ptp_settime,
++		.enable		= cavium_ptp_enable,
++	};
++
++	clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
++	clock_cfg |= PTP_CLOCK_CFG_PTP_EN;
++	writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
++
++	clock_comp = ((u64)1000000000ull << 32) / clock->clock_rate;
++	writeq(clock_comp, clock->reg_base + PTP_CLOCK_COMP);
++
++	clock->ptp_clock = ptp_clock_register(&clock->ptp_info, dev);
++	if (!clock->ptp_clock) {
++		err = -ENODEV;
++		goto error_stop;
++	}
++	if (IS_ERR(clock->ptp_clock)) {
++		err = PTR_ERR(clock->ptp_clock);
++		goto error_stop;
++	}
++
++	pci_set_drvdata(pdev, clock);
++	return 0;
++
++error_stop:
++	clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
++	clock_cfg &= ~PTP_CLOCK_CFG_PTP_EN;
++	writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
++	pcim_iounmap_regions(pdev, 1 << PCI_PTP_BAR_NO);
++
++error_free:
++	devm_kfree(dev, clock);
++
++error:
++	/* For `cavium_ptp_get()` we need to differentiate between the case
++	 * when the core has not tried to probe this device and the case when
++	 * the probe failed.  In the later case we pretend that the
++	 * initialization was successful and keep the error in
++	 * `dev->driver_data`.
++	 */
++	pci_set_drvdata(pdev, ERR_PTR(err));
++	return 0;
++}
++
++static void cavium_ptp_remove(struct pci_dev *pdev)
++{
++	struct cavium_ptp *clock = pci_get_drvdata(pdev);
++	u64 clock_cfg;
++
++	if (IS_ERR_OR_NULL(clock))
++		return;
++
++	ptp_clock_unregister(clock->ptp_clock);
++
++	clock_cfg = readq(clock->reg_base + PTP_CLOCK_CFG);
++	clock_cfg &= ~PTP_CLOCK_CFG_PTP_EN;
++	writeq(clock_cfg, clock->reg_base + PTP_CLOCK_CFG);
++}
++
++static const struct pci_device_id cavium_ptp_id_table[] = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_CAVIUM_PTP) },
++	{ 0, }
++};
++
++static struct pci_driver cavium_ptp_driver = {
++	.name = DRV_NAME,
++	.id_table = cavium_ptp_id_table,
++	.probe = cavium_ptp_probe,
++	.remove = cavium_ptp_remove,
++};
++
++static int __init cavium_ptp_init_module(void)
++{
++	return pci_register_driver(&cavium_ptp_driver);
++}
++
++static void __exit cavium_ptp_cleanup_module(void)
++{
++	pci_unregister_driver(&cavium_ptp_driver);
++}
++
++module_init(cavium_ptp_init_module);
++module_exit(cavium_ptp_cleanup_module);
++
++MODULE_DESCRIPTION(DRV_NAME);
++MODULE_AUTHOR("Cavium Networks <support@cavium.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_DEVICE_TABLE(pci, cavium_ptp_id_table);
+diff --git a/drivers/net/ethernet/cavium/common/cavium_ptp.h b/drivers/net/ethernet/cavium/common/cavium_ptp.h
+new file mode 100644
+index 000000000000..be2bafc7beeb
+--- /dev/null
++++ b/drivers/net/ethernet/cavium/common/cavium_ptp.h
+@@ -0,0 +1,70 @@
++// SPDX-License-Identifier: GPL-2.0
++/* cavium_ptp.h - PTP 1588 clock on Cavium hardware
++ * Copyright (c) 2003-2015, 2017 Cavium, Inc.
++ */
++
++#ifndef CAVIUM_PTP_H
++#define CAVIUM_PTP_H
++
++#include <linux/ptp_clock_kernel.h>
++#include <linux/timecounter.h>
++
++struct cavium_ptp {
++	struct pci_dev *pdev;
++
++	/* Serialize access to cycle_counter, time_counter and hw_registers */
++	spinlock_t spin_lock;
++	struct cyclecounter cycle_counter;
++	struct timecounter time_counter;
++	void __iomem *reg_base;
++
++	u32 clock_rate;
++
++	struct ptp_clock_info ptp_info;
++	struct ptp_clock *ptp_clock;
++};
++
++#if IS_ENABLED(CONFIG_CAVIUM_PTP)
++
++struct cavium_ptp *cavium_ptp_get(void);
++void cavium_ptp_put(struct cavium_ptp *ptp);
++
++static inline u64 cavium_ptp_tstamp2time(struct cavium_ptp *ptp, u64 tstamp)
++{
++	unsigned long flags;
++	u64 ret;
++
++	spin_lock_irqsave(&ptp->spin_lock, flags);
++	ret = timecounter_cyc2time(&ptp->time_counter, tstamp);
++	spin_unlock_irqrestore(&ptp->spin_lock, flags);
++
++	return ret;
++}
++
++static inline int cavium_ptp_clock_index(struct cavium_ptp *clock)
++{
++	return ptp_clock_index(clock->ptp_clock);
++}
++
++#else
++
++static inline struct cavium_ptp *cavium_ptp_get(void)
++{
++	return ERR_PTR(-ENODEV);
++}
++
++static inline void cavium_ptp_put(struct cavium_ptp *ptp) {}
++
++static inline u64 cavium_ptp_tstamp2time(struct cavium_ptp *ptp, u64 tstamp)
++{
++	return 0;
++}
++
++static inline int cavium_ptp_clock_index(struct cavium_ptp *clock)
++{
++	return -1;
++}
++
++#endif
++
++#endif
 -- 
 2.15.1
