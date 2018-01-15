@@ -1,40 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jan 2018 17:49:47 +0000
-Subject: [PATCH 08/11] signal/arm: Document conflicts with SI_USER and
- SIGFPE
-In-Reply-To: <20180112005940.23279-8-ebiederm@xmission.com>
-References: <87373b6ghs.fsf@xmission.com>
- <20180112005940.23279-8-ebiederm@xmission.com>
-Message-ID: <20180115174947.GH17719@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Jan 2018 09:52:20 -0800
+Subject: PM regression in next
+In-Reply-To: <20180115171917.GB12018@sirena.org.uk>
+References: <20180112191251.GE21458@sirena.org.uk>
+ <20180112210706.GE4821@atomide.com>
+ <20180112211535.GH21458@sirena.org.uk>
+ <20180112215010.GG4821@atomide.com>
+ <20180112221126.GK21458@sirena.org.uk>
+ <20180112224959.GH4821@atomide.com>
+ <20180112225947.GL21458@sirena.org.uk>
+ <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
+ <20180115165050.GJ4821@atomide.com>
+ <20180115171917.GB12018@sirena.org.uk>
+Message-ID: <20180115175220.GK4821@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 06:59:37PM -0600, Eric W. Biederman wrote:
-> Setting si_code to 0 results in a userspace seeing an si_code of 0.
-> This is the same si_code as SI_USER.  Posix and common sense requires
-> that SI_USER not be a signal specific si_code.  As such this use of 0
-> for the si_code is a pretty horribly broken ABI.
+* Mark Brown <broonie@kernel.org> [180115 17:19]:
+> On Mon, Jan 15, 2018 at 08:50:51AM -0800, Tony Lindgren wrote:
+> > * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [180115 01:46]:
 > 
-> Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
-> value of __SI_KILL and now sees a value of SIL_KILL with the result
-> that uid and pid fields are copied and which might copying the si_addr
-> field by accident but certainly not by design.  Making this a very
-> flakey implementation.
+> > > I hope your driver will be OK by using regmap.
+> > > In worst case, we can back .read/.write, but it will be component driver side.
 > 
-> Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
-> appropriate fields will be reliably copied.
+> > Well we have the merge window about to open in a week, so
+> > please just revert the known broken patches.
+> 
+> Did anyone actually try testing the fix I posted yet?
 
-So what do you suggest when none of the SIGFPE FPE_xxx codes match the
-condition that "we don't know what happened" ?  Raise a SIGKILL instead
-maybe?  We will have dumped the VFP state into the kernel log at this
-point, things are pretty much fscked.
+Hmm I don't seem to have anything in my inbox. What might
+be the subject for it?
 
-It's probably an impossible condition unless the hardware has failed,
-no one has knowingly reported getting such a dump in their kernel log,
-so it's something that could very likely be changed in some way
-without anyone noticing.
+Regards,
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Tony
