@@ -1,126 +1,108 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 15 Jan 2018 12:09:53 -0600
-Subject: [PATCH] arm64: dts: rockchip: add roc-rk3328-cc board
-In-Reply-To: <10243464.nJpoDBzbVB@phil>
-References: <20180106094538.15568-1-djw@t-chip.com.cn>
- <20180111203033.mnap7tijbfsvr5pa@rob-hp-laptop>
- <10243464.nJpoDBzbVB@phil>
-Message-ID: <CAL_JsqKSvyi0HRFkwYfr2HS_xBuQfTYphUYP7ass1nQn3EKLgw@mail.gmail.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Mon, 15 Jan 2018 18:11:10 +0000
+Subject: [GIT PULL] updates to soc/fsl drivers for v4.16
+In-Reply-To: <CAK8P3a3d8VeYk=3p=hF1_==MRLXWwW4bbOZnv0y62BcoEg2-1w@mail.gmail.com>
+References: <1515628596-4715-1-git-send-email-leoyang.li@nxp.com>
+ <20180112020217.tqdjt3voqimr3ptx@localhost>
+ <AM4PR0401MB1699179D81FBB37456325AEA8F170@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+ <CAK8P3a3d8VeYk=3p=hF1_==MRLXWwW4bbOZnv0y62BcoEg2-1w@mail.gmail.com>
+Message-ID: <AM4PR0401MB1699E44F24CED9B28D9EA4D88FEB0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 2:33 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Rob,
->
-> Am Donnerstag, 11. Januar 2018, 14:30:33 CET schrieb Rob Herring:
->> > diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
->> > new file mode 100644
->> > index 0000000..2134baf
->> > --- /dev/null
->> > +++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
->> > @@ -0,0 +1,313 @@
->> > +/*
->> > + * Copyright (c) 2017 T-Chip Intelligent Technology Co., Ltd
->> > + *
->> > + * This file is dual-licensed: you can use it either under the terms
->> > + * of the GPL or the X11 license, at your option. Note that this dual
->> > + * licensing only applies to this file, and not this project as a
->> > + * whole.
->> > + *
->> > + *  a) This library is free software; you can redistribute it and/or
->> > + *     modify it under the terms of the GNU General Public License as
->> > + *     published by the Free Software Foundation; either version 2 of the
->> > + *     License, or (at your option) any later version.
->> > + *
->> > + *     This library is distributed in the hope that it will be useful,
->> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + *     GNU General Public License for more details.
->> > + *
->> > + * Or, alternatively,
->> > + *
->> > + *  b) Permission is hereby granted, free of charge, to any person
->> > + *     obtaining a copy of this software and associated documentation
->> > + *     files (the "Software"), to deal in the Software without
->> > + *     restriction, including without limitation the rights to use,
->> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> > + *     sell copies of the Software, and to permit persons to whom the
->> > + *     Software is furnished to do so, subject to the following
->> > + *     conditions:
->> > + *
->> > + *     The above copyright notice and this permission notice shall be
->> > + *     included in all copies or substantial portions of the Software.
->> > + *
->> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> > + *     OTHER DEALINGS IN THE SOFTWARE.
->> > + */
->>
->> Use SPDX license tag.
->
-> It looks like Thomas' SPDX documentation patches are not yet merged
-> and there were smaller protests about SPDX information only being
-> available on some external website, so just for my understanding, SPDX
-> is the agreed standard now, right?
-
-His series adds the license text for all the tags which Russell said
-addressed his concerns.
-
-I think it is not yet merged mainly because Thomas has been busy with
-Spectre and Meltdown.
-
-> And judging by the SPDX conversion for Rockchip dts I have in my inbox
-> the correct tags should probably be
->         // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->
-> due to the
-> "All devicetrees claim to be either GPL or X11 while the actual license
-> text is MIT. Therefore we use MIT for the SPDX tag as X11 is clearly
-> wrong."
-
-Right.
 
 
->> > +&i2c1 {
->> > +   status = "okay";
->> > +
->> > +   rk805: rk805 at 18 {
->>
->> pmic at 18
->>
->> > +           compatible = "rockchip,rk805";
->> > +           reg = <0x18>;
->> > +           interrupt-parent = <&gpio1>;
->> > +           interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
->> > +           #clock-cells = <1>;
->> > +           clock-output-names = "xin32k", "rk805-clkout2";
->> > +           gpio-controller;
->> > +           #gpio-cells = <2>;
->> > +           pinctrl-names = "default";
->> > +           pinctrl-0 = <&pmic_int_l>;
->> > +           rockchip,system-power-controller;
->> > +           wakeup-source;
->> > +
->> > +           vcc1-supply = <&vcc_sys>;
->> > +           vcc2-supply = <&vcc_sys>;
->> > +           vcc3-supply = <&vcc_sys>;
->> > +           vcc4-supply = <&vcc_sys>;
->> > +           vcc5-supply = <&vcc_io>;
->> > +           vcc6-supply = <&vcc_io>;
->> > +
->> > +           regulators {
->> > +                   vdd_logic: DCDC_REG1 {
->>
->> Don't use '_' in node names.
->
-> The driver binds against the node names including the underscores.
-> (with regulator-compatible being deprecated)
+> -----Original Message-----
+> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> Behalf Of Arnd Bergmann
+> Sent: Monday, January 15, 2018 7:10 AM
+> To: Leo Li <leoyang.li@nxp.com>
+> Cc: Olof Johansson <olof@lixom.net>; arm at kernel.org;
+> shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [GIT PULL] updates to soc/fsl drivers for v4.16
+> 
+> On Fri, Jan 12, 2018 at 8:28 PM, Leo Li <leoyang.li@nxp.com> wrote:
+> >> -----Original Message-----
+> >> From: Olof Johansson [mailto:olof at lixom.net]
+> >> Sent: Thursday, January 11, 2018 8:02 PM
+> >> To: Leo Li <leoyang.li@nxp.com>
+> >> Cc: arm at kernel.org; shawnguo at kernel.org; linux-arm-
+> >> kernel at lists.infradead.org
+> >> Subject: Re: [GIT PULL] updates to soc/fsl drivers for v4.16
+> >>
+> >> On Wed, Jan 10, 2018 at 05:56:36PM -0600, Li Yang wrote:
+> >> > Hi arm-soc maintainer,
+> >> >
+> >> > Please merge the following tag to get updates to the soc/fsl/guts
+> >> > driver for support of additional SoCs and more error path handling.
+> >> >
+> >> > Thanks,
+> >> > Leo
+> >> >
+> >> >
+> >> > The following changes since commit
+> >> b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d:
+> >> >
+> >> >   Linux 4.15-rc7 (2018-01-07 14:22:41 -0800)
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
+> >> > tags/soc-fsl-for-4.16
+> >> >
+> >> > for you to fetch changes up to
+> >> 00ce0a2304014c73c2b7915215c7b3c73e2a25aa:
+> >> >
+> >> >   soc: fsl: guts: Add a NULL check for devm_kasprintf() (2018-01-10
+> >> > 16:54:26 -0600)
+> >>
+> >> 1) This is based on much too new a release
+> >
+> > The branch was created and the first patch was applied quite a while
+> > ago.  The second patch is relatively new but very straightforward.  I
+> > rebased the branch to
+> > -rc7 just before sending the pull request thinking it would be easier
+> > for you to merge.  If that is not a preferred action, I will not do that again in
+> the future.
+> 
+> The general rule is to base on top of -rc1, unless you have a dependency on a
+> patch that went into a later -rc. Going to some -rc that is already part of arm-
+> soc is generally fine, but if you send a branch based on a later -rc than ours, it
+> messes up the git history unnecessarily, and it means that whatever you
+> send has seen less testing than what you had before the rebase.
+> 
+> >> 2) the fact that it's based on this new a release makes me suspect it hasn't
+> >>    been sitting in linux-next either, at least not since before -rc7.
+> >
+> > My tree is not being merged by the Linux-next right now.  So you think we
+> should ask Linux-next to add my tree too?
+> 
+> It's not mandatory, but most of our downstream trees are part of linux-next.
+> 
+> >> Conclusion: Please resend post merge window and we'll queue it up for
+> >> the next release. If the bugfix should go in sooner than that, I can
+> >> cherry-pick that into our fixes. Let me know.
+> >
+> > I know the pull request is coming a little bit late.  But the two small patches
+> are really simple and straightforward.  They are not technically a fix but it will
+> be really helpful if you can take it in this merge window.  And going forward,
+> what is your preferred time frame to send pull request to for-next?
+> 
+> Send them as soon as you think the code is ready. In general, earlier is better,
+> even if you are still testing or expect that you may need additional patches
+> on top. If you send a large chunk of changes during -rc2 and then later (rc6 or
+> rc7) have some fixes to address issues you found with those, we're much
+> happier than when we don't hear anything until -rc6 and then get the larger
+> set of patches with more testing.
+> 
+> If you can find the old commit before your rebase (using 'git reflog') then
+> please send that one so we can reconsider. If you can't find it, just send the
+> two patches directly. Also, anything that is a real bugfix can of course get
+> merged any time.
 
-Okay. You've probably told me that before (and will again next time I forget).
+Thanks for your helpful explanation.  You can see from the link below that the first patch was applied around -rc2 time.
 
-Rob
+https://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git/log/?h=6ea0acf
+
+Regards,
+Leo
