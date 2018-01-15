@@ -1,69 +1,39 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 15 Jan 2018 11:33:37 +0100
-Subject: [PATCH v3 03/16] iio: adc: axp20x_adc: make it possible to probe from
- DT
+Date: Mon, 15 Jan 2018 11:33:48 +0100
+Subject: [PATCH v3 14/16] ARM: dtsi: axp81x: add battery power supply subnode
 In-Reply-To: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
 References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <063c68ec080a999e10bf33e417c974142ddaaf9a.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <9c045de8dcee9a71803978855762e272efdc41d3.1516012352.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare for a future patch that will add a DT node for the ADC, make
-axp20x_adc able to probe from DT and get the per-variant data from
-of_device_id.data since platform_device_id.driver_data won't be set when
-probing by DT.
+The X-Powers AXP81X PMIC exposes battery supply various data such as
+the battery status (charging, discharging, full, dead), current max
+limit, current current, battery capacity (in percentage), voltage max
+and min limits, current voltage, and battery capacity (in Ah).
 
-Leave the ability to probe via platform for driver compatibility with
-old DTs.
+This adds the battery power supply subnode for AXP81X PMIC.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/iio/adc/axp20x_adc.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/axp81x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-index 3fc1b06..3968053 100644
---- a/drivers/iio/adc/axp20x_adc.c
-+++ b/drivers/iio/adc/axp20x_adc.c
-@@ -515,6 +515,13 @@ static const struct axp_data axp22x_data = {
- 	.maps = axp22x_maps,
- };
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 6b5e7bc..1b05c7f 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -69,6 +69,11 @@
+ 		};
+ 	};
  
-+static const struct of_device_id axp20x_adc_of_match[] = {
-+	{ .compatible = "x-powers,axp209-adc", .data = (void *)&axp20x_data, },
-+	{ .compatible = "x-powers,axp221-adc", .data = (void *)&axp22x_data, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, axp20x_adc_of_match);
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp813-battery-power-supply";
++		status = "disabled";
++	};
 +
- static const struct platform_device_id axp20x_adc_id_match[] = {
- 	{ .name = "axp20x-adc", .driver_data = (kernel_ulong_t)&axp20x_data, },
- 	{ .name = "axp22x-adc", .driver_data = (kernel_ulong_t)&axp22x_data, },
-@@ -543,7 +550,16 @@ static int axp20x_probe(struct platform_device *pdev)
- 	indio_dev->dev.of_node = pdev->dev.of_node;
- 	indio_dev->modes = INDIO_DIRECT_MODE;
- 
--	info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
-+	if (!pdev->dev.of_node) {
-+		const struct platform_device_id *id;
-+
-+		id = platform_get_device_id(pdev);
-+		info->data = (struct axp_data *)id->driver_data;
-+	} else {
-+		struct device *dev = &pdev->dev;
-+
-+		info->data = (struct axp_data *)of_device_get_match_data(dev);
-+	}
- 
- 	indio_dev->name = platform_get_device_id(pdev)->name;
- 	indio_dev->info = info->data->iio_info;
-@@ -606,6 +622,7 @@ static int axp20x_remove(struct platform_device *pdev)
- static struct platform_driver axp20x_adc_driver = {
- 	.driver = {
- 		.name = "axp20x-adc",
-+		.of_match_table = of_match_ptr(axp20x_adc_of_match),
- 	},
- 	.id_table = axp20x_adc_id_match,
- 	.probe = axp20x_probe,
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <3000>;
 -- 
 git-series 0.9.1
