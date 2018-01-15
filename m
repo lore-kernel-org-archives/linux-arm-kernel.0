@@ -1,35 +1,31 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 15 Jan 2018 11:33:49 +0100
-Subject: [PATCH v3 15/16] ARM: dtsi: sun8i: a711: enable battery power supply
- subnode
-In-Reply-To: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
-References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <ac46e3ff9fd2137177bcc5185a44abf29f448be2.1516012352.git-series.quentin.schulz@free-electrons.com>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Mon, 15 Jan 2018 10:41:53 +0000
+Subject: [PATCH -next] firmware: arm_sdei: Fix return value check in
+ sdei_present_dt()
+Message-ID: <1516012913-196560-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TBS A711 has an AXP813 PMIC and a soldered battery, thus, we enable
-the battery power supply subnode in its Device Tree.
+In case of error, the function of_platform_device_create() returns
+NULL pointer not ERR_PTR(). The IS_ERR() test in the return value
+check should be replaced with NULL test.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Fixes: 677a60bd2003 ("firmware: arm_sdei: Discover SDEI support via ACPI")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/firmware/arm_sdei.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index 511fca4..1de362f 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -231,6 +231,10 @@
+diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+index 8f6563c..1ea7164 100644
+--- a/drivers/firmware/arm_sdei.c
++++ b/drivers/firmware/arm_sdei.c
+@@ -1023,7 +1023,7 @@ static bool __init sdei_present_dt(void)
  
- #include "axp81x.dtsi"
+ 	pdev = of_platform_device_create(np, sdei_driver.driver.name, NULL);
+ 	of_node_put(np);
+-	if (IS_ERR(pdev))
++	if (!pdev)
+ 		return false;
  
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &reg_aldo1 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
--- 
-git-series 0.9.1
+ 	return true;
