@@ -1,605 +1,624 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Mon, 15 Jan 2018 12:07:34 +0200
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
-In-Reply-To: <20180115095031.pzsgrp3tdmemotrs@flea.lan>
-References: <1515747666-6597-1-git-send-email-stefan@olimex.com>
- <20180115095031.pzsgrp3tdmemotrs@flea.lan>
-Message-ID: <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
+From: hean.loong.ong@intel.com (Hean-Loong, Ong)
+Date: Mon, 15 Jan 2018 18:21:41 +0800
+Subject: [PATCHv<8> 3/3] ARM:drm ivip Intel FPGA Video and Image Processing
+ Suite
+In-Reply-To: <1516011701-2748-1-git-send-email-hean.loong.ong@intel.com>
+References: <1516011701-2748-1-git-send-email-hean.loong.ong@intel.com>
+Message-ID: <1516011701-2748-4-git-send-email-hean.loong.ong@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2018 11:50 AM, Maxime Ripard wrote:
-> Hi Stefan,
->
-> On Fri, Jan 12, 2018 at 11:01:05AM +0200, Stefan Mavrodiev wrote:
->> This is new System-On-Module platform with universal dimm socket for
->> easy insertation. The EVB board is designed to be universal with
->> future modules. Product page is located here [1].
->>
->> There are two dts files - one for base model and another for eMMC variant.
->>
->> Base features of A20-SOM204 board includes:
->> 	* 1GB DDR3 RAM
->> 	* AXP209 PMU
->> 	* KSZ9031 Gigabit PHY
->> 	* AT24C16 EEPROM
->> 	* Status LED
->> 	* LCD connector
->> 	* GPIO connector
->>
->> There will be variants with the following options:
->> 	* Second LAN8710A Megabit PHY
->> 	* 16MB SPI Flash memory
->> 	* eMMC card
->> 	* ATECC508 crypto device
->>
->> The EVB board has:
->> 	* Debug UART
->> 	* MicroSD card connector
->> 	* USB-OTG connector
->> 	* Two USB host
->> 	* RTL8723BS WiFi/BT combo
->> 	* IrDA transceiver/receiver
->> 	* HDMI connector
->> 	* VGA connector
->> 	* Megabit ethernet transceiver
->> 	* Gigabit ethernet transceiver
->> 	* SATA connector
->> 	* CAN driver
->> 	* CSI camera
->> 	* MIC and HP connectors
->> 	* PCIe x4 connector
->> 	* USB3 connector
->> 	* Two UEXT connectors
->> 	* Two user LEDs
->>
->> Some of the features are multiplexed and cannot be used the same time:
->> CAN and Megabit PHY. Others are not usable with A20 SoC: PCIe and USB3.
->>
->> [1] https://www.olimex.com/Products/SOM204/
->>
->> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
->> ---
->>   arch/arm/boot/dts/Makefile                         |   2 +
->>   .../boot/dts/sun7i-a20-olimex-som204-evb-emmc.dts  |  70 ++++
->>   arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts  | 392 +++++++++++++++++++++
->>   3 files changed, 464 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som204-evb-emmc.dts
->>   create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index d0381e9..c890042 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -918,6 +918,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>   	sun7i-a20-m3.dtb \
->>   	sun7i-a20-mk808c.dtb \
->>   	sun7i-a20-olimex-som-evb.dtb \
->> +	sun7i-a20-olimex-som204-evb.dtb \
->> +	sun7i-a20-olimex-som204-evb-emmc.dtb \
-> Ideally, you should split that patch into two, one to introduce the
-> base board and the second one for the emmc.
->
->>   	sun7i-a20-olinuxino-lime.dtb \
->>   	sun7i-a20-olinuxino-lime2.dtb \
->>   	sun7i-a20-olinuxino-lime2-emmc.dtb \
->> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb-emmc.dts
->> new file mode 100644
->> index 0000000..97c4824
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb-emmc.dts
->> @@ -0,0 +1,70 @@
->> +/*
->> + * Copyright 2018 - Stefan Mavrodiev <stefan@olimex.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
-> Could you use the SPDX header, as the first line,
->
-> // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->
-> instead?
->
-> And then, you can drop the license text (but you should keep the
-> Copyright line).
->
->> +/dts-v1/;
->> +#include "sun7i-a20-olimex-som204-evb.dts"
->> +
->> +/ {
->> +	model = "Olimex A20-SOM204-EVB-eMMC";
->> +	compatible = "olimex,a20-olimex-som204-evb-emmc", "allwinner,sun7i-a20";
->> +
->> +	mmc2_pwrseq: mmc2_pwrseq {
->> +		compatible = "mmc-pwrseq-emmc";
->> +		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
->> +	};
->> +};
->> +
->> +&mmc2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc2_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	mmc-pwrseq = <&mmc2_pwrseq>;
->> +	bus-width = <4>;
->> +	non-removable;
->> +	status = "okay";
->> +
->> +	emmc: emmc at 0 {
->> +		reg = <0>;
->> +		compatible = "mmc-card";
->> +		broken-hpi;
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
->> new file mode 100644
->> index 0000000..ec4492b
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
->> @@ -0,0 +1,392 @@
->> +/*
->> + * Copyright 2018 - Stefan Mavrodiev <stefan@olimex.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
-> Same thing for this file.
->
->> +/dts-v1/;
->> +#include "sun7i-a20.dtsi"
->> +#include "sunxi-common-regulators.dtsi"
->> +
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/interrupt-controller/irq.h>
->> +#include <dt-bindings/pwm/pwm.h>
->> +
->> +/ {
->> +	model = "Olimex A20-SOM204-EVB";
->> +	compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
->> +
->> +	aliases {
->> +		serial0 = &uart0;
->> +		serial1 = &uart4;
->> +		serial2 = &uart7;
->> +		spi0 = &spi1;
->> +		spi1 = &spi2;
->> +		ethernet1 = &rtl8723bs;
-> ethernet1? if there's a single network interface, it should be
-> ethernet0.
-I think this will conflict the gmac alias defined in sun7i-a20.dtsi:
+From: Ong Hean Loong <hean.loong.ong@intel.com>
 
-aliases {
- ??? ethernet0 = &gmac;
-};
+Driver for Intel FPGA Video and Image Processing Suite Frame Buffer II.
+The driver only supports the Intel Arria10 devkit and its variants.
+This driver can be either loaded staticlly or in modules.
+The OF device tree binding is located at:
+Documentation/devicetree/bindings/display/altr,vip-fb2.txt
 
->
->> +	};
->> +
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +	};
->> +
->> +	hdmi-connector {
->> +		compatible = "hdmi-connector";
->> +		type = "a";
->> +
->> +		port {
->> +			hdmi_con_in: endpoint {
->> +				remote-endpoint = <&hdmi_out_con>;
->> +			};
->> +		};
->> +	};
->> +
->> +	leds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&led_pins_olimex_som204_evb>;
-> You don't need that pinctrl node.
->
->> +		stat {
->> +			label = "a20-som204:green:stat";
->> +			gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
->> +			default-state = "on";
->> +		};
->> +
->> +		led1 {
->> +			label = "a20-som204-evb:green:led1";
->> +			gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
->> +			default-state = "on";
->> +		};
->> +
->> +		led2 {
->> +			label = "a20-som204-evb:yellow:led2";
->> +			gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
->> +			default-state = "on";
->> +		};
-> You don't have the same prefix between stat and led1/led2. I'm fine
-> with both, but you should be consistent :)
-STAT led is on the SOM204 module, while led1/2 on the EVB. Thats why 
-they have
-different prefix.
->
->> +	};
->> +
->> +	mmc2_pwrseq: mmc2_pwrseq {
->> +		compatible = "mmc-pwrseq-emmc";
->> +		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
->> +	};
-> This is already declared in the emmc variant, isn't it?
->
->> +	rtl_pwrseq: rtl_pwrseq {
->> +		compatible = "mmc-pwrseq-simple";
->> +		reset-gpios = <&pio 6 9 GPIO_ACTIVE_LOW>,
->> +			      <&pio 1 11 GPIO_ACTIVE_LOW>;
->> +	};
-> It looks suspicious that you have two reset lines.
-RTL8723BS is comblo WiFI/BT module. There is separate reset control for 
-each of the
-systems.
->
->> +};
->> +
->> +&ahci {
->> +	target-supply = <&reg_ahci_5v>;
-> You should use the regulators you defined in your PMIC there.
->
->> +	status = "okay";
->> +};
->> +
->> +&can0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&can0_pins_a>;
->> +	status = "okay";
->> +};
->>
->> +&codec {
->> +	status = "okay";
->> +};
->> +
->> +&cpu0 {
->> +	cpu-supply = <&reg_dcdc2>;
->> +};
->> +
->> +&de {
->> +	status = "okay";
->> +};
->> +
->> +&ehci0 {
->> +	status = "okay";
->> +};
->> +
->> +&ehci1 {
->> +	status = "okay";
->> +};
->> +
->> +&gmac {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&gmac_pins_rgmii_a>;
->> +	phy = <&phy3>;
->> +	phy-mode = "rgmii";
->> +	phy-supply = <&reg_vcc3v3>;
->> +
->> +	snps,reset-gpio = <&pio 0 17 GPIO_ACTIVE_HIGH>;
->> +	snps,reset-active-low;
->> +	snps,reset-delays-us = <0 10000 1000000>;
->> +	status = "okay";
->> +
->> +	phy3: ethernet-phy at 3 {
->> +		reg = <3>;
->> +	};
->> +};
->> +
->> +&hdmi {
->> +	status = "okay";
->> +};
->> +
->> +&hdmi_out {
->> +	hdmi_out_con: endpoint {
->> +		remote-endpoint = <&hdmi_con_in>;
->> +	};
->> +};
->> +
->> +&i2c0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&i2c0_pins_a>;
->> +	status = "okay";
->> +
->> +	axp209: pmic at 34 {
->> +		reg = <0x34>;
->> +		interrupt-parent = <&nmi_intc>;
->> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->> +	};
->> +};
->> +
->> +&i2c1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&i2c1_pins_a>;
->> +	status = "okay";
->> +
->> +	eeprom: eeprom at 50 {
->> +		compatible = "atmel,24c16";
->> +		reg = <0x50>;
->> +		pagesize = <16>;
->> +	};
->> +};
->> +
->> +&i2c2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&i2c2_pins_a>;
->> +	status = "okay";
->> +};
-> What is connected to that bus?
-The bus is exposed to one of the connectors (UEXT2). Same for SPI1/2 and 
-UART4/7.
->
->> +&ir0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&ir0_rx_pins_a>,
->> +		    <&ir0_tx_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&mmc0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc0_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	bus-width = <4>;
->> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>;
->> +	cd-inverted;
->> +	status = "okay";
->> +};
->> +
->> +&mmc3 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc3_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	mmc-pwrseq = <&rtl_pwrseq>;
->> +	bus-width = <4>;
->> +	non-removable;
->> +	status = "okay";
->> +
->> +	rtl8723bs: sdio_wifi at 1 {
->> +		reg = <1>;
->> +	};
->> +};
->> +
->> +&ohci0 {
->> +	status = "okay";
->> +};
->> +
->> +&ohci1 {
->> +	status = "okay";
->> +};
->> +
->> +&otg_sram {
->> +	status = "okay";
->> +};
->> +
->> +&pio {
->> +
->> +	bt_uart_pins: bt_uart_pins at 0 {
->> +		pins = "PG6", "PG7", "PG8";
->> +		function = "uart3";
->> +	};
->> +
->> +	led_pins_olimex_som204_evb: led_pins at 0 {
->> +		pins = "PI0", "PI10", "PI11";
->> +		function = "gpio_out";
->> +		drive-strength = <20>;
->> +	};
->> +
->> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
->> +		pins = "PH4";
->> +		function = "gpio_in";
->> +		bias-pull-up;
->> +	};
->> +
->> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
->> +		pins = "PH5";
->> +		function = "gpio_in";
->> +		bias-pull-down;
->> +	};
->> +};
-> You don't need any of these pins
->
->> +#include "axp209.dtsi"
->> +
->> +&ac_power_supply {
->> +	status = "okay";
->> +};
->> +&battery_power_supply {
->> +	status = "okay";
->> +};
->> +
->> +&reg_ahci_5v {
->> +	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
->> +	status = "okay";
->> +};
->> +
->> +&reg_dcdc2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1000000>;
->> +	regulator-max-microvolt = <1400000>;
->> +	regulator-name = "vdd-cpu";
->> +};
->> +
->> +&reg_dcdc3 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1000000>;
->> +	regulator-max-microvolt = <1400000>;
->> +	regulator-name = "vdd-int-dll";
->> +};
->> +
->> +&reg_ldo1 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <1300000>;
->> +	regulator-max-microvolt = <1300000>;
->> +	regulator-name = "vdd-rtc";
->> +};
->> +
->> +&reg_ldo2 {
->> +	regulator-always-on;
->> +	regulator-min-microvolt = <3000000>;
->> +	regulator-max-microvolt = <3000000>;
->> +	regulator-name = "avcc";
->> +};
->> +
->> +&reg_ldo4 {
->> +	regulator-min-microvolt = <3300000>;
->> +	regulator-max-microvolt = <3300000>;
->> +	regulator-name = "vcc-pg";
->> +};
->> +
->> +&reg_usb0_vbus {
->> +	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
->> +	status = "okay";
->> +};
->> +
->> +&reg_usb1_vbus {
->> +	status = "okay";
->> +};
->> +
->> +&reg_usb2_vbus {
->> +	status = "okay";
->> +};
->> +
->> +&spi1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&spi1_pins_a>,
->> +		    <&spi1_cs0_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&spi2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&spi2_pins_a>,
->> +		    <&spi2_cs0_pins_a>;
->> +	status = "okay";
->> +};
-> What is connected on those buses
-As mentioned SPI1/2 are exposed to UEXT1/2.
->
->> +&uart0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart0_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&uart3 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&bt_uart_pins>;
->> +	status = "okay";
->> +};
->> +
->> +&uart4 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart4_pins_a>;
->> +	status = "okay";
->> +};
->> +
->> +&uart7 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&uart7_pins_a>;
->> +	status = "okay";
->> +};
-> Same thing for these three UARTs
-Uart3 is used for H5 BT protocol. UART4/7 are exposed to UEXT.
->
->> +&usb_otg {
->> +	dr_mode = "otg";
->> +	status = "okay";
->> +};
->> +
->> +&usb_power_supply {
->> +	status = "okay";
->> +};
->> +
->> +&usbphy {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&usb0_id_detect_pin>,
->> +		    <&usb0_vbus_detect_pin>;
->> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
->> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
->> +	usb0_vbus_power-supply = <&usb_power_supply>;
->> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->> +	usb1_vbus-supply = <&reg_usb1_vbus>;
->> +	usb2_vbus-supply = <&reg_usb2_vbus>;
-> You should also use one of the PMIC regulators here.
->
-> Thanks!
-> Maxime
->
-Regards,
-Stefan Mavrodiev
+Signed-off-by: Ong Hean Loong <hean.loong.ong@intel.com>
+---
+ drivers/gpu/drm/Kconfig               |    2 +
+ drivers/gpu/drm/Makefile              |    1 +
+ drivers/gpu/drm/ivip/Kconfig          |   14 +++
+ drivers/gpu/drm/ivip/Makefile         |    9 ++
+ drivers/gpu/drm/ivip/intel_vip_conn.c |   95 ++++++++++++++++
+ drivers/gpu/drm/ivip/intel_vip_core.c |  162 +++++++++++++++++++++++++++
+ drivers/gpu/drm/ivip/intel_vip_drv.h  |   52 +++++++++
+ drivers/gpu/drm/ivip/intel_vip_of.c   |  193 +++++++++++++++++++++++++++++++++
+ 8 files changed, 528 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/gpu/drm/ivip/Kconfig
+ create mode 100644 drivers/gpu/drm/ivip/Makefile
+ create mode 100644 drivers/gpu/drm/ivip/intel_vip_conn.c
+ create mode 100644 drivers/gpu/drm/ivip/intel_vip_core.c
+ create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.h
+ create mode 100644 drivers/gpu/drm/ivip/intel_vip_of.c
+
+diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+index 83cb2a8..38a184d 100644
+--- a/drivers/gpu/drm/Kconfig
++++ b/drivers/gpu/drm/Kconfig
+@@ -195,6 +195,8 @@ source "drivers/gpu/drm/nouveau/Kconfig"
+ 
+ source "drivers/gpu/drm/i915/Kconfig"
+ 
++source "drivers/gpu/drm/ivip/Kconfig"
++
+ config DRM_VGEM
+ 	tristate "Virtual GEM provider"
+ 	depends on DRM
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 8ce0703..f7a57f5 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -59,6 +59,7 @@ obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+ obj-$(CONFIG_DRM_MGA)	+= mga/
+ obj-$(CONFIG_DRM_I810)	+= i810/
+ obj-$(CONFIG_DRM_I915)	+= i915/
++obj-$(CONFIG_DRM_IVIP) += ivip/
+ obj-$(CONFIG_DRM_MGAG200) += mgag200/
+ obj-$(CONFIG_DRM_VC4)  += vc4/
+ obj-$(CONFIG_DRM_CIRRUS_QEMU) += cirrus/
+diff --git a/drivers/gpu/drm/ivip/Kconfig b/drivers/gpu/drm/ivip/Kconfig
+new file mode 100644
+index 0000000..1d08b90
+--- /dev/null
++++ b/drivers/gpu/drm/ivip/Kconfig
+@@ -0,0 +1,14 @@
++config DRM_IVIP
++        tristate "Intel FGPA Video and Image Processing"
++        depends on DRM && OF
++        select DRM_GEM_CMA_HELPER
++        select DRM_KMS_HELPER
++        select DRM_KMS_FB_HELPER
++        select DRM_KMS_CMA_HELPER
++        help
++		  Choose this option if you have an Intel FPGA Arria 10 system
++		  and above with an Intel Display Port IP. This does not support
++		  legacy Intel FPGA Cyclone V display port. Currently only single
++		  frame buffer is supported. Note that ACPI and X_86 architecture
++		  is not supported for Arria10. If M is selected the module will be
++		  called ivip.
+diff --git a/drivers/gpu/drm/ivip/Makefile b/drivers/gpu/drm/ivip/Makefile
+new file mode 100644
+index 0000000..cc55b04
+--- /dev/null
++++ b/drivers/gpu/drm/ivip/Makefile
+@@ -0,0 +1,9 @@
++#
++# Makefile for the drm device driver.  This driver provides support for the
++# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
++
++ccflags-y := -Iinclude/drm
++
++obj-$(CONFIG_DRM_IVIP) += ivip.o
++ivip-objs := intel_vip_of.o intel_vip_core.o \
++	intel_vip_conn.o
+diff --git a/drivers/gpu/drm/ivip/intel_vip_conn.c b/drivers/gpu/drm/ivip/intel_vip_conn.c
+new file mode 100644
+index 0000000..46bb04c
+--- /dev/null
++++ b/drivers/gpu/drm/ivip/intel_vip_conn.c
+@@ -0,0 +1,95 @@
++/*
++ * intel_vip_conn.c -- Intel Video and Image Processing(VIP)
++ * Frame Buffer II driver
++ *
++ * This driver supports the Intel VIP Frame Reader component.
++ * More info on the hardware can be found in the Intel Video
++ * and Image Processing Suite User Guide at this address
++ * http://www.altera.com/literature/ug/ug_vip.pdf.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * Authors:
++ * Ong, Hean-Loong <hean.loong.ong@intel.com>
++ *
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_encoder_slave.h>
++#include <drm/drm_plane_helper.h>
++
++static enum drm_connector_status
++intelvipfb_drm_connector_detect(struct drm_connector *connector, bool force)
++{
++	return connector_status_connected;
++}
++
++static void intelvipfb_drm_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_unregister(connector);
++	drm_connector_cleanup(connector);
++}
++
++static const struct drm_connector_funcs intelvipfb_drm_connector_funcs = {
++	.reset = drm_atomic_helper_connector_reset,
++	.detect = intelvipfb_drm_connector_detect,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.destroy = intelvipfb_drm_connector_destroy,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++static int intelvipfb_drm_connector_get_modes(struct drm_connector *connector)
++{
++	struct drm_device *drm = connector->dev;
++	int count;
++
++	count = drm_add_modes_noedid(connector, drm->mode_config.max_width,
++			drm->mode_config.max_height);
++	drm_set_preferred_mode(connector, drm->mode_config.max_width,
++			drm->mode_config.max_height);
++	return count;
++}
++
++static const struct drm_connector_helper_funcs
++intelvipfb_drm_connector_helper_funcs = {
++	.get_modes = intelvipfb_drm_connector_get_modes,
++};
++
++struct drm_connector *
++intelvipfb_conn_setup(struct drm_device *drm)
++{
++	struct drm_connector *conn;
++	int ret;
++
++	conn = devm_kzalloc(drm->dev, sizeof(*conn), GFP_KERNEL);
++	if (IS_ERR(conn))
++		return NULL;
++
++	ret = drm_connector_init(drm, conn, &intelvipfb_drm_connector_funcs,
++			DRM_MODE_CONNECTOR_DisplayPort);
++	if (ret < 0) {
++		dev_err(drm->dev, "failed to initialize drm connector\n");
++		ret = -ENOMEM;
++		goto error_connector_cleanup;
++	}
++
++	conn->polled = 0;
++	drm_connector_helper_add(conn, &intelvipfb_drm_connector_helper_funcs);
++
++	return conn;
++
++error_connector_cleanup:
++	drm_connector_cleanup(conn);
++
++	return NULL;
++}
+diff --git a/drivers/gpu/drm/ivip/intel_vip_core.c b/drivers/gpu/drm/ivip/intel_vip_core.c
+new file mode 100644
+index 0000000..3304a3f
+--- /dev/null
++++ b/drivers/gpu/drm/ivip/intel_vip_core.c
+@@ -0,0 +1,162 @@
++/*
++ * intel_vip_core.c -- Intel Video and Image Processing(VIP)
++ * Frame Buffer II driver
++ *
++ * This driver supports the Intel VIP Frame Reader component.
++ * More info on the hardware can be found in the Intel Video
++ * and Image Processing Suite User Guide at this address
++ * http://www.altera.com/literature/ug/ug_vip.pdf.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * Authors:
++ * Ong, Hean-Loong <hean.loong.ong@intel.com>
++ *
++ */
++
++#include <drm/drmP.h>
++#include <drm/drm_atomic.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_fb_helper.h>
++#include <drm/drm_fb_cma_helper.h>
++#include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_plane_helper.h>
++#include <drm/drm_simple_kms_helper.h>
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++
++#include "intel_vip_drv.h"
++
++static void intelvipfb_enable(struct drm_simple_display_pipe *pipe,
++	       struct drm_crtc_state *crtc_state)
++{
++	/*
++	 * The frameinfo variable has to correspond to the size of the VIP Suite
++	 * Frame Reader register 7 which will determine the maximum size used
++	 * in this frameinfo
++	 */
++
++	u32 frameinfo;
++	struct intelvipfb_priv *priv = pipe->plane.dev->dev_private;
++	void __iomem *base = priv->base;
++	struct drm_plane_state *state = pipe->plane.state;
++	dma_addr_t addr;
++
++	addr = drm_fb_cma_get_gem_addr(state->fb, state, 0);
++
++	dev_info(pipe->plane.dev->dev, "Address 0x%x\n", addr);
++
++	frameinfo =
++		readl(base + INTELVIPFB_FRAME_READER) & 0x00ffffff;
++	writel(frameinfo, base + INTELVIPFB_FRAME_INFO);
++	writel(addr, base + INTELVIPFB_FRAME_START);
++	/* Finally set the control register to 1 to start streaming */
++	writel(1, base + INTELVIPFB_CONTROL);
++}
++
++static void intelvipfb_disable(struct drm_simple_display_pipe *pipe)
++{
++	struct intelvipfb_priv *priv = pipe->plane.dev->dev_private;
++	void __iomem *base = priv->base;
++	/* set the control register to 0 to stop streaming */
++	writel(0, base + INTELVIPFB_CONTROL);
++}
++
++static const struct drm_mode_config_funcs intelvipfb_mode_config_funcs = {
++	.fb_create = drm_fb_cma_create,
++	.atomic_check = drm_atomic_helper_check,
++	.atomic_commit = drm_atomic_helper_commit,
++};
++
++static void intelvipfb_setup_mode_config(struct drm_device *drm)
++{
++	drm_mode_config_init(drm);
++	drm->mode_config.funcs = &intelvipfb_mode_config_funcs;
++}
++
++static int intelvipfb_pipe_prepare_fb(struct drm_simple_display_pipe *pipe,
++					struct drm_plane_state *plane_state)
++{
++	return drm_fb_cma_prepare_fb(&pipe->plane, plane_state);
++}
++
++
++static struct drm_simple_display_pipe_funcs fbpriv_funcs = {
++	.prepare_fb = intelvipfb_pipe_prepare_fb,
++	.enable = intelvipfb_enable,
++	.disable = intelvipfb_disable
++};
++
++int intelvipfb_probe(struct device *dev)
++{
++	int retval;
++	struct drm_device *drm;
++	struct intelvipfb_priv *fbpriv = dev_get_drvdata(dev);
++	struct drm_connector *connector;
++	u32 formats[] = {DRM_FORMAT_XRGB8888};
++
++	drm = fbpriv->drm;
++
++	drm->dev_private = fbpriv;
++
++	intelvipfb_setup_mode_config(drm);
++
++	connector = intelvipfb_conn_setup(drm);
++	if (!connector) {
++		dev_err(drm->dev, "Connector setup failed\n");
++		goto err_mode_config;
++	}
++
++	retval = drm_simple_display_pipe_init(drm, &fbpriv->pipe,
++			&fbpriv_funcs, formats,
++			ARRAY_SIZE(formats), NULL, connector);
++	if (retval < 0) {
++		dev_err(drm->dev, "Cannot setup simple display pipe\n");
++		goto err_mode_config;
++	}
++
++	fbpriv->fbcma = drm_fbdev_cma_init(drm,
++			drm->mode_config.preferred_depth,
++			drm->mode_config.num_connector);
++
++	drm_mode_config_reset(drm);
++
++	drm_dev_register(drm, 0);
++
++	return retval;
++
++err_mode_config:
++
++	drm_mode_config_cleanup(drm);
++	return -ENODEV;
++}
++
++int intelvipfb_remove(struct device *dev)
++{
++	struct intelvipfb_priv *fbpriv = dev_get_drvdata(dev);
++	struct drm_device *drm =  fbpriv->drm;
++
++	drm_dev_unregister(drm);
++
++	if (fbpriv->fbcma)
++		drm_fbdev_cma_fini(fbpriv->fbcma);
++
++	drm_mode_config_cleanup(drm);
++	drm_dev_unref(drm);
++
++	return 0;
++}
++
++MODULE_AUTHOR("Ong, Hean-Loong <hean.loong.ong@intel.com>");
++MODULE_DESCRIPTION("Intel VIP Frame Buffer II driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/gpu/drm/ivip/intel_vip_drv.h b/drivers/gpu/drm/ivip/intel_vip_drv.h
+new file mode 100644
+index 0000000..0a3555d
+--- /dev/null
++++ b/drivers/gpu/drm/ivip/intel_vip_drv.h
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (C) 2017 Intel Corporation.
++ *
++ * Intel Video and Image Processing(VIP) Frame Buffer II driver.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Authors:
++ * Ong, Hean-Loong <hean.loong.ong@intel.com>
++ *
++ */
++#ifndef _INTEL_VIP_DRV_H
++#define _INTEL_VIP_DRV_H
++
++#define DRIVER_NAME    "intelvipfb"
++#define BYTES_PER_PIXEL	 4
++#define CRTC_NUM	        1
++#define CONN_NUM	        1
++
++/* control registers */
++#define INTELVIPFB_CONTROL	      0
++#define INTELVIPFB_STATUS	       0x4
++#define INTELVIPFB_INTERRUPT	    0x8
++#define INTELVIPFB_FRAME_COUNTER	0xC
++#define INTELVIPFB_FRAME_DROP	   0x10
++#define INTELVIPFB_FRAME_INFO	   0x14
++#define INTELVIPFB_FRAME_START	  0x18
++#define INTELVIPFB_FRAME_READER	         0x1C
++
++int intelvipfb_probe(struct device *dev);
++int intelvipfb_remove(struct device *dev);
++int intelvipfb_setup_crtc(struct drm_device *drm);
++struct drm_connector *intelvipfb_conn_setup(struct drm_device *drm);
++
++struct intelvipfb_priv {
++	struct drm_simple_display_pipe pipe;
++	struct drm_fbdev_cma *fbcma;
++	struct drm_device *drm;
++	void    __iomem *base;
++};
++
++#endif
+diff --git a/drivers/gpu/drm/ivip/intel_vip_of.c b/drivers/gpu/drm/ivip/intel_vip_of.c
+new file mode 100644
+index 0000000..47302f9
+--- /dev/null
++++ b/drivers/gpu/drm/ivip/intel_vip_of.c
+@@ -0,0 +1,193 @@
++/*
++ * intel_vip_of.c -- Intel Video and Image Processing(VIP)
++ * Frame Buffer II driver
++ *
++ * This driver supports the Intel VIP Frame Reader component.
++ * More info on the hardware can be found in the Intel Video
++ * and Image Processing Suite User Guide at this address
++ * http://www.altera.com/literature/ug/ug_vip.pdf.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * Authors:
++ * Ong, Hean-Loong <hean.loong.ong@intel.com>
++ *
++ */
++#include <drm/drm_fb_helper.h>
++#include <drm/drm_fb_cma_helper.h>
++#include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_of.h>
++#include <drm/drm_simple_kms_helper.h>
++
++#include <linux/component.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++
++#include "intel_vip_drv.h"
++
++DEFINE_DRM_GEM_CMA_FOPS(drm_fops);
++
++static void intelvipfb_lastclose(struct drm_device *drm)
++{
++	struct intelvipfb_priv *priv = drm->dev_private;
++
++	drm_fbdev_cma_restore_mode(priv->fbcma);
++}
++
++static struct drm_driver intelvipfb_drm = {
++	.driver_features =
++			DRIVER_MODESET | DRIVER_GEM |
++			DRIVER_PRIME | DRIVER_ATOMIC,
++	.gem_free_object_unlocked = drm_gem_cma_free_object,
++	.gem_vm_ops = &drm_gem_cma_vm_ops,
++	.dumb_create = drm_gem_cma_dumb_create,
++	.dumb_destroy = drm_gem_dumb_destroy,
++	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
++	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
++	.gem_prime_export = drm_gem_prime_export,
++	.gem_prime_import = drm_gem_prime_import,
++	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
++	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
++	.gem_prime_vmap = drm_gem_cma_prime_vmap,
++	.gem_prime_vunmap = drm_gem_cma_prime_vunmap,
++	.gem_prime_mmap = drm_gem_cma_prime_mmap,
++	.lastclose = intelvipfb_lastclose,
++	.name = DRIVER_NAME,
++	.date = "20170729",
++	.desc = "Intel FPGA VIP SUITE",
++	.major = 1,
++	.minor = 0,
++	.ioctls = NULL,
++	.patchlevel = 0,
++	.fops = &drm_fops,
++};
++
++/*
++ * Setting up information derived from OF Device Tree Nodes
++ * max-width, max-height, bits per pixel, memory port width
++ */
++
++static int intelvipfb_drm_setup(struct device *dev,
++					struct intelvipfb_priv *fbpriv)
++{
++	struct drm_device *drm = fbpriv->drm;
++	struct device_node *np = dev->of_node;
++	int mem_word_width;
++	int max_h, max_w;
++	int ret;
++
++	ret = of_property_read_u32(np, "altr,max-width", &max_w);
++	if (ret) {
++		dev_err(dev,
++			"Missing required parameter 'altr,max-width'");
++		return ret;
++	}
++
++	ret = of_property_read_u32(np, "altr,max-height", &max_h);
++	if (ret) {
++		dev_err(dev,
++			"Missing required parameter 'altr,max-height'");
++		return ret;
++	}
++
++	ret = of_property_read_u32(np, "altr,mem-port-width", &mem_word_width);
++	if (ret) {
++		dev_err(dev, "Missing required parameter 'altr,mem-port-width '");
++		return ret;
++	}
++
++	if (!(mem_word_width >= 32 && mem_word_width % 32 == 0)) {
++		dev_err(dev,
++			"mem-word-width is set to %i. must be >= 32 and multiple of 32.",
++			 mem_word_width);
++		return -ENODEV;
++	}
++
++	drm->mode_config.min_width = 640;
++	drm->mode_config.min_height = 480;
++	drm->mode_config.max_width = max_w;
++	drm->mode_config.max_height = max_h;
++	drm->mode_config.preferred_depth = 32;
++
++	return 0;
++}
++
++static int intelvipfb_of_probe(struct platform_device *pdev)
++{
++	int retval;
++	struct resource *reg_res;
++	struct intelvipfb_priv *fbpriv;
++	struct device *dev = &pdev->dev;
++	struct drm_device *drm;
++
++	fbpriv = devm_kzalloc(dev, sizeof(*fbpriv), GFP_KERNEL);
++	if (!fbpriv)
++		return -ENOMEM;
++
++	/*setup DRM */
++	drm = drm_dev_alloc(&intelvipfb_drm, dev);
++	if (IS_ERR(drm))
++		return PTR_ERR(drm);
++
++	retval = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
++	if (retval)
++		return -ENODEV;
++
++	fbpriv->drm = drm;
++
++	reg_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!reg_res)
++		return -ENOMEM;
++
++	fbpriv->base = devm_ioremap_resource(dev, reg_res);
++
++	if (IS_ERR(fbpriv->base)) {
++		dev_err(dev, "devm_ioremap_resource failed\n");
++		retval = PTR_ERR(fbpriv->base);
++		return -ENOMEM;
++	}
++
++	intelvipfb_drm_setup(dev, fbpriv);
++
++	dev_set_drvdata(dev, fbpriv);
++
++	return intelvipfb_probe(dev);
++}
++
++static int intelvipfb_of_remove(struct platform_device *pdev)
++{
++	return intelvipfb_remove(&pdev->dev);
++}
++
++/*
++ * The name vip-frame-buffer-2.0 is derived from
++ * http://www.altera.com/literature/ug/ug_vip.pdf
++ * frame buffer IP cores section 14
++ */
++
++static const struct of_device_id intelvipfb_of_match[] = {
++	{ .compatible = "altr,vip-frame-buffer-2.0" },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, intelvipfb_of_match);
++
++static struct platform_driver intelvipfb_driver = {
++	.probe = intelvipfb_of_probe,
++	.remove = intelvipfb_of_remove,
++	.driver = {
++		.name = DRIVER_NAME,
++		.of_match_table = intelvipfb_of_match,
++	},
++};
++
++module_platform_driver(intelvipfb_driver);
+-- 
+1.7.1
