@@ -1,34 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Jan 2018 15:47:40 +0100
-Subject: [PATCH 2/2] soc: bcm: brcmstb: Be multi-platform compatible
-In-Reply-To: <20180112210815.9684-3-f.fainelli@gmail.com>
-References: <20180112210815.9684-1-f.fainelli@gmail.com>
- <20180112210815.9684-3-f.fainelli@gmail.com>
-Message-ID: <CAK8P3a1H1y_f2M9a0F_CcsCgfx8Y2T=MHH9K+4=YqVN3_fB4wA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Jan 2018 14:49:04 +0000
+Subject: EDAC driver for ARMv8 L1/L2 cache
+In-Reply-To: <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
+References: <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112171251.4ricaz3lzditr7pi@pd.tnic>
+ <VI1PR04MB2078B4491702765BA546C5539A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
+ <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
+ <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180113113156.nnmkuh25rilzwf4p@pd.tnic>
+ <20180115142154.rj6cgnhlll7ivyew@lakrids.cambridge.arm.com>
+ <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
+Message-ID: <20180115144903.cdbud6akuavq4qnl@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 10:08 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> We were making a bunch of wrong assumptions that turned out to blow out
-> on non-Broadcom STB platforms:
->
-> - we would return -ENODEV from brcmstb_soc_device_early_init() if we
->   could not find the sun_top_ctrl device node, this is not an error
->   in the context of a multi-platform kernel
-> - we would still try to register the Broadcom STB SoC device, even if we
->   are not running on such a platform
->
-> While at it, also fix the sun_top_ctrl device_node leaks while we change
-> the flow of brcmstb_soc_device_init() and
-> brcmstb_soc_device_early_init().
->
-> Fixes: f780429adfbc ("soc: brcmstb: biuctrl: Move to early_initcall")
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> [florian: Combine all of Thierry's patch in one go for easier review]
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+On Mon, Jan 15, 2018 at 03:32:49PM +0100, Borislav Petkov wrote:
+> On Mon, Jan 15, 2018 at 02:21:54PM +0000, Mark Rutland wrote:
+> > I'm not sure it's possible to cover all potential EDAC implementations
+> > behind the same driver.
+> > 
+> > If we need these drivers, they should be <cpuname>_edac or <soc>_edac.
+> 
+> Yuck, I wanted to avoid that...
+> 
+> Oh well, can we at least share the barebones design and exchange
+> registers/DT only or is it more complicated than that?
 
-Applied both to next/drivers, thanks!
+Unfortunately, it's likely to be more complicated than that. The HW may
+be wildly different.
 
-         Arnd
+The ARMv8 RAS extensions provide some level of architected EDAC support,
+which should be more uniform across CPUs, FW, hypervisors, etc. That we
+could support as armv8_ras_edac, and going forward I'd hope that
+implementations align with that.
+
+Thanks,
+Mark.
