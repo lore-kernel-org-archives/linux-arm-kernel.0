@@ -1,46 +1,49 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 15 Jan 2018 12:00:50 -0800
-Subject: [PATCH] arm64: Stop printing the virtual memory layout
-In-Reply-To: <20180115181839.keb4gyodwgruolk6@armageddon.cambridge.arm.com>
-References: <20171219192810.22537-1-labbott@redhat.com>
- <CAGXu5jKH+XZLor5hApTpzbeq0SBz4Qo-AarAFjAfWXM5p3uSVA@mail.gmail.com>
- <CAGXu5j+Re4ZrZp4+RSoHtLvuo2bMqdU-2Ja2OWnYB-1-p5GLOQ@mail.gmail.com>
- <20180115181839.keb4gyodwgruolk6@armageddon.cambridge.arm.com>
-Message-ID: <CAGXu5j+TKWPXBT+CQbcGVK7A1MNFxHorh15zeZDEPkTBgGSNwg@mail.gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 15 Jan 2018 14:12:26 -0600
+Subject: [PATCH 08/11] signal/arm: Document conflicts with SI_USER and
+ SIGFPE
+In-Reply-To: <20180115174947.GH17719@n2100.armlinux.org.uk> (Russell King's
+ message of "Mon, 15 Jan 2018 17:49:47 +0000")
+References: <87373b6ghs.fsf@xmission.com>
+ <20180112005940.23279-8-ebiederm@xmission.com>
+ <20180115174947.GH17719@n2100.armlinux.org.uk>
+Message-ID: <878tcyop91.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 10:18 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Jan 09, 2018 at 03:02:12PM -0800, Kees Cook wrote:
->> On Tue, Dec 19, 2017 at 1:04 PM, Kees Cook <keescook@chromium.org> wrote:
->> > On Tue, Dec 19, 2017 at 11:28 AM, Laura Abbott <labbott@redhat.com> wrote:
->> >> Printing kernel addresses should be done in limited circumstances, mostly
->> >> for debugging purposes. Printing out the virtual memory layout at every
->> >> kernel bootup doesn't really fall into this category so delete the prints.
->> >> There are other ways to get the same information.
->> >
->> > In looking at this patch, I wonder: is there anything listed here that
->> > is _missing_ from CONFIG_PTDUMP? I would expect all of these to
->> > already be listed there, but I thought I'd ask...
->> >
->> > Regardless:
->> >
->> > Acked-by: Kees Cook <keescook@chromium.org>
->> >
->> > -Kees
->> >
->> >>
->> >> Signed-off-by: Laura Abbott <labbott@redhat.com>
->>
->> Did this patch get picked up? I don't see it in -next.
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+
+> On Thu, Jan 11, 2018 at 06:59:37PM -0600, Eric W. Biederman wrote:
+>> Setting si_code to 0 results in a userspace seeing an si_code of 0.
+>> This is the same si_code as SI_USER.  Posix and common sense requires
+>> that SI_USER not be a signal specific si_code.  As such this use of 0
+>> for the si_code is a pretty horribly broken ABI.
+>> 
+>> Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
+>> value of __SI_KILL and now sees a value of SIL_KILL with the result
+>> that uid and pid fields are copied and which might copying the si_addr
+>> field by accident but certainly not by design.  Making this a very
+>> flakey implementation.
+>> 
+>> Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
+>> appropriate fields will be reliably copied.
 >
-> I queued it now, should appear soon.
+> So what do you suggest when none of the SIGFPE FPE_xxx codes match the
+> condition that "we don't know what happened" ?  Raise a SIGKILL instead
+> maybe?  We will have dumped the VFP state into the kernel log at this
+> point, things are pretty much fscked.
+>
+> It's probably an impossible condition unless the hardware has failed,
+> no one has knowingly reported getting such a dump in their kernel log,
+> so it's something that could very likely be changed in some way
+> without anyone noticing.
 
-Great, thanks!
+It sounds like we have two equally valid possible solutions:
+1) force_sig(SIGKILL, current);
+2) Allocate a new FPE_xxx code in asm-generic/siginfo.h
+   I believe the next available number is 15.
 
--Kees
+If no one is going to notice this should be comparatively easy to fix.
+I just don't have the knowledge of arm to make the judgement myself.
 
--- 
-Kees Cook
-Pixel Security
+Eric
