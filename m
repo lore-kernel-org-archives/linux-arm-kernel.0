@@ -1,61 +1,151 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 15 Jan 2018 17:22:31 +0100
-Subject: [RFC PATCH 0/2] fixing the gpio ownership
-Message-ID: <20180115162233.6205-1-ludovic.desroches@microchip.com>
+Date: Mon, 15 Jan 2018 17:22:33 +0100
+Subject: [RFC PATCH 2/2] gpio: provide a consumer when requesting a gpio
+In-Reply-To: <20180115162233.6205-1-ludovic.desroches@microchip.com>
+References: <20180115162233.6205-1-ludovic.desroches@microchip.com>
+Message-ID: <20180115162233.6205-3-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It can be useful for the pinmuxing layer to know which device is
+requesting a GPIO. Add a consumer variant for gpiod_request to
+reach this goal.
 
-A few weeks ago, I have sent an RFC about adding bias support for GPIOs [1].
+GPIO chips managed by pin controllers should provide the new
+request_consumer operation. They can rely on
+gpiochip_generic_request_consumer instead of
+gpiochip_generic_request.
 
-It was motivated by the fact that I wanted to enable the pinmuxing strict mode
-for my pin controller which can muxed a pin as a peripheral or as a GPIO.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ drivers/gpio/gpiolib.c      | 40 +++++++++++++++++++++++++++++++++-------
+ include/linux/gpio/driver.h |  5 +++++
+ 2 files changed, 38 insertions(+), 7 deletions(-)
 
-Enabling the strict mode prevents several devices to be probed because
-requesting a GPIO fails. The pin request function complains about the
-ownership of the GPIO which is different from the mux ownership. I have to
-remove my pinctrl node to avoid this conflict but I need it to configure my
-pins and to set a pull-up bias for my GPIOs.
-
-My first idea was to add new flags in addition to GPIO_ACTIVE_HIGH and others.
-Obviously, it was not the way to go since many new flags may be added:
-strength, debounce, etc.
-
-Then I proposed a very "quick and dirty" patch to give the picture of what I
-have in mind but I had no feedback. It was probably too dirty. The idea was
-to add a cell to the gpios property with a phandle on a pinctrl node which
-contains only the pinconf, no pinmux. The configuration is applied later when
-requesting the GPIO. The main issue is that enabling the strict mode will
-break old DTBs. I was going to submit patches for this but, after using the
-sysfs which still show me a bad ownership, I decided that it should be fixed.
-
-So I did these patches. Unfortunately, there are several ways to lead to
-gpiod_request(). It does the trick only for the gpiod_get family. The issue is
-still present with legacy gpio_request and fwnode_get_named_gpiod. It seems
-that more and more drivers are converted to use GPIO descriptors so there is
-some hope. The advantage of this solution is to not break old DTBs. As I am
-not aware of all usage of the gpiolib, I tried to implement it in the safest
-way.
-
-Regards
-
-Ludovic
-
-[1] https://www.spinics.net/lists/arm-kernel/msg623149.html
-
-
-Ludovic Desroches (2):
-  pinctrl: add consumer variant for gpio request
-  gpio: provide a consumer when requesting a gpio
-
- drivers/gpio/gpiolib.c           | 40 +++++++++++++++++++++++++++++++++-------
- drivers/pinctrl/core.c           | 13 ++++++++++---
- drivers/pinctrl/pinmux.c         | 16 ++++++++++++++--
- drivers/pinctrl/pinmux.h         | 10 ++++++++++
- include/linux/gpio/driver.h      |  5 +++++
- include/linux/pinctrl/consumer.h |  6 ++++++
- 6 files changed, 78 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 39a0144d5be5..e6645101ec74 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1970,6 +1970,20 @@ int gpiochip_generic_request(struct gpio_chip *chip, unsigned offset)
+ EXPORT_SYMBOL_GPL(gpiochip_generic_request);
+ 
+ /**
++ * gpiochip_generic_request_consumer() - request the gpio function for a pin
++ * @chip: the gpiochip owning the GPIO
++ * @offset: the offset of the GPIO to request for GPIO function
++ * @consumer: name of the device requesting the GPIO
++ */
++int gpiochip_generic_request_consumer(struct gpio_chip *chip, unsigned offset,
++				      const char *consumer)
++{
++	return pinctrl_gpio_request_consumer(chip->gpiodev->base + offset,
++					     consumer);
++}
++EXPORT_SYMBOL_GPL(gpiochip_generic_request_consumer);
++
++/**
+  * gpiochip_generic_free() - free the gpio function from a pin
+  * @chip: the gpiochip to request the gpio function for
+  * @offset: the offset of the GPIO to free from GPIO function
+@@ -2119,7 +2133,8 @@ EXPORT_SYMBOL_GPL(gpiochip_remove_pin_ranges);
+  * on each other, and help provide better diagnostics in debugfs.
+  * They're called even less than the "set direction" calls.
+  */
+-static int gpiod_request_commit(struct gpio_desc *desc, const char *label)
++static int gpiod_request_commit(struct gpio_desc *desc, const char *label,
++				const char *consumer)
+ {
+ 	struct gpio_chip	*chip = desc->gdev->chip;
+ 	int			status;
+@@ -2139,10 +2154,14 @@ static int gpiod_request_commit(struct gpio_desc *desc, const char *label)
+ 		goto done;
+ 	}
+ 
+-	if (chip->request) {
++	if (chip->request || chip->request_consumer) {
+ 		/* chip->request may sleep */
+ 		spin_unlock_irqrestore(&gpio_lock, flags);
+-		status = chip->request(chip, gpio_chip_hwgpio(desc));
++		if (chip->request_consumer)
++			status = chip->request_consumer(chip,
++					gpio_chip_hwgpio(desc), consumer);
++		else
++			status = chip->request(chip, gpio_chip_hwgpio(desc));
+ 		spin_lock_irqsave(&gpio_lock, flags);
+ 
+ 		if (status < 0) {
+@@ -2200,7 +2219,8 @@ static int validate_desc(const struct gpio_desc *desc, const char *func)
+ 		return; \
+ 	} while (0)
+ 
+-int gpiod_request(struct gpio_desc *desc, const char *label)
++int gpiod_request_consumer(struct gpio_desc *desc, const char *label,
++			   const char *consumer)
+ {
+ 	int status = -EPROBE_DEFER;
+ 	struct gpio_device *gdev;
+@@ -2209,7 +2229,7 @@ int gpiod_request(struct gpio_desc *desc, const char *label)
+ 	gdev = desc->gdev;
+ 
+ 	if (try_module_get(gdev->owner)) {
+-		status = gpiod_request_commit(desc, label);
++		status = gpiod_request_commit(desc, label, consumer);
+ 		if (status < 0)
+ 			module_put(gdev->owner);
+ 		else
+@@ -2222,6 +2242,11 @@ int gpiod_request(struct gpio_desc *desc, const char *label)
+ 	return status;
+ }
+ 
++int gpiod_request(struct gpio_desc *desc, const char *label)
++{
++	return gpiod_request_consumer(desc, label, NULL);
++}
++
+ static bool gpiod_free_commit(struct gpio_desc *desc)
+ {
+ 	bool			ret = false;
+@@ -2320,7 +2345,7 @@ struct gpio_desc *gpiochip_request_own_desc(struct gpio_chip *chip, u16 hwnum,
+ 		return desc;
+ 	}
+ 
+-	err = gpiod_request_commit(desc, label);
++	err = gpiod_request_commit(desc, label, NULL);
+ 	if (err < 0)
+ 		return ERR_PTR(err);
+ 
+@@ -3672,7 +3697,8 @@ struct gpio_desc *__must_check gpiod_get_index(struct device *dev,
+ 	}
+ 
+ 	/* If a connection label was passed use that, else use the device name as label */
+-	status = gpiod_request(desc, con_id ? con_id : dev_name(dev));
++	status = gpiod_request_consumer(desc, con_id ? con_id : dev_name(dev),
++					dev_name(dev));
+ 	if (status < 0)
+ 		return ERR_PTR(status);
+ 
+diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
+index 1ba9a331ec51..6bc5c57f0cbd 100644
+--- a/include/linux/gpio/driver.h
++++ b/include/linux/gpio/driver.h
+@@ -228,6 +228,9 @@ struct gpio_chip {
+ 
+ 	int			(*request)(struct gpio_chip *chip,
+ 						unsigned offset);
++	int			(*request_consumer)(struct gpio_chip *chip,
++						unsigned offset,
++						const char *consumer);
+ 	void			(*free)(struct gpio_chip *chip,
+ 						unsigned offset);
+ 	int			(*get_direction)(struct gpio_chip *chip,
+@@ -500,6 +503,8 @@ static inline int gpiochip_irqchip_add_nested(struct gpio_chip *gpiochip,
+ #endif /* CONFIG_GPIOLIB_IRQCHIP */
+ 
+ int gpiochip_generic_request(struct gpio_chip *chip, unsigned offset);
++int gpiochip_generic_request_consumer(struct gpio_chip *chip, unsigned offset,
++				      const char *consumer);
+ void gpiochip_generic_free(struct gpio_chip *chip, unsigned offset);
+ int gpiochip_generic_config(struct gpio_chip *chip, unsigned offset,
+ 			    unsigned long config);
 -- 
 2.12.2
