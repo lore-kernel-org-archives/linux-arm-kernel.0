@@ -1,50 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Jan 2018 08:42:51 +0000
-Subject: [PATCH v4 03/19] arm64: asm-offsets: Remove potential circular
- dependency
-In-Reply-To: <20180115083449.GD21403@cbox>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-4-marc.zyngier@arm.com> <20180115083449.GD21403@cbox>
-Message-ID: <cbe5c186-1adc-ef3e-e52e-5d60548c352a@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Jan 2018 08:44:25 +0000
+Subject: [PATCH v2 1/3] crypto/generic: sha3 - fixes for alignment and big
+ endian operation
+In-Reply-To: <cad7b34c-ca50-f856-c3fa-221b4c937d3e@free.fr>
+References: <20180114164118.18330-1-ard.biesheuvel@linaro.org>
+ <20180114164118.18330-2-ard.biesheuvel@linaro.org>
+ <cad7b34c-ca50-f856-c3fa-221b4c937d3e@free.fr>
+Message-ID: <CAKv+Gu_-DFR6iORh_Y=_a6+juL9UuaS1+3dvactqy0vkA0pWLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/18 08:34, Christoffer Dall wrote:
-> On Thu, Jan 04, 2018 at 06:43:18PM +0000, Marc Zyngier wrote:
->> So far, we've been lucky enough that none of the include files
->> that asm-offsets.c requires include asm-offsets.h. This is
->> about to change, and would introduce a nasty circular dependency...
+On 15 January 2018 at 05:53, Chris Moore <moore@free.fr> wrote:
+> Hi,
+>
+> Le 14/01/2018 ? 17:41, Ard Biesheuvel a ?crit :
 >>
->> Let's now guard the inclusion of asm-offsets.h so that it never
->> gets pulled from asm-offsets.c. The same issue exists between
->> bounce.c and include/generated/bounds.h, and is worked around
->> by using the existing guard symbol.
+>> Ensure that the input is byte swabbed before injecting it into the
+>
+>
+> Nitpick : s/swabbed/swapped/
+>
+
+Thanks Chris - byte swapping is often referred to as swabbing, but I
+guess 'byte swabbing' is redundant regardless.
+
+>> SHA3 transform. Use the get_unaligned() accessor for this so that
+>> we don't perform unaligned access inadvertently on architectures
+>> that do not support that.
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/asm-offsets.h | 2 ++
->>  arch/arm64/kernel/asm-offsets.c      | 2 ++
->>  2 files changed, 4 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
->> index d370ee36a182..7d6531a81eb3 100644
->> --- a/arch/arm64/include/asm/asm-offsets.h
->> +++ b/arch/arm64/include/asm/asm-offsets.h
->> @@ -1 +1,3 @@
->> +#if !defined(__GENERATING_ASM_OFFSETS_H) && !defined(__GENERATING_BOUNDS_H)
-> 
-> I don't understand why we need to check __GENERATING_BOUNDS_H here?
-> What is the interaction between asm-offsets and bounds?
-
-bound.c ends up including asm-offsets.h as well once you start adding
-the dependency between it and alternatives.h. See the report there:
-
-https://www.spinics.net/lists/arm-kernel/msg623723.html
-
-which this check addresses.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+>
+> Cheers,
+> Chris
+>
