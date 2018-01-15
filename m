@@ -1,45 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Jan 2018 14:38:13 +0100
-Subject: stable-rc build: 2 warnings 0 failures
- (stable-rc/v4.14.13-119-gb32d455)
-In-Reply-To: <5a5c9ee8.cf53650a.dae00.f369@mx.google.com>
-References: <5a5c9ee8.cf53650a.dae00.f369@mx.google.com>
-Message-ID: <CAK8P3a2vXJT1g6wa4cbcDJ48sfOKfemazV0e1crJ5v=6DOZ5fg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 15 Jan 2018 13:46:18 +0000
+Subject: [PATCH v6 04/12] arm64/acpi: Create arch specific cpu to acpi id
+ helper
+In-Reply-To: <20180113005920.28658-5-jeremy.linton@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-5-jeremy.linton@arm.com>
+Message-ID: <20180115134618.GD5473@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 1:30 PM, Olof's autobuilder <build@lixom.net> wrote:
+On Fri, Jan 12, 2018 at 06:59:12PM -0600, Jeremy Linton wrote:
+> Its helpful to be able to lookup the acpi_processor_id associated
+> with a logical cpu. Provide an arm64 helper to do this.
+> 
 
-> Warnings:
->
->         arm.allmodconfig:
-> /tmp/cccX4oa4.s:18153: Warning: using r15 results in unpredictable behaviour
-> /tmp/cccX4oa4.s:18225: Warning: using r15 results in unpredictable behaviour
+Makes sense to me, but wondering if we need a weak implementation for
+CONFIG_ACPI. Anyways, will check when this gets used in the series.
 
-This appears to be an old issue that only now started to get reported
-here. From what I can
-tell, new versions of binutils warn about two isntructions in the kprobes test:
+Not sure if this can be squashed into the patch using it, anyways looks
+good on its own.
 
-Maybe we can work around it using a patch like below?
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-        Arnd
-
-diff --git a/arch/arm/probes/kprobes/test-arm.c
-b/arch/arm/probes/kprobes/test-arm.c
-index 8866aedfdea2..8b7df0ce04d2 100644
---- a/arch/arm/probes/kprobes/test-arm.c
-+++ b/arch/arm/probes/kprobes/test-arm.c
-@@ -169,10 +169,10 @@ void kprobe_arm_test_cases(void)
-
-        /* Data-processing with PC as a target and status registers updated */
-        TEST_UNSUPPORTED("movs  pc, r1")
--       TEST_UNSUPPORTED("movs  pc, r1, lsl r2")
-+       TEST_UNSUPPORTED(__inst_arm(0xe1b0f211) "       @ movs  pc, r1, lsl r2")
-        TEST_UNSUPPORTED("movs  pc, #0x10000")
-        TEST_UNSUPPORTED("adds  pc, lr, r1")
--       TEST_UNSUPPORTED("adds  pc, lr, r1, lsl r2")
-+       TEST_UNSUPPORTED(__inst_arm(0xe09ef211) "       @ adds  pc,
-lr, r1, lsl r2")
-        TEST_UNSUPPORTED("adds  pc, lr, #4")
-
-        /* Data-processing with SP as target */
+--
+Regards,
+Sudeep
