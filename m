@@ -1,170 +1,219 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 15 Jan 2018 19:38:59 +0000
-Subject: [PATCH v6 06/13] arm64: kernel: Prepare for a DISR user
+Date: Mon, 15 Jan 2018 19:38:57 +0000
+Subject: [PATCH v6 04/13] arm64: kernel: Survive corrected RAS errors notified
+ by SError
 In-Reply-To: <20180115193906.30053-1-james.morse@arm.com>
 References: <20180115193906.30053-1-james.morse@arm.com>
-Message-ID: <20180115193906.30053-7-james.morse@arm.com>
+Message-ID: <20180115193906.30053-5-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM would like to consume any pending SError (or RAS error) after guest
-exit. Today it has to unmask SError and use dsb+isb to synchronise the
-CPU. With the RAS extensions we can use ESB to synchronise any pending
-SError.
+Prior to v8.2, SError is an uncontainable fatal exception. The v8.2 RAS
+extensions use SError to notify software about RAS errors, these can be
+contained by the Error Syncronization Barrier.
 
-Add the necessary macros to allow DISR to be read and converted to an
-ESR.
+An ACPI system with firmware-first may use SError as its 'SEI'
+notification. Future patches may add code to 'claim' this SError as a
+notification.
 
-We clear the DISR register when we enable the RAS cpufeature, and the
-kernel has not executed any ESB instructions. Any value we find in DISR
-must have belonged to firmware. Executing an ESB instruction is the
-only way to update DISR, so we can expect firmware to have handled
-any deferred SError. By the same logic we clear DISR in the idle path.
+Other systems can distinguish these RAS errors from the SError ESR and
+use the AET bits and additional data from RAS-Error registers to handle
+the error. Future patches may add this kernel-first handling.
+
+Without support for either of these we will panic(), even if we received
+a corrected error. Add code to decode the severity of RAS errors. We can
+safely ignore contained errors where the CPU can continue to make
+progress. For all other errors we continue to panic().
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
 Changes since v4:
- * Corrected 'we ran ESB()' in the commit message.
+ * Reworded 'blocking' to 'fatal'.
+ * Added AET_SHIFT define
+ * Check local CPU caps to allow survivable contained SError on systems where
+   some CPUs have RAS support and some don't.
+ * Clarified where we are merging uncategorized and uncontained. Mostly
+   comments and swapping '0' for a macro defined as 0.
+   Note: These two share an encoding on aarch32.
+ * Removed preempt bodge, KVM now calls this from a non-preemtible location.
 
- arch/arm64/include/asm/assembler.h |  7 +++++++
- arch/arm64/include/asm/esr.h       |  7 +++++++
- arch/arm64/include/asm/exception.h | 14 ++++++++++++++
- arch/arm64/include/asm/processor.h |  1 +
- arch/arm64/include/asm/sysreg.h    |  1 +
- arch/arm64/kernel/cpufeature.c     |  9 +++++++++
- arch/arm64/mm/proc.S               |  5 +++++
- 7 files changed, 44 insertions(+)
+(all of which I think are minor)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 5dc4856f3bb9..40e506b32cb6 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -108,6 +108,13 @@
- 	dmb	\opt
- 	.endm
- 
-+/*
-+ * RAS Error Synchronization barrier
-+ */
-+	.macro  esb
-+	hint    #16
-+	.endm
-+
- /*
-  * NOP sequence
-  */
+
+ arch/arm64/include/asm/esr.h   | 13 ++++++++++
+ arch/arm64/include/asm/traps.h | 54 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c      | 51 +++++++++++++++++++++++++++++++++++----
+ 3 files changed, 113 insertions(+), 5 deletions(-)
+
 diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index c367838700fa..803443d74926 100644
+index 014d7d8edcf9..c367838700fa 100644
 --- a/arch/arm64/include/asm/esr.h
 +++ b/arch/arm64/include/asm/esr.h
-@@ -140,6 +140,13 @@
- #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
- #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+@@ -86,6 +86,18 @@
+ #define ESR_ELx_WNR_SHIFT	(6)
+ #define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
  
-+#define DISR_EL1_IDS		(UL(1) << 24)
-+/*
-+ * DISR_EL1 and ESR_ELx share the bottom 13 bits, but the RES0 bits may mean
-+ * different things in the future...
-+ */
-+#define DISR_EL1_ESR_MASK	(ESR_ELx_AET | ESR_ELx_EA | ESR_ELx_FSC)
++/* Asynchronous Error Type */
++#define ESR_ELx_IDS_SHIFT	(24)
++#define ESR_ELx_IDS		(UL(1) << ESR_ELx_IDS_SHIFT)
++#define ESR_ELx_AET_SHIFT	(10)
++#define ESR_ELx_AET		(UL(0x7) << ESR_ELx_AET_SHIFT)
 +
- /* ESR value templates for specific events */
++#define ESR_ELx_AET_UC		(UL(0) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_UEU		(UL(1) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_UEO		(UL(2) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_UER		(UL(3) << ESR_ELx_AET_SHIFT)
++#define ESR_ELx_AET_CE		(UL(6) << ESR_ELx_AET_SHIFT)
++
+ /* Shared ISS field definitions for Data/Instruction aborts */
+ #define ESR_ELx_SET_SHIFT	(11)
+ #define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
+@@ -100,6 +112,7 @@
+ #define ESR_ELx_FSC		(0x3F)
+ #define ESR_ELx_FSC_TYPE	(0x3C)
+ #define ESR_ELx_FSC_EXTABT	(0x10)
++#define ESR_ELx_FSC_SERROR	(0x11)
+ #define ESR_ELx_FSC_ACCESS	(0x08)
+ #define ESR_ELx_FSC_FAULT	(0x04)
+ #define ESR_ELx_FSC_PERM	(0x0C)
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 1696f9de9359..178e338d2889 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -19,6 +19,7 @@
+ #define __ASM_TRAP_H
  
- /* BRK instruction trap from AArch64 state */
-diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
-index 0c2eec490abf..bc30429d8e91 100644
---- a/arch/arm64/include/asm/exception.h
-+++ b/arch/arm64/include/asm/exception.h
-@@ -18,6 +18,8 @@
- #ifndef __ASM_EXCEPTION_H
- #define __ASM_EXCEPTION_H
- 
+ #include <linux/list.h>
 +#include <asm/esr.h>
-+
- #include <linux/interrupt.h>
+ #include <asm/sections.h>
  
- #define __exception	__attribute__((section(".exception.text")))
-@@ -27,4 +29,16 @@
- #define __exception_irq_entry	__exception
+ struct pt_regs;
+@@ -66,4 +67,57 @@ static inline int in_entry_text(unsigned long ptr)
+ 	return ptr >= (unsigned long)&__entry_text_start &&
+ 	       ptr < (unsigned long)&__entry_text_end;
+ }
++
++/*
++ * CPUs with the RAS extensions have an Implementation-Defined-Syndrome bit
++ * to indicate whether this ESR has a RAS encoding. CPUs without this feature
++ * have a ISS-Valid bit in the same position.
++ * If this bit is set, we know its not a RAS SError.
++ * If its clear, we need to know if the CPU supports RAS. Uncategorized RAS
++ * errors share the same encoding as an all-zeros encoding from a CPU that
++ * doesn't support RAS.
++ */
++static inline bool arm64_is_ras_serror(u32 esr)
++{
++	WARN_ON(preemptible());
++
++	if (esr & ESR_ELx_IDS)
++		return false;
++
++	if (this_cpu_has_cap(ARM64_HAS_RAS_EXTN))
++		return true;
++	else
++		return false;
++}
++
++/*
++ * Return the AET bits from a RAS SError's ESR.
++ *
++ * It is implementation defined whether Uncategorized errors are containable.
++ * We treat them as Uncontainable.
++ * Non-RAS SError's are reported as Uncontained/Uncategorized.
++ */
++static inline u32 arm64_ras_serror_get_severity(u32 esr)
++{
++	u32 aet = esr & ESR_ELx_AET;
++
++	if (!arm64_is_ras_serror(esr)) {
++		/* Not a RAS error, we can't interpret the ESR. */
++		return ESR_ELx_AET_UC;
++	}
++
++	/*
++	 * AET is RES0 if 'the value returned in the DFSC field is not
++	 * [ESR_ELx_FSC_SERROR]'
++	 */
++	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR) {
++		/* No severity information : Uncategorized */
++		return ESR_ELx_AET_UC;
++	}
++
++	return aet;
++}
++
++bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr);
++void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr);
+ #endif
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 3d3588fcd1c7..bbb0fde2780e 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -662,17 +662,58 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
+ }
  #endif
  
-+static inline u32 disr_to_esr(u64 disr)
-+{
-+	unsigned int esr = ESR_ELx_EC_SERROR << ESR_ELx_EC_SHIFT;
+-asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
+ {
+-	nmi_enter();
+-
+ 	console_verbose();
+ 
+ 	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
+ 		smp_processor_id(), esr, esr_get_class_string(esr));
+-	__show_regs(regs);
++	if (regs)
++		__show_regs(regs);
 +
-+	if ((disr & DISR_EL1_IDS) == 0)
-+		esr |= (disr & DISR_EL1_ESR_MASK);
-+	else
-+		esr |= (disr & ESR_ELx_ISS_MASK);
++	nmi_panic(regs, "Asynchronous SError Interrupt");
 +
-+	return esr;
++	cpu_park_loop();
++	unreachable();
 +}
 +
- #endif	/* __ASM_EXCEPTION_H */
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 023cacb946c3..cee4ae25a5d1 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -216,6 +216,7 @@ static inline void spin_lock_prefetch(const void *ptr)
++bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
++{
++	u32 aet = arm64_ras_serror_get_severity(esr);
++
++	switch (aet) {
++	case ESR_ELx_AET_CE:	/* corrected error */
++	case ESR_ELx_AET_UEO:	/* restartable, not yet consumed */
++		/*
++		 * The CPU can make progress. We may take UEO again as
++		 * a more severe error.
++		 */
++		return false;
++
++	case ESR_ELx_AET_UEU:	/* Uncorrected Unrecoverable */
++	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
++		/*
++		 * The CPU can't make progress. The exception may have
++		 * been imprecise.
++		 */
++		return true;
++
++	case ESR_ELx_AET_UC:	/* Uncontainable or Uncategorized error */
++	default:
++		/* Error has been silently propagated */
++		arm64_serror_panic(regs, esr);
++	}
++}
++
++asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++{
++	nmi_enter();
++
++	/* non-RAS errors are not containable */
++	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
++		arm64_serror_panic(regs, esr);
  
- int cpu_enable_pan(void *__unused);
- int cpu_enable_cache_maint_trap(void *__unused);
-+int cpu_clear_disr(void *__unused);
- 
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 1281bc8263c2..115b89aeec00 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -279,6 +279,7 @@
- #define SYS_AMAIR_EL1			sys_reg(3, 0, 10, 3, 0)
- 
- #define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
-+#define SYS_DISR_EL1			sys_reg(3, 0, 12, 1,  1)
- 
- #define SYS_ICC_IAR0_EL1		sys_reg(3, 0, 12, 8, 0)
- #define SYS_ICC_EOIR0_EL1		sys_reg(3, 0, 12, 8, 1)
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 0c0af18121e1..ae5433005504 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1039,6 +1039,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.sign = FTR_UNSIGNED,
- 		.field_pos = ID_AA64PFR0_RAS_SHIFT,
- 		.min_field_value = ID_AA64PFR0_RAS_V1,
-+		.enable = cpu_clear_disr,
- 	},
- #endif /* CONFIG_ARM64_RAS_EXTN */
- 	{},
-@@ -1466,3 +1467,11 @@ static int __init enable_mrs_emulation(void)
+-	panic("Asynchronous SError Interrupt");
++	nmi_exit();
  }
  
- core_initcall(enable_mrs_emulation);
-+
-+int cpu_clear_disr(void *__unused)
-+{
-+	/* Firmware may have left a deferred SError in this register. */
-+	write_sysreg_s(0, SYS_DISR_EL1);
-+
-+	return 0;
-+}
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index ec4c3d82b4d6..05e4ae934b23 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -132,6 +132,11 @@ alternative_endif
- 	ubfx	x11, x11, #1, #1
- 	msr	oslar_el1, x11
- 	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
-+
-+alternative_if ARM64_HAS_RAS_EXTN
-+	msr_s	SYS_DISR_EL1, xzr
-+alternative_else_nop_endif
-+
- 	isb
- 	ret
- ENDPROC(cpu_do_resume)
+ void __pte_error(const char *file, int line, unsigned long val)
 -- 
 2.15.1
