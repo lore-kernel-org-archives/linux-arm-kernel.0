@@ -1,88 +1,112 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 15 Jan 2018 11:13:04 -0700
-Subject: [PATCH v2 00/10] perf tools: Add support for CoreSight trace decoding
-Message-ID: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Mon, 15 Jan 2018 11:13:10 -0700
+Subject: [PATCH v2 06/10] perf tools: Add functionality to communicate with
+ the openCSD decoder
+In-Reply-To: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1516039994-314-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+This patch adds functions to communicate with the openCSD trace decoder,
+more specifically to access program memory, fetch trace packets and
+reset the decoder.
 
-This patchset adds support for per-thread CoreSight trace decoding from the
-"perf report" interface.  It is largely modelled on what has been done for
-intelPT traces and currently targets the ETMv4 architecture.  Support for
-cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
+Co-authored-by: Tor Jeremiassen <tor@ti.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 60 +++++++++++++++++++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  9 ++++
+ 2 files changed, 69 insertions(+)
 
-The trace decoding support is done using the Open CoreSight Decoding
-Library (openCSD), a stand alone open source project available here [1].
-Integration of the openCSD library with the perf tools follow what has
-been done for other support libraries.  If the library has been installed
-on a system the build scripts will include support for CoreSight trace
-decoding:
-
-...			zlib: [ on  ]
-...			lzma: [ OFF ]
-...			get_cpuid: [ on  ]
-...			bpf: [ on  ]
-...			libopencsd: [ on  ] <------
-
-Instructions on how to build and install the openCSD library are provided
-in the HOWTO.md of the project repository.  We elected to keep the decoder
-library independent of the kernel tree as it is also used outside of the
-perf toolset and various non-linux projects.
-
-The work applies cleanly to [2] and depend on the following patches [3, 4].
-
-Lastly there is a divergence of opinions on whether the decoding library
-should be part of the kernel tree or live on its own as we chose to do -
-your point of view on the matter would be greatly appreciated.
-
-Regards,
-Mathieu
-
-[1]. https://github.com/Linaro/OpenCSD
-[2]. git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core
-[3]. https://marc.info/?l=linux-kernel&m=151561673423088&w=2
-[4]. https://marc.info/?l=linux-kernel&m=151579875721440&w=2 
-
-Changes for V2:
-. Rebased to Acme's latest (321e85e9458a)
-. Following what has been done for libdw and libbabeltrace and added the
-  possibililty to use alternate header/library for development purposes.
-
-Mathieu Poirier (8):
-  perf tools: Integrating the CoreSight decoding library
-  perf tools: Add initial entry point for decoder CoreSight traces
-  perf tools: Add decoder mechanic to support dumping trace data
-  perf tools: Add support for decoding CoreSight trace data
-  perf tools: Add functionality to communicate with the openCSD decoder
-  pert tools: Add queue management functionality
-  perf tools: Add full support for CoreSight trace decoding
-  perf tools: Add mechanic to synthesise CoreSight trace packets
-
-Tor Jeremiassen (2):
-  perf tools: Add processing of coresight metadata
-  MAINTAINERS: Adding entry for CoreSight trace decoding
-
- MAINTAINERS                                     |    3 +-
- tools/build/Makefile.feature                    |    6 +-
- tools/build/feature/Makefile                    |    7 +-
- tools/build/feature/test-all.c                  |    5 +
- tools/build/feature/test-libopencsd.c           |    8 +
- tools/perf/Makefile.config                      |   25 +
- tools/perf/Makefile.perf                        |    2 +
- tools/perf/util/Build                           |    6 +
- tools/perf/util/auxtrace.c                      |    2 +
- tools/perf/util/cs-etm-decoder/Build            |    1 +
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  513 ++++++++++++
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  105 +++
- tools/perf/util/cs-etm.c                        | 1023 +++++++++++++++++++++++
- tools/perf/util/cs-etm.h                        |   18 +
- 14 files changed, 1720 insertions(+), 4 deletions(-)
- create mode 100644 tools/build/feature/test-libopencsd.c
- create mode 100644 tools/perf/util/cs-etm-decoder/Build
- create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
- create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
- create mode 100644 tools/perf/util/cs-etm.c
-
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 57b020b0b36f..1fb01849f1c7 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -45,6 +45,66 @@ struct cs_etm_decoder {
+ 	struct cs_etm_packet packet_buffer[MAX_BUFFER];
+ };
+ 
++static u32
++cs_etm_decoder__mem_access(const void *context,
++			   const ocsd_vaddr_t address,
++			   const ocsd_mem_space_acc_t mem_space __maybe_unused,
++			   const u32 req_size,
++			   u8 *buffer)
++{
++	struct cs_etm_decoder *decoder = (struct cs_etm_decoder *) context;
++
++	return decoder->mem_access(decoder->data,
++				   address,
++				   req_size,
++				   buffer);
++}
++
++int cs_etm_decoder__add_mem_access_cb(struct cs_etm_decoder *decoder,
++				      u64 start, u64 end,
++				      cs_etm_mem_cb_type cb_func)
++{
++	decoder->mem_access = cb_func;
++
++	if (ocsd_dt_add_callback_mem_acc(decoder->dcd_tree, start, end,
++					 OCSD_MEM_SPACE_ANY,
++					 cs_etm_decoder__mem_access, decoder))
++		return -1;
++
++	return 0;
++}
++
++int cs_etm_decoder__reset(struct cs_etm_decoder *decoder)
++{
++	ocsd_datapath_resp_t dp_ret;
++
++	dp_ret = ocsd_dt_process_data(decoder->dcd_tree, OCSD_OP_RESET,
++				      0, 0, NULL, NULL);
++	if (OCSD_DATA_RESP_IS_FATAL(dp_ret))
++		return -1;
++
++	return 0;
++}
++
++int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
++			       struct cs_etm_packet *packet)
++{
++	if (!decoder || !packet)
++		return -EINVAL;
++
++	/* Nothing to do, might as well just return */
++	if (decoder->packet_count == 0)
++		return 0;
++
++	*packet = decoder->packet_buffer[decoder->head];
++
++	decoder->head = (decoder->head + 1) & (MAX_BUFFER - 1);
++
++	decoder->packet_count--;
++
++	return 1;
++}
++
+ static void cs_etm_decoder__gen_etmv4_config(struct cs_etm_trace_params *params,
+ 					     ocsd_etmv4_cfg *config)
+ {
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index a1e9b0ac5965..3d2e6205d186 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -93,4 +93,13 @@ cs_etm_decoder__new(int num_cpu,
+ 
+ void cs_etm_decoder__free(struct cs_etm_decoder *decoder);
+ 
++int cs_etm_decoder__add_mem_access_cb(struct cs_etm_decoder *decoder,
++				      u64 start, u64 end,
++				      cs_etm_mem_cb_type cb_func);
++
++int cs_etm_decoder__get_packet(struct cs_etm_decoder *decoder,
++			       struct cs_etm_packet *packet);
++
++int cs_etm_decoder__reset(struct cs_etm_decoder *decoder);
++
+ #endif /* INCLUDE__CS_ETM_DECODER_H__ */
 -- 
 2.7.4
