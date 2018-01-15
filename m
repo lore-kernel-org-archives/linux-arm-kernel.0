@@ -1,87 +1,32 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Mon, 15 Jan 2018 15:23:49 +0000
-Subject: [PATCH 2/3] KVM: arm/arm64: fix HYP ID map extension to 52 bits
-In-Reply-To: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
-References: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1516029830-12326-3-git-send-email-kristina.martsenko@arm.com>
+Date: Mon, 15 Jan 2018 15:23:47 +0000
+Subject: [PATCH 0/3] Fixes for 52-bit physical address patches
+Message-ID: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fa2a8445b1d3 incorrectly masks the index of the HYP ID map pgd
-entry, causing a non-VHE kernel to hang during boot. This happens when
-VA_BITS=48 and the ID map text is in 52-bit physical memory. In this
-case we don't need an extra table level but need more entries in the
-top-level table, so we need to map into hyp_pgd and need to use
-__kvm_idmap_ptrs_per_pgd to mask in the extra bits. However,
-__create_hyp_mappings currently masks by PTRS_PER_PGD instead.
+Hi Catalin/Will,
 
-Fix it so that we always use __kvm_idmap_ptrs_per_pgd for the HYP ID
-map. This ensures that we use the larger mask for the top-level ID map
-table when it has more entries. In all other cases, PTRS_PER_PGD is used
-as normal.
+Here are a couple of fixes to the 52-bit physical address patch series.
+Some bugs were introduced in the last version (v2) of the series, which
+has now been merged to arm64/for-next/core. The first two patches in
+this series put things back as they were in the previous version (v1) of
+the series. The third patch fixes a comment. These issues have been
+discussed in the email thread of v2 of the series.
 
-Fixes: fa2a8445b1d3 ("arm64: allow ID map to be extended to 52 bits")
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
----
- virt/kvm/arm/mmu.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
+Thanks,
+Kristina
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 761787befd3b..876caf531d32 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -623,21 +623,15 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
- 	return 0;
- }
- 
--static int __create_hyp_mappings(pgd_t *pgdp,
-+static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
- 				 unsigned long start, unsigned long end,
- 				 unsigned long pfn, pgprot_t prot)
- {
- 	pgd_t *pgd;
- 	pud_t *pud;
--	unsigned long addr, next, ptrs_per_pgd = PTRS_PER_PGD;
-+	unsigned long addr, next;
- 	int err = 0;
- 
--	/*
--	 * If it's not the hyp_pgd, fall back to the kvm idmap layout.
--	 */
--	if (pgdp != hyp_pgd)
--		ptrs_per_pgd = __kvm_idmap_ptrs_per_pgd();
--
- 	mutex_lock(&kvm_hyp_pgd_mutex);
- 	addr = start & PAGE_MASK;
- 	end = PAGE_ALIGN(end);
-@@ -705,8 +699,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
- 		int err;
- 
- 		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
--		err = __create_hyp_mappings(hyp_pgd, virt_addr,
--					    virt_addr + PAGE_SIZE,
-+		err = __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD,
-+					    virt_addr, virt_addr + PAGE_SIZE,
- 					    __phys_to_pfn(phys_addr),
- 					    prot);
- 		if (err)
-@@ -737,7 +731,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
- 	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
- 		return -EINVAL;
- 
--	return __create_hyp_mappings(hyp_pgd, start, end,
-+	return __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD, start, end,
- 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
- }
- 
-@@ -1743,7 +1737,7 @@ static int kvm_map_idmap_text(pgd_t *pgd)
- 	int err;
- 
- 	/* Create the idmap in the boot page tables */
--	err = 	__create_hyp_mappings(pgd,
-+	err = 	__create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
- 				      hyp_idmap_start, hyp_idmap_end,
- 				      __phys_to_pfn(hyp_idmap_start),
- 				      PAGE_HYP_EXEC);
+
+Kristina Martsenko (3):
+  arm64: fix ID map extension to 52 bits
+  KVM: arm/arm64: fix HYP ID map extension to 52 bits
+  arm64: fix comment above tcr_compute_pa_size
+
+ arch/arm64/include/asm/assembler.h   |  2 +-
+ arch/arm64/include/asm/mmu_context.h |  5 ++---
+ virt/kvm/arm/mmu.c                   | 18 ++++++------------
+ 3 files changed, 9 insertions(+), 16 deletions(-)
+
 -- 
 2.1.4
