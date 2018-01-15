@@ -1,26 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 15 Jan 2018 12:23:49 +0000
-Subject: [PATCH v6 01/12] drivers: base: cacheinfo: move
- cache_setup_of_node()
-In-Reply-To: <20180113005920.28658-2-jeremy.linton@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-2-jeremy.linton@arm.com>
-Message-ID: <20180115122349.GA5473@e107155-lin>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Mon, 15 Jan 2018 12:24:59 +0000
+Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for
+ hardened usercopy
+In-Reply-To: <1515636190-24061-34-git-send-email-keescook@chromium.org>
+References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
+ <1515636190-24061-34-git-send-email-keescook@chromium.org>
+Message-ID: <20180115122458.GI12608@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 06:59:09PM -0600, Jeremy Linton wrote:
-> In preparation for the next patch, and to aid in
-> review of that patch, lets move cache_setup_of_node
-> farther down in the module without any changes.
-> 
-  ^^^^
-s/farther/further/
+On Thu, Jan 11, 2018 at 02:03:05AM +0000, Kees Cook wrote:
+> This whitelists the FPU register state portion of the thread_struct for
+> copying to userspace, instead of the default entire structure.
+>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Cc: zijun_hu <zijun_hu@htc.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm64/Kconfig                 | 1 +
+>  arch/arm64/include/asm/processor.h | 8 ++++++++
+>  2 files changed, 9 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index a93339f5178f..c84477e6a884 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -90,6 +90,7 @@ config ARM64
+>       select HAVE_ARCH_MMAP_RND_BITS
+>       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+>       select HAVE_ARCH_SECCOMP_FILTER
+> +     select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+>       select HAVE_ARCH_TRACEHOOK
+>       select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+>       select HAVE_ARCH_VMAP_STACK
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 023cacb946c3..e58a5864ec89 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -113,6 +113,14 @@ struct thread_struct {
+>       struct debug_info       debug;          /* debugging */
+>  };
+>
+> +/* Whitelist the fpsimd_state for copying to userspace. */
+> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
+> +                                             unsigned long *size)
+> +{
+> +     *offset = offsetof(struct thread_struct, fpsimd_state);
+> +     *size = sizeof(struct fpsimd_state);
 
-Makes sense
+This should be fpsimd_state.user_fpsimd (fpsimd_state.cpu is important
+for correctly context switching and not supposed to be user-accessible.
+A user copy that encompasses that is definitely a bug).
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
---
-Regards,
-Sudeep
+Cheers
+---Dave
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
