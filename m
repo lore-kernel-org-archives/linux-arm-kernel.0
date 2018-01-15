@@ -1,21 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Jan 2018 18:02:33 +0000
-Subject: [bug report] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <6457a5ff-21d7-0867-2cf1-3b5d08349e2e@arm.com>
-References: <20180112201334.sfqjnyw4or4msfeq@mwanda>
- <6457a5ff-21d7-0867-2cf1-3b5d08349e2e@arm.com>
-Message-ID: <20180115180232.zuxrgdwf2jfproth@armageddon.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 15 Jan 2018 19:03:03 +0100
+Subject: i2c: Include GPIO consumer header in main include
+In-Reply-To: <20171208133934.18038-1-linus.walleij@linaro.org>
+References: <20171208133934.18038-1-linus.walleij@linaro.org>
+Message-ID: <20180115180303.pdax5amdj2rtytih@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 10:51:16AM +0000, Suzuki K. Poulose wrote:
-> perf: dsu: Use signed field for dsu_pmu->num_counters
-> We set dsu_pmu->num_counters to -1, when the DSU is allocated
-> but not initialised when none of the CPUs are active in the DSU.
-> However, we use an unsigned field for num_counters. Switch this
-> to a signed field.
+On Fri, Dec 08, 2017 at 02:39:34PM +0100, Linus Walleij wrote:
+> It seems most users of <linux/i2c.h> pick up their
+> dependency of <linux/gpio/consumer.h> from other paths but
+> that is not a universal law, so include the header
+> explicitly so we have struct gpio_desc available.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Applied. Thanks.
+I still think drivers needing GPIO should include it explicitly.
+So, NAK until further arguments arrive...
 
--- 
-Catalin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/11fd1e6e/attachment.sig>
