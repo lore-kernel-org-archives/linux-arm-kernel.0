@@ -1,45 +1,160 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Jan 2018 16:54:59 +0100
-Subject: [PATCH v4 11/19] KVM: arm/arm64: Demote HYP VA range display to
- being a debug feature
-In-Reply-To: <20180104184334.16571-12-marc.zyngier@arm.com>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-12-marc.zyngier@arm.com>
-Message-ID: <20180115155459.GM21403@cbox>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Mon, 15 Jan 2018 09:59:42 -0600
+Subject: [PATCH 1/2 v2] ARM: dts: Add Aspeed SoC USB controllers to
+ device-tree
+In-Reply-To: <1515738064.31850.100.camel@kernel.crashing.org>
+References: <1515738064.31850.100.camel@kernel.crashing.org>
+Message-ID: <1516031982.5522.3.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 06:43:26PM +0000, Marc Zyngier wrote:
-> Displaying the HYP VA information is slightly counterproductive when
-> using VA randomization. Turn it into a debug feature only, and adjust
-> the last displayed value to reflect the top of RAM instead of ~0.
+On Fri, 2018-01-12 at 17:21 +1100, Benjamin Herrenschmidt wrote:
+> This adds the USB controllers to the DT template of the
+> AST24xx and AST25xx SoCs.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+> This patch doesn't enable them by default on any board specific
+> .dts yet. This will be done when we have the necessary clock/reset
+> and pinmux support. In the meantime though, this will work if
+> u-boot configures things properly.
+> 
+> For the AST2400 I only added pinmux definition for port 1
+> which is dual USB1/USB2. There are additional USB1 only ports
+> that might require more work but I don't have HW to test at
+> hand so I'm leaving that to whoever cares.
+> 
+> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 > ---
->  virt/kvm/arm/mmu.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index b4b69c2d1012..84d09f1a44d4 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1760,9 +1760,10 @@ int kvm_mmu_init(void)
->  	 */
->  	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
->  
-> -	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
-> -	kvm_info("HYP VA range: %lx:%lx\n",
-> -		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
-> +	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
-> +	kvm_debug("HYP VA range: %lx:%lx\n",
-> +		  kern_hyp_va(PAGE_OFFSET),
-> +		  kern_hyp_va((unsigned long)high_memory - 1));
->  
->  	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
->  	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
-> -- 
-> 2.14.2
+> v2: Previous patch was missing actually adding the nodes
+>     (which was an old patch in my tree I had forgotten to
+>     merge).
 > 
+>  arch/arm/boot/dts/aspeed-g4.dtsi | 27 +++++++++++++++++++++++++++
+>  arch/arm/boot/dts/aspeed-g5.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index b0d8431a3700..e55f2ad5de59 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -103,6 +103,23 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		ehci0: usb at 1e6a1000 {
+> +			compatible = "aspeed,ast2400-ehci", "generic-ehci";
+> +			reg = <0x1e6a1000 0x100>;
+> +			interrupts = <5>;
+> +			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
+> +			status = "disabled";
+> +		};
+> +
+> +		uhci: usb at 1e6b0000 {
+> +			compatible = "aspeed,ast2400-uhci", "generic-uhci";
+> +			reg = <0x1e6b0000 0x100>;
+> +			interrupts = <14>;
+> +			#ports = <3>;
+
+I tried to find the documentation for the #ports property, but it seems
+to not exist. Couldn't find any users either, but maybe I didn't look
+broadly enough. It is tested for in drivers/usb/host/uhci-platform.c
+though, so I guess it's functional.
+
+> +			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
+> +			status = "disabled";
+> +		};
+> +
+>  		apb {
+>  			compatible = "simple-bus";
+>  			#address-cells = <1>;
+> @@ -1227,6 +1244,16 @@
+>  		groups = "USBCKI";
+>  	};
+>  
+> +	pinctrl_usb2h_default: usb2h_default {
+> +		function = "USB2H1";
+> +		groups = "USB2H1";
+> +	};
+> +
+> +	pinctrl_usb2d_default: usb2d_default {
+> +		function = "USB2D1";
+> +		groups = "USB2D1";
+> +	};
+> +
+>  	pinctrl_vgabios_rom_default: vgabios_rom_default {
+>  		function = "VGABIOS_ROM";
+>  		groups = "VGABIOS_ROM";
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index 40de3b66c33f..655258edee24 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -138,6 +138,31 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		ehci0: usb at 1e6a1000 {
+> +			compatible = "aspeed,ast2500-ehci", "generic-ehci";
+> +			reg = <0x1e6a1000 0x100>;
+> +			interrupts = <5>;
+> +			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ehci1: usb at 1e6a3000 {
+> +			compatible = "aspeed,ast2500-ehci", "generic-ehci";
+> +			reg = <0x1e6a3000 0x100>;
+> +			interrupts = <13>;
+> +			clocks = <&syscon ASPEED_CLK_GATE_USBPORT2CLK>;
+> +			status = "disabled";
+> +		};
+> +
+> +		uhci: usb at 1e6b0000 {
+> +			compatible = "aspeed,ast2500-uhci", "generic-uhci";
+> +			reg = <0x1e6b0000 0x100>;
+> +			interrupts = <14>;
+> +			#ports = <2>;
+> +			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
+> +			status = "disabled";
+> +		};
+> +
+>  		apb {
+>  			compatible = "simple-bus";
+>  			#address-cells = <1>;
+> @@ -1358,6 +1383,21 @@
+>  		groups = "USBCKI";
+>  	};
+>  
+> +	pinctrl_usb2ah_default: usb2ah_default {
+> +		function = "USB2AH";
+> +		groups = "USB2AH";
+> +	};
+> +
+> +	pinctrl_usb11bhid_default: usb11bhid_default {
+> +		function = "USB11BHID";
+> +		groups = "USB11BHID";
+> +	};
+> +
+> +	pinctrl_usb2bh_default: usb2bh_default {
+> +		function = "USB2BH";
+> +		groups = "USB2BH";
+> +	};
+> +
+>  	pinctrl_vgabiosrom_default: vgabiosrom_default {
+>  		function = "VGABIOSROM";
+>  		groups = "VGABIOSROM";
+
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/6a843572/attachment.sig>
