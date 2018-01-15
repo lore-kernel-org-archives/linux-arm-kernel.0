@@ -1,28 +1,49 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 16 Jan 2018 08:56:55 +1100
-Subject: [PATCH 1/2 v2] ARM: dts: Add Aspeed SoC USB controllers to
- device-tree
-In-Reply-To: <1516031982.5522.3.camel@aj.id.au>
-References: <1515738064.31850.100.camel@kernel.crashing.org>
- <1516031982.5522.3.camel@aj.id.au>
-Message-ID: <1516053415.31850.137.camel@kernel.crashing.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 15 Jan 2018 23:22:42 +0000
+Subject: PM regression in next
+In-Reply-To: <20180115165050.GJ4821@atomide.com>
+References: <20180112012019.GA4059@atomide.com>
+ <20180112190046.GD4821@atomide.com>
+ <20180112191251.GE21458@sirena.org.uk>
+ <20180112210706.GE4821@atomide.com>
+ <20180112211535.GH21458@sirena.org.uk>
+ <20180112215010.GG4821@atomide.com>
+ <20180112221126.GK21458@sirena.org.uk>
+ <20180112224959.GH4821@atomide.com>
+ <20180112225947.GL21458@sirena.org.uk>
+ <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
+ <20180115165050.GJ4821@atomide.com>
+Message-ID: <871siqbte4.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-01-15 at 09:59 -0600, Andrew Jeffery wrote:
-> > +             uhci: usb at 1e6b0000 {
-> > +                     compatible = "aspeed,ast2400-uhci", "generic-uhci";
-> > +                     reg = <0x1e6b0000 0x100>;
-> > +                     interrupts = <14>;
-> > +                     #ports = <3>;
+
+Hi Tony
+
+> > I'm sorry that my patch breaks your drivers.
+> > It seems removing .read/.write callback was too much aggressive.
 > 
-> I tried to find the documentation for the #ports property, but it seems
-> to not exist. Couldn't find any users either, but maybe I didn't look
-> broadly enough. It is tested for in drivers/usb/host/uhci-platform.c
-> though, so I guess it's functional.
+> No problem, things happen. The thing I'm worried about here
+> though is that these patches were "completely untested
+> clean-up patches" :)
 
-I added it to uhci-platform back when that was merged but forgot to
-update the binding. I'll send a separate patch for that.
+Yes, you are 100% true
 
-Cheers,
-Ben.
+> For the next set of changes like this,
+> please make sure you Cc the driver authors so they can test
+> and ack the changes if you can't test them, OK?
+
+Actually, I have posted "convert codec/platform to component"
+patch-set to ALSA ML, without Cc:ing to you.
+
+	Subject: [PATCH 00/38] ASoC: replace platform to component
+	Date: Fri, 12 Jan 2018 09:40:29 +0900
+
+	Subject: [PATCH 000/187] ASoC: replace codec to component
+	Date: Fri, 12 Jan 2018 10:05:05 +0900
+
+I will send test request mail to each driver's authoer
+
+Best regards
+---
+Kuninori Morimoto
