@@ -1,79 +1,35 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 15 Jan 2018 17:17:54 +0000
-Subject: [PATCH 04/14] mmc: mmci: Add STM32 variant
-In-Reply-To: <CACRpkdYVDpmEmrF=Zk1zX8RCRnPDieTgPuCen6KQ4ttFpAm+Yg@mail.gmail.com>
-References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
- <1515759368-16946-5-git-send-email-patrice.chotard@st.com>
- <CACRpkdYVDpmEmrF=Zk1zX8RCRnPDieTgPuCen6KQ4ttFpAm+Yg@mail.gmail.com>
-Message-ID: <ce14077b-2b8b-f8a7-2107-78b1d9dcab27@st.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Jan 2018 17:19:17 +0000
+Subject: PM regression in next
+In-Reply-To: <20180115165050.GJ4821@atomide.com>
+References: <20180112190046.GD4821@atomide.com>
+ <20180112191251.GE21458@sirena.org.uk>
+ <20180112210706.GE4821@atomide.com>
+ <20180112211535.GH21458@sirena.org.uk>
+ <20180112215010.GG4821@atomide.com>
+ <20180112221126.GK21458@sirena.org.uk>
+ <20180112224959.GH4821@atomide.com>
+ <20180112225947.GL21458@sirena.org.uk>
+ <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
+ <20180115165050.GJ4821@atomide.com>
+Message-ID: <20180115171917.GB12018@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+On Mon, Jan 15, 2018 at 08:50:51AM -0800, Tony Lindgren wrote:
+> * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [180115 01:46]:
 
-On 01/15/2018 02:13 AM, Linus Walleij wrote:
-> On Fri, Jan 12, 2018 at 1:15 PM,  <patrice.chotard@st.com> wrote:
-> 
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> STM32F4 and STM32F7 MCUs has a SDIO controller that looks like
->> an ARM pl810.
-> 
-> PL180 you mean. Ulf can fix while applying.
+> > I hope your driver will be OK by using regmap.
+> > In worst case, we can back .read/.write, but it will be component driver side.
 
-I need to send a v2, i will fix it.
+> Well we have the merge window about to open in a week, so
+> please just revert the known broken patches.
 
-> 
->> This patch adds the STM32 variant so that mmci driver supports it.
->>
->> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> 
-> (...)
->> +static struct variant_data variant_stm32 = {
->> +       .fifosize               = 32 * 4,
->> +       .fifohalfsize           = 8 * 4,
->> +       .clkreg                 = MCI_CLK_ENABLE,
->> +       .clkreg_enable          = MCI_ST_UX500_HWFCEN,
-> 
-> If the asic designed derived this from ux500 I guess it is proper.
-> 
->> +       .clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
->> +       .clkreg_neg_edge_enable = MCI_ST_UX500_NEG_EDGE,
->> +       .datalength_bits        = 24,
->> +       .datactrl_mask_sdio     = MCI_DPSM_ST_SDIOEN,
->> +       .st_sdio                = true,
-> 
-> Did you test SDIO? I think we lack features for that.
-
-no, the board accept only micro SD card, so only MMC mode can be tested.
-
-> 
->> +       {
->> +               .id     = 0x00880180,
->> +               .mask   = 0x00ffffff,
->> +               .data   = &variant_stm32,
->> +       },
-> 
-> Since ux500 was 480180 I wonder what variants 5,6,7 are...
-
-What is the rule to define the id ? for ST Micro variants we got the 
-list below :
-	.id     = 0x00180180,  u300
-	.id     = 0x10180180,  nomadik
-	.id     = 0x00280180,  nomadik
-	.id     = 0x00480180,  ux500
-	.id     = 0x10480180,  ux500v2
-	.id     = 0x00880180,  variant_stm32
-
-I simply update the sixth digit for stm32 variant.
-
-
-Patrice
-
-> 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Yours,
-> Linus Walleij
-> 
+Did anyone actually try testing the fix I posted yet?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/c87402a5/attachment-0001.sig>
