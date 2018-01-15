@@ -1,70 +1,162 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Jan 2018 08:50:51 -0800
-Subject: PM regression in next
-In-Reply-To: <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
-References: <20180112012019.GA4059@atomide.com>
- <20180112190046.GD4821@atomide.com>
- <20180112191251.GE21458@sirena.org.uk>
- <20180112210706.GE4821@atomide.com>
- <20180112211535.GH21458@sirena.org.uk>
- <20180112215010.GG4821@atomide.com>
- <20180112221126.GK21458@sirena.org.uk>
- <20180112224959.GH4821@atomide.com>
- <20180112225947.GL21458@sirena.org.uk>
- <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20180115165050.GJ4821@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 15 Jan 2018 16:55:48 +0000
+Subject: [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
+In-Reply-To: <20180108144905.qu5qbmaaglcgwvwq@yury-thinkpad>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <20180108144905.qu5qbmaaglcgwvwq@yury-thinkpad>
+Message-ID: <20180115165548.GV22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [180115 01:46]:
+On Mon, Jan 08, 2018 at 05:49:05PM +0300, Yury Norov wrote:
+> On Tue, Oct 31, 2017 at 03:50:52PM +0000, Dave Martin wrote:
+> > This series implements Linux kernel support for the ARM Scalable Vector
+> > Extension (SVE). [1]  It supersedes the previous v3: see [3] for link
+> > and full cover letter.
+> > 
+> > This is a minor update to v4, but does contain a couple of important
+> > fixes.
+> > 
+> > As in previous postings, the last two patches (here 29-30) are still
+> > RFC and not proposed for merging at this time.
+> > 
+> > The patches apply on
+> > git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+> > for-next/core
+> > d7b1d22d3821 ("arm64: uapi: Remove PSR_Q_BIT")
+> > 
+> > To reduce spam, some people may not been copied on the entire series.
+> > For those who did not receive the whole series, it can be found in the
+> > linux-arm-kernel archive. [2]
+> > 
+> > See the individual patches for details of changes.
+> > 
+> > For reviewer convenience, a git tree is available. [4]
+> > 
+> > Since there are some changes against already-reviewed patches, I've also
+> > pushed an unsquashed fixes tree for people to take a look at if it
+> > helps. [5]
+> > 
+> > 
+> > Summary:
+> > 
+> >  * "regset: Add support for dynamically sized regsets" fixed to avoid
+> >    x86 breakage;
+> > 
+> >  * one trival arm64 patch added to add asmlinkage annotations, and a
+> >    corresponding minor change to the Core task context handling patch;
+> > 
+> >  * one new arm64 fix ("signal: Verify extra data is user-readable in
+> >    sys_rt_sigreturn") to ensure that access_ok() checks are done for the
+> >    whole extended signal frame, not just the base frame;
+> > 
+> >  * one minor fix to the SVE sigreturn code to return consistent
+> >    intermediate error values (semantic correctness, non-functional
+> >    change);
+> > 
+> >  * one minor change to call __copy_from_user() instead of
+> >    copy_from_user() in a situation where there is already an access_ok()
+> >    check;
+> > 
+> > 
+> > [1] ARM Scalable Vector Extension
+> > https://community.arm.com/groups/processors/blog/2016/08/22/technology-update-the-scalable-vector-extension-sve-for-the-armv8-a-architecture
+> > 
+> > [2] linux-arm-kernel October 2017 Archives by thread
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/thread.html
+> > 
+> > [3] [PATCH v4 00/28] ARM Scalable Vector Extension (SVE)
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/539414.html
+> > 
+> > [4] For review and testing only -- **do not pull**
+> >     (This branch has review changelogs which should not form part of
+> >     the final commits.)
+> > 
+> >     v5 series (this posting)
+> > 
+> >     http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v5
+> >     git://linux-arm.org/linux-dm.git sve/v5
+> > 
+> > [5] For review and testing only -- **do not pull**
+> >     (This branch has review changelogs which should not form part of
+> >     the final commits.)
+> > 
+> >     v4 with unsquashed fixes
+> > 
+> >     http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve/v4%2Bfixes
+> >     git://linux-arm.org/linux-dm.git sve/v4+fixes
 > 
-> Hi all
+> Hi Dave,
 > 
-> > > > Most devices have one regmap per device which can be retrieved with
-> > > > dev_get_regmap(), it's the attempt to use that which I suspect is
-> > > > broken.  Like I said snd_soc_codec_init_regmap() ought to fix things if
-> > > > that's the issue.
-> > 
-> > > OK. Adding Peter to loop as it's his driver after all. Not sure
-> > > how well mixing regmap register access to the same module with
-> > > cached twl4030_read() would work :)
-> > 
-> > Yes, that local cache is not a super good idea any more and hopefully
-> > redundant.
-> > 
-> > > Maybe there should also be some big warning happening if
-> > > snd_soc_codec_init_regmap() is now needed and no regmap is
-> > > found?
-> > 
-> > Some devices just plain don't have registers at all (perhaps GPIOs or
-> > just stub drivers providing capability information).  However we should
-> > be screaming loudly about the fact that the I/O we tried to do fails,
-> > that clearly shouldn't be being ignored.
+> During rebase of my ILP32 series on 4.15 kernel I found that 
+> ILP32 needs to be enabled with SVE support, like you do for 
+> LP64 in this series.
 > 
-> I'm sorry that my patch breaks your drivers.
-> It seems removing .read/.write callback was too much aggressive.
+> I did all rebase work on this draft branch:
+> https://github.com/norov/linux/tree/ilp32-4.15-rc7
+> 
+> But any ILP32 program I tried crash, and the message in dmesg looks
+> like this:
+> [   39.510667] CPU: 0 PID: 1857 Comm: mytime Not tainted 4.15.0-rc7-00028-g45e0659df4d9 #41
+> [   39.510712] Hardware name: linux,dummy-virt (DT)
+> [   39.510829] pstate: 00000000 (nzcv daif -PAN -UAO)
+> [   39.511101] pc : 0x33488e28
+> [   39.511125] lr : 0x33488e28
+> [   39.511138] sp : 00000000fffef670
+> [   39.511158] x29: 000000005a536c33 x28: 0000000000000000 
+> [   39.511211] x27: 0000000000000000 x26: 0000000000000000 
+> [   39.511235] x25: 0000000000000000 x24: 0000000000000000 
+> [   39.511257] x23: 0000000000466000 x22: 0000000000000000 
+> [   39.511278] x21: 0000000000000000 x20: 000000000047f2a8 
+> [   39.511300] x19: 0000000000000000 x18: 0000000000000001 
+> [   39.511321] x17: 0000000000001000 x16: 0000000000001030 
+> [   39.511342] x15: 0000000000554e47 x14: 0000000000000001 
+> [   39.511364] x13: 0000000000000004 x12: 000000000000003c 
+> [   39.511385] x11: 0000100000000000 x10: 0800000000000000 
+> [   39.511406] x9 : 0fffffffffffffff x8 : 000000000000007c 
+> [   39.511427] x7 : 0000000000000077 x6 : 0000000000000041 
+> [   39.511448] x5 : 0000000000000411 x4 : 00000000fbad2488 
+> [   39.511468] x3 : 0000000000000001 x2 : 0000000000497950 
+> [   39.511489] x1 : 0000000000497550 x0 : 0000000000000001
+> 
+> (PC, LR and other registers may differ depending on test)
+> 
+> I'm pretty sure that this is SVE-related issue because if I disable
+> ARM64_SVE in config, everything becomes working.
 
-No problem, things happen. The thing I'm worried about here
-though is that these patches were "completely untested
-clean-up patches" :) For the next set of changes like this,
-please make sure you Cc the driver authors so they can test
-and ack the changes if you can't test them, OK?
+Really, software that does not use SVE should not see any difference.
 
-> I hope your driver will be OK by using regmap.
-> In worst case, we can back .read/.write, but it will be component driver side.
+Do you see any pattern to the failures?  Do they appear to be signal-
+related?
 
-Well we have the merge window about to open in a week, so
-please just revert the known broken patches.
+Are you running on the SVE-enabled model, or is this on hardware?
 
-Like I described, it looks all the non-regmap drivers with
-read/write function pointers removed are broken now.
+> I didn't get deep enough into this yet, and most probably there's
+> some stupid reason for crashing apps on my side, but in mail list
+> I found some sve-related patches that I cannot apply both on 4.15-rc
+> and next-20180108. And according to patch names, it is important
+> fixes, like this one:
+> https://www.spinics.net/lists/arm-kernel/msg619548.html
+> 
+> ILP32 code may spit some kernel issues from time to time, so there's
+> minor chance that the problem is not in ILP32 itself - that's why I
+> write this email to you.
+> 
+> What I want to ask you, do you have some branch with the most recent
+> SVE code that includes all fixes? Better if it would be 4.15-based
+> series, because we don't support ILP32 on next-* kernels now.
 
-Just adding back the read/write function pointers while
-keeping your other changes seems also risky to me at this
-point. It seems it should work for twl4030 and twl6030
-though, have not checked the other drivers but they seem
-to have more changes.
+The above fix was queued for -rc2.  All pending fixes should be in
+mainline by now.
 
-Regards,
+> Also, if you have few minutes to take look at my series, I would
+> kindly ask you do this, because I still think that this is my
+> misunderstanding of how SVE should work for ILP32, and you as author
+> may just catch the bug at a glance.
 
-Tony
+I'll take a look -- I didn't think that carefully about the ILP32
+case so far, because it "should" be straightforward.  But there may
+be gotchas I hadn't considered so far.
+
+Cheers
+---Dave
