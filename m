@@ -1,43 +1,168 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 15 Jan 2018 16:06:22 -0200
-Subject: [PATCH v2] ARM: vfp: Go back to clearing vfp_current_hw_state[]
-Message-ID: <1516039582-5905-1-git-send-email-festevam@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Jan 2018 19:07:28 +0100
+Subject: [PATCH v4 12/19] KVM: arm/arm64: Move ioremap calls to
+ create_hyp_io_mappings
+In-Reply-To: <20180104184334.16571-13-marc.zyngier@arm.com>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-13-marc.zyngier@arm.com>
+Message-ID: <20180115180728.GN21403@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu, Jan 04, 2018 at 06:43:27PM +0000, Marc Zyngier wrote:
+> Both HYP io mappings call ioremap, followed by create_hyp_io_mappings.
+> Let's move the ioremap call into create_hyp_io_mappings itself, which
+> simplifies the code a bit and allows for further refactoring.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   |  3 ++-
+>  arch/arm64/include/asm/kvm_mmu.h |  3 ++-
+>  virt/kvm/arm/mmu.c               | 24 ++++++++++++++----------
+>  virt/kvm/arm/vgic/vgic-v2.c      | 31 ++++++++-----------------------
+>  4 files changed, 26 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index fa6f2174276b..cb3bef71ec9b 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -41,7 +41,8 @@
+>  #include <asm/stage2_pgtable.h>
+>  
+>  int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+> +			   void __iomem **kaddr);
+>  void free_hyp_pgds(void);
+>  
+>  void stage2_unmap_vm(struct kvm *kvm);
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index b0c3cbe9b513..09a208014457 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -119,7 +119,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+>  #include <asm/stage2_pgtable.h>
+>  
+>  int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+> +			   void __iomem **kaddr);
+>  void free_hyp_pgds(void);
+>  
+>  void stage2_unmap_vm(struct kvm *kvm);
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 84d09f1a44d4..38adbe0a016c 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -709,26 +709,30 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
+>  }
+>  
+>  /**
+> - * create_hyp_io_mappings - duplicate a kernel IO mapping into Hyp mode
+> - * @from:	The kernel start VA of the range
+> - * @to:		The kernel end VA of the range (exclusive)
+> + * create_hyp_io_mappings - Map IO into both kernel and HYP
+>   * @phys_addr:	The physical start address which gets mapped
+> + * @size:	Size of the region being mapped
+> + * @kaddr:	Kernel VA for this mapping
+>   *
+>   * The resulting HYP VA is the same as the kernel VA, modulo
+>   * HYP_PAGE_OFFSET.
+>   */
+> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+> +			   void __iomem **kaddr)
 
-Commit 384b38b66947 ("ARM: 7873/1: vfp: clear vfp_current_hw_state
-for dying cpu") fixed the cpu dying notifier by clearing
-vfp_current_hw_state[]. However commit e5b61bafe704 ("arm: Convert VFP
-hotplug notifiers to state machine") incorrectly used the original
-vfp_force_reload() function in the cpu dying notifier.
+nit: you could make this return a "void __iomem *" and use ERR_PTR etc.
+as well, but it'll probably look worse on the calling side, so either
+way is fine with me.
 
-Fix it by going back to clearing vfp_current_hw_state[].
+>  {
+> -	unsigned long start = kern_hyp_va((unsigned long)from);
+> -	unsigned long end = kern_hyp_va((unsigned long)to);
+> +	unsigned long start, end;
+>  
+> -	if (is_kernel_in_hyp_mode())
+> +	*kaddr = ioremap(phys_addr, size);
+> +	if (!*kaddr)
+> +		return -ENOMEM;
+> +
+> +	if (is_kernel_in_hyp_mode()) {
+>  		return 0;
+> +	}
 
-Fixes: e5b61bafe704 ("arm: Convert VFP hotplug notifiers to state machine")
-Cc: linux-stable <stable@vger.kernel.org>
-Reported-by: Kohji Okuno <okuno.kohji@jp.panasonic.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Improve the commit message
+nit: we don't need the curly braces
 
- arch/arm/vfp/vfpmodule.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>  
+> -	/* Check for a valid kernel IO mapping */
+> -	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+> -		return -EINVAL;
+>  
+> +	start = kern_hyp_va((unsigned long)*kaddr);
+> +	end = kern_hyp_va((unsigned long)*kaddr + size);
+>  	return __create_hyp_mappings(hyp_pgd, start, end,
+>  				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+>  }
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> index 80897102da26..bc49d702f9f0 100644
+> --- a/virt/kvm/arm/vgic/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -332,16 +332,10 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+>  	if (!PAGE_ALIGNED(info->vcpu.start) ||
+>  	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
+>  		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
+> -		kvm_vgic_global_state.vcpu_base_va = ioremap(info->vcpu.start,
+> -							     resource_size(&info->vcpu));
+> -		if (!kvm_vgic_global_state.vcpu_base_va) {
+> -			kvm_err("Cannot ioremap GICV\n");
+> -			return -ENOMEM;
+> -		}
+>  
+> -		ret = create_hyp_io_mappings(kvm_vgic_global_state.vcpu_base_va,
+> -					     kvm_vgic_global_state.vcpu_base_va + resource_size(&info->vcpu),
+> -					     info->vcpu.start);
+> +		ret = create_hyp_io_mappings(info->vcpu.start,
+> +					     resource_size(&info->vcpu),
+> +					     &kvm_vgic_global_state.vcpu_base_va);
+>  		if (ret) {
+>  			kvm_err("Cannot map GICV into hyp\n");
+>  			goto out;
+> @@ -350,26 +344,17 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+>  		static_branch_enable(&vgic_v2_cpuif_trap);
+>  	}
+>  
+> -	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
+> -						   resource_size(&info->vctrl));
+> -	if (!kvm_vgic_global_state.vctrl_base) {
+> -		kvm_err("Cannot ioremap GICH\n");
+> -		ret = -ENOMEM;
+> +	ret = create_hyp_io_mappings(info->vctrl.start,
+> +				     resource_size(&info->vctrl),
+> +				     &kvm_vgic_global_state.vctrl_base);
+> +	if (ret) {
+> +		kvm_err("Cannot map VCTRL into hyp\n");
+>  		goto out;
+>  	}
+>  
+>  	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
+>  	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
+>  
+> -	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
+> -				     kvm_vgic_global_state.vctrl_base +
+> -					 resource_size(&info->vctrl),
+> -				     info->vctrl.start);
+> -	if (ret) {
+> -		kvm_err("Cannot map VCTRL into hyp\n");
+> -		goto out;
+> -	}
+> -
+>  	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
+>  	if (ret) {
+>  		kvm_err("Cannot register GICv2 KVM device\n");
+> -- 
+> 2.14.2
+> 
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index a71a48e..aa7496b 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -648,7 +648,7 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
-  */
- static int vfp_dying_cpu(unsigned int cpu)
- {
--	vfp_force_reload(cpu, current_thread_info());
-+	vfp_current_hw_state[cpu] = NULL;
- 	return 0;
- }
- 
--- 
-2.7.4
+Otherwise looks good:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
