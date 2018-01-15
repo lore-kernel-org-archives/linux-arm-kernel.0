@@ -1,122 +1,127 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 15 Jan 2018 07:43:34 -0800
-Subject: [PATCH] ARM: dts: Fix missing "device_type" in Aspeed memory nodes
-In-Reply-To: <1515732971.31850.87.camel@kernel.crashing.org>
-References: <1515732971.31850.87.camel@kernel.crashing.org>
-Message-ID: <CACPK8XfFQeskqDDKr3+0iTmC6X4vLdvLq9dfYukb_b4tYN7Kew@mail.gmail.com>
+From: ayan.halder@arm.com (Ayan Halder)
+Date: Mon, 15 Jan 2018 15:47:44 +0000
+Subject: [PATCH 01/19] drm/fourcc: Add a function to tell if the format
+ embeds alpha
+In-Reply-To: <20180109132833.petfgnh3fvbbvosv@flea>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <b58c65b26e59dff7917d90846cb797a11ca09efa.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <1796930.sWoKI78acY@avalon> <20180109132833.petfgnh3fvbbvosv@flea>
+Message-ID: <20180115154744.GA28269@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 8:56 PM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> When Joel removed skeleton.dtsi, the Aspeed boards lost their
-> "device_type" property in the memory node. Since a number of
-> these still use old bootloaders that won't patch it properly,
-> booting breaks as a result.
+On Tue, Jan 09, 2018 at 02:28:33PM +0100, Maxime Ripard wrote:
+> Hi Laurent,
 >
-> This adds the property back to the individual nodes.
+> On Tue, Jan 09, 2018 at 02:29:58PM +0200, Laurent Pinchart wrote:
+> > On Tuesday, 9 January 2018 12:56:20 EET Maxime Ripard wrote:
+> > > There's a bunch of drivers that duplicate the same function to know if a
+> > > particular format embeds an alpha component or not.
+> > >
+> > > Let's create a helper to avoid duplicating that logic.
+> > >
+> > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > Cc: Eric Anholt <eric@anholt.net>
+> > > Cc: Inki Dae <inki.dae@samsung.com>
+> > > Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> > > Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > Cc: Mark Yao <mark.yao@rock-chips.com>
+> > > Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/gpu/drm/drm_fourcc.c | 43 +++++++++++++++++++++++++++++++++++++-
+> > >  include/drm/drm_fourcc.h     |  1 +-
+> > >  2 files changed, 44 insertions(+)
+> > >
+> > > diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
+> > > index 9c0152df45ad..6e6227d6a46b 100644
+> > > --- a/drivers/gpu/drm/drm_fourcc.c
+> > > +++ b/drivers/gpu/drm/drm_fourcc.c
+> > > @@ -348,3 +348,46 @@ int drm_format_plane_height(int height, uint32_t
+> > > format, int plane) return height / info->vsub;
+> > >  }
+> > >  EXPORT_SYMBOL(drm_format_plane_height);
+> > > +
+> > > +/**
+> > > + * drm_format_has_alpha - get whether the format embeds an alpha component
+> > > + * @format: pixel format (DRM_FORMAT_*)
+> > > + *
+> > > + * Returns:
+> > > + * true if the format embeds an alpha component, false otherwise.
+> > > + */
+> > > +bool drm_format_has_alpha(uint32_t format)
+> > > +{
+> > > + switch (format) {
+> > > + case DRM_FORMAT_ARGB4444:
+> > > + case DRM_FORMAT_ABGR4444:
+> > > + case DRM_FORMAT_RGBA4444:
+> > > + case DRM_FORMAT_BGRA4444:
+> > > + case DRM_FORMAT_ARGB1555:
+> > > + case DRM_FORMAT_ABGR1555:
+> > > + case DRM_FORMAT_RGBA5551:
+> > > + case DRM_FORMAT_BGRA5551:
+> > > + case DRM_FORMAT_ARGB8888:
+> > > + case DRM_FORMAT_ABGR8888:
+> > > + case DRM_FORMAT_RGBA8888:
+> > > + case DRM_FORMAT_BGRA8888:
+> > > + case DRM_FORMAT_ARGB2101010:
+> > > + case DRM_FORMAT_ABGR2101010:
+> > > + case DRM_FORMAT_RGBA1010102:
+> > > + case DRM_FORMAT_BGRA1010102:
+> > > + case DRM_FORMAT_AYUV:
+> > > + case DRM_FORMAT_XRGB8888_A8:
+> > > + case DRM_FORMAT_XBGR8888_A8:
+> > > + case DRM_FORMAT_RGBX8888_A8:
+> > > + case DRM_FORMAT_BGRX8888_A8:
+> > > + case DRM_FORMAT_RGB888_A8:
+> > > + case DRM_FORMAT_BGR888_A8:
+> > > + case DRM_FORMAT_RGB565_A8:
+> > > + case DRM_FORMAT_BGR565_A8:
+> > > +         return true;
+> > > +
+> > > + default:
+> > > +         return false;
+> > > + }
+> > > +}
+> > > +EXPORT_SYMBOL(drm_format_has_alpha);
+> >
+> > How about adding the information to struct drm_format_info instead ?
+> > drm_format_has_alpha() could then be implemented as
+> >
+> > bool drm_format_has_alpha(uint32_t format)
+> > {
+> >     const struct drm_format_info *info;
+> >
+> >     info = drm_format_info(format);
+> >     return info ? info->has_alpha : false;
+> > }
 >
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> ---
->
-> Should we just have a skeleton in the g4 and g5 dtsi with just
-> that property instead ?
+> I considered it, and wasn't too sure about if adding more fields to
+> drm_format_info was ok. I can definitely do it that way.
+Are you going to send an updated patch with the change mentioned here.
+Or should I update my patch (https://patchwork.kernel.org/patch/10161023/)
+and change the type of '.alpha' to boolean to denote if the color
+format has an alpha channel or not.
 
-I like this option better. That way future boards don't need to
-remember to add this. Can you send a v2 please?
+> > although drivers should really use the drm_framebuffer::format field directly
+> > in most cases, so the helper might not be needed at all.
+>
+> The drivers converted in my serie shouldn't be too hard to convert to
+> use drm_format_info directly, so that can be removed as well.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-Thanks for the patch. I assume I missed this as I normally use a
-device tree aware boot where u-boot populates the memory node for us.
 
-Cheers,
 
-Joel
-
-> ---
->  arch/arm/boot/dts/aspeed-ast2500-evb.dts         | 1 +
->  arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts    | 1 +
->  arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts     | 1 +
->  arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts | 1 +
->  arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts       | 1 +
->  arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts     | 1 +
->  6 files changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> index ede11c597673..0c3f14d05046 100644
-> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> @@ -17,6 +17,7 @@
->         };
->
->         memory at 80000000 {
-> +               device_type = "memory";
->                 reg = <0x80000000 0x20000000>;
->         };
->  };
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> index 4379d09a261f..9d18cce971be 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> @@ -13,6 +13,7 @@
->         };
->
->         memory at 40000000 {
-> +               device_type = "memory";
->                 reg = <0x40000000 0x20000000>;
->         };
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> index 623b6ab42021..cd06d5738782 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> @@ -13,6 +13,7 @@
->         };
->
->         memory at 80000000 {
-> +               device_type = "memory";
->                 reg = <0x80000000 0x20000000>;
->         };
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts b/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
-> index 5f9049d2c4c3..b64553a083b0 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
-> @@ -14,6 +14,7 @@
->         };
->
->         memory at 80000000 {
-> +               device_type = "memory";
->                 reg = <0x80000000 0x20000000>;
->         };
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts b/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
-> index c881484a85cf..f3f5b3279e52 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
-> @@ -13,6 +13,7 @@
->         };
->
->         memory at 80000000 {
-> +               device_type = "memory";
->                 reg = <0x80000000 0x40000000>;
->         };
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts b/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
-> index 76aa6ea1f988..ca7a4ae9ed08 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
-> @@ -13,6 +13,7 @@
->         };
->
->         memory at 40000000 {
-> +               device_type = "memory";
->                 reg = <0x40000000 0x8000000>;
->         };
->
->
->
->
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
