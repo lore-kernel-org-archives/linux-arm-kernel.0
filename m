@@ -1,230 +1,254 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 15 Jan 2018 11:33:44 +0100
-Subject: [PATCH v3 10/16] power: supply: axp20x_battery: use data structure
- instead of ID for
+Date: Mon, 15 Jan 2018 11:33:41 +0100
+Subject: [PATCH v3 07/16] iio: adc: axp20x_adc: add support for AXP813 ADC
 In-Reply-To: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
 References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <c4129842e1254289ebb3ad1755879a3722bac1cf.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <e9e6b1e841f6b2ce66076d3a4031e3579ead8486.1516012352.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-variant specific code
+The X-Powers AXP813 PMIC is really close to what is already done for
+AXP20X/AXP22X.
 
-We used to use IDs to select a function or a feature depending on the
-variant. It's easier to maintain the code by adding data structure
-storing the few differences between variants so that we don't add a pile
-of if conditions.
+There are two pairs of bits to set the rate (one for Voltage and Current
+measurements and one for TS/GPIO0 voltage measurements) instead of one.
 
-Let's use this data structure and update the code to use it.
+The register to set the ADC rates is different from the one for
+AXP20X/AXP22X.
+
+GPIO0 can be used as an ADC (measuring Volts) unlike for AXP22X.
+
+The scales to apply to the different inputs are unlike the ones from
+AXP20X and AXP22X.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
- drivers/power/supply/axp20x_battery.c | 100 +++++++++++++++++----------
- 1 file changed, 66 insertions(+), 34 deletions(-)
+ drivers/iio/adc/axp20x_adc.c | 123 ++++++++++++++++++++++++++++++++++++-
+ include/linux/mfd/axp20x.h   |   2 +-
+ 2 files changed, 125 insertions(+)
 
-diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
-index 7494f0f..d73c78f 100644
---- a/drivers/power/supply/axp20x_battery.c
-+++ b/drivers/power/supply/axp20x_battery.c
-@@ -53,6 +53,16 @@
+diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
+index 3968053..7cdb8bc 100644
+--- a/drivers/iio/adc/axp20x_adc.c
++++ b/drivers/iio/adc/axp20x_adc.c
+@@ -35,8 +35,13 @@
+ #define AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(x)	(((x) & BIT(0)) << 1)
  
- #define AXP20X_V_OFF_MASK		GENMASK(2, 0)
+ #define AXP20X_ADC_RATE_MASK			GENMASK(7, 6)
++#define AXP813_V_I_ADC_RATE_MASK		GENMASK(5, 4)
++#define AXP813_ADC_RATE_MASK			(AXP20X_ADC_RATE_MASK | AXP813_V_I_ADC_RATE_MASK)
+ #define AXP20X_ADC_RATE_HZ(x)			((ilog2((x) / 25) << 6) & AXP20X_ADC_RATE_MASK)
+ #define AXP22X_ADC_RATE_HZ(x)			((ilog2((x) / 100) << 6) & AXP20X_ADC_RATE_MASK)
++#define AXP813_TS_GPIO0_ADC_RATE_HZ(x)		AXP20X_ADC_RATE_HZ(x)
++#define AXP813_V_I_ADC_RATE_HZ(x)		((ilog2((x) / 100) << 4) & AXP813_V_I_ADC_RATE_MASK)
++#define AXP813_ADC_RATE_HZ(x)			(AXP20X_ADC_RATE_HZ(x) | AXP813_V_I_ADC_RATE_HZ(x))
  
-+struct axp20x_batt_ps;
-+
-+struct axp_data {
-+	int	ccc_scale;
-+	int	ccc_offset;
-+	bool	has_fg_valid;
-+	int	(*get_max_voltage)(struct axp20x_batt_ps *batt, int *val);
-+	int	(*set_max_voltage)(struct axp20x_batt_ps *batt, int val);
-+};
-+
- struct axp20x_batt_ps {
- 	struct regmap *regmap;
- 	struct power_supply *batt;
-@@ -62,7 +72,7 @@ struct axp20x_batt_ps {
- 	struct iio_channel *batt_v;
- 	/* Maximum constant charge current */
- 	unsigned int max_ccc;
--	u8 axp_id;
-+	struct axp_data	*data;
+ #define AXP20X_ADC_CHANNEL(_channel, _name, _type, _reg)	\
+ 	{							\
+@@ -95,6 +100,12 @@ enum axp22x_adc_channel_i {
+ 	AXP22X_BATT_DISCHRG_I,
  };
  
- static int axp20x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-@@ -123,22 +133,6 @@ static int axp22x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
- 	return 0;
- }
++enum axp813_adc_channel_v {
++	AXP813_TS_IN = 0,
++	AXP813_GPIO0_V,
++	AXP813_BATT_V,
++};
++
+ static struct iio_map axp20x_maps[] = {
+ 	{
+ 		.consumer_dev_name = "axp20x-usb-power-supply",
+@@ -197,6 +208,25 @@ static const struct iio_chan_spec axp22x_adc_channels[] = {
+ 			   AXP20X_BATT_DISCHRG_I_H),
+ };
  
--static void raw_to_constant_charge_current(struct axp20x_batt_ps *axp, int *val)
--{
--	if (axp->axp_id == AXP209_ID)
--		*val = *val * 100000 + 300000;
--	else
--		*val = *val * 150000 + 300000;
--}
--
--static void constant_charge_current_to_raw(struct axp20x_batt_ps *axp, int *val)
--{
--	if (axp->axp_id == AXP209_ID)
--		*val = (*val - 300000) / 100000;
--	else
--		*val = (*val - 300000) / 150000;
--}
--
- static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
- 					      int *val)
++static const struct iio_chan_spec axp813_adc_channels[] = {
++	{
++		.type = IIO_TEMP,
++		.address = AXP22X_PMIC_TEMP_H,
++		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
++				      BIT(IIO_CHAN_INFO_SCALE) |
++				      BIT(IIO_CHAN_INFO_OFFSET),
++		.datasheet_name = "pmic_temp",
++	},
++	AXP20X_ADC_CHANNEL(AXP813_GPIO0_V, "gpio0_v", IIO_VOLTAGE,
++			   AXP288_GP_ADC_H),
++	AXP20X_ADC_CHANNEL(AXP813_BATT_V, "batt_v", IIO_VOLTAGE,
++			   AXP20X_BATT_V_H),
++	AXP20X_ADC_CHANNEL(AXP22X_BATT_CHRG_I, "batt_chrg_i", IIO_CURRENT,
++			   AXP20X_BATT_CHRG_I_H),
++	AXP20X_ADC_CHANNEL(AXP22X_BATT_DISCHRG_I, "batt_dischrg_i", IIO_CURRENT,
++			   AXP20X_BATT_DISCHRG_I_H),
++};
++
+ static int axp20x_adc_raw(struct iio_dev *indio_dev,
+ 			  struct iio_chan_spec const *chan, int *val)
  {
-@@ -150,7 +144,7 @@ static int axp20x_get_constant_charge_current(struct axp20x_batt_ps *axp,
- 
- 	*val &= AXP20X_CHRG_CTRL1_TGT_CURR;
- 
--	raw_to_constant_charge_current(axp, val);
-+	*val = *val * axp->data->ccc_scale + axp->data->ccc_offset;
- 
- 	return 0;
- }
-@@ -269,8 +263,7 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
- 		if (ret)
- 			return ret;
- 
--		if (axp20x_batt->axp_id == AXP221_ID &&
--		    !(reg & AXP22X_FG_VALID))
-+		if (axp20x_batt->data->has_fg_valid && !(reg & AXP22X_FG_VALID))
- 			return -EINVAL;
- 
- 		/*
-@@ -281,11 +274,8 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
- 		break;
- 
- 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
--		if (axp20x_batt->axp_id == AXP209_ID)
--			return axp20x_battery_get_max_voltage(axp20x_batt,
--							      &val->intval);
--		return axp22x_battery_get_max_voltage(axp20x_batt,
--						      &val->intval);
-+		return axp20x_batt->data->get_max_voltage(axp20x_batt,
-+							  &val->intval);
- 
- 	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
- 		ret = regmap_read(axp20x_batt->regmap, AXP20X_V_OFF, &reg);
-@@ -312,6 +302,32 @@ static int axp20x_battery_get_prop(struct power_supply *psy,
- 	return 0;
+@@ -243,6 +273,18 @@ static int axp22x_adc_raw(struct iio_dev *indio_dev,
+ 	return IIO_VAL_INT;
  }
  
-+static int axp22x_battery_set_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-+					  int val)
++static int axp813_adc_raw(struct iio_dev *indio_dev,
++			  struct iio_chan_spec const *chan, int *val)
 +{
-+	switch (val) {
-+	case 4100000:
-+		val = AXP20X_CHRG_CTRL1_TGT_4_1V;
-+		break;
++	struct axp20x_adc_iio *info = iio_priv(indio_dev);
 +
-+	case 4200000:
-+		val = AXP20X_CHRG_CTRL1_TGT_4_2V;
-+		break;
++	*val = axp20x_read_variable_width(info->regmap, chan->address, 12);
++	if (*val < 0)
++		return *val;
 +
-+	default:
-+		/*
-+		 * AXP20x max voltage can be set to 4.36V and AXP22X max voltage
-+		 * can be set to 4.22V and 4.24V, but these voltages are too
-+		 * high for Lithium based batteries (AXP PMICs are supposed to
-+		 * be used with these kinds of battery).
-+		 */
-+		return -EINVAL;
-+	}
-+
-+	return regmap_update_bits(axp20x_batt->regmap, AXP20X_CHRG_CTRL1,
-+				  AXP20X_CHRG_CTRL1_TGT_VOLT, val);
++	return IIO_VAL_INT;
 +}
 +
- static int axp20x_battery_set_max_voltage(struct axp20x_batt_ps *axp20x_batt,
- 					  int val)
+ static int axp20x_adc_scale_voltage(int channel, int *val, int *val2)
  {
-@@ -321,9 +337,6 @@ static int axp20x_battery_set_max_voltage(struct axp20x_batt_ps *axp20x_batt,
- 		break;
+ 	switch (channel) {
+@@ -273,6 +315,24 @@ static int axp20x_adc_scale_voltage(int channel, int *val, int *val2)
+ 	}
+ }
  
- 	case 4150000:
--		if (axp20x_batt->axp_id == AXP221_ID)
--			return -EINVAL;
--
- 		val = AXP20X_CHRG_CTRL1_TGT_4_15V;
- 		break;
- 
-@@ -351,7 +364,8 @@ static int axp20x_set_constant_charge_current(struct axp20x_batt_ps *axp_batt,
- 	if (charge_current > axp_batt->max_ccc)
- 		return -EINVAL;
- 
--	constant_charge_current_to_raw(axp_batt, &charge_current);
-+	charge_current = (charge_current - axp_batt->data->ccc_offset) /
-+		axp_batt->data->ccc_scale;
- 
- 	if (charge_current > AXP20X_CHRG_CTRL1_TGT_CURR || charge_current < 0)
- 		return -EINVAL;
-@@ -365,12 +379,14 @@ static int axp20x_set_max_constant_charge_current(struct axp20x_batt_ps *axp,
++static int axp813_adc_scale_voltage(int channel, int *val, int *val2)
++{
++	switch (channel) {
++	case AXP813_GPIO0_V:
++		*val = 0;
++		*val2 = 800000;
++		return IIO_VAL_INT_PLUS_MICRO;
++
++	case AXP813_BATT_V:
++		*val = 1;
++		*val2 = 100000;
++		return IIO_VAL_INT_PLUS_MICRO;
++
++	default:
++		return -EINVAL;
++	}
++}
++
+ static int axp20x_adc_scale_current(int channel, int *val, int *val2)
  {
- 	bool lower_max = false;
+ 	switch (channel) {
+@@ -342,6 +402,26 @@ static int axp22x_adc_scale(struct iio_chan_spec const *chan, int *val,
+ 	}
+ }
  
--	constant_charge_current_to_raw(axp, &charge_current);
-+	charge_current = (charge_current - axp->data->ccc_offset) /
-+		axp->data->ccc_scale;
++static int axp813_adc_scale(struct iio_chan_spec const *chan, int *val,
++			    int *val2)
++{
++	switch (chan->type) {
++	case IIO_VOLTAGE:
++		return axp813_adc_scale_voltage(chan->channel, val, val2);
++
++	case IIO_CURRENT:
++		*val = 1;
++		return IIO_VAL_INT;
++
++	case IIO_TEMP:
++		*val = 100;
++		return IIO_VAL_INT;
++
++	default:
++		return -EINVAL;
++	}
++}
++
+ static int axp20x_adc_offset_voltage(struct iio_dev *indio_dev, int channel,
+ 				     int *val)
+ {
+@@ -425,6 +505,26 @@ static int axp22x_read_raw(struct iio_dev *indio_dev,
+ 	}
+ }
  
- 	if (charge_current > AXP20X_CHRG_CTRL1_TGT_CURR || charge_current < 0)
- 		return -EINVAL;
- 
--	raw_to_constant_charge_current(axp, &charge_current);
-+	charge_current = charge_current * axp->data->ccc_scale +
-+		axp->data->ccc_offset;
- 
- 	if (charge_current > axp->max_ccc)
- 		dev_warn(axp->dev,
-@@ -460,13 +476,28 @@ static const struct power_supply_desc axp20x_batt_ps_desc = {
- 	.set_property = axp20x_battery_set_prop,
++static int axp813_read_raw(struct iio_dev *indio_dev,
++			   struct iio_chan_spec const *chan, int *val,
++			   int *val2, long mask)
++{
++	switch (mask) {
++	case IIO_CHAN_INFO_OFFSET:
++		*val = -2667;
++		return IIO_VAL_INT;
++
++	case IIO_CHAN_INFO_SCALE:
++		return axp813_adc_scale(chan, val, val2);
++
++	case IIO_CHAN_INFO_RAW:
++		return axp813_adc_raw(indio_dev, chan, val);
++
++	default:
++		return -EINVAL;
++	}
++}
++
+ static int axp20x_write_raw(struct iio_dev *indio_dev,
+ 			    struct iio_chan_spec const *chan, int val, int val2,
+ 			    long mask)
+@@ -470,6 +570,10 @@ static const struct iio_info axp22x_adc_iio_info = {
+ 	.read_raw = axp22x_read_raw,
  };
  
-+struct axp_data axp209_data = {
-+	.ccc_scale = 100000,
-+	.ccc_offset = 300000,
-+	.get_max_voltage = axp20x_battery_get_max_voltage,
-+	.set_max_voltage = axp20x_battery_set_max_voltage,
++static const struct iio_info axp813_adc_iio_info = {
++	.read_raw = axp813_read_raw,
 +};
 +
-+struct axp_data axp221_data = {
-+	.ccc_scale = 150000,
-+	.ccc_offset = 300000,
-+	.has_fg_valid = true,
-+	.get_max_voltage = axp22x_battery_get_max_voltage,
-+	.set_max_voltage = axp22x_battery_set_max_voltage,
-+};
+ static int axp20x_adc_rate(struct axp20x_adc_iio *info, int rate)
+ {
+ 	return regmap_update_bits(info->regmap, AXP20X_ADC_RATE,
+@@ -484,6 +588,13 @@ static int axp22x_adc_rate(struct axp20x_adc_iio *info, int rate)
+ 				  AXP22X_ADC_RATE_HZ(rate));
+ }
+ 
++static int axp813_adc_rate(struct axp20x_adc_iio *info, int rate)
++{
++	return regmap_update_bits(info->regmap, AXP813_ADC_RATE,
++				 AXP813_ADC_RATE_MASK,
++				 AXP813_ADC_RATE_HZ(rate));
++}
 +
- static const struct of_device_id axp20x_battery_ps_id[] = {
- 	{
- 		.compatible = "x-powers,axp209-battery-power-supply",
--		.data = (void *)AXP209_ID,
-+		.data = (void *)&axp209_data,
- 	}, {
- 		.compatible = "x-powers,axp221-battery-power-supply",
--		.data = (void *)AXP221_ID,
-+		.data = (void *)&axp221_data,
- 	}, { /* sentinel */ },
+ struct axp_data {
+ 	const struct iio_info		*iio_info;
+ 	int				num_channels;
+@@ -515,9 +626,20 @@ static const struct axp_data axp22x_data = {
+ 	.maps = axp22x_maps,
  };
- MODULE_DEVICE_TABLE(of, axp20x_battery_ps_id);
-@@ -476,6 +507,7 @@ static int axp20x_power_probe(struct platform_device *pdev)
- 	struct axp20x_batt_ps *axp20x_batt;
- 	struct power_supply_config psy_cfg = {};
- 	struct power_supply_battery_info info;
-+	struct device *dev = &pdev->dev;
  
- 	if (!of_device_is_available(pdev->dev.of_node))
- 		return -ENODEV;
-@@ -516,7 +548,7 @@ static int axp20x_power_probe(struct platform_device *pdev)
- 	psy_cfg.drv_data = axp20x_batt;
- 	psy_cfg.of_node = pdev->dev.of_node;
++static const struct axp_data axp813_data = {
++	.iio_info = &axp813_adc_iio_info,
++	.num_channels = ARRAY_SIZE(axp813_adc_channels),
++	.channels = axp813_adc_channels,
++	.adc_en1_mask = AXP22X_ADC_EN1_MASK,
++	.adc_rate = axp813_adc_rate,
++	.adc_en2 = false,
++	.maps = axp22x_maps,
++};
++
+ static const struct of_device_id axp20x_adc_of_match[] = {
+ 	{ .compatible = "x-powers,axp209-adc", .data = (void *)&axp20x_data, },
+ 	{ .compatible = "x-powers,axp221-adc", .data = (void *)&axp22x_data, },
++	{ .compatible = "x-powers,axp813-adc", .data = (void *)&axp813_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_adc_of_match);
+@@ -525,6 +647,7 @@ MODULE_DEVICE_TABLE(of, axp20x_adc_of_match);
+ static const struct platform_device_id axp20x_adc_id_match[] = {
+ 	{ .name = "axp20x-adc", .driver_data = (kernel_ulong_t)&axp20x_data, },
+ 	{ .name = "axp22x-adc", .driver_data = (kernel_ulong_t)&axp22x_data, },
++	{ .name = "axp813-adc", .driver_data = (kernel_ulong_t)&axp813_data, },
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(platform, axp20x_adc_id_match);
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 080798f..82bf774 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -266,6 +266,8 @@ enum axp20x_variants {
+ #define AXP288_RT_BATT_V_H		0xa0
+ #define AXP288_RT_BATT_V_L		0xa1
  
--	axp20x_batt->axp_id = (uintptr_t)of_device_get_match_data(&pdev->dev);
-+	axp20x_batt->data = (struct axp_data *)of_device_get_match_data(dev);
- 
- 	axp20x_batt->batt = devm_power_supply_register(&pdev->dev,
- 						       &axp20x_batt_ps_desc,
++#define AXP813_ADC_RATE			0x85
++
+ /* Fuel Gauge */
+ #define AXP288_FG_RDC1_REG          0xba
+ #define AXP288_FG_RDC0_REG          0xbb
 -- 
 git-series 0.9.1
