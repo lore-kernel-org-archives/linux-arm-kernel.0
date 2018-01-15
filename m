@@ -1,36 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Jan 2018 08:44:25 +0000
-Subject: [PATCH v2 1/3] crypto/generic: sha3 - fixes for alignment and big
- endian operation
-In-Reply-To: <cad7b34c-ca50-f856-c3fa-221b4c937d3e@free.fr>
-References: <20180114164118.18330-1-ard.biesheuvel@linaro.org>
- <20180114164118.18330-2-ard.biesheuvel@linaro.org>
- <cad7b34c-ca50-f856-c3fa-221b4c937d3e@free.fr>
-Message-ID: <CAKv+Gu_-DFR6iORh_Y=_a6+juL9UuaS1+3dvactqy0vkA0pWLw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 15 Jan 2018 09:55:43 +0100
+Subject: [PATCH][next] hwrng: exynos: check for -ve error return from
+ readl_poll_timeout
+In-Reply-To: <20180112163048.26960-1-colin.king@canonical.com>
+References: <20180112163048.26960-1-colin.king@canonical.com>
+Message-ID: <CAJKOXPeBJi2eLROVXhPWPpVHvCgAzhhbkmE2yR8fP+oMCUT5Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2018 at 05:53, Chris Moore <moore@free.fr> wrote:
-> Hi,
+On Fri, Jan 12, 2018 at 5:30 PM, Colin King <colin.king@canonical.com> wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 >
-> Le 14/01/2018 ? 17:41, Ard Biesheuvel a ?crit :
->>
->> Ensure that the input is byte swabbed before injecting it into the
+> Currently, the return from readl_poll_timeout is being assigned to
+> a u32 and this is being checked for a -ve return which is always
+> false since a u32 cannot be less than zero.  Fix this by changing
+> val to an int so that error returns can be correctly detected.
 >
+> Detected by CoverityScan, CID#1463776 ("Logically dead code")
 >
-> Nitpick : s/swabbed/swapped/
+> Fixes: 6cd225cc5d8a ("hwrng: exynos - add Samsung Exynos True RNG driver")
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/char/hw_random/exynos-trng.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
 
-Thanks Chris - byte swapping is often referred to as swabbing, but I
-guess 'byte swabbing' is redundant regardless.
+Thanks for the patch! Dan already fixed this few days before:
+https://www.spinics.net/lists/linux-samsung-soc/msg61724.html
 
->> SHA3 transform. Use the get_unaligned() accessor for this so that
->> we don't perform unaligned access inadvertently on architectures
->> that do not support that.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
->
-> Cheers,
-> Chris
->
+Best regards,
+Krzysztof
