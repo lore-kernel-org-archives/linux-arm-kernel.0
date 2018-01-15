@@ -1,42 +1,35 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 15 Jan 2018 11:33:45 +0100
-Subject: [PATCH v3 11/16] dt-bindings: power: supply: axp20x: add AXP813
- battery DT binding
+Date: Mon, 15 Jan 2018 11:33:42 +0100
+Subject: [PATCH v3 08/16] ARM: dtsi: axp81x: add node for ADC
 In-Reply-To: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
 References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <7b53727c33207f4b7ae36218c99abfb86876e716.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <eb8f23f57dc9d7d7c87c5eea2f85e90470e27c83.1516012352.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP813 can have a battery as power supply, so let's add it to the
-list of compatibles.
+This adds a DT node for the ADC of the PMIC so that there can be
+consumers of its IIO channels declaring their consumptions via DT.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/power/supply/axp20x_battery.txt | 8 +++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/axp81x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-index c248866..41916f6 100644
---- a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-+++ b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-@@ -4,12 +4,12 @@ Required Properties:
-  - compatible, one of:
- 			"x-powers,axp209-battery-power-supply"
- 			"x-powers,axp221-battery-power-supply"
-+			"x-powers,axp813-battery-power-supply"
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index fd55b89..6b5e7bc 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -48,6 +48,11 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
--This node is a subnode of the axp20x/axp22x PMIC.
-+This node is a subnode of its respective PMIC DT node.
- 
--The AXP20X and AXP22X can read the battery voltage, charge and discharge
--currents of the battery by reading ADC channels from the AXP20X/AXP22X
--ADC.
-+The supported devices can read the battery voltage, charge and discharge
-+currents of the battery by reading ADC channels from the ADC.
- 
- Example:
- 
++	axp_adc: adc {
++		compatible = "x-powers,axp813-adc";
++		#io-channel-cells = <1>;
++	};
++
+ 	axp_gpio: axp-gpio {
+ 		compatible = "x-powers,axp813-gpio";
+ 		gpio-controller;
 -- 
 git-series 0.9.1
