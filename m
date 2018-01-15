@@ -1,168 +1,126 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Jan 2018 19:07:28 +0100
-Subject: [PATCH v4 12/19] KVM: arm/arm64: Move ioremap calls to
- create_hyp_io_mappings
-In-Reply-To: <20180104184334.16571-13-marc.zyngier@arm.com>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-13-marc.zyngier@arm.com>
-Message-ID: <20180115180728.GN21403@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 15 Jan 2018 12:09:53 -0600
+Subject: [PATCH] arm64: dts: rockchip: add roc-rk3328-cc board
+In-Reply-To: <10243464.nJpoDBzbVB@phil>
+References: <20180106094538.15568-1-djw@t-chip.com.cn>
+ <20180111203033.mnap7tijbfsvr5pa@rob-hp-laptop>
+ <10243464.nJpoDBzbVB@phil>
+Message-ID: <CAL_JsqKSvyi0HRFkwYfr2HS_xBuQfTYphUYP7ass1nQn3EKLgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 06:43:27PM +0000, Marc Zyngier wrote:
-> Both HYP io mappings call ioremap, followed by create_hyp_io_mappings.
-> Let's move the ioremap call into create_hyp_io_mappings itself, which
-> simplifies the code a bit and allows for further refactoring.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h   |  3 ++-
->  arch/arm64/include/asm/kvm_mmu.h |  3 ++-
->  virt/kvm/arm/mmu.c               | 24 ++++++++++++++----------
->  virt/kvm/arm/vgic/vgic-v2.c      | 31 ++++++++-----------------------
->  4 files changed, 26 insertions(+), 35 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index fa6f2174276b..cb3bef71ec9b 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -41,7 +41,8 @@
->  #include <asm/stage2_pgtable.h>
->  
->  int create_hyp_mappings(void *from, void *to, pgprot_t prot);
-> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-> +			   void __iomem **kaddr);
->  void free_hyp_pgds(void);
->  
->  void stage2_unmap_vm(struct kvm *kvm);
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index b0c3cbe9b513..09a208014457 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -119,7 +119,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
->  #include <asm/stage2_pgtable.h>
->  
->  int create_hyp_mappings(void *from, void *to, pgprot_t prot);
-> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-> +			   void __iomem **kaddr);
->  void free_hyp_pgds(void);
->  
->  void stage2_unmap_vm(struct kvm *kvm);
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 84d09f1a44d4..38adbe0a016c 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -709,26 +709,30 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
->  }
->  
->  /**
-> - * create_hyp_io_mappings - duplicate a kernel IO mapping into Hyp mode
-> - * @from:	The kernel start VA of the range
-> - * @to:		The kernel end VA of the range (exclusive)
-> + * create_hyp_io_mappings - Map IO into both kernel and HYP
->   * @phys_addr:	The physical start address which gets mapped
-> + * @size:	Size of the region being mapped
-> + * @kaddr:	Kernel VA for this mapping
->   *
->   * The resulting HYP VA is the same as the kernel VA, modulo
->   * HYP_PAGE_OFFSET.
->   */
-> -int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
-> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-> +			   void __iomem **kaddr)
+On Fri, Jan 12, 2018 at 2:33 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Rob,
+>
+> Am Donnerstag, 11. Januar 2018, 14:30:33 CET schrieb Rob Herring:
+>> > diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+>> > new file mode 100644
+>> > index 0000000..2134baf
+>> > --- /dev/null
+>> > +++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+>> > @@ -0,0 +1,313 @@
+>> > +/*
+>> > + * Copyright (c) 2017 T-Chip Intelligent Technology Co., Ltd
+>> > + *
+>> > + * This file is dual-licensed: you can use it either under the terms
+>> > + * of the GPL or the X11 license, at your option. Note that this dual
+>> > + * licensing only applies to this file, and not this project as a
+>> > + * whole.
+>> > + *
+>> > + *  a) This library is free software; you can redistribute it and/or
+>> > + *     modify it under the terms of the GNU General Public License as
+>> > + *     published by the Free Software Foundation; either version 2 of the
+>> > + *     License, or (at your option) any later version.
+>> > + *
+>> > + *     This library is distributed in the hope that it will be useful,
+>> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> > + *     GNU General Public License for more details.
+>> > + *
+>> > + * Or, alternatively,
+>> > + *
+>> > + *  b) Permission is hereby granted, free of charge, to any person
+>> > + *     obtaining a copy of this software and associated documentation
+>> > + *     files (the "Software"), to deal in the Software without
+>> > + *     restriction, including without limitation the rights to use,
+>> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> > + *     sell copies of the Software, and to permit persons to whom the
+>> > + *     Software is furnished to do so, subject to the following
+>> > + *     conditions:
+>> > + *
+>> > + *     The above copyright notice and this permission notice shall be
+>> > + *     included in all copies or substantial portions of the Software.
+>> > + *
+>> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> > + *     OTHER DEALINGS IN THE SOFTWARE.
+>> > + */
+>>
+>> Use SPDX license tag.
+>
+> It looks like Thomas' SPDX documentation patches are not yet merged
+> and there were smaller protests about SPDX information only being
+> available on some external website, so just for my understanding, SPDX
+> is the agreed standard now, right?
 
-nit: you could make this return a "void __iomem *" and use ERR_PTR etc.
-as well, but it'll probably look worse on the calling side, so either
-way is fine with me.
+His series adds the license text for all the tags which Russell said
+addressed his concerns.
 
->  {
-> -	unsigned long start = kern_hyp_va((unsigned long)from);
-> -	unsigned long end = kern_hyp_va((unsigned long)to);
-> +	unsigned long start, end;
->  
-> -	if (is_kernel_in_hyp_mode())
-> +	*kaddr = ioremap(phys_addr, size);
-> +	if (!*kaddr)
-> +		return -ENOMEM;
-> +
-> +	if (is_kernel_in_hyp_mode()) {
->  		return 0;
-> +	}
+I think it is not yet merged mainly because Thomas has been busy with
+Spectre and Meltdown.
 
-nit: we don't need the curly braces
+> And judging by the SPDX conversion for Rockchip dts I have in my inbox
+> the correct tags should probably be
+>         // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>
+> due to the
+> "All devicetrees claim to be either GPL or X11 while the actual license
+> text is MIT. Therefore we use MIT for the SPDX tag as X11 is clearly
+> wrong."
 
->  
-> -	/* Check for a valid kernel IO mapping */
-> -	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
-> -		return -EINVAL;
->  
-> +	start = kern_hyp_va((unsigned long)*kaddr);
-> +	end = kern_hyp_va((unsigned long)*kaddr + size);
->  	return __create_hyp_mappings(hyp_pgd, start, end,
->  				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
->  }
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 80897102da26..bc49d702f9f0 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -332,16 +332,10 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->  	if (!PAGE_ALIGNED(info->vcpu.start) ||
->  	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
->  		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
-> -		kvm_vgic_global_state.vcpu_base_va = ioremap(info->vcpu.start,
-> -							     resource_size(&info->vcpu));
-> -		if (!kvm_vgic_global_state.vcpu_base_va) {
-> -			kvm_err("Cannot ioremap GICV\n");
-> -			return -ENOMEM;
-> -		}
->  
-> -		ret = create_hyp_io_mappings(kvm_vgic_global_state.vcpu_base_va,
-> -					     kvm_vgic_global_state.vcpu_base_va + resource_size(&info->vcpu),
-> -					     info->vcpu.start);
-> +		ret = create_hyp_io_mappings(info->vcpu.start,
-> +					     resource_size(&info->vcpu),
-> +					     &kvm_vgic_global_state.vcpu_base_va);
->  		if (ret) {
->  			kvm_err("Cannot map GICV into hyp\n");
->  			goto out;
-> @@ -350,26 +344,17 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->  		static_branch_enable(&vgic_v2_cpuif_trap);
->  	}
->  
-> -	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
-> -						   resource_size(&info->vctrl));
-> -	if (!kvm_vgic_global_state.vctrl_base) {
-> -		kvm_err("Cannot ioremap GICH\n");
-> -		ret = -ENOMEM;
-> +	ret = create_hyp_io_mappings(info->vctrl.start,
-> +				     resource_size(&info->vctrl),
-> +				     &kvm_vgic_global_state.vctrl_base);
-> +	if (ret) {
-> +		kvm_err("Cannot map VCTRL into hyp\n");
->  		goto out;
->  	}
->  
->  	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
->  	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
->  
-> -	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
-> -				     kvm_vgic_global_state.vctrl_base +
-> -					 resource_size(&info->vctrl),
-> -				     info->vctrl.start);
-> -	if (ret) {
-> -		kvm_err("Cannot map VCTRL into hyp\n");
-> -		goto out;
-> -	}
-> -
->  	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
->  	if (ret) {
->  		kvm_err("Cannot register GICv2 KVM device\n");
-> -- 
-> 2.14.2
-> 
+Right.
 
-Otherwise looks good:
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> > +&i2c1 {
+>> > +   status = "okay";
+>> > +
+>> > +   rk805: rk805 at 18 {
+>>
+>> pmic at 18
+>>
+>> > +           compatible = "rockchip,rk805";
+>> > +           reg = <0x18>;
+>> > +           interrupt-parent = <&gpio1>;
+>> > +           interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
+>> > +           #clock-cells = <1>;
+>> > +           clock-output-names = "xin32k", "rk805-clkout2";
+>> > +           gpio-controller;
+>> > +           #gpio-cells = <2>;
+>> > +           pinctrl-names = "default";
+>> > +           pinctrl-0 = <&pmic_int_l>;
+>> > +           rockchip,system-power-controller;
+>> > +           wakeup-source;
+>> > +
+>> > +           vcc1-supply = <&vcc_sys>;
+>> > +           vcc2-supply = <&vcc_sys>;
+>> > +           vcc3-supply = <&vcc_sys>;
+>> > +           vcc4-supply = <&vcc_sys>;
+>> > +           vcc5-supply = <&vcc_io>;
+>> > +           vcc6-supply = <&vcc_io>;
+>> > +
+>> > +           regulators {
+>> > +                   vdd_logic: DCDC_REG1 {
+>>
+>> Don't use '_' in node names.
+>
+> The driver binds against the node names including the underscores.
+> (with regulator-compatible being deprecated)
+
+Okay. You've probably told me that before (and will again next time I forget).
+
+Rob
