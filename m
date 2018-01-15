@@ -1,165 +1,93 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Jan 2018 11:51:34 +0000
-Subject: [PATCH v3 11/13] arm64: Implement branch predictor hardening for
- affected Cortex-A CPUs
-In-Reply-To: <20180109161218.2079-1-suzuki.poulose@arm.com>
-References: <1515432758-26440-12-git-send-email-will.deacon@arm.com>
- <20180109161218.2079-1-suzuki.poulose@arm.com>
-Message-ID: <0baae1c1-8ea8-e01d-ff16-aabae36f8ee5@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 15 Jan 2018 12:52:14 +0100
+Subject: [PATCH] clk: Properly update prepare/enable count on orphan clock
+ reparent
+References: <CGME20180115115231eucas1p1499f46ca64b65598d03a182ed5670f28@eucas1p1.samsung.com>
+Message-ID: <20180115115214.10303-1-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+If orphaned clock has been already prepared/enabled (for example if it or
+one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+counters of the newly assigned parent are not updated correctly. This
+might later cause warnings during changing clock parents.
 
-On 09/01/18 16:12, Suzuki K Poulose wrote:
-> On 08/01/18 17:32, Will Deacon wrote:
->> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
->> and can theoretically be attacked by malicious code.
->>
->> This patch implements a PSCI-based mitigation for these CPUs when available.
->> The call into firmware will invalidate the branch predictor state, preventing
->> any malicious entries from affecting other victim contexts.
->>
->> Co-developed-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Will, Marc,
-> 
->> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
->> +	{
->> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
->> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
->> +		.enable = enable_psci_bp_hardening,
->> +	},
->> +	{
->> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
->> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
->> +		.enable = enable_psci_bp_hardening,
->> +	},
->> +	{
->> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
->> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
->> +		.enable = enable_psci_bp_hardening,
->> +	},
->> +	{
->> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
->> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
->> +		.enable = enable_psci_bp_hardening,
->> +	},
->> +#endif
-> 
-> The introduction of multiple entries for the same capability breaks
-> some assumptions in this_cpu_has_caps() and verify_local_cpu_features()
-> as they all stop at the first entry matching the "capability" and could
-> return wrong results. We need something like the following to make this
-> work, should someone add duplicate feature entry or use
-> this_cpu_has_caps() on one of the errata.
-> 
-> ---8>---
-> 
-> arm64: capabilities: Handle duplicate entries for a capability
-> 
-> Sometimes a single capability could be listed multiple times with
-> differing matches(), e.g, CPU errata for different MIDR versions.
-> This breaks verify_local_cpu_feature() and this_cpu_has_cap() as
-> we stop checking for a capability on a CPU with the first
-> entry in the given table, which is not sufficient. Make sure we
-> run the checks for all entries of the same capability. We do
-> this by fixing __this_cpu_has_cap() to run through all the
-> entries in the given table for a match and reuse it for
-> verify_local_cpu_feature().
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/cpufeature.c | 44 ++++++++++++++++++++++--------------------
->  1 file changed, 23 insertions(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 862a417ca0e2..0c43447f7406 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1120,6 +1120,26 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
->  			cap_set_elf_hwcap(hwcaps);
->  }
->  
-> +/*
-> + * Check if the current CPU has a given feature capability.
-> + * Should be called from non-preemptible context.
-> + */
-> +static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-> +			       unsigned int cap)
-> +{
-> +	const struct arm64_cpu_capabilities *caps;
-> +
-> +	if (WARN_ON(preemptible()))
-> +		return false;
-> +
-> +	for (caps = cap_array; caps->desc; caps++)
-> +		if (caps->capability == cap &&
-> +		    caps->matches &&
-> +		    caps->matches(caps, SCOPE_LOCAL_CPU))
-> +			return true;
-> +	return false;
-> +}
-> +
->  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->  			    const char *info)
->  {
-> @@ -1183,8 +1203,9 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
->  }
->  
->  static void
-> -verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
-> +verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
->  {
-> +	const struct arm64_cpu_capabilities *caps = caps_list;
->  	for (; caps->matches; caps++) {
->  		if (!cpus_have_cap(caps->capability))
->  			continue;
-> @@ -1192,7 +1213,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
->  		 * If the new CPU misses an advertised feature, we cannot proceed
->  		 * further, park the cpu.
->  		 */
-> -		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
-> +		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
->  			pr_crit("CPU%d: missing feature: %s\n",
->  					smp_processor_id(), caps->desc);
->  			cpu_die_early();
-> @@ -1274,25 +1295,6 @@ static void __init mark_const_caps_ready(void)
->  	static_branch_enable(&arm64_const_caps_ready);
->  }
->  
-> -/*
-> - * Check if the current CPU has a given feature capability.
-> - * Should be called from non-preemptible context.
-> - */
-> -static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-> -			       unsigned int cap)
-> -{
-> -	const struct arm64_cpu_capabilities *caps;
-> -
-> -	if (WARN_ON(preemptible()))
-> -		return false;
-> -
-> -	for (caps = cap_array; caps->desc; caps++)
-> -		if (caps->capability == cap && caps->matches)
-> -			return caps->matches(caps, SCOPE_LOCAL_CPU);
-> -
-> -	return false;
-> -}
-> -
->  extern const struct arm64_cpu_capabilities arm64_errata[];
->  
->  bool this_cpu_has_cap(unsigned int cap)
-> 
+This patch fixes following warning on Exynos5422-based boards:
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:811 clk_core_disable_lock+0x18/0x24
+Modules linked in:
+CPU: 0 PID: 59 Comm: kworker/0:1 Not tainted 4.15.0-rc7-next-20180115 #106
+Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+Workqueue: pm genpd_power_off_work_fn
+[<c0111504>] (unwind_backtrace) from [<c010dbec>] (show_stack+0x10/0x14)
+[<c010dbec>] (show_stack) from [<c09b3f34>] (dump_stack+0x90/0xc8)
+[<c09b3f34>] (dump_stack) from [<c0125060>] (__warn+0xe4/0x110)
+[<c0125060>] (__warn) from [<c01250cc>] (warn_slowpath_null+0x40/0x48)
+[<c01250cc>] (warn_slowpath_null) from [<c048d584>] (clk_core_disable_lock+0x18/0x24)
+[<c048d584>] (clk_core_disable_lock) from [<c048e490>] (clk_core_disable_unprepare+0xc/0x20)
+[<c048e490>] (clk_core_disable_unprepare) from [<c048ea60>] (__clk_set_parent_after+0x48/0x4c)
+[<c048ea60>] (__clk_set_parent_after) from [<c048ec88>] (clk_core_set_parent_nolock+0x224/0x5b4)
+[<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>] (clk_set_parent+0x38/0x6c)
+[<c048f23c>] (clk_set_parent) from [<c049c41c>] (exynos_pd_power+0x74/0x1cc)
+[<c049c41c>] (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+[<c0550768>] (genpd_power_off) from [<c0550b34>] (genpd_power_off_work_fn+0x2c/0x40)
+[<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>] (process_one_work+0x1d0/0x7bc)
+[<c01432e4>] (process_one_work) from [<c014393c>] (worker_thread+0x34/0x4dc)
+[<c014393c>] (worker_thread) from [<c014a0d0>] (kthread+0x128/0x164)
+[<c014a0d0>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+---[ end trace 503c239fb760f17a ]---
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:684 clk_core_disable_unprepare+0x18/0x20
+Modules linked in:
+CPU: 0 PID: 59 Comm: kworker/0:1 Tainted: G        W        4.15.0-rc7-next-20180115 #106
+Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+Workqueue: pm genpd_power_off_work_fn
+[<c0111504>] (unwind_backtrace) from [<c010dbec>] (show_stack+0x10/0x14)
+[<c010dbec>] (show_stack) from [<c09b3f34>] (dump_stack+0x90/0xc8)
+[<c09b3f34>] (dump_stack) from [<c0125060>] (__warn+0xe4/0x110)
+[<c0125060>] (__warn) from [<c01250cc>] (warn_slowpath_null+0x40/0x48)
+[<c01250cc>] (warn_slowpath_null) from [<c048e49c>] (clk_core_disable_unprepare+0x18/0x20)
+[<c048e49c>] (clk_core_disable_unprepare) from [<c048ea60>] (__clk_set_parent_after+0x48/0x4c)
+[<c048ea60>] (__clk_set_parent_after) from [<c048ec88>] (clk_core_set_parent_nolock+0x224/0x5b4)
+[<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>] (clk_set_parent+0x38/0x6c)
+[<c048f23c>] (clk_set_parent) from [<c049c41c>] (exynos_pd_power+0x74/0x1cc)
+[<c049c41c>] (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+[<c0550768>] (genpd_power_off) from [<c0550b34>] (genpd_power_off_work_fn+0x2c/0x40)
+[<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>] (process_one_work+0x1d0/0x7bc)
+[<c01432e4>] (process_one_work) from [<c014393c>] (worker_thread+0x34/0x4dc)
+[<c014393c>] (worker_thread) from [<c014a0d0>] (kthread+0x128/0x164)
+[<c014a0d0>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+1fa0:                                     00000000 00000000 00000000 00000000
+1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+---[ end trace 503c239fb760f17b ]---
+------------[ cut here ]------------
 
-This looks sensible to me.
+Fixes: f8f8f1d04494 ("clk: Don't touch hardware when reparenting during registration")
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/clk/clk.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 0f686a9dac3e..d33c087d7868 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2982,6 +2982,10 @@ static int __clk_core_init(struct clk_core *core)
+ 		if (parent) {
+ 			/* update the clk tree topology */
+ 			flags = clk_enable_lock();
++			if (orphan->prepare_count)
++				clk_core_prepare(parent);
++			if (orphan->enable_count)
++				clk_core_enable(parent);
+ 			clk_reparent(orphan, parent);
+ 			clk_enable_unlock(flags);
+ 			__clk_recalc_accuracies(orphan);
 -- 
-Jazz is not dead. It just smells funny...
+2.15.0
