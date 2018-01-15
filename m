@@ -1,53 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Jan 2018 02:13:20 +0100
-Subject: [PATCH 04/14] mmc: mmci: Add STM32 variant
-In-Reply-To: <1515759368-16946-5-git-send-email-patrice.chotard@st.com>
-References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
- <1515759368-16946-5-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdYVDpmEmrF=Zk1zX8RCRnPDieTgPuCen6KQ4ttFpAm+Yg@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 15 Jan 2018 01:45:51 +0000
+Subject: PM regression in next
+In-Reply-To: <20180112225947.GL21458@sirena.org.uk>
+References: <20180112002322.GB3875@atomide.com>	<20180111164537.79165ac8918e6d38e1837062@linux-foundation.org>	<20180112012019.GA4059@atomide.com>	<20180112190046.GD4821@atomide.com>	<20180112191251.GE21458@sirena.org.uk>	<20180112210706.GE4821@atomide.com>	<20180112211535.GH21458@sirena.org.uk>	<20180112215010.GG4821@atomide.com>	<20180112221126.GK21458@sirena.org.uk>	<20180112224959.GH4821@atomide.com>	<20180112225947.GL21458@sirena.org.uk>
+Message-ID: <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 1:15 PM,  <patrice.chotard@st.com> wrote:
 
-> From: Patrice Chotard <patrice.chotard@st.com>
->
-> STM32F4 and STM32F7 MCUs has a SDIO controller that looks like
-> an ARM pl810.
+Hi all
 
-PL180 you mean. Ulf can fix while applying.
+> > > Most devices have one regmap per device which can be retrieved with
+> > > dev_get_regmap(), it's the attempt to use that which I suspect is
+> > > broken.  Like I said snd_soc_codec_init_regmap() ought to fix things if
+> > > that's the issue.
+> 
+> > OK. Adding Peter to loop as it's his driver after all. Not sure
+> > how well mixing regmap register access to the same module with
+> > cached twl4030_read() would work :)
+> 
+> Yes, that local cache is not a super good idea any more and hopefully
+> redundant.
+> 
+> > Maybe there should also be some big warning happening if
+> > snd_soc_codec_init_regmap() is now needed and no regmap is
+> > found?
+> 
+> Some devices just plain don't have registers at all (perhaps GPIOs or
+> just stub drivers providing capability information).  However we should
+> be screaming loudly about the fact that the I/O we tried to do fails,
+> that clearly shouldn't be being ignored.
 
-> This patch adds the STM32 variant so that mmci driver supports it.
->
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+I'm sorry that my patch breaks your drivers.
+It seems removing .read/.write callback was too much aggressive.
+I hope your driver will be OK by using regmap.
+In worst case, we can back .read/.write, but it will be component driver side.
 
-(...)
-> +static struct variant_data variant_stm32 = {
-> +       .fifosize               = 32 * 4,
-> +       .fifohalfsize           = 8 * 4,
-> +       .clkreg                 = MCI_CLK_ENABLE,
-> +       .clkreg_enable          = MCI_ST_UX500_HWFCEN,
-
-If the asic designed derived this from ux500 I guess it is proper.
-
-> +       .clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
-> +       .clkreg_neg_edge_enable = MCI_ST_UX500_NEG_EDGE,
-> +       .datalength_bits        = 24,
-> +       .datactrl_mask_sdio     = MCI_DPSM_ST_SDIOEN,
-> +       .st_sdio                = true,
-
-Did you test SDIO? I think we lack features for that.
-
-> +       {
-> +               .id     = 0x00880180,
-> +               .mask   = 0x00ffffff,
-> +               .data   = &variant_stm32,
-> +       },
-
-Since ux500 was 480180 I wonder what variants 5,6,7 are...
-
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Best regards
+---
+Kuninori Morimoto
