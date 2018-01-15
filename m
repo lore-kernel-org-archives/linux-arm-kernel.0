@@ -1,174 +1,252 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 15 Jan 2018 17:24:06 +0100
-Subject: [RFC PATCH 1/2] pinctrl: add consumer variant for gpio request
-In-Reply-To: <20180115162407.6314-1-ludovic.desroches@microchip.com>
-References: <20180115162407.6314-1-ludovic.desroches@microchip.com>
-Message-ID: <20180115162407.6314-2-ludovic.desroches@microchip.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 15 Jan 2018 16:30:29 +0000
+Subject: [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and
+ SIGFPE, SIGTRAP, SIGBUS
+In-Reply-To: <20180112005940.23279-7-ebiederm@xmission.com>
+References: <87373b6ghs.fsf@xmission.com>
+ <20180112005940.23279-7-ebiederm@xmission.com>
+Message-ID: <20180115163028.GU22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a consumer variant to GPIO request relative functions. The goal
-is to fix the bad ownership, which is arbitrary set to
-"range->name:gpio", of a GPIO.
+On Thu, Jan 11, 2018 at 06:59:36PM -0600, Eric W. Biederman wrote:
+> Setting si_code to 0 results in a userspace seeing an si_code of 0.
+> This is the same si_code as SI_USER.  Posix and common sense requires
+> that SI_USER not be a signal specific si_code.  As such this use of 0
+> for the si_code is a pretty horribly broken ABI.
 
-There is a lack of configuration features for GPIO. For instance,
-we can't set the bias. Some pin controllers manage both device's
-pins and GPIOs. GPIOs can benefit from pin configuration. Usually,
-a pinctrl node is used to mux the pin as a GPIO and to set up its
-configuration.
+I think this situation may have come about because 0 is used as a
+padding value for "impossible" cases -- i.e., things that can't happen
+unless the kernel is broken, or things that are too unrecoverable for
+clean error reporting to be helpful.
 
-The pinmuxing strict mode involves that a pin which is muxed can't
-be requested as a GPIO if the owner is not the same. Unfortunately,
-the ownership of a GPIO is set arbitrarily to "range->name:gpio".
-So there is a mismatch about the ownership which prevents a device
-from being the owner of the pinmuxing and requesting the same pin as
-a GPIO.
+In general, I think these values are not expected to reach userspace in
+practice.
 
-Adding some consumer variants for GPIO request stuff will allow to
-pass the name of the device which requests the GPIO to not return an
-error if it's also the owner of the pinmuxing.
+This is not an excuse though -- and not 100% true -- so it's certainly
+worthy of cleanup.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
----
- drivers/pinctrl/core.c           | 13 ++++++++++---
- drivers/pinctrl/pinmux.c         | 16 ++++++++++++++--
- drivers/pinctrl/pinmux.h         | 10 ++++++++++
- include/linux/pinctrl/consumer.h |  6 ++++++
- 4 files changed, 40 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 2c0dbfcff3e6..51c75a6057b2 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -733,14 +733,15 @@ int pinctrl_get_group_selector(struct pinctrl_dev *pctldev,
- }
- 
- /**
-- * pinctrl_gpio_request() - request a single pin to be used as GPIO
-+ * pinctrl_gpio_request_consumer() - request a single pin to be used as GPIO
-  * @gpio: the GPIO pin number from the GPIO subsystem number space
-+ * @consumer: the name of the device requesting the GPIO
-  *
-  * This function should *ONLY* be used from gpiolib-based GPIO drivers,
-  * as part of their gpio_request() semantics, platforms and individual drivers
-  * shall *NOT* request GPIO pins to be muxed in.
-  */
--int pinctrl_gpio_request(unsigned gpio)
-+int pinctrl_gpio_request_consumer(unsigned gpio, const char *consumer)
- {
- 	struct pinctrl_dev *pctldev;
- 	struct pinctrl_gpio_range *range;
-@@ -759,12 +760,18 @@ int pinctrl_gpio_request(unsigned gpio)
- 	/* Convert to the pin controllers number space */
- 	pin = gpio_to_pin(range, gpio);
- 
--	ret = pinmux_request_gpio(pctldev, range, pin, gpio);
-+	ret = pinmux_request_gpio_consumer(pctldev, range, pin, gpio, consumer);
- 
- 	mutex_unlock(&pctldev->mutex);
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(pinctrl_gpio_request_consumer);
-+
-+int pinctrl_gpio_request(unsigned gpio)
-+{
-+	return pinctrl_gpio_request_consumer(gpio, NULL);
-+}
- EXPORT_SYMBOL_GPL(pinctrl_gpio_request);
- 
- /**
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 55502fc4479c..8d422eb0ed38 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -232,14 +232,19 @@ static const char *pin_free(struct pinctrl_dev *pctldev, int pin,
-  * @pctldev: pin controller device affected
-  * @pin: the pin to mux in for GPIO
-  * @range: the applicable GPIO range
-+ * @consumer: the name of the device requesting the GPIO
-  */
--int pinmux_request_gpio(struct pinctrl_dev *pctldev,
-+int pinmux_request_gpio_consumer(struct pinctrl_dev *pctldev,
- 			struct pinctrl_gpio_range *range,
--			unsigned pin, unsigned gpio)
-+			unsigned pin, unsigned gpio,
-+			const char *consumer)
- {
- 	const char *owner;
- 	int ret;
- 
-+	if (consumer)
-+		return pin_request(pctldev, pin, consumer, range);
-+
- 	/* Conjure some name stating what chip and pin this is taken by */
- 	owner = kasprintf(GFP_KERNEL, "%s:%d", range->name, gpio);
- 	if (!owner)
-@@ -252,6 +257,13 @@ int pinmux_request_gpio(struct pinctrl_dev *pctldev,
- 	return ret;
- }
- 
-+int pinmux_request_gpio(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range,
-+			unsigned pin, unsigned gpio)
-+{
-+	return pinmux_request_gpio_consumer(pctldev, range, pin, gpio, NULL);
-+}
-+
- /**
-  * pinmux_free_gpio() - release a pin from GPIO muxing
-  * @pctldev: the pin controller device for the pin
-diff --git a/drivers/pinctrl/pinmux.h b/drivers/pinctrl/pinmux.h
-index a331fcdbedd9..837599922a42 100644
---- a/drivers/pinctrl/pinmux.h
-+++ b/drivers/pinctrl/pinmux.h
-@@ -19,6 +19,9 @@ int pinmux_validate_map(const struct pinctrl_map *map, int i);
- int pinmux_request_gpio(struct pinctrl_dev *pctldev,
- 			struct pinctrl_gpio_range *range,
- 			unsigned pin, unsigned gpio);
-+int pinmux_request_gpio_consumer(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range,
-+			unsigned pin, unsigned gpio, const char *consumer);
- void pinmux_free_gpio(struct pinctrl_dev *pctldev, unsigned pin,
- 		      struct pinctrl_gpio_range *range);
- int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
-@@ -50,6 +53,13 @@ static inline int pinmux_request_gpio(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+static inline int pinmux_request_gpio_consumer(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range,
-+			unsigned pin, unsigned gpio, const char *consumer)
-+{
-+	return 0;
-+}
-+
- static inline void pinmux_free_gpio(struct pinctrl_dev *pctldev,
- 				    unsigned pin,
- 				    struct pinctrl_gpio_range *range)
-diff --git a/include/linux/pinctrl/consumer.h b/include/linux/pinctrl/consumer.h
-index 0412cc9833e9..8c521a14db43 100644
---- a/include/linux/pinctrl/consumer.h
-+++ b/include/linux/pinctrl/consumer.h
-@@ -26,6 +26,7 @@ struct device;
- 
- /* External interface to pin control */
- extern int pinctrl_gpio_request(unsigned gpio);
-+extern int pinctrl_gpio_request_consumer(unsigned gpio, const char *consumer);
- extern void pinctrl_gpio_free(unsigned gpio);
- extern int pinctrl_gpio_direction_input(unsigned gpio);
- extern int pinctrl_gpio_direction_output(unsigned gpio);
-@@ -67,6 +68,11 @@ static inline int pinctrl_gpio_request(unsigned gpio)
- 	return 0;
- }
- 
-+static inline int pinctrl_gpio_request_consumer(unsigned gpio, const char *consumer);
-+{
-+	return 0;
-+}
-+
- static inline void pinctrl_gpio_free(unsigned gpio)
- {
- }
--- 
-2.12.2
+It would be good to approach this similarly for arm and arm64, since
+the arm64 fault code is derived from arm.
+
+
+> Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
+> value of __SI_KILL and now sees a value of SIL_KILL with the result
+> that uid and pid fields are copied and which might copying the si_addr
+> field by accident but certainly not by design.  Making this a very
+> flakey implementation.
+> 
+> Utilizing FPE_FIXME, BUS_FIXME, TRAP_FIXME siginfo_layout will now return
+> SIL_FAULT and the appropriate fields will be reliably copied.
+> 
+> But folks this is a new and unique kind of bad.  This is massively
+> untested code bad.  This is inventing new and unique was to get
+> siginfo wrong bad.  This is don't even think about Posix or what
+> siginfo means bad.  This is lots of eyeballs all missing the fact
+> that the code does the wrong thing bad.  This is getting stuck
+> and keep making the same mistake bad.
+> 
+> I really hope we can find a non userspace breaking fix for this on a
+> port as new as arm64.
+
+> Possible ABI fixes include:
+> - Send the signal without siginfo
+> - Don't generate a signal
+
+The above two sould like ABI breaks?
+
+> - Possibly assign and use an appropriate si_code
+> - Don't handle cases which can't happen
+
+I think a mixture of these two is the best approach.
+
+In any case, si_code == 0 here doesn't seem to have any explicit meaning.
+I think we can translate all of the arm64 faults to proper si_codes --
+see my sketch below.  Probably means a bit more thought though.
+
+
+
+The only counterargument would be if there is software relying on
+these bogus signal cases getting si_code == 0 for a useful purpose.
+
+The main reason I see to check for SI_USER is to allow a process to
+filter out spurious signals (say, an asynchronous I/O signal for
+which si_value would be garbage), and to print out diagnostics
+before (in the case of a well-behaved program) resetting the signal
+to SIG_DFL and killing itself to report the signal to the waiter.
+
+Daemons may be more discerning about who is allowed to signal them,
+but overloading SIGBUS (say) as an IPC channel sounds like a very odd
+thing to do.  The same probably applies to any signal that has
+nontrivial metadata.
+
+
+Have you found software that is impacted by this in practice?
+
+[...]
+
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -867,7 +867,7 @@ asmlinkage void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+>  asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+>  {
+>  	siginfo_t info;
+> -	unsigned int si_code = 0;
+> +	unsigned int si_code = FPE_FIXME;
+>  
+>  	if (esr & FPEXC_IOF)
+>  		si_code = FPE_FLTINV;
+
+This 0 can happen for vector operations where the implementation may
+not be able to report exactly what happened, for example where
+the implementer didn't want to pay the cost of tracking exactly
+what went wrong in each lane.
+
+However, the FPEXC_* bits can be garbage in such a case rather
+than being all zero: we should be checking the TFV bit in the ESR here.
+This may be a bug.
+
+Perhaps FPE_FLTINV should be returned in si_code for such cases:  it's
+not otherwise used on arm64 -- invalid instructions would be reported as
+SIGILL/ILL_ILLOPC instead).
+
+Otherwise, we might want to define a new code or arbitrarily pick
+one of the existing FLT_* since this is really a more benign condition
+than executing an illegal instruction.  Alternatively, treat the
+fault as spurious and suppress it, but that doesn't feel right either.
+
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 9b7f89df49db..abe200587334 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -596,7 +596,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  
+>  	info.si_signo = SIGBUS;
+>  	info.si_errno = 0;
+> -	info.si_code  = 0;
+> +	info.si_code  = BUS_FIXME;
+
+Probably BUS_OBJERR.
+
+>  	if (esr & ESR_ELx_FnV)
+>  		info.si_addr = NULL;
+>  	else
+> @@ -607,70 +607,70 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  }
+>  
+>  static const struct fault_info fault_info[] = {
+> -	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
+> -	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
+> -	{ do_bad,		SIGBUS,  0,		"level 2 address size fault"	},
+> -	{ do_bad,		SIGBUS,  0,		"level 3 address size fault"	},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"ttbr address size fault"	},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"level 1 address size fault"	},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"level 2 address size fault"	},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"level 3 address size fault"	},
+
+Pagetable screwup or kernel/system/CPU bug -> SIGKILL, or panic().
+
+[...]
+
+> -	{ do_bad,		SIGBUS,  0,		"unknown 8"			},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"unknown 8"			},
+
+[...]
+
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"unknown 12"			},
+
+Not architected, so they could mean absolutely anything.  If they
+can happen at all, they are probably unsafe to ignore.
+
+ -> SIGKILL, or panic().
+
+Similary for all the "unknown" codes in the table, which I omit for
+brevity.
+
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"synchronous external abort"	},
+
+This si_code seems to be a fallback for if ACPI is absent or doesn't
+know what to do with this error.
+
+-> SIGBUS/BUS_OBJERR?
+
+Can probably legitimately happen for userspace for suitable MMIO mappings.
+
+Perhaps it's more serious though in the presence of ACPI.  Do we expect
+that ACPI can diagnose all localisable errors?
+
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 0 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 1 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 2 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 3 (translation table walk)"	},
+
+Pagetable screwup or kernel/system/CPU bug -> SIGKILL, or panic().
+
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"synchronous parity or ECC error" },	// Reserved when RAS is implemented
+
+Possibly SIGBUS/BUS_MCEERR_AR (though I don't know exactly what
+userspace is supposed to do with this or whether this implies the
+existence or certain kernel features for managing the error that
+may not be present on arm64...)
+
+Otherwise, SIGKILL.
+
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 0 synchronous parity error (translation table walk)"	},	// Reserved when RAS is implemented
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 1 synchronous parity error (translation table walk)"	},	// Reserved when RAS is implemented
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 2 synchronous parity error (translation table walk)"	},	// Reserved when RAS is implemented
+> +	{ do_sea,		SIGBUS,  BUS_FIXME,	"level 3 synchronous parity error (translation table walk)"	},	// Reserved when RAS is implemented
+
+Process page tables corrupt: if the kernel couldn't fix this, the
+process can't reasonably fix it -> SIGKILL
+
+Since this is a RAS-type error it could be triggered by a cosmic ray
+rather than requiring a kernel or system bug or other major failure, so
+we probably shouldn't panic the system if the error is localisable to a
+particular process.
+
+>  	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"TLB conflict abort"		},
+
+Broken kernel, kernel memory corruption, CPU/system bug etc.:
+SIGKILL or panic().
+
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"Unsupported atomic hardware update fault"	},
+
+Broken kernel, kernel memory corruption, CPU/system bug etc.:
+SIGKILL or panic().
+
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"implementation fault (lockdown abort)" },
+
+Userspace shouldn't have access to lockdown: kernel/system bug
+-> SIGKILL or panic().
+
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"implementation fault (unsupported exclusive)" },
+
+If running on an implementation where this fault can happen in response to an exclusive load/store issued by userspace may fail somewhere in the memory system, this should probably be SIGBUS/BUS_OBJERR (or possibly a new BUS_* code).
+
+This one may need to be hardware-dependent, if this fault can mean
+something different depending on the hardware (I'm gussing this
+possibility from "implementation" -- I've not checked the docs.)
+
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"section domain fault"		},
+> +	{ do_bad,		SIGBUS,  BUS_FIXME,	"page domain fault"		},
+
+Broken kernel, kernel memory corruption, CPU/system bug etc.:
+SIGKILL or panic().
+
+>  };
+>  
+>  int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+> @@ -739,11 +739,11 @@ static struct fault_info __refdata debug_fault_info[] = {
+> +	{ do_bad,	SIGBUS,		BUS_FIXME,	"unknown 3"		},
+> +	{ do_bad,	SIGTRAP,	TRAP_FIXME,	"aarch32 vector catch"	},
+> +	{ do_bad,	SIGBUS,		BUS_FIXME,	"unknown 7"		},
+>  };
+
+Impossible (?), or meaning unknown.
+SIGKILL/panic() for these?  Or possibly (since these are probably well
+localised errors) SIGILL/ILL_ILLOPC.
+
+Cheers
+---Dave
