@@ -1,30 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Jan 2018 13:57:58 +0100
-Subject: [PATCH] ARM: lpc3250: fix uda1380 gpio numbers
-In-Reply-To: <20180110162220.224945-1-arnd@arndb.de>
-References: <20180110162220.224945-1-arnd@arndb.de>
-Message-ID: <CAK8P3a0q+UM_7wY_rdbkJOzLfoS4HYCXSXodpqtHHY=h-7_mpQ@mail.gmail.com>
+Date: Mon, 15 Jan 2018 14:00:40 +0100
+Subject: [PATCH] ARM: dts: s5pv210: add interrupt-parent for ohci
+In-Reply-To: <CAJKOXPfhQOBg5z3rXHqH7-rA+S_ggTeu=OxHEYm7NG=NDy-8qQ@mail.gmail.com>
+References: <20180110161045.4052684-1-arnd@arndb.de>
+ <CAJKOXPfhQOBg5z3rXHqH7-rA+S_ggTeu=OxHEYm7NG=NDy-8qQ@mail.gmail.com>
+Message-ID: <CAK8P3a2Q070P8y9a2_GmBz4dnHv=OF=OvcaojkGnhRvuWAjcsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> dtc warns about obviously incorrect GPIO numbers for the audio codec
-> on both lpc32xx boards:
+On Thu, Jan 11, 2018 at 9:09 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Wed, Jan 10, 2018 at 5:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> The ohci-hcd node has an interrupt number but no interrupt-parent,
+>> leading to a warning with current dtc versions:
+>>
+>> arch/arm/boot/dts/s5pv210-aquila.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+>> arch/arm/boot/dts/s5pv210-goni.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+>> arch/arm/boot/dts/s5pv210-smdkc110.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+>> arch/arm/boot/dts/s5pv210-smdkv210.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+>> arch/arm/boot/dts/s5pv210-torbreck.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+>>
+>> As seen from the related exynos dts files, the ohci and ehci controllers
+>> always share one interrupt number, and the number is the same here as
+>> well, so setting the same interrupt-parent is the reasonable solution
+>> here.
 >
-> arch/arm/boot/dts/lpc3250-phy3250.dtb: Warning (gpios_property): reset-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-> arch/arm/boot/dts/lpc3250-phy3250.dtb: Warning (gpios_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-> arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpios_property): reset-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-> arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpios_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
->
-> It looks like the nodes are written for a different binding that combines
-> the GPIO number into a single number rather than a bank/number pair.
-> I found the right numbers on stackexchange.com, so this patch fixes
-> the warning and has a reasonable chance of getting things to actually
-> work.
->
-> Link: https://unix.stackexchange.com/questions/59497/alsa-asoc-how-to-correctly-load-devices-drivers/62217#62217
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Your patch is correct. However my last pull request still waits and it
+> is quite late in this release cycle so I will apply it for v4.17 after
+> this merge window. On the other hand you can take it directly (in that
+> case: Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>).
 
-I've applied this to the next/dt branch now.
+Applied to next/dt, thanks!
 
-       Arnd
+      Arnd
