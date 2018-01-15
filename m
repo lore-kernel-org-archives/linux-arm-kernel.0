@@ -1,32 +1,33 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Mon, 15 Jan 2018 15:23:47 +0000
-Subject: [PATCH 0/3] Fixes for 52-bit physical address patches
-Message-ID: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
+Date: Mon, 15 Jan 2018 15:23:50 +0000
+Subject: [PATCH 3/3] arm64: fix comment above tcr_compute_pa_size
+In-Reply-To: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
+References: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1516029830-12326-4-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin/Will,
+The 'pos' argument is used to select where in TCR to write the value:
+the IPS or PS bitfield.
 
-Here are a couple of fixes to the 52-bit physical address patch series.
-Some bugs were introduced in the last version (v2) of the series, which
-has now been merged to arm64/for-next/core. The first two patches in
-this series put things back as they were in the previous version (v1) of
-the series. The third patch fixes a comment. These issues have been
-discussed in the email thread of v2 of the series.
+Fixes: 787fd1d019b2 ("arm64: limit PA size to supported range")
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Kristina
-
-
-Kristina Martsenko (3):
-  arm64: fix ID map extension to 52 bits
-  KVM: arm/arm64: fix HYP ID map extension to 52 bits
-  arm64: fix comment above tcr_compute_pa_size
-
- arch/arm64/include/asm/assembler.h   |  2 +-
- arch/arm64/include/asm/mmu_context.h |  5 ++---
- virt/kvm/arm/mmu.c                   | 18 ++++++------------
- 3 files changed, 9 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 215a49213507..b9f30ebc1820 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -352,7 +352,7 @@ alternative_endif
+  * ID_AA64MMFR0_EL1.PARange value
+  *
+  *	tcr:		register with the TCR_ELx value to be updated
+- *	pos:		PARange bitfield position
++ *	pos:		IPS or PS bitfield position
+  *	tmp{0,1}:	temporary registers
+  */
+ 	.macro	tcr_compute_pa_size, tcr, pos, tmp0, tmp1
 -- 
 2.1.4
