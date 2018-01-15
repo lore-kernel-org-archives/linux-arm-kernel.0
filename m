@@ -1,26 +1,16 @@
-From: moore@free.fr (Chris Moore)
-Date: Mon, 15 Jan 2018 06:53:48 +0100
-Subject: [PATCH v2 1/3] crypto/generic: sha3 - fixes for alignment and big
- endian operation
-In-Reply-To: <20180114164118.18330-2-ard.biesheuvel@linaro.org>
-References: <20180114164118.18330-1-ard.biesheuvel@linaro.org>
- <20180114164118.18330-2-ard.biesheuvel@linaro.org>
-Message-ID: <cad7b34c-ca50-f856-c3fa-221b4c937d3e@free.fr>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 15 Jan 2018 07:48:38 +0100
+Subject: [PATCH] ARM: dts: iwg20m: Enable cmt0
+In-Reply-To: <1515704379-29154-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1515704379-29154-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180115064838.3tc2nkczbcuxi777@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 11, 2018 at 08:59:38PM +0000, Fabrizio Castro wrote:
+> This patch enables cmt0 support from within the iwg20m SoM dtsi.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 
-Le 14/01/2018 ? 17:41, Ard Biesheuvel a ?crit?:
-> Ensure that the input is byte swabbed before injecting it into the
-
-Nitpick : s/swabbed/swapped/
-
-> SHA3 transform. Use the get_unaligned() accessor for this so that
-> we don't perform unaligned access inadvertently on architectures
-> that do not support that.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Cheers,
-Chris
+Thanks, applied.
