@@ -1,75 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 15 Jan 2018 12:17:46 +0300
-Subject: [PATCH 2/3] arm64: dts: renesas: eagle: Remove renesas,
- no-ether-link property
-In-Reply-To: <20180115084125.8112-3-horms+renesas@verge.net.au>
-References: <20180115084125.8112-1-horms+renesas@verge.net.au>
- <20180115084125.8112-3-horms+renesas@verge.net.au>
-Message-ID: <7cda829c-cb72-ef12-90fe-80f9dbb9200e@cogentembedded.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Jan 2018 10:46:31 +0100
+Subject: [PATCH v4 03/19] arm64: asm-offsets: Remove potential circular
+ dependency
+In-Reply-To: <cbe5c186-1adc-ef3e-e52e-5d60548c352a@arm.com>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-4-marc.zyngier@arm.com>
+ <20180115083449.GD21403@cbox> <cbe5c186-1adc-ef3e-e52e-5d60548c352a@arm.com>
+Message-ID: <CAMJs5B-mqPnxrZk6w3Utn-+WBA03WkWw4jXxcXM+k=EM0gz5Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Mon, Jan 15, 2018 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 15/01/18 08:34, Christoffer Dall wrote:
+>> On Thu, Jan 04, 2018 at 06:43:18PM +0000, Marc Zyngier wrote:
+>>> So far, we've been lucky enough that none of the include files
+>>> that asm-offsets.c requires include asm-offsets.h. This is
+>>> about to change, and would introduce a nasty circular dependency...
+>>>
+>>> Let's now guard the inclusion of asm-offsets.h so that it never
+>>> gets pulled from asm-offsets.c. The same issue exists between
+>>> bounce.c and include/generated/bounds.h, and is worked around
+>>> by using the existing guard symbol.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/include/asm/asm-offsets.h | 2 ++
+>>>  arch/arm64/kernel/asm-offsets.c      | 2 ++
+>>>  2 files changed, 4 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
+>>> index d370ee36a182..7d6531a81eb3 100644
+>>> --- a/arch/arm64/include/asm/asm-offsets.h
+>>> +++ b/arch/arm64/include/asm/asm-offsets.h
+>>> @@ -1 +1,3 @@
+>>> +#if !defined(__GENERATING_ASM_OFFSETS_H) && !defined(__GENERATING_BOUNDS_H)
+>>
+>> I don't understand why we need to check __GENERATING_BOUNDS_H here?
+>> What is the interaction between asm-offsets and bounds?
+>
+> bound.c ends up including asm-offsets.h as well once you start adding
+> the dependency between it and alternatives.h. See the report there:
+>
+> https://www.spinics.net/lists/arm-kernel/msg623723.html
+>
+> which this check addresses.
+>
+Ah, I see.
 
-On 1/15/2018 11:41 AM, Simon Horman wrote:
-
-> Regarding Salvator-X and ULCB boards, Bogdan Mirea says:
-
-    Intended to reply to the original patches but due to high load haven't 
-ever finished that email...
-
->      The present change is a bug fix for AVB link iteratively up/down.
-> 
->      Steps to reproduce:
->      - start AVB TX stream (Using aplay via MSE),
->      - disconnect+reconnect the eth cable,
->      - after a reconnection the eth connection goes iteratively up/down
->        without user interaction,
->      - this may heal after some seconds or even stay for minutes.
-> 
->      As the documentation specifies, the "renesas,no-ether-link" option
->      should be used when a board does not provide a proper AVB_LINK signal.
->      There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
->      and ULCB starter kits since the AVB_LINK is correctly handled by HW.
-> 
->      Choosing to keep or remove the "renesas,no-ether-link" option will
->      have impact on the code flow in the following ways:
->      - keeping this option enabled may lead to unexpected behavior since
->        the RX & TX are enabled/disabled directly from adjust_link function
->        without any HW interrogation,
-
-    What does he mean by that? The adjust_link() is surely called as a result 
-of interrogating the PHY...
-
->      - removing this option, the RX & TX will only be enabled/disabled after
->        HW interrogation. The HW check is made through the LMON pin in PSR
-
-    s/pin/bit/.
-
->        register which specifies AVB_LINK signal value (0 - at low level;
->        1 - at high level).
-
-    Things are not that simple with this signal. The main cause of the issues 
-is that it's connected to a LED control output of the Micrel PHY and that one 
-may have different meaning -- e.g., it can well be blinking when some traffic 
-happens (and IIRC that's might be a problem with KSZ9031, usually used with 
-AVB). I remember I have tried without this option but finally decided to leave 
-it specified as my schematics reading skills failed me in this case... I need 
-to test this patch.
-
->      In conclusion, the present change is also a safety improvement because
->      it removes the "renesas,no-ether-link" option leading to a proper way
->      of detecting the link state based on HW interrogation and not on
->      software heuristic.
-> 
-> On examination of the documentation for the Eagle board this change seems
-> necessary as AVB_LINK is documented as being connected.
-> 
-> Fixes: 38525608952a ("arm64: dts: renesas: eagle: add EtherAVB support")
-> Cc: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-[...]
-
-MBR, Sergei
+Thanks,
+-Christoffer
