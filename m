@@ -1,38 +1,39 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 15 Jan 2018 22:27:31 +0200
-Subject: [PATCH v2 01/16] drivers: pwm: core: use a single of xlate
- function
-In-Reply-To: <6441df76-fb4a-ce00-1019-f7ff9143b75e@microchip.com>
-References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
- <1515766983-15151-2-git-send-email-claudiu.beznea@microchip.com>
- <20180112183512.GB102880@google.com>
- <6441df76-fb4a-ce00-1019-f7ff9143b75e@microchip.com>
-Message-ID: <CAHp75VcaFDEQ1cBzeU2eBj_vf19ok6EWLC07SOTQLRH8BQSbzA@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 15 Jan 2018 14:31:27 -0600
+Subject: [patch v16 3/4] Documentation: jtag: Add bindings for Aspeed SoC
+ 24xx and 25xx families JTAG master driver
+In-Reply-To: <1515776909-29894-4-git-send-email-oleksandrs@mellanox.com>
+References: <1515776909-29894-1-git-send-email-oleksandrs@mellanox.com>
+ <1515776909-29894-4-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <CACPK8XejAoSfQhTWHbzm4jX7A-tau1Oijm2qeWP+Gwz=PU8+tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 10:41 AM, Claudiu Beznea
-<Claudiu.Beznea@microchip.com> wrote:
-
-> For this driver, the PWM bindings were changed (I did a grep by "google,cros-ec-pwm"
-> and located only:
-> arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> files) and changed the bindings in this series, as follows, patch 7 from this series:
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> index 0384e3121f18..0c790ec387eb 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -77,7 +77,7 @@
+On Fri, Jan 12, 2018 at 11:08 AM, Oleksandr Shamray
+<oleksandrs@mellanox.com> wrote:
+> It has been tested on Mellanox system with BMC equipped with
+> Aspeed 2520 SoC for programming CPLD devices.
 >
->         backlight: backlight {
->                 compatible = "pwm-backlight";
-> -               pwms = <&cros_ec_pwm 1>;
-> +               pwms = <&cros_ec_pwm 1 65535>;
+> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-This shows an breakage for user. The old PWM device tree sources or
-binaries should work independently on what changes you did to kernel.
+For the device tree bindings:
 
--- 
-With Best Regards,
-Andy Shevchenko
+Acked-by: Joel Stanley <joel@jms.id.au>
+
+> diff --git a/drivers/jtag/jtag-aspeed.c b/drivers/jtag/jtag-aspeed.c
+> index 9cbd6da..f679041 100644
+> --- a/drivers/jtag/jtag-aspeed.c
+> +++ b/drivers/jtag/jtag-aspeed.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/reset.h>
+
+Oops, this is in the wrong patch.
+
+>  #include <linux/slab.h>
+>  #include <linux/types.h>
+>  #include <uapi/linux/jtag.h>
