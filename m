@@ -1,80 +1,47 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Mon, 15 Jan 2018 08:07:43 -0800 (PST)
-Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <20180115123338.GB5473@e107155-lin>
-Message-ID: <mhng-72d1934a-43df-4a5b-851d-0dd6d8a1b30b@palmer-si-x1c4>
+From: york.sun@nxp.com (York Sun)
+Date: Mon, 15 Jan 2018 16:19:09 +0000
+Subject: EDAC driver for ARMv8 L1/L2 cache
+References: <bc8d7450-3f58-95c2-42c2-d16b2f7a76e4@linux.intel.com>
+ <VI1PR04MB20786CC3E2981C0F60E095079A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112171251.4ricaz3lzditr7pi@pd.tnic>
+ <VI1PR04MB2078B4491702765BA546C5539A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
+ <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
+ <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180113113156.nnmkuh25rilzwf4p@pd.tnic>
+ <20180115142154.rj6cgnhlll7ivyew@lakrids.cambridge.arm.com>
+ <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
+Message-ID: <VI1PR04MB20786DE6AE24D4BB555E87C69AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jan 2018 04:33:38 PST (-0800), sudeep.holla at arm.com wrote:
-> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
->> The original intent in cacheinfo was that an architecture
->> specific populate_cache_leaves() would probe the hardware
->> and then cache_shared_cpu_map_setup() and
->> cache_override_properties() would provide firmware help to
->> extend/expand upon what was probed. Arm64 was really
->> the only architecture that was working this way, and
->> with the removal of most of the hardware probing logic it
->> became clear that it was possible to simplify the logic a bit.
+On 01/15/2018 06:32 AM, Borislav Petkov wrote:
+> On Mon, Jan 15, 2018 at 02:21:54PM +0000, Mark Rutland wrote:
+>> I'm not sure it's possible to cover all potential EDAC implementations
+>> behind the same driver.
 >>
->> This patch combines the walk of the DT nodes with the
->> code updating the cache size/line_size and nr_sets.
->> cache_override_properties() (which was DT specific) is
->> then removed. The result is that cacheinfo.of_node is
->> no longer used as a temporary place to hold DT references
->> for future calls that update cache properties. That change
->> helps to clarify its one remaining use (matching
->> cacheinfo nodes that represent shared caches) which
->> will be used by the ACPI/PPTT code in the following patches.
->>
->> Cc: Palmer Dabbelt <palmer@sifive.com>
->> Cc: Albert Ou <albert@sifive.com>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>  arch/riscv/kernel/cacheinfo.c |  1 +
->>  drivers/base/cacheinfo.c      | 65 +++++++++++++++++++------------------------
->>  include/linux/cacheinfo.h     |  1 +
->>  3 files changed, 31 insertions(+), 36 deletions(-)
->>
->> diff --git a/arch/riscv/kernel/cacheinfo.c b/arch/riscv/kernel/cacheinfo.c
->> index 10ed2749e246..6f4500233cf8 100644
->> --- a/arch/riscv/kernel/cacheinfo.c
->> +++ b/arch/riscv/kernel/cacheinfo.c
->> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
->>  		CACHE_WRITE_BACK
->>  		| CACHE_READ_ALLOCATE
->>  		| CACHE_WRITE_ALLOCATE;
->> +	cache_of_set_props(this_leaf, node);
->
-> This may be necessary but can it be done as later patch ? So far nothing
-> is added that may break riscv IIUC.
->
-> Palmer, Albert,
->
-> Can you confirm ? Also, as I see we can thin down arch specific
-> implementation on riscv if it's just using DT like ARM64. Sorry if
-> I am missing to see something, so thought of checking.
->
-> [...]
+>> If we need these drivers, they should be <cpuname>_edac or <soc>_edac.
+> 
+> Yuck, I wanted to avoid that...
+> 
+> Oh well, can we at least share the barebones design and exchange
+> registers/DT only or is it more complicated than that?
+> 
 
-Sorry, I guess I'm a bit confused as to what's going on here.  RISC-V uses 
-device tree on all Linux systems.
+I have different plan on the driver. Since I don't get interrupt on
+correctable errors, my thinking is to use dynamic polling interval. With
+more correctable errors, the polling interval is decreased to a
+threshold, then further action needs to be taken (at least I would raise
+an error message). The idea is uncorrectable error proceeds from
+increasing correctable errors. I would use per CPU data structure so we
+know which core has increasing errors. For embedded system, we may
+shutdown the core(s) with error to protect the system from critical
+failure. Similarly but differently, L2 cache is shared on the same
+cluster. We may have to shutdown the whole cluster if we have excessive
+correctable errors. For server, it may simply shutdown. Of course the
+decision is not made by the driver, but by RAS or other monitoring policy.
 
->> diff --git a/include/linux/cacheinfo.h b/include/linux/cacheinfo.h
->> index 3d9805297cda..d35299a590a4 100644
->> --- a/include/linux/cacheinfo.h
->> +++ b/include/linux/cacheinfo.h
->> @@ -99,6 +99,7 @@ int func(unsigned int cpu)					\
->>  struct cpu_cacheinfo *get_cpu_cacheinfo(unsigned int cpu);
->>  int init_cache_level(unsigned int cpu);
->>  int populate_cache_leaves(unsigned int cpu);
->> +void cache_of_set_props(struct cacheinfo *this_leaf, struct device_node *np);
->>
->
-> IIUC riscv is the only user for this outside of cacheinfo.c, right ?
-> Hopefully we can get rid of it.
->
-> Other than that, it looks OK. I will wait for response from riscv team
-> do that these riscv related changes can be dropped or move to later
-> patch if really needed.
+Any comment is welcomed.
+
+York
