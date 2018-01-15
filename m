@@ -1,10 +1,8 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 15 Jan 2018 09:41:25 +0100
-Subject: [PATCH 3/3] arm64: dts: renesas: draak: Remove renesas,
+Date: Mon, 15 Jan 2018 09:41:22 +0100
+Subject: [PATCH 0/3] arm64: dts: v3msk, eagle, draak: Remove renesas,
  no-ether-link property
-In-Reply-To: <20180115084125.8112-1-horms+renesas@verge.net.au>
-References: <20180115084125.8112-1-horms+renesas@verge.net.au>
-Message-ID: <20180115084125.8112-4-horms+renesas@verge.net.au>
+Message-ID: <20180115084125.8112-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,34 +32,26 @@ Regarding Salvator-X and ULCB boards, Bogdan Mirea says:
       register which specifies AVB_LINK signal value (0 - at low level;
       1 - at high level).
 
-    In conclusion, the present change is also a safety improvement because
-    it removes the "renesas,no-ether-link" option leading to a proper way
+    In conclusion, the change is also a safety improvement because it
+    removes the "renesas,no-ether-link" option leading to a proper way
     of detecting the link state based on HW interrogation and not on
     software heuristic.
 
-On examination of the documentation for the Draak board this change seems
-necessary as AVB0_LINK is documented as being connected.
+Bogdan Mirea also highlighted that this change may be relevant to the
+DTS files for V3M Starter Kit, Draak and Eagle boards. Examination of the
+relevant documentation has confirmed this.
 
-Fixes: 4503b50eac08 ("arm64: dts: renesas: r8a77995: draak: enable EthernetAVB")
-Cc: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
+Based on renesas-devel-20180115-v4.15-rc8
+
+Simon Horman (3):
+  arm64: dts: renesas: v3msk: Remove renesas, no-ether-link property
+  arm64: dts: renesas: eagle: Remove renesas, no-ether-link property
+  arm64: dts: renesas: draak: Remove renesas, no-ether-link property
+
+ arch/arm64/boot/dts/renesas/r8a77970-eagle.dts | 1 -
+ arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts | 1 -
  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 1 -
- 1 file changed, 1 deletion(-)
+ 3 files changed, 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index 09de73b11db8..ee82ec26428a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -78,7 +78,6 @@
- &avb {
- 	pinctrl-0 = <&avb0_pins>;
- 	pinctrl-names = "default";
--	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
- 	status = "okay";
- 
 -- 
 2.11.0
