@@ -1,154 +1,102 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 15 Jan 2018 07:33:05 -0800
-Subject: [PATCH 1/2 v2] ARM: dts: Add Aspeed SoC USB controllers to
- device-tree
-In-Reply-To: <1515738064.31850.100.camel@kernel.crashing.org>
-References: <1515738064.31850.100.camel@kernel.crashing.org>
-Message-ID: <CACPK8XcWVDYhK9wFWKXzghV+H3nYH0xTyzTpUds4acKtcpty4g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Jan 2018 16:33:54 +0100
+Subject: [PATCH v2] arm64: allwinner: a64: orangepi-zero-plus2: add usb otg
+In-Reply-To: <8080607.cgOBd57Bn1@ice-x220i>
+References: <1515748144-25204-1-git-send-email-jagan@amarulasolutions.com>
+ <20180115080139.k2vrczo3hnvdt3df@flea.lan>
+ <8080607.cgOBd57Bn1@ice-x220i>
+Message-ID: <20180115153354.4anukmnd64yj3oec@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 11, 2018 at 10:21 PM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> This adds the USB controllers to the DT template of the
-> AST24xx and AST25xx SoCs.
->
-> This patch doesn't enable them by default on any board specific
-> .dts yet. This will be done when we have the necessary clock/reset
-> and pinmux support. In the meantime though, this will work if
-> u-boot configures things properly.
->
-> For the AST2400 I only added pinmux definition for port 1
-> which is dual USB1/USB2. There are additional USB1 only ports
-> that might require more work but I don't have HW to test at
-> hand so I'm leaving that to whoever cares.
->
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+On Mon, Jan 15, 2018 at 04:05:07PM +0800, Icenowy Zheng wrote:
+> ? 2018?1?15???? CST ??4:01:39?Maxime Ripard ???
+> > Hi,
+> > 
+> > On Fri, Jan 12, 2018 at 02:39:04PM +0530, Jagan Teki wrote:
+> > > Add usb otg support for orangepi-zero-plus2 board:
+> > > - Add usb_otg node with dr_mode as 'otg'
+> > > - USB0-IDDET connected to PA21
+> > > - VBUS connected through DCIN which always on
+> > > 
+> > > Tested mass storage function.
+> > > 
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > ---
+> > > Changes for v2:
+> > > - Change dr_mode to peripheral
+> > > 
+> > >  .../dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 18
+> > >  ++++++++++++++++++ 1 file changed, 18 insertions(+)
+> > > 
+> > > diff --git
+> > > a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> > > b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts index
+> > > af43533..6511190 100644
+> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> > > @@ -73,6 +73,10 @@
+> > > 
+> > >  	};
+> > >  
+> > >  };
+> > > 
+> > > +&ehci0 {
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > > 
+> > >  &mmc0 {
+> > >  
+> > >  	pinctrl-names = "default";
+> > >  	pinctrl-0 = <&mmc0_pins_a>;
+> > > 
+> > > @@ -111,6 +115,10 @@
+> > > 
+> > >  	status = "okay";
+> > >  
+> > >  };
+> > > 
+> > > +&ohci0 {
+> > > +	status = "okay";
+> > > +};
+> > > +
+> > > 
+> > >  &uart0 {
+> > >  
+> > >  	pinctrl-names = "default";
+> > >  	pinctrl-0 = <&uart0_pins_a>;
+> > > 
+> > > @@ -122,3 +130,13 @@
+> > > 
+> > >  	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> > >  	status = "okay";
+> > >  
+> > >  };
+> > > 
+> > > +
+> > > +&usb_otg {
+> > > +	dr_mode = "peripheral";
+> > 
+> > If VBUS is always on, this can only operate safely in host mode, not
+> > peripheral.
+> 
+> I think this kind of device is designed to directly drain power from the host 
+> in peripheral mode.
 
-Andrew, can you check the pinmux stuff for us please?
+Then the commit log has it backwards, VBUS is not connected through
+DCIN, DCIN is VBUS.
 
-The other parts look good.
+Maxime
 
-Cheers,
-
-Joel
-
-> ---
->
-> v2: Previous patch was missing actually adding the nodes
->     (which was an old patch in my tree I had forgotten to
->     merge).
->
->  arch/arm/boot/dts/aspeed-g4.dtsi | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/aspeed-g5.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index b0d8431a3700..e55f2ad5de59 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -103,6 +103,23 @@
->                         status = "disabled";
->                 };
->
-> +               ehci0: usb at 1e6a1000 {
-> +                       compatible = "aspeed,ast2400-ehci", "generic-ehci";
-> +                       reg = <0x1e6a1000 0x100>;
-> +                       interrupts = <5>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               uhci: usb at 1e6b0000 {
-> +                       compatible = "aspeed,ast2400-uhci", "generic-uhci";
-> +                       reg = <0x1e6b0000 0x100>;
-> +                       interrupts = <14>;
-> +                       #ports = <3>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
-> +                       status = "disabled";
-> +               };
-> +
->                 apb {
->                         compatible = "simple-bus";
->                         #address-cells = <1>;
-> @@ -1227,6 +1244,16 @@
->                 groups = "USBCKI";
->         };
->
-> +       pinctrl_usb2h_default: usb2h_default {
-> +               function = "USB2H1";
-> +               groups = "USB2H1";
-> +       };
-> +
-> +       pinctrl_usb2d_default: usb2d_default {
-> +               function = "USB2D1";
-> +               groups = "USB2D1";
-> +       };
-> +
->         pinctrl_vgabios_rom_default: vgabios_rom_default {
->                 function = "VGABIOS_ROM";
->                 groups = "VGABIOS_ROM";
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 40de3b66c33f..655258edee24 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -138,6 +138,31 @@
->                         status = "disabled";
->                 };
->
-> +               ehci0: usb at 1e6a1000 {
-> +                       compatible = "aspeed,ast2500-ehci", "generic-ehci";
-> +                       reg = <0x1e6a1000 0x100>;
-> +                       interrupts = <5>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               ehci1: usb at 1e6a3000 {
-> +                       compatible = "aspeed,ast2500-ehci", "generic-ehci";
-> +                       reg = <0x1e6a3000 0x100>;
-> +                       interrupts = <13>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT2CLK>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               uhci: usb at 1e6b0000 {
-> +                       compatible = "aspeed,ast2500-uhci", "generic-uhci";
-> +                       reg = <0x1e6b0000 0x100>;
-> +                       interrupts = <14>;
-> +                       #ports = <2>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
-> +                       status = "disabled";
-> +               };
-> +
->                 apb {
->                         compatible = "simple-bus";
->                         #address-cells = <1>;
-> @@ -1358,6 +1383,21 @@
->                 groups = "USBCKI";
->         };
->
-> +       pinctrl_usb2ah_default: usb2ah_default {
-> +               function = "USB2AH";
-> +               groups = "USB2AH";
-> +       };
-> +
-> +       pinctrl_usb11bhid_default: usb11bhid_default {
-> +               function = "USB11BHID";
-> +               groups = "USB11BHID";
-> +       };
-> +
-> +       pinctrl_usb2bh_default: usb2bh_default {
-> +               function = "USB2BH";
-> +               groups = "USB2BH";
-> +       };
-> +
->         pinctrl_vgabiosrom_default: vgabiosrom_default {
->                 function = "VGABIOSROM";
->                 groups = "VGABIOSROM";
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/4783897a/attachment.sig>
