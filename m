@@ -1,36 +1,33 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 15 Jan 2018 11:29:31 -0600
-Subject: [PATCH] ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y
-Message-ID: <1516037371-3932-1-git-send-email-david@lechnology.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 15 Jan 2018 18:19:00 +0100
+Subject: [PATCH v3 2/2] i2c: mv64xxx: Fix clock resource by adding an
+ optional bus clock
+In-Reply-To: <87wp0n5nw1.fsf@free-electrons.com>
+References: <20180112103956.4875-1-gregory.clement@free-electrons.com>
+ <20180112103956.4875-3-gregory.clement@free-electrons.com>
+ <20180112105434.juefp2apuber3zti@flea.lan>
+ <87wp0n5nw1.fsf@free-electrons.com>
+Message-ID: <20180115171859.nukvtrez5yun4564@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes CONFIG_DAVINCI_WATCHDOG from a module to a compiled-in
-option. Since the reset function has been moved out of the mach code in
-commit 0808d3260456 ("ARM: davinci: remove watchdog reset") and into the
-watchdog driver, devices cannot reboot unless the watchdog driver is
-loaded, so make it a compiled-in option so that we can always reboot, even
-when modules are not loaded.
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Suggested-by: Adam Ford <aford173@gmail.com>
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/configs/davinci_all_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> > Are you sure the i2c controller is on the AXI bus? It seems more
+> > likely to be on an APB bus.
+> 
+> No I am not sure :)
+> Actually I don't have this information, so lets call it "reg" for
+> register clock.
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 62f853f..b400670 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -138,7 +138,7 @@ CONFIG_POWER_RESET_GPIO=y
- CONFIG_SYSCON_REBOOT_MODE=m
- CONFIG_BATTERY_LEGO_EV3=m
- CONFIG_WATCHDOG=y
--CONFIG_DAVINCI_WATCHDOG=m
-+CONFIG_DAVINCI_WATCHDOG=y
- CONFIG_MFD_DM355EVM_MSP=y
- CONFIG_TPS6507X=y
- CONFIG_REGULATOR=y
--- 
-2.7.4
+So, I assume a V4 is needed for this series.
+
+BTW would be someone from FreeElectrons be up to maintaining this
+driver?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/50eaf8f1/attachment.sig>
