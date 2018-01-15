@@ -1,49 +1,68 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Mon, 15 Jan 2018 14:12:26 -0600
-Subject: [PATCH 08/11] signal/arm: Document conflicts with SI_USER and
- SIGFPE
-In-Reply-To: <20180115174947.GH17719@n2100.armlinux.org.uk> (Russell King's
- message of "Mon, 15 Jan 2018 17:49:47 +0000")
-References: <87373b6ghs.fsf@xmission.com>
- <20180112005940.23279-8-ebiederm@xmission.com>
- <20180115174947.GH17719@n2100.armlinux.org.uk>
-Message-ID: <878tcyop91.fsf@xmission.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 15 Jan 2018 22:19:39 +0200
+Subject: [RFC PATCH 1/2] pinctrl: add consumer variant for gpio request
+In-Reply-To: <20180115162233.6205-2-ludovic.desroches@microchip.com>
+References: <20180115162233.6205-1-ludovic.desroches@microchip.com>
+ <20180115162233.6205-2-ludovic.desroches@microchip.com>
+Message-ID: <CAHp75VdGp1_hwK7rUq4u_gKpypdV7LYhV4+kQoVb_u7D+a6pwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+On Mon, Jan 15, 2018 at 6:22 PM, Ludovic Desroches
+<ludovic.desroches@microchip.com> wrote:
 
-> On Thu, Jan 11, 2018 at 06:59:37PM -0600, Eric W. Biederman wrote:
->> Setting si_code to 0 results in a userspace seeing an si_code of 0.
->> This is the same si_code as SI_USER.  Posix and common sense requires
->> that SI_USER not be a signal specific si_code.  As such this use of 0
->> for the si_code is a pretty horribly broken ABI.
->> 
->> Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
->> value of __SI_KILL and now sees a value of SIL_KILL with the result
->> that uid and pid fields are copied and which might copying the si_addr
->> field by accident but certainly not by design.  Making this a very
->> flakey implementation.
->> 
->> Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
->> appropriate fields will be reliably copied.
->
-> So what do you suggest when none of the SIGFPE FPE_xxx codes match the
-> condition that "we don't know what happened" ?  Raise a SIGKILL instead
-> maybe?  We will have dumped the VFP state into the kernel log at this
-> point, things are pretty much fscked.
->
-> It's probably an impossible condition unless the hardware has failed,
-> no one has knowingly reported getting such a dump in their kernel log,
-> so it's something that could very likely be changed in some way
-> without anyone noticing.
+Did I miss cover letter for this?
 
-It sounds like we have two equally valid possible solutions:
-1) force_sig(SIGKILL, current);
-2) Allocate a new FPE_xxx code in asm-generic/siginfo.h
-   I believe the next available number is 15.
+> Add a consumer variant to GPIO request relative functions. The goal
+> is to fix the bad ownership, which is arbitrary set to
+> "range->name:gpio", of a GPIO.
 
-If no one is going to notice this should be comparatively easy to fix.
-I just don't have the knowledge of arm to make the judgement myself.
+Hmm... It's supposed to be name of the owner of the pin range (pin
+control device name IIUC).
 
-Eric
+> There is a lack of configuration features for GPIO. For instance,
+> we can't set the bias. Some pin controllers manage both device's
+> pins and GPIOs. GPIOs can benefit from pin configuration. Usually,
+> a pinctrl node is used to mux the pin as a GPIO and to set up its
+> configuration.
+
+Don't we have means to do that?
+
+At least that what I see in aspeed_gpio_set_config().
+
+Or I missed a point here?
+
+> The pinmuxing strict mode involves that a pin which is muxed can't
+> be requested as a GPIO if the owner is not the same.
+
+Any elaborated example?
+
+> Unfortunately,
+> the ownership of a GPIO is set arbitrarily to "range->name:gpio".
+> So there is a mismatch about the ownership which prevents a device
+> from being the owner of the pinmuxing and requesting the same pin as
+> a GPIO.
+
+> Adding some consumer variants for GPIO request stuff will allow to
+> pass the name of the device which requests the GPIO to not return an
+> error if it's also the owner of the pinmuxing.
+
+I think we need something more generic in core than producing more API
+functions.
+
+But I would like to get problem first.
+
+> +       if (consumer)
+> +               return pin_request(pctldev, pin, consumer, range);
+> +
+
+Hmm... My understanding that GPIO is just a (special) function out of
+pin muxing. So, doing musing is essential to get proper function out
+of it.
+
+Does your hardware considers this differently? If so, I would really
+want to see some datasheets.
+
+-- 
+With Best Regards,
+Andy Shevchenko
