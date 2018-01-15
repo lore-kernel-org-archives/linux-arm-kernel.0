@@ -1,127 +1,166 @@
-From: ayan.halder@arm.com (Ayan Halder)
-Date: Mon, 15 Jan 2018 15:47:44 +0000
-Subject: [PATCH 01/19] drm/fourcc: Add a function to tell if the format
- embeds alpha
-In-Reply-To: <20180109132833.petfgnh3fvbbvosv@flea>
-References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
- <b58c65b26e59dff7917d90846cb797a11ca09efa.1515494838.git-series.maxime.ripard@free-electrons.com>
- <1796930.sWoKI78acY@avalon> <20180109132833.petfgnh3fvbbvosv@flea>
-Message-ID: <20180115154744.GA28269@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 15 Jan 2018 15:48:13 +0000
+Subject: [PATCH v6 05/12] ACPI/PPTT: Add Processor Properties Topology
+ Table parsing
+In-Reply-To: <20180113005920.28658-6-jeremy.linton@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-6-jeremy.linton@arm.com>
+Message-ID: <20180115154813.GB17664@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 02:28:33PM +0100, Maxime Ripard wrote:
-> Hi Laurent,
->
-> On Tue, Jan 09, 2018 at 02:29:58PM +0200, Laurent Pinchart wrote:
-> > On Tuesday, 9 January 2018 12:56:20 EET Maxime Ripard wrote:
-> > > There's a bunch of drivers that duplicate the same function to know if a
-> > > particular format embeds an alpha component or not.
-> > >
-> > > Let's create a helper to avoid duplicating that logic.
-> > >
-> > > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Cc: Eric Anholt <eric@anholt.net>
-> > > Cc: Inki Dae <inki.dae@samsung.com>
-> > > Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> > > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > Cc: Mark Yao <mark.yao@rock-chips.com>
-> > > Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  drivers/gpu/drm/drm_fourcc.c | 43 +++++++++++++++++++++++++++++++++++++-
-> > >  include/drm/drm_fourcc.h     |  1 +-
-> > >  2 files changed, 44 insertions(+)
-> > >
-> > > diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
-> > > index 9c0152df45ad..6e6227d6a46b 100644
-> > > --- a/drivers/gpu/drm/drm_fourcc.c
-> > > +++ b/drivers/gpu/drm/drm_fourcc.c
-> > > @@ -348,3 +348,46 @@ int drm_format_plane_height(int height, uint32_t
-> > > format, int plane) return height / info->vsub;
-> > >  }
-> > >  EXPORT_SYMBOL(drm_format_plane_height);
-> > > +
-> > > +/**
-> > > + * drm_format_has_alpha - get whether the format embeds an alpha component
-> > > + * @format: pixel format (DRM_FORMAT_*)
-> > > + *
-> > > + * Returns:
-> > > + * true if the format embeds an alpha component, false otherwise.
-> > > + */
-> > > +bool drm_format_has_alpha(uint32_t format)
-> > > +{
-> > > + switch (format) {
-> > > + case DRM_FORMAT_ARGB4444:
-> > > + case DRM_FORMAT_ABGR4444:
-> > > + case DRM_FORMAT_RGBA4444:
-> > > + case DRM_FORMAT_BGRA4444:
-> > > + case DRM_FORMAT_ARGB1555:
-> > > + case DRM_FORMAT_ABGR1555:
-> > > + case DRM_FORMAT_RGBA5551:
-> > > + case DRM_FORMAT_BGRA5551:
-> > > + case DRM_FORMAT_ARGB8888:
-> > > + case DRM_FORMAT_ABGR8888:
-> > > + case DRM_FORMAT_RGBA8888:
-> > > + case DRM_FORMAT_BGRA8888:
-> > > + case DRM_FORMAT_ARGB2101010:
-> > > + case DRM_FORMAT_ABGR2101010:
-> > > + case DRM_FORMAT_RGBA1010102:
-> > > + case DRM_FORMAT_BGRA1010102:
-> > > + case DRM_FORMAT_AYUV:
-> > > + case DRM_FORMAT_XRGB8888_A8:
-> > > + case DRM_FORMAT_XBGR8888_A8:
-> > > + case DRM_FORMAT_RGBX8888_A8:
-> > > + case DRM_FORMAT_BGRX8888_A8:
-> > > + case DRM_FORMAT_RGB888_A8:
-> > > + case DRM_FORMAT_BGR888_A8:
-> > > + case DRM_FORMAT_RGB565_A8:
-> > > + case DRM_FORMAT_BGR565_A8:
-> > > +         return true;
-> > > +
-> > > + default:
-> > > +         return false;
-> > > + }
-> > > +}
-> > > +EXPORT_SYMBOL(drm_format_has_alpha);
-> >
-> > How about adding the information to struct drm_format_info instead ?
-> > drm_format_has_alpha() could then be implemented as
-> >
-> > bool drm_format_has_alpha(uint32_t format)
-> > {
-> >     const struct drm_format_info *info;
-> >
-> >     info = drm_format_info(format);
-> >     return info ? info->has_alpha : false;
-> > }
->
-> I considered it, and wasn't too sure about if adding more fields to
-> drm_format_info was ok. I can definitely do it that way.
-Are you going to send an updated patch with the change mentioned here.
-Or should I update my patch (https://patchwork.kernel.org/patch/10161023/)
-and change the type of '.alpha' to boolean to denote if the color
-format has an alpha channel or not.
+On Fri, Jan 12, 2018 at 06:59:13PM -0600, Jeremy Linton wrote:
+> ACPI 6.2 adds a new table, which describes how processing units
+> are related to each other in tree like fashion. Caches are
+> also sprinkled throughout the tree and describe the properties
+> of the caches in relation to other caches and processing units.
+> 
+> Add the code to parse the cache hierarchy and report the total
+> number of levels of cache for a given core using
+> acpi_find_last_cache_level() as well as fill out the individual
+> cores cache information with cache_setup_acpi() once the
+> cpu_cacheinfo structure has been populated by the arch specific
+> code.
+> 
+> An additional patch later in the set adds the ability to report
+> peers in the topology using find_acpi_cpu_topology()
+> to report a unique ID for each processing unit at a given level
+> in the tree. These unique id's can then be used to match related
+> processing units which exist as threads, COD (clusters
+> on die), within a given package, etc.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  drivers/acpi/pptt.c | 476 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 476 insertions(+)
+>  create mode 100644 drivers/acpi/pptt.c
+> 
+> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+> new file mode 100644
+> index 000000000000..2c4b3ed862a8
+> --- /dev/null
+> +++ b/drivers/acpi/pptt.c
+> @@ -0,0 +1,476 @@
+> +/*
+> + * Copyright (C) 2018, ARM
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * This file implements parsing of Processor Properties Topology Table (PPTT)
+> + * which is optionally used to describe the processor and cache topology.
+> + * Due to the relative pointers used throughout the table, this doesn't
+> + * leverage the existing subtable parsing in the kernel.
+> + *
+> + * The PPTT structure is an inverted tree, with each node potentially
+> + * holding one or two inverted tree data structures describing
+> + * the caches available at that level. Each cache structure optionally
+> + * contains properties describing the cache at a given level which can be
+> + * used to override hardware probed values.
+> + */
+> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/cacheinfo.h>
+> +#include <acpi/processor.h>
+> +
+> +/* total number of attributes checked by the properties code */
+> +#define PPTT_CHECKED_ATTRIBUTES 6
+> +
+> +/*
+> + * Given the PPTT table, find and verify that the subtable entry
+> + * is located within the table
+> + */
+> +static struct acpi_subtable_header *fetch_pptt_subtable(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	struct acpi_subtable_header *entry;
+> +
+> +	/* there isn't a subtable at reference 0 */
+> +	if (pptt_ref < sizeof(struct acpi_subtable_header))
+> +		return NULL;
+> +
+> +	if (pptt_ref + sizeof(struct acpi_subtable_header) > table_hdr->length)
+> +		return NULL;
+> +
+> +	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr, pptt_ref);
+> +
+> +	if (pptt_ref + entry->length > table_hdr->length)
+> +		return NULL;
+> +
+> +	return entry;
+> +}
+> +
+> +static struct acpi_pptt_processor *fetch_pptt_node(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	return (struct acpi_pptt_processor *)fetch_pptt_subtable(table_hdr,
+> +								 pptt_ref);
+> +}
+> +
+> +static struct acpi_pptt_cache *fetch_pptt_cache(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	return (struct acpi_pptt_cache *)fetch_pptt_subtable(table_hdr,
+> +							     pptt_ref);
+> +}
+> +
+> +static struct acpi_subtable_header *acpi_get_pptt_resource(
+> +	struct acpi_table_header *table_hdr,
+> +	struct acpi_pptt_processor *node, int resource)
+> +{
+> +	u32 *ref;
+> +
+> +	if (resource >= node->number_of_priv_resources)
+> +		return NULL;
+> +
+> +	ref = ACPI_ADD_PTR(u32, node, sizeof(struct acpi_pptt_processor));
+> +	ref += resource;
+> +
+> +	return fetch_pptt_subtable(table_hdr, *ref);
+> +}
+> +
+> +/*
+> + * Attempt to find a given cache level, while counting the max number
+> + * of cache levels for the cache node.
+> + *
+> + * Given a pptt resource, verify that it is a cache node, then walk
+> + * down each level of caches, counting how many levels are found
+> + * as well as checking the cache type (icache, dcache, unified). If a
+> + * level & type match, then we set found, and continue the search.
+> + * Once the entire cache branch has been walked return its max
+> + * depth.
+> + */
+> +static int acpi_pptt_walk_cache(struct acpi_table_header *table_hdr,
+> +				int local_level,
+> +				struct acpi_subtable_header *res,
+> +				struct acpi_pptt_cache **found,
+> +				int level, int type)
+> +{
+> +	struct acpi_pptt_cache *cache;
+> +
+> +	if (res->type != ACPI_PPTT_TYPE_CACHE)
+> +		return 0;
+> +
+> +	cache = (struct acpi_pptt_cache *) res;
+> +	while (cache) {
+> +		local_level++;
+> +
+> +		if ((local_level == level) &&
+> +		    (cache->flags & ACPI_PPTT_CACHE_TYPE_VALID) &&
+> +		    ((cache->attributes & ACPI_PPTT_MASK_CACHE_TYPE) == type)) {
+> +			if ((*found != NULL) && (cache != *found))
 
-> > although drivers should really use the drm_framebuffer::format field directly
-> > in most cases, so the helper might not be needed at all.
->
-> The drivers converted in my serie shouldn't be too hard to convert to
-> use drm_format_info directly, so that can be removed as well.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+I forgot to mention this earlier, I see you have used parentheses too
+liberally at quite some place in this file like the above 4 line.
+Please drop those unnecessary parentheses.
 
-
-
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+--
+Regards,
+Sudeep
