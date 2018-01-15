@@ -1,90 +1,51 @@
-From: Hermann.Lauer@iwr.uni-heidelberg.de (Hermann Lauer)
-Date: Mon, 15 Jan 2018 16:06:56 +0100
-Subject: [RESEND] phy: sun4i-usb: add support for R40 USB PHY
-In-Reply-To: <20180103084944.3145-1-icenowy@aosc.io>
-References: <20180103084944.3145-1-icenowy@aosc.io>
-Message-ID: <20180115150656.bibc4draok4i4oae@lemon.iwr.uni-heidelberg.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 15 Jan 2018 15:08:59 +0000
+Subject: stable-rc build: 2 warnings 0 failures
+ (stable-rc/v4.14.13-119-gb32d455)
+In-Reply-To: <CAK8P3a2vXJT1g6wa4cbcDJ48sfOKfemazV0e1crJ5v=6DOZ5fg@mail.gmail.com>
+References: <5a5c9ee8.cf53650a.dae00.f369@mx.google.com>
+ <CAK8P3a2vXJT1g6wa4cbcDJ48sfOKfemazV0e1crJ5v=6DOZ5fg@mail.gmail.com>
+Message-ID: <CAKv+Gu9ZyXjiKfD6cqEpexdVA_CnYr1kByZJQcKBuK7ig=7MmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 03, 2018 at 04:49:44PM +0800, Icenowy Zheng wrote:
-> Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+On 15 January 2018 at 13:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Mon, Jan 15, 2018 at 1:30 PM, Olof's autobuilder <build@lixom.net> wrote:
+>
+>> Warnings:
+>>
+>>         arm.allmodconfig:
+>> /tmp/cccX4oa4.s:18153: Warning: using r15 results in unpredictable behaviour
+>> /tmp/cccX4oa4.s:18225: Warning: using r15 results in unpredictable behaviour
+>
+> This appears to be an old issue that only now started to get reported
+> here. From what I can
+> tell, new versions of binutils warn about two isntructions in the kprobes test:
+>
+> Maybe we can work around it using a patch like below?
+>
+>         Arnd
+>
 
-You may add
+Can't we just add -Wa,--no-warn for this file?
 
-Tested-by: Hermann.Lauer at iwr.uni-heidelberg.de
 
-as my Banana Pi M2 Ultra is running over a week now with an usb-network
-adapter which is needed until devicetree entries for the Banana Pi M2 Ultra
-are available for the ccu register enabling allowing access to the ethernet phy.
-
-Thanks !
-
-> ---
-> When resending, the ACK's by Maxime and Rob are added.
-> 
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt |  1 +
->  drivers/phy/allwinner/phy-sun4i-usb.c                   | 12 ++++++++++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index c1ce5a0a652e..07ca4ec4a745 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -11,6 +11,7 @@ Required properties:
->    * allwinner,sun8i-a33-usb-phy
->    * allwinner,sun8i-a83t-usb-phy
->    * allwinner,sun8i-h3-usb-phy
-> +  * allwinner,sun8i-r40-usb-phy
->    * allwinner,sun8i-v3s-usb-phy
->    * allwinner,sun50i-a64-usb-phy
->  - reg : a list of offset + length pairs
-> diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
-> index aa857be692cf..bee798892b21 100644
-> --- a/drivers/phy/allwinner/phy-sun4i-usb.c
-> +++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-> @@ -112,6 +112,7 @@ enum sun4i_usb_phy_type {
->  	sun8i_a33_phy,
->  	sun8i_a83t_phy,
->  	sun8i_h3_phy,
-> +	sun8i_r40_phy,
->  	sun8i_v3s_phy,
->  	sun50i_a64_phy,
->  };
-> @@ -919,6 +920,16 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
->  	.phy0_dual_route = true,
->  };
->  
-> +static const struct sun4i_usb_phy_cfg sun8i_r40_cfg = {
-> +	.num_phys = 3,
-> +	.type = sun8i_r40_phy,
-> +	.disc_thresh = 3,
-> +	.phyctl_offset = REG_PHYCTL_A33,
-> +	.dedicated_clocks = true,
-> +	.enable_pmu_unk1 = true,
-> +	.phy0_dual_route = true,
-> +};
-> +
->  static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
->  	.num_phys = 1,
->  	.type = sun8i_v3s_phy,
-> @@ -948,6 +959,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
->  	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
->  	{ .compatible = "allwinner,sun8i-a83t-usb-phy", .data = &sun8i_a83t_cfg },
->  	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
-> +	{ .compatible = "allwinner,sun8i-r40-usb-phy", .data = &sun8i_r40_cfg },
->  	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
->  	{ .compatible = "allwinner,sun50i-a64-usb-phy",
->  	  .data = &sun50i_a64_cfg},
-
--- 
-Netzwerkadministration/Zentrale Dienste, Interdiziplinaeres 
-Zentrum fuer wissenschaftliches Rechnen der Universitaet Heidelberg
-IWR; INF 205; 69120 Heidelberg; Tel: (06221)54-14405 Fax: -14427
-Email: Hermann.Lauer at iwr.uni-heidelberg.de
+> diff --git a/arch/arm/probes/kprobes/test-arm.c
+> b/arch/arm/probes/kprobes/test-arm.c
+> index 8866aedfdea2..8b7df0ce04d2 100644
+> --- a/arch/arm/probes/kprobes/test-arm.c
+> +++ b/arch/arm/probes/kprobes/test-arm.c
+> @@ -169,10 +169,10 @@ void kprobe_arm_test_cases(void)
+>
+>         /* Data-processing with PC as a target and status registers updated */
+>         TEST_UNSUPPORTED("movs  pc, r1")
+> -       TEST_UNSUPPORTED("movs  pc, r1, lsl r2")
+> +       TEST_UNSUPPORTED(__inst_arm(0xe1b0f211) "       @ movs  pc, r1, lsl r2")
+>         TEST_UNSUPPORTED("movs  pc, #0x10000")
+>         TEST_UNSUPPORTED("adds  pc, lr, r1")
+> -       TEST_UNSUPPORTED("adds  pc, lr, r1, lsl r2")
+> +       TEST_UNSUPPORTED(__inst_arm(0xe09ef211) "       @ adds  pc,
+> lr, r1, lsl r2")
+>         TEST_UNSUPPORTED("adds  pc, lr, #4")
+>
+>         /* Data-processing with SP as target */
