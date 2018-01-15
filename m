@@ -1,46 +1,147 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 15 Jan 2018 09:52:31 +0530
-Subject: [PATCH 1/3] arm: spear600: Add missing interrupt-parent of rtc
-In-Reply-To: <CAK8P3a3MZX-ZsxX9h1-8kVQhn9hqY=c8L1+=e3uTfjEjBCYuPg@mail.gmail.com>
-References: <20180112020711.6gp2pnsxxjzelidq@localhost>
- <20180112032223.GK3626@vireshk-i7>
- <CAOesGMggU73asY1SEUDD_BsWcrGYR___o8e5omjziOPEwJgqBQ@mail.gmail.com>
- <CAK8P3a2SO4=YKBE3L_AKsyfNe77YR7a8F=dvbS=ic03=6NK8MA@mail.gmail.com>
- <CAOesGMgcf9FovbzhPkKnrG4ETRFP3dsSJnTYNfp1wECMFeFOGA@mail.gmail.com>
- <CAL_JsqJVWLazDRB1me2OubqqMhdsqsR+cLSHR+K0OY3dZHcE-w@mail.gmail.com>
- <CAOesGMiyfpRyoe4dxQeNMF5invysVBEy+J5OwUhuop=JyAvZoQ@mail.gmail.com>
- <CAK8P3a3KTz0sOSbO9+sAY1Sv95hZF4Yg1qMzOaXPAZ_1pOgGpg@mail.gmail.com>
- <CAOesGMiHeitS_j9r0DsPf3k1jVJT9_z-bHyrhbB7fQ__LjjaqA@mail.gmail.com>
- <CAK8P3a3MZX-ZsxX9h1-8kVQhn9hqY=c8L1+=e3uTfjEjBCYuPg@mail.gmail.com>
-Message-ID: <20180115042231.GA22978@vireshk-i7>
+From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
+Date: Mon, 15 Jan 2018 10:14:05 +0530
+Subject: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
+ any reservation
+In-Reply-To: <DB5PR0401MB173376E6E9B45B871BD1A66086140@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+References: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
+ <5A4F5C45.3090006@arm.com>
+ <DB5PR0401MB1733C9CB0DCDF94FCF3E4E1286130@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+ <5A58F75E.8030106@arm.com>
+ <DB5PR0401MB173376E6E9B45B871BD1A66086140@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+Message-ID: <CAFTCetQvrNG7fr2-y4wOmjgFyC6D1U18K3iq5--RcNwt+hEz2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-01-18, 23:05, Arnd Bergmann wrote:
-> I've sent patches for all the remaining MODULE_LICENSE warnings earlier
-> this week, and we should now have patches for almost all the dtc
-> warnings in flight. This is what I still see on my randconfig builder
-> with linux-next + arm-soc/for-next + patches I sent:
-> 
->      arch/arm/boot/dts/spear1310-evb.dtb: Warning (gpios_property):
-> Missing property '#gpio-cells' in node /interrupt-controller at ec801000
-> or bad phandle (referred from /ahb/apb/spi at e0100000:cs-gpios[6])
->      arch/arm/boot/dts/spear1310-evb.dtb: Warning (gpios_property):
-> Property 'cs-gpios', cell 6 is not a phandle reference in
-> /ahb/apb/spi at e0100000
->      arch/arm/boot/dts/spear1340-evb.dtb: Warning (dmas_property):
-> Missing property '#dma-cells' in node /interrupt-controller at ec801000
-> or bad phandle (referred from /ahb/apb/serial at b4100000:dmas[4])
->      arch/arm/boot/dts/spear1340-evb.dtb: Warning (dmas_property):
-> Property 'dmas', cell 4 is not a phandle reference in
-> /ahb/apb/serial at b4100000
->      arch/arm/boot/dts/spear600-evb.dtb: Warning
-> (interrupts_property): Missing interrupt-parent for
-> /ahb/apb/rtc at fc900000
+Hi Poonam, James
 
-These are all the warnings we got earlier. So none of my patches are in the
-branch you tested I believe. Can you do a `git log` and see if they are present
-?
+On Sat, Jan 13, 2018 at 8:37 AM, Poonam Aggrwal <poonam.aggrwal@nxp.com> wrote:
+> Hi James
+>
+> Regards
+> Poonam
+>
+>> -----Original Message-----
+>> From: James Morse [mailto:james.morse at arm.com]
+>> Sent: Friday, January 12, 2018 11:29 PM
+>> To: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+>> Cc: linux-arm-kernel at lists.infradead.org; takahiro.akashi at linaro.org;
+>> will.deacon at arm.com; G.h. Gao <guanhua.gao@nxp.com>; Abhimanyu Saini
+>> <abhimanyu.saini@nxp.com>; kexec at lists.infradead.org
+>> Subject: Re: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
+>> any reservation
+>>
+>> Hi Poonam,
+>>
+>> On 08/01/18 04:31, Poonam Aggrwal wrote:
+>> > James Morse wrote:
+>> >> On 04/01/18 15:34, Poonam Aggrwal wrote:
+>> >>> Address for both crashkernel memory and elfcorehdr can be assigned
+>> >>> statically. For crashkernel memory it is via
+>> >>> crashkernel=SIZE at ADDRESS and elfcorehdr_addr via by kexec-utils in dump
+>> kernel device tree.
+>> >>
+>> >> There are some crashkernel=SIZE at ADDRESS values that the user can
+>> >> supply that we must reject. The obvious one is if it overlaps with
+>> >> the kernel text. (this patch won't spot this). We need to read the
+>> >> hardware's reserved regions from the DT before we allocate the
+>> >> crashkernel region, for example if the bootloader reserved a chunk of
+>> >> memory for a frame-buffer, I shouldn't be able to use that as crashkernel
+>> memory.
+>> >>
+>> >> (you shouldn't need to specify an address, doing so prevents the
+>> >> kernel from picking memory it can use)
+>> >>
+>> >>
+>> >>> So memory should be reserved for both the above areas before any
+>> >>> other memory reservations are done. Otherwise overlaps may happen
+>> >>> and memory allocations will fail leading to failure in booting the
+>> >>> dump capture kernel.
+>>
+>> >>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
+>> >>> 00e7b90..24ce15d 100644
+>> >>> --- a/arch/arm64/mm/init.c
+>> >>> +++ b/arch/arm64/mm/init.c
+>> >>> @@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
+>>
+>> >>> + reserve_elfcorehdr();
+>> >>
+>> >> (Moving reserve_elfcorehdr() makes sense, but..)
+>> >>
+>> >>
+>> >>> + reserve_crashkernel();
+>> >>
+>> >> reserve_crashkernel() does the allocation for the crashkernels reserved
+>> memory.
+>> >> I expect this to always fail in the kdump kernel because there isn't
+>> >> enough memory. (fdt_enforce_memory_region() at the top of this
+>> >> function calls memblock_cap_memory_range()).
+>> >>
+>> >> Moving this allocation above the early_init_fdt_scan_reserved_mem()
+>> >> below means we may allocate memory for the crashdump that is in use
+>> >> by firmware/hardware and described as reserved in the DT.
+>>
+>> > Yeah, this is a good point. So ideally the address of the crash kernel
+>> > should be diligently provided by the user based on the system.
+>>
+>> Even better: the region to store the crash kernel in should be chosen by the
+>> kernel.
+>> When using kdump I boot with 'crashkernel=1G', the kernel chooses where to
+>> place the reserved region.
+> Right. This is a commonly used.
+>  Even if I specified a reasonable physical address, the
+>> efistub may relocate the kernel over the top during boot as part of its KASLR
+>> work.
+> Agree
+>>
+>> (Why does anyone ever need to specify an offset here?)
+> offset is normally an optional argument. Request Takahiro to provide his inputs.  Does this imply any updates in kexec design/implementation/documentation?
 
--- 
-viresh
+offset is a optional argument. For relocatable kernels (and kernels
+which support KASLR), specifying offset is normally not needed.
+
+Please refer to the 'Extended crashkernel syntax' documentation
+(<https://github.com/torvalds/linux/blob/master/Documentation/kdump/kdump.txt#L259>):
+
+Extended crashkernel syntax
+===========================
+
+While the "crashkernel=size[@offset]" syntax is sufficient for most
+configurations, sometimes it's handy to have the reserved memory dependent
+on the value of System RAM -- that's mostly for distributors that pre-setup
+the kernel command line to avoid a unbootable system after some memory has
+been removed from the machine.
+
+The syntax is:
+
+    crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+    range=start-[end]
+
+For example:
+
+    crashkernel=512M-2G:64M,2G-:128M
+
+This would mean:
+
+    1) if the RAM is smaller than 512M, then don't reserve anything
+       (this is the "rescue" case)
+    2) if the RAM size is between 512M and 2G (exclusive), then reserve 64M
+    3) if the RAM size is larger than 2G, then reserve 128M
+
+As James mentioned for arm64, in case of relocatable/kaslr kernels,
+the efistub may relocate the kernel over the top during boot as part
+of its KASLR. So, the offset field may make more sense for
+non-relocatable/static kernels, but for newer kernels, its better to
+use the 'Extended crashkernel syntax' syntax which is also supported
+by newer distribution versions.
+
+For e.g. see ubuntu trusty kdump-config man page -
+<http://manpages.ubuntu.com/manpages/trusty/man8/kdump-config.8.html>:
+
+  kdump kernel relocation address does not match crashkernel= parameter:
+              For non-relocatable architectures,  the  kdump  kernel  must  be
+              built   with   a  predetermined  start  address.   This  message
+              indicates that the start address of the  kdump  kernel  and  the
+              start address in the crashkernel= parameter do not match.
+
+Regards,
+Bhupesh
