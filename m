@@ -1,71 +1,101 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 15 Jan 2018 10:51:16 +0000
-Subject: [bug report] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20180112201334.sfqjnyw4or4msfeq@mwanda>
-References: <20180112201334.sfqjnyw4or4msfeq@mwanda>
-Message-ID: <6457a5ff-21d7-0867-2cf1-3b5d08349e2e@arm.com>
+From: hao5781286@gmail.com (Hao Zhang)
+Date: Mon, 15 Jan 2018 19:19:04 +0800
+Subject: [PATCH v1 4/4] ARM: dts: add pwm node for r40.
+In-Reply-To: <20180115083813.ad2yqdwnd2nskbhs@flea.lan>
+References: <20180111113412.GA22008@arx-s1>
+ <20180111124752.2ljspnaclwgz2s62@flea.lan>
+ <CAJeuY78QLOYZUUS7ghakqqpdzigdvpdHCsw+6onkUCjgZMqTzA@mail.gmail.com>
+ <20180115083813.ad2yqdwnd2nskbhs@flea.lan>
+Message-ID: <CAJeuY799nhZazzRb8JRf6juvWs158pj2LAHpfQ78d-mtO73Y=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+2018-01-15 16:38 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> Hi,
+>
+> On Sun, Jan 14, 2018 at 02:43:39PM +0800, Hao Zhang wrote:
+>> 2018-01-11 20:47 GMT+08:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+>> > On Thu, Jan 11, 2018 at 07:34:12PM +0800, hao_zhang wrote:
+>> >> This patch add pwm node for r40.
+>> >>
+>> >> Signed-off-by: hao_zhang <hao5781286@gmail.com>
+>> >> ---
+>> >>  arch/arm/boot/dts/sun8i-r40.dtsi | 13 +++++++++++++
+>> >>  1 file changed, 13 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+>> >> index 173dcc1..84c963c 100644
+>> >> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+>> >> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+>> >> @@ -295,6 +295,11 @@
+>> >>                               bias-pull-up;
+>> >>                       };
+>> >>
+>> >> +                     pwm_pins: pwm-pins {
+>> >> +                             pins = "PB2", "PB3";
+>> >> +                             function = "pwm";
+>> >> +                     };
+>> >> +
+>> >
+>> > Is it the only combination of pins that is usable?
+>> >
+>> > If so, you can add the pinctrl-0 property directly in the pwm nodes.
+>> >
+>>
+>> There are 8 channel pwm of R40/V40/T3, the pins that can be configed
+>> to pwm are: PB2, PB3, PI20, PI21, PB20, PB21, PB9, PB10
+>
+> And a single controller, or several of them?
 
-Thanks for the report.
+Single controller with 8 channels pwm output.
 
-On 12/01/18 20:13, Dan Carpenter wrote:
-> Hello Suzuki K Poulose,
-> 
-> The patch 7520fa99246d: "perf: ARM DynamIQ Shared Unit PMU support"
-> from Jan 2, 2018, leads to the following static checker warning:
-> 
-> 	drivers/perf/arm_dsu_pmu.c:680 dsu_pmu_init_pmu()
-> 	warn: impossible condition '(dsu_pmu->num_counters == -1) => (0-255 == (-1))'
-> 
-> drivers/perf/arm_dsu_pmu.c
->     674  /*
->     675   * dsu_pmu_init_pmu: Initialise the DSU PMU configurations if
->     676   * we haven't done it already.
->     677   */
->     678  static void dsu_pmu_init_pmu(struct dsu_pmu *dsu_pmu)
->     679  {
->     680          if (dsu_pmu->num_counters == -1)
->                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-> A u8 variable can't ever be -1.
-> 
->     681                  dsu_pmu_probe_pmu(dsu_pmu);
->     682          /* Reset the interrupt overflow mask */
->     683          dsu_pmu_get_reset_overflow();
->     684  }
-> 
-> regards,
-> dan carpenter
-> 
+>
+>> PB2, PB3 can be configed on bananapi-m2-ultra and on my T3 board,
+>> but the other pins is not exist on the board or some pin is confilct
+>> with other functions, so i just add PB2, PB3. but i think split it
+>> is better, just like this :
+>>
+>> pwm0_pin: pwm0-pin {
+>>     pins = "PB2";
+>>     function = "pwm";
+>> };
+>>
+>> pwm1_pin: pwm1-pin {
+>>     pins = "PB3";
+>>     function = "pwm";
+>> };
+>
+> Yep, that would be better. If it's just a matter of channels, maybe we
+> can even name them pwm-ch0-pin and pwm-ch1-pin? That would be more
+> explicit.
+>
 
-Here is the fix.
+Agree
 
----8>---
-
-perf: dsu: Use signed field for dsu_pmu->num_counters
-    
-We set dsu_pmu->num_counters to -1, when the DSU is allocated
-but not initialised when none of the CPUs are active in the DSU.
-However, we use an unsigned field for num_counters. Switch this
-to a signed field.
-
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-diff --git a/drivers/perf/arm_dsu_pmu.c b/drivers/perf/arm_dsu_pmu.c
-index 37c0526c93d5..93c50e377507 100644
---- a/drivers/perf/arm_dsu_pmu.c
-+++ b/drivers/perf/arm_dsu_pmu.c
-@@ -120,7 +120,7 @@ struct dsu_pmu {
-  	cpumask_t			associated_cpus;
-  	cpumask_t			active_cpu;
-  	struct hlist_node		cpuhp_node;
--	u8				num_counters;
-+	s8				num_counters;
-  	int				irq;
-  	DECLARE_BITMAP(cpmceid_bitmap, DSU_PMU_MAX_COMMON_EVENTS);
-  };
+>> the node of pwm2~7 should also be added here?
+>
+> If there's no users, no.
+>
+>> On sun8i-r40-bananapi-m2-ultra.dts:
+>> because of the special customize board, i think just add pinctrl-0 = <&pwm0_pin>
+>> (PB3 I just use to test pwm channel 1)for bananapi-m2-ultra board is enough.
+>>
+>> &pwm {
+>>     pinctrl-names = "default";
+>>     pinctrl-0 = <&pwm0_pin>;
+>>     status = "okay";
+>> };
+>
+> It depends if that PWM is used as a PWM all the time (for example to
+> drive a backlight for a panel tied to the board), or if it's exported
+> through one of the generic pin headers, please leave it populated but
+> disabled (with a comment that it is exported on one of the pin of the
+> headers)
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
