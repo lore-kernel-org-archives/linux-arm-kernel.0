@@ -1,51 +1,89 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Jan 2018 15:08:59 +0000
-Subject: stable-rc build: 2 warnings 0 failures
- (stable-rc/v4.14.13-119-gb32d455)
-In-Reply-To: <CAK8P3a2vXJT1g6wa4cbcDJ48sfOKfemazV0e1crJ5v=6DOZ5fg@mail.gmail.com>
-References: <5a5c9ee8.cf53650a.dae00.f369@mx.google.com>
- <CAK8P3a2vXJT1g6wa4cbcDJ48sfOKfemazV0e1crJ5v=6DOZ5fg@mail.gmail.com>
-Message-ID: <CAKv+Gu9ZyXjiKfD6cqEpexdVA_CnYr1kByZJQcKBuK7ig=7MmQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 15 Jan 2018 16:13:22 +0100
+Subject: [PATCH v2 04/12] drm/bridge/synopsys: dw-hdmi: Export some PHY
+ related functions
+In-Reply-To: <2850049.ORu4oj41BJ@jernej-laptop>
+References: <20180110192512.19684-1-jernej.skrabec@siol.net>
+ <20180110192512.19684-5-jernej.skrabec@siol.net>
+ <2850049.ORu4oj41BJ@jernej-laptop>
+Message-ID: <3ea0c21c-0ab4-651e-3779-abdc71dcb599@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2018 at 13:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, Jan 15, 2018 at 1:30 PM, Olof's autobuilder <build@lixom.net> wrote:
->
->> Warnings:
+On 12/01/2018 21:42, Jernej ?krabec wrote:
+> Hi all,
+> 
+> Dne sreda, 10. januar 2018 ob 20:25:04 CET je Jernej Skrabec napisal(a):
+>> Parts of PHY code could be useful also for custom PHYs. For example,
+>> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
+>> with few additional memory mapped registers, so most of the Synopsys PHY
+>> related code could be reused.
 >>
->>         arm.allmodconfig:
->> /tmp/cccX4oa4.s:18153: Warning: using r15 results in unpredictable behaviour
->> /tmp/cccX4oa4.s:18225: Warning: using r15 results in unpredictable behaviour
->
-> This appears to be an old issue that only now started to get reported
-> here. From what I can
-> tell, new versions of binutils warn about two isntructions in the kprobes test:
->
-> Maybe we can work around it using a patch like below?
->
->         Arnd
->
+>> Functions exported here are actually not specific to Synopsys PHYs but
+>> to DWC HDMI controller PHY interface. This means that even if the PHY is
+>> completely custom, i.e. not designed by Synopsys, exported functions can
+>> be useful.
+>>
+>> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>> ---
+>>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 44
+>> +++++++++++++++++++++---------- include/drm/bridge/dw_hdmi.h              |
+>> 11 ++++++++
+>>  2 files changed, 41 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
+>> 7ca14d7325b5..7d80f4b56683 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> @@ -1037,19 +1037,21 @@ static void dw_hdmi_phy_enable_svsret(struct dw_hdmi
+>> *hdmi, u8 enable) HDMI_PHY_CONF0_SVSRET_MASK);
+>>  }
+>>
+>> -static void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
+>> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
+>>  {
+>>  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
+>>  			 HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET,
+>>  			 HDMI_PHY_CONF0_GEN2_PDDQ_MASK);
+>>  }
+>> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_pddq);
+>>
+>> -static void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
+>> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
+>>  {
+>>  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
+>>  			 HDMI_PHY_CONF0_GEN2_TXPWRON_OFFSET,
+>>  			 HDMI_PHY_CONF0_GEN2_TXPWRON_MASK);
+>>  }
+>> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_txpwron);
+>>
+>>  static void dw_hdmi_phy_sel_data_en_pol(struct dw_hdmi *hdmi, u8 enable)
+>>  {
+>> @@ -1065,6 +1067,22 @@ static void dw_hdmi_phy_sel_interface_control(struct
+>> dw_hdmi *hdmi, u8 enable) HDMI_PHY_CONF0_SELDIPIF_MASK);
+>>  }
+>>
+>> +void dw_hdmi_phy_reset(struct dw_hdmi *hdmi)
+>> +{
+>> +	/* PHY reset. The reset signal is active high on Gen2 PHYs. */
+>> +	hdmi_writeb(hdmi, HDMI_MC_PHYRSTZ_PHYRSTZ, HDMI_MC_PHYRSTZ);
+>> +	hdmi_writeb(hdmi, 0, HDMI_MC_PHYRSTZ);
+>> +}
+>> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_reset);
+> 
+> I just noticed that meson dw hdmi driver uses function with the same name, 
+> which break compilation. Is it ok if I rename meson specific reset to 
+> meson_dw_hdmi_phy_reset()?
 
-Can't we just add -Wa,--no-warn for this file?
+Hi Jernej,
 
+Yes,
 
-> diff --git a/arch/arm/probes/kprobes/test-arm.c
-> b/arch/arm/probes/kprobes/test-arm.c
-> index 8866aedfdea2..8b7df0ce04d2 100644
-> --- a/arch/arm/probes/kprobes/test-arm.c
-> +++ b/arch/arm/probes/kprobes/test-arm.c
-> @@ -169,10 +169,10 @@ void kprobe_arm_test_cases(void)
->
->         /* Data-processing with PC as a target and status registers updated */
->         TEST_UNSUPPORTED("movs  pc, r1")
-> -       TEST_UNSUPPORTED("movs  pc, r1, lsl r2")
-> +       TEST_UNSUPPORTED(__inst_arm(0xe1b0f211) "       @ movs  pc, r1, lsl r2")
->         TEST_UNSUPPORTED("movs  pc, #0x10000")
->         TEST_UNSUPPORTED("adds  pc, lr, r1")
-> -       TEST_UNSUPPORTED("adds  pc, lr, r1, lsl r2")
-> +       TEST_UNSUPPORTED(__inst_arm(0xe09ef211) "       @ adds  pc,
-> lr, r1, lsl r2")
->         TEST_UNSUPPORTED("adds  pc, lr, #4")
->
->         /* Data-processing with SP as target */
+Neil
+
+> 
+> Best regards,
+> Jernej
+> 
+[...]
