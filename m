@@ -1,91 +1,69 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 15 Jan 2018 11:33:34 +0100
-Subject: [PATCH v3 00/16] add support for AXP813 ADC and battery power supply
-Message-ID: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
+Date: Mon, 15 Jan 2018 11:33:37 +0100
+Subject: [PATCH v3 03/16] iio: adc: axp20x_adc: make it possible to probe from
+ DT
+In-Reply-To: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
+References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <063c68ec080a999e10bf33e417c974142ddaaf9a.1516012352.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP813 PMIC is relatively close to the already supported AXP20X and
-AXP22X. It provides three different power outputs: battery, AC and USB, and
-measures a few different things: temperature, power supply status, current
-current and voltage supplied, maximum current limit, battery capacity, min
-and max voltage limits.
+To prepare for a future patch that will add a DT node for the ADC, make
+axp20x_adc able to probe from DT and get the per-variant data from
+of_device_id.data since platform_device_id.driver_data won't be set when
+probing by DT.
 
-One of its two GPIOs can be used as an ADC.
+Leave the ability to probe via platform for driver compatibility with
+old DTs.
 
-There are a few differences with AXP20X/AXP22X PMICs though:
-  - a different constant charge current formula,
-  - battery temperature, GPIO0 and battery voltages are the only voltages
-  measurable,
-  - all data are stored on 12 bits (AXP20X/AXP22X had one type of data that
-  was stored on 13 bits),
-  - different scales and offsets,
-  - a different ADC rate formula and register,
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ drivers/iio/adc/axp20x_adc.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-This patch series adds support for the PMIC's ADC and battery power supply
-in the existing drivers.
-
-Make the axp20x MFD automatically probe the ADC driver, add the battery
-power supply node in axp81x node and enable it for the TBS A711 since it
-has a soldered battery.
-
-I suggest patches:
-  - 4,5,8,14,15,16 go through Maxime and Chen-Yu's tree,
-  - 1,2,3,7 go through Jonathan's tree,
-  - 6,9,13 go through Lee's tree,
-  - 10,11,12 go through Sebastian's tree,
-
-v3:
-  - merging dt-bindings patches for axp_adc as requested by Rob,
-  - re-ordered constant in IIO driver as requested by Julian,
-  - compatibles for ADC are now named after the first design that
-  introduced the IP instead of wildcard as requested by Maxime,
-  - renamed DT node name from axp-adc to adc as requested by Rob,
-  - replaced enumeration of supported PMICs in battery power supply DT
-  bindings documentation by "supported devices" as requested by Jonathan,
-  - added a new patch for removing "axp-" from axp81x's pinctrl DT node,
-
-v2:
-  - introduce data structure instead of ID for variant specific code in
-  battery driver,
-  - add DT binding for ADC driver,
-  - make mfd probe the ADC driver via DT as well so that its IIO channels
-  can be consumed by other drivers via DT mapping,
-
-Thanks,
-Quentin
-
-Quentin Schulz (16):
-  iio: adc: axp20x_adc: put ADC rate setting in a per-variant function
-  dt-bindings: iio: adc: add binding for X-Powers AXP PMICs ADC
-  iio: adc: axp20x_adc: make it possible to probe from DT
-  ARM: dtsi: axp209: add node for ADC
-  ARM: dtsi: axp22x: add node for ADC
-  mfd: axp20x: make AXP209/22x cells probe their ADC via DT
-  iio: adc: axp20x_adc: add support for AXP813 ADC
-  ARM: dtsi: axp81x: add node for ADC
-  mfd: axp20x: probe axp20x_adc driver for AXP813
-  power: supply: axp20x_battery: use data structure instead of ID for variant specific code
-  dt-bindings: power: supply: axp20x: add AXP813 battery DT binding
-  power: supply: axp20x_battery: add support for AXP813
-  mfd: axp20x: add battery power supply cell for AXP813
-  ARM: dtsi: axp81x: add battery power supply subnode
-  ARM: dtsi: sun8i: a711: enable battery power supply subnode
-  ARM: dtsi: axp81x: remove IP name from DT node name
-
- Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt          |  48 ++++++++++++++++++++++-
- Documentation/devicetree/bindings/power/supply/axp20x_battery.txt |   8 ++--
- arch/arm/boot/dts/axp209.dtsi                                     |   5 ++-
- arch/arm/boot/dts/axp22x.dtsi                                     |   5 ++-
- arch/arm/boot/dts/axp81x.dtsi                                     |  12 ++++-
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts                         |   4 ++-
- drivers/iio/adc/axp20x_adc.c                                      | 160 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----
- drivers/mfd/axp20x.c                                              |  13 +++++-
- drivers/power/supply/axp20x_battery.c                             | 134 ++++++++++++++++++++++++++++++++++++++++++++++--------------
- include/linux/mfd/axp20x.h                                        |   2 +-
- 10 files changed, 346 insertions(+), 45 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/axp20x_adc.txt
-
-base-commit: b625c1ff82272e26c76570d3c7123419ec345b20
+diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
+index 3fc1b06..3968053 100644
+--- a/drivers/iio/adc/axp20x_adc.c
++++ b/drivers/iio/adc/axp20x_adc.c
+@@ -515,6 +515,13 @@ static const struct axp_data axp22x_data = {
+ 	.maps = axp22x_maps,
+ };
+ 
++static const struct of_device_id axp20x_adc_of_match[] = {
++	{ .compatible = "x-powers,axp209-adc", .data = (void *)&axp20x_data, },
++	{ .compatible = "x-powers,axp221-adc", .data = (void *)&axp22x_data, },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, axp20x_adc_of_match);
++
+ static const struct platform_device_id axp20x_adc_id_match[] = {
+ 	{ .name = "axp20x-adc", .driver_data = (kernel_ulong_t)&axp20x_data, },
+ 	{ .name = "axp22x-adc", .driver_data = (kernel_ulong_t)&axp22x_data, },
+@@ -543,7 +550,16 @@ static int axp20x_probe(struct platform_device *pdev)
+ 	indio_dev->dev.of_node = pdev->dev.of_node;
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+ 
+-	info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
++	if (!pdev->dev.of_node) {
++		const struct platform_device_id *id;
++
++		id = platform_get_device_id(pdev);
++		info->data = (struct axp_data *)id->driver_data;
++	} else {
++		struct device *dev = &pdev->dev;
++
++		info->data = (struct axp_data *)of_device_get_match_data(dev);
++	}
+ 
+ 	indio_dev->name = platform_get_device_id(pdev)->name;
+ 	indio_dev->info = info->data->iio_info;
+@@ -606,6 +622,7 @@ static int axp20x_remove(struct platform_device *pdev)
+ static struct platform_driver axp20x_adc_driver = {
+ 	.driver = {
+ 		.name = "axp20x-adc",
++		.of_match_table = of_match_ptr(axp20x_adc_of_match),
+ 	},
+ 	.id_table = axp20x_adc_id_match,
+ 	.probe = axp20x_probe,
 -- 
 git-series 0.9.1
