@@ -1,92 +1,114 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 15 Jan 2018 19:39:02 +0000
-Subject: [PATCH v6 09/13] KVM: arm64: Save/Restore guest DISR_EL1
+Date: Mon, 15 Jan 2018 19:39:06 +0000
+Subject: [PATCH v6 13/13] KVM: arm64: Emulate RAS error registers and set
+ HCR_EL2's TERR & TEA
 In-Reply-To: <20180115193906.30053-1-james.morse@arm.com>
 References: <20180115193906.30053-1-james.morse@arm.com>
-Message-ID: <20180115193906.30053-10-james.morse@arm.com>
+Message-ID: <20180115193906.30053-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we deliver a virtual SError to the guest, the guest may defer it
-with an ESB instruction. The guest reads the deferred value via DISR_EL1,
-but the guests view of DISR_EL1 is re-mapped to VDISR_EL2 when HCR_EL2.AMO
-is set.
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Add the KVM code to save/restore VDISR_EL2, and make it accessible to
-userspace as DISR_EL1.
+ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
+aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
+all Non-secure EL1&0 error record accesses to EL2.
 
+This patch enables the two bits for the guest OS, guaranteeing that
+KVM takes external aborts and traps attempts to access the physical
+error registers.
+
+ERRIDR_EL1 advertises the number of error records, we return
+zero meaning we can treat all the other registers as RAZ/WI too.
+
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+[removed specific emulation, use trap_raz_wi() directly for everything,
+ rephrased parts of the commit message]
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-v5 of this patch missed some Reviewed-bys, which came from here:
-https://patchwork.kernel.org/patch/10017465/
+v5 of this series/patch missed the Reviewed-by's, which come from here:
+https://patchwork.kernel.org/patch/10017537/
 
- arch/arm64/include/asm/kvm_host.h | 1 +
- arch/arm64/include/asm/sysreg.h   | 1 +
- arch/arm64/kvm/hyp/sysreg-sr.c    | 6 ++++++
- arch/arm64/kvm/sys_regs.c         | 1 +
- 4 files changed, 9 insertions(+)
+ arch/arm64/include/asm/kvm_arm.h     |  2 ++
+ arch/arm64/include/asm/kvm_emulate.h |  7 +++++++
+ arch/arm64/include/asm/sysreg.h      | 10 ++++++++++
+ arch/arm64/kvm/sys_regs.c            | 10 ++++++++++
+ 4 files changed, 29 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 3014b39b8fe2..84fcb2a896a1 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -121,6 +121,7 @@ enum vcpu_sysreg {
- 	PAR_EL1,	/* Physical Address Register */
- 	MDSCR_EL1,	/* Monitor Debug System Control Register */
- 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
-+	DISR_EL1,	/* Deferred Interrupt Status Register */
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 715d395ef45b..b0c84171e6a3 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,8 @@
+ #include <asm/types.h>
  
- 	/* Performance Monitors Registers */
- 	PMCR_EL0,	/* Control Register */
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_TEA		(UL(1) << 37)
++#define HCR_TERR	(UL(1) << 36)
+ #define HCR_E2H		(UL(1) << 34)
+ #define HCR_ID		(UL(1) << 33)
+ #define HCR_CD		(UL(1) << 32)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index e002ab7f919a..413dc82b1e89 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -50,6 +50,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+ 	if (is_kernel_in_hyp_mode())
+ 		vcpu->arch.hcr_el2 |= HCR_E2H;
++	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++		/* route synchronous external abort exceptions to EL2 */
++		vcpu->arch.hcr_el2 |= HCR_TEA;
++		/* trap error record accesses */
++		vcpu->arch.hcr_el2 |= HCR_TERR;
++	}
++
+ 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+ 		vcpu->arch.hcr_el2 &= ~HCR_RW;
+ }
 diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index aec10f75a43c..e213bd92e998 100644
+index e213bd92e998..a16eb8d00689 100644
 --- a/arch/arm64/include/asm/sysreg.h
 +++ b/arch/arm64/include/asm/sysreg.h
-@@ -358,6 +358,7 @@
- #define SYS_VSESR_EL2			sys_reg(3, 4, 5, 2, 3)
- #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
- 
-+#define SYS_VDISR_EL2			sys_reg(3, 4, 12, 1,  1)
- #define __SYS__AP0Rx_EL2(x)		sys_reg(3, 4, 12, 8, x)
- #define SYS_ICH_AP0R0_EL2		__SYS__AP0Rx_EL2(0)
- #define SYS_ICH_AP0R1_EL2		__SYS__AP0Rx_EL2(1)
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index c54cc2afb92b..2c17afd2be96 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -66,6 +66,9 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
- 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+@@ -176,6 +176,16 @@
+ #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
+ #define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
+ #define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
 +
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-+		ctxt->sys_regs[DISR_EL1] = read_sysreg_s(SYS_VDISR_EL2);
- }
- 
- static hyp_alternate_select(__sysreg_call_save_host_state,
-@@ -119,6 +122,9 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pc,		elr);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
++#define SYS_ERRIDR_EL1			sys_reg(3, 0, 5, 3, 0)
++#define SYS_ERRSELR_EL1			sys_reg(3, 0, 5, 3, 1)
++#define SYS_ERXFR_EL1			sys_reg(3, 0, 5, 4, 0)
++#define SYS_ERXCTLR_EL1			sys_reg(3, 0, 5, 4, 1)
++#define SYS_ERXSTATUS_EL1		sys_reg(3, 0, 5, 4, 2)
++#define SYS_ERXADDR_EL1			sys_reg(3, 0, 5, 4, 3)
++#define SYS_ERXMISC0_EL1		sys_reg(3, 0, 5, 5, 0)
++#define SYS_ERXMISC1_EL1		sys_reg(3, 0, 5, 5, 1)
 +
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
-+		write_sysreg_s(ctxt->sys_regs[DISR_EL1], SYS_VDISR_EL2);
- }
+ #define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
+ #define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
  
- static hyp_alternate_select(__sysreg_call_restore_host_state,
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 1830ebc227d1..9edf4ac8a320 100644
+index 9edf4ac8a320..50a43c7b97ca 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -1169,6 +1169,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+@@ -1159,6 +1159,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
+ 	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
+ 	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
++
++	{ SYS_DESC(SYS_ERRIDR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERRSELR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXFR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXCTLR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXSTATUS_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXADDR_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXMISC0_EL1), trap_raz_wi },
++	{ SYS_DESC(SYS_ERXMISC1_EL1), trap_raz_wi },
++
+ 	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
+ 	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
  
- 	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
-+	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
- 
- 	{ SYS_DESC(SYS_ICC_IAR0_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_EOIR0_EL1), read_from_write_only },
 -- 
 2.15.1
