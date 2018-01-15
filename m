@@ -1,86 +1,59 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 15 Jan 2018 16:05:07 +0800
-Subject: [PATCH v2] arm64: allwinner: a64: orangepi-zero-plus2: add usb otg
-In-Reply-To: <20180115080139.k2vrczo3hnvdt3df@flea.lan>
-References: <1515748144-25204-1-git-send-email-jagan@amarulasolutions.com>
- <20180115080139.k2vrczo3hnvdt3df@flea.lan>
-Message-ID: <8080607.cgOBd57Bn1@ice-x220i>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 15 Jan 2018 09:33:35 +0100
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <5A58F8E3.5060002@arm.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com>
+ <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+ <5A283F26.3020507@arm.com>
+ <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
+ <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com>
+ <5A58F8E3.5060002@arm.com>
+Message-ID: <20180115083335.GC21403@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018?1?15???? CST ??4:01:39?Maxime Ripard ???
-> Hi,
-> 
-> On Fri, Jan 12, 2018 at 02:39:04PM +0530, Jagan Teki wrote:
-> > Add usb otg support for orangepi-zero-plus2 board:
-> > - Add usb_otg node with dr_mode as 'otg'
-> > - USB0-IDDET connected to PA21
-> > - VBUS connected through DCIN which always on
-> > 
-> > Tested mass storage function.
-> > 
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> > Changes for v2:
-> > - Change dr_mode to peripheral
-> > 
-> >  .../dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 18
-> >  ++++++++++++++++++ 1 file changed, 18 insertions(+)
-> > 
-> > diff --git
-> > a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts index
-> > af43533..6511190 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > @@ -73,6 +73,10 @@
-> > 
-> >  	};
-> >  
-> >  };
-> > 
-> > +&ehci0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > 
-> >  &mmc0 {
-> >  
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&mmc0_pins_a>;
-> > 
-> > @@ -111,6 +115,10 @@
-> > 
-> >  	status = "okay";
-> >  
-> >  };
-> > 
-> > +&ohci0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > 
-> >  &uart0 {
-> >  
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&uart0_pins_a>;
-> > 
-> > @@ -122,3 +130,13 @@
-> > 
-> >  	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> >  	status = "okay";
-> >  
-> >  };
-> > 
-> > +
-> > +&usb_otg {
-> > +	dr_mode = "peripheral";
-> 
-> If VBUS is always on, this can only operate safely in host mode, not
-> peripheral.
+On Fri, Jan 12, 2018 at 06:05:23PM +0000, James Morse wrote:
+> On 15/12/17 03:30, gengdongjiu wrote:
+> > On 2017/12/7 14:37, gengdongjiu wrote:
 
-I think this kind of device is designed to directly drain power from the host 
-in peripheral mode.
+[...]
 
 > 
-> Maxime
+> (I recall someone saying migration is needed for any new KVM/cpu features, but I
+> can't find the thread)
+> 
+
+I don't know of any hard set-in-stone rule for this, but I have
+certainly argued that since migration is a popular technique in data
+centers and often a key motivation behind using virtual machines as it
+provides both load-balancing and high availability, we should think
+about migration support for all features and state.  Further, experience
+has shown that retroactively trying to support migration can result in
+really complex interfaces for saving/restoring state (see the ITS
+ordering requirements in
+Documentation/virtual/kvm/devices/arm-vgic-its.txt as an example) so
+thinking about this problem when introducing functionality is a good
+idea.
+
+Of course, if there are really good arguments for having some state that
+simply cannot be migrated, then that's fine, and we should just make
+sure that userspace (e.g. QEMU) and higher level components in the
+stack (libvirt, openstack, etc.) can detect this state being used, and
+ideally enable/disable it, so that it can predict that a particular VM
+cannot be migrated off a particular host, or between a particular set of
+two hosts.  As an example, migration is typically prohibited when using
+VFIO direct device assignment, but userspace etc. are already aware of
+this.
+
+As a final note, if we add support for some architectural feature, which
+may be present on some particular hardware and/or implementation, if the
+KVM support for said feature is automatically enabled (and not
+selectively from userspace), I would push back quite strongly on
+something that doesn't support migration, because it would effectively
+prevent migration of VMs on ARM.
+
+Thanks,
+-Christoffer
