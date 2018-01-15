@@ -1,231 +1,165 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 15 Jan 2018 12:04:43 +0000
-Subject: [PATCH v3 1/8] ARM: sun9i: Support SMP bring-up on A80
-In-Reply-To: <20180115071450.18355-2-wens@csie.org>
-References: <20180115071450.18355-1-wens@csie.org>
- <20180115071450.18355-2-wens@csie.org>
-Message-ID: <20180115120440.GT22781@e103592.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 15 Jan 2018 12:22:05 +0000
+Subject: [PATCH v2 3/6] arm: KVM: Invalidate BTB on guest exit
+In-Reply-To: <20180108185533.9698-4-marc.zyngier@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-4-marc.zyngier@arm.com>
+Message-ID: <0c89fa00-68e7-d28c-1e97-4d4f6e3aa747@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 07:14:43AM +0000, Chen-Yu Tsai wrote:
-> The A80 is a big.LITTLE SoC with 1 cluster of 4 Cortex-A7s and
-> 1 cluster of 4 Cortex-A15s.
+On 08/01/18 18:55, Marc Zyngier wrote:
+> In order to avoid aliasing attacks against the branch predictor,
+> let's invalidate the BTB on guest exit. This is made complicated
+> by the fact that we cannot take a branch before invalidating the
+> BTB.
 > 
-> This patch adds support to bring up the second cluster and thus all
-> cores using custom platform SMP code. Core/cluster power down has not
-> been implemented, thus CPU hotplugging is not supported.
+> Another thing is that we perform the invalidation on all
+> implementations, no matter if they are affected or not.
 > 
-> This is limited to !THUMB2_KERNEL for now. The entry code must be built
-> as ARM machine code, and it does not switch modes. Further work was
-> done to move the assembly code to a separate file and add the proper
-> mode statements and mode switching instructions. However initial tests
-> failed to boot properly with Thumb-2.
-> 
-> Parts of the trampoline and re-entry code for the boot cpu was adapted
-> from the MCPM framework.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/mach-sunxi/Kconfig  |   7 +
->  arch/arm/mach-sunxi/Makefile |   1 +
->  arch/arm/mach-sunxi/mcpm.c   | 548 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 556 insertions(+)
->  create mode 100644 arch/arm/mach-sunxi/mcpm.c
+>   arch/arm/include/asm/kvm_asm.h |  2 --
+>   arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
+>   arch/arm/kvm/hyp/hyp-entry.S   | 64 ++++++++++++++++++++++++++++++++++++++++--
+>   3 files changed, 74 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index 58153cdf025b..b53e37d170e6 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -48,4 +48,11 @@ config MACH_SUN9I
->  	default ARCH_SUNXI
->  	select ARM_GIC
->  
-> +config ARCH_SUNXI_MCPM
-> +	bool
-> +	depends on SMP && !THUMB2_KERNEL
-> +	default MACH_SUN9I
-> +	select ARM_CCI400_PORT_CTRL
-> +	select ARM_CPU_SUSPEND
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 36dd2962a42d..df24ed48977d 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -61,8 +61,6 @@ struct kvm_vcpu;
+>   extern char __kvm_hyp_init[];
+>   extern char __kvm_hyp_init_end[];
+>   
+> -extern char __kvm_hyp_vector[];
+> -
+>   extern void __kvm_flush_vm_context(void);
+>   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>   extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index eb46fc81a440..b47db5b9e407 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -37,6 +37,7 @@
+>   
+>   #include <linux/highmem.h>
+>   #include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+>   #include <asm/pgalloc.h>
+>   #include <asm/stage2_pgtable.h>
+>   
+> @@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>   
+>   static inline void *kvm_get_hyp_vector(void)
+>   {
+> -	return kvm_ksym_ref(__kvm_hyp_vector);
+> +	extern char __kvm_hyp_vector[];
+> +	extern char __kvm_hyp_vector_bp_inv[];
 > +
-
-If this no longer uses MCPM, you should get rid of "mcpm" from all the
-names, comments etc. -- it's just confusing otherwise.
-
->  endif
-> diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-> index 27b168f121a1..cacd1afa8137 100644
-> --- a/arch/arm/mach-sunxi/Makefile
-> +++ b/arch/arm/mach-sunxi/Makefile
-> @@ -1,2 +1,3 @@
->  obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-> +obj-$(CONFIG_ARCH_SUNXI_MCPM) += mcpm.o
->  obj-$(CONFIG_SMP) += platsmp.o
-> diff --git a/arch/arm/mach-sunxi/mcpm.c b/arch/arm/mach-sunxi/mcpm.c
-> new file mode 100644
-> index 000000000000..7c77bb3b367a
-> --- /dev/null
-> +++ b/arch/arm/mach-sunxi/mcpm.c
-
-[...]
-
-> +static int sunxi_mcpm_cpu_table[SUNXI_NR_CLUSTERS][SUNXI_CPUS_PER_CLUSTER];
-> +static int sunxi_mcpm_first_comer;
+> +	switch(read_cpuid_part()) {
+> +	case ARM_CPU_PART_CORTEX_A12:
+> +	case ARM_CPU_PART_CORTEX_A17:
+> +		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
 > +
-> +/*
-> + * Enable cluster-level coherency, in preparation for turning on the MMU.
-> + *
-> + * Also enable regional clock gating and L2 data latency settings for
-> + * Cortex-A15. These settings are from the vendor kernel.
-> + */
-> +static void __naked sunxi_mcpm_cluster_cache_enable(void)
-> +{
-> +	asm volatile (
-> +		"mrc	p15, 0, r1, c0, c0, 0\n"
-> +		"movw	r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) "\n"
-> +		"movt	r2, #" __stringify(ARM_CPU_PART_MASK >> 16) "\n"
-> +		"and	r1, r1, r2\n"
-> +		"movw	r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 0xffff) "\n"
-> +		"movt	r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 16) "\n"
-> +		"cmp	r1, r2\n"
-> +		"bne	not_a15\n"
-> +
-> +		/* The following is Cortex-A15 specific */
-> +
-> +		/* ACTLR2: Enable CPU regional clock gates */
-> +		"mrc p15, 1, r1, c15, c0, 4\n"
-> +		"orr r1, r1, #(0x1<<31)\n"
-> +		"mcr p15, 1, r1, c15, c0, 4\n"
-> +
-> +		/* L2ACTLR */
-> +		"mrc p15, 1, r1, c15, c0, 0\n"
-> +		/* Enable L2, GIC, and Timer regional clock gates */
-> +		"orr r1, r1, #(0x1<<26)\n"
-> +		/* Disable clean/evict from being pushed to external */
-> +		"orr r1, r1, #(0x1<<3)\n"
-> +		"mcr p15, 1, r1, c15, c0, 0\n"
-> +
-> +		/* L2CTRL: L2 data RAM latency */
-> +		"mrc p15, 1, r1, c9, c0, 2\n"
-> +		"bic r1, r1, #(0x7<<0)\n"
-> +		"orr r1, r1, #(0x3<<0)\n"
-> +		"mcr p15, 1, r1, c9, c0, 2\n"
-> +
-> +		/* End of Cortex-A15 specific setup */
-> +		"not_a15:\n"
-> +
-> +		/* Get value of sunxi_mcpm_first_comer */
-> +		"adr	r1, first\n"
-> +		"ldr	r0, [r1]\n"
-> +		"ldr	r0, [r1, r0]\n"
-> +
-> +		/* Skip cci_enable_port_for_self if not first comer */
-> +		"cmp	r0, #0\n"
-> +		"bxeq	lr\n"
-> +		"b	cci_enable_port_for_self\n"
-
-For Thumb, you need a ".align 2" here.
-
-I've never understood why gas doesn't implicitly align .word on arches
-that care about data alignment, but it doesn't...
-
-Since the MMU isn't on yet, you may get alignment faults if the .word
-is misaligned in the assembled code.
-
-> +
-> +		"first: .word sunxi_mcpm_first_comer - .\n"
-> +	);
-> +}
-
-[...]
-
-> +static int __init sunxi_mcpm_init(void)
-> +{
-> +	struct device_node *cpucfg_node, *node;
-> +	struct resource res;
-> +	int ret;
-> +
-> +	if (!of_machine_is_compatible("allwinner,sun9i-a80"))
-> +		return -ENODEV;
-> +
-> +	if (!sunxi_mcpm_cpu_table_init())
-> +		return -EINVAL;
-> +
-> +	if (!cci_probed()) {
-> +		pr_err("%s: CCI-400 not available\n", __func__);
-> +		return -ENODEV;
+> +	default:
+> +		return kvm_ksym_ref(__kvm_hyp_vector);
 > +	}
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "allwinner,sun9i-a80-prcm");
-> +	if (!node) {
-> +		pr_err("%s: PRCM not available\n", __func__);
-> +		return -ENODEV;
-> +	}
+>   }
+>   
+>   static inline int kvm_map_vectors(void)
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> index 95a2faefc070..2e8d2179eb70 100644
+> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -70,6 +70,59 @@ __kvm_hyp_vector:
+>   	W(b)	hyp_hvc
+>   	W(b)	hyp_irq
+>   	W(b)	hyp_fiq
+> +	
+> +	.align 5
+> +__kvm_hyp_vector_bp_inv:
+> +	.global __kvm_hyp_vector_bp_inv
 > +
 > +	/*
-> +	 * Unfortunately we can not request the I/O region for the PRCM.
-> +	 * It is shared with the PRCM clock.
+> +	 * We encode the exception entry in the bottom 3 bits of
+> +	 * SP, and we have to guarantee to be 8 bytes aligned.
 > +	 */
-> +	prcm_base = of_iomap(node, 0);
-> +	of_node_put(node);
-> +	if (!prcm_base) {
-> +		pr_err("%s: failed to map PRCM registers\n", __func__);
-> +		return -ENOMEM;
-> +	}
+> +	W(add)	sp, sp, #1	/* Reset 	  7 */
+> +	W(add)	sp, sp, #1	/* Undef	  6 */
+> +	W(add)	sp, sp, #1	/* Syscall	  5 */
+> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
+> +	W(add)	sp, sp, #1	/* Data abort	  3 */
+> +	W(add)	sp, sp, #1	/* HVC		  2 */
+> +	W(add)	sp, sp, #1	/* IRQ		  1 */
+> +	W(add)	sp, sp, #1	/* FIQ		  0 */
 > +
-> +	cpucfg_node = of_find_compatible_node(NULL, NULL,
-> +					      "allwinner,sun9i-a80-cpucfg");
-> +	if (!cpucfg_node) {
-> +		ret = -ENODEV;
-> +		pr_err("%s: CPUCFG not available\n", __func__);
-> +		goto err_unmap_prcm;
-> +	}
+> +	sub	sp, sp, #1
+
+FWIW, I'd be inclined to remove the above two instructions, but leave 
+the FIQ comment (and blank line before the mcr) in place for clarity.
+
+Robin.
+
+> +	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+> +	isb
 > +
-> +	cpucfg_base = of_io_request_and_map(cpucfg_node, 0, "sunxi-mcpm");
-> +	if (IS_ERR(cpucfg_base)) {
-> +		ret = PTR_ERR(cpucfg_base);
-> +		pr_err("%s: failed to map CPUCFG registers: %d\n",
-> +		       __func__, ret);
-> +		goto err_put_cpucfg_node;
-> +	}
+> +	/*
+> +	 * Yet another silly hack: Use VPIDR as a temp register.
+> +	 * Thumb2 is really a pain, as SP cannot be used with most
+> +	 * of the bitwise instructions. The vect_br macro ensures
+> +	 * things gets cleaned-up.
+> +	 */
+> +	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
+> +	mov	r0, sp
+> +	and	r0, r0, #7
+> +	sub	sp, sp, r0
+> +	push	{r1, r2}
+> +	mov	r1, r0
+> +	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+> +	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+> +	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
 > +
-> +	/* Configure CCI-400 for boot cluster */
-> +	ret = sunxi_mcpm_lookback();
-> +	if (ret) {
-> +		pr_err("%s: failed to configure boot cluster: %d\n",
-> +		       __func__, ret);
-> +		goto err_unmap_release_cpucfg;
-> +	}
+> +.macro vect_br val, targ
+> +	cmp	r1, #\val
+> +	popeq	{r1, r2}
+> +	beq	\targ
+> +.endm
 > +
-> +	/* We don't need the CPUCFG device node anymore */
-> +	of_node_put(cpucfg_node);
-> +
-> +	/* Set the hardware entry point address */
-> +	writel(__pa_symbol(sunxi_mcpm_secondary_startup),
-> +	       prcm_base + PRCM_CPU_SOFT_ENTRY_REG);
-
-It's possible the firmware / boot ROM doesn't know how to branch
-correctly to a Thumb symbol here.  This is often missed in firmware
-implementations (or deliberately omitted, since it easy to work
-around in the OS).
-
-Things you could try:
-
-1) Add CFLAGS_mcpm.o += -marm
-(to see whether building just this file as ARM fixes it).
-
-2) Split sunxi_mcpm_secondary_startup out into a separate asm file
-and build just that as ARM, so that the entry point from the firmware
-is ARM.
-
-If both work, the firmware can't branch directly to Thumb and so you
-need to keep the secondary entry point as ARM code.
-
-If (1) works but (2) doesn't, then there must be somthing else in this
-file that is Thumb-incompatible, but I don't see it so far.
-
-
-[...]
-
-Cheers
----Dave
+> +	vect_br	0, hyp_fiq
+> +	vect_br	1, hyp_irq
+> +	vect_br	2, hyp_hvc
+> +	vect_br	3, hyp_dabt
+> +	vect_br	4, hyp_pabt
+> +	vect_br	5, hyp_svc
+> +	vect_br	6, hyp_undef
+> +	vect_br	7, hyp_reset
+>   
+>   .macro invalid_vector label, cause
+>   	.align
+> @@ -149,7 +202,14 @@ hyp_hvc:
+>   	bx	ip
+>   
+>   1:
+> -	push	{lr}
+> +	/*
+> +	 * Pushing r2 here is just a way of keeping the stack aligned to
+> +	 * 8 bytes on any path that can trigger a HYP exception. Here,
+> +	 * we may well be about to jump into the guest, and the guest
+> +	 * exit would otherwise be badly decoded by our fancy
+> +	 * "decode-exception-without-a-branch" code...
+> +	 */
+> +	push	{r2, lr}
+>   
+>   	mov	lr, r0
+>   	mov	r0, r1
+> @@ -159,7 +219,7 @@ hyp_hvc:
+>   THUMB(	orr	lr, #1)
+>   	blx	lr			@ Call the HYP function
+>   
+> -	pop	{lr}
+> +	pop	{r2, lr}
+>   	eret
+>   
+>   guest_trap:
+> 
