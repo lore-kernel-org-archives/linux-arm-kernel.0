@@ -1,32 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Jan 2018 18:00:24 +0000
-Subject: [PATCH 2/3] KVM: arm/arm64: fix HYP ID map extension to 52 bits
-In-Reply-To: <1516029830-12326-3-git-send-email-kristina.martsenko@arm.com>
-References: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
- <1516029830-12326-3-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <f22d9c0a-a719-3226-8f6b-47f5d2f0499d@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Jan 2018 18:01:27 +0000
+Subject: [PATCH v3 11/13] arm64: Implement branch predictor hardening for
+ affected Cortex-A CPUs
+In-Reply-To: <20180109161218.2079-1-suzuki.poulose@arm.com>
+References: <1515432758-26440-12-git-send-email-will.deacon@arm.com>
+ <20180109161218.2079-1-suzuki.poulose@arm.com>
+Message-ID: <20180115180127.jkwe6pbp4j7xcdhl@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/01/18 15:23, Kristina Martsenko wrote:
-> Commit fa2a8445b1d3 incorrectly masks the index of the HYP ID map pgd
-> entry, causing a non-VHE kernel to hang during boot. This happens when
-> VA_BITS=48 and the ID map text is in 52-bit physical memory. In this
-> case we don't need an extra table level but need more entries in the
-> top-level table, so we need to map into hyp_pgd and need to use
-> __kvm_idmap_ptrs_per_pgd to mask in the extra bits. However,
-> __create_hyp_mappings currently masks by PTRS_PER_PGD instead.
+On Tue, Jan 09, 2018 at 04:12:18PM +0000, Suzuki K. Poulose wrote:
+> arm64: capabilities: Handle duplicate entries for a capability
 > 
-> Fix it so that we always use __kvm_idmap_ptrs_per_pgd for the HYP ID
-> map. This ensures that we use the larger mask for the top-level ID map
-> table when it has more entries. In all other cases, PTRS_PER_PGD is used
-> as normal.
+> Sometimes a single capability could be listed multiple times with
+> differing matches(), e.g, CPU errata for different MIDR versions.
+> This breaks verify_local_cpu_feature() and this_cpu_has_cap() as
+> we stop checking for a capability on a CPU with the first
+> entry in the given table, which is not sufficient. Make sure we
+> run the checks for all entries of the same capability. We do
+> this by fixing __this_cpu_has_cap() to run through all the
+> entries in the given table for a match and reuse it for
+> verify_local_cpu_feature().
 > 
-> Fixes: fa2a8445b1d3 ("arm64: allow ID map to be extended to 52 bits")
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 44 ++++++++++++++++++++++--------------------
+>  1 file changed, 23 insertions(+), 21 deletions(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Applied. Thanks.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
