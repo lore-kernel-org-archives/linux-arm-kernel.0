@@ -1,76 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 14 Jan 2018 23:29:16 +0000
-Subject: [PATCH 1/7] arm64: kernel: avoid executable literal pools
-In-Reply-To: <CAKv+Gu8D5Zxfjbj21J9-e2Z+kVdDv4KmFhrOf-SinGM_1zh36g@mail.gmail.com>
-References: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
- <20180110121142.18291-2-ard.biesheuvel@linaro.org>
- <CAKv+Gu8D5Zxfjbj21J9-e2Z+kVdDv4KmFhrOf-SinGM_1zh36g@mail.gmail.com>
-Message-ID: <CAKv+Gu-eBKS7_7jc5AAiWkO8VcEpVWF4VFwA9zrDvsM_dkpw8Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Jan 2018 02:01:36 +0100
+Subject: [PATCH 01/14] mmc: mmci: Don't pretend all variants to have
+ MMCIMASK1 register
+In-Reply-To: <1515759368-16946-2-git-send-email-patrice.chotard@st.com>
+References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
+ <1515759368-16946-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdb3iS7FuGbC3n9xpazvtEW7AjbLKNZ5vKpJAv2D8c4sbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2018 at 23:27, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 10 January 2018 at 12:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Recent versions of GCC will emit literals into a separate .rodata section
->> rather than interspersed with the instruction stream. We disabled this
->> in commit 67dfa1751ce71 ("arm64: errata: Add -mpc-relative-literal-loads
->> to build flags"), because it uses adrp/add pairs to reference these
->> literals even when building with -mcmodel=large, which breaks module
->> loading when we have the mitigation for Cortex-A53 erratum #843419
->> enabled.
->>
->> However, due to the recent discoveries regarding speculative execution,
->> we should avoid putting data into executable sections, to prevent
->> creating speculative gadgets inadvertently.
->>
->> So set -mpc-relative-literal-loads only for modules, and only if the
->> A53 erratum is enabled.
->>
+On Fri, Jan 12, 2018 at 1:15 PM,  <patrice.chotard@st.com> wrote:
+
+> From: Patrice Chotard <patrice.chotard@st.com>
 >
-> This appears not to help: even with the command line option removed,
-> the literals are still emitted into the .text section, even though the
-> references are emitted using adrp/ldr pairs. AFAICT, the reason for
-> this feature was very large functions (>1 MB), even though I am pretty
-> sure I discussed the ROP gadget use case with Ramana at some point.
+> Two mask registers are used in order to select which events have to
+> actually generate an interrupt on each IRQ line.
 >
-
-Ehm, apologies, right reply but to wrong patch.
-
-*This* patch is pointless because vmlinux is built using the small
-model so whether we apply the GGC option to everything or to modules
-only does not make any difference.
-
-In summary, it seems the only way to get rid of literals in the .text
-section entirely is by dropping the large C model entirely.
-
+> It seems that in the single-IRQ case it's assumed that the IRQs lines
+> are simply OR-ed, while the two mask registers are still present. The
+> driver still programs the two mask registers separately.
 >
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/Makefile | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
->> index b481b4a7c011..bd7cb205e28a 100644
->> --- a/arch/arm64/Makefile
->> +++ b/arch/arm64/Makefile
->> @@ -26,7 +26,8 @@ ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
->>    ifeq ($(call ld-option, --fix-cortex-a53-843419),)
->>  $(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
->>    else
->> -LDFLAGS_vmlinux        += --fix-cortex-a53-843419
->> +LDFLAGS_vmlinux                += --fix-cortex-a53-843419
->> +KBUILD_CFLAGS_MODULE   += $(call cc-option, -mpc-relative-literal-loads)
->>    endif
->>  endif
->>
->> @@ -51,7 +52,6 @@ endif
->>
->>  KBUILD_CFLAGS  += -mgeneral-regs-only $(lseinstr) $(brokengasinst)
->>  KBUILD_CFLAGS  += -fno-asynchronous-unwind-tables
->> -KBUILD_CFLAGS  += $(call cc-option, -mpc-relative-literal-loads)
->>  KBUILD_AFLAGS  += $(lseinstr) $(brokengasinst)
->>
->>  KBUILD_CFLAGS  += $(call cc-option,-mabi=lp64)
->> --
->> 2.11.0
->>
+> However the STM32 variant has only one IRQ, and also has only one mask
+> register.
+>
+> This patch prepares for STM32 variant support by making the driver using
+> only one mask register.
+>
+> This patch also optimize the MMCIMASK1 mask usage by caching it into
+> host->mask1_reg which avoid to read it into mmci_irq().
+>
+> Tested only on STM32 variant. RFT for variants other than STM32
+>
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
