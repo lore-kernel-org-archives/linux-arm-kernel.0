@@ -1,48 +1,87 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Mon, 15 Jan 2018 15:23:48 +0000
-Subject: [PATCH 1/3] arm64: fix ID map extension to 52 bits
+Date: Mon, 15 Jan 2018 15:23:49 +0000
+Subject: [PATCH 2/3] KVM: arm/arm64: fix HYP ID map extension to 52 bits
 In-Reply-To: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
 References: <1516029830-12326-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1516029830-12326-2-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1516029830-12326-3-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fa2a8445b1d3 added support for extending the ID map to 52 bits,
-but accidentally dropped a required change to __cpu_uses_extended_idmap.
-As a result, the kernel fails to boot when VA_BITS = 48 and the ID map
-text is in 52-bit physical memory, because we reduce TCR.T0SZ to cover
-the ID map, but then never set it back to VA_BITS.
+Commit fa2a8445b1d3 incorrectly masks the index of the HYP ID map pgd
+entry, causing a non-VHE kernel to hang during boot. This happens when
+VA_BITS=48 and the ID map text is in 52-bit physical memory. In this
+case we don't need an extra table level but need more entries in the
+top-level table, so we need to map into hyp_pgd and need to use
+__kvm_idmap_ptrs_per_pgd to mask in the extra bits. However,
+__create_hyp_mappings currently masks by PTRS_PER_PGD instead.
 
-Add back the change, and also clean up some double parentheses.
+Fix it so that we always use __kvm_idmap_ptrs_per_pgd for the HYP ID
+map. This ensures that we use the larger mask for the top-level ID map
+table when it has more entries. In all other cases, PTRS_PER_PGD is used
+as normal.
 
 Fixes: fa2a8445b1d3 ("arm64: allow ID map to be extended to 52 bits")
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ virt/kvm/arm/mmu.c | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 8f80fcb49252..5aee19905556 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -72,8 +72,7 @@ extern u64 idmap_ptrs_per_pgd;
- 
- static inline bool __cpu_uses_extended_idmap(void)
- {
--	return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
--		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
-+	return unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS));
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 761787befd3b..876caf531d32 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -623,21 +623,15 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+ 	return 0;
  }
  
- /*
-@@ -82,7 +81,7 @@ static inline bool __cpu_uses_extended_idmap(void)
-  */
- static inline bool __cpu_uses_extended_idmap_level(void)
+-static int __create_hyp_mappings(pgd_t *pgdp,
++static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+ 				 unsigned long start, unsigned long end,
+ 				 unsigned long pfn, pgprot_t prot)
  {
--	return ARM64_HW_PGTABLE_LEVELS((64 - idmap_t0sz)) > CONFIG_PGTABLE_LEVELS;
-+	return ARM64_HW_PGTABLE_LEVELS(64 - idmap_t0sz) > CONFIG_PGTABLE_LEVELS;
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+-	unsigned long addr, next, ptrs_per_pgd = PTRS_PER_PGD;
++	unsigned long addr, next;
+ 	int err = 0;
+ 
+-	/*
+-	 * If it's not the hyp_pgd, fall back to the kvm idmap layout.
+-	 */
+-	if (pgdp != hyp_pgd)
+-		ptrs_per_pgd = __kvm_idmap_ptrs_per_pgd();
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 	addr = start & PAGE_MASK;
+ 	end = PAGE_ALIGN(end);
+@@ -705,8 +699,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
+ 		int err;
+ 
+ 		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
+-		err = __create_hyp_mappings(hyp_pgd, virt_addr,
+-					    virt_addr + PAGE_SIZE,
++		err = __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD,
++					    virt_addr, virt_addr + PAGE_SIZE,
+ 					    __phys_to_pfn(phys_addr),
+ 					    prot);
+ 		if (err)
+@@ -737,7 +731,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+ 	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+ 		return -EINVAL;
+ 
+-	return __create_hyp_mappings(hyp_pgd, start, end,
++	return __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD, start, end,
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
  }
  
- /*
+@@ -1743,7 +1737,7 @@ static int kvm_map_idmap_text(pgd_t *pgd)
+ 	int err;
+ 
+ 	/* Create the idmap in the boot page tables */
+-	err = 	__create_hyp_mappings(pgd,
++	err = 	__create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
+ 				      hyp_idmap_start, hyp_idmap_end,
+ 				      __phys_to_pfn(hyp_idmap_start),
+ 				      PAGE_HYP_EXEC);
 -- 
 2.1.4
