@@ -1,36 +1,89 @@
-From: york.sun@nxp.com (York Sun)
-Date: Mon, 15 Jan 2018 23:28:14 +0000
-Subject: EDAC driver for ARMv8 L1/L2 cache
-References: <20180112171251.4ricaz3lzditr7pi@pd.tnic>
- <VI1PR04MB2078B4491702765BA546C5539A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
- <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
- <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180113113156.nnmkuh25rilzwf4p@pd.tnic>
- <20180115142154.rj6cgnhlll7ivyew@lakrids.cambridge.arm.com>
- <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
- <VI1PR04MB20786DE6AE24D4BB555E87C69AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180115232321.ojo3lfvces2q2qhm@pd.tnic>
-Message-ID: <VI1PR04MB207883AE86B7685B9D9DE3029AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Mon, 15 Jan 2018 18:28:37 -0500
+Subject: [PATCH v4 0/8] PCI: brcmstb: Add Broadcom Settopbox PCIe support
+Message-ID: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2018 03:23 PM, Borislav Petkov wrote:
-> On Mon, Jan 15, 2018 at 04:19:09PM +0000, York Sun wrote:
->> I have different plan on the driver. Since I don't get interrupt on
->> correctable errors,
-> 
-> Is that something nxp-specific or generic ARM64 thing?
-> 
-> If it is the former, then you'd need a special driver for your hardware,
-> as much as I don't like the idea of having per-vendor driver...
-> 
-It is generic ARM64 thing. I believe only SError interrupt is available.
-But SError can be caused by many reasons. For L1/L2 only uncorrectable
-errors trigger SError. My first step is to deal with correctable errors
-and to raise a flag somehow (Haven't think that through yet) when
-excessive errors are reported. Next step I will deal with the
-uncorrectable errors with interrupt.
+This patch series adds support for the Broadcom Settopbox PCIe host
+controller.  It is targeted to Broadcom Settopbox chips running on
+ARM, ARM64, and MIPS platforms.
 
-York
+V4 Changes:
+  - Merged all BrcmSTB PCIe controller files into a single file.
+  - All new files now have the SPDX identifier.
+  - Removed the list of PCIe controllers.
+  - Removed "link-up" race.
+  - Removed probe of msi psuedo-device.
+  - Multiple comment text changes, as requested.
+  - "SSC" => "Spread Spectrum Clocking".
+  - Set 'memc' variable.
+  - Unnecessary variable initializations removed (eg rc_bar2_size).
+  - Added comment on "L23" link state.
+  - Removed use of "__refdata".
+  - Formatting of structure elements.
+
+V3 Changes:
+  - Fold pcie-brcmstb-msi.c into pcie-brcmstb.c
+  - Use PCI_XXX constants for PCIe capability registers
+  - Removal of any unused constants
+  - Change s/pci/pcie/ for filenames, comment text
+  - Config space access now uses 8/16/32 read/writes
+  - Use proper multi-line comment style
+  - Use function names, structure that are common in other host drivers
+  - DT binding 'brcm,ssc' is now 'brcm,enable-ssc'
+  - Dropped DT binding 'xyz-supply'
+  - Not setting CRS support as Linux does it if it is advertised.
+  - Removed code that was considered "debug code".
+  - Use of_get_pcie_domain_nr()
+  - Variable 'bridge_setup_done' removed.
+
+V2 Changes:
+* Patch brcmstb-add-memory-API:
+  - fix DT_PROP_DATA_TO_U32 macro.
+  - dropped one EXPORT_SYMBOL, changed the other to GPL.
+* Patch DT-docs-for-Brcmstb-PCIe:
+  - change 'brcm,gen' prop to standard 'max-link-speed'.
+  - rewrite bindings commit to omit standard prop defs.
+  - change props "supplies", "supply-names" to "xyz-supply"
+* Patch removed: export-symbol-arch_setup_dma_ops [4/9]
+* Patch brcmstb-add-dma-ranges:
+  - use get_dma_ops(); also use a const dma_map_ops structure.
+  - rewrite map_sg(), unmap_sg(), other calls like syng_sg_*()
+  - omit brcm_mapping_error(), but added code in brcm_dma_supported()
+  - put all of the notifier code in one compilation unit.
+
+Florian Fainelli (1):
+  SOC: brcmstb: add memory API
+
+Jim Quinlan (7):
+  dt-bindings: pci: Add DT docs for Brcmstb PCIe device
+  PCI: brcmstb: Add Broadcom STB PCIe host controller driver
+  PCI: brcmstb: Add dma-range mapping for inbound traffic
+  PCI/MSI: Enable PCI_MSI_IRQ_DOMAIN support for MIPS
+  PCI: brcmstb: Add MSI capability
+  MIPS: BMIPS: Add PCI bindings for 7425, 7435
+  MIPS: BMIPS: Enable PCI
+
+ .../devicetree/bindings/pci/brcmstb-pcie.txt       |   59 +
+ arch/mips/Kconfig                                  |    3 +
+ arch/mips/boot/dts/brcm/bcm7425.dtsi               |   26 +
+ arch/mips/boot/dts/brcm/bcm7435.dtsi               |   27 +
+ arch/mips/boot/dts/brcm/bcm97425svmb.dts           |    4 +
+ arch/mips/boot/dts/brcm/bcm97435svmb.dts           |    4 +
+ arch/mips/include/asm/Kbuild                       |    1 +
+ drivers/pci/Kconfig                                |    2 +-
+ drivers/pci/host/Kconfig                           |    9 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pcie-brcmstb.c                    | 1830 ++++++++++++++++++++
+ drivers/soc/bcm/brcmstb/Makefile                   |    2 +-
+ drivers/soc/bcm/brcmstb/memory.c                   |  158 ++
+ include/soc/brcmstb/memory_api.h                   |   25 +
+ 14 files changed, 2149 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-brcmstb.c
+ create mode 100644 drivers/soc/bcm/brcmstb/memory.c
+ create mode 100644 include/soc/brcmstb/memory_api.h
+
+-- 
+1.9.0.138.g2de3478
