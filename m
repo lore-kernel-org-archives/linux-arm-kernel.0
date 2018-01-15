@@ -1,35 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Jan 2018 17:19:17 +0000
-Subject: PM regression in next
-In-Reply-To: <20180115165050.GJ4821@atomide.com>
-References: <20180112190046.GD4821@atomide.com>
- <20180112191251.GE21458@sirena.org.uk>
- <20180112210706.GE4821@atomide.com>
- <20180112211535.GH21458@sirena.org.uk>
- <20180112215010.GG4821@atomide.com>
- <20180112221126.GK21458@sirena.org.uk>
- <20180112224959.GH4821@atomide.com>
- <20180112225947.GL21458@sirena.org.uk>
- <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
- <20180115165050.GJ4821@atomide.com>
-Message-ID: <20180115171917.GB12018@sirena.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 15 Jan 2018 11:21:24 -0600
+Subject: [PATCH 5/6] arm64: tegra: Add Tegra194 chip device tree
+In-Reply-To: <7085e085-134c-27cf-6ee7-ae691e63d454@kapsi.fi>
+References: <1515387278-29777-1-git-send-email-mperttunen@nvidia.com>
+ <1515387278-29777-6-git-send-email-mperttunen@nvidia.com>
+ <20180111215638.f5vxykb2vvxeypmk@rob-hp-laptop>
+ <7085e085-134c-27cf-6ee7-ae691e63d454@kapsi.fi>
+Message-ID: <CAL_JsqLH8FJ+ppFrtxS7ja-Apkj=RfDcDoFOtNPsnbb6+Pgp-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 08:50:51AM -0800, Tony Lindgren wrote:
-> * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [180115 01:46]:
+On Fri, Jan 12, 2018 at 1:22 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
+> On 11.01.2018 23:56, Rob Herring wrote:
+>>
+>> On Mon, Jan 08, 2018 at 06:54:37AM +0200, Mikko Perttunen wrote:
+>>>
+>>> Add the chip-level device tree, including binding headers, for the
+>>> NVIDIA Tegra194 "Xavier" system-on-chip. Only a small subset of devices
+>>> are initially available, enough to boot to UART console.
+>>>
+>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>>> ---
 
-> > I hope your driver will be OK by using regmap.
-> > In worst case, we can back .read/.write, but it will be component driver side.
+>>> +       interrupt-parent = <&gic>;
+>>> +       #address-cells = <2>;
+>>> +       #size-cells = <2>;
+>>> +
+>>> +       uarta: serial at 3100000 {
+>>
+>>
+>> These should all be under a bus node. Tegra failed to do this at the
+>> start and we're still copy-n-pasting this mistake.
+>>
+>> Then you probably don't need 2 address and size cells for all the
+>> peripherals.
+>
+>
+> So I should create one big simple-bus node and put everything with an
+> address apart from /memory (and maybe /sysram) inside it?
 
-> Well we have the merge window about to open in a week, so
-> please just revert the known broken patches.
+Yes. Though you can have multiple buses if that makes sense. Things
+like fixed clocks, gpio-leds, etc. (typically board level) that don't
+have any bus should stay at the top level.
 
-Did anyone actually try testing the fix I posted yet?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180115/c87402a5/attachment-0001.sig>
+Rob
