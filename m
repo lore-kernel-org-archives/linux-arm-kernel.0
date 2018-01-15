@@ -1,43 +1,36 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 15 Jan 2018 13:05:57 -0500
-Subject: [RESEND PATCH 0/2] selftests: ftrace: Fix multiple-kprobe testcase
-In-Reply-To: <151593777761.23875.10360397710751679883.stgit@devbox>
-References: <151593777761.23875.10360397710751679883.stgit@devbox>
-Message-ID: <20180115130557.34aaac4f@gandalf.local.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Jan 2018 10:06:26 -0800
+Subject: PM regression in next
+In-Reply-To: <20180115175626.GC12018@sirena.org.uk>
+References: <20180112211535.GH21458@sirena.org.uk>
+ <20180112215010.GG4821@atomide.com>
+ <20180112221126.GK21458@sirena.org.uk>
+ <20180112224959.GH4821@atomide.com>
+ <20180112225947.GL21458@sirena.org.uk>
+ <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
+ <20180115165050.GJ4821@atomide.com>
+ <20180115171917.GB12018@sirena.org.uk>
+ <20180115175220.GK4821@atomide.com>
+ <20180115175626.GC12018@sirena.org.uk>
+Message-ID: <20180115180626.GL4821@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Mark Brown <broonie@kernel.org> [180115 17:56]:
+> On Mon, Jan 15, 2018 at 09:52:20AM -0800, Tony Lindgren wrote:
+> > * Mark Brown <broonie@kernel.org> [180115 17:19]:
+> 
+> > > Did anyone actually try testing the fix I posted yet?
+> 
+> > Hmm I don't seem to have anything in my inbox. What might
+> > be the subject for it?
+> 
+> Sorry, I didn't actually post it - just suggested adding the
+> snd_soc_codec_set_regmap() call.
 
-Shuah,
+Oh I see. Yeah that seems like a good long term solution after
+the regressions are fixed.
 
-Want to take these in your tree? You can add:
+Regards,
 
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-
--- Steve
-
-
-On Sun, 14 Jan 2018 22:49:37 +0900
-Masami Hiramatsu <mhiramat@kernel.org> wrote:
-
-> Hi,
-> 
-> These patches are fixing a bug and improve testcase to
-> ensure adding 256 kprobe events for test.
-> 
-> I've just updated to the latest kselftest/master branch.
-> 
-> Thank you,
-> 
-> ---
-> 
-> Masami Hiramatsu (2):
->       [BUGFIX] selftest: ftrace: Fix to pick text symbols for kprobes
->       selftest: ftrace: Fix to add 256 kprobe events correctly
-> 
-> 
->  .../ftrace/test.d/kprobe/multiple_kprobes.tc       |   21 +++++++++++++++++---
->  1 file changed, 18 insertions(+), 3 deletions(-)
-> 
-> --
-> Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
+Tony
