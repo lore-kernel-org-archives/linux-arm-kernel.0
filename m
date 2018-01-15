@@ -1,49 +1,32 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 15 Jan 2018 23:22:42 +0000
-Subject: PM regression in next
-In-Reply-To: <20180115165050.GJ4821@atomide.com>
-References: <20180112012019.GA4059@atomide.com>
- <20180112190046.GD4821@atomide.com>
- <20180112191251.GE21458@sirena.org.uk>
- <20180112210706.GE4821@atomide.com>
- <20180112211535.GH21458@sirena.org.uk>
- <20180112215010.GG4821@atomide.com>
- <20180112221126.GK21458@sirena.org.uk>
- <20180112224959.GH4821@atomide.com>
- <20180112225947.GL21458@sirena.org.uk>
- <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
- <20180115165050.GJ4821@atomide.com>
-Message-ID: <871siqbte4.wl%kuninori.morimoto.gx@renesas.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 16 Jan 2018 00:23:21 +0100
+Subject: EDAC driver for ARMv8 L1/L2 cache
+In-Reply-To: <VI1PR04MB20786DE6AE24D4BB555E87C69AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
+References: <20180112171251.4ricaz3lzditr7pi@pd.tnic>
+ <VI1PR04MB2078B4491702765BA546C5539A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
+ <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
+ <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180113113156.nnmkuh25rilzwf4p@pd.tnic>
+ <20180115142154.rj6cgnhlll7ivyew@lakrids.cambridge.arm.com>
+ <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
+ <VI1PR04MB20786DE6AE24D4BB555E87C69AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
+Message-ID: <20180115232321.ojo3lfvces2q2qhm@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 15, 2018 at 04:19:09PM +0000, York Sun wrote:
+> I have different plan on the driver. Since I don't get interrupt on
+> correctable errors,
 
-Hi Tony
+Is that something nxp-specific or generic ARM64 thing?
 
-> > I'm sorry that my patch breaks your drivers.
-> > It seems removing .read/.write callback was too much aggressive.
-> 
-> No problem, things happen. The thing I'm worried about here
-> though is that these patches were "completely untested
-> clean-up patches" :)
+If it is the former, then you'd need a special driver for your hardware,
+as much as I don't like the idea of having per-vendor driver...
 
-Yes, you are 100% true
+-- 
+Regards/Gruss,
+    Boris.
 
-> For the next set of changes like this,
-> please make sure you Cc the driver authors so they can test
-> and ack the changes if you can't test them, OK?
-
-Actually, I have posted "convert codec/platform to component"
-patch-set to ALSA ML, without Cc:ing to you.
-
-	Subject: [PATCH 00/38] ASoC: replace platform to component
-	Date: Fri, 12 Jan 2018 09:40:29 +0900
-
-	Subject: [PATCH 000/187] ASoC: replace codec to component
-	Date: Fri, 12 Jan 2018 10:05:05 +0900
-
-I will send test request mail to each driver's authoer
-
-Best regards
----
-Kuninori Morimoto
+Good mailing practices for 400: avoid top-posting and trim the reply.
