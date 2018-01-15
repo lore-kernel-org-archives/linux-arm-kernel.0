@@ -1,86 +1,165 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Jan 2018 12:48:27 +0100
-Subject: [PATCH v4 09/19] arm64: cpufeatures: Drop the
- ARM64_HYP_OFFSET_LOW feature flag
-In-Reply-To: <20180104184334.16571-10-marc.zyngier@arm.com>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-10-marc.zyngier@arm.com>
-Message-ID: <20180115114827.GJ21403@cbox>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Jan 2018 11:51:34 +0000
+Subject: [PATCH v3 11/13] arm64: Implement branch predictor hardening for
+ affected Cortex-A CPUs
+In-Reply-To: <20180109161218.2079-1-suzuki.poulose@arm.com>
+References: <1515432758-26440-12-git-send-email-will.deacon@arm.com>
+ <20180109161218.2079-1-suzuki.poulose@arm.com>
+Message-ID: <0baae1c1-8ea8-e01d-ff16-aabae36f8ee5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 06:43:24PM +0000, Marc Zyngier wrote:
-> Now that we can dynamically compute the kernek/hyp VA mask, there
+Hi Suzuki,
 
-nit: s/kernek/kernel/
-
-> is need for a feature flag to trigger the alternative patching.
-
-is *no* need?
-
-> Let's drop the flag and everything that depends on it.
-
-Otherwise:
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+On 09/01/18 16:12, Suzuki K Poulose wrote:
+> On 08/01/18 17:32, Will Deacon wrote:
+>> Cortex-A57, A72, A73 and A75 are susceptible to branch predictor aliasing
+>> and can theoretically be attacked by malicious code.
+>>
+>> This patch implements a PSCI-based mitigation for these CPUs when available.
+>> The call into firmware will invalidate the branch predictor state, preventing
+>> any malicious entries from affecting other victim contexts.
+>>
+>> Co-developed-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Will, Marc,
+> 
+>> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+>> +	{
+>> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+>> +		.enable = enable_psci_bp_hardening,
+>> +	},
+>> +	{
+>> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+>> +		.enable = enable_psci_bp_hardening,
+>> +	},
+>> +	{
+>> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+>> +		.enable = enable_psci_bp_hardening,
+>> +	},
+>> +	{
+>> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>> +		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+>> +		.enable = enable_psci_bp_hardening,
+>> +	},
+>> +#endif
+> 
+> The introduction of multiple entries for the same capability breaks
+> some assumptions in this_cpu_has_caps() and verify_local_cpu_features()
+> as they all stop at the first entry matching the "capability" and could
+> return wrong results. We need something like the following to make this
+> work, should someone add duplicate feature entry or use
+> this_cpu_has_caps() on one of the errata.
+> 
+> ---8>---
+> 
+> arm64: capabilities: Handle duplicate entries for a capability
+> 
+> Sometimes a single capability could be listed multiple times with
+> differing matches(), e.g, CPU errata for different MIDR versions.
+> This breaks verify_local_cpu_feature() and this_cpu_has_cap() as
+> we stop checking for a capability on a CPU with the first
+> entry in the given table, which is not sufficient. Make sure we
+> run the checks for all entries of the same capability. We do
+> this by fixing __this_cpu_has_cap() to run through all the
+> entries in the given table for a match and reuse it for
+> verify_local_cpu_feature().
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  arch/arm64/include/asm/cpucaps.h |  2 +-
->  arch/arm64/kernel/cpufeature.c   | 19 -------------------
->  2 files changed, 1 insertion(+), 20 deletions(-)
+>  arch/arm64/kernel/cpufeature.c | 44 ++++++++++++++++++++++--------------------
+>  1 file changed, 23 insertions(+), 21 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index 2ff7c5e8efab..f130f35dca3c 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -32,7 +32,7 @@
->  #define ARM64_HAS_VIRT_HOST_EXTN		11
->  #define ARM64_WORKAROUND_CAVIUM_27456		12
->  #define ARM64_HAS_32BIT_EL0			13
-> -#define ARM64_HYP_OFFSET_LOW			14
-> +/* #define ARM64_UNALLOCATED_ENTRY			14 */
->  #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
->  #define ARM64_HAS_NO_FPSIMD			16
->  #define ARM64_WORKAROUND_REPEAT_TLBI		17
 > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index a73a5928f09b..b99f8b1688c3 100644
+> index 862a417ca0e2..0c43447f7406 100644
 > --- a/arch/arm64/kernel/cpufeature.c
 > +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -825,19 +825,6 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
->  	return is_kernel_in_hyp_mode();
+> @@ -1120,6 +1120,26 @@ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
+>  			cap_set_elf_hwcap(hwcaps);
 >  }
 >  
-> -static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
-> -			   int __unused)
+> +/*
+> + * Check if the current CPU has a given feature capability.
+> + * Should be called from non-preemptible context.
+> + */
+> +static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+> +			       unsigned int cap)
+> +{
+> +	const struct arm64_cpu_capabilities *caps;
+> +
+> +	if (WARN_ON(preemptible()))
+> +		return false;
+> +
+> +	for (caps = cap_array; caps->desc; caps++)
+> +		if (caps->capability == cap &&
+> +		    caps->matches &&
+> +		    caps->matches(caps, SCOPE_LOCAL_CPU))
+> +			return true;
+> +	return false;
+> +}
+> +
+>  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>  			    const char *info)
+>  {
+> @@ -1183,8 +1203,9 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+>  }
+>  
+>  static void
+> -verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+> +verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
+>  {
+> +	const struct arm64_cpu_capabilities *caps = caps_list;
+>  	for (; caps->matches; caps++) {
+>  		if (!cpus_have_cap(caps->capability))
+>  			continue;
+> @@ -1192,7 +1213,7 @@ verify_local_cpu_features(const struct arm64_cpu_capabilities *caps)
+>  		 * If the new CPU misses an advertised feature, we cannot proceed
+>  		 * further, park the cpu.
+>  		 */
+> -		if (!caps->matches(caps, SCOPE_LOCAL_CPU)) {
+> +		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
+>  			pr_crit("CPU%d: missing feature: %s\n",
+>  					smp_processor_id(), caps->desc);
+>  			cpu_die_early();
+> @@ -1274,25 +1295,6 @@ static void __init mark_const_caps_ready(void)
+>  	static_branch_enable(&arm64_const_caps_ready);
+>  }
+>  
+> -/*
+> - * Check if the current CPU has a given feature capability.
+> - * Should be called from non-preemptible context.
+> - */
+> -static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+> -			       unsigned int cap)
 > -{
-> -	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
+> -	const struct arm64_cpu_capabilities *caps;
 > -
-> -	/*
-> -	 * Activate the lower HYP offset only if:
-> -	 * - the idmap doesn't clash with it,
-> -	 * - the kernel is not running at EL2.
-> -	 */
-> -	return idmap_addr > GENMASK(VA_BITS - 2, 0) && !is_kernel_in_hyp_mode();
+> -	if (WARN_ON(preemptible()))
+> -		return false;
+> -
+> -	for (caps = cap_array; caps->desc; caps++)
+> -		if (caps->capability == cap && caps->matches)
+> -			return caps->matches(caps, SCOPE_LOCAL_CPU);
+> -
+> -	return false;
 > -}
 > -
->  static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unused)
->  {
->  	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
-> @@ -926,12 +913,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  		.field_pos = ID_AA64PFR0_EL0_SHIFT,
->  		.min_field_value = ID_AA64PFR0_EL0_32BIT_64BIT,
->  	},
-> -	{
-> -		.desc = "Reduced HYP mapping offset",
-> -		.capability = ARM64_HYP_OFFSET_LOW,
-> -		.def_scope = SCOPE_SYSTEM,
-> -		.matches = hyp_offset_low,
-> -	},
->  	{
->  		/* FP/SIMD is not implemented */
->  		.capability = ARM64_HAS_NO_FPSIMD,
-> -- 
-> 2.14.2
+>  extern const struct arm64_cpu_capabilities arm64_errata[];
+>  
+>  bool this_cpu_has_cap(unsigned int cap)
 > 
+
+This looks sensible to me.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
