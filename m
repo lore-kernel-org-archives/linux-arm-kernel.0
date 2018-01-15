@@ -1,49 +1,40 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 15 Jan 2018 17:43:29 +0000
-Subject: [PATCH 2/7] ARM: dts: STi: Add gpio polarity for "hdmi, hpd-gpio"
- property
-In-Reply-To: <CAK8P3a3thPTMgcMRT0jqwoOidhxXndWCP0tYpUsPhMTW7DvgCA@mail.gmail.com>
-References: <1515572469-19276-1-git-send-email-patrice.chotard@st.com>
- <1515572469-19276-3-git-send-email-patrice.chotard@st.com>
- <CAK8P3a3thPTMgcMRT0jqwoOidhxXndWCP0tYpUsPhMTW7DvgCA@mail.gmail.com>
-Message-ID: <aa7fb6b7-8fde-8206-7459-e7fe14dc2f09@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jan 2018 17:49:47 +0000
+Subject: [PATCH 08/11] signal/arm: Document conflicts with SI_USER and
+ SIGFPE
+In-Reply-To: <20180112005940.23279-8-ebiederm@xmission.com>
+References: <87373b6ghs.fsf@xmission.com>
+ <20180112005940.23279-8-ebiederm@xmission.com>
+Message-ID: <20180115174947.GH17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
-
-On 01/15/2018 03:59 PM, Arnd Bergmann wrote:
-> On Wed, Jan 10, 2018 at 9:21 AM,  <patrice.chotard@st.com> wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> The GPIO polarity is missing in the hdmi,hpd-gpio property, this
->> fixes the following DT warnings:
->>
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (gpios_property): hdmi,hpd-gpio property
->> size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
->>
->> arch/arm/boot/dts/stih407-b2120.dtb: Warning (gpios_property): hdmi,hpd-gpio property
->> size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
->>
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (gpios_property): hdmi,hpd-gpio property
->> size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+On Thu, Jan 11, 2018 at 06:59:37PM -0600, Eric W. Biederman wrote:
+> Setting si_code to 0 results in a userspace seeing an si_code of 0.
+> This is the same si_code as SI_USER.  Posix and common sense requires
+> that SI_USER not be a signal specific si_code.  As such this use of 0
+> for the si_code is a pretty horribly broken ABI.
 > 
-> Olof has picked up a number of other dtc warning fixes into next/dt,
-> so I ended up
-> adding this to the same place rather than our fixes branch, but added
-> a Cc:stable
-> tag. We now have just one warning left in arm-soc, and I think Linus
-> Walleij will
-> send a patch for that soon. >
-> Please send a pull request for the remaining commits from the STi
-> series, thanks!
-
-Ok thanks
-
-Patrice
-
+> Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
+> value of __SI_KILL and now sees a value of SIL_KILL with the result
+> that uid and pid fields are copied and which might copying the si_addr
+> field by accident but certainly not by design.  Making this a very
+> flakey implementation.
 > 
->        Arnd
-> 
+> Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
+> appropriate fields will be reliably copied.
+
+So what do you suggest when none of the SIGFPE FPE_xxx codes match the
+condition that "we don't know what happened" ?  Raise a SIGKILL instead
+maybe?  We will have dumped the VFP state into the kernel log at this
+point, things are pretty much fscked.
+
+It's probably an impossible condition unless the hardware has failed,
+no one has knowingly reported getting such a dump in their kernel log,
+so it's something that could very likely be changed in some way
+without anyone noticing.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
