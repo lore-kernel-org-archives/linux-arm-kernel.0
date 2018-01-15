@@ -1,108 +1,88 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Mon, 15 Jan 2018 18:11:10 +0000
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.16
-In-Reply-To: <CAK8P3a3d8VeYk=3p=hF1_==MRLXWwW4bbOZnv0y62BcoEg2-1w@mail.gmail.com>
-References: <1515628596-4715-1-git-send-email-leoyang.li@nxp.com>
- <20180112020217.tqdjt3voqimr3ptx@localhost>
- <AM4PR0401MB1699179D81FBB37456325AEA8F170@AM4PR0401MB1699.eurprd04.prod.outlook.com>
- <CAK8P3a3d8VeYk=3p=hF1_==MRLXWwW4bbOZnv0y62BcoEg2-1w@mail.gmail.com>
-Message-ID: <AM4PR0401MB1699E44F24CED9B28D9EA4D88FEB0@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 15 Jan 2018 11:13:04 -0700
+Subject: [PATCH v2 00/10] perf tools: Add support for CoreSight trace decoding
+Message-ID: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnaldo,
 
+This patchset adds support for per-thread CoreSight trace decoding from the
+"perf report" interface.  It is largely modelled on what has been done for
+intelPT traces and currently targets the ETMv4 architecture.  Support for
+cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
 
-> -----Original Message-----
-> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
-> Behalf Of Arnd Bergmann
-> Sent: Monday, January 15, 2018 7:10 AM
-> To: Leo Li <leoyang.li@nxp.com>
-> Cc: Olof Johansson <olof@lixom.net>; arm at kernel.org;
-> shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [GIT PULL] updates to soc/fsl drivers for v4.16
-> 
-> On Fri, Jan 12, 2018 at 8:28 PM, Leo Li <leoyang.li@nxp.com> wrote:
-> >> -----Original Message-----
-> >> From: Olof Johansson [mailto:olof at lixom.net]
-> >> Sent: Thursday, January 11, 2018 8:02 PM
-> >> To: Leo Li <leoyang.li@nxp.com>
-> >> Cc: arm at kernel.org; shawnguo at kernel.org; linux-arm-
-> >> kernel at lists.infradead.org
-> >> Subject: Re: [GIT PULL] updates to soc/fsl drivers for v4.16
-> >>
-> >> On Wed, Jan 10, 2018 at 05:56:36PM -0600, Li Yang wrote:
-> >> > Hi arm-soc maintainer,
-> >> >
-> >> > Please merge the following tag to get updates to the soc/fsl/guts
-> >> > driver for support of additional SoCs and more error path handling.
-> >> >
-> >> > Thanks,
-> >> > Leo
-> >> >
-> >> >
-> >> > The following changes since commit
-> >> b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d:
-> >> >
-> >> >   Linux 4.15-rc7 (2018-01-07 14:22:41 -0800)
-> >> >
-> >> > are available in the git repository at:
-> >> >
-> >> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
-> >> > tags/soc-fsl-for-4.16
-> >> >
-> >> > for you to fetch changes up to
-> >> 00ce0a2304014c73c2b7915215c7b3c73e2a25aa:
-> >> >
-> >> >   soc: fsl: guts: Add a NULL check for devm_kasprintf() (2018-01-10
-> >> > 16:54:26 -0600)
-> >>
-> >> 1) This is based on much too new a release
-> >
-> > The branch was created and the first patch was applied quite a while
-> > ago.  The second patch is relatively new but very straightforward.  I
-> > rebased the branch to
-> > -rc7 just before sending the pull request thinking it would be easier
-> > for you to merge.  If that is not a preferred action, I will not do that again in
-> the future.
-> 
-> The general rule is to base on top of -rc1, unless you have a dependency on a
-> patch that went into a later -rc. Going to some -rc that is already part of arm-
-> soc is generally fine, but if you send a branch based on a later -rc than ours, it
-> messes up the git history unnecessarily, and it means that whatever you
-> send has seen less testing than what you had before the rebase.
-> 
-> >> 2) the fact that it's based on this new a release makes me suspect it hasn't
-> >>    been sitting in linux-next either, at least not since before -rc7.
-> >
-> > My tree is not being merged by the Linux-next right now.  So you think we
-> should ask Linux-next to add my tree too?
-> 
-> It's not mandatory, but most of our downstream trees are part of linux-next.
-> 
-> >> Conclusion: Please resend post merge window and we'll queue it up for
-> >> the next release. If the bugfix should go in sooner than that, I can
-> >> cherry-pick that into our fixes. Let me know.
-> >
-> > I know the pull request is coming a little bit late.  But the two small patches
-> are really simple and straightforward.  They are not technically a fix but it will
-> be really helpful if you can take it in this merge window.  And going forward,
-> what is your preferred time frame to send pull request to for-next?
-> 
-> Send them as soon as you think the code is ready. In general, earlier is better,
-> even if you are still testing or expect that you may need additional patches
-> on top. If you send a large chunk of changes during -rc2 and then later (rc6 or
-> rc7) have some fixes to address issues you found with those, we're much
-> happier than when we don't hear anything until -rc6 and then get the larger
-> set of patches with more testing.
-> 
-> If you can find the old commit before your rebase (using 'git reflog') then
-> please send that one so we can reconsider. If you can't find it, just send the
-> two patches directly. Also, anything that is a real bugfix can of course get
-> merged any time.
+The trace decoding support is done using the Open CoreSight Decoding
+Library (openCSD), a stand alone open source project available here [1].
+Integration of the openCSD library with the perf tools follow what has
+been done for other support libraries.  If the library has been installed
+on a system the build scripts will include support for CoreSight trace
+decoding:
 
-Thanks for your helpful explanation.  You can see from the link below that the first patch was applied around -rc2 time.
+...			zlib: [ on  ]
+...			lzma: [ OFF ]
+...			get_cpuid: [ on  ]
+...			bpf: [ on  ]
+...			libopencsd: [ on  ] <------
 
-https://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git/log/?h=6ea0acf
+Instructions on how to build and install the openCSD library are provided
+in the HOWTO.md of the project repository.  We elected to keep the decoder
+library independent of the kernel tree as it is also used outside of the
+perf toolset and various non-linux projects.
+
+The work applies cleanly to [2] and depend on the following patches [3, 4].
+
+Lastly there is a divergence of opinions on whether the decoding library
+should be part of the kernel tree or live on its own as we chose to do -
+your point of view on the matter would be greatly appreciated.
 
 Regards,
-Leo
+Mathieu
+
+[1]. https://github.com/Linaro/OpenCSD
+[2]. git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core
+[3]. https://marc.info/?l=linux-kernel&m=151561673423088&w=2
+[4]. https://marc.info/?l=linux-kernel&m=151579875721440&w=2 
+
+Changes for V2:
+. Rebased to Acme's latest (321e85e9458a)
+. Following what has been done for libdw and libbabeltrace and added the
+  possibililty to use alternate header/library for development purposes.
+
+Mathieu Poirier (8):
+  perf tools: Integrating the CoreSight decoding library
+  perf tools: Add initial entry point for decoder CoreSight traces
+  perf tools: Add decoder mechanic to support dumping trace data
+  perf tools: Add support for decoding CoreSight trace data
+  perf tools: Add functionality to communicate with the openCSD decoder
+  pert tools: Add queue management functionality
+  perf tools: Add full support for CoreSight trace decoding
+  perf tools: Add mechanic to synthesise CoreSight trace packets
+
+Tor Jeremiassen (2):
+  perf tools: Add processing of coresight metadata
+  MAINTAINERS: Adding entry for CoreSight trace decoding
+
+ MAINTAINERS                                     |    3 +-
+ tools/build/Makefile.feature                    |    6 +-
+ tools/build/feature/Makefile                    |    7 +-
+ tools/build/feature/test-all.c                  |    5 +
+ tools/build/feature/test-libopencsd.c           |    8 +
+ tools/perf/Makefile.config                      |   25 +
+ tools/perf/Makefile.perf                        |    2 +
+ tools/perf/util/Build                           |    6 +
+ tools/perf/util/auxtrace.c                      |    2 +
+ tools/perf/util/cs-etm-decoder/Build            |    1 +
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  513 ++++++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  105 +++
+ tools/perf/util/cs-etm.c                        | 1023 +++++++++++++++++++++++
+ tools/perf/util/cs-etm.h                        |   18 +
+ 14 files changed, 1720 insertions(+), 4 deletions(-)
+ create mode 100644 tools/build/feature/test-libopencsd.c
+ create mode 100644 tools/perf/util/cs-etm-decoder/Build
+ create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+ create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+ create mode 100644 tools/perf/util/cs-etm.c
+
+-- 
+2.7.4
