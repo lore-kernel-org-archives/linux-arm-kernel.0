@@ -1,128 +1,75 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 15 Jan 2018 10:11:10 +0100
-Subject: [PATCH v4 04/19] arm64: alternatives: Enforce alignment of
- struct alt_instr
-In-Reply-To: <20180104184334.16571-5-marc.zyngier@arm.com>
-References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-5-marc.zyngier@arm.com>
-Message-ID: <20180115091110.GE21403@cbox>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 15 Jan 2018 12:17:46 +0300
+Subject: [PATCH 2/3] arm64: dts: renesas: eagle: Remove renesas,
+ no-ether-link property
+In-Reply-To: <20180115084125.8112-3-horms+renesas@verge.net.au>
+References: <20180115084125.8112-1-horms+renesas@verge.net.au>
+ <20180115084125.8112-3-horms+renesas@verge.net.au>
+Message-ID: <7cda829c-cb72-ef12-90fe-80f9dbb9200e@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 06:43:19PM +0000, Marc Zyngier wrote:
-> We're playing a dangerous game with struct alt_instr, as we produce
-> it using assembly tricks, but parse them using the C structure.
-> We just assume that the respective alignments of the two will
-> be the same.
-> 
-> But as we add more fields to this structure, the alignment requirements
-> of the structure may change, and lead to all kind of funky bugs.
-> 
-> TO solve this, let's move the definition of struct alt_instr to its
-> own file, and use this to generate the alignment constraint from
-> asm-offsets.c. The various macros are then patched to take the
-> alignment into account.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/alternative.h       | 13 +++++--------
->  arch/arm64/include/asm/alternative_types.h | 13 +++++++++++++
->  arch/arm64/kernel/asm-offsets.c            |  4 ++++
->  3 files changed, 22 insertions(+), 8 deletions(-)
->  create mode 100644 arch/arm64/include/asm/alternative_types.h
-> 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index 4a85c6952a22..395befde7595 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -2,28 +2,24 @@
->  #ifndef __ASM_ALTERNATIVE_H
->  #define __ASM_ALTERNATIVE_H
->  
-> +#include <asm/asm-offsets.h>
->  #include <asm/cpucaps.h>
->  #include <asm/insn.h>
->  
->  #ifndef __ASSEMBLY__
->  
-> +#include <asm/alternative_types.h>
-> +
->  #include <linux/init.h>
->  #include <linux/types.h>
->  #include <linux/stddef.h>
->  #include <linux/stringify.h>
->  
-> -struct alt_instr {
-> -	s32 orig_offset;	/* offset to original instruction */
-> -	s32 alt_offset;		/* offset to replacement instruction */
-> -	u16 cpufeature;		/* cpufeature bit set for replacement */
-> -	u8  orig_len;		/* size of original instruction(s) */
-> -	u8  alt_len;		/* size of new instruction(s), <= orig_len */
-> -};
-> -
->  void __init apply_alternatives_all(void);
->  void apply_alternatives(void *start, size_t length);
->  
->  #define ALTINSTR_ENTRY(feature)						      \
-> +	" .align " __stringify(ALTINSTR_ALIGN) "\n"			      \
->  	" .word 661b - .\n"				/* label           */ \
->  	" .word 663f - .\n"				/* new instruction */ \
->  	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
-> @@ -69,6 +65,7 @@ void apply_alternatives(void *start, size_t length);
->  #include <asm/assembler.h>
->  
->  .macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
-> +	.align ALTINSTR_ALIGN
->  	.word \orig_offset - .
->  	.word \alt_offset - .
->  	.hword \feature
+Hello!
 
-I don't understand much of the magics in this file, but...
+On 1/15/2018 11:41 AM, Simon Horman wrote:
 
-> diff --git a/arch/arm64/include/asm/alternative_types.h b/arch/arm64/include/asm/alternative_types.h
-> new file mode 100644
-> index 000000000000..26cf76167f2d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/alternative_types.h
-> @@ -0,0 +1,13 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef __ASM_ALTERNATIVE_TYPES_H
-> +#define __ASM_ALTERNATIVE_TYPES_H
-> +
-> +struct alt_instr {
-> +	s32 orig_offset;	/* offset to original instruction */
-> +	s32 alt_offset;		/* offset to replacement instruction */
-> +	u16 cpufeature;		/* cpufeature bit set for replacement */
-> +	u8  orig_len;		/* size of original instruction(s) */
-> +	u8  alt_len;		/* size of new instruction(s), <= orig_len */
-> +};
-> +
-> +#endif
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 5ab8841af382..f00666341ae2 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -25,6 +25,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/kvm_host.h>
->  #include <linux/suspend.h>
-> +#include <asm/alternative_types.h>
->  #include <asm/cpufeature.h>
->  #include <asm/thread_info.h>
->  #include <asm/memory.h>
-> @@ -151,5 +152,8 @@ int main(void)
->    DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
->    DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
->    DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-> +  BLANK();
-> +  DEFINE(ALTINSTR_ALIGN,	(63 - __builtin_clzl(__alignof__(struct alt_instr))));
-> +
->    return 0;
->  }
-> -- 
-> 2.14.2
+> Regarding Salvator-X and ULCB boards, Bogdan Mirea says:
+
+    Intended to reply to the original patches but due to high load haven't 
+ever finished that email...
+
+>      The present change is a bug fix for AVB link iteratively up/down.
 > 
+>      Steps to reproduce:
+>      - start AVB TX stream (Using aplay via MSE),
+>      - disconnect+reconnect the eth cable,
+>      - after a reconnection the eth connection goes iteratively up/down
+>        without user interaction,
+>      - this may heal after some seconds or even stay for minutes.
+> 
+>      As the documentation specifies, the "renesas,no-ether-link" option
+>      should be used when a board does not provide a proper AVB_LINK signal.
+>      There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
+>      and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+> 
+>      Choosing to keep or remove the "renesas,no-ether-link" option will
+>      have impact on the code flow in the following ways:
+>      - keeping this option enabled may lead to unexpected behavior since
+>        the RX & TX are enabled/disabled directly from adjust_link function
+>        without any HW interrogation,
 
-... the rest looks correct to me.  FWIW:
+    What does he mean by that? The adjust_link() is surely called as a result 
+of interrogating the PHY...
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>      - removing this option, the RX & TX will only be enabled/disabled after
+>        HW interrogation. The HW check is made through the LMON pin in PSR
+
+    s/pin/bit/.
+
+>        register which specifies AVB_LINK signal value (0 - at low level;
+>        1 - at high level).
+
+    Things are not that simple with this signal. The main cause of the issues 
+is that it's connected to a LED control output of the Micrel PHY and that one 
+may have different meaning -- e.g., it can well be blinking when some traffic 
+happens (and IIRC that's might be a problem with KSZ9031, usually used with 
+AVB). I remember I have tried without this option but finally decided to leave 
+it specified as my schematics reading skills failed me in this case... I need 
+to test this patch.
+
+>      In conclusion, the present change is also a safety improvement because
+>      it removes the "renesas,no-ether-link" option leading to a proper way
+>      of detecting the link state based on HW interrogation and not on
+>      software heuristic.
+> 
+> On examination of the documentation for the Eagle board this change seems
+> necessary as AVB_LINK is documented as being connected.
+> 
+> Fixes: 38525608952a ("arm64: dts: renesas: eagle: add EtherAVB support")
+> Cc: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
+> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[...]
+
+MBR, Sergei
