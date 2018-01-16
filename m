@@ -1,41 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Jan 2018 08:38:33 +0100
-Subject: [PATCH 04/14] mmc: mmci: Add STM32 variant
-In-Reply-To: <ce14077b-2b8b-f8a7-2107-78b1d9dcab27@st.com>
-References: <1515759368-16946-1-git-send-email-patrice.chotard@st.com>
- <1515759368-16946-5-git-send-email-patrice.chotard@st.com>
- <CACRpkdYVDpmEmrF=Zk1zX8RCRnPDieTgPuCen6KQ4ttFpAm+Yg@mail.gmail.com>
- <ce14077b-2b8b-f8a7-2107-78b1d9dcab27@st.com>
-Message-ID: <CACRpkdY88umqVBcFNy7Z6vgHztRr7MbAjh-AWz0nYgFXoOwCLQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 16 Jan 2018 13:10:37 +0530
+Subject: [GIT PULL] TI DaVinci SoC updates for v4.16 (part 2)
+In-Reply-To: <CAOesGMgzeoYQZ1cDE3hJH6RAKcVv0=nA8u0vqFCvTPzbE2vLag@mail.gmail.com>
+References: <20180110112505.13633-1-nsekhar@ti.com>
+ <20180112013602.q2sm25s6o3oebkbj@localhost>
+ <db68cbec-a3e2-9c9e-e09c-f3d9a9972636@lechnology.com>
+ <8a0bd7f2-c3a9-1322-a567-7a9ffdaf69d8@ti.com>
+ <CAOesGMgzeoYQZ1cDE3hJH6RAKcVv0=nA8u0vqFCvTPzbE2vLag@mail.gmail.com>
+Message-ID: <7f666ae1-c076-2ea2-7703-8e036899bc30@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 6:17 PM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
-
->>> +       {
->>> +               .id     = 0x00880180,
->>> +               .mask   = 0x00ffffff,
->>> +               .data   = &variant_stm32,
->>> +       },
+On Friday 12 January 2018 11:44 PM, Olof Johansson wrote:
+> On Thu, Jan 11, 2018 at 9:47 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> Hi Olof,
 >>
->> Since ux500 was 480180 I wonder what variants 5,6,7 are...
->
-> What is the rule to define the id ?
+>> On Friday 12 January 2018 08:06 AM, David Lechner wrote:
+>>> On 01/11/2018 07:36 PM, Olof Johansson wrote:
+>>>> On Wed, Jan 10, 2018 at 04:55:05PM +0530, Sekhar Nori wrote:
+>>>>> The following changes since commit
+>>>>> 23bbeaef90ab7607d03428bbb708efe44f43c761:
+>>>>>
+>>>>>    ARM: davinci: constify gpio_led (2018-01-05 19:28:41 +0530)
+>>>>>
+>>>>> are available in the git repository at:
+>>>>>
+>>>>>
+>>>>> git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
+>>>>> tags/davinci-for-v4.16/soc-p2
+>>>>>
+>>>>> for you to fetch changes up to 0808d3260456aaba061fe06ead31d578c8bdc936:
+>>>>>
+>>>>>    ARM: davinci: remove watchdog reset (2018-01-10 14:38:07 +0530)
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> A patch to shift to using watchdog timer for DaVinci restart
+>>>>> functionality.
+>>>>> The driver support is present in linux-next as 71d1f058844d "watchdog:
+>>>>> davinci_wdt: add restart function"
+>>>>
+>>>> Hi,
+>>>>
+>>>> So if this is merged before the driver is merged, what happens?
+>>>
+>>> Then reboot hangs.
+>>
+>> Yes. I did request[1] an immutable branch with just the driver change
+>> applied, but looks like the message was lost and the current driver
+>> change is applied over many other watchdog changes.
+>>
+>>>
+>>>> Might
+>>>> be better to hold off a release to avoid regressions?
+>>
+>> The main reason I sent it out anyway is because this cleanup is a
+>> dependency to move to common clock framework and I want to reduce those
+>> to a minimum to have a good chance of migrating to it in v4.17.
+>>
+>> If the watchdog driver change never makes it (very low chance), then I
+>> can resend a revert for -rc2. If ARM-SoC is merged before watchdog, yes,
+>> during a short while in merge window reboot will be broken. But I
+>> figured its a risk worth taking to have a chance of getting this into v4.16.
+>>
+>> If you have a "send these late" branch, it will be nice to put it in
+>> there. If this is too much uncertainty, then okay, lets hold for v4.17.
+> 
+> Keep in mind that while the tree might regress for a period of time,
+> what's really awkward is that bisection will be hard across this,
+> since for some states of the tree you will have the platform-side
+> change but not the watchdog change. That's really one of the main
+> reasons for having a stable branch that can be used as a base -- you
+> can then not hit that case.
+> 
+> One option is to make a base branch that contains this code that's
+> used for the base of the CCF work that is based on 4.16-rc1 once it is
+> out. What trees to do you expect to have CCF code going through? Clock
+> and arm-soc, any others? If it's just those two we can deal with that,
+> if it's more trees than that it might get complicated still.
 
-These four bits mean "revision".
+I think it will just be clock and ARM-SoC trees. So, will take you
+advise and postpone this to v4.17 then.
 
-The number comes from hardware, so the ST ASIC department
-has some person who is responsible for revising the VHDL or
-Verilog code that this hardware is compiled from, and that person
-is bumping the version.
-
-Theoretically it is a "company function" or something bureaucratic
-like that updating the hardware so I guess it could be several
-people following procedure who have updated this number in the
-hardware over the years.
-
-But I bet it is a single person in Grenoble who has been doing
-the MMC/SD block since it appeared.
-
-Yours,
-Linus Walleij
+Thanks,
+Sekhar
