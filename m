@@ -1,645 +1,253 @@
-From: kyan@codeaurora.org (Kyle Yan)
-Date: Mon, 15 Jan 2018 17:00:08 -0800
-Subject: [PATCH v1] EDAC, armv8: Add Cache Error Reporting driver for
- ARMv8 processors
-In-Reply-To: <20180115144441.d6dlwl7herq24byv@lakrids.cambridge.arm.com>
-References: <1515804626-21254-1-git-send-email-kyan@codeaurora.org>
- <20180115144441.d6dlwl7herq24byv@lakrids.cambridge.arm.com>
-Message-ID: <3d3da849d32b1a674d1bcd560eeba261@codeaurora.org>
+From: chenzhou10@huawei.com (chenzhou)
+Date: Tue, 16 Jan 2018 01:07:01 +0000
+Subject: [PATCH] arm64: support do_csum with neon
+In-Reply-To: <1a09aa53-d18a-3536-db22-b15167790618@arm.com>
+References: <1515757996-4675-1-git-send-email-chenzhou10@huawei.com>
+ <1a09aa53-d18a-3536-db22-b15167790618@arm.com>
+Message-ID: <A47D9AAE3C8E3E4A815B312B14DE7558015ADF91@dggemi501-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-15 06:44, Mark Rutland wrote:
-> Hi,
-> 
-> On Fri, Jan 12, 2018 at 04:50:26PM -0800, Kyle Yan wrote:
->> Interrupt based EDAC driver for ARMv8 processors that implement
->> RAS for error detection of CPU caches and lso allows optional polling
->> of error syndrome registers if interrupts are not supported.
-> 
-> Is this using the architectural RAS extensions, or something specific 
-> to
-> QC CPUs? It would be good to call this out explicitly.
-> 
-> If it's the latter, this needs rewording to be clear that this is
-> specific to QC CPUs, and is not a generic ARMv8 feature.
-> 
-This is not specific to QC CPUs and looks at the system registers 
-defined by the RAS extensions.
+Hi Robin,
 
-> Is there any interaction with SDEI that we need to be aware of?
-I do not believe so. Instead of being firmware-first, this is more meant 
-to be kernel-first implementation.
+-----Original Message-----
+From: Robin Murphy [mailto:robin.murphy at arm.com] 
+Sent: Friday, January 12, 2018 8:23 PM
+To: chenzhou; catalin.marinas at arm.com; will.deacon at arm.com
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] arm64: support do_csum with neon
 
->> 
->> Signed-off-by: Kyle Yan <kyan@codeaurora.org>
->> ---
->>  drivers/edac/Kconfig      |  21 ++
->>  drivers/edac/Makefile     |   1 +
->>  drivers/edac/armv8_edac.c | 489 
->> ++++++++++++++++++++++++++++++++++++++++++++++
-> 
-> I see that there's DT parsing code, but no binding. Please add one, as
-> per Documentation/devicetree/bindings/submitting-patches.txt.
-> 
-Will do.
-> If this is architectural, how is this expected to work on ACPI systems?
-> 
-The current design of this driver has only been tested/used on mobile 
-devices so I do not yet know how it will work on ACPI systems.
+On 12/01/18 11:53, Chen Zhou wrote:
+> On arm64 little endian such as the Cortex-A57, the neon based 
+> implementation performance increases by about 70% when len is greater 
+> than 512.
 
->>  3 files changed, 511 insertions(+)
->>  create mode 100644 drivers/edac/armv8_edac.c
->> 
->> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
->> index 96afb2a..47a68e3 100644
->> --- a/drivers/edac/Kconfig
->> +++ b/drivers/edac/Kconfig
->> @@ -457,4 +457,25 @@ config EDAC_XGENE
->>  	  Support for error detection and correction on the
->>  	  APM X-Gene family of SOCs.
->> 
->> +config EDAC_ARMV8
->> +	depends on (ARM || ARM64)
->> +	tristate "ARMv8 L1/L2/L3/SCU Caches ECC"
->> +	help
->> +	   Support for error detection and correction on ARMv8 cores
->> +	   supporting RAS features. Reports errors caught by ARMv8
->> +	   ECC mechanism.
->> +	   For debugging issues having to do with stability and overall 
->> system
->> +	   health, you should probably say 'Y' here.
->> +
->> +config EDAC_ARMV8_POLL
->> +	depends on EDAC_ARMV8
->> +	bool "Poll on ARMv8 ECC registers"
->> +	help
->> +	   This option chooses whether or not you want to poll on the 
->> Kryo3xx
->> +	   ECC registers.
-> 
-> Are these registers specific to Kryo3xx (i.e. IMPLEMENTATION DEFINED),
-> or are they defined by the RAS extensions?
-> 
-Oops! Typo here. The registers are defined by RAS extensions.
+Um, I don't see the kernel-mode NEON infrastructure being used anywhere here. Blindly destroying someone else's register context is never going to end well, regardless of how fast you can do it...
 
->>          When this is enabled, the polling rate can be set as
->> +	   a module parameter. By default, it will call the polling function
->> +	   every second.
->> +	   This option should only be used if the associated interrupt lines
->> +	   are not enabled.
->> +
->>  endif # EDAC
->> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
->> index 0fd9ffa..57113ba 100644
->> --- a/drivers/edac/Makefile
->> +++ b/drivers/edac/Makefile
->> @@ -43,6 +43,7 @@ obj-$(CONFIG_EDAC_IE31200)		+= ie31200_edac.o
->>  obj-$(CONFIG_EDAC_X38)			+= x38_edac.o
->>  obj-$(CONFIG_EDAC_I82860)		+= i82860_edac.o
->>  obj-$(CONFIG_EDAC_R82600)		+= r82600_edac.o
->> +obj-$(CONFIG_EDAC_ARMV8)		+= armv8_edac.o
->> 
->>  amd64_edac_mod-y := amd64_edac.o
->>  amd64_edac_mod-$(CONFIG_EDAC_DEBUG) += amd64_edac_dbg.o
->> diff --git a/drivers/edac/armv8_edac.c b/drivers/edac/armv8_edac.c
->> new file mode 100644
->> index 0000000..d986c47
->> --- /dev/null
->> +++ b/drivers/edac/armv8_edac.c
->> @@ -0,0 +1,489 @@
->> +/* Copyright (c) 2016-2018, The Linux Foundation. All rights 
->> reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or 
->> modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/edac.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/smp.h>
->> +#include <linux/cpu.h>
->> +#include <linux/cpu_pm.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/of_irq.h>
->> +
->> +#include "edac_mc.h"
->> +#include "edac_device.h"
->> +
->> +static int poll_msec = 1000;
->> +module_param(poll_msec, int, 0444);
->> +
->> +static bool panic_on_ue = 0;
->> +module_param_named(panic_on_ue, panic_on_ue, bool, 0664);
->> +
->> +#define L1 0x0
->> +#define L2 0x1
->> +#define L3 0x2
->> +
->> +#define EDAC_CPU	"armv8_edac"
->> +
->> +#define ERRXSTATUS_VALID(a)	((a >> 30) & 0x1)
->> +#define ERRXSTATUS_UE(a)	((a >> 29) & 0x1)
->> +#define ERRXSTATUS_SERR(a)	(a & 0xFF)
->> +
->> +#define ERRXMISC_LVL(a)		((a >> 1) & 0x7)
->> +#define ERRXMISC_WAY(a)		((a >> 28) & 0xF)
->> +
->> +#define ERRXCTLR_ENABLE		0x10f
->> +#define ERRXMISC_OVERFLOW	0x7F7F00000000ULL
->> +
->> +static inline void set_errxctlr_el1(void)
->> +{
->> +	asm volatile("msr s3_0_c5_c4_1, %0" : : "r" (ERRXCTLR_ENABLE));
->> +}
->> +
->> +static inline void set_errxmisc_overflow(void)
->> +{
->> +	asm volatile("msr s3_0_c5_c5_0, %0" : : "r" (ERRXMISC_OVERFLOW));
->> +}
->> +
->> +static inline void write_errselr_el1(u64 val)
->> +{
->> +	asm volatile("msr s3_0_c5_c3_1, %0" : : "r" (val));
->> +}
->> +
->> +static inline u64 read_errxstatus_el1(void)
->> +{
->> +	u64 val;
->> +
->> +	asm volatile("mrs %0, s3_0_c5_c4_2" : "=r" (val));
->> +	return val;
->> +}
->> +
->> +static inline u64 read_errxmisc_el1(void)
->> +{
->> +	u64 val;
->> +
->> +	asm volatile("mrs %0, s3_0_c5_c5_0" : "=r" (val));
->> +	return val;
->> +}
->> +
->> +static inline void clear_errxstatus_valid(u64 val)
->> +{
->> +	asm volatile("msr s3_0_c5_c4_2, %0" : : "r" (val));
->> +}
-> 
-> Please use {read,write}_sysreg().
-> 
-> If these registers are defined by ARMv8, please place definitions in
-> arm64's <asm/sysreg.h>.
-> 
-Will do.
->> +
->> +struct errors_edac {
->> +	const char * const msg;
->> +	void (*func)(struct edac_device_ctl_info *edac_dev,
->> +			int inst_nr, int block_nr, const char *msg);
->> +};
->> +
->> +static const struct errors_edac errors[] = {
->> +	{ "L1 Correctable Error", edac_device_handle_ce },
->> +	{ "L1 Uncorrectable Error", edac_device_handle_ue },
->> +	{ "L2 Correctable Error", edac_device_handle_ce },
->> +	{ "L2 Uncorrectable Error", edac_device_handle_ue },
->> +	{ "L3 Correctable Error", edac_device_handle_ce },
->> +	{ "L3 Uncorrectable Error", edac_device_handle_ue },
->> +};
->> +
->> +#define L1_CE 0
->> +#define L1_UE 1
->> +#define L2_CE 2
->> +#define L2_UE 3
->> +#define L3_CE 4
->> +#define L3_UE 5
->> +
->> +#define DATA_BUF_ERR		0x2
->> +#define CACHE_DATA_ERR		0x6
->> +#define CACHE_TAG_DIRTY_ERR	0x7
->> +#define TLB_PARITY_ERR_DATA	0x8
->> +#define TLB_PARITY_ERR_TAG	0x9
->> +#define BUS_ERROR		0x12
->> +
->> +struct erp_drvdata {
->> +	struct edac_device_ctl_info *edev_ctl;
->> +	struct erp_drvdata __percpu **erp_cpu_drvdata;
->> +	struct notifier_block nb_pm;
->> +	int ppi;
->> +};
->> +
->> +static struct erp_drvdata *panic_handler_drvdata;
->> +
->> +static DEFINE_SPINLOCK(armv8_edac_lock);
->> +
->> +static void l1_l2_irq_enable(void *info)
->> +{
->> +	int irq = *(int *)info;
->> +
->> +	enable_percpu_irq(irq, IRQ_TYPE_LEVEL_HIGH);
->> +}
->> +
->> +static int request_erp_irq(struct platform_device *pdev, const char 
->> *propname,
->> +			const char *desc, irq_handler_t handler,
->> +			void *ed, int percpu)
->> +{
->> +	int rc;
->> +	struct resource *r;
->> +	struct erp_drvdata *drv = ed;
->> +
->> +	r = platform_get_resource_byname(pdev, IORESOURCE_IRQ, propname);
->> +
->> +	if (!r) {
->> +		pr_err("ARMv8 CPU ERP: Could not find <%s> IRQ property. Proceeding 
->> anyway.\n",
->> +			propname);
-> 
-> What is "ERP" ?
-> 
-Error Reporting. I may just rename it to EDAC or list it out in 
-Documentation.
->> +		goto out;
->> +	}
->> +
->> +	if (!percpu) {
->> +		rc = devm_request_threaded_irq(&pdev->dev, r->start, NULL,
->> +					       handler,
->> +					       IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
->> +					       desc,
->> +					       ed);
->> +
->> +		if (rc) {
->> +			pr_err("ARMv8 CPU ERP: Failed to request IRQ %d: %d (%s / %s). 
->> Proceeding anyway.\n",
->> +			       (int) r->start, rc, propname, desc);
->> +			goto out;
->> +		}
->> +
->> +	} else {
->> +		drv->erp_cpu_drvdata = alloc_percpu(struct erp_drvdata *);
->> +		if (!drv->erp_cpu_drvdata) {
->> +			pr_err("Failed to allocate percpu erp data\n");
->> +			goto out;
->> +		}
->> +
->> +		*raw_cpu_ptr(drv->erp_cpu_drvdata) = drv;
->> +		rc = request_percpu_irq(r->start, handler, desc,
->> +				drv->erp_cpu_drvdata);
->> +
->> +		if (rc) {
->> +			pr_err("ARMv8 CPU ERP: Failed to request IRQ %d: %d (%s / %s). 
->> Proceeding anyway.\n",
->> +			       (int) r->start, rc, propname, desc);
->> +			goto out_free;
->> +		}
->> +
->> +		drv->ppi = r->start;
->> +		on_each_cpu(l1_l2_irq_enable, &(r->start), 1);
->> +	}
->> +
->> +	return 0;
->> +
->> +out_free:
->> +	free_percpu(drv->erp_cpu_drvdata);
->> +	drv->erp_cpu_drvdata = NULL;
->> +out:
->> +	return 1;
->> +}
->> +
->> +static void dump_err_reg(int errorcode, int level, u64 errxstatus, 
->> u64 errxmisc,
->> +	struct edac_device_ctl_info *edev_ctl)
->> +{
->> +	edac_printk(KERN_CRIT, EDAC_CPU, "ERRXSTATUS_EL1: %llx\n", 
->> errxstatus);
->> +	edac_printk(KERN_CRIT, EDAC_CPU, "ERRXMISC_EL1: %llx\n", errxmisc);
->> +	edac_printk(KERN_CRIT, EDAC_CPU, "Cache level: L%d\n", level+1);
->> +
->> +	switch (ERRXSTATUS_SERR(errxstatus)) {
->> +	case DATA_BUF_ERR:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from internal data 
->> buffer\n");
->> +		break;
->> +
->> +	case CACHE_DATA_ERR:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from cache data 
->> RAM\n");
->> +		break;
->> +
->> +	case CACHE_TAG_DIRTY_ERR:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from cache tag or dirty 
->> RAM\n");
->> +		break;
->> +
->> +	case TLB_PARITY_ERR_DATA:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "Parity error on TLB DATA RAM\n");
->> +		break;
->> +
->> +	case TLB_PARITY_ERR_TAG:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "Parity error on TLB TAG RAM\n");
->> +		break;
->> +
->> +	case BUS_ERROR:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "Bus Error\n");
->> +		break;
->> +	}
->> +
->> +	if (level == L3)
->> +		edac_printk(KERN_CRIT, EDAC_CPU,
->> +			"Way: %d\n", (int) ERRXMISC_WAY(errxmisc));
->> +	else
->> +		edac_printk(KERN_CRIT, EDAC_CPU,
->> +			"Way: %d\n", (int) ERRXMISC_WAY(errxmisc) >> 2);
->> +
->> +	edev_ctl->panic_on_ue = panic_on_ue;
->> +	errors[errorcode].func(edev_ctl, smp_processor_id(),
->> +				level, errors[errorcode].msg);
->> +}
->> +
->> +static void armv8_parse_l1_l2_cache_error(u64 errxstatus, u64 
->> errxmisc,
->> +	struct edac_device_ctl_info *edev_ctl)
->> +{
->> +	switch (ERRXMISC_LVL(errxmisc)) {
->> +	case L1:
->> +		if (ERRXSTATUS_UE(errxstatus))
->> +			dump_err_reg(L1_UE, L1, errxstatus, errxmisc,
->> +					edev_ctl);
->> +		else
->> +			dump_err_reg(L1_CE, L1, errxstatus, errxmisc,
->> +					edev_ctl);
->> +		break;
->> +	case L2:
->> +		if (ERRXSTATUS_UE(errxstatus))
->> +			dump_err_reg(L2_UE, L2, errxstatus, errxmisc,
->> +					edev_ctl);
->> +		else
->> +			dump_err_reg(L2_CE, L2, errxstatus, errxmisc,
->> +					edev_ctl);
->> +		break;
->> +	default:
->> +		edac_printk(KERN_CRIT, EDAC_CPU, "Unknown ERRXMISC_LVL value\n");
->> +	}
->> +}
->> +
->> +static bool armv8_check_l1_l2_ecc(void *info)
->> +{
->> +	struct edac_device_ctl_info *edev_ctl = info;
->> +	u64 errxstatus;
->> +	u64 errxmisc;
->> +	unsigned long flags;
->> +
->> +	spin_lock_irqsave(&armv8_edac_lock, flags);
->> +	write_errselr_el1(0);
->> +	errxstatus = read_errxstatus_el1();
->> +
->> +	if (ERRXSTATUS_VALID(errxstatus)) {
->> +		errxmisc = read_errxmisc_el1();
->> +		edac_printk(KERN_CRIT, EDAC_CPU,
->> +		"CPU%d detected a L1/L2 cache error\n",
->> +		smp_processor_id());
->> +
->> +		armv8_parse_l1_l2_cache_error(errxstatus, errxmisc, edev_ctl);
->> +		clear_errxstatus_valid(errxstatus);
->> +		spin_unlock_irqrestore(&armv8_edac_lock, flags);
->> +		return true;
->> +	}
->> +	spin_unlock_irqrestore(&armv8_edac_lock, flags);
->> +	return false;
->> +}
->> +
->> +static bool armv8_check_l3_scu_error(struct edac_device_ctl_info 
->> *edev_ctl)
->> +{
->> +	u64 errxstatus = 0;
->> +	u64 errxmisc = 0;
->> +	unsigned long flags;
->> +
->> +	spin_lock_irqsave(&armv8_edac_lock, flags);
->> +	write_errselr_el1(1);
->> +	errxstatus = read_errxstatus_el1();
->> +	errxmisc = read_errxmisc_el1();
->> +
->> +	if (ERRXSTATUS_VALID(errxstatus) &&
->> +		ERRXMISC_LVL(errxmisc) == L3) {
->> +		if (ERRXSTATUS_UE(errxstatus)) {
->> +			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 uncorrectable 
->> error\n");
->> +			dump_err_reg(L3_UE, L3, errxstatus, errxmisc,
->> +				edev_ctl);
->> +		} else {
->> +			edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 correctable 
->> error\n");
->> +			dump_err_reg(L3_CE, L3, errxstatus, errxmisc,
->> +				edev_ctl);
->> +		}
->> +
->> +		clear_errxstatus_valid(errxstatus);
->> +		spin_unlock_irqrestore(&armv8_edac_lock, flags);
->> +		return true;
->> +	}
->> +	spin_unlock_irqrestore(&armv8_edac_lock, flags);
->> +	return false;
->> +}
->> +
->> +static void armv8_check_l1_l2_ecc_helper(void *info)
->> +{
->> +	armv8_check_l1_l2_ecc(info);
->> +}
->> +
->> +void armv8_poll_cache_errors(struct edac_device_ctl_info *edev_ctl)
->> +{
->> +	int cpu;
->> +
->> +	if (!edev_ctl)
->> +		edev_ctl = panic_handler_drvdata->edev_ctl;
->> +
->> +	armv8_check_l3_scu_error(edev_ctl);
->> +	for_each_possible_cpu(cpu) {
->> +		smp_call_function_single(cpu, armv8_check_l1_l2_ecc_helper,
->> +			edev_ctl, 0);
->> +	}
->> +}
->> +
->> +static irqreturn_t armv8_l1_l2_handler(int irq, void *drvdata)
->> +{
->> +	if (armv8_check_l1_l2_ecc(panic_handler_drvdata->edev_ctl))
->> +		return IRQ_HANDLED;
->> +	return IRQ_NONE;
->> +}
->> +
->> +static irqreturn_t armv8_l3_scu_handler(int irq, void *drvdata)
->> +{
->> +	struct erp_drvdata *drv = drvdata;
->> +	struct edac_device_ctl_info *edev_ctl = drv->edev_ctl;
->> +
->> +	if (armv8_check_l3_scu_error(edev_ctl))
->> +		return IRQ_HANDLED;
->> +	return IRQ_NONE;
->> +}
->> +
->> +static void initialize_registers(void *info)
->> +{
->> +	set_errxctlr_el1();
->> +	set_errxmisc_overflow();
->> +}
->> +
->> +static void init_regs_on_cpu(bool all_cpus)
->> +{
->> +	int cpu;
->> +
->> +	write_errselr_el1(0);
->> +	if (all_cpus) {
->> +		for_each_possible_cpu(cpu)
->> +			smp_call_function_single(cpu, initialize_registers,
->> +						NULL, 1);
->> +	} else {
->> +		initialize_registers(NULL);
->> +	}
->> +
->> +	write_errselr_el1(1);
->> +	initialize_registers(NULL);
->> +}
->> +
->> +static int armv8_pmu_cpu_pm_notify(struct notifier_block *self,
->> +				unsigned long action, void *v)
->> +{
->> +	switch (action) {
->> +	case CPU_PM_EXIT:
->> +		init_regs_on_cpu(false);
->> +		armv8_check_l3_scu_error(panic_handler_drvdata->edev_ctl);
->> +		armv8_check_l1_l2_ecc(panic_handler_drvdata->edev_ctl);
->> +		break;
->> +	}
->> +
->> +	return NOTIFY_OK;
->> +}
-> 
-> What about CPU hotplug?
-> 
-Agreed that CPU hotplug will be required for the small window between 
-hotplugging back in and LPM exit.
+Robin.
 
->> +
->> +static int armv8_cpu_erp_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct erp_drvdata *drv;
->> +	int rc = 0;
->> +	int fail = 0;
->> +
->> +	init_regs_on_cpu(true);
->> +
->> +	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
->> +
->> +	if (!drv)
->> +		return -ENOMEM;
->> +
->> +	drv->edev_ctl = edac_device_alloc_ctl_info(0, "cpu",
->> +					num_possible_cpus(), "L", 3, 1, NULL, 0,
->> +					edac_device_alloc_index());
->> +
->> +	if (!drv->edev_ctl)
->> +		return -ENOMEM;
->> +
->> +	if (IS_ENABLED(CONFIG_EDAC_ARMV8_POLL)) {
->> +		drv->edev_ctl->edac_check = armv8_poll_cache_errors;
->> +		drv->edev_ctl->poll_msec = poll_msec;
->> +	}
->> +
->> +	drv->edev_ctl->dev = dev;
->> +	drv->edev_ctl->mod_name = dev_name(dev);
->> +	drv->edev_ctl->dev_name = dev_name(dev);
->> +	drv->edev_ctl->ctl_name = "cache";
->> +	drv->edev_ctl->panic_on_ue = panic_on_ue;
->> +	drv->nb_pm.notifier_call = armv8_pmu_cpu_pm_notify;
->> +	platform_set_drvdata(pdev, drv);
->> +
->> +	rc = edac_device_add_device(drv->edev_ctl);
->> +	if (rc)
->> +		goto out_mem;
->> +
->> +	panic_handler_drvdata = drv;
->> +
->> +	if (!IS_ENABLED(CONFIG_EDAC_ARMV8_POLL)) {
->> +		fail += request_erp_irq(pdev, "l1-l2-irq",
->> +				"l1_l2_irq",
->> +				armv8_l1_l2_handler, drv, 1);
->> +
->> +		fail += request_erp_irq(pdev, "l3-scu-irq",
->> +				"l3_scu_irq",
->> +				armv8_l3_scu_handler, drv, 0);
-> 
-> SCU isn't an architectural concept, and a combined l1-l2 interrupt
-> sounds very specific to a particular implementation.
-> 
-Can do a rename to something more akin to "private_cache_irq" and 
-"shared_cache_irq".
+Thank you very much for your review. You're right. I don't think about whether the
+systems support NEON and don't put kernel_neon_begin and kernel_neon_end
+calls around NEON code. I will fix this up later.
 
-> My understanding was that with the RAS extensions, SError would be used
-> to notify on RAS conditions, so I'm confused as to why we'd need
-> regular interrupts here.
-> 
-There may be cases where interrupts are preferred. To my knowledge 
-(though I may mistaken), SErrors would not catch correctable errors?
+Thanks
+Chen Zhou
 
->> +
->> +		if (fail == of_irq_count(dev->of_node)) {
->> +			pr_err("ERP: Could not request any IRQs. Giving up.\n");
->> +			rc = -ENODEV;
->> +			goto out_dev;
->> +		}
->> +	}
->> +
->> +	cpu_pm_register_notifier(&(drv->nb_pm));
->> +
->> +	return 0;
->> +
->> +out_dev:
->> +	edac_device_del_device(dev);
->> +out_mem:
->> +	edac_device_free_ctl_info(drv->edev_ctl);
->> +	return rc;
->> +}
->> +
->> +static int armv8_cpu_erp_remove(struct platform_device *pdev)
->> +{
->> +	struct erp_drvdata *drv = dev_get_drvdata(&pdev->dev);
->> +	struct edac_device_ctl_info *edac_ctl = drv->edev_ctl;
->> +
->> +	if (drv->erp_cpu_drvdata) {
->> +		free_percpu_irq(drv->ppi, drv->erp_cpu_drvdata);
->> +		free_percpu(drv->erp_cpu_drvdata);
->> +	}
->> +
->> +	edac_device_del_device(edac_ctl->dev);
->> +	edac_device_free_ctl_info(edac_ctl);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct of_device_id armv8_cpu_erp_match_table[] = {
->> +	{ .compatible = "arm,armv8-cpu-erp" },
->> +	{ }
->> +};
+> Signed-off-by: Chen Zhou <chenzhou10@huawei.com>
+> ---
+>   arch/arm64/include/asm/checksum.h |   3 +
+>   arch/arm64/lib/Makefile           |   1 +
+>   arch/arm64/lib/do_csum.S          | 177 ++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 181 insertions(+)
+>   create mode 100644 arch/arm64/lib/do_csum.S
 > 
-> This needs a binding document, laying out precisely what this is
-> intended to describe.
+> diff --git a/arch/arm64/include/asm/checksum.h 
+> b/arch/arm64/include/asm/checksum.h
+> index 09f6533..e300782 100644
+> --- a/arch/arm64/include/asm/checksum.h
+> +++ b/arch/arm64/include/asm/checksum.h
+> @@ -26,6 +26,9 @@ static inline __sum16 csum_fold(__wsum csum)
+>   }
+>   #define csum_fold csum_fold
+>   
+> +#define do_csum do_csum
+> +extern unsigned int do_csum(const unsigned char *, size_t);
+> +
+>   static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
+>   {
+>   	__uint128_t tmp;
+> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile index 
+> 1a811ec..5b6aa34 100644
+> --- a/arch/arm64/lib/Makefile
+> +++ b/arch/arm64/lib/Makefile
+> @@ -3,6 +3,7 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
+>   		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
+>   		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
+>   		   strchr.o strrchr.o
+> +lib-y += do_csum.o
+>   
+>   # Tell the compiler to treat all general purpose registers as
+>   # callee-saved, which allows for efficient runtime patching of the 
+> bl diff --git a/arch/arm64/lib/do_csum.S b/arch/arm64/lib/do_csum.S 
+> new file mode 100644 index 0000000..8e7b486
+> --- /dev/null
+> +++ b/arch/arm64/lib/do_csum.S
+> @@ -0,0 +1,177 @@
+> +/*
+> + * Optmized version of the standard do_csum() function
+> + *
+> + * Parameters:
+> + *	x0 - address of buffer to checksum (const unsigned char *)
+> + *	x1 - length of the buffer (int)
+> + * Returns:
+> + *	x0 - the return checksum of the buffer
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +
+> +ENTRY(do_csum)
+> +	ldr	x13, =0xffff
+> +	eor	x4, x4, x4
+> +	eor	x5, x5, x5
+> +	eor	v0.16b, v0.16b, v0.16b
+> +
+> +	//len is zero or negative
+> +	and	x6, x1, #0x80000000
+> +	cmp	x6, #0
+> +	b.gt	out
+> +	cbz	w1, out
+> +
+> +	tst	x0, #1
+> +	b.eq	addr_not_odd
+> +
+> +	//addr is odd
+> +	mov	x4, #1
+> +	ldr	x6, [x0], #1
+> +#ifdef __AARCH64EB__
+> +	and     x6, x6, #0xff
+> +#else
+> +	lsl   x6, x6, #8
+> +	and   x6, x6, x13
+> +#endif
+> +	add     x5, x5, x6
+> +	sub     x1, x1, #1
+> +
+> +addr_not_odd:
+> +	cmp	x1, #32
+> +	b.lt	len_4
+> +	cmp	x1, #192
+> +	b.ge	len_than_192
+> +	b	do_loop_16
+> +
+> +len_than_192:
+> +	ldp	q1, q0, [x0], #32
+> +	ldp	q3, q2, [x0], #32
+> +	ldp	q5, q4, [x0], #32
+> +	sub	x1, x1, #96
+> +
+> +do_loop_96:
+> +	ldp	q7, q6, [x0], #32
+> +	ldp	q9, q8, [x0], #32
+> +	ldp	q11, q10, [x0], #32
+> +
+> +	uaddl	v12.4s, v0.4h, v6.4h
+> +	uaddl2	v13.4s, v0.8h, v6.8h
+> +
+> +	uaddl	v14.4s, v1.4h, v7.4h
+> +	uaddl2	v15.4s, v1.8h, v7.8h
+> +
+> +	uaddl	v16.4s, v2.4h, v8.4h
+> +	uaddl2	v17.4s, v2.8h, v8.8h
+> +
+> +	uaddl	v18.4s, v3.4h, v9.4h
+> +	uaddl2	v19.4s, v3.8h, v9.8h
+> +
+> +	uaddl	v20.4s, v4.4h, v10.4h
+> +	uaddl2	v21.4s, v4.8h, v10.8h
+> +	uaddl	v22.4s, v5.4h, v11.4h
+> +	uaddl2	v23.4s, v5.8h, v11.8h
+> +
+> +	add	v0.4s, v12.4s, v13.4s
+> +	add	v1.4s, v14.4s, v15.4s
+> +	add	v2.4s, v16.4s, v17.4s
+> +	add	v3.4s, v18.4s, v19.4s
+> +	add	v4.4s, v20.4s, v21.4s
+> +	add	v5.4s, v22.4s, v23.4s
+> +
+> +	sub	x1, x1, #96
+> +	cmp	x1, #96
+> +	b.ge	do_loop_96
+> +
+> +	add	v0.4s, v0.4s, v1.4s
+> +	add	v2.4s, v2.4s, v3.4s
+> +	add	v4.4s, v4.4s, v5.4s
+> +	add	v0.4s, v0.4s, v2.4s
+> +	add	v0.4s, v0.4s, v4.4s     //get result
+> +
+> +	cmp	x1, #16
+> +	b.lt	get_64
+> +
+> +do_loop_16:
+> +	ldr	q6, [x0], #16
+> +	uaddl	v24.4s, v0.4h, v6.4h
+> +	uaddl2	v25.4s, v0.8h, v6.8h
+> +	add	v0.4s, v24.4s, v25.4s
+> +	sub	x1, x1, #16
+> +	cmp	x1, #16
+> +	b.ge	do_loop_16
+> +
+> +get_64:
+> +	mov	x6, v0.d[0]
+> +	add	x5, x5, x6
+> +	mov	x6, v0.d[1]
+> +
+> +	add	x5, x5, x6
+> +	cmp	x5, x6
+> +	b.ge	len_4
+> +	add	x5, x5, #1
+> +
+> +len_4:
+> +	cmp	x1, #4
+> +	b.lt	len_2
+> +
+> +	sub	x1, x1, #4
+> +	ldr	w6, [x0], #4
+> +	and	x6, x6, #0xffffffff
+> +	add	x5, x5, x6
+> +	b	len_4
+> +
+> +len_2:
+> +	cmp	x1, #2
+> +	b.lt	len_1
+> +	sub	x1, x1, #2
+> +	ldrh	w6, [x0], #2
+> +	and	x6, x6, x13
+> +	add	x5, x5, x6
+> +
+> +len_1:
+> +	cmp	x1, #1
+> +	b.lt	fold_32
+> +	ldr	x6, [x0], #1
+> +#ifdef __AARCH64EB__
+> +	lsl	x6, x6, #8
+> +	and	x6, x6, x13
+> +#else
+> +	and	x6, x6, #0xff
+> +#endif
+> +	add	x5, x5, x6
+> +
+> +fold_32:
+> +	and	x9, x5, x13		//[15:0]
+> +	and	x10, x13, x5, lsr #16	//[31:16]
+> +	and	x11, x13, x5, lsr #32	//[47:32]
+> +	and	x12, x13, x5, lsr #48	//[47:32]
+> +
+> +	add	x9, x9, x10
+> +	add	x11, x11, x12
+> +
+> +	add	x9, x9, x11
+> +
+> +	and	x10, x9, x13
+> +	and	x11, x13, x9, lsr #16
+> +
+> +	add	x5, x10, x11
+> +
+> +	and     x9, x5, x13             //add carry
+> +	and     x10, x13, x5, lsr #16
+> +	add	x5, x9, x10
+> +
+> +	cbz	x4, out			//addr isn't odd
+> +
+> +	lsr	x6, x5, #8
+> +	and	x6, x6, #0xff
+> +	and	x7, x5, #0xff
+> +	lsl	x7, x7, #8
+> +
+> +	orr	x5, x6, x7
+> +
+> +out:
+> +	mov	x0, x5
+> +	ret
+> +ENDPROC(do_csum)
 > 
-Will do.
-> Thanks,
-> Mark.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
