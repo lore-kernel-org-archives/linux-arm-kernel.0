@@ -1,176 +1,169 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Tue, 16 Jan 2018 07:04:09 +0000
-Subject: [patch v16 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <20180115205142.GD2818@kryptos.localdomain>
-References: <1515776909-29894-1-git-send-email-oleksandrs@mellanox.com>
- <1515776909-29894-2-git-send-email-oleksandrs@mellanox.com>
- <20180115205142.GD2818@kryptos.localdomain>
-Message-ID: <AM4PR0501MB2194BD3F84A1E944EF335ECAB1EA0@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+From: takahiro.akashi@linaro.org (takahiro.akashi at linaro.org)
+Date: Tue, 16 Jan 2018 16:07:05 +0900
+Subject: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
+ any reservation
+In-Reply-To: <CAFTCetQvrNG7fr2-y4wOmjgFyC6D1U18K3iq5--RcNwt+hEz2g@mail.gmail.com>
+References: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
+ <5A4F5C45.3090006@arm.com>
+ <DB5PR0401MB1733C9CB0DCDF94FCF3E4E1286130@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+ <5A58F75E.8030106@arm.com>
+ <DB5PR0401MB173376E6E9B45B871BD1A66086140@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+ <CAFTCetQvrNG7fr2-y4wOmjgFyC6D1U18K3iq5--RcNwt+hEz2g@mail.gmail.com>
+Message-ID: <20180116070703.GA15458@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia
-
-> -----Original Message-----
-> From: Julia Cartwright [mailto:juliac at eso.teric.us]
-> Sent: 15 ?????? 2018 ?. 22:52
-> To: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; openbmc at lists.ozlabs.org; joel at jms.id.au;
-> jiri at resnulli.us; tklauser at distanz.ch; linux-serial at vger.kernel.org; Vadim
-> Pasternak <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
-> level at mellanox.com>; robh+dt at kernel.org; openocd-devel-
-> owner at lists.sourceforge.net; linux-api at vger.kernel.org;
-> davem at davemloft.net; mchehab at kernel.org; Jiri Pirko
-> <jiri@mellanox.com>
-> Subject: Re: [patch v16 1/4] drivers: jtag: Add JTAG core driver
+On Mon, Jan 15, 2018 at 10:14:05AM +0530, Bhupesh SHARMA wrote:
+> Hi Poonam, James
 > 
-> Hello Oleksandr-
-> 
-> I have a few comments below.
-> 
-> On Fri, Jan 12, 2018 at 07:08:26PM +0200, Oleksandr Shamray wrote:
-> > Initial patch for JTAG driver
-> > JTAG class driver provide infrastructure to support hardware/software
-> > JTAG platform drivers. It provide user layer API interface for
-> > flashing and debugging external devices which equipped with JTAG
-> > interface using standard transactions.
+> On Sat, Jan 13, 2018 at 8:37 AM, Poonam Aggrwal <poonam.aggrwal@nxp.com> wrote:
+> > Hi James
 > >
-
-[..]
-> > +		break;
-> > +
-> > +	case JTAG_IOCXFER:
-> > +		if (!jtag->ops->xfer)
+> > Regards
+> > Poonam
+> >
+> >> -----Original Message-----
+> >> From: James Morse [mailto:james.morse at arm.com]
+> >> Sent: Friday, January 12, 2018 11:29 PM
+> >> To: Poonam Aggrwal <poonam.aggrwal@nxp.com>
+> >> Cc: linux-arm-kernel at lists.infradead.org; takahiro.akashi at linaro.org;
+> >> will.deacon at arm.com; G.h. Gao <guanhua.gao@nxp.com>; Abhimanyu Saini
+> >> <abhimanyu.saini@nxp.com>; kexec at lists.infradead.org
+> >> Subject: Re: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
+> >> any reservation
+> >>
+> >> Hi Poonam,
+> >>
+> >> On 08/01/18 04:31, Poonam Aggrwal wrote:
+> >> > James Morse wrote:
+> >> >> On 04/01/18 15:34, Poonam Aggrwal wrote:
+> >> >>> Address for both crashkernel memory and elfcorehdr can be assigned
+> >> >>> statically. For crashkernel memory it is via
+> >> >>> crashkernel=SIZE at ADDRESS and elfcorehdr_addr via by kexec-utils in dump
+> >> kernel device tree.
+> >> >>
+> >> >> There are some crashkernel=SIZE at ADDRESS values that the user can
+> >> >> supply that we must reject. The obvious one is if it overlaps with
+> >> >> the kernel text. (this patch won't spot this). We need to read the
+> >> >> hardware's reserved regions from the DT before we allocate the
+> >> >> crashkernel region, for example if the bootloader reserved a chunk of
+> >> >> memory for a frame-buffer, I shouldn't be able to use that as crashkernel
+> >> memory.
+> >> >>
+> >> >> (you shouldn't need to specify an address, doing so prevents the
+> >> >> kernel from picking memory it can use)
+> >> >>
+> >> >>
+> >> >>> So memory should be reserved for both the above areas before any
+> >> >>> other memory reservations are done. Otherwise overlaps may happen
+> >> >>> and memory allocations will fail leading to failure in booting the
+> >> >>> dump capture kernel.
+> >>
+> >> >>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c index
+> >> >>> 00e7b90..24ce15d 100644
+> >> >>> --- a/arch/arm64/mm/init.c
+> >> >>> +++ b/arch/arm64/mm/init.c
+> >> >>> @@ -453,6 +453,14 @@ void __init arm64_memblock_init(void)
+> >>
+> >> >>> + reserve_elfcorehdr();
+> >> >>
+> >> >> (Moving reserve_elfcorehdr() makes sense, but..)
+> >> >>
+> >> >>
+> >> >>> + reserve_crashkernel();
+> >> >>
+> >> >> reserve_crashkernel() does the allocation for the crashkernels reserved
+> >> memory.
+> >> >> I expect this to always fail in the kdump kernel because there isn't
+> >> >> enough memory. (fdt_enforce_memory_region() at the top of this
+> >> >> function calls memblock_cap_memory_range()).
+> >> >>
+> >> >> Moving this allocation above the early_init_fdt_scan_reserved_mem()
+> >> >> below means we may allocate memory for the crashdump that is in use
+> >> >> by firmware/hardware and described as reserved in the DT.
+> >>
+> >> > Yeah, this is a good point. So ideally the address of the crash kernel
+> >> > should be diligently provided by the user based on the system.
+> >>
+> >> Even better: the region to store the crash kernel in should be chosen by the
+> >> kernel.
+> >> When using kdump I boot with 'crashkernel=1G', the kernel chooses where to
+> >> place the reserved region.
+> > Right. This is a commonly used.
+> >  Even if I specified a reasonable physical address, the
+> >> efistub may relocate the kernel over the top during boot as part of its KASLR
+> >> work.
+> > Agree
+> >>
+> >> (Why does anyone ever need to specify an offset here?)
+> > offset is normally an optional argument. Request Takahiro to provide his inputs.  Does this imply any updates in kexec design/implementation/documentation?
 > 
-> Are all ops optional?  That seems bizarre.  I would have expected at least one
-> callback to be required.
-
-You right. But I'm preferred to check pointers before use it.
-
+> offset is a optional argument. For relocatable kernels (and kernels
+> which support KASLR), specifying offset is normally not needed.
 > 
-> [..]
-> > +static int jtag_open(struct inode *inode, struct file *file) {
-> > +	struct jtag *jtag = container_of(file->private_data, struct jtag,
-> > +					 miscdev);
-> > +
-> > +	if (mutex_lock_interruptible(&jtag->open_lock))
-> > +		return -ERESTARTSYS;
-> > +
-> > +	if (jtag->opened) {
-> > +		mutex_unlock(&jtag->open_lock);
-> > +		return -EBUSY;
-> > +	}
-> > +
-> > +	nonseekable_open(inode, file);
-> > +	file->private_data = jtag;
+> Please refer to the 'Extended crashkernel syntax' documentation
+> (<https://github.com/torvalds/linux/blob/master/Documentation/kdump/kdump.txt#L259>):
 > 
-> These two can be moved out of the lock.
+> Extended crashkernel syntax
+> ===========================
+> 
+> While the "crashkernel=size[@offset]" syntax is sufficient for most
+> configurations, sometimes it's handy to have the reserved memory dependent
+> on the value of System RAM -- that's mostly for distributors that pre-setup
+> the kernel command line to avoid a unbootable system after some memory has
+> been removed from the machine.
+> 
+> The syntax is:
+> 
+>     crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+>     range=start-[end]
+> 
+> For example:
+> 
+>     crashkernel=512M-2G:64M,2G-:128M
+> 
+> This would mean:
+> 
+>     1) if the RAM is smaller than 512M, then don't reserve anything
+>        (this is the "rescue" case)
+>     2) if the RAM size is between 512M and 2G (exclusive), then reserve 64M
+>     3) if the RAM size is larger than 2G, then reserve 128M
+> 
+> As James mentioned for arm64, in case of relocatable/kaslr kernels,
+> the efistub may relocate the kernel over the top during boot as part
+> of its KASLR.
 
-Agree.
+It would be sad if we couldn't specify kaslr and kdump at the same time.
+Since kaslr will skip any of memory regions whose attributes are not
+CONVENTIONAL_MEMORY for allocating a relocated kernel image, we will be
+able to have a dedicated range of memory reserved for kdump.
+In this case, using an "offset" in "crashkernel=" will be crucial.
 
-> 
-> > +	jtag->opened = true;
-> > +	mutex_unlock(&jtag->open_lock);
-> > +	return 0;
-> > +}
-> > +
-> > +static int jtag_release(struct inode *inode, struct file *file) {
-> > +	struct jtag *jtag = file->private_data;
-> > +
-> > +	mutex_lock(&jtag->open_lock);
-> > +	jtag->opened = false;
-> > +	mutex_unlock(&jtag->open_lock);
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct file_operations jtag_fops = {
-> > +	.owner		= THIS_MODULE,
-> > +	.open		= jtag_open,
-> > +	.release	= jtag_release,
-> > +	.llseek		= noop_llseek,
-> > +	.unlocked_ioctl = jtag_ioctl,
-> > +};
-> > +
-> > +struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
-> > +{
-> > +	struct jtag *jtag;
-> > +
-> > +	jtag = kzalloc(sizeof(*jtag), GFP_KERNEL);
-> 
-> Did you mean to allocate: sizeof(*jtag) + priv_size?
+(I don't know how we can notify uefi of the region though.)
 
-Thank, it's a mistake.
+> So, the offset field may make more sense for
+> non-relocatable/static kernels, but for newer kernels, its better to
+> use the 'Extended crashkernel syntax' syntax which is also supported
+> by newer distribution versions.
 
-> 
-> > +	if (!jtag)
-> > +		return NULL;
-> > +
-> > +	jtag->ops = ops;
-> > +	return jtag;
-> > +}
-> > +EXPORT_SYMBOL_GPL(jtag_alloc);
-> > +
-> > +void jtag_free(struct jtag *jtag)
-> > +{
-> > +	kfree(jtag);
-> > +}
-> > +EXPORT_SYMBOL_GPL(jtag_free);
-> > +
-> > +int jtag_register(struct jtag *jtag)
-> > +{
-> > +	char *name;
-> > +	int err;
-> > +	int id;
-> > +
-> > +	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
-> > +	if (id < 0)
-> > +		return id;
-> > +
-> > +	jtag->id = id;
-> > +
-> > +	name = kzalloc(MAX_JTAG_NAME_LEN, GFP_KERNEL);
-> > +	if (!name) {
-> > +		err = -ENOMEM;
-> > +		goto err_jtag_alloc;
-> > +	}
-> > +
-> > +	err = snprintf(name, MAX_JTAG_NAME_LEN, "jtag%d", id);
-> > +	if (err < 0)
-> > +		goto err_jtag_name;
-> > +
-> > +	mutex_init(&jtag->open_lock);
-> > +	jtag->miscdev.fops =  &jtag_fops;
-> > +	jtag->miscdev.minor = MISC_DYNAMIC_MINOR;
-> > +	jtag->miscdev.name = name;
-> > +
-> > +	err = misc_register(&jtag->miscdev);
-> > +	if (err)
-> > +		dev_err(jtag->dev, "Unable to register device\n");
-> > +	else
-> > +		return 0;
-> > +	jtag->opened = false;
-> 
-> Well, this code flow is just confusing.
-> 
-> I suggest a redo with:
-> 
-> 	err = misc_register(&jtag->miscdev);
-> 	if (err) {
-> 		dev_err(jtag->dev, "Unable to register device\n");
-> 		goto err_jtag_name;
-> 	}
-> 
-> If you need to initialize 'opened', do it prior to misc_register.
-> 
+How better is it for the case?
 
-Thanks
+I don't know exactly what you mean by "newer kernel/distribution", but
+kdump on arm64 supports this feature from the day one.
+(It is basically independent from architectures.)
 
-> Thanks,
->    Julia
+Thanks,
+-Takahiro AKASHI
 
-Thanks for Review.
 
-Br,
-Oleksandr
+> For e.g. see ubuntu trusty kdump-config man page -
+> <http://manpages.ubuntu.com/manpages/trusty/man8/kdump-config.8.html>:
+> 
+>   kdump kernel relocation address does not match crashkernel= parameter:
+>               For non-relocatable architectures,  the  kdump  kernel  must  be
+>               built   with   a  predetermined  start  address.   This  message
+>               indicates that the start address of the  kdump  kernel  and  the
+>               start address in the crashkernel= parameter do not match.
+> 
+> Regards,
+> Bhupesh
