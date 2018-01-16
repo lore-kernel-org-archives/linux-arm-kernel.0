@@ -1,51 +1,176 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 16 Jan 2018 12:18:19 +0530
-Subject: [PATCH v5 02/44] clk: davinci: New driver for davinci PLL clocks
-In-Reply-To: <4a32c52f-4335-52c0-fa63-625a449b00b5@lechnology.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-3-git-send-email-david@lechnology.com>
- <7fc8bd35-0416-216d-8e1e-53a0ec6e8790@ti.com>
- <01fbde0e-36a0-2b19-e385-e63bc4a3ae4a@lechnology.com>
- <eb2b1a63-9c7c-aeca-170f-d38642442438@ti.com>
- <4a32c52f-4335-52c0-fa63-625a449b00b5@lechnology.com>
-Message-ID: <7620b3a1-8806-2e39-4b08-b21064160e06@ti.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Tue, 16 Jan 2018 07:04:09 +0000
+Subject: [patch v16 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <20180115205142.GD2818@kryptos.localdomain>
+References: <1515776909-29894-1-git-send-email-oleksandrs@mellanox.com>
+ <1515776909-29894-2-git-send-email-oleksandrs@mellanox.com>
+ <20180115205142.GD2818@kryptos.localdomain>
+Message-ID: <AM4PR0501MB2194BD3F84A1E944EF335ECAB1EA0@AM4PR0501MB2194.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 13 January 2018 06:41 AM, David Lechner wrote:
-> On 01/12/2018 10:18 AM, Sekhar Nori wrote:
->> On Friday 12 January 2018 08:55 PM, David Lechner wrote:
->>>>
->>>> PLL output on DA850 must never be below 300MHz or above 600MHz (see
->>>> datasheet table "Allowed PLL Operating Conditions"). Does this take
->>>> care
->>>> of that? Thats one of the main reasons I recall I went with some
->>>> specific values of prediv, pllm and post div in
->>>> arch/arm/mach-davinci/da850.c
->>>
->>> Apparently, I missed this requirement. It looks like I am going to
->>> have to
->>> rework things so that there is some coordination between the PLL and the
->>> PLLDIV clocks in order to get the < 300MHz operating points.
->>
->> Just to make sure we are on the same page. The datasheet
->> constraint is 600 >= PLLOUT >= 300. PLLOUT is output of POSTDIV.
+Hi Julia
+
+> -----Original Message-----
+> From: Julia Cartwright [mailto:juliac at eso.teric.us]
+> Sent: 15 ?????? 2018 ?. 22:52
+> To: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; openbmc at lists.ozlabs.org; joel at jms.id.au;
+> jiri at resnulli.us; tklauser at distanz.ch; linux-serial at vger.kernel.org; Vadim
+> Pasternak <vadimp@mellanox.com>; system-sw-low-level <system-sw-low-
+> level at mellanox.com>; robh+dt at kernel.org; openocd-devel-
+> owner at lists.sourceforge.net; linux-api at vger.kernel.org;
+> davem at davemloft.net; mchehab at kernel.org; Jiri Pirko
+> <jiri@mellanox.com>
+> Subject: Re: [patch v16 1/4] drivers: jtag: Add JTAG core driver
 > 
-> Hmm... I am on a different page. It looks to me like PLLOUT is the output
-> of PLLM, not POSTDIV. The datasheet says nothing at all and the TRM does
-> not say it explicitly, but footnote 2 on the table "System PLLC Output
-> Clocks", for example, makes it pretty clear.
+> Hello Oleksandr-
+> 
+> I have a few comments below.
+> 
+> On Fri, Jan 12, 2018 at 07:08:26PM +0200, Oleksandr Shamray wrote:
+> > Initial patch for JTAG driver
+> > JTAG class driver provide infrastructure to support hardware/software
+> > JTAG platform drivers. It provide user layer API interface for
+> > flashing and debugging external devices which equipped with JTAG
+> > interface using standard transactions.
+> >
 
-You are right. There is also this note in "Device clock generation" of
-TRM which makes this clear.
+[..]
+> > +		break;
+> > +
+> > +	case JTAG_IOCXFER:
+> > +		if (!jtag->ops->xfer)
+> 
+> Are all ops optional?  That seems bizarre.  I would have expected at least one
+> callback to be required.
 
-"
-The PLLOUT stage in PLLC0 and PLLC1 is capable of providing frequencies
-greater than what the SYSCLK dividers can handle. The POSTDIV stage
-should be programmed to keep the input to the SYSCLK dividers within
-operating limits. See the device datasheet for the maximum operating
-frequencies.
-"
+You right. But I'm preferred to check pointers before use it.
 
-Thanks,
-Sekhar
+> 
+> [..]
+> > +static int jtag_open(struct inode *inode, struct file *file) {
+> > +	struct jtag *jtag = container_of(file->private_data, struct jtag,
+> > +					 miscdev);
+> > +
+> > +	if (mutex_lock_interruptible(&jtag->open_lock))
+> > +		return -ERESTARTSYS;
+> > +
+> > +	if (jtag->opened) {
+> > +		mutex_unlock(&jtag->open_lock);
+> > +		return -EBUSY;
+> > +	}
+> > +
+> > +	nonseekable_open(inode, file);
+> > +	file->private_data = jtag;
+> 
+> These two can be moved out of the lock.
+
+Agree.
+
+> 
+> > +	jtag->opened = true;
+> > +	mutex_unlock(&jtag->open_lock);
+> > +	return 0;
+> > +}
+> > +
+> > +static int jtag_release(struct inode *inode, struct file *file) {
+> > +	struct jtag *jtag = file->private_data;
+> > +
+> > +	mutex_lock(&jtag->open_lock);
+> > +	jtag->opened = false;
+> > +	mutex_unlock(&jtag->open_lock);
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct file_operations jtag_fops = {
+> > +	.owner		= THIS_MODULE,
+> > +	.open		= jtag_open,
+> > +	.release	= jtag_release,
+> > +	.llseek		= noop_llseek,
+> > +	.unlocked_ioctl = jtag_ioctl,
+> > +};
+> > +
+> > +struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
+> > +{
+> > +	struct jtag *jtag;
+> > +
+> > +	jtag = kzalloc(sizeof(*jtag), GFP_KERNEL);
+> 
+> Did you mean to allocate: sizeof(*jtag) + priv_size?
+
+Thank, it's a mistake.
+
+> 
+> > +	if (!jtag)
+> > +		return NULL;
+> > +
+> > +	jtag->ops = ops;
+> > +	return jtag;
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_alloc);
+> > +
+> > +void jtag_free(struct jtag *jtag)
+> > +{
+> > +	kfree(jtag);
+> > +}
+> > +EXPORT_SYMBOL_GPL(jtag_free);
+> > +
+> > +int jtag_register(struct jtag *jtag)
+> > +{
+> > +	char *name;
+> > +	int err;
+> > +	int id;
+> > +
+> > +	id = ida_simple_get(&jtag_ida, 0, 0, GFP_KERNEL);
+> > +	if (id < 0)
+> > +		return id;
+> > +
+> > +	jtag->id = id;
+> > +
+> > +	name = kzalloc(MAX_JTAG_NAME_LEN, GFP_KERNEL);
+> > +	if (!name) {
+> > +		err = -ENOMEM;
+> > +		goto err_jtag_alloc;
+> > +	}
+> > +
+> > +	err = snprintf(name, MAX_JTAG_NAME_LEN, "jtag%d", id);
+> > +	if (err < 0)
+> > +		goto err_jtag_name;
+> > +
+> > +	mutex_init(&jtag->open_lock);
+> > +	jtag->miscdev.fops =  &jtag_fops;
+> > +	jtag->miscdev.minor = MISC_DYNAMIC_MINOR;
+> > +	jtag->miscdev.name = name;
+> > +
+> > +	err = misc_register(&jtag->miscdev);
+> > +	if (err)
+> > +		dev_err(jtag->dev, "Unable to register device\n");
+> > +	else
+> > +		return 0;
+> > +	jtag->opened = false;
+> 
+> Well, this code flow is just confusing.
+> 
+> I suggest a redo with:
+> 
+> 	err = misc_register(&jtag->miscdev);
+> 	if (err) {
+> 		dev_err(jtag->dev, "Unable to register device\n");
+> 		goto err_jtag_name;
+> 	}
+> 
+> If you need to initialize 'opened', do it prior to misc_register.
+> 
+
+Thanks
+
+> Thanks,
+>    Julia
+
+Thanks for Review.
+
+Br,
+Oleksandr
