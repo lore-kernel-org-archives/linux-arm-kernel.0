@@ -1,32 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Jan 2018 08:29:17 +0100
-Subject: [PATCH] ARM: dts: nomadik: add interrupt-parent for clcd
-In-Reply-To: <20180115163719.1736753-1-arnd@arndb.de>
-References: <20180115163719.1736753-1-arnd@arndb.de>
-Message-ID: <CACRpkdYCu57Y0KZGt9c7iM6nwe7qCxK+PcPC5God-rnOoHFt4Q@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 16 Jan 2018 08:35:26 +0100
+Subject: [PATCH] soc: xilinx: xlnx_vcu: Depends on HAS_IOMEM for xlnx_vcu
+In-Reply-To: <1516084488-16372-1-git-send-email-dshah@xilinx.com>
+References: <201801141754.lROQHRMR%fengguang.wu@intel.com>
+ <1516084488-16372-1-git-send-email-dshah@xilinx.com>
+Message-ID: <162bd4c1-6125-f856-85b1-6ee2d69ac7ec@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 5:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 16.1.2018 07:34, Dhaval Shah wrote:
+> xlnx_vcu driver uses devm_ioremap_nocache, which is included
+> only when HAS_IOMEM is enabled.
+> 
+> drivers/soc/xilinx/xlnx_vcu.o: In function `xvcu_probe':
+>    xlnx_vcu.c:(.text+0x116): undefined reference to `devm_ioremap_nocache'
+>    xlnx_vcu.c:(.text+0x1ae): undefined reference to `devm_ioremap_nocache'
+> 
+> Signed-off-by: Dhaval Shah <dshah@xilinx.com>
+> ---
+>  drivers/soc/xilinx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/soc/xilinx/Kconfig b/drivers/soc/xilinx/Kconfig
+> index 266b50f..bf657ab 100644
+> --- a/drivers/soc/xilinx/Kconfig
+> +++ b/drivers/soc/xilinx/Kconfig
+> @@ -3,6 +3,7 @@ menu "Xilinx SoC drivers"
+>  
+>  config XILINX_VCU
+>          tristate "Xilinx VCU logicoreIP Init"
+> +	depends on HAS_IOMEM
+>          help
+>            Provides the driver to enable and disable the isolation between the
+>            processing system and programmable logic part by using the logicoreIP
+> 
 
-> The clcd device is lacking an interrupt-parent property, which makes
-> the interrupt unusable and shows up as a warning with the latest
-> dtc version:
->
-> arch/arm/boot/dts/ste-nomadik-s8815.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
-> arch/arm/boot/dts/ste-nomadik-nhk15.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
->
-> I looked up the old board files and found that this interrupt has
-> the same irqchip as all the other on-chip device, it just needs one
-> extra line.
->
-> Fixes: 17470b7da11c ("ARM: dts: add the CLCD LCD display to the NHK15")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Applied.
 
-Sorry for not getting to fixing this myself quickly enough.
-
-Yours,
-Linus Walleij
+Thanks,
+Michal
