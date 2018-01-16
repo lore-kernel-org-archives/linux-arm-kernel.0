@@ -1,69 +1,55 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 16 Jan 2018 00:38:33 +0000
-Subject: PM regression in next
-In-Reply-To: <20180115185525.GA4042@atomide.com>
-References: <20180112221126.GK21458@sirena.org.uk>
- <20180112224959.GH4821@atomide.com>
- <20180112225947.GL21458@sirena.org.uk>
- <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
- <20180115165050.GJ4821@atomide.com>
- <20180115171917.GB12018@sirena.org.uk>
- <20180115175220.GK4821@atomide.com>
- <20180115175626.GC12018@sirena.org.uk>
- <20180115180626.GL4821@atomide.com>
- <20180115181352.GD12018@sirena.org.uk>
- <20180115185525.GA4042@atomide.com>
-Message-ID: <873736abb4.wl%kuninori.morimoto.gx@renesas.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Tue, 16 Jan 2018 08:42:43 +0800
+Subject: [PATCH 04/19] drm/rockchip: Use the alpha format helper
+In-Reply-To: <a8b8fe38a8659744fae6fe75fbb4ab2ce42a37e6.1515494838.git-series.maxime.ripard@free-electrons.com>
+References: <cover.713e47b83733ed05f0c38f5ba6ef8b6c1e32805c.1515494838.git-series.maxime.ripard@free-electrons.com>
+ <a8b8fe38a8659744fae6fe75fbb4ab2ce42a37e6.1515494838.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <e6bb1185-7d26-8701-4838-283f1b00a85d@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Mark, Tony
-
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Fri, 12 Jan 2018 10:24:36 -0800
-> Subject: [PATCH] ASoC: Fix twl4030 and 6040 regression by adding back read
->  and write
+? 2018/1/9 18:56, Maxime Ripard ??:
+> Now that the core has a drm format helper to tell if a format embeds an
+> alpha component in it, let's use it.
 > 
-> Commit 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read on twl4030")
-> caused regressions for both twl4030 and twl6040 as it assumes the
-> ASoC driver is using regmap. As a side effect, this also causes a
-> considerable increase in idle power consumption omap3 boards using
-> twl4030 as the PMIC.
-> 
-> This is because the removal of read and write function pointers
-> causes some of the ASoC IO functions to not do anything. For example,
-> snd_soc_register_card() calls snd_soc_dapm_new_widgets() that calls
-> snd_soc_codec_drv_read() that now does nothing.
-> 
-> A long term solution suggested by Mark Brown <broonie@kernel.org>
-> is to make the twl drivers use regmap by adding a call to
-> snd_soc_codec_set_regmap(). This however needs more consideration
-> as currently the driver internal reads do caching and we would have
-> both regmap access and internal read/write access accessing the same
-> hardware registers.
-> 
-> So to fix the regression, let's just do a partial revert adding back
-> the read and write function pointers. Note that other non-regmap
-> ASoC drivers may need similar patches.
-> 
-> Fixes: 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read on twl4030")
-> Fixes: 93a00c467fe9 ("ASoC: don't use snd_soc_write/read on twl6040")
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Cc: Mark Yao <mark.yao@rock-chips.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 +------------
+>   1 file changed, 1 insertion(+), 12 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 19128b4dea54..cfc4d4909185 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -253,17 +253,6 @@ static bool is_yuv_support(uint32_t format)
+>   	}
+>   }
+>   
+> -static bool is_alpha_support(uint32_t format)
+> -{
+> -	switch (format) {
+> -	case DRM_FORMAT_ARGB8888:
+> -	case DRM_FORMAT_ABGR8888:
+> -		return true;
+> -	default:
+> -		return false;
+> -	}
+> -}
+> -
+>   static uint16_t scl_vop_cal_scale(enum scale_mode mode, uint32_t src,
+>   				  uint32_t dst, bool is_horizontal,
+>   				  int vsu_mode, int *vskiplines)
+> @@ -790,7 +779,7 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>   	rb_swap = has_rb_swapped(fb->format->format);
+>   	VOP_WIN_SET(vop, win, rb_swap, rb_swap);
+>   
+> -	if (is_alpha_support(fb->format->format)) {
+> +	if (drm_format_has_alpha(fb->format->format)) {
+>   		VOP_WIN_SET(vop, win, dst_alpha_ctl,
+>   			    DST_FACTOR_M0(ALPHA_SRC_INVERSE));
+>   		val = SRC_ALPHA_EN(1) | SRC_COLOR_M0(ALPHA_SRC_PRE_MUL) |
+> 
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-
-Mark
-I think all other driver needs .read/.write back.
-I will post it.
-And .read/.write is supported on codec driver side only now,
-so, we need it to component side too.
-I will post it too.
-
-Best regards
----
-Kuninori Morimoto
+remove dead email: Mark Yao <mark.yao@rock-chips.com>
+Acked-by: Sandy huang <hjc@rock-chips.com>
