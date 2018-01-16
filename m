@@ -1,39 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Jan 2018 16:36:23 -0800
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 16 Jan 2018 00:38:33 +0000
 Subject: PM regression in next
-In-Reply-To: <871siqbte4.wl%kuninori.morimoto.gx@renesas.com>
-References: <20180112191251.GE21458@sirena.org.uk>
- <20180112210706.GE4821@atomide.com>
- <20180112211535.GH21458@sirena.org.uk>
- <20180112215010.GG4821@atomide.com>
- <20180112221126.GK21458@sirena.org.uk>
+In-Reply-To: <20180115185525.GA4042@atomide.com>
+References: <20180112221126.GK21458@sirena.org.uk>
  <20180112224959.GH4821@atomide.com>
  <20180112225947.GL21458@sirena.org.uk>
  <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
  <20180115165050.GJ4821@atomide.com>
- <871siqbte4.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20180116003623.GB4042@atomide.com>
+ <20180115171917.GB12018@sirena.org.uk>
+ <20180115175220.GK4821@atomide.com>
+ <20180115175626.GC12018@sirena.org.uk>
+ <20180115180626.GL4821@atomide.com>
+ <20180115181352.GD12018@sirena.org.uk>
+ <20180115185525.GA4042@atomide.com>
+Message-ID: <873736abb4.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [180115 23:22]:
-> > For the next set of changes like this,
-> > please make sure you Cc the driver authors so they can test
-> > and ack the changes if you can't test them, OK?
-> 
-> Actually, I have posted "convert codec/platform to component"
-> patch-set to ALSA ML, without Cc:ing to you.
-> 
-> 	Subject: [PATCH 00/38] ASoC: replace platform to component
-> 	Date: Fri, 12 Jan 2018 09:40:29 +0900
-> 
-> 	Subject: [PATCH 000/187] ASoC: replace codec to component
-> 	Date: Fri, 12 Jan 2018 10:05:05 +0900
-> 
-> I will send test request mail to each driver's authoer
 
-Thanks, yeah that's something for Peter to look at :)
+Hi Mark, Tony
 
-Regards,
+> From tony Mon Sep 17 00:00:00 2001
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Fri, 12 Jan 2018 10:24:36 -0800
+> Subject: [PATCH] ASoC: Fix twl4030 and 6040 regression by adding back read
+>  and write
+> 
+> Commit 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read on twl4030")
+> caused regressions for both twl4030 and twl6040 as it assumes the
+> ASoC driver is using regmap. As a side effect, this also causes a
+> considerable increase in idle power consumption omap3 boards using
+> twl4030 as the PMIC.
+> 
+> This is because the removal of read and write function pointers
+> causes some of the ASoC IO functions to not do anything. For example,
+> snd_soc_register_card() calls snd_soc_dapm_new_widgets() that calls
+> snd_soc_codec_drv_read() that now does nothing.
+> 
+> A long term solution suggested by Mark Brown <broonie@kernel.org>
+> is to make the twl drivers use regmap by adding a call to
+> snd_soc_codec_set_regmap(). This however needs more consideration
+> as currently the driver internal reads do caching and we would have
+> both regmap access and internal read/write access accessing the same
+> hardware registers.
+> 
+> So to fix the regression, let's just do a partial revert adding back
+> the read and write function pointers. Note that other non-regmap
+> ASoC drivers may need similar patches.
+> 
+> Fixes: 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read on twl4030")
+> Fixes: 93a00c467fe9 ("ASoC: don't use snd_soc_write/read on twl6040")
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
 
-Tony
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Mark
+I think all other driver needs .read/.write back.
+I will post it.
+And .read/.write is supported on codec driver side only now,
+so, we need it to component side too.
+I will post it too.
+
+Best regards
+---
+Kuninori Morimoto
