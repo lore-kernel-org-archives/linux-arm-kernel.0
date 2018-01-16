@@ -1,92 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 16 Jan 2018 11:45:05 +0530
-Subject: [PATCH net-next v5 2/4] phy: cp110-comphy: 2.5G SGMII mode
-In-Reply-To: <20180112075130.30890-3-antoine.tenart@free-electrons.com>
-References: <20180112075130.30890-1-antoine.tenart@free-electrons.com>
- <20180112075130.30890-3-antoine.tenart@free-electrons.com>
-Message-ID: <33bcdba5-af30-c77b-ae53-bea72d1103fe@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 16 Jan 2018 12:02:47 +0530
+Subject: [PATCH v5 02/44] clk: davinci: New driver for davinci PLL clocks
+In-Reply-To: <d8171267-dc49-e573-ca69-c2b77b44a119@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-3-git-send-email-david@lechnology.com>
+ <7fc8bd35-0416-216d-8e1e-53a0ec6e8790@ti.com>
+ <d8171267-dc49-e573-ca69-c2b77b44a119@lechnology.com>
+Message-ID: <f0a09394-aa44-4a0a-5d5d-ac0d9f8bcb4e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Friday 12 January 2018 01:21 PM, Antoine Tenart wrote:
-> This patch allow the CP100 comphy to configure some lanes in the
-> 2.5G SGMII mode. This mode is quite close to SGMII and uses nearly the
-> same code path.
+On Saturday 13 January 2018 07:43 AM, David Lechner wrote:
+> On 01/12/2018 03:21 AM, Sekhar Nori wrote:
+>> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+>>> +static unsigned long davinci_pll_clk_recalc(struct clk_hw *hw,
+>>> +??????????????????????? unsigned long parent_rate)
+>>> +{
+>>> +??? struct davinci_pll_clk *pll = to_davinci_pll_clk(hw);
+>>> +??? unsigned long rate = parent_rate;
+>>> +??? u32 prediv, mult, postdiv;
+>>> +
+>>> +??? prediv = readl(pll->base + PREDIV) & PREDIV_RATIO_MASK;
+>>> +??? mult = readl(pll->base + PLLM) & PLLM_MASK;
+>>> +??? postdiv = readl(pll->base + POSTDIV) & POSTDIV_RATIO_MASK;
+>>
+>> Shouldn't we check if the pre and post dividers are enabled before using
+>> them?
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> I dug into this and the answer is no. The enable bit acts like a gate, not
+> a bypass, so it does not affect the rate calculation.
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-> index a0d522154cdf..4ef429250d7b 100644
-> --- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-> +++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-> @@ -135,19 +135,25 @@ struct mvebu_comhy_conf {
->  static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
->  	/* lane 0 */
->  	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
-> +	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
->  	/* lane 1 */
->  	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
-> +	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
->  	/* lane 2 */
->  	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
-> +	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
->  	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
->  	/* lane 3 */
->  	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
-> +	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
->  	/* lane 4 */
->  	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
-> +	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
->  	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
->  	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
->  	/* lane 5 */
->  	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
-> +	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
->  };
->  
->  struct mvebu_comphy_priv {
-> @@ -206,6 +212,10 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
->  	if (mode == PHY_MODE_10GKR)
->  		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xe) |
->  		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xe);
-> +	else if (mode == PHY_MODE_2500SGMII)
-> +		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x8) |
-> +		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x8) |
-> +		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
->  	else if (mode == PHY_MODE_SGMII)
->  		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x6) |
->  		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x6) |
-> @@ -296,13 +306,13 @@ static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
->  	return 0;
->  }
->  
-> -static int mvebu_comphy_set_mode_sgmii(struct phy *phy)
-> +static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
->  {
->  	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
->  	struct mvebu_comphy_priv *priv = lane->priv;
->  	u32 val;
->  
-> -	mvebu_comphy_ethernet_init_reset(lane, PHY_MODE_SGMII);
-> +	mvebu_comphy_ethernet_init_reset(lane, mode);
->  
->  	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
->  	val &= ~MVEBU_COMPHY_RX_CTRL1_CLK8T_EN;
-> @@ -487,7 +497,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
->  
->  	switch (lane->mode) {
->  	case PHY_MODE_SGMII:
-> -		ret = mvebu_comphy_set_mode_sgmii(phy);
-> +	case PHY_MODE_2500SGMII:
-> +		ret = mvebu_comphy_set_mode_sgmii(phy, lane->mode);
->  		break;
->  	case PHY_MODE_10GKR:
->  		ret = mvebu_comphy_set_mode_10gkr(phy);
-> 
+Alright, thanks for checking this.
+
+Regards,
+Sekhar
