@@ -1,43 +1,27 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Jan 2018 12:24:02 +0800
-Subject: [PATCH v3 0/8] ARM: sun9i: SMP and CPU hotplug support
-In-Reply-To: <nycvar.YSQ.7.76.1801151502050.13881@knanqh.ubzr>
-References: <20180115071450.18355-1-wens@csie.org>
- <nycvar.YSQ.7.76.1801151502050.13881@knanqh.ubzr>
-Message-ID: <CAGb2v66Kn6RDqj7Pjmj_vJ9ivU6PoSiVHdJqHTh9_Q4tUrk+iw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 16 Jan 2018 11:29:53 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: set CONFIG_DAVINCI_WATCHDOG=y
+In-Reply-To: <1516037371-3932-1-git-send-email-david@lechnology.com>
+References: <1516037371-3932-1-git-send-email-david@lechnology.com>
+Message-ID: <800a4c95-ca8d-6235-288a-222a38c04cf9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 5:00 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 15 Jan 2018, Chen-Yu Tsai wrote:
->
->> Changes since v2:
->>   - Do away with the MCPM framework, directly implement smp_ops
->>   - Some debug messages were clarified
->>   - New ARCH_SUNXI_MCPM Kconfig symbol for this feature
->
-> You should use ARCH_SUNXI_SMP instead to avoid confusion with the actual
-> MCPM code. Ditto for function names as Dave mentioned.
+On Monday 15 January 2018 10:59 PM, David Lechner wrote:
+> This changes CONFIG_DAVINCI_WATCHDOG from a module to a compiled-in
+> option. Since the reset function has been moved out of the mach code in
+> commit 0808d3260456 ("ARM: davinci: remove watchdog reset") and into the
+> watchdog driver, devices cannot reboot unless the watchdog driver is
+> loaded, so make it a compiled-in option so that we can always reboot, even
+> when modules are not loaded.
+> 
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Suggested-by: Adam Ford <aford173@gmail.com>
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-All switched to "MC_SMP". There is existing, albeit deprecated, SMP code
-for single cluster SoCs, so "multi cluster" is desired to differentiate
-from the old stuff.
+Hmm, we already depend on modules to load correctly for a lot of
+functionality. Why should reboot be an exception? In general, unless the
+driver is needed for loading rootfile system, I would keep it as a module.
 
-> For the ARM to Thumb switch you could add something like this at the
-> beginning of your entry code:
->
-> #ifdef CONFIG_THUMB2_KERNEL
->         .arm
->         mov     ip, #1
->         bx      ip
->         .thumb
-> #endif
->         [your code follows here]
->
-> And make sure that code is word aligned.
-
-Thanks for the tip. As I mentioned in my reply to Dave,
-this wasn't really needed.
-
-Thanks again!
-ChenYu
+Thanks,
+Sekhar
