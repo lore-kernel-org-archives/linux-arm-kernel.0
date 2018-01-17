@@ -1,93 +1,147 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 17 Jan 2018 10:51:10 -0700
-Subject: [PATCH v3 00/10] perf tools: Add support for CoreSight trace decoding
-Message-ID: <1516211480-5100-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Wed, 17 Jan 2018 10:52:10 -0700
+Subject: [PATCH v3 01/10] perf tools: Integrating the CoreSight decoding
+ library
+In-Reply-To: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1516211539-5166-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+The Open CoreSight Decoding Library (openCSD) is a free and open
+library to decode traces collected by the CoreSight hardware
+infrastructure.
 
-This patchset adds support for per-thread CoreSight trace decoding from the
-"perf report" interface.  It is largely modelled on what has been done for
-intelPT traces and currently targets the ETMv4 architecture.  Support for
-cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
+This patch adds the required mechanic to recognise the presence
+of the openCSD library on a system and set up miscellaneous flags
+to be used in the compilation of the trace decoding feature.
 
-The trace decoding support is done using the Open CoreSight Decoding
-Library (openCSD), a stand alone open source project available here [1].
-Integration of the openCSD library with the perf tools follow what has
-been done for other support libraries.  If the library has been installed
-on a system the build scripts will automatially include support for
-CoreSight trace decoding.  The status of the library on the system is
-displayed when adding the VF=1 option as per Jiri's patch [2]:
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/build/Makefile.feature   |  3 ++-
+ tools/build/feature/Makefile   |  7 ++++++-
+ tools/build/feature/test-all.c |  5 +++++
+ tools/perf/Makefile.config     | 25 +++++++++++++++++++++++++
+ tools/perf/Makefile.perf       |  2 ++
+ 5 files changed, 40 insertions(+), 2 deletions(-)
 
-...			timerfd: [ on  ]
-...			sched_getcpu: [ on  ]
-...			sdt: [ OFF ]
-...			setns: [ on  ]
-...			libopencsd: [ on  ] <---
-
-Instructions on how to build and install the openCSD library are provided
-in the HOWTO.md of the project repository.  We elected to keep the decoder
-library independent of the kernel tree as it is also used outside of the
-perf toolset and various non-linux projects.
-
-The work applies cleanly to [3] and depend on the following patches [4, 5].
-
-Lastly there is a divergence of opinions on whether the decoding library
-should be part of the kernel tree or live on its own as we chose to do -
-your point of view on the matter would be greatly appreciated.
-
-Regards,
-Mathieu
-
-[1]. https://github.com/Linaro/OpenCSD
-[2]. https://marc.info/?l=linux-kernel&m=151549001914932&w=2
-[3]. git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core
-[4]. https://marc.info/?l=linux-kernel&m=151561673423088&w=2
-[5]. https://marc.info/?l=linux-kernel&m=151579875721440&w=2
-
-Changes for V3:
-. Rebased to Acme's latest tree (a72594ca5c70)
-. Fixed indentation in Makefile.feature as per Jiri's request
-
-Changes for V2:
-. Rebased to Acme's latest (321e85e9458a)
-. Following what has been done for libdw and libbabeltrace and added the
-  possibililty to use alternate header/library for development purposes.
-
-
-Mathieu Poirier (8):
-  perf tools: Integrating the CoreSight decoding library
-  perf tools: Add initial entry point for decoder CoreSight traces
-  perf tools: Add decoder mechanic to support dumping trace data
-  perf tools: Add support for decoding CoreSight trace data
-  perf tools: Add functionality to communicate with the openCSD decoder
-  pert tools: Add queue management functionality
-  perf tools: Add full support for CoreSight trace decoding
-  perf tools: Add mechanic to synthesise CoreSight trace packets
-
-Tor Jeremiassen (2):
-  perf tools: Add processing of coresight metadata
-  MAINTAINERS: Adding entry for CoreSight trace decoding
-
- MAINTAINERS                                     |    3 +-
- tools/build/Makefile.feature                    |    3 +-
- tools/build/feature/Makefile                    |    7 +-
- tools/build/feature/test-all.c                  |    5 +
- tools/perf/Makefile.config                      |   25 +
- tools/perf/Makefile.perf                        |    2 +
- tools/perf/util/Build                           |    6 +
- tools/perf/util/auxtrace.c                      |    2 +
- tools/perf/util/cs-etm-decoder/Build            |    1 +
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  513 ++++++++++++
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  105 +++
- tools/perf/util/cs-etm.c                        | 1023 +++++++++++++++++++++++
- tools/perf/util/cs-etm.h                        |   18 +
- 13 files changed, 1710 insertions(+), 3 deletions(-)
- create mode 100644 tools/perf/util/cs-etm-decoder/Build
- create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
- create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
- create mode 100644 tools/perf/util/cs-etm.c
-
+diff --git a/tools/build/Makefile.feature b/tools/build/Makefile.feature
+index e52fcefee379..c378f003b007 100644
+--- a/tools/build/Makefile.feature
++++ b/tools/build/Makefile.feature
+@@ -66,7 +66,8 @@ FEATURE_TESTS_BASIC :=                  \
+         bpf                             \
+         sched_getcpu			\
+         sdt				\
+-        setns
++        setns				\
++        libopencsd
+ 
+ # FEATURE_TESTS_BASIC + FEATURE_TESTS_EXTRA is the complete list
+ # of all feature tests
+diff --git a/tools/build/feature/Makefile b/tools/build/feature/Makefile
+index cff38f342283..59585fe20221 100644
+--- a/tools/build/feature/Makefile
++++ b/tools/build/feature/Makefile
+@@ -52,7 +52,8 @@ FILES=                                          \
+          test-cxx.bin                           \
+          test-jvmti.bin				\
+          test-sched_getcpu.bin			\
+-         test-setns.bin
++         test-setns.bin				\
++         test-libopencsd.bin
+ 
+ FILES := $(addprefix $(OUTPUT),$(FILES))
+ 
+@@ -104,6 +105,10 @@ $(OUTPUT)test-sched_getcpu.bin:
+ $(OUTPUT)test-setns.bin:
+ 	$(BUILD)
+ 
++$(OUTPUT)test-libopencsd.bin:
++	$(BUILD) # -lopencsd_c_api -lopencsd provided by
++		 # $(FEATURE_CHECK_LDFLAGS-libopencsd)
++
+ DWARFLIBS := -ldw
+ ifeq ($(findstring -static,${LDFLAGS}),-static)
+ DWARFLIBS += -lelf -lebl -lz -llzma -lbz2
+diff --git a/tools/build/feature/test-all.c b/tools/build/feature/test-all.c
+index 6fdf83263ab7..8dc20a61341f 100644
+--- a/tools/build/feature/test-all.c
++++ b/tools/build/feature/test-all.c
+@@ -162,6 +162,10 @@
+ # include "test-setns.c"
+ #undef main
+ 
++#define main main_test_libopencsd
++# include "test-libopencsd.c"
++#undef main
++
+ int main(int argc, char *argv[])
+ {
+ 	main_test_libpython();
+@@ -199,6 +203,7 @@ int main(int argc, char *argv[])
+ 	main_test_sched_getcpu();
+ 	main_test_sdt();
+ 	main_test_setns();
++	main_test_libopencsd();
+ 
+ 	return 0;
+ }
+diff --git a/tools/perf/Makefile.config b/tools/perf/Makefile.config
+index 12dec6ea5ed2..15ef1e55c7d0 100644
+--- a/tools/perf/Makefile.config
++++ b/tools/perf/Makefile.config
+@@ -105,6 +105,16 @@ FEATURE_CHECK_LDFLAGS-libunwind = $(LIBUNWIND_LDFLAGS) $(LIBUNWIND_LIBS)
+ FEATURE_CHECK_CFLAGS-libunwind-debug-frame = $(LIBUNWIND_CFLAGS)
+ FEATURE_CHECK_LDFLAGS-libunwind-debug-frame = $(LIBUNWIND_LDFLAGS) $(LIBUNWIND_LIBS)
+ 
++ifdef CSINCLUDES
++  LIBOPENCSD_CFLAGS := -I$(CSINCLUDES)
++endif
++OPENCSDLIBS := -lopencsd_c_api -lopencsd
++ifdef CSLIBS
++  LIBOPENCSD_LDFLAGS := -L$(CSLIBS)
++endif
++FEATURE_CHECK_CFLAGS-libopencsd := $(LIBOPENCSD_CFLAGS)
++FEATURE_CHECK_LDFLAGS-libopencsd := $(LIBOPENCSD_LDFLAGS) $(OPENCSDLIBS)
++
+ ifeq ($(NO_PERF_REGS),0)
+   CFLAGS += -DHAVE_PERF_REGS_SUPPORT
+ endif
+@@ -353,6 +363,21 @@ ifeq ($(feature-setns), 1)
+   $(call detected,CONFIG_SETNS)
+ endif
+ 
++ifndef NO_CORESIGHT
++  ifeq ($(feature-libopencsd), 1)
++    CFLAGS += -DHAVE_CSTRACE_SUPPORT $(LIBOPENCSD_CFLAGS)
++    LDFLAGS += $(LIBOPENCSD_LDFLAGS)
++    EXTLIBS += $(OPENCSDLIBS)
++    $(call detected,CONFIG_LIBOPENCSD)
++    ifdef CSTRACE_RAW
++      CFLAGS += -DCS_DEBUG_RAW
++      ifeq (${CSTRACE_RAW}, packed)
++        CFLAGS += -DCS_RAW_PACKED
++      endif
++    endif
++  endif
++endif
++
+ ifndef NO_LIBELF
+   CFLAGS += -DHAVE_LIBELF_SUPPORT
+   EXTLIBS += -lelf
+diff --git a/tools/perf/Makefile.perf b/tools/perf/Makefile.perf
+index 9fdefd748e2e..92dfa9580eab 100644
+--- a/tools/perf/Makefile.perf
++++ b/tools/perf/Makefile.perf
+@@ -98,6 +98,8 @@ include ../scripts/utilities.mak
+ # When selected, pass LLVM_CONFIG=/path/to/llvm-config to `make' if
+ # llvm-config is not in $PATH.
+ 
++# Define NO_CORESIGHT if you do not want support for CoreSight trace decoding.
++
+ # As per kernel Makefile, avoid funny character set dependencies
+ unexport LC_ALL
+ LC_COLLATE=C
 -- 
 2.7.4
