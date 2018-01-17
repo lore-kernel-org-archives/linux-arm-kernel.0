@@ -1,207 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 17 Jan 2018 15:16:33 -0800
-Subject: [PATCH net-next] net: stmmac: Fix reception of Broadcom switches
- tags
-In-Reply-To: <4fb40e11-a160-b9c7-aa02-f30a9de172bd@st.com>
-References: <20180116232545.22054-1-f.fainelli@gmail.com>
- <4fb40e11-a160-b9c7-aa02-f30a9de172bd@st.com>
-Message-ID: <d33e6f92-7080-5077-ba44-629fefef052d@gmail.com>
+From: joerg.krause@embedded.rocks (=?UTF-8?q?J=C3=B6rg=20Krause?=)
+Date: Thu, 18 Jan 2018 00:23:47 +0100
+Subject: [PATCH RESEND] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux mode
+Message-ID: <20180117232347.24513-1-joerg.krause@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peppe,
+RESEND because of missing Ccs. Original patch is [0].
 
-On 01/16/2018 11:06 PM, Giuseppe CAVALLARO wrote:
-> Hi Florian
-> 
-> for gmac4.x and gmac3.x series the ACS bit is the Automatic Pad or CRC
-> Stripping, so the
-> core strips the Pad or FCS on frames if the value of the length field is
-> < 1536 bytes.
-> For MAC10-100 there is the Bit 8 (ASTP) of the reg0 that does the same
-> if len is < 46bytes.
+The 32 kHz reference clock on the i.MX6UL(L) can be output by
+setting the external signal XTALOSC_REF_CLK_32K in one of the
+following ways [1]:
 
-OK, thanks for the detail on the older core, I will update my v2 to take
-that into account.
+|----------------------------------------------------------|
+| Signal              | Pad             | Mode | Direction |
+|----------------------------------------------------------|
+| XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
+|                     | GPIO1_IO03      | ALT3 |           |
+|                     | JTAG_TCK        | ALT6 |           |
+|----------------------------------------------------------|
 
-> In your patch I can just suggest to add a new field to strip the PAD/FCS
-> w/o passing the whole
-> netdev struct to the core_init. In the main driver, we could manage the
-> pad-strip feature (also
-> by using dt) or disable it in case of netdev_uses_dsa; then propagating
-> this setting to the core_init
-> or calling a new callback. What do you think?
+[0] https://patchwork.ozlabs.org/patch/816108/
+[1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
 
-I don't think adding a DT property is a good idea, because we can
-determine whether ACS is necessary or not at runtime when DSA with
-proprietary Ethernet switch tags is used or not using netdev_uses_dsa().
+Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+---
+ arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Having the DT property to configure whether ACS is turned on or off
-means that the Device Tree now describes a policy, rather than a
-capability, which is counter to the Device Tree spirit. Besides, this
-leaves room for making mistake, and this creates a support burden. When
-interfaced with a switch, the switch is guaranteed to egress 64 bytes
-(including FCS) packets towards stmmac, and the only thing we need to do
-is ensure that stmmac does the same thing. This is a small penalty to
-pay for small packets, and this is done only when DSA is used.
-
-Regarding passing a net_device to the core_init functions, this was done
-because dev->mtu was already accessed, and we might need to access
-additional net_device members in the future, 2 means we need to find a
-solution that scales, so passing the net_device around was a natural
-choice. Function pointers described in common.h are not exactly
-consistent in what type of arguments they take, so I did not see this as
-being a big problem.
-
-Thank you.
-
-> 
-> Regards
-> Peppe
-> 
-> On 1/17/2018 12:25 AM, Florian Fainelli wrote:
->> Broadcom tags inserted by Broadcom switches put a 4 byte header after
->> the MAC SA and before the EtherType, which may look like some sort of 0
->> length LLC/SNAP packet (tcpdump and wireshark do think that way). With
->> ACS enabled in stmmac the packets were truncated to 8 bytes on
->> reception, whereas clearing this bit allowed normal reception to occur.
->>
->> In order to make that possible, we need to pass a net_device argument to
->> the different core_init() functions and we are dependent on the Broadcom
->> tagger padding packets correctly (which it now does). To be as little
->> invasive as possible, this is only done for gmac1000 when the network
->> device is DSA-enabled (netdev_uses_dsa() returns true).
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->> ? drivers/net/ethernet/stmicro/stmmac/common.h???????? |? 2 +-
->> ? drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c??? |? 3 ++-
->> ? drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c | 12 +++++++++++-
->> ? drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c? |? 3 ++-
->> ? drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c??? | 11 ++++++++++-
->> ? drivers/net/ethernet/stmicro/stmmac/stmmac_main.c??? |? 2 +-
->> ? 6 files changed, 27 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/common.h
->> b/drivers/net/ethernet/stmicro/stmmac/common.h
->> index ce2ea2d491ac..2ffe76c0ff74 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/common.h
->> +++ b/drivers/net/ethernet/stmicro/stmmac/common.h
->> @@ -474,7 +474,7 @@ struct mac_device_info;
->> ? /* Helpers to program the MAC core */
->> ? struct stmmac_ops {
->> ????? /* MAC core initialization */
->> -??? void (*core_init)(struct mac_device_info *hw, int mtu);
->> +??? void (*core_init)(struct mac_device_info *hw, struct net_device
->> *dev);
->> ????? /* Enable the MAC RX/TX */
->> ????? void (*set_mac)(void __iomem *ioaddr, bool enable);
->> ????? /* Enable and verify that the IPC module is supported */
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> index 9eb7f65d8000..a3fa65b1ca8e 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> @@ -483,7 +483,8 @@ static int sun8i_dwmac_init(struct platform_device
->> *pdev, void *priv)
->> ????? return 0;
->> ? }
->> ? -static void sun8i_dwmac_core_init(struct mac_device_info *hw, int mtu)
->> +static void sun8i_dwmac_core_init(struct mac_device_info *hw,
->> +????????????????? struct net_device *dev)
->> ? {
->> ????? void __iomem *ioaddr = hw->pcsr;
->> ????? u32 v;
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
->> b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
->> index 8a86340ff2d3..540d21786a43 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
->> @@ -25,18 +25,28 @@
->> ? #include <linux/crc32.h>
->> ? #include <linux/slab.h>
->> ? #include <linux/ethtool.h>
->> +#include <net/dsa.h>
->> ? #include <asm/io.h>
->> ? #include "stmmac_pcs.h"
->> ? #include "dwmac1000.h"
->> ? -static void dwmac1000_core_init(struct mac_device_info *hw, int mtu)
->> +static void dwmac1000_core_init(struct mac_device_info *hw,
->> +??????????????? struct net_device *dev)
->> ? {
->> ????? void __iomem *ioaddr = hw->pcsr;
->> ????? u32 value = readl(ioaddr + GMAC_CONTROL);
->> +??? int mtu = dev->mtu;
->> ? ????? /* Configure GMAC core */
->> ????? value |= GMAC_CORE_INIT;
->> ? +??? /* Clear ACS bit because Ethernet switch tagging formats such as
->> +???? * Broadcom tags can look like invalid LLC/SNAP packets and cause
->> the
->> +???? * hardware to truncate packets on reception.
->> +???? */
->> +??? if (netdev_uses_dsa(dev))
->> +??????? value &= ~GMAC_CONTROL_ACS;
->> +
->> ????? if (mtu > 1500)
->> ????????? value |= GMAC_CONTROL_2K;
->> ????? if (mtu > 2000)
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
->> b/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
->> index 8ef517356313..c1ee427c42cb 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
->> @@ -28,7 +28,8 @@
->> ? #include <asm/io.h>
->> ? #include "dwmac100.h"
->> ? -static void dwmac100_core_init(struct mac_device_info *hw, int mtu)
->> +static void dwmac100_core_init(struct mac_device_info *hw,
->> +?????????????????? struct net_device *dev)
->> ? {
->> ????? void __iomem *ioaddr = hw->pcsr;
->> ????? u32 value = readl(ioaddr + MAC_CONTROL);
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
->> b/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
->> index f3ed8f7853eb..6af5100d3cb2 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
->> @@ -20,13 +20,22 @@
->> ? #include "stmmac_pcs.h"
->> ? #include "dwmac4.h"
->> ? -static void dwmac4_core_init(struct mac_device_info *hw, int mtu)
->> +static void dwmac4_core_init(struct mac_device_info *hw,
->> +???????????????? struct net_device *dev)
->> ? {
->> ????? void __iomem *ioaddr = hw->pcsr;
->> ????? u32 value = readl(ioaddr + GMAC_CONFIG);
->> +??? int mtu = dev->mtu;
->> ? ????? value |= GMAC_CORE_INIT;
->> ? +??? /* Clear ACS bit because Ethernet switch tagging formats such as
->> +???? * Broadcom tags can look like invalid LLC/SNAP packets and cause
->> the
->> +???? * hardware to truncate packets on reception.
->> +???? */
->> +??? if (netdev_uses_dsa(dev))
->> +??????? value &= ~GMAC_CONTROL_ACS;
->> +
->> ????? if (mtu > 1500)
->> ????????? value |= GMAC_CONFIG_2K;
->> ????? if (mtu > 2000)
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> index f99f14c35063..7ad841434ec8 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
->> @@ -2527,7 +2527,7 @@ static int stmmac_hw_setup(struct net_device
->> *dev, bool init_ptp)
->> ????? }
->> ? ????? /* Initialize the MAC Core */
->> -??? priv->hw->mac->core_init(priv->hw, dev->mtu);
->> +??? priv->hw->mac->core_init(priv->hw, dev);
->> ? ????? /* Initialize MTL*/
->> ????? if (priv->synopsys_id >= DWMAC_CORE_4_00)
-> 
-> 
-
-
+diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
+index 0034eeb84542..e12654018c23 100644
+--- a/arch/arm/boot/dts/imx6ul-pinfunc.h
++++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
+@@ -63,6 +63,7 @@
+ #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
+ #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
+ #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
++#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
+ #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
+ #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
+ #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
+@@ -101,6 +102,7 @@
+ #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
+ #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
+ #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
++#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
+ #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
+ #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
+ #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
+@@ -316,6 +318,7 @@
+ #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
+ #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
+ #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
++#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
+ #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
+ #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
+ #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
 -- 
-Florian
+2.15.1
