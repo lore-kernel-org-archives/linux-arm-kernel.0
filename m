@@ -1,27 +1,42 @@
 From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 17 Jan 2018 15:47:47 +0800
-Subject: [PATCH v2 11/13] iommu/rockchip: Use OF_IOMMU to attach devices
- automatically
-In-Reply-To: <CAAFQd5AOZ797dNEvr5TbuWK-rw=dTCArUZM53t4_gNRugBd=sg@mail.gmail.com>
+Date: Wed, 17 Jan 2018 15:52:49 +0800
+Subject: [PATCH v2 12/13] iommu/rockchip: Add runtime PM support
+In-Reply-To: <CAAFQd5ATRh5hdJhVxDoXjFz72cBmv-yNaW7v-eUxkVRYA3=uJg@mail.gmail.com>
 References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-12-jeffy.chen@rock-chips.com>
- <CAAFQd5C=SM21CmL8J334HseJ6SJH1wAVzKhrsk_cXMmpf8mK8g@mail.gmail.com>
- <5A5EF94E.7010806@rock-chips.com>
- <CAAFQd5AOZ797dNEvr5TbuWK-rw=dTCArUZM53t4_gNRugBd=sg@mail.gmail.com>
-Message-ID: <5A5EFFA3.6070206@rock-chips.com>
+ <20180116132540.18939-13-jeffy.chen@rock-chips.com>
+ <CAAFQd5DCxgsL52+5XetV9MRDecL7dN6_QdHysKUOWaEqSf=ijw@mail.gmail.com>
+ <5A5EFAB2.7040001@rock-chips.com>
+ <CAAFQd5ATRh5hdJhVxDoXjFz72cBmv-yNaW7v-eUxkVRYA3=uJg@mail.gmail.com>
+Message-ID: <5A5F00D1.5010506@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2018 03:30 PM, Tomasz Figa wrote:
->> >but it's possible the probe failed after calling iommu_device_set_fwnode, so
->> >i'll try to add some checks here, and maybe adjust probe() to prevent it
->> >too.
-> I think iommu_device_set_fwnode() is not enough for of_iommu_xlate()
-> to find the IOMMU. The IOMMU is actually added to the IOMMU list by
-> iommu_device_register(), which is last in the sequence, so I guess we
-> should be fine.
+Hi Tomasz,
+
+On 01/17/2018 03:38 PM, Tomasz Figa wrote:
+>>> >>Don't we need to check here (and in _shutdown() too) if we have a
+>>> >>domain attached?
+>> >
+>> >hmmm, right, the startup might been called by resume, so should check
+>> >iommu->domain here.
+>> >
+>> >but the shutdown would be called at the end of detach or suspend, it could
+>> >be not attached or attached.
+> If startup might be called by resume, without domain attached, what
+> prevents shutdown from being called by suspend after that resume,
+> still without domain attached? Is it guaranteed that if resume is
+> called, someone will attach a domain before suspend is called?
 >
-hmmm, the later patch would change that ;) i'll fix it in the next version.
+no, the shutdown would be called by:
+1/ end of detach_dev
+so it would be not attached at that time
+
+2/ suspend
+so it could be attached, and also could be not attached
+
+
+anyway, i think the shutdown would work without domain attached(just 
+disable paging and clear the iommu bases) ;)
 
 > Best regards,
 > Tomasz
