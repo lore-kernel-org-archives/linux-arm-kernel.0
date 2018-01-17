@@ -1,33 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Jan 2018 15:46:24 +0100
-Subject: [PATCH] IIO: ADC: stm32-dfsdm: remove unused variable
-Message-ID: <20180117144644.2302131-1-arnd@arndb.de>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 17 Jan 2018 14:52:09 +0000
+Subject: [PATCH] arm64: Run enable method for errata work arounds on late
+ CPUs
+In-Reply-To: <20180117143816.GF22781@e103592.cambridge.arm.com>
+References: <20180117100556.29270-1-suzuki.poulose@arm.com>
+ <20180117122548.GE22781@e103592.cambridge.arm.com>
+ <766fe9e9-ff68-c06f-c253-d548a2a3cbcb@arm.com>
+ <20180117143816.GF22781@e103592.cambridge.arm.com>
+Message-ID: <0872cba5-3dcd-3453-947a-481aa0483af0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A cleanup left one variable behind that is no longer needed and
-can be removed, as shown by the gcc warning:
+On 17/01/18 14:38, Dave Martin wrote:
+> On Wed, Jan 17, 2018 at 01:22:19PM +0000, Suzuki K Poulose wrote:
+>> On 17/01/18 12:25, Dave Martin wrote:
+>>> On Wed, Jan 17, 2018 at 10:05:56AM +0000, Suzuki K Poulose wrote:
+>>>> When a CPU is brought up after we have finalised the system
+>>>> wide capabilities (i.e, features and errata), we make sure the
+>>>> new CPU doesn't need a new errata work around which has not been
+>>>> detected already. However we don't run enable() method on the new
+>>>> CPU for the errata work arounds already detected. This could
+>>>> cause the new CPU running without potential work arounds.
+>>>> It is upto the "enable()" method to decide if this CPU should
+>>>> do something about the errata.
+>>>>
+>>>> Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Andre Przywara <andre.przywara@arm.com>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Cc: Dave Martin <dave.martin@arm.com>
+>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> ---
+>>>>   arch/arm64/kernel/cpu_errata.c | 9 ++++++---
+>>>>   1 file changed, 6 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>>>> index 90a9e465339c..54e41dfe41f6 100644
+>>>> --- a/arch/arm64/kernel/cpu_errata.c
+>>>> +++ b/arch/arm64/kernel/cpu_errata.c
+>>>> @@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
+>>>>   {
+>>>>   	const struct arm64_cpu_capabilities *caps = arm64_errata;
+>>>> -	for (; caps->matches; caps++)
+>>>> -		if (!cpus_have_cap(caps->capability) &&
+>>>> -			caps->matches(caps, SCOPE_LOCAL_CPU)) {
+>>>> +	for (; caps->matches; caps++) {
+>>>> +		if (cpus_have_cap(caps->capability)) {
+>>>> +			if (caps->enable)
+>>>> +				caps->enable((void *)caps);
+>>>
+>>> Do we really need this cast?
+>>
+>> Yes, otherwise we would be passing a "const *" where a "void *" is expected,
+>> and the compiler warns. Or we could simply change the prototype of the
+>> enable() method to accept a const capability ptr.
+> 
+> Hmmm, what is this argument for exactly?  cpufeature.h doesn't explain
+> what it is.
 
-drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
-drivers/iio/adc/stm32-dfsdm-core.c:245:29: error: unused variable 'of_id' [-Werror=unused-variable]
+This was introduced by commit 0a0d111d40fd1 ("arm64: cpufeature: Pass capability
+structure to ->enable callback").
 
-Fixes: abaca806fd13 ("IIO: ADC: stm32-dfsdm: code optimization")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/iio/adc/stm32-dfsdm-core.c | 1 -
- 1 file changed, 1 deletion(-)
+The idea is to enable multiple entries in the table for a single capability.
+Some capabilities (read errata) could be detected in multiple ways. e.g, different
+MIDR ranges. (e.g, ARM64_HARDEN_BRANCH_PREDICTOR, ARM64_WORKAROUND_QCOM_FALKOR_E1003.
+Now, even though the errata is the same, there might be different work arounds
+for them in each "matching" cases. So, we need the "caps" passed on to the
+enable() method to see if the "specific work around" should be applied
+to the system/CPU (since CPU hwcap could be set by one of the cpu_capabilities
+entry.) (as we invoke enable() for all "available" capabilities.)
 
-diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-index 84277bcc465f..6290332cfd3f 100644
---- a/drivers/iio/adc/stm32-dfsdm-core.c
-+++ b/drivers/iio/adc/stm32-dfsdm-core.c
-@@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
- static int stm32_dfsdm_probe(struct platform_device *pdev)
- {
- 	struct dfsdm_priv *priv;
--	const struct of_device_id *of_id;
- 	const struct stm32_dfsdm_dev_data *dev_data;
- 	struct stm32_dfsdm *dfsdm;
- 	int ret;
--- 
-2.9.0
+Passing the caps information makes it easier to decide, by using the caps->matches().
+
+> 
+> Does any enable method use this for anything other than a struct
+> arm64_cpu_capabilities const * ?
+
+No, we use it only for const struct arm64_cpu_capability *.
+
+> If not, it would be better to specifiy that.
+
+Yes, that could be done.
+
+Cheers
+Suzuki
