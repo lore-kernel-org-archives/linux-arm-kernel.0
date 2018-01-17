@@ -1,30 +1,86 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 17 Jan 2018 08:44:01 +0100
-Subject: Power domain clock warnings on recent next
-In-Reply-To: <f1bf1c15-0bba-4cf6-42a2-80a3982dbae1@samsung.com>
-References: <CGME20180116200735epcas4p4455aea99ad21c4c45260d4752d789add@epcas4p4.samsung.com>
- <20180116200728.tjad7tzz3uvsmgg3@kozik-lap>
- <f1bf1c15-0bba-4cf6-42a2-80a3982dbae1@samsung.com>
-Message-ID: <CAJKOXPe-xCra5DFh-u2-FvkRwUZyoQbb8P5bK=MHq-9WdnhJWw@mail.gmail.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Wed, 17 Jan 2018 15:45:13 +0800
+Subject: [PATCH v2 01/13] iommu/rockchip: Request irqs in rk_iommu_probe()
+In-Reply-To: <CAAFQd5Bnv3cLJ0wWY4+LJ+0GzDcm0F9QArY+QfFg692hd6UPjQ@mail.gmail.com>
+References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
+ <20180116132540.18939-2-jeffy.chen@rock-chips.com>
+ <CAAFQd5AO6_GYMs0xac-4ECFH9pn_ssg8jsFVoif0WDQ-daSuRA@mail.gmail.com>
+ <5A5EF672.6040304@rock-chips.com>
+ <CAAFQd5Bnv3cLJ0wWY4+LJ+0GzDcm0F9QArY+QfFg692hd6UPjQ@mail.gmail.com>
+Message-ID: <5A5EFF09.3070604@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 7:25 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi Krzysztof,
->
-> On 2018-01-16 21:07, Krzysztof Kozlowski wrote:
->>
->> Hi everyone,
->>
->> Anyone already noticed or started bisecting warnings coming from
->> clk_core_disable_lock/exynos_pd_power on recent linux-next?
->
->
-> Yes, I've noticed it early this week and prepared a patch:
-> https://www.spinics.net/lists/arm-kernel/msg628881.html
+Hi Tomasz,
 
-Thanks!
+On 01/17/2018 03:16 PM, Tomasz Figa wrote:
+>>> >>
+>>> >>This lacks consistency. of_irq_count() is used for counting, but
+>>> >>platform_get_irq() is used for getting. Either platform_ or of_ API
+>>> >>should be used for both and I'd lean for platform_, since it's more
+>>> >>general.
+>> >
+>> >hmmm, right, i was thinking of removing num_irq, and do something like:
+>> >while (nr++) {
+>> >   err = platform_get_irq(dev, nr);
+>> >   if (err == -EPROBE_DEFER)
+>> >      break;
+>> >   if (err < 0)
+>> >      return err;
+>> >   ....
+>> >}
+>> >
+>> >but forgot to do that..
+> Was there anything wrong with platform_irq_count() used by existing code?
 
-Best regards,
-Krzysztof
+just thought the platform_irq_count might ignore some errors(except for 
+EPROBE_DEFER):
+
+int platform_irq_count(struct platform_device *dev)
+{
+         int ret, nr = 0;
+
+         while ((ret = platform_get_irq(dev, nr)) >= 0)
+                 nr++;
+
+         if (ret == -EPROBE_DEFER)
+                 return ret;
+
+         return nr;
+}
+
+but guess that would not matter..
+
+>
+>> >
+>>> >>
+>>>> >>>+               if (irq < 0) {
+>>>> >>>+                       dev_err(dev, "Failed to get IRQ, %d\n", irq);
+>>>> >>>                          return -ENXIO;
+>>>> >>>                  }
+>>>> >>>+               err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
+>>>> >>>+                                      IRQF_SHARED, dev_name(dev),
+>>>> >>>iommu);
+>>>> >>>+               if (err)
+>>>> >>>+                       return err;
+>>>> >>>          }
+>>> >>
+>>> >>
+>>> >>Looks like there is some more initialization below. Is the driver okay
+>>> >>with the IRQ being potentially fired right here? (Shared IRQ handlers
+>>> >>might be run at request_irq() time for testing.)
+>>> >>
+>> >right, forget about that. maybe we can check iommu->domain not NULL in
+>> >rk_iommu_irq()
+> Maybe we could just move IRQ requesting to the end of probe?
+>
+ok, that should work too.
+
+and maybe we should also check power status in the irq handler? if it 
+get fired after powered off...
+
+> Best regards,
+> Tomasz
+>
+>
+>
