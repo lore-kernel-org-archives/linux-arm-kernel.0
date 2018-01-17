@@ -1,124 +1,81 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 17 Jan 2018 18:22:29 +0000
-Subject: [PATCH v3 30/41] KVM: arm64: Prepare to handle deferred
- save/restore of 32-bit registers
-In-Reply-To: <20180112120747.27999-31-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-31-christoffer.dall@linaro.org>
-Message-ID: <9a2edac8-29aa-ffac-a845-ef6090e2226c@arm.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Wed, 17 Jan 2018 19:16:14 +0100
+Subject: [PATCH] [v2] drm/exynos: g2d: use monotonic timestamps
+In-Reply-To: <20180117170131.2677586-1-arnd@arndb.de>
+References: <20180117170131.2677586-1-arnd@arndb.de>
+Message-ID: <8b3c5b1a-c630-30d6-a261-2ee12d71fcc5@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hey Arnd,
 
-On 12/01/18 12:07, Christoffer Dall wrote:
-> 32-bit registers are not used by a 64-bit host kernel and can be
-> deferred, but we need to rework the accesses to this register to access
-> the latest value depending on whether or not guest system registers are
-> loaded on the CPU or only reside in memory.
+looks good to me!
+
+Reviewed-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+
+- Tobias
+
+
+Arnd Bergmann wrote:
+> The exynos DRM driver uses real-time 'struct timeval' values
+> for exporting its timestamps to user space. This has multiple
+> problems:
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
+> 1. signed seconds overflow in y2038
+> 2. the 'struct timeval' definition is deprecated in the kernel
+> 3. time may jump or go backwards after a 'settimeofday()' syscall
+> 4. other DRM timestamps are in CLOCK_MONOTONIC domain, so they
+>    can't be compared
+> 5. exporting microseconds requires a division by 1000, which may
+>    be slow on some architectures.
+> 
+> The code existed in two places before, but the IPP portion was
+> removed in 8ded59413ccc ("drm/exynos: ipp: Remove Exynos DRM
+> IPP subsystem"), so we no longer need to worry about it.
+> 
+> Ideally timestamps should just use 64-bit nanoseconds instead, but
+> of course we can't change that now. Instead, this tries to address
+> the first four points above by using monotonic 'timespec' values.
+> 
+> According to Tobias Jakobi, user space doesn't care about the
+> timestamp at the moment, so we can change the format. Even if
+> there is something looking at them, it will work just fine with
+> monotonic times as long as the application only looks at the
+> relative values between two events.
+> 
+> Link: https://patchwork.kernel.org/patch/10038593/
+> Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->   arch/arm64/include/asm/kvm_emulate.h | 32 +++++-------------
->   arch/arm64/kvm/regmap.c              | 65 ++++++++++++++++++++++++++----------
->   arch/arm64/kvm/sys_regs.c            |  6 ++--
->   3 files changed, 60 insertions(+), 43 deletions(-)
+> v2: rebased to what will be in 4.15, now that ipp is gone,
+>     updated changelog text based on input from Tobias.
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-
-[...]
-
-> diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
-> index bbc6ae32e4af..3f65098aff8d 100644
-> --- a/arch/arm64/kvm/regmap.c
-> +++ b/arch/arm64/kvm/regmap.c
-> @@ -141,28 +141,59 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
->   /*
->    * Return the SPSR for the current mode of the virtual CPU.
->    */
-> -unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
-> +static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
->   {
->   	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
->   	switch (mode) {
-> -	case COMPAT_PSR_MODE_SVC:
-> -		mode = KVM_SPSR_SVC;
-> -		break;
-> -	case COMPAT_PSR_MODE_ABT:
-> -		mode = KVM_SPSR_ABT;
-> -		break;
-> -	case COMPAT_PSR_MODE_UND:
-> -		mode = KVM_SPSR_UND;
-> -		break;
-> -	case COMPAT_PSR_MODE_IRQ:
-> -		mode = KVM_SPSR_IRQ;
-> -		break;
-> -	case COMPAT_PSR_MODE_FIQ:
-> -		mode = KVM_SPSR_FIQ;
-> -		break;
-> +	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
-> +	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
-> +	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
-> +	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
-> +	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
-> +	default: BUG();
-> +	}
-> +}
-> +
-> +unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
-> +{
-> +	int spsr_idx = vcpu_spsr32_mode(vcpu);
-> +
-> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
-> +		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
-> +
-> +	switch (spsr_idx) {
-> +	case KVM_SPSR_SVC:
-> +		return read_sysreg_el1(spsr);
-> +	case KVM_SPSR_ABT:
-> +		return read_sysreg(spsr_abt);
-> +	case KVM_SPSR_UND:
-> +		return read_sysreg(spsr_und);
-> +	case KVM_SPSR_IRQ:
-> +		return read_sysreg(spsr_irq);
-> +	case KVM_SPSR_FIQ:
-> +		return read_sysreg(spsr_fiq);
->   	default:
->   		BUG();
-
-Nit:
-
-Since the BUG() is in vcpu_spsr32_mode now, you can probably remove it 
-here (or add it to vcpu_write_sprsr32 for consistency).
-
->   	}
-> +}
->   
-> -	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
-> +void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
-> +{
-> +	int spsr_idx = vcpu_spsr32_mode(vcpu);
-> +
-> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
-> +		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
-> +
-> +	switch (spsr_idx) {
-> +	case KVM_SPSR_SVC:
-> +		write_sysreg_el1(v, spsr);
-> +	case KVM_SPSR_ABT:
-> +		write_sysreg(v, spsr_abt);
-> +	case KVM_SPSR_UND:
-> +		write_sysreg(v, spsr_und);
-> +	case KVM_SPSR_IRQ:
-> +		write_sysreg(v, spsr_irq);
-> +	case KVM_SPSR_FIQ:
-> +		write_sysreg(v, spsr_fiq);
-> +	}
->   }
-
-Cheers,
-
--- 
-Julien Thierry
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> index 2b8bf2dd6387..9effe40f5fa5 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> @@ -926,7 +926,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+>  	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
+>  	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
+>  	struct drm_exynos_pending_g2d_event *e;
+> -	struct timeval now;
+> +	struct timespec64 now;
+>  
+>  	if (list_empty(&runqueue_node->event_list))
+>  		return;
+> @@ -934,9 +934,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+>  	e = list_first_entry(&runqueue_node->event_list,
+>  			     struct drm_exynos_pending_g2d_event, base.link);
+>  
+> -	do_gettimeofday(&now);
+> +	ktime_get_ts64(&now);
+>  	e->event.tv_sec = now.tv_sec;
+> -	e->event.tv_usec = now.tv_usec;
+> +	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
+>  	e->event.cmdlist_no = cmdlist_no;
+>  
+>  	drm_send_event(drm_dev, &e->base);
+> 
