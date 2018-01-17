@@ -1,30 +1,33 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 17 Jan 2018 11:27:10 +0000
-Subject: [PATCH -next] dmaengine: stm32-dmamux: Remove unnecessary
- platform_get_resource() error check
-Message-ID: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
+Date: Wed, 17 Jan 2018 11:40:24 +0000
+Subject: [PATCH -next] crypto: stm32 - remove redundant dev_err call in
+ stm32_cryp_probe()
+Message-ID: <1516189224-11877-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource() already checks if the resource is NULL, so
-remove the unnecessary platform_get_resource() error check.
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/dma/stm32-dmamux.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/crypto/stm32/stm32-cryp.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/dma/stm32-dmamux.c b/drivers/dma/stm32-dmamux.c
-index d5db0f6..4dbb30c 100644
---- a/drivers/dma/stm32-dmamux.c
-+++ b/drivers/dma/stm32-dmamux.c
-@@ -253,9 +253,6 @@ static int stm32_dmamux_probe(struct platform_device *pdev)
- 	}
+diff --git a/drivers/crypto/stm32/stm32-cryp.c b/drivers/crypto/stm32/stm32-cryp.c
+index cf1dddb..4a06a7a 100644
+--- a/drivers/crypto/stm32/stm32-cryp.c
++++ b/drivers/crypto/stm32/stm32-cryp.c
+@@ -1052,10 +1052,8 @@ static int stm32_cryp_probe(struct platform_device *pdev)
  
  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res)
--		return -ENODEV;
--
- 	iomem = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(iomem))
- 		return PTR_ERR(iomem);
+ 	cryp->regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(cryp->regs)) {
+-		dev_err(dev, "Cannot map CRYP IO\n");
++	if (IS_ERR(cryp->regs))
+ 		return PTR_ERR(cryp->regs);
+-	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
