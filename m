@@ -1,31 +1,65 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Wed, 17 Jan 2018 17:52:50 +0200
-Subject: DRM: double free in rcar_du_vsp.c
-Message-ID: <234140a7-8538-3ec4-1c40-e6ebcc42be8f@epam.com>
+From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
+Date: Wed, 17 Jan 2018 15:56:19 +0000
+Subject: [PATCH 3/8] staging: fsl-mc: Add SPDX license identifiers
+In-Reply-To: <20180116151312.GA1174@kroah.com>
+References: <1516108750-24938-1-git-send-email-bogdan.purcareata@nxp.com>
+ <1516108750-24938-4-git-send-email-bogdan.purcareata@nxp.com>
+ <20180116151312.GA1174@kroah.com>
+Message-ID: <VI1PR0402MB36641599B3ADF70F23C0BF20EAE90@VI1PR0402MB3664.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> -----Original Message-----
+> From: Greg KH [mailto:gregkh at linuxfoundation.org]
+> Sent: Tuesday, January 16, 2018 5:13 PM
+> To: Bogdan Purcareata <bogdan.purcareata@nxp.com>
+> Cc: Laurentiu Tudor <laurentiu.tudor@nxp.com>; Ruxandra Ioana Ciocoi Radulescu
+> <ruxandra.radulescu@nxp.com>; devel at driverdev.osuosl.org; robh at kernel.org;
+> stuyoder at gmail.com; arnd at arndb.de; marc.zyngier at arm.com; Roy Pledge
+> <roy.pledge@nxp.com>; Ioana Ciornei <ioana.ciornei@nxp.com>; linux-
+> kernel at vger.kernel.org; Horia Geant? <horia.geanta@nxp.com>; Nipun Gupta
+> <nipun.gupta@nxp.com>; tglx at linutronix.de; linux-arm-
+> kernel at lists.infradead.org; jason at lakedaemon.net
+> Subject: Re: [PATCH 3/8] staging: fsl-mc: Add SPDX license identifiers
+> 
+> On Tue, Jan 16, 2018 at 03:19:05PM +0200, Bogdan Purcareata wrote:
+> > diff --git a/drivers/staging/fsl-mc/bus/dpbp-cmd.h b/drivers/staging/fsl-
+> mc/bus/dpbp-cmd.h
+> > index 5904836..1ac8ec6 100644
+> > --- a/drivers/staging/fsl-mc/bus/dpbp-cmd.h
+> > +++ b/drivers/staging/fsl-mc/bus/dpbp-cmd.h
+> > @@ -1,33 +1,8 @@
+> > +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+> 
+> Hm, I don't think you want to do that.  How can a Linux driver subsytem
+> that wraps calls to the kernel's driver core (which are GPL-only), be
+> accessed by BSD-3 code?
 
-I have found issue with double free() in RCAR DU VSP driver. it is 
-caused by rcar_du_vsp_plane_atomic_duplicate_state(), which duplicates 
-struct rcar_du_vsp_plane_state. This struct holds sg_tables which are 
-then freed in rcar_du_vsp_plane_cleanup_fb(). This function is called 
-for every rcar_du_vsp_plane_state, so it calls sg_free_table() twice for 
-the same sg_table.
+For this particular file, the original license was dual GPL/BSD. The patch removes the license text and adds an equivalent SPDX tag.
 
-I'm not familiar with DRM, so I can't say why this does not occur every 
-time, but this bug caused problems on our setup from time to time. Looks 
-like it occurs only under heavy system load.
+> If I didn't know any better, I would think you were trying to create a
+> "GPL Condom" here :)
+> 
+> Anyway, why all of the BSD-3 stuff here?  That makes no sense for kernel
+> code at all, and this is a relicensing of the file, have you gotten
+> legal approval of everyone that has modified the file while it was under
+> the GPL-v2 only text to be able to change it to BSD-3 as well?
 
-As I said, I'm not good in DRM, so I don't know the proper fix. But you 
-can find workaround at [1]. I don't know how good it is, but at least
-it resolved issue on our setup. If drm guys think that this fix is fine 
-enough, I can push it to the  ML for a proper review.
+Previous to this patch, the files under drivers/staging/fsl-mc/ use a combination of GPL-2.0 and (GPL-2.0+ / BSD-3-Clause) licenses (expressed by the full license text). 
 
-[1] 
-https://github.com/lorc/linux/commit/80155506d3499273155366a1d263a81baface718
+The original intent was to have an uniform dual license for all files. Before making this change, I have consulted the other current contributors, but based on your feedback, we think it's best to keep the current licenses.
 
-Cheers,
--- 
-Volodymyr Babchuk
+> Careful, this is a _VERY_ tricky thing to do right.  I need a
+> signed-off-by on this type of patch from your legal council to ensure
+> that they know exactly what you are doing, and have reviewed it
+> properly, before I can take it.
+> 
+> Hint, stick to the existing license in the files, it makes more sense,
+> you are not going to be taking this code out of Linux and putting it
+> anywhere.
+
+I will send a v2 keeping the existing license for each file - removing the full license text and adding a SPDX tag. This way there will be no change from a legal standpoint.
+
+Thank you for the feedback!
+
+Bogdan
