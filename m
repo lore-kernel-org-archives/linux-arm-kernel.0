@@ -1,43 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Jan 2018 17:55:16 +0530
-Subject: [PATCH v5 10/44] clk: davinci: New driver for davinci PSC clocks
-In-Reply-To: <83f3d207-9645-cbdf-d6cf-b6e6a8458abe@lechnology.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-11-git-send-email-david@lechnology.com>
- <e0a9af55-a8b1-c359-fe88-d038648e02f1@ti.com>
- <83f3d207-9645-cbdf-d6cf-b6e6a8458abe@lechnology.com>
-Message-ID: <1b568e12-dd45-f371-a1a8-576c97a6b58e@ti.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 17 Jan 2018 12:27:27 +0000
+Subject: [PATCH 1/3] arm64: perf: Make PMU interrupt NMI safe
+In-Reply-To: <20180117122014.GM2228@hirez.programming.kicks-ass.net>
+References: <1516190685-20048-1-git-send-email-julien.thierry@arm.com>
+ <1516190685-20048-2-git-send-email-julien.thierry@arm.com>
+ <20180117122014.GM2228@hirez.programming.kicks-ass.net>
+Message-ID: <000372ce-8739-14ed-c403-1651c5c1501d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 January 2018 10:21 PM, David Lechner wrote:
 
->>> +static struct clk *davinci_psc_clk_register(const char *name,
->>> +??????????????????????? const char *parent_name,
->>> +??????????????????????? struct regmap *regmap,
->>> +??????????????????????? u32 lpsc, u32 pd, u32 flags)
->>> +{
->>> +??? struct clk_init_data init;
->>> +??? struct davinci_psc_clk *psc;
->>> +??? struct clk *clk;
->>> +
->>> +??? psc = kzalloc(sizeof(*psc), GFP_KERNEL);
->>> +??? if (!psc)
->>> +??????? return ERR_PTR(-ENOMEM);
->>> +
->>> +??? init.name = name;
->>> +??? init.ops = &davinci_psc_clk_ops;
->>> +??? init.parent_names = (parent_name ? &parent_name : NULL);
->>> +??? init.num_parents = (parent_name ? 1 : 0);
->>> +??? init.flags = CLK_SET_RATE_PARENT;
+
+On 17/01/18 12:20, Peter Zijlstra wrote:
+> On Wed, Jan 17, 2018 at 12:04:43PM +0000, Julien Thierry wrote:
+>> Before using an NMI, we must make sure the IRQ handler uses no locks and
+>> only calls NMI safe functions.
 >>
->> Is this needed since PSC does not cause any rate change?
+>> Get rid of PMU lock, saving and restoring the PMU counter selector in the
+>> PMU interrupt handler
 > 
-> Yes, because one of the PSCs is the ARM clock and for cpufreq, we
-> need to propagate the rate change up the chain to SYSCLK6.
+> You fail to explain why its safe to do so. Presumably that lock was
+> there for a reason, why can you remove it and expect things to keep
+> working?
+> 
 
-Good point. But how about treating that as an exception with a new LPSC_
-quirk flag?
+Right, this was poorly worded. The lock was there to prevent the PMU 
+interrupt modifying the counter selector register while the interrupted 
+context was using it.
+
+So the lock was not simply removed, but replaced with the saving and 
+restoring the selector register value in the interrupt handler.
+
+I'll reword that when I submit a new iteration of that series.
 
 Thanks,
-Sekhar
+
+-- 
+Julien Thierry
