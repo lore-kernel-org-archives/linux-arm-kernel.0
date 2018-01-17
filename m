@@ -1,64 +1,68 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 17 Jan 2018 13:31:50 +0000
-Subject: [PATCH] arm64: Run enable method for errata work arounds on late
- CPUs
-In-Reply-To: <29147833-b47f-3ad9-e2d8-295551c43900@arm.com>
-References: <20180117100556.29270-1-suzuki.poulose@arm.com>
- <20180117122548.GE22781@e103592.cambridge.arm.com>
- <29147833-b47f-3ad9-e2d8-295551c43900@arm.com>
-Message-ID: <bbc19683-340a-cc81-ded9-966d232248db@arm.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Wed, 17 Jan 2018 21:32:00 +0800
+Subject: [PATCH v2 13/13] iommu/rockchip: Support sharing IOMMU between
+ masters
+In-Reply-To: <1bd5378d-8285-e0d9-8105-f9dd9f8cfdcb@arm.com>
+References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
+ <20180116132540.18939-14-jeffy.chen@rock-chips.com>
+ <1bd5378d-8285-e0d9-8105-f9dd9f8cfdcb@arm.com>
+Message-ID: <5A5F5050.5040308@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 13:20, Robin Murphy wrote:
-> On 17/01/18 12:25, Dave Martin wrote:
->> On Wed, Jan 17, 2018 at 10:05:56AM +0000, Suzuki K Poulose wrote:
->>> When a CPU is brought up after we have finalised the system
->>> wide capabilities (i.e, features and errata), we make sure the
->>> new CPU doesn't need a new errata work around which has not been
->>> detected already. However we don't run enable() method on the new
->>> CPU for the errata work arounds already detected. This could
->>> cause the new CPU running without potential work arounds.
->>> It is upto the "enable()" method to decide if this CPU should
->>> do something about the errata.
->>>
->>> Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Andre Przywara <andre.przywara@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Dave Martin <dave.martin@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>> ? arch/arm64/kernel/cpu_errata.c | 9 ++++++---
->>> ? 1 file changed, 6 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->>> index 90a9e465339c..54e41dfe41f6 100644
->>> --- a/arch/arm64/kernel/cpu_errata.c
->>> +++ b/arch/arm64/kernel/cpu_errata.c
->>> @@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
->>> ? {
->>> ????? const struct arm64_cpu_capabilities *caps = arm64_errata;
->>> -??? for (; caps->matches; caps++)
->>> -??????? if (!cpus_have_cap(caps->capability) &&
->>> -??????????? caps->matches(caps, SCOPE_LOCAL_CPU)) {
->>> +??? for (; caps->matches; caps++) {
->>> +??????? if (cpus_have_cap(caps->capability)) {
->>> +??????????? if (caps->enable)
->>> +??????????????? caps->enable((void *)caps);
+Hi Robin,
+
+On 01/17/2018 09:00 PM, Robin Murphy wrote:
+> On 16/01/18 13:25, Jeffy Chen wrote:
+>> There would be some masters sharing the same IOMMU device. Put them in
+>> the same iommu group and share the same iommu domain.
 >>
->> Do we really need this cast?
-> 
-> Seems to me like the prototype for .enable needs updating. If any existing callback was actually using the (non-const) void* for some purpose (thankfully nothing seems to be), then passing the capability pointer into that would be unlikely to end well anyway.
-
-I agree. This was initially written such that we could call it via on_each_cpu().
-But then we later switched to stop_machine(). And we weren't using the argument until
-very recently with the introduction of multiple entries for the same capability.
-
-I will try to clean this up in a separate series, which would involve cleaning up
-all the enable(), quite invasive. I would like this to go in for 4.16, as it is
-needed for things like KPTI and some of the existing caps.
-
-Cheers
-Suzuki
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> ---
+>>
+>> Changes in v2: None
+>>
+>>   drivers/iommu/rockchip-iommu.c | 39
+>> +++++++++++++++++++++++++++++++--------
+>>   1 file changed, 31 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/iommu/rockchip-iommu.c
+>> b/drivers/iommu/rockchip-iommu.c
+>> index c8de1456a016..6c316dd0dd2d 100644
+>> --- a/drivers/iommu/rockchip-iommu.c
+>> +++ b/drivers/iommu/rockchip-iommu.c
+>> @@ -100,11 +100,13 @@ struct rk_iommu {
+>>       struct iommu_device iommu;
+>>       struct list_head node; /* entry in rk_iommu_domain.iommus */
+>>       struct iommu_domain *domain; /* domain to which iommu is
+>> attached */
+>> +    struct iommu_group *group;
+>>       struct mutex pm_mutex; /* serializes power transitions */
+>>   };
+>>   struct rk_iommudata {
+>>       struct device_link *link; /* runtime PM link from IOMMU to
+>> master */
+>> +    struct iommu_domain *domain; /* domain to which device is
+>> attached */
+>
+> I don't see why this is needed - for example, mtk_iommu does the same
+> thing without needing to track the active domain in more than one place.
+>
+> Fundamentally, for this kind of IOMMU without the notion of multiple
+> translation contexts, the logic should look like:
+>
+>      iommudrv_attach_device(dev, domain) {
+>          iommu = dev_get_iommu(dev);
+>          if (iommu->curr_domain != domain) {
+>              update_hw_state(iommu, domain);
+>              iommu->curr_domain = domain;
+>          }
+>      }
+>
+> which I think is essentially what you have anyway. When a group contains
+> multiple devices, you update the IOMMU state for the first device, then
+> calls for subsequent devices in the group do nothing since they see the
+> IOMMU state is already up-to-date with the new domain.
+>
+right, will remove it.
+> Robin.
