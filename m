@@ -1,45 +1,58 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 17 Jan 2018 15:52:49 +0800
-Subject: [PATCH v2 12/13] iommu/rockchip: Add runtime PM support
-In-Reply-To: <CAAFQd5ATRh5hdJhVxDoXjFz72cBmv-yNaW7v-eUxkVRYA3=uJg@mail.gmail.com>
-References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-13-jeffy.chen@rock-chips.com>
- <CAAFQd5DCxgsL52+5XetV9MRDecL7dN6_QdHysKUOWaEqSf=ijw@mail.gmail.com>
- <5A5EFAB2.7040001@rock-chips.com>
- <CAAFQd5ATRh5hdJhVxDoXjFz72cBmv-yNaW7v-eUxkVRYA3=uJg@mail.gmail.com>
-Message-ID: <5A5F00D1.5010506@rock-chips.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 17 Jan 2018 16:00:57 +0800
+Subject: [PATCH v5 0/3] Add support for Hi3660 mailbox driver
+Message-ID: <1516176060-8947-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi3660 mailbox controller is used to send message within multiple
+processors, MCU, HIFI, etc. This patch series is to implement an
+initial version for Hi3660 mailbox driver with "automatic
+acknowledge" mode.
 
-On 01/17/2018 03:38 PM, Tomasz Figa wrote:
->>> >>Don't we need to check here (and in _shutdown() too) if we have a
->>> >>domain attached?
->> >
->> >hmmm, right, the startup might been called by resume, so should check
->> >iommu->domain here.
->> >
->> >but the shutdown would be called at the end of detach or suspend, it could
->> >be not attached or attached.
-> If startup might be called by resume, without domain attached, what
-> prevents shutdown from being called by suspend after that resume,
-> still without domain attached? Is it guaranteed that if resume is
-> called, someone will attach a domain before suspend is called?
->
-no, the shutdown would be called by:
-1/ end of detach_dev
-so it would be not attached at that time
+The patch set have been verified with Hi3660 stub clock driver, so
+we can send message to MCU to execute CPU frequency scaling. This is
+tested on 96boards Hikey960.
 
-2/ suspend
-so it could be attached, and also could be not attached
+Changes from v4:
+* According to Jassi suggestion, refactored mailbox driver and removed
+  "inline" for function declaration;
+
+Changes from v3:
+* According to Jassi suggestion, refined structure name to
+  "struct hi3660_chan_info";
+* According to Jassi suggestion, moved channel 'lock'+'acquire'
+  operations into .startup();
+
+Changes from v2:
+* According to Mark Rutland suggestions, removed sev()/wfe() from
+  driver, the system has no two masters sharing the same channel for
+  data transferring so we don't need these instructions;
+* Refined DT binding and doc according to Rob suggestions;
+* Refined driver according to Julien suggestions;
+
+Changes from v1:
+* Added cover letter to track the changelog;
+* Added document for DT binding;
+* Refactored and simplized mailbox driver with "automatic ack" mode;
+* Refined commit logs for patches;
 
 
-anyway, i think the shutdown would work without domain attached(just 
-disable paging and clear the iommu bases) ;)
+Kaihua Zhong (2):
+  mailbox: Add support for Hi3660 mailbox
+  dts: arm64: Add mailbox binding for hi3660
 
-> Best regards,
-> Tomasz
->
->
->
+Leo Yan (1):
+  dt-bindings: mailbox: Introduce Hi3660 controller binding
+
+ .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  |  51 ++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   8 +
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi3660-mailbox.c                   | 316 +++++++++++++++++++++
+ 5 files changed, 385 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
+ create mode 100644 drivers/mailbox/hi3660-mailbox.c
+
+-- 
+1.9.1
