@@ -1,43 +1,42 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Tue, 16 Jan 2018 18:13:48 -0800
-Subject: [PATCH RFC v1] arm64: Handle traps from accessing CNTVCT/CNTFRQ
- for CONFIG_COMPAT
-In-Reply-To: <20180116213745.GA9545@Asurada-Nvidia>
-References: <1515645816-14063-1-git-send-email-nicoleotsuka@gmail.com>
- <e750e380-f06b-dbbf-a61c-4281c0168b05@arm.com>
- <20180116203218.GA6318@Asurada-Nvidia>
- <86r2qpec32.wl-marc.zyngier@arm.com>
- <20180116213745.GA9545@Asurada-Nvidia>
-Message-ID: <20180117021346.GA26166@Asurada-Nvidia>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Wed, 17 Jan 2018 11:36:37 +0900
+Subject: [PATCH 00/13] replace print_symbol() with printk()-s
+In-Reply-To: <20180116163301.lh76kvjheyobjgkp@pathway.suse.cz>
+References: <20171211125025.2270-1-sergey.senozhatsky@gmail.com>
+ <20180105100300.j3svmcvvpfe2iows@pathway.suse.cz>
+ <20180105102105.GB471@jagdpanzerIV>
+ <20180105102538.GC471@jagdpanzerIV>
+ <20180105144239.i3pc6npgmoi4ddln@pathway.suse.cz>
+ <20180108020942.GB533@jagdpanzerIV>
+ <20180116163301.lh76kvjheyobjgkp@pathway.suse.cz>
+Message-ID: <20180117023637.GC423@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 01:37:46PM -0800, Nicolin Chen wrote:
-> On Tue, Jan 16, 2018 at 09:19:13PM +0000, Marc Zyngier wrote:
+On (01/16/18 17:33), Petr Mladek wrote:
+[..]
+> > JFI, the patch is in Linus's tree as of now (d0729bc6bee797fb).
 > 
-> > > I understand that it should take care of the condition field as
-> > > a general instruction handler. Just for curiosity: If we confine
-> > > the topic to read access of CNTVCT/CNTFRQ, what'd be the penalty
-> > > by ignoring the condition field and executing it anyway?
-> > 
-> > Do you mean, apart from severely corrupting userspace execution?
-> > That's a rhetorical question, right?
+> Great. I have pushed the patch that removes printk_symbol()
+> into printk.git, branch for-4.16-print-symbol.
 > 
-> I don't quite understand the corrupting userspace execution part.
-> What I see for a conditional CNTVCT read is more likely:
-> 	if (condition) {	// in this case, if (true)
-> 		r1 = lower32(cntvct);
-> 		r2 = higher32(cntvct);
-> 	}
+> Note that I have updated the commit message similar way
+> like I did for the other commits. Especially I wanted
+> to mention what it was obsoleted by. The message is:
 > 
-> Could you please elaborate a bit? Thank you.
+>   kallsyms: remove print_symbol() function
+> 
+>   No more print_symbol()/__print_symbol() users left, remove these
+>   symbols.
+> 
+>   It was a very old API that encouraged people use continuous lines.
+>   It had been obsoleted by %pS format specifier in a normal printk()
+>   call.
+> 
+> 
+> See also
+> https://git.kernel.org/pub/scm/linux/kernel/git/pmladek/printk.git/commit/?h=for-4.16-print-symbol&id=d2279c9d7f7db7f97567368bfc4539b3411adf8d
 
-I guess I got it now. The concern seems to be Thumb instructions.
-So ignoring a condition for a Thumb instruction may cause its IT
-scope shifting. For ARM mode, the only penalty could be two Rts
-getting written -- which shouldn't corrupt userspace execution.
+thanks!
 
-Please correct me if I am wrong or not thorough.
-
-Thanks
-Nicolin
+	-ss
