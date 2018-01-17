@@ -1,215 +1,171 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 17 Jan 2018 10:52:18 -0700
-Subject: [PATCH v3 09/10] perf tools: Add mechanic to synthesise CoreSight
- trace packets
-In-Reply-To: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1516211539-5166-10-git-send-email-mathieu.poirier@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 17 Jan 2018 17:58:06 +0000
+Subject: [PATCH v6 05/12] ACPI/PPTT: Add Processor Properties Topology
+ Table parsing
+In-Reply-To: <65c42ed6-8ac7-3adb-43f2-de20080eaaa9@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-6-jeremy.linton@arm.com>
+ <20180115145839.GA12531@e107155-lin>
+ <65c42ed6-8ac7-3adb-43f2-de20080eaaa9@arm.com>
+Message-ID: <6215c089-0b93-2ac5-34ac-8d5e726cbf58@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once decoded from trace packets information on trace range needs
-to be communicated to the perf synthesis infrastructure so that it
-is available to the perf tools built-in rendering tools and scripts.
 
-Co-authored-by: Tor Jeremiassen <tor@ti.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- tools/perf/util/cs-etm.c | 168 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 168 insertions(+)
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 407095af1456..b9f0a53dfa65 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -453,6 +453,157 @@ static void  cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
- 	}
- }
- 
-+/*
-+ * The cs etm packet encodes an instruction range between a branch target
-+ * and the next taken branch. Generate sample accordingly.
-+ */
-+static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq,
-+				       struct cs_etm_packet *packet)
-+{
-+	int ret = 0;
-+	struct cs_etm_auxtrace *etm = etmq->etm;
-+	struct perf_sample sample = {.ip = 0,};
-+	union perf_event *event = etmq->event_buf;
-+	u64 start_addr = packet->start_addr;
-+	u64 end_addr = packet->end_addr;
-+
-+	event->sample.header.type = PERF_RECORD_SAMPLE;
-+	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.size = sizeof(struct perf_event_header);
-+
-+	sample.ip = start_addr;
-+	sample.pid = etmq->pid;
-+	sample.tid = etmq->tid;
-+	sample.addr = end_addr;
-+	sample.id = etmq->etm->branches_id;
-+	sample.stream_id = etmq->etm->branches_id;
-+	sample.period = 1;
-+	sample.cpu = packet->cpu;
-+	sample.flags = 0;
-+	sample.cpumode = PERF_RECORD_MISC_USER;
-+
-+	ret = perf_session__deliver_synth_event(etm->session, event, &sample);
-+
-+	if (ret)
-+		pr_err(
-+		"CS ETM Trace: failed to deliver instruction event, error %d\n",
-+		ret);
-+
-+	return ret;
-+}
-+
-+struct cs_etm_synth {
-+	struct perf_tool dummy_tool;
-+	struct perf_session *session;
-+};
-+
-+static int cs_etm__event_synth(struct perf_tool *tool,
-+			       union perf_event *event,
-+			       struct perf_sample *sample __maybe_unused,
-+			       struct machine *machine __maybe_unused)
-+{
-+	struct cs_etm_synth *cs_etm_synth =
-+		      container_of(tool, struct cs_etm_synth, dummy_tool);
-+
-+	return perf_session__deliver_synth_event(cs_etm_synth->session,
-+						 event, NULL);
-+}
-+
-+static int cs_etm__synth_event(struct perf_session *session,
-+			       struct perf_event_attr *attr, u64 id)
-+{
-+	struct cs_etm_synth cs_etm_synth;
-+
-+	memset(&cs_etm_synth, 0, sizeof(struct cs_etm_synth));
-+	cs_etm_synth.session = session;
-+
-+	return perf_event__synthesize_attr(&cs_etm_synth.dummy_tool, attr, 1,
-+					   &id, cs_etm__event_synth);
-+}
-+
-+static int cs_etm__synth_events(struct cs_etm_auxtrace *etm,
-+				struct perf_session *session)
-+{
-+	struct perf_evlist *evlist = session->evlist;
-+	struct perf_evsel *evsel;
-+	struct perf_event_attr attr;
-+	bool found = false;
-+	u64 id;
-+	int err;
-+
-+	evlist__for_each_entry(evlist, evsel) {
-+		if (evsel->attr.type == etm->pmu_type) {
-+			found = true;
-+			break;
-+		}
-+	}
-+
-+	if (!found) {
-+		pr_debug("No selected events with CoreSight Trace data\n");
-+		return 0;
-+	}
-+
-+	memset(&attr, 0, sizeof(struct perf_event_attr));
-+	attr.size = sizeof(struct perf_event_attr);
-+	attr.type = PERF_TYPE_HARDWARE;
-+	attr.sample_type = evsel->attr.sample_type & PERF_SAMPLE_MASK;
-+	attr.sample_type |= PERF_SAMPLE_IP | PERF_SAMPLE_TID |
-+			    PERF_SAMPLE_PERIOD;
-+	if (etm->timeless_decoding)
-+		attr.sample_type &= ~(u64)PERF_SAMPLE_TIME;
-+	else
-+		attr.sample_type |= PERF_SAMPLE_TIME;
-+
-+	attr.exclude_user = evsel->attr.exclude_user;
-+	attr.exclude_kernel = evsel->attr.exclude_kernel;
-+	attr.exclude_hv = evsel->attr.exclude_hv;
-+	attr.exclude_host = evsel->attr.exclude_host;
-+	attr.exclude_guest = evsel->attr.exclude_guest;
-+	attr.sample_id_all = evsel->attr.sample_id_all;
-+	attr.read_format = evsel->attr.read_format;
-+
-+	/* create new id val to be a fixed offset from evsel id */
-+	id = evsel->id[0] + 1000000000;
-+
-+	if (!id)
-+		id = 1;
-+
-+	if (etm->synth_opts.branches) {
-+		attr.config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS;
-+		attr.sample_period = 1;
-+		attr.sample_type |= PERF_SAMPLE_ADDR;
-+		err = cs_etm__synth_event(session, &attr, id);
-+		if (err)
-+			return err;
-+		etm->sample_branches = true;
-+		etm->branches_sample_type = attr.sample_type;
-+		etm->branches_id = id;
-+	}
-+
-+	return 0;
-+}
-+
-+static int cs_etm__sample(struct cs_etm_queue *etmq)
-+{
-+	int ret;
-+	struct cs_etm_packet packet;
-+
-+	while (1) {
-+		ret = cs_etm_decoder__get_packet(etmq->decoder, &packet);
-+		if (ret <= 0)
-+			return ret;
-+
-+		/*
-+		 * If the packet contains an instruction range, generate an
-+		 * instruction sequence event.
-+		 */
-+		if (packet.sample_type & CS_ETM_RANGE)
-+			cs_etm__synth_branch_sample(etmq, &packet);
-+	}
-+
-+	return 0;
-+}
-+
- static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- {
- 	struct cs_etm_auxtrace *etm = etmq->etm;
-@@ -494,6 +645,12 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- 
- 		etmq->offset += processed;
- 		buffer_used += processed;
-+
-+		/*
-+		 * Nothing to do with an error condition, let's hope the next
-+		 * chunk will be better.
-+		 */
-+		err = cs_etm__sample(etmq);
- 	} while (buffer.len > buffer_used);
- 
- goto more;
-@@ -828,6 +985,17 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 		return 0;
- 	}
- 
-+	if (session->itrace_synth_opts && session->itrace_synth_opts->set) {
-+		etm->synth_opts = *session->itrace_synth_opts;
-+	} else {
-+		itrace_synth_opts__set_default(&etm->synth_opts);
-+		etm->synth_opts.callchain = false;
-+	}
-+
-+	err = cs_etm__synth_events(etm, session);
-+	if (err)
-+		goto err_free_queues;
-+
- 	err = auxtrace_queues__process_index(&etm->queues, session);
- 	if (err)
- 		goto err_free_queues;
+On 16/01/18 20:55, Jeremy Linton wrote:
+> 
+
+[...]
+
+>>> +/*
+>>> + * Determine if the *node parameter is a leaf node by iterating the
+>>> + * PPTT table, looking for nodes which reference it.
+>>> + * Return 0 if we find a node referencing the passed node,
+>>> + * or 1 if we don't.
+>>> + */
+>>> +static int acpi_pptt_leaf_node(struct acpi_table_header *table_hdr,
+>>> +?????????????????? struct acpi_pptt_processor *node)
+>>> +{
+>>> +??? struct acpi_subtable_header *entry;
+>>> +??? unsigned long table_end;
+>>> +??? u32 node_entry;
+>>> +??? struct acpi_pptt_processor *cpu_node;
+>>> +
+>>> +??? table_end = (unsigned long)table_hdr + table_hdr->length;
+>>> +??? node_entry = ACPI_PTR_DIFF(node, table_hdr);
+>>> +??? entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
+>>> +???????????????? sizeof(struct acpi_table_pptt));
+>>> +
+>>> +??? while ((unsigned long)(entry + 1) < table_end) {
+>>
+>> Is entry + 1 check sufficient to access entry of length ?
+>> Shouldn't that be entry + sizeof(struct acpi_pptt_processor *) so that
+>> we are sure it's valid entry ?
+> 
+> All we need is the subtable_header size which gives us the type/len. As
+> we are just scanning the whole table touching the entry->length and the
+> while() terminates if that is > table_end it should be ok. In general
+> sizeof(acpi_pptt_processor) isn't right either since the structure only
+> covers a larger "header" portion due to attached entries extending
+> beyond it.
+
+OK, understood. In that case it should be at least
+entry + sizeof(struct acpi_subtable_header), no ?
+
+I did a quick check and acpi_parse_entries_array does exactly same.
+Does it make sense to keep it consistent with that ?
+
+Also looking at acpi_parse_entries_array, I recall now that it has some
+kind of handler to deal with such table parsing. I think we should be
+able to reuse, I need to stare more at the code to see how :(.
+Let me know if you already looked at that and found reasons not to use it.
+
+>>> +??????? cpu_node = (struct acpi_pptt_processor *)entry;
+>>> +??????? if ((entry->type == ACPI_PPTT_TYPE_PROCESSOR) &&
+>>> +??????????? (cpu_node->parent == node_entry))
+>>> +??????????? return 0;
+>>> +??????? entry = ACPI_ADD_PTR(struct acpi_subtable_header, entry,
+>>> +???????????????????? entry->length);
+>>> +??? }
+>>> +??? return 1;
+>>> +}
+>>> +
+>>> +/*
+>>> + * Find the subtable entry describing the provided processor.
+>>> + * This is done by iterating the PPTT table looking for processor nodes
+>>> + * which have an acpi_processor_id that matches the acpi_cpu_id
+>>> parameter
+>>> + * passed into the function. If we find a node that matches this
+>>> criteria
+>>> + * we verify that its a leaf node in the topology rather than depending
+>>> + * on the valid flag, which doesn't need to be set for leaf nodes.
+>>> + */
+>>> +static struct acpi_pptt_processor *acpi_find_processor_node(
+>>> +??? struct acpi_table_header *table_hdr,
+>>> +??? u32 acpi_cpu_id)
+>>> +{
+>>> +??? struct acpi_subtable_header *entry;
+>>> +??? unsigned long table_end;
+>>> +??? struct acpi_pptt_processor *cpu_node;
+>>> +
+>>> +??? table_end = (unsigned long)table_hdr + table_hdr->length;
+>>> +??? entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr,
+>>> +???????????????? sizeof(struct acpi_table_pptt));
+>>> +
+>>> +??? /* find the processor structure associated with this cpuid */
+>>> +??? while ((unsigned long)(entry + 1) < table_end) {
+>>
+>> Same comment as above on entry + 
+> This one is probably less clear than the one above, because we do access
+> a full acpi_pptt_processor sized structure, but only after making sure
+> that is actually a processor node. If anything the check should probably
+> dereference the len as a second check aka
+> 
+> while ((entry+1 < table_end) && (entry+1->length < table_end))
+> 
+> I think this may have been changed after previous review comments asked
+> for the cpu_node assignment earlier and of course moving the leaf_node
+> check into the if condition to avoid a bit of extra processing.
+> 
+
+Makes sense.
+
+
+>>> +/* Convert the linux cache_type to a ACPI PPTT cache type value */
+>>> +static u8 acpi_cache_type(enum cache_type type)
+>>> +{
+>>
+>> [nit] Just wondering if we can avoid this with some static mapping:
+>>
+>> static u8 acpi_cache_type[] = {
+>> ???????? [CACHE_TYPE_NONE] = 0,
+>> ???????? [CACHE_TYPE_DATA] = ACPI_PPTT_CACHE_TYPE_DATA,
+>> ???????? [CACHE_TYPE_INST] = ACPI_PPTT_CACHE_TYPE_INSTR,
+>> ???????? [CACHE_TYPE_UNIFIED] = ACPI_PPTT_CACHE_TYPE_UNIFIED,
+>> };
+> 
+> Potentially, but the default case below is important and makes it a
+> little less brittle because, as the recent DT commit, in your table
+> TYPE_NONE actually needs to map to ACPI TYPE_UNIFIED to find the nodes.
+> 
+
+OK
+
+> Doesn't matter much to me, and I would convert it if the switch() got a
+> lot bigger, but right now I tend to think what the code actually would
+> look like is a two entry conversion (data/instruction) with a default
+> initially set. So a loop for two entries is borderline IMHO.
+> 
+
+Sure, that sounds good.
+
+
+>>> +??? /*
+>>> +???? * If all the above flags are valid, and the cache type is NOCACHE
+>>> +???? * update the cache type as well.
+>>> +???? */
+>>
+>> I am not sure if it makes sense to mandate at least last 2 (read allocate
+>> and write policy). They can be optional.
+> 
+> As I mentioned in the previous set, I'm of the opinion that some are
+> more useful than others, but to avoid having a discussion about which
+> ones, just decided to do them all. After all, its not going to hurt
+> (AFAIK).
+> 
+
+Sorry I missed to notice that.
+
+> 
+> If your more _sure_ and no one else has an opinion then i will remove
+> those two.
+>
+
+That was just my opinion based on the possibility that some vendors
+don't what to provide those information. We can wait until we come
+across tables that have these missing.
+
 -- 
-2.7.4
+Regards,
+Sudeep
