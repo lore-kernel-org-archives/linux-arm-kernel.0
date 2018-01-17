@@ -1,52 +1,30 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 17 Jan 2018 19:32:41 +0100
-Subject: [PATCH 1/4] ARM64: add basic Kconfig symbols for i.MX8
-Message-ID: <20180117183244.28303-1-l.stach@pengutronix.de>
+Date: Wed, 17 Jan 2018 19:32:44 +0100
+Subject: [PATCH 4/4] MAINTAINERS: add i.MX8 DT path to i.MX architecture
+In-Reply-To: <20180117183244.28303-1-l.stach@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+Message-ID: <20180117183244.28303-4-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Shawn agreed to take patches for the i.MX8 parts through his tree.
+
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm64/Kconfig.platforms |  6 ++++++
- drivers/soc/imx/Kconfig      | 12 ++++++++++++
- 2 files changed, 18 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 2401373565ff..2a22802d1f9e 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -131,6 +131,12 @@ config ARCH_MVEBU
- 	   - Armada 7K SoC Family
- 	   - Armada 8K SoC Family
- 
-+config ARCH_MXC
-+	bool "ARMv8 based NXP i.MX SoC family"
-+	help
-+	  This enabled support for the ARMv8 based SoCs in the
-+	  NXP i.MX family.
-+
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
- 	select GPIOLIB
-diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
-index a5b86a28f343..8c9f04440896 100644
---- a/drivers/soc/imx/Kconfig
-+++ b/drivers/soc/imx/Kconfig
-@@ -8,3 +8,15 @@ config IMX7_PM_DOMAINS
- 	default y if SOC_IMX7D
- 
- endmenu
-+
-+if ARCH_MXC
-+
-+if ARM64
-+
-+config SOC_IMX8MQ
-+	bool "i.MX8MQ support"
-+	help
-+	  This enables support for the i.MX8MQ SoC.
-+endif
-+
-+endif
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 18994806e441..c51d1e15c386 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1390,6 +1390,7 @@ F:	arch/arm/mach-imx/
+ F:	arch/arm/mach-mxs/
+ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
++F:	arch/arm64/boot/dts/nxp/
+ F:	drivers/clk/imx/
+ F:	drivers/soc/imx/
+ F:	include/soc/imx/
 -- 
 2.11.0
