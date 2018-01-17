@@ -1,80 +1,124 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 17 Jan 2018 18:20:25 +0000
-Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <65f78c99-8b86-0098-7ced-899840a4bf16@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-3-jeremy.linton@arm.com>
- <20180115123338.GB5473@e107155-lin>
- <65f78c99-8b86-0098-7ced-899840a4bf16@arm.com>
-Message-ID: <ca64334c-9345-705c-80d8-f2deb924a679@arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 17 Jan 2018 18:22:29 +0000
+Subject: [PATCH v3 30/41] KVM: arm64: Prepare to handle deferred
+ save/restore of 32-bit registers
+In-Reply-To: <20180112120747.27999-31-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-31-christoffer.dall@linaro.org>
+Message-ID: <9a2edac8-29aa-ffac-a845-ef6090e2226c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 12/01/18 12:07, Christoffer Dall wrote:
+> 32-bit registers are not used by a 64-bit host kernel and can be
+> deferred, but we need to rework the accesses to this register to access
+> the latest value depending on whether or not guest system registers are
+> loaded on the CPU or only reside in memory.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-On 16/01/18 21:07, Jeremy Linton wrote:
-> Hi,
-> 
-> On 01/15/2018 06:33 AM, Sudeep Holla wrote:
->> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
->>> The original intent in cacheinfo was that an architecture
->>> specific populate_cache_leaves() would probe the hardware
->>> and then cache_shared_cpu_map_setup() and
->>> cache_override_properties() would provide firmware help to
->>> extend/expand upon what was probed. Arm64 was really
->>> the only architecture that was working this way, and
->>> with the removal of most of the hardware probing logic it
->>> became clear that it was possible to simplify the logic a bit.
->>>
->>> This patch combines the walk of the DT nodes with the
->>> code updating the cache size/line_size and nr_sets.
->>> cache_override_properties() (which was DT specific) is
->>> then removed. The result is that cacheinfo.of_node is
->>> no longer used as a temporary place to hold DT references
->>> for future calls that update cache properties. That change
->>> helps to clarify its one remaining use (matching
->>> cacheinfo nodes that represent shared caches) which
->>> will be used by the ACPI/PPTT code in the following patches.
->>>
->>> Cc: Palmer Dabbelt <palmer@sifive.com>
->>> Cc: Albert Ou <albert@sifive.com>
->>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>> ---
->>> ? arch/riscv/kernel/cacheinfo.c |? 1 +
->>> ? drivers/base/cacheinfo.c????? | 65
->>> +++++++++++++++++++------------------------
->>> ? include/linux/cacheinfo.h???? |? 1 +
->>> ? 3 files changed, 31 insertions(+), 36 deletions(-)
->>>
->>> diff --git a/arch/riscv/kernel/cacheinfo.c
->>> b/arch/riscv/kernel/cacheinfo.c
->>> index 10ed2749e246..6f4500233cf8 100644
->>> --- a/arch/riscv/kernel/cacheinfo.c
->>> +++ b/arch/riscv/kernel/cacheinfo.c
->>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
->>> ????????? CACHE_WRITE_BACK
->>> ????????? | CACHE_READ_ALLOCATE
->>> ????????? | CACHE_WRITE_ALLOCATE;
->>> +??? cache_of_set_props(this_leaf, node);
->>
->> This may be necessary but can it be done as later patch ? So far nothing
->> is added that may break riscv IIUC.
-> 
-> Well I think you have a bisection issue where the additional information
-> will disappear between this patch and wherever we put this code back in.
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+> ---
+>   arch/arm64/include/asm/kvm_emulate.h | 32 +++++-------------
+>   arch/arm64/kvm/regmap.c              | 65 ++++++++++++++++++++++++++----------
+>   arch/arm64/kvm/sys_regs.c            |  6 ++--
+>   3 files changed, 60 insertions(+), 43 deletions(-)
 > 
 
-Hmm, I am sorry but I fail to see the issue. Before this change,
-populate_cache_leaves just populated the info as per ci_leaf_init in
-arch/riscv/kernel/cacheinfo.c and cache_override_properties used to fill
-the remaining.
+[...]
 
-After this patch, the same is achieved in cache_shared_cpu_map_setup.
+> diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
+> index bbc6ae32e4af..3f65098aff8d 100644
+> --- a/arch/arm64/kvm/regmap.c
+> +++ b/arch/arm64/kvm/regmap.c
+> @@ -141,28 +141,59 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
+>   /*
+>    * Return the SPSR for the current mode of the virtual CPU.
+>    */
+> -unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
+> +static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
+>   {
+>   	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
+>   	switch (mode) {
+> -	case COMPAT_PSR_MODE_SVC:
+> -		mode = KVM_SPSR_SVC;
+> -		break;
+> -	case COMPAT_PSR_MODE_ABT:
+> -		mode = KVM_SPSR_ABT;
+> -		break;
+> -	case COMPAT_PSR_MODE_UND:
+> -		mode = KVM_SPSR_UND;
+> -		break;
+> -	case COMPAT_PSR_MODE_IRQ:
+> -		mode = KVM_SPSR_IRQ;
+> -		break;
+> -	case COMPAT_PSR_MODE_FIQ:
+> -		mode = KVM_SPSR_FIQ;
+> -		break;
+> +	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
+> +	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
+> +	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
+> +	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
+> +	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
+> +	default: BUG();
+> +	}
+> +}
+> +
+> +unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
+> +{
+> +	int spsr_idx = vcpu_spsr32_mode(vcpu);
+> +
+> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> +		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
+> +
+> +	switch (spsr_idx) {
+> +	case KVM_SPSR_SVC:
+> +		return read_sysreg_el1(spsr);
+> +	case KVM_SPSR_ABT:
+> +		return read_sysreg(spsr_abt);
+> +	case KVM_SPSR_UND:
+> +		return read_sysreg(spsr_und);
+> +	case KVM_SPSR_IRQ:
+> +		return read_sysreg(spsr_irq);
+> +	case KVM_SPSR_FIQ:
+> +		return read_sysreg(spsr_fiq);
+>   	default:
+>   		BUG();
 
-In both case, it was by the end of detect_cache_attributes, so I see no
-issue.
+Nit:
+
+Since the BUG() is in vcpu_spsr32_mode now, you can probably remove it 
+here (or add it to vcpu_write_sprsr32 for consistency).
+
+>   	}
+> +}
+>   
+> -	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
+> +void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
+> +{
+> +	int spsr_idx = vcpu_spsr32_mode(vcpu);
+> +
+> +	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> +		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
+> +
+> +	switch (spsr_idx) {
+> +	case KVM_SPSR_SVC:
+> +		write_sysreg_el1(v, spsr);
+> +	case KVM_SPSR_ABT:
+> +		write_sysreg(v, spsr_abt);
+> +	case KVM_SPSR_UND:
+> +		write_sysreg(v, spsr_und);
+> +	case KVM_SPSR_IRQ:
+> +		write_sysreg(v, spsr_irq);
+> +	case KVM_SPSR_FIQ:
+> +		write_sysreg(v, spsr_fiq);
+> +	}
+>   }
+
+Cheers,
 
 -- 
-Regards,
-Sudeep
+Julien Thierry
