@@ -1,33 +1,46 @@
-From: ryan@edited.us (oscardagrach)
-Date: Wed, 17 Jan 2018 14:35:30 -0600
-Subject: [PATCH] arm64: dts: hikey: Enable HS200 mode on eMMC
-Message-ID: <20180117203531.17152-1-ryan@edited.us>
+From: nicoleotsuka@gmail.com (Nicolin Chen)
+Date: Wed, 17 Jan 2018 12:41:56 -0800
+Subject: [PATCH RFC v1] arm64: Handle traps from accessing CNTVCT/CNTFRQ
+ for CONFIG_COMPAT
+In-Reply-To: <83b9c187-7fbf-3e05-6321-de7fa05fd868@arm.com>
+References: <1515645816-14063-1-git-send-email-nicoleotsuka@gmail.com>
+ <e750e380-f06b-dbbf-a61c-4281c0168b05@arm.com>
+ <20180116203218.GA6318@Asurada-Nvidia>
+ <86r2qpec32.wl-marc.zyngier@arm.com>
+ <20180116213745.GA9545@Asurada-Nvidia>
+ <20180117021346.GA26166@Asurada-Nvidia>
+ <83b9c187-7fbf-3e05-6321-de7fa05fd868@arm.com>
+Message-ID: <20180117204154.GA2935@Asurada-Nvidia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the hi6220 datasheet, the MMC controller is JEDEC eMMC 4.5
-compliant, in addition to supporting a clock of up to 150MHz. The Hikey
-schematic also indicates the device utilizes 1.8v signaling. Define these
-parameters in the device tree to enable HS200 mode.
+On Wed, Jan 17, 2018 at 09:03:48AM +0000, Marc Zyngier wrote:
 
-Signed-off-by: Ryan Grachek <ryan@edited.us>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
- 1 file changed, 2 insertions(+)
+> > So ignoring a condition for a Thumb instruction may cause its IT
+> > scope shifting. For ARM mode, the only penalty could be two Rts
+> > getting written -- which shouldn't corrupt userspace execution.
+> > 
+> > Please correct me if I am wrong or not thorough.
+> 
+> Consider the following:
+> 	
+> 	mov	r0, #0
+> 	mov	r1, #0
+> 	cmp	r1, #3
+> 	mrrceq	r0, r1, cntvct // simplified version
+> 
+> Oh look, you've corrupted r0 and r1, which should never have be changed.
+> Whatever uses the content r0 and r1 after the mrrc will misbehave. How
+> is that an acceptable behaviour? How do you expect userspace to cope
+> with such a brain damage?
+> 
+> If you intend to emulate the CPU, you must emulate it fully, to the
+> letter of the architecture. No ifs, no buts.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 3aee6123d161..964e43e05ac6 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -299,7 +299,9 @@
- 		/* GPIO blocks 16 thru 19 do not appear to be routed to pins */
- 
- 		dwmmc_0: dwmmc0 at f723d000 {
-+			max-frequency = <150000000>;
- 			cap-mmc-highspeed;
-+			mmc-hs200-1_8v;
- 			non-removable;
- 			bus-width = <0x8>;
- 			vmmc-supply = <&ldo19>;
--- 
-2.11.0
+Thanks for the explain. I see the point here.
+
+I saw your version for arm64 compat doesn't check if (rt != 31)
+as MRS handler does. Is there any reason for that?
+
+Thank you
+Nicolin
