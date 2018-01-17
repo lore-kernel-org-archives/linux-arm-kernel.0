@@ -1,39 +1,23 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 18 Jan 2018 00:12:18 +0100
-Subject: [PATCH 07/12] i2c: rk3x: account for const type of
- of_device_id.data
-In-Reply-To: <1514899688-27844-8-git-send-email-Julia.Lawall@lip6.fr>
-References: <1514899688-27844-1-git-send-email-Julia.Lawall@lip6.fr>
- <1514899688-27844-8-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20180117231218.e3xa5vq4mg6b6kta@ninjato>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 17 Jan 2018 15:14:19 -0800
+Subject: [PATCH v2 01/16] drivers: pwm: core: use a single of xlate
+ function
+In-Reply-To: <9a130c0b-572d-be0b-8ac7-596714208d41@microchip.com>
+References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
+ <1515766983-15151-2-git-send-email-claudiu.beznea@microchip.com>
+ <20180112183512.GB102880@google.com>
+ <6441df76-fb4a-ce00-1019-f7ff9143b75e@microchip.com>
+ <CAHp75VcaFDEQ1cBzeU2eBj_vf19ok6EWLC07SOTQLRH8BQSbzA@mail.gmail.com>
+ <9a130c0b-572d-be0b-8ac7-596714208d41@microchip.com>
+Message-ID: <20180117231357.GC112833@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 02, 2018 at 02:28:03PM +0100, Julia Lawall wrote:
-> This driver creates a number of const structures that it stores in
-> the data field of an of_device_id array.
-> 
-> The data field of an of_device_id structure has type const void *, so
-> there is no need for a const-discarding cast when putting const values
-> into such a structure.
-> 
-> Furthermore, adding const to the declaration of the location that
-> receives a const value from such a field ensures that the compiler
-> will continue to check that the value is not modified.  The
-> const-discarding cast on the extraction from the data field is thus
-> no longer needed.
-> 
-> Done using Coccinelle.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
+On Tue, Jan 16, 2018 at 10:24:59AM +0200, Claudiu Beznea wrote:
+> Please explain me further. From this I understand, as a general rule,
+> that the device tree binaries from, e.g. 3 years ago, should be
+> compatible with, e.g. the current version of kernel?
 
-Applied to for-next, thanks!
+Yes.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/4b380b13/attachment.sig>
+https://www.kernel.org/doc/Documentation/devicetree/bindings/ABI.txt
