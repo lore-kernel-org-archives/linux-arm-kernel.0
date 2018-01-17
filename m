@@ -1,58 +1,156 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 17 Jan 2018 17:42:20 +0000
-Subject: [PATCH v2 2/2] arm64: Run enable method for errata work arounds on
- late CPUs
-In-Reply-To: <20180117174220.7959-1-suzuki.poulose@arm.com>
-References: <20180117174220.7959-1-suzuki.poulose@arm.com>
-Message-ID: <20180117174220.7959-3-suzuki.poulose@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 17 Jan 2018 18:47:01 +0100
+Subject: [3/5] clk: divider: add divider_ro_round_rate helper
+In-Reply-To: <f32ed81b-685e-acf6-d2d9-ecd27fd9b8ba@lechnology.com>
+References: <20180105170959.17266-4-jbrunet@baylibre.com>
+ <f32ed81b-685e-acf6-d2d9-ecd27fd9b8ba@lechnology.com>
+Message-ID: <1516211221.2608.140.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is brought up after we have finalised the system
-wide capabilities (i.e, features and errata), we make sure the
-new CPU doesn't need a new errata work around which has not been
-detected already. However we don't run enable() method on the new
-CPU for the errata work arounds already detected. This could
-cause the new CPU running without potential work arounds.
-It is upto the "enable()" method to decide if this CPU should
-do something about the errata.
+On Thu, 2018-01-11 at 17:08 -0600, David Lechner wrote:
+> On 01/05/2018 11:09 AM, Jerome Brunet wrote:
+> > Like divider_round_rate, a couple a of driver are doing more or less
+> > the same operation to round the rate of the divider when it is read-only.
+> > 
+> > We can factor this code so let's provide an helper function for this
+> 
+> Perhaps you could also make use of this new helper here (clk-divider.c):
+> 
+> const struct clk_ops clk_divider_ro_ops = {
+> 	.recalc_rate = clk_divider_recalc_rate,
+> 	.round_rate = clk_divider_round_rate,
+> };
+> EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
 
-Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpu_errata.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+The helper is used in this driver and ro_ops will use it.
+I don't get this comment, could you be more specific
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 90a9e465339c..54e41dfe41f6 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
- {
- 	const struct arm64_cpu_capabilities *caps = arm64_errata;
- 
--	for (; caps->matches; caps++)
--		if (!cpus_have_cap(caps->capability) &&
--			caps->matches(caps, SCOPE_LOCAL_CPU)) {
-+	for (; caps->matches; caps++) {
-+		if (cpus_have_cap(caps->capability)) {
-+			if (caps->enable)
-+				caps->enable((void *)caps);
-+		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
- 			pr_crit("CPU%d: Requires work around for %s, not detected"
- 					" at boot time\n",
- 				smp_processor_id(),
- 				caps->desc ? : "an erratum");
- 			cpu_die_early();
- 		}
-+	}
- }
- 
- void update_cpu_errata_workarounds(void)
--- 
-2.13.6
+> 
+> > 
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> > ---
+> >   drivers/clk/clk-divider.c    | 43 ++++++++++++++++++++++++++++---------------
+> >   include/linux/clk-provider.h | 15 +++++++++++++++
+> >   2 files changed, 43 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> > index a851d3e04c7f..3eb2b27f3513 100644
+> > --- a/drivers/clk/clk-divider.c
+> > +++ b/drivers/clk/clk-divider.c
+> > @@ -344,29 +344,42 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+> >   }
+> >   EXPORT_SYMBOL_GPL(divider_round_rate_parent);
+> >   
+> 
+> It is nice to have documentation comments on public functions. Especially
+> in this case where @prate is an in/out parameter and @table is optional.
+
+Sure, but divider_round_rate_parent was already and undocumented. There is no
+reason to change this is this particular patch (it is not the topic)
+
+The RO helper being the counter part of this one, it did not do it differently
+
+I suppose a documentation could be added in another patch.
+
+However, I don't know if there is policy regarding the documentation of
+functions internal to CCF. Maybe Stephen can tell us ?
+
+Cheers
+Jerome
+
+
+> 
+> > +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+> > +				  unsigned long rate, unsigned long *prate,
+> > +				  const struct clk_div_table *table, u8 width,
+> > +				  unsigned long flags, unsigned int val)
+> > +{
+> > +	int div;
+> > +
+> > +	div = _get_div(table, val, flags, width);
+> > +
+> > +	/* Even a read-only clock can propagate a rate change */
+> > +	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+> > +		if (!parent)
+> > +			return -EINVAL;
+> > +
+> > +		*prate = clk_hw_round_rate(parent, rate * div);
+> > +	}
+> > +
+> > +	return DIV_ROUND_UP_ULL((u64)*prate, div);
+> > +}
+> > +EXPORT_SYMBOL_GPL(divider_ro_round_rate_parent);
+> > +
+> > +
+> >   static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> >   				unsigned long *prate)
+> >   {
+> >   	struct clk_divider *divider = to_clk_divider(hw);
+> > -	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
+> > -	int bestdiv;
+> > +	u32 val;
+> >   
+> >   	/* if read only, just return current value */
+> >   	if (divider->flags & CLK_DIVIDER_READ_ONLY) {
+> > -		bestdiv = clk_readl(divider->reg) >> divider->shift;
+> > -		bestdiv &= div_mask(divider->width);
+> > -		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
+> > -			divider->width);
+> > -
+> > -		/* Even a read-only clock can propagate a rate change */
+> > -		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
+> > -			if (!hw_parent)
+> > -				return -EINVAL;
+> > -
+> > -			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
+> > -		}
+> > +		val = clk_readl(divider->reg) >> divider->shift;
+> > +		val &= div_mask(divider->width);
+> >   
+> > -		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
+> > +		return divider_ro_round_rate(hw, rate, prate, divider->table,
+> > +					     divider->width, divider->flags,
+> > +					     val);
+> >   	}
+> >   
+> >   	return divider_round_rate(hw, rate, prate, divider->table,
+> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > index 175a62a15619..eb2c3a035e98 100644
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -417,6 +417,10 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+> >   			       unsigned long rate, unsigned long *prate,
+> >   			       const struct clk_div_table *table,
+> >   			       u8 width, unsigned long flags);
+> > +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
+> > +				  unsigned long rate, unsigned long *prate,
+> > +				  const struct clk_div_table *table, u8 width,
+> > +				  unsigned long flags, unsigned int val);
+> >   int divider_get_val(unsigned long rate, unsigned long parent_rate,
+> >   		const struct clk_div_table *table, u8 width,
+> >   		unsigned long flags);
+> > @@ -772,6 +776,17 @@ static inline long divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> >   					 rate, prate, table, width, flags);
+> >   }
+> >   
+> 
+> Same here (about documentation comment).
+> 
+> > +static inline long divider_ro_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +					 unsigned long *prate,
+> > +					 const struct clk_div_table *table,
+> > +					 u8 width, unsigned long flags,
+> > +					 unsigned int val)
+> > +{
+> > +	return divider_ro_round_rate_parent(hw, clk_hw_get_parent(hw),
+> > +					    rate, prate, table, width, flags,
+> > +					    val);
+> > +}
+> > +
+> >   /*
+> >    * FIXME clock api without lock protection
+> >    */
+> > 
+> 
+> 
