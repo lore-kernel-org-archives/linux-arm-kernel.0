@@ -1,171 +1,291 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 17 Jan 2018 21:14:16 +0100
-Subject: [PATCH v3 07/12] drm/sun4i: Add has_channel_0 TCON quirk
+Date: Wed, 17 Jan 2018 21:14:15 +0100
+Subject: [PATCH v3 06/12] dt-bindings: display: sun4i-drm: Add A83T HDMI
+ pipeline
 In-Reply-To: <20180117201421.25954-1-jernej.skrabec@siol.net>
 References: <20180117201421.25954-1-jernej.skrabec@siol.net>
-Message-ID: <20180117201421.25954-8-jernej.skrabec@siol.net>
+Message-ID: <20180117201421.25954-7-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some TCONs on newer SoCs doesn't support channel 0, since they are meant
-to be used only with TV or HDMI encoder.
+This commit adds all necessary compatibles and descriptions needed to
+implement A83T HDMI pipeline.
 
-Prepare support for them with adding has_channel_0 quirk.
+Mixer is already properly described, so only compatible is added.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+However, A83T TV TCON, which is connected to HDMI, doesn't have channel 0,
+contrary to all TCONs currently described. Because of that, TCON
+documentation is extended.
+
+A83T features Synopsys DW HDMI controller with a custom PHY which looks
+like Synopsys Gen2 PHY with few additions. Since there is no
+documentation, needed properties were found out through experimentation
+and reading BSP code.
+
+At the end, example is added for newer SoCs, which feature DE2 and DW
+HDMI.
+
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 41 +++++++++++++++++++++++++++-----------
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
- 2 files changed, 30 insertions(+), 12 deletions(-)
+ .../bindings/display/sunxi/sun4i-drm.txt           | 197 ++++++++++++++++++++-
+ 1 file changed, 190 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index b78fed809992..0815c528d08e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -84,6 +84,7 @@ static void sun4i_tcon_channel_set_status(struct sun4i_tcon *tcon, int channel,
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index cd626ee1147a..4fb380f3e53d 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -64,6 +64,52 @@ Required properties:
+     first port should be the input endpoint. The second should be the
+     output, usually to an HDMI connector.
  
- 	switch (channel) {
- 	case 0:
-+		WARN_ON(!tcon->quirks->has_channel_0);
- 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
- 				   SUN4I_TCON0_CTL_TCON_ENABLE,
- 				   enabled ? SUN4I_TCON0_CTL_TCON_ENABLE : 0);
-@@ -276,6 +277,8 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
- 	u8 clk_delay;
- 	u32 reg, val = 0;
- 
-+	WARN_ON(!tcon->quirks->has_channel_0);
++DWC HDMI TX Encoder
++-------------------
 +
- 	tcon->dclk_min_div = 7;
- 	tcon->dclk_max_div = 7;
- 	sun4i_tcon0_mode_set_common(tcon, mode);
-@@ -344,6 +347,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 	u8 clk_delay;
- 	u32 val = 0;
- 
-+	WARN_ON(!tcon->quirks->has_channel_0);
++The HDMI transmitter is a Synopsys DesignWare HDMI 1.4 TX controller IP
++with Allwinner's own PHY IP. It supports audio and video outputs and CEC.
 +
- 	tcon->dclk_min_div = 6;
- 	tcon->dclk_max_div = 127;
- 	sun4i_tcon0_mode_set_common(tcon, mode);
-@@ -570,10 +575,12 @@ static int sun4i_tcon_init_clocks(struct device *dev,
- 	}
- 	clk_prepare_enable(tcon->clk);
++These DT bindings follow the Synopsys DWC HDMI TX bindings defined in
++Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt with the
++following device-specific properties.
++
++Required properties:
++
++  - compatible: value must be one of:
++    * "allwinner,sun8i-a83t-dw-hdmi"
++  - reg: base address and size of memory-mapped region
++  - reg-io-width: See dw_hdmi.txt. Shall be 1.
++  - interrupts: HDMI interrupt number
++  - clocks: phandles to the clocks feeding the HDMI encoder
++    * iahb: the HDMI bus clock
++    * isfr: the HDMI register clock
++  - clock-names: the clock names mentioned above
++  - resets: phandle to the reset controller
++  - reset-names: must be "ctrl"
++  - phys: phandle to the DWC HDMI PHY
++  - phy-names: must be "phy"
++
++  - ports: A ports node with endpoint definitions as defined in
++    Documentation/devicetree/bindings/media/video-interfaces.txt. The
++    first port should be the input endpoint. The second should be the
++    output, usually to an HDMI connector.
++
++DWC HDMI PHY
++------------
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun8i-a83t-hdmi-phy
++  - reg: base address and size of memory-mapped region
++  - clocks: phandles to the clocks feeding the HDMI PHY
++    * bus: the HDMI PHY interface clock
++    * mod: the HDMI PHY module clock
++    * tmds: TMDS clock
++  - clock-names: the clock names mentioned above
++  - resets: phandle to the reset controller driving the PHY
++  - reset-names: must be "phy"
++
+ TV Encoder
+ ----------
  
--	tcon->sclk0 = devm_clk_get(dev, "tcon-ch0");
--	if (IS_ERR(tcon->sclk0)) {
--		dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
--		return PTR_ERR(tcon->sclk0);
-+	if (tcon->quirks->has_channel_0) {
-+		tcon->sclk0 = devm_clk_get(dev, "tcon-ch0");
-+		if (IS_ERR(tcon->sclk0)) {
-+			dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
-+			return PTR_ERR(tcon->sclk0);
-+		}
- 	}
+@@ -94,24 +140,23 @@ Required properties:
+    * allwinner,sun7i-a20-tcon
+    * allwinner,sun8i-a33-tcon
+    * allwinner,sun8i-a83t-tcon-lcd
++   * allwinner,sun8i-a83t-tcon-tv
+    * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+- - clocks: phandles to the clocks feeding the TCON. Three are needed:
++ - clocks: phandles to the clocks feeding the TCON. One is needed:
+    - 'ahb': the interface clocks
+-   - 'tcon-ch0': The clock driving the TCON channel 0
+  - resets: phandles to the reset controllers driving the encoder
+    - "lcd": the reset line for the TCON channel 0
  
- 	if (tcon->quirks->has_channel_1) {
-@@ -930,10 +937,12 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_clocks;
- 	}
+  - clock-names: the clock names mentioned above
+  - reset-names: the reset names mentioned above
+- - clock-output-names: Name of the pixel clock created
  
--	ret = sun4i_dclk_create(dev, tcon);
--	if (ret) {
--		dev_err(dev, "Couldn't create our TCON dot clock\n");
--		goto err_free_clocks;
-+	if (tcon->quirks->has_channel_0) {
-+		ret = sun4i_dclk_create(dev, tcon);
-+		if (ret) {
-+			dev_err(dev, "Couldn't create our TCON dot clock\n");
-+			goto err_free_clocks;
-+		}
- 	}
+ - ports: A ports node with endpoint definitions as defined in
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoint, the second one the output
  
- 	ret = sun4i_tcon_init_irq(dev, tcon);
-@@ -991,7 +1000,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	return 0;
+-  The output may have multiple endpoints. The TCON has two channels,
++  The output may have multiple endpoints. TCON can have two channels,
+   usually with the first channel being used for the panels interfaces
+   (RGB, LVDS, etc.), and the second being used for the outputs that
+   require another controller (TV Encoder, HDMI, etc.). The endpoints
+@@ -119,11 +164,16 @@ Required properties:
+   channel the endpoint is associated to. If that property is not
+   present, the endpoint number will be used as the channel number.
  
- err_free_dotclock:
--	sun4i_dclk_free(tcon);
-+	if (tcon->quirks->has_channel_0)
-+		sun4i_dclk_free(tcon);
- err_free_clocks:
- 	sun4i_tcon_free_clocks(tcon);
- err_assert_reset:
-@@ -1005,7 +1015,8 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
- 	struct sun4i_tcon *tcon = dev_get_drvdata(dev);
++When TCON supports channel 0 (all TCONs except TV TCON on A83T), two
++more clocks are needed:
++   - 'tcon-ch0': The clock driving the TCON channel 0
++   - clock-output-names: Name of the pixel clock created
++
+ On SoCs other than the A33 and V3s, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
  
- 	list_del(&tcon->list);
--	sun4i_dclk_free(tcon);
-+	if (tcon->quirks->has_channel_0)
-+		sun4i_dclk_free(tcon);
- 	sun4i_tcon_free_clocks(tcon);
- }
+-On SoCs that support LVDS (all SoCs but the A13, H3, H5 and V3s), you
+-need one more reset line:
++When TCON support LVDS (all TCONs except TV TCON on A83T and those found
++in A13, H3, H5 and V3s SoCs), you need one more reset line:
+    - 'lvds': The reset line driving the LVDS logic
  
-@@ -1102,16 +1113,19 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
- }
+ And on the A23, A31, A31s and A33, you need one more clock line:
+@@ -226,6 +276,7 @@ supported.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-a83t-de2-mixer-0
++    * allwinner,sun8i-a83t-de2-mixer-1
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+@@ -261,7 +312,7 @@ Required properties:
+   - allwinner,pipelines: list of phandle to the display engine
+     frontends (DE 1.0) or mixers (DE 2.0) available.
  
- static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
-+	.has_channel_0		= true,
- 	.has_channel_1		= true,
- 	.set_mux		= sun4i_a10_tcon_set_mux,
+-Example:
++Example 1:
+ 
+ panel: panel {
+ 	compatible = "olimex,lcd-olinuxino-43-ts";
+@@ -460,3 +511,135 @@ display-engine {
+ 	compatible = "allwinner,sun5i-a13-display-engine";
+ 	allwinner,pipelines = <&fe0>;
  };
- 
- static const struct sun4i_tcon_quirks sun5i_a13_quirks = {
-+	.has_channel_0		= true,
- 	.has_channel_1		= true,
- 	.set_mux		= sun5i_a13_tcon_set_mux,
- };
- 
- static const struct sun4i_tcon_quirks sun6i_a31_quirks = {
-+	.has_channel_0		= true,
- 	.has_channel_1		= true,
- 	.has_lvds_alt		= true,
- 	.needs_de_be_mux	= true,
-@@ -1119,26 +1133,29 @@ static const struct sun4i_tcon_quirks sun6i_a31_quirks = {
- };
- 
- static const struct sun4i_tcon_quirks sun6i_a31s_quirks = {
-+	.has_channel_0		= true,
- 	.has_channel_1		= true,
- 	.needs_de_be_mux	= true,
- };
- 
- static const struct sun4i_tcon_quirks sun7i_a20_quirks = {
-+	.has_channel_0		= true,
- 	.has_channel_1		= true,
- 	/* Same display pipeline structure as A10 */
- 	.set_mux		= sun4i_a10_tcon_set_mux,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
-+	.has_channel_0		= true,
- 	.has_lvds_alt		= true,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
--	/* nothing is supported */
-+	.has_channel_0		= true,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
--	/* nothing is supported */
-+	.has_channel_0		= true,
- };
- 
- /* sun4i_drv uses this list to check if a device node is a TCON */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index b761c7b823c5..78d55e7cd2b3 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -172,6 +172,7 @@
- struct sun4i_tcon;
- 
- struct sun4i_tcon_quirks {
-+	bool	has_channel_0;	/* a83t does not have channel 0 on second TCON */
- 	bool	has_channel_1;	/* a33 does not have channel 1 */
- 	bool	has_lvds_alt;	/* Does the LVDS clock have a parent other than the TCON clock? */
- 	bool	needs_de_be_mux; /* sun6i needs mux to select backend */
++
++Example 2:
++
++connector {
++	compatible = "hdmi-connector";
++	type = "a";
++
++	port {
++		hdmi_con_in: endpoint {
++			remote-endpoint = <&hdmi_out_con>;
++		};
++	};
++};
++
++de: display-engine {
++	compatible = "allwinner,sun8i-a83t-display-engine";
++	allwinner,pipelines = <&mixer1>;
++};
++
++mixer1: mixer at 1200000 {
++	compatible = "allwinner,sun8i-a83t-de2-mixer-1";
++	reg = <0x01200000 0x100000>;
++	clocks = <&display_clocks CLK_BUS_MIXER1>,
++		 <&display_clocks CLK_MIXER1>;
++	clock-names = "bus",
++		      "mod";
++	resets = <&display_clocks RST_WB>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		mixer1_out: port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			mixer1_out_tcon1: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&tcon1_in_mixer1>;
++			};
++		};
++	};
++};
++
++tcon1: lcd-controller at 1c0d000 {
++	compatible = "allwinner,sun8i-a83t-tcon-tv";
++	reg = <0x01c0d000 0x1000>;
++	interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&ccu CLK_BUS_TCON1>, <&ccu CLK_TCON1>;
++	clock-names = "ahb", "tcon-ch1";
++	resets = <&ccu RST_BUS_TCON1>;
++	reset-names = "lcd";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		tcon1_in: port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			tcon1_in_mixer1: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&mixer1_out_tcon1>;
++			};
++		};
++
++		tcon1_out: port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			tcon1_out_hdmi: endpoint at 1 {
++				reg = <1>;
++				remote-endpoint = <&hdmi_in_tcon1>;
++			};
++		};
++	};
++};
++
++hdmi: hdmi at 1ee0000 {
++	compatible = "allwinner,sun8i-a83t-dw-hdmi";
++	reg = <0x01ee0000 0x10000>;
++	reg-io-width = <1>;
++	interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_SLOW>;
++	clock-names = "iahb", "isfr";
++	resets = <&ccu RST_BUS_HDMI1>;
++	reset-names = "ctrl";
++	phys = <&hdmi_phy>;
++	phy-names = "hdmi-phy";
++	status = "disabled";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		hdmi_in: port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			hdmi_in_tcon1: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&tcon1_out_hdmi>;
++			};
++		};
++
++		hdmi_out: port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			hdmi_out_con: endpoint {
++				remote-endpoint = <&hdmi_con_in>;
++			};
++		};
++	};
++};
++
++hdmi_phy: hdmi-phy at 1ef0000 {
++	compatible = "allwinner,sun8i-a83t-hdmi-phy";
++	reg = <0x01ef0000 0x10000>;
++	clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_SLOW>,
++		 <&ccu CLK_HDMI>;
++	clock-names = "bus", "mod", "tmds";
++	resets = <&ccu RST_BUS_HDMI0>;
++	reset-names = "phy";
++	#phy-cells = <0>;
++};
 -- 
 2.15.1
