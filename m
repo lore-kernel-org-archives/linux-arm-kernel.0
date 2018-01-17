@@ -1,29 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 17 Jan 2018 20:29:31 +0530
-Subject: [PATCH v5 16/44] clk: davinci: Add platform information for TI
- DM646x PSC
-In-Reply-To: <1515377863-20358-17-git-send-email-david@lechnology.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-17-git-send-email-david@lechnology.com>
-Message-ID: <000fc63a-bba5-6fac-450b-5ed0f8a9bfea@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 17 Jan 2018 16:02:56 +0100
+Subject: [PATCH] clk: imx: pllv2: avoid using uninitialized values
+Message-ID: <20180117150256.7430-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+Forward the errors returned by __clk_pllv2_set_rate() in the recalc rate
+function, to avoid using uninitialized values for the rate calculation.
 
-> +void __init dm646x_psc_clk_init(void __iomem *psc)
-> +{
-> +	struct clk_onecell_data *clk_data;
-> +
-> +	clk_data = davinci_psc_register_clocks(psc, dm646x_psc_info, 41);
-> +	if (!clk_data)
-> +		return;
-> +
-> +	clk_register_clkdev(clk_data->clks[0], "arm", NULL);
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ drivers/clk/imx/clk-pllv2.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-I don't think this "arm" con_id is used any where for non-DA850 SoCs.
-And same with "dsp" in other files. Probably best to drop these dubious
-usage ones rather than carry them forward.
-
-Thanks,
-Sekhar
+diff --git a/drivers/clk/imx/clk-pllv2.c b/drivers/clk/imx/clk-pllv2.c
+index 85b5cbe9744c..eeba3cb14e2d 100644
+--- a/drivers/clk/imx/clk-pllv2.c
++++ b/drivers/clk/imx/clk-pllv2.c
+@@ -182,8 +182,12 @@ static long clk_pllv2_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		unsigned long *prate)
+ {
+ 	u32 dp_op, dp_mfd, dp_mfn;
++	int ret;
++
++	ret = __clk_pllv2_set_rate(rate, *prate, &dp_op, &dp_mfd, &dp_mfn);
++	if (ret)
++		return ret;
+ 
+-	__clk_pllv2_set_rate(rate, *prate, &dp_op, &dp_mfd, &dp_mfn);
+ 	return __clk_pllv2_recalc_rate(*prate, MXC_PLL_DP_CTL_DPDCK0_2_EN,
+ 			dp_op, dp_mfd, dp_mfn);
+ }
+-- 
+2.11.0
