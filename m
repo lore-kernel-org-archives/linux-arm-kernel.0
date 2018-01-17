@@ -1,49 +1,69 @@
-From: jmarchan@redhat.com (Jerome Marchand)
-Date: Wed, 17 Jan 2018 16:03:13 +0100
-Subject: [PATCH v3] arm64: fix unwind_frame() for filtered out fn for
- function graph tracing
-In-Reply-To: <20180116175734.4rp4bewr7us4jypk@armageddon.cambridge.arm.com>
-References: <20180112104832.9417-1-jmarchan@redhat.com>
- <20180116175734.4rp4bewr7us4jypk@armageddon.cambridge.arm.com>
-Message-ID: <ae2880e9-0d59-19fc-0d1f-80c2f011415f@redhat.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 17 Jan 2018 15:11:33 +0000
+Subject: [PATCH v3 10/41] KVM: arm64: Move debug dirty flag calculation
+ out of world switch
+In-Reply-To: <20180112120747.27999-11-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-11-christoffer.dall@linaro.org>
+Message-ID: <a34bfed5-05d3-7835-57cc-84ae874741a9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/18 18:57, Catalin Marinas wrote:
-> On Fri, Jan 12, 2018 at 11:48:32AM +0100, Jerome Marchand wrote:
->> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->> index 76809ccd309c..5a528c58ef68 100644
->> --- a/arch/arm64/kernel/stacktrace.c
->> +++ b/arch/arm64/kernel/stacktrace.c
->> @@ -59,6 +59,10 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
->>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>  	if (tsk->ret_stack &&
->>  			(frame->pc == (unsigned long)return_to_handler)) {
->> +		WARN_ON(frame->graph == -1);
->> +		if (frame->graph < -1)
->> +			frame->graph += FTRACE_NOTRACE_DEPTH;
->> +
->>  		/*
->>  		 * This is a case where function graph tracer has
->>  		 * modified a return address (LR) in a stack frame
+
+
+On 12/01/18 12:07, Christoffer Dall wrote:
+> There is no need to figure out inside the world-switch if we should
+> save/restore the debug registers or not, we can might as well do that in
+
+Nit: -can*
+
+> the higher level debug setup code, making it easier to optimize down the
+> line.
 > 
-> So do we still allow this to continue if graph == -1? The following line
-> doesn't seem safe:
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+> ---
+>   arch/arm64/kvm/debug.c        | 5 +++++
+>   arch/arm64/kvm/hyp/debug-sr.c | 6 ------
+>   2 files changed, 5 insertions(+), 6 deletions(-)
 > 
-> 		frame->pc = tsk->ret_stack[frame->graph--].ret;
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index fa63b28c65e0..feedb877cff8 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -193,6 +193,11 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>   	if (trap_debug)
+>   		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+>   
+> +	/* If KDE or MDE are set, perform a full save/restore cycle. */
+> +	if ((vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_KDE) ||
+> +	    (vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_MDE))
+> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+> +
+>   	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+>   	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
+>   }
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index 321c9c05dd9e..406829b6a43e 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -162,12 +162,6 @@ void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
+>   
+>   void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>   {
+> -	/* If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
+> -	 * a full save/restore cycle. */
+> -	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
+> -	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
+> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+> -
+>   	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+>   			   kern_hyp_va(vcpu->arch.host_cpu_context));
+>   	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
 > 
 
-You're right. We probably should return a error (-EINVAL I guess) if
-this happens. Note that this shouldn't happen here and if we're
-confident enough that profile_pc() was the only faulty caller, we could
-just drop the warning.
-
-Jerome
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180117/2bb52dbe/attachment.sig>
+-- 
+Julien Thierry
