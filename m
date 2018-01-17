@@ -1,41 +1,76 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 17 Jan 2018 20:32:22 +0100 (CET)
-Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
-References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
- <1059643032.72553.1516136078614@email.1und1.de>
- <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
- <1199109167.10232.1516213158515@email.1und1.de>
- <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
-Message-ID: <998321576.11526.1516217542223@email.1und1.de>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Wed, 17 Jan 2018 22:37:17 +0300
+Subject: DT binding for staging vchiq
+In-Reply-To: <299185620.10681.1516214926155@email.1und1.de>
+References: <3379fe3c-62ef-85a1-0073-da184e32cdf8@orpaltech.com>
+ <299185620.10681.1516214926155@email.1und1.de>
+Message-ID: <953ec60d-f8f8-f871-9e9e-bda882ea03fb@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergey,
+Stefan, thank you so much for detailed answer.
 
-> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 19:49 geschrieben:
-> 
-> 
-> Hi Stefan
-> 
-> wifi network was working fine when I used a raspbian image downloaded 
-> from official site.
-> 
-> Here is my config https://pastebin.com/7XRpmM0X  and cpuinfo 
-> https://pastebin.com/08Z6gDZ9
-> 
-> I have no idea about version you are talking about.
 
-please stop top-posting.
-
-I was talking about the board revision of your RPi. You can get this information by looking at the PCB.
-
-I updated to the last firmware and your config but i'm unable to reproduce this issue.
-
-Do you use U-Boot or only the Raspberry Pi bootloader?
-What are your modifications to config.txt?
-
-> 
-> Thanks.
-> 
+On 01/17/2018 09:48 PM, Stefan Wahren wrote:
+> Hi Sergey,
 >
+>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 14:45 geschrieben:
+>>
+>>
+>> Hello everyone,
+>>
+>> I am trying to use RPi3  VC4 gpu with Qt5 quick/qml. When I run my
+>> application Qt5 is always complaining about missing vchiq device in the
+>> system. I know there is vchiq driver available in staging.
+>>
+>> My questions are:
+>>
+>> 1) What is the current status of the driver ? Is it working at all?
+>  From my point of view it's still experimental. It's mostly the same driver as in downstream, but its function highly dependents on the configuration:
+>
+> arm/bcm2835_defconfig = should work
+> arm/multi_v7_defconfig = may work
+> arm64/defconfig = won't work [1]
+>
+> In order to the function of the driver use vchiq_test from the Raspberry Pi userland.
+>
+> Btw testers are always welcome :-)
+>
+>> can it be used with Qt5 ?
+> If your application works with the downstream kernel, there is a high chance.
+>
+>> 2) Can I have a working example of DT binding for the driver ?
+> This is one of my many TODOs [2] to provide a binding document. Please try the following old patch. The cache-line-size depends on the used SoC (BCM2835 = 32, BCM2836/BCM2837 = 64).
+>
+> Good luck
+>
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> index e55b362..7398b96 100644
+> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> @@ -27,6 +27,14 @@
+>                          firmware = <&firmware>;
+>                          #power-domain-cells = <1>;
+>                  };
+> +
+> +               vchiq: vchiq {
+> +                       compatible = "brcm,bcm2835-vchiq";
+> +                       reg = <0x7e00b840 0xf>;
+> +                       interrupts = <0 2>;
+> +                       cache-line-size = <64>;
+> +                       firmware = <&firmware>;
+> +		};
+>          };
+>   };
+>
+>
+> [1] - https://github.com/lategoodbye/rpi-zero/issues/23
+> [2] - https://github.com/lategoodbye/rpi-zero/issues/8
+>
+>> Thanks
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
