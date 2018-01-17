@@ -1,127 +1,55 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 17 Jan 2018 11:47:19 +0200
-Subject: PM regression in next
-In-Reply-To: <20180115185525.GA4042@atomide.com>
-References: <20180112221126.GK21458@sirena.org.uk>
- <20180112224959.GH4821@atomide.com> <20180112225947.GL21458@sirena.org.uk>
- <87wp0jzyig.wl%kuninori.morimoto.gx@renesas.com>
- <20180115165050.GJ4821@atomide.com> <20180115171917.GB12018@sirena.org.uk>
- <20180115175220.GK4821@atomide.com> <20180115175626.GC12018@sirena.org.uk>
- <20180115180626.GL4821@atomide.com> <20180115181352.GD12018@sirena.org.uk>
- <20180115185525.GA4042@atomide.com>
-Message-ID: <e168493c-c1db-07e5-a33b-faa447e22f4a@ti.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 17 Jan 2018 10:05:56 +0000
+Subject: [PATCH] arm64: Run enable method for errata work arounds on late CPUs
+Message-ID: <20180117100556.29270-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When a CPU is brought up after we have finalised the system
+wide capabilities (i.e, features and errata), we make sure the
+new CPU doesn't need a new errata work around which has not been
+detected already. However we don't run enable() method on the new
+CPU for the errata work arounds already detected. This could
+cause the new CPU running without potential work arounds.
+It is upto the "enable()" method to decide if this CPU should
+do something about the errata.
 
-On 2018-01-15 20:55, Tony Lindgren wrote:
-> * Mark Brown <broonie@kernel.org> [180115 18:14]:
->> On Mon, Jan 15, 2018 at 10:06:26AM -0800, Tony Lindgren wrote:
->>> * Mark Brown <broonie@kernel.org> [180115 17:56]:
->>
->>>> Sorry, I didn't actually post it - just suggested adding the
->>>> snd_soc_codec_set_regmap() call.
->>
->>> Oh I see. Yeah that seems like a good long term solution after
->>> the regressions are fixed.
->>
->> I would like to see us do that sooner rather than later assuming it
->> addresses the issue, it's quicker and simpler.
-> 
-> Peter, can you take a look at that?
+Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpu_errata.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Sorry I have missed the thread...
-
-> 
-> Meanwhile, here's a regression fix for Linux next for twl4030
-> and 6040 drivers.
-
-The .read and the .write in snd_soc_codec_driver is needed. Without it
-DAPM can not read/write to registers when we have codec driver which
-does not have regmap. twl4030/6040 is an MFD device and the regmap is
-owned by the mfd driver, the codec, vibra, gpio, clk, etc sub devices
-are using callbacks to do IO.
-
-I will look at the local caching, but afaik it was needed and can not be
-done in regmap or mfd level.
-
-I will also take a look at the dac33 driver to see if it is broken, but
-I don't have Nokia n9/n950 where I could test it.
-
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ---------------------
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Fri, 12 Jan 2018 10:24:36 -0800
-> Subject: [PATCH] ASoC: Fix twl4030 and 6040 regression by adding back read
->  and write
-> 
-> Commit 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read on twl4030")
-> caused regressions for both twl4030 and twl6040 as it assumes the
-> ASoC driver is using regmap. As a side effect, this also causes a
-> considerable increase in idle power consumption omap3 boards using
-> twl4030 as the PMIC.
-> 
-> This is because the removal of read and write function pointers
-> causes some of the ASoC IO functions to not do anything. For example,
-> snd_soc_register_card() calls snd_soc_dapm_new_widgets() that calls
-> snd_soc_codec_drv_read() that now does nothing.
-> 
-> A long term solution suggested by Mark Brown <broonie@kernel.org>
-> is to make the twl drivers use regmap by adding a call to
-> snd_soc_codec_set_regmap(). This however needs more consideration
-> as currently the driver internal reads do caching and we would have
-> both regmap access and internal read/write access accessing the same
-> hardware registers.
-> 
-> So to fix the regression, let's just do a partial revert adding back
-> the read and write function pointers. Note that other non-regmap
-> ASoC drivers may need similar patches.
-> 
-> Fixes: 3bb0f7c31b1a ("ASoC: don't use snd_soc_write/read on twl4030")
-> Fixes: 93a00c467fe9 ("ASoC: don't use snd_soc_write/read on twl6040")
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  sound/soc/codecs/twl4030.c | 2 ++
->  sound/soc/codecs/twl6040.c | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-> --- a/sound/soc/codecs/twl4030.c
-> +++ b/sound/soc/codecs/twl4030.c
-> @@ -2195,6 +2195,8 @@ static int twl4030_soc_remove(struct snd_soc_codec *codec)
->  static const struct snd_soc_codec_driver soc_codec_dev_twl4030 = {
->  	.probe = twl4030_soc_probe,
->  	.remove = twl4030_soc_remove,
-> +	.read = twl4030_read,
-> +	.write = twl4030_write,
->  	.set_bias_level = twl4030_set_bias_level,
->  	.idle_bias_off = true,
->  
-> diff --git a/sound/soc/codecs/twl6040.c b/sound/soc/codecs/twl6040.c
-> --- a/sound/soc/codecs/twl6040.c
-> +++ b/sound/soc/codecs/twl6040.c
-> @@ -1158,6 +1158,8 @@ static int twl6040_remove(struct snd_soc_codec *codec)
->  static const struct snd_soc_codec_driver soc_codec_dev_twl6040 = {
->  	.probe = twl6040_probe,
->  	.remove = twl6040_remove,
-> +	.read = twl6040_read,
-> +	.write = twl6040_write,
->  	.set_bias_level = twl6040_set_bias_level,
->  	.suspend_bias_off = true,
->  	.ignore_pmdown_time = true,
-> 
-
-- P?ter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 90a9e465339c..54e41dfe41f6 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
+ {
+ 	const struct arm64_cpu_capabilities *caps = arm64_errata;
+ 
+-	for (; caps->matches; caps++)
+-		if (!cpus_have_cap(caps->capability) &&
+-			caps->matches(caps, SCOPE_LOCAL_CPU)) {
++	for (; caps->matches; caps++) {
++		if (cpus_have_cap(caps->capability)) {
++			if (caps->enable)
++				caps->enable((void *)caps);
++		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
+ 			pr_crit("CPU%d: Requires work around for %s, not detected"
+ 					" at boot time\n",
+ 				smp_processor_id(),
+ 				caps->desc ? : "an erratum");
+ 			cpu_die_early();
+ 		}
++	}
+ }
+ 
+ void update_cpu_errata_workarounds(void)
+-- 
+2.13.6
