@@ -1,26 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Jan 2018 11:52:11 +0000
-Subject: [PATCH] arm64: mm: Add additional parameter to
- uaccess_ttbr0_disable
-In-Reply-To: <20180117113850.21949-1-christoffer.dall@linaro.org>
-References: <20180117113850.21949-1-christoffer.dall@linaro.org>
-Message-ID: <20180117115211.itijfrz6o6xibf7n@armageddon.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 17 Jan 2018 11:54:42 +0000
+Subject: [PATCH v2 4/6] irqchip/gic: Add functions to access irq priorities
+In-Reply-To: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1516190084-18978-5-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 12:38:50PM +0100, Christoffer Dall wrote:
-> Add an extra temporary register parameter to uaccess_ttbr0_disable which
-> is about to be required for arm64 PAN support.
-> 
-> This patch doesn't introduce any functional change but ensures that the
-> kernel compiles once the KVM/ARM tree is merged with the arm64 tree by
-> ensuring a trivially mergable conflict with commit
-> 6b88a32c7af68895134872cdec3b6bfdb532d94e
-> ("arm64: kpti: Fix the interaction between ASID switching and software PAN").
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Add functions to read/write priorities to the GIC [re]distributor.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-common.c | 10 ++++++++++
+ drivers/irqchip/irq-gic-common.h |  2 ++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+index 30017df..1dfa60b 100644
+--- a/drivers/irqchip/irq-gic-common.c
++++ b/drivers/irqchip/irq-gic-common.c
+@@ -91,6 +91,16 @@ int gic_configure_irq(unsigned int irq, unsigned int type,
+ 	return ret;
+ }
+
++void gic_set_irq_prio(unsigned int irq, void __iomem *base, u8 prio)
++{
++	writeb_relaxed(prio, base + GIC_DIST_PRI + irq);
++}
++
++u8 gic_get_irq_prio(unsigned int irq, void __iomem *base)
++{
++	return readb_relaxed(base + GIC_DIST_PRI + irq);
++}
++
+ void gic_dist_config(void __iomem *base, int gic_irqs,
+ 		     void (*sync_access)(void))
+ {
+diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+index 3919cd7..1586dbd 100644
+--- a/drivers/irqchip/irq-gic-common.h
++++ b/drivers/irqchip/irq-gic-common.h
+@@ -35,6 +35,8 @@ void gic_dist_config(void __iomem *base, int gic_irqs,
+ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
+ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
+ 		void *data);
++void gic_set_irq_prio(unsigned int irq, void __iomem *base, u8 prio);
++u8 gic_get_irq_prio(unsigned int irq, void __iomem *base);
+
+ void gic_set_kvm_info(const struct gic_kvm_info *info);
+
+--
+1.9.1
