@@ -1,92 +1,46 @@
 From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 17 Jan 2018 20:46:08 +0800
-Subject: [PATCH v2 01/13] iommu/rockchip: Request irqs in rk_iommu_probe()
-In-Reply-To: <0b341bbd-6823-a041-9cac-e35bdc9e9bdc@arm.com>
+Date: Wed, 17 Jan 2018 20:47:22 +0800
+Subject: [PATCH v2 09/13] iommu/rockchip: Use iommu_group_get_for_dev()
+ for add_device
+In-Reply-To: <4c1b2469-9a32-c6ca-522f-73143b0fa618@arm.com>
 References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-2-jeffy.chen@rock-chips.com>
- <0b341bbd-6823-a041-9cac-e35bdc9e9bdc@arm.com>
-Message-ID: <5A5F4590.1060107@rock-chips.com>
+ <20180116132540.18939-10-jeffy.chen@rock-chips.com>
+ <4c1b2469-9a32-c6ca-522f-73143b0fa618@arm.com>
+Message-ID: <5A5F45DA.5000104@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Robin,
 
-On 01/17/2018 08:18 PM, Robin Murphy wrote:
->>
->> @@ -91,7 +92,6 @@ struct rk_iommu {
->>       void __iomem **bases;
->>       int num_mmu;
->>       int *irq;
+On 01/17/2018 08:31 PM, Robin Murphy wrote:
+> On 16/01/18 13:25, Jeffy Chen wrote:
+>> IOMMU drivers are supposed to call this function instead of manually
+>> creating a group in their .add_device callback. This behavior is not
+>> strictly required by ARM DMA mapping implementation, but ARM64 already
+>> relies on it. This patch fixes the rockchip-iommu driver to comply with
+>> this requirement.
 >
-> Nit: irq seems to be redundant now as well.
-oops, will fix it.
+> FWIW that's not 100% true: what arm64 relies on is the group having a
+> default DMA ops domain. Technically, you *could* open-code that in the
+> driver's group allocation, but obviously using the appropriate existing
+> API is nicer :)
+ok, will rewrite the commit message.
 >
->> -    int num_irq;
->>       bool reset_disabled;
->>       struct iommu_device iommu;
->>       struct list_head node; /* entry in rk_iommu_domain.iommus */
->> @@ -830,13 +830,6 @@ static int rk_iommu_attach_device(struct
->> iommu_domain *domain,
->>       iommu->domain = domain;
->> -    for (i = 0; i < iommu->num_irq; i++) {
->> -        ret = devm_request_irq(iommu->dev, iommu->irq[i], rk_iommu_irq,
->> -                       IRQF_SHARED, dev_name(dev), iommu);
->> -        if (ret)
->> -            return ret;
->> -    }
->> -
->>       for (i = 0; i < iommu->num_mmu; i++) {
->>           rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
->>                      rk_domain->dt_dma);
->> @@ -885,9 +878,6 @@ static void rk_iommu_detach_device(struct
->> iommu_domain *domain,
->>       }
->>       rk_iommu_disable_stall(iommu);
->> -    for (i = 0; i < iommu->num_irq; i++)
->> -        devm_free_irq(iommu->dev, iommu->irq[i], iommu);
->> -
->>       iommu->domain = NULL;
->>       dev_dbg(dev, "Detached from iommu domain\n");
->> @@ -1138,7 +1128,7 @@ static int rk_iommu_probe(struct platform_device
->> *pdev)
->>       struct rk_iommu *iommu;
->>       struct resource *res;
->>       int num_res = pdev->num_resources;
->> -    int err, i;
->> +    int err, i, irq, num_irq;
->>       iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
->>       if (!iommu)
->> @@ -1165,23 +1155,17 @@ static int rk_iommu_probe(struct
->> platform_device *pdev)
->>       if (iommu->num_mmu == 0)
->>           return PTR_ERR(iommu->bases[0]);
->> -    iommu->num_irq = platform_irq_count(pdev);
->> -    if (iommu->num_irq < 0)
->> -        return iommu->num_irq;
->> -    if (iommu->num_irq == 0)
->> -        return -ENXIO;
->> -
->> -    iommu->irq = devm_kcalloc(dev, iommu->num_irq, sizeof(*iommu->irq),
->> -                  GFP_KERNEL);
->> -    if (!iommu->irq)
->> -        return -ENOMEM;
->> -
->> -    for (i = 0; i < iommu->num_irq; i++) {
->> -        iommu->irq[i] = platform_get_irq(pdev, i);
->> -        if (iommu->irq[i] < 0) {
->> -            dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
->> +    num_irq = of_irq_count(dev->of_node);
+> [...]
+>> @@ -1182,6 +1164,29 @@ static void rk_iommu_remove_device(struct
+>> device *dev)
+>>       iommu_group_remove_device(dev);
+>>   }
+>> +static struct iommu_group *rk_iommu_device_group(struct device *dev)
+>> +{
+>> +    struct iommu_group *group;
+>> +    int ret;
+>> +
+>> +    group = iommu_group_get(dev);
+>> +    if (!group) {
 >
-> To follow up on the other reply, I'm not sure you really need to count
-> the IRQs beforehand at all - you're going to be looping through
-> platform_get_irq() and handling errors anyway, so you may as well just
-> start at 0 and keep going until -ENOENT (or use platform_get_resource()
-> to double-check whether an index should be valid, as we do in arm_smmu).
-ok, will do that.
->
-> Otherwise, it looks like everything that the IRQ handler needs in the
-> iommu struct (dev, num_mmu and bases) is already initialised by this
-> point, so we should be OK with respect to races.
-ok.
+> This check is pointless - if dev->iommu_group were non-NULL you wouldn't
+> have been called in the first place.
+right, it's allocated in the probe.
 >
 > Robin.
