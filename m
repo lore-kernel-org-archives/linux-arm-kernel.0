@@ -1,8 +1,8 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 17 Jan 2018 11:40:24 +0000
-Subject: [PATCH -next] crypto: stm32 - remove redundant dev_err call in
- stm32_cryp_probe()
-Message-ID: <1516189224-11877-1-git-send-email-weiyongjun1@huawei.com>
+Date: Wed, 17 Jan 2018 11:40:34 +0000
+Subject: [PATCH -next] hwrng: bcm2835 - Remove redundant dev_err call in
+ bcm2835_rng_probe()
+Message-ID: <1516189234-11957-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,22 +12,22 @@ error message.
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/crypto/stm32/stm32-cryp.c | 4 +---
+ drivers/char/hw_random/bcm2835-rng.c | 4 +---
  1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/crypto/stm32/stm32-cryp.c b/drivers/crypto/stm32/stm32-cryp.c
-index cf1dddb..4a06a7a 100644
---- a/drivers/crypto/stm32/stm32-cryp.c
-+++ b/drivers/crypto/stm32/stm32-cryp.c
-@@ -1052,10 +1052,8 @@ static int stm32_cryp_probe(struct platform_device *pdev)
+diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+index 25e5631..7a84cec 100644
+--- a/drivers/char/hw_random/bcm2835-rng.c
++++ b/drivers/char/hw_random/bcm2835-rng.c
+@@ -158,10 +158,8 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	cryp->regs = devm_ioremap_resource(dev, res);
--	if (IS_ERR(cryp->regs)) {
--		dev_err(dev, "Cannot map CRYP IO\n");
-+	if (IS_ERR(cryp->regs))
- 		return PTR_ERR(cryp->regs);
+ 	/* map peripheral */
+ 	priv->base = devm_ioremap_resource(dev, r);
+-	if (IS_ERR(priv->base)) {
+-		dev_err(dev, "failed to remap rng regs");
++	if (IS_ERR(priv->base))
+ 		return PTR_ERR(priv->base);
 -	}
  
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
+ 	/* Clock is optional on most platforms */
+ 	priv->clk = devm_clk_get(dev, NULL);
