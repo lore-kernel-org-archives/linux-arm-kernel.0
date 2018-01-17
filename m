@@ -1,981 +1,356 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 17 Jan 2018 11:54:41 +0000
-Subject: [PATCH v2 3/6] arm64: irqflags: Use ICC sysregs to implement IRQ
- masking
+Date: Wed, 17 Jan 2018 11:54:44 +0000
+Subject: [PATCH v2 6/6] arm64: Add support for pseudo-NMIs
 In-Reply-To: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
 References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1516190084-18978-4-git-send-email-julien.thierry@arm.com>
+Message-ID: <1516190084-18978-7-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Thompson <daniel.thompson@linaro.org>
+arm64 does not provide native NMIs. Emulate the NMI behaviour using GIC
+priorities.
 
-Currently irqflags is implemented using the PSR's I bit. It is possible
-to implement irqflags by using the co-processor interface to the GIC.
-Using the co-processor interface makes it feasible to simulate NMIs
-using GIC interrupt prioritization.
+Add the possibility to set an IRQ as an NMI and the handling of the NMI.
 
-This patch changes the irqflags macros to modify, save and restore
-ICC_PMR_EL1. This has a substantial knock on effect for the rest of
-the kernel. There are four reasons for this:
+If the view of GIC priorities is the secure one (i.e. SCR_EL3.FIQ == 0), do
+not allow the use of NMIs. Emit a warning when attempting to set an IRQ as
+NMI under this scenario.
 
-1. The state of the PMR becomes part of the interrupt context and must be
-   saved and restored during exceptions. It is saved on the stack as part
-   of the saved context when an interrupt/exception is taken.
-
-2. The hardware automatically masks the I bit (at boot, during traps, etc).
-   I bit status is inherited in the different kernel entry types and PMR
-   value is unaffected by exception. So once the I bit is inherited, IRQ
-   flags are back to the same state as before the exception.
-   In the interrupt entry, however, daif flags are not inherited.
-   Switching from I bit masking to PMR masking is done after acknowledging
-   the interrupt (otherwise PMR would prevent the IRQ ack).
-
-3. Some instructions, such as wfi, require that the PMR not be used
-   for interrupt masking. Before calling these instructions we must
-   switch from PMR masking to I bit masking.
-   This is also the case when KVM runs a guest, if the CPU receives
-   an interrupt from the host, interrupts must not be masked in PMR
-   otherwise the GIC will not signal it to the CPU.
-
-4. We use the alternatives system to allow a single kernel to boot and
-   be switched to the alternative masking approach at runtime.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-[julien.thierry at arm.com: changes reflected in commit,
-			 message, fixes, renaming]
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: James Morse <james.morse@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/Kconfig                     |  15 ++++
- arch/arm64/include/asm/arch_gicv3.h    |  37 ++++++++++
- arch/arm64/include/asm/assembler.h     |  23 +++++-
- arch/arm64/include/asm/daifflags.h     |  36 +++++++---
- arch/arm64/include/asm/efi.h           |   5 ++
- arch/arm64/include/asm/irqflags.h      | 125 +++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/processor.h     |   4 ++
- arch/arm64/include/asm/ptrace.h        |  14 +++-
- arch/arm64/kernel/asm-offsets.c        |   1 +
- arch/arm64/kernel/entry.S              |  28 +++++++-
- arch/arm64/kernel/head.S               |  38 ++++++++++
- arch/arm64/kernel/process.c            |   6 ++
- arch/arm64/kernel/smp.c                |   8 +++
- arch/arm64/kvm/hyp/hyp-entry.S         |  20 ++++++
- arch/arm64/kvm/hyp/switch.c            |  21 ++++++
- arch/arm64/mm/proc.S                   |  23 ++++++
- drivers/irqchip/irq-gic-v3-its.c       |   2 +-
- drivers/irqchip/irq-gic-v3.c           |  82 +++++++++++----------
- include/linux/irqchip/arm-gic-common.h |   6 ++
- include/linux/irqchip/arm-gic.h        |   5 --
- 20 files changed, 439 insertions(+), 60 deletions(-)
+ arch/arm64/kernel/entry.S    |  56 +++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c | 141 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/interrupt.h    |   1 +
+ 3 files changed, 198 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c9a7e9e..9834ff4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -850,6 +850,21 @@ config FORCE_MAX_ZONEORDER
- 	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
- 	  4M allocations matching the default size used by generic code.
-
-+config USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	bool "Use ICC system registers for IRQ masking"
-+	select CONFIG_ARM_GIC_V3
-+	help
-+	  Using the ICC system registers for IRQ masking makes it possible
-+	  to simulate NMI on ARM64 systems. This allows several interesting
-+	  features (especially debug features) to be used on these systems.
-+
-+	  Say Y here to implement IRQ masking using ICC system
-+	  registers when the GIC System Registers are available. The changes
-+	  are applied dynamically using the alternatives system so it is safe
-+	  to enable this option on systems with older interrupt controllers.
-+
-+	  If unsure, say N
-+
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 9becba9..490bb3a 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -76,6 +76,11 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
- 	return irqstat;
- }
-
-+static inline u32 gic_read_pmr(void)
-+{
-+	return read_sysreg_s(SYS_ICC_PMR_EL1);
-+}
-+
- static inline void gic_write_pmr(u32 val)
- {
- 	write_sysreg_s(val, SYS_ICC_PMR_EL1);
-@@ -145,5 +150,37 @@ static inline void gic_write_bpr1(u32 val)
- #define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
- #define gits_read_vpendbaser(c)		readq_relaxed(c)
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+static inline void gic_start_pmr_masking(void)
-+{
-+	if (cpus_have_const_cap(ARM64_HAS_SYSREG_GIC_CPUIF)) {
-+		gic_write_pmr(ICC_PMR_EL1_MASKED);
-+		asm volatile ("msr daifclr, #2" : : : "memory");
-+	}
-+}
-+
-+static inline u32 gic_pmr_save_and_unmask(void)
-+{
-+	if (cpus_have_const_cap(ARM64_HAS_SYSREG_GIC_CPUIF)) {
-+		u32 old;
-+
-+		old = gic_read_pmr();
-+		gic_write_pmr(ICC_PMR_EL1_UNMASKED);
-+		dsb(sy);
-+
-+		return old;
-+	} else {
-+		/* Idle priority, no masking */
-+		return ICC_PMR_EL1_UNMASKED;
-+	}
-+}
-+
-+static inline void gic_pmr_restore(u32 pmr)
-+{
-+	if (cpus_have_const_cap(ARM64_HAS_SYSREG_GIC_CPUIF))
-+		gic_write_pmr(pmr);
-+}
-+#endif
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 8b16828..d320bd6 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -23,6 +23,7 @@
- #ifndef __ASM_ASSEMBLER_H
- #define __ASM_ASSEMBLER_H
-
-+#include <asm/alternative.h>
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
-@@ -63,12 +64,30 @@
- /*
-  * Enable and disable interrupts.
-  */
--	.macro	disable_irq
-+	.macro	disable_irq, tmp
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	mov	\tmp, #ICC_PMR_EL1_MASKED
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
- 	msr	daifset, #2
-+alternative_else
-+	msr_s	SYS_ICC_PMR_EL1, \tmp
-+alternative_endif
-+#else
-+	msr	daifset, #2
-+#endif
- 	.endm
-
--	.macro	enable_irq
-+	.macro	enable_irq, tmp
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	mov	\tmp, #ICC_PMR_EL1_UNMASKED
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
- 	msr	daifclr, #2
-+alternative_else
-+	msr_s	SYS_ICC_PMR_EL1, \tmp
-+alternative_endif
-+#else
-+	msr	daifclr, #2
-+#endif
- 	.endm
-
- 	.macro	save_and_disable_irq, flags
-diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-index 22e4c83..ba85822 100644
---- a/arch/arm64/include/asm/daifflags.h
-+++ b/arch/arm64/include/asm/daifflags.h
-@@ -18,9 +18,24 @@
-
- #include <linux/irqflags.h>
-
-+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+
- #define DAIF_PROCCTX		0
- #define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
-
-+#else
-+
-+#define DAIF_PROCCTX							\
-+	(cpus_have_const_cap(ARM64_HAS_SYSREG_GIC_CPUIF) ?		\
-+		MAKE_ARCH_FLAGS(0, ICC_PMR_EL1_UNMASKED) :		\
-+		0)
-+
-+#define DAIF_PROCCTX_NOIRQ						\
-+	(cpus_have_const_cap(ARM64_HAS_SYSREG_GIC_CPUIF) ?		\
-+		MAKE_ARCH_FLAGS(0, ICC_PMR_EL1_MASKED) :		\
-+		PSR_I_BIT)
-+#endif
-+
- /* mask/save/unmask/restore all exceptions, including interrupts. */
- static inline void local_daif_mask(void)
- {
-@@ -36,11 +51,8 @@ static inline unsigned long local_daif_save(void)
- {
- 	unsigned long flags;
-
--	asm volatile(
--		"mrs	%0, daif		// local_daif_save\n"
--		: "=r" (flags)
--		:
--		: "memory");
-+	flags = arch_local_save_flags();
-+
- 	local_daif_mask();
-
- 	return flags;
-@@ -54,17 +66,21 @@ static inline void local_daif_unmask(void)
- 		:
- 		:
- 		: "memory");
-+
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/* Unmask IRQs in PMR if needed */
-+	if (cpus_have_const_cap(ARM64_HAS_SYSREG_GIC_CPUIF))
-+		arch_local_irq_enable();
-+#endif
- }
-
- static inline void local_daif_restore(unsigned long flags)
- {
- 	if (!arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_on();
--	asm volatile(
--		"msr	daif, %0		// local_daif_restore"
--		:
--		: "r" (flags)
--		: "memory");
-+
-+	arch_local_irq_restore(flags);
-+
- 	if (arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_off();
- }
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index c4cd508..421525f 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -40,7 +40,12 @@
- 	efi_virtmap_unload();						\
- })
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+#define ARCH_EFI_IRQ_FLAGS_MASK \
-+	(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | ARCH_FLAG_PMR_EN)
-+#else
- #define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-+#endif
-
- /* arch specific definitions used by the stub code */
-
-diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index 24692ed..3d5d443 100644
---- a/arch/arm64/include/asm/irqflags.h
-+++ b/arch/arm64/include/asm/irqflags.h
-@@ -18,7 +18,10 @@
-
- #ifdef __KERNEL__
-
-+#include <asm/alternative.h>
-+#include <asm/cpufeature.h>
- #include <asm/ptrace.h>
-+#include <asm/sysreg.h>
-
- /*
-  * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
-@@ -33,6 +36,7 @@
-  * unmask it at all other times.
-  */
-
-+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
- /*
-  * CPU interrupt mask handling.
-  */
-@@ -96,5 +100,126 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
- {
- 	return flags & PSR_I_BIT;
- }
-+
-+static inline void maybe_switch_to_sysreg_gic_cpuif(void) {}
-+
-+#else /* CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS */
-+
-+#define ARCH_FLAG_PMR_EN 0x1
-+
-+#define MAKE_ARCH_FLAGS(daif, pmr)					\
-+	((daif) | (((pmr) >> ICC_PMR_EL1_EN_SHIFT) & ARCH_FLAG_PMR_EN))
-+
-+#define ARCH_FLAGS_GET_PMR(flags)				\
-+	((((flags) & ARCH_FLAG_PMR_EN) << ICC_PMR_EL1_EN_SHIFT) \
-+		| ICC_PMR_EL1_MASKED)
-+
-+#define ARCH_FLAGS_GET_DAIF(flags) ((flags) & ~ARCH_FLAG_PMR_EN)
-+
-+/*
-+ * CPU interrupt mask handling.
-+ */
-+static inline unsigned long arch_local_irq_save(void)
-+{
-+	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
-+	unsigned long pmr = 0;
-+
-+	asm volatile(ALTERNATIVE(
-+		"mrs	%0, daif		// arch_local_irq_save\n"
-+		"msr	daifset, #2\n"
-+		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
-+		/* --- */
-+		"mrs	%0, daif\n"
-+		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1) "\n"
-+		"msr_s	" __stringify(SYS_ICC_PMR_EL1) ", %2",
-+		ARM64_HAS_SYSREG_GIC_CPUIF)
-+		: "=&r" (flags), "=&r" (pmr)
-+		: "r" (masked)
-+		: "memory");
-+
-+	return MAKE_ARCH_FLAGS(flags, pmr);
-+}
-+
-+static inline void arch_local_irq_enable(void)
-+{
-+	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
-+
-+	asm volatile(ALTERNATIVE(
-+		"msr	daifclr, #2		// arch_local_irq_enable\n"
-+		"nop",
-+		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
-+		"dsb	sy",
-+		ARM64_HAS_SYSREG_GIC_CPUIF)
-+		:
-+		: "r" (unmasked)
-+		: "memory");
-+}
-+
-+static inline void arch_local_irq_disable(void)
-+{
-+	unsigned long masked = ICC_PMR_EL1_MASKED;
-+
-+	asm volatile(ALTERNATIVE(
-+		"msr	daifset, #2		// arch_local_irq_disable",
-+		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0",
-+		ARM64_HAS_SYSREG_GIC_CPUIF)
-+		:
-+		: "r" (masked)
-+		: "memory");
-+}
-+
-+/*
-+ * Save the current interrupt enable state.
-+ */
-+static inline unsigned long arch_local_save_flags(void)
-+{
-+	unsigned long flags;
-+	unsigned long pmr = 0;
-+
-+	asm volatile(ALTERNATIVE(
-+		"mrs	%0, daif		// arch_local_save_flags\n"
-+		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
-+		"mrs	%0, daif\n"
-+		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1),
-+		ARM64_HAS_SYSREG_GIC_CPUIF)
-+		: "=r" (flags), "=r" (pmr)
-+		:
-+		: "memory");
-+
-+	return MAKE_ARCH_FLAGS(flags, pmr);
-+}
-+
-+/*
-+ * restore saved IRQ state
-+ */
-+static inline void arch_local_irq_restore(unsigned long flags)
-+{
-+	unsigned long pmr = ARCH_FLAGS_GET_PMR(flags);
-+
-+	flags = ARCH_FLAGS_GET_DAIF(flags);
-+
-+	asm volatile(ALTERNATIVE(
-+		"msr	daif, %0		// arch_local_irq_restore\n"
-+		"nop\n"
-+		"nop",
-+		"msr	daif, %0\n"
-+		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%1\n"
-+		"dsb	sy",
-+		ARM64_HAS_SYSREG_GIC_CPUIF)
-+	:
-+	: "r" (flags), "r" (pmr)
-+	: "memory");
-+}
-+
-+static inline int arch_irqs_disabled_flags(unsigned long flags)
-+{
-+	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
-+		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
-+}
-+
-+void maybe_switch_to_sysreg_gic_cpuif(void);
-+
-+#endif /* CONFIG_IRQFLAGS_GIC_MASKING */
-+
- #endif
- #endif
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 023cacb..d569dee 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -137,6 +137,10 @@ static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
- 	memset(regs, 0, sizeof(*regs));
- 	forget_syscall(regs);
- 	regs->pc = pc;
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/* Have IRQs enabled by default */
-+	regs->pmr_save = ICC_PMR_EL1_UNMASKED;
-+#endif
- }
-
- static inline void start_thread(struct pt_regs *regs, unsigned long pc,
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 6069d66..aa1e948 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -25,6 +25,12 @@
- #define CurrentEL_EL1		(1 << 2)
- #define CurrentEL_EL2		(2 << 2)
-
-+/* PMR values used to mask/unmask interrupts */
-+#define ICC_PMR_EL1_EN_SHIFT	6
-+#define ICC_PMR_EL1_EN_BIT	(1 << ICC_PMR_EL1_EN_SHIFT) // PMR IRQ enable
-+#define ICC_PMR_EL1_UNMASKED    0xf0
-+#define ICC_PMR_EL1_MASKED      (ICC_PMR_EL1_UNMASKED ^ ICC_PMR_EL1_EN_BIT)
-+
- /* AArch32-specific ptrace requests */
- #define COMPAT_PTRACE_GETREGS		12
- #define COMPAT_PTRACE_SETREGS		13
-@@ -136,7 +142,7 @@ struct pt_regs {
- #endif
-
- 	u64 orig_addr_limit;
--	u64 unused;	// maintain 16 byte alignment
-+	u64 pmr_save;
- 	u64 stackframe[2];
- };
-
-@@ -171,8 +177,14 @@ static inline void forget_syscall(struct pt_regs *regs)
- #define processor_mode(regs) \
- 	((regs)->pstate & PSR_MODE_MASK)
-
-+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
- #define interrupts_enabled(regs) \
- 	(!((regs)->pstate & PSR_I_BIT))
-+#else
-+#define interrupts_enabled(regs)	    \
-+	((!((regs)->pstate & PSR_I_BIT)) && \
-+	 ((regs)->pmr_save & ICC_PMR_EL1_EN_BIT))
-+#endif
-
- #define fast_interrupts_enabled(regs) \
- 	(!((regs)->pstate & PSR_F_BIT))
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 71bf088..6b00b0d 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -75,6 +75,7 @@ int main(void)
-   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
-   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
-   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
-+  DEFINE(S_PMR_SAVE,		offsetof(struct pt_regs, pmr_save));
-   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
-   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-   BLANK();
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 6d14b8f..8209b45 100644
+index 8209b45..170215c 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -20,6 +20,7 @@
-
- #include <linux/init.h>
- #include <linux/linkage.h>
-+#include <linux/irqchip/arm-gic-v3.h>
-
- #include <asm/alternative.h>
- #include <asm/assembler.h>
-@@ -210,6 +211,16 @@ alternative_else_nop_endif
- 	msr	sp_el0, tsk
- 	.endif
+@@ -355,6 +355,18 @@ alternative_else_nop_endif
+ 	mov	sp, x19
+ 	.endm
 
 +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/* Save pmr */
-+alternative_if ARM64_HAS_SYSREG_GIC_CPUIF
-+	mrs_s	x20, SYS_ICC_PMR_EL1
-+alternative_else
-+	mov	x20, #ICC_PMR_EL1_UNMASKED
-+alternative_endif
-+	str	x20, [sp, #S_PMR_SAVE]
++	/* Should be checked on return from irq handlers */
++	.macro	branch_if_was_nmi, tmp, target
++	alternative_if ARM64_HAS_SYSREG_GIC_CPUIF
++	mrs	\tmp, daif
++	alternative_else
++	mov	\tmp, #0
++	alternative_endif
++	tbnz	\tmp, #7, \target // Exiting an NMI
++	.endm
 +#endif
 +
- 	/*
- 	 * Registers that may be useful after this macro is invoked:
- 	 *
-@@ -230,6 +241,15 @@ alternative_else_nop_endif
- 	/* No need to restore UAO, it will be restored from SPSR_EL1 */
- 	.endif
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/* Restore pmr, ensuring IRQs are off before restoring context. */
-+alternative_if ARM64_HAS_SYSREG_GIC_CPUIF
-+	ldr	x20, [sp, #S_PMR_SAVE]
-+	msr_s	SYS_ICC_PMR_EL1, x20
-+	dsb	sy
-+alternative_else_nop_endif
-+#endif
-+
- 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
- 	.if	\el == 0
- 	ct_user_enter
-@@ -820,17 +840,18 @@ ENDPROC(el0_error)
-  * and this includes saving x0 back into the kernel stack.
-  */
- ret_fast_syscall:
--	disable_daif
-+	disable_irq x21				// disable interrupts
- 	str	x0, [sp, #S_X0]			// returned x0
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
- 	and	x2, x1, #_TIF_SYSCALL_WORK
- 	cbnz	x2, ret_fast_syscall_trace
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
-+	disable_daif
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
- ret_fast_syscall_trace:
--	enable_daif
-+	enable_daif				// enable interrupts
- 	b	__sys_trace_return_skipped	// we already saved x0
-
  /*
-@@ -848,11 +869,12 @@ work_pending:
-  * "slow" syscall return path.
-  */
- ret_to_user:
--	disable_daif
-+	disable_irq x21				// disable interrupts
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
- finish_ret_to_user:
-+	disable_daif
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
- ENDPROC(ret_to_user)
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index e3cb9fb..ec2eb4a 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -563,6 +563,44 @@ set_cpu_boot_mode_flag:
+  * These are the registers used in the syscall handler, and allow us to
+  * have in theory up to 7 arguments to a function - x0 to x6.
+@@ -574,12 +586,30 @@ ENDPROC(el1_sync)
+ el1_irq:
+ 	kernel_entry 1
+ 	enable_da_f
++
+ #ifdef CONFIG_TRACE_IRQFLAGS
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	ldr	x20, [sp, #S_PMR_SAVE]
++	/* Irqs were disabled, don't trace */
++	tbz	x20, ICC_PMR_EL1_EN_SHIFT, 1f
++#endif
+ 	bl	trace_hardirqs_off
++1:
+ #endif
+
+ 	irq_handler
+
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	/*
++	 * Irqs were disabled, we have an nmi.
++	 * We might have interrupted a context with interrupt disabled that set
++	 * NEED_RESCHED flag.
++	 * Skip preemption and irq tracing if needed.
++	 */
++	tbz	x20, ICC_PMR_EL1_EN_SHIFT, untraced_irq_exit
++	branch_if_was_nmi x0, skip_preempt
++#endif
++
+ #ifdef CONFIG_PREEMPT
+ 	ldr	w24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
+ 	cbnz	w24, 1f				// preempt count != 0
+@@ -588,9 +618,13 @@ el1_irq:
+ 	bl	el1_preempt
+ 1:
+ #endif
++
++skip_preempt:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_on
+ #endif
++
++untraced_irq_exit:
+ 	kernel_exit 1
+ ENDPROC(el1_irq)
+
+@@ -810,6 +844,11 @@ el0_irq_naked:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_on
+ #endif
++
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	branch_if_was_nmi x2, nmi_ret_to_user
++#endif
++
+ 	b	ret_to_user
+ ENDPROC(el0_irq)
+
+@@ -1000,8 +1039,15 @@ ENTRY(cpu_switch_to)
+ 	ldp	x27, x28, [x8], #16
+ 	ldp	x29, x9, [x8], #16
+ 	ldr	lr, [x8]
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	mrs	x10, daif
++	msr	daifset, #2
++#endif
+ 	mov	sp, x9
+ 	msr	sp_el0, x1
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	msr	daif, x10
++#endif
  	ret
- ENDPROC(set_cpu_boot_mode_flag)
+ ENDPROC(cpu_switch_to)
+ NOKPROBE(cpu_switch_to)
+@@ -1018,3 +1064,13 @@ ENTRY(ret_from_fork)
+ 	b	ret_to_user
+ ENDPROC(ret_from_fork)
+ NOKPROBE(ret_from_fork)
++
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++/*
++ * NMI return path to EL0
++ */
++nmi_ret_to_user:
++	ldr	x1, [tsk, #TSK_TI_FLAGS]
++	b	finish_ret_to_user
++ENDPROC(nmi_ret_to_user)
++#endif
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 58b5e89..8d348f9 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -34,6 +34,8 @@
+ #include <linux/irqchip/arm-gic-v3.h>
+ #include <linux/irqchip/irq-partition-percpu.h>
+
++#include <trace/events/irq.h>
++
+ #include <asm/cputype.h>
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
+@@ -41,6 +43,8 @@
+
+ #include "irq-gic-common.h"
+
++#define GICD_INT_NMI_PRI		0xa0
++
+ struct redist_region {
+ 	void __iomem		*redist_base;
+ 	phys_addr_t		phys_base;
+@@ -227,6 +231,87 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GICD_ISENABLER);
+ }
 
 +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 +/*
-+ * void maybe_switch_to_sysreg_gic_cpuif(void)
-+ *
-+ * Enable interrupt controller system register access if this feature
-+ * has been detected by the alternatives system.
-+ *
-+ * Before we jump into generic code we must enable interrupt controller system
-+ * register access because this is required by the irqflags macros.  We must
-+ * also mask interrupts at the PMR and unmask them within the PSR. That leaves
-+ * us set up and ready for the kernel to make its first call to
-+ * arch_local_irq_enable().
-+
-+ *
++ * Chip flow handler for SPIs set as NMI
 + */
-+ENTRY(maybe_switch_to_sysreg_gic_cpuif)
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-+	b	1f
-+alternative_else
-+	mrs_s	x0, SYS_ICC_SRE_EL1
-+alternative_endif
-+	orr	x0, x0, #1
-+	msr_s	SYS_ICC_SRE_EL1, x0	// Set ICC_SRE_EL1.SRE==1
-+	isb				// Make sure SRE is now set
-+	mrs	x0, daif
-+	tbz	x0, #7, no_mask_pmr	// Are interrupts on?
-+	mov	x0, ICC_PMR_EL1_MASKED
-+	msr_s	SYS_ICC_PMR_EL1, x0	// Prepare for unmask of I bit
-+	msr	daifclr, #2		// Clear the I bit
-+	b	1f
-+no_mask_pmr:
-+	mov	x0, ICC_PMR_EL1_UNMASKED
-+	msr_s	SYS_ICC_PMR_EL1, x0
-+1:
-+	ret
-+ENDPROC(maybe_switch_to_sysreg_gic_cpuif)
-+#endif
++static void handle_fasteoi_nmi(struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct irqaction *action = desc->action;
++	unsigned int irq = irq_desc_get_irq(desc);
++	irqreturn_t res;
 +
- /*
-  * These values are written with the MMU off, but read with the MMU on.
-  * Writers will invalidate the corresponding address, discarding up to a
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6b7dcf4..56871f2 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -66,6 +66,8 @@
- EXPORT_SYMBOL(__stack_chk_guard);
- #endif
-
-+#include <asm/arch_gicv3.h>
++	if (chip->irq_ack)
++		chip->irq_ack(&desc->irq_data);
 +
- /*
-  * Function pointers to optional machine specific functions
-  */
-@@ -224,6 +226,7 @@ void __show_regs(struct pt_regs *regs)
- 	print_symbol("pc : %s\n", regs->pc);
- 	print_symbol("lr : %s\n", lr);
- 	printk("sp : %016llx\n", sp);
-+	printk("pmr_save: %08llx\n", regs->pmr_save);
-
- 	i = top_reg;
-
-@@ -349,6 +352,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	} else {
- 		memset(childregs, 0, sizeof(struct pt_regs));
- 		childregs->pstate = PSR_MODE_EL1h;
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+		childregs->pmr_save = ICC_PMR_EL1_UNMASKED;
-+#endif
- 		if (IS_ENABLED(CONFIG_ARM64_UAO) &&
- 		    cpus_have_const_cap(ARM64_HAS_UAO))
- 			childregs->pstate |= PSR_UAO_BIT;
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 37361b5..ec56ee1 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -221,6 +221,8 @@ asmlinkage void secondary_start_kernel(void)
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu;
-
-+	maybe_switch_to_sysreg_gic_cpuif();
++	trace_irq_handler_entry(irq, action);
++	res = action->handler(irq, action->dev_id);
++	trace_irq_handler_exit(irq, action, res);
 +
- 	cpu = task_cpu(current);
- 	set_my_cpu_offset(per_cpu_offset(cpu));
-
-@@ -459,6 +461,12 @@ void __init smp_prepare_boot_cpu(void)
- 	 * and/or scheduling is enabled.
- 	 */
- 	apply_alternatives_early();
++	if (chip->irq_eoi)
++		chip->irq_eoi(&desc->irq_data);
++}
++
++/*
++ * Chip flow handler for PPIs set as NMI
++ */
++static void handle_percpu_devid_nmi(struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct irqaction *action = desc->action;
++	unsigned int irq = irq_desc_get_irq(desc);
++	irqreturn_t res;
++
++	if (chip->irq_ack)
++		chip->irq_ack(&desc->irq_data);
++
++	trace_irq_handler_entry(irq, action);
++	res = action->handler(irq, raw_cpu_ptr(action->percpu_dev_id));
++	trace_irq_handler_exit(irq, action, res);
++
++	if (chip->irq_eoi)
++		chip->irq_eoi(&desc->irq_data);
++}
++
++static int gic_irq_set_irqchip_prio(struct irq_data *d, bool val)
++{
++	u8 prio;
++	irq_flow_handler_t handler;
++
++	if (gic_peek_irq(d, GICD_ISENABLER)) {
++		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
++		return -EPERM;
++	}
++
++	if (val) {
++		prio = GICD_INT_NMI_PRI;
++
++		if (gic_irq(d) < 32)
++			handler = handle_percpu_devid_nmi;
++		else
++			handler = handle_fasteoi_nmi;
++	} else {
++		prio = GICD_INT_DEF_PRI;
++
++		if (gic_irq(d) < 32)
++			handler = handle_percpu_devid_irq;
++		else
++			handler = handle_fasteoi_irq;
++	}
 +
 +	/*
-+	 * Conditionally switch to GIC PMR for interrupt masking (this
-+	 * will be a nop if we are using normal interrupt masking)
++	 * Already in a locked context for the desc from calling
++	 * irq_set_irq_chip_state.
++	 * It should be safe to simply modify the handler.
 +	 */
-+	maybe_switch_to_sysreg_gic_cpuif();
- }
-
- static u64 __init of_get_cpu_mpidr(struct device_node *dn)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 5170ce1..e5e97e8 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -42,7 +42,27 @@
- .endm
-
- ENTRY(__vhe_hyp_call)
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+alternative_if ARM64_HAS_SYSREG_GIC_CPUIF
-+	/*
-+	 * In non-VHE, trapping to EL2 will set the PSR.I bit.
-+	 * Force it here whenever we are playing with PMR.
-+	 */
-+	str	x19, [sp, #-16]!
-+	mrs	x19, daif
-+	msr	daifset, #2
-+alternative_else_nop_endif
++	irq_to_desc(d->irq)->handle_irq = handler;
++	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), prio);
++
++	return 0;
++}
 +#endif
 +
- 	do_el2_call
-+
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+alternative_if ARM64_HAS_SYSREG_GIC_CPUIF
-+	msr	daif, x19
-+	ldr	x19, [sp], #16
-+alternative_else_nop_endif
-+#endif
-+
- 	/*
- 	 * We used to rely on having an exception return to get
- 	 * an implicit isb. In the E2H case, we don't have it anymore.
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index f7c651f..4fac70d 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -18,6 +18,9 @@
- #include <linux/types.h>
- #include <linux/jump_label.h>
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+#include <asm/arch_gicv3.h>
-+#endif
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
-@@ -303,6 +306,19 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	struct kvm_cpu_context *guest_ctxt;
- 	bool fp_enabled;
- 	u64 exit_code;
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	u32 pmr_save;
-+#endif
-+
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/*
-+	 * Having IRQs masked via PMR when entering the guest means the GIC
-+	 * will not signal the CPU of interrupts of lower priority, and the
-+	 * only way to get out will be via guest exceptions.
-+	 * Naturally, we want to avoid this.
-+	 */
-+	pmr_save = gic_pmr_save_and_unmask();
-+#endif
-
- 	vcpu = kern_hyp_va(vcpu);
- 	write_sysreg(vcpu, tpidr_el2);
-@@ -417,6 +433,11 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 */
- 	__debug_cond_restore_host_state(vcpu);
-
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	/* PMR was unmasked, no need for dsb */
-+	gic_pmr_restore(pmr_save);
-+#endif
-+
- 	return exit_code;
- }
-
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 95233df..8b91661 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -20,6 +20,7 @@
-
- #include <linux/init.h>
- #include <linux/linkage.h>
-+#include <linux/irqchip/arm-gic-v3.h>
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/hwcap.h>
-@@ -47,11 +48,33 @@
-  *	cpu_do_idle()
-  *
-  *	Idle the processor (wait for interrupt).
-+ *
-+ *	If CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS is set we must do additional
-+ *	work to ensure that interrupts are not masked at the PMR (because the
-+ *	core will not wake up if we block the wake up signal in the interrupt
-+ *	controller).
-  */
- ENTRY(cpu_do_idle)
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-+#endif
-+	dsb	sy				// WFI may enter a low-power mode
-+	wfi
-+	ret
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+alternative_else
-+	mrs	x0, daif			// save I bit
-+	msr	daifset, #2			// set I bit
-+	mrs_s	x1, SYS_ICC_PMR_EL1		// save PMR
-+alternative_endif
-+	mov	x2, #ICC_PMR_EL1_UNMASKED
-+	msr_s	SYS_ICC_PMR_EL1, x2		// unmask at PMR
- 	dsb	sy				// WFI may enter a low-power mode
- 	wfi
-+	msr_s	SYS_ICC_PMR_EL1, x1		// restore PMR
-+	msr	daif, x0			// restore I bit
- 	ret
-+#endif
- ENDPROC(cpu_do_idle)
-
- #ifdef CONFIG_CPU_PM
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 06f025f..35e5f45 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -60,7 +60,7 @@
- #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
- #define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
-
--#define LPI_PROP_DEFAULT_PRIO	0xa0
-+#define LPI_PROP_DEFAULT_PRIO	GICD_INT_DEF_PRI
-
- /*
-  * Collection structure - just an ID, and a redistributor address to
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b56c3e2..df51d96 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -71,9 +71,6 @@ struct gic_chip_data {
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() + SZ_64K)
-
--/* Our default, arbitrary priority value. Linux only uses one anyway. */
--#define DEFAULT_PMR_VALUE	0xf0
--
- static inline unsigned int gic_irq(struct irq_data *d)
+ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 				     enum irqchip_irq_state which, bool val)
  {
- 	return d->hwirq;
-@@ -348,48 +345,55 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+@@ -248,6 +333,18 @@ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 		reg = val ? GICD_ICENABLER : GICD_ISENABLER;
+ 		break;
+
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	case IRQCHIP_STATE_NMI:
++		if (static_branch_likely(&have_non_secure_prio_view)) {
++			return gic_irq_set_irqchip_prio(d, val);
++		} else if (val) {
++			pr_warn("Failed to set IRQ %u as NMI, NMIs are unsupported\n",
++				gic_irq(d));
++			return -EINVAL;
++		}
++		return 0;
++#endif
++
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -275,6 +372,13 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
+ 		*val = !gic_peek_irq(d, GICD_ISENABLER);
+ 		break;
+
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	case IRQCHIP_STATE_NMI:
++		*val = (gic_get_irq_prio(gic_irq(d), gic_dist_base(d)) ==
++			GICD_INT_NMI_PRI);
++		break;
++#endif
++
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -345,6 +449,22 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+ 	return aff;
+ }
+
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++static void do_handle_nmi(unsigned int hwirq, struct pt_regs *regs)
++{
++	struct pt_regs *old_regs = set_irq_regs(regs);
++	unsigned int irq;
++
++	nmi_enter();
++
++	irq = irq_find_mapping(gic_data.domain, hwirq);
++	generic_handle_irq(irq);
++
++	nmi_exit();
++	set_irq_regs(old_regs);
++}
++#endif
++
+ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
  {
  	u32 irqnr;
+@@ -360,6 +480,25 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+ 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+ 		int err;
 
--	do {
--		irqnr = gic_read_iar();
-+	irqnr = gic_read_iar();
-
--		if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
--			int err;
 +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	isb();
-+	/* Masking IRQs earlier would prevent to ack the current interrupt */
-+	gic_start_pmr_masking();
-+#endif
-
--			if (static_key_true(&supports_deactivate))
-+	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
-+		int err;
++		if (static_branch_likely(&have_non_secure_prio_view)
++		    && unlikely(gic_read_rpr() == GICD_INT_NMI_PRI)) {
++			/*
++			 * We need to prevent other NMIs to occur even after a
++			 * priority drop.
++			 * We keep I flag set until cpsr is restored from
++			 * kernel_exit.
++			 */
++			arch_irqs_daif_disable();
 +
-+		if (static_key_true(&supports_deactivate))
-+			gic_write_eoir(irqnr);
-+		else {
-+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+			isb();
-+#endif
++			if (static_key_true(&supports_deactivate))
++				gic_write_eoir(irqnr);
++
++			do_handle_nmi(irqnr, regs);
++			return;
 +		}
-+
-+		err = handle_domain_irq(gic_data.domain, irqnr, regs);
-+		if (err) {
-+			WARN_ONCE(true, "Unexpected interrupt received!\n");
-+			if (static_key_true(&supports_deactivate)) {
-+				if (irqnr < 8192)
-+					gic_write_dir(irqnr);
-+			} else {
- 				gic_write_eoir(irqnr);
--			else
--				isb();
--
--			err = handle_domain_irq(gic_data.domain, irqnr, regs);
--			if (err) {
--				WARN_ONCE(true, "Unexpected interrupt received!\n");
--				if (static_key_true(&supports_deactivate)) {
--					if (irqnr < 8192)
--						gic_write_dir(irqnr);
--				} else {
--					gic_write_eoir(irqnr);
--				}
- 			}
--			continue;
- 		}
--		if (irqnr < 16) {
--			gic_write_eoir(irqnr);
--			if (static_key_true(&supports_deactivate))
--				gic_write_dir(irqnr);
-+		return;
-+	}
-+	if (irqnr < 16) {
-+		gic_write_eoir(irqnr);
-+		if (static_key_true(&supports_deactivate))
-+			gic_write_dir(irqnr);
- #ifdef CONFIG_SMP
--			/*
--			 * Unlike GICv2, we don't need an smp_rmb() here.
--			 * The control dependency from gic_read_iar to
--			 * the ISB in gic_write_eoir is enough to ensure
--			 * that any shared data read by handle_IPI will
--			 * be read after the ACK.
--			 */
--			handle_IPI(irqnr, regs);
-+		/*
-+		 * Unlike GICv2, we don't need an smp_rmb() here.
-+		 * The control dependency from gic_read_iar to
-+		 * the ISB in gic_write_eoir is enough to ensure
-+		 * that any shared data read by handle_IPI will
-+		 * be read after the ACK.
-+		 */
-+		handle_IPI(irqnr, regs);
- #else
--			WARN_ONCE(true, "Unexpected SGI received!\n");
-+		WARN_ONCE(true, "Unexpected SGI received!\n");
- #endif
--			continue;
--		}
--	} while (irqnr != ICC_IAR1_EL1_SPURIOUS);
-+		return;
-+	}
- }
-
- static void __init gic_dist_init(void)
-@@ -543,8 +547,10 @@ static void gic_cpu_sys_reg_init(void)
- 	if (!gic_enable_sre())
- 		pr_err("GIC: unable to set SRE (disabled@EL2), panic ahead\n");
-
-+#ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
- 	/* Set priority mask register */
--	gic_write_pmr(DEFAULT_PMR_VALUE);
-+	gic_write_pmr(ICC_PMR_EL1_UNMASKED);
 +#endif
-
- 	/*
- 	 * Some firmwares hand over to the kernel with the BPR changed from
-diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
-index 0a83b43..2c9a4b3 100644
---- a/include/linux/irqchip/arm-gic-common.h
-+++ b/include/linux/irqchip/arm-gic-common.h
-@@ -13,6 +13,12 @@
- #include <linux/types.h>
- #include <linux/ioport.h>
-
-+#define GICD_INT_DEF_PRI		0xc0
-+#define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
-+					(GICD_INT_DEF_PRI << 16) |\
-+					(GICD_INT_DEF_PRI << 8) |\
-+					GICD_INT_DEF_PRI)
 +
- enum gic_type {
- 	GIC_V2,
- 	GIC_V3,
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index d3453ee..47f5a8c 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -65,11 +65,6 @@
- #define GICD_INT_EN_CLR_X32		0xffffffff
- #define GICD_INT_EN_SET_SGI		0x0000ffff
- #define GICD_INT_EN_CLR_PPI		0xffff0000
--#define GICD_INT_DEF_PRI		0xa0
--#define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
--					(GICD_INT_DEF_PRI << 16) |\
--					(GICD_INT_DEF_PRI << 8) |\
--					GICD_INT_DEF_PRI)
+ 		if (static_key_true(&supports_deactivate))
+ 			gic_write_eoir(irqnr);
+ 		else {
+@@ -1057,6 +1196,8 @@ static void __init gic_detect_prio_view(void)
+ 			if (gic_read_rpr() == gic_get_irq_prio(acked_irqnr,
+ 							       rdist_base))
+ 				static_branch_enable(&have_non_secure_prio_view);
++			else
++				pr_warn("Cannot enable use of pseudo-NMIs\n");
+ 		} else {
+ 			pr_warn("Unexpected IRQ for priority detection: %u\n",
+ 				acked_irqnr);
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index 69c2382..cdcefe4 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -421,6 +421,7 @@ enum irqchip_irq_state {
+ 	IRQCHIP_STATE_ACTIVE,		/* Is interrupt in progress? */
+ 	IRQCHIP_STATE_MASKED,		/* Is interrupt masked? */
+ 	IRQCHIP_STATE_LINE_LEVEL,	/* Is IRQ line high? */
++	IRQCHIP_STATE_NMI,		/* Is IRQ an NMI? */
+ };
 
- #define GICH_HCR			0x0
- #define GICH_VTR			0x4
+ extern int irq_get_irqchip_state(unsigned int irq, enum irqchip_irq_state which,
 --
 1.9.1
