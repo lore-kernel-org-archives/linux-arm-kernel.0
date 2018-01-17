@@ -1,72 +1,112 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 17 Jan 2018 09:06:40 +0100
-Subject: [PATCH v2 01/10] perf tools: Integrating the CoreSight decoding
- library
-In-Reply-To: <CANLsYkyEnJ5QzYyuGwhCB5p_2mE+8DdjaU6=Vpa6=CeKR+DzWg@mail.gmail.com>
-References: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
- <1516039994-314-2-git-send-email-mathieu.poirier@linaro.org>
- <20180116121500.GB26643@krava>
- <CANLsYkyEnJ5QzYyuGwhCB5p_2mE+8DdjaU6=Vpa6=CeKR+DzWg@mail.gmail.com>
-Message-ID: <20180117080640.GD6183@krava>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Wed, 17 Jan 2018 10:29:53 +0200
+Subject: [PATCH v2 03/16] pwm: cros-ec: update documentation regarding
+ pwm-cells
+In-Reply-To: <61b85600-7aee-e9d1-6587-17e5e419b03a@microchip.com>
+References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
+ <1515766983-15151-4-git-send-email-claudiu.beznea@microchip.com>
+ <20180112183122.GA102880@google.com>
+ <61b85600-7aee-e9d1-6587-17e5e419b03a@microchip.com>
+Message-ID: <c2078487-8cc6-429e-6c38-092d776c33aa@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 01:30:33PM -0700, Mathieu Poirier wrote:
-> On 16 January 2018 at 05:15, Jiri Olsa <jolsa@redhat.com> wrote:
-> > On Mon, Jan 15, 2018 at 11:13:05AM -0700, Mathieu Poirier wrote:
-> >> The Open CoreSight Decoding Library (openCSD) is a free and open
-> >> library to decode traces collected by the CoreSight hardware
-> >> infrastructure.
-> >>
-> >> This patch adds the required mechanic to recognise the presence
-> >> of the openCSD library on a system and set up miscellaneous flags
-> >> to be used in the compilation of the trace decoding feature.
-> >>
-> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> ---
-> >>  tools/build/Makefile.feature          |  6 ++++--
-> >>  tools/build/feature/Makefile          |  7 ++++++-
-> >>  tools/build/feature/test-all.c        |  5 +++++
-> >>  tools/build/feature/test-libopencsd.c |  8 ++++++++
-> >>  tools/perf/Makefile.config            | 25 +++++++++++++++++++++++++
-> >>  tools/perf/Makefile.perf              |  2 ++
-> >>  6 files changed, 50 insertions(+), 3 deletions(-)
-> >>  create mode 100644 tools/build/feature/test-libopencsd.c
-> >>
-> >> diff --git a/tools/build/Makefile.feature b/tools/build/Makefile.feature
-> >> index e52fcefee379..dc3d97b248ab 100644
-> >> --- a/tools/build/Makefile.feature
-> >> +++ b/tools/build/Makefile.feature
-> >> @@ -66,7 +66,8 @@ FEATURE_TESTS_BASIC :=                  \
-> >>          bpf                             \
-> >>          sched_getcpu                 \
-> >>          sdt                          \
-> >> -        setns
-> >> +        setns                                \
-> >> +     libopencsd
-> >>
-> >>  # FEATURE_TESTS_BASIC + FEATURE_TESTS_EXTRA is the complete list
-> >>  # of all feature tests
-> >> @@ -108,7 +109,8 @@ FEATURE_DISPLAY ?=              \
-> >>           zlib                   \
-> >>           lzma                   \
-> >>           get_cpuid              \
-> >> -         bpf
-> >> +         bpf                 \
-> >> +      libopencsd
-> >
-> > we put in this list only generic libraries, this one seems arch
-> > specific please put it into FEATURE_TESTS_EXTRA list
-> 
-> Humm... Jiri,
-> 
-> I was thinking that libopencsd should fall in the same category as
-> libunwind-arm and libunwind-aarch64.  Both are not architecture
-> specific and used to process traces acquired on ARM platforms.  As
-> such I suggest to keep libopencsd as part of FEATURE_TESTS_BASIC and
-> remove it from under FEATURE_DISPLAY - how does that sound to you?
-> 
 
-ok, that sounds good
 
-jirka
+On 15.01.2018 11:01, Claudiu Beznea wrote:
+> 
+> 
+> On 12.01.2018 20:31, Brian Norris wrote:
+>> On Fri, Jan 12, 2018 at 04:22:50PM +0200, Claudiu Beznea wrote:
+>>> pwm-cells should be at least 2 to provide channel number and period value.
+>>
+>> Nacked-by: Brian Norris <briannorris@chromium.org>
+>>
+>> We don't control the period from the kernel; only the duty cycle.
+> I agree, I saw this in the driver. This is the way I put the 0xffff
+> period in the patch 7 of this series. I though that since all the drivers
+> which uses PWM framework uses the generic PWM bindings (except pwm-pxa.c,
+> pwm-cros-ec.c and pwm-clps711x.c) I though it would be simpler (from the
+> driver's perspective and also from core's perspective) to have generic
+> bindings for all as follows:
+> pwms = <&controller PWM-channel PWM-period PWM-flags>;
+> 
+> To allow pwm-cross-ec.c to use this generic binding, since it is uses a
+> fix period and of_pwm_xlate() xlate DT arguments without taking care of
+> the cross-ec particularity, using 0xffff period in the pwms binding will
+> not harm this driver (correct me if I'm wrong). For this, the pwm-cells
+> argument need to be increased at 2. In patch 7 of this series I used
+> pwms = <&cros_ec_pwm 1 65535>;
+> which initialize the PWM 1 with 0xffff period.
+> 
+> Thanks,
+> Claudiu
+> 
+> (Now,
+>> that's perhaps not a wise firmware interface, and we may fix that
+>> someday, but you can't just declare a breaking change to a documented,
+>> reviewed binding.
+>>
+>>> Cc: Brian Norris <briannorris@chromium.org>
+>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/pwm/google,cros-ec-pwm.txt | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pwm/google,cros-ec-pwm.txt b/Documentation/devicetree/bindings/pwm/google,cros-ec-pwm.txt
+>>> index 472bd46ab5a4..03347fd302b5 100644
+>>> --- a/Documentation/devicetree/bindings/pwm/google,cros-ec-pwm.txt
+>>> +++ b/Documentation/devicetree/bindings/pwm/google,cros-ec-pwm.txt
+>>> @@ -8,7 +8,7 @@ Documentation/devicetree/bindings/mfd/cros-ec.txt).
+>>>  
+>>>  Required properties:
+>>>  - compatible: Must contain "google,cros-ec-pwm"
+>>> -- #pwm-cells: Should be 1. The cell specifies the PWM index.
+>>> +- #pwm-cells: Should be 2. The cell specifies the PWM index.
+>>
+>> Umm, "2 cells", but you use the singular "cell", and don't document what
+>> the second one is? That's nonsense.
+I didn't saw this comment. The second cell is from the standard PWM binding
+as all the other PWM drivers uses. e.g.:
+pwms=<&controller PWM-channel PWM-period PWM-flags>
+
+With these changes, if pwm-cells=1 then only PWM-channel will be parsed,
+if it is 2 PWM-channel and PWM-period will be parsed, if pwm-cells=3
+then PWM-channel, PWM-period and PWM-flags will be parsed.
+In your driver you used to have only one cell because you wanted to allow
+user to give as argument only PWM channel, and you did not want a change
+of PWM period (and in of_xlate function you initialize pwm period with 0xffff
+value: this is why I changed the binding in patch 7 of this series, file
+rk3399-gru-kevin.dts). But e.g. sysfs could try to change the PWM period,
+there is no restriction to change the PWM period from sysfs, in the sysfs
+interface but the restriction is in PWM apply of the drive. The same things
+happens with these changes too. The user could introduce any PWM period via
+DT but the pwm apply function of the driver will return error.
+
+Thanks,
+Claudiu
+
+>>
+>> Brian
+>>
+>>>  
+>>>  Example:
+>>>  	cros-ec at 0 {
+>>> @@ -18,6 +18,6 @@ Example:
+>>>  
+>>>  		cros_ec_pwm: ec-pwm {
+>>>  			compatible = "google,cros-ec-pwm";
+>>> -			#pwm-cells = <1>;
+>>> +			#pwm-cells = <2>;
+>>>  		};
+>>>  	};
+>>> -- 
+>>> 2.7.4
+>>>
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
