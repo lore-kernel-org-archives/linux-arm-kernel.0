@@ -1,35 +1,56 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Wed, 17 Jan 2018 12:10:33 +0800
-Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
- predictor against aliasing attacks
-In-Reply-To: <1515157961-20963-8-git-send-email-will.deacon@arm.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-8-git-send-email-will.deacon@arm.com>
-Message-ID: <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 17 Jan 2018 13:21:44 +0900
+Subject: [PATCH v2 01/13] iommu/rockchip: Request irqs in rk_iommu_probe()
+In-Reply-To: <20180116132540.18939-2-jeffy.chen@rock-chips.com>
+References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
+ <20180116132540.18939-2-jeffy.chen@rock-chips.com>
+Message-ID: <CAAFQd5AO6_GYMs0xac-4ECFH9pn_ssg8jsFVoif0WDQ-daSuRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Jeffy,
 
-On 2018/1/5 21:12, Will Deacon wrote:
-> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-> index 5f7097d0cd12..d99b36555a16 100644
-> --- a/arch/arm64/mm/context.c
-> +++ b/arch/arm64/mm/context.c
-> @@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
->  			"ic iallu; dsb nsh; isb",
->  			ARM64_WORKAROUND_CAVIUM_27456,
->  			CONFIG_CAVIUM_ERRATUM_27456));
-> +
-> +	arm64_apply_bp_hardening();
->  }
+Thanks for the patch. Please see my comments inline.
 
-post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
-means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
-when mm_swtich and kernel_exit?
+On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
 
->From the code logical, it seems not only related to erratum 2745 anymore?
-should it be renamed?
+Please add patch description.
 
-Thanks
-Yisheng
+> Suggested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+[snip]
+> -       for (i = 0; i < iommu->num_irq; i++) {
+> -               iommu->irq[i] = platform_get_irq(pdev, i);
+> -               if (iommu->irq[i] < 0) {
+> -                       dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
+> +       num_irq = of_irq_count(dev->of_node);
+> +       for (i = 0; i < num_irq; i++) {
+> +               irq = platform_get_irq(pdev, i);
+
+This lacks consistency. of_irq_count() is used for counting, but
+platform_get_irq() is used for getting. Either platform_ or of_ API
+should be used for both and I'd lean for platform_, since it's more
+general.
+
+> +               if (irq < 0) {
+> +                       dev_err(dev, "Failed to get IRQ, %d\n", irq);
+>                         return -ENXIO;
+>                 }
+> +               err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
+> +                                      IRQF_SHARED, dev_name(dev), iommu);
+> +               if (err)
+> +                       return err;
+>         }
+
+Looks like there is some more initialization below. Is the driver okay
+with the IRQ being potentially fired right here? (Shared IRQ handlers
+might be run at request_irq() time for testing.)
+
+>
+>         iommu->reset_disabled = device_property_read_bool(dev,
+
+^^
+
+Best regards,
+Tomasz
