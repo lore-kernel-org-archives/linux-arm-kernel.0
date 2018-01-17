@@ -1,86 +1,97 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 17 Jan 2018 17:55:42 +0100
-Subject: [net-next: PATCH v3 3/7] device property: Introduce fwnode_irq_get()
+Date: Wed, 17 Jan 2018 17:55:41 +0100
+Subject: [net-next: PATCH v3 2/7] device property: Introduce
+ fwnode_get_phy_mode()
 In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
 References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-Message-ID: <1516208146-4144-4-git-send-email-mw@semihalf.com>
+Message-ID: <1516208146-4144-3-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now there were two very similar functions allowing
-to get Linux IRQ number from ACPI handle (acpi_irq_get())
-and OF node (of_irq_get()). The first one appeared to be used
-only as a subroutine of platform_irq_get(), which (in the generic
-code) limited IRQ obtaining from _CRS method only to nodes
-associated to kernel's struct platform_device.
+Until now there were two almost identical functions for
+obtaining network PHY mode - of_get_phy_mode() and,
+more generic, device_get_phy_mode(). However it is not uncommon,
+that the network interface is represented as a child
+of the actual controller, hence it is not associated
+directly to any struct device, required by the latter
+routine.
 
-This patch introduces new helper routine - fwnode_irq_get(),
-which allows to get the IRQ number directly from the fwnode
-to be used as common for OF/ACPI worlds.
+This commit allows for getting the PHY mode for
+children nodes in the ACPI world by introducing a new function -
+fwnode_get_phy_mode(). This commit also changes
+device_get_phy_mode() routine to be its wrapper, in order
+to prevent unnecessary duplication.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 ---
- drivers/base/property.c  | 27 ++++++++++++++++++++
- include/linux/property.h |  2 ++
- 2 files changed, 29 insertions(+)
+ drivers/base/property.c  | 24 ++++++++++++++++----
+ include/linux/property.h |  1 +
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 7c4a53d..adb3893 100644
+index f261d1a..7c4a53d 100644
 --- a/drivers/base/property.c
 +++ b/drivers/base/property.c
-@@ -16,6 +16,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_graph.h>
-+#include <linux/of_irq.h>
- #include <linux/property.h>
- #include <linux/etherdevice.h>
- #include <linux/phy.h>
-@@ -1230,6 +1231,32 @@ void *device_get_mac_address(struct device *dev, char *addr, int alen)
- EXPORT_SYMBOL(device_get_mac_address);
+@@ -1126,21 +1126,21 @@ enum dev_dma_attr device_get_dma_attr(struct device *dev)
+ EXPORT_SYMBOL_GPL(device_get_dma_attr);
  
  /**
-+ * fwnode_irq_get - Get IRQ directly from a fwnode
-+ * @fwnode:	Pointer to the firmware node
-+ * @index:	Zero-based index of the IRQ
-+ *
-+ * Returns Linux IRQ number on success. Other values are determined
-+ * accordingly to acpi_/of_ irq_get() operation.
-+ */
-+int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index)
-+{
-+	struct acpi_device *adev = to_acpi_device_node(fwnode);
-+	struct device_node *of_node = to_of_node(fwnode);
-+	struct resource res;
-+	int ret;
-+
-+	if (IS_ENABLED(CONFIG_OF) && of_node)
-+		return of_irq_get(of_node, index);
-+
-+	ret = acpi_irq_get(acpi_device_handle(adev), index, &res);
-+	if (ret)
-+		return ret;
-+
-+	return res.start;
-+}
-+EXPORT_SYMBOL(fwnode_irq_get);
+- * device_get_phy_mode - Get phy mode for given device
+- * @dev:	Pointer to the given device
++ * fwnode_get_phy_mode - Get phy mode for given firmware node
++ * @fwnode:	Pointer to the given node
+  *
+  * The function gets phy interface string from property 'phy-mode' or
+  * 'phy-connection-type', and return its index in phy_modes table, or errno in
+  * error case.
+  */
+-int device_get_phy_mode(struct device *dev)
++int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
+ {
+ 	const char *pm;
+ 	int err, i;
+ 
+-	err = device_property_read_string(dev, "phy-mode", &pm);
++	err = fwnode_property_read_string(fwnode, "phy-mode", &pm);
+ 	if (err < 0)
+-		err = device_property_read_string(dev,
++		err = fwnode_property_read_string(fwnode,
+ 						  "phy-connection-type", &pm);
+ 	if (err < 0)
+ 		return err;
+@@ -1151,6 +1151,20 @@ int device_get_phy_mode(struct device *dev)
+ 
+ 	return -ENODEV;
+ }
++EXPORT_SYMBOL_GPL(fwnode_get_phy_mode);
 +
 +/**
-  * device_graph_get_next_endpoint - Get next endpoint firmware node
-  * @fwnode: Pointer to the parent firmware node
-  * @prev: Previous endpoint node or %NULL to get the first
++ * device_get_phy_mode - Get phy mode for given device
++ * @dev:	Pointer to the given device
++ *
++ * The function gets phy interface string from property 'phy-mode' or
++ * 'phy-connection-type', and return its index in phy_modes table, or errno in
++ * error case.
++ */
++int device_get_phy_mode(struct device *dev)
++{
++	return fwnode_get_phy_mode(dev_fwnode(dev));
++}
+ EXPORT_SYMBOL_GPL(device_get_phy_mode);
+ 
+ static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
 diff --git a/include/linux/property.h b/include/linux/property.h
-index 9b13332..e05889f 100644
+index 35620e0..9b13332 100644
 --- a/include/linux/property.h
 +++ b/include/linux/property.h
-@@ -103,6 +103,8 @@ struct fwnode_handle *device_get_named_child_node(struct device *dev,
- struct fwnode_handle *fwnode_handle_get(struct fwnode_handle *fwnode);
- void fwnode_handle_put(struct fwnode_handle *fwnode);
+@@ -279,6 +279,7 @@ int device_get_phy_mode(struct device *dev);
  
-+int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index);
-+
- unsigned int device_get_child_node_count(struct device *dev);
+ void *device_get_mac_address(struct device *dev, char *addr, int alen);
  
- static inline bool device_property_read_bool(struct device *dev,
++int fwnode_get_phy_mode(struct fwnode_handle *fwnode);
+ void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
+ 			     char *addr, int alen);
+ struct fwnode_handle *fwnode_graph_get_next_endpoint(
 -- 
 2.7.4
