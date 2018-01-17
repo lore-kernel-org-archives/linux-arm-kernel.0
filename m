@@ -1,46 +1,51 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Wed, 17 Jan 2018 12:41:56 -0800
-Subject: [PATCH RFC v1] arm64: Handle traps from accessing CNTVCT/CNTFRQ
- for CONFIG_COMPAT
-In-Reply-To: <83b9c187-7fbf-3e05-6321-de7fa05fd868@arm.com>
-References: <1515645816-14063-1-git-send-email-nicoleotsuka@gmail.com>
- <e750e380-f06b-dbbf-a61c-4281c0168b05@arm.com>
- <20180116203218.GA6318@Asurada-Nvidia>
- <86r2qpec32.wl-marc.zyngier@arm.com>
- <20180116213745.GA9545@Asurada-Nvidia>
- <20180117021346.GA26166@Asurada-Nvidia>
- <83b9c187-7fbf-3e05-6321-de7fa05fd868@arm.com>
-Message-ID: <20180117204154.GA2935@Asurada-Nvidia>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 17 Jan 2018 12:45:39 -0800
+Subject: per-task stack canaries for arm64
+In-Reply-To: <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
+References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+ <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
+ <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
+Message-ID: <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 09:03:48AM +0000, Marc Zyngier wrote:
+On Wed, Jan 17, 2018 at 12:32 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 17 January 2018 at 19:10, Kees Cook <keescook@chromium.org> wrote:
+>> On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+> [...]
+>> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
+>> which was done for x86 only, and provides both:
+>>   -mstack-protector-guard-symbol=...
+>>   -mstack-protector-guard-reg=...
+>>
+>> If this could be extended to arm64, I think we'd be in good shape (and
+>> it could be trivially detected at build time).
+>>
+>
+> I'm not entirely sure what the point is of specifying the name of the
+> symbol on the command line. It is ultimately up to the GCC developers
+> to decide how much point there is to maintaining parity with x86 here.
+>
+> [...]
+>>> Ramana indicated at the time that he would be up for adding, e.g.,
+>>> -fstack-protector-linux-kernel as a command line option, and add the
+>>> contents of tpidr_el1 to every reference of __stack_chk_guard when
+>>> set.
+>>
+>> I think we want to reuse the command-line names from the x86 options
+>> above, unless there's a good reason not to?
+>
+> I'm perfectly happy to settle for whatever the GCC developers manage
+> to agree on, as long as it gives us the ability to use tpidr_el1 as
+> the offset.
 
-> > So ignoring a condition for a Thumb instruction may cause its IT
-> > scope shifting. For ARM mode, the only penalty could be two Rts
-> > getting written -- which shouldn't corrupt userspace execution.
-> > 
-> > Please correct me if I am wrong or not thorough.
-> 
-> Consider the following:
-> 	
-> 	mov	r0, #0
-> 	mov	r1, #0
-> 	cmp	r1, #3
-> 	mrrceq	r0, r1, cntvct // simplified version
-> 
-> Oh look, you've corrupted r0 and r1, which should never have be changed.
-> Whatever uses the content r0 and r1 after the mrrc will misbehave. How
-> is that an acceptable behaviour? How do you expect userspace to cope
-> with such a brain damage?
-> 
-> If you intend to emulate the CPU, you must emulate it fully, to the
-> letter of the architecture. No ifs, no buts.
+Ramana, Uro?, what's the best next step? Should we open a GCC bug
+specifically for arm64 here?
 
-Thanks for the explain. I see the point here.
+-Kees
 
-I saw your version for arm64 compat doesn't check if (rt != 31)
-as MRS handler does. Is there any reason for that?
-
-Thank you
-Nicolin
+-- 
+Kees Cook
+Pixel Security
