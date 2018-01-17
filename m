@@ -1,24 +1,28 @@
-From: figure1802@126.com (FF)
-Date: Wed, 17 Jan 2018 12:13:08 +0800 (CST)
-Subject: [PATCH v3 07/20] arm64: mm: Allocate ASIDs in pairs
-In-Reply-To: <27699ff3.2a02.160fcc87182.Coremail.figure1802@126.com>
-References: <27699ff3.2a02.160fcc87182.Coremail.figure1802@126.com>
-Message-ID: <40f9df1.48df.161025212b6.Coremail.figure1802@126.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 17 Jan 2018 14:22:47 +0900
+Subject: [PATCH v2 04/13] iommu/rockchip: Fix error handling in probe
+In-Reply-To: <20180116132540.18939-5-jeffy.chen@rock-chips.com>
+References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
+ <20180116132540.18939-5-jeffy.chen@rock-chips.com>
+Message-ID: <CAAFQd5A=szLktgV9RrsON+K7y21suXf9KfBaSWc44DauKapbKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-At 2018-01-16 10:24:42, "FF" <figure1802@126.com> wrote:
->hi?all:
->why we use two? ASID for a?process? what is the benefits?
->After KPTI, the kernel?space?mapping?become?non-Global TLB (process-specific TLB)? so we need?one ASID for? process?running in?userspace?
->and other ASID?for process?running in?kernel?space? it will?switch the ASID when a process? switching?to/form?userpsace?
+On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> Add missing iommu_device_sysfs_remove in error path.
 >
+> Also adjust sequence of deinit functions in the remove.
 >
->what is the benefits add?exception trampoline page? it will performance regression?
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+> Changes in v2: None
+>
+>  drivers/iommu/rockchip-iommu.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
 >
 
-anyone can help to confirm?
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 
-Thanks,
-FF
+Best regards,
+Tomasz
