@@ -1,25 +1,33 @@
 From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 17 Jan 2018 14:32:11 +0900
-Subject: [PATCH v2 02/13] iommu/rockchip: Suppress unbinding
-In-Reply-To: <CAAFQd5C_d2JW6kPQOMQ=mB6kHMdNZQGFvamjaDhexoPD_4W7+A@mail.gmail.com>
+Date: Wed, 17 Jan 2018 14:37:32 +0900
+Subject: [PATCH v2 10/13] iommu/rockchip: Use IOMMU device for dma mapping
+ operations
+In-Reply-To: <20180116132540.18939-11-jeffy.chen@rock-chips.com>
 References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-3-jeffy.chen@rock-chips.com>
- <CAAFQd5C_d2JW6kPQOMQ=mB6kHMdNZQGFvamjaDhexoPD_4W7+A@mail.gmail.com>
-Message-ID: <CAAFQd5CXH_20649oZNrzFjHoKfpDi6gHF91jd3uCyjyOkH+Ohw@mail.gmail.com>
+ <20180116132540.18939-11-jeffy.chen@rock-chips.com>
+Message-ID: <CAAFQd5CFZj4nPcJsdndw6B1uoaTRU4MDJ7tUAjg3LiO7a72qQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 1:23 PM, Tomasz Figa <tfiga@chromium.org> wrote:
-> On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
->> It's not safe to unbind rockchip IOMMU driver.
+On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> Use the first registered IOMMU device for dma mapping operations, and
+> drop the domain platform device.
 >
-> Might be good to explain why it is not safe and actually add that it
-> does not make any sense for such low level devices.
+> This is similar to exynos iommu driver.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+> Changes in v2: None
+>
+>  drivers/iommu/rockchip-iommu.c | 91 +++++++++++-------------------------------
+>  1 file changed, 24 insertions(+), 67 deletions(-)
 
-Actually, shouldn't we also remove support for .remove() and module
-exit? I don't think it's actually feasible to unload this driver. We
-actually even have ROCKCHIP_IOMMU Kconfig entry defined as bool, so
-the driver can be only built-in.
+Looks good to me, but we need to remove platform driver .remove(), as
+it was done for Exynos IOMMU as well. With that fixed (probably
+squashed to the patch that prohibits unbind):
+
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 
 Best regards,
 Tomasz
