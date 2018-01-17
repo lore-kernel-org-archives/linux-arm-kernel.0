@@ -1,39 +1,165 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Jan 2018 12:57:32 +0000
-Subject: [PATCH] arm64: mm: Add additional parameter to
- uaccess_ttbr0_disable
-In-Reply-To: <20180117113850.21949-1-christoffer.dall@linaro.org>
-References: <20180117113850.21949-1-christoffer.dall@linaro.org>
-Message-ID: <bd24a127-4215-d7a5-64f8-b79a05bc9a47@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Jan 2018 13:00:25 +0000
+Subject: [PATCH v2 13/13] iommu/rockchip: Support sharing IOMMU between
+ masters
+In-Reply-To: <20180116132540.18939-14-jeffy.chen@rock-chips.com>
+References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
+ <20180116132540.18939-14-jeffy.chen@rock-chips.com>
+Message-ID: <1bd5378d-8285-e0d9-8105-f9dd9f8cfdcb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 11:38, Christoffer Dall wrote:
-> Add an extra temporary register parameter to uaccess_ttbr0_disable which
-> is about to be required for arm64 PAN support.
+On 16/01/18 13:25, Jeffy Chen wrote:
+> There would be some masters sharing the same IOMMU device. Put them in
+> the same iommu group and share the same iommu domain.
 > 
-> This patch doesn't introduce any functional change but ensures that the
-> kernel compiles once the KVM/ARM tree is merged with the arm64 tree by
-> ensuring a trivially mergable conflict with commit
-> 6b88a32c7af68895134872cdec3b6bfdb532d94e
-> ("arm64: kpti: Fix the interaction between ASID switching and software PAN").
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 > ---
->  arch/arm64/include/asm/asm-uaccess.h | 8 ++++----
->  arch/arm64/lib/clear_user.S          | 2 +-
->  arch/arm64/lib/copy_from_user.S      | 2 +-
->  arch/arm64/lib/copy_in_user.S        | 2 +-
->  arch/arm64/lib/copy_to_user.S        | 2 +-
->  arch/arm64/mm/cache.S                | 4 ++--
->  arch/arm64/xen/hypercall.S           | 2 +-
->  7 files changed, 11 insertions(+), 11 deletions(-)
+> 
+> Changes in v2: None
+> 
+>   drivers/iommu/rockchip-iommu.c | 39 +++++++++++++++++++++++++++++++--------
+>   1 file changed, 31 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index c8de1456a016..6c316dd0dd2d 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -100,11 +100,13 @@ struct rk_iommu {
+>   	struct iommu_device iommu;
+>   	struct list_head node; /* entry in rk_iommu_domain.iommus */
+>   	struct iommu_domain *domain; /* domain to which iommu is attached */
+> +	struct iommu_group *group;
+>   	struct mutex pm_mutex; /* serializes power transitions */
+>   };
+>   
+>   struct rk_iommudata {
+>   	struct device_link *link; /* runtime PM link from IOMMU to master */
+> +	struct iommu_domain *domain; /* domain to which device is attached */
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I don't see why this is needed - for example, mtk_iommu does the same 
+thing without needing to track the active domain in more than one place.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Fundamentally, for this kind of IOMMU without the notion of multiple 
+translation contexts, the logic should look like:
+
+	iommudrv_attach_device(dev, domain) {
+		iommu = dev_get_iommu(dev);
+		if (iommu->curr_domain != domain) {
+			update_hw_state(iommu, domain);
+			iommu->curr_domain = domain;
+		}
+	}
+
+which I think is essentially what you have anyway. When a group contains 
+multiple devices, you update the IOMMU state for the first device, then 
+calls for subsequent devices in the group do nothing since they see the 
+IOMMU state is already up-to-date with the new domain.
+
+Robin.
+
+>   	struct rk_iommu *iommu;
+>   };
+>   
+> @@ -964,6 +966,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>   {
+>   	struct rk_iommu *iommu;
+>   	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+> +	struct rk_iommudata *data = dev->archdata.iommu;
+>   	unsigned long flags;
+>   
+>   	/* Allow 'virtual devices' (eg drm) to detach from domain */
+> @@ -971,6 +974,12 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>   	if (!iommu)
+>   		return;
+>   
+> +	/* device already detached */
+> +	if (data->domain != domain)
+> +		return;
+> +
+> +	data->domain = NULL;
+> +
+>   	dev_dbg(dev, "Detaching from iommu domain\n");
+>   
+>   	/* iommu already detached */
+> @@ -994,6 +1003,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>   {
+>   	struct rk_iommu *iommu;
+>   	struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+> +	struct rk_iommudata *data = dev->archdata.iommu;
+>   	unsigned long flags;
+>   	int ret;
+>   
+> @@ -1005,15 +1015,21 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>   	if (!iommu)
+>   		return 0;
+>   
+> +	/* device already attached */
+> +	if (data->domain == domain)
+> +		return 0;
+> +
+> +	if (data->domain)
+> +		rk_iommu_detach_device(data->domain, dev);
+> +
+> +	data->domain = domain;
+> +
+>   	dev_dbg(dev, "Attaching to iommu domain\n");
+>   
+>   	/* iommu already attached */
+>   	if (iommu->domain == domain)
+>   		return 0;
+>   
+> -	if (iommu->domain)
+> -		rk_iommu_detach_device(iommu->domain, dev);
+> -
+>   	iommu->domain = domain;
+>   
+>   	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+> @@ -1150,13 +1166,11 @@ static void rk_iommu_remove_device(struct device *dev)
+>   
+>   static struct iommu_group *rk_iommu_device_group(struct device *dev)
+>   {
+> -	struct iommu_group *group;
+> +	struct rk_iommu *iommu;
+>   
+> -	group = iommu_group_get(dev);
+> -	if (!group)
+> -		group = iommu_group_alloc();
+> +	iommu = rk_iommu_from_dev(dev);
+>   
+> -	return group;
+> +	return iommu ? iommu->group : NULL;
+>   }
+>   
+>   static int rk_iommu_of_xlate(struct device *dev,
+> @@ -1263,6 +1277,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	if (err)
+>   		goto err_remove_sysfs;
+>   
+> +	iommu->group = iommu_group_alloc();
+> +	if (IS_ERR(iommu->group)) {
+> +		err = PTR_ERR(iommu->group);
+> +		goto err_unreg_iommu;
+> +	}
+> +
+>   	/*
+>   	 * Use the first registered IOMMU device for domain to use with DMA
+>   	 * API, since a domain might not physically correspond to a single
+> @@ -1276,6 +1296,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	pm_runtime_enable(dev);
+>   
+>   	return 0;
+> +err_unreg_iommu:
+> +	iommu_device_unregister(&iommu->iommu);
+>   err_remove_sysfs:
+>   	iommu_device_sysfs_remove(&iommu->iommu);
+>   err_put_clocks:
+> @@ -1289,6 +1311,7 @@ static int rk_iommu_remove(struct platform_device *pdev)
+>   
+>   	pm_runtime_disable(&pdev->dev);
+>   
+> +	iommu_group_put(iommu->group);
+>   	iommu_device_unregister(&iommu->iommu);
+>   	iommu_device_sysfs_remove(&iommu->iommu);
+>   	rk_iommu_put_clocks(iommu);
+> 
