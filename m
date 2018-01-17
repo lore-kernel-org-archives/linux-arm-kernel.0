@@ -1,64 +1,123 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 17 Jan 2018 12:15:05 +0000
-Subject: [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and
- SIGFPE, SIGTRAP, SIGBUS
-In-Reply-To: <20180117115708.GM17719@n2100.armlinux.org.uk>
-References: <87373b6ghs.fsf@xmission.com>
- <20180112005940.23279-7-ebiederm@xmission.com>
- <20180115163028.GU22781@e103592.cambridge.arm.com>
- <87h8rnox3c.fsf@xmission.com>
- <20180116172407.GA22781@e103592.cambridge.arm.com>
- <871sipl9p9.fsf@xmission.com>
- <20180117115708.GM17719@n2100.armlinux.org.uk>
-Message-ID: <20180117121505.GD22781@e103592.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Jan 2018 12:18:21 +0000
+Subject: [PATCH v2 01/13] iommu/rockchip: Request irqs in rk_iommu_probe()
+In-Reply-To: <20180116132540.18939-2-jeffy.chen@rock-chips.com>
+References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
+ <20180116132540.18939-2-jeffy.chen@rock-chips.com>
+Message-ID: <0b341bbd-6823-a041-9cac-e35bdc9e9bdc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 11:57:09AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 16, 2018 at 04:28:50PM -0600, Eric W. Biederman wrote:
-> > I will keep FPE_FIXME as a place holder until this gets sorted out.
-> > 
-> > There is a second issue I am looking at in this location,
-> > and maybe I don't have to address it now.  But it looks like the code is
-> > calling send_sig_info instead of force_sig_info for a synchronous
-> > exception.  Am I reading that correctly?
+On 16/01/18 13:25, Jeffy Chen wrote:
+> Suggested-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
 > 
-> VFP used to use force_sig_info(), but it seems to be really the wrong
-> call to use.  force_sig_info() checks whether the program decided to
-> ignore or block the signal, and if it did, replaces the signal handler
-> with the default handler and unblocks the signal.
+> Changes in v2: None
 > 
-> Are you really suggesting that FP all FP signals should get this
-> treatment?
+>   drivers/iommu/rockchip-iommu.c | 38 +++++++++++---------------------------
+>   1 file changed, 11 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 9d991c2d8767..4a12d4746095 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -18,6 +18,7 @@
+>   #include <linux/mm.h>
+>   #include <linux/module.h>
+>   #include <linux/of.h>
+> +#include <linux/of_irq.h>
+>   #include <linux/of_platform.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/slab.h>
+> @@ -91,7 +92,6 @@ struct rk_iommu {
+>   	void __iomem **bases;
+>   	int num_mmu;
+>   	int *irq;
 
-feenableexcept(FE_OVERFLOW) kind of means "I can't run safely past
-an fp overflow exception, please signal me instead".
+Nit: irq seems to be redundant now as well.
 
-If the process also blocked SIGFPE, that could be taken to mean
-"I can't run safely past an fp overflow exception _and_ I can't
-take SIGFPE either" ... i.e., if an fp overflow happens there is
-no way to proceed and it's really fatal.
+> -	int num_irq;
+>   	bool reset_disabled;
+>   	struct iommu_device iommu;
+>   	struct list_head node; /* entry in rk_iommu_domain.iommus */
+> @@ -830,13 +830,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>   
+>   	iommu->domain = domain;
+>   
+> -	for (i = 0; i < iommu->num_irq; i++) {
+> -		ret = devm_request_irq(iommu->dev, iommu->irq[i], rk_iommu_irq,
+> -				       IRQF_SHARED, dev_name(dev), iommu);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>   	for (i = 0; i < iommu->num_mmu; i++) {
+>   		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
+>   			       rk_domain->dt_dma);
+> @@ -885,9 +878,6 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>   	}
+>   	rk_iommu_disable_stall(iommu);
+>   
+> -	for (i = 0; i < iommu->num_irq; i++)
+> -		devm_free_irq(iommu->dev, iommu->irq[i], iommu);
+> -
+>   	iommu->domain = NULL;
+>   
+>   	dev_dbg(dev, "Detached from iommu domain\n");
+> @@ -1138,7 +1128,7 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	struct rk_iommu *iommu;
+>   	struct resource *res;
+>   	int num_res = pdev->num_resources;
+> -	int err, i;
+> +	int err, i, irq, num_irq;
+>   
+>   	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
+>   	if (!iommu)
+> @@ -1165,23 +1155,17 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	if (iommu->num_mmu == 0)
+>   		return PTR_ERR(iommu->bases[0]);
+>   
+> -	iommu->num_irq = platform_irq_count(pdev);
+> -	if (iommu->num_irq < 0)
+> -		return iommu->num_irq;
+> -	if (iommu->num_irq == 0)
+> -		return -ENXIO;
+> -
+> -	iommu->irq = devm_kcalloc(dev, iommu->num_irq, sizeof(*iommu->irq),
+> -				  GFP_KERNEL);
+> -	if (!iommu->irq)
+> -		return -ENOMEM;
+> -
+> -	for (i = 0; i < iommu->num_irq; i++) {
+> -		iommu->irq[i] = platform_get_irq(pdev, i);
+> -		if (iommu->irq[i] < 0) {
+> -			dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
+> +	num_irq = of_irq_count(dev->of_node);
 
-What SIG_IGN ought to mean is rather more debatable, but again,
-the process could be asking for two opposite things: guarantee a
-SIGFPE is delivered instead of running past an fp exception, and
-also guarantee that SIGFPE is _not_ delivered.
+To follow up on the other reply, I'm not sure you really need to count 
+the IRQs beforehand at all - you're going to be looping through 
+platform_get_irq() and handling errors anyway, so you may as well just 
+start at 0 and keep going until -ENOENT (or use platform_get_resource() 
+to double-check whether an index should be valid, as we do in arm_smmu).
 
-It looks like arm and arm64 are different from most other arches
-(including x86) here, but I'm not sure what is considered correct, and
-it looks like the answer is not standardised.  There's a possibility
-that some software goes subtly wrong on arm/arm64 where on other arches
-it would get terminated with SIGKILL.
+Otherwise, it looks like everything that the IRQ handler needs in the 
+iommu struct (dev, num_mmu and bases) is already initialised by this 
+point, so we should be OK with respect to races.
 
-Whether this matters depends on how harmless the fp exception is to
-the work of the program.  I think if an exception is set to trap
-via feenableexcept() then that's a strong hint the programmer thinks
-that exception is not harmless.  OTOH, trapping is not always
-available anyway...
+Robin.
 
-
-Was there some particular program being broken by the force_sig_info()
-here?
-
-Cheers
----Dave
+> +	for (i = 0; i < num_irq; i++) {
+> +		irq = platform_get_irq(pdev, i);
+> +		if (irq < 0) {
+> +			dev_err(dev, "Failed to get IRQ, %d\n", irq);
+>   			return -ENXIO;
+>   		}
+> +		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
+> +				       IRQF_SHARED, dev_name(dev), iommu);
+> +		if (err)
+> +			return err;
+>   	}
+>   
+>   	iommu->reset_disabled = device_property_read_bool(dev,
+> 
