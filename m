@@ -1,123 +1,100 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Jan 2018 12:18:21 +0000
-Subject: [PATCH v2 01/13] iommu/rockchip: Request irqs in rk_iommu_probe()
-In-Reply-To: <20180116132540.18939-2-jeffy.chen@rock-chips.com>
-References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-2-jeffy.chen@rock-chips.com>
-Message-ID: <0b341bbd-6823-a041-9cac-e35bdc9e9bdc@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Jan 2018 17:48:36 +0530
+Subject: [PATCH v5 11/44] clk: davinci: Add platform information for TI
+ DA830 PSC
+In-Reply-To: <4dd36ca7-e41d-58d8-ec8c-787978307943@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-12-git-send-email-david@lechnology.com>
+ <91fe16dc-907e-6dbb-c8db-c27561132093@ti.com>
+ <4dd36ca7-e41d-58d8-ec8c-787978307943@lechnology.com>
+Message-ID: <86581de6-a982-7a7b-9a83-22c869417211@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/18 13:25, Jeffy Chen wrote:
-> Suggested-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
+On Tuesday 16 January 2018 10:46 PM, David Lechner wrote:
+
+>>> +static const struct davinci_psc_clk_info da830_psc0_info[]
+>>> __initconst = {
+>>> +??? LPSC(0, 0, tpcc, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(1, 0, tptc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(2, 0, tptc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(3, 0, aemif, pll0_sysclk3, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(4, 0, spi0, pll0_sysclk2, 0),
+>>> +??? LPSC(5, 0, mmcsd, pll0_sysclk2, 0),
+>>> +??? LPSC(6, 0, aintc, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(7, 0, arm_rom, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(8, 0, secu_mgr, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(9, 0, uart0, pll0_sysclk2, 0),
+>>> +??? LPSC(10, 0, scr0_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(11, 0, scr1_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(12, 0, scr2_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>> +??? LPSC(13, 0, dmax, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
+>>
+>> pruss is better (I know the name is coming from existing code).
+>>
+>>> +??? LPSC(14, 0, arm, pll0_sysclk6, LPSC_ALWAYS_ENABLED),
+>>
+>> This is LPSC 15 which controls DSP too. But its missing from existing
+>> code. Not sure why. Probably a note for future. For now okay with
+>> ignoring it.
+>>
+>>> +??? { }
+>>> +};
+>>
+>> Tables like these are much easier to parse if columns are spaced using a
+>> tab.
+>>
 > 
-> Changes in v2: None
+> Tabs make the lines over 80 columns. How about spaces instead?
+
+That works for me. I guess checkpatch will complain, but hopefully
+maintainers will agree on the exception.
+
+>>> +void __init da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
+>>> +{
+>>> +??? struct clk_onecell_data *clk_data;
+>>> +
+>>> +??? clk_data = davinci_psc_register_clocks(psc0, da830_psc0_info, 16);
+>>> +??? if (!clk_data)
+>>> +??????? return;
+>>> +
+>>> +??? clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
+>>> +??? clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
+>>> +??? clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
+>>> +??? clk_register_clkdev(clk_data->clks[14], "arm", NULL);
+>>> +
+>>> +??? clk_free_onecell_data(clk_data);
+>>> +
+>>> +??? clk_data = davinci_psc_register_clocks(psc1, da830_psc1_info, 32);
+>>> +??? if (!clk_data)
+>>> +??????? return;
+>>> +
+>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
+>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
+>>> +??? clk_register_clkdev(clk_data->clks[2], NULL, "ohci-da8xx");
+>>> +??? clk_register_clkdev(clk_data->clks[3], "gpio", NULL);
+>>
+>> This is pretty bad (and no fault of yours) - having a con_id but no
+>> device name. Can you please make a pre-series which passes NULL con_id
+>> in gpio-davinci.c?
 > 
->   drivers/iommu/rockchip-iommu.c | 38 +++++++++++---------------------------
->   1 file changed, 11 insertions(+), 27 deletions(-)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 9d991c2d8767..4a12d4746095 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -18,6 +18,7 @@
->   #include <linux/mm.h>
->   #include <linux/module.h>
->   #include <linux/of.h>
-> +#include <linux/of_irq.h>
->   #include <linux/of_platform.h>
->   #include <linux/platform_device.h>
->   #include <linux/slab.h>
-> @@ -91,7 +92,6 @@ struct rk_iommu {
->   	void __iomem **bases;
->   	int num_mmu;
->   	int *irq;
+> I'll give it a try. This is complicated by the fact that the con_id has
+> made it's way into the device tree bindings. However, I think we can
+> safely deprecate clock-names = "gpio" in the device tree bindings since
+> we can make the driver ignore that property to preserve backwards
+> compatibility.
 
-Nit: irq seems to be redundant now as well.
+I don't think this breaks DT-backward compatibility. Passing a NULL
+con_id in driver should find the clock for that device even if DT entry
+has clock-names present. As far as I can read clk_find().
 
-> -	int num_irq;
->   	bool reset_disabled;
->   	struct iommu_device iommu;
->   	struct list_head node; /* entry in rk_iommu_domain.iommus */
-> @@ -830,13 +830,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->   
->   	iommu->domain = domain;
->   
-> -	for (i = 0; i < iommu->num_irq; i++) {
-> -		ret = devm_request_irq(iommu->dev, iommu->irq[i], rk_iommu_irq,
-> -				       IRQF_SHARED, dev_name(dev), iommu);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->   	for (i = 0; i < iommu->num_mmu; i++) {
->   		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
->   			       rk_domain->dt_dma);
-> @@ -885,9 +878,6 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
->   	}
->   	rk_iommu_disable_stall(iommu);
->   
-> -	for (i = 0; i < iommu->num_irq; i++)
-> -		devm_free_irq(iommu->dev, iommu->irq[i], iommu);
-> -
->   	iommu->domain = NULL;
->   
->   	dev_dbg(dev, "Detached from iommu domain\n");
-> @@ -1138,7 +1128,7 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   	struct rk_iommu *iommu;
->   	struct resource *res;
->   	int num_res = pdev->num_resources;
-> -	int err, i;
-> +	int err, i, irq, num_irq;
->   
->   	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
->   	if (!iommu)
-> @@ -1165,23 +1155,17 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   	if (iommu->num_mmu == 0)
->   		return PTR_ERR(iommu->bases[0]);
->   
-> -	iommu->num_irq = platform_irq_count(pdev);
-> -	if (iommu->num_irq < 0)
-> -		return iommu->num_irq;
-> -	if (iommu->num_irq == 0)
-> -		return -ENXIO;
-> -
-> -	iommu->irq = devm_kcalloc(dev, iommu->num_irq, sizeof(*iommu->irq),
-> -				  GFP_KERNEL);
-> -	if (!iommu->irq)
-> -		return -ENOMEM;
-> -
-> -	for (i = 0; i < iommu->num_irq; i++) {
-> -		iommu->irq[i] = platform_get_irq(pdev, i);
-> -		if (iommu->irq[i] < 0) {
-> -			dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
-> +	num_irq = of_irq_count(dev->of_node);
+The less intrusive alternate is to add the GPIO device name in the table
+here, while keeping the con_id and keeping the driver untouched. The
+advantage of that is lesser number of dependent patches for this series
+to go in.
 
-To follow up on the other reply, I'm not sure you really need to count 
-the IRQs beforehand at all - you're going to be looping through 
-platform_get_irq() and handling errors anyway, so you may as well just 
-start at 0 and keep going until -ENOENT (or use platform_get_resource() 
-to double-check whether an index should be valid, as we do in arm_smmu).
+Later once CCF conversion has been there in the kernel for one full
+release and no regressions, these other clean-ups can be done.
 
-Otherwise, it looks like everything that the IRQ handler needs in the 
-iommu struct (dev, num_mmu and bases) is already initialised by this 
-point, so we should be OK with respect to races.
-
-Robin.
-
-> +	for (i = 0; i < num_irq; i++) {
-> +		irq = platform_get_irq(pdev, i);
-> +		if (irq < 0) {
-> +			dev_err(dev, "Failed to get IRQ, %d\n", irq);
->   			return -ENXIO;
->   		}
-> +		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
-> +				       IRQF_SHARED, dev_name(dev), iommu);
-> +		if (err)
-> +			return err;
->   	}
->   
->   	iommu->reset_disabled = device_property_read_bool(dev,
-> 
+Thanks,
+Sekhar
