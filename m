@@ -1,156 +1,93 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 17 Jan 2018 18:47:01 +0100
-Subject: [3/5] clk: divider: add divider_ro_round_rate helper
-In-Reply-To: <f32ed81b-685e-acf6-d2d9-ecd27fd9b8ba@lechnology.com>
-References: <20180105170959.17266-4-jbrunet@baylibre.com>
- <f32ed81b-685e-acf6-d2d9-ecd27fd9b8ba@lechnology.com>
-Message-ID: <1516211221.2608.140.camel@baylibre.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 17 Jan 2018 10:51:10 -0700
+Subject: [PATCH v3 00/10] perf tools: Add support for CoreSight trace decoding
+Message-ID: <1516211480-5100-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-01-11 at 17:08 -0600, David Lechner wrote:
-> On 01/05/2018 11:09 AM, Jerome Brunet wrote:
-> > Like divider_round_rate, a couple a of driver are doing more or less
-> > the same operation to round the rate of the divider when it is read-only.
-> > 
-> > We can factor this code so let's provide an helper function for this
-> 
-> Perhaps you could also make use of this new helper here (clk-divider.c):
-> 
-> const struct clk_ops clk_divider_ro_ops = {
-> 	.recalc_rate = clk_divider_recalc_rate,
-> 	.round_rate = clk_divider_round_rate,
-> };
-> EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
+Hi Arnaldo,
 
-The helper is used in this driver and ro_ops will use it.
-I don't get this comment, could you be more specific
+This patchset adds support for per-thread CoreSight trace decoding from the
+"perf report" interface.  It is largely modelled on what has been done for
+intelPT traces and currently targets the ETMv4 architecture.  Support for
+cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
 
-> 
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> >   drivers/clk/clk-divider.c    | 43 ++++++++++++++++++++++++++++---------------
-> >   include/linux/clk-provider.h | 15 +++++++++++++++
-> >   2 files changed, 43 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > index a851d3e04c7f..3eb2b27f3513 100644
-> > --- a/drivers/clk/clk-divider.c
-> > +++ b/drivers/clk/clk-divider.c
-> > @@ -344,29 +344,42 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-> >   }
-> >   EXPORT_SYMBOL_GPL(divider_round_rate_parent);
-> >   
-> 
-> It is nice to have documentation comments on public functions. Especially
-> in this case where @prate is an in/out parameter and @table is optional.
+The trace decoding support is done using the Open CoreSight Decoding
+Library (openCSD), a stand alone open source project available here [1].
+Integration of the openCSD library with the perf tools follow what has
+been done for other support libraries.  If the library has been installed
+on a system the build scripts will automatially include support for
+CoreSight trace decoding.  The status of the library on the system is
+displayed when adding the VF=1 option as per Jiri's patch [2]:
 
-Sure, but divider_round_rate_parent was already and undocumented. There is no
-reason to change this is this particular patch (it is not the topic)
+...			timerfd: [ on  ]
+...			sched_getcpu: [ on  ]
+...			sdt: [ OFF ]
+...			setns: [ on  ]
+...			libopencsd: [ on  ] <---
 
-The RO helper being the counter part of this one, it did not do it differently
+Instructions on how to build and install the openCSD library are provided
+in the HOWTO.md of the project repository.  We elected to keep the decoder
+library independent of the kernel tree as it is also used outside of the
+perf toolset and various non-linux projects.
 
-I suppose a documentation could be added in another patch.
+The work applies cleanly to [3] and depend on the following patches [4, 5].
 
-However, I don't know if there is policy regarding the documentation of
-functions internal to CCF. Maybe Stephen can tell us ?
+Lastly there is a divergence of opinions on whether the decoding library
+should be part of the kernel tree or live on its own as we chose to do -
+your point of view on the matter would be greatly appreciated.
 
-Cheers
-Jerome
+Regards,
+Mathieu
+
+[1]. https://github.com/Linaro/OpenCSD
+[2]. https://marc.info/?l=linux-kernel&m=151549001914932&w=2
+[3]. git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core
+[4]. https://marc.info/?l=linux-kernel&m=151561673423088&w=2
+[5]. https://marc.info/?l=linux-kernel&m=151579875721440&w=2
+
+Changes for V3:
+. Rebased to Acme's latest tree (a72594ca5c70)
+. Fixed indentation in Makefile.feature as per Jiri's request
+
+Changes for V2:
+. Rebased to Acme's latest (321e85e9458a)
+. Following what has been done for libdw and libbabeltrace and added the
+  possibililty to use alternate header/library for development purposes.
 
 
-> 
-> > +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-> > +				  unsigned long rate, unsigned long *prate,
-> > +				  const struct clk_div_table *table, u8 width,
-> > +				  unsigned long flags, unsigned int val)
-> > +{
-> > +	int div;
-> > +
-> > +	div = _get_div(table, val, flags, width);
-> > +
-> > +	/* Even a read-only clock can propagate a rate change */
-> > +	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-> > +		if (!parent)
-> > +			return -EINVAL;
-> > +
-> > +		*prate = clk_hw_round_rate(parent, rate * div);
-> > +	}
-> > +
-> > +	return DIV_ROUND_UP_ULL((u64)*prate, div);
-> > +}
-> > +EXPORT_SYMBOL_GPL(divider_ro_round_rate_parent);
-> > +
-> > +
-> >   static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-> >   				unsigned long *prate)
-> >   {
-> >   	struct clk_divider *divider = to_clk_divider(hw);
-> > -	struct clk_hw *hw_parent = clk_hw_get_parent(hw);
-> > -	int bestdiv;
-> > +	u32 val;
-> >   
-> >   	/* if read only, just return current value */
-> >   	if (divider->flags & CLK_DIVIDER_READ_ONLY) {
-> > -		bestdiv = clk_readl(divider->reg) >> divider->shift;
-> > -		bestdiv &= div_mask(divider->width);
-> > -		bestdiv = _get_div(divider->table, bestdiv, divider->flags,
-> > -			divider->width);
-> > -
-> > -		/* Even a read-only clock can propagate a rate change */
-> > -		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
-> > -			if (!hw_parent)
-> > -				return -EINVAL;
-> > -
-> > -			*prate = clk_hw_round_rate(hw_parent, rate * bestdiv);
-> > -		}
-> > +		val = clk_readl(divider->reg) >> divider->shift;
-> > +		val &= div_mask(divider->width);
-> >   
-> > -		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
-> > +		return divider_ro_round_rate(hw, rate, prate, divider->table,
-> > +					     divider->width, divider->flags,
-> > +					     val);
-> >   	}
-> >   
-> >   	return divider_round_rate(hw, rate, prate, divider->table,
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index 175a62a15619..eb2c3a035e98 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -417,6 +417,10 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-> >   			       unsigned long rate, unsigned long *prate,
-> >   			       const struct clk_div_table *table,
-> >   			       u8 width, unsigned long flags);
-> > +long divider_ro_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-> > +				  unsigned long rate, unsigned long *prate,
-> > +				  const struct clk_div_table *table, u8 width,
-> > +				  unsigned long flags, unsigned int val);
-> >   int divider_get_val(unsigned long rate, unsigned long parent_rate,
-> >   		const struct clk_div_table *table, u8 width,
-> >   		unsigned long flags);
-> > @@ -772,6 +776,17 @@ static inline long divider_round_rate(struct clk_hw *hw, unsigned long rate,
-> >   					 rate, prate, table, width, flags);
-> >   }
-> >   
-> 
-> Same here (about documentation comment).
-> 
-> > +static inline long divider_ro_round_rate(struct clk_hw *hw, unsigned long rate,
-> > +					 unsigned long *prate,
-> > +					 const struct clk_div_table *table,
-> > +					 u8 width, unsigned long flags,
-> > +					 unsigned int val)
-> > +{
-> > +	return divider_ro_round_rate_parent(hw, clk_hw_get_parent(hw),
-> > +					    rate, prate, table, width, flags,
-> > +					    val);
-> > +}
-> > +
-> >   /*
-> >    * FIXME clock api without lock protection
-> >    */
-> > 
-> 
-> 
+Mathieu Poirier (8):
+  perf tools: Integrating the CoreSight decoding library
+  perf tools: Add initial entry point for decoder CoreSight traces
+  perf tools: Add decoder mechanic to support dumping trace data
+  perf tools: Add support for decoding CoreSight trace data
+  perf tools: Add functionality to communicate with the openCSD decoder
+  pert tools: Add queue management functionality
+  perf tools: Add full support for CoreSight trace decoding
+  perf tools: Add mechanic to synthesise CoreSight trace packets
+
+Tor Jeremiassen (2):
+  perf tools: Add processing of coresight metadata
+  MAINTAINERS: Adding entry for CoreSight trace decoding
+
+ MAINTAINERS                                     |    3 +-
+ tools/build/Makefile.feature                    |    3 +-
+ tools/build/feature/Makefile                    |    7 +-
+ tools/build/feature/test-all.c                  |    5 +
+ tools/perf/Makefile.config                      |   25 +
+ tools/perf/Makefile.perf                        |    2 +
+ tools/perf/util/Build                           |    6 +
+ tools/perf/util/auxtrace.c                      |    2 +
+ tools/perf/util/cs-etm-decoder/Build            |    1 +
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  513 ++++++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  105 +++
+ tools/perf/util/cs-etm.c                        | 1023 +++++++++++++++++++++++
+ tools/perf/util/cs-etm.h                        |   18 +
+ 13 files changed, 1710 insertions(+), 3 deletions(-)
+ create mode 100644 tools/perf/util/cs-etm-decoder/Build
+ create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+ create mode 100644 tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+ create mode 100644 tools/perf/util/cs-etm.c
+
+-- 
+2.7.4
