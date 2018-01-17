@@ -1,88 +1,77 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Wed, 17 Jan 2018 18:47:05 +0000
-Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <1199109167.10232.1516213158515@email.1und1.de>
-References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
- <1059643032.72553.1516136078614@email.1und1.de>
- <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
- <1199109167.10232.1516213158515@email.1und1.de>
-Message-ID: <a05474da-039b-2fb3-2a5a-dd04910b5be2@raspberrypi.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 17 Jan 2018 19:48:46 +0100 (CET)
+Subject: DT binding for staging vchiq
+In-Reply-To: <3379fe3c-62ef-85a1-0073-da184e32cdf8@orpaltech.com>
+References: <3379fe3c-62ef-85a1-0073-da184e32cdf8@orpaltech.com>
+Message-ID: <299185620.10681.1516214926155@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sergey,
 
-On 17/01/2018 18:19, Stefan Wahren wrote:
-> Hi Sergey,
+> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 14:45 geschrieben:
 > 
->> Sergey Suloev <ssuloev@orpaltech.com> hat am 16. Januar 2018 um 22:07 geschrieben:
->>
->>
->> sure, here you go
->>
->> https://pastebin.com/kAHUrb6m
->>
->>
->> On 01/16/2018 11:54 PM, Stefan Wahren wrote:
->>> Hi Sergey,
->>>
->>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 16. Januar 2018 um 21:27 geschrieben:
->>>>
->>>>
->>>> Hi,
->>>> I still have the issue "mmc1 timeout" with mainline 4.15rc7, discussed here
->>>>
->>>> http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-June/004003.html
->>>>
->>>> Is there any progress on this ?
->>>> Thanks
->>>>
->>> please provide the dmesg output.
 > 
-> first of all please avoid top-posting.
+> Hello everyone,
 > 
-> These mmc1 timeouts are unexpected for Raspberry Pi 3 with mailine kernel. I'm using multi_v7_defconfig and get the following:
+> I am trying to use RPi3  VC4 gpu with Qt5 quick/qml. When I run my 
+> application Qt5 is always complaining about missing vchiq device in the 
+> system. I know there is vchiq driver available in staging.
 > 
-> [    0.730597] mmc1: SDHCI controller on 3f300000.sdhci [3f300000.sdhci] using PIO
-> [    0.738238] ledtrig-cpu: registered to indicate activity on CPUs
-> [    0.745085] usbcore: registered new interface driver usbhid
-> [    0.751536] usbhid: USB HID core driver
-> [    0.758625] bcm2835-mbox 3f00b880.mailbox: mailbox enabled
-> [    0.767760] NET: Registered protocol family 10
-> [    0.775301] Segment Routing with IPv6
-> [    0.781785] sit: IPv6, IPv4 and MPLS over IPv4 tunneling driver
-> [    0.788874] NET: Registered protocol family 17
-> [    0.795399] can: controller area network core (rev 20170425 abi 9)
-> [    0.802013] NET: Registered protocol family 29
-> [    0.808495] can: raw protocol (rev 20170425)
-> [    0.814965] can: broadcast manager protocol (rev 20170425 t)
-> [    0.821447] can: netlink gateway (rev 20170425) max_hops=1
-> [    0.828317] Key type dns_resolver registered
-> [    0.835733] Registering SWP/SWPB emulation handler
-> [    0.842787] Loading compiled-in X.509 certificates
-> [    0.852989] 3f201000.serial: ttyAMA0 at MMIO 0x3f201000 (irq = 87, base_baud = 0) is a PL011 rev2
-> [    0.862190] mmc1: queuing unknown CIS tuple 0x80 (2 bytes)
-> [    0.868970] raspberrypi-firmware soc:firmware: Attached to firmware from 2017-07-03 14:16
-> [    0.870688] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
-> [    0.872371] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
-> [    0.875388] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
-> [    0.897742] mmc0: host does not support reading read-only switch, assuming write-enable
-> [    0.906523] mmc0: new high speed SDHC card at address 1234
-> [    0.913738] mmcblk0: mmc0:1234 SA32G 29.3 GiB
-> [    0.922210]  mmcblk0: p1 p2
-> [    0.928980] dwc2 3f980000.usb: 3f980000.usb supply vusb_d not found, using dummy regulator
-> [    0.935881] dwc2 3f980000.usb: 3f980000.usb supply vusb_a not found, using dummy regulator
-> [    0.993219] dwc2 3f980000.usb: DWC OTG Controller
-> [    0.999967] dwc2 3f980000.usb: new USB bus registered, assigned bus number 1
-> [    1.002026] mmc1: new high speed SDIO card at address 0001
+> My questions are:
 > 
-> Could you please also share your config?
-> Do you have a Raspberry Pi 3 B 1.2?
-> Did you check the function of the hardware before?
+> 1) What is the current status of the driver ? Is it working at all?
 
-To add to Stefan's questions, have you specifically checked that your power supply
-is adequate? Issues like this during startup are often caused by a momentary undervoltage
-triggered by increased current demands as many subsystems are started at once. We
-recommend a 2.5A supply for Pi 3.
+>From my point of view it's still experimental. It's mostly the same driver as in downstream, but its function highly dependents on the configuration:
 
-Phil
+arm/bcm2835_defconfig = should work
+arm/multi_v7_defconfig = may work
+arm64/defconfig = won't work [1]
+
+In order to the function of the driver use vchiq_test from the Raspberry Pi userland.
+
+Btw testers are always welcome :-)
+
+> 
+> can it be used with Qt5 ?
+
+If your application works with the downstream kernel, there is a high chance.
+
+> 
+> 2) Can I have a working example of DT binding for the driver ?
+
+This is one of my many TODOs [2] to provide a binding document. Please try the following old patch. The cache-line-size depends on the used SoC (BCM2835 = 32, BCM2836/BCM2837 = 64).
+
+Good luck
+
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index e55b362..7398b96 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -27,6 +27,14 @@
+                        firmware = <&firmware>;
+                        #power-domain-cells = <1>;
+                };
++
++               vchiq: vchiq {
++                       compatible = "brcm,bcm2835-vchiq";
++                       reg = <0x7e00b840 0xf>;
++                       interrupts = <0 2>;
++                       cache-line-size = <64>;
++                       firmware = <&firmware>;
++		};
+        };
+ };
+
+
+[1] - https://github.com/lategoodbye/rpi-zero/issues/23
+[2] - https://github.com/lategoodbye/rpi-zero/issues/8
+
+> 
+> Thanks
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
