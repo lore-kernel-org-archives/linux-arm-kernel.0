@@ -1,79 +1,62 @@
 From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 17 Jan 2018 16:30:08 +0900
-Subject: [PATCH v2 11/13] iommu/rockchip: Use OF_IOMMU to attach devices
- automatically
-In-Reply-To: <5A5EF94E.7010806@rock-chips.com>
+Date: Wed, 17 Jan 2018 16:38:17 +0900
+Subject: [PATCH v2 12/13] iommu/rockchip: Add runtime PM support
+In-Reply-To: <5A5EFAB2.7040001@rock-chips.com>
 References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-12-jeffy.chen@rock-chips.com>
- <CAAFQd5C=SM21CmL8J334HseJ6SJH1wAVzKhrsk_cXMmpf8mK8g@mail.gmail.com>
- <5A5EF94E.7010806@rock-chips.com>
-Message-ID: <CAAFQd5AOZ797dNEvr5TbuWK-rw=dTCArUZM53t4_gNRugBd=sg@mail.gmail.com>
+ <20180116132540.18939-13-jeffy.chen@rock-chips.com>
+ <CAAFQd5DCxgsL52+5XetV9MRDecL7dN6_QdHysKUOWaEqSf=ijw@mail.gmail.com>
+ <5A5EFAB2.7040001@rock-chips.com>
+Message-ID: <CAAFQd5ATRh5hdJhVxDoXjFz72cBmv-yNaW7v-eUxkVRYA3=uJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 4:20 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
+On Wed, Jan 17, 2018 at 4:26 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
 > Hi Tomasz,
 >
 > Thanks for your reply.
 >
->
-> On 01/17/2018 01:44 PM, Tomasz Figa wrote:
+> On 01/17/2018 02:20 PM, Tomasz Figa wrote:
 >>
 >> On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com>
->> wrote:
->>>
->>> Converts the rockchip-iommu driver to use the OF_IOMMU infrastructure,
->>> which allows attaching master devices to their IOMMUs automatically
->>> according to DT properties.
->>>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>> ---
->>>
->>> Changes in v2: None
->>>
->>>   drivers/iommu/rockchip-iommu.c | 116
->>> +++++++++++------------------------------
->>>   1 file changed, 31 insertions(+), 85 deletions(-)
->>>
->>> diff --git a/drivers/iommu/rockchip-iommu.c
->>> b/drivers/iommu/rockchip-iommu.c
->>> index 51e4f982c4a6..c2d3ac82184e 100644
->>> --- a/drivers/iommu/rockchip-iommu.c
->>> +++ b/drivers/iommu/rockchip-iommu.c
->>
 >> [snip]
 >>>
->>> +static int rk_iommu_of_xlate(struct device *dev,
->>> +                            struct of_phandle_args *args)
->>> +{
->>> +       struct platform_device *iommu_dev;
->>> +
->>> +       iommu_dev = of_find_device_by_node(args->np);
->>> +       if (!iommu_dev) {
->>> +               dev_err(dev, "iommu %pOF not found\n", args->np);
->>> +               return -ENODEV;
->>> +       }
->>> +
->>> +       dev->archdata.iommu = platform_get_drvdata(iommu_dev);
+>>> +static int rk_iommu_startup(struct rk_iommu *iommu)
+>>>   {
+>>> -       struct rk_iommu *iommu;
+>>> +       struct iommu_domain *domain = iommu->domain;
+>>>          struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
+>>> -       unsigned long flags;
+>>>          int ret, i;
+>>>
+>>> -       /*
+>>> -        * Allow 'virtual devices' (e.g., drm) to attach to domain.
+>>> -        * Such a device does not belong to an iommu group.
+>>> -        */
+>>> -       iommu = rk_iommu_from_dev(dev);
+>>> -       if (!iommu)
+>>> -               return 0;
+>>> -
+>>> -       if (iommu->domain)
+>>> -               rk_iommu_detach_device(iommu->domain, dev);
+>>> -
+>>>          ret = rk_iommu_enable_clocks(iommu);
+>>>          if (ret)
+>>>                  return ret;
+>>>
 >>
->>
->> This will work only if that iommu was already probed. Do we have any
->> guarantees that this callback is not called earlier?
+>> Don't we need to check here (and in _shutdown() too) if we have a
+>> domain attached?
 >
-> in of_iommu.c, the of_iommu_xlate would check for fwnode before calling
-> this.
-
-Right, looks like deferred probe is handled there.
-
+> hmmm, right, the startup might been called by resume, so should check
+> iommu->domain here.
 >
-> but it's possible the probe failed after calling iommu_device_set_fwnode, so
-> i'll try to add some checks here, and maybe adjust probe() to prevent it
-> too.
+> but the shutdown would be called at the end of detach or suspend, it could
+> be not attached or attached.
 
-I think iommu_device_set_fwnode() is not enough for of_iommu_xlate()
-to find the IOMMU. The IOMMU is actually added to the IOMMU list by
-iommu_device_register(), which is last in the sequence, so I guess we
-should be fine.
+If startup might be called by resume, without domain attached, what
+prevents shutdown from being called by suspend after that resume,
+still without domain attached? Is it guaranteed that if resume is
+called, someone will attach a domain before suspend is called?
 
 Best regards,
 Tomasz
