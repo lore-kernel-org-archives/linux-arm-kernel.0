@@ -1,70 +1,65 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 17 Jan 2018 21:14:10 +0100
-Subject: [PATCH v3 01/12] clk: sunxi-ng: Mask nkmp factors when setting
- register
+Date: Wed, 17 Jan 2018 21:14:11 +0100
+Subject: [PATCH v3 02/12] clk: sunxi-ng: Change formula for NKMP PLLs
 In-Reply-To: <20180117201421.25954-1-jernej.skrabec@siol.net>
 References: <20180117201421.25954-1-jernej.skrabec@siol.net>
-Message-ID: <20180117201421.25954-2-jernej.skrabec@siol.net>
+Message-ID: <20180117201421.25954-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, if one of the factors isn't present, bit 0 gets always set to
-1. For example, A83T has NMP PLLs modelled as NKMP PLL without K. Since
-K is not specified, it's offset, width and shift is 0. Driver assumes
-that lowest value possible is 1, otherwise we would get division by 0.
-That situation causes that bit 0 is always set, which may change wanted
-clock rate.
+This commit changes formula from this:
 
-Fix that by masking every factor according to it's specified width.
-Factors with width set to 0 won't have any influence to final register
-value.
+Freq = (parent_freq * N * K) / (M * P)
+
+to this:
+
+Freq = (parent_freq / M) * N * K / P
+
+This improves situation when N is in the range 1-255. PLL parent clock
+is almost always 24 MHz, which means that for N >= 180 original formula
+overflows and result becomes useless. Situation can be improved if M is
+used as predivider as it can be seen in the second formula. That way at
+least M > 1 is considered, but it still leaves small gap for wrong result
+when M = 1 and N >= 180.
+
+Using M as predivider shouldn't cause any issue, because it is in range
+1-4 at most, so there is no or only minimal rounding error.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nkmp.c | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index e58c95787f94..a99068a08315 100644
+index a99068a08315..e6c996ad4483 100644
 --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
 +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -134,6 +134,7 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
- 			   unsigned long parent_rate)
- {
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
-+	u32 n_mask, k_mask, m_mask, p_mask;
- 	struct _ccu_nkmp _nkmp;
- 	unsigned long flags;
- 	u32 reg;
-@@ -149,18 +150,20 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -33,7 +33,7 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+ 				for (_p = nkmp->min_p; _p <= nkmp->max_p; _p <<= 1) {
+ 					unsigned long tmp_rate;
  
- 	ccu_nkmp_find_best(parent_rate, rate, &_nkmp);
+-					tmp_rate = parent * _n * _k / (_m * _p);
++					tmp_rate = (parent / _m) * _n * _k / _p;
  
-+	n_mask = GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
-+	k_mask = GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
-+	m_mask = GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
-+	p_mask = GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
-+
- 	spin_lock_irqsave(nkmp->common.lock, flags);
+ 					if (tmp_rate > rate)
+ 						continue;
+@@ -107,7 +107,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
+ 	p = reg >> nkmp->p.shift;
+ 	p &= (1 << nkmp->p.width) - 1;
  
- 	reg = readl(nkmp->common.base + nkmp->common.reg);
--	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
--	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
--	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
--	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
--
--	reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
--	reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
--	reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
--	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
-+	reg &= ~(n_mask | k_mask | m_mask | p_mask);
-+
-+	reg |= ((_nkmp.n - nkmp->n.offset) << nkmp->n.shift) & n_mask;
-+	reg |= ((_nkmp.k - nkmp->k.offset) << nkmp->k.shift) & k_mask;
-+	reg |= ((_nkmp.m - nkmp->m.offset) << nkmp->m.shift) & m_mask;
-+	reg |= (ilog2(_nkmp.p) << nkmp->p.shift) & p_mask;
+-	return (parent_rate * n * k >> p) / m;
++	return (parent_rate / m) * n * k >> p;
+ }
  
- 	writel(reg, nkmp->common.base + nkmp->common.reg);
+ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+@@ -127,7 +127,7 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
  
+ 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
+ 
+-	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
++	return (*parent_rate / _nkmp.m) * _nkmp.n * _nkmp.k / _nkmp.p;
+ }
+ 
+ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
 2.15.1
