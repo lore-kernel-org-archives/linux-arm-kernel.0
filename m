@@ -1,77 +1,85 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 17 Jan 2018 17:55:39 +0100
-Subject: [net-next: PATCH v3 0/7] Armada 7k/8k PP2 ACPI support
-Message-ID: <1516208146-4144-1-git-send-email-mw@semihalf.com>
+Date: Wed, 17 Jan 2018 17:55:43 +0100
+Subject: [net-next: PATCH v3 4/7] device property: Allow iterating over
+ available child fwnodes
+In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
+References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
+Message-ID: <1516208146-4144-5-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Implement a new helper function fwnode_get_next_available_child_node(),
+which enables obtaining next enabled child fwnode, which
+works on a similar basis to OF's of_get_next_available_child().
 
-This is a third version of the patchset introducing mvpp2 driver ability
-to operate with ACPI. Until follow-up generic MDIO is introduced
-it can using the link interrupt capability (a.k.a. in-band management)
-on all ports, 1000BaseT RGMII included.
-Driver operation was tested on top of the net-next branch
-with both DT and ACPI on MacchiatoBin and Armada 7040 DB boards.
+This commit also introduces a macro, thanks to which it is
+possible to iterate over the available fwnodes, using the
+new function described above.
 
-The main changes were requested during v2 review, which was
-adding generic helper routines for:
-* interating over available fwnodes (new patch 4/7)
-* getting IRQ directly from fwnode (new patch 3/7)
-Thanks to the latter the driver code could be simplified
-and allowed to drop formula-based IRQ obtaining. Changes are
-summarized in the changelog below.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
+ drivers/base/property.c  | 26 ++++++++++++++++++++
+ include/linux/property.h |  6 +++++
+ 2 files changed, 32 insertions(+)
 
-mvpp2 driver can work with the ACPI representation, as exposed
-on a public branch:
-https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
-It was compiled together with the most recent Tianocore EDK2 revision.
-Please refer to the firmware build instruction on MacchiatoBin board:
-http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
-
-ACPI representation of PP2 controllers (withouth PHY support) can
-be viewed in the github:
-* MacchiatoBin:
-https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
-
-* Armada 7040 DB:
-https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
-
-I will appreciate any comments or remarks.
-
-Best regards,
-Marcin
-
-Changelog:
-v2 -> v3:
-* 1/7, 2/7
-    - Add Rafael's Acked-by's
-* 3/7, 4/7
-    - New patches
-* 6/7, 7/7
-    - Update driver with new helper routines usage
-    - Improve commit log.
-
-v1 -> v2:
-* Remove MDIO patches
-* Use PP2 ports only with link interrupts
-* Release second region resources in mvpp2 driver (code moved from
-  mvmdio), as explained in details in 5/5 commit message.
-
-
-Marcin Wojtas (7):
-  device property: Introduce fwnode_get_mac_address()
-  device property: Introduce fwnode_get_phy_mode()
-  device property: Introduce fwnode_irq_get()
-  device property: Allow iterating over available child fwnodes
-  net: mvpp2: simplify maintaining enabled ports' list
-  net: mvpp2: use device_*/fwnode_* APIs instead of of_*
-  net: mvpp2: enable ACPI support in the driver
-
- drivers/base/property.c              | 105 ++++++++--
- drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
- include/linux/property.h             |  11 ++
- 3 files changed, 230 insertions(+), 92 deletions(-)
-
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index adb3893..2343906 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -998,6 +998,32 @@ fwnode_get_next_child_node(const struct fwnode_handle *fwnode,
+ EXPORT_SYMBOL_GPL(fwnode_get_next_child_node);
+ 
+ /**
++ * fwnode_get_next_available_child_node - Return the next
++ * available child node handle for a node
++ * @fwnode: Firmware node to find the next child node for.
++ * @child: Handle to one of the node's child nodes or a %NULL handle.
++ */
++struct fwnode_handle *
++fwnode_get_next_available_child_node(const struct fwnode_handle *fwnode,
++				     struct fwnode_handle *child)
++{
++	struct fwnode_handle *next_child = child;
++
++	if (!fwnode)
++		return NULL;
++
++	do {
++		next_child = fwnode_get_next_child_node(fwnode, next_child);
++
++		if (!next_child || fwnode_device_is_available(next_child))
++			break;
++	} while (next_child);
++
++	return next_child;
++}
++EXPORT_SYMBOL_GPL(fwnode_get_next_available_child_node);
++
++/**
+  * device_get_next_child_node - Return the next child node handle for a device
+  * @dev: Device to find the next child node for.
+  * @child: Handle to one of the device's child nodes or a null handle.
+diff --git a/include/linux/property.h b/include/linux/property.h
+index e05889f..5b0563a 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -83,11 +83,17 @@ struct fwnode_handle *fwnode_get_next_parent(
+ 	struct fwnode_handle *fwnode);
+ struct fwnode_handle *fwnode_get_next_child_node(
+ 	const struct fwnode_handle *fwnode, struct fwnode_handle *child);
++struct fwnode_handle *fwnode_get_next_available_child_node(
++	const struct fwnode_handle *fwnode, struct fwnode_handle *child);
+ 
+ #define fwnode_for_each_child_node(fwnode, child)			\
+ 	for (child = fwnode_get_next_child_node(fwnode, NULL); child;	\
+ 	     child = fwnode_get_next_child_node(fwnode, child))
+ 
++#define fwnode_for_each_available_child_node(fwnode, child)		       \
++	for (child = fwnode_get_next_available_child_node(fwnode, NULL); child;\
++	     child = fwnode_get_next_available_child_node(fwnode, child))
++
+ struct fwnode_handle *device_get_next_child_node(
+ 	struct device *dev, struct fwnode_handle *child);
+ 
 -- 
 2.7.4
