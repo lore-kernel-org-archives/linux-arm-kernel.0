@@ -1,151 +1,41 @@
-From: juliac@eso.teric.us (Julia Cartwright)
-Date: Wed, 17 Jan 2018 13:14:41 -0600
-Subject: [patch v17 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1516087139-7510-2-git-send-email-oleksandrs@mellanox.com>
-References: <1516087139-7510-1-git-send-email-oleksandrs@mellanox.com>
- <1516087139-7510-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <20180117191441.GE2818@kryptos.localdomain>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 17 Jan 2018 20:32:22 +0100 (CET)
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+ <1199109167.10232.1516213158515@email.1und1.de>
+ <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+Message-ID: <998321576.11526.1516217542223@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Oleksandr-
+Hi Sergey,
 
-On Tue, Jan 16, 2018 at 09:18:56AM +0200, Oleksandr Shamray wrote:
-[..]
-> v16->v17
-> Comments pointed by Julia Cartwright <juliac@eso.teric.us>
+> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 19:49 geschrieben:
+> 
+> 
+> Hi Stefan
+> 
+> wifi network was working fine when I used a raspbian image downloaded 
+> from official site.
+> 
+> Here is my config https://pastebin.com/7XRpmM0X  and cpuinfo 
+> https://pastebin.com/08Z6gDZ9
+> 
+> I have no idea about version you are talking about.
 
-More review feedback below:
+please stop top-posting.
 
-[..]
-> +++ b/drivers/jtag/jtag.c
-[..]
-> +static long jtag_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-> +{
-> +	struct jtag *jtag = file->private_data;
-> +	struct jtag_run_test_idle idle;
-> +	struct jtag_xfer xfer;
-> +	u8 *xfer_data;
-> +	u32 data_size;
-> +	u32 value;
-> +	int err;
-> +
-> +	if (!arg)
-> +		return -EINVAL;
-> +
-> +	switch (cmd) {
-> +	case JTAG_GIOCFREQ:
-> +		if (!jtag->ops->freq_get)
-> +			err = -EOPNOTSUPP;
+I was talking about the board revision of your RPi. You can get this information by looking at the PCB.
 
-Did you mean:
+I updated to the last firmware and your config but i'm unable to reproduce this issue.
 
-			return -EOPNOTSUPP;
+Do you use U-Boot or only the Raspberry Pi bootloader?
+What are your modifications to config.txt?
 
-?
-
-> +
-> +		err = jtag->ops->freq_get(jtag, &value);
-
-Otherwise you're check was worthless, you'll call NULL here.
-
-Also, w.r.t. the set of ops which are required to be implemented: this
-isn't the right place to do the check.
-
-Instead, do it in jtag_alloc():
-
-	struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
-	{
-		struct jtag *jtag;
-
-		if (!ops->freq_get || !ops->xfer || ...) /* fixup condition */
-			return NULL;
-
-		jtag = kzalloc(sizeof(*jtag) + priv_size, GFP_KERNEL);
-		if (!jtag)
-			return NULL;
-
-		jtag->ops = ops;
-		return jtag;
-	}
-	EXPORT_SYMBOL_GPL(jtag_alloc);
-
-[..]
-> +	case JTAG_IOCXFER:
-[..]
-> +		data_size = DIV_ROUND_UP(xfer.length, BITS_PER_BYTE);
-> +		xfer_data = memdup_user(u64_to_user_ptr(xfer.tdio), data_size);
-> +
-> +		if (!xfer_data)
-
-memdup_user() doesn't return NULL on error.  You need to check for
-IS_ERR(xfer_data).
-
-> +			return -EFAULT;
-> +
-> +		err = jtag->ops->xfer(jtag, &xfer, xfer_data);
-> +		if (err) {
-> +			kfree(xfer_data);
-> +			return -EFAULT;
-> +		}
-> +
-> +		err = copy_to_user(u64_to_user_ptr(xfer.tdio),
-> +				   (void *)(xfer_data), data_size);
-> +
-> +		if (err) {
-> +			kfree(xfer_data);
-> +			return -EFAULT;
-> +		}
-> +
-> +		kfree(xfer_data);
-
-Move the kfree() above the if (err).
-
-> +		if (copy_to_user((void *)arg, &xfer, sizeof(struct jtag_xfer)))
-> +			return -EFAULT;
-> +		break;
-> +
-> +	case JTAG_GIOCSTATUS:
-> +		if (!jtag->ops->status_get)
-> +			return -EOPNOTSUPP;
-> +
-> +		err = jtag->ops->status_get(jtag, &value);
-> +		if (err)
-> +			break;
-> +
-> +		err = put_user(value, (__u32 *)arg);
-> +		if (err)
-> +			err = -EFAULT;
-
-put_user() returns -EFAULT on failure, so this shouldn't be necessary.
-
-[..]
-> --- /dev/null
-> +++ b/include/uapi/linux/jtag.h
-[..]
-> +/**
-> + * struct jtag_xfer - jtag xfer:
-> + *
-> + * @type: transfer type
-> + * @direction: xfer direction
-> + * @length: xfer bits len
-> + * @tdio : xfer data array
-> + * @endir: xfer end state
-> + *
-> + * Structure represents interface to JTAG device for jtag sdr xfer
-> + * execution.
-> + */
-> +struct jtag_xfer {
-> +	__u8	type;
-> +	__u8	direction;
-> +	__u8	endstate;
-
-Just to be as unambiguous as possible, considering this is ABI, I would
-suggest explicitly putting a padding byte here.
-
-> +	__u32	length;
-> +	__u64	tdio;
-> +};
-
-Thanks,
-   Julia
+> 
+> Thanks.
+> 
+>
