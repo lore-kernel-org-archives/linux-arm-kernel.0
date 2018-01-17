@@ -1,174 +1,57 @@
-From: jramirez@baylibre.com (Jorge Ramirez-Ortiz)
-Date: Wed, 17 Jan 2018 11:56:27 +0100
-Subject: [PATCH] ARM64: dts: meson: accept MAC addr from u-boot  environment
-Message-ID: <1516186587-22157-1-git-send-email-jramirez@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jan 2018 10:58:15 +0000
+Subject: [PATCH] ARM: make memzero optimization smarter
+In-Reply-To: <nycvar.YSQ.7.76.1801162150190.13881@knanqh.ubzr>
+References: <20180116162905.1404585-1-arnd@arndb.de>
+ <nycvar.YSQ.7.76.1801161205560.13881@knanqh.ubzr>
+ <CAK8P3a2bfErHxu2i-3JJpUdG64RSoYgmpip2xLAutiSSM9UEkw@mail.gmail.com>
+ <nycvar.YSQ.7.76.1801162150190.13881@knanqh.ubzr>
+Message-ID: <20180117105815.GL17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend configuring the MAC address from u-boot to all meson boards.
+On Tue, Jan 16, 2018 at 11:07:34PM -0500, Nicolas Pitre wrote:
+> On Tue, 16 Jan 2018, Arnd Bergmann wrote:
+> 
+> > On Tue, Jan 16, 2018 at 6:10 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > > On Tue, 16 Jan 2018, Arnd Bergmann wrote:
+> > >
+> > >> However, we can avoid this class of bogus warnings for the memset() macro
+> > >> by only doing the micro-optimization for zero-length arguments when the
+> > >> length is a compile-time constant. This should also reduce code size by
+> > >> a few bytes, and avoid an extra branch for the cases that a variable-length
+> > >> argument is always nonzero, which is probably the common case anyway.
+> > >>
+> > >> I have made sure that the __memzero implementation can safely handle
+> > >> a zero length argument.
+> > >
+> > > Why not simply drop the test on (__n) != 0 then? I fail to see what the
+> > > advantage is in that case.
+> > 
+> > Good point. We might actually get even better results by dropping the
+> > __memzero path entirely, since gcc has can optimize trivial memset()
+> > operations and inline them.
+> > 
+> > If I read arch/arm/lib/memzero.S correctly, it saves exactly two 'orr'
+> > instructions compared to the memset.S implementation, but calling
+> > memset() rather than __memzero() from C code ends up saving a
+> > function call at least some of the time.
+> > 
+> > Building a defconfig kernel with gcc-7.2.1, I see 1919 calls to __memzero()
+> > and 636 calls to memset() in vmlinux. If I remove the macro entirely,
+> > I get 1775 calls to memset() instead, so 780 memzero instances got
+> > inlined, and kernel shrinks by 5488 bytes (0.03%), not counting the
+> > __memzero implementation that we could possibly also drop.
+> 
+> I get 3668 fewer bytes just by removing the test against 0 in the macro.
+> 
+> And an additional 5092 fewer bytes by removing the call-to-__memzero 
+> optimization.
 
-I didn't test this changeset but having checked libretech's u-boot
-tree I believe it should just work.
+However, __memzero is not safe against being called with a zero length
+so it's not something we can simply remove.
 
-Signed-off-by: Jorge Ramirez-Ortiz <jramirez@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts           | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            | 1 +
- arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts             | 1 +
- 12 files changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index 4157987..c58ee4c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -48,6 +48,7 @@
- / {
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-index 4b17a76..82faff3 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
-@@ -52,6 +52,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-index 38dfdde..ac4e4fd 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -54,6 +54,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 08b7bb7..bc39c24 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -53,6 +53,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index 23c08c3..9d97a78 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -47,6 +47,7 @@
- / {
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index f2bc6de..284d8db 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -47,6 +47,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-index 977b424..a60361d 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-@@ -16,6 +16,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-index edc512a..35cdcea 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-@@ -29,6 +29,7 @@
- 
- 	aliases {
- 		serial2 = &uart_AO_B;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	gpio-keys-polled {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-index 1b8f328..012d355 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-@@ -52,6 +52,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-index 129af90..b60f1be 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-@@ -17,6 +17,7 @@
- 	aliases {
- 		serial0 = &uart_AO;
- 		serial1 = &uart_A;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-index 22c6977..c51f2fb8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-@@ -54,6 +54,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
-index 470f72b..90dc882 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
-@@ -58,6 +58,7 @@
- 
- 	aliases {
- 		serial0 = &uart_AO;
-+		ethernet0 = &ethmac;
- 	};
- 
- 	chosen {
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
