@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 17 Jan 2018 17:17:05 +0100
-Subject: [PATCH v2 04/16] ARM: dts: r8a7790: sort subnodes of root node
+Date: Wed, 17 Jan 2018 17:17:08 +0100
+Subject: [PATCH v2 07/16] ARM: dts: r8a7791: sort subnodes of root node
 In-Reply-To: <20180117161717.14589-1-horms+renesas@verge.net.au>
 References: <20180117161717.14589-1-horms+renesas@verge.net.au>
-Message-ID: <20180117161717.14589-5-horms+renesas@verge.net.au>
+Message-ID: <20180117161717.14589-8-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,15 +16,15 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 v2
 * New patch
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 104 ++++++++++++++++++++---------------------
- 1 file changed, 52 insertions(+), 52 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 134 ++++++++++++++++++++---------------------
+ 1 file changed, 67 insertions(+), 67 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 54c5a2d7ea89..3bbcc0b93f1c 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -40,6 +40,35 @@
- 		vin3 = &vin3;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index de2af2199731..dc659351472f 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -39,6 +39,35 @@
+ 		vin2 = &vin2;
  	};
  
 +	/*
@@ -59,10 +59,14 @@ index 54c5a2d7ea89..3bbcc0b93f1c 100644
  	cpus {
  		#address-cells = <1>;
  		#size-cells = <0>;
-@@ -158,6 +187,29 @@
+@@ -82,23 +111,27 @@
  		};
  	};
  
+-	thermal-zones {
+-		cpu_thermal: cpu-thermal {
+-			polling-delay-passive	= <0>;
+-			polling-delay		= <0>;
 +	/* External root clock */
 +	extal_clk: extal {
 +		compatible = "fixed-clock";
@@ -70,27 +74,62 @@ index 54c5a2d7ea89..3bbcc0b93f1c 100644
 +		/* This value must be overridden by the board. */
 +		clock-frequency = <0>;
 +	};
-+
+ 
+-			thermal-sensors = <&thermal>;
 +	/* External PCIe clock - can be overridden by the board */
 +	pcie_bus_clk: pcie_bus {
 +		compatible = "fixed-clock";
 +		#clock-cells = <0>;
 +		clock-frequency = <0>;
 +	};
-+
+ 
+-			trips {
+-				cpu-crit {
+-					temperature	= <95000>;
+-					hysteresis	= <0>;
+-					type		= "critical";
+-				};
+-			};
+-			cooling-maps {
+-			};
+-		};
 +	/* External SCIF clock */
 +	scif_clk: scif {
 +		compatible = "fixed-clock";
 +		#clock-cells = <0>;
 +		/* This value must be overridden by the board. */
 +		clock-frequency = <0>;
+ 	};
+ 
+ 	soc {
+@@ -1668,6 +1701,25 @@
+ 		};
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			polling-delay-passive	= <0>;
++			polling-delay		= <0>;
++
++			thermal-sensors = <&thermal>;
++
++			trips {
++				cpu-crit {
++					temperature	= <95000>;
++					hysteresis	= <0>;
++					type		= "critical";
++				};
++			};
++			cooling-maps {
++			};
++		};
 +	};
 +
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-@@ -1678,62 +1730,10 @@
- 				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -1676,62 +1728,10 @@
+ 				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
  	};
  
 -	/* External root clock */
@@ -98,13 +137,6 @@ index 54c5a2d7ea89..3bbcc0b93f1c 100644
 -		compatible = "fixed-clock";
 -		#clock-cells = <0>;
 -		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
--	/* External PCIe clock - can be overridden by the board */
--	pcie_bus_clk: pcie_bus {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
 -		clock-frequency = <0>;
 -	};
 -
@@ -124,6 +156,13 @@ index 54c5a2d7ea89..3bbcc0b93f1c 100644
 -		clock-frequency = <0>;
 -	};
 -	audio_clk_c: audio_clk_c {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External PCIe clock - can be overridden by the board */
+-	pcie_bus_clk: pcie_bus {
 -		compatible = "fixed-clock";
 -		#clock-cells = <0>;
 -		clock-frequency = <0>;
