@@ -1,62 +1,73 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 17 Jan 2018 09:03:29 -0500 (EST)
-Subject: [PATCH] ARM: make memzero optimization smarter
-In-Reply-To: <20180117105815.GL17719@n2100.armlinux.org.uk>
-References: <20180116162905.1404585-1-arnd@arndb.de>
- <nycvar.YSQ.7.76.1801161205560.13881@knanqh.ubzr>
- <CAK8P3a2bfErHxu2i-3JJpUdG64RSoYgmpip2xLAutiSSM9UEkw@mail.gmail.com>
- <nycvar.YSQ.7.76.1801162150190.13881@knanqh.ubzr>
- <20180117105815.GL17719@n2100.armlinux.org.uk>
-Message-ID: <nycvar.YSQ.7.76.1801170859210.13881@knanqh.ubzr>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 17 Jan 2018 14:04:38 +0000
+Subject: [PATCH] arm64: Run enable method for errata work arounds on late
+ CPUs
+In-Reply-To: <bfef2d82-c43b-2254-9e29-cf4c22e4581c@arm.com>
+References: <20180117100556.29270-1-suzuki.poulose@arm.com>
+ <20180117122548.GE22781@e103592.cambridge.arm.com>
+ <29147833-b47f-3ad9-e2d8-295551c43900@arm.com>
+ <bbc19683-340a-cc81-ded9-966d232248db@arm.com>
+ <bfef2d82-c43b-2254-9e29-cf4c22e4581c@arm.com>
+Message-ID: <5d51dd4a-d985-22e5-6583-bcc4bfdf8e6f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jan 2018, Russell King - ARM Linux wrote:
+On 17/01/18 13:43, Robin Murphy wrote:
+> On 17/01/18 13:31, Suzuki K Poulose wrote:
+>> On 17/01/18 13:20, Robin Murphy wrote:
+>>> On 17/01/18 12:25, Dave Martin wrote:
+>>>> On Wed, Jan 17, 2018 at 10:05:56AM +0000, Suzuki K Poulose wrote:
+>>>>> When a CPU is brought up after we have finalised the system
+>>>>> wide capabilities (i.e, features and errata), we make sure the
+>>>>> new CPU doesn't need a new errata work around which has not been
+>>>>> detected already. However we don't run enable() method on the new
+>>>>> CPU for the errata work arounds already detected. This could
+>>>>> cause the new CPU running without potential work arounds.
+>>>>> It is upto the "enable()" method to decide if this CPU should
+>>>>> do something about the errata.
+>>>>>
+>>>>> Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
+>>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>> Cc: Andre Przywara <andre.przywara@arm.com>
+>>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>>> Cc: Dave Martin <dave.martin@arm.com>
+>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>>> ---
+>>>>> ? arch/arm64/kernel/cpu_errata.c | 9 ++++++---
+>>>>> ? 1 file changed, 6 insertions(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>>>>> index 90a9e465339c..54e41dfe41f6 100644
+>>>>> --- a/arch/arm64/kernel/cpu_errata.c
+>>>>> +++ b/arch/arm64/kernel/cpu_errata.c
+>>>>> @@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
+>>>>> ? {
+>>>>> ????? const struct arm64_cpu_capabilities *caps = arm64_errata;
+>>>>> -??? for (; caps->matches; caps++)
+>>>>> -??????? if (!cpus_have_cap(caps->capability) &&
+>>>>> -??????????? caps->matches(caps, SCOPE_LOCAL_CPU)) {
+>>>>> +??? for (; caps->matches; caps++) {
+>>>>> +??????? if (cpus_have_cap(caps->capability)) {
+>>>>> +??????????? if (caps->enable)
+>>>>> +??????????????? caps->enable((void *)caps);
+>>>>
+>>>> Do we really need this cast?
+>>>
+>>> Seems to me like the prototype for .enable needs updating. If any existing callback was actually using the (non-const) void* for some purpose (thankfully nothing seems to be), then passing the capability pointer into that would be unlikely to end well anyway.
+>>
+>> I agree. This was initially written such that we could call it via on_each_cpu().
+>> But then we later switched to stop_machine(). And we weren't using the argument until
+>> very recently with the introduction of multiple entries for the same capability.
+>>
+>> I will try to clean this up in a separate series, which would involve cleaning up
+>> all the enable(), quite invasive. I would like this to go in for 4.16, as it is>> needed for things like KPTI and some of the existing caps.
 
-> On Tue, Jan 16, 2018 at 11:07:34PM -0500, Nicolas Pitre wrote:
-> > On Tue, 16 Jan 2018, Arnd Bergmann wrote:
-> > 
-> > > On Tue, Jan 16, 2018 at 6:10 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > > > On Tue, 16 Jan 2018, Arnd Bergmann wrote:
-> > > >
-> > > >> However, we can avoid this class of bogus warnings for the memset() macro
-> > > >> by only doing the micro-optimization for zero-length arguments when the
-> > > >> length is a compile-time constant. This should also reduce code size by
-> > > >> a few bytes, and avoid an extra branch for the cases that a variable-length
-> > > >> argument is always nonzero, which is probably the common case anyway.
-> > > >>
-> > > >> I have made sure that the __memzero implementation can safely handle
-> > > >> a zero length argument.
-> > > >
-> > > > Why not simply drop the test on (__n) != 0 then? I fail to see what the
-> > > > advantage is in that case.
-> > > 
-> > > Good point. We might actually get even better results by dropping the
-> > > __memzero path entirely, since gcc has can optimize trivial memset()
-> > > operations and inline them.
-> > > 
-> > > If I read arch/arm/lib/memzero.S correctly, it saves exactly two 'orr'
-> > > instructions compared to the memset.S implementation, but calling
-> > > memset() rather than __memzero() from C code ends up saving a
-> > > function call at least some of the time.
-> > > 
-> > > Building a defconfig kernel with gcc-7.2.1, I see 1919 calls to __memzero()
-> > > and 636 calls to memset() in vmlinux. If I remove the macro entirely,
-> > > I get 1775 calls to memset() instead, so 780 memzero instances got
-> > > inlined, and kernel shrinks by 5488 bytes (0.03%), not counting the
-> > > __memzero implementation that we could possibly also drop.
-> > 
-> > I get 3668 fewer bytes just by removing the test against 0 in the macro.
-> > 
-> > And an additional 5092 fewer bytes by removing the call-to-__memzero 
-> > optimization.
+Correction, s/KPTI/bp hardening/
+
 > 
-> However, __memzero is not safe against being called with a zero length
-> so it's not something we can simply remove.
+> OK, sounds good. For the sake of the immediate fix, perhaps it's cleaner to just pass NULL here if the current callbacks ignore it?
 
-The idea is about the possibility of removing __memzero altogether.
-It is not clear that the tiny performance gain from a dedicated memzero 
-implementation is worth the current overhead around it.
+As I said above, we have some users at the moment, so we cant do that.
 
-
-Nicolas
+Suzuki
