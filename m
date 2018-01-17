@@ -1,35 +1,56 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 17 Jan 2018 17:39:44 +0000
-Subject: [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and
- SIGFPE, SIGTRAP, SIGBUS
-In-Reply-To: <87h8rkflft.fsf@xmission.com>
-References: <87373b6ghs.fsf@xmission.com>
- <20180112005940.23279-7-ebiederm@xmission.com>
- <20180115163028.GU22781@e103592.cambridge.arm.com>
- <87h8rnox3c.fsf@xmission.com>
- <20180117171729.GJ22781@e103592.cambridge.arm.com>
- <87h8rkflft.fsf@xmission.com>
-Message-ID: <20180117173944.GK22781@e103592.cambridge.arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 17 Jan 2018 17:42:19 +0000
+Subject: [PATCH v2 1/2] arm64: capabilities: Clarify argument passed to enable
+ call back
+In-Reply-To: <20180117174220.7959-1-suzuki.poulose@arm.com>
+References: <20180117174220.7959-1-suzuki.poulose@arm.com>
+Message-ID: <20180117174220.7959-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 11:24:06AM -0600, Eric W. Biederman wrote:
-> Dave Martin <Dave.Martin@arm.com> writes:
+We issue the enable() call back for all CPU hwcaps capabilities
+available on the system, on all the CPUs. So far we have ignored
+the argument passed to the call back, which had a prototype to
+accept a "void *" for use with on_each_cpu() and later with
+stop_machine(). However, with commit 0a0d111d40fd1
+("arm64: cpufeature: Pass capability structure to ->enable callback"),
+there are some users of the argument who wants the matching capability
+struct pointer where there are multiple matching criteria for a single
+capability. Changing the prototype is quite an invasive change and
+will be part of a future series. For now, add a comment to clarify
+what is expected.
 
-[...]
+Suggested-by: Dave Martin <dave.martin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-> > Should si_code simply be ignored for the SIGKILL case?
-> 
-> I know what x86 does in a similar case is it uses force_sig instead of
-> force_sig_info.  Then the generic code gets to worry about 
-> 
-> If the appropriate paths generic paths get to worry about what siginfo
-> to fill in in that case.  Which for SI_KERNEL is zero for everything
-> except the si_code and the si_signo.
-> 
-> That seems perfectly reasonable.
-
-OK, I'll go with SI_KERNEL then.
-
-Cheers
----Dave
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index ac67cfc2585a..c049e28274d4 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -97,7 +97,14 @@ struct arm64_cpu_capabilities {
+ 	u16 capability;
+ 	int def_scope;			/* default scope */
+ 	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+-	int (*enable)(void *);		/* Called on all active CPUs */
++	/*
++	 * For each @capability set in CPU hwcaps, @enable() is called on all
++	 * active CPUs with const struct arm64_cpu_capabilities * as argument.
++	 * It is upto the callback (especially when multiple entries for the
++	 * same capability exists) to determine if any action should be taken
++	 * based on @matches() applies to thie CPU.
++	 */
++	int (*enable)(void *caps);
+ 	union {
+ 		struct {	/* To be used for erratum handling only */
+ 			u32 midr_model;
+-- 
+2.13.6
