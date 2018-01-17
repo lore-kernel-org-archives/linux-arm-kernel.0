@@ -1,28 +1,44 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 17 Jan 2018 14:02:31 +0100
-Subject: [PATCH V4 11/26] iommu/amd: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
-References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
- <1513661883-28662-12-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180117130231.GP28161@8bytes.org>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Wed, 17 Jan 2018 13:02:40 +0000
+Subject: [PATCH -next] crypto: stm32 - remove redundant dev_err call in
+ stm32_cryp_probe()
+In-Reply-To: <1516189224-11877-1-git-send-email-weiyongjun1@huawei.com>
+References: <1516189224-11877-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <d2641cbb-61fa-00e7-6ac8-f05d3cde0628@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 19, 2017 at 12:37:47AM -0500, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Getting ready to remove pci_get_bus_and_slot() function in favor of
-> pci_get_domain_bus_and_slot().
-> 
-> Hard-code the domain number as 0 for the AMD IOMMU driver.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/iommu/amd_iommu.c      | 3 ++-
->  drivers/iommu/amd_iommu_init.c | 9 +++++----
->  drivers/iommu/amd_iommu_v2.c   | 3 ++-
->  3 files changed, 9 insertions(+), 6 deletions(-)
+Hi,
 
-Acked-by: Joerg Roedel <jroedel@suse.de>
+
+Thank you for the patch.
+
+
+On 17/01/18 12:40, Wei Yongjun wrote:
+> There is a error message within devm_ioremap_resource
+> already, so remove the dev_err call to avoid redundant
+> error message.
+>
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Reviewed-by: Fabien Dessenne <fabien.dessenne@st.com>
+> ---
+>   drivers/crypto/stm32/stm32-cryp.c | 4 +---
+>   1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/drivers/crypto/stm32/stm32-cryp.c b/drivers/crypto/stm32/stm32-cryp.c
+> index cf1dddb..4a06a7a 100644
+> --- a/drivers/crypto/stm32/stm32-cryp.c
+> +++ b/drivers/crypto/stm32/stm32-cryp.c
+> @@ -1052,10 +1052,8 @@ static int stm32_cryp_probe(struct platform_device *pdev)
+>   
+>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	cryp->regs = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(cryp->regs)) {
+> -		dev_err(dev, "Cannot map CRYP IO\n");
+> +	if (IS_ERR(cryp->regs))
+>   		return PTR_ERR(cryp->regs);
+> -	}
+>   
+>   	irq = platform_get_irq(pdev, 0);
+>   	if (irq < 0) {
+>
