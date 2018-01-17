@@ -1,171 +1,34 @@
 From: maxime.chevallier@smile.fr (Maxime Chevallier)
-Date: Wed, 17 Jan 2018 17:15:28 +0100
-Subject: [PATCH 4/4] spi: a3700: Add full-duplex support
-In-Reply-To: <1516205728-3256-1-git-send-email-maxime.chevallier@smile.fr>
-References: <1516205728-3256-1-git-send-email-maxime.chevallier@smile.fr>
-Message-ID: <1516205728-3256-5-git-send-email-maxime.chevallier@smile.fr>
+Date: Wed, 17 Jan 2018 17:15:24 +0100
+Subject: [PATCH 0/4] spi: a3700: Add improvements and full-duplex transfers
+Message-ID: <1516205728-3256-1-git-send-email-maxime.chevallier@smile.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada 3700 SPI controller has support for full-duplex transfers,
-but it can only be done without using the hardware FIFOs.
+This patchset adds some improvements on the existing Armada 3700 SPI
+driver, the biggest being adding support for full-duplex transfers.
 
-A full duplex transfer is done by shifting 4 bytes at a time, or even
-one byte at a time for transfers less than 4 bytes long.
+The first patch fixes an undocumented (to my knowledge, I might have
+missed something) behaviour where some of the content of the last
+write transfer is shifted out during a read half-duplex operation.
 
-While this method is perfectly suitable for small transfers, it is still
-slower than using the FIFOs.
+The second one sets the correct limits on the SPI max and min
+frequencies, based on the source clock rate.
 
-This commit implement full-duplex support, making sure that half-duplex
-transfers are still done using the FIFOs with the existing method.
+The last 2 patches enable full-duplex transfers. On this controller,
+full-duplex transfers cannot use the hardware FIFOs and have to be
+performed either 1 or 4 bytes at a time. Because this is more
+CPU intensive, and a bit slower than FIFO mode, we only use the
+full-duplex way of transferring data when necessary.
 
-Some setup functions were moved around to make sure the controller is
-properly configured before beginning each transfer.
+Maxime Chevallier (4):
+  spi: a3700: Clear DATA_OUT when performing a read
+  spi: a3700: Set frequency limits at startup
+  spi: a3700: Allow to enable or disable FIFO mode
+  spi: a3700: Add full-duplex support
 
-This was tested on EspressoBin with a logical analyser, and a simple
-setup where MISO is connected on MOSI. Transfers were made from
-userspace using spidev and spi-pipe from the spi-tools project
+ drivers/spi/spi-armada-3700.c | 106 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 91 insertions(+), 15 deletions(-)
 
-Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
----
- drivers/spi/spi-armada-3700.c | 85 +++++++++++++++++++++++++++++++++++++------
- 1 file changed, 73 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-index b387309..a8576c8 100644
---- a/drivers/spi/spi-armada-3700.c
-+++ b/drivers/spi/spi-armada-3700.c
-@@ -421,15 +421,20 @@ static void a3700_spi_transfer_setup(struct spi_device *spi,
- 				     struct spi_transfer *xfer)
- {
- 	struct a3700_spi *a3700_spi;
--	unsigned int byte_len;
- 
- 	a3700_spi = spi_master_get_devdata(spi->master);
- 
- 	a3700_spi_clock_set(a3700_spi, xfer->speed_hz);
- 
--	byte_len = xfer->bits_per_word >> 3;
-+	/* Use 4 bytes long transfers. Each transfer method has its way to deal
-+	 * with the remaining bytes for non 4-bytes aligned transfers.
-+	 */
-+	a3700_spi_bytelen_set(a3700_spi, 4);
- 
--	a3700_spi_fifo_thres_set(a3700_spi, byte_len);
-+	/* Initialize the working buffers */
-+	a3700_spi->tx_buf  = xfer->tx_buf;
-+	a3700_spi->rx_buf  = xfer->rx_buf;
-+	a3700_spi->buf_len = xfer->len;
- }
- 
- static void a3700_spi_set_cs(struct spi_device *spi, bool enable)
-@@ -584,27 +589,26 @@ static int a3700_spi_prepare_message(struct spi_master *master,
- 	if (ret)
- 		return ret;
- 
--	a3700_spi_bytelen_set(a3700_spi, 4);
--
- 	a3700_spi_mode_set(a3700_spi, spi->mode);
- 
- 	return 0;
- }
- 
--static int a3700_spi_transfer_one(struct spi_master *master,
-+static int a3700_spi_transfer_one_fifo(struct spi_master *master,
- 				  struct spi_device *spi,
- 				  struct spi_transfer *xfer)
- {
- 	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
- 	int ret = 0, timeout = A3700_SPI_TIMEOUT;
--	unsigned int nbits = 0;
-+	unsigned int nbits = 0, byte_len;
- 	u32 val;
- 
--	a3700_spi_transfer_setup(spi, xfer);
-+	/* Make sure we use FIFO mode */
-+	a3700_spi_fifo_mode_set(a3700_spi, true);
- 
--	a3700_spi->tx_buf  = xfer->tx_buf;
--	a3700_spi->rx_buf  = xfer->rx_buf;
--	a3700_spi->buf_len = xfer->len;
-+	/* Configure FIFO thresholds */
-+	byte_len = xfer->bits_per_word >> 3;
-+	a3700_spi_fifo_thres_set(a3700_spi, byte_len);
- 
- 	if (xfer->tx_buf)
- 		nbits = xfer->tx_nbits;
-@@ -739,6 +743,64 @@ static int a3700_spi_transfer_one(struct spi_master *master,
- 	return ret;
- }
- 
-+static int a3700_spi_transfer_one_full_duplex(struct spi_master *master,
-+				  struct spi_device *spi,
-+				  struct spi_transfer *xfer)
-+{
-+	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
-+	u32 val_in, val_out;
-+
-+	/* Disable FIFO mode */
-+	a3700_spi_fifo_mode_set(a3700_spi, false);
-+
-+	while (a3700_spi->buf_len) {
-+
-+		/* When we have less than 4 bytes to transfer, switch to 1 byte
-+		 * mode. This is reset after each transfer
-+		 */
-+		if (a3700_spi->buf_len < 4)
-+			a3700_spi_bytelen_set(a3700_spi, 1);
-+
-+		if (a3700_spi->byte_len == 1)
-+			val_out = *a3700_spi->tx_buf;
-+		else
-+			val_out = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
-+
-+		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val_out);
-+
-+		/* Wait for all the data to be shifted in / out */
-+		while (!(spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG) &
-+				A3700_SPI_XFER_DONE))
-+			cpu_relax();
-+
-+		val_in = le32_to_cpu(spireg_read(a3700_spi,
-+						 A3700_SPI_DATA_IN_REG));
-+
-+		memcpy(a3700_spi->rx_buf, &val_in, a3700_spi->byte_len);
-+
-+		a3700_spi->buf_len -= a3700_spi->byte_len;
-+		a3700_spi->tx_buf += a3700_spi->byte_len;
-+		a3700_spi->rx_buf += a3700_spi->byte_len;
-+
-+	}
-+
-+	spi_finalize_current_transfer(master);
-+
-+	return 0;
-+}
-+
-+static int a3700_spi_transfer_one(struct spi_master *master,
-+				  struct spi_device *spi,
-+				  struct spi_transfer *xfer)
-+{
-+	a3700_spi_transfer_setup(spi, xfer);
-+
-+	if (xfer->tx_buf && xfer->rx_buf)
-+		return a3700_spi_transfer_one_full_duplex(master, spi, xfer);
-+
-+	return a3700_spi_transfer_one_fifo(master, spi, xfer);
-+}
-+
- static int a3700_spi_unprepare_message(struct spi_master *master,
- 				       struct spi_message *message)
- {
-@@ -788,7 +850,6 @@ static int a3700_spi_probe(struct platform_device *pdev)
- 	master->transfer_one = a3700_spi_transfer_one;
- 	master->unprepare_message = a3700_spi_unprepare_message;
- 	master->set_cs = a3700_spi_set_cs;
--	master->flags = SPI_MASTER_HALF_DUPLEX;
- 	master->mode_bits |= (SPI_RX_DUAL | SPI_TX_DUAL |
- 			      SPI_RX_QUAD | SPI_TX_QUAD);
- 
 -- 
 2.1.4
