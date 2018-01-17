@@ -1,41 +1,88 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Jan 2018 15:27:27 +0000
-Subject: [PATCH] IIO: ADC: stm32-dfsdm: remove unused variable
-In-Reply-To: <20180117144644.2302131-1-arnd@arndb.de>
-References: <20180117144644.2302131-1-arnd@arndb.de>
-Message-ID: <2c431c85-4749-b56e-2803-d0d27c9ba980@arm.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed, 17 Jan 2018 23:25:42 +0800
+Subject: [PATCH v3 12/12] iommu/rockchip: Support sharing IOMMU between masters
+In-Reply-To: <20180117152542.26429-1-jeffy.chen@rock-chips.com>
+References: <20180117152542.26429-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180117152542.26429-13-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 14:46, Arnd Bergmann wrote:
-> A cleanup left one variable behind that is no longer needed and
-> can be removed, as shown by the gcc warning:
-> 
-> drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
-> drivers/iio/adc/stm32-dfsdm-core.c:245:29: error: unused variable 'of_id' [-Werror=unused-variable]
-> 
-> Fixes: abaca806fd13 ("IIO: ADC: stm32-dfsdm: code optimization")
+There would be some masters sharing the same IOMMU device. Put them in
+the same iommu group and share the same iommu domain.
 
-Weird, "git show abaca806fd13" contains this exact hunk. I guess it's 
-actually the subsequent merge commit at fault...
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Robin.
+Changes in v3:
+Remove rk_iommudata->domain.
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->   drivers/iio/adc/stm32-dfsdm-core.c | 1 -
->   1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-> index 84277bcc465f..6290332cfd3f 100644
-> --- a/drivers/iio/adc/stm32-dfsdm-core.c
-> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
-> @@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
->   static int stm32_dfsdm_probe(struct platform_device *pdev)
->   {
->   	struct dfsdm_priv *priv;
-> -	const struct of_device_id *of_id;
->   	const struct stm32_dfsdm_dev_data *dev_data;
->   	struct stm32_dfsdm *dfsdm;
->   	int ret;
-> 
+Changes in v2: None
+
+ drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index b5585d39d95c..95b1b3c1984c 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -97,6 +97,7 @@ struct rk_iommu {
+ 	struct iommu_device iommu;
+ 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+ 	struct iommu_domain *domain; /* domain to which iommu is attached */
++	struct iommu_group *group;
+ };
+ 
+ struct rk_iommudata {
+@@ -1155,6 +1156,15 @@ static void rk_iommu_remove_device(struct device *dev)
+ 	iommu_group_remove_device(dev);
+ }
+ 
++static struct iommu_group *rk_iommu_device_group(struct device *dev)
++{
++	struct rk_iommu *iommu;
++
++	iommu = rk_iommu_from_dev(dev);
++
++	return iommu->group;
++}
++
+ static int rk_iommu_of_xlate(struct device *dev,
+ 			     struct of_phandle_args *args)
+ {
+@@ -1190,7 +1200,7 @@ static const struct iommu_ops rk_iommu_ops = {
+ 	.add_device = rk_iommu_add_device,
+ 	.remove_device = rk_iommu_remove_device,
+ 	.iova_to_phys = rk_iommu_iova_to_phys,
+-	.device_group = generic_device_group,
++	.device_group = rk_iommu_device_group,
+ 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
+ 	.of_xlate = rk_iommu_of_xlate,
+ };
+@@ -1246,9 +1256,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	iommu->reset_disabled = device_property_read_bool(dev,
+ 					"rockchip,disable-mmu-reset");
+ 
++	iommu->group = iommu_group_alloc();
++	if (IS_ERR(iommu->group)) {
++		err = PTR_ERR(iommu->group);
++		goto err_put_clocks;
++	}
++
+ 	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+ 	if (err)
+-		goto err_put_clocks;
++		goto err_put_group;
+ 
+ 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+ 	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
+@@ -1272,6 +1288,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	return 0;
+ err_remove_sysfs:
+ 	iommu_device_sysfs_remove(&iommu->iommu);
++err_put_group:
++	iommu_group_put(iommu->group);
+ err_put_clocks:
+ 	rk_iommu_put_clocks(iommu);
+ 	return err;
+-- 
+2.11.0
