@@ -1,62 +1,30 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 17 Jan 2018 16:38:17 +0900
-Subject: [PATCH v2 12/13] iommu/rockchip: Add runtime PM support
-In-Reply-To: <5A5EFAB2.7040001@rock-chips.com>
-References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-13-jeffy.chen@rock-chips.com>
- <CAAFQd5DCxgsL52+5XetV9MRDecL7dN6_QdHysKUOWaEqSf=ijw@mail.gmail.com>
- <5A5EFAB2.7040001@rock-chips.com>
-Message-ID: <CAAFQd5ATRh5hdJhVxDoXjFz72cBmv-yNaW7v-eUxkVRYA3=uJg@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 17 Jan 2018 08:44:01 +0100
+Subject: Power domain clock warnings on recent next
+In-Reply-To: <f1bf1c15-0bba-4cf6-42a2-80a3982dbae1@samsung.com>
+References: <CGME20180116200735epcas4p4455aea99ad21c4c45260d4752d789add@epcas4p4.samsung.com>
+ <20180116200728.tjad7tzz3uvsmgg3@kozik-lap>
+ <f1bf1c15-0bba-4cf6-42a2-80a3982dbae1@samsung.com>
+Message-ID: <CAJKOXPe-xCra5DFh-u2-FvkRwUZyoQbb8P5bK=MHq-9WdnhJWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 4:26 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
-> Hi Tomasz,
+On Wed, Jan 17, 2018 at 7:25 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hi Krzysztof,
 >
-> Thanks for your reply.
->
-> On 01/17/2018 02:20 PM, Tomasz Figa wrote:
+> On 2018-01-16 21:07, Krzysztof Kozlowski wrote:
 >>
->> On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com>
->> [snip]
->>>
->>> +static int rk_iommu_startup(struct rk_iommu *iommu)
->>>   {
->>> -       struct rk_iommu *iommu;
->>> +       struct iommu_domain *domain = iommu->domain;
->>>          struct rk_iommu_domain *rk_domain = to_rk_domain(domain);
->>> -       unsigned long flags;
->>>          int ret, i;
->>>
->>> -       /*
->>> -        * Allow 'virtual devices' (e.g., drm) to attach to domain.
->>> -        * Such a device does not belong to an iommu group.
->>> -        */
->>> -       iommu = rk_iommu_from_dev(dev);
->>> -       if (!iommu)
->>> -               return 0;
->>> -
->>> -       if (iommu->domain)
->>> -               rk_iommu_detach_device(iommu->domain, dev);
->>> -
->>>          ret = rk_iommu_enable_clocks(iommu);
->>>          if (ret)
->>>                  return ret;
->>>
+>> Hi everyone,
 >>
->> Don't we need to check here (and in _shutdown() too) if we have a
->> domain attached?
+>> Anyone already noticed or started bisecting warnings coming from
+>> clk_core_disable_lock/exynos_pd_power on recent linux-next?
 >
-> hmmm, right, the startup might been called by resume, so should check
-> iommu->domain here.
 >
-> but the shutdown would be called at the end of detach or suspend, it could
-> be not attached or attached.
+> Yes, I've noticed it early this week and prepared a patch:
+> https://www.spinics.net/lists/arm-kernel/msg628881.html
 
-If startup might be called by resume, without domain attached, what
-prevents shutdown from being called by suspend after that resume,
-still without domain attached? Is it guaranteed that if resume is
-called, someone will attach a domain before suspend is called?
+Thanks!
 
 Best regards,
-Tomasz
+Krzysztof
