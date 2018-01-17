@@ -1,69 +1,39 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 17 Jan 2018 15:11:33 +0000
-Subject: [PATCH v3 10/41] KVM: arm64: Move debug dirty flag calculation
- out of world switch
-In-Reply-To: <20180112120747.27999-11-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-11-christoffer.dall@linaro.org>
-Message-ID: <a34bfed5-05d3-7835-57cc-84ae874741a9@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jan 2018 16:11:42 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#3)
+Message-ID: <87bmhs7c5t.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Here is the late pull request for dt64 for mvebu for v4.16, actually
+it is a fix needed for what we have currently in linux-next.
 
-On 12/01/18 12:07, Christoffer Dall wrote:
-> There is no need to figure out inside the world-switch if we should
-> save/restore the debug registers or not, we can might as well do that in
+Thanks,
 
-Nit: -can*
+Gregory
 
-> the higher level debug setup code, making it easier to optimize down the
-> line.
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+The following changes since commit 474c5885582c4a79c21bcf01ed98f98c935f1f4a:
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+  arm64: dts: marvell: add Ethernet aliases (2018-01-05 17:02:45 +0100)
 
-> ---
->   arch/arm64/kvm/debug.c        | 5 +++++
->   arch/arm64/kvm/hyp/debug-sr.c | 6 ------
->   2 files changed, 5 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index fa63b28c65e0..feedb877cff8 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -193,6 +193,11 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->   	if (trap_debug)
->   		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
->   
-> +	/* If KDE or MDE are set, perform a full save/restore cycle. */
-> +	if ((vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_KDE) ||
-> +	    (vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_MDE))
-> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +
->   	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
->   	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
->   }
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index 321c9c05dd9e..406829b6a43e 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -162,12 +162,6 @@ void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
->   
->   void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
->   {
-> -	/* If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
-> -	 * a full save/restore cycle. */
-> -	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
-> -	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
-> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> -
->   	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
->   			   kern_hyp_va(vcpu->arch.host_cpu_context));
->   	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
-> 
+are available in the Git repository at:
 
--- 
-Julien Thierry
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.16-3
+
+for you to fetch changes up to f9a0c27b5c3c93b824c2978fafc250ba969b1602:
+
+  arm64: dts: marvell: armada-80x0: Fix pinctrl compatible string (2018-01-12 17:00:12 +0100)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.16 (part 3)
+
+Fix for the CP110 dt de-duplication series
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm64: dts: marvell: armada-80x0: Fix pinctrl compatible string
+
+ arch/arm64/boot/dts/marvell/armada-80x0.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
