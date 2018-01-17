@@ -1,58 +1,78 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 17 Jan 2018 16:00:57 +0800
-Subject: [PATCH v5 0/3] Add support for Hi3660 mailbox driver
-Message-ID: <1516176060-8947-1-git-send-email-leo.yan@linaro.org>
+Date: Wed, 17 Jan 2018 16:02:23 +0800
+Subject: [PATCH v5 1/3] dt-bindings: mailbox: Introduce Hi3660 controller
+ binding
+Message-ID: <1516176145-9387-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi3660 mailbox controller is used to send message within multiple
-processors, MCU, HIFI, etc. This patch series is to implement an
-initial version for Hi3660 mailbox driver with "automatic
-acknowledge" mode.
+Introduce a binding for the Hi3660 mailbox controller, the mailbox is
+used within application processor (AP), communication processor (CP),
+HIFI and MCU, etc.
 
-The patch set have been verified with Hi3660 stub clock driver, so
-we can send message to MCU to execute CPU frequency scaling. This is
-tested on 96boards Hikey960.
-
-Changes from v4:
-* According to Jassi suggestion, refactored mailbox driver and removed
-  "inline" for function declaration;
-
-Changes from v3:
-* According to Jassi suggestion, refined structure name to
-  "struct hi3660_chan_info";
-* According to Jassi suggestion, moved channel 'lock'+'acquire'
-  operations into .startup();
-
-Changes from v2:
-* According to Mark Rutland suggestions, removed sev()/wfe() from
-  driver, the system has no two masters sharing the same channel for
-  data transferring so we don't need these instructions;
-* Refined DT binding and doc according to Rob suggestions;
-* Refined driver according to Julien suggestions;
-
-Changes from v1:
-* Added cover letter to track the changelog;
-* Added document for DT binding;
-* Refactored and simplized mailbox driver with "automatic ack" mode;
-* Refined commit logs for patches;
-
-
-Kaihua Zhong (2):
-  mailbox: Add support for Hi3660 mailbox
-  dts: arm64: Add mailbox binding for hi3660
-
-Leo Yan (1):
-  dt-bindings: mailbox: Introduce Hi3660 controller binding
-
- .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  |  51 ++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   8 +
- drivers/mailbox/Kconfig                            |   8 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/hi3660-mailbox.c                   | 316 +++++++++++++++++++++
- 5 files changed, 385 insertions(+)
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
- create mode 100644 drivers/mailbox/hi3660-mailbox.c
 
+diff --git a/Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt b/Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
+new file mode 100644
+index 0000000..3e5b453
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
+@@ -0,0 +1,51 @@
++Hisilicon Hi3660 Mailbox Controller
++
++Hisilicon Hi3660 mailbox controller supports up to 32 channels.  Messages
++are passed between processors, including application & communication
++processors, MCU, HIFI, etc.  Each channel is unidirectional and accessed
++by using MMIO registers; it supports maximum to 8 words message.
++
++Controller
++----------
++
++Required properties:
++- compatible:		: Shall be "hisilicon,hi3660-mbox"
++- reg:			: Offset and length of the device's register set
++- #mbox-cells:		: Must be 3
++			  <&phandle channel dst_irq ack_irq>
++			    phandle	: Label name of controller
++			    channel	: Channel number
++			    dst_irq	: Remote interrupt vector
++			    ack_irq	: Local interrupt vector
++
++- interrupts:		: Contains the two IRQ lines for mailbox.
++
++Example:
++
++mailbox: mailbox at e896b000 {
++	compatible = "hisilicon,hi3660-mbox";
++	reg = <0x0 0xe896b000 0x0 0x1000>;
++	interrupts = <0x0 0xc0 0x4>,
++		     <0x0 0xc1 0x4>;
++	#mbox-cells = <3>;
++};
++
++Client
++------
++
++Required properties:
++- compatible		: See the client docs
++- mboxes		: Standard property to specify a Mailbox (See ./mailbox.txt)
++			  Cells must match 'mbox-cells' (See Controller docs above)
++
++Optional properties
++- mbox-names		: Name given to channels seen in the 'mboxes' property.
++
++Example:
++
++stub_clock: stub_clock at e896b500 {
++	compatible = "hisilicon,hi3660-stub-clk";
++	reg = <0x0 0xe896b500 0x0 0x0100>;
++	#clock-cells = <1>;
++	mboxes = <&mailbox 13 3 0>;
++};
 -- 
 1.9.1
