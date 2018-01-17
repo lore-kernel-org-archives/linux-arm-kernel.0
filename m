@@ -1,33 +1,20 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 17 Jan 2018 14:37:32 +0900
-Subject: [PATCH v2 10/13] iommu/rockchip: Use IOMMU device for dma mapping
- operations
-In-Reply-To: <20180116132540.18939-11-jeffy.chen@rock-chips.com>
-References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-11-jeffy.chen@rock-chips.com>
-Message-ID: <CAAFQd5CFZj4nPcJsdndw6B1uoaTRU4MDJ7tUAjg3LiO7a72qQg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 16 Jan 2018 17:04:21 -0800
+Subject: [PATCH v3] ARM64: dts: meson-axg: enable IR controller
+In-Reply-To: <20171215145906.1494-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Fri, 15 Dec 2017 22:59:06 +0800")
+References: <20171215145906.1494-1-yixun.lan@amlogic.com>
+Message-ID: <7hinc1b8iy.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> Use the first registered IOMMU device for dma mapping operations, and
-> drop the domain platform device.
->
-> This is similar to exynos iommu driver.
->
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
->
-> Changes in v2: None
->
->  drivers/iommu/rockchip-iommu.c | 91 +++++++++++-------------------------------
->  1 file changed, 24 insertions(+), 67 deletions(-)
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-Looks good to me, but we need to remove platform driver .remove(), as
-it was done for Exynos IOMMU as well. With that fixed (probably
-squashed to the patch that prohibits unbind):
+> Enable IR remote controller which found in Amlogic's Meson-AXG SoCs.
+>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+I think I forgot to reply to this one, but for the record, this was
+applied to v4.16/dt64.
 
-Best regards,
-Tomasz
+Kevin
