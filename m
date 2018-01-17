@@ -1,25 +1,58 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 17 Jan 2018 17:42:18 +0000
-Subject: [PATCH v2 0/2] arm64: Run enable method for errata work arounds on
+Date: Wed, 17 Jan 2018 17:42:20 +0000
+Subject: [PATCH v2 2/2] arm64: Run enable method for errata work arounds on
  late CPUs
-Message-ID: <20180117174220.7959-1-suzuki.poulose@arm.com>
+In-Reply-To: <20180117174220.7959-1-suzuki.poulose@arm.com>
+References: <20180117174220.7959-1-suzuki.poulose@arm.com>
+Message-ID: <20180117174220.7959-3-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This v2 of the patch posted here [1]. Following the discussion there,
-I have included a patch (Patch 1) to clarify the argument passed to @enable()
-call back for a capability. Original patch (Patch 2) is unchanged.
+When a CPU is brought up after we have finalised the system
+wide capabilities (i.e, features and errata), we make sure the
+new CPU doesn't need a new errata work around which has not been
+detected already. However we don't run enable() method on the new
+CPU for the errata work arounds already detected. This could
+cause the new CPU running without potential work arounds.
+It is upto the "enable()" method to decide if this CPU should
+do something about the errata.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/554578.html
+Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpu_errata.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-
-Suzuki K Poulose (2):
-  arm64: capabilities: Clarify argument passed to enable call back
-  arm64: Run enable method for errata work arounds on late CPUs
-
- arch/arm64/include/asm/cpufeature.h | 9 ++++++++-
- arch/arm64/kernel/cpu_errata.c      | 9 ++++++---
- 2 files changed, 14 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 90a9e465339c..54e41dfe41f6 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
+ {
+ 	const struct arm64_cpu_capabilities *caps = arm64_errata;
+ 
+-	for (; caps->matches; caps++)
+-		if (!cpus_have_cap(caps->capability) &&
+-			caps->matches(caps, SCOPE_LOCAL_CPU)) {
++	for (; caps->matches; caps++) {
++		if (cpus_have_cap(caps->capability)) {
++			if (caps->enable)
++				caps->enable((void *)caps);
++		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
+ 			pr_crit("CPU%d: Requires work around for %s, not detected"
+ 					" at boot time\n",
+ 				smp_processor_id(),
+ 				caps->desc ? : "an erratum");
+ 			cpu_die_early();
+ 		}
++	}
+ }
+ 
+ void update_cpu_errata_workarounds(void)
 -- 
 2.13.6
