@@ -1,36 +1,91 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 17 Jan 2018 19:11:48 +0100
-Subject: [net-next: PATCH v3 0/7] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-Message-ID: <20180117181148.GA5894@lunn.ch>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 17 Jan 2018 19:19:18 +0100 (CET)
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+Message-ID: <1199109167.10232.1516213158515@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 05:55:39PM +0100, Marcin Wojtas wrote:
-> Hi,
+Hi Sergey,
+
+> Sergey Suloev <ssuloev@orpaltech.com> hat am 16. Januar 2018 um 22:07 geschrieben:
 > 
-> This is a third version of the patchset introducing mvpp2 driver ability
-> to operate with ACPI. Until follow-up generic MDIO is introduced
-> it can using the link interrupt capability (a.k.a. in-band management)
-> on all ports, 1000BaseT RGMII included.
-> Driver operation was tested on top of the net-next branch
-> with both DT and ACPI on MacchiatoBin and Armada 7040 DB boards.
 > 
-> The main changes were requested during v2 review, which was
-> adding generic helper routines for:
-> * interating over available fwnodes (new patch 4/7)
-> * getting IRQ directly from fwnode (new patch 3/7)
+> sure, here you go
+> 
+> https://pastebin.com/kAHUrb6m
+> 
+> 
+> On 01/16/2018 11:54 PM, Stefan Wahren wrote:
+> > Hi Sergey,
+> >
+> >> Sergey Suloev <ssuloev@orpaltech.com> hat am 16. Januar 2018 um 21:27 geschrieben:
+> >>
+> >>
+> >> Hi,
+> >> I still have the issue "mmc1 timeout" with mainline 4.15rc7, discussed here
+> >>
+> >> http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-June/004003.html
+> >>
+> >> Is there any progress on this ?
+> >> Thanks
+> >>
+> > please provide the dmesg output.
 
-Hi Marcin
+first of all please avoid top-posting.
 
-Thanks for adding these helpers. It makes the changes for ACPI much
-less invasive and more natural.
+These mmc1 timeouts are unexpected for Raspberry Pi 3 with mailine kernel. I'm using multi_v7_defconfig and get the following:
 
-Does the IRQ helper solve the issue of getting an interrupt from a
-child node? I don't see this explicitly mentioned in the commit.  It
-seems to be getting it from a device. Is the child a device?
+[    0.730597] mmc1: SDHCI controller on 3f300000.sdhci [3f300000.sdhci] using PIO
+[    0.738238] ledtrig-cpu: registered to indicate activity on CPUs
+[    0.745085] usbcore: registered new interface driver usbhid
+[    0.751536] usbhid: USB HID core driver
+[    0.758625] bcm2835-mbox 3f00b880.mailbox: mailbox enabled
+[    0.767760] NET: Registered protocol family 10
+[    0.775301] Segment Routing with IPv6
+[    0.781785] sit: IPv6, IPv4 and MPLS over IPv4 tunneling driver
+[    0.788874] NET: Registered protocol family 17
+[    0.795399] can: controller area network core (rev 20170425 abi 9)
+[    0.802013] NET: Registered protocol family 29
+[    0.808495] can: raw protocol (rev 20170425)
+[    0.814965] can: broadcast manager protocol (rev 20170425 t)
+[    0.821447] can: netlink gateway (rev 20170425) max_hops=1
+[    0.828317] Key type dns_resolver registered
+[    0.835733] Registering SWP/SWPB emulation handler
+[    0.842787] Loading compiled-in X.509 certificates
+[    0.852989] 3f201000.serial: ttyAMA0 at MMIO 0x3f201000 (irq = 87, base_baud = 0) is a PL011 rev2
+[    0.862190] mmc1: queuing unknown CIS tuple 0x80 (2 bytes)
+[    0.868970] raspberrypi-firmware soc:firmware: Attached to firmware from 2017-07-03 14:16
+[    0.870688] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
+[    0.872371] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
+[    0.875388] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
+[    0.897742] mmc0: host does not support reading read-only switch, assuming write-enable
+[    0.906523] mmc0: new high speed SDHC card at address 1234
+[    0.913738] mmcblk0: mmc0:1234 SA32G 29.3 GiB 
+[    0.922210]  mmcblk0: p1 p2
+[    0.928980] dwc2 3f980000.usb: 3f980000.usb supply vusb_d not found, using dummy regulator
+[    0.935881] dwc2 3f980000.usb: 3f980000.usb supply vusb_a not found, using dummy regulator
+[    0.993219] dwc2 3f980000.usb: DWC OTG Controller
+[    0.999967] dwc2 3f980000.usb: new USB bus registered, assigned bus number 1
+[    1.002026] mmc1: new high speed SDIO card at address 0001
 
-Thanks
+Could you please also share your config?
+Do you have a Raspberry Pi 3 B 1.2?
+Did you check the function of the hardware before?
 
-      Andrew
+> >
+> > Stefan
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
