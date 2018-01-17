@@ -1,76 +1,44 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Wed, 17 Jan 2018 22:37:17 +0300
-Subject: DT binding for staging vchiq
-In-Reply-To: <299185620.10681.1516214926155@email.1und1.de>
-References: <3379fe3c-62ef-85a1-0073-da184e32cdf8@orpaltech.com>
- <299185620.10681.1516214926155@email.1und1.de>
-Message-ID: <953ec60d-f8f8-f871-9e9e-bda882ea03fb@orpaltech.com>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Wed, 17 Jan 2018 19:38:00 +0000
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <6fd0ccca-e167-d010-561b-fc60ba16b2e7@orpaltech.com>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+ <1199109167.10232.1516213158515@email.1und1.de>
+ <a05474da-039b-2fb3-2a5a-dd04910b5be2@raspberrypi.org>
+ <6fd0ccca-e167-d010-561b-fc60ba16b2e7@orpaltech.com>
+Message-ID: <73cb9234-8773-798f-afb7-ca7227117071@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan, thank you so much for detailed answer.
+Hi Sergey,
 
+On 17/01/2018 18:52, Sergey Suloev wrote:
+> Hi Phil
+> 
+> thank you for that detail. But I am using the same power supply that I have been always using for my rpi3. It worked with a raspbian image and I never had such issues.
+> 
+> Thanks
 
-On 01/17/2018 09:48 PM, Stefan Wahren wrote:
-> Hi Sergey,
->
->> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 14:45 geschrieben:
+[ This is the "top posting" crime that Stefan was referring to. We are supposed to add comments inline
+or at the end. ]
+
+A different kernel will have different timing and current requirements. To rule out a
+marginal supply, boot a standard Raspbian image and run "vcgencmd get_throttled". An
+answer other than 0x0 (likely 0x50000, but possibly 0x50005) indicates that undervoltage
+has occurred (and is possibly still ocurring). This may not be enough to trigger a
+malfunction, but the potential is there.
+
+Phil
+
+> On 01/17/2018 09:47 PM, Phil Elwell wrote:
+>> Hi Sergey,
 >>
+>> To add to Stefan's questions, have you specifically checked that your power supply
+>> is adequate? Issues like this during startup are often caused by a momentary undervoltage
+>> triggered by increased current demands as many subsystems are started at once. We
+>> recommend a 2.5A supply for Pi 3.
 >>
->> Hello everyone,
->>
->> I am trying to use RPi3  VC4 gpu with Qt5 quick/qml. When I run my
->> application Qt5 is always complaining about missing vchiq device in the
->> system. I know there is vchiq driver available in staging.
->>
->> My questions are:
->>
->> 1) What is the current status of the driver ? Is it working at all?
->  From my point of view it's still experimental. It's mostly the same driver as in downstream, but its function highly dependents on the configuration:
->
-> arm/bcm2835_defconfig = should work
-> arm/multi_v7_defconfig = may work
-> arm64/defconfig = won't work [1]
->
-> In order to the function of the driver use vchiq_test from the Raspberry Pi userland.
->
-> Btw testers are always welcome :-)
->
->> can it be used with Qt5 ?
-> If your application works with the downstream kernel, there is a high chance.
->
->> 2) Can I have a working example of DT binding for the driver ?
-> This is one of my many TODOs [2] to provide a binding document. Please try the following old patch. The cache-line-size depends on the used SoC (BCM2835 = 32, BCM2836/BCM2837 = 64).
->
-> Good luck
->
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index e55b362..7398b96 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -27,6 +27,14 @@
->                          firmware = <&firmware>;
->                          #power-domain-cells = <1>;
->                  };
-> +
-> +               vchiq: vchiq {
-> +                       compatible = "brcm,bcm2835-vchiq";
-> +                       reg = <0x7e00b840 0xf>;
-> +                       interrupts = <0 2>;
-> +                       cache-line-size = <64>;
-> +                       firmware = <&firmware>;
-> +		};
->          };
->   };
->
->
-> [1] - https://github.com/lategoodbye/rpi-zero/issues/23
-> [2] - https://github.com/lategoodbye/rpi-zero/issues/8
->
->> Thanks
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> Phil
+> 
