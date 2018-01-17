@@ -1,11 +1,11 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Jan 2018 13:20:42 +0000
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 17 Jan 2018 13:22:19 +0000
 Subject: [PATCH] arm64: Run enable method for errata work arounds on late
  CPUs
 In-Reply-To: <20180117122548.GE22781@e103592.cambridge.arm.com>
 References: <20180117100556.29270-1-suzuki.poulose@arm.com>
  <20180117122548.GE22781@e103592.cambridge.arm.com>
-Message-ID: <29147833-b47f-3ad9-e2d8-295551c43900@arm.com>
+Message-ID: <766fe9e9-ff68-c06f-c253-d548a2a3cbcb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -49,18 +49,24 @@ On 17/01/18 12:25, Dave Martin wrote:
 > 
 > Do we really need this cast?
 
-Seems to me like the prototype for .enable needs updating. If any 
-existing callback was actually using the (non-const) void* for some 
-purpose (thankfully nothing seems to be), then passing the capability 
-pointer into that would be unlikely to end well anyway.
+Yes, otherwise we would be passing a "const *" where a "void *" is expected,
+and the compiler warns. Or we could simply change the prototype of the
+enable() method to accept a const capability ptr.
 
-We probably want to replace or append that with a proper const struct 
-arm64_cpu_capabilities* argument, to make it more of a method call.
-
-Robin.
-
+> 
 > Can enable() fail, or do we already guarantee that it succeeds (by
 > having detected the cap in the first place)?
+
+enable() can't fail, since as you said the cap is already detected
+by the scope of the capability. It is just the matter of enable() deciding
+to do some action on the calling CPU depending on the type of the
+work around (e.g, enable SCTLR bit or enable trapping etc). It is left
+to the capability to decide whether the calling CPU needs any action
+or not (e.g, bp hardening).
+
+Cheers
+Suzuki
+
 > 
 >> +		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
 > 
@@ -68,9 +74,4 @@ Robin.
 > 
 > Cheers
 > ---Dave
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
