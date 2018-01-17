@@ -1,26 +1,36 @@
-From: pochun.lin@mediatek.com (pochun.lin at mediatek.com)
-Date: Wed, 17 Jan 2018 21:35:22 +0800
-Subject: pull request: linux-firmware: Update Mediatek MT8173 VPU firmware
-Message-ID: <1516196123-24327-1-git-send-email-pochun.lin@mediatek.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Jan 2018 13:39:18 +0000
+Subject: [PATCH 1/2] iommu/msm: Claim bus ops on probe
+In-Reply-To: <20180117133331.vidtyduiu7zr3fwc@8bytes.org>
+References: <f1a506337bf602c54f4d6d417c14ca556a5f3674.1515436860.git.robin.murphy@arm.com>
+ <20180117133331.vidtyduiu7zr3fwc@8bytes.org>
+Message-ID: <bc83496f-f0c0-6fe7-acd4-b96526a81dc3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 65b1c68c63f974d72610db38dfae49861117cae2:
+On 17/01/18 13:33, Joerg Roedel wrote:
+> On Mon, Jan 08, 2018 at 06:42:30PM +0000, Robin Murphy wrote:
+>> Since the MSM IOMMU driver now probes via DT exclusively rather than
+>> platform data, dependent masters should be deferred until the IOMMU
+>> itself is ready. Thus we can do away with the early initialisation
+>> hook to unconditionally claim the bus ops, and instead do that only
+>> once an IOMMU is actually probed. Furthermore, this should also make
+>> the driver safe for multiplatform kernels on non-MSM SoCs.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> Applied both, thanks Robin.
 
-  wl18xx: update firmware file 8.9.0.0.76 (2018-01-04 10:06:01 -0500)
+Oops, patch #2 of this series will break the build, as it was 
+accidentally based on an older branch missing the Renesas IPMMU updates. 
+Please see v2 [1] - I'm still hoping for confirmation from the Renesas 
+folks, but it *should* be fine...
 
-are available in the git repository at:
+Incidentally, per your other mail, these changes also makes Jeffy's 
+"Only do IOMMU lookup for available ones" patch obsolete.
 
-  https://github.com/pochun-lin/linux_fw_vpu_v1.0.8.git v1.0.8
+Sorry for the mess,
+Robin.
 
-for you to fetch changes up to e72c23c9ff2ceeb3509cb6441cc81f0227edf06d:
-
-  mediatek: update MT8173 VPU firmware to 1.0.8 (2018-01-17 20:19:56 +0800)
-
-----------------------------------------------------------------
-pochun.lin (1):
-      mediatek: update MT8173 VPU firmware to 1.0.8
-
- vpu_d.bin | Bin 4082928 -> 2977008 bytes
- vpu_p.bin | Bin 131160 -> 131168 bytes
- 2 files changed, 0 insertions(+), 0 deletions(-)
+[1] 
+https://lists.linuxfoundation.org/pipermail/iommu/2018-January/025395.html
