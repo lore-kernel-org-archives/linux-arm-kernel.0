@@ -1,40 +1,23 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 17 Jan 2018 16:02:25 +0800
-Subject: [PATCH v5 3/3] dts: arm64: Add mailbox binding for hi3660
-In-Reply-To: <1516176145-9387-1-git-send-email-leo.yan@linaro.org>
-References: <1516176145-9387-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1516176145-9387-3-git-send-email-leo.yan@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 17 Jan 2018 09:05:13 +0100
+Subject: [PATCH] clk: Properly update prepare/enable count on orphan clock
+ reparent
+In-Reply-To: <20180115115214.10303-1-m.szyprowski@samsung.com>
+References: <CGME20180115115231eucas1p1499f46ca64b65598d03a182ed5670f28@eucas1p1.samsung.com>
+ <20180115115214.10303-1-m.szyprowski@samsung.com>
+Message-ID: <CAJKOXPdZupF7tsdQ7ZUON95ska3XFgTMgeD1359He_=8FyGy2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kaihua Zhong <zhongkaihua@huawei.com>
+On Mon, Jan 15, 2018 at 12:52 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> If orphaned clock has been already prepared/enabled (for example if it or
+> one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+> counters of the newly assigned parent are not updated correctly. This
+> might later cause warnings during changing clock parents.
+>
 
-Add DT binding for mailbox driver.
+Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Signed-off-by: Ruyi Wang <wangruyi@huawei.com>
-Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 22570c3..1ef7b94 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -286,6 +286,14 @@
- 			#reset-cells = <2>;
- 		};
- 
-+		mailbox: mailbox at e896b000 {
-+			compatible = "hisilicon,hi3660-mbox";
-+			reg = <0x0 0xe896b000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <3>;
-+		};
-+
- 		stub_clock: stub_clock at e896b500 {
- 			compatible = "hisilicon,hi3660-stub-clk";
- 			reg = <0x0 0xe896b500 0x0 0x0100>;
--- 
-1.9.1
+Best regards,
+Krzysztof
