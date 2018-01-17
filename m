@@ -1,87 +1,44 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Wed, 17 Jan 2018 11:24:06 -0600
-Subject: [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and
- SIGFPE, SIGTRAP, SIGBUS
-In-Reply-To: <20180117171729.GJ22781@e103592.cambridge.arm.com> (Dave Martin's
- message of "Wed, 17 Jan 2018 17:17:29 +0000")
-References: <87373b6ghs.fsf@xmission.com>
- <20180112005940.23279-7-ebiederm@xmission.com>
- <20180115163028.GU22781@e103592.cambridge.arm.com>
- <87h8rnox3c.fsf@xmission.com>
- <20180117171729.GJ22781@e103592.cambridge.arm.com>
-Message-ID: <87h8rkflft.fsf@xmission.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 17 Jan 2018 11:28:41 -0600
+Subject: [PATCH v5 10/44] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <1b568e12-dd45-f371-a1a8-576c97a6b58e@ti.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-11-git-send-email-david@lechnology.com>
+ <e0a9af55-a8b1-c359-fe88-d038648e02f1@ti.com>
+ <83f3d207-9645-cbdf-d6cf-b6e6a8458abe@lechnology.com>
+ <1b568e12-dd45-f371-a1a8-576c97a6b58e@ti.com>
+Message-ID: <b6cd0d89-82f5-66bd-f595-f13fc26bc557@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <Dave.Martin@arm.com> writes:
+On 01/17/2018 06:25 AM, Sekhar Nori wrote:
+> On Tuesday 16 January 2018 10:21 PM, David Lechner wrote:
+> 
+>>>> +static struct clk *davinci_psc_clk_register(const char *name,
+>>>> +??????????????????????? const char *parent_name,
+>>>> +??????????????????????? struct regmap *regmap,
+>>>> +??????????????????????? u32 lpsc, u32 pd, u32 flags)
+>>>> +{
+>>>> +??? struct clk_init_data init;
+>>>> +??? struct davinci_psc_clk *psc;
+>>>> +??? struct clk *clk;
+>>>> +
+>>>> +??? psc = kzalloc(sizeof(*psc), GFP_KERNEL);
+>>>> +??? if (!psc)
+>>>> +??????? return ERR_PTR(-ENOMEM);
+>>>> +
+>>>> +??? init.name = name;
+>>>> +??? init.ops = &davinci_psc_clk_ops;
+>>>> +??? init.parent_names = (parent_name ? &parent_name : NULL);
+>>>> +??? init.num_parents = (parent_name ? 1 : 0);
+>>>> +??? init.flags = CLK_SET_RATE_PARENT;
+>>>
+>>> Is this needed since PSC does not cause any rate change?
+>>
+>> Yes, because one of the PSCs is the ARM clock and for cpufreq, we
+>> need to propagate the rate change up the chain to SYSCLK6.
+> 
+> Good point. But how about treating that as an exception with a new LPSC_
+> quirk flag?
 
-> On Mon, Jan 15, 2018 at 11:23:03AM -0600, Eric W. Biederman wrote:
->> Dave Martin <Dave.Martin@arm.com> writes:
->> 
->> > On Thu, Jan 11, 2018 at 06:59:36PM -0600, Eric W. Biederman wrote:
->
-> [...]
->
->> >> Possible ABI fixes include:
->> >> - Send the signal without siginfo
->> >> - Don't generate a signal
->
-> [...]
->
->> >> - Possibly assign and use an appropriate si_code
->> >> - Don't handle cases which can't happen
->> >
->> > I think a mixture of these two is the best approach.
->> >
->> > In any case, si_code == 0 here doesn't seem to have any explicit meaning.
->> > I think we can translate all of the arm64 faults to proper si_codes --
->> > see my sketch below.  Probably means a bit more thought though.
->
-> [...]
->
->> >> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->
-> [...]
->
->> >> @@ -607,70 +607,70 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->> >>  }
->> >>  
->> >>  static const struct fault_info fault_info[] = {
->> >> -	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
->> >> -	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
->> >> -	{ do_bad,		SIGBUS,  0,		"level 2 address size fault"	},
->> >> -	{ do_bad,		SIGBUS,  0,		"level 3 address size fault"	},
->
-> If I convert this kind of thing to SIGKILL there really is nothing
-> sensible to put in si_code, except possibly SI_KERNEL (indicating that
-> the kill did not come from userspace).  Even so, it hardly seems worth
-> filling in fields like si_pid and si_uid just to make this "correct".
->
-> In any case, if siginfo is never seen by userspace for SIGKILL this is
-> moot.
->
-> Obviously, siginfo is never copied to the user stack in that case, but
-> is it also guaranteed not to be visible to userspace by other means?
-> For ptrace I'm hoping not, since SIGKILL should nuke the tracee
-> immediately instead of being reported to the tracer as a
-> signal-delivery-stop -- so the tracer should get WIFSIGNALED() &&
-> WTERMSIG() == SIGKILL.  A subsequent PTRACE_GETSIGINFO would fail with
-> ESRCH.
->
-> Does that match your understanding?
->
-> If so, there is some merit in not pretending to pass a reall value
-> for si_code.
->
-> Should si_code simply be ignored for the SIGKILL case?
-
-I know what x86 does in a similar case is it uses force_sig instead of
-force_sig_info.  Then the generic code gets to worry about 
-
-If the appropriate paths generic paths get to worry about what siginfo
-to fill in in that case.  Which for SI_KERNEL is zero for everything
-except the si_code and the si_signo.
-
-That seems perfectly reasonable.
-
-Eric
+Sure.
