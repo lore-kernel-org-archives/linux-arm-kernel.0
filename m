@@ -1,69 +1,91 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Jan 2018 12:31:05 +0000
-Subject: [PATCH v2 09/13] iommu/rockchip: Use iommu_group_get_for_dev()
- for add_device
-In-Reply-To: <20180116132540.18939-10-jeffy.chen@rock-chips.com>
-References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-10-jeffy.chen@rock-chips.com>
-Message-ID: <4c1b2469-9a32-c6ca-522f-73143b0fa618@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jan 2018 12:37:52 +0000
+Subject: [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and
+ SIGFPE, SIGTRAP, SIGBUS
+In-Reply-To: <20180117121505.GD22781@e103592.cambridge.arm.com>
+References: <87373b6ghs.fsf@xmission.com>
+ <20180112005940.23279-7-ebiederm@xmission.com>
+ <20180115163028.GU22781@e103592.cambridge.arm.com>
+ <87h8rnox3c.fsf@xmission.com>
+ <20180116172407.GA22781@e103592.cambridge.arm.com>
+ <871sipl9p9.fsf@xmission.com>
+ <20180117115708.GM17719@n2100.armlinux.org.uk>
+ <20180117121505.GD22781@e103592.cambridge.arm.com>
+Message-ID: <20180117123752.GN17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/18 13:25, Jeffy Chen wrote:
-> IOMMU drivers are supposed to call this function instead of manually
-> creating a group in their .add_device callback. This behavior is not
-> strictly required by ARM DMA mapping implementation, but ARM64 already
-> relies on it. This patch fixes the rockchip-iommu driver to comply with
-> this requirement.
-
-FWIW that's not 100% true: what arm64 relies on is the group having a 
-default DMA ops domain. Technically, you *could* open-code that in the 
-driver's group allocation, but obviously using the appropriate existing 
-API is nicer :)
-
-[...]
-> @@ -1182,6 +1164,29 @@ static void rk_iommu_remove_device(struct device *dev)
->   	iommu_group_remove_device(dev);
->   }
->   
-> +static struct iommu_group *rk_iommu_device_group(struct device *dev)
-> +{
-> +	struct iommu_group *group;
-> +	int ret;
-> +
-> +	group = iommu_group_get(dev);
-> +	if (!group) {
-
-This check is pointless - if dev->iommu_group were non-NULL you wouldn't 
-have been called in the first place.
-
-Robin.
-
-> +		group = iommu_group_alloc();
-> +		if (IS_ERR(group))
-> +			return group;
-> +	}
-> +
-> +	ret = rk_iommu_group_set_iommudata(group, dev);
-> +	if (ret)
-> +		goto err_put_group;
-> +
-> +	return group;
-> +
-> +err_put_group:
-> +	iommu_group_put(group);
-> +	return ERR_PTR(ret);
-> +}
-> +
->   static const struct iommu_ops rk_iommu_ops = {
->   	.domain_alloc = rk_iommu_domain_alloc,
->   	.domain_free = rk_iommu_domain_free,
-> @@ -1193,6 +1198,7 @@ static const struct iommu_ops rk_iommu_ops = {
->   	.add_device = rk_iommu_add_device,
->   	.remove_device = rk_iommu_remove_device,
->   	.iova_to_phys = rk_iommu_iova_to_phys,
-> +	.device_group = rk_iommu_device_group,
->   	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
->   };
->   
+On Wed, Jan 17, 2018 at 12:15:05PM +0000, Dave Martin wrote:
+> On Wed, Jan 17, 2018 at 11:57:09AM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Jan 16, 2018 at 04:28:50PM -0600, Eric W. Biederman wrote:
+> > > I will keep FPE_FIXME as a place holder until this gets sorted out.
+> > > 
+> > > There is a second issue I am looking at in this location,
+> > > and maybe I don't have to address it now.  But it looks like the code is
+> > > calling send_sig_info instead of force_sig_info for a synchronous
+> > > exception.  Am I reading that correctly?
+> > 
+> > VFP used to use force_sig_info(), but it seems to be really the wrong
+> > call to use.  force_sig_info() checks whether the program decided to
+> > ignore or block the signal, and if it did, replaces the signal handler
+> > with the default handler and unblocks the signal.
+> > 
+> > Are you really suggesting that FP all FP signals should get this
+> > treatment?
 > 
+> feenableexcept(FE_OVERFLOW) kind of means "I can't run safely past
+> an fp overflow exception, please signal me instead".
+> 
+> If the process also blocked SIGFPE, that could be taken to mean
+> "I can't run safely past an fp overflow exception _and_ I can't
+> take SIGFPE either" ... i.e., if an fp overflow happens there is
+> no way to proceed and it's really fatal.
+> 
+> What SIG_IGN ought to mean is rather more debatable, but again,
+> the process could be asking for two opposite things: guarantee a
+> SIGFPE is delivered instead of running past an fp exception, and
+> also guarantee that SIGFPE is _not_ delivered.
+> 
+> It looks like arm and arm64 are different from most other arches
+> (including x86) here, but I'm not sure what is considered correct, and
+> it looks like the answer is not standardised.  There's a possibility
+> that some software goes subtly wrong on arm/arm64 where on other arches
+> it would get terminated with SIGKILL.
+> 
+> Whether this matters depends on how harmless the fp exception is to
+> the work of the program.  I think if an exception is set to trap
+> via feenableexcept() then that's a strong hint the programmer thinks
+> that exception is not harmless.  OTOH, trapping is not always
+> available anyway...
+
+Like many of these things, there is no clear answer.  It's a set of
+conflicting requirements, and as you point out, even if you've called
+feenableexcept(), you are not guaranteed to get a trap.
+
+However, do remember that FP exceptions on ARM hardware are already
+asynchronous - they get reported by the _next_ FP operation to the one
+that caused them, which means they could be raised by a library function
+sometime after it occured (when the library function decides to save the
+FP registers to the stack before it makes use of them.)  It's entirely
+possible that the library function has blocked FP signals temporarily
+(not explicitly, just decided to block all signals while it does
+something sensitive) and will unblock them again afterwards - at which
+point we get the SIGFPE, and it would be quite right to deliver that
+signal to the user SIGFPE handler, rather than forcing it onto the
+program mid-library function.
+
+It's also possible that SIGFPE could be blocked by another signal handler
+having been invoked, and it triggers the latent generation of the SIGFPE.
+
+I'd be more inclined to agree with you if VFP exceptions were synchronous
+but they aren't.
+
+> Was there some particular program being broken by the force_sig_info()
+> here?
+
+I don't recall.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
