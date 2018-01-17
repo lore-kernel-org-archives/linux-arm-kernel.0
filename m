@@ -1,269 +1,311 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 17 Jan 2018 17:52:21 +0000
-Subject: [PATCH v3 26/41] KVM: arm64: Introduce framework for accessing
- deferred sysregs
-In-Reply-To: <20180112120747.27999-27-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-27-christoffer.dall@linaro.org>
-Message-ID: <dce891ed-3e43-a136-9d7b-c7186fe2ff3c@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 17 Jan 2018 10:52:11 -0700
+Subject: [PATCH v3 02/10] perf tools: Add initial entry point for decoder
+ CoreSight traces
+In-Reply-To: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1516211539-5166-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds the entry point for CoreSight trace decoding, serving
+as a jumping board for furhter expansions.
 
+Co-authored-by: Tor Jeremiassen <tor@ti.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/perf/util/Build      |   5 ++
+ tools/perf/util/auxtrace.c |   2 +
+ tools/perf/util/cs-etm.c   | 213 +++++++++++++++++++++++++++++++++++++++++++++
+ tools/perf/util/cs-etm.h   |  15 ++++
+ 4 files changed, 235 insertions(+)
+ create mode 100644 tools/perf/util/cs-etm.c
 
-On 12/01/18 12:07, Christoffer Dall wrote:
-> We are about to defer saving and restoring some groups of system
-> registers to vcpu_put and vcpu_load on supported systems.  This means
-> that we need some infrastructure to access system registes which
-> supports either accessing the memory backing of the register or directly
-> accessing the system registers, depending on the state of the system
-> when we access the register.
-> 
-> We do this by defining a set of read/write accessors for each system
-> register, and letting each system register be defined as "immediate" or
-> "deferrable".  Immediate registers are always saved/restored in the
-> world-switch path, but deferrable registers are only saved/restored in
-> vcpu_put/vcpu_load when supported and sysregs_loaded_on_cpu will be set
-> in that case.
-> 
-
-The patch is fine, however I'd suggest adding a comment in the pointing 
-out that the IMMEDIATE/DEFERRABLE apply to save/restore to the vcpu 
-struct. Instinctively I would expect the deferrable/immediate to apply 
-to the actual hardware register access, so a comment would prevent 
-people like me to get on the wrong track.
-
-> Not that we don't use the deferred mechanism yet in this patch, but only
-> introduce infrastructure.  This is to improve convenience of review in
-> the subsequent patches where it is clear which registers become
-> deferred.
-> 
->   [ Most of this logic was contributed by Marc Zyngier ]
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-> ---
->   arch/arm64/include/asm/kvm_host.h |   8 +-
->   arch/arm64/kvm/sys_regs.c         | 160 ++++++++++++++++++++++++++++++++++++++
->   2 files changed, 166 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 91272c35cc36..4b5ef82f6bdb 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -281,6 +281,10 @@ struct kvm_vcpu_arch {
->   
->   	/* Detect first run of a vcpu */
->   	bool has_run_once;
-> +
-> +	/* True when deferrable sysregs are loaded on the physical CPU,
-> +	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
-> +	bool sysregs_loaded_on_cpu;
->   };
->   
->   #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-> @@ -293,8 +297,8 @@ struct kvm_vcpu_arch {
->    */
->   #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
->   
-> -#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
-> -#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
-> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
-> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
->   
->   /*
->    * CP14 and CP15 live in the same array, as they are backed by the
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 96398d53b462..9d353a6a55c9 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -35,6 +35,7 @@
->   #include <asm/kvm_coproc.h>
->   #include <asm/kvm_emulate.h>
->   #include <asm/kvm_host.h>
-> +#include <asm/kvm_hyp.h>
->   #include <asm/kvm_mmu.h>
->   #include <asm/perf_event.h>
->   #include <asm/sysreg.h>
-> @@ -76,6 +77,165 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
->   	return false;
->   }
->   
-> +struct sys_reg_accessor {
-> +	u64	(*rdsr)(struct kvm_vcpu *, int);
-> +	void	(*wrsr)(struct kvm_vcpu *, int, u64);
-
-Nit:
-
-Why use a signed integer for the register index argument?
-
-> +};
-> +
-> +#define DECLARE_IMMEDIATE_SR(i)						\
-> +	static u64 __##i##_read(struct kvm_vcpu *vcpu, int r)		\
-> +	{								\
-> +		return __vcpu_sys_reg(vcpu, r);				\
-> +	}								\
-> +									\
-> +	static void __##i##_write(struct kvm_vcpu *vcpu, int r, u64 v)	\
-> +	{								\
-> +		__vcpu_sys_reg(vcpu, r) = v;				\
-> +	}								\
-> +
-> +#define DECLARE_DEFERRABLE_SR(i, s)					\
-> +	static u64 __##i##_read(struct kvm_vcpu *vcpu, int r)		\
-> +	{								\
-> +		if (vcpu->arch.sysregs_loaded_on_cpu) {			\
-> +			WARN_ON(kvm_arm_get_running_vcpu() != vcpu);	\
-> +			return read_sysreg_s((s));			\
-> +		}							\
-> +		return __vcpu_sys_reg(vcpu, r);				\
-> +	}								\
-> +									\
-> +	static void __##i##_write(struct kvm_vcpu *vcpu, int r, u64 v)	\
-> +	{								\
-> +		if (vcpu->arch.sysregs_loaded_on_cpu) {			\
-> +			WARN_ON(kvm_arm_get_running_vcpu() != vcpu);	\
-> +			write_sysreg_s(v, (s));				\
-> +		} else {						\
-> +			__vcpu_sys_reg(vcpu, r) = v;			\
-> +		}							\
-> +	}								\
-> +
-> +
-> +#define SR_HANDLER_RANGE(i,e)						\
-> +	[i ... e] =  (struct sys_reg_accessor) {			\
-> +		.rdsr = __##i##_read,					\
-> +		.wrsr = __##i##_write,					\
-
-Nit:
-Could we have __vcpu_##i##_read and __vcpu_##i##_write?
-
-> +	}
-> +
-> +#define SR_HANDLER(i)	SR_HANDLER_RANGE(i, i)
-> +
-> +static void bad_sys_reg(int reg)
-> +{
-> +	WARN_ONCE(1, "Bad system register access %d\n", reg);
-> +}
-> +
-> +static u64 __default_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-> +{
-> +	bad_sys_reg(reg);
-> +	return 0;
-> +}
-> +
-> +static void __default_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
-> +{
-> +	bad_sys_reg(reg);
-> +}
-> +
-> +/* Ordered as in enum vcpu_sysreg */
-> +DECLARE_IMMEDIATE_SR(MPIDR_EL1);
-> +DECLARE_IMMEDIATE_SR(CSSELR_EL1);
-> +DECLARE_IMMEDIATE_SR(SCTLR_EL1);
-> +DECLARE_IMMEDIATE_SR(ACTLR_EL1);
-> +DECLARE_IMMEDIATE_SR(CPACR_EL1);
-> +DECLARE_IMMEDIATE_SR(TTBR0_EL1);
-> +DECLARE_IMMEDIATE_SR(TTBR1_EL1);
-> +DECLARE_IMMEDIATE_SR(TCR_EL1);
-> +DECLARE_IMMEDIATE_SR(ESR_EL1);
-> +DECLARE_IMMEDIATE_SR(AFSR0_EL1);
-> +DECLARE_IMMEDIATE_SR(AFSR1_EL1);
-> +DECLARE_IMMEDIATE_SR(FAR_EL1);
-> +DECLARE_IMMEDIATE_SR(MAIR_EL1);
-> +DECLARE_IMMEDIATE_SR(VBAR_EL1);
-> +DECLARE_IMMEDIATE_SR(CONTEXTIDR_EL1);
-> +DECLARE_IMMEDIATE_SR(TPIDR_EL0);
-> +DECLARE_IMMEDIATE_SR(TPIDRRO_EL0);
-> +DECLARE_IMMEDIATE_SR(TPIDR_EL1);
-> +DECLARE_IMMEDIATE_SR(AMAIR_EL1);
-> +DECLARE_IMMEDIATE_SR(CNTKCTL_EL1);
-> +DECLARE_IMMEDIATE_SR(PAR_EL1);
-> +DECLARE_IMMEDIATE_SR(MDSCR_EL1);
-> +DECLARE_IMMEDIATE_SR(MDCCINT_EL1);
-> +DECLARE_IMMEDIATE_SR(PMCR_EL0);
-> +DECLARE_IMMEDIATE_SR(PMSELR_EL0);
-> +DECLARE_IMMEDIATE_SR(PMEVCNTR0_EL0);
-> +/* PMEVCNTR30_EL0 */
-> +DECLARE_IMMEDIATE_SR(PMCCNTR_EL0);
-> +DECLARE_IMMEDIATE_SR(PMEVTYPER0_EL0);
-> +/* PMEVTYPER30_EL0 */
-> +DECLARE_IMMEDIATE_SR(PMCCFILTR_EL0);
-> +DECLARE_IMMEDIATE_SR(PMCNTENSET_EL0);
-> +DECLARE_IMMEDIATE_SR(PMINTENSET_EL1);
-> +DECLARE_IMMEDIATE_SR(PMOVSSET_EL0);
-> +DECLARE_IMMEDIATE_SR(PMSWINC_EL0);
-> +DECLARE_IMMEDIATE_SR(PMUSERENR_EL0);
-> +DECLARE_IMMEDIATE_SR(DACR32_EL2);
-> +DECLARE_IMMEDIATE_SR(IFSR32_EL2);
-> +DECLARE_IMMEDIATE_SR(FPEXC32_EL2);
-> +DECLARE_IMMEDIATE_SR(DBGVCR32_EL2);
-> +
-> +static const struct sys_reg_accessor sys_reg_accessors[NR_SYS_REGS] = {
-> +	[0 ... NR_SYS_REGS - 1] = {
-> +		.rdsr = __default_read_sys_reg,
-> +		.wrsr = __default_write_sys_reg,
-> +	},
-> +
-> +	SR_HANDLER(MPIDR_EL1),
-> +	SR_HANDLER(CSSELR_EL1),
-> +	SR_HANDLER(SCTLR_EL1),
-> +	SR_HANDLER(ACTLR_EL1),
-> +	SR_HANDLER(CPACR_EL1),
-> +	SR_HANDLER(TTBR0_EL1),
-> +	SR_HANDLER(TTBR1_EL1),
-> +	SR_HANDLER(TCR_EL1),
-> +	SR_HANDLER(ESR_EL1),
-> +	SR_HANDLER(AFSR0_EL1),
-> +	SR_HANDLER(AFSR1_EL1),
-> +	SR_HANDLER(FAR_EL1),
-> +	SR_HANDLER(MAIR_EL1),
-> +	SR_HANDLER(VBAR_EL1),
-> +	SR_HANDLER(CONTEXTIDR_EL1),
-> +	SR_HANDLER(TPIDR_EL0),
-> +	SR_HANDLER(TPIDRRO_EL0),
-> +	SR_HANDLER(TPIDR_EL1),
-> +	SR_HANDLER(AMAIR_EL1),
-> +	SR_HANDLER(CNTKCTL_EL1),
-> +	SR_HANDLER(PAR_EL1),
-> +	SR_HANDLER(MDSCR_EL1),
-> +	SR_HANDLER(MDCCINT_EL1),
-> +	SR_HANDLER(PMCR_EL0),
-> +	SR_HANDLER(PMSELR_EL0),
-> +	SR_HANDLER_RANGE(PMEVCNTR0_EL0, PMEVCNTR30_EL0),
-> +	SR_HANDLER(PMCCNTR_EL0),
-> +	SR_HANDLER_RANGE(PMEVTYPER0_EL0, PMEVTYPER30_EL0),
-> +	SR_HANDLER(PMCCFILTR_EL0),
-> +	SR_HANDLER(PMCNTENSET_EL0),
-> +	SR_HANDLER(PMINTENSET_EL1),
-> +	SR_HANDLER(PMOVSSET_EL0),
-> +	SR_HANDLER(PMSWINC_EL0),
-> +	SR_HANDLER(PMUSERENR_EL0),
-> +	SR_HANDLER(DACR32_EL2),
-> +	SR_HANDLER(IFSR32_EL2),
-> +	SR_HANDLER(FPEXC32_EL2),
-> +	SR_HANDLER(DBGVCR32_EL2),
-> +};
-> +
-> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-> +{
-> +	return sys_reg_accessors[reg].rdsr(vcpu, reg);
-> +}
-> +
-> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
-> +{
-> +	sys_reg_accessors[reg].wrsr(vcpu, reg, val);
-> +}
-> +
->   /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
->   static u32 cache_levels;
->   
-> 
-
+diff --git a/tools/perf/util/Build b/tools/perf/util/Build
+index 7c6a8b461e24..d3c42912264a 100644
+--- a/tools/perf/util/Build
++++ b/tools/perf/util/Build
+@@ -88,6 +88,11 @@ libperf-$(CONFIG_AUXTRACE) += intel-pt.o
+ libperf-$(CONFIG_AUXTRACE) += intel-bts.o
+ libperf-$(CONFIG_AUXTRACE) += arm-spe.o
+ libperf-$(CONFIG_AUXTRACE) += arm-spe-pkt-decoder.o
++
++ifdef CONFIG_LIBOPENCSD
++libperf-$(CONFIG_AUXTRACE) += cs-etm.o
++endif
++
+ libperf-y += parse-branch-options.o
+ libperf-y += dump-insn.o
+ libperf-y += parse-regs-options.o
+diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+index 3bba9947ab7f..9faf3b5367db 100644
+--- a/tools/perf/util/auxtrace.c
++++ b/tools/perf/util/auxtrace.c
+@@ -52,6 +52,7 @@
+ #include "debug.h"
+ #include <subcmd/parse-options.h>
+ 
++#include "cs-etm.h"
+ #include "intel-pt.h"
+ #include "intel-bts.h"
+ #include "arm-spe.h"
+@@ -914,6 +915,7 @@ int perf_event__process_auxtrace_info(struct perf_tool *tool __maybe_unused,
+ 	case PERF_AUXTRACE_ARM_SPE:
+ 		return arm_spe_process_auxtrace_info(event, session);
+ 	case PERF_AUXTRACE_CS_ETM:
++		return cs_etm__process_auxtrace_info(event, session);
+ 	case PERF_AUXTRACE_UNKNOWN:
+ 	default:
+ 		return -EINVAL;
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+new file mode 100644
+index 000000000000..f47797101857
+--- /dev/null
++++ b/tools/perf/util/cs-etm.c
+@@ -0,0 +1,213 @@
++/*
++ * SPDX-License-Identifier: GPL-2.0
++ *
++ * Copyright(C) 2015-2018 Linaro Limited.
++ *
++ * Author: Tor Jeremiassen <tor@ti.com>
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ */
++
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/log2.h>
++#include <linux/types.h>
++
++#include <stdlib.h>
++
++#include "auxtrace.h"
++#include "color.h"
++#include "cs-etm.h"
++#include "debug.h"
++#include "evlist.h"
++#include "intlist.h"
++#include "machine.h"
++#include "map.h"
++#include "perf.h"
++#include "thread.h"
++#include "thread_map.h"
++#include "thread-stack.h"
++#include "util.h"
++
++#define MAX_TIMESTAMP (~0ULL)
++
++struct cs_etm_auxtrace {
++	struct auxtrace auxtrace;
++	struct auxtrace_queues queues;
++	struct auxtrace_heap heap;
++	struct itrace_synth_opts synth_opts;
++	struct perf_session *session;
++	struct machine *machine;
++	struct thread *unknown_thread;
++
++	u8 timeless_decoding;
++	u8 snapshot_mode;
++	u8 data_queued;
++	u8 sample_branches;
++
++	int num_cpu;
++	u32 auxtrace_type;
++	u64 branches_sample_type;
++	u64 branches_id;
++	u64 **metadata;
++	u64 kernel_start;
++	unsigned int pmu_type;
++};
++
++struct cs_etm_queue {
++	struct cs_etm_auxtrace *etm;
++	struct thread *thread;
++	struct cs_etm_decoder *decoder;
++	struct auxtrace_buffer *buffer;
++	const struct cs_etm_state *state;
++	union perf_event *event_buf;
++	unsigned int queue_nr;
++	pid_t pid, tid;
++	int cpu;
++	u64 time;
++	u64 timestamp;
++	u64 offset;
++};
++
++static int cs_etm__flush_events(struct perf_session *session,
++				struct perf_tool *tool)
++{
++	(void) session;
++	(void) tool;
++	return 0;
++}
++
++static void cs_etm__free_queue(void *priv)
++{
++	struct cs_etm_queue *etmq = priv;
++
++	free(etmq);
++}
++
++static void cs_etm__free_events(struct perf_session *session)
++{
++	unsigned int i;
++	struct cs_etm_auxtrace *aux = container_of(session->auxtrace,
++						   struct cs_etm_auxtrace,
++						   auxtrace);
++	struct auxtrace_queues *queues = &aux->queues;
++
++	for (i = 0; i < queues->nr_queues; i++) {
++		cs_etm__free_queue(queues->queue_array[i].priv);
++		queues->queue_array[i].priv = NULL;
++	}
++
++	auxtrace_queues__free(queues);
++}
++
++static void cs_etm__free(struct perf_session *session)
++{
++	struct cs_etm_auxtrace *aux = container_of(session->auxtrace,
++						   struct cs_etm_auxtrace,
++						   auxtrace);
++	cs_etm__free_events(session);
++	session->auxtrace = NULL;
++
++	zfree(&aux);
++}
++
++static int cs_etm__process_event(struct perf_session *session,
++				 union perf_event *event,
++				 struct perf_sample *sample,
++				 struct perf_tool *tool)
++{
++	(void) session;
++	(void) event;
++	(void) sample;
++	(void) tool;
++	return 0;
++}
++
++static int cs_etm__process_auxtrace_event(struct perf_session *session,
++					  union perf_event *event,
++					  struct perf_tool *tool)
++{
++	(void) session;
++	(void) event;
++	(void) tool;
++	return 0;
++}
++
++static bool cs_etm__is_timeless_decoding(struct cs_etm_auxtrace *etm)
++{
++	struct perf_evsel *evsel;
++	struct perf_evlist *evlist = etm->session->evlist;
++	bool timeless_decoding = true;
++
++	/*
++	 * Circle through the list of event and complain if we find one
++	 * with the time bit set.
++	 */
++	evlist__for_each_entry(evlist, evsel) {
++		if ((evsel->attr.sample_type & PERF_SAMPLE_TIME))
++			timeless_decoding = false;
++	}
++
++	return timeless_decoding;
++}
++
++int cs_etm__process_auxtrace_info(union perf_event *event,
++				  struct perf_session *session)
++{
++	struct auxtrace_info_event *auxtrace_info = &event->auxtrace_info;
++	struct cs_etm_auxtrace *etm = NULL;
++	int event_header_size = sizeof(struct perf_event_header);
++	int info_header_size;
++	int total_size = auxtrace_info->header.size;
++	int err = 0;
++
++	/*
++	 * sizeof(auxtrace_info_event::type) +
++	 * sizeof(auxtrace_info_event::reserved) == 8
++	 */
++	info_header_size = 8;
++
++	if (total_size < (event_header_size + info_header_size))
++		return -EINVAL;
++
++	etm = zalloc(sizeof(*etm));
++
++	if (!etm)
++		err = -ENOMEM;
++
++	err = auxtrace_queues__init(&etm->queues);
++	if (err)
++		goto err_free_etm;
++
++	etm->session = session;
++	etm->machine = &session->machines.host;
++
++	etm->auxtrace_type = auxtrace_info->type;
++	etm->timeless_decoding = cs_etm__is_timeless_decoding(etm);
++
++	etm->auxtrace.process_event = cs_etm__process_event;
++	etm->auxtrace.process_auxtrace_event = cs_etm__process_auxtrace_event;
++	etm->auxtrace.flush_events = cs_etm__flush_events;
++	etm->auxtrace.free_events = cs_etm__free_events;
++	etm->auxtrace.free = cs_etm__free;
++	session->auxtrace = &etm->auxtrace;
++
++	if (dump_trace)
++		return 0;
++
++	err = auxtrace_queues__process_index(&etm->queues, session);
++	if (err)
++		goto err_free_queues;
++
++	etm->data_queued = etm->queues.populated;
++
++	return 0;
++
++err_free_queues:
++	auxtrace_queues__free(&etm->queues);
++	session->auxtrace = NULL;
++err_free_etm:
++	zfree(&etm);
++
++	return -EINVAL;
++}
+diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
+index 3cc6bc3263fe..5ab6a8ef1b32 100644
+--- a/tools/perf/util/cs-etm.h
++++ b/tools/perf/util/cs-etm.h
+@@ -18,6 +18,9 @@
+ #ifndef INCLUDE__UTIL_PERF_CS_ETM_H__
+ #define INCLUDE__UTIL_PERF_CS_ETM_H__
+ 
++#include "util/event.h"
++#include "util/session.h"
++
+ /* Versionning header in case things need tro change in the future.  That way
+  * decoding of old snapshot is still possible.
+  */
+@@ -71,4 +74,16 @@ static const u64 __perf_cs_etmv4_magic   = 0x4040404040404040ULL;
+ #define CS_ETMV3_PRIV_SIZE (CS_ETM_PRIV_MAX * sizeof(u64))
+ #define CS_ETMV4_PRIV_SIZE (CS_ETMV4_PRIV_MAX * sizeof(u64))
+ 
++#ifdef HAVE_CSTRACE_SUPPORT
++int cs_etm__process_auxtrace_info(union perf_event *event,
++				  struct perf_session *session);
++#else
++static inline int
++cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
++			      struct perf_session *session __maybe_unused)
++{
++	return -1;
++}
++#endif
++
+ #endif
 -- 
-Julien Thierry
+2.7.4
