@@ -1,134 +1,75 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 17 Jan 2018 11:51:39 +0800
-Subject: [PATCHv<8> 3/3] ARM:drm ivip Intel FPGA Video and Image
- Processing Suite
-In-Reply-To: <1516011701-2748-4-git-send-email-hean.loong.ong@intel.com>
-References: <1516011701-2748-4-git-send-email-hean.loong.ong@intel.com>
-Message-ID: <201801171116.yNGtq4yI%fengguang.wu@intel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 16 Jan 2018 23:07:34 -0500 (EST)
+Subject: [PATCH] ARM: make memzero optimization smarter
+In-Reply-To: <CAK8P3a2bfErHxu2i-3JJpUdG64RSoYgmpip2xLAutiSSM9UEkw@mail.gmail.com>
+References: <20180116162905.1404585-1-arnd@arndb.de>
+ <nycvar.YSQ.7.76.1801161205560.13881@knanqh.ubzr>
+ <CAK8P3a2bfErHxu2i-3JJpUdG64RSoYgmpip2xLAutiSSM9UEkw@mail.gmail.com>
+Message-ID: <nycvar.YSQ.7.76.1801162150190.13881@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ong,
+On Tue, 16 Jan 2018, Arnd Bergmann wrote:
 
-Thank you for the patch! Yet something to improve:
+> On Tue, Jan 16, 2018 at 6:10 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 16 Jan 2018, Arnd Bergmann wrote:
+> >
+> >> However, we can avoid this class of bogus warnings for the memset() macro
+> >> by only doing the micro-optimization for zero-length arguments when the
+> >> length is a compile-time constant. This should also reduce code size by
+> >> a few bytes, and avoid an extra branch for the cases that a variable-length
+> >> argument is always nonzero, which is probably the common case anyway.
+> >>
+> >> I have made sure that the __memzero implementation can safely handle
+> >> a zero length argument.
+> >
+> > Why not simply drop the test on (__n) != 0 then? I fail to see what the
+> > advantage is in that case.
+> 
+> Good point. We might actually get even better results by dropping the
+> __memzero path entirely, since gcc has can optimize trivial memset()
+> operations and inline them.
+> 
+> If I read arch/arm/lib/memzero.S correctly, it saves exactly two 'orr'
+> instructions compared to the memset.S implementation, but calling
+> memset() rather than __memzero() from C code ends up saving a
+> function call at least some of the time.
+> 
+> Building a defconfig kernel with gcc-7.2.1, I see 1919 calls to __memzero()
+> and 636 calls to memset() in vmlinux. If I remove the macro entirely,
+> I get 1775 calls to memset() instead, so 780 memzero instances got
+> inlined, and kernel shrinks by 5488 bytes (0.03%), not counting the
+> __memzero implementation that we could possibly also drop.
 
-[auto build test ERROR on drm/drm-next]
-[also build test ERROR on v4.15-rc8 next-20180116]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I get 3668 fewer bytes just by removing the test against 0 in the macro.
 
-url:    https://github.com/0day-ci/linux/commits/Hean-Loong-Ong/Intel-FPGA-Video-and-Image-Processing-Suite/20180117-103626
-base:   git://people.freedesktop.org/~airlied/linux.git drm-next
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+And an additional 5092 fewer bytes by removing the call-to-__memzero 
+optimization.
 
-All error/warnings (new ones prefixed by >>):
+That's using gcc v6.3.1.
 
-   In file included from include/linux/cdev.h:8:0,
-                    from include/drm/drmP.h:36,
-                    from drivers/gpu/drm/ivip/intel_vip_core.c:24:
-   drivers/gpu/drm/ivip/intel_vip_core.c: In function 'intelvipfb_enable':
->> drivers/gpu/drm/ivip/intel_vip_core.c:57:33: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
-     dev_info(pipe->plane.dev->dev, "Address 0x%x\n", addr);
-                                    ^
-   include/linux/device.h:1355:51: note: in definition of macro 'dev_info'
-    #define dev_info(dev, fmt, arg...) _dev_info(dev, fmt, ##arg)
-                                                      ^~~
-   drivers/gpu/drm/ivip/intel_vip_core.c: At top level:
->> drivers/gpu/drm/ivip/intel_vip_core.c:76:15: error: 'drm_fb_cma_create' undeclared here (not in a function); did you mean 'drm_gem_cma_create'?
-     .fb_create = drm_fb_cma_create,
-                  ^~~~~~~~~~~~~~~~~
-                  drm_gem_cma_create
-   drivers/gpu/drm/ivip/intel_vip_core.c: In function 'intelvipfb_pipe_prepare_fb':
->> drivers/gpu/drm/ivip/intel_vip_core.c:90:9: error: implicit declaration of function 'drm_fb_cma_prepare_fb'; did you mean 'drm_fb_cma_get_gem_obj'? [-Werror=implicit-function-declaration]
-     return drm_fb_cma_prepare_fb(&pipe->plane, plane_state);
-            ^~~~~~~~~~~~~~~~~~~~~
-            drm_fb_cma_get_gem_obj
-   cc1: some warnings being treated as errors
+> FWIW, the zero-length check saves five references to __memzero()
+> and one reference to memset(), or 16 bytes in kernel size, I have not
+> checked what those are.
 
-vim +76 drivers/gpu/drm/ivip/intel_vip_core.c
+They apparently are:
 
-  > 24	#include <drm/drmP.h>
-    25	#include <drm/drm_atomic.h>
-    26	#include <drm/drm_atomic_helper.h>
-    27	#include <drm/drm_crtc_helper.h>
-    28	#include <drm/drm_fb_helper.h>
-    29	#include <drm/drm_fb_cma_helper.h>
-    30	#include <drm/drm_gem_cma_helper.h>
-    31	#include <drm/drm_plane_helper.h>
-    32	#include <drm/drm_simple_kms_helper.h>
-    33	
-    34	#include <linux/init.h>
-    35	#include <linux/kernel.h>
-    36	#include <linux/module.h>
-    37	
-    38	#include "intel_vip_drv.h"
-    39	
-    40	static void intelvipfb_enable(struct drm_simple_display_pipe *pipe,
-    41		       struct drm_crtc_state *crtc_state)
-    42	{
-    43		/*
-    44		 * The frameinfo variable has to correspond to the size of the VIP Suite
-    45		 * Frame Reader register 7 which will determine the maximum size used
-    46		 * in this frameinfo
-    47		 */
-    48	
-    49		u32 frameinfo;
-    50		struct intelvipfb_priv *priv = pipe->plane.dev->dev_private;
-    51		void __iomem *base = priv->base;
-    52		struct drm_plane_state *state = pipe->plane.state;
-    53		dma_addr_t addr;
-    54	
-    55		addr = drm_fb_cma_get_gem_addr(state->fb, state, 0);
-    56	
-  > 57		dev_info(pipe->plane.dev->dev, "Address 0x%x\n", addr);
-    58	
-    59		frameinfo =
-    60			readl(base + INTELVIPFB_FRAME_READER) & 0x00ffffff;
-    61		writel(frameinfo, base + INTELVIPFB_FRAME_INFO);
-    62		writel(addr, base + INTELVIPFB_FRAME_START);
-    63		/* Finally set the control register to 1 to start streaming */
-    64		writel(1, base + INTELVIPFB_CONTROL);
-    65	}
-    66	
-    67	static void intelvipfb_disable(struct drm_simple_display_pipe *pipe)
-    68	{
-    69		struct intelvipfb_priv *priv = pipe->plane.dev->dev_private;
-    70		void __iomem *base = priv->base;
-    71		/* set the control register to 0 to stop streaming */
-    72		writel(0, base + INTELVIPFB_CONTROL);
-    73	}
-    74	
-    75	static const struct drm_mode_config_funcs intelvipfb_mode_config_funcs = {
-  > 76		.fb_create = drm_fb_cma_create,
-    77		.atomic_check = drm_atomic_helper_check,
-    78		.atomic_commit = drm_atomic_helper_commit,
-    79	};
-    80	
-    81	static void intelvipfb_setup_mode_config(struct drm_device *drm)
-    82	{
-    83		drm_mode_config_init(drm);
-    84		drm->mode_config.funcs = &intelvipfb_mode_config_funcs;
-    85	}
-    86	
-    87	static int intelvipfb_pipe_prepare_fb(struct drm_simple_display_pipe *pipe,
-    88						struct drm_plane_state *plane_state)
-    89	{
-  > 90		return drm_fb_cma_prepare_fb(&pipe->plane, plane_state);
-    91	}
-    92	
+security/keys/key.c:1117:2:
+  memset(&ktype->lock_class, 0, sizeof(ktype->lock_class));
+crypto/drbg.c:615:3:
+   memset(drbg->V, 1, drbg_statelen(drbg));
+crypto/drbg.c:1120:3:
+   memset(drbg->V, 0, drbg_statelen(drbg));
+crypto/drbg.c:1121:3:
+   memset(drbg->C, 0, drbg_statelen(drbg));
+drivers/crypto/bcm/cipher.c:1963:2:
+  memset(ctx->bcm_spu_req_hdr, 0, alloc_len);
+drivers/media/platform/vivid/vivid-vbi-cap.c:106:2:
+  memset(vbuf, 0x10, vb2_plane_size(&buf->vb.vb2_buf, 0));
+drivers/media/platform/vivid/vivid-vbi-cap.c:127:2:
+  memset(vbuf, 0, vb2_plane_size(&buf->vb.vb2_buf, 0));
+drivers/gpu/drm/nouveau/nvkm/subdev/bios/conn.c:50:2:
+  memset(info, 0x00, sizeof(*info));
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 49851 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180117/391412dd/attachment-0001.gz>
+
+Nicolas
