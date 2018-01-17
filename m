@@ -1,35 +1,37 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 17 Jan 2018 10:40:03 +0100
-Subject: [PATCH] ARM: dts: stm32: Add leds support to stm32f769 Discovery board
+Date: Wed, 17 Jan 2018 10:40:05 +0100
+Subject: [PATCH] ARM: dts: stm32: Add push button to stm32f769 Discovery board
 In-Reply-To: <20180117094005.20728-1-benjamin.gaignard@st.com>
 References: <20180117094005.20728-1-benjamin.gaignard@st.com>
-Message-ID: <20180117094005.20728-2-benjamin.gaignard@st.com>
+Message-ID: <20180117094005.20728-4-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the two user leds.
+Add node for user push button.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- arch/arm/boot/dts/stm32f769-disco.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/stm32f769-disco.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-index 4463ca13a740..25a4b71f0317 100644
+index 25a4b71f0317..8b3e1b518570 100644
 --- a/arch/arm/boot/dts/stm32f769-disco.dts
 +++ b/arch/arm/boot/dts/stm32f769-disco.dts
-@@ -61,6 +61,16 @@
- 		serial0 = &usart1;
+@@ -71,6 +71,18 @@
+ 			gpios = <&gpioj 13 0>;
+ 		};
  	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		green {
-+			gpios = <&gpioj 5 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+		red {
-+			gpios = <&gpioj 13 0>;
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		autorepeat;
++		button at 0 {
++			label = "User";
++			linux,code = <KEY_HOME>;
++			gpios = <&gpioa 0 0>;
 +		};
 +	};
  };
