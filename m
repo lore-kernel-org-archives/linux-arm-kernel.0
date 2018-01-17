@@ -1,18 +1,24 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 17 Jan 2018 13:23:33 +0900
-Subject: [PATCH v2 02/13] iommu/rockchip: Suppress unbinding
-In-Reply-To: <20180116132540.18939-3-jeffy.chen@rock-chips.com>
-References: <20180116132540.18939-1-jeffy.chen@rock-chips.com>
- <20180116132540.18939-3-jeffy.chen@rock-chips.com>
-Message-ID: <CAAFQd5C_d2JW6kPQOMQ=mB6kHMdNZQGFvamjaDhexoPD_4W7+A@mail.gmail.com>
+From: figure1802@126.com (FF)
+Date: Wed, 17 Jan 2018 12:13:08 +0800 (CST)
+Subject: [PATCH v3 07/20] arm64: mm: Allocate ASIDs in pairs
+In-Reply-To: <27699ff3.2a02.160fcc87182.Coremail.figure1802@126.com>
+References: <27699ff3.2a02.160fcc87182.Coremail.figure1802@126.com>
+Message-ID: <40f9df1.48df.161025212b6.Coremail.figure1802@126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 10:25 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> It's not safe to unbind rockchip IOMMU driver.
 
-Might be good to explain why it is not safe and actually add that it
-does not make any sense for such low level devices.
+At 2018-01-16 10:24:42, "FF" <figure1802@126.com> wrote:
+>hi?all:
+>why we use two? ASID for a?process? what is the benefits?
+>After KPTI, the kernel?space?mapping?become?non-Global TLB (process-specific TLB)? so we need?one ASID for? process?running in?userspace?
+>and other ASID?for process?running in?kernel?space? it will?switch the ASID when a process? switching?to/form?userpsace?
+>
+>
+>what is the benefits add?exception trampoline page? it will performance regression?
+>
 
-Best regards,
-Tomasz
+anyone can help to confirm?
+
+Thanks,
+FF
