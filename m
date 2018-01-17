@@ -1,35 +1,49 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 17 Jan 2018 16:02:56 +0100
-Subject: [PATCH] clk: imx: pllv2: avoid using uninitialized values
-Message-ID: <20180117150256.7430-1-l.stach@pengutronix.de>
+From: jmarchan@redhat.com (Jerome Marchand)
+Date: Wed, 17 Jan 2018 16:03:13 +0100
+Subject: [PATCH v3] arm64: fix unwind_frame() for filtered out fn for
+ function graph tracing
+In-Reply-To: <20180116175734.4rp4bewr7us4jypk@armageddon.cambridge.arm.com>
+References: <20180112104832.9417-1-jmarchan@redhat.com>
+ <20180116175734.4rp4bewr7us4jypk@armageddon.cambridge.arm.com>
+Message-ID: <ae2880e9-0d59-19fc-0d1f-80c2f011415f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forward the errors returned by __clk_pllv2_set_rate() in the recalc rate
-function, to avoid using uninitialized values for the rate calculation.
+On 16/01/18 18:57, Catalin Marinas wrote:
+> On Fri, Jan 12, 2018 at 11:48:32AM +0100, Jerome Marchand wrote:
+>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>> index 76809ccd309c..5a528c58ef68 100644
+>> --- a/arch/arm64/kernel/stacktrace.c
+>> +++ b/arch/arm64/kernel/stacktrace.c
+>> @@ -59,6 +59,10 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+>>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>>  	if (tsk->ret_stack &&
+>>  			(frame->pc == (unsigned long)return_to_handler)) {
+>> +		WARN_ON(frame->graph == -1);
+>> +		if (frame->graph < -1)
+>> +			frame->graph += FTRACE_NOTRACE_DEPTH;
+>> +
+>>  		/*
+>>  		 * This is a case where function graph tracer has
+>>  		 * modified a return address (LR) in a stack frame
+> 
+> So do we still allow this to continue if graph == -1? The following line
+> doesn't seem safe:
+> 
+> 		frame->pc = tsk->ret_stack[frame->graph--].ret;
+> 
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/clk/imx/clk-pllv2.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+You're right. We probably should return a error (-EINVAL I guess) if
+this happens. Note that this shouldn't happen here and if we're
+confident enough that profile_pc() was the only faulty caller, we could
+just drop the warning.
 
-diff --git a/drivers/clk/imx/clk-pllv2.c b/drivers/clk/imx/clk-pllv2.c
-index 85b5cbe9744c..eeba3cb14e2d 100644
---- a/drivers/clk/imx/clk-pllv2.c
-+++ b/drivers/clk/imx/clk-pllv2.c
-@@ -182,8 +182,12 @@ static long clk_pllv2_round_rate(struct clk_hw *hw, unsigned long rate,
- 		unsigned long *prate)
- {
- 	u32 dp_op, dp_mfd, dp_mfn;
-+	int ret;
-+
-+	ret = __clk_pllv2_set_rate(rate, *prate, &dp_op, &dp_mfd, &dp_mfn);
-+	if (ret)
-+		return ret;
- 
--	__clk_pllv2_set_rate(rate, *prate, &dp_op, &dp_mfd, &dp_mfn);
- 	return __clk_pllv2_recalc_rate(*prate, MXC_PLL_DP_CTL_DPDCK0_2_EN,
- 			dp_op, dp_mfd, dp_mfn);
- }
--- 
-2.11.0
+Jerome
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180117/2bb52dbe/attachment.sig>
