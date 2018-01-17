@@ -1,75 +1,27 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 17 Jan 2018 11:10:54 -0800
-Subject: per-task stack canaries for arm64
-In-Reply-To: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
-References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
-Message-ID: <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 17 Jan 2018 20:23:01 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: suppress MSI allocation failure message
+In-Reply-To: <66706458-d971-be9b-4390-80a9be39248c@arm.com>
+References: <1516214399-24012-1-git-send-email-nwatters@codeaurora.org>
+ <2f651cfe-e006-cf1d-b624-08e2ba5340fc@arm.com>
+ <66706458-d971-be9b-4390-80a9be39248c@arm.com>
+Message-ID: <20180117192301.GV28161@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Hi all,
->
-> This is a followup to a discussion I had with Ramana in San Francisco
-> 5 months ago. Apologies for the tardiness.
+On Wed, Jan 17, 2018 at 07:08:39PM +0000, Marc Zyngier wrote:
+> On 17/01/18 18:54, Robin Murphy wrote:
 
-Link to prior discussion, just for anyone following along:
-https://lkml.org/lkml/2017/6/27/227
+> Indeed. How about checking dev->msi_domain first, which should tell you
+> whether it is even possible to allocate MSIs, and fallback to wired IRQs
+> instead. That way, we keep the warning on genuine failures to allocate
+> MSIs, and you get to add a nice "Falling back to wired interrupts"
+> message when msi_domain is NULL.
+> 
+> Thoughts?
 
-> The topic of the discussion was compiler support for per-task stack
-> cookies in the arm64 kernel. From the compiler side, this would simply
-> entail offsetting the address of __stack_chk_guard with value held in
-> tpidr_el1, so we can make it a per-CPU variable.
+That sounds much better then the proposed patch. I am not really interested
+in changing log-levels to make test-tools happy.
 
-AIUI, some progress was made on this recently, and is somewhat discussed here:
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81490
-and spawned this:
-https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
-which was done for x86 only, and provides both:
-  -mstack-protector-guard-symbol=...
-  -mstack-protector-guard-reg=...
 
-If this could be extended to arm64, I think we'd be in good shape (and
-it could be trivially detected at build time).
-
-> On the kernel side,
-> we would need fairly straight-forward plumbing to detect the compiler
-> support, and switching to a per-CPU variable when supported. Beyond
-> that, we need to update the per-CPU value at context switch time, and
-> perhaps some handling of the initial state when per-CPU variables are
-> initialized.
-
-Right. My mental list has been:
-
-We'll need to adjust how __stack_chk_guard is defined (and tweak
-boot_init_stack_canary()).
-
-x86 makes the canary updates in arch/x86/entry/entry_*.S as part of
-__switch_to's __switch_to_asm. Looks like arm64 would do it in
-arch/arm64/kernel/entry.S cpu_switch_to?
-
-x86 does percpu init in arch/x86/kernel/setup_percpu.c. I'm not sure
-where this needs to happen in arm64.
-
-> Ramana indicated at the time that he would be up for adding, e.g.,
-> -fstack-protector-linux-kernel as a command line option, and add the
-> contents of tpidr_el1 to every reference of __stack_chk_guard when
-> set.
-
-I think we want to reuse the command-line names from the x86 options
-above, unless there's a good reason not to?
-
-> Would this be sufficient to implement this from the kernel side? Am I
-> missing anything here? I am missing the cross-arch context entirely,
-> so are there things we should take into account and/or learn from?
->
-> Comments welcome.
-
-I think it's very close, yes. Thanks for poking at this!
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+	Joerg
