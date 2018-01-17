@@ -1,119 +1,64 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 17 Jan 2018 15:41:13 +0100
-Subject: [PATCH 5/5]  arm: zynq: Add support for Xilinx zc770 xm013 dc4 board
-In-Reply-To: <cover.1516200065.git.michal.simek@xilinx.com>
-References: <cover.1516200065.git.michal.simek@xilinx.com>
-Message-ID: <3be3cd00b710827da46817693748eb6bcee00f82.1516200065.git.michal.simek@xilinx.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 17 Jan 2018 14:44:32 +0000
+Subject: [PATCH v3 08/41] KVM: arm/arm64: Introduce vcpu_el1_is_32bit
+In-Reply-To: <20180112120747.27999-9-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-9-christoffer.dall@linaro.org>
+Message-ID: <4a3fa63c-5925-e406-26dd-da4e9765e7fa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-zc770 is based board which is extended by FMC/DC cards for SoC
-validation. FMCs/DCs are supposed to cover all SoC configurations.
-FMC/DC contains can, ethernet, i2c, qspi, spi and uart.
+Hi Christoffer,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+On 12/01/18 12:07, Christoffer Dall wrote:
+> We have numerous checks around that checks if the HCR_EL2 has the RW bit
+> set to figure out if we're running an AArch64 or AArch32 VM.  In some
+> cases, directly checking the RW bit (given its unintuitive name), is a
+> bit confusing, and that's not going to improve as we move logic around
+> for the following patches that optimize KVM on AArch64 hosts with VHE.
+> 
+> Therefore, introduce a helper, vcpu_el1_is_32bit, and replace existing
+> direct checks of HCR_EL2.RW with the helper.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm64/include/asm/kvm_emulate.h | 7 ++++++-
+>   arch/arm64/kvm/hyp/switch.c          | 8 ++------
+>   arch/arm64/kvm/hyp/sysreg-sr.c       | 5 +++--
+>   arch/arm64/kvm/inject_fault.c        | 6 +++---
+>   4 files changed, 14 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index b36aaa1fe332..e07bf463ac58 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -45,6 +45,11 @@ void kvm_inject_undef32(struct kvm_vcpu *vcpu);
+>   void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+>   void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+>   
+> +static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
+> +{
+> +	return !(vcpu->arch.hcr_el2 & HCR_RW);
+> +}
+> +
 
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/zynq-zc770-xm013.dts | 78 ++++++++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
- create mode 100644 arch/arm/boot/dts/zynq-zc770-xm013.dts
+Just so I understand, the difference between this and vcpu_mode_is_32bit 
+is that vcpu_mode_is_32bit might return true because an 
+interrupt/exception occured while guest was executing 32bit EL0 but 
+guest EL1 is still 64bits, is that correct?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 6bd4b9a29511..44be37afa544 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1044,6 +1044,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
- 	zynq-zc770-xm010.dtb \
- 	zynq-zc770-xm011.dtb \
- 	zynq-zc770-xm012.dtb \
-+	zynq-zc770-xm013.dtb \
- 	zynq-zed.dtb \
- 	zynq-zybo.dtb
- dtb-$(CONFIG_MACH_ARMADA_370) += \
-diff --git a/arch/arm/boot/dts/zynq-zc770-xm013.dts b/arch/arm/boot/dts/zynq-zc770-xm013.dts
-new file mode 100644
-index 000000000000..ad3e1d108a9b
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-zc770-xm013.dts
-@@ -0,0 +1,78 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Xilinx ZC770 XM013 board DTS
-+ *
-+ * Copyright (C) 2013 Xilinx, Inc.
-+ */
-+/dts-v1/;
-+#include "zynq-7000.dtsi"
-+
-+/ {
-+	compatible = "xlnx,zynq-zc770-xm013", "xlnx,zynq-7000";
-+	model = "Xilinx Zynq";
-+
-+	aliases {
-+		ethernet0 = &gem1;
-+		i2c0 = &i2c1;
-+		serial0 = &uart0;
-+		spi1 = &spi0;
-+	};
-+
-+	chosen {
-+		bootargs = "";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&gem1 {
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+	phy-handle = <&ethernet_phy>;
-+
-+	ethernet_phy: ethernet-phy at 7 {
-+		reg = <7>;
-+		device_type = "ethernet-phy";
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	si570: clock-generator at 55 {
-+		#clock-cells = <0>;
-+		compatible = "silabs,si570";
-+		temperature-stability = <50>;
-+		reg = <0x55>;
-+		factory-fout = <156250000>;
-+		clock-frequency = <148500000>;
-+	};
-+};
-+
-+&spi0 {
-+	status = "okay";
-+	num-cs = <4>;
-+	is-decoded-cs = <0>;
-+	eeprom: at25 at 0 {
-+		at25,byte-len = <8192>;
-+		at25,addr-mode = <2>;
-+		at25,page-size = <32>;
-+
-+		compatible = "atmel,at25";
-+		reg = <2>;
-+		spi-max-frequency = <1000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
+Also, it seems the process controlling KVM is supposed to provide the 
+information of whether the vcpu runs a 32bit el1, would it be better to do:
+
+	return test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features);
+
+instead of looking at the hcr? Or is there a case where those might differ?
+
+Otherwise:
+
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Cheers,
+
 -- 
-1.9.1
+Julien Thierry
