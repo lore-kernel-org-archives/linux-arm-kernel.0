@@ -1,36 +1,23 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Jan 2018 13:39:18 +0000
-Subject: [PATCH 1/2] iommu/msm: Claim bus ops on probe
-In-Reply-To: <20180117133331.vidtyduiu7zr3fwc@8bytes.org>
-References: <f1a506337bf602c54f4d6d417c14ca556a5f3674.1515436860.git.robin.murphy@arm.com>
- <20180117133331.vidtyduiu7zr3fwc@8bytes.org>
-Message-ID: <bc83496f-f0c0-6fe7-acd4-b96526a81dc3@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 17 Jan 2018 14:41:46 +0100
+Subject: [PATCH v2 2/3] iommu/ipmmu-vmsa: Remove redundant
+ of_iommu_init_fn hook
+In-Reply-To: <12163854e04da92b5de586912bf7257fc0fed79a.1515512134.git.robin.murphy@arm.com>
+References: <da664cf8f60c77cbb657cc2e3849560604eaf6da.1515512134.git.robin.murphy@arm.com>
+ <12163854e04da92b5de586912bf7257fc0fed79a.1515512134.git.robin.murphy@arm.com>
+Message-ID: <20180117134146.fcf2dammcuoowiks@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 13:33, Joerg Roedel wrote:
-> On Mon, Jan 08, 2018 at 06:42:30PM +0000, Robin Murphy wrote:
->> Since the MSM IOMMU driver now probes via DT exclusively rather than
->> platform data, dependent masters should be deferred until the IOMMU
->> itself is ready. Thus we can do away with the early initialisation
->> hook to unconditionally claim the bus ops, and instead do that only
->> once an IOMMU is actually probed. Furthermore, this should also make
->> the driver safe for multiplatform kernels on non-MSM SoCs.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On Tue, Jan 09, 2018 at 04:17:26PM +0000, Robin Murphy wrote:
+> Having of_iommu_init() call ipmmu_init() via ipmmu_vmsa_iommu_of_setup()
+> does nothing that the subsys_initcall wouldn't do slightly later anyway,
+> since probe-deferral of masters means it is no longer critical to
+> register the driver super-early. Clean it up.
 > 
-> Applied both, thanks Robin.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 
-Oops, patch #2 of this series will break the build, as it was 
-accidentally based on an older branch missing the Renesas IPMMU updates. 
-Please see v2 [1] - I'm still hoping for confirmation from the Renesas 
-folks, but it *should* be fine...
+Applied this one, thanks.
 
-Incidentally, per your other mail, these changes also makes Jeffy's 
-"Only do IOMMU lookup for available ones" patch obsolete.
-
-Sorry for the mess,
-Robin.
-
-[1] 
-https://lists.linuxfoundation.org/pipermail/iommu/2018-January/025395.html
+The other two are already applied now from your first post.
