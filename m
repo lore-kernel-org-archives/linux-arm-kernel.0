@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 17 Jan 2018 17:17:06 +0100
-Subject: [PATCH v2 05/16] ARM: dts: r8a7791: consistently use single space
+Date: Wed, 17 Jan 2018 17:17:02 +0100
+Subject: [PATCH v2 01/16] ARM: dts: r8a7790: consistently use single space
  after =
 In-Reply-To: <20180117161717.14589-1-horms+renesas@verge.net.au>
 References: <20180117161717.14589-1-horms+renesas@verge.net.au>
-Message-ID: <20180117161717.14589-6-horms+renesas@verge.net.au>
+Message-ID: <20180117161717.14589-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,31 +19,31 @@ This patch should not introduce any functional change.
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 v2
-* New patch
+* Consistently use tabs for indentation as much as possible
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 75 +++++++++++++++++++++---------------------
+ arch/arm/boot/dts/r8a7790.dtsi | 75 +++++++++++++++++++++---------------------
  1 file changed, 38 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8266a9b7cafd..38a9b8cb736d 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -237,9 +237,9 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 13926fc7abfa..b4306f7c1bbb 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -291,9 +291,9 @@
  	};
  
  	thermal: thermal at e61f0000 {
--		compatible =	"renesas,thermal-r8a7791",
+-		compatible =	"renesas,thermal-r8a7790",
 -				"renesas,rcar-gen2-thermal",
 -				"renesas,rcar-thermal";
-+		compatible = "renesas,thermal-r8a7791",
++		compatible = "renesas,thermal-r8a7790",
 +			     "renesas,rcar-gen2-thermal",
 +			     "renesas,rcar-thermal";
  		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
  		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&cpg CPG_MOD 522>;
-@@ -375,20 +375,20 @@
+@@ -423,20 +423,20 @@
  	audma0: dma-controller at ec700000 {
- 		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
+ 		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
  		reg = <0 0xec700000 0 0x10000>;
 -		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
 -				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
@@ -76,9 +76,9 @@ index 8266a9b7cafd..38a9b8cb736d 100644
  		interrupt-names = "error",
  				"ch0", "ch1", "ch2", "ch3",
  				"ch4", "ch5", "ch6", "ch7",
-@@ -405,20 +405,20 @@
+@@ -453,20 +453,20 @@
  	audma1: dma-controller at ec720000 {
- 		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
+ 		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
  		reg = <0 0xec720000 0 0x10000>;
 -		interrupts =	<GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
 -				 GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
@@ -111,17 +111,17 @@ index 8266a9b7cafd..38a9b8cb736d 100644
  		interrupt-names = "error",
  				"ch0", "ch1", "ch2", "ch3",
  				"ch4", "ch5", "ch6", "ch7",
-@@ -1487,12 +1487,13 @@
+@@ -1437,12 +1437,13 @@
  		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
  		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
  		 */
--		compatible =  "renesas,rcar_sound-r8a7791", "renesas,rcar_sound-gen2";
+-		compatible =  "renesas,rcar_sound-r8a7790", "renesas,rcar_sound-gen2";
 -		reg =	<0 0xec500000 0 0x1000>, /* SCU */
 -			<0 0xec5a0000 0 0x100>,  /* ADG */
 -			<0 0xec540000 0 0x1000>, /* SSIU */
 -			<0 0xec541000 0 0x280>,  /* SSI */
 -			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
-+		compatible = "renesas,rcar_sound-r8a7791",
++		compatible = "renesas,rcar_sound-r8a7790",
 +			     "renesas,rcar_sound-gen2";
 +		reg = <0 0xec500000 0 0x1000>, /* SCU */
 +		      <0 0xec5a0000 0 0x100>,  /* ADG */
