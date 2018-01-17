@@ -1,55 +1,40 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 17 Jan 2018 10:05:56 +0000
-Subject: [PATCH] arm64: Run enable method for errata work arounds on late CPUs
-Message-ID: <20180117100556.29270-1-suzuki.poulose@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Jan 2018 10:07:15 +0000
+Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
+ predictor against aliasing attacks
+In-Reply-To: <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+ <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
+Message-ID: <20180117100715.GA27892@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is brought up after we have finalised the system
-wide capabilities (i.e, features and errata), we make sure the
-new CPU doesn't need a new errata work around which has not been
-detected already. However we don't run enable() method on the new
-CPU for the errata work arounds already detected. This could
-cause the new CPU running without potential work arounds.
-It is upto the "enable()" method to decide if this CPU should
-do something about the errata.
+On Wed, Jan 17, 2018 at 12:10:33PM +0800, Yisheng Xie wrote:
+> Hi Will,
+> 
+> On 2018/1/5 21:12, Will Deacon wrote:
+> > diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+> > index 5f7097d0cd12..d99b36555a16 100644
+> > --- a/arch/arm64/mm/context.c
+> > +++ b/arch/arm64/mm/context.c
+> > @@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
+> >  			"ic iallu; dsb nsh; isb",
+> >  			ARM64_WORKAROUND_CAVIUM_27456,
+> >  			CONFIG_CAVIUM_ERRATUM_27456));
+> > +
+> > +	arm64_apply_bp_hardening();
+> >  }
+> 
+> post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
+> means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
+> when mm_swtich and kernel_exit?
+> 
+> From the code logical, it seems not only related to erratum 2745 anymore?
+> should it be renamed?
 
-Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpu_errata.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+post_ttbr_update_workaround just runs code after a TTBR update, which
+includes mitigations against variant 2 of "spectre" and also a workaround
+for a Cavium erratum. These are separate issues.
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 90a9e465339c..54e41dfe41f6 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
- {
- 	const struct arm64_cpu_capabilities *caps = arm64_errata;
- 
--	for (; caps->matches; caps++)
--		if (!cpus_have_cap(caps->capability) &&
--			caps->matches(caps, SCOPE_LOCAL_CPU)) {
-+	for (; caps->matches; caps++) {
-+		if (cpus_have_cap(caps->capability)) {
-+			if (caps->enable)
-+				caps->enable((void *)caps);
-+		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
- 			pr_crit("CPU%d: Requires work around for %s, not detected"
- 					" at boot time\n",
- 				smp_processor_id(),
- 				caps->desc ? : "an erratum");
- 			cpu_die_early();
- 		}
-+	}
- }
- 
- void update_cpu_errata_workarounds(void)
--- 
-2.13.6
+Will
