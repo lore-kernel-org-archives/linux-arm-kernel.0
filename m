@@ -1,95 +1,111 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 17 Jan 2018 17:55:44 +0100
-Subject: [net-next: PATCH v3 5/7] net: mvpp2: simplify maintaining enabled
- ports' list
+Date: Wed, 17 Jan 2018 17:55:40 +0100
+Subject: [net-next: PATCH v3 1/7] device property: Introduce
+ fwnode_get_mac_address()
 In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
 References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-Message-ID: <1516208146-4144-6-git-send-email-mw@semihalf.com>
+Message-ID: <1516208146-4144-2-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'port_count' field of the mvpp2 structure holds an overall amount
-of available ports, based on DT nodes status. In order to be prepared
-to support other HW description, obtain the value by incrementing it
-upon each successful port initialization. This allowed for simplifying
-port indexing in the controller's private array, whose size is now not
-dynamically allocated, but fixed to MVPP2_MAX_PORTS.
+Until now there were two almost identical functions for
+obtaining MAC address - of_get_mac_address() and, more generic,
+device_get_mac_address(). However it is not uncommon,
+that the network interface is represented as a child
+of the actual controller, hence it is not associated
+directly to any struct device, required by the latter
+routine.
 
-This patch simplifies creating and filling list of enabled ports and
-is a part of the preparation for adding ACPI support in the mvpp2 driver.
+This commit allows for getting the MAC address for
+children nodes in the ACPI world by introducing a new function -
+fwnode_get_mac_address(). This commit also changes
+device_get_mac_address() routine to be its wrapper, in order
+to prevent unnecessary duplication.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 32 +++++++-------------
- 1 file changed, 11 insertions(+), 21 deletions(-)
+ drivers/base/property.c  | 28 ++++++++++++++------
+ include/linux/property.h |  2 ++
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index a197607..7f42d90 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -865,7 +865,7 @@ struct mvpp2 {
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index 851b1b6..f261d1a 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -1153,11 +1153,11 @@ int device_get_phy_mode(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(device_get_phy_mode);
  
- 	/* List of pointers to port structures */
- 	int port_count;
--	struct mvpp2_port **port_list;
-+	struct mvpp2_port *port_list[MVPP2_MAX_PORTS];
- 
- 	/* Aggregated TXQs */
- 	struct mvpp2_tx_queue *aggr_txqs;
-@@ -7741,7 +7741,7 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
- /* Ports initialization */
- static int mvpp2_port_probe(struct platform_device *pdev,
- 			    struct device_node *port_node,
--			    struct mvpp2 *priv, int index)
-+			    struct mvpp2 *priv)
+-static void *device_get_mac_addr(struct device *dev,
++static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
+ 				 const char *name, char *addr,
+ 				 int alen)
  {
- 	struct device_node *phy_node;
- 	struct phy *comphy;
-@@ -7934,7 +7934,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	}
- 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
+-	int ret = device_property_read_u8_array(dev, name, addr, alen);
++	int ret = fwnode_property_read_u8_array(fwnode, name, addr, alen);
  
--	priv->port_list[index] = port;
-+	priv->port_list[priv->port_count++] = port;
+ 	if (ret == 0 && alen == ETH_ALEN && is_valid_ether_addr(addr))
+ 		return addr;
+@@ -1165,8 +1165,8 @@ static void *device_get_mac_addr(struct device *dev,
+ }
+ 
+ /**
+- * device_get_mac_address - Get the MAC for a given device
+- * @dev:	Pointer to the device
++ * fwnode_get_mac_address - Get the MAC from the firmware node
++ * @fwnode:	Pointer to the firmware node
+  * @addr:	Address of buffer to store the MAC in
+  * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
+  *
+@@ -1187,19 +1187,31 @@ static void *device_get_mac_addr(struct device *dev,
+  * In this case, the real MAC is in 'local-mac-address', and 'mac-address'
+  * exists but is all zeros.
+ */
+-void *device_get_mac_address(struct device *dev, char *addr, int alen)
++void *fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr, int alen)
+ {
+ 	char *res;
+ 
+-	res = device_get_mac_addr(dev, "mac-address", addr, alen);
++	res = fwnode_get_mac_addr(fwnode, "mac-address", addr, alen);
+ 	if (res)
+ 		return res;
+ 
+-	res = device_get_mac_addr(dev, "local-mac-address", addr, alen);
++	res = fwnode_get_mac_addr(fwnode, "local-mac-address", addr, alen);
+ 	if (res)
+ 		return res;
+ 
+-	return device_get_mac_addr(dev, "address", addr, alen);
++	return fwnode_get_mac_addr(fwnode, "address", addr, alen);
++}
++EXPORT_SYMBOL(fwnode_get_mac_address);
 +
- 	return 0;
++/**
++ * device_get_mac_address - Get the MAC for a given device
++ * @dev:	Pointer to the device
++ * @addr:	Address of buffer to store the MAC in
++ * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
++ */
++void *device_get_mac_address(struct device *dev, char *addr, int alen)
++{
++	return fwnode_get_mac_address(dev_fwnode(dev), addr, alen);
+ }
+ EXPORT_SYMBOL(device_get_mac_address);
  
- err_free_port_pcpu:
-@@ -8313,28 +8314,17 @@ static int mvpp2_probe(struct platform_device *pdev)
- 		goto err_mg_clk;
- 	}
+diff --git a/include/linux/property.h b/include/linux/property.h
+index f6189a3..35620e0 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -279,6 +279,8 @@ int device_get_phy_mode(struct device *dev);
  
--	priv->port_count = of_get_available_child_count(dn);
--	if (priv->port_count == 0) {
--		dev_err(&pdev->dev, "no ports enabled\n");
--		err = -ENODEV;
--		goto err_mg_clk;
--	}
--
--	priv->port_list = devm_kcalloc(&pdev->dev, priv->port_count,
--				       sizeof(*priv->port_list),
--				       GFP_KERNEL);
--	if (!priv->port_list) {
--		err = -ENOMEM;
--		goto err_mg_clk;
--	}
--
- 	/* Initialize ports */
--	i = 0;
- 	for_each_available_child_of_node(dn, port_node) {
--		err = mvpp2_port_probe(pdev, port_node, priv, i);
-+		err = mvpp2_port_probe(pdev, port_node, priv);
- 		if (err < 0)
- 			goto err_port_probe;
--		i++;
-+	}
-+
-+	if (priv->port_count == 0) {
-+		dev_err(&pdev->dev, "no ports enabled\n");
-+		err = -ENODEV;
-+		goto err_mg_clk;
- 	}
+ void *device_get_mac_address(struct device *dev, char *addr, int alen);
  
- 	/* Statistics must be gathered regularly because some of them (like
++void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
++			     char *addr, int alen);
+ struct fwnode_handle *fwnode_graph_get_next_endpoint(
+ 	const struct fwnode_handle *fwnode, struct fwnode_handle *prev);
+ struct fwnode_handle *
 -- 
 2.7.4
