@@ -1,64 +1,33 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 17 Jan 2018 14:44:32 +0000
-Subject: [PATCH v3 08/41] KVM: arm/arm64: Introduce vcpu_el1_is_32bit
-In-Reply-To: <20180112120747.27999-9-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-9-christoffer.dall@linaro.org>
-Message-ID: <4a3fa63c-5925-e406-26dd-da4e9765e7fa@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Jan 2018 15:46:24 +0100
+Subject: [PATCH] IIO: ADC: stm32-dfsdm: remove unused variable
+Message-ID: <20180117144644.2302131-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+A cleanup left one variable behind that is no longer needed and
+can be removed, as shown by the gcc warning:
 
-On 12/01/18 12:07, Christoffer Dall wrote:
-> We have numerous checks around that checks if the HCR_EL2 has the RW bit
-> set to figure out if we're running an AArch64 or AArch32 VM.  In some
-> cases, directly checking the RW bit (given its unintuitive name), is a
-> bit confusing, and that's not going to improve as we move logic around
-> for the following patches that optimize KVM on AArch64 hosts with VHE.
-> 
-> Therefore, introduce a helper, vcpu_el1_is_32bit, and replace existing
-> direct checks of HCR_EL2.RW with the helper.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->   arch/arm64/include/asm/kvm_emulate.h | 7 ++++++-
->   arch/arm64/kvm/hyp/switch.c          | 8 ++------
->   arch/arm64/kvm/hyp/sysreg-sr.c       | 5 +++--
->   arch/arm64/kvm/inject_fault.c        | 6 +++---
->   4 files changed, 14 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index b36aaa1fe332..e07bf463ac58 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -45,6 +45,11 @@ void kvm_inject_undef32(struct kvm_vcpu *vcpu);
->   void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
->   void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
->   
-> +static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
-> +{
-> +	return !(vcpu->arch.hcr_el2 & HCR_RW);
-> +}
-> +
+drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
+drivers/iio/adc/stm32-dfsdm-core.c:245:29: error: unused variable 'of_id' [-Werror=unused-variable]
 
-Just so I understand, the difference between this and vcpu_mode_is_32bit 
-is that vcpu_mode_is_32bit might return true because an 
-interrupt/exception occured while guest was executing 32bit EL0 but 
-guest EL1 is still 64bits, is that correct?
+Fixes: abaca806fd13 ("IIO: ADC: stm32-dfsdm: code optimization")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/iio/adc/stm32-dfsdm-core.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Also, it seems the process controlling KVM is supposed to provide the 
-information of whether the vcpu runs a 32bit el1, would it be better to do:
-
-	return test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features);
-
-instead of looking at the hcr? Or is there a case where those might differ?
-
-Otherwise:
-
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-Cheers,
-
+diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
+index 84277bcc465f..6290332cfd3f 100644
+--- a/drivers/iio/adc/stm32-dfsdm-core.c
++++ b/drivers/iio/adc/stm32-dfsdm-core.c
+@@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
+ static int stm32_dfsdm_probe(struct platform_device *pdev)
+ {
+ 	struct dfsdm_priv *priv;
+-	const struct of_device_id *of_id;
+ 	const struct stm32_dfsdm_dev_data *dev_data;
+ 	struct stm32_dfsdm *dfsdm;
+ 	int ret;
 -- 
-Julien Thierry
+2.9.0
