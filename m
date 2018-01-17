@@ -1,59 +1,52 @@
-From: joerg.krause@embedded.rocks (=?UTF-8?q?J=C3=B6rg=20Krause?=)
-Date: Thu, 18 Jan 2018 00:23:47 +0100
-Subject: [PATCH RESEND] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux mode
-Message-ID: <20180117232347.24513-1-joerg.krause@embedded.rocks>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Jan 2018 23:35:08 +0000
+Subject: [PATCH RFC v1] arm64: Handle traps from accessing CNTVCT/CNTFRQ
+ for CONFIG_COMPAT
+In-Reply-To: <20180117204154.GA2935@Asurada-Nvidia>
+References: <1515645816-14063-1-git-send-email-nicoleotsuka@gmail.com>
+ <e750e380-f06b-dbbf-a61c-4281c0168b05@arm.com>
+ <20180116203218.GA6318@Asurada-Nvidia>
+ <86r2qpec32.wl-marc.zyngier@arm.com>
+ <20180116213745.GA9545@Asurada-Nvidia>
+ <20180117021346.GA26166@Asurada-Nvidia>
+ <83b9c187-7fbf-3e05-6321-de7fa05fd868@arm.com>
+ <20180117204154.GA2935@Asurada-Nvidia>
+Message-ID: <20180117233508.45282a7b@m750.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RESEND because of missing Ccs. Original patch is [0].
+On Wed, 17 Jan 2018 12:41:56 -0800
+Nicolin Chen <nicoleotsuka@gmail.com> wrote:
 
-The 32 kHz reference clock on the i.MX6UL(L) can be output by
-setting the external signal XTALOSC_REF_CLK_32K in one of the
-following ways [1]:
+> On Wed, Jan 17, 2018 at 09:03:48AM +0000, Marc Zyngier wrote:
+> 
+> > > So ignoring a condition for a Thumb instruction may cause its IT
+> > > scope shifting. For ARM mode, the only penalty could be two Rts
+> > > getting written -- which shouldn't corrupt userspace execution.
+> > > 
+> > > Please correct me if I am wrong or not thorough.  
+> > 
+> > Consider the following:
+> > 	
+> > 	mov	r0, #0
+> > 	mov	r1, #0
+> > 	cmp	r1, #3
+> > 	mrrceq	r0, r1, cntvct // simplified version
+> > 
+> > Oh look, you've corrupted r0 and r1, which should never have be
+> > changed. Whatever uses the content r0 and r1 after the mrrc will
+> > misbehave. How is that an acceptable behaviour? How do you expect
+> > userspace to cope with such a brain damage?
+> > 
+> > If you intend to emulate the CPU, you must emulate it fully, to the
+> > letter of the architecture. No ifs, no buts.  
+> 
+> Thanks for the explain. I see the point here.
+> 
+> I saw your version for arm64 compat doesn't check if (rt != 31)
+> as MRS handler does. Is there any reason for that?
 
-|----------------------------------------------------------|
-| Signal              | Pad             | Mode | Direction |
-|----------------------------------------------------------|
-| XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
-|                     | GPIO1_IO03      | ALT3 |           |
-|                     | JTAG_TCK        | ALT6 |           |
-|----------------------------------------------------------|
+Um, perhaps because it's *compat*? How do you envision an AArch32
+MR{R}C instruction targeting r31, exactly? ;)
 
-[0] https://patchwork.ozlabs.org/patch/816108/
-[1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
-
-Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
----
- arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
-index 0034eeb84542..e12654018c23 100644
---- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-@@ -63,6 +63,7 @@
- #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
- #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
- #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
-+#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
- #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
- #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
- #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
-@@ -101,6 +102,7 @@
- #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
- #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
- #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
-+#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
- #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
- #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
- #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
-@@ -316,6 +318,7 @@
- #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
- #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
- #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
-+#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
- #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
- #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
- #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
--- 
-2.15.1
+Robin.
