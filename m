@@ -1,48 +1,40 @@
 From: maxime.chevallier@smile.fr (Maxime Chevallier)
-Date: Wed, 17 Jan 2018 17:15:26 +0100
-Subject: [PATCH 2/4] spi: a3700: Set frequency limits at startup
+Date: Wed, 17 Jan 2018 17:15:25 +0100
+Subject: [PATCH 1/4] spi: a3700: Clear DATA_OUT when performing a read
 In-Reply-To: <1516205728-3256-1-git-send-email-maxime.chevallier@smile.fr>
 References: <1516205728-3256-1-git-send-email-maxime.chevallier@smile.fr>
-Message-ID: <1516205728-3256-3-git-send-email-maxime.chevallier@smile.fr>
+Message-ID: <1516205728-3256-2-git-send-email-maxime.chevallier@smile.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 3700 SPI controller has an internal clock divider which can
-divide the parent clock frequency by up to 30.
+When performing a read using FIFO mode, the spi controller shifts out
+the last 2 bytes that were written in a previous transfer on MOSI.
 
-This patch sets the limits in the spi_controller fields so that we can
-detect when a non-supported frequency is requested by a device for a
-transfer.
+This undocumented behaviour can cause devices to misinterpret the
+transfer, so we explicitly clear the WFIFO before each read.
+
+This behaviour was noticed on EspressoBin.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
 ---
- drivers/spi/spi-armada-3700.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/spi/spi-armada-3700.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-index c11ea6c..8048468 100644
+index d653453..c11ea6c 100644
 --- a/drivers/spi/spi-armada-3700.c
 +++ b/drivers/spi/spi-armada-3700.c
-@@ -27,6 +27,8 @@
+@@ -615,6 +615,11 @@ static int a3700_spi_transfer_one(struct spi_master *master,
+ 	a3700_spi_header_set(a3700_spi);
  
- #define DRIVER_NAME			"armada_3700_spi"
- 
-+#define A3700_SPI_MAX_SPEED_HZ		100000000
-+#define A3700_SPI_MAX_PRESCALE		30
- #define A3700_SPI_TIMEOUT		10
- 
- /* SPI Register Offest */
-@@ -823,6 +825,11 @@ static int a3700_spi_probe(struct platform_device *pdev)
- 		goto error;
- 	}
- 
-+	master->max_speed_hz = min_t(unsigned long, A3700_SPI_MAX_SPEED_HZ,
-+					clk_get_rate(spi->clk));
-+	master->min_speed_hz = DIV_ROUND_UP(clk_get_rate(spi->clk),
-+						A3700_SPI_MAX_PRESCALE);
+ 	if (xfer->rx_buf) {
++		/* Clear WFIFO, since it's last 2 bytes are shifted out during
++		 * a read operation
++		 */
++		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, 0);
 +
- 	ret = a3700_spi_init(spi);
- 	if (ret)
- 		goto error_clk;
+ 		/* Set read data length */
+ 		spireg_write(a3700_spi, A3700_SPI_IF_DIN_CNT_REG,
+ 			     a3700_spi->buf_len);
 -- 
 2.1.4
