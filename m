@@ -1,58 +1,43 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 17 Jan 2018 12:25:49 +0000
-Subject: [PATCH] arm64: Run enable method for errata work arounds on late
- CPUs
-In-Reply-To: <20180117100556.29270-1-suzuki.poulose@arm.com>
-References: <20180117100556.29270-1-suzuki.poulose@arm.com>
-Message-ID: <20180117122548.GE22781@e103592.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 17 Jan 2018 17:55:16 +0530
+Subject: [PATCH v5 10/44] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <83f3d207-9645-cbdf-d6cf-b6e6a8458abe@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-11-git-send-email-david@lechnology.com>
+ <e0a9af55-a8b1-c359-fe88-d038648e02f1@ti.com>
+ <83f3d207-9645-cbdf-d6cf-b6e6a8458abe@lechnology.com>
+Message-ID: <1b568e12-dd45-f371-a1a8-576c97a6b58e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 10:05:56AM +0000, Suzuki K Poulose wrote:
-> When a CPU is brought up after we have finalised the system
-> wide capabilities (i.e, features and errata), we make sure the
-> new CPU doesn't need a new errata work around which has not been
-> detected already. However we don't run enable() method on the new
-> CPU for the errata work arounds already detected. This could
-> cause the new CPU running without potential work arounds.
-> It is upto the "enable()" method to decide if this CPU should
-> do something about the errata.
+On Tuesday 16 January 2018 10:21 PM, David Lechner wrote:
+
+>>> +static struct clk *davinci_psc_clk_register(const char *name,
+>>> +??????????????????????? const char *parent_name,
+>>> +??????????????????????? struct regmap *regmap,
+>>> +??????????????????????? u32 lpsc, u32 pd, u32 flags)
+>>> +{
+>>> +??? struct clk_init_data init;
+>>> +??? struct davinci_psc_clk *psc;
+>>> +??? struct clk *clk;
+>>> +
+>>> +??? psc = kzalloc(sizeof(*psc), GFP_KERNEL);
+>>> +??? if (!psc)
+>>> +??????? return ERR_PTR(-ENOMEM);
+>>> +
+>>> +??? init.name = name;
+>>> +??? init.ops = &davinci_psc_clk_ops;
+>>> +??? init.parent_names = (parent_name ? &parent_name : NULL);
+>>> +??? init.num_parents = (parent_name ? 1 : 0);
+>>> +??? init.flags = CLK_SET_RATE_PARENT;
+>>
+>> Is this needed since PSC does not cause any rate change?
 > 
-> Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work arounds on hotplugged CPU")
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/cpu_errata.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 90a9e465339c..54e41dfe41f6 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
->  {
->  	const struct arm64_cpu_capabilities *caps = arm64_errata;
->  
-> -	for (; caps->matches; caps++)
-> -		if (!cpus_have_cap(caps->capability) &&
-> -			caps->matches(caps, SCOPE_LOCAL_CPU)) {
-> +	for (; caps->matches; caps++) {
-> +		if (cpus_have_cap(caps->capability)) {
-> +			if (caps->enable)
-> +				caps->enable((void *)caps);
+> Yes, because one of the PSCs is the ARM clock and for cpufreq, we
+> need to propagate the rate change up the chain to SYSCLK6.
 
-Do we really need this cast?
+Good point. But how about treating that as an exception with a new LPSC_
+quirk flag?
 
-Can enable() fail, or do we already guarantee that it succeeds (by
-having detected the cap in the first place)?
-
-> +		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
-
-[...]
-
-Cheers
----Dave
+Thanks,
+Sekhar
