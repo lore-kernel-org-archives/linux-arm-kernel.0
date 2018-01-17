@@ -1,78 +1,647 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Jan 2018 13:43:35 +0000
-Subject: [PATCH] arm64: Run enable method for errata work arounds on late
- CPUs
-In-Reply-To: <bbc19683-340a-cc81-ded9-966d232248db@arm.com>
-References: <20180117100556.29270-1-suzuki.poulose@arm.com>
- <20180117122548.GE22781@e103592.cambridge.arm.com>
- <29147833-b47f-3ad9-e2d8-295551c43900@arm.com>
- <bbc19683-340a-cc81-ded9-966d232248db@arm.com>
-Message-ID: <bfef2d82-c43b-2254-9e29-cf4c22e4581c@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 Jan 2018 21:43:31 +0800
+Subject: [PATCH v3 08/13] drm/sun4i: Add a driver for the display frontend
+In-Reply-To: <3b7164f4a5199f0499c6f41201b31bc471cb3af9.1515492513.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
+ <3b7164f4a5199f0499c6f41201b31bc471cb3af9.1515492513.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 13:31, Suzuki K Poulose wrote:
-> On 17/01/18 13:20, Robin Murphy wrote:
->> On 17/01/18 12:25, Dave Martin wrote:
->>> On Wed, Jan 17, 2018 at 10:05:56AM +0000, Suzuki K Poulose wrote:
->>>> When a CPU is brought up after we have finalised the system
->>>> wide capabilities (i.e, features and errata), we make sure the
->>>> new CPU doesn't need a new errata work around which has not been
->>>> detected already. However we don't run enable() method on the new
->>>> CPU for the errata work arounds already detected. This could
->>>> cause the new CPU running without potential work arounds.
->>>> It is upto the "enable()" method to decide if this CPU should
->>>> do something about the errata.
->>>>
->>>> Fixes: commit 6a6efbb45b7d95c84 ("arm64: Verify CPU errata work 
->>>> arounds on hotplugged CPU")
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Andre Przywara <andre.przywara@arm.com>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Cc: Dave Martin <dave.martin@arm.com>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>>> ? arch/arm64/kernel/cpu_errata.c | 9 ++++++---
->>>> ? 1 file changed, 6 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kernel/cpu_errata.c 
->>>> b/arch/arm64/kernel/cpu_errata.c
->>>> index 90a9e465339c..54e41dfe41f6 100644
->>>> --- a/arch/arm64/kernel/cpu_errata.c
->>>> +++ b/arch/arm64/kernel/cpu_errata.c
->>>> @@ -373,15 +373,18 @@ void verify_local_cpu_errata_workarounds(void)
->>>> ? {
->>>> ????? const struct arm64_cpu_capabilities *caps = arm64_errata;
->>>> -??? for (; caps->matches; caps++)
->>>> -??????? if (!cpus_have_cap(caps->capability) &&
->>>> -??????????? caps->matches(caps, SCOPE_LOCAL_CPU)) {
->>>> +??? for (; caps->matches; caps++) {
->>>> +??????? if (cpus_have_cap(caps->capability)) {
->>>> +??????????? if (caps->enable)
->>>> +??????????????? caps->enable((void *)caps);
->>>
->>> Do we really need this cast?
->>
->> Seems to me like the prototype for .enable needs updating. If any 
->> existing callback was actually using the (non-const) void* for some 
->> purpose (thankfully nothing seems to be), then passing the capability 
->> pointer into that would be unlikely to end well anyway.
-> 
-> I agree. This was initially written such that we could call it via 
-> on_each_cpu().
-> But then we later switched to stop_machine(). And we weren't using the 
-> argument until
-> very recently with the introduction of multiple entries for the same 
-> capability.
-> 
-> I will try to clean this up in a separate series, which would involve 
-> cleaning up
-> all the enable(), quite invasive. I would like this to go in for 4.16, 
-> as it is
-> needed for things like KPTI and some of the existing caps.
+On Tue, Jan 9, 2018 at 6:09 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The display frontend is an hardware block that can be used to implement
+> some more advanced features like hardware scaling or colorspace
+> conversions. It can also be used to implement the output format of the VPU.
+>
+> Let's create a minimal driver for it that will only enable the hardware
+> scaling features.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/Makefile         |   3 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.c      |  27 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.h      |   1 +-
+>  drivers/gpu/drm/sun4i/sun4i_frontend.c | 384 ++++++++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_frontend.h |  99 +++++++-
+>  5 files changed, 509 insertions(+), 5 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
+>
+> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+> index 0c2f8c7facae..b660d82011f4 100644
+> --- a/drivers/gpu/drm/sun4i/Makefile
+> +++ b/drivers/gpu/drm/sun4i/Makefile
+> @@ -1,5 +1,6 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  sun4i-backend-y                        += sun4i_backend.o sun4i_layer.o
+> +sun4i-frontend-y               += sun4i_frontend.o
+>
+>  sun4i-drm-y                    += sun4i_drv.o
+>  sun4i-drm-y                    += sun4i_framebuffer.o
+> @@ -21,6 +22,6 @@ obj-$(CONFIG_DRM_SUN4I)               += sun4i-tcon.o
+>  obj-$(CONFIG_DRM_SUN4I)                += sun4i_tv.o
+>  obj-$(CONFIG_DRM_SUN4I)                += sun6i_drc.o
+>
+> -obj-$(CONFIG_DRM_SUN4I_BACKEND)        += sun4i-backend.o
+> +obj-$(CONFIG_DRM_SUN4I_BACKEND)        += sun4i-backend.o sun4i-frontend.o
+>  obj-$(CONFIG_DRM_SUN4I_HDMI)   += sun4i-drm-hdmi.o
+>  obj-$(CONFIG_DRM_SUN8I_MIXER)  += sun8i-mixer.o
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index 75c76cdd82bc..42e68cf3a2e8 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -23,6 +23,7 @@
+>  #include <drm/drm_of.h>
+>
+>  #include "sun4i_drv.h"
+> +#include "sun4i_frontend.h"
+>  #include "sun4i_framebuffer.h"
+>  #include "sun4i_tcon.h"
+>
+> @@ -98,6 +99,7 @@ static int sun4i_drv_bind(struct device *dev)
+>                 goto free_drm;
+>         }
+>         drm->dev_private = drv;
+> +       INIT_LIST_HEAD(&drv->frontend_list);
+>         INIT_LIST_HEAD(&drv->engine_list);
+>         INIT_LIST_HEAD(&drv->tcon_list);
+>
+> @@ -185,6 +187,14 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
+>                 of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
+>  }
+>
+> +static bool sun4i_drv_node_is_supported_frontend(struct device_node *node)
+> +{
+> +       if (IS_ENABLED(CONFIG_DRM_SUN4I_BACKEND))
+> +               return !!of_match_node(sun4i_frontend_of_table, node);
+> +
+> +       return false;
+> +}
+> +
+>  static bool sun4i_drv_node_is_tcon(struct device_node *node)
+>  {
+>         return of_device_is_compatible(node, "allwinner,sun4i-a10-tcon") ||
+> @@ -239,9 +249,11 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+>         int count = 0;
+>
+>         /*
+> -        * We don't support the frontend for now, so we will never
+> -        * have a device bound. Just skip over it, but we still want
+> -        * the rest our pipeline to be added.
+> +        * The frontend has been disabled in some of our old device
+> +        * trees. If we find a node that is the frontend and is
+> +        * disabled, we should just follow through and parse its
+> +        * child, but without adding it to the component list.
+> +        * Otherwise, we obviously want to add it to the list.
+>          */
+>         if (!sun4i_drv_node_is_frontend(node) &&
+>             !of_device_is_available(node))
+> @@ -254,7 +266,14 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+>         if (sun4i_drv_node_is_connector(node))
+>                 return 0;
+>
+> -       if (!sun4i_drv_node_is_frontend(node)) {
+> +       /*
+> +        * If the device is either just a regular device, or an
+> +        * enabled frontend supported by the driver, we add it to our
+> +        * component list.
+> +        */
+> +       if (!sun4i_drv_node_is_frontend(node) ||
+> +           (sun4i_drv_node_is_supported_frontend(node) &&
+> +            of_device_is_available(node))) {
 
-OK, sounds good. For the sake of the immediate fix, perhaps it's cleaner 
-to just pass NULL here if the current callbacks ignore it?
+Nit: sun4i_drv_node_is_supported_frontend should be a subset of
+sun4i_drv_node_is_frontend, so of_device_is_available should always
+be true at this point.
 
-Robin.
+>                 /* Add current component */
+>                 DRM_DEBUG_DRIVER("Adding component %pOF\n", node);
+>                 drm_of_component_match_add(dev, match, compare_of, node);
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+> index a960c89270cc..9c26a345f85c 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.h
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+> @@ -19,6 +19,7 @@
+>
+>  struct sun4i_drv {
+>         struct list_head        engine_list;
+> +       struct list_head        frontend_list;
+>         struct list_head        tcon_list;
+>
+>         struct drm_fbdev_cma    *fbdev;
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> new file mode 100644
+> index 000000000000..c19238cec1b7
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> @@ -0,0 +1,384 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2017 Free Electrons
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + */
+> +#include <drm/drmP.h>
+> +#include <drm/drm_gem_cma_helper.h>
+> +#include <drm/drm_fb_cma_helper.h>
+> +
+> +#include <linux/clk.h>
+> +#include <linux/component.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset.h>
+> +
+> +#include "sun4i_drv.h"
+> +#include "sun4i_frontend.h"
+> +
+> +static const u32 sun4i_frontend_vert_coef[32] = {
+> +       0x00004000, 0x000140ff, 0x00033ffe, 0x00043ffd,
+> +       0x00063efc, 0xff083dfc, 0x000a3bfb, 0xff0d39fb,
+> +       0xff0f37fb, 0xff1136fa, 0xfe1433fb, 0xfe1631fb,
+> +       0xfd192ffb, 0xfd1c2cfb, 0xfd1f29fb, 0xfc2127fc,
+> +       0xfc2424fc, 0xfc2721fc, 0xfb291ffd, 0xfb2c1cfd,
+> +       0xfb2f19fd, 0xfb3116fe, 0xfb3314fe, 0xfa3611ff,
+> +       0xfb370fff, 0xfb390dff, 0xfb3b0a00, 0xfc3d08ff,
+> +       0xfc3e0600, 0xfd3f0400, 0xfe3f0300, 0xff400100,
+> +};
+> +
+> +static const u32 sun4i_frontend_horz_coef[64] = {
+> +       0x40000000, 0x00000000, 0x40fe0000, 0x0000ff03,
+> +       0x3ffd0000, 0x0000ff05, 0x3ffc0000, 0x0000ff06,
+> +       0x3efb0000, 0x0000ff08, 0x3dfb0000, 0x0000ff09,
+> +       0x3bfa0000, 0x0000fe0d, 0x39fa0000, 0x0000fe0f,
+> +       0x38fa0000, 0x0000fe10, 0x36fa0000, 0x0000fe12,
+> +       0x33fa0000, 0x0000fd16, 0x31fa0000, 0x0000fd18,
+> +       0x2ffa0000, 0x0000fd1a, 0x2cfa0000, 0x0000fc1e,
+> +       0x29fa0000, 0x0000fc21, 0x27fb0000, 0x0000fb23,
+> +       0x24fb0000, 0x0000fb26, 0x21fb0000, 0x0000fb29,
+> +       0x1ffc0000, 0x0000fa2b, 0x1cfc0000, 0x0000fa2e,
+> +       0x19fd0000, 0x0000fa30, 0x16fd0000, 0x0000fa33,
+> +       0x14fd0000, 0x0000fa35, 0x11fe0000, 0x0000fa37,
+> +       0x0ffe0000, 0x0000fa39, 0x0dfe0000, 0x0000fa3b,
+> +       0x0afe0000, 0x0000fa3e, 0x08ff0000, 0x0000fb3e,
+> +       0x06ff0000, 0x0000fb40, 0x05ff0000, 0x0000fc40,
+> +       0x03ff0000, 0x0000fd41, 0x01ff0000, 0x0000fe42,
+> +};
+> +
+> +static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < 32; i++) {
+> +               regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
+> +                            sun4i_frontend_horz_coef[2 * i]);
+> +               regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZCOEF0_REG(i),
+> +                            sun4i_frontend_horz_coef[2 * i]);
+> +               regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF1_REG(i),
+> +                            sun4i_frontend_horz_coef[2 * i + 1]);
+> +               regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZCOEF1_REG(i),
+> +                            sun4i_frontend_horz_coef[2 * i + 1]);
+> +               regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTCOEF_REG(i),
+> +                            sun4i_frontend_vert_coef[i]);
+> +               regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTCOEF_REG(i),
+> +                            sun4i_frontend_vert_coef[i]);
+> +       }
+> +
+> +       regmap_update_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
+> +                          SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
+> +                          SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
+> +}
+> +
+> +int sun4i_frontend_init(struct sun4i_frontend *frontend)
+> +{
+> +       return pm_runtime_get_sync(frontend->dev);
+> +}
+> +EXPORT_SYMBOL(sun4i_frontend_init);
+> +
+> +void sun4i_frontend_exit(struct sun4i_frontend *frontend)
+> +{
+> +       pm_runtime_put(frontend->dev);
+> +}
+> +EXPORT_SYMBOL(sun4i_frontend_exit);
+> +
+> +void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
+> +                                 struct drm_plane *plane)
+> +{
+> +       struct drm_plane_state *state = plane->state;
+> +       struct drm_framebuffer *fb = state->fb;
+> +       dma_addr_t paddr;
+> +
+> +       /* Set the line width */
+> +       DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
+> +                    fb->pitches[0]);
+> +
+> +       /* Set the physical address of the buffer in memory */
+> +       paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
+> +       paddr -= PHYS_OFFSET;
+> +       DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR0_REG, paddr);
+> +}
+> +EXPORT_SYMBOL(sun4i_frontend_update_buffer);
+> +
+> +static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
+> +{
+> +       switch (fmt) {
+> +       case DRM_FORMAT_ARGB8888:
+> +               *val = 5;
+> +               return 0;
+> +
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +}
+> +
+> +static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
+> +{
+> +       switch (fmt) {
+> +       case DRM_FORMAT_XRGB8888:
+> +       case DRM_FORMAT_ARGB8888:
+> +               *val = 2;
+> +               return 0;
+> +
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +}
+> +
+> +int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+> +                                 struct drm_plane *plane, uint32_t out_fmt)
+> +{
+> +       struct drm_plane_state *state = plane->state;
+> +       struct drm_framebuffer *fb = state->fb;
+> +       u32 out_fmt_val;
+> +       u32 in_fmt_val;
+> +       int ret;
+> +
+> +       ret = sun4i_frontend_drm_format_to_input_fmt(fb->format->format,
+> +                                                    &in_fmt_val);
+> +       if (ret) {
+> +               DRM_DEBUG_DRIVER("Invalid input format\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = sun4i_frontend_drm_format_to_output_fmt(out_fmt, &out_fmt_val);
+> +       if (ret) {
+> +               DRM_DEBUG_DRIVER("Invalid output format\n");
+> +               return ret;
+> +       }
+> +
+> +       /*
+> +        * I have no idea what this does exactly, but it seems to be
+> +        * related to the scaler FIR filter phase parameters.
+> +        */
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG, 0x400);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG, 0x400);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG, 0x400);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG, 0x400);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
+> +
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
+> +                    SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
+> +                    SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
+> +                    SUN4I_FRONTEND_INPUT_FMT_PS(1));
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
+> +                    SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
+
+Seems that you also need to set the "ALPHA_EN" bit for ARGB.
+
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL(sun4i_frontend_update_formats);
+> +
+> +void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
+> +                                struct drm_plane *plane)
+> +{
+> +       struct drm_plane_state *state = plane->state;
+> +
+> +       /* Set height and width */
+> +       DRM_DEBUG_DRIVER("Frontend size W: %u H: %u\n",
+> +                        state->crtc_w, state->crtc_h);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_INSIZE_REG,
+> +                    SUN4I_FRONTEND_INSIZE(state->src_h >> 16,
+> +                                          state->src_w >> 16));
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_INSIZE_REG,
+> +                    SUN4I_FRONTEND_INSIZE(state->src_h >> 16,
+> +                                          state->src_w >> 16));
+> +
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_OUTSIZE_REG,
+> +                    SUN4I_FRONTEND_OUTSIZE(state->crtc_h, state->crtc_w));
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_OUTSIZE_REG,
+> +                    SUN4I_FRONTEND_OUTSIZE(state->crtc_h, state->crtc_w));
+> +
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZFACT_REG,
+> +                    state->src_w / state->crtc_w);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZFACT_REG,
+> +                    state->src_w / state->crtc_w);
+> +
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTFACT_REG,
+> +                    state->src_h / state->crtc_h);
+> +       regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTFACT_REG,
+> +                    state->src_h / state->crtc_h);
+> +
+> +       regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
+> +                         SUN4I_FRONTEND_FRM_CTRL_REG_RDY,
+> +                         SUN4I_FRONTEND_FRM_CTRL_REG_RDY);
+> +}
+> +EXPORT_SYMBOL(sun4i_frontend_update_coord);
+> +
+> +int sun4i_frontend_enable(struct sun4i_frontend *frontend)
+> +{
+> +       regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
+> +                         SUN4I_FRONTEND_FRM_CTRL_FRM_START,
+> +                         SUN4I_FRONTEND_FRM_CTRL_FRM_START);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL(sun4i_frontend_enable);
+> +
+> +static struct regmap_config sun4i_frontend_regmap_config = {
+> +       .reg_bits       = 32,
+> +       .val_bits       = 32,
+> +       .reg_stride     = 4,
+> +       .max_register   = 0x0a14,
+> +};
+> +
+> +static int sun4i_frontend_bind(struct device *dev, struct device *master,
+> +                        void *data)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct sun4i_frontend *frontend;
+> +       struct drm_device *drm = data;
+> +       struct sun4i_drv *drv = drm->dev_private;
+> +       struct resource *res;
+> +       void __iomem *regs;
+> +
+> +       frontend = devm_kzalloc(dev, sizeof(*frontend), GFP_KERNEL);
+> +       if (!frontend)
+> +               return -ENOMEM;
+> +
+> +       dev_set_drvdata(dev, frontend);
+> +       frontend->dev = dev;
+> +       frontend->node = dev->of_node;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       regs = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(regs))
+> +               return PTR_ERR(regs);
+> +
+> +       frontend->regs = devm_regmap_init_mmio(dev, regs,
+> +                                              &sun4i_frontend_regmap_config);
+> +       if (IS_ERR(frontend->regs)) {
+> +               dev_err(dev, "Couldn't create the frontend regmap\n");
+> +               return PTR_ERR(frontend->regs);
+> +       }
+> +
+> +       frontend->reset = devm_reset_control_get(dev, NULL);
+> +       if (IS_ERR(frontend->reset)) {
+> +               dev_err(dev, "Couldn't get our reset line\n");
+> +               return PTR_ERR(frontend->reset);
+> +       }
+> +       reset_control_reset(frontend->reset);
+
+reset_control_reset leaves the reset control deasserted. At this
+point the clock might not be running, which might mean the internal
+state is not completely wiped out. (Though this really depends on
+the design of the internal logic.)
+
+Maybe just assert it? It gets deasserted in the runtime PM callback
+later. And just to be safe, I would move it close to the end of the
+probe path, past all possible errors, so the hardware doesn't get
+touched until everything is ready. Or don't touch it anywhere in
+the probe path, and have the runtime PM resume function do a reset.
+
+Regards
+ChenYu
+
+> +
+> +       frontend->bus_clk = devm_clk_get(dev, "ahb");
+> +       if (IS_ERR(frontend->bus_clk)) {
+> +               dev_err(dev, "Couldn't get our bus clock\n");
+> +               return PTR_ERR(frontend->bus_clk);
+> +       }
+> +
+> +       frontend->mod_clk = devm_clk_get(dev, "mod");
+> +       if (IS_ERR(frontend->mod_clk)) {
+> +               dev_err(dev, "Couldn't get our mod clock\n");
+> +               return PTR_ERR(frontend->mod_clk);
+> +       }
+> +
+> +       frontend->ram_clk = devm_clk_get(dev, "ram");
+> +       if (IS_ERR(frontend->ram_clk)) {
+> +               dev_err(dev, "Couldn't get our ram clock\n");
+> +               return PTR_ERR(frontend->ram_clk);
+> +       }
+> +
+> +       list_add_tail(&frontend->list, &drv->frontend_list);
+> +       pm_runtime_enable(dev);
+> +
+> +       return 0;
+> +}
+> +
+> +static void sun4i_frontend_unbind(struct device *dev, struct device *master,
+> +                           void *data)
+> +{
+> +       struct sun4i_frontend *frontend = dev_get_drvdata(dev);
+> +
+> +       list_del(&frontend->list);
+> +       pm_runtime_force_suspend(dev);
+> +}
+> +
+> +static const struct component_ops sun4i_frontend_ops = {
+> +       .bind   = sun4i_frontend_bind,
+> +       .unbind = sun4i_frontend_unbind,
+> +};
+> +
+> +static int sun4i_frontend_probe(struct platform_device *pdev)
+> +{
+> +       return component_add(&pdev->dev, &sun4i_frontend_ops);
+> +}
+> +
+> +static int sun4i_frontend_remove(struct platform_device *pdev)
+> +{
+> +       component_del(&pdev->dev, &sun4i_frontend_ops);
+> +
+> +       return 0;
+> +}
+> +
+> +static int sun4i_frontend_runtime_resume(struct device *dev)
+> +{
+> +       struct sun4i_frontend *frontend = dev_get_drvdata(dev);
+> +       int ret;
+> +
+> +       clk_set_rate(frontend->mod_clk, 300000000);
+> +
+> +       clk_prepare_enable(frontend->bus_clk);
+> +       clk_prepare_enable(frontend->mod_clk);
+> +       clk_prepare_enable(frontend->ram_clk);
+> +
+> +       ret = reset_control_deassert(frontend->reset);
+> +       if (ret) {
+> +               dev_err(dev, "Couldn't deassert our reset line\n");
+> +               return ret;
+> +       }
+> +
+> +       regmap_update_bits(frontend->regs, SUN4I_FRONTEND_EN_REG,
+> +                          SUN4I_FRONTEND_EN_EN,
+> +                          SUN4I_FRONTEND_EN_EN);
+> +
+> +       regmap_update_bits(frontend->regs, SUN4I_FRONTEND_BYPASS_REG,
+> +                          SUN4I_FRONTEND_BYPASS_CSC_EN,
+> +                          SUN4I_FRONTEND_BYPASS_CSC_EN);
+> +
+> +       sun4i_frontend_scaler_init(frontend);
+> +
+> +       return 0;
+> +}
+> +
+> +static int sun4i_frontend_runtime_suspend(struct device *dev)
+> +{
+> +       struct sun4i_frontend *frontend = dev_get_drvdata(dev);
+> +
+> +       clk_disable_unprepare(frontend->ram_clk);
+> +       clk_disable_unprepare(frontend->mod_clk);
+> +       clk_disable_unprepare(frontend->bus_clk);
+> +
+> +       reset_control_assert(frontend->reset);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct dev_pm_ops sun4i_frontend_pm_ops = {
+> +       .runtime_resume         = sun4i_frontend_runtime_resume,
+> +       .runtime_suspend        = sun4i_frontend_runtime_suspend,
+> +};
+> +
+> +const struct of_device_id sun4i_frontend_of_table[] = {
+> +       { .compatible = "allwinner,sun8i-a33-display-frontend" },
+> +       { }
+> +};
+> +EXPORT_SYMBOL(sun4i_frontend_of_table);
+> +MODULE_DEVICE_TABLE(of, sun4i_frontend_of_table);
+> +
+> +static struct platform_driver sun4i_frontend_driver = {
+> +       .probe          = sun4i_frontend_probe,
+> +       .remove         = sun4i_frontend_remove,
+> +       .driver         = {
+> +               .name           = "sun4i-frontend",
+> +               .of_match_table = sun4i_frontend_of_table,
+> +               .pm             = &sun4i_frontend_pm_ops,
+> +       },
+> +};
+> +module_platform_driver(sun4i_frontend_driver);
+> +
+> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
+> +MODULE_DESCRIPTION("Allwinner A10 Display Engine Frontend Driver");
+> +MODULE_LICENSE("GPL");
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+> new file mode 100644
+> index 000000000000..02661ce81f3e
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+> @@ -0,0 +1,99 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2017 Free Electrons
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + */
+> +
+> +#ifndef _SUN4I_FRONTEND_H_
+> +#define _SUN4I_FRONTEND_H_
+> +
+> +#include <linux/list.h>
+> +
+> +#define SUN4I_FRONTEND_EN_REG                  0x000
+> +#define SUN4I_FRONTEND_EN_EN                           BIT(0)
+> +
+> +#define SUN4I_FRONTEND_FRM_CTRL_REG            0x004
+> +#define SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL       BIT(23)
+> +#define SUN4I_FRONTEND_FRM_CTRL_FRM_START              BIT(16)
+> +#define SUN4I_FRONTEND_FRM_CTRL_COEF_RDY               BIT(1)
+> +#define SUN4I_FRONTEND_FRM_CTRL_REG_RDY                        BIT(0)
+> +
+> +#define SUN4I_FRONTEND_BYPASS_REG              0x008
+> +#define SUN4I_FRONTEND_BYPASS_CSC_EN                   BIT(1)
+> +
+> +#define SUN4I_FRONTEND_BUF_ADDR0_REG           0x020
+> +
+> +#define SUN4I_FRONTEND_LINESTRD0_REG           0x040
+> +
+> +#define SUN4I_FRONTEND_INPUT_FMT_REG           0x04c
+> +#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(mod)         ((mod) << 8)
+> +#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(fmt)         ((fmt) << 4)
+> +#define SUN4I_FRONTEND_INPUT_FMT_PS(ps)                        (ps)
+> +
+> +#define SUN4I_FRONTEND_OUTPUT_FMT_REG          0x05c
+> +#define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(fmt)                (fmt)
+> +
+> +#define SUN4I_FRONTEND_CH0_INSIZE_REG          0x100
+> +#define SUN4I_FRONTEND_INSIZE(h, w)                    ((((h) - 1) << 16) | (((w) - 1)))
+> +
+> +#define SUN4I_FRONTEND_CH0_OUTSIZE_REG         0x104
+> +#define SUN4I_FRONTEND_OUTSIZE(h, w)                   ((((h) - 1) << 16) | (((w) - 1)))
+> +
+> +#define SUN4I_FRONTEND_CH0_HORZFACT_REG                0x108
+> +#define SUN4I_FRONTEND_HORZFACT(i, f)                  (((i) << 16) | (f))
+> +
+> +#define SUN4I_FRONTEND_CH0_VERTFACT_REG                0x10c
+> +#define SUN4I_FRONTEND_VERTFACT(i, f)                  (((i) << 16) | (f))
+> +
+> +#define SUN4I_FRONTEND_CH0_HORZPHASE_REG       0x110
+> +#define SUN4I_FRONTEND_CH0_VERTPHASE0_REG      0x114
+> +#define SUN4I_FRONTEND_CH0_VERTPHASE1_REG      0x118
+> +
+> +#define SUN4I_FRONTEND_CH1_INSIZE_REG          0x200
+> +#define SUN4I_FRONTEND_CH1_OUTSIZE_REG         0x204
+> +#define SUN4I_FRONTEND_CH1_HORZFACT_REG                0x208
+> +#define SUN4I_FRONTEND_CH1_VERTFACT_REG                0x20c
+> +
+> +#define SUN4I_FRONTEND_CH1_HORZPHASE_REG       0x210
+> +#define SUN4I_FRONTEND_CH1_VERTPHASE0_REG      0x214
+> +#define SUN4I_FRONTEND_CH1_VERTPHASE1_REG      0x218
+> +
+> +#define SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i)    (0x400 + i * 4)
+> +#define SUN4I_FRONTEND_CH0_HORZCOEF1_REG(i)    (0x480 + i * 4)
+> +#define SUN4I_FRONTEND_CH0_VERTCOEF_REG(i)     (0x500 + i * 4)
+> +#define SUN4I_FRONTEND_CH1_HORZCOEF0_REG(i)    (0x600 + i * 4)
+> +#define SUN4I_FRONTEND_CH1_HORZCOEF1_REG(i)    (0x680 + i * 4)
+> +#define SUN4I_FRONTEND_CH1_VERTCOEF_REG(i)     (0x700 + i * 4)
+> +
+> +struct clk;
+> +struct device_node;
+> +struct drm_plane;
+> +struct regmap;
+> +struct reset_control;
+> +
+> +struct sun4i_frontend {
+> +       struct list_head        list;
+> +       struct device           *dev;
+> +       struct device_node      *node;
+> +
+> +       struct clk              *bus_clk;
+> +       struct clk              *mod_clk;
+> +       struct clk              *ram_clk;
+> +       struct regmap           *regs;
+> +       struct reset_control    *reset;
+> +};
+> +
+> +extern const struct of_device_id sun4i_frontend_of_table[];
+> +
+> +int sun4i_frontend_init(struct sun4i_frontend *frontend);
+> +void sun4i_frontend_exit(struct sun4i_frontend *frontend);
+> +int sun4i_frontend_enable(struct sun4i_frontend *frontend);
+> +
+> +void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
+> +                                 struct drm_plane *plane);
+> +void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
+> +                                struct drm_plane *plane);
+> +int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+> +                                 struct drm_plane *plane, uint32_t out_fmt);
+> +
+> +#endif /* _SUN4I_FRONTEND_H_ */
+> --
+> git-series 0.9.1
