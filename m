@@ -1,82 +1,119 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed, 17 Jan 2018 11:33:09 -0600
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
+Date: Wed, 17 Jan 2018 11:35:54 -0600
+Subject: [PATCH v5 19/44] clk: davinci: New driver for TI DA8XX CFGCHIP
+ clocks
+In-Reply-To: <c3c0f9cf-b93e-6d1e-1e44-7dcef1ea11cf@ti.com>
 References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <8d09dba6-9b1d-e06e-8730-256b8a4320db@ti.com>
- <b6baa17e-1239-c209-9eca-52e5da73e921@lechnology.com>
- <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
-Message-ID: <b85f7b4a-7b4c-11d8-6ea5-db4717e11658@lechnology.com>
+ <1515377863-20358-20-git-send-email-david@lechnology.com>
+ <c3c0f9cf-b93e-6d1e-1e44-7dcef1ea11cf@ti.com>
+Message-ID: <19f2830e-6d57-ebd9-1873-f79bea3e8439@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2018 05:57 AM, Sekhar Nori wrote:
-> On Tuesday 16 January 2018 10:51 PM, David Lechner wrote:
->> On 01/16/2018 08:00 AM, Sekhar Nori wrote:
->>> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
->>>> +void __init da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
->>>> +{
->>>> +??? struct clk_onecell_data *clk_data;
->>>> +
->>>> +??? clk_data = davinci_psc_register_clocks(psc0, da850_psc0_info, 16);
->>>> +??? if (!clk_data)
->>>> +??????? return;
->>>> +
->>>> +??? clk_register_clkdev(clk_data->clks[3], NULL, "ti-aemif");
->>>> +??? clk_register_clkdev(clk_data->clks[3], "aemif", "davinci-nand.0");
->>>> +??? clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
->>>> +??? clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
->>>> +??? clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
->>>> +??? clk_register_clkdev(clk_data->clks[14], "arm", NULL);
->>>> +??? clk_register_clkdev(clk_data->clks[15], NULL, "davinci-rproc.0");
->>>> +
->>>> +??? clk_free_onecell_data(clk_data);
->>>> +
->>>> +??? clk_data = davinci_psc_register_clocks(psc1, da850_psc1_info, 32);
->>>> +??? if (!clk_data)
->>>> +??????? return;
->>>> +
->>>> +??? clk_register_clkdev(clk_data->clks[1], "usb20_psc_clk", NULL);
->>>
->>> Is this con_id really needed now? Searching for "usb20_psc_clk" in your
->>> tree results in only this one hit.
+On 01/17/2018 09:31 AM, Sekhar Nori wrote:
+> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+>> This adds a new driver for the gate and multiplexer clocks in the
+>> CFGCHIPn syscon registers on TI DA8XX-type SoCs.
 >>
->> Yes, this is left over from previous attempts.
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>>   drivers/clk/davinci/Makefile        |   2 +
+>>   drivers/clk/davinci/da8xx-cfgchip.c | 203 ++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 205 insertions(+)
+>>   create mode 100644 drivers/clk/davinci/da8xx-cfgchip.c
 >>
->>>
->>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
->>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
->>>
->>> I guess multiple dev_id matches like these are another hurdle in moving
->>> them to davinci_psc_clk_info[] table? If its too cumbersome to keep
->>> multiple entries in the table, they can be handled as an exception at
->>> the end of processing the table? Still they are not the norm so I hope
->>> the normal case will still benefit.
->>
->> Right, as I mentioned in the reply to the previous patch, instead of
->> assigning a con_id and dev_id to each clock, we would need to assign
->> an array with a list of clocks. I think that would work better than
->> trying to handle the extras as an exception since there, on average,
->> about 5 per SoC.
+>> diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
+>> index 6c388d4..11178b7 100644
+>> --- a/drivers/clk/davinci/Makefile
+>> +++ b/drivers/clk/davinci/Makefile
+>> @@ -1,6 +1,8 @@
+>>   # SPDX-License-Identifier: GPL-2.0
+>>   
+>>   ifeq ($(CONFIG_COMMON_CLK), y)
+>> +obj-$(CONFIG_ARCH_DAVINCI_DA8XX)	+= da8xx-cfgchip.o
+>> +
+>>   obj-y += pll.o
+>>   obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
+>>   obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= pll-da850.o
+>> diff --git a/drivers/clk/davinci/da8xx-cfgchip.c b/drivers/clk/davinci/da8xx-cfgchip.c
+>> new file mode 100644
+>> index 0000000..772e09a
+>> --- /dev/null
+>> +++ b/drivers/clk/davinci/da8xx-cfgchip.c
+>> @@ -0,0 +1,203 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Clock driver for DA8xx/AM17xx/AM18xx/OMAP-L13x CFGCHIP
+>> + *
+>> + * Copyright (C) 2017 David Lechner <david@lechnology.com>
 > 
-> Okay, are you going to try this to see how it looks? It looks like
-> samsung (clk-s3c2410.c) and tegra (clk-tegra20.c) use such tables
-> (although both use separate tables mapping just the gate number to
-> con_id/dev_id).
+> 2018
 > 
-> Others like u8540_clk.c and clk-mmp2.c have multiple calls in code to
-> clk_register_clkdev() like you have, but they keep them right after the
-> gate clock registration which makes it easy to see the mapping.
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/mfd/da8xx-cfgchip.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/of.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#ifdef CONFIG_OF
 > 
-> clk-imx35.c has multiple clk_register_clkdev() calls, but uses an enum
-> for the gates so its easy to see the mapping. This approach looks fine
-> to me as well.
+> Is this ifdef really needed, or included to save space for non-OF
+> builds? I think it can be removed if not really needed.
 > 
-> So looks like there is a whole gamut of ways people have approached
-> this. But I do think we need to change the scheme you have currently
-> since it is difficult to review and audit (believe me on this one :))
+>> +static void da8xx_cfgchip_gate_clk_init(struct device_node *np, u32 reg,
+>> +					u32 mask)
+>> +{
+>> +	struct da8xx_cfgchip_gate_clk *clk;
+>> +	struct clk_init_data init;
+>> +	const char *name = np->name;
+>> +	const char *parent_name;
+>> +	struct regmap *regmap;
+>> +	int ret;
+>> +
+>> +	of_property_read_string(np, "clock-output-names", &name);
+>> +	parent_name = of_clk_get_parent_name(np, 0);
+>> +
+>> +	regmap = syscon_node_to_regmap(of_get_parent(np));
+>> +	if (IS_ERR(regmap)) {
+>> +		pr_err("%s: no regmap for syscon parent of %s (%ld)\n",
+>> +		       __func__, np->full_name, PTR_ERR(regmap));
+> 
+> please use pr_fmt for this driver too.
+> 
+>> +static void da8xx_cfgchip_mux_clk_init(struct device_node *np, u32 reg,
+>> +				       u32 mask)
+>> +{
+>> +	struct da8xx_cfgchip_mux_clk *clk;
+>> +	struct clk_init_data init;
+>> +	const char *name = np->name;
+>> +	const char *parent_names[2];
+>> +	struct regmap *regmap;
+>> +	int ret;
+>> +
+>> +	ret = of_property_match_string(np, "clock-names", "pll0_sysclk2");
+>> +	parent_names[0] = of_clk_get_parent_name(np, ret);
+>> +	if (!parent_names[0]) {
+>> +		pr_err("%s: missing pll0_sysclk2 clock\n", __func__);
+>> +		return;
+>> +	}
+>> +
+>> +	ret = of_property_match_string(np, "clock-names", "pll1_sysclk2");
+>> +	parent_names[1] = of_clk_get_parent_name(np, ret);
+>> +	if (!parent_names[1]) {
+>> +		pr_err("%s: missing pll1_sysclk2 clock\n", __func__);
+>> +		return;
+>> +	}
+> 
+> The fact that you are looking specifically for pll0_sysclk2 and
+> pll1_sysclk2 makes it really specific to async3 and the same function
+> cannot be used for something like EMIFA clock source. Can this part of
+> the function be factored out so rest of the function can still be reused
+> for another clock?
 > 
 
-OK, I'll figure out something here.
+Already fixed this stuff a couple days ago. ;-)
+
+And I went ahead and added the EMIFA clocks (the mux and the DIV4.5)
