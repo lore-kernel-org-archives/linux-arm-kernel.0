@@ -1,103 +1,82 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed, 17 Jan 2018 11:32:31 -0600
-Subject: [PATCH v5 11/44] clk: davinci: Add platform information for TI
- DA830 PSC
-In-Reply-To: <86581de6-a982-7a7b-9a83-22c869417211@ti.com>
+Date: Wed, 17 Jan 2018 11:33:09 -0600
+Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
+ DA850 PSC
+In-Reply-To: <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
 References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-12-git-send-email-david@lechnology.com>
- <91fe16dc-907e-6dbb-c8db-c27561132093@ti.com>
- <4dd36ca7-e41d-58d8-ec8c-787978307943@lechnology.com>
- <86581de6-a982-7a7b-9a83-22c869417211@ti.com>
-Message-ID: <72abb187-1c84-f307-d4f8-be5403787bac@lechnology.com>
+ <1515377863-20358-13-git-send-email-david@lechnology.com>
+ <8d09dba6-9b1d-e06e-8730-256b8a4320db@ti.com>
+ <b6baa17e-1239-c209-9eca-52e5da73e921@lechnology.com>
+ <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
+Message-ID: <b85f7b4a-7b4c-11d8-6ea5-db4717e11658@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2018 06:18 AM, Sekhar Nori wrote:
-> On Tuesday 16 January 2018 10:46 PM, David Lechner wrote:
-> 
->>>> +static const struct davinci_psc_clk_info da830_psc0_info[]
->>>> __initconst = {
->>>> +??? LPSC(0, 0, tpcc, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(1, 0, tptc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(2, 0, tptc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(3, 0, aemif, pll0_sysclk3, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(4, 0, spi0, pll0_sysclk2, 0),
->>>> +??? LPSC(5, 0, mmcsd, pll0_sysclk2, 0),
->>>> +??? LPSC(6, 0, aintc, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(7, 0, arm_rom, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(8, 0, secu_mgr, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(9, 0, uart0, pll0_sysclk2, 0),
->>>> +??? LPSC(10, 0, scr0_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(11, 0, scr1_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(12, 0, scr2_ss, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>> +??? LPSC(13, 0, dmax, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>>
->>> pruss is better (I know the name is coming from existing code).
->>>
->>>> +??? LPSC(14, 0, arm, pll0_sysclk6, LPSC_ALWAYS_ENABLED),
->>>
->>> This is LPSC 15 which controls DSP too. But its missing from existing
->>> code. Not sure why. Probably a note for future. For now okay with
->>> ignoring it.
->>>
->>>> +??? { }
->>>> +};
->>>
->>> Tables like these are much easier to parse if columns are spaced using a
->>> tab.
->>>
->>
->> Tabs make the lines over 80 columns. How about spaces instead?
-> 
-> That works for me. I guess checkpatch will complain, but hopefully
-> maintainers will agree on the exception.
-> 
->>>> +void __init da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
+On 01/17/2018 05:57 AM, Sekhar Nori wrote:
+> On Tuesday 16 January 2018 10:51 PM, David Lechner wrote:
+>> On 01/16/2018 08:00 AM, Sekhar Nori wrote:
+>>> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+>>>> +void __init da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
 >>>> +{
 >>>> +??? struct clk_onecell_data *clk_data;
 >>>> +
->>>> +??? clk_data = davinci_psc_register_clocks(psc0, da830_psc0_info, 16);
+>>>> +??? clk_data = davinci_psc_register_clocks(psc0, da850_psc0_info, 16);
 >>>> +??? if (!clk_data)
 >>>> +??????? return;
 >>>> +
+>>>> +??? clk_register_clkdev(clk_data->clks[3], NULL, "ti-aemif");
+>>>> +??? clk_register_clkdev(clk_data->clks[3], "aemif", "davinci-nand.0");
 >>>> +??? clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
 >>>> +??? clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
 >>>> +??? clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
 >>>> +??? clk_register_clkdev(clk_data->clks[14], "arm", NULL);
+>>>> +??? clk_register_clkdev(clk_data->clks[15], NULL, "davinci-rproc.0");
 >>>> +
 >>>> +??? clk_free_onecell_data(clk_data);
 >>>> +
->>>> +??? clk_data = davinci_psc_register_clocks(psc1, da830_psc1_info, 32);
+>>>> +??? clk_data = davinci_psc_register_clocks(psc1, da850_psc1_info, 32);
 >>>> +??? if (!clk_data)
 >>>> +??????? return;
 >>>> +
+>>>> +??? clk_register_clkdev(clk_data->clks[1], "usb20_psc_clk", NULL);
+>>>
+>>> Is this con_id really needed now? Searching for "usb20_psc_clk" in your
+>>> tree results in only this one hit.
+>>
+>> Yes, this is left over from previous attempts.
+>>
+>>>
 >>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
 >>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
->>>> +??? clk_register_clkdev(clk_data->clks[2], NULL, "ohci-da8xx");
->>>> +??? clk_register_clkdev(clk_data->clks[3], "gpio", NULL);
 >>>
->>> This is pretty bad (and no fault of yours) - having a con_id but no
->>> device name. Can you please make a pre-series which passes NULL con_id
->>> in gpio-davinci.c?
+>>> I guess multiple dev_id matches like these are another hurdle in moving
+>>> them to davinci_psc_clk_info[] table? If its too cumbersome to keep
+>>> multiple entries in the table, they can be handled as an exception at
+>>> the end of processing the table? Still they are not the norm so I hope
+>>> the normal case will still benefit.
 >>
->> I'll give it a try. This is complicated by the fact that the con_id has
->> made it's way into the device tree bindings. However, I think we can
->> safely deprecate clock-names = "gpio" in the device tree bindings since
->> we can make the driver ignore that property to preserve backwards
->> compatibility.
-
-Agreed.
-
-> I don't think this breaks DT-backward compatibility. Passing a NULL
-> con_id in driver should find the clock for that device even if DT entry
-> has clock-names present. As far as I can read clk_find().
+>> Right, as I mentioned in the reply to the previous patch, instead of
+>> assigning a con_id and dev_id to each clock, we would need to assign
+>> an array with a list of clocks. I think that would work better than
+>> trying to handle the extras as an exception since there, on average,
+>> about 5 per SoC.
 > 
-> The less intrusive alternate is to add the GPIO device name in the table
-> here, while keeping the con_id and keeping the driver untouched. The
-> advantage of that is lesser number of dependent patches for this series
-> to go in.
+> Okay, are you going to try this to see how it looks? It looks like
+> samsung (clk-s3c2410.c) and tegra (clk-tegra20.c) use such tables
+> (although both use separate tables mapping just the gate number to
+> con_id/dev_id).
 > 
-> Later once CCF conversion has been there in the kernel for one full
-> release and no regressions, these other clean-ups can be done.
+> Others like u8540_clk.c and clk-mmp2.c have multiple calls in code to
+> clk_register_clkdev() like you have, but they keep them right after the
+> gate clock registration which makes it easy to see the mapping.
+> 
+> clk-imx35.c has multiple clk_register_clkdev() calls, but uses an enum
+> for the gates so its easy to see the mapping. This approach looks fine
+> to me as well.
+> 
+> So looks like there is a whole gamut of ways people have approached
+> this. But I do think we need to change the scheme you have currently
+> since it is difficult to review and audit (believe me on this one :))
+> 
 
-I like this approach.
+OK, I'll figure out something here.
