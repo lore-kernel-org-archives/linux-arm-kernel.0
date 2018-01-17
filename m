@@ -1,62 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Jan 2018 21:09:19 +0100
-Subject: [PATCH] IIO: ADC: stm32-dfsdm: remove unused variable
-In-Reply-To: <8dd30c35-011c-1d0f-7331-76df8fcd0c23@st.com>
-References: <20180117144644.2302131-1-arnd@arndb.de>
- <8dd30c35-011c-1d0f-7331-76df8fcd0c23@st.com>
-Message-ID: <CAK8P3a2_g+cPjZgv=_c=VunV+eCVPkFn7mYSxqKD_LqNdrLUBw@mail.gmail.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Wed, 17 Jan 2018 21:14:12 +0100
+Subject: [PATCH v3 03/12] drm/bridge/synopsys: dw-hdmi: Enable workaround for
+ v1.32a
+In-Reply-To: <20180117201421.25954-1-jernej.skrabec@siol.net>
+References: <20180117201421.25954-1-jernej.skrabec@siol.net>
+Message-ID: <20180117201421.25954-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 4:27 PM, Arnaud Pouliquen
-<arnaud.pouliquen@st.com> wrote:
-> Hi Arnd,
->
-> On 01/17/2018 03:46 PM, Arnd Bergmann wrote:
->> A cleanup left one variable behind that is no longer needed and
->> can be removed, as shown by the gcc warning:
->>
->> drivers/iio/adc/stm32-dfsdm-core.c: In function 'stm32_dfsdm_probe':
->> drivers/iio/adc/stm32-dfsdm-core.c:245:29: error: unused variable 'of_id' [-Werror=unused-variable]
->>
->> Fixes: abaca806fd13 ("IIO: ADC: stm32-dfsdm: code optimization")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->>  drivers/iio/adc/stm32-dfsdm-core.c | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
->> index 84277bcc465f..6290332cfd3f 100644
->> --- a/drivers/iio/adc/stm32-dfsdm-core.c
->> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
->> @@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
->>  static int stm32_dfsdm_probe(struct platform_device *pdev)
->>  {
->>       struct dfsdm_priv *priv;
->> -     const struct of_device_id *of_id;
->>       const struct stm32_dfsdm_dev_data *dev_data;
->>       struct stm32_dfsdm *dfsdm;
->>       int ret;
->>
-> Could you crosscheck? This is included in the patch:
-> https://www.spinics.net/lists/arm-kernel/msg628841.html applied in
-> Mark's branches ( commit abaca806fd13afd069e04e883de8ec75924b0598)
+Allwinner SoCs have dw hdmi controller v1.32a which exhibits same
+magenta line issue as i.MX6Q and i.MX6DL. Enable workaround for it.
 
-The problem appears to have come from a mismerge in commit d84b4c7c706f
-("Merge branch 'topic/iio' of
-https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound
-into asoc-st-dfsdm"). abaca806fd13 was fine, but when Mark merged it into
-his branch, it seems there was a conflict because both sides contained
-a copy of my earlier patch 2353758bc2d4 ("IIO: ADC: stm32-dfsdm: avoid
-unused-variable warning") and 25140717414c, plus one had your
-abaca806fd1 patch on top.
+Tests show that one iteration is enough.
 
-So my patch is correct, but my the 'Fixes' line in the description is wrong,
-it should have an explanation about the mismerge.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Mark, not sure how you want to proceed from here: if this is a branch
-that can get rebased, it might be best to do that merge again, or even
-drop one of the two copies of my earlier patch. Otherwise I can send
-a new version of the fix with an updated explanation.
-
-      Arnd
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index a38db40ce990..7ca14d7325b5 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1634,9 +1634,10 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 	 * then write one of the FC registers several times.
+ 	 *
+ 	 * The number of iterations matters and depends on the HDMI TX revision
+-	 * (and possibly on the platform). So far only i.MX6Q (v1.30a) and
+-	 * i.MX6DL (v1.31a) have been identified as needing the workaround, with
+-	 * 4 and 1 iterations respectively.
++	 * (and possibly on the platform). So far i.MX6Q (v1.30a), i.MX6DL
++	 * (v1.31a) and multiple Allwinner SoCs (v1.32a) have been identified
++	 * as needing the workaround, with 4 iterations for v1.30a and 1
++	 * iteration for others.
+ 	 */
+ 
+ 	switch (hdmi->version) {
+@@ -1644,6 +1645,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 		count = 4;
+ 		break;
+ 	case 0x131a:
++	case 0x132a:
+ 		count = 1;
+ 		break;
+ 	default:
+-- 
+2.15.1
