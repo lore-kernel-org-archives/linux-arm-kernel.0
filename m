@@ -1,107 +1,93 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Wed, 17 Jan 2018 21:49:39 +0300
-Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <1199109167.10232.1516213158515@email.1und1.de>
-References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
- <1059643032.72553.1516136078614@email.1und1.de>
- <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
- <1199109167.10232.1516213158515@email.1und1.de>
-Message-ID: <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 17 Jan 2018 12:51:31 -0600
+Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <ca64334c-9345-705c-80d8-f2deb924a679@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-3-jeremy.linton@arm.com>
+ <20180115123338.GB5473@e107155-lin>
+ <65f78c99-8b86-0098-7ced-899840a4bf16@arm.com>
+ <ca64334c-9345-705c-80d8-f2deb924a679@arm.com>
+Message-ID: <15884ccc-2cfb-da91-5844-369d8237175d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan
+Hi,
 
-wifi network was working fine when I used a raspbian image downloaded 
-from official site.
-
-Here is my config https://pastebin.com/7XRpmM0X? and cpuinfo 
-https://pastebin.com/08Z6gDZ9
-
-I have no idea about version you are talking about.
-
-Thanks.
-
-
-On 01/17/2018 09:19 PM, Stefan Wahren wrote:
-> Hi Sergey,
->
->> Sergey Suloev <ssuloev@orpaltech.com> hat am 16. Januar 2018 um 22:07 geschrieben:
+On 01/17/2018 12:20 PM, Sudeep Holla wrote:
+> 
+> 
+> On 16/01/18 21:07, Jeremy Linton wrote:
+>> Hi,
 >>
->>
->> sure, here you go
->>
->> https://pastebin.com/kAHUrb6m
->>
->>
->> On 01/16/2018 11:54 PM, Stefan Wahren wrote:
->>> Hi Sergey,
+>> On 01/15/2018 06:33 AM, Sudeep Holla wrote:
+>>> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
+>>>> The original intent in cacheinfo was that an architecture
+>>>> specific populate_cache_leaves() would probe the hardware
+>>>> and then cache_shared_cpu_map_setup() and
+>>>> cache_override_properties() would provide firmware help to
+>>>> extend/expand upon what was probed. Arm64 was really
+>>>> the only architecture that was working this way, and
+>>>> with the removal of most of the hardware probing logic it
+>>>> became clear that it was possible to simplify the logic a bit.
+>>>>
+>>>> This patch combines the walk of the DT nodes with the
+>>>> code updating the cache size/line_size and nr_sets.
+>>>> cache_override_properties() (which was DT specific) is
+>>>> then removed. The result is that cacheinfo.of_node is
+>>>> no longer used as a temporary place to hold DT references
+>>>> for future calls that update cache properties. That change
+>>>> helps to clarify its one remaining use (matching
+>>>> cacheinfo nodes that represent shared caches) which
+>>>> will be used by the ACPI/PPTT code in the following patches.
+>>>>
+>>>> Cc: Palmer Dabbelt <palmer@sifive.com>
+>>>> Cc: Albert Ou <albert@sifive.com>
+>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>>> ---
+>>>>  ? arch/riscv/kernel/cacheinfo.c |? 1 +
+>>>>  ? drivers/base/cacheinfo.c????? | 65
+>>>> +++++++++++++++++++------------------------
+>>>>  ? include/linux/cacheinfo.h???? |? 1 +
+>>>>  ? 3 files changed, 31 insertions(+), 36 deletions(-)
+>>>>
+>>>> diff --git a/arch/riscv/kernel/cacheinfo.c
+>>>> b/arch/riscv/kernel/cacheinfo.c
+>>>> index 10ed2749e246..6f4500233cf8 100644
+>>>> --- a/arch/riscv/kernel/cacheinfo.c
+>>>> +++ b/arch/riscv/kernel/cacheinfo.c
+>>>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+>>>>  ????????? CACHE_WRITE_BACK
+>>>>  ????????? | CACHE_READ_ALLOCATE
+>>>>  ????????? | CACHE_WRITE_ALLOCATE;
+>>>> +??? cache_of_set_props(this_leaf, node);
 >>>
->>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 16. Januar 2018 um 21:27 geschrieben:
->>>>
->>>>
->>>> Hi,
->>>> I still have the issue "mmc1 timeout" with mainline 4.15rc7, discussed here
->>>>
->>>> http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-June/004003.html
->>>>
->>>> Is there any progress on this ?
->>>> Thanks
->>>>
->>> please provide the dmesg output.
-> first of all please avoid top-posting.
->
-> These mmc1 timeouts are unexpected for Raspberry Pi 3 with mailine kernel. I'm using multi_v7_defconfig and get the following:
->
-> [    0.730597] mmc1: SDHCI controller on 3f300000.sdhci [3f300000.sdhci] using PIO
-> [    0.738238] ledtrig-cpu: registered to indicate activity on CPUs
-> [    0.745085] usbcore: registered new interface driver usbhid
-> [    0.751536] usbhid: USB HID core driver
-> [    0.758625] bcm2835-mbox 3f00b880.mailbox: mailbox enabled
-> [    0.767760] NET: Registered protocol family 10
-> [    0.775301] Segment Routing with IPv6
-> [    0.781785] sit: IPv6, IPv4 and MPLS over IPv4 tunneling driver
-> [    0.788874] NET: Registered protocol family 17
-> [    0.795399] can: controller area network core (rev 20170425 abi 9)
-> [    0.802013] NET: Registered protocol family 29
-> [    0.808495] can: raw protocol (rev 20170425)
-> [    0.814965] can: broadcast manager protocol (rev 20170425 t)
-> [    0.821447] can: netlink gateway (rev 20170425) max_hops=1
-> [    0.828317] Key type dns_resolver registered
-> [    0.835733] Registering SWP/SWPB emulation handler
-> [    0.842787] Loading compiled-in X.509 certificates
-> [    0.852989] 3f201000.serial: ttyAMA0 at MMIO 0x3f201000 (irq = 87, base_baud = 0) is a PL011 rev2
-> [    0.862190] mmc1: queuing unknown CIS tuple 0x80 (2 bytes)
-> [    0.868970] raspberrypi-firmware soc:firmware: Attached to firmware from 2017-07-03 14:16
-> [    0.870688] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
-> [    0.872371] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
-> [    0.875388] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
-> [    0.897742] mmc0: host does not support reading read-only switch, assuming write-enable
-> [    0.906523] mmc0: new high speed SDHC card at address 1234
-> [    0.913738] mmcblk0: mmc0:1234 SA32G 29.3 GiB
-> [    0.922210]  mmcblk0: p1 p2
-> [    0.928980] dwc2 3f980000.usb: 3f980000.usb supply vusb_d not found, using dummy regulator
-> [    0.935881] dwc2 3f980000.usb: 3f980000.usb supply vusb_a not found, using dummy regulator
-> [    0.993219] dwc2 3f980000.usb: DWC OTG Controller
-> [    0.999967] dwc2 3f980000.usb: new USB bus registered, assigned bus number 1
-> [    1.002026] mmc1: new high speed SDIO card at address 0001
->
-> Could you please also share your config?
-> Do you have a Raspberry Pi 3 B 1.2?
-> Did you check the function of the hardware before?
->
->>> Stefan
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>> This may be necessary but can it be done as later patch ? So far nothing
+>>> is added that may break riscv IIUC.
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> Well I think you have a bisection issue where the additional information
+>> will disappear between this patch and wherever we put this code back in.
+>>
+> 
+> Hmm, I am sorry but I fail to see the issue. Before this change,
+> populate_cache_leaves just populated the info as per ci_leaf_init in
+> arch/riscv/kernel/cacheinfo.c and cache_override_properties used to fill
+> the remaining.
+> 
+> After this patch, the same is achieved in cache_shared_cpu_map_setup.
+> 
+> In both case, it was by the end of detect_cache_attributes, so I see no
+> issue.
+> 
+
+
+Hi,
+
+I must be misunderstanding something.
+
+AFAIK, The code in cache_setup_of_node() won't call cache_of_set_props() 
+because it returns when there is an existing of_node (fw_unique) created 
+by the riscv populate_cache_leaves(). That's why I'm making the direct 
+call here. If we fail to get that change in place before 
+cache_override_properties() is removed then the fields not set by the 
+riscv code (size/etc) will be missing.
