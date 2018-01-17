@@ -1,70 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Jan 2018 18:01:21 +0100
-Subject: [PATCH] [v2] drm/exynos: g2d: use monotonic timestamps
-Message-ID: <20180117170131.2677586-1-arnd@arndb.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Jan 2018 17:14:25 +0000
+Subject: [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and
+ SIGFPE, SIGTRAP, SIGBUS
+In-Reply-To: <87y3kwh1t5.fsf@xmission.com>
+References: <87373b6ghs.fsf@xmission.com>
+ <20180112005940.23279-7-ebiederm@xmission.com>
+ <20180115163028.GU22781@e103592.cambridge.arm.com>
+ <87h8rnox3c.fsf@xmission.com>
+ <20180116172407.GA22781@e103592.cambridge.arm.com>
+ <871sipl9p9.fsf@xmission.com>
+ <20180117115708.GM17719@n2100.armlinux.org.uk>
+ <20180117121505.GD22781@e103592.cambridge.arm.com>
+ <20180117123752.GN17719@n2100.armlinux.org.uk>
+ <87y3kwh1t5.fsf@xmission.com>
+Message-ID: <20180117171425.GQ17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos DRM driver uses real-time 'struct timeval' values
-for exporting its timestamps to user space. This has multiple
-problems:
+On Wed, Jan 17, 2018 at 10:45:10AM -0600, Eric W. Biederman wrote:
+> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+> >From your description there still seems to be an association with an
+> instruction so I don't know if I would really call the signal
+> asynchronous.  It sounds like the exception is delayed and not
+> asynchronous.
 
-1. signed seconds overflow in y2038
-2. the 'struct timeval' definition is deprecated in the kernel
-3. time may jump or go backwards after a 'settimeofday()' syscall
-4. other DRM timestamps are in CLOCK_MONOTONIC domain, so they
-   can't be compared
-5. exporting microseconds requires a division by 1000, which may
-   be slow on some architectures.
+Traps can only be passed from ARM coprocessors by a coprocessor refusing
+to execute an instruction.  That's what happens in this case - the VFP
+gets offered an instruction to execute.  It accepts it, and the CPU
+continues, leaving the VFP to execute its instruction independently.  If
+this instruction generates an error, then nothing happens at this point.
 
-The code existed in two places before, but the IPP portion was
-removed in 8ded59413ccc ("drm/exynos: ipp: Remove Exynos DRM
-IPP subsystem"), so we no longer need to worry about it.
+That error remains pending until the CPU offers the coprocessor the next
+VFP instruction, which it refuses.  That causes an undefined instruction
+exception, and we trap into the kernel VFP code which reads the VFP
+status and works out what needs to be done.
 
-Ideally timestamps should just use 64-bit nanoseconds instead, but
-of course we can't change that now. Instead, this tries to address
-the first four points above by using monotonic 'timespec' values.
+What this means is that if you execute a VFP instruction, wait 10 minutes
+and then execute another VFP instruction, if the first VFP instruction
+raised an exception, you'll get to hear about it 10 minutes later.
 
-According to Tobias Jakobi, user space doesn't care about the
-timestamp at the moment, so we can change the format. Even if
-there is something looking at them, it will work just fine with
-monotonic times as long as the application only looks at the
-relative values between two events.
+You can use whatever weasel words you want to describe that situation,
+my choice is "asynchronous", your choice is "delayed".  However, it is
+clearly not "synchronous", and arguing that we should report something
+synchronously that is not reported to _us_ synchronously (where
+synchronous means "at the same time") is IMHO daft.
 
-Link: https://patchwork.kernel.org/patch/10038593/
-Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: rebased to what will be in 4.15, now that ipp is gone,
-    updated changelog text based on input from Tobias.
----
- drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+So, let's take an example:
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 2b8bf2dd6387..9effe40f5fa5 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -926,7 +926,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
- 	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
- 	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
- 	struct drm_exynos_pending_g2d_event *e;
--	struct timeval now;
-+	struct timespec64 now;
- 
- 	if (list_empty(&runqueue_node->event_list))
- 		return;
-@@ -934,9 +934,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
- 	e = list_first_entry(&runqueue_node->event_list,
- 			     struct drm_exynos_pending_g2d_event, base.link);
- 
--	do_gettimeofday(&now);
-+	ktime_get_ts64(&now);
- 	e->event.tv_sec = now.tv_sec;
--	e->event.tv_usec = now.tv_usec;
-+	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
- 	e->event.cmdlist_no = cmdlist_no;
- 
- 	drm_send_event(drm_dev, &e->base);
+	installs SIGFPE handler
+	..fp instructions.. one of which raises an exception
+	returns to main loop
+	main loop blocks all signals while it sets stuff up
+	calls ppoll()
+
+In the synchronous SIGFPE delivery case, the SIGFPE handler will be
+called when the exception is generated in the FP code, and delivered
+at that time.  The fact that the main loop blocks all signals happens
+later, so the users handler gets called as one expects.
+
+In the VFP case, however, the FP instructions towards the end may not
+end up causing the exception to be signalled until sometime later,
+and as I've already explained, that may be the result of a C library
+function accessing the VFP registers.  This could well end up trying
+to deliver the SIGFPE while signals are blocked, and we get
+drastically different behaviour if force_sig_info() is used.
+
+In the VFP case, if force_sig_info() is used, the program gets killed
+at this point.  In the non-VFP case, the program's signal handler was
+called.
+
+Using send_sig_info() results in the already delayed or asynchronous
+signal being held off until ppoll() drops the blocking, at which point
+the signal is delivered, the program handles it in its handler, and
+the program continues to run.
+
+So
+1. non-VFP case, program doesn't get killed but gets the opportunity
+   to handle the signal.
+2. VFP case with send_sig_info, program doesn't get killed but gets
+   the opportunity to handle the signal.
+3. VFP case with force_sig_info, the program gets killed and dumps
+   core.
+
+Which one of these results in a big change of behaviour in your
+opinion?
+
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
