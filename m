@@ -1,120 +1,75 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 17 Jan 2018 13:08:34 -0600
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <8d09dba6-9b1d-e06e-8730-256b8a4320db@ti.com>
- <b6baa17e-1239-c209-9eca-52e5da73e921@lechnology.com>
- <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
-Message-ID: <7b33c9a1-468c-15e6-2899-be334b4f3807@lechnology.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 17 Jan 2018 11:10:54 -0800
+Subject: per-task stack canaries for arm64
+In-Reply-To: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+Message-ID: <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2018 05:57 AM, Sekhar Nori wrote:
-> On Tuesday 16 January 2018 10:51 PM, David Lechner wrote:
->> On 01/16/2018 08:00 AM, Sekhar Nori wrote:
->>> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
->>>> +void __init da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
->>>> +{
->>>> +??? struct clk_onecell_data *clk_data;
->>>> +
->>>> +??? clk_data = davinci_psc_register_clocks(psc0, da850_psc0_info, 16);
->>>> +??? if (!clk_data)
->>>> +??????? return;
->>>> +
->>>> +??? clk_register_clkdev(clk_data->clks[3], NULL, "ti-aemif");
->>>> +??? clk_register_clkdev(clk_data->clks[3], "aemif", "davinci-nand.0");
->>>> +??? clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
->>>> +??? clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
->>>> +??? clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
->>>> +??? clk_register_clkdev(clk_data->clks[14], "arm", NULL);
->>>> +??? clk_register_clkdev(clk_data->clks[15], NULL, "davinci-rproc.0");
->>>> +
->>>> +??? clk_free_onecell_data(clk_data);
->>>> +
->>>> +??? clk_data = davinci_psc_register_clocks(psc1, da850_psc1_info, 32);
->>>> +??? if (!clk_data)
->>>> +??????? return;
->>>> +
->>>> +??? clk_register_clkdev(clk_data->clks[1], "usb20_psc_clk", NULL);
->>>
->>> Is this con_id really needed now? Searching for "usb20_psc_clk" in your
->>> tree results in only this one hit.
->>
->> Yes, this is left over from previous attempts.
->>
->>>
->>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
->>>> +??? clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
->>>
->>> I guess multiple dev_id matches like these are another hurdle in moving
->>> them to davinci_psc_clk_info[] table? If its too cumbersome to keep
->>> multiple entries in the table, they can be handled as an exception at
->>> the end of processing the table? Still they are not the norm so I hope
->>> the normal case will still benefit.
->>
->> Right, as I mentioned in the reply to the previous patch, instead of
->> assigning a con_id and dev_id to each clock, we would need to assign
->> an array with a list of clocks. I think that would work better than
->> trying to handle the extras as an exception since there, on average,
->> about 5 per SoC.
-> 
-> Okay, are you going to try this to see how it looks?
+On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Hi all,
+>
+> This is a followup to a discussion I had with Ramana in San Francisco
+> 5 months ago. Apologies for the tardiness.
 
-It is looking like this:
+Link to prior discussion, just for anyone following along:
+https://lkml.org/lkml/2017/6/27/227
 
+> The topic of the discussion was compiler support for per-task stack
+> cookies in the arm64 kernel. From the compiler side, this would simply
+> entail offsetting the address of __stack_chk_guard with value held in
+> tpidr_el1, so we can make it a per-CPU variable.
 
-static const struct davinci_psc_clkdev_info emfia_clkdev[] __initconst = {
-	LPSC_CLKDEV(NULL,	"ti-aemif"),
-	LPSC_CLKDEV("aemif",	"davinci-nand.0"),
-	{ }
-};
+AIUI, some progress was made on this recently, and is somewhat discussed here:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81490
+and spawned this:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
+which was done for x86 only, and provides both:
+  -mstack-protector-guard-symbol=...
+  -mstack-protector-guard-reg=...
 
-static const struct davinci_psc_clkdev_info spi0_clkdev[] __initconst = {
-	LPSC_CLKDEV(NULL,	"spi_davinci.0"),
-	{ }
-};
+If this could be extended to arm64, I think we'd be in good shape (and
+it could be trivially detected at build time).
 
-static const struct davinci_psc_clkdev_info mmcsd0_clkdev[] __initconst = {
-	LPSC_CLKDEV(NULL,	"da830-mmc.0"),
-	{ }
-};
+> On the kernel side,
+> we would need fairly straight-forward plumbing to detect the compiler
+> support, and switching to a per-CPU variable when supported. Beyond
+> that, we need to update the per-CPU value at context switch time, and
+> perhaps some handling of the initial state when per-CPU variables are
+> initialized.
 
-static const struct davinci_psc_clkdev_info uart0_clkdev[] __initconst = {
-	LPSC_CLKDEV(NULL,	"serial8250.0"),
-	{ }
-};
+Right. My mental list has been:
 
-static const struct davinci_psc_clkdev_info arm_clkdev[] __initconst = {
-	/*
-	 * REVISIT: cpufreq-davinci should be modified to use dev_id and drop
-	 * use of con_id.
-	 */
-	LPSC_CLKDEV("arm",	NULL),
-	{ }
-};
+We'll need to adjust how __stack_chk_guard is defined (and tweak
+boot_init_stack_canary()).
 
-static const struct davinci_psc_clkdev_info dsp_clkdev[] __initconst = {
-	LPSC_CLKDEV(NULL,	"davinci-rproc.0"),
-	{ }
-};
+x86 makes the canary updates in arch/x86/entry/entry_*.S as part of
+__switch_to's __switch_to_asm. Looks like arm64 would do it in
+arch/arm64/kernel/entry.S cpu_switch_to?
 
-static const struct davinci_psc_clk_info da850_psc0_info[] __initconst = {
-	LPSC(0,  0, tpcc0,   pll0_sysclk2, NULL,          LPSC_ALWAYS_ENABLED),
-	LPSC(1,  0, tptc0,   pll0_sysclk2, NULL,          LPSC_ALWAYS_ENABLED),
-	LPSC(2,  0, tptc1,   pll0_sysclk2, NULL,          LPSC_ALWAYS_ENABLED),
-	LPSC(3,  0, emifa,   async1,       emfia_clkdev,  0),
-	LPSC(4,  0, spi0,    pll0_sysclk2, spi0_clkdev,   0),
-	LPSC(5,  0, mmcsd0,  pll0_sysclk2, mmcsd0_clkdev, 0),
-	LPSC(6,  0, aintc,   pll0_sysclk4, NULL,          LPSC_ALWAYS_ENABLED),
-	LPSC(7,  0, arm_rom, pll0_sysclk2, NULL,          LPSC_ALWAYS_ENABLED),
-	LPSC(9,  0, uart0,   pll0_sysclk2, uart0_clkdev,  0),
-	LPSC(13, 0, pruss,   pll0_sysclk2, NULL,          0),
-	LPSC(14, 0, arm,     pll0_sysclk6, arm_clkdev,    LPSC_ALWAYS_ENABLED |
-							  LPSC_ARM_RATE),
-	LPSC(15, 1, dsp,     pll0_sysclk1, dsp_clkdev,    LPSC_FORCE |
-							  LPSC_LOCAL_RESET),
-	{ }
-};
+x86 does percpu init in arch/x86/kernel/setup_percpu.c. I'm not sure
+where this needs to happen in arm64.
+
+> Ramana indicated at the time that he would be up for adding, e.g.,
+> -fstack-protector-linux-kernel as a command line option, and add the
+> contents of tpidr_el1 to every reference of __stack_chk_guard when
+> set.
+
+I think we want to reuse the command-line names from the x86 options
+above, unless there's a good reason not to?
+
+> Would this be sufficient to implement this from the kernel side? Am I
+> missing anything here? I am missing the cross-arch context entirely,
+> so are there things we should take into account and/or learn from?
+>
+> Comments welcome.
+
+I think it's very close, yes. Thanks for poking at this!
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
