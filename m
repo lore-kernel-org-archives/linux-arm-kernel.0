@@ -1,85 +1,95 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 17 Jan 2018 17:55:43 +0100
-Subject: [net-next: PATCH v3 4/7] device property: Allow iterating over
- available child fwnodes
+Date: Wed, 17 Jan 2018 17:55:44 +0100
+Subject: [net-next: PATCH v3 5/7] net: mvpp2: simplify maintaining enabled
+ ports' list
 In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
 References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-Message-ID: <1516208146-4144-5-git-send-email-mw@semihalf.com>
+Message-ID: <1516208146-4144-6-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement a new helper function fwnode_get_next_available_child_node(),
-which enables obtaining next enabled child fwnode, which
-works on a similar basis to OF's of_get_next_available_child().
+'port_count' field of the mvpp2 structure holds an overall amount
+of available ports, based on DT nodes status. In order to be prepared
+to support other HW description, obtain the value by incrementing it
+upon each successful port initialization. This allowed for simplifying
+port indexing in the controller's private array, whose size is now not
+dynamically allocated, but fixed to MVPP2_MAX_PORTS.
 
-This commit also introduces a macro, thanks to which it is
-possible to iterate over the available fwnodes, using the
-new function described above.
+This patch simplifies creating and filling list of enabled ports and
+is a part of the preparation for adding ACPI support in the mvpp2 driver.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/base/property.c  | 26 ++++++++++++++++++++
- include/linux/property.h |  6 +++++
- 2 files changed, 32 insertions(+)
+ drivers/net/ethernet/marvell/mvpp2.c | 32 +++++++-------------
+ 1 file changed, 11 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index adb3893..2343906 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -998,6 +998,32 @@ fwnode_get_next_child_node(const struct fwnode_handle *fwnode,
- EXPORT_SYMBOL_GPL(fwnode_get_next_child_node);
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index a197607..7f42d90 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -865,7 +865,7 @@ struct mvpp2 {
  
- /**
-+ * fwnode_get_next_available_child_node - Return the next
-+ * available child node handle for a node
-+ * @fwnode: Firmware node to find the next child node for.
-+ * @child: Handle to one of the node's child nodes or a %NULL handle.
-+ */
-+struct fwnode_handle *
-+fwnode_get_next_available_child_node(const struct fwnode_handle *fwnode,
-+				     struct fwnode_handle *child)
-+{
-+	struct fwnode_handle *next_child = child;
-+
-+	if (!fwnode)
-+		return NULL;
-+
-+	do {
-+		next_child = fwnode_get_next_child_node(fwnode, next_child);
-+
-+		if (!next_child || fwnode_device_is_available(next_child))
-+			break;
-+	} while (next_child);
-+
-+	return next_child;
-+}
-+EXPORT_SYMBOL_GPL(fwnode_get_next_available_child_node);
-+
-+/**
-  * device_get_next_child_node - Return the next child node handle for a device
-  * @dev: Device to find the next child node for.
-  * @child: Handle to one of the device's child nodes or a null handle.
-diff --git a/include/linux/property.h b/include/linux/property.h
-index e05889f..5b0563a 100644
---- a/include/linux/property.h
-+++ b/include/linux/property.h
-@@ -83,11 +83,17 @@ struct fwnode_handle *fwnode_get_next_parent(
- 	struct fwnode_handle *fwnode);
- struct fwnode_handle *fwnode_get_next_child_node(
- 	const struct fwnode_handle *fwnode, struct fwnode_handle *child);
-+struct fwnode_handle *fwnode_get_next_available_child_node(
-+	const struct fwnode_handle *fwnode, struct fwnode_handle *child);
+ 	/* List of pointers to port structures */
+ 	int port_count;
+-	struct mvpp2_port **port_list;
++	struct mvpp2_port *port_list[MVPP2_MAX_PORTS];
  
- #define fwnode_for_each_child_node(fwnode, child)			\
- 	for (child = fwnode_get_next_child_node(fwnode, NULL); child;	\
- 	     child = fwnode_get_next_child_node(fwnode, child))
+ 	/* Aggregated TXQs */
+ 	struct mvpp2_tx_queue *aggr_txqs;
+@@ -7741,7 +7741,7 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
+ /* Ports initialization */
+ static int mvpp2_port_probe(struct platform_device *pdev,
+ 			    struct device_node *port_node,
+-			    struct mvpp2 *priv, int index)
++			    struct mvpp2 *priv)
+ {
+ 	struct device_node *phy_node;
+ 	struct phy *comphy;
+@@ -7934,7 +7934,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 	}
+ 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
  
-+#define fwnode_for_each_available_child_node(fwnode, child)		       \
-+	for (child = fwnode_get_next_available_child_node(fwnode, NULL); child;\
-+	     child = fwnode_get_next_available_child_node(fwnode, child))
+-	priv->port_list[index] = port;
++	priv->port_list[priv->port_count++] = port;
 +
- struct fwnode_handle *device_get_next_child_node(
- 	struct device *dev, struct fwnode_handle *child);
+ 	return 0;
  
+ err_free_port_pcpu:
+@@ -8313,28 +8314,17 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 		goto err_mg_clk;
+ 	}
+ 
+-	priv->port_count = of_get_available_child_count(dn);
+-	if (priv->port_count == 0) {
+-		dev_err(&pdev->dev, "no ports enabled\n");
+-		err = -ENODEV;
+-		goto err_mg_clk;
+-	}
+-
+-	priv->port_list = devm_kcalloc(&pdev->dev, priv->port_count,
+-				       sizeof(*priv->port_list),
+-				       GFP_KERNEL);
+-	if (!priv->port_list) {
+-		err = -ENOMEM;
+-		goto err_mg_clk;
+-	}
+-
+ 	/* Initialize ports */
+-	i = 0;
+ 	for_each_available_child_of_node(dn, port_node) {
+-		err = mvpp2_port_probe(pdev, port_node, priv, i);
++		err = mvpp2_port_probe(pdev, port_node, priv);
+ 		if (err < 0)
+ 			goto err_port_probe;
+-		i++;
++	}
++
++	if (priv->port_count == 0) {
++		dev_err(&pdev->dev, "no ports enabled\n");
++		err = -ENODEV;
++		goto err_mg_clk;
+ 	}
+ 
+ 	/* Statistics must be gathered regularly because some of them (like
 -- 
 2.7.4
