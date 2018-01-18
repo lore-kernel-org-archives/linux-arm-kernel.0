@@ -1,78 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Jan 2018 14:14:11 +0100
-Subject: [PATCH] [wireless-next] mt76: fix building without CONFIG_LEDS_CLASS
-Message-ID: <20180118131524.817297-1-arnd@arndb.de>
+Date: Thu, 18 Jan 2018 14:16:38 +0100
+Subject: [PATCH] scsi: fas216: fix sense buffer initialization
+Message-ID: <20180118131650.893849-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_LEDS_CLASS is disabled, or it is a loadable module while
-mt76 is built-in, we run into a link error:
+While testing with the ARM specific memset() macro removed, I ran
+into a compiler warning that shows an old bug:
 
-drivers/net/wireless/mediatek/mt76/mac80211.o: In function `mt76_register_device':
-mac80211.c:(.text+0xb78): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `devm_of_led_classdev_register'
+drivers/scsi/arm/fas216.c: In function 'fas216_rq_sns_done':
+drivers/scsi/arm/fas216.c:2014:40: error: argument to 'sizeof' in 'memset' call is the same expression as the destination; did you mean to provide an explicit length? [-Werror=sizeof-pointer-memaccess]
 
-We don't really need a hard dependency here as the driver can presumably
-work just fine without LEDs, so this follows the iwlwifi example and
-adds a separate Kconfig option for the LED support, this will be available
-whenever it will link, and otherwise the respective code gets left out from
-the driver object.
+It turns out that the definition of the scsi_cmd structure changed back
+in linux-2.6.25, so now we clear only four bytes (sizeof(pointer)) instead
+of 96 (SCSI_SENSE_BUFFERSIZE). I did not check whether we actually need
+to initialize the buffer here, but it's clear that if we do it, we
+should use the correct size.
 
-Fixes: 17f1de56df05 ("mt76: add common code shared between multiple chipsets")
+Fixes: de25deb18016 ("[SCSI] use dynamically allocated sense buffer")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/wireless/mediatek/mt76/Kconfig       | 5 +++++
- drivers/net/wireless/mediatek/mt76/mac80211.c    | 8 +++++---
- drivers/net/wireless/mediatek/mt76/mt76x2_init.c | 6 ++++--
- 3 files changed, 14 insertions(+), 5 deletions(-)
+ drivers/scsi/arm/fas216.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/wireless/mediatek/mt76/Kconfig b/drivers/net/wireless/mediatek/mt76/Kconfig
-index fc05d79c80d0..9d12c1f5284e 100644
---- a/drivers/net/wireless/mediatek/mt76/Kconfig
-+++ b/drivers/net/wireless/mediatek/mt76/Kconfig
-@@ -8,3 +8,8 @@ config MT76x2E
- 	depends on PCI
- 	---help---
- 	  This adds support for MT7612/MT7602/MT7662-based wireless PCIe devices.
-+
-+config MT76_LEDS
-+	bool "LED support for MT76"
-+	depends on MT76_CORE
-+	depends on LEDS_CLASS=y || MT76_CORE=LEDS_CLASS
-diff --git a/drivers/net/wireless/mediatek/mt76/mac80211.c b/drivers/net/wireless/mediatek/mt76/mac80211.c
-index 3acf0e175d71..144e312a9407 100644
---- a/drivers/net/wireless/mediatek/mt76/mac80211.c
-+++ b/drivers/net/wireless/mediatek/mt76/mac80211.c
-@@ -295,9 +295,11 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
- 	mt76_check_sband(dev, NL80211_BAND_2GHZ);
- 	mt76_check_sband(dev, NL80211_BAND_5GHZ);
- 
--	ret = mt76_led_init(dev);
--	if (ret)
--		return ret;
-+	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
-+		ret = mt76_led_init(dev);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	return ieee80211_register_hw(hw);
- }
-diff --git a/drivers/net/wireless/mediatek/mt76/mt76x2_init.c b/drivers/net/wireless/mediatek/mt76/mt76x2_init.c
-index 4373a2ba5143..0c9d02af205d 100644
---- a/drivers/net/wireless/mediatek/mt76/mt76x2_init.c
-+++ b/drivers/net/wireless/mediatek/mt76/mt76x2_init.c
-@@ -849,8 +849,10 @@ int mt76x2_register_device(struct mt76x2_dev *dev)
- 	mt76x2_dfs_init_detector(dev);
- 
- 	/* init led callbacks */
--	dev->mt76.led_cdev.brightness_set = mt76x2_led_set_brightness;
--	dev->mt76.led_cdev.blink_set = mt76x2_led_set_blink;
-+	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
-+		dev->mt76.led_cdev.brightness_set = mt76x2_led_set_brightness;
-+		dev->mt76.led_cdev.blink_set = mt76x2_led_set_blink;
-+	}
- 
- 	ret = mt76_register_device(&dev->mt76, true, mt76x2_rates,
- 				   ARRAY_SIZE(mt76x2_rates));
+diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
+index f4775ca70bab..27bda2b05de6 100644
+--- a/drivers/scsi/arm/fas216.c
++++ b/drivers/scsi/arm/fas216.c
+@@ -2011,7 +2011,7 @@ static void fas216_rq_sns_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
+ 		 * have valid data in the sense buffer that could
+ 		 * confuse the higher levels.
+ 		 */
+-		memset(SCpnt->sense_buffer, 0, sizeof(SCpnt->sense_buffer));
++		memset(SCpnt->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
+ //printk("scsi%d.%c: sense buffer: ", info->host->host_no, '0' + SCpnt->device->id);
+ //{ int i; for (i = 0; i < 32; i++) printk("%02x ", SCpnt->sense_buffer[i]); printk("\n"); }
+ 	/*
 -- 
 2.9.0
