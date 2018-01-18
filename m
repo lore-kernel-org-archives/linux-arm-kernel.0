@@ -1,126 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 18 Jan 2018 14:12:07 +0100
-Subject: [PATCH v3 30/41] KVM: arm64: Prepare to handle deferred
- save/restore of 32-bit registers
-In-Reply-To: <9a2edac8-29aa-ffac-a845-ef6090e2226c@arm.com>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-31-christoffer.dall@linaro.org>
- <9a2edac8-29aa-ffac-a845-ef6090e2226c@arm.com>
-Message-ID: <20180118131207.GD27865@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Jan 2018 14:14:11 +0100
+Subject: [PATCH] [wireless-next] mt76: fix building without CONFIG_LEDS_CLASS
+Message-ID: <20180118131524.817297-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 06:22:29PM +0000, Julien Thierry wrote:
-> Hi,
-> 
-> On 12/01/18 12:07, Christoffer Dall wrote:
-> >32-bit registers are not used by a 64-bit host kernel and can be
-> >deferred, but we need to rework the accesses to this register to access
-> >the latest value depending on whether or not guest system registers are
-> >loaded on the CPU or only reside in memory.
-> >
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-> 
-> >---
-> >  arch/arm64/include/asm/kvm_emulate.h | 32 +++++-------------
-> >  arch/arm64/kvm/regmap.c              | 65 ++++++++++++++++++++++++++----------
-> >  arch/arm64/kvm/sys_regs.c            |  6 ++--
-> >  3 files changed, 60 insertions(+), 43 deletions(-)
-> >
-> 
-> [...]
-> 
-> >diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
-> >index bbc6ae32e4af..3f65098aff8d 100644
-> >--- a/arch/arm64/kvm/regmap.c
-> >+++ b/arch/arm64/kvm/regmap.c
-> >@@ -141,28 +141,59 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
-> >  /*
-> >   * Return the SPSR for the current mode of the virtual CPU.
-> >   */
-> >-unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
-> >+static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
-> >  {
-> >  	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
-> >  	switch (mode) {
-> >-	case COMPAT_PSR_MODE_SVC:
-> >-		mode = KVM_SPSR_SVC;
-> >-		break;
-> >-	case COMPAT_PSR_MODE_ABT:
-> >-		mode = KVM_SPSR_ABT;
-> >-		break;
-> >-	case COMPAT_PSR_MODE_UND:
-> >-		mode = KVM_SPSR_UND;
-> >-		break;
-> >-	case COMPAT_PSR_MODE_IRQ:
-> >-		mode = KVM_SPSR_IRQ;
-> >-		break;
-> >-	case COMPAT_PSR_MODE_FIQ:
-> >-		mode = KVM_SPSR_FIQ;
-> >-		break;
-> >+	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
-> >+	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
-> >+	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
-> >+	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
-> >+	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
-> >+	default: BUG();
-> >+	}
-> >+}
-> >+
-> >+unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
-> >+{
-> >+	int spsr_idx = vcpu_spsr32_mode(vcpu);
-> >+
-> >+	if (!vcpu->arch.sysregs_loaded_on_cpu)
-> >+		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
-> >+
-> >+	switch (spsr_idx) {
-> >+	case KVM_SPSR_SVC:
-> >+		return read_sysreg_el1(spsr);
-> >+	case KVM_SPSR_ABT:
-> >+		return read_sysreg(spsr_abt);
-> >+	case KVM_SPSR_UND:
-> >+		return read_sysreg(spsr_und);
-> >+	case KVM_SPSR_IRQ:
-> >+		return read_sysreg(spsr_irq);
-> >+	case KVM_SPSR_FIQ:
-> >+		return read_sysreg(spsr_fiq);
-> >  	default:
-> >  		BUG();
-> 
-> Nit:
-> 
-> Since the BUG() is in vcpu_spsr32_mode now, you can probably remove it here
-> (or add it to vcpu_write_sprsr32 for consistency).
-> 
-> >  	}
+When CONFIG_LEDS_CLASS is disabled, or it is a loadable module while
+mt76 is built-in, we run into a link error:
 
-Yes, I'll remove it.
+drivers/net/wireless/mediatek/mt76/mac80211.o: In function `mt76_register_device':
+mac80211.c:(.text+0xb78): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `devm_of_led_classdev_register'
 
-Thanks,
--Christoffer
+We don't really need a hard dependency here as the driver can presumably
+work just fine without LEDs, so this follows the iwlwifi example and
+adds a separate Kconfig option for the LED support, this will be available
+whenever it will link, and otherwise the respective code gets left out from
+the driver object.
 
-> >+}
-> >-	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
-> >+void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
-> >+{
-> >+	int spsr_idx = vcpu_spsr32_mode(vcpu);
-> >+
-> >+	if (!vcpu->arch.sysregs_loaded_on_cpu)
-> >+		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
-> >+
-> >+	switch (spsr_idx) {
-> >+	case KVM_SPSR_SVC:
-> >+		write_sysreg_el1(v, spsr);
-> >+	case KVM_SPSR_ABT:
-> >+		write_sysreg(v, spsr_abt);
-> >+	case KVM_SPSR_UND:
-> >+		write_sysreg(v, spsr_und);
-> >+	case KVM_SPSR_IRQ:
-> >+		write_sysreg(v, spsr_irq);
-> >+	case KVM_SPSR_FIQ:
-> >+		write_sysreg(v, spsr_fiq);
-> >+	}
-> >  }
+Fixes: 17f1de56df05 ("mt76: add common code shared between multiple chipsets")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/wireless/mediatek/mt76/Kconfig       | 5 +++++
+ drivers/net/wireless/mediatek/mt76/mac80211.c    | 8 +++++---
+ drivers/net/wireless/mediatek/mt76/mt76x2_init.c | 6 ++++--
+ 3 files changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/wireless/mediatek/mt76/Kconfig b/drivers/net/wireless/mediatek/mt76/Kconfig
+index fc05d79c80d0..9d12c1f5284e 100644
+--- a/drivers/net/wireless/mediatek/mt76/Kconfig
++++ b/drivers/net/wireless/mediatek/mt76/Kconfig
+@@ -8,3 +8,8 @@ config MT76x2E
+ 	depends on PCI
+ 	---help---
+ 	  This adds support for MT7612/MT7602/MT7662-based wireless PCIe devices.
++
++config MT76_LEDS
++	bool "LED support for MT76"
++	depends on MT76_CORE
++	depends on LEDS_CLASS=y || MT76_CORE=LEDS_CLASS
+diff --git a/drivers/net/wireless/mediatek/mt76/mac80211.c b/drivers/net/wireless/mediatek/mt76/mac80211.c
+index 3acf0e175d71..144e312a9407 100644
+--- a/drivers/net/wireless/mediatek/mt76/mac80211.c
++++ b/drivers/net/wireless/mediatek/mt76/mac80211.c
+@@ -295,9 +295,11 @@ int mt76_register_device(struct mt76_dev *dev, bool vht,
+ 	mt76_check_sband(dev, NL80211_BAND_2GHZ);
+ 	mt76_check_sband(dev, NL80211_BAND_5GHZ);
+ 
+-	ret = mt76_led_init(dev);
+-	if (ret)
+-		return ret;
++	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
++		ret = mt76_led_init(dev);
++		if (ret)
++			return ret;
++	}
+ 
+ 	return ieee80211_register_hw(hw);
+ }
+diff --git a/drivers/net/wireless/mediatek/mt76/mt76x2_init.c b/drivers/net/wireless/mediatek/mt76/mt76x2_init.c
+index 4373a2ba5143..0c9d02af205d 100644
+--- a/drivers/net/wireless/mediatek/mt76/mt76x2_init.c
++++ b/drivers/net/wireless/mediatek/mt76/mt76x2_init.c
+@@ -849,8 +849,10 @@ int mt76x2_register_device(struct mt76x2_dev *dev)
+ 	mt76x2_dfs_init_detector(dev);
+ 
+ 	/* init led callbacks */
+-	dev->mt76.led_cdev.brightness_set = mt76x2_led_set_brightness;
+-	dev->mt76.led_cdev.blink_set = mt76x2_led_set_blink;
++	if (IS_ENABLED(CONFIG_MT76_LEDS)) {
++		dev->mt76.led_cdev.brightness_set = mt76x2_led_set_brightness;
++		dev->mt76.led_cdev.blink_set = mt76x2_led_set_blink;
++	}
+ 
+ 	ret = mt76_register_device(&dev->mt76, true, mt76x2_rates,
+ 				   ARRAY_SIZE(mt76x2_rates));
+-- 
+2.9.0
