@@ -1,64 +1,107 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Thu, 18 Jan 2018 18:06:21 +0530
-Subject: [Patch v6 02/12] [media] s5p-mfc: Adding initial support for
- MFC v10.10
-In-Reply-To: <CAOFm3uHyNt3k+_n3SvSP-BNFeEeu1CO6PpEbxs9JU0MxsHm=Jg@mail.gmail.com>
-References: <CGME20171208093637epcas1p217ea0e337333ebf6918bc0418753d2af@epcas1p2.samsung.com>
- <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
- <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
- <CAOFm3uHyNt3k+_n3SvSP-BNFeEeu1CO6PpEbxs9JU0MxsHm=Jg@mail.gmail.com>
-Message-ID: <1516278981.22129.12.camel@smitha-fedora>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 18 Jan 2018 14:04:08 +0100
+Subject: [PATCH v3 05/12] drm/bridge/synopsys: dw-hdmi: don't clobber
+ drvdata
+In-Reply-To: <20180117201421.25954-6-jernej.skrabec@siol.net>
+References: <20180117201421.25954-1-jernej.skrabec@siol.net>
+ <20180117201421.25954-6-jernej.skrabec@siol.net>
+Message-ID: <91cd3ffd-e5cc-8149-2c57-6f93da55a0e4@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-12-08 at 14:25 +0100, Philippe Ombredanne wrote:
-> Smitha,
+On 17/01/2018 21:14, Jernej Skrabec wrote:
+> dw_hdmi shouldn't set drvdata since some drivers might need to store
+> it's own data there. Rework dw_hdmi in a way to return struct dw_hdmi
+> instead to store it in drvdata. This way drivers are responsible to
+> store and pass structure when needed.
 > 
-> On Fri, Dec 8, 2017 at 10:08 AM, Smitha T Murthy <smitha.t@samsung.com> wrote:
-> > Adding the support for MFC v10.10, with new register file and
-> > necessary hw control, decoder, encoder and structural changes.
-> >
-> > CC: Rob Herring <robh+dt@kernel.org>
-> > CC: devicetree at vger.kernel.org
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> []
-> > --- /dev/null
-> > +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > @@ -0,0 +1,36 @@
-> > +/*
-> > + * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
-> > + *
-> > + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
-> > + *     http://www.samsung.com/
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
+> Idea was taken from the following commit:
+> 8242ecbd597d ("drm/bridge/synopsys: stop clobbering drvdata")
 > 
-> Have you considered using the new SPDX ids instead of this fine legalese? e.g.:
+> Cc: p.zabel at pengutronix.de
+> Cc: narmstrong at baylibre.com
+> Cc: Laurent.pinchart at ideasonboard.com
+> Cc: hjc at rock-chips.com
+> Cc: heiko at sntech.de
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c   | 31 ++++++++++++-----------------
+>  drivers/gpu/drm/imx/dw_hdmi-imx.c           | 13 +++++++++---
+>  drivers/gpu/drm/meson/meson_dw_hdmi.c       | 14 +++++++++----
+>  drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c      | 12 +++++++++--
+>  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 13 +++++++++---
+>  include/drm/bridge/dw_hdmi.h                | 13 ++++++------
+>  6 files changed, 60 insertions(+), 36 deletions(-)
 > 
-> // SPDX-License-Identifier: GPL-2.0
+
+[...]
+> diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> index e8c3ef8a94ce..d49af17310c9 100644
+> --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> @@ -140,6 +140,7 @@ struct meson_dw_hdmi {
+>  	struct clk *venci_clk;
+>  	struct regulator *hdmi_supply;
+>  	u32 irq_stat;
+> +	struct dw_hdmi *hdmi;
+>  };
+>  #define encoder_to_meson_dw_hdmi(x) \
+>  	container_of(x, struct meson_dw_hdmi, encoder)
+> @@ -878,9 +879,12 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
+>  	dw_plat_data->input_bus_format = MEDIA_BUS_FMT_YUV8_1X24;
+>  	dw_plat_data->input_bus_encoding = V4L2_YCBCR_ENC_709;
+>  
+> -	ret = dw_hdmi_bind(pdev, encoder, &meson_dw_hdmi->dw_plat_data);
+> -	if (ret)
+> -		return ret;
+> +	platform_set_drvdata(pdev, meson_dw_hdmi);
+> +
+> +	meson_dw_hdmi->hdmi = dw_hdmi_bind(pdev, encoder,
+> +					   &meson_dw_hdmi->dw_plat_data);
+> +	if (IS_ERR(meson_dw_hdmi->hdmi))
+> +		return PTR_ERR(meson_dw_hdmi->hdmi);
+>  
+>  	DRM_DEBUG_DRIVER("HDMI controller initialized\n");
+>  
+> @@ -890,7 +894,9 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
+>  static void meson_dw_hdmi_unbind(struct device *dev, struct device *master,
+>  				   void *data)
+>  {
+> -	dw_hdmi_unbind(dev);
+> +	struct meson_dw_hdmi *meson_dw_hdmi = dev_get_drvdata(dev);
+> +
+> +	dw_hdmi_unbind(meson_dw_hdmi->hdmi);
+>  }
+>  
+>  static const struct component_ops meson_dw_hdmi_ops = {
+
+[..]
+
+> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+> index f3f3f0e1b2d3..dd2a8cf7d20b 100644
+> --- a/include/drm/bridge/dw_hdmi.h
+> +++ b/include/drm/bridge/dw_hdmi.h
+> @@ -143,12 +143,13 @@ struct dw_hdmi_plat_data {
+>  			     unsigned long mpixelclock);
+>  };
+>  
+> -int dw_hdmi_probe(struct platform_device *pdev,
+> -		  const struct dw_hdmi_plat_data *plat_data);
+> -void dw_hdmi_remove(struct platform_device *pdev);
+> -void dw_hdmi_unbind(struct device *dev);
+> -int dw_hdmi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
+> -		 const struct dw_hdmi_plat_data *plat_data);
+> +struct dw_hdmi *dw_hdmi_probe(struct platform_device *pdev,
+> +			      const struct dw_hdmi_plat_data *plat_data);
+> +void dw_hdmi_remove(struct dw_hdmi *hdmi);
+> +void dw_hdmi_unbind(struct dw_hdmi *hdmi);
+> +struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
+> +			     struct drm_encoder *encoder,
+> +			     const struct dw_hdmi_plat_data *plat_data);
+>  
+>  void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
+>  
 > 
-> This is much shorter and neater (unless you are a legalese lover of
-> course!)  Check also Thomas doc patches and Linus comments on why he
-> prefers the C++ comment style for these.
-> 
-> And even better could be this more compact form? I am a big fan of the
-> C++ style comments for these (and so is Linus)
-> 
-> // SPDX-License-Identifier: GPL-2.0
-> // Copyright (c) 2017 Samsung Electronics Co., Ltd.
-> // Register definition file for Samsung MFC V10.x Interface (FIMV) driver
-> 
-> You can also read this fine article from a fellow Samsung colleague
-> [1]. And if you ever consider doing this for all Samsung's past,
-> present and future contributions, you will have my deep gratitude
-> 
-> [1] https://blogs.s-osg.org/linux-kernel-license-practices-revisited-spdx/
-> 
-Ok I will change to the SPDX license in the next patch series for the
-v10 register file. Correspondingly for the MFC driver's files I will
-update the license as a separate patch and submit.
+
+For meson-drm and dw-hdmi bridge changes :
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
