@@ -1,135 +1,71 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 18 Jan 2018 15:34:19 +0100
-Subject: [PATCH v3 03/14] mmc: mmci: Don't pretend all variants to have
- OPENDRAIN bit
+Date: Thu, 18 Jan 2018 15:34:24 +0100
+Subject: [PATCH v3 08/14] ARM: dts: stm32: Add pin map for SDIO controller on
+ stm32f4
 In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
 References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1516286070-24927-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <1516286070-24927-9-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+From: Andrea Merello <andrea.merello@gmail.com>
 
-This patch prepares for supporting STM32 variant which doesn't
-have opendrain bit in MMCIPOWER register.
-ST others variant (u300, nomadik and ux500) uses MCI_OD bit whereas
-others variants uses MCI_ROD bit.
+This patch adds the pin configuration for SDIO controller on
+stm32f4.
 
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
 
-v3: _ use variant->opendrain instead of host->variant->opendrain
-    _ remove comment about OD and ROD bit
+v3: _ none
 
-v2: _ Replace opendrain bool type by u32
-    _ Clean opendrain bit management code
+v2: _ none
 
- drivers/mmc/host/mmci.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 8a4fbc2..f0edfe7 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -85,6 +85,7 @@
-  * @mmcimask1: true if variant have a MMCIMASK1 register.
-  * @start_err: bitmask identifying the STARTBITERR bit inside MMCISTATUS
-  *	       register.
-+ * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -116,6 +117,7 @@ struct variant_data {
- 	bool			reversed_irq_handling;
- 	bool			mmcimask1;
- 	u32			start_err;
-+	u32			opendrain;
+ arch/arm/boot/dts/stm32f4-pinctrl.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/arch/arm/boot/dts/stm32f4-pinctrl.dtsi b/arch/arm/boot/dts/stm32f4-pinctrl.dtsi
+index ae94d86..3520289 100644
+--- a/arch/arm/boot/dts/stm32f4-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32f4-pinctrl.dtsi
+@@ -338,6 +338,37 @@
+ 					slew-rate = <3>;
+ 				};
+ 			};
++
++			sdio_pins: sdio_pins at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDIO_D0 */
++						 <STM32_PINMUX('C', 9, AF12)>, /* SDIO_D1 */
++						 <STM32_PINMUX('C', 10, AF12)>, /* SDIO_D2 */
++						 <STM32_PINMUX('C', 11, AF12)>, /* SDIO_D3 */
++						 <STM32_PINMUX('C', 12, AF12)>, /* SDIO_CK */
++						 <STM32_PINMUX('D', 2, AF12)>; /* SDIO_CMD */
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++			};
++
++			sdio_pins_od: sdio_pins_od at 0 {
++				pins1 {
++					pinmux = <STM32_PINMUX('C', 8, AF12)>, /* SDIO_D0 */
++						 <STM32_PINMUX('C', 9, AF12)>, /* SDIO_D1 */
++						 <STM32_PINMUX('C', 10, AF12)>, /* SDIO_D2 */
++						 <STM32_PINMUX('C', 11, AF12)>, /* SDIO_D3 */
++						 <STM32_PINMUX('C', 12, AF12)>; /* SDIO_CK */
++					drive-push-pull;
++					slew-rate = <2>;
++				};
++
++				pins2 {
++					pinmux = <STM32_PINMUX('D', 2, AF12)>; /* SDIO_CMD */
++					drive-open-drain;
++					slew-rate = <2>;
++				};
++			};
+ 		};
+ 	};
  };
- 
- static struct variant_data variant_arm = {
-@@ -127,6 +129,7 @@ struct variant_data {
- 	.reversed_irq_handling	= true,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_ROD,
- };
- 
- static struct variant_data variant_arm_extended_fifo = {
-@@ -137,6 +140,7 @@ struct variant_data {
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_ROD,
- };
- 
- static struct variant_data variant_arm_extended_fifo_hwfc = {
-@@ -148,6 +152,7 @@ struct variant_data {
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_ROD,
- };
- 
- static struct variant_data variant_u300 = {
-@@ -165,6 +170,7 @@ struct variant_data {
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_OD,
- };
- 
- static struct variant_data variant_nomadik = {
-@@ -183,6 +189,7 @@ struct variant_data {
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_OD,
- };
- 
- static struct variant_data variant_ux500 = {
-@@ -207,6 +214,7 @@ struct variant_data {
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_OD,
- };
- 
- static struct variant_data variant_ux500v2 = {
-@@ -233,6 +241,7 @@ struct variant_data {
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_OD,
- };
- 
- static struct variant_data variant_qcom = {
-@@ -253,6 +262,7 @@ struct variant_data {
- 	.qcom_dml		= true,
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
-+	.opendrain		= MCI_ROD,
- };
- 
- /* Busy detection for the ST Micro variant */
-@@ -1455,17 +1465,8 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 				~MCI_ST_DATA2DIREN);
- 	}
- 
--	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN) {
--		if (host->hw_designer != AMBA_VENDOR_ST)
--			pwr |= MCI_ROD;
--		else {
--			/*
--			 * The ST Micro variant use the ROD bit for something
--			 * else and only has OD (Open Drain).
--			 */
--			pwr |= MCI_OD;
--		}
--	}
-+	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN && variant->opendrain)
-+		pwr |= variant->opendrain;
- 
- 	/*
- 	 * If clock = 0 and the variant requires the MMCIPOWER to be used for
 -- 
 1.9.1
