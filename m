@@ -1,157 +1,353 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Jan 2018 14:45:22 +0000
-Subject: [RFC PATCH v2 1/3] arm64/kernel: kaslr: reduce module randomization
- range to 4 GB
+Date: Thu, 18 Jan 2018 14:45:23 +0000
+Subject: [RFC PATCH v2 2/3] arm64/kernel: don't ban ADRP to work around
+ Cortex-A53 erratum #843419
 In-Reply-To: <20180118144524.18704-1-ard.biesheuvel@linaro.org>
 References: <20180118144524.18704-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180118144524.18704-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180118144524.18704-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have to rely on the GCC large code model for KASLR for
-two distinct but related reasons:
-- if we enable full randomization, modules will be loaded very far away
-  from the core kernel, where they are out of range for ADRP instructions,
-- even without full randomization, the fact that the 128 MB module region
-  is now no longer fully reserved for kernel modules means that there is
-  a very low likelihood that the normal bottom-up allocation of other
-  vmalloc regions may collide, and use up the range for other things.
+Working around Cortex-A53 erratum #843419 involves special handling of
+ADRP instructions that end up in the last two instruction slots of a
+4k page, or whose output register gets overwritten without having been
+read.
 
-Large model code is suboptimal, given that each symbol reference involves
-a literal load that goes through the D-cache, reducing cache utilization.
-But more importantly, literals are not instructions but part of .text
-nonetheless, and hence mapped with executable permissions.
+Normally, this gets taken care of by the linker, which can spot such
+sequences at final link time, and insert a veneer if the ADRP ends up
+at a vulnerable offset. However, linux kernel modules are partially
+linked ELF objects, and so there is no 'final link time' other than the
+runtime loading of the module, at which time all the static relocations
+are resolved.
 
-So let's get rid of our dependency on the large model for KASLR, by:
-- reducing the full randomization range to 4 GB, thereby ensuring that
-  ADRP references between modules and the kernel are always in range,
-- reduce the spillover range to 4 GB as well, so that we fallback to a
-  region that is still guaranteed to be in range
-- move the randomization window of the core kernel to the middle of the
-  VMALLOC space
+For this reason, we have implemented the #843419 workaround for modules
+by avoiding ADRP instructions altogether, by using the large C model,
+and by passing -mpc-relative-literal-loads to recent versions of GCC
+that may emit adrp/ldr pairs to perform literal loads. However, this
+workaround forces us to keep literal data mixed with the instructions
+in the executable .text segment, and literal data may inadvertently
+turn into an exploitable speculative gadget depending on the relative
+offsets of arbitrary symbols.
 
-Note that KASAN always uses the module region outside of the vmalloc space,
-so keep the kernel close to that if KASAN is enabled.
+So let's reimplement this workaround in a way that allows us to switch
+back to the small C model, and to drop the -mpc-relative-literal-loads
+GCC switch, by patching affected ADRP instructions at runtime:
+- ADRP instructions that do not appear at 4k relative offset 0xff8 or
+  0xffc are ignored
+- ADRP instructions that are within 1 MB of their target symbol are
+  converted into ADR instructions
+- remaining ADRP instructions are redirected via a veneer that performs
+  the load using an unaffected movn/movk sequence.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig         |  6 +++---
- arch/arm64/kernel/kaslr.c  | 20 ++++++++++++--------
- arch/arm64/kernel/module.c | 10 +++++++---
- include/linux/sizes.h      |  2 ++
- 4 files changed, 24 insertions(+), 14 deletions(-)
+ arch/arm64/Kconfig                  | 12 +--
+ arch/arm64/Makefile                 |  5 --
+ arch/arm64/include/asm/module.h     |  2 +
+ arch/arm64/kernel/module-plts.c     | 78 +++++++++++++++++++-
+ arch/arm64/kernel/module.c          | 32 +++++++-
+ arch/arm64/kernel/reloc_test_core.c |  4 +-
+ arch/arm64/kernel/reloc_test_syms.S | 12 ++-
+ 7 files changed, 122 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b488076d63c2..1cb3441558fa 100644
+index 1cb3441558fa..592ef5040b86 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -1140,12 +1140,12 @@ config RANDOMIZE_BASE
- 	  If unsure, say N.
- 
- config RANDOMIZE_MODULE_REGION_FULL
--	bool "Randomize the module region independently from the core kernel"
-+	bool "Randomize the module region over a 4 GB range"
- 	depends on RANDOMIZE_BASE
+@@ -452,12 +452,12 @@ config ARM64_ERRATUM_845719
+ config ARM64_ERRATUM_843419
+ 	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
  	default y
+-	select ARM64_MODULE_CMODEL_LARGE if MODULES
++	select ARM64_MODULE_PLTS if MODULES
  	help
--	  Randomizes the location of the module region without considering the
--	  location of the core kernel. This way, it is impossible for modules
-+	  Randomizes the location of the module region inside a 4 GB window
-+	  covering the core kernel. This way, it is less likely for modules
- 	  to leak information about the location of core kernel data structures
- 	  but it does imply that function calls between modules and the core
- 	  kernel will need to be resolved via veneers in the module PLT.
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index 47080c49cc7e..9e68a37429b9 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -117,13 +117,15 @@ u64 __init kaslr_early_init(u64 dt_phys)
- 	/*
- 	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
- 	 * kernel image offset from the seed. Let's place the kernel in the
--	 * lower half of the VMALLOC area (VA_BITS - 2).
-+	 * middle half of the VMALLOC area (VA_BITS - 2), and stay clear of
-+	 * the lower and upper quarters to avoid colliding with other
-+	 * allocations.
- 	 * Even if we could randomize at page granularity for 16k and 64k pages,
- 	 * let's always round to 2 MB so we don't interfere with the ability to
- 	 * map using contiguous PTEs
- 	 */
- 	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
--	offset = seed & mask;
-+	offset = BIT(VA_BITS - 3) + (seed & mask);
+ 	  This option links the kernel with '--fix-cortex-a53-843419' and
+-	  builds modules using the large memory model in order to avoid the use
+-	  of the ADRP instruction, which can cause a subsequent memory access
+-	  to use an incorrect address on Cortex-A53 parts up to r0p4.
++	  enables PLT support to replace certain ADRP instructions, which can
++	  cause subsequent memory accesses to use an incorrect address on
++	  Cortex-A53 parts up to r0p4.
  
- 	/* use the top 16 bits to randomize the linear region */
- 	memstart_offset_seed = seed >> 48;
-@@ -149,21 +151,23 @@ u64 __init kaslr_early_init(u64 dt_phys)
- 		 * vmalloc region, since shadow memory is allocated for each
- 		 * module at load time, whereas the vmalloc region is shadowed
- 		 * by KASAN zero pages. So keep modules out of the vmalloc
--		 * region if KASAN is enabled.
-+		 * region if KASAN is enabled, and put the kernel within 4 GB
-+		 * of the module region.
- 		 */
--		return offset;
-+		return offset % SZ_2G;
+ 	  If unsure, say Y.
  
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_MODULE_REGION_FULL)) {
- 		/*
--		 * Randomize the module region independently from the core
--		 * kernel. This prevents modules from leaking any information
-+		 * Randomize the module region over a 4 GB window covering the
-+		 * kernel. This reduces the risk of modules leaking information
- 		 * about the address of the kernel itself, but results in
- 		 * branches between modules and the core kernel that are
- 		 * resolved via PLTs. (Branches between modules will be
- 		 * resolved normally.)
- 		 */
--		module_range = VMALLOC_END - VMALLOC_START - MODULES_VSIZE;
--		module_alloc_base = VMALLOC_START;
-+		module_range = SZ_4G - (u64)(_end - _stext);
-+		module_alloc_base = max((u64)_end + offset - SZ_4G,
-+					(u64)MODULES_VADDR);
- 	} else {
- 		/*
- 		 * Randomize the module region by setting module_alloc_base to
+@@ -1101,12 +1101,8 @@ config ARM64_SVE
+ 
+ 	  To enable use of this extension on CPUs that implement it, say Y.
+ 
+-config ARM64_MODULE_CMODEL_LARGE
+-	bool
+-
+ config ARM64_MODULE_PLTS
+ 	bool
+-	select ARM64_MODULE_CMODEL_LARGE
+ 	select HAVE_MOD_ARCH_SPECIFIC
+ 
+ config RELOCATABLE
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b481b4a7c011..811ad08c531d 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -51,7 +51,6 @@ endif
+ 
+ KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
+ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+-KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
+ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+ 
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+@@ -77,10 +76,6 @@ endif
+ 
+ CHECKFLAGS	+= -D__aarch64__ -m64
+ 
+-ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
+-KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+-endif
+-
+ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
+ KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
+ endif
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 4f766178fa6f..b6dbbe3123a9 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -39,6 +39,8 @@ struct mod_arch_specific {
+ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+ 			  Elf64_Sym *sym);
+ 
++u64 module_emit_adrp_veneer(struct module *mod, void *loc, u64 val);
++
+ #ifdef CONFIG_RANDOMIZE_BASE
+ extern u64 module_alloc_base;
+ #else
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index ea640f92fe5a..865094a0181e 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -41,6 +41,47 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+ 	return (u64)&plt[i];
+ }
+ 
++#ifdef CONFIG_ARM64_ERRATUM_843419
++u64 module_emit_adrp_veneer(struct module *mod, void *loc, u64 val)
++{
++	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
++							  &mod->arch.init;
++	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
++	int i = pltsec->plt_num_entries;
++	u32 mov0, mov1, mov2, br;
++	int rd;
++
++	/* get the destination register of the ADRP instruction */
++	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD,
++					  le32_to_cpup((__le32 *)loc));
++
++	/* generate the veneer instructions */
++	mov0 = aarch64_insn_gen_movewide(rd, (u16)~val, 0,
++					 AARCH64_INSN_VARIANT_64BIT,
++					 AARCH64_INSN_MOVEWIDE_INVERSE);
++	mov1 = aarch64_insn_gen_movewide(rd, (u16)(val >> 16), 16,
++					 AARCH64_INSN_VARIANT_64BIT,
++					 AARCH64_INSN_MOVEWIDE_KEEP);
++	mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
++					 AARCH64_INSN_VARIANT_64BIT,
++					 AARCH64_INSN_MOVEWIDE_KEEP);
++	br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
++					 AARCH64_INSN_BRANCH_NOLINK);
++
++	plt[i] = (struct plt_entry){
++			cpu_to_le32(mov0),
++			cpu_to_le32(mov1),
++			cpu_to_le32(mov2),
++			cpu_to_le32(br)
++		};
++
++	pltsec->plt_num_entries++;
++	BUG_ON(pltsec->plt_num_entries > pltsec->plt_max_entries);
++
++	return (u64)&plt[i];
++}
++#endif
++
+ #define cmp_3way(a,b)	((a) < (b) ? -1 : (a) > (b))
+ 
+ static int cmp_rela(const void *a, const void *b)
+@@ -68,16 +109,22 @@ static bool duplicate_rel(const Elf64_Rela *rela, int num)
+ }
+ 
+ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+-			       Elf64_Word dstidx)
++			       Elf64_Word dstidx, Elf_Shdr *sechdrs)
+ {
++	Elf64_Shdr *dstsec = sechdrs + sechdrs[dstidx].sh_info;
+ 	unsigned int ret = 0;
+ 	Elf64_Sym *s;
+ 	int i;
+ 
+ 	for (i = 0; i < num; i++) {
++		u64 min_align;
++
+ 		switch (ELF64_R_TYPE(rela[i].r_info)) {
+ 		case R_AARCH64_JUMP26:
+ 		case R_AARCH64_CALL26:
++			if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
++				break;
++
+ 			/*
+ 			 * We only have to consider branch targets that resolve
+ 			 * to symbols that are defined in a different section.
+@@ -109,6 +156,31 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
+ 			if (rela[i].r_addend != 0 || !duplicate_rel(rela, i))
+ 				ret++;
+ 			break;
++		case R_AARCH64_ADR_PREL_PG_HI21_NC:
++		case R_AARCH64_ADR_PREL_PG_HI21:
++			if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
++				break;
++
++			/*
++			 * Determine the minimal safe alignment for this ADRP
++			 * instruction: the section alignment at which it is
++			 * guaranteed not to appear at a vulnerable offset.
++			 */
++			min_align = 2 << ffz(rela[i].r_offset | 0x7);
++
++			/*
++			 * Allocate veneer space for each ADRP that may appear
++			 *@a vulnerable offset nonetheless. At relocation
++			 * time, some of these will remain unused since some
++			 * ADRP instructions can be patched to ADR instructions
++			 * instead.
++			 */
++			if (min_align > SZ_4K)
++				ret++;
++			else
++				dstsec->sh_addralign = max(dstsec->sh_addralign,
++							   min_align);
++			break;
+ 		}
+ 	}
+ 	return ret;
+@@ -166,10 +238,10 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 
+ 		if (strncmp(secstrings + dstsec->sh_name, ".init", 5) != 0)
+ 			core_plts += count_plts(syms, rels, numrels,
+-						sechdrs[i].sh_info);
++						sechdrs[i].sh_info, sechdrs);
+ 		else
+ 			init_plts += count_plts(syms, rels, numrels,
+-						sechdrs[i].sh_info);
++						sechdrs[i].sh_info, sechdrs);
+ 	}
+ 
+ 	mod->arch.core.plt->sh_type = SHT_NOBITS;
 diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index f469e0435903..c28a04256e1f 100644
+index c28a04256e1f..000196fe8f82 100644
 --- a/arch/arm64/kernel/module.c
 +++ b/arch/arm64/kernel/module.c
-@@ -45,7 +45,10 @@ void *module_alloc(unsigned long size)
- 				NUMA_NO_NODE, __builtin_return_address(0));
+@@ -201,6 +201,32 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
+ 	return 0;
+ }
  
- 	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
--	    !IS_ENABLED(CONFIG_KASAN))
-+	    !IS_ENABLED(CONFIG_KASAN)) {
-+		u64 start = max(_end - SZ_4G, MODULES_VADDR);
-+		u64 end = start + SZ_4G;
++static bool reloc_adrp_erratum_843419(struct module *mod, __le32 *place,
++				      u64 val)
++{
++	if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
++		return false;
 +
- 		/*
- 		 * KASAN can only deal with module allocations being served
- 		 * from the reserved module region, since the remainder of
-@@ -55,9 +58,10 @@ void *module_alloc(unsigned long size)
- 		 * less likely that the module region gets exhausted, so we
- 		 * can simply omit this fallback in that case.
- 		 */
--		p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
--				VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
-+		p = __vmalloc_node_range(size, MODULE_ALIGN, start,
-+				end, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
- 				NUMA_NO_NODE, __builtin_return_address(0));
++	/* only ADRP instructions at the end of a 4k page are affected */
++	if (((u64)place & 0xfff) < 0xff8)
++		return false;
++
++	/* patch ADRP to ADR if it is in range */
++	if (!reloc_insn_imm(RELOC_OP_PREL, place, val & ~0xfff, 0, 21,
++			    AARCH64_INSN_IMM_ADR)) {
++		((u8 *)place)[3] &= 0x7f; /* clear opcode bit 31 */
++	} else {
++		u32 insn;
++
++		/* out of range for ADR -> emit a veneer */
++		val = module_emit_adrp_veneer(mod, place, val & ~0xfff);
++		insn = aarch64_insn_gen_branch_imm((u64)place, val,
++						   AARCH64_INSN_BRANCH_NOLINK);
++		*place = cpu_to_le32(insn);
 +	}
- 
- 	if (p && (kasan_module_alloc(p, size) < 0)) {
- 		vfree(p);
-diff --git a/include/linux/sizes.h b/include/linux/sizes.h
-index ce3e8150c174..bc621db852d9 100644
---- a/include/linux/sizes.h
-+++ b/include/linux/sizes.h
-@@ -44,4 +44,6 @@
- #define SZ_1G				0x40000000
- #define SZ_2G				0x80000000
- 
-+#define SZ_4G				0x100000000ULL
++	return true;
++}
 +
- #endif /* __LINUX_SIZES_H__ */
+ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 		       const char *strtab,
+ 		       unsigned int symindex,
+@@ -340,14 +366,16 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
+ 					     AARCH64_INSN_IMM_ADR);
+ 			break;
+-#ifndef CONFIG_ARM64_ERRATUM_843419
+ 		case R_AARCH64_ADR_PREL_PG_HI21_NC:
+ 			overflow_check = false;
+ 		case R_AARCH64_ADR_PREL_PG_HI21:
++			ovf = 0;
++			if (reloc_adrp_erratum_843419(me, loc, val))
++				break;
++
+ 			ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
+ 					     AARCH64_INSN_IMM_ADR);
+ 			break;
+-#endif
+ 		case R_AARCH64_ADD_ABS_LO12_NC:
+ 		case R_AARCH64_LDST8_ABS_LO12_NC:
+ 			overflow_check = false;
+diff --git a/arch/arm64/kernel/reloc_test_core.c b/arch/arm64/kernel/reloc_test_core.c
+index c124752a8bd3..a70489c584c7 100644
+--- a/arch/arm64/kernel/reloc_test_core.c
++++ b/arch/arm64/kernel/reloc_test_core.c
+@@ -28,6 +28,7 @@ asmlinkage u64 absolute_data16(void);
+ asmlinkage u64 signed_movw(void);
+ asmlinkage u64 unsigned_movw(void);
+ asmlinkage u64 relative_adrp(void);
++asmlinkage u64 relative_adrp_far(void);
+ asmlinkage u64 relative_adr(void);
+ asmlinkage u64 relative_data64(void);
+ asmlinkage u64 relative_data32(void);
+@@ -43,9 +44,8 @@ static struct {
+ 	{ "R_AARCH64_ABS16",		absolute_data16, UL(SYM16_ABS_VAL) },
+ 	{ "R_AARCH64_MOVW_SABS_Gn",	signed_movw, UL(SYM64_ABS_VAL) },
+ 	{ "R_AARCH64_MOVW_UABS_Gn",	unsigned_movw, UL(SYM64_ABS_VAL) },
+-#ifndef CONFIG_ARM64_ERRATUM_843419
+ 	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp, (u64)&sym64_rel },
+-#endif
++	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp_far, (u64)&printk },
+ 	{ "R_AARCH64_ADR_PREL_LO21",	relative_adr, (u64)&sym64_rel },
+ 	{ "R_AARCH64_PREL64",		relative_data64, (u64)&sym64_rel },
+ 	{ "R_AARCH64_PREL32",		relative_data32, (u64)&sym64_rel },
+diff --git a/arch/arm64/kernel/reloc_test_syms.S b/arch/arm64/kernel/reloc_test_syms.S
+index e1edcefeb02d..f333b4b7880d 100644
+--- a/arch/arm64/kernel/reloc_test_syms.S
++++ b/arch/arm64/kernel/reloc_test_syms.S
+@@ -43,15 +43,21 @@ ENTRY(unsigned_movw)
+ 	ret
+ ENDPROC(unsigned_movw)
+ 
+-#ifndef CONFIG_ARM64_ERRATUM_843419
+-
++	.align	12
++	.space	0xff8
+ ENTRY(relative_adrp)
+ 	adrp	x0, sym64_rel
+ 	add	x0, x0, #:lo12:sym64_rel
+ 	ret
+ ENDPROC(relative_adrp)
+ 
+-#endif
++	.align	12
++	.space	0xffc
++ENTRY(relative_adrp_far)
++	adrp	x0, printk
++	add	x0, x0, #:lo12:printk
++	ret
++ENDPROC(relative_adrp_far)
+ 
+ ENTRY(relative_adr)
+ 	adr	x0, sym64_rel
 -- 
 2.11.0
