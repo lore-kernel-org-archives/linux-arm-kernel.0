@@ -1,93 +1,48 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 18 Jan 2018 14:25:52 +0000
-Subject: [PATCH v2 0/2] arm64: Run enable method for errata work arounds
- on late CPUs
-In-Reply-To: <20180118142125.GM22781@e103592.cambridge.arm.com>
-References: <20180117174220.7959-1-suzuki.poulose@arm.com>
- <20180118114540.GL22781@e103592.cambridge.arm.com>
- <5c1945a8-a66d-9306-1c6d-3c1c8febcab2@arm.com>
- <851887b9-974a-6f20-920b-d9149d8122fe@arm.com>
- <20180118142125.GM22781@e103592.cambridge.arm.com>
-Message-ID: <806b4c01-9c82-8666-aa05-b1dc5d5afd47@arm.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Thu, 18 Jan 2018 15:27:43 +0100
+Subject: [PATCH v2 01/10] perf tools: Integrating the CoreSight decoding
+ library
+In-Reply-To: <20180118141423.GE18383@kernel.org>
+References: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
+ <1516039994-314-2-git-send-email-mathieu.poirier@linaro.org>
+ <20180116121500.GB26643@krava>
+ <CANLsYkyEnJ5QzYyuGwhCB5p_2mE+8DdjaU6=Vpa6=CeKR+DzWg@mail.gmail.com>
+ <20180117080640.GD6183@krava> <20180118134139.GC18383@kernel.org>
+ <20180118135948.GA2940@krava> <20180118141423.GE18383@kernel.org>
+Message-ID: <20180118142743.GD2940@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 14:21, Dave Martin wrote:
-> On Thu, Jan 18, 2018 at 12:08:43PM +0000, Robin Murphy wrote:
->> On 18/01/18 12:00, Robin Murphy wrote:
->> [...]
->>>> +struct enable_arg {
->>>> +??? int (*enable)(struct arm64_cpu_capabilities const *);
->>>> +??? struct arm64_cpu_capabilities const *cap;
->>>> +};
->>>> +
->>>> +static int __enable_cpu_capability(void *arg)
->>>> +{
->>>> +??? struct enable_arg const *e = arg;
->>>> +
->>>> +??? return e->enable(e->cap);
->>>> +}
->>>
->>> AFAICS, you shouldn't even need the intermediate struct - if you were
->>> instead to call stop_machine(&caps->enable, ...), the wrapper could be:
->>>
->>>  ????<type> **fn = arg;
->>>  ????*fn(container_of(fn, struct arm64_cpu_capabilities, enable));
->>>
->>> (cheaty pseudocode because there's no way I'm going to write a
->>> pointer-to-function-pointer type correctly in an email client...)
->>>
->>> That's certainly a fair bit simpler in terms of diffstat; whether it's
->>> really as intuitive as I think it is is perhaps another matter, though.
->>
->> Ah, right, but then you'd be back to casting away const, and at that point
->> it makes no sense to do the container_of dance instead of just passing the
->> struct pointer itself around...
->>
->> I shall now excuse myself from this discussion, as I'm clearly not helping
->> :)
->>
->> Robin.
+On Thu, Jan 18, 2018 at 11:14:23AM -0300, Arnaldo Carvalho de Melo wrote:
+> Em Thu, Jan 18, 2018 at 02:59:48PM +0100, Jiri Olsa escreveu:
+> > On Thu, Jan 18, 2018 at 10:41:39AM -0300, Arnaldo Carvalho de Melo wrote:
+> > > 	Shouldn't libopencsd be treated like libbabeltrace was before
+> > > the required version was widely available in distros?
 > 
-> That's what I was about to say... but neat trick.
+> > > 	I.e. these csets should have the rationale for that:
 > 
-> However, it does concentrate the type fudge in one place and keeps the
-> arm64_cpu_capabilities::enable() prototype correct, so it's still better
-> than the original.
+> > > Enabling it once it became widely available:
 > 
+> > >    24787afbcd01 ("perf tools: Enable LIBBABELTRACE by default")
 > 
-> Thinking about it, the following is probably clearer and no worse:
+> > > Disabling it because we would need to get things from tarballs/git
+> > > repos, build it in our machines, as requested by Ingo:
 > 
-> static int __enable_cpu_capability(void *arg)
-> {
-> 	struct arm64_cpu_capabilities const *cap = arg;
+> > >   6ab2b762befd ("perf build: Disable libbabeltrace check by default")
+> > 
+> > I think at that time we did not have a way to hide the check,
+> > now we have FEATURE_DISPLAY seprated so we can still check
+> > for it, but users won't be bothered with [ FAIL ] output
 > 
-> 	return cap->enable(cap);
-> }
+> Ok, users won't be bothered with the fail output, but we tried hard to
+> get the build fast by having it only test for things that are widely
+> available, right? I.e. if we know something is not widely available then
+> we better not try to build with it and get faster builds, wasn't that
+> part of the rationale in the babeltrace case?
 > 
-> ...
-> 
-> stop_machine(__enable_cpu_capability, (void *)caps, cpu_online_mask);
-> 
-> 
-> In your version, the argument would be (void *)&caps->enable, which is
-> really just a proxy for (void *)caps, unless I missed something.
-> 
-> 
-> What do you think Suzuki?  I can respin my patch if you fancy picking it
-> up.  Either way, it's not urgent.
+> If one has to build from sources some library, then its not a problem to
+> have in the make command line a LIBOPENCSD=1 switch?
 
-Thanks for cooking that up Dave & Robin. I prefer your second version.
-Please feel free to respin it. As you rightly said, this is not urgent
-and could pick it up in my re-writing of the capability infrastructure ;-)
+right, we can do it like that
 
-Meanwhile, I would really like some reviews on the original patch and
-push it for 4.16 (as a fix at least).
-
-Cheers
-Suzuki
-
-> 
-> Cheers
-> ---Dave
-> 
+jirka
