@@ -1,74 +1,36 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 18 Jan 2018 23:03:48 +0100
-Subject: [PATCH] Nokia N9: add support for up/down keys in the dts
-In-Reply-To: <20180102194236.ahrhkvnefre2l6gf@earth.universe>
-References: <20180102125948.GA20051@amd>
- <20180102194236.ahrhkvnefre2l6gf@earth.universe>
-Message-ID: <20180118220348.GD17196@amd>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Fri, 19 Jan 2018 00:04:22 +0100
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable AC97 codec support
+In-Reply-To: <1516279527-6516-1-git-send-email-fabio.estevam@nxp.com>
+References: <1516279527-6516-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <bbea2d1a-32a8-2b03-5bd6-fd36b0d68d37@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-01-02 20:42:36, Sebastian Reichel wrote:
-> Hi,
+On 18.01.2018 13:45, Fabio Estevam wrote:
+> imx6qdl udoo board has an AC97 codec. 
 > 
-> On Tue, Jan 02, 2018 at 01:59:48PM +0100, Pavel Machek wrote:
-> > 
-> > This adds support for volume up/down keys in the dts.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> Add support for it by default.
 > 
-> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-
-Tony, ping? Can I get you to apply this one?
-
-[PATCHv2] nokia N9: Add support for magnetometer
-
-should be good to go, too...
-									Pavel
-									
-
-> > diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
-> > index 39e35f8..57a6679 100644
-> > --- a/arch/arm/boot/dts/omap3-n9.dts
-> > +++ b/arch/arm/boot/dts/omap3-n9.dts
-> > @@ -11,9 +11,10 @@
-> >  /dts-v1/;
-> >  
-> >  #include "omap3-n950-n9.dtsi"
-> > +#include <dt-bindings/input/input.h>
-> >  
-> >  / {
-> >  	model = "Nokia N9";
-> >  	compatible = "nokia,omap3-n9", "ti,omap36xx", "ti,omap3";
-> >  };
-> >  
-> > @@ -72,3 +133,9 @@
-> >  	st,max-limit-y = <46>;
-> >  	st,max-limit-z = <46>;
-> >  };
-> > +
-> > +&twl_keypad {
-> > +	linux,keymap = < MATRIX_KEY(6, 8, KEY_VOLUMEUP)
-> > +			 MATRIX_KEY(7, 8, KEY_VOLUMEDOWN)
-> > +			 >;
-> > +};
-> > 
-> > 
-> > -- 
-> > (english) http://www.livejournal.com/~pavelmachek
-> > (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index 4cb9829..80ef9ed 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -285,6 +285,7 @@ CONFIG_SND_SOC_IMX_SGTL5000=y
+>  CONFIG_SND_SOC_IMX_SPDIF=y
+>  CONFIG_SND_SOC_IMX_MC13783=y
+>  CONFIG_SND_SOC_FSL_ASOC_CARD=y
+> +CONFIG_SND_SOC_AC97_CODEC=y
+>  CONFIG_SND_SOC_CS42XX8_I2C=y
+>  CONFIG_SND_SOC_TLV320AIC3X=y
+>  CONFIG_SND_SOC_WM8960=y
 > 
 
+Acked-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/8963ae25/attachment.sig>
+Maciej
