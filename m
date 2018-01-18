@@ -1,64 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 18 Jan 2018 12:31:41 +0000
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180109130012.GA27447@lunn.ch>
-References: <20180104160939.GA7785@xora-haswell>
- <20180104162036.GL3401@lunn.ch>
- <20180108144548.GA31502@xora-haswell>
- <20180108145312.GH10940@lunn.ch>
- <20180108151453.GB31502@xora-haswell>
- <20180108154243.GA30962@lunn.ch>
- <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
- <20180109101941.GD31502@xora-haswell>
- <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
- <20180109130012.GA27447@lunn.ch>
-Message-ID: <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 18 Jan 2018 13:31:37 +0100
+Subject: [net-next: PATCH v4 0/7] Armada 7k/8k PP2 ACPI support
+Message-ID: <1516278704-17141-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Mika]
+Hi,
 
-On Tue, Jan 09, 2018 at 02:00:12PM +0100, Andrew Lunn wrote:
-> On Tue, Jan 09, 2018 at 11:22:00AM +0100, Marcin Wojtas wrote:
-> > 2018-01-09 11:19 GMT+01:00 Graeme Gregory <graeme.gregory@linaro.org>:
-> > > On Mon, Jan 08, 2018 at 06:17:06PM +0100, Marcin Wojtas wrote:
-> > >> Hi Andrew,
-> > >>
-> > >>
-> > >>
-> > >> 2018-01-08 16:42 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
-> > >> > w> I am not familiar with MDIO, but if its similar or a specific
-> > >> >> implementation of a serial bus that does sound sane!
-> > >> >
-> > >>
-> > >> Thanks for digging, I will check if and how we can use
-> > >> GenericSerialBus with MDIO.
-> > >>
-> > > Maybe Lorenzo, Hanjun, Sudeep can comment here they might have come
-> > > across similar on other ARM boards.
-> > >
-> > 
-> > I'm looking forward to their feedback, however, what I've noticed,
-> > each driver handles mdio/phys on its own, not using any generic
-> > solution, which is what I need to actually avoid :)
-> 
-> Agreed. Lets define it once for all drivers using phylib/phylink.
+I quickly resend the series, thanks to Antoine Tenart's remark,
+who spotted !CONFIG_ACPI compilation issue after introducing
+the new fwnode_irq_get() routine. Please see the details in the changelog
+below and the 3/7 commit log.
 
-To start with, I am not entirely familiar with MDIO, apologies in
-advance. Building something on top of GenericSerialBus sounds correct
-but if I am not mistaken you would need a new bus type in the ACPI
-specs.
+mvpp2 driver can work with the ACPI representation, as exposed
+on a public branch:
+https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+It was compiled together with the most recent Tianocore EDK2 revision.
+Please refer to the firmware build instruction on MacchiatoBin board:
+http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
 
-I CC'ed Mika since he is more familiar with handling these bits of ACPI
-specs - I wonder whether this is a problem that cropped up on x86
-systems too.
+ACPI representation of PP2 controllers (withouth PHY support) can
+be viewed in the github:
+* MacchiatoBin:
+https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
 
-I do not think there is one and only answer but there must be a single
-set of bindings and if the ACPI specs already cater for some of them
-we have to reuse them.
+* Armada 7040 DB:
+https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
 
-Please take some time to ensure the solution you are pushing is widely
-deployable.
+I will appreciate any comments or remarks.
 
-Thanks,
-Lorenzo
+Best regards,
+Marcin
+
+Changelog:
+v3 -> v4:
+* 3/7
+    - add new macro (ACPI_HANDLE_FWNODE) and fix
+      compilation with !CONFIG_ACPI
+    - extend commit log and mention usability of fwnode_irq_get
+      for the child nodes as well
+
+v2 -> v3:
+* 1/7, 2/7
+    - Add Rafael's Acked-by's
+* 3/7, 4/7
+    - New patches
+* 6/7, 7/7
+    - Update driver with new helper routines usage
+    - Improve commit log.
+
+v1 -> v2:
+* Remove MDIO patches
+* Use PP2 ports only with link interrupts
+* Release second region resources in mvpp2 driver (code moved from
+  mvmdio), as explained in details in 5/5 commit message.
+
+Marcin Wojtas (7):
+  device property: Introduce fwnode_get_mac_address()
+  device property: Introduce fwnode_get_phy_mode()
+  device property: Introduce fwnode_irq_get()
+  device property: Allow iterating over available child fwnodes
+  net: mvpp2: simplify maintaining enabled ports' list
+  net: mvpp2: use device_*/fwnode_* APIs instead of of_*
+  net: mvpp2: enable ACPI support in the driver
+
+ drivers/base/property.c              | 104 ++++++++--
+ drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
+ include/linux/acpi.h                 |   3 +
+ include/linux/property.h             |  11 ++
+ 4 files changed, 232 insertions(+), 92 deletions(-)
+
+-- 
+2.7.4
