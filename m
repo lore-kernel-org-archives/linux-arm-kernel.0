@@ -1,161 +1,230 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 18 Jan 2018 15:29:59 +0200
-Subject: [PATCHv2 15/15] clk: ti: convert to use proper register
- definition for all accesses
-In-Reply-To: <CAHCN7x+hkCyrj1pH7f5DQia-1QgF3g-idAo0Sd-vY6u8iLufWA@mail.gmail.com>
-References: <1489236606-24023-1-git-send-email-t-kristo@ti.com>
- <1489236606-24023-16-git-send-email-t-kristo@ti.com>
- <CAHCN7x+oKEmXBpogy4VOB8UgmTd6+X5fBiP66yzUqXmvDWdqaw@mail.gmail.com>
- <6b4c5bf2-1260-0e79-0414-9870f21e4a75@ti.com>
- <CAHCN7xLaP-th=vAzN8C1QXstf3c5SP4JADAZZXTb1Nd6N6QdsQ@mail.gmail.com>
- <20180117211907.GE4042@atomide.com>
- <CAHCN7xJ-NaKoeZOqrdc48fFCLNQvm_uRXC0ErtiG+Ac86a14+w@mail.gmail.com>
- <4f0f185a-2890-3747-7060-1f5b5a77022a@ti.com>
- <CAHCN7x+hkCyrj1pH7f5DQia-1QgF3g-idAo0Sd-vY6u8iLufWA@mail.gmail.com>
-Message-ID: <cee43b44-1de6-a317-e89a-57f86607df86@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 18 Jan 2018 14:32:24 +0100
+Subject: [PATCH v3 00/41] Optimize KVM/ARM for VHE systems
+In-Reply-To: <20180118121821.gkfgvynco4b723nf@yury-thinkpad>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180115141423.5qho7xvmikq27jvs@yury-thinkpad>
+ <20180118111632.GA27865@cbox>
+ <20180118121821.gkfgvynco4b723nf@yury-thinkpad>
+Message-ID: <20180118133224.GE27865@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 15:26, Adam Ford wrote:
-> On Thu, Jan 18, 2018 at 1:34 AM, Tero Kristo <t-kristo@ti.com> wrote:
->> On 17/01/18 23:44, Adam Ford wrote:
->>>
->>> On Wed, Jan 17, 2018 at 3:19 PM, Tony Lindgren <tony@atomide.com> wrote:
->>>>
->>>> * Adam Ford <aford173@gmail.com> [180117 15:15]:
->>>>>
->>>>> On Wed, Jan 17, 2018 at 8:02 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>>>>
->>>>>> On 17/01/18 15:27, Adam Ford wrote:
->>>>>>>
->>>>>>>
->>>>>>> On Sat, Mar 11, 2017 at 6:50 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> Currently, TI clock driver uses an encapsulated struct that is cast
->>>>>>>> into
->>>>>>>> a void pointer to store all register addresses. This can be
->>>>>>>> considered
->>>>>>>> as rather nasty hackery, and prevents from expanding the register
->>>>>>>> address field also. Instead, replace all the code to use proper
->>>>>>>> struct
->>>>>>>> in place for this, which contains all the previously used data.
->>>>>>>>
->>>>>>>> This patch is rather large as it is touching multiple files, but this
->>>>>>>> can't be split up as we need to avoid any boot breakage.
->>>>>>>>
->>>>>>>
->>>>>>> I know it's late coming, but according to git bisect, this patch is
->>>>>>> causing some problems with Logic PD Torpedo 37xx Dev kit.
->>>>>>
->>>>>>
->>>>>>
->>>>>> Oh reporting bugs is never too late, thanks for posting this out.
->>>>>>
->>>>>>>
->>>>>>> It it is a DM3730 that has a WL1283 chipset attached to the SDIO
->>>>>>> interface on MMC3.  The driver seems to load properly, but when
->>>>>>> loading wpa_supplicant to activate the WL1283, we get a giant crash.
->>>>>>> I checked kernel revisions starting at 4.14 and working back to when
->>>>>>> it worked, then used git bisect from there.
->>>>>>>
->>>>>>> I am hoping it might be a simple fix for something that just needs to
->>>>>>> get added or tweaked in the device tree.
->>>>>>
->>>>>>
->>>>>>
->>>>>> I don't have access to the specific hw, but can you try to dig out
->>>>>> which
->>>>>> hwmod is causing the crash? Just print out the oh->name from the
->>>>>> _wait_softreset_complete. That would help root causing the issue.
->>>>>>
->>>>>
->>>>> With one small patch, I was able to make it work again.
->>>>>
->>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
->>>>> b/arch/arm/mach-omap2/omap_hwmod.c
->>>>> index 2dbd632..ed1f625 100644
->>>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
->>>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->>>>> @@ -477,7 +477,7 @@ static int _wait_softreset_complete(struct
->>>>> omap_hwmod *oh)
->>>>>           int c = 0;
->>>>>
->>>>>           sysc = oh->class->sysc;
->>>>> -
->>>>> +pr_warn("_wait_softreset_complete: %s\n", oh->name);
->>>>>           if (sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
->>>>>                   omap_test_timeout((omap_hwmod_read(oh, sysc->syss_offs)
->>>>>                                      & SYSS_RESETDONE_MASK),
->>>>>
->>>>>
->>>>> This leads me to believe that the omap_test_timeout functions might
->>>>> not be working quite right.
->>>>
->>>>
->>>> There may be a srst_udelay needed for some module, see commit
->>>> ebf244148092 ("ARM: OMAP2+: Use srst_udelay for USB on dm814x")
->>>> for example.
->>>>
->>>> You might be able to find which module it is by commenting out
->>>> postcore_initcall_sync(omap3_l3_init) in drivers/bus/omap_l3_smx.c
->>>> temporarily as the system will most likely hang right there.
->>>
->>>
->>> I commented out that line as you suggested, but the system boots as
->>> normal and I get the crash (as normal)
->>>
->>> I am looking through the DM3730 and OMAP3630 TRM now.  Any thought on
->>> a keyword search I should use to see which hwmods might require
->>> srst_udelay?
->>
->>
->> Looking at the log you provided, it looks like only mmc1, mmc3 and i2c1 are
->> reset during the wlan probe. Based on the prints coming out in the failing
->> case, it looks like the culprit might be mmc3 for some reason.
->>
->> [   18.239746] _wait_softreset_complete: mmc3
->> [   18.638580] _wait_softreset_complete: mmc3
->> [   18.657562] _wait_softreset_complete: mmc1
->> [   18.833374] wlcore: firmware booted (Rev 7.3.10.0.141)
->>
->> ^ the firmware notification above does not come out in the crash.
->>
+On Thu, Jan 18, 2018 at 03:18:21PM +0300, Yury Norov wrote:
+> On Thu, Jan 18, 2018 at 12:16:32PM +0100, Christoffer Dall wrote:
+> > Hi Yury,
+> > 
+> > [cc'ing Alex Bennee who had some thoughts on this]
+> > 
+> > On Mon, Jan 15, 2018 at 05:14:23PM +0300, Yury Norov wrote:
+> > > On Fri, Jan 12, 2018 at 01:07:06PM +0100, Christoffer Dall wrote:
+> > > > This series redesigns parts of KVM/ARM to optimize the performance on
+> > > > VHE systems.  The general approach is to try to do as little work as
+> > > > possible when transitioning between the VM and the hypervisor.  This has
+> > > > the benefit of lower latency when waiting for interrupts and delivering
+> > > > virtual interrupts, and reduces the overhead of emulating behavior and
+> > > > I/O in the host kernel.
+> > > > 
+> > > > Patches 01 through 06 are not VHE specific, but rework parts of KVM/ARM
+> > > > that can be generally improved.  We then add infrastructure to move more
+> > > > logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
+> > > > registers.
+> > > > 
+> > > > We then introduce a new world-switch function for VHE systems, which we
+> > > > can tweak and optimize for VHE systems.  To do that, we rework a lot of
+> > > > the system register save/restore handling and emulation code that may
+> > > > need access to system registers, so that we can defer as many system
+> > > > register save/restore operations to vcpu_load and vcpu_put, and move
+> > > > this logic out of the VHE world switch function.
+> > > > 
+> > > > We then optimize the configuration of traps.  On non-VHE systems, both
+> > > > the host and VM kernels run in EL1, but because the host kernel should
+> > > > have full access to the underlying hardware, but the VM kernel should
+> > > > not, we essentially make the host kernel more privileged than the VM
+> > > > kernel despite them both running at the same privilege level by enabling
+> > > > VE traps when entering the VM and disabling those traps when exiting the
+> > > > VM.  On VHE systems, the host kernel runs in EL2 and has full access to
+> > > > the hardware (as much as allowed by secure side software), and is
+> > > > unaffected by the trap configuration.  That means we can configure the
+> > > > traps for VMs running in EL1 once, and don't have to switch them on and
+> > > > off for every entry/exit to/from the VM.
+> > > > 
+> > > > Finally, we improve our VGIC handling by moving all save/restore logic
+> > > > out of the VHE world-switch, and we make it possible to truly only
+> > > > evaluate if the AP list is empty and not do *any* VGIC work if that is
+> > > > the case, and only do the minimal amount of work required in the course
+> > > > of the VGIC processing when we have virtual interrupts in flight.
+> > > > 
+> > > > The patches are based on v4.15-rc3, v9 of the level-triggered mapped
+> > > > interrupts support series [1], and the first five patches of James' SDEI
+> > > > series [2].
+> > > > 
+> > > > I've given the patches a fair amount of testing on Thunder-X, Mustang,
+> > > > Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
+> > > > functionality on the Foundation model, running both 64-bit VMs and
+> > > > 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
+> > > > GICv2-on-GICv3.
+> > > > 
+> > > > The patches are also available in the vhe-optimize-v3 branch on my
+> > > > kernel.org repository [3].  The vhe-optimize-v3-base branch contains
+> > > > prerequisites of this series.
+> > > > 
+> > > > Changes since v2:
+> > > >  - Rebased on v4.15-rc3.
+> > > >  - Includes two additional patches that only does vcpu_load after
+> > > >    kvm_vcpu_first_run_init and only for KVM_RUN.
+> > > >  - Addressed review comments from v2 (detailed changelogs are in the
+> > > >    individual patches).
+> > > > 
+> > > > Thanks,
+> > > > -Christoffer
+> > > > 
+> > > > [1]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v9
+> > > > [2]: git://linux-arm.org/linux-jm.git sdei/v5/base
+> > > > [3]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v3
+> > > 
+> > > I tested this v3 series on ThunderX2 with IPI benchmark:
+> > > https://lkml.org/lkml/2017/12/11/364
+> > > 
+> > > I tried to address your comments in discussion to v2, like pinning
+> > > the module to specific CPU (with taskset), increasing the number of
+> > > iterations, tuning governor to max performance. Results didn't change
+> > > much, and are pretty stable.
+> > > 
+> > > Comparing to vanilla guest, Norml IPI delivery for v3 is 20% slower.
+> > > For v2 it was 27% slower, and for v1 - 42% faster. What's interesting,
+> > > the acknowledge time is much faster for v3, so overall time to
+> > > deliver and acknowledge IPI (2nd column) is less than vanilla
+> > > 4.15-rc3 kernel.
+> > > 
+> > > Test setup is not changed since v2: ThunderX2, 112 online CPUs,
+> > > guest is running under qemu-kvm, emulating gic version 3.
+> > > 
+> > > Below is test results for v1-3 normalized to host vanilla kernel
+> > > dry-run time.
+> > > 
+> > > Yury
+> > > 
+> > > Host, v4.14:
+> > > Dry-run:          0         1
+> > > Self-IPI:         9        18
+> > > Normal IPI:      81       110
+> > > Broadcast IPI:    0      2106
+> > > 
+> > > Guest, v4.14:
+> > > Dry-run:          0         1
+> > > Self-IPI:        10        18
+> > > Normal IPI:     305       525
+> > > Broadcast IPI:    0      9729
+> > > 
+> > > Guest, v4.14 + VHE:
+> > > Dry-run:          0         1
+> > > Self-IPI:         9        18
+> > > Normal IPI:     176       343
+> > > Broadcast IPI:    0      9885
+> > > 
+> > > And for v2.
+> > > 
+> > > Host, v4.15:                   
+> > > Dry-run:          0         1
+> > > Self-IPI:         9        18
+> > > Normal IPI:      79       108
+> > > Broadcast IPI:    0      2102
+> > >                         
+> > > Guest, v4.15-rc:
+> > > Dry-run:          0         1
+> > > Self-IPI:         9        18
+> > > Normal IPI:     291       526
+> > > Broadcast IPI:    0     10439
+> > > 
+> > > Guest, v4.15-rc + VHE:
+> > > Dry-run:          0         2
+> > > Self-IPI:        14        28
+> > > Normal IPI:     370       569
+> > > Broadcast IPI:    0     11688
+> > > 
+> > > And for v3.
+> > > 
+> > > Host 4.15-rc3					
+> > > Dry-run:	  0	    1
+> > > Self-IPI:	  9	   18
+> > > Normal IPI:	 80	  110
+> > > Broadcast IPI:	  0	 2088
+> > > 		
+> > > Guest, 4.15-rc3	
+> > > Dry-run:	  0	    1
+> > > Self-IPI:	  9	   18
+> > > Normal IPI:	289	  497
+> > > Broadcast IPI:	  0	 9999
+> > > 		
+> > > Guest, 4.15-rc3	+ VHE
+> > > Dry-run:	  0	    2
+> > > Self-IPI:	 12	   24
+> > > Normal IPI:	347	  490
+> > > Broadcast IPI:	  0	11906
+> > 
+> > So, I had a look at your measurement code, and just want to make a
+> > sanity check that I understand the measurements correctly.
+> > 
+> > Firstly, if we execute something 100,000 times and summarize the result
+> > for each run, and get anything less than 100,000 (in this case ~300),
+> > without scaling the value, doesn't that mean that in the vast majority
+> > of cases, you are getting 0 as your measurement?
 > 
-> I agree with your assessment.  Any ideas why moving the debug
-> statement before the if statement would make it start working?  I
-> added some artificial udelay at around 100, but I still got the crash.
-> It seems like there is some timing issue, but at the same time just
-> adding a delay isn't enough.
+> I cannot report absolute numbers so I posted normalized values to dry-run
+> case. 300 for IPI delivery means that it 300 times slower than no-op
+> (dry-run case). Absolute numbers looks quite reasonable, few useconds
+> for normal IPI.
 
-The pr_warn does more than just delay, it accesses the io-space 
-potentially causing a flush on certain IO ranges. There might be some 
-OCP readback missing for example, in which case a simple udelay may not 
-help.
-
--Tero
+Ah, I see, you normalized it after the output from your benchmark.  I
+thought you normalized it in the benchmark code originally, but then I
+didn't see it in the patch you linked to, so wasn't sure what was going
+on.
 
 > 
->> -Tero
->>
-> 
-> adam
-> 
->>>
->>> adam
->>>
->>>>
->>>> Regards,
->>>>
->>>> Tony
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>
->> --
+> Let me know if you need absolute numbers.
+> https://lkml.org/lkml/2017/12/13/301
+>  
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+I trust you, that's fine.
+
+> > Secondly, are we sure all the required memory barriers are in place?
+> > I know that the IPI send contains an smp_wmb(), but when you read back
+> > the value in the caller, do you have the necessary smp_wmb() on the
+> > handler side and a corresponding smp_rmb() on the sending side?  I'm not
+> > sure what kind of effect missing barriers for a measurement framework
+> > like this would have, but it's worth making sure we're not chasing red
+> > herrings here.
+> 
+> I don't share memory between PMUs. 
+
+PMUs?
+
+You do share memory between your CPUs, it's the little piece of memory
+that your time variable points to.
+
+I was concerned if the read back from your sender CPU of the value
+written by the receiving CPU was properly ordered, but looking at
+handle_IPI and smp_call_function_single, there are barriers pretty much
+all over, and I don't think a missing barrier would result in what we
+see here (given that I understand the normalization above).
+
+
+>  
+> > That obviously doesn't change that the overall turnaround time is
+> > improved more in the v1 case than in the v3 case, which I'd like to
+> > explore/bisect in any case.
+> 
+> So me. For any idea, let me know, I'll check it.
+> 
+So another thing that would be very useful (which I would do myself if I
+had access to a TX2) would be to simply bisect the series and run
+the benchmark and see where the regression is introduced.
+
+In case you have time for that, I have a bisectable series with the
+recent KVM/ARM fixes in the 'vhe-optimize-v3-with-fixes' branch on:
+git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git
+
+
+Thanks,
+-Christoffer
