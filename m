@@ -1,214 +1,282 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 18 Jan 2018 15:18:21 +0300
-Subject: [PATCH v3 00/41] Optimize KVM/ARM for VHE systems
-In-Reply-To: <20180118111632.GA27865@cbox>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180115141423.5qho7xvmikq27jvs@yury-thinkpad>
- <20180118111632.GA27865@cbox>
-Message-ID: <20180118121821.gkfgvynco4b723nf@yury-thinkpad>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Jan 2018 12:27:53 +0000
+Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <20180118115251.5542-9-jeffy.chen@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-9-jeffy.chen@rock-chips.com>
+Message-ID: <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 12:16:32PM +0100, Christoffer Dall wrote:
-> Hi Yury,
+On 18/01/18 11:52, Jeffy Chen wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
 > 
-> [cc'ing Alex Bennee who had some thoughts on this]
+> Current code relies on master driver enabling necessary clocks before
+> IOMMU is accessed, however there are cases when the IOMMU should be
+> accessed while the master is not running yet, for example allocating
+> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
+> mapping API and doesn't engage the master driver at all.
 > 
-> On Mon, Jan 15, 2018 at 05:14:23PM +0300, Yury Norov wrote:
-> > On Fri, Jan 12, 2018 at 01:07:06PM +0100, Christoffer Dall wrote:
-> > > This series redesigns parts of KVM/ARM to optimize the performance on
-> > > VHE systems.  The general approach is to try to do as little work as
-> > > possible when transitioning between the VM and the hypervisor.  This has
-> > > the benefit of lower latency when waiting for interrupts and delivering
-> > > virtual interrupts, and reduces the overhead of emulating behavior and
-> > > I/O in the host kernel.
-> > > 
-> > > Patches 01 through 06 are not VHE specific, but rework parts of KVM/ARM
-> > > that can be generally improved.  We then add infrastructure to move more
-> > > logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
-> > > registers.
-> > > 
-> > > We then introduce a new world-switch function for VHE systems, which we
-> > > can tweak and optimize for VHE systems.  To do that, we rework a lot of
-> > > the system register save/restore handling and emulation code that may
-> > > need access to system registers, so that we can defer as many system
-> > > register save/restore operations to vcpu_load and vcpu_put, and move
-> > > this logic out of the VHE world switch function.
-> > > 
-> > > We then optimize the configuration of traps.  On non-VHE systems, both
-> > > the host and VM kernels run in EL1, but because the host kernel should
-> > > have full access to the underlying hardware, but the VM kernel should
-> > > not, we essentially make the host kernel more privileged than the VM
-> > > kernel despite them both running at the same privilege level by enabling
-> > > VE traps when entering the VM and disabling those traps when exiting the
-> > > VM.  On VHE systems, the host kernel runs in EL2 and has full access to
-> > > the hardware (as much as allowed by secure side software), and is
-> > > unaffected by the trap configuration.  That means we can configure the
-> > > traps for VMs running in EL1 once, and don't have to switch them on and
-> > > off for every entry/exit to/from the VM.
-> > > 
-> > > Finally, we improve our VGIC handling by moving all save/restore logic
-> > > out of the VHE world-switch, and we make it possible to truly only
-> > > evaluate if the AP list is empty and not do *any* VGIC work if that is
-> > > the case, and only do the minimal amount of work required in the course
-> > > of the VGIC processing when we have virtual interrupts in flight.
-> > > 
-> > > The patches are based on v4.15-rc3, v9 of the level-triggered mapped
-> > > interrupts support series [1], and the first five patches of James' SDEI
-> > > series [2].
-> > > 
-> > > I've given the patches a fair amount of testing on Thunder-X, Mustang,
-> > > Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
-> > > functionality on the Foundation model, running both 64-bit VMs and
-> > > 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
-> > > GICv2-on-GICv3.
-> > > 
-> > > The patches are also available in the vhe-optimize-v3 branch on my
-> > > kernel.org repository [3].  The vhe-optimize-v3-base branch contains
-> > > prerequisites of this series.
-> > > 
-> > > Changes since v2:
-> > >  - Rebased on v4.15-rc3.
-> > >  - Includes two additional patches that only does vcpu_load after
-> > >    kvm_vcpu_first_run_init and only for KVM_RUN.
-> > >  - Addressed review comments from v2 (detailed changelogs are in the
-> > >    individual patches).
-> > > 
-> > > Thanks,
-> > > -Christoffer
-> > > 
-> > > [1]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v9
-> > > [2]: git://linux-arm.org/linux-jm.git sdei/v5/base
-> > > [3]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v3
-> > 
-> > I tested this v3 series on ThunderX2 with IPI benchmark:
-> > https://lkml.org/lkml/2017/12/11/364
-> > 
-> > I tried to address your comments in discussion to v2, like pinning
-> > the module to specific CPU (with taskset), increasing the number of
-> > iterations, tuning governor to max performance. Results didn't change
-> > much, and are pretty stable.
-> > 
-> > Comparing to vanilla guest, Norml IPI delivery for v3 is 20% slower.
-> > For v2 it was 27% slower, and for v1 - 42% faster. What's interesting,
-> > the acknowledge time is much faster for v3, so overall time to
-> > deliver and acknowledge IPI (2nd column) is less than vanilla
-> > 4.15-rc3 kernel.
-> > 
-> > Test setup is not changed since v2: ThunderX2, 112 online CPUs,
-> > guest is running under qemu-kvm, emulating gic version 3.
-> > 
-> > Below is test results for v1-3 normalized to host vanilla kernel
-> > dry-run time.
-> > 
-> > Yury
-> > 
-> > Host, v4.14:
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:      81       110
-> > Broadcast IPI:    0      2106
-> > 
-> > Guest, v4.14:
-> > Dry-run:          0         1
-> > Self-IPI:        10        18
-> > Normal IPI:     305       525
-> > Broadcast IPI:    0      9729
-> > 
-> > Guest, v4.14 + VHE:
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:     176       343
-> > Broadcast IPI:    0      9885
-> > 
-> > And for v2.
-> > 
-> > Host, v4.15:                   
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:      79       108
-> > Broadcast IPI:    0      2102
-> >                         
-> > Guest, v4.15-rc:
-> > Dry-run:          0         1
-> > Self-IPI:         9        18
-> > Normal IPI:     291       526
-> > Broadcast IPI:    0     10439
-> > 
-> > Guest, v4.15-rc + VHE:
-> > Dry-run:          0         2
-> > Self-IPI:        14        28
-> > Normal IPI:     370       569
-> > Broadcast IPI:    0     11688
-> > 
-> > And for v3.
-> > 
-> > Host 4.15-rc3					
-> > Dry-run:	  0	    1
-> > Self-IPI:	  9	   18
-> > Normal IPI:	 80	  110
-> > Broadcast IPI:	  0	 2088
-> > 		
-> > Guest, 4.15-rc3	
-> > Dry-run:	  0	    1
-> > Self-IPI:	  9	   18
-> > Normal IPI:	289	  497
-> > Broadcast IPI:	  0	 9999
-> > 		
-> > Guest, 4.15-rc3	+ VHE
-> > Dry-run:	  0	    2
-> > Self-IPI:	 12	   24
-> > Normal IPI:	347	  490
-> > Broadcast IPI:	  0	11906
+> This patch fixes the problem by letting clocks needed for IOMMU
+> operation to be listed in Device Tree and making the driver enable them
+> for the time of accessing the hardware.
+
+Is it worth using the clk_bulk_*() APIs for this? At a glance, most of 
+the code being added here appears to duplicate what those functions 
+already do (but I'm no clk API expert, for sure).
+
+Robin.
+
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> ---
 > 
-> So, I had a look at your measurement code, and just want to make a
-> sanity check that I understand the measurements correctly.
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
 > 
-> Firstly, if we execute something 100,000 times and summarize the result
-> for each run, and get anything less than 100,000 (in this case ~300),
-> without scaling the value, doesn't that mean that in the vast majority
-> of cases, you are getting 0 as your measurement?
-
-I cannot report absolute numbers so I posted normalized values to dry-run
-case. 300 for IPI delivery means that it 300 times slower than no-op
-(dry-run case). Absolute numbers looks quite reasonable, few useconds
-for normal IPI.
-
-Let me know if you need absolute numbers.
-https://lkml.org/lkml/2017/12/13/301
- 
-> Secondly, are we sure all the required memory barriers are in place?
-> I know that the IPI send contains an smp_wmb(), but when you read back
-> the value in the caller, do you have the necessary smp_wmb() on the
-> handler side and a corresponding smp_rmb() on the sending side?  I'm not
-> sure what kind of effect missing barriers for a measurement framework
-> like this would have, but it's worth making sure we're not chasing red
-> herrings here.
-
-I don't share memory between PMUs. Instead I completely rely on
-smp_call_function_single() which takes *info parameter to share
-data.
-
-Looking at generic_exec_single() code that makes work, for self-ipi
-things are trivial; and for normal ipi, there's detailed comment
-on cache visibility of *info. So I hope everything is right there.
-
-/*  
- * The list addition should be visible before sending the IPI
- * handler locks the list to pull the entry off it because of
- * normal cache coherency rules implied by spinlocks.
- *
- * If IPIs can go out of order to the cache coherency protocol
- * in an architecture, sufficient synchronisation should be added
- * to arch code to make it appear to obey cache coherency WRT
- * locking and barrier primitives.  Generic code isn't really
- * equipped to do the right thing...
- */
- 
-> That obviously doesn't change that the overall turnaround time is
-> improved more in the v1 case than in the v3 case, which I'd like to
-> explore/bisect in any case.
-
-So me. For any idea, let me know, I'll check it.
-
-Yury
+>   .../devicetree/bindings/iommu/rockchip,iommu.txt   |   8 ++
+>   drivers/iommu/rockchip-iommu.c                     | 114 +++++++++++++++++++--
+>   2 files changed, 116 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+> index 2098f7732264..33dd853359fa 100644
+> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+> @@ -14,6 +14,13 @@ Required properties:
+>                       "single-master" device, and needs no additional information
+>                       to associate with its master device.  See:
+>                       Documentation/devicetree/bindings/iommu/iommu.txt
+> +Optional properties:
+> +- clocks : A list of master clocks requires for the IOMMU to be accessible
+> +           by the host CPU. The number of clocks depends on the master
+> +           block and might as well be zero. See [1] for generic clock
+> +           bindings description.
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>   
+>   Optional properties:
+>   - rockchip,disable-mmu-reset : Don't use the mmu reset operation.
+> @@ -27,5 +34,6 @@ Example:
+>   		reg = <0xff940300 0x100>;
+>   		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+>   		interrupt-names = "vopl_mmu";
+> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
+>   		#iommu-cells = <0>;
+>   	};
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 1914ac52042c..9b85a3050449 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -4,6 +4,7 @@
+>    * published by the Free Software Foundation.
+>    */
+>   
+> +#include <linux/clk.h>
+>   #include <linux/compiler.h>
+>   #include <linux/delay.h>
+>   #include <linux/device.h>
+> @@ -89,6 +90,8 @@ struct rk_iommu {
+>   	struct device *dev;
+>   	void __iomem **bases;
+>   	int num_mmu;
+> +	struct clk **clocks;
+> +	int num_clocks;
+>   	bool reset_disabled;
+>   	struct iommu_device iommu;
+>   	struct list_head node; /* entry in rk_iommu_domain.iommus */
+> @@ -443,6 +446,83 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+>   	return 0;
+>   }
+>   
+> +static void rk_iommu_put_clocks(struct rk_iommu *iommu)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < iommu->num_clocks; ++i) {
+> +		clk_unprepare(iommu->clocks[i]);
+> +		clk_put(iommu->clocks[i]);
+> +	}
+> +}
+> +
+> +static int rk_iommu_get_clocks(struct rk_iommu *iommu)
+> +{
+> +	struct device_node *np = iommu->dev->of_node;
+> +	int ret;
+> +	int i;
+> +
+> +	ret = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+> +	if (ret == -ENOENT)
+> +		return 0;
+> +	else if (ret < 0)
+> +		return ret;
+> +
+> +	iommu->num_clocks = ret;
+> +	iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
+> +				     sizeof(*iommu->clocks), GFP_KERNEL);
+> +	if (!iommu->clocks)
+> +		return -ENOMEM;
+> +
+> +	for (i = 0; i < iommu->num_clocks; ++i) {
+> +		iommu->clocks[i] = of_clk_get(np, i);
+> +		if (IS_ERR(iommu->clocks[i])) {
+> +			iommu->num_clocks = i;
+> +			goto err_clk_put;
+> +		}
+> +		ret = clk_prepare(iommu->clocks[i]);
+> +		if (ret) {
+> +			clk_put(iommu->clocks[i]);
+> +			iommu->num_clocks = i;
+> +			goto err_clk_put;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +
+> +err_clk_put:
+> +	rk_iommu_put_clocks(iommu);
+> +
+> +	return ret;
+> +}
+> +
+> +static int rk_iommu_enable_clocks(struct rk_iommu *iommu)
+> +{
+> +	int i, ret;
+> +
+> +	for (i = 0; i < iommu->num_clocks; ++i) {
+> +		ret = clk_enable(iommu->clocks[i]);
+> +		if (ret)
+> +			goto err_disable;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_disable:
+> +	for (--i; i >= 0; --i)
+> +		clk_disable(iommu->clocks[i]);
+> +
+> +	return ret;
+> +}
+> +
+> +static void rk_iommu_disable_clocks(struct rk_iommu *iommu)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < iommu->num_clocks; ++i)
+> +		clk_disable(iommu->clocks[i]);
+> +}
+> +
+>   static void log_iova(struct rk_iommu *iommu, int index, dma_addr_t iova)
+>   {
+>   	void __iomem *base = iommu->bases[index];
+> @@ -499,6 +579,8 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>   	irqreturn_t ret = IRQ_NONE;
+>   	int i;
+>   
+> +	WARN_ON(rk_iommu_enable_clocks(iommu));
+> +
+>   	for (i = 0; i < iommu->num_mmu; i++) {
+>   		int_status = rk_iommu_read(iommu->bases[i], RK_MMU_INT_STATUS);
+>   		if (int_status == 0)
+> @@ -545,6 +627,8 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>   		rk_iommu_write(iommu->bases[i], RK_MMU_INT_CLEAR, int_status);
+>   	}
+>   
+> +	rk_iommu_disable_clocks(iommu);
+> +
+>   	return ret;
+>   }
+>   
+> @@ -587,7 +671,9 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
+>   	list_for_each(pos, &rk_domain->iommus) {
+>   		struct rk_iommu *iommu;
+>   		iommu = list_entry(pos, struct rk_iommu, node);
+> +		rk_iommu_enable_clocks(iommu);
+>   		rk_iommu_zap_lines(iommu, iova, size);
+> +		rk_iommu_disable_clocks(iommu);
+>   	}
+>   	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+>   }
+> @@ -816,10 +902,14 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>   	if (!iommu)
+>   		return 0;
+>   
+> -	ret = rk_iommu_enable_stall(iommu);
+> +	ret = rk_iommu_enable_clocks(iommu);
+>   	if (ret)
+>   		return ret;
+>   
+> +	ret = rk_iommu_enable_stall(iommu);
+> +	if (ret)
+> +		goto err_disable_clocks;
+> +
+>   	ret = rk_iommu_force_reset(iommu);
+>   	if (ret)
+>   		goto err_disable_stall;
+> @@ -844,11 +934,14 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>   	dev_dbg(dev, "Attached to iommu domain\n");
+>   
+>   	rk_iommu_disable_stall(iommu);
+> +	rk_iommu_disable_clocks(iommu);
+>   
+>   	return 0;
+>   
+>   err_disable_stall:
+>   	rk_iommu_disable_stall(iommu);
+> +err_disable_clocks:
+> +	rk_iommu_disable_clocks(iommu);
+>   
+>   	return ret;
+>   }
+> @@ -871,6 +964,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>   	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+>   
+>   	/* Ignore error while disabling, just keep going */
+> +	WARN_ON(rk_iommu_enable_clocks(iommu));
+>   	rk_iommu_enable_stall(iommu);
+>   	rk_iommu_disable_paging(iommu);
+>   	for (i = 0; i < iommu->num_mmu; i++) {
+> @@ -878,6 +972,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>   		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
+>   	}
+>   	rk_iommu_disable_stall(iommu);
+> +	rk_iommu_disable_clocks(iommu);
+>   
+>   	iommu->domain = NULL;
+>   
+> @@ -1167,21 +1262,28 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   			return err;
+>   	}
+>   
+> +	err = rk_iommu_get_clocks(iommu);
+> +	if (err)
+> +		return err;
+> +
+>   	iommu->reset_disabled = device_property_read_bool(dev,
+>   					"rockchip,disable-mmu-reset");
+>   
+>   	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+>   	if (err)
+> -		return err;
+> +		goto err_put_clocks;
+>   
+>   	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+>   	err = iommu_device_register(&iommu->iommu);
+> -	if (err) {
+> -		iommu_device_sysfs_remove(&iommu->iommu);
+> -		return err;
+> -	}
+> +	if (err)
+> +		goto err_remove_sysfs;
+>   
+>   	return 0;
+> +err_remove_sysfs:
+> +	iommu_device_sysfs_remove(&iommu->iommu);
+> +err_put_clocks:
+> +	rk_iommu_put_clocks(iommu);
+> +	return err;
+>   }
+>   
+>   static const struct of_device_id rk_iommu_dt_ids[] = {
+> 
