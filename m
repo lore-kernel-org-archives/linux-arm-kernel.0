@@ -1,35 +1,53 @@
-From: henryzhang62@gmail.com (henryzhang62 at gmail.com)
-Date: Wed, 17 Jan 2018 18:41:33 -0800
-Subject: [PATCH v4] ARM: dts: bcm283x: Fix pin function of JTAG pins
-Message-ID: <1516243293-25010-1-git-send-email-henryzhang62@gmail.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Thu, 18 Jan 2018 02:58:36 +0000
+Subject: [PATCH] arm64/kernel: kaslr: drop special Image placement logic
+In-Reply-To: <20180117161127.15771-1-ard.biesheuvel@linaro.org>
+References: <20180117161127.15771-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180118025836.5zlcgk2evx3ztncg@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Henry Zhang <henryzhang62@gmail.com>
+On Wed, Jan 17, 2018 at 04:11:27PM +0000, Ard Biesheuvel wrote:
+> Now that the early kernel mapping logic can tolerate placements of
+> Image that cross swapper table boundaries, we can remove the logic
+> that adjusts the offset if the dice roll produced an offset that
+> puts the kernel right on top of one.
 
-BCM2835 ARM Peripherals doc shows gpio pins 4, 5, 6, 12 and 13
-carry altenate function, ALT5 for ARM JTAG
+Reviewed-by: Steve Capper <steve.capper@arm.com>
 
-Fixes: 21ff843931b2 ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
-
-Signed-off-by: Henry Zhang <henryzhang62@gmail.com>
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm283x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index dcde93c..64971e4 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -251,7 +251,7 @@
- 
- 			jtag_gpio4: jtag_gpio4 {
- 				brcm,pins = <4 5 6 12 13>;
--				brcm,function = <BCM2835_FSEL_ALT4>;
-+				brcm,function = <BCM2835_FSEL_ALT5>;
- 			};
- 			jtag_gpio22: jtag_gpio22 {
- 				brcm,pins = <22 23 24 25 26 27>;
--- 
-2.7.4
+> 
+> Cc: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/kaslr.c | 15 ---------------
+>  1 file changed, 15 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+> index 47080c49cc7e..e3d5cbe2167b 100644
+> --- a/arch/arm64/kernel/kaslr.c
+> +++ b/arch/arm64/kernel/kaslr.c
+> @@ -128,21 +128,6 @@ u64 __init kaslr_early_init(u64 dt_phys)
+>  	/* use the top 16 bits to randomize the linear region */
+>  	memstart_offset_seed = seed >> 48;
+>  
+> -	/*
+> -	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
+> -	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+> -	 * happens, round down the KASLR offset by (1 << SWAPPER_TABLE_SHIFT).
+> -	 *
+> -	 * NOTE: The references to _text and _end below will already take the
+> -	 *       modulo offset (the physical displacement modulo 2 MB) into
+> -	 *       account, given that the physical placement is controlled by
+> -	 *       the loader, and will not change as a result of the virtual
+> -	 *       mapping we choose.
+> -	 */
+> -	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
+> -	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT))
+> -		offset = round_down(offset, 1 << SWAPPER_TABLE_SHIFT);
+> -
+>  	if (IS_ENABLED(CONFIG_KASAN))
+>  		/*
+>  		 * KASAN does not expect the module region to intersect the
+> -- 
+> 2.11.0
+> 
