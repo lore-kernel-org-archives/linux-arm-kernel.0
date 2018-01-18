@@ -1,91 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 Jan 2018 22:28:49 +0800
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
-In-Reply-To: <20180118100745.y62adzvfnrzqkagd@flea.lan>
-References: <1515747666-6597-1-git-send-email-stefan@olimex.com>
- <20180115095031.pzsgrp3tdmemotrs@flea.lan>
- <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
- <20180118100745.y62adzvfnrzqkagd@flea.lan>
-Message-ID: <CAGb2v66U9ziFhU5n6haTA3LGNX7BavmfXiiCmvebtqaMxcN0-w@mail.gmail.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Thu, 18 Jan 2018 15:34:23 +0100
+Subject: [PATCH v3 07/14] ARM: dts: stm32: Add SDIO controller for stm32f429
+In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1516286070-24927-8-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 6:07 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi!
->
-> On Mon, Jan 15, 2018 at 12:07:34PM +0200, Stefan Mavrodiev wrote:
->> > > +/dts-v1/;
->> > > +#include "sun7i-a20.dtsi"
->> > > +#include "sunxi-common-regulators.dtsi"
->> > > +
->> > > +
->> > > +#include <dt-bindings/gpio/gpio.h>
->> > > +#include <dt-bindings/interrupt-controller/irq.h>
->> > > +#include <dt-bindings/pwm/pwm.h>
->> > > +
->> > > +/ {
->> > > + model = "Olimex A20-SOM204-EVB";
->> > > + compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
->> > > +
->> > > + aliases {
->> > > +         serial0 = &uart0;
->> > > +         serial1 = &uart4;
->> > > +         serial2 = &uart7;
->> > > +         spi0 = &spi1;
->> > > +         spi1 = &spi2;
->> > > +         ethernet1 = &rtl8723bs;
->> >
->> > ethernet1? if there's a single network interface, it should be
->> > ethernet0.
->>
->> I think this will conflict the gmac alias defined in sun7i-a20.dtsi:
->>
->> aliases {
->>     ethernet0 = &gmac;
->> };
->
-> We have that? That's bad, but you're right :)
->
->> > > +         stat {
->> > > +                 label = "a20-som204:green:stat";
->> > > +                 gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
->> > > +                 default-state = "on";
->> > > +         };
->> > > +
->> > > +         led1 {
->> > > +                 label = "a20-som204-evb:green:led1";
->> > > +                 gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
->> > > +                 default-state = "on";
->> > > +         };
->> > > +
->> > > +         led2 {
->> > > +                 label = "a20-som204-evb:yellow:led2";
->> > > +                 gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
->> > > +                 default-state = "on";
->> > > +         };
->> >
->> > You don't have the same prefix between stat and led1/led2. I'm fine
->> > with both, but you should be consistent :)
->>
->> STAT led is on the SOM204 module, while led1/2 on the EVB. Thats why
->> they have different prefix.
->
-> Still, the user and the system will see it as a single board, and the
-> documentation states that it should be the board name. I'm not quite
-> sure what a good rule would be here. Have you looked at how other
-> boards dealt with it? Chen-Yu, any opinion on this?
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Follow the bindings, I guess? I don't think we (sunxi) have dealt
-with modules that have LEDs or anything that needs to be named after
-the board.
+stm32f429 embeds ARM_PL180 sdi IP, adds SDIO controller
+node to allow MMC support.
 
-On a related topic, I don't know if you (Stefan / Olimex) want to split
-this into a .dtsi file for the SoM, and a .dts file for the EVB. It might
-help your customers? I've tried it previously, and it helps in some ways
-when you're matching the files to the schematics. But it is confusing
-when you want the big picture. On the other hand, this is not going to
-help with supporting different modules on the same baseboard, as the
-routing, peripherals and labels likely won't match up. Just my two cents.
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
 
-ChenYu
+v3: _ none
+
+v2: _ none
+
+
+ arch/arm/boot/dts/stm32f429.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 10099df..ede77e0 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -511,6 +511,17 @@
+ 			};
+ 		};
+ 
++		sdio: sdio at 40012c00 {
++			compatible = "arm,pl180", "arm,primecell";
++			arm,primecell-periphid = <0x00880180>;
++			reg = <0x40012c00 0x400>;
++			clocks = <&rcc 0 STM32F4_APB2_CLOCK(SDIO)>;
++			clock-names = "apb_pclk";
++			interrupts = <49>;
++			max-frequency = <48000000>;
++			status = "disabled";
++		};
++
+ 		syscfg: system-config at 40013800 {
+ 			compatible = "syscon";
+ 			reg = <0x40013800 0x400>;
+-- 
+1.9.1
