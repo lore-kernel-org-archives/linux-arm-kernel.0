@@ -1,69 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 Jan 2018 08:22:58 +0100
-Subject: [PATCH v3 08/13] drm/sun4i: Add a driver for the display frontend
-In-Reply-To: <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
+Date: Thu, 18 Jan 2018 08:25:21 +0100
+Subject: [PATCH v3 09/13] drm/sun4i: backend: Wire in the frontend
+In-Reply-To: <CAGb2v64zBzvH0b7fjQ_oaX=T=av=fV5pJOtvfj3FYCGjnWKnrg@mail.gmail.com>
 References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
- <3b7164f4a5199f0499c6f41201b31bc471cb3af9.1515492513.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
-Message-ID: <20180118072258.ucbchh32mhyln2qn@flea.lan>
+ <936ca493795fe9a223f2958bdf8e7b6c874522ec.1515492513.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v64zBzvH0b7fjQ_oaX=T=av=fV5pJOtvfj3FYCGjnWKnrg@mail.gmail.com>
+Message-ID: <20180118072521.dgneqicglb3jen7j@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Jan 17, 2018 at 09:43:31PM +0800, Chen-Yu Tsai wrote:
-> >         if (sun4i_drv_node_is_connector(node))
-> >                 return 0;
-> >
-> > -       if (!sun4i_drv_node_is_frontend(node)) {
-> > +       /*
-> > +        * If the device is either just a regular device, or an
-> > +        * enabled frontend supported by the driver, we add it to our
-> > +        * component list.
-> > +        */
-> > +       if (!sun4i_drv_node_is_frontend(node) ||
-> > +           (sun4i_drv_node_is_supported_frontend(node) &&
-> > +            of_device_is_available(node))) {
+On Wed, Jan 17, 2018 at 09:46:13PM +0800, Chen-Yu Tsai wrote:
+> > +       for_each_available_child_of_node(port, ep) {
+> > +               remote = of_graph_get_remote_port_parent(ep);
+> > +               if (!remote)
+> > +                       continue;
+> > +
+> > +               /* does this node match any registered engines? */
+> > +               list_for_each_entry(frontend, &drv->frontend_list, list) {
+> > +                       if (remote == frontend->node) {
+> > +                               of_node_put(remote);
+> > +                               of_node_put(port);
+> > +                               return frontend;
+> > +                       }
+> > +               }
 > 
-> Nit: sun4i_drv_node_is_supported_frontend should be a subset of
-> sun4i_drv_node_is_frontend, so of_device_is_available should always
-> be true at this point.
-
-That's not really the condition though :)
-
-It's if the device is *not* a frontend or if it is a supported
-frontend that is available, add it to the endpoints list.
-
-> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
-> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
-> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
-> > +                    SUN4I_FRONTEND_INPUT_FMT_PS(1));
-> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
-> > +                    SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
+> I assume that since you are only enabling support on the A33, you are
+> not considering dual display pipeline cases. We have cross connections
+> in the of graph for those situations, i.e. frontend0 can output to both
+> backend0 and backend1, as described in the following link:
 > 
-> Seems that you also need to set the "ALPHA_EN" bit for ARGB.
-
-I have not seen that bit documented anywhere. Where is it coming from?
-
-> > +       frontend->reset = devm_reset_control_get(dev, NULL);
-> > +       if (IS_ERR(frontend->reset)) {
-> > +               dev_err(dev, "Couldn't get our reset line\n");
-> > +               return PTR_ERR(frontend->reset);
-> > +       }
-> > +       reset_control_reset(frontend->reset);
+> http://elixir.free-electrons.com/linux/v4.15-rc8/source/arch/arm/boot/dts/sun6i-a31.dtsi#L1177
 > 
-> reset_control_reset leaves the reset control deasserted. At this
-> point the clock might not be running, which might mean the internal
-> state is not completely wiped out. (Though this really depends on
-> the design of the internal logic.)
+> So with your code, both backends would end up using frontend0, and
+> if both display pipelines are active, one would potentially step on
+> the other.
 > 
-> Maybe just assert it? It gets deasserted in the runtime PM callback
-> later. And just to be safe, I would move it close to the end of the
-> probe path, past all possible errors, so the hardware doesn't get
-> touched until everything is ready. Or don't touch it anywhere in
-> the probe path, and have the runtime PM resume function do a reset.
+> Instead, have the frontend store its ID in its data structure, and
+> have the backend look through the list of frontends to find a match
+> for the backend's ID. This is what we already do for engine <-> TCON:
+> 
+> http://elixir.free-electrons.com/linux/v4.15-rc8/source/drivers/gpu/drm/sun4i/sun4i_tcon.c#L583
+> 
+> Or just leave a TODO note and I can do it later. :)
 
-That seems like the best solution yes.
+We discussed it on IRC, and yes, I don't have a test setup right now
+with two pipelines being used, and there's a few changes that need to
+be made for it to operate properly on the A10/A20. That's why I only
+added the A33 in the supported list at the moment.
+
+I'll add a TODO note
+
+> Otherwise,
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
 Thanks!
 Maxime
@@ -78,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/bc349914/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/e68aee04/attachment.sig>
