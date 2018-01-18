@@ -1,111 +1,97 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 18 Jan 2018 13:31:38 +0100
-Subject: [net-next: PATCH v4 1/7] device property: Introduce
- fwnode_get_mac_address()
+Date: Thu, 18 Jan 2018 13:31:39 +0100
+Subject: [net-next: PATCH v4 2/7] device property: Introduce
+ fwnode_get_phy_mode()
 In-Reply-To: <1516278704-17141-1-git-send-email-mw@semihalf.com>
 References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
-Message-ID: <1516278704-17141-2-git-send-email-mw@semihalf.com>
+Message-ID: <1516278704-17141-3-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Until now there were two almost identical functions for
-obtaining MAC address - of_get_mac_address() and, more generic,
-device_get_mac_address(). However it is not uncommon,
+obtaining network PHY mode - of_get_phy_mode() and,
+more generic, device_get_phy_mode(). However it is not uncommon,
 that the network interface is represented as a child
 of the actual controller, hence it is not associated
 directly to any struct device, required by the latter
 routine.
 
-This commit allows for getting the MAC address for
+This commit allows for getting the PHY mode for
 children nodes in the ACPI world by introducing a new function -
-fwnode_get_mac_address(). This commit also changes
-device_get_mac_address() routine to be its wrapper, in order
+fwnode_get_phy_mode(). This commit also changes
+device_get_phy_mode() routine to be its wrapper, in order
 to prevent unnecessary duplication.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 ---
- drivers/base/property.c  | 28 ++++++++++++++------
- include/linux/property.h |  2 ++
- 2 files changed, 22 insertions(+), 8 deletions(-)
+ drivers/base/property.c  | 24 ++++++++++++++++----
+ include/linux/property.h |  1 +
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 851b1b6..f261d1a 100644
+index f261d1a..7c4a53d 100644
 --- a/drivers/base/property.c
 +++ b/drivers/base/property.c
-@@ -1153,11 +1153,11 @@ int device_get_phy_mode(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(device_get_phy_mode);
- 
--static void *device_get_mac_addr(struct device *dev,
-+static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
- 				 const char *name, char *addr,
- 				 int alen)
- {
--	int ret = device_property_read_u8_array(dev, name, addr, alen);
-+	int ret = fwnode_property_read_u8_array(fwnode, name, addr, alen);
- 
- 	if (ret == 0 && alen == ETH_ALEN && is_valid_ether_addr(addr))
- 		return addr;
-@@ -1165,8 +1165,8 @@ static void *device_get_mac_addr(struct device *dev,
- }
+@@ -1126,21 +1126,21 @@ enum dev_dma_attr device_get_dma_attr(struct device *dev)
+ EXPORT_SYMBOL_GPL(device_get_dma_attr);
  
  /**
-- * device_get_mac_address - Get the MAC for a given device
-- * @dev:	Pointer to the device
-+ * fwnode_get_mac_address - Get the MAC from the firmware node
-+ * @fwnode:	Pointer to the firmware node
-  * @addr:	Address of buffer to store the MAC in
-  * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
+- * device_get_phy_mode - Get phy mode for given device
+- * @dev:	Pointer to the given device
++ * fwnode_get_phy_mode - Get phy mode for given firmware node
++ * @fwnode:	Pointer to the given node
   *
-@@ -1187,19 +1187,31 @@ static void *device_get_mac_addr(struct device *dev,
-  * In this case, the real MAC is in 'local-mac-address', and 'mac-address'
-  * exists but is all zeros.
- */
--void *device_get_mac_address(struct device *dev, char *addr, int alen)
-+void *fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr, int alen)
+  * The function gets phy interface string from property 'phy-mode' or
+  * 'phy-connection-type', and return its index in phy_modes table, or errno in
+  * error case.
+  */
+-int device_get_phy_mode(struct device *dev)
++int fwnode_get_phy_mode(struct fwnode_handle *fwnode)
  {
- 	char *res;
+ 	const char *pm;
+ 	int err, i;
  
--	res = device_get_mac_addr(dev, "mac-address", addr, alen);
-+	res = fwnode_get_mac_addr(fwnode, "mac-address", addr, alen);
- 	if (res)
- 		return res;
+-	err = device_property_read_string(dev, "phy-mode", &pm);
++	err = fwnode_property_read_string(fwnode, "phy-mode", &pm);
+ 	if (err < 0)
+-		err = device_property_read_string(dev,
++		err = fwnode_property_read_string(fwnode,
+ 						  "phy-connection-type", &pm);
+ 	if (err < 0)
+ 		return err;
+@@ -1151,6 +1151,20 @@ int device_get_phy_mode(struct device *dev)
  
--	res = device_get_mac_addr(dev, "local-mac-address", addr, alen);
-+	res = fwnode_get_mac_addr(fwnode, "local-mac-address", addr, alen);
- 	if (res)
- 		return res;
- 
--	return device_get_mac_addr(dev, "address", addr, alen);
-+	return fwnode_get_mac_addr(fwnode, "address", addr, alen);
-+}
-+EXPORT_SYMBOL(fwnode_get_mac_address);
+ 	return -ENODEV;
+ }
++EXPORT_SYMBOL_GPL(fwnode_get_phy_mode);
 +
 +/**
-+ * device_get_mac_address - Get the MAC for a given device
-+ * @dev:	Pointer to the device
-+ * @addr:	Address of buffer to store the MAC in
-+ * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
++ * device_get_phy_mode - Get phy mode for given device
++ * @dev:	Pointer to the given device
++ *
++ * The function gets phy interface string from property 'phy-mode' or
++ * 'phy-connection-type', and return its index in phy_modes table, or errno in
++ * error case.
 + */
-+void *device_get_mac_address(struct device *dev, char *addr, int alen)
++int device_get_phy_mode(struct device *dev)
 +{
-+	return fwnode_get_mac_address(dev_fwnode(dev), addr, alen);
- }
- EXPORT_SYMBOL(device_get_mac_address);
++	return fwnode_get_phy_mode(dev_fwnode(dev));
++}
+ EXPORT_SYMBOL_GPL(device_get_phy_mode);
  
+ static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
 diff --git a/include/linux/property.h b/include/linux/property.h
-index f6189a3..35620e0 100644
+index 35620e0..9b13332 100644
 --- a/include/linux/property.h
 +++ b/include/linux/property.h
-@@ -279,6 +279,8 @@ int device_get_phy_mode(struct device *dev);
+@@ -279,6 +279,7 @@ int device_get_phy_mode(struct device *dev);
  
  void *device_get_mac_address(struct device *dev, char *addr, int alen);
  
-+void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
-+			     char *addr, int alen);
++int fwnode_get_phy_mode(struct fwnode_handle *fwnode);
+ void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
+ 			     char *addr, int alen);
  struct fwnode_handle *fwnode_graph_get_next_endpoint(
- 	const struct fwnode_handle *fwnode, struct fwnode_handle *prev);
- struct fwnode_handle *
 -- 
 2.7.4
