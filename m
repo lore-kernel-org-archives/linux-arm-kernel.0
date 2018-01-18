@@ -1,190 +1,76 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Thu, 18 Jan 2018 17:13:14 +1100
-Subject: [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps receiver) power
- control driver
-In-Reply-To: <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost>
- <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
-Message-ID: <20180118061314.GG3286@localhost>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 18 Jan 2018 12:07:05 +0530
+Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
+ DA850 PSC
+In-Reply-To: <7b33c9a1-468c-15e6-2899-be334b4f3807@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-13-git-send-email-david@lechnology.com>
+ <8d09dba6-9b1d-e06e-8730-256b8a4320db@ti.com>
+ <b6baa17e-1239-c209-9eca-52e5da73e921@lechnology.com>
+ <bb1f446e-5900-7e73-c1b7-955662a9541b@ti.com>
+ <7b33c9a1-468c-15e6-2899-be334b4f3807@lechnology.com>
+Message-ID: <674907e2-a182-6239-5871-88245475f2e5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 06:59:59PM +0100, H. Nikolaus Schaller wrote:
-> Hi Johan,
+On Thursday 18 January 2018 12:38 AM, David Lechner wrote:
+> It is looking like this:
 > 
-> > Am 12.01.2018 um 16:39 schrieb Johan Hovold <johan@kernel.org>:
-> > 
-> >> Let's restart this discussion and focus on the main roadblock (others
-> >> are minor details which can be sorted out later).
-> >> 
-> >> If it feels like a hack, the key issue seems to me to be the choice of
-> >> the API to present the GPS data to user space. Right?
-> > 
-> > Or even more fundamentally, does this belong in the kernel at all?
 > 
-> Yes, that can be questioned of course. It was questioned and discussed
-> several times and I thought the answer was a clear yes. But let's reiterate.
+> static const struct davinci_psc_clkdev_info emfia_clkdev[] __initconst = {
+> ????LPSC_CLKDEV(NULL,??? "ti-aemif"),
+> ????LPSC_CLKDEV("aemif",??? "davinci-nand.0"),
+> ????{ }
+> };
 > 
-> > Also it seems at least part of your specific problem is that you have
-> > failed to wire up the WAKEUP pin of the W2SG0004/84 properly,
+> static const struct davinci_psc_clkdev_info spi0_clkdev[] __initconst = {
+> ????LPSC_CLKDEV(NULL,??? "spi_davinci.0"),
+> ????{ }
+> };
 > 
-> The w2sg0004 has no wakeup pin. At least I can't find one in the data sheet.
-
-I should have said w2sg0084 above, which is the only datasheet I have found.
-
-> The two pins you refer to from the 0084 data sheet are called BootSelect0/1
-> in the 0004 and have a different function.
+> static const struct davinci_psc_clkdev_info mmcsd0_clkdev[] __initconst = {
+> ????LPSC_CLKDEV(NULL,??? "da830-mmc.0"),
+> ????{ }
+> };
 > 
-> To be clear, we did not fail to wire it up. We did the design before the
-> 0084 was announced and available. We just had to swap in the 0084 into
-> existing PCBs during production because the 0004 became EOL. Otherwise
-> we would probably still use the 0004 without WAKEUP output.
+> static const struct davinci_psc_clkdev_info uart0_clkdev[] __initconst = {
+> ????LPSC_CLKDEV(NULL,??? "serial8250.0"),
+> ????{ }
+> };
 > 
-> To make it worse, we have no documentation for an individual board if
-> an 0004 or 0084 chip is installed and there is no means how a software
-> can find out which one it is talking to (especially before properly
-> powering on). Therefore we can not even provide two different device
-> trees or drivers or whatever, unless we ask people to open their device
-> and look on the chip. Quite crazy wrt. user-friendlyness of software
-> installation in 2018...
+> static const struct davinci_psc_clkdev_info arm_clkdev[] __initconst = {
+> ????/*
+> ???? * REVISIT: cpufreq-davinci should be modified to use dev_id and drop
+> ???? * use of con_id.
+> ???? */
+> ????LPSC_CLKDEV("arm",??? NULL),
+> ????{ }
+> };
 > 
-> Therefore, a driver must be capable to handle both chips in the same way,
-> with minimalistic assumptions, even if the 0084 could provide a direct
-> signal to make it easier than using serdev to monitor the data stream.
-
-Fair enough.
-
-> >  which then
-> > forces you to look at the data stream to determine the power state of
-> > the chip. Judging from a quick look at the GTA04 schematics it seems
-> > you've even connected the WAKEUP output to the 1V8_OUT output?!
+> static const struct davinci_psc_clkdev_info dsp_clkdev[] __initconst = {
+> ????LPSC_CLKDEV(NULL,??? "davinci-rproc.0"),
+> ????{ }
+> };
 > 
-> No. You failed to see that this is an optional 0R, which is not installed.
-> The 0R on pin 7 (BootSelect1) to GND was removed when we did switch from
-> 0004 to 0084. Pin 6 (BootSelect0/WAKEUP) was never connected.
+> static const struct davinci_psc_clk_info da850_psc0_info[] __initconst = {
+> ????LPSC(0,? 0, tpcc0,?? pll0_sysclk2, NULL,????????? LPSC_ALWAYS_ENABLED),
+> ????LPSC(1,? 0, tptc0,?? pll0_sysclk2, NULL,????????? LPSC_ALWAYS_ENABLED),
+> ????LPSC(2,? 0, tptc1,?? pll0_sysclk2, NULL,????????? LPSC_ALWAYS_ENABLED),
+> ????LPSC(3,? 0, emifa,?? async1,?????? emfia_clkdev,? 0),
+> ????LPSC(4,? 0, spi0,??? pll0_sysclk2, spi0_clkdev,?? 0),
+> ????LPSC(5,? 0, mmcsd0,? pll0_sysclk2, mmcsd0_clkdev, 0),
+> ????LPSC(6,? 0, aintc,?? pll0_sysclk4, NULL,????????? LPSC_ALWAYS_ENABLED),
+> ????LPSC(7,? 0, arm_rom, pll0_sysclk2, NULL,????????? LPSC_ALWAYS_ENABLED),
+> ????LPSC(9,? 0, uart0,?? pll0_sysclk2, uart0_clkdev,? 0),
+> ????LPSC(13, 0, pruss,?? pll0_sysclk2, NULL,????????? 0),
+> ????LPSC(14, 0, arm,???? pll0_sysclk6, arm_clkdev,??? LPSC_ALWAYS_ENABLED |
+> ????????????????????????????? LPSC_ARM_RATE),
+> ????LPSC(15, 1, dsp,???? pll0_sysclk1, dsp_clkdev,??? LPSC_FORCE |
+> ????????????????????????????? LPSC_LOCAL_RESET),
+> ????{ }
+> };
 
-Ok.
+This looks good to me!
 
-> > The kernel is probably not the place to be working around issues like
-> > that,
-
-> > even if serdev at least allows for such hacks to be fairly
-> > isolated in drivers (unlike some of the earlier proposals touching core
-> > code).
-> 
-> Please tell me why there are so many hacks for hardware issues in certain
-> drivers. Any why those are good and this one (if it is one at all) is not.
-
-Hacks are never good, but sometimes needed. But we should try to keep
-them contained in drivers rather than allow them to spread to core code,
-was what I was trying to say above.
-
-> What I can learn from your discussion is that it might be considerable
-> to add an optional gpio for the 0084 WAKEUP and add some logic to
-> support users who have or will have that pin connected.
-> 
-> But even then we would need a driver to handle this gpio and issue
-> an on/off impulse on the other to switch states. It would be a different
-> driver (variant - maybe some CONFIG option or handled by code), but not
-> "no driver".
-
-Having a WAKEUP signal would allow for a more straight-forward
-implementation, be it in the kernel or in user space.
-
-> >> I see three reasonable options how this presentation can be done:
-> >> 
-> >> 1. char device
-> >> 2. tty device
-> >> 3. some new gps interface API (similar to network, bluetooth interfaces)
-> >> 4. no driver and use the UART tty directly
-> >> 
-> >> Pros and cons:
-> > 
-> >> 4. no driver and use UART directly
-> >> + a non-solution seems to be attractive
-> >> - must turn on/off chip by gpio hacks from user-space
-> > 
-> > I'm not sure that would amount to more of hack then doing it in the
-> > kernel would.
-> 
-> It might not be big effort in the user-space code/scripts.
-> 
-> But much effort to convince all the plethora of user-space client maintainers
-> to integrate something. And have them roll out. And have distributions take it.
-> And have users upgrade to it. 5 years later...
-> 
-> Do you think it is easier to convince them than you? They usually assume a
-> power management issue should be solved by the kernel driver.
-> 
-> That is what Andreas did remark as motivation: provide a solution
-> for *existing* user spaces.
-
-I understand that this is what you want, but that in itself is not a
-sufficient reason to put something in the kernel.
-
-> >> - can not guarantee (!) to power off the chip if the last user-space
-> >> process using it is killed (which is essential for power-management of
-> >> a handheld, battery operated device)
-> > 
-> > That depends on how you implement things (extending gpsd, wrapper
-> > script, pty daemon, ...).
-> 
-> No. You can of course cover all standard cases but there is one fundamental
-> issue which is IMHO a problem of any user-space implementation:
-> 
-> 	How can you guarantee that the chip is powered off if no
-> 	user-space process is using it or if the last process doing
-> 	this is killed by *whatever* reason?
-> 
-> E.g. after a kill -9. Or if someone deinstalls gpsd or whatever and assumes
-> (and wants a guarantee) that GPS is now turned off and never turned on drawing
-> precious milliamps from the battery for no use.
-
-Have something run at init to put the device in a low power state.
-
-> As it is well known, a user-space process can't protect itself against kill -9.
-> Or has this recently been changed and I am not aware of?
-> 
-> This is the fundamental reason why we need a kernel driver to provide
-> reliable, repeatable and trustable power management of this chip.
-> 
-> It is equally fundamental as a hard disk should spin down after the last
-> file is closed. Even if this process ends by a kill -9.
-> 
-> A second almost equally fundamental aspect to be considered is how you want
-> to automatically and reliably turn off the chip by pure user-space code when
-> entering suspend.
-
-Suspend is initiated by user space, so just power down the device before
-doing so.
-
-> >> If not, I want to suggest to accept the second-best choice 2. for now and we
-> >> will update the driver as soon as 3. appears. IMHO it would be a good test case
-> >> for a new subsystem.
-> > 
-> > Getting the interface right from the start is quite important, as
-> > otherwise we may end up having to support a superseded one for a long
-> > time.
-> 
-> This seems to contradict your argument that user-space can very easily
-> adapt to everything. If the latter were true there would be no need to
-> keep old interfaces supported for a long time.
-
-You probably know that we try hard never to change an interface that
-would break user space, and that's why we need to get it right.
-
-> So can you agree to that a battery powered portable device must have
-> reliable and trustable power management? And if it provable can't be
-> implemented in user-space (a single counter example suffices) it must
-> be a kernel driver?
-
-Having a kernel driver would make things easier for user space, sure,
-but again, that's not a sufficient reason to merge just any kernel
-implementation.
-
-Johan
+Regards,
+Sekhar
