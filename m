@@ -1,36 +1,41 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 18 Jan 2018 15:38:47 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d4: fix pinctrl compatible string
-Message-ID: <20180118143847.15309-1-ludovic.desroches@microchip.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 18 Jan 2018 15:42:43 +0100
+Subject: [PATCH -next] dmaengine: stm32-dmamux: Remove unnecessary
+ platform_get_resource() error check
+In-Reply-To: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
+References: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <abcc8970-728f-42c2-3986-44d3de0f8a21@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santiago Esteban <Santiago.Esteban@microchip.com>
+Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 
-The compatible string is incorrect. Add atmel,sama5d3-pinctrl since
-it's the appropriate compatible string. Remove the
-atmel,at91rm9200-pinctrl compatible string, this fallback is
-useless, there are too many changes.
-
-Signed-off-by: Santiago Esteban <Santiago.Esteban@microchip.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Cc: stable at vger.kernel.org #v3.18
----
- arch/arm/boot/dts/sama5d4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 373b3621b536..c7105096c623 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1379,7 +1379,7 @@
- 			pinctrl at fc06a000 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
-+				compatible = "atmel,sama5d3-pinctrl", "atmel,at91sam9x5-pinctrl", "simple-bus";
- 				ranges = <0xfc068000 0xfc068000 0x100
- 					  0xfc06a000 0xfc06a000 0x4000>;
- 				/* WARNING: revisit as pin spec has changed */
--- 
-2.12.2
+On 01/17/2018 12:27 PM, Wei Yongjun wrote:
+> devm_ioremap_resource() already checks if the resource is NULL, so
+> remove the unnecessary platform_get_resource() error check.
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/dma/stm32-dmamux.c | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/drivers/dma/stm32-dmamux.c b/drivers/dma/stm32-dmamux.c
+> index d5db0f6..4dbb30c 100644
+> --- a/drivers/dma/stm32-dmamux.c
+> +++ b/drivers/dma/stm32-dmamux.c
+> @@ -253,9 +253,6 @@ static int stm32_dmamux_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res)
+> -		return -ENODEV;
+> -
+>  	iomem = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(iomem))
+>  		return PTR_ERR(iomem);
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
