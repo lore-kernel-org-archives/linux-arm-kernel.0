@@ -1,133 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Jan 2018 16:37:36 +0000
-Subject: [PATCH] efi: arm64: Check whether x18 is preserved by runtime
- services calls
-Message-ID: <20180118163736.1253-1-ard.biesheuvel@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 18 Jan 2018 17:55:21 +0100
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+ <1199109167.10232.1516213158515@email.1und1.de>
+ <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+ <998321576.11526.1516217542223@email.1und1.de>
+ <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
+ <974305384.15547.1516259017873@email.1und1.de>
+ <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
+Message-ID: <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whether or not we will ever decide to start using x18 as a platform
-register in Linux is uncertain, but by that time, we will need to
-ensure that UEFI runtime services calls don't corrupt it. So let's
-start issuing warnings now for this, and increase the likelihood that
-these firmware images have all been replaced by that time.
+Hi Sergey,
 
-This has been fixed on the EDK2 side in commit 6d73863b5464
-("BaseTools/tools_def AARCH64: mark register x18 as reserved").,
-dated July 13, 2017.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/efi.h            |  4 +++-
- drivers/firmware/efi/Makefile           |  2 +-
- drivers/firmware/efi/arm-runtime.c      | 10 +++++++++
- drivers/firmware/efi/arm64-rt-wrapper.S | 40 +++++++++++++++++++++++++++++++++
- 4 files changed, 54 insertions(+), 2 deletions(-)
- create mode 100644 drivers/firmware/efi/arm64-rt-wrapper.S
+Am 18.01.2018 um 13:55 schrieb Sergey Suloev:
+> Hi, Stefan
+>
+> On 01/18/2018 10:03 AM, Stefan Wahren wrote:
+>> Hi Sergey,
+>>
+>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 
+>>> 21:04 geschrieben:
+>>>
+>>>
+>>> Hi Stefan,
+>>>
+>>> I am using u-boot tagged 2018.01.
+>> interesting. I don't use u-boot as second stage bootloader. Maybe it 
+>> messed up the pin configuration of the GPIO expander. Could you 
+>> please try without u-boot?
+>
+> but how can u-boot influence that ? As far as I understand the error 
+> happens in a very late boot stage, actually in the end. At this time 
+> bcm2837-rpi-3-b device tree file from kernel is already loaded. Do you 
+> think this DTB is incorrect ?
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 8389050328bb..2278e4bf270a 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -31,7 +31,7 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
- ({									\
- 	efi_##f##_t *__f;						\
- 	__f = p->f;							\
--	__f(args);							\
-+	__efi_rt_asm_wrapper(__f, args);				\
- })
- 
- #define arch_efi_call_virt_teardown()					\
-@@ -40,6 +40,8 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
- 	efi_virtmap_unload();						\
- })
- 
-+efi_status_t __efi_rt_asm_wrapper(void *, ...);
-+
- #define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
- 
- /* arch specific definitions used by the stub code */
-diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
-index 269501dfba53..eb8be0a00931 100644
---- a/drivers/firmware/efi/Makefile
-+++ b/drivers/firmware/efi/Makefile
-@@ -28,5 +28,5 @@ obj-$(CONFIG_APPLE_PROPERTIES)		+= apple-properties.o
- 
- arm-obj-$(CONFIG_EFI)			:= arm-init.o arm-runtime.o
- obj-$(CONFIG_ARM)			+= $(arm-obj-y)
--obj-$(CONFIG_ARM64)			+= $(arm-obj-y)
-+obj-$(CONFIG_ARM64)			+= $(arm-obj-y) arm64-rt-wrapper.o
- obj-$(CONFIG_EFI_CAPSULE_LOADER)	+= capsule-loader.o
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 1cc41c3d6315..de84b490a844 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -11,6 +11,8 @@
-  *
-  */
- 
-+#define pr_fmt(fmt)	"efi: " fmt
-+
- #include <linux/dmi.h>
- #include <linux/efi.h>
- #include <linux/io.h>
-@@ -182,3 +184,11 @@ static int __init arm_dmi_init(void)
- 	return 0;
- }
- core_initcall(arm_dmi_init);
-+
-+#ifdef CONFIG_ARM64
-+efi_status_t efi_handle_corrupted_x18(efi_status_t s)
-+{
-+	pr_warn_ratelimited(FW_BUG "x18 corrupted by EFI firmware!");
-+	return s;
-+}
-+#endif
-diff --git a/drivers/firmware/efi/arm64-rt-wrapper.S b/drivers/firmware/efi/arm64-rt-wrapper.S
-new file mode 100644
-index 000000000000..a6a2b64134c9
---- /dev/null
-+++ b/drivers/firmware/efi/arm64-rt-wrapper.S
-@@ -0,0 +1,40 @@
-+/*
-+ * Copyright (C) 2018 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+ENTRY(__efi_rt_asm_wrapper)
-+	stp	x29, x30, [sp, #-32]!
-+	mov	x29, sp
-+
-+	/*
-+	 * Register x18 is designated as the 'platform' register by the AAPCS,
-+	 * which means firmware running at the same exception level as the OS
-+	 * (such as UEFI) should never touch it.
-+	 */
-+	str	x18, [sp, #16]
-+
-+	/*
-+	 * We are lucky enough that no EFI runtime services take more than
-+	 * 5 arguments, so all are passed in registers rather than via the
-+	 * stack.
-+	 */
-+	mov	x8, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	mov	x3, x4
-+	mov	x4, x5
-+	blr	x8
-+
-+	ldr	x1, [sp, #16]
-+	cmp	x1, x18
-+	ldp	x29, x30, [sp], #32
-+	b.ne	efi_handle_corrupted_x18	// tail call
-+	ret
-+ENDPROC(__efi_rt_asm_wrapper)
--- 
-2.11.0
+wild guessing doesn't help here. Did you test it without U-Boot? Did the 
+issue still occur?
+
+Stefan
+
+>
+> Thanks
+>
+>
