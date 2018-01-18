@@ -1,61 +1,64 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Thu, 18 Jan 2018 09:56:16 -0800
-Subject: [PATCH v2] arm64: Branch predictor hardening for Cavium ThunderX2
-In-Reply-To: <20180118135354.GB20783@arm.com>
-References: <20180108164651.GQ25869@arm.com>
- <1515502022-7376-1-git-send-email-jnair@caviumnetworks.com>
- <e9a192da-f603-6523-6d2e-858eb9c7d1b2@jonmasters.org>
- <20180116234554.GA38392@jc-sabre> <20180118135354.GB20783@arm.com>
-Message-ID: <20180118175615.GF38392@jc-sabre>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Thu, 18 Jan 2018 20:56:54 +0300
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+ <1199109167.10232.1516213158515@email.1und1.de>
+ <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+ <998321576.11526.1516217542223@email.1und1.de>
+ <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
+ <974305384.15547.1516259017873@email.1und1.de>
+ <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
+ <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
+Message-ID: <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 01:53:55PM +0000, Will Deacon wrote:
-> Hi JC,
-> 
-> On Tue, Jan 16, 2018 at 03:45:54PM -0800, Jayachandran C wrote:
-> > On Tue, Jan 16, 2018 at 04:52:53PM -0500, Jon Masters wrote:
-> > > On 01/09/2018 07:47 AM, Jayachandran C wrote:
-> > > 
-> > > > Use PSCI based mitigation for speculative execution attacks targeting
-> > > > the branch predictor. The approach is similar to the one used for
-> > > > Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
-> > > > test if the firmware supports the capability.
-> > > > 
-> > > > If the secure firmware has been updated with the mitigation code to
-> > > > invalidate the branch target buffer, we use the PSCI version call to
-> > > > invoke it.
-> > > 
-> > > What's the status of this patch currently? Previously you had suggested
-> > > to hold while the SMC got standardized, but then you seemed happy with
-> > > pulling in. What's the latest?
-> > 
-> > My understanding is that the SMC standardization is being worked on
-> > but will take more time, and the KPTI current patchset will go to
-> > mainline before that.
-> > 
-> > Given that, I would expect arm64 maintainers to pick up this patch for
-> > ThunderX2, but I have not seen any comments so far.
-> > 
-> > Will/Marc, please let me know if you are planning to pick this patch
-> > into the KPTI tree.
-> 
-> Are you really sure you want us to apply this? If we do, then you can't run
-> KVM guests anymore because your IMPDEF SMC results in an UNDEF being
-> injected (crash below).
-> 
-> I really think that you should just hook up the enable_psci_bp_hardening
-> callback like we've done for the Cortex CPUs. We can optimise this later
-> once the SMC standarisation work has been completed (which is nearly final
-> now and works in a backwards-compatible manner).
+Hi, Stefan,
 
-I think Marc's patch here:
-https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=kvm-arm64/kpti&id=d35e77fae4b70331310c3bc1796bb43b93f9a85e
-handles returning for undefined smc calls in guest.
+On 01/18/2018 07:55 PM, Stefan Wahren wrote:
+> Hi Sergey,
+>
+>
+> Am 18.01.2018 um 13:55 schrieb Sergey Suloev:
+>> Hi, Stefan
+>>
+>> On 01/18/2018 10:03 AM, Stefan Wahren wrote:
+>>> Hi Sergey,
+>>>
+>>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 
+>>>> 21:04 geschrieben:
+>>>>
+>>>>
+>>>> Hi Stefan,
+>>>>
+>>>> I am using u-boot tagged 2018.01.
+>>> interesting. I don't use u-boot as second stage bootloader. Maybe it 
+>>> messed up the pin configuration of the GPIO expander. Could you 
+>>> please try without u-boot?
+>>
+>> but how can u-boot influence that ? As far as I understand the error 
+>> happens in a very late boot stage, actually in the end. At this time 
+>> bcm2837-rpi-3-b device tree file from kernel is already loaded. Do 
+>> you think this DTB is incorrect ?
+>
+> wild guessing doesn't help here. Did you test it without U-Boot? Did 
+> the issue still occur?
+>
+> Stefan
+>
+>>
+>> Thanks
+>>
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I think in this case we have to choose between crashing or giving a false
-sense of security when a guest compiled with HARDEN_BRANCH_PREDICTOR is
-booted on an hypervisor that does not support hardening. Crashing maybe
-a reasonable option.
-
-JC.
+no I haven't checked it yet. I'm going to find information about setting 
+it up w/o u-boot since I've never tried it before.
