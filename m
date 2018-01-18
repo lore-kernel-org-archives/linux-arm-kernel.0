@@ -1,107 +1,192 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 18 Jan 2018 14:04:08 +0100
-Subject: [PATCH v3 05/12] drm/bridge/synopsys: dw-hdmi: don't clobber
- drvdata
-In-Reply-To: <20180117201421.25954-6-jernej.skrabec@siol.net>
+Date: Thu, 18 Jan 2018 14:05:18 +0100
+Subject: [PATCH v3 04/12] drm/bridge/synopsys: dw-hdmi: Export some PHY
+ related functions
+In-Reply-To: <20180117201421.25954-5-jernej.skrabec@siol.net>
 References: <20180117201421.25954-1-jernej.skrabec@siol.net>
- <20180117201421.25954-6-jernej.skrabec@siol.net>
-Message-ID: <91cd3ffd-e5cc-8149-2c57-6f93da55a0e4@baylibre.com>
+ <20180117201421.25954-5-jernej.skrabec@siol.net>
+Message-ID: <e04fa67d-3779-dcc1-5a37-77aecbe2139c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 17/01/2018 21:14, Jernej Skrabec wrote:
-> dw_hdmi shouldn't set drvdata since some drivers might need to store
-> it's own data there. Rework dw_hdmi in a way to return struct dw_hdmi
-> instead to store it in drvdata. This way drivers are responsible to
-> store and pass structure when needed.
+> Parts of PHY code could be useful also for custom PHYs. For example,
+> Allwinner A83T has custom PHY which is probably Synopsys gen2 PHY
+> with few additional memory mapped registers, so most of the Synopsys PHY
+> related code could be reused.
 > 
-> Idea was taken from the following commit:
-> 8242ecbd597d ("drm/bridge/synopsys: stop clobbering drvdata")
+> Functions exported here are actually not specific to Synopsys PHYs but
+> to DWC HDMI controller PHY interface. This means that even if the PHY is
+> completely custom, i.e. not designed by Synopsys, exported functions can
+> be useful.
 > 
-> Cc: p.zabel at pengutronix.de
-> Cc: narmstrong at baylibre.com
-> Cc: Laurent.pinchart at ideasonboard.com
-> Cc: hjc at rock-chips.com
-> Cc: heiko at sntech.de
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c   | 31 ++++++++++++-----------------
->  drivers/gpu/drm/imx/dw_hdmi-imx.c           | 13 +++++++++---
->  drivers/gpu/drm/meson/meson_dw_hdmi.c       | 14 +++++++++----
->  drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c      | 12 +++++++++--
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 13 +++++++++---
->  include/drm/bridge/dw_hdmi.h                | 13 ++++++------
->  6 files changed, 60 insertions(+), 36 deletions(-)
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 44 +++++++++++++++++++++----------
+>  drivers/gpu/drm/meson/meson_dw_hdmi.c     |  8 +++---
+>  include/drm/bridge/dw_hdmi.h              | 11 ++++++++
+>  3 files changed, 45 insertions(+), 18 deletions(-)
 > 
-
-[...]
-> diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> index e8c3ef8a94ce..d49af17310c9 100644
-> --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-> @@ -140,6 +140,7 @@ struct meson_dw_hdmi {
->  	struct clk *venci_clk;
->  	struct regulator *hdmi_supply;
->  	u32 irq_stat;
-> +	struct dw_hdmi *hdmi;
->  };
->  #define encoder_to_meson_dw_hdmi(x) \
->  	container_of(x, struct meson_dw_hdmi, encoder)
-> @@ -878,9 +879,12 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
->  	dw_plat_data->input_bus_format = MEDIA_BUS_FMT_YUV8_1X24;
->  	dw_plat_data->input_bus_encoding = V4L2_YCBCR_ENC_709;
->  
-> -	ret = dw_hdmi_bind(pdev, encoder, &meson_dw_hdmi->dw_plat_data);
-> -	if (ret)
-> -		return ret;
-> +	platform_set_drvdata(pdev, meson_dw_hdmi);
-> +
-> +	meson_dw_hdmi->hdmi = dw_hdmi_bind(pdev, encoder,
-> +					   &meson_dw_hdmi->dw_plat_data);
-> +	if (IS_ERR(meson_dw_hdmi->hdmi))
-> +		return PTR_ERR(meson_dw_hdmi->hdmi);
->  
->  	DRM_DEBUG_DRIVER("HDMI controller initialized\n");
->  
-> @@ -890,7 +894,9 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
->  static void meson_dw_hdmi_unbind(struct device *dev, struct device *master,
->  				   void *data)
->  {
-> -	dw_hdmi_unbind(dev);
-> +	struct meson_dw_hdmi *meson_dw_hdmi = dev_get_drvdata(dev);
-> +
-> +	dw_hdmi_unbind(meson_dw_hdmi->hdmi);
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index 7ca14d7325b5..7d80f4b56683 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -1037,19 +1037,21 @@ static void dw_hdmi_phy_enable_svsret(struct dw_hdmi *hdmi, u8 enable)
+>  			 HDMI_PHY_CONF0_SVSRET_MASK);
 >  }
 >  
->  static const struct component_ops meson_dw_hdmi_ops = {
-
-[..]
-
+> -static void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
+> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable)
+>  {
+>  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
+>  			 HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET,
+>  			 HDMI_PHY_CONF0_GEN2_PDDQ_MASK);
+>  }
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_pddq);
+>  
+> -static void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
+> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable)
+>  {
+>  	hdmi_mask_writeb(hdmi, enable, HDMI_PHY_CONF0,
+>  			 HDMI_PHY_CONF0_GEN2_TXPWRON_OFFSET,
+>  			 HDMI_PHY_CONF0_GEN2_TXPWRON_MASK);
+>  }
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_gen2_txpwron);
+>  
+>  static void dw_hdmi_phy_sel_data_en_pol(struct dw_hdmi *hdmi, u8 enable)
+>  {
+> @@ -1065,6 +1067,22 @@ static void dw_hdmi_phy_sel_interface_control(struct dw_hdmi *hdmi, u8 enable)
+>  			 HDMI_PHY_CONF0_SELDIPIF_MASK);
+>  }
+>  
+> +void dw_hdmi_phy_reset(struct dw_hdmi *hdmi)
+> +{
+> +	/* PHY reset. The reset signal is active high on Gen2 PHYs. */
+> +	hdmi_writeb(hdmi, HDMI_MC_PHYRSTZ_PHYRSTZ, HDMI_MC_PHYRSTZ);
+> +	hdmi_writeb(hdmi, 0, HDMI_MC_PHYRSTZ);
+> +}
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_reset);
+> +
+> +void dw_hdmi_phy_i2c_set_addr(struct dw_hdmi *hdmi, u8 address)
+> +{
+> +	hdmi_phy_test_clear(hdmi, 1);
+> +	hdmi_writeb(hdmi, address, HDMI_PHY_I2CM_SLAVE_ADDR);
+> +	hdmi_phy_test_clear(hdmi, 0);
+> +}
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_i2c_set_addr);
+> +
+>  static void dw_hdmi_phy_power_off(struct dw_hdmi *hdmi)
+>  {
+>  	const struct dw_hdmi_phy_data *phy = hdmi->phy.data;
+> @@ -1203,16 +1221,11 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi)
+>  	if (phy->has_svsret)
+>  		dw_hdmi_phy_enable_svsret(hdmi, 1);
+>  
+> -	/* PHY reset. The reset signal is active high on Gen2 PHYs. */
+> -	hdmi_writeb(hdmi, HDMI_MC_PHYRSTZ_PHYRSTZ, HDMI_MC_PHYRSTZ);
+> -	hdmi_writeb(hdmi, 0, HDMI_MC_PHYRSTZ);
+> +	dw_hdmi_phy_reset(hdmi);
+>  
+>  	hdmi_writeb(hdmi, HDMI_MC_HEACPHY_RST_ASSERT, HDMI_MC_HEACPHY_RST);
+>  
+> -	hdmi_phy_test_clear(hdmi, 1);
+> -	hdmi_writeb(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2,
+> -		    HDMI_PHY_I2CM_SLAVE_ADDR);
+> -	hdmi_phy_test_clear(hdmi, 0);
+> +	dw_hdmi_phy_i2c_set_addr(hdmi, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
+>  
+>  	/* Write to the PHY as configured by the platform */
+>  	if (pdata->configure_phy)
+> @@ -1251,15 +1264,16 @@ static void dw_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
+>  	dw_hdmi_phy_power_off(hdmi);
+>  }
+>  
+> -static enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
+> -						      void *data)
+> +enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
+> +					       void *data)
+>  {
+>  	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
+>  		connector_status_connected : connector_status_disconnected;
+>  }
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_read_hpd);
+>  
+> -static void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
+> -				   bool force, bool disabled, bool rxsense)
+> +void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
+> +			    bool force, bool disabled, bool rxsense)
+>  {
+>  	u8 old_mask = hdmi->phy_mask;
+>  
+> @@ -1271,8 +1285,9 @@ static void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
+>  	if (old_mask != hdmi->phy_mask)
+>  		hdmi_writeb(hdmi, hdmi->phy_mask, HDMI_PHY_MASK0);
+>  }
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_update_hpd);
+>  
+> -static void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
+> +void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
+>  {
+>  	/*
+>  	 * Configure the PHY RX SENSE and HPD interrupts polarities and clear
+> @@ -1291,6 +1306,7 @@ static void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
+>  	hdmi_writeb(hdmi, ~(HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE),
+>  		    HDMI_IH_MUTE_PHY_STAT0);
+>  }
+> +EXPORT_SYMBOL_GPL(dw_hdmi_phy_setup_hpd);
+>  
+>  static const struct dw_hdmi_phy_ops dw_hdmi_synopsys_phy_ops = {
+>  	.init = dw_hdmi_phy_init,
+> diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> index 17de3afd98f6..e8c3ef8a94ce 100644
+> --- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> +++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
+> @@ -302,7 +302,7 @@ static void meson_hdmi_phy_setup_mode(struct meson_dw_hdmi *dw_hdmi,
+>  	}
+>  }
+>  
+> -static inline void dw_hdmi_phy_reset(struct meson_dw_hdmi *dw_hdmi)
+> +static inline void meson_dw_hdmi_phy_reset(struct meson_dw_hdmi *dw_hdmi)
+>  {
+>  	struct meson_drm *priv = dw_hdmi->priv;
+>  
+> @@ -409,9 +409,9 @@ static int dw_hdmi_phy_init(struct dw_hdmi *hdmi, void *data,
+>  	msleep(100);
+>  
+>  	/* Reset PHY 3 times in a row */
+> -	dw_hdmi_phy_reset(dw_hdmi);
+> -	dw_hdmi_phy_reset(dw_hdmi);
+> -	dw_hdmi_phy_reset(dw_hdmi);
+> +	meson_dw_hdmi_phy_reset(dw_hdmi);
+> +	meson_dw_hdmi_phy_reset(dw_hdmi);
+> +	meson_dw_hdmi_phy_reset(dw_hdmi);
+>  
+>  	/* Temporary Disable VENC video stream */
+>  	if (priv->venc.hdmi_use_enci)
 > diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-> index f3f3f0e1b2d3..dd2a8cf7d20b 100644
+> index 182f83283e24..f3f3f0e1b2d3 100644
 > --- a/include/drm/bridge/dw_hdmi.h
 > +++ b/include/drm/bridge/dw_hdmi.h
-> @@ -143,12 +143,13 @@ struct dw_hdmi_plat_data {
->  			     unsigned long mpixelclock);
->  };
+> @@ -157,7 +157,18 @@ void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
+>  void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
 >  
-> -int dw_hdmi_probe(struct platform_device *pdev,
-> -		  const struct dw_hdmi_plat_data *plat_data);
-> -void dw_hdmi_remove(struct platform_device *pdev);
-> -void dw_hdmi_unbind(struct device *dev);
-> -int dw_hdmi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
-> -		 const struct dw_hdmi_plat_data *plat_data);
-> +struct dw_hdmi *dw_hdmi_probe(struct platform_device *pdev,
-> +			      const struct dw_hdmi_plat_data *plat_data);
-> +void dw_hdmi_remove(struct dw_hdmi *hdmi);
-> +void dw_hdmi_unbind(struct dw_hdmi *hdmi);
-> +struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
-> +			     struct drm_encoder *encoder,
-> +			     const struct dw_hdmi_plat_data *plat_data);
+>  /* PHY configuration */
+> +void dw_hdmi_phy_i2c_set_addr(struct dw_hdmi *hdmi, u8 address);
+>  void dw_hdmi_phy_i2c_write(struct dw_hdmi *hdmi, unsigned short data,
+>  			   unsigned char addr);
 >  
->  void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
->  
+> +void dw_hdmi_phy_gen2_pddq(struct dw_hdmi *hdmi, u8 enable);
+> +void dw_hdmi_phy_gen2_txpwron(struct dw_hdmi *hdmi, u8 enable);
+> +void dw_hdmi_phy_reset(struct dw_hdmi *hdmi);
+> +
+> +enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
+> +					       void *data);
+> +void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
+> +			    bool force, bool disabled, bool rxsense);
+> +void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data);
+> +
+>  #endif /* __IMX_HDMI_H__ */
 > 
 
-For meson-drm and dw-hdmi bridge changes :
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
