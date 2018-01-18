@@ -1,83 +1,103 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 18 Jan 2018 18:16:11 +0100
-Subject: [PATCH v3 00/14] Add MMCI support for STM32F SoCs family
-In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <CAPDyKFrccszR9Br6ixy43W_YkYWdDws=1XTPKyHt4iHi1wDG-w@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Thu, 18 Jan 2018 18:20:09 +0100
+Subject: [PATCH 1/3] dt-bindings: phy: phy-rockchip-typec: add usb3 otg
+ reset
+In-Reply-To: <20180117220715.GA112833@google.com>
+References: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
+ <1515751704-13213-2-git-send-email-william.wu@rock-chips.com>
+ <20180117220715.GA112833@google.com>
+Message-ID: <CAFqH_52KiHQzEeaX5rFN66pMqAuVVKeWJhxnS5L4hY4XiVG8mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 January 2018 at 15:34,  <patrice.chotard@st.com> wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
+2018-01-17 23:07 GMT+01:00 Brian Norris <briannorris@chromium.org>:
+> + Enric
 >
-> This series reworks patches submitted one year ago by Andrea Merello [1]
-> but without succeed to merged it.
+> On Fri, Jan 12, 2018 at 06:08:22PM +0800, William Wu wrote:
+>> This patch adds USB3 OTG reset property for rk3399 Type-C PHY
+>> to hold the USB3 controller in reset state.
+>>
+>> Signed-off-by: William Wu <william.wu@rock-chips.com>
+>> ---
 >
-> STM32F4 and STM32F7 SoCs families embeds a variant of the ARM PrimeCell
-> PL18x SD host controller, for which the mmci driver exists.
-> This series adds support for these SoCs to the mmci driver.
+> I was going back and forth on this, since at one point this binding was
+> merged but had no enabled users...but now I see Heiko has queued up some
+> of Enric's work for 4.16, and it uses the existing binding.
 >
-> As other variants, this one need some specific quirks, that this
-> series address.
->
-> This series has been tested on following boards :
->         _ stm32f429-eval
->         _ stm32f469-disco
->         _ stm32f746-eval
->         _ stm32f769-disco
->
-> DT update for stm32f7 pinctrl, stm32f746-eval and stm32f769-disco boards
-> will be sent later to avoid conflict with pending stm32f7 series [1] which
-> is not yet merged on kernel mainline.
->
-> [1] https://www.spinics.net/lists/linux-mmc/msg41616.html
-> [2] https://patchwork.kernel.org/patch/10104447/
->
-> v3: _ patch 3: use variant->opendrain instead of host->variant->opendrain
->     _ patch 4: exit from probe() if no pinctrl dt node are found
->     _ previous patch 15: removed as already applied in pinctrl tree
->
-> v2: _ add Revievied-by, Acked-by in some patches
->     _ replace bool by u32 for start_err and opendrain fields of struct variant_data
->     _ split previous patch 3 in two parts, first patch clean the open drain bit code
->       and second part add pinctrl pins management when no open drain bit is available.
->     _ replace "pl180" by "PL180" in patch "mmc: mmci: Add STM32 variant"
->
-> Andrea Merello (2):
->   ARM: dts: stm32: Add pin map for SDIO controller on stm32f4
->   ARM: dts: stm32: Enable SDIO controller on stm32f469 disco board
->
-> Patrice Chotard (12):
->   mmc: mmci: Don't pretend all variants to have MMCIMASK1 register
->   mmc: mmci: Don't pretend all variants to have MCI_STARBITERR flag
->   mmc: mmci: Don't pretend all variants to have OPENDRAIN bit
->   mmc: mmci: Add support for setting pad type via pinctrl
->   mmc: mmci: Add STM32 variant
->   ARM: dts: stm32: Add SDIO controller for stm32f746
->   ARM: dts: stm32: Add SDIO controller for stm32f429
->   ARM: dts: stm32: Enable SDIO controller on stm32429i-eval board
->   ARM: stm32: Add AMBA support for STM32F4 and STM32F7 SoCs
->   ARM: configs: stm32: Enable MMC_ARMMMCI support
->   ARM: configs: stm32: Enable EXT3_FS support
->   clk: stm32: Add clk entry for SDMMC2 on stm32F769
->
->  arch/arm/boot/dts/stm32429i-eval.dts   |  19 +++++
->  arch/arm/boot/dts/stm32f4-pinctrl.dtsi |  31 +++++++++
->  arch/arm/boot/dts/stm32f429.dtsi       |  11 +++
->  arch/arm/boot/dts/stm32f469-disco.dts  |  19 +++++
->  arch/arm/boot/dts/stm32f746.dtsi       |  22 ++++++
->  arch/arm/configs/stm32_defconfig       |   3 +
->  arch/arm/mach-stm32/Kconfig            |   3 +
->  drivers/clk/clk-stm32f4.c              |   3 +-
->  drivers/mmc/host/mmci.c                | 124 ++++++++++++++++++++++++++++-----
->  drivers/mmc/host/mmci.h                |   6 ++
->  10 files changed, 224 insertions(+), 17 deletions(-)
->
-> --
-> 1.9.1
+> So, if this reset is added, it should be optional.
 >
 
-Thanks, applied patch1 to patch5 for next!
+As Brian said commit 06c47e6286d5 'usb: dwc3: of-simple: Add support
+to get resets for the device' introduced the support to get the resets
+from dwc3-of-simple and the queued commit 'b7e63d95c14d arm64: dts:
+rockchip: add reset property for dwc3 controllers on rk3399' started
+using it. Without the latest I get errors like this doing bind/unbind
+tests.
 
-Kind regards
-Uffe
+   dwc3: probe of fe900000.dwc3 failed with error -110
+
+I just tested these series on top of mainline, I reverted my patch
+because otherwise two drivers are requesting the same reset and fails,
+and I did some of the bind/unbind test. They just worked fine, and
+seems that this is right way, so this makes me think some questions.
+
+Should 'b7e63d95c14d arm64: dts: rockchip: add reset property for dwc3
+controllers on rk3399' removed for 4.16? That's a question for Heiko I
+guess, if it's removed we will have usb broken meanwhile these patches
+doesn't land. If we don't remove the patch we will need to introduce a
+new patch in this series that reverts the first patch.
+
+Is commit 06c47e6286d5 'usb: dwc3: of-simple: Add support to get
+resets for the device'  really needed ? Seems that I was the only user
+of it.
+
+Anyway, these patches looks good to me and are
+
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+
+> Brian
+>
+>>  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 12 +++++++-----
+>>  1 file changed, 7 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> index 6ea867e..db2902e 100644
+>> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> @@ -13,7 +13,7 @@ Required properties:
+>>   - assigned-clock-rates : the phy core clk frequency, shall be: 50000000
+>>   - resets : a list of phandle + reset specifier pairs
+>>   - reset-names : string reset name, must be:
+>> -              "uphy", "uphy-pipe", "uphy-tcphy"
+>> +              "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg"
+>>   - extcon : extcon specifier for the Power Delivery
+>>
+>>  Note, there are 2 type-c phys for RK3399, and they are almost identical, except
+>> @@ -56,8 +56,9 @@ Example:
+>>               assigned-clock-rates = <50000000>;
+>>               resets = <&cru SRST_UPHY0>,
+>>                        <&cru SRST_UPHY0_PIPE_L00>,
+>> -                      <&cru SRST_P_UPHY0_TCPHY>;
+>> -             reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+>> +                      <&cru SRST_P_UPHY0_TCPHY>,
+>> +                      <&cru SRST_A_USB3_OTG0>;
+>> +             reset-names = "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg";
+>>               rockchip,typec-conn-dir = <0xe580 0 16>;
+>>               rockchip,usb3tousb2-en = <0xe580 3 19>;
+>>               rockchip,external-psm = <0xe588 14 30>;
+>> @@ -84,8 +85,9 @@ Example:
+>>               assigned-clock-rates = <50000000>;
+>>               resets = <&cru SRST_UPHY1>,
+>>                        <&cru SRST_UPHY1_PIPE_L00>,
+>> -                      <&cru SRST_P_UPHY1_TCPHY>;
+>> -             reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
+>> +                      <&cru SRST_P_UPHY1_TCPHY>,
+>> +                      <&cru SRST_A_USB3_OTG1>;
+>> +             reset-names = "uphy", "uphy-pipe", "uphy-tcphy", "usb3-otg";
+>>               rockchip,typec-conn-dir = <0xe58c 0 16>;
+>>               rockchip,usb3tousb2-en = <0xe58c 3 19>;
+>>               rockchip,external-psm = <0xe594 14 30>;
+>> --
+>> 2.0.0
+>>
+>>
