@@ -1,29 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Jan 2018 11:46:07 +0000
-Subject: [PATCH 0/7] arm64: move literal data into .rodata section
-In-Reply-To: <20180118114112.GA20091@gondor.apana.org.au>
-References: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
- <20180118114112.GA20091@gondor.apana.org.au>
-Message-ID: <CAKv+Gu_oh7q81mr=XPW+HM9zewETtbL=mnN0mkr83f5=n4zr6Q@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 18 Jan 2018 12:46:13 +0100
+Subject: [PATCH v2 0/3] Device tree fixes for Axentia TSE-850 and Nattis
+Message-ID: <20180118114616.6639-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 January 2018 at 11:41, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Wed, Jan 10, 2018 at 12:11:35PM +0000, Ard Biesheuvel wrote:
->> Prevent inadvertently creating speculative gadgets by moving literal data
->> into the .rodata section.
->>
->> Patch #1 enables this for C code, by reverting a change that disables the
->> GCC feature implementing this. Note that this conflicts with the mitigation
->> of erratum #843419 for Cortex-A53.
->
-> Ard, which tree is this supposed to go through?
->
+Hi!
 
-Hi Herbert,
+Here's a series that is of the "documentation" kind. It fixes things
+that don't really need fixing, but the fixes are correct none-the-less
+and should prevent possible confusion.
 
-I am going to drop that first patch, the remaining 6 patches can go
-through the crypto tree as they are independent.
+Changes since v1:
 
-Thanks,
-Ard.
+- One more fix added to patch 1/3. The size of the rootfs partition
+  should be 504MB, as the flash is 512MB total.
+
+Sorry for the noise.
+
+Cheers,
+Peter
+
+Peter Rosin (3):
+  ARM: dts: at91: nattis: use up-to-date mtd partitions
+  ARM: dts: at91: nattis: add lvds-encoder
+  ARM: dts: at91: tse850: make the sound dai cell count explicit
+
+ arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 58 ++++++++++++++++++++++-------
+ arch/arm/boot/dts/at91-tse850-3.dts         |  1 +
+ 2 files changed, 45 insertions(+), 14 deletions(-)
+
+-- 
+2.11.0
