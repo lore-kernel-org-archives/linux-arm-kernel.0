@@ -1,82 +1,52 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Thu, 18 Jan 2018 17:47:36 +1100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <20180112194022.7da1e726@kemnade.info>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost> <20180109184347.28ba0a6e@aktux>
- <20180112144647.GA5992@localhost>
- <20180112194022.7da1e726@kemnade.info>
-Message-ID: <20180118064736.GH3286@localhost>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 18 Jan 2018 08:03:37 +0100 (CET)
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+ <1199109167.10232.1516213158515@email.1und1.de>
+ <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+ <998321576.11526.1516217542223@email.1und1.de>
+ <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
+Message-ID: <974305384.15547.1516259017873@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 07:40:35PM +0100, Andreas Kemnade wrote:
-> On Fri, 12 Jan 2018 15:46:47 +0100
-> Johan Hovold <johan@kernel.org> wrote:
-> 
-> > On Tue, Jan 09, 2018 at 06:43:47PM +0100, Andreas Kemnade wrote:
-> > > On Fri, 22 Dec 2017 13:44:27 +0100
-> > > Johan Hovold <johan@kernel.org> wrote:
-> > > 
-> > > [...]  
-> > > > I'd suggest reiterating the problem you're trying to solve and
-> > > > enumerating the previously discussed potential solutions in order to
-> > > > find a proper abstraction level for this (before getting lost in
-> > > > implementation details).
-> > > >   
-> > > The main point here is in short words: Having a device powered on or off
-> > > when the uart it is attached to, is used or not used anymore,
-> > > so the already available userspace applications do not need to be changed.  
-> > 
-> > So we'd end up with something in-between a kernel driver and a
-> > user-space solution. What about devices that need to be (partially)
-> > powered also when the port isn't open? A pure user-space solution would
-> > be able to handle all variants.
-> > 
-> Well partly powered devices are at many places, And they hide that problem
-> from userspace, just get the open()/get() and close()/put() from there and power the
-> device accordingly. 
-> 
-> So the question still remains why should the kernel hide some things and some
-> it should not.
-> If it all is in userspace, then there is still something needed in the devicetree
-> (if I understand correctly, every information about hardware which cannot be
-> auto-probed belongs into device tree) so that the userspace knows what kind of
-> device is at that port. So there can be a daemon powering on and off devices.
-> But that would break existing applications which just expect that they just need
-> to open/close the device. 
-> 
-> Or you need to have some inotify handler in userspace and attach it there to
-> react on close() and open() of that device.
-> But this thing needs to have two kind of information:
-> 
-> 1. the type of chip available to do the right powerup sequence. 
-> 
-> 2. how the chip is wired up to the cpu. 
-> 
-> So to avoid having hardware information spread all over the table at least
-> these information would need to be in devicetree. But that also all feels
-> like a hack and hard to maintain.
+Hi Sergey,
 
-Having the device described in the device tree is certainly desirable,
-not least for chip identification. And with a GPS framework in the
-kernel with a well-defined interface, implementing power management
-would be straight forward.
+> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 21:04 geschrieben:
+> 
+> 
+> Hi Stefan,
+> 
+> On 01/17/2018 10:32 PM, Stefan Wahren wrote:
+> > Hi Sergey,
+> >
+> >> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 19:49 geschrieben:
+> >>
+> >>
+> >> Hi Stefan
+> >>
+> >> wifi network was working fine when I used a raspbian image downloaded
+> >> from official site.
+> >>
+> >> Here is my config https://pastebin.com/7XRpmM0X  and cpuinfo
+> >> https://pastebin.com/08Z6gDZ9
+> >>
+> >> I have no idea about version you are talking about.
+> > please stop top-posting.
+> >
+> > I was talking about the board revision of your RPi. You can get this information by looking at the PCB.
+> >
+> > I updated to the last firmware and your config but i'm unable to reproduce this issue.
+> >
+> > Do you use U-Boot or only the Raspberry Pi bootloader?
+> > What are your modifications to config.txt?
+> >
+> >> Thanks.
+> >>
+> >>
+> I am using u-boot tagged 2018.01.
 
-I'm just not convinced that the proposed tty interface is the right
-interface for this. User space would still rely on gpsd for the GPS
-protocols, and would also ultimately be managing power by killing gpsd
-or whatever daemon that would otherwise be holding the port open.
-
-Something like the generic power sequences that has been discussed
-elsewhere might be a better fit for this if all you want to do is power
-on and off on port open and close (and on suspend/resume). There really
-isn't anything GPS-specific in the current proposal (besides the
-suggested tty-device name).
-
-But sure, that wouldn't be sufficient to deal with the
-unknown-power-state problem with the device in question.
-
-Johan
+interesting. I don't use u-boot as second stage bootloader. Maybe it messed up the pin configuration of the GPIO expander. Could you please try without u-boot?
