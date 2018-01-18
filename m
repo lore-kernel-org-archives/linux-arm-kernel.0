@@ -1,71 +1,65 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 18 Jan 2018 22:27:21 +0100
-Subject: [patch v15 4/4] Documentation: jtag: Add ABI documentation
-In-Reply-To: <1514202808-29747-5-git-send-email-oleksandrs@mellanox.com>
-References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
- <1514202808-29747-5-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <20180118212720.GA17196@amd>
+Date: Thu, 18 Jan 2018 23:03:48 +0100
+Subject: [PATCH] Nokia N9: add support for up/down keys in the dts
+In-Reply-To: <20180102194236.ahrhkvnefre2l6gf@earth.universe>
+References: <20180102125948.GA20051@amd>
+ <20180102194236.ahrhkvnefre2l6gf@earth.universe>
+Message-ID: <20180118220348.GD17196@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-12-25 13:53:28, Oleksandr Shamray wrote:
-> Added document that describe the ABI for JTAG class drivrer
+On Tue 2018-01-02 20:42:36, Sebastian Reichel wrote:
+> Hi,
 > 
-> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v14->v15
-> v13->v14
-> v12->v13
-> v11->v12
-> Tobias Klauser <tklauser@distanz.ch>
-> - rename /Documentation/ABI/testing/jatg-dev -> jtag-dev
-> - Typo: s/interfase/interface
-> v10->v11
-> v9->v10
-> Fixes added by Oleksandr:
-> - change jtag-cdev to jtag-dev in documentation
-> - update Kernel Version and Date in jtag-dev documentation;
-> v8->v9
-> v7->v8
-> v6->v7
-> Comments pointed by Pavel Machek <pavel@ucw.cz>
-> - Added jtag-cdev documentation to Documentation/ABI/testing folder
-> ---
->  Documentation/ABI/testing/jtag-dev |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/ABI/testing/jtag-dev
+> On Tue, Jan 02, 2018 at 01:59:48PM +0100, Pavel Machek wrote:
+> > 
+> > This adds support for volume up/down keys in the dts.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > 
-> diff --git a/Documentation/ABI/testing/jtag-dev b/Documentation/ABI/testing/jtag-dev
-> new file mode 100644
-> index 0000000..cab867d
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/jtag-dev
-> @@ -0,0 +1,27 @@
-> +What:		/dev/jtag[0-9]+
-> +Date:		October 2017
-> +KernelVersion:	4.15
-> +Contact:	oleksandrs at mellanox.com
-> +Description:
-> +		The misc device files /dev/jtag* are the interface
-> +		between JTAG master interface and userspace.
-> +
-> +		The ioctl(2)-based ABI is defined and documented in
-> +		[include/uapi]<linux/jtag.h>.
-> +
-> +		The following file operations are supported:
-> +
-> +		open(2)
-> +		The argument flag currently support only one access
-> +		mode O_RDWR.
-> +
-> +		ioctl(2)
-> +		Initiate various actions.
-> +		See the inline documentation in [include/uapi]<linux/jtag.h>
-> +		for descriptions of all ioctls.
+> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
-Sorry, can we have real docs? I tried to decipher it from jtag.h, but
-its not easy. We should have API docs...
+Tony, ping? Can I get you to apply this one?
+
+[PATCHv2] nokia N9: Add support for magnetometer
+
+should be good to go, too...
+									Pavel
+									
+
+> > diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
+> > index 39e35f8..57a6679 100644
+> > --- a/arch/arm/boot/dts/omap3-n9.dts
+> > +++ b/arch/arm/boot/dts/omap3-n9.dts
+> > @@ -11,9 +11,10 @@
+> >  /dts-v1/;
+> >  
+> >  #include "omap3-n950-n9.dtsi"
+> > +#include <dt-bindings/input/input.h>
+> >  
+> >  / {
+> >  	model = "Nokia N9";
+> >  	compatible = "nokia,omap3-n9", "ti,omap36xx", "ti,omap3";
+> >  };
+> >  
+> > @@ -72,3 +133,9 @@
+> >  	st,max-limit-y = <46>;
+> >  	st,max-limit-z = <46>;
+> >  };
+> > +
+> > +&twl_keypad {
+> > +	linux,keymap = < MATRIX_KEY(6, 8, KEY_VOLUMEUP)
+> > +			 MATRIX_KEY(7, 8, KEY_VOLUMEDOWN)
+> > +			 >;
+> > +};
+> > 
+> > 
+> > -- 
+> > (english) http://www.livejournal.com/~pavelmachek
+> > (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
+> 
+
 
 
 -- 
@@ -77,4 +71,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/e4452250/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/8963ae25/attachment.sig>
