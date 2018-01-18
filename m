@@ -1,79 +1,53 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 18 Jan 2018 15:49:40 +0100
-Subject: [PATCH 2/2] clk: stm32: Add DSI clock for STM32F469 Board
-In-Reply-To: <1516286980-8603-1-git-send-email-gabriel.fernandez@st.com>
-References: <1516286980-8603-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1516286980-8603-3-git-send-email-gabriel.fernandez@st.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 18 Jan 2018 16:06:44 +0100
+Subject: [PATCH net-next v5 0/4] net: mvpp2: 1000BaseX and 2500BaseX
+ support
+In-Reply-To: <20180116151245.GJ17719@n2100.armlinux.org.uk>
+References: <20180112075130.30890-1-antoine.tenart@free-electrons.com>
+ <20180116151245.GJ17719@n2100.armlinux.org.uk>
+Message-ID: <20180118150644.GH2690@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Hi Russell,
 
-This patch adds DSI clock for STM32F469 board
+On Tue, Jan 16, 2018 at 03:12:45PM +0000, Russell King - ARM Linux wrote:
+> 
+> As I've already said, we need to make sure things are done in a similar
+> way for all netdev DT drivers that are hoping to switch to phylink.
+> The mvneta patches are now in net-next for this.
+> 
+> What I can see is that there's a stark difference between mvpp2 and
+> mvneta and their handling of the "link irq" aka inband autonegotiation
+> status.
+> 
+> mvneta requires 'managed = "in-band-status";' to use the results of
+> the gmac negotiation otherwise inband AN is disabled.  As phylink was
+> developed against mvneta, phylink requires that for Base-X modes.
+> 
+> So, in order to be compatible with mvneta and to do what phylink expects,
+> specifying 'managed = "in-band-status";' is a requirement for Base-X
+> modes, and having that in place _now_ will make the transition to
+> phylink easier without creating the need to update DT when that change
+> happens.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32f4.c                 | 11 ++++++++++-
- include/dt-bindings/clock/stm32fx-clock.h |  3 ++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+Yes, we should aim for similar bindings and not having all drivers doing
+their own way. Part of the PPv2 move to phylink will be to rework the
+"link irq" to match what phylink expect, and I think we all agree on
+this. Part of this will be to update the dt of the 7k-db and 8k-db, as
+they're the two boards currently using the "link irq" in mainline.
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index da44f8d..3c28798 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -521,7 +521,7 @@ struct stm32f4_pll_data {
- };
- 
- static const struct stm32f4_pll_data stm32f469_pll[MAX_PLL_DIV] = {
--	{ PLL,	   50, { "pll",	     "pll-q",    NULL	    } },
-+	{ PLL,	   50, { "pll",	     "pll-q",    "pll-r"    } },
- 	{ PLL_I2S, 50, { "plli2s-p", "plli2s-q", "plli2s-r" } },
- 	{ PLL_SAI, 50, { "pllsai-p", "pllsai-q", "pllsai-r" } },
- };
-@@ -1047,6 +1047,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
- 	"no-clock", "lse", "lsi", "hse-rtc"
- };
- 
-+static const char *dsi_parent[2] = { NULL, "pll-r" };
-+
- static const char *lcd_parent[1] = { "pllsai-r-div" };
- 
- static const char *i2s_parents[2] = { "plli2s-r", NULL };
-@@ -1156,6 +1158,12 @@ struct stm32f4_clk_data {
- 		NO_GATE, 0,
- 		0
- 	},
-+	{
-+		CLK_F469_DSI, "dsi", dsi_parent, ARRAY_SIZE(dsi_parent),
-+		STM32F4_RCC_DCKCFGR, 29, 1,
-+		STM32F4_RCC_APB2ENR, 27,
-+		CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT
-+	},
- };
- 
- static const struct stm32_aux_clk stm32f746_aux_clk[] = {
-@@ -1450,6 +1458,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	stm32f4_gate_map = data->gates_map;
- 
- 	hse_clk = of_clk_get_parent_name(np, 0);
-+	dsi_parent[0] = hse_clk;
- 
- 	i2s_in_clk = of_clk_get_parent_name(np, 1);
- 
-diff --git a/include/dt-bindings/clock/stm32fx-clock.h b/include/dt-bindings/clock/stm32fx-clock.h
-index 4d523b0..58d8b51 100644
---- a/include/dt-bindings/clock/stm32fx-clock.h
-+++ b/include/dt-bindings/clock/stm32fx-clock.h
-@@ -35,8 +35,9 @@
- #define CLK_SAIQ_PDIV		13
- #define CLK_HSI			14
- #define CLK_SYSCLK		15
-+#define CLK_F469_DSI		16
- 
--#define END_PRIMARY_CLK		16
-+#define END_PRIMARY_CLK		17
- 
- #define CLK_HDMI_CEC		16
- #define CLK_SPDIF		17
+I don't mind too much keeping these base-X patches out-of-tree for now,
+and to send them as part of the phylink series during the next cycle.
+
+I don't quite get the reason not to take them now, as they do not
+modify any DT-related part. Or do you fear this would allow others to
+send DT patches before the PPv2 move to phylink lands in?
+
+Thanks,
+Antoine
+
 -- 
-1.9.1
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
