@@ -1,192 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 18 Jan 2018 13:53:55 +0000
-Subject: [PATCH v2] arm64: Branch predictor hardening for Cavium ThunderX2
-In-Reply-To: <20180116234554.GA38392@jc-sabre>
-References: <20180108164651.GQ25869@arm.com>
- <1515502022-7376-1-git-send-email-jnair@caviumnetworks.com>
- <e9a192da-f603-6523-6d2e-858eb9c7d1b2@jonmasters.org>
- <20180116234554.GA38392@jc-sabre>
-Message-ID: <20180118135354.GB20783@arm.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 18 Jan 2018 21:54:28 +0800
+Subject: [PATCH 0/2] pinctrl: meson: use one uniform 'function' name
+In-Reply-To: <7h4lnlcpds.fsf@baylibre.com>
+References: <20180108073328.205769-1-yixun.lan@amlogic.com>
+ <1515401544.5048.67.camel@baylibre.com>
+ <a6a4ed23-696c-ae2d-9b6a-c2578372b1aa@amlogic.com>
+ <1515569324.5048.103.camel@baylibre.com>
+ <9a27021f-acfc-a010-8ea1-a1bc8f076b6e@amlogic.com>
+ <7h4lnlcpds.fsf@baylibre.com>
+Message-ID: <43ed7553-708b-3063-4bb8-885d6094de8f@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi JC,
-
-On Tue, Jan 16, 2018 at 03:45:54PM -0800, Jayachandran C wrote:
-> On Tue, Jan 16, 2018 at 04:52:53PM -0500, Jon Masters wrote:
-> > On 01/09/2018 07:47 AM, Jayachandran C wrote:
-> > 
-> > > Use PSCI based mitigation for speculative execution attacks targeting
-> > > the branch predictor. The approach is similar to the one used for
-> > > Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
-> > > test if the firmware supports the capability.
-> > > 
-> > > If the secure firmware has been updated with the mitigation code to
-> > > invalidate the branch target buffer, we use the PSCI version call to
-> > > invoke it.
-> > 
-> > What's the status of this patch currently? Previously you had suggested
-> > to hold while the SMC got standardized, but then you seemed happy with
-> > pulling in. What's the latest?
+On 01/17/2018 08:14 AM, Kevin Hilman wrote:
+> Yixun Lan <yixun.lan@amlogic.com> writes:
 > 
-> My understanding is that the SMC standardization is being worked on
-> but will take more time, and the KPTI current patchset will go to
-> mainline before that.
+>> Hi Jerome:
+>>
+>> On 01/10/2018 03:28 PM, Jerome Brunet wrote:
+>>> On Wed, 2018-01-10 at 10:12 +0800, Yixun Lan wrote:
+>>>>
+>>>> On 01/08/18 16:52, Jerome Brunet wrote:
+>>>>> On Mon, 2018-01-08 at 15:33 +0800, Yixun Lan wrote:
+>>>>>> These two patches are general improvement for meson pinctrl driver.
+>>>>>> It make the two pinctrl trees (ee/ao) to share one uniform 'function' name for
+>>>>>> one hardware block even its pin groups live inside two differet hardware domains,
+>>>>>> which for example EE vs AO domain here.
+>>>>>>
+>>>>>> This idea is motivated by Martin's question at [1]
+>>>>>>
+>>>>>> [1]
+>>>>>>  http://lkml.kernel.org/r/CAFBinCCuQ-NK747+GHDkhZty_UMMgzCYOYFcNTrRDJgU8OM=Gw at mail.gmail.com
+>>>>>>
+>>>>>>
+>>>>>> Yixun Lan (2):
+>>>>>>   pinctrl: meson: introduce a macro to have name/groups seperated
+>>>>>>   pinctrl: meson-axg: correct the pin expansion of UART_AO_B
+>>>>>>
+>>>>>>  drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
+>>>>>>  drivers/pinctrl/meson/pinctrl-meson.h     | 8 +++++---
+>>>>>>  2 files changed, 7 insertions(+), 5 deletions(-)
+>>>>>
+>>>>> Hi Yixun,
+>>>>>
+>>>>> Honestly, I don't like the idea. I think it adds an unnecessary complexity.
+>>>>> I don't see the point of FUNCTION_EX(uart_ao_b, _z) when you could simply write 
+>>>>> FUNCTION(uart_ao_b_z) ... especially when there is just a couple of function per
+>>>>> SoC available on different domains.
+>>>>>
+>>>>> A pinctrl driver can already be challenging to understand at first, let's keep
+>>>>> it simple and avoid adding more macros.
+>>>>>
+>>>>
+>>>> Hi Jerome?
+>>>>   In my opinion, the idea of keeping one uniform 'function' in DT (thus
+>>>> introducing another macro) is worth considering. It would make the DT
+>>>> part much clean.
+>>>
+>>> Ok this is your opinion. I don't share it. Keeping function names tidy is good,
+>>> I don't think we need another macro to do so.
+>>>
+>>>>   And yes, it's a trade-off here, either we 1) do more in code to make
+>>>> DT clean or 2) do nothing in the code level to make DT live with it.
+>>>
+>>> I don't see how adding a macro doing just string concatenation is going to make
+>>> anything more clean. It does not prevent one to write FUNCTION_EX(uart_ao_b,
+>>> _gpioz), resulting in uart_ao_b_gpioz, which is what is apparently considered
+>>> 'not clean'
+>>>
+>> for the benefits of introducing macro 'FUNCTION_EX', it will end with
+>>  .name = "uart_ao_b", -> same for both EE, AO domain, and it will match
+>> the DT part (although still different for '.groups')
+>>
+>>
+>>> BTW, there no cleanness issue here, the name is just out of the 'usual scheme'
+>>> but there is no problem with. If you want to change this, and
+>>> s/uart_ao_b_gpioz/uart_ao_b_z/, now is the time to change it. 
+>>>
+>> I'd rather *NOT* to push a pinctrl patch for just changing
+>> 'uart_ao_b_gpioz' to 'uart_ao_b_z' (it's a cosmetic change, and still
+>> end with two different name - 'uart_ao_b_gpioz/z' & 'uart_ao_b' in DT)
 > 
-> Given that, I would expect arm64 maintainers to pick up this patch for
-> ThunderX2, but I have not seen any comments so far.
+> FWIW, I agree with Jerome.
 > 
-> Will/Marc, please let me know if you are planning to pick this patch
-> into the KPTI tree.
+> Rather than this patch adding a(nother) hard-to-understand macro, please
+> submit a pinctrl rename/cleanup to s/uart_ao_b_gpioz/uart_ao_b_z/.
+> Since there are not any users of the _gpioz name, now is the time to do
+> it.
+> 
+> We're already using the _x _y _z suffixes all over the place, and IMO,
+> adding this new macro would make that even more confusing that it
+> already is.
+> 
+> Kevin
+> 
 
-Are you really sure you want us to apply this? If we do, then you can't run
-KVM guests anymore because your IMPDEF SMC results in an UNDEF being
-injected (crash below).
+HI Linus
+  In this case, please drop this series, and I will send another patch
+which simply adjust the pin group name.
+  Thanks
 
-I really think that you should just hook up the enable_psci_bp_hardening
-callback like we've done for the Cortex CPUs. We can optimise this later
-once the SMC standarisation work has been completed (which is nearly final
-now and works in a backwards-compatible manner).
-
-Will
-
---->8
-
-[    0.319123] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    0.319125] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    0.319147] Modules linked in:
-[    0.319152] CPU: 2 PID: 19 Comm: migration/2 Not tainted 4.15.0-rc8-00103-g9409c1e175be-dirty #1
-[    0.319154] Hardware name: linux,dummy-virt (DT)
-[    0.319156] pstate: 00000085 (nzcv daIf -PAN -UAO)
-[    0.319163] pc : __arm_smccc_smc+0x0/0x2c
-[    0.319166] lr : enable_tx2_psci_bp_hardening+0x6c/0x108
-[    0.319167] sp : ffff000009dcbd30
-[    0.319168] x29: ffff000009dcbd40 x28: 0000000000000000 
-[    0.319171] x27: ffff00000803bc88 x26: 0000000000000001 
-[    0.319174] x25: ffff000008d13980 x24: ffff00000907b575 
-[    0.319176] x23: 0000000000000001 x22: 0000000000000000 
-[    0.319179] x21: ffff00000803bd3c x20: ffff00000803bd18 
-[    0.319181] x19: ffff0000089f2438 x18: 0000000000000030 
-[    0.319183] x17: 0000000000000000 x16: 0000000000000000 
-[    0.319185] x15: 0000000000000000 x14: 0000000000000400 
-[    0.319187] x13: 0000000000000400 x12: 0000000000000000 
-[    0.319189] x11: 0000000000000000 x10: 0000000000000a00 
-[    0.319192] x9 : ffff000009dcbd80 x8 : ffff8001f691b460 
-[    0.319194] x7 : 0000000000000000 x6 : 0000000000000000 
-[    0.319196] x5 : 0000000000000000 x4 : 0000000000000000 
-[    0.319198] x3 : 0000000000000000 x2 : 0000000000000000 
-[    0.319200] x1 : 000000000000b0a0 x0 : 00000000c200ff00 
-[    0.319203] Process migration/2 (pid: 19, stack limit = 0x000000004aa336a5)
-[    0.319204] Call trace:
-[    0.319207]  __arm_smccc_smc+0x0/0x2c
-[    0.319211]  multi_cpu_stop+0x8c/0x110
-[    0.319213]  cpu_stopper_thread+0xac/0x120
-[    0.319219]  smpboot_thread_fn+0x158/0x240
-[    0.319220]  kthread+0x128/0x130
-[    0.319223]  ret_from_fork+0x10/0x18
-[    0.319226] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    0.319230] ---[ end trace 169f08213b3163bb ]---
-[    0.319234] Internal error: undefined instruction: 0 [#2] PREEMPT SMP
-[    0.319259] note: migration/2[19] exited with preempt_count 1
-[    0.319284] Modules linked in:
-[    0.319288] CPU: 3 PID: 24 Comm: migration/3 Tainted: G      D          4.15.0-rc8-00103-g9409c1e175be-dirty #1
-[    0.319289] Hardware name: linux,dummy-virt (DT)
-[    0.319291] pstate: 00000085 (nzcv daIf -PAN -UAO)
-[    0.319295] pc : __arm_smccc_smc+0x0/0x2c
-[    0.319298] lr : enable_tx2_psci_bp_hardening+0x6c/0x108
-[    0.319298] sp : ffff000009df3d30
-[    0.319300] x29: ffff000009df3d40 x28: 0000000000000000 
-[    0.319303] x27: ffff00000803bc88 x26: 0000000000000001 
-[    0.319305] x25: ffff000008d13980 x24: ffff00000907b575 
-[    0.319307] x23: 0000000000000001 x22: 0000000000000000 
-[    0.319310] x21: ffff00000803bd3c x20: ffff00000803bd18 
-[    0.319312] x19: ffff0000089f2438 x18: 0000000000000030 
-[    0.319314] x17: 0000000000000000 x16: 0000000000000000 
-[    0.319316] x15: 0000000000000000 x14: 0000000000000400 
-[    0.319318] x13: 0000000000000400 x12: 0000000000000001 
-[    0.319321] x11: 000000009ad0065e x10: 0000000000000a00 
-[    0.319323] x9 : ffff000009df3d80 x8 : ffff8001f691fa60 
-[    0.319325] x7 : 0000000000000000 x6 : 0000000000000000 
-[    0.319327] x5 : 0000000000000000 x4 : 0000000000000000 
-[    0.319329] x3 : 0000000000000000 x2 : 0000000000000000 
-[    0.319331] x1 : 000000000000b0a0 x0 : 00000000c200ff00 
-[    0.319334] Process migration/3 (pid: 24, stack limit = 0x00000000be13f0f9)
-[    0.319335] Call trace:
-[    0.319338]  __arm_smccc_smc+0x0/0x2c
-[    0.319340]  multi_cpu_stop+0x8c/0x110
-[    0.319342]  cpu_stopper_thread+0xac/0x120
-[    0.319345]  smpboot_thread_fn+0x158/0x240
-[    0.319346]  kthread+0x128/0x130
-[    0.319348]  ret_from_fork+0x10/0x18
-[    0.319351] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    0.319352] ---[ end trace 169f08213b3163bc ]---
-[    0.319355] note: migration/3[24] exited with preempt_count 1
-[    0.319371] Internal error: undefined instruction: 0 [#3] PREEMPT SMP
-[    0.319373] Modules linked in:
-[    0.319376] CPU: 1 PID: 14 Comm: migration/1 Tainted: G      D          4.15.0-rc8-00103-g9409c1e175be-dirty #1
-[    0.319377] Hardware name: linux,dummy-virt (DT)
-[    0.319379] pstate: 00000085 (nzcv daIf -PAN -UAO)
-[    0.319383] pc : __arm_smccc_smc+0x0/0x2c
-[    0.319385] lr : enable_tx2_psci_bp_hardening+0x6c/0x108
-[    0.319386] sp : ffff000009da3d30
-[    0.319387] x29: ffff000009da3d40 x28: 0000000000000000 
-[    0.319390] x27: ffff00000803bc88 x26: 0000000000000001 
-[    0.319393] x25: ffff000008d13980 x24: ffff00000907b575 
-[    0.319395] x23: 0000000000000001 x22: 0000000000000000 
-[    0.319397] x21: ffff00000803bd3c x20: ffff00000803bd18 
-[    0.319399] x19: ffff0000089f2438 x18: 0000000000000030 
-[    0.319402] x17: 0000000000000000 x16: 0000000000000000 
-[    0.319404] x15: 0000000000000000 x14: 0000000000000400 
-[    0.319406] x13: 0000000000000400 x12: 0000000000000000 
-[    0.319408] x11: 0000000000000000 x10: 0000000000000a00 
-[    0.319410] x9 : ffff000009da3d80 x8 : ffff8001f68e6c60 
-[    0.319412] x7 : 0000000000000000 x6 : 0000000000000000 
-[    0.319414] x5 : 0000000000000000 x4 : 0000000000000000 
-[    0.319416] x3 : 0000000000000000 x2 : 0000000000000000 
-[    0.319418] x1 : 000000000000b0a0 x0 : 00000000c200ff00 
-[    0.319422] Process migration/1 (pid: 14, stack limit = 0x00000000596b9e92)
-[    0.319423] Call trace:
-[    0.319425]  __arm_smccc_smc+0x0/0x2c
-[    0.319427]  multi_cpu_stop+0x8c/0x110
-[    0.319429]  cpu_stopper_thread+0xac/0x120
-[    0.319431]  smpboot_thread_fn+0x158/0x240
-[    0.319433]  kthread+0x128/0x130
-[    0.319435]  ret_from_fork+0x10/0x18
-[    0.319437] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    0.319439] ---[ end trace 169f08213b3163bd ]---
-[    0.319441] note: migration/1[14] exited with preempt_count 1
-[    0.857389] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    0.863472] Internal error: undefined instruction: 0 [#4] PREEMPT SMP
-[    0.869937] Modules linked in:
-[    0.872969] CPU: 0 PID: 11 Comm: migration/0 Tainted: G      D          4.15.0-rc8-00103-g9409c1e175be-dirty #1
-[    0.883064] Hardware name: linux,dummy-virt (DT)
-[    0.887680] pstate: 00000085 (nzcv daIf -PAN -UAO)
-[    0.892453] pc : __arm_smccc_smc+0x0/0x2c
-[    0.896466] lr : enable_tx2_psci_bp_hardening+0x6c/0x108
-[    0.901767] sp : ffff000009d73d30
-[    0.905078] x29: ffff000009d73d40 x28: 0000000000000000 
-[    0.910404] x27: ffff00000803bc88 x26: 0000000000000001 
-[    0.915706] x25: ffff000008d13980 x24: ffff00000907b575 
-[    0.921040] x23: 0000000000000001 x22: 0000000000000000 
-[    0.926357] x21: ffff00000803bd3c x20: ffff00000803bd18 
-[    0.931660] x19: ffff0000089f2438 x18: 0000000000000010 
-[    0.936954] x17: 00000000ffffff80 x16: 00000000bad0c696 
-[    0.942280] x15: 0000000000000000 x14: 0000000000000400 
-[    0.947567] x13: 0000000000000400 x12: 0000000000000001 
-[    0.952861] x11: 0000000002014024 x10: 0000000000000a00 
-[    0.958179] x9 : ffff000009d73d80 x8 : ffff8001f68e1860 
-[    0.963460] x7 : 0000000000000000 x6 : 0000000000000000 
-[    0.968761] x5 : 0000000000000000 x4 : 0000000000000000 
-[    0.974071] x3 : 0000000000000000 x2 : 0000000000000000 
-[    0.979341] x1 : 000000000000b0a0 x0 : 00000000c200ff00 
-[    0.984676] Process migration/0 (pid: 11, stack limit = 0x0000000054c91580)
-[    0.991623] Call trace:
-[    0.994062]  __arm_smccc_smc+0x0/0x2c
-[    0.997749]  multi_cpu_stop+0x8c/0x110
-[    1.001495]  cpu_stopper_thread+0xac/0x120
-[    1.005567]  smpboot_thread_fn+0x158/0x240
-[    1.009665]  kthread+0x128/0x130
-[    1.012881]  ret_from_fork+0x10/0x18
-[    1.016435] Code: 2a080042 b8236885 29008829 17ffffc0 (d4000003) 
-[    1.022526] ---[ end trace 169f08213b3163be ]---
-[    1.027146] note: migration/0[11] exited with preempt_count 1
+Yixun
