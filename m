@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Jan 2018 11:23:36 +0000
-Subject: Applied "spi: a3700: Allow to enable or disable FIFO mode" to the spi
- tree
-In-Reply-To: <1516205728-3256-4-git-send-email-maxime.chevallier@smile.fr>
-Message-ID: <E1ec8IC-0003tZ-Bb@debutante>
+Date: Thu, 18 Jan 2018 11:23:54 +0000
+Subject: Applied "spi: a3700: Set frequency limits at startup" to the spi tree
+In-Reply-To: <1516205728-3256-3-git-send-email-maxime.chevallier@smile.fr>
+Message-ID: <E1ec8IU-0003uU-1h@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: a3700: Allow to enable or disable FIFO mode
+   spi: a3700: Set frequency limits at startup
 
 has been applied to the spi tree at
 
@@ -34,53 +33,48 @@ to this mail.
 Thanks,
 Mark
 
->From a456c9320d997fdb26bfab496dd9e37f155cc788 Mon Sep 17 00:00:00 2001
+>From abf3a49e50967bd67cff67f289690f76436f461f Mon Sep 17 00:00:00 2001
 From: Maxime Chevallier <maxime.chevallier@smile.fr>
-Date: Wed, 17 Jan 2018 17:15:27 +0100
-Subject: [PATCH] spi: a3700: Allow to enable or disable FIFO mode
+Date: Wed, 17 Jan 2018 17:15:26 +0100
+Subject: [PATCH] spi: a3700: Set frequency limits at startup
 
-The armada 3700 SPI controller allows to make transfers without using
-the 32 bytes RFIFO and WFIFO.
+Armada 3700 SPI controller has an internal clock divider which can
+divide the parent clock frequency by up to 30.
 
-This commit enable switching between FIFO and non-FIFO mode, which is
-necessary to implement full-duplex transfers.
+This patch sets the limits in the spi_controller fields so that we can
+detect when a non-supported frequency is requested by a device for a
+transfer.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-armada-3700.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/spi/spi-armada-3700.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-index 07f227e3c834..97938c6d6267 100644
+index 4857b0119556..07f227e3c834 100644
 --- a/drivers/spi/spi-armada-3700.c
 +++ b/drivers/spi/spi-armada-3700.c
-@@ -185,12 +185,15 @@ static int a3700_spi_pin_mode_set(struct a3700_spi *a3700_spi,
- 	return 0;
- }
+@@ -27,6 +27,8 @@
  
--static void a3700_spi_fifo_mode_set(struct a3700_spi *a3700_spi)
-+static void a3700_spi_fifo_mode_set(struct a3700_spi *a3700_spi, bool enable)
- {
- 	u32 val;
+ #define DRIVER_NAME			"armada_3700_spi"
  
- 	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
--	val |= A3700_SPI_FIFO_MODE;
-+	if (enable)
-+		val |= A3700_SPI_FIFO_MODE;
-+	else
-+		val &= ~A3700_SPI_FIFO_MODE;
- 	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
- }
++#define A3700_SPI_MAX_SPEED_HZ		100000000
++#define A3700_SPI_MAX_PRESCALE		30
+ #define A3700_SPI_TIMEOUT		10
  
-@@ -291,7 +294,7 @@ static int a3700_spi_init(struct a3700_spi *a3700_spi)
- 		a3700_spi_deactivate_cs(a3700_spi, i);
+ /* SPI Register Offest */
+@@ -815,6 +817,11 @@ static int a3700_spi_probe(struct platform_device *pdev)
+ 		goto error;
+ 	}
  
- 	/* Enable FIFO mode */
--	a3700_spi_fifo_mode_set(a3700_spi);
-+	a3700_spi_fifo_mode_set(a3700_spi, true);
- 
- 	/* Set SPI mode */
- 	a3700_spi_mode_set(a3700_spi, master->mode_bits);
++	master->max_speed_hz = min_t(unsigned long, A3700_SPI_MAX_SPEED_HZ,
++					clk_get_rate(spi->clk));
++	master->min_speed_hz = DIV_ROUND_UP(clk_get_rate(spi->clk),
++						A3700_SPI_MAX_PRESCALE);
++
+ 	ret = a3700_spi_init(spi);
+ 	if (ret)
+ 		goto error_clk;
 -- 
 2.15.1
