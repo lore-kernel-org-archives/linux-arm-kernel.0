@@ -1,41 +1,42 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 18 Jan 2018 15:42:43 +0100
-Subject: [PATCH -next] dmaengine: stm32-dmamux: Remove unnecessary
- platform_get_resource() error check
-In-Reply-To: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
-References: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <abcc8970-728f-42c2-3986-44d3de0f8a21@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 Jan 2018 14:45:21 +0000
+Subject: [RFC PATCH v2 0/3] arm64/kernel: get rid of GCC large model code
+Message-ID: <20180118144524.18704-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+GCC's large model uses literal pools to emit cross object symbol
+references rather than movz/movk sequences, resulting in data items
+mixed in the with executable code in modules' .text segments. This
+is a potential cause for reduced performance (although no real world
+scenarios are known), but may result in code gadgets that are exploitable
+under speculative execution.
 
-On 01/17/2018 12:27 PM, Wei Yongjun wrote:
-> devm_ioremap_resource() already checks if the resource is NULL, so
-> remove the unnecessary platform_get_resource() error check.
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->  drivers/dma/stm32-dmamux.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/dma/stm32-dmamux.c b/drivers/dma/stm32-dmamux.c
-> index d5db0f6..4dbb30c 100644
-> --- a/drivers/dma/stm32-dmamux.c
-> +++ b/drivers/dma/stm32-dmamux.c
-> @@ -253,9 +253,6 @@ static int stm32_dmamux_probe(struct platform_device *pdev)
->  	}
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res)
-> -		return -ENODEV;
-> -
->  	iomem = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(iomem))
->  		return PTR_ERR(iomem);
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+We are using GCC's large model for two separate, both of which can be
+worked around rather easily:
+- KASLR uses it to move modules and the kernel very far apart, which is
+  not really needed,
+- the Cortex-A53 erratum code uses it to avoid ADRP instruction altogether,
+  which can be replaced by selective patching of only the ADRP instructions
+  that are affected by the erratum
+
+Ard Biesheuvel (3):
+  arm64/kernel: kaslr: reduce module randomization range to 4 GB
+  arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419
+  arm64/kernel: enable A53 erratum #8434319 handling at runtime
+
+ arch/arm64/Kconfig                  | 18 ++---
+ arch/arm64/Makefile                 |  5 --
+ arch/arm64/include/asm/cpucaps.h    |  3 +-
+ arch/arm64/include/asm/module.h     |  2 +
+ arch/arm64/kernel/cpu_errata.c      | 26 +++++++
+ arch/arm64/kernel/kaslr.c           | 20 +++--
+ arch/arm64/kernel/module-plts.c     | 79 +++++++++++++++++++-
+ arch/arm64/kernel/module.c          | 43 +++++++++--
+ arch/arm64/kernel/reloc_test_core.c |  4 +-
+ arch/arm64/kernel/reloc_test_syms.S | 12 ++-
+ include/linux/sizes.h               |  2 +
+ 11 files changed, 176 insertions(+), 38 deletions(-)
+
+-- 
+2.11.0
