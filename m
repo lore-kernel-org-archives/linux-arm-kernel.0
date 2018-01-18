@@ -1,89 +1,79 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 18 Jan 2018 21:27:58 +0100
-Subject: [PATCH v4 15/19] arm64; insn: Add encoder for the EXTR instruction
-In-Reply-To: <20180104184334.16571-16-marc.zyngier@arm.com>
+Date: Thu, 18 Jan 2018 21:28:16 +0100
+Subject: [PATCH v4 17/19] arm64: KVM: Dynamically compute the HYP VA mask
+In-Reply-To: <20180104184334.16571-18-marc.zyngier@arm.com>
 References: <20180104184334.16571-1-marc.zyngier@arm.com>
- <20180104184334.16571-16-marc.zyngier@arm.com>
-Message-ID: <20180118202758.GC21802@cbox>
+ <20180104184334.16571-18-marc.zyngier@arm.com>
+Message-ID: <20180118202816.GE21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 04, 2018 at 06:43:30PM +0000, Marc Zyngier wrote:
-> Add an encoder for the EXTR instruction, which also implements the ROR
-> variant (where Rn == Rm).
+On Thu, Jan 04, 2018 at 06:43:32PM +0000, Marc Zyngier wrote:
+> As we're moving towards a much more dynamic way to compute our
+> HYP VA, let's express the mask in a slightly different way.
+> 
+> Instead of comparing the idmap position to the "low" VA mask,
+> we directly compute the mask by taking into account the idmap's
+> (VA_BIT-1) bit.
+> 
+> No functionnal change.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/include/asm/insn.h |  6 ++++++
->  arch/arm64/kernel/insn.c      | 32 ++++++++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+)
+>  arch/arm64/kvm/va_layout.c | 17 ++++++-----------
+>  1 file changed, 6 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index 815b35bc53ed..f62c56b1793f 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -319,6 +319,7 @@ __AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
->  __AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
->  __AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
->  __AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
-> +__AARCH64_INSN_FUNCS(extr,	0x7FA00000, 0x13800000)
->  __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
->  __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
->  __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
-> @@ -433,6 +434,11 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
->  				       enum aarch64_insn_register Rn,
->  				       enum aarch64_insn_register Rd,
->  				       u64 imm);
-> +u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
-> +			  enum aarch64_insn_register Rm,
-> +			  enum aarch64_insn_register Rn,
-> +			  enum aarch64_insn_register Rd,
-> +			  u8 lsb);
->  u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
->  			      enum aarch64_insn_prfm_type type,
->  			      enum aarch64_insn_prfm_target target,
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 72cb1721c63f..59669d7d4383 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -1621,3 +1621,35 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
->  	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
->  	return aarch64_encode_immediate(imm, variant, insn);
+> diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
+> index aee758574e61..75bb1c6772b0 100644
+> --- a/arch/arm64/kvm/va_layout.c
+> +++ b/arch/arm64/kvm/va_layout.c
+> @@ -21,24 +21,19 @@
+>  #include <asm/insn.h>
+>  #include <asm/kvm_mmu.h>
+>  
+> -#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+> -#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
+> -
+>  static u64 va_mask;
+>  
+>  static void compute_layout(void)
+>  {
+>  	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
+> -	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
+> +	u64 region;
+
+the naming here really confused me.  Would it make sense to call this
+'hyp_va_msb' or something like that instead?
+
+>  
+> -	/*
+> -	 * Activate the lower HYP offset only if the idmap doesn't
+> -	 * clash with it,
+> -	 */
+> -	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
+> -		mask = HYP_PAGE_OFFSET_HIGH_MASK;
+
+Ah, the series was tested, it was just that this code only existed for a
+short while.  Amusingly, I think this ephemeral bug goes against the "No
+function change" statement in the commit message.
+
+> +	/* Where is my RAM region? */
+> +	region  = idmap_addr & BIT(VA_BITS - 1);
+> +	region ^= BIT(VA_BITS - 1);
+>  
+> -	va_mask = mask;
+> +	va_mask  = BIT(VA_BITS - 1) - 1;
+
+nit: This could also be written as GENMASK_ULL(VA_BITS - 2, 0) --- and
+now I'm not sure which one I prefer.
+
+> +	va_mask |= region;
 >  }
-> +
-> +u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
-> +			  enum aarch64_insn_register Rm,
-> +			  enum aarch64_insn_register Rn,
-> +			  enum aarch64_insn_register Rd,
-> +			  u8 lsb)
-> +{
-> +	u32 insn;
-> +
-> +	insn = aarch64_insn_get_extr_value();
-> +
-> +	switch (variant) {
-> +	case AARCH64_INSN_VARIANT_32BIT:
-> +		if (lsb > 31)
-> +			return AARCH64_BREAK_FAULT;
-> +		break;
-> +	case AARCH64_INSN_VARIANT_64BIT:
-> +		if (lsb > 63)
-> +			return AARCH64_BREAK_FAULT;
-> +		insn |= AARCH64_INSN_SF_BIT;
-> +		insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, 1);
-> +		break;
-> +	default:
-> +		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
-> +		return AARCH64_BREAK_FAULT;
-> +	}
-> +
-> +	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, lsb);
-> +	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
-> +	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
-> +	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
-> +}
+>  
+>  static u32 compute_instruction(int n, u32 rd, u32 rn)
 > -- 
 > 2.14.2
 > 
+Otherwise looks good:
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
