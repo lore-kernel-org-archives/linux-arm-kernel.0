@@ -1,89 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 Jan 2018 15:53:12 +0800
-Subject: [PATCH v3 08/13] drm/sun4i: Add a driver for the display frontend
-In-Reply-To: <20180118072258.ucbchh32mhyln2qn@flea.lan>
-References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
- <3b7164f4a5199f0499c6f41201b31bc471cb3af9.1515492513.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
- <20180118072258.ucbchh32mhyln2qn@flea.lan>
-Message-ID: <CAGb2v64sp=fUi44Hge2qObva3XucnGXj=a+_wH-M4GraGmkYYQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 18 Jan 2018 13:23:08 +0530
+Subject: [PATCH v5 11/44] clk: davinci: Add platform information for TI
+ DA830 PSC
+In-Reply-To: <72abb187-1c84-f307-d4f8-be5403787bac@lechnology.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-12-git-send-email-david@lechnology.com>
+ <91fe16dc-907e-6dbb-c8db-c27561132093@ti.com>
+ <4dd36ca7-e41d-58d8-ec8c-787978307943@lechnology.com>
+ <86581de6-a982-7a7b-9a83-22c869417211@ti.com>
+ <72abb187-1c84-f307-d4f8-be5403787bac@lechnology.com>
+Message-ID: <9be7d712-33ae-3e5b-beeb-a14faa51e777@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 3:22 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Wed, Jan 17, 2018 at 09:43:31PM +0800, Chen-Yu Tsai wrote:
->> >         if (sun4i_drv_node_is_connector(node))
->> >                 return 0;
->> >
->> > -       if (!sun4i_drv_node_is_frontend(node)) {
->> > +       /*
->> > +        * If the device is either just a regular device, or an
->> > +        * enabled frontend supported by the driver, we add it to our
->> > +        * component list.
->> > +        */
->> > +       if (!sun4i_drv_node_is_frontend(node) ||
->> > +           (sun4i_drv_node_is_supported_frontend(node) &&
->> > +            of_device_is_available(node))) {
+On Wednesday 17 January 2018 11:02 PM, David Lechner wrote:
+>>>>> +??? clk_register_clkdev(clk_data->clks[3], "gpio", NULL);
+>>>>
+>>>> This is pretty bad (and no fault of yours) - having a con_id but no
+>>>> device name. Can you please make a pre-series which passes NULL con_id
+>>>> in gpio-davinci.c?
+>>>
+>>> I'll give it a try. This is complicated by the fact that the con_id has
+>>> made it's way into the device tree bindings. However, I think we can
+>>> safely deprecate clock-names = "gpio" in the device tree bindings since
+>>> we can make the driver ignore that property to preserve backwards
+>>> compatibility.
+> 
+> Agreed.
+> 
+>> I don't think this breaks DT-backward compatibility. Passing a NULL
+>> con_id in driver should find the clock for that device even if DT entry
+>> has clock-names present. As far as I can read clk_find().
 >>
->> Nit: sun4i_drv_node_is_supported_frontend should be a subset of
->> sun4i_drv_node_is_frontend, so of_device_is_available should always
->> be true at this point.
->
-> That's not really the condition though :)
->
-> It's if the device is *not* a frontend or if it is a supported
-> frontend that is available, add it to the endpoints list.
-
-Right. I got confused by the inverted logic. Sorry.
-
->
->> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
->> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
->> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
->> > +                    SUN4I_FRONTEND_INPUT_FMT_PS(1));
->> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
->> > +                    SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
+>> The less intrusive alternate is to add the GPIO device name in the table
+>> here, while keeping the con_id and keeping the driver untouched. The
+>> advantage of that is lesser number of dependent patches for this series
+>> to go in.
 >>
->> Seems that you also need to set the "ALPHA_EN" bit for ARGB.
->
-> I have not seen that bit documented anywhere. Where is it coming from?
+>> Later once CCF conversion has been there in the kernel for one full
+>> release and no regressions, these other clean-ups can be done.
+> 
+> I like this approach.
 
-The A31's user manual. I just checked all the datasheets, and only
-the A31 and the A80 have this bit (bit 7) defined. It says if the
-bit is cleared, alpha is replaced with 0xff. I assume it works either
-way on the A33, or you wouldn't be suprised. Leave it out for now then.
-(Or maybe a TODO note now that we know about it.)
+One downside is that we will have to have clock-names = "gpio" in da850
+device-tree too. Since its already present in keystone already, I don't
+think adding one more is such a big issue.
 
-ChenYu
-
->
->> > +       frontend->reset = devm_reset_control_get(dev, NULL);
->> > +       if (IS_ERR(frontend->reset)) {
->> > +               dev_err(dev, "Couldn't get our reset line\n");
->> > +               return PTR_ERR(frontend->reset);
->> > +       }
->> > +       reset_control_reset(frontend->reset);
->>
->> reset_control_reset leaves the reset control deasserted. At this
->> point the clock might not be running, which might mean the internal
->> state is not completely wiped out. (Though this really depends on
->> the design of the internal logic.)
->>
->> Maybe just assert it? It gets deasserted in the runtime PM callback
->> later. And just to be safe, I would move it close to the end of the
->> probe path, past all possible errors, so the hardware doesn't get
->> touched until everything is ready. Or don't touch it anywhere in
->> the probe path, and have the runtime PM resume function do a reset.
->
-> That seems like the best solution yes.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Thanks,
+Sekhar
