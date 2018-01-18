@@ -1,226 +1,129 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Jan 2018 12:35:25 +0000
-Subject: [PATCH v4 09/13] iommu/rockchip: Use IOMMU device for dma mapping
- operations
-In-Reply-To: <20180118115251.5542-10-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-10-jeffy.chen@rock-chips.com>
-Message-ID: <0b680e53-e62b-12cb-38b6-32f073250cf0@arm.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 18 Jan 2018 14:43:03 +0100
+Subject: [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps receiver) power
+ control driver
+In-Reply-To: <20180118061314.GG3286@localhost>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost>
+ <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
+ <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+ <20180112153903.GB5992@localhost>
+ <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
+ <20180118061314.GG3286@localhost>
+Message-ID: <8B2641B8-E86B-425C-9E79-E9C41E4E623C@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 11:52, Jeffy Chen wrote:
-> Use the first registered IOMMU device for dma mapping operations, and
-> drop the domain platform device.
-> 
-> This is similar to exynos iommu driver.
+Hi Johan,
 
-I'd been meaning to look into this myself for the sake of removing the 
-arch_setup_dma_ops() hack, so I'm glad to see it done :)
+> Am 18.01.2018 um 07:13 schrieb Johan Hovold <johan@kernel.org>:
+> 
+> Hacks are never good, but sometimes needed. But we should try to keep
+> them contained in drivers rather than allow them to spread to core code,
+> was what I was trying to say above.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Well, aren't we talking here about a well isolated driver? And not about
+core code?
 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Reviewed-by: Tomasz Figa <tfiga@chromium.org>
-> ---
+Core code already provides everything to build a driver for this chip
+to make us happy with.
+
+It is just not yet providing a generic gps interface API to make everybody
+happy with.
+
+>> That is what Andreas did remark as motivation: provide a solution
+>> for *existing* user spaces.
 > 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
+> I understand that this is what you want, but that in itself is not a
+> sufficient reason to put something in the kernel.
+
+Agreed, but it is a secondary (but still strong) motivation, not the primary one.
+
 > 
->   drivers/iommu/rockchip-iommu.c | 85 ++++++++++++------------------------------
->   1 file changed, 24 insertions(+), 61 deletions(-)
+>>>> - can not guarantee (!) to power off the chip if the last user-space
+>>>> process using it is killed (which is essential for power-management of
+>>>> a handheld, battery operated device)
+>>> 
+>>> That depends on how you implement things (extending gpsd, wrapper
+>>> script, pty daemon, ...).
+>> 
+>> No. You can of course cover all standard cases but there is one fundamental
+>> issue which is IMHO a problem of any user-space implementation:
+>> 
+>> 	How can you guarantee that the chip is powered off if no
+>> 	user-space process is using it or if the last process doing
+>> 	this is killed by *whatever* reason?
+>> 
+>> E.g. after a kill -9. Or if someone deinstalls gpsd or whatever and assumes
+>> (and wants a guarantee) that GPS is now turned off and never turned on drawing
+>> precious milliamps from the battery for no use.
 > 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 9b85a3050449..bdb7c5de6fc2 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -77,7 +77,6 @@
->   
->   struct rk_iommu_domain {
->   	struct list_head iommus;
-> -	struct platform_device *pdev;
->   	u32 *dt; /* page directory table */
->   	dma_addr_t dt_dma;
->   	spinlock_t iommus_lock; /* lock for iommus list */
-> @@ -98,12 +97,14 @@ struct rk_iommu {
->   	struct iommu_domain *domain; /* domain to which iommu is attached */
->   };
->   
-> +static struct device *dma_dev;
-> +
->   static inline void rk_table_flush(struct rk_iommu_domain *dom, dma_addr_t dma,
->   				  unsigned int count)
->   {
->   	size_t size = count * sizeof(u32); /* count of u32 entry */
->   
-> -	dma_sync_single_for_device(&dom->pdev->dev, dma, size, DMA_TO_DEVICE);
-> +	dma_sync_single_for_device(dma_dev, dma, size, DMA_TO_DEVICE);
->   }
->   
->   static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
-> @@ -690,7 +691,6 @@ static void rk_iommu_zap_iova_first_last(struct rk_iommu_domain *rk_domain,
->   static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
->   				  dma_addr_t iova)
->   {
-> -	struct device *dev = &rk_domain->pdev->dev;
->   	u32 *page_table, *dte_addr;
->   	u32 dte_index, dte;
->   	phys_addr_t pt_phys;
-> @@ -708,9 +708,9 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
->   	if (!page_table)
->   		return ERR_PTR(-ENOMEM);
->   
-> -	pt_dma = dma_map_single(dev, page_table, SPAGE_SIZE, DMA_TO_DEVICE);
-> -	if (dma_mapping_error(dev, pt_dma)) {
-> -		dev_err(dev, "DMA mapping error while allocating page table\n");
-> +	pt_dma = dma_map_single(dma_dev, page_table, SPAGE_SIZE, DMA_TO_DEVICE);
-> +	if (dma_mapping_error(dma_dev, pt_dma)) {
-> +		dev_err(dma_dev, "DMA mapping error while allocating page table\n");
->   		free_page((unsigned long)page_table);
->   		return ERR_PTR(-ENOMEM);
->   	}
-> @@ -982,29 +982,20 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
->   static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
->   {
->   	struct rk_iommu_domain *rk_domain;
-> -	struct platform_device *pdev;
-> -	struct device *iommu_dev;
->   
->   	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
->   		return NULL;
->   
-> -	/* Register a pdev per domain, so DMA API can base on this *dev
-> -	 * even some virtual master doesn't have an iommu slave
-> -	 */
-> -	pdev = platform_device_register_simple("rk_iommu_domain",
-> -					       PLATFORM_DEVID_AUTO, NULL, 0);
-> -	if (IS_ERR(pdev))
-> +	if (!dma_dev)
->   		return NULL;
->   
-> -	rk_domain = devm_kzalloc(&pdev->dev, sizeof(*rk_domain), GFP_KERNEL);
-> +	rk_domain = devm_kzalloc(dma_dev, sizeof(*rk_domain), GFP_KERNEL);
->   	if (!rk_domain)
-> -		goto err_unreg_pdev;
-> -
-> -	rk_domain->pdev = pdev;
-> +		return NULL;
->   
->   	if (type == IOMMU_DOMAIN_DMA &&
->   	    iommu_get_dma_cookie(&rk_domain->domain))
-> -		goto err_unreg_pdev;
-> +		return NULL;
->   
->   	/*
->   	 * rk32xx iommus use a 2 level pagetable.
-> @@ -1015,11 +1006,10 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
->   	if (!rk_domain->dt)
->   		goto err_put_cookie;
->   
-> -	iommu_dev = &pdev->dev;
-> -	rk_domain->dt_dma = dma_map_single(iommu_dev, rk_domain->dt,
-> +	rk_domain->dt_dma = dma_map_single(dma_dev, rk_domain->dt,
->   					   SPAGE_SIZE, DMA_TO_DEVICE);
-> -	if (dma_mapping_error(iommu_dev, rk_domain->dt_dma)) {
-> -		dev_err(iommu_dev, "DMA map error for DT\n");
-> +	if (dma_mapping_error(dma_dev, rk_domain->dt_dma)) {
-> +		dev_err(dma_dev, "DMA map error for DT\n");
->   		goto err_free_dt;
->   	}
->   
-> @@ -1040,8 +1030,6 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
->   err_put_cookie:
->   	if (type == IOMMU_DOMAIN_DMA)
->   		iommu_put_dma_cookie(&rk_domain->domain);
-> -err_unreg_pdev:
-> -	platform_device_unregister(pdev);
->   
->   	return NULL;
->   }
-> @@ -1058,20 +1046,18 @@ static void rk_iommu_domain_free(struct iommu_domain *domain)
->   		if (rk_dte_is_pt_valid(dte)) {
->   			phys_addr_t pt_phys = rk_dte_pt_address(dte);
->   			u32 *page_table = phys_to_virt(pt_phys);
-> -			dma_unmap_single(&rk_domain->pdev->dev, pt_phys,
-> +			dma_unmap_single(dma_dev, pt_phys,
->   					 SPAGE_SIZE, DMA_TO_DEVICE);
->   			free_page((unsigned long)page_table);
->   		}
->   	}
->   
-> -	dma_unmap_single(&rk_domain->pdev->dev, rk_domain->dt_dma,
-> +	dma_unmap_single(dma_dev, rk_domain->dt_dma,
->   			 SPAGE_SIZE, DMA_TO_DEVICE);
->   	free_page((unsigned long)rk_domain->dt);
->   
->   	if (domain->type == IOMMU_DOMAIN_DMA)
->   		iommu_put_dma_cookie(&rk_domain->domain);
-> -
-> -	platform_device_unregister(rk_domain->pdev);
->   }
->   
->   static bool rk_iommu_is_dev_iommu_master(struct device *dev)
-> @@ -1194,30 +1180,6 @@ static const struct iommu_ops rk_iommu_ops = {
->   	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
->   };
->   
-> -static int rk_iommu_domain_probe(struct platform_device *pdev)
-> -{
-> -	struct device *dev = &pdev->dev;
-> -
-> -	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms), GFP_KERNEL);
-> -	if (!dev->dma_parms)
-> -		return -ENOMEM;
-> -
-> -	/* Set dma_ops for dev, otherwise it would be dummy_dma_ops */
-> -	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), NULL, false);
-> -
-> -	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
-> -	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
-> -
-> -	return 0;
-> -}
-> -
-> -static struct platform_driver rk_iommu_domain_driver = {
-> -	.probe = rk_iommu_domain_probe,
-> -	.driver = {
-> -		   .name = "rk_iommu_domain",
-> -	},
-> -};
-> -
->   static int rk_iommu_probe(struct platform_device *pdev)
->   {
->   	struct device *dev = &pdev->dev;
-> @@ -1278,6 +1240,14 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   	if (err)
->   		goto err_remove_sysfs;
->   
-> +	/*
-> +	 * Use the first registered IOMMU device for domain to use with DMA
-> +	 * API, since a domain might not physically correspond to a single
-> +	 * IOMMU device..
-> +	 */
-> +	if (!dma_dev)
-> +		dma_dev = &pdev->dev;
-> +
->   	return 0;
->   err_remove_sysfs:
->   	iommu_device_sysfs_remove(&iommu->iommu);
-> @@ -1316,14 +1286,7 @@ static int __init rk_iommu_init(void)
->   	if (ret)
->   		return ret;
->   
-> -	ret = platform_driver_register(&rk_iommu_domain_driver);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = platform_driver_register(&rk_iommu_driver);
-> -	if (ret)
-> -		platform_driver_unregister(&rk_iommu_domain_driver);
-> -	return ret;
-> +	return platform_driver_register(&rk_iommu_driver);
->   }
->   subsys_initcall(rk_iommu_init);
->   
+> Have something run at init to put the device in a low power state.
+
+This does *not* solve the issue how to *guarantee* that it becomes
+powered off if the number of user-space processes goes down to zero
+*after* init.
+
+Please consider that a portable device is rarely booted but might be
+operated over several days with many suspend cycles. And people may
+still expect that the power consumer "GPS" is turned off if their
+personal user-space setup simply kills gpsd.
+
 > 
+>> As it is well known, a user-space process can't protect itself against kill -9.
+>> Or has this recently been changed and I am not aware of?
+>> 
+>> This is the fundamental reason why we need a kernel driver to provide
+>> reliable, repeatable and trustable power management of this chip.
+>> 
+>> It is equally fundamental as a hard disk should spin down after the last
+>> file is closed. Even if this process ends by a kill -9.
+
+Please advise how we should solve this fundamental problem in user-space.
+
+>> 
+>> This seems to contradict your argument that user-space can very easily
+>> adapt to everything. If the latter were true there would be no need to
+>> keep old interfaces supported for a long time.
+> 
+> You probably know that we try hard never to change an interface that
+> would break user space, and that's why we need to get it right.
+
+Yes, I know and agree that it is very important (and difficult to achieve).
+
+But it seems that there are different opinions of what "right" is...
+
+You seem to focus on the "right" API only (where we agree that the "right"
+API does not exist and likely will never come or at least in the near future).
+
+But for us the whole combination of kernel + user-space must behave "right"
+(and use a function split that allows to optimally achieve this goal).
+
+> 
+>> So can you agree to that a battery powered portable device must have
+>> reliable and trustable power management? And if it provable can't be
+>> implemented in user-space (a single counter example suffices) it must
+>> be a kernel driver?
+> 
+> Having a kernel driver would make things easier for user space, sure,
+> but again, that's not a sufficient reason to merge just any kernel
+> implementation.
+
+It is not about "easier" for anyone. Neither for you nor for me. For us
+it would be much easier not to have to run this never-ending discussion
+over and over...
+
+It is about making it technically fully "reliable". And not 99% as per
+quick and dirty user-space hacks.
+
+It is so easy to invent scenarios in user-space to make the device practically
+unusable by unnoticed draining a full battery within less than a day when
+not perfectly turning off the chip power.
+
+So if a kernel driver can better protect users against this situation for
+a portable device with this chip, why shouldn't it do with a handful LOC?
+What requirement is more important than this?
+
+BR and thanks,
+Nikolaus
