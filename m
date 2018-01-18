@@ -1,32 +1,96 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 18 Jan 2018 15:23:23 +0200
-Subject: [PATCH] [wireless-next] mt76: fix building without
- CONFIG_LEDS_CLASS
-In-Reply-To: <20180118131524.817297-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Thu, 18 Jan 2018 14:14:11 +0100")
-References: <20180118131524.817297-1-arnd@arndb.de>
-Message-ID: <87bmhrb8s4.fsf@kamboji.qca.qualcomm.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 18 Jan 2018 14:23:22 +0100
+Subject: [net-next: PATCH v4 0/7] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <1516278704-17141-1-git-send-email-mw@semihalf.com>
+References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
+Message-ID: <20180118132322.GE2690@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi Marcin,
 
-> When CONFIG_LEDS_CLASS is disabled, or it is a loadable module while
-> mt76 is built-in, we run into a link error:
->
-> drivers/net/wireless/mediatek/mt76/mac80211.o: In function `mt76_register_device':
-> mac80211.c:(.text+0xb78): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `devm_of_led_classdev_register'
->
-> We don't really need a hard dependency here as the driver can presumably
-> work just fine without LEDs, so this follows the iwlwifi example and
-> adds a separate Kconfig option for the LED support, this will be available
-> whenever it will link, and otherwise the respective code gets left out from
-> the driver object.
->
-> Fixes: 17f1de56df05 ("mt76: add common code shared between multiple chipsets")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+I tested the series on a MacchiatoBin to ensure the mvpp2 DT support was
+still working. I was able to use all supported ports as before, and saw
+no issue.
 
-I'm planning to queue this for 4.16.
+For all mvpp2 patches, you can add:
+
+Tested-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Thanks!
+Antoine
+
+On Thu, Jan 18, 2018 at 01:31:37PM +0100, Marcin Wojtas wrote:
+> Hi,
+> 
+> I quickly resend the series, thanks to Antoine Tenart's remark,
+> who spotted !CONFIG_ACPI compilation issue after introducing
+> the new fwnode_irq_get() routine. Please see the details in the changelog
+> below and the 3/7 commit log.
+> 
+> mvpp2 driver can work with the ACPI representation, as exposed
+> on a public branch:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+> It was compiled together with the most recent Tianocore EDK2 revision.
+> Please refer to the firmware build instruction on MacchiatoBin board:
+> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
+> 
+> ACPI representation of PP2 controllers (withouth PHY support) can
+> be viewed in the github:
+> * MacchiatoBin:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
+> 
+> * Armada 7040 DB:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
+> 
+> I will appreciate any comments or remarks.
+> 
+> Best regards,
+> Marcin
+> 
+> Changelog:
+> v3 -> v4:
+> * 3/7
+>     - add new macro (ACPI_HANDLE_FWNODE) and fix
+>       compilation with !CONFIG_ACPI
+>     - extend commit log and mention usability of fwnode_irq_get
+>       for the child nodes as well
+> 
+> v2 -> v3:
+> * 1/7, 2/7
+>     - Add Rafael's Acked-by's
+> * 3/7, 4/7
+>     - New patches
+> * 6/7, 7/7
+>     - Update driver with new helper routines usage
+>     - Improve commit log.
+> 
+> v1 -> v2:
+> * Remove MDIO patches
+> * Use PP2 ports only with link interrupts
+> * Release second region resources in mvpp2 driver (code moved from
+>   mvmdio), as explained in details in 5/5 commit message.
+> 
+> Marcin Wojtas (7):
+>   device property: Introduce fwnode_get_mac_address()
+>   device property: Introduce fwnode_get_phy_mode()
+>   device property: Introduce fwnode_irq_get()
+>   device property: Allow iterating over available child fwnodes
+>   net: mvpp2: simplify maintaining enabled ports' list
+>   net: mvpp2: use device_*/fwnode_* APIs instead of of_*
+>   net: mvpp2: enable ACPI support in the driver
+> 
+>  drivers/base/property.c              | 104 ++++++++--
+>  drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
+>  include/linux/acpi.h                 |   3 +
+>  include/linux/property.h             |  11 ++
+>  4 files changed, 232 insertions(+), 92 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
 
 -- 
-Kalle Valo
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
