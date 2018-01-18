@@ -1,53 +1,67 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 18 Jan 2018 02:58:36 +0000
-Subject: [PATCH] arm64/kernel: kaslr: drop special Image placement logic
-In-Reply-To: <20180117161127.15771-1-ard.biesheuvel@linaro.org>
-References: <20180117161127.15771-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180118025836.5zlcgk2evx3ztncg@capper-debian.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 18 Jan 2018 12:31:46 +0900
+Subject: [PATCH] kbuild: fix W= option checks for extra DTC warnings
+Message-ID: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 04:11:27PM +0000, Ard Biesheuvel wrote:
-> Now that the early kernel mapping logic can tolerate placements of
-> Image that cross swapper table boundaries, we can remove the logic
-> that adjusts the offset if the dice roll produced an offset that
-> puts the kernel right on top of one.
+Kbuild supports 3 levels of extra warnings, and multiple levels can
+be combined, like W=12, W=123.  It was added by commit a6de553da01c
+("kbuild: Allow to combine multiple W= levels").
 
-Reviewed-by: Steve Capper <steve.capper@arm.com>
+>From the log of commit 8654cb8d0371 ("dtc: update warning settings
+for new bus and node/property name checks"), I assume:
 
-> 
-> Cc: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/kaslr.c | 15 ---------------
->  1 file changed, 15 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-> index 47080c49cc7e..e3d5cbe2167b 100644
-> --- a/arch/arm64/kernel/kaslr.c
-> +++ b/arch/arm64/kernel/kaslr.c
-> @@ -128,21 +128,6 @@ u64 __init kaslr_early_init(u64 dt_phys)
->  	/* use the top 16 bits to randomize the linear region */
->  	memstart_offset_seed = seed >> 48;
->  
-> -	/*
-> -	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
-> -	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
-> -	 * happens, round down the KASLR offset by (1 << SWAPPER_TABLE_SHIFT).
-> -	 *
-> -	 * NOTE: The references to _text and _end below will already take the
-> -	 *       modulo offset (the physical displacement modulo 2 MB) into
-> -	 *       account, given that the physical placement is controlled by
-> -	 *       the loader, and will not change as a result of the virtual
-> -	 *       mapping we choose.
-> -	 */
-> -	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
-> -	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT))
-> -		offset = round_down(offset, 1 << SWAPPER_TABLE_SHIFT);
-> -
->  	if (IS_ENABLED(CONFIG_KASAN))
->  		/*
->  		 * KASAN does not expect the module region to intersect the
-> -- 
-> 2.11.0
-> 
+ - unit_address_vs_reg, simple_bus_reg, etc. belong to level 1
+ - node_name_chars_strict, property_name_chars_strict belong to level 2
+
+However, the level 1 warnings are displayed by any argument to W=.
+On the other hand, the level 2 warnings are displayed by W=2, but
+not by W=12, or W=123.
+
+Use $(findstring ...) like scripts/Makefile.extrawarn.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+Side Notes for possible additional works:
+
+ [1] I implemented DTC extra warnings differently in U-Boot:
+
+    https://github.com/u-boot/u-boot/blob/v2018.01/scripts/Makefile.extrawarn#L64
+
+    Better to collect extra warning stuff into scripts/Makefile.extrawarn ?
+
+ [2] KBUILD_ENABLE_EXTRA_GCC_CHECKS is getting a historical misnomer
+     because we use it for Clang and DTC too.
+
+     Better to rename?  (keeping backward-compatibility for a while)?
+
+
+ scripts/Makefile.lib | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 1ca4dcd..7dee1da 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -264,7 +264,7 @@ cmd_gzip = (cat $(filter-out FORCE,$^) | gzip -n -f -9 > $@) || \
+ DTC ?= $(objtree)/scripts/dtc/dtc
+ 
+ # Disable noisy checks by default
+-ifeq ($(KBUILD_ENABLE_EXTRA_GCC_CHECKS),)
++ifeq ($(findstring 1,$(KBUILD_ENABLE_EXTRA_GCC_CHECKS)),)
+ DTC_FLAGS += -Wno-unit_address_vs_reg \
+ 	-Wno-simple_bus_reg \
+ 	-Wno-unit_address_format \
+@@ -273,7 +273,7 @@ DTC_FLAGS += -Wno-unit_address_vs_reg \
+ 	-Wno-pci_device_reg
+ endif
+ 
+-ifeq ($(KBUILD_ENABLE_EXTRA_GCC_CHECKS),2)
++ifneq ($(findstring 2,$(KBUILD_ENABLE_EXTRA_GCC_CHECKS)),)
+ DTC_FLAGS += -Wnode_name_chars_strict \
+ 	-Wproperty_name_chars_strict
+ endif
+-- 
+2.7.4
