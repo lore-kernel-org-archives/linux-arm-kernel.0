@@ -1,7 +1,7 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 18 Jan 2018 19:07:05 +0100 (CET)
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Thu, 18 Jan 2018 18:09:58 +0000
 Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
+In-Reply-To: <206582731.31195.1516298825692@email.1und1.de>
 References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
  <1059643032.72553.1516136078614@email.1und1.de>
  <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
@@ -13,25 +13,34 @@ References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
  <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
  <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
  <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
-Message-ID: <206582731.31195.1516298825692@email.1und1.de>
+ <206582731.31195.1516298825692@email.1und1.de>
+Message-ID: <36bbbc0f-9f50-1567-d5a0-548cd77fd615@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergey,
+On 18/01/2018 18:07, Stefan Wahren wrote:
+> Hi Sergey,
+> 
+>> Sergey Suloev <ssuloev@orpaltech.com> hat am 18. Januar 2018 um 18:56 geschrieben:
+>>
+>>
+>> Hi, Stefan,
+>>
+>>
+>> no I haven't checked it yet. I'm going to find information about setting 
+>> it up w/o u-boot since I've never tried it before.
+>>
+>>
+> 
+> store the kernel zImage as /boot/kernel7.img
+> 
+> and define the DT within config.txt 
+> 
+> device_tree=bcm2837-rpi-3-b.dtb
+> 
 
-> Sergey Suloev <ssuloev@orpaltech.com> hat am 18. Januar 2018 um 18:56 geschrieben:
-> 
-> 
-> Hi, Stefan,
-> 
-> 
-> no I haven't checked it yet. I'm going to find information about setting 
-> it up w/o u-boot since I've never tried it before.
-> 
-> 
+And comment out or delete:
 
-store the kernel zImage as /boot/kernel7.img
+#kernel=u-boot.bin
 
-and define the DT within config.txt 
-
-device_tree=bcm2837-rpi-3-b.dtb
+Phil
