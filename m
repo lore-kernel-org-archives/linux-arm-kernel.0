@@ -1,97 +1,135 @@
-From: graeme.gregory@linaro.org (graeme.gregory at linaro.org)
-Date: Thu, 18 Jan 2018 15:53:16 +0000
-Subject: [net-next: PATCH v3 0/7] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
-Message-ID: <20180118155316.GA32010@xora-haswell>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 18 Jan 2018 17:02:08 +0100
+Subject: [PATCH] pinctrl: at91-pio4: add support for drive-strength property
+Message-ID: <20180118160208.16461-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 05:55:39PM +0100, Marcin Wojtas wrote:
-> Hi,
-> 
-> This is a third version of the patchset introducing mvpp2 driver ability
-> to operate with ACPI. Until follow-up generic MDIO is introduced
-> it can using the link interrupt capability (a.k.a. in-band management)
-> on all ports, 1000BaseT RGMII included.
-> Driver operation was tested on top of the net-next branch
-> with both DT and ACPI on MacchiatoBin and Armada 7040 DB boards.
-> 
-> The main changes were requested during v2 review, which was
-> adding generic helper routines for:
-> * interating over available fwnodes (new patch 4/7)
-> * getting IRQ directly from fwnode (new patch 3/7)
-> Thanks to the latter the driver code could be simplified
-> and allowed to drop formula-based IRQ obtaining. Changes are
-> summarized in the changelog below.
-> 
-> mvpp2 driver can work with the ACPI representation, as exposed
-> on a public branch:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
-> It was compiled together with the most recent Tianocore EDK2 revision.
-> Please refer to the firmware build instruction on MacchiatoBin board:
-> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
-> 
-> ACPI representation of PP2 controllers (withouth PHY support) can
-> be viewed in the github:
-> * MacchiatoBin:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
-> 
-> * Armada 7040 DB:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
-> 
-> I will appreciate any comments or remarks.
-> 
+Add support for the drive-strength property. Usually its value is
+expressed in mA. Since the numeric value depends on VDDIOP voltage,
+the controller uses low, medium and high to define the drive-strengh.
 
-Nice work, this looks pretty neat to me, for series.
+The PIO controller accepts two values for the low drive: 0 or 1. Most
+of the time, we don't care about the drive strength, there is no need
+to change it, so 0 is considered as the default value. The low-drive
+value won't be advertised through pinconf-pins file excepted if it
+has been set explicitly in the device tree ie if its value is
+different from 0.
 
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ .../bindings/pinctrl/atmel,at91-pio4-pinctrl.txt   |  5 ++--
+ drivers/pinctrl/pinctrl-at91-pio4.c                | 33 ++++++++++++++++++++++
+ include/dt-bindings/pinctrl/at91.h                 |  4 +++
+ 3 files changed, 40 insertions(+), 2 deletions(-)
 
-Thanks
-
-Graeme
-
-> Best regards,
-> Marcin
-> 
-> Changelog:
-> v2 -> v3:
-> * 1/7, 2/7
->     - Add Rafael's Acked-by's
-> * 3/7, 4/7
->     - New patches
-> * 6/7, 7/7
->     - Update driver with new helper routines usage
->     - Improve commit log.
-> 
-> v1 -> v2:
-> * Remove MDIO patches
-> * Use PP2 ports only with link interrupts
-> * Release second region resources in mvpp2 driver (code moved from
->   mvmdio), as explained in details in 5/5 commit message.
-> 
-> 
-> Marcin Wojtas (7):
->   device property: Introduce fwnode_get_mac_address()
->   device property: Introduce fwnode_get_phy_mode()
->   device property: Introduce fwnode_irq_get()
->   device property: Allow iterating over available child fwnodes
->   net: mvpp2: simplify maintaining enabled ports' list
->   net: mvpp2: use device_*/fwnode_* APIs instead of of_*
->   net: mvpp2: enable ACPI support in the driver
-> 
->  drivers/base/property.c              | 105 ++++++++--
->  drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
->  include/linux/property.h             |  11 ++
->  3 files changed, 230 insertions(+), 92 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/94426c35/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+index 61ac75706cc9..183064bc4bda 100644
+--- a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+@@ -34,8 +34,8 @@ right representation of the pin.
+ 
+ Optional properties:
+ - GENERIC_PINCONFIG: generic pinconfig options to use, bias-disable,
+-bias-pull-down, bias-pull-up, drive-open-drain, input-schmitt-enable,
+-input-debounce, output-low, output-high.
++bias-pull-down, bias-pull-up, drive-open-drain, drive-strength,
++input-schmitt-enable, input-debounce, output-low, output-high.
+ 
+ Example:
+ 
+@@ -66,6 +66,7 @@ Example:
+ 			pinmux = <PIN_PB0>,
+ 				 <PIN_PB5>;
+ 			bias-pull-up;
++			drive-strength = <ATMEL_PIO_DRVSTR_LO>;
+ 		};
+ 
+ 		pinctrl_sdmmc1_default: sdmmc1_default {
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 4b57a13758a4..857c0a41a905 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -14,6 +14,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <dt-bindings/pinctrl/at91.h>
+ #include <linux/clk.h>
+ #include <linux/gpio/driver.h>
+ /* FIXME: needed for gpio_to_irq(), get rid of this */
+@@ -49,6 +50,8 @@
+ #define		ATMEL_PIO_IFSCEN_MASK		BIT(13)
+ #define		ATMEL_PIO_OPD_MASK		BIT(14)
+ #define		ATMEL_PIO_SCHMITT_MASK		BIT(15)
++#define		ATMEL_PIO_DRVSTR_MASK		GENMASK(17, 16)
++#define		ATMEL_PIO_DRVSTR_OFFSET		16
+ #define		ATMEL_PIO_CFGR_EVTSEL_MASK	GENMASK(26, 24)
+ #define		ATMEL_PIO_CFGR_EVTSEL_FALLING	(0 << 24)
+ #define		ATMEL_PIO_CFGR_EVTSEL_RISING	(1 << 24)
+@@ -685,6 +688,11 @@ static int atmel_conf_pin_config_group_get(struct pinctrl_dev *pctldev,
+ 			return -EINVAL;
+ 		arg = 1;
+ 		break;
++	case PIN_CONFIG_DRIVE_STRENGTH:
++		if (!(res & ATMEL_PIO_DRVSTR_MASK))
++			return -EINVAL;
++		arg = (res & ATMEL_PIO_DRVSTR_MASK) >> ATMEL_PIO_DRVSTR_OFFSET;
++		break;
+ 	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
+ 		if (!(res & ATMEL_PIO_SCHMITT_MASK))
+ 			return -EINVAL;
+@@ -737,6 +745,18 @@ static int atmel_conf_pin_config_group_set(struct pinctrl_dev *pctldev,
+ 			else
+ 				conf |= ATMEL_PIO_OPD_MASK;
+ 			break;
++		case PIN_CONFIG_DRIVE_STRENGTH:
++			switch (arg) {
++			case ATMEL_PIO_DRVSTR_LO:
++			case ATMEL_PIO_DRVSTR_ME:
++			case ATMEL_PIO_DRVSTR_HI:
++				conf &= (~ATMEL_PIO_DRVSTR_MASK);
++				conf |= arg << ATMEL_PIO_DRVSTR_OFFSET;
++				break;
++			default:
++				dev_warn(pctldev->dev, "drive strength not updated (incorrect value)\n");
++			}
++			break;
+ 		case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
+ 			if (arg == 0)
+ 				conf |= ATMEL_PIO_SCHMITT_MASK;
+@@ -814,6 +834,19 @@ static void atmel_conf_pin_config_dbg_show(struct pinctrl_dev *pctldev,
+ 		seq_printf(s, "%s ", "open-drain");
+ 	if (conf & ATMEL_PIO_SCHMITT_MASK)
+ 		seq_printf(s, "%s ", "schmitt");
++	if (conf & ATMEL_PIO_DRVSTR_MASK) {
++		switch ((conf & ATMEL_PIO_DRVSTR_MASK) >> ATMEL_PIO_DRVSTR_OFFSET) {
++		case ATMEL_PIO_DRVSTR_LO:
++			seq_printf(s, "%s ", "low-drive");
++			break;
++		case ATMEL_PIO_DRVSTR_ME:
++			seq_printf(s, "%s ", "medium-drive");
++			break;
++		case ATMEL_PIO_DRVSTR_HI:
++			seq_printf(s, "%s ", "high-drive");
++			break;
++		}
++	}
+ }
+ 
+ static const struct pinconf_ops atmel_confops = {
+diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
+index 2732d6c0fb39..eb81867eac77 100644
+--- a/include/dt-bindings/pinctrl/at91.h
++++ b/include/dt-bindings/pinctrl/at91.h
+@@ -39,4 +39,8 @@
+ #define AT91_PERIPH_C		3
+ #define AT91_PERIPH_D		4
+ 
++#define ATMEL_PIO_DRVSTR_LO	1
++#define ATMEL_PIO_DRVSTR_ME	2
++#define ATMEL_PIO_DRVSTR_HI	3
++
+ #endif /* __DT_BINDINGS_AT91_PINCTRL_H__ */
+-- 
+2.12.2
