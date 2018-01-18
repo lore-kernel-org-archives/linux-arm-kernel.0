@@ -1,86 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 18 Jan 2018 12:01:31 -0800
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Jan 2018 20:20:53 +0000
 Subject: [PATCH] arm64: Stop printing the virtual memory layout
-In-Reply-To: <20171219192810.22537-1-labbott@redhat.com>
+In-Reply-To: <94d6b5c8-07c4-32b5-9746-646b0021d2e9@gmail.com>
 References: <20171219192810.22537-1-labbott@redhat.com>
-Message-ID: <94d6b5c8-07c4-32b5-9746-646b0021d2e9@gmail.com>
+ <94d6b5c8-07c4-32b5-9746-646b0021d2e9@gmail.com>
+Message-ID: <20180118202053.GR17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2017 11:28 AM, Laura Abbott wrote:
-> Printing kernel addresses should be done in limited circumstances, mostly
-> for debugging purposes. Printing out the virtual memory layout at every
-> kernel bootup doesn't really fall into this category so delete the prints.
-> There are other ways to get the same information.
-
-This really has some value when debugging systems, could we possibly
-just hide that behind an appropriate configuration option instead of
-completely removing this?
-
+On Thu, Jan 18, 2018 at 12:01:31PM -0800, Florian Fainelli wrote:
+> On 12/19/2017 11:28 AM, Laura Abbott wrote:
+> > Printing kernel addresses should be done in limited circumstances, mostly
+> > for debugging purposes. Printing out the virtual memory layout at every
+> > kernel bootup doesn't really fall into this category so delete the prints.
+> > There are other ways to get the same information.
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> Follow up to my previous proposal to switch all these to %px
-> ---
->  arch/arm64/mm/init.c | 43 -------------------------------------------
->  1 file changed, 43 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 5960bef0170d..672094ed7e07 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -599,49 +599,6 @@ void __init mem_init(void)
->  
->  	mem_init_print_info(NULL);
->  
-> -#define MLK(b, t) b, t, ((t) - (b)) >> 10
-> -#define MLM(b, t) b, t, ((t) - (b)) >> 20
-> -#define MLG(b, t) b, t, ((t) - (b)) >> 30
-> -#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
-> -
-> -	pr_notice("Virtual kernel memory layout:\n");
-> -#ifdef CONFIG_KASAN
-> -	pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
-> -		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
-> -#endif
-> -	pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-> -		MLM(MODULES_VADDR, MODULES_END));
-> -	pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
-> -		MLG(VMALLOC_START, VMALLOC_END));
-> -	pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -		MLK_ROUNDUP(_text, _etext));
-> -	pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -		MLK_ROUNDUP(__start_rodata, __init_begin));
-> -	pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -		MLK_ROUNDUP(__init_begin, __init_end));
-> -	pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -		MLK_ROUNDUP(_sdata, _edata));
-> -	pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -		MLK_ROUNDUP(__bss_start, __bss_stop));
-> -	pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
-> -		MLK(FIXADDR_START, FIXADDR_TOP));
-> -	pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-> -		MLM(PCI_IO_START, PCI_IO_END));
-> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -	pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
-> -		MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
-> -	pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
-> -		MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
-> -		    (unsigned long)virt_to_page(high_memory)));
-> -#endif
-> -	pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-> -		MLM(__phys_to_virt(memblock_start_of_DRAM()),
-> -		    (unsigned long)high_memory));
-> -
-> -#undef MLK
-> -#undef MLM
-> -#undef MLK_ROUNDUP
-> -
->  	/*
->  	 * Check boundaries twice: Some fundamental inconsistencies can be
->  	 * detected at build time already.
-> 
+> This really has some value when debugging systems, could we possibly
+> just hide that behind an appropriate configuration option instead of
+> completely removing this?
 
+I've already ended up having to revert the vsprintf() change nobbling
+%p for that very reason when debugging the BPF code.  It's easier to
+do that while debugging than remember about the %px thing - and lets
+face it, probably less error prone if it leaks out.
+
+Otherwise we'll just end up with everyone spelling %p as %px in their
+debug statements... or using %lx and casting to unsigned long.
+
+So yes, I do think a Kconfig option (defaulting to obscuring kernel
+addresses of course) would have been very sensible for this.
 
 -- 
-Florian
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
