@@ -1,109 +1,69 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 18 Jan 2018 10:14:06 +0000
-Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <15884ccc-2cfb-da91-5844-369d8237175d@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-3-jeremy.linton@arm.com>
- <20180115123338.GB5473@e107155-lin>
- <65f78c99-8b86-0098-7ced-899840a4bf16@arm.com>
- <ca64334c-9345-705c-80d8-f2deb924a679@arm.com>
- <15884ccc-2cfb-da91-5844-369d8237175d@arm.com>
-Message-ID: <05a8b375-70c4-34d4-6cde-8dd4cd62c10b@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Jan 2018 11:16:44 +0100
+Subject: [RESEND RFC PATCH 0/2] fixing the gpio ownership
+In-Reply-To: <20180115162407.6314-1-ludovic.desroches@microchip.com>
+References: <20180115162407.6314-1-ludovic.desroches@microchip.com>
+Message-ID: <CACRpkdbNqn-MJuzq=BpbNYveD-F8Hee2NY6ny4-SJL+F=wHq7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ludovic, thanks for your patches!
 
+On Mon, Jan 15, 2018 at 5:24 PM, Ludovic Desroches
+<ludovic.desroches@microchip.com> wrote:
 
-On 17/01/18 18:51, Jeremy Linton wrote:
-> Hi,
-> 
-> On 01/17/2018 12:20 PM, Sudeep Holla wrote:
->>
->>
->> On 16/01/18 21:07, Jeremy Linton wrote:
->>> Hi,
->>>
->>> On 01/15/2018 06:33 AM, Sudeep Holla wrote:
->>>> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
->>>>> The original intent in cacheinfo was that an architecture
->>>>> specific populate_cache_leaves() would probe the hardware
->>>>> and then cache_shared_cpu_map_setup() and
->>>>> cache_override_properties() would provide firmware help to
->>>>> extend/expand upon what was probed. Arm64 was really
->>>>> the only architecture that was working this way, and
->>>>> with the removal of most of the hardware probing logic it
->>>>> became clear that it was possible to simplify the logic a bit.
->>>>>
->>>>> This patch combines the walk of the DT nodes with the
->>>>> code updating the cache size/line_size and nr_sets.
->>>>> cache_override_properties() (which was DT specific) is
->>>>> then removed. The result is that cacheinfo.of_node is
->>>>> no longer used as a temporary place to hold DT references
->>>>> for future calls that update cache properties. That change
->>>>> helps to clarify its one remaining use (matching
->>>>> cacheinfo nodes that represent shared caches) which
->>>>> will be used by the ACPI/PPTT code in the following patches.
->>>>>
->>>>> Cc: Palmer Dabbelt <palmer@sifive.com>
->>>>> Cc: Albert Ou <albert@sifive.com>
->>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>>> ---
->>>>> ?? arch/riscv/kernel/cacheinfo.c |? 1 +
->>>>> ?? drivers/base/cacheinfo.c????? | 65
->>>>> +++++++++++++++++++------------------------
->>>>> ?? include/linux/cacheinfo.h???? |? 1 +
->>>>> ?? 3 files changed, 31 insertions(+), 36 deletions(-)
->>>>>
->>>>> diff --git a/arch/riscv/kernel/cacheinfo.c
->>>>> b/arch/riscv/kernel/cacheinfo.c
->>>>> index 10ed2749e246..6f4500233cf8 100644
->>>>> --- a/arch/riscv/kernel/cacheinfo.c
->>>>> +++ b/arch/riscv/kernel/cacheinfo.c
->>>>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo
->>>>> *this_leaf,
->>>>> ?????????? CACHE_WRITE_BACK
->>>>> ?????????? | CACHE_READ_ALLOCATE
->>>>> ?????????? | CACHE_WRITE_ALLOCATE;
->>>>> +??? cache_of_set_props(this_leaf, node);
->>>>
->>>> This may be necessary but can it be done as later patch ? So far
->>>> nothing
->>>> is added that may break riscv IIUC.
->>>
->>> Well I think you have a bisection issue where the additional information
->>> will disappear between this patch and wherever we put this code back in.
->>>
->>
->> Hmm, I am sorry but I fail to see the issue. Before this change,
->> populate_cache_leaves just populated the info as per ci_leaf_init in
->> arch/riscv/kernel/cacheinfo.c and cache_override_properties used to fill
->> the remaining.
->>
->> After this patch, the same is achieved in cache_shared_cpu_map_setup.
->>
->> In both case, it was by the end of detect_cache_attributes, so I see no
->> issue.
->>
-> 
-> 
-> Hi,
-> 
-> I must be misunderstanding something.
-> 
+> A few weeks ago, I have sent an RFC about adding bias support for GPIOs [1].
 
-Looks like I was missing to understand something :)
+I was confused I think, because the issue of ownership and adding
+bias support were conflated.
 
-> AFAIK, The code in cache_setup_of_node() won't call cache_of_set_props()
-> because it returns when there is an existing of_node (fw_unique) created
-> by the riscv populate_cache_leaves(). That's why I'm making the direct
-> call here. If we fail to get that change in place before
-> cache_override_properties() is removed then the fields not set by the
-> riscv code (size/etc) will be missing.
+I think I discussed properly the ideas I have for pin control properties
+vs the GPIOlib API/ABI in my response to patch 1.
 
-Indeed. I am trying to avoid use of cache_of_set_props outside.
-How about skipping setting up of fw_unique in ci_leaf_init instead ?
+> It was motivated by the fact that I wanted to enable the pinmuxing strict mode
+> for my pin controller which can muxed a pin as a peripheral or as a GPIO.
 
--- 
-Regards,
-Sudeep
+So that is a different thing from bias support.
+
+> Enabling the strict mode prevents several devices to be probed because
+> requesting a GPIO fails. The pin request function complains about the
+> ownership of the GPIO which is different from the mux ownership. I have to
+> remove my pinctrl node to avoid this conflict but I need it to configure my
+> pins and to set a pull-up bias for my GPIOs.
+
+Okay I think the right solution is to fix the ownership issue, and set
+up bias using pin control/config but use the line through gpiolib for now.
+
+> The main issue is that enabling the strict mode will
+> break old DTBs.
+
+Yeah we need to work around that.
+
+> I was going to submit patches for this but, after using the
+> sysfs which still show me a bad ownership, I decided that it should be fixed.
+
+Yep :)
+
+> So I did these patches. Unfortunately, there are several ways to lead to
+> gpiod_request(). It does the trick only for the gpiod_get family. The issue is
+> still present with legacy gpio_request and fwnode_get_named_gpiod.
+
+fwnode_get_named_gpiod() must really be fixed too. You probably
+want to have things like LEDs and GPIO keys working even if
+your pin controller is strict.
+
+I don't care so much about the old functions, I guess you just have
+to make sure that the drivers for *your* pin controller all use descriptors
+so that you can enable strict mode on *your* pin controller, right?
+
+Restrict your task to this, I'd say.
+
+> It seems
+> that more and more drivers are converted to use GPIO descriptors so there is
+> some hope.
+
+Yeah I'm doing this when I have time. There is plenty of work...
+Help appreciated.
+
+Yours,
+Linus Walleij
