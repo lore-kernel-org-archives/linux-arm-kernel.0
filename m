@@ -1,7 +1,7 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Thu, 18 Jan 2018 20:56:54 +0300
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 18 Jan 2018 19:07:05 +0100 (CET)
 Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
+In-Reply-To: <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
 References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
  <1059643032.72553.1516136078614@email.1und1.de>
  <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
@@ -12,53 +12,26 @@ References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
  <974305384.15547.1516259017873@email.1und1.de>
  <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
  <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
-Message-ID: <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
+ <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
+Message-ID: <206582731.31195.1516298825692@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stefan,
+Hi Sergey,
 
-On 01/18/2018 07:55 PM, Stefan Wahren wrote:
-> Hi Sergey,
->
->
-> Am 18.01.2018 um 13:55 schrieb Sergey Suloev:
->> Hi, Stefan
->>
->> On 01/18/2018 10:03 AM, Stefan Wahren wrote:
->>> Hi Sergey,
->>>
->>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 
->>>> 21:04 geschrieben:
->>>>
->>>>
->>>> Hi Stefan,
->>>>
->>>> I am using u-boot tagged 2018.01.
->>> interesting. I don't use u-boot as second stage bootloader. Maybe it 
->>> messed up the pin configuration of the GPIO expander. Could you 
->>> please try without u-boot?
->>
->> but how can u-boot influence that ? As far as I understand the error 
->> happens in a very late boot stage, actually in the end. At this time 
->> bcm2837-rpi-3-b device tree file from kernel is already loaded. Do 
->> you think this DTB is incorrect ?
->
-> wild guessing doesn't help here. Did you test it without U-Boot? Did 
-> the issue still occur?
->
-> Stefan
->
->>
->> Thanks
->>
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Sergey Suloev <ssuloev@orpaltech.com> hat am 18. Januar 2018 um 18:56 geschrieben:
+> 
+> 
+> Hi, Stefan,
+> 
+> 
+> no I haven't checked it yet. I'm going to find information about setting 
+> it up w/o u-boot since I've never tried it before.
+> 
+> 
 
-no I haven't checked it yet. I'm going to find information about setting 
-it up w/o u-boot since I've never tried it before.
+store the kernel zImage as /boot/kernel7.img
+
+and define the DT within config.txt 
+
+device_tree=bcm2837-rpi-3-b.dtb
