@@ -1,55 +1,51 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Thu, 18 Jan 2018 17:17:45 +0100
-Subject: [PATCH v3 02/12] clk: sunxi-ng: Change formula for NKMP PLLs
-In-Reply-To: <20180118105841.73rwj3he2exd7pno@flea.lan>
-References: <20180117201421.25954-1-jernej.skrabec@siol.net>
- <20180117201421.25954-3-jernej.skrabec@siol.net>
- <20180118105841.73rwj3he2exd7pno@flea.lan>
-Message-ID: <4724479.MCcHYbe7Bl@jernej-laptop>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Thu, 18 Jan 2018 16:37:15 +0000
+Subject: [PATCH 1/2] clk: stm32: END_PRIMARY_CLK should be declare after
+ CLK_SYSCLK
+In-Reply-To: <1516286980-8603-2-git-send-email-gabriel.fernandez@st.com>
+References: <1516286980-8603-1-git-send-email-gabriel.fernandez@st.com>
+ <1516286980-8603-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1dd9d895-016f-f74b-ec9d-8e02959a561d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Gabriel,
 
-Dne ?etrtek, 18. januar 2018 ob 11:58:41 CET je Maxime Ripard napisal(a):
-> Hi,
+Tested successfully on f469 disco board.
+
+Tested-by: Philippe Cornu <philippe.cornu@st.com>
+
+Many thanks,
+Philippe :-)
+
+On 01/18/2018 03:49 PM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> On Wed, Jan 17, 2018 at 09:14:11PM +0100, Jernej Skrabec wrote:
-> > This commit changes formula from this:
-> > 
-> > Freq = (parent_freq * N * K) / (M * P)
-> > 
-> > to this:
-> > 
-> > Freq = (parent_freq / M) * N * K / P
-> > 
-> > This improves situation when N is in the range 1-255. PLL parent clock
-> > is almost always 24 MHz, which means that for N >= 180 original formula
-> > overflows and result becomes useless. Situation can be improved if M is
-> > used as predivider as it can be seen in the second formula. That way at
-> > least M > 1 is considered, but it still leaves small gap for wrong result
-> > when M = 1 and N >= 180.
-> > 
-> > Using M as predivider shouldn't cause any issue, because it is in range
-> > 1-4 at most, so there is no or only minimal rounding error.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Update of END_PRIMARY_CLK was missed, it should be after CLK_SYSCLK
+> hsi and sysclk are overwritten by gpioa and gpiob.
 > 
-> I'd really prefer to stick to the formula documented and that we've
-> used so far. NKMP clocks are most notably used for the CPU PLLs and
-> I've debugged way too many cpufreq bugs already :)
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>   include/dt-bindings/clock/stm32fx-clock.h | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> What about using long long types for the parent * n * k result?
-
-Yes, using long long is the best possible solution and covers all cases 
-whereas this patch does not.
-
-I thought that do_div() would cause a lot of overhead, but I noticed that it's 
-not big if both numbers fit in 32 bit, which in our case is true most of the 
-time.
-
-I will make a helper function for calculating rate, since using long long 
-needs more than one line of code.
-
-Best regards,
-Jernej
+> diff --git a/include/dt-bindings/clock/stm32fx-clock.h b/include/dt-bindings/clock/stm32fx-clock.h
+> index 49bb3c2..4d523b0 100644
+> --- a/include/dt-bindings/clock/stm32fx-clock.h
+> +++ b/include/dt-bindings/clock/stm32fx-clock.h
+> @@ -33,11 +33,11 @@
+>   #define CLK_SAI2		11
+>   #define CLK_I2SQ_PDIV		12
+>   #define CLK_SAIQ_PDIV		13
+> -
+> -#define END_PRIMARY_CLK		14
+> -
+>   #define CLK_HSI			14
+>   #define CLK_SYSCLK		15
+> +
+> +#define END_PRIMARY_CLK		16
+> +
+>   #define CLK_HDMI_CEC		16
+>   #define CLK_SPDIF		17
+>   #define CLK_USART1		18
+> 
