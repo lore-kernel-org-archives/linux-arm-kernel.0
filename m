@@ -1,53 +1,31 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 18 Jan 2018 16:06:44 +0100
-Subject: [PATCH net-next v5 0/4] net: mvpp2: 1000BaseX and 2500BaseX
- support
-In-Reply-To: <20180116151245.GJ17719@n2100.armlinux.org.uk>
-References: <20180112075130.30890-1-antoine.tenart@free-electrons.com>
- <20180116151245.GJ17719@n2100.armlinux.org.uk>
-Message-ID: <20180118150644.GH2690@kwain>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 18 Jan 2018 07:09:23 -0800
+Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for
+ inbound	traffic
+In-Reply-To: <20180118073123.GA15766@lst.de>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
+ <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
+ <20180118073123.GA15766@lst.de>
+Message-ID: <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On January 17, 2018 11:31:23 PM PST, Christoph Hellwig <hch@lst.de> wrote:
+>On Wed, Jan 17, 2018 at 08:15:33PM -0600, Rob Herring wrote:
+>> > (a) overriding/redefining the dma_to_phys() and phys_to_dma() calls
+>> > that are used by the dma_ops routines.  This is the approach of
+>> >
+>> >         arch/mips/cavium-octeon/dma-octeon.c
+>> 
+>> MIPS is rarely an example to follow. :)
+>
+>But in this case it actually is the example to follow as told
+>previously.
+>
+>NAK again for these chained dma ops that only create problems.
 
-On Tue, Jan 16, 2018 at 03:12:45PM +0000, Russell King - ARM Linux wrote:
-> 
-> As I've already said, we need to make sure things are done in a similar
-> way for all netdev DT drivers that are hoping to switch to phylink.
-> The mvneta patches are now in net-next for this.
-> 
-> What I can see is that there's a stark difference between mvpp2 and
-> mvneta and their handling of the "link irq" aka inband autonegotiation
-> status.
-> 
-> mvneta requires 'managed = "in-band-status";' to use the results of
-> the gmac negotiation otherwise inband AN is disabled.  As phylink was
-> developed against mvneta, phylink requires that for Base-X modes.
-> 
-> So, in order to be compatible with mvneta and to do what phylink expects,
-> specifying 'managed = "in-band-status";' is a requirement for Base-X
-> modes, and having that in place _now_ will make the transition to
-> phylink easier without creating the need to update DT when that change
-> happens.
-
-Yes, we should aim for similar bindings and not having all drivers doing
-their own way. Part of the PPv2 move to phylink will be to rework the
-"link irq" to match what phylink expect, and I think we all agree on
-this. Part of this will be to update the dt of the 7k-db and 8k-db, as
-they're the two boards currently using the "link irq" in mainline.
-
-I don't mind too much keeping these base-X patches out-of-tree for now,
-and to send them as part of the phylink series during the next cycle.
-
-I don't quite get the reason not to take them now, as they do not
-modify any DT-related part. Or do you fear this would allow others to
-send DT patches before the PPv2 move to phylink lands in?
-
-Thanks,
-Antoine
+Care to explain what should be done instead?
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Florian
