@@ -1,79 +1,822 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 18 Jan 2018 02:16:34 +0100
-Subject: [PATCH v2 09/16] ARM: dts: r8a7793: consistently use single
- space after =
-In-Reply-To: <20180117161717.14589-10-horms+renesas@verge.net.au>
-References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-10-horms+renesas@verge.net.au>
-Message-ID: <20180118011634.GI11924@bigcity.dyn.berto.se>
+From: kyan@codeaurora.org (Kyle Yan)
+Date: Wed, 17 Jan 2018 17:19:47 -0800
+Subject: [PATCH v1] EDAC, armv8: Add Cache Error Reporting driver for
+ ARMv8 processors
+In-Reply-To: <5A5DF9F4.90101@arm.com>
+References: <1515804626-21254-1-git-send-email-kyan@codeaurora.org>
+ <20180115144441.d6dlwl7herq24byv@lakrids.cambridge.arm.com>
+ <3d3da849d32b1a674d1bcd560eeba261@codeaurora.org> <5A5DF9F4.90101@arm.com>
+Message-ID: <6c3d84bd102d49aa78591caa5adf7bfc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-thanks for your work.
-
-On 2018-01-17 17:17:10 +0100, Simon Horman wrote:
-> Consistently use a single space after a =.
+On 2018-01-16 05:11, James Morse wrote:
+> Hi Kyle,
 > 
-> This patch removes instances where a tab is used instead.  It also avoids
-> running over 80 columns in width in one of the lines where whitespace is
-> updated.
+> (Thanks for looping me in Mark!)
 > 
-> This patch should not introduce any functional change.
+> On 16/01/18 01:00, Kyle Yan wrote:
+>> On 2018-01-15 06:44, Mark Rutland wrote:
+>>> On Fri, Jan 12, 2018 at 04:50:26PM -0800, Kyle Yan wrote:
+>>>> Interrupt based EDAC driver for ARMv8 processors that implement
+>>>> RAS for error detection of CPU caches and lso allows optional 
+>>>> polling
+>>>> of error syndrome registers if interrupts are not supported.
+>>> 
+>>> Is this using the architectural RAS extensions, or something specific 
+>>> to
+>>> QC CPUs? It would be good to call this out explicitly.
+>>> 
+>>> If it's the latter, this needs rewording to be clear that this is
+>>> specific to QC CPUs, and is not a generic ARMv8 feature.
 > 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> This is not specific to QC CPUs and looks at the system registers 
+>> defined by the
+>> RAS extensions.
+> 
+> Excellent, so it should work on the FVP too!
+> 
+> [...]
+> 
+> 
+>>> If this is architectural, how is this expected to work on ACPI 
+>>> systems?
+>>> 
+>> The current design of this driver has only been tested/used on mobile 
+>> devices so
+>> I do not yet know how it will work on ACPI systems.
+> 
+> For ACPI systems wanting to do kernel-first I assume there will need to 
+> be some
+> description of where the mmio RAS nodes are in the address space and 
+> what
+> interrupts etc they generate. This would be equivalent to the data in 
+> the DT.
+> 
+> How come you don't read ERRIDR to find out how many nodes are behind 
+> the CPU
+> interface registers? Surely you have to poll all of them?
+> 
+> If you're polling this, you must have to poke the system register 
+> every-second
+> on every-CPU. Wouldn't it be better to use the memory-mapped interface 
+> on one
+> CPU to do this?
+> 
+> You aren't touching ERR<n>FR at all, this tells us whether the node(?) 
+> supports
+> error recovery interrupts, counter formats etc.
+> 
+> 
+>>>> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+>>>> index 96afb2a..47a68e3 100644
+>>>> --- a/drivers/edac/Kconfig
+>>>> +++ b/drivers/edac/Kconfig
+>>>> @@ -457,4 +457,25 @@ config EDAC_XGENE
+>>>>        Support for error detection and correction on the
+>>>>        APM X-Gene family of SOCs.
+>>>> 
+>>>> +config EDAC_ARMV8
+>>>> +    depends on (ARM || ARM64)
+> 
+> As you are accessing system registers this should depend on 
+> 'ARM64_RAS_EXTN'
+> too, and register accesses need to be behind something like
+> cpus_have_const_cap(ARM64_RAS_EXTN).
+> 
+> The patch that adds these bits is here:
+> https://www.spinics.net/lists/arm-kernel/msg628997.html
+> 
+> (I don't know how cpufeature detection works on 32bit)
+> 
+> 
+>>>> +    tristate "ARMv8 L1/L2/L3/SCU Caches ECC"
+>>>> +    help
+>>>> +       Support for error detection and correction on ARMv8 cores
+>>>> +       supporting RAS features. Reports errors caught by ARMv8
+>>>> +       ECC mechanism.
+>>>> +       For debugging issues having to do with stability and overall 
+>>>> system
+>>>> +       health, you should probably say 'Y' here.
+>>>> +
+>>>> +config EDAC_ARMV8_POLL
+>>>> +    depends on EDAC_ARMV8
+>>>> +    bool "Poll on ARMv8 ECC registers"
+>>>> +    help
+>>>> +       This option chooses whether or not you want to poll on the 
+>>>> Kryo3xx
+>>>> +       ECC registers.
+>>> 
+>>> Are these registers specific to Kryo3xx (i.e. IMPLEMENTATION 
+>>> DEFINED),
+>>> or are they defined by the RAS extensions?
+>>> 
+>> Oops! Typo here. The registers are defined by RAS extensions.
+>> 
+>>>>          When this is enabled, the polling rate can be set as
+>>>> +       a module parameter. By default, it will call the polling 
+>>>> function
+>>>> +       every second.
+> 
+> ACPI's firmware-first polling mechanism allows firmware to specify the 
+> polling
+> rate. How was 'every second' picked? Does it depend on the SoC?
+> 
+> 
+>>>> +       This option should only be used if the associated interrupt 
+>>>> lines
+>>>> +       are not enabled.
+> 
+> How does the user know?
+> 
+> 
+>>>> diff --git a/drivers/edac/armv8_edac.c b/drivers/edac/armv8_edac.c
+>>>> new file mode 100644
+>>>> index 0000000..d986c47
+>>>> --- /dev/null
+>>>> +++ b/drivers/edac/armv8_edac.c
+>>>> @@ -0,0 +1,489 @@
+>>>> +/* Copyright (c) 2016-2018, The Linux Foundation. All rights 
+>>>> reserved.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or 
+>>>> modify
+>>>> + * it under the terms of the GNU General Public License version 2 
+>>>> and
+>>>> + * only version 2 as published by the Free Software Foundation.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + */
+>>>> +
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/edac.h>
+>>>> +#include <linux/of_device.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +#include <linux/smp.h>
+>>>> +#include <linux/cpu.h>
+>>>> +#include <linux/cpu_pm.h>
+>>>> +#include <linux/interrupt.h>
+>>>> +#include <linux/of_irq.h>
+> 
+> (Nit: alphabetical order makes for fewer conflicts in the future)
+> 
+> 
+>>>> +#include "edac_mc.h"
+>>>> +#include "edac_device.h"
+>>>> +
+>>>> +static int poll_msec = 1000;
+>>>> +module_param(poll_msec, int, 0444);
+>>>> +
+>>>> +static bool panic_on_ue = 0;
+>>>> +module_param_named(panic_on_ue, panic_on_ue, bool, 0664);
+>>>> +
+>>>> +#define L1 0x0
+>>>> +#define L2 0x1
+>>>> +#define L3 0x2
+> 
+>>>> +#define EDAC_CPU    "armv8_edac"
+>>>> +
+>>>> +#define ERRXSTATUS_VALID(a)    ((a >> 30) & 0x1)
+>>>> +#define ERRXSTATUS_UE(a)    ((a >> 29) & 0x1)
+>>>> +#define ERRXSTATUS_SERR(a)    (a & 0xFF)
+>>>> +
+>>>> +#define ERRXMISC_LVL(a)        ((a >> 1) & 0x7)
+>>>> +#define ERRXMISC_WAY(a)        ((a >> 28) & 0xF)
+> 
+> Which ERR<n>MISC is this? [0] has two. At first glance these are both
+> implementation-defined, so we can't rely on the values.
+> 
+> (MISC0 has some archtitected-layout, it seems we're expected to know 
+> which
+> layout it will be based on ERR<n>FR - but I can't see 'lvl' or 'way' in 
+> any of
+> those layouts).
+> 
+> You don't check ERR<n>STATUS.MV to know if the 'Miscallaneous Registers 
+> Valid'.
+> 
+> 
+>>>> +#define ERRXCTLR_ENABLE        0x10f
+> 
+> This looks like a magic value to set some bits. Could you add defines 
+> to name
+> each one, then combine so we know what was set.
+> This register has one of two layouts, it seems each control picks a 
+> layout. How
+> can we know if the read/write bits are combined or separate? It looks 
+> like this
+> in ERR<n>FR too.
+> 
+> 
+>>>> +#define ERRXMISC_OVERFLOW    0x7F7F00000000ULL
+> 
+> This looks like a magic value written to a register with an impdef 
+> layout.
+> 
+> [...]
+> 
+>>>> +static inline void set_errxctlr_el1(void)
+>>>> +{
+>>>> +    asm volatile("msr s3_0_c5_c4_1, %0" : : "r" (ERRXCTLR_ENABLE));
+>>>> +}
+> 
+>>> 
+>>> Please use {read,write}_sysreg().
+>>> 
+>>> If these registers are defined by ARMv8, please place definitions in
+>>> arm64's <asm/sysreg.h>.
+>>> 
+>> Will do.
+> 
+> Yes please!
+> 
+> (The s3_0_c5_c4_1 syntax isn't supported by all toolchains, see 
+> 72c5839515260dc
+> "arm64: gicv3: Allow GICv3 compilation with older binutils")
+> 
+> You also need to guard these with something like
+> cpus_have_const_cap(ARM64_RAS_EXTN) so CPUs without the RAS extensions 
+> don't try
+> to access an unimplemented system register. Testing once during probe 
+> is
+> probably the best place to do this.
+> 
+> 
+>>>> +
+>>>> +struct errors_edac {
+>>>> +    const char * const msg;
+>>>> +    void (*func)(struct edac_device_ctl_info *edac_dev,
+>>>> +            int inst_nr, int block_nr, const char *msg);
+>>>> +};
+>>>> +
+>>>> +static const struct errors_edac errors[] = {
+>>>> +    { "L1 Correctable Error", edac_device_handle_ce },
+>>>> +    { "L1 Uncorrectable Error", edac_device_handle_ue },
+>>>> +    { "L2 Correctable Error", edac_device_handle_ce },
+>>>> +    { "L2 Uncorrectable Error", edac_device_handle_ue },
+>>>> +    { "L3 Correctable Error", edac_device_handle_ce },
+>>>> +    { "L3 Uncorrectable Error", edac_device_handle_ue },
+>>>> +};
+>>>> +
+> 
+>>>> +#define L1_CE 0
+>>>> +#define L1_UE 1
+>>>> +#define L2_CE 2
+>>>> +#define L2_UE 3
+>>>> +#define L3_CE 4
+>>>> +#define L3_UE 5
+> 
+> This are read from ERR<n>MISC, I can't find this in the spec[0], are 
+> these
+> specific to your implementation?
+> 
+> 
+>>>> +#define DATA_BUF_ERR        0x2
+>>>> +#define CACHE_DATA_ERR        0x6
+>>>> +#define CACHE_TAG_DIRTY_ERR    0x7
+>>>> +#define TLB_PARITY_ERR_DATA    0x8
+>>>> +#define TLB_PARITY_ERR_TAG    0x9
+> 
+> (Nit: 'TAG' is the example address/control data that has become 
+> corrupt. We
+> don't know how the cache is designed, 'metadata' may be a better choice 
+> of word
+> here).
+> 
+>>>> +#define BUS_ERROR        0x12
+> 
+> There are 21 of these and only 2 are implementation defined. How come 
+> you don't
+> define all of them?
+> 
+> All these get used for is to map to a name, would a table be better?
+> (e.g. arch/arm64/mm/fault.c::fault_info)
+> 
+> 
+>>>> +struct erp_drvdata {
+>>>> +    struct edac_device_ctl_info *edev_ctl;
+>>>> +    struct erp_drvdata __percpu **erp_cpu_drvdata;
+>>>> +    struct notifier_block nb_pm;
+>>>> +    int ppi;
+>>>> +};
+>>>> +
+>>>> +static struct erp_drvdata *panic_handler_drvdata;
+>>>> +
+>>>> +static DEFINE_SPINLOCK(armv8_edac_lock);
+>>>> +
+>>>> +static void l1_l2_irq_enable(void *info)
+>>>> +{
+>>>> +    int irq = *(int *)info;
+>>>> +
+>>>> +    enable_percpu_irq(irq, IRQ_TYPE_LEVEL_HIGH);
+>>>> +}
+> 
+> (Shouldn't the 'percpu' and 'level_high' be information learnt from the 
+> DT?)
+> 
+> 
+>>>> +static int request_erp_irq(struct platform_device *pdev, const char 
+>>>> *propname,
+>>>> +            const char *desc, irq_handler_t handler,
+>>>> +            void *ed, int percpu)
+>>>> +{
+>>>> +    int rc;
+>>>> +    struct resource *r;
+>>>> +    struct erp_drvdata *drv = ed;
+>>>> +
+>>>> +    r = platform_get_resource_byname(pdev, IORESOURCE_IRQ, 
+>>>> propname);
+>>>> +
+>>>> +    if (!r) {
+>>>> +        pr_err("ARMv8 CPU ERP: Could not find <%s> IRQ property. 
+>>>> Proceeding
+>>>> anyway.\n",
+>>>> +            propname);
+>>> 
+>>> What is "ERP" ?
+> 
+>> Error Reporting. I may just rename it to EDAC or list it out in 
+>> Documentation.
+> 
+>>>> +        goto out;
+>>>> +    }
+>>>> +
+>>>> +    if (!percpu) {
+>>>> +        rc = devm_request_threaded_irq(&pdev->dev, r->start, NULL,
+>>>> +                           handler,
+>>>> +                           IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+>>>> +                           desc,
+>>>> +                           ed);
+>>>> +
+>>>> +        if (rc) {
+>>>> +            pr_err("ARMv8 CPU ERP: Failed to request IRQ %d: %d (%s 
+>>>> / %s).
+>>>> Proceeding anyway.\n",
+>>>> +                   (int) r->start, rc, propname, desc);
+>>>> +            goto out;
+>>>> +        }
+>>>> +
+>>>> +    } else {
+>>>> +        drv->erp_cpu_drvdata = alloc_percpu(struct erp_drvdata *);
+>>>> +        if (!drv->erp_cpu_drvdata) {
+>>>> +            pr_err("Failed to allocate percpu erp data\n");
+>>>> +            goto out;
+>>>> +        }
+>>>> +
+>>>> +        *raw_cpu_ptr(drv->erp_cpu_drvdata) = drv;
+> 
+> raw_cpu_ptr(). You call this from armv8_cpu_erp_probe(), so you're 
+> probably
+> preemtible. Could you use this_cpu_ptr() and enable 
+> CONFIG_DEBUG_PREEMPT.
+> 
+> (How come you only set this per-cpu cookie on one cpu?)
+> 
+> 
+>>>> +        rc = request_percpu_irq(r->start, handler, desc,
+>>>> +                drv->erp_cpu_drvdata);
+>>>> +
+>>>> +        if (rc) {
+>>>> +            pr_err("ARMv8 CPU ERP: Failed to request IRQ %d: %d (%s 
+>>>> / %s).
+>>>> Proceeding anyway.\n",
+>>>> +                   (int) r->start, rc, propname, desc);
+>>>> +            goto out_free;
+>>>> +        }
+>>>> +
+>>>> +        drv->ppi = r->start;
+>>>> +        on_each_cpu(l1_l2_irq_enable, &(r->start), 1);
+>>>> +    }
+>>>> +
+>>>> +    return 0;
+>>>> +
+>>>> +out_free:
+>>>> +    free_percpu(drv->erp_cpu_drvdata);
+>>>> +    drv->erp_cpu_drvdata = NULL;
+>>>> +out:
+>>>> +    return 1;
+>>>> +}
+>>>> +
+>>>> +static void dump_err_reg(int errorcode, int level, u64 errxstatus, 
+>>>> u64
+>>>> errxmisc,
+>>>> +    struct edac_device_ctl_info *edev_ctl)
+>>>> +{
+>>>> +    edac_printk(KERN_CRIT, EDAC_CPU, "ERRXSTATUS_EL1: %llx\n", 
+>>>> errxstatus);
+>>>> +    edac_printk(KERN_CRIT, EDAC_CPU, "ERRXMISC_EL1: %llx\n", 
+>>>> errxmisc);
+>>>> +    edac_printk(KERN_CRIT, EDAC_CPU, "Cache level: L%d\n", 
+>>>> level+1);
+>>>> +    switch (ERRXSTATUS_SERR(errxstatus)) {
+>>>> +    case DATA_BUF_ERR:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from internal 
+>>>> data
+>>>> buffer\n");
+>>>> +        break;
+>>>> +
+>>>> +    case CACHE_DATA_ERR:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from cache data 
+>>>> RAM\n");
+>>>> +        break;
+>>>> +
+>>>> +    case CACHE_TAG_DIRTY_ERR:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "ECC Error from cache tag 
+>>>> or dirty
+>>>> RAM\n");
+>>>> +        break;
+>>>> +
+>>>> +    case TLB_PARITY_ERR_DATA:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "Parity error on TLB DATA 
+>>>> RAM\n");
+>>>> +        break;
+>>>> +
+>>>> +    case TLB_PARITY_ERR_TAG:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "Parity error on TLB TAG 
+>>>> RAM\n");
+>>>> +        break;
+>>>> +
+>>>> +    case BUS_ERROR:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "Bus Error\n");
+>>>> +        break;
+>>>> +    }
+> 
+>>>> +    if (level == L3)
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU,
+>>>> +            "Way: %d\n", (int) ERRXMISC_WAY(errxmisc));
+>>>> +    else
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU,
+>>>> +            "Way: %d\n", (int) ERRXMISC_WAY(errxmisc) >> 2);
+>>>> +
+>>>> +    edev_ctl->panic_on_ue = panic_on_ue;
+>>>> +    errors[errorcode].func(edev_ctl, smp_processor_id(),
+>>>> +                level, errors[errorcode].msg);
+>>>> +}
+>>>> +
+>>>> +static void armv8_parse_l1_l2_cache_error(u64 errxstatus, u64 
+>>>> errxmisc,
+>>>> +    struct edac_device_ctl_info *edev_ctl)
+>>>> +{
+>>>> +    switch (ERRXMISC_LVL(errxmisc)) {
+>>>> +    case L1:
+>>>> +        if (ERRXSTATUS_UE(errxstatus))
+>>>> +            dump_err_reg(L1_UE, L1, errxstatus, errxmisc,
+>>>> +                    edev_ctl);
+>>>> +        else
+>>>> +            dump_err_reg(L1_CE, L1, errxstatus, errxmisc,
+>>>> +                    edev_ctl);
+> 
+> If the UE bit is clear the error may have been 'corrected or deferred'. 
+> I guess
+> we assume deferred errors don't happen, so !UE means Corrected-Error.
+> 
+> 
+>>>> +        break;
+>>>> +    case L2:
+>>>> +        if (ERRXSTATUS_UE(errxstatus))
+>>>> +            dump_err_reg(L2_UE, L2, errxstatus, errxmisc,
+>>>> +                    edev_ctl);
+>>>> +        else
+>>>> +            dump_err_reg(L2_CE, L2, errxstatus, errxmisc,
+>>>> +                    edev_ctl);
+>>>> +        break;
+>>>> +    default:
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU, "Unknown ERRXMISC_LVL 
+>>>> value\n");
+>>>> +    }
+>>>> +}
+>>>> +
+>>>> +static bool armv8_check_l1_l2_ecc(void *info)
+>>>> +{
+>>>> +    struct edac_device_ctl_info *edev_ctl = info;
+>>>> +    u64 errxstatus;
+>>>> +    u64 errxmisc;
+>>>> +    unsigned long flags;
+>>>> +
+>>>> +    spin_lock_irqsave(&armv8_edac_lock, flags);
+> 
+>>>> +    write_errselr_el1(0);
+> 
+> How do we know how many nodes backed by the cpu interface there are?
+> How do we know '0' is the one we want?
+> 
+>>>> +    errxstatus = read_errxstatus_el1();
+>>>> +
+>>>> +    if (ERRXSTATUS_VALID(errxstatus)) {
+>>>> +        errxmisc = read_errxmisc_el1();
+>>>> +        edac_printk(KERN_CRIT, EDAC_CPU,
+>>>> +        "CPU%d detected a L1/L2 cache error\n",
+>>>> +        smp_processor_id());
+>>>> +
+>>>> +        armv8_parse_l1_l2_cache_error(errxstatus, errxmisc, 
+>>>> edev_ctl);
+>>>> +        clear_errxstatus_valid(errxstatus);
+>>>> +        spin_unlock_irqrestore(&armv8_edac_lock, flags);
+>>>> +        return true;
+>>>> +    }
+>>>> +    spin_unlock_irqrestore(&armv8_edac_lock, flags);
+>>>> +    return false;
+>>>> +}
+>>>> +
+>>>> +static bool armv8_check_l3_scu_error(struct edac_device_ctl_info 
+>>>> *edev_ctl)
+>>>> +{
+>>>> +    u64 errxstatus = 0;
+>>>> +    u64 errxmisc = 0;
+>>>> +    unsigned long flags;
+>>>> +
+>>>> +    spin_lock_irqsave(&armv8_edac_lock, flags);
+> 
+>>>> +    write_errselr_el1(1);
+> 
+> How do we know '1' is the one we want?
+> 
+> 
+>>>> +    errxstatus = read_errxstatus_el1();
+>>>> +    errxmisc = read_errxmisc_el1();
+>>>> +
+>>>> +    if (ERRXSTATUS_VALID(errxstatus) &&
+>>>> +        ERRXMISC_LVL(errxmisc) == L3) {
+>>>> +        if (ERRXSTATUS_UE(errxstatus)) {
+>>>> +            edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 
+>>>> uncorrectable
+>>>> error\n");
+>>>> +            dump_err_reg(L3_UE, L3, errxstatus, errxmisc,
+>>>> +                edev_ctl);
+>>>> +        } else {
+>>>> +            edac_printk(KERN_CRIT, EDAC_CPU, "Detected L3 
+>>>> correctable
+>>>> error\n");
+>>>> +            dump_err_reg(L3_CE, L3, errxstatus, errxmisc,
+>>>> +                edev_ctl);
+> 
+> What about deferred errors?
+> 
+> 
+>>>> +        }
+>>>> +
+>>>> +        clear_errxstatus_valid(errxstatus);
+>>>> +        spin_unlock_irqrestore(&armv8_edac_lock, flags);
+>>>> +        return true;
+>>>> +    }
+>>>> +    spin_unlock_irqrestore(&armv8_edac_lock, flags);
+>>>> +    return false;
+>>>> +}
+>>>> +
+>>>> +static void armv8_check_l1_l2_ecc_helper(void *info)
+>>>> +{
+>>>> +    armv8_check_l1_l2_ecc(info);
+>>>> +}
+>>>> +
+>>>> +void armv8_poll_cache_errors(struct edac_device_ctl_info *edev_ctl)
+>>>> +{
+>>>> +    int cpu;
+>>>> +
+>>>> +    if (!edev_ctl)
+>>>> +        edev_ctl = panic_handler_drvdata->edev_ctl;
+>>>> +
+>>>> +    armv8_check_l3_scu_error(edev_ctl);
+>>>> +    for_each_possible_cpu(cpu) {
+>>>> +        smp_call_function_single(cpu, armv8_check_l1_l2_ecc_helper,
+>>>> +            edev_ctl, 0);
+> 
+> on_each_cpu()?
+> 
+>>>> +    }
+>>>> +}
+>>>> +
+>>>> +static irqreturn_t armv8_l1_l2_handler(int irq, void *drvdata)
+>>>> +{
+>>>> +    if (armv8_check_l1_l2_ecc(panic_handler_drvdata->edev_ctl))
+>>>> +        return IRQ_HANDLED;
+>>>> +    return IRQ_NONE;
+>>>> +}
+>>>> +
+>>>> +static irqreturn_t armv8_l3_scu_handler(int irq, void *drvdata)
+>>>> +{
+>>>> +    struct erp_drvdata *drv = drvdata;
+>>>> +    struct edac_device_ctl_info *edev_ctl = drv->edev_ctl;
+>>>> +
+>>>> +    if (armv8_check_l3_scu_error(edev_ctl))
+>>>> +        return IRQ_HANDLED;
+>>>> +    return IRQ_NONE;
+>>>> +}
+>>>> +
+>>>> +static void initialize_registers(void *info)
+>>>> +{
+>>>> +    set_errxctlr_el1();
+>>>> +    set_errxmisc_overflow();
+>>>> +}
+>>>> +
+>>>> +static void init_regs_on_cpu(bool all_cpus)
+>>>> +{
+>>>> +    int cpu;
+>>>> +
+>>>> +    write_errselr_el1(0);
+> 
+> This only happens on the local CPU, the other end of your
+> smp_call_function_single() may have junk in this register.
+> 
+> 
+>>>> +    if (all_cpus) {
+>>>> +        for_each_possible_cpu(cpu)
+>>>> +            smp_call_function_single(cpu, initialize_registers,
+>>>> +                        NULL, 1);
+> 
+> on_each_cpu()?
+> 
+> 
+>>>> +    } else {
+>>>> +        initialize_registers(NULL);
+>>>> +    }
+>>>> +
+>>>> +    write_errselr_el1(1);
+>>>> +    initialize_registers(NULL);
+> 
+> You seem to magically-know that this 'record 1' is shared between all 
+> CPUs and
+> visible via the cpu interface.
+> 
+Yes this portion (and coming to the realization that a lot of other 
+parts) of the
+code is specific to our topology. Is there any way to detect this? 
+ERRIDR reports
+how many records there are but not what each record is for. Without this 
+information,
+not sure how there could be a generic interrupt based driver.
 
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
-> ---
-> v2
-> * New patch
-> ---
->  arch/arm/boot/dts/r8a7793.dtsi | 19 ++++++++++---------
->  1 file changed, 10 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-> index e95f4fb44dc4..ea4bc06c8e8a 100644
-> --- a/arch/arm/boot/dts/r8a7793.dtsi
-> +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> @@ -228,9 +228,9 @@
->  	};
->  
->  	thermal: thermal at e61f0000 {
-> -		compatible =	"renesas,thermal-r8a7793",
-> -				"renesas,rcar-gen2-thermal",
-> -				"renesas,rcar-thermal";
-> +		compatible = "renesas,thermal-r8a7793",
-> +			     "renesas,rcar-gen2-thermal",
-> +			     "renesas,rcar-thermal";
->  		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
->  		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&cpg CPG_MOD 522>;
-> @@ -1174,12 +1174,13 @@
->  		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
->  		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
->  		 */
-> -		compatible =  "renesas,rcar_sound-r8a7793", "renesas,rcar_sound-gen2";
-> -		reg =	<0 0xec500000 0 0x1000>, /* SCU */
-> -			<0 0xec5a0000 0 0x100>,  /* ADG */
-> -			<0 0xec540000 0 0x1000>, /* SSIU */
-> -			<0 0xec541000 0 0x280>,  /* SSI */
-> -			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
-> +		compatible = "renesas,rcar_sound-r8a7793",
-> +			     "renesas,rcar_sound-gen2";
-> +		reg = <0 0xec500000 0 0x1000>, /* SCU */
-> +		      <0 0xec5a0000 0 0x100>,  /* ADG */
-> +		      <0 0xec540000 0 0x1000>, /* SSIU */
-> +		      <0 0xec541000 0 0x280>,  /* SSI */
-> +		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
->  		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
->  
->  		clocks = <&cpg CPG_MOD 1005>,
-> -- 
-> 2.11.0
+>>>> +}
+>>>> +
+>>>> +static int armv8_pmu_cpu_pm_notify(struct notifier_block *self,
+>>>> +                unsigned long action, void *v)
+>>>> +{
+>>>> +    switch (action) {
+>>>> +    case CPU_PM_EXIT:
+>>>> +        init_regs_on_cpu(false);
+>>>> +        armv8_check_l3_scu_error(panic_handler_drvdata->edev_ctl);
+>>>> +        armv8_check_l1_l2_ecc(panic_handler_drvdata->edev_ctl);
+>>>> +        break;
+>>>> +    }
+>>>> +
+>>>> +    return NOTIFY_OK;
+>>>> +}
+>>> 
+>>> What about CPU hotplug?
+>>> 
+>> Agreed that CPU hotplug will be required for the small window between
+>> hotplugging back in and LPM exit.
+>> 
+>>>> +
+>>>> +static int armv8_cpu_erp_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +    struct device *dev = &pdev->dev;
+>>>> +    struct erp_drvdata *drv;
+>>>> +    int rc = 0;
+>>>> +    int fail = 0;
+>>>> +
+>>>> +    init_regs_on_cpu(true);
+>>>> +
+>>>> +    drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
+>>>> +
+>>>> +    if (!drv)
+>>>> +        return -ENOMEM;
+>>>> +
+>>>> +    drv->edev_ctl = edac_device_alloc_ctl_info(0, "cpu",
+>>>> +                    num_possible_cpus(), "L", 3, 1, NULL, 0,
+>>>> +                    edac_device_alloc_index());
+>>>> +
+>>>> +    if (!drv->edev_ctl)
+>>>> +        return -ENOMEM;
+>>>> +
+>>>> +    if (IS_ENABLED(CONFIG_EDAC_ARMV8_POLL)) {
+>>>> +        drv->edev_ctl->edac_check = armv8_poll_cache_errors;
+>>>> +        drv->edev_ctl->poll_msec = poll_msec;
+>>>> +    }
+>>>> +
+>>>> +    drv->edev_ctl->dev = dev;
+>>>> +    drv->edev_ctl->mod_name = dev_name(dev);
+>>>> +    drv->edev_ctl->dev_name = dev_name(dev);
 > 
+>>>> +    drv->edev_ctl->ctl_name = "cache";
+> 
+> How do we know records '0' and '1' are 'cache'?
+> 
+> 
+>>>> +    drv->edev_ctl->panic_on_ue = panic_on_ue;
+>>>> +    drv->nb_pm.notifier_call = armv8_pmu_cpu_pm_notify;
+>>>> +    platform_set_drvdata(pdev, drv);
+>>>> +
+>>>> +    rc = edac_device_add_device(drv->edev_ctl);
+>>>> +    if (rc)
+>>>> +        goto out_mem;
+>>>> +
+>>>> +    panic_handler_drvdata = drv;
+>>>> +
+>>>> +    if (!IS_ENABLED(CONFIG_EDAC_ARMV8_POLL)) {
+>>>> +        fail += request_erp_irq(pdev, "l1-l2-irq",
+>>>> +                "l1_l2_irq",
+>>>> +                armv8_l1_l2_handler, drv, 1);
+>>>> +
+>>>> +        fail += request_erp_irq(pdev, "l3-scu-irq",
+>>>> +                "l3_scu_irq",
+>>>> +                armv8_l3_scu_handler, drv, 0);
+> 
+> How do we know 'l1/l2' is per-cpu and l2 isn't? I'd expect this 
+> information to
+> come from the DT.
+> 
+> 
+>>> SCU isn't an architectural concept, and a combined l1-l2 interrupt
+>>> sounds very specific to a particular implementation.
+> 
+>> Can do a rename to something more akin to "private_cache_irq" and
+>> "shared_cache_irq".
+> 
+>>> My understanding was that with the RAS extensions, SError would be 
+>>> used
+>>> to notify on RAS conditions, so I'm confused as to why we'd need
+>>> regular interrupts here.
+> 
+>> There may be cases where interrupts are preferred. To my knowledge 
+>> (though I may
+>> mistaken), SErrors would not catch correctable errors?
+> 
+> With the v8.2 RAS Extensions both synchronous and asynchronous 
+> external-aborts
+> have a severity in the ESR which tells us
+> corrected/restartable/recoverable/uncontainable.
+> 
+> Error nodes may signal an 'error recovery interrupt' or 'fatal handling
+> interrupt' when the in-band external-abort mechanisms can't be used. 
+> (Sections
+> 3.3 to 3.5 of [0]).
+> 
+> 
+>>>> +        if (fail == of_irq_count(dev->of_node)) {
+>>>> +            pr_err("ERP: Could not request any IRQs. Giving 
+>>>> up.\n");
+>>>> +            rc = -ENODEV;
+>>>> +            goto out_dev;
+>>>> +        }
+>>>> +    }
+>>>> +
+>>>> +    cpu_pm_register_notifier(&(drv->nb_pm));
+>>>> +
+>>>> +    return 0;
+>>>> +
+>>>> +out_dev:
+>>>> +    edac_device_del_device(dev);
+>>>> +out_mem:
+>>>> +    edac_device_free_ctl_info(drv->edev_ctl);
+>>>> +    return rc;
+>>>> +}
+>>>> +
+>>>> +static int armv8_cpu_erp_remove(struct platform_device *pdev)
+>>>> +{
+>>>> +    struct erp_drvdata *drv = dev_get_drvdata(&pdev->dev);
+>>>> +    struct edac_device_ctl_info *edac_ctl = drv->edev_ctl;
+>>>> +
+>>>> +    if (drv->erp_cpu_drvdata) {
+>>>> +        free_percpu_irq(drv->ppi, drv->erp_cpu_drvdata);
+>>>> +        free_percpu(drv->erp_cpu_drvdata);
+>>>> +    }
+>>>> +
+>>>> +    edac_device_del_device(edac_ctl->dev);
+>>>> +    edac_device_free_ctl_info(edac_ctl);
+>>>> +
+>>>> +    return 0;
+>>>> +}
+>>>> +
+>>>> +static const struct of_device_id armv8_cpu_erp_match_table[] = {
+>>>> +    { .compatible = "arm,armv8-cpu-erp" },
+>>>> +    { }
+>>>> +};
+>>> 
+>>> This needs a binding document, laying out precisely what this is
+>>> intended to describe.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+I should probably amend a previous statement about this all being 
+defined in RAS. Didn't realize this initially
+but as you have mentioned, even though the registers are architected, 
+the decoding/bits within the registers are
+implementation defined. So within the driver, some of the "magically 
+known" values are because as it is right now,
+the decodings and some behavior is specific to our implementation.
 
--- 
-Regards,
-Niklas S?derlund
+To more generalize this, would it be better to (after checking the 
+IDR/FR registers) to instead just dump out the
+ERRXSTATUS/ERRXMISC directly, and then have registered callbacks to 
+actually properly decode the values into
+something more readable?
+
+Thanks,
+Kyle
