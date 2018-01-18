@@ -1,22 +1,33 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 18 Jan 2018 23:02:13 +1100
-Subject: [PATCH] hw_random: mediatek: Setup default RNG quality
-In-Reply-To: <134f98ae3270cc6040121cf75d50c916adfe58dc.1515556571.git.sean.wang@mediatek.com>
-References: <134f98ae3270cc6040121cf75d50c916adfe58dc.1515556571.git.sean.wang@mediatek.com>
-Message-ID: <20180118120213.GC20717@gondor.apana.org.au>
+Date: Thu, 18 Jan 2018 23:02:42 +1100
+Subject: [PATCH 0/7] arm64: move literal data into .rodata section
+In-Reply-To: <CAKv+Gu_oh7q81mr=XPW+HM9zewETtbL=mnN0mkr83f5=n4zr6Q@mail.gmail.com>
+References: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
+ <20180118114112.GA20091@gondor.apana.org.au>
+ <CAKv+Gu_oh7q81mr=XPW+HM9zewETtbL=mnN0mkr83f5=n4zr6Q@mail.gmail.com>
+Message-ID: <20180118120242.GE20717@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 12:02:46PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Thu, Jan 18, 2018 at 11:46:07AM +0000, Ard Biesheuvel wrote:
+> On 18 January 2018 at 11:41, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> > On Wed, Jan 10, 2018 at 12:11:35PM +0000, Ard Biesheuvel wrote:
+> >> Prevent inadvertently creating speculative gadgets by moving literal data
+> >> into the .rodata section.
+> >>
+> >> Patch #1 enables this for C code, by reverting a change that disables the
+> >> GCC feature implementing this. Note that this conflicts with the mitigation
+> >> of erratum #843419 for Cortex-A53.
+> >
+> > Ard, which tree is this supposed to go through?
+> >
 > 
-> When hw_random device's quality is non-zero, it will automatically fill
-> the kernel's entropy pool at boot.  For the purpose, one conservative
-> quality value is being picked up as the default value.
+> Hi Herbert,
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> I am going to drop that first patch, the remaining 6 patches can go
+> through the crypto tree as they are independent.
 
-Patch applied.  Thanks.
+Patches 2-7 applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
