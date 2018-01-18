@@ -1,43 +1,149 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 17 Jan 2018 17:47:34 -0600
-Subject: [PATCH v3] firmware: qcom: scm: Fix incorrect of_node_put calls
- in scm_init
-In-Reply-To: <20180116164549.GE478@tuxbook>
-References: <1513345214-22835-1-git-send-email-lollivier@baylibre.com>
- <20180116164549.GE478@tuxbook>
-Message-ID: <20180117234734.GA4402@hector>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Thu, 18 Jan 2018 01:16:34 +0100
+Subject: [PATCH v2 01/16] ARM: dts: r8a7790: consistently use single
+ space after =
+In-Reply-To: <20180117161717.14589-2-horms+renesas@verge.net.au>
+References: <20180117161717.14589-1-horms+renesas@verge.net.au>
+ <20180117161717.14589-2-horms+renesas@verge.net.au>
+Message-ID: <20180118001633.GA11924@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 08:45:49AM -0800, Bjorn Andersson wrote:
-> On Fri 15 Dec 05:40 PST 2017, Loys Ollivier wrote:
-> 
-> > When using other platform architectures, in the init of the qcom_scm
-> > driver, of_node_put is called on /firmware if no qcom dt is found.
-> > This results in a kernel error: Bad of_node_put() on /firmware.
-> > 
-> > These calls to of_node_put from the qcom_scm init are unnecessary as
-> > of_find_matching_node and of_platform_populate are calling it
-> > automatically.
-> > 
-> > Remove the calls to of_node_put() on fw_np.
-> > 
-> > Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
-> > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
-> 
-> Hi Loys,
-> 
-> Your patch is correct! We are however removing all this logic from
-> qcom_scm_init() in v4.16.
-> 
-> See:
-> https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git/commit/?h=for-next&id=3aa0582fdb824139630298880fbf78d4ac774d3c
-> https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git/commit/?h=for-next&id=3aa0582fdb824139630298880fbf78d4ac774d3c
+Hi Simon,
 
+Thanks for your patch.
 
-Yeah sorry for the delay in response.  I pulled in the second part of a separate
-fix that removes all that code from the qcom_scm.  It made more sense to do it
-automatically from the base code.
+On 2018-01-17 17:17:02 +0100, Simon Horman wrote:
+> Consistently use a single space after a =.
+> 
+> This patch removes instances where a tab or multiple spaces are used
+> instead.  It also avoids running over 80 columns in width in one of the
+> lines where whitespace is updated.
+> 
+> This patch should not introduce any functional change.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Andy
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+> ---
+> v2
+> * Consistently use tabs for indentation as much as possible
+> ---
+>  arch/arm/boot/dts/r8a7790.dtsi | 75 +++++++++++++++++++++---------------------
+>  1 file changed, 38 insertions(+), 37 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 13926fc7abfa..b4306f7c1bbb 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -291,9 +291,9 @@
+>  	};
+>  
+>  	thermal: thermal at e61f0000 {
+> -		compatible =	"renesas,thermal-r8a7790",
+> -				"renesas,rcar-gen2-thermal",
+> -				"renesas,rcar-thermal";
+> +		compatible = "renesas,thermal-r8a7790",
+> +			     "renesas,rcar-gen2-thermal",
+> +			     "renesas,rcar-thermal";
+>  		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
+>  		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cpg CPG_MOD 522>;
+> @@ -423,20 +423,20 @@
+>  	audma0: dma-controller at ec700000 {
+>  		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
+>  		reg = <0 0xec700000 0 0x10000>;
+> -		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "error",
+>  				"ch0", "ch1", "ch2", "ch3",
+>  				"ch4", "ch5", "ch6", "ch7",
+> @@ -453,20 +453,20 @@
+>  	audma1: dma-controller at ec720000 {
+>  		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
+>  		reg = <0 0xec720000 0 0x10000>;
+> -		interrupts =	<GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "error",
+>  				"ch0", "ch1", "ch2", "ch3",
+>  				"ch4", "ch5", "ch6", "ch7",
+> @@ -1437,12 +1437,13 @@
+>  		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
+>  		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
+>  		 */
+> -		compatible =  "renesas,rcar_sound-r8a7790", "renesas,rcar_sound-gen2";
+> -		reg =	<0 0xec500000 0 0x1000>, /* SCU */
+> -			<0 0xec5a0000 0 0x100>,  /* ADG */
+> -			<0 0xec540000 0 0x1000>, /* SSIU */
+> -			<0 0xec541000 0 0x280>,  /* SSI */
+> -			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
+> +		compatible = "renesas,rcar_sound-r8a7790",
+> +			     "renesas,rcar_sound-gen2";
+> +		reg = <0 0xec500000 0 0x1000>, /* SCU */
+> +		      <0 0xec5a0000 0 0x100>,  /* ADG */
+> +		      <0 0xec540000 0 0x1000>, /* SSIU */
+> +		      <0 0xec541000 0 0x280>,  /* SSI */
+> +		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
+>  		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
+>  
+>  		clocks = <&cpg CPG_MOD 1005>,
+> -- 
+> 2.11.0
+> 
+
+-- 
+Regards,
+Niklas S?derlund
