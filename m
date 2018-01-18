@@ -1,73 +1,91 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 18 Jan 2018 14:19:09 +0100
-Subject: [Patch v6 02/12] [media] s5p-mfc: Adding initial support for MFC
- v10.10
-In-Reply-To: <1516278981.22129.12.camel@smitha-fedora>
-References: <CGME20171208093637epcas1p217ea0e337333ebf6918bc0418753d2af@epcas1p2.samsung.com>
- <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
- <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
- <CAOFm3uHyNt3k+_n3SvSP-BNFeEeu1CO6PpEbxs9JU0MxsHm=Jg@mail.gmail.com>
- <1516278981.22129.12.camel@smitha-fedora>
-Message-ID: <332f1f0e-bfa9-4102-6c0d-28cf13eeeaad@xs4all.nl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 Jan 2018 13:19:39 +0000
+Subject: per-task stack canaries for arm64
+In-Reply-To: <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
+References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+ <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
+ <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
+ <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
+ <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
+Message-ID: <CAKv+Gu-TtJ7Pxa7+qOX7MiQwPFwsNOup2Q=0TvjCO4xHxf3QQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/18 13:36, Smitha T Murthy wrote:
-> On Fri, 2017-12-08 at 14:25 +0100, Philippe Ombredanne wrote:
->> Smitha,
->>
->> On Fri, Dec 8, 2017 at 10:08 AM, Smitha T Murthy <smitha.t@samsung.com> wrote:
->>> Adding the support for MFC v10.10, with new register file and
->>> necessary hw control, decoder, encoder and structural changes.
+On 18 January 2018 at 10:26, Ramana Radhakrishnan
+<ramana.radhakrishnan@arm.com> wrote:
+> On 1/17/18 8:45 PM, Kees Cook wrote:
+>> On Wed, Jan 17, 2018 at 12:32 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 17 January 2018 at 19:10, Kees Cook <keescook@chromium.org> wrote:
+>>>> On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
+>>>> <ard.biesheuvel@linaro.org> wrote:
+>>> [...]
+>>>> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
+>>>> which was done for x86 only, and provides both:
+>>>>   -mstack-protector-guard-symbol=...
+>>>>   -mstack-protector-guard-reg=...
+>>>>
+>>>> If this could be extended to arm64, I think we'd be in good shape (and
+>>>> it could be trivially detected at build time).
+>>>>
 >>>
->>> CC: Rob Herring <robh+dt@kernel.org>
->>> CC: devicetree at vger.kernel.org
->>> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
->>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>> Acked-by: Rob Herring <robh@kernel.org>
->> []
->>> --- /dev/null
->>> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
->>> @@ -0,0 +1,36 @@
->>> +/*
->>> + * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
->>> + *
->>> + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
->>> + *     http://www.samsung.com/
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
+>>> I'm not entirely sure what the point is of specifying the name of the
+>>> symbol on the command line. It is ultimately up to the GCC developers
+>>> to decide how much point there is to maintaining parity with x86 here.
+>>>
+>>> [...]
+>>>>> Ramana indicated at the time that he would be up for adding, e.g.,
+>>>>> -fstack-protector-linux-kernel as a command line option, and add the
+>>>>> contents of tpidr_el1 to every reference of __stack_chk_guard when
+>>>>> set.
+>
+> Wow, that was a hall-way conversation eons ago. It took me a while to
+> page that in.
+>
+>
+>>>>
+>>>> I think we want to reuse the command-line names from the x86 options
+>>>> above, unless there's a good reason not to?
+>>>
+>>> I'm perfectly happy to settle for whatever the GCC developers manage
+>>> to agree on, as long as it gives us the ability to use tpidr_el1 as
+>>> the offset.
 >>
->> Have you considered using the new SPDX ids instead of this fine legalese? e.g.:
->>
->> // SPDX-License-Identifier: GPL-2.0
->>
->> This is much shorter and neater (unless you are a legalese lover of
->> course!)  Check also Thomas doc patches and Linus comments on why he
->> prefers the C++ comment style for these.
->>
->> And even better could be this more compact form? I am a big fan of the
->> C++ style comments for these (and so is Linus)
->>
->> // SPDX-License-Identifier: GPL-2.0
->> // Copyright (c) 2017 Samsung Electronics Co., Ltd.
->> // Register definition file for Samsung MFC V10.x Interface (FIMV) driver
->>
->> You can also read this fine article from a fellow Samsung colleague
->> [1]. And if you ever consider doing this for all Samsung's past,
->> present and future contributions, you will have my deep gratitude
->>
->> [1] https://blogs.s-osg.org/linux-kernel-license-practices-revisited-spdx/
->>
-> Ok I will change to the SPDX license in the next patch series for the
-> v10 register file. Correspondingly for the MFC driver's files I will
-> update the license as a separate patch and submit.
-> 
+>> Ramana, Uro?, what's the best next step? Should we open a GCC bug
+>> specifically for arm64 here?
+>
+> The next best step is someone opening a GCC feature request with some
+> more details - CC'ing me on ramana at gcc.gnu.org should work. What I would
+> like to see is a feature request on GCC bugzilla along with some
+> comments / buyin from the AArch64 kernel maintainers whether they would
+> like to see such a feature and what the behaviour should be and get some
+> feedback from the AArch64 GCC maintainers upstream before starting the
+> work.
+>
+> I think the following (unoptimized) or some derivative of this should work.
+>
+>         adrp    x19, __stack_chk_guard
+>         add     x19, x19, :lo12:__stack_chk_guard
+>         mrs     x2, tpidr_el1
+>         add     x2, x2, x19
+>         ldr     x2, [x2]
+>
+>
+> It's also not likely that this will be done in time for GCC 8 as we are
+> now in stage 4 and we're probably looking at GCC 9 for this assuming
+> this goes ahead.
+>
+> Hope this helps.
+>
 
-Ah, I forgot about this series. I'll try to review it tomorrow or Monday.
+Thanks Ramana.
 
-Sorry about the delay,
+I guess there is one snag here: if we get scheduled to another CPU
+between the mrs and the ldr, we will load the wrong value. I guess
+this is what Mark alluded to in his reference to atomics in the quoted
+email thread.
 
-	Hans
+Also, we select between tpidr_el2 and tpidr_el1 at runtime depending
+on whether VHE is available.
+
+So I guess it isn't as simple as I thought, unfortunately ...
