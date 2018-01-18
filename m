@@ -1,28 +1,75 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 18 Jan 2018 12:43:59 -0600
-Subject: [PATCH v5 29/44] ARM: da8xx: add new USB PHY clock init using
- common clock framework
-In-Reply-To: <83dfab9a-be30-6313-d756-50fa018e757e@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-30-git-send-email-david@lechnology.com>
- <83dfab9a-be30-6313-d756-50fa018e757e@ti.com>
-Message-ID: <c31d26b6-fb79-4581-039f-b977d737da2d@lechnology.com>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Thu, 18 Jan 2018 13:27:15 -0500
+Subject: [PATCH v2] arm64: Branch predictor hardening for Cavium ThunderX2
+In-Reply-To: <20180118175615.GF38392@jc-sabre>
+References: <20180108164651.GQ25869@arm.com>
+ <1515502022-7376-1-git-send-email-jnair@caviumnetworks.com>
+ <e9a192da-f603-6523-6d2e-858eb9c7d1b2@jonmasters.org>
+ <20180116234554.GA38392@jc-sabre> <20180118135354.GB20783@arm.com>
+ <20180118175615.GF38392@jc-sabre>
+Message-ID: <cd75aa1e-10ec-2e40-3136-a34d4ec2258f@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2018 09:14 AM, Sekhar Nori wrote:
-> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
->> +int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
->> +{
->> +	struct regmap *cfgchip;
->> +	struct clk *usb0_psc_clk, *clk;
->> +	struct clk_hw *parent;
->> +
->> +	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
+On 01/18/2018 12:56 PM, Jayachandran C wrote:
+> On Thu, Jan 18, 2018 at 01:53:55PM +0000, Will Deacon wrote:
+>> Hi JC,
+>>
+>> On Tue, Jan 16, 2018 at 03:45:54PM -0800, Jayachandran C wrote:
+>>> On Tue, Jan 16, 2018 at 04:52:53PM -0500, Jon Masters wrote:
+>>>> On 01/09/2018 07:47 AM, Jayachandran C wrote:
+>>>>
+>>>>> Use PSCI based mitigation for speculative execution attacks targeting
+>>>>> the branch predictor. The approach is similar to the one used for
+>>>>> Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
+>>>>> test if the firmware supports the capability.
+>>>>>
+>>>>> If the secure firmware has been updated with the mitigation code to
+>>>>> invalidate the branch target buffer, we use the PSCI version call to
+>>>>> invoke it.
+>>>>
+>>>> What's the status of this patch currently? Previously you had suggested
+>>>> to hold while the SMC got standardized, but then you seemed happy with
+>>>> pulling in. What's the latest?
+>>>
+>>> My understanding is that the SMC standardization is being worked on
+>>> but will take more time, and the KPTI current patchset will go to
+>>> mainline before that.
+>>>
+>>> Given that, I would expect arm64 maintainers to pick up this patch for
+>>> ThunderX2, but I have not seen any comments so far.
+>>>
+>>> Will/Marc, please let me know if you are planning to pick this patch
+>>> into the KPTI tree.
+>>
+>> Are you really sure you want us to apply this? If we do, then you can't run
+>> KVM guests anymore because your IMPDEF SMC results in an UNDEF being
+>> injected (crash below).
+>>
+>> I really think that you should just hook up the enable_psci_bp_hardening
+>> callback like we've done for the Cortex CPUs. We can optimise this later
+>> once the SMC standarisation work has been completed (which is nearly final
+>> now and works in a backwards-compatible manner).
 > 
-> Am I right in understanding that this API is only called for non-DT
-> boot? If yes, do we really need the lookup by compatible?
+> I think Marc's patch here:
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=kvm-arm64/kpti&id=d35e77fae4b70331310c3bc1796bb43b93f9a85e
+> handles returning for undefined smc calls in guest.
+> 
+> I think in this case we have to choose between crashing or giving a false
+> sense of security when a guest compiled with HARDEN_BRANCH_PREDICTOR is
+> booted on an hypervisor that does not support hardening. Crashing maybe
+> a reasonable option.
 
-This code is used in DT boot until [PATCH v5 43/44] "ARM: da8xx-dt:
-switch to device tree clocks". So, yes it is needed temporarily to
-prevent breaking USB.
+Crashing is a completely unreasonable option and is totally
+unacceptable. We never do this in enterprise, period.
+
+It's reasonable to give an output in dmesg that a system isn't hardened,
+but it's not reasonable to crash. On x86, we added a new qemu machine
+type for those guests that would have IBRS exposed, and ask users to
+switch that on explicitly, but even if they boot the new kernels on
+unpatched infrastructure, we'll detect the lack of the branch predictor
+control interface and just log that.
+
+The exact same thing should happen on ARM.
+
+Jon.
