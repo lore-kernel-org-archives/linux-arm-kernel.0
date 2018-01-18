@@ -1,63 +1,53 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 18 Jan 2018 11:18:02 +0200
-Subject: [PATCH v2 03/16] pwm: cros-ec: update documentation regarding
- pwm-cells
-In-Reply-To: <20180117231056.GB112833@google.com>
-References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
- <1515766983-15151-4-git-send-email-claudiu.beznea@microchip.com>
- <20180112183122.GA102880@google.com>
- <61b85600-7aee-e9d1-6587-17e5e419b03a@microchip.com>
- <c2078487-8cc6-429e-6c38-092d776c33aa@microchip.com>
- <20180117231056.GB112833@google.com>
-Message-ID: <48829251-ef9a-1566-9a69-9e66ce64c232@microchip.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Jan 2018 10:25:54 +0100
+Subject: [PATCH] kbuild: fix W= option checks for extra DTC warnings
+In-Reply-To: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK8P3a04vu=C4Aop1WpT7KnB_yP2J1wK5oJv9QiubiSxr0-ykw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 18, 2018 at 4:31 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Kbuild supports 3 levels of extra warnings, and multiple levels can
+> be combined, like W=12, W=123.  It was added by commit a6de553da01c
+> ("kbuild: Allow to combine multiple W= levels").
+>
+> From the log of commit 8654cb8d0371 ("dtc: update warning settings
+> for new bus and node/property name checks"), I assume:
+>
+>  - unit_address_vs_reg, simple_bus_reg, etc. belong to level 1
+>  - node_name_chars_strict, property_name_chars_strict belong to level 2
+>
+> However, the level 1 warnings are displayed by any argument to W=.
+> On the other hand, the level 2 warnings are displayed by W=2, but
+> not by W=12, or W=123.
+>
+> Use $(findstring ...) like scripts/Makefile.extrawarn.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
+Good catch!
 
-On 18.01.2018 01:10, Brian Norris wrote:
-> On Wed, Jan 17, 2018 at 10:29:53AM +0200, Claudiu Beznea wrote:
->> With these changes, if pwm-cells=1 then only PWM-channel will be parsed,
-> 
-> I'm not sure if I'm understanding you correctly but...no. If cells is 1,
-> then your driver change just causes us not to parse correctly, and
-> everything fails.
-My bad, agree with you, will fail with pwm-cells=1. I forgot about:
-+	if (args->args_count < PWM_ARGS_CNT_XLATE_PERIOD ||
-+	    args->args_count > PWM_ARGS_CNT_XLATE_MAX)
- 		return ERR_PTR(-EINVAL);
-restriction.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-> 
->> if it is 2 PWM-channel and PWM-period will be parsed, if pwm-cells=3
->> then PWM-channel, PWM-period and PWM-flags will be parsed.
->> In your driver you used to have only one cell because you wanted to allow
->> user to give as argument only PWM channel, and you did not want a change
->> of PWM period (and in of_xlate function you initialize pwm period with 0xffff
->> value: this is why I changed the binding in patch 7 of this series, file
-> 
-> It's not a matter of "allow", it's a matter of description. The period
-> isn't actually even 0xffff, that's just a pseudo-period, to reflect that
-> you have a choice of duty cycles of 0 to 0xffff. I (justifiably, I
-> think) didn't think putting this false value in the device tree was
-> accurate.
-Ok, I didn't investigate the driver to see what is truly set in HW.
-> 
->> rk3399-gru-kevin.dts). But e.g. sysfs could try to change the PWM period,
->> there is no restriction to change the PWM period from sysfs, in the sysfs
->> interface but the restriction is in PWM apply of the drive. The same things
->> happens with these changes too. The user could introduce any PWM period via
->> DT but the pwm apply function of the driver will return error.
-> 
-> sysfs has no bearing on a device tree binding. Just because we have a
-> broken interface here doesn't mean we should change how we describe the
-> hardware.
-> 
-Based on [1] and the comments I will drop the first 7 patches of this series.
+> Side Notes for possible additional works:
+>
+>  [1] I implemented DTC extra warnings differently in U-Boot:
+>
+>     https://github.com/u-boot/u-boot/blob/v2018.01/scripts/Makefile.extrawarn#L64
+>
+>     Better to collect extra warning stuff into scripts/Makefile.extrawarn ?
+>
+>  [2] KBUILD_ENABLE_EXTRA_GCC_CHECKS is getting a historical misnomer
+>      because we use it for Clang and DTC too.
+>
+>      Better to rename?  (keeping backward-compatibility for a while)?
 
-Thanks,
-Claudiu 
+I'd suggest we leave it for now, I still plan to eventually do my
+large rework of
+the way we handle extra warning levels, likely that will result in
+Makefile.extrawarn
+being completely replaced.
 
-[1] https://www.kernel.org/doc/Documentation/devicetree/bindings/ABI.txt
-> Brian
-> 
+       Arnd
