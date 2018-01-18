@@ -1,75 +1,57 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Thu, 18 Jan 2018 13:27:15 -0500
-Subject: [PATCH v2] arm64: Branch predictor hardening for Cavium ThunderX2
-In-Reply-To: <20180118175615.GF38392@jc-sabre>
-References: <20180108164651.GQ25869@arm.com>
- <1515502022-7376-1-git-send-email-jnair@caviumnetworks.com>
- <e9a192da-f603-6523-6d2e-858eb9c7d1b2@jonmasters.org>
- <20180116234554.GA38392@jc-sabre> <20180118135354.GB20783@arm.com>
- <20180118175615.GF38392@jc-sabre>
-Message-ID: <cd75aa1e-10ec-2e40-3136-a34d4ec2258f@jonmasters.org>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 18 Jan 2018 12:49:08 -0600
+Subject: [PATCH v5 21/44] clk: davinci: New driver for TI DA8XX USB PHY
+ clocks
+In-Reply-To: <493e4809-6b77-7772-70c7-ad0fa04e9033@ti.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-22-git-send-email-david@lechnology.com>
+ <493e4809-6b77-7772-70c7-ad0fa04e9033@ti.com>
+Message-ID: <8821ac95-ee3f-b53b-9a8a-598b69d1b35e@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2018 12:56 PM, Jayachandran C wrote:
-> On Thu, Jan 18, 2018 at 01:53:55PM +0000, Will Deacon wrote:
->> Hi JC,
->>
->> On Tue, Jan 16, 2018 at 03:45:54PM -0800, Jayachandran C wrote:
->>> On Tue, Jan 16, 2018 at 04:52:53PM -0500, Jon Masters wrote:
->>>> On 01/09/2018 07:47 AM, Jayachandran C wrote:
->>>>
->>>>> Use PSCI based mitigation for speculative execution attacks targeting
->>>>> the branch predictor. The approach is similar to the one used for
->>>>> Cortex-A CPUs, but in case of ThunderX2 we add another SMC call to
->>>>> test if the firmware supports the capability.
->>>>>
->>>>> If the secure firmware has been updated with the mitigation code to
->>>>> invalidate the branch target buffer, we use the PSCI version call to
->>>>> invoke it.
->>>>
->>>> What's the status of this patch currently? Previously you had suggested
->>>> to hold while the SMC got standardized, but then you seemed happy with
->>>> pulling in. What's the latest?
->>>
->>> My understanding is that the SMC standardization is being worked on
->>> but will take more time, and the KPTI current patchset will go to
->>> mainline before that.
->>>
->>> Given that, I would expect arm64 maintainers to pick up this patch for
->>> ThunderX2, but I have not seen any comments so far.
->>>
->>> Will/Marc, please let me know if you are planning to pick this patch
->>> into the KPTI tree.
->>
->> Are you really sure you want us to apply this? If we do, then you can't run
->> KVM guests anymore because your IMPDEF SMC results in an UNDEF being
->> injected (crash below).
->>
->> I really think that you should just hook up the enable_psci_bp_hardening
->> callback like we've done for the Cortex CPUs. We can optimise this later
->> once the SMC standarisation work has been completed (which is nearly final
->> now and works in a backwards-compatible manner).
+On 01/18/2018 07:05 AM, Sekhar Nori wrote:
+> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
 > 
-> I think Marc's patch here:
-> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=kvm-arm64/kpti&id=d35e77fae4b70331310c3bc1796bb43b93f9a85e
-> handles returning for undefined smc calls in guest.
+>> +static int da8xx_usb1_phy_clk_set_parent(struct clk_hw *hw, u8 index)
+>> +{
+>> +	struct da8xx_usb1_phy_clk *clk = to_da8xx_usb1_phy_clk(hw);
+>> +	unsigned int mask, val;
+>> +
+>> +	/* Set the USB 1.1 PHY clock mux based on the parent clock. */
+>> +	mask = CFGCHIP2_USB1PHYCLKMUX;
+>> +	switch (index) {
+>> +	case DA8XX_USB1_PHY_CLK_PARENT_USB_REFCLKIN:
+>> +		val = CFGCHIP2_USB1PHYCLKMUX;
+>> +		break;
+>> +	case DA8XX_USB1_PHY_CLK_PARENT_USB0_PHY_PLL:
+>> +		val = 0;
+>> +		break;
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	regmap_write_bits(clk->regmap, CFGCHIP(2), mask, val);
 > 
-> I think in this case we have to choose between crashing or giving a false
-> sense of security when a guest compiled with HARDEN_BRANCH_PREDICTOR is
-> booted on an hypervisor that does not support hardening. Crashing maybe
-> a reasonable option.
+> This function can be simplified quite a bit if you use a shift.
+> 
+> #define CFGCHIP2_USB1PHYCLKMUX_SHIFT	12
+> 
+> static int da8xx_usb1_phy_clk_set_parent(struct clk_hw *hw, u8 index)
+> {
+> 	struct da8xx_usb1_phy_clk *clk = to_da8xx_usb1_phy_clk(hw);
+> 
+> 	regmap_write_bits(clk->regmap, CFGCHIP(2),
+> 			  CFGCHIP2_USB1PHYCLKMUX,
+> 			  index << CFGCHIP2_USB1PHYCLKMUX_SHIFT);
+> }
+> 
+> Same thing for da8xx_usb0_phy_clk_set_parent() as well.
+> 
 
-Crashing is a completely unreasonable option and is totally
-unacceptable. We never do this in enterprise, period.
+or to avoid defining a new macro?
 
-It's reasonable to give an output in dmesg that a system isn't hardened,
-but it's not reasonable to crash. On x86, we added a new qemu machine
-type for those guests that would have IBRS exposed, and ask users to
-switch that on explicitly, but even if they boot the new kernels on
-unpatched infrastructure, we'll detect the lack of the branch predictor
-control interface and just log that.
 
-The exact same thing should happen on ARM.
-
-Jon.
+> 	regmap_write_bits(clk->regmap, CFGCHIP(2),
+> 			  CFGCHIP2_USB1PHYCLKMUX,
+> 			  index ? CFGCHIP2_USB1PHYCLKMUX : 0);
