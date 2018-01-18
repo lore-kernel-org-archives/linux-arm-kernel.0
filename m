@@ -1,28 +1,28 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 18 Jan 2018 12:40:05 -0600
-Subject: [PATCH v5 43/44] ARM: da8xx-dt: switch to device tree clocks
-In-Reply-To: <8b30f1e6-74dc-3fd6-71a6-c9ceaf77a9d1@ti.com>
-References: <1515378307-23718-1-git-send-email-david@lechnology.com>
- <1515378307-23718-4-git-send-email-david@lechnology.com>
- <8b30f1e6-74dc-3fd6-71a6-c9ceaf77a9d1@ti.com>
-Message-ID: <b9443e4c-b8c6-5388-955e-696d0f7b3151@lechnology.com>
+Date: Thu, 18 Jan 2018 12:43:59 -0600
+Subject: [PATCH v5 29/44] ARM: da8xx: add new USB PHY clock init using
+ common clock framework
+In-Reply-To: <83dfab9a-be30-6313-d756-50fa018e757e@ti.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-30-git-send-email-david@lechnology.com>
+ <83dfab9a-be30-6313-d756-50fa018e757e@ti.com>
+Message-ID: <c31d26b6-fb79-4581-039f-b977d737da2d@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2018 09:27 AM, Sekhar Nori wrote:
-> On Monday 08 January 2018 07:55 AM, David Lechner wrote:
->> This removes all of the clock init code from da8xx-dt.c. This includes
->> all of the OF_DEV_AUXDATA that was just used for looking up clocks.
->>
->> Note: You need to have clocks defined in your device tree or your system
->> won't boot after this patch.
+On 01/18/2018 09:14 AM, Sekhar Nori wrote:
+> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
+>> +int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+>> +{
+>> +	struct regmap *cfgchip;
+>> +	struct clk *usb0_psc_clk, *clk;
+>> +	struct clk_hw *parent;
+>> +
+>> +	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
 > 
-> I am not sure we can do this then, as we cannot break DT compatibility.
-> 
+> Am I right in understanding that this API is only called for non-DT
+> boot? If yes, do we really need the lookup by compatible?
 
-In the past, you have told me that you don't want the .dts changes and code
-changes in the same patch. In this case, if you apply either one separately,
-it will break clocks. It does not matter which one is first.
-
-So either we have to squash [PATCH v5 44/44] ARM: dts: da850: Add clocks
-into this patch or deal with the breakage.
+This code is used in DT boot until [PATCH v5 43/44] "ARM: da8xx-dt:
+switch to device tree clocks". So, yes it is needed temporarily to
+prevent breaking USB.
