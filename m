@@ -1,67 +1,80 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 18 Jan 2018 12:50:55 -0800
-Subject: [PATCH v2 1/4] ARM: bcm2835: sync firmware properties with
- downstream
-In-Reply-To: <632b9d56-78cf-1e8e-8cd2-30edd2de70c0@i2se.com>
-References: <cover.1515698418.git.baruch@tkos.co.il>
- <e68675d54955c754ebe8ffc2491585fde5b396bc.1515698418.git.baruch@tkos.co.il>
- <1991337128.42939.1515837465503@email.1und1.de>
- <CACRpkdZ_g3-jR-7pOnS9MwpHprfEz8acB9SWcMLyoOVcB0iLvA@mail.gmail.com>
- <20180116104904.fsebsozoa4xysbz7@tarshish>
- <632b9d56-78cf-1e8e-8cd2-30edd2de70c0@i2se.com>
-Message-ID: <87vafy7uxc.fsf@anholt.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 18 Jan 2018 22:27:21 +0100
+Subject: [patch v15 4/4] Documentation: jtag: Add ABI documentation
+In-Reply-To: <1514202808-29747-5-git-send-email-oleksandrs@mellanox.com>
+References: <1514202808-29747-1-git-send-email-oleksandrs@mellanox.com>
+ <1514202808-29747-5-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20180118212720.GA17196@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Mon 2017-12-25 13:53:28, Oleksandr Shamray wrote:
+> Added document that describe the ABI for JTAG class drivrer
+> 
+> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v14->v15
+> v13->v14
+> v12->v13
+> v11->v12
+> Tobias Klauser <tklauser@distanz.ch>
+> - rename /Documentation/ABI/testing/jatg-dev -> jtag-dev
+> - Typo: s/interfase/interface
+> v10->v11
+> v9->v10
+> Fixes added by Oleksandr:
+> - change jtag-cdev to jtag-dev in documentation
+> - update Kernel Version and Date in jtag-dev documentation;
+> v8->v9
+> v7->v8
+> v6->v7
+> Comments pointed by Pavel Machek <pavel@ucw.cz>
+> - Added jtag-cdev documentation to Documentation/ABI/testing folder
+> ---
+>  Documentation/ABI/testing/jtag-dev |   27 +++++++++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/jtag-dev
+> 
+> diff --git a/Documentation/ABI/testing/jtag-dev b/Documentation/ABI/testing/jtag-dev
+> new file mode 100644
+> index 0000000..cab867d
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/jtag-dev
+> @@ -0,0 +1,27 @@
+> +What:		/dev/jtag[0-9]+
+> +Date:		October 2017
+> +KernelVersion:	4.15
+> +Contact:	oleksandrs at mellanox.com
+> +Description:
+> +		The misc device files /dev/jtag* are the interface
+> +		between JTAG master interface and userspace.
+> +
+> +		The ioctl(2)-based ABI is defined and documented in
+> +		[include/uapi]<linux/jtag.h>.
+> +
+> +		The following file operations are supported:
+> +
+> +		open(2)
+> +		The argument flag currently support only one access
+> +		mode O_RDWR.
+> +
+> +		ioctl(2)
+> +		Initiate various actions.
+> +		See the inline documentation in [include/uapi]<linux/jtag.h>
+> +		for descriptions of all ioctls.
 
-> Hi Baruch,
->
-> Am 16.01.2018 um 11:49 schrieb Baruch Siach:
->> Hi Linus,
->>
->> On Tue, Jan 16, 2018 at 10:57:32AM +0100, Linus Walleij wrote:
->>> On Sat, Jan 13, 2018 at 10:57 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->>>>> Baruch Siach <baruch@tkos.co.il> hat am 11. Januar 2018 um 20:44 geschrieben:
->>>>>
->>>>> Add latest firmware property tags from the latest Raspberry Pi downstream
->>>>> kernel. This is needed for the GPIO tags, so we can control the GPIO
->>>>> multiplexor lines.
->>>>>
->>>>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>>
->>>> Maybe this is obvious, but patch #3 depends on this change so no cherry-picking allowed.
->>> I will save this for after the merge window as it feels now.
->>>
->>> But as far as I have the right ACKs I can put it in the GPIO tree.
->>>
->>> Baruch: can you resend the series with all ACKs and push me
->>> to apply it all in the GPIO tree if you're fine with this approach?
->> I plan to send another revision of this series later today to address Stefan's
->> comments on this one. Once Stefan and/or Eric ack the entire series, I'm fine
->> with you taking it through the GPIO tree if it is OK with the BCM2835
->> maintainers.
->>
->> baruch
->>
->
-> we also need an ACK from the devicetree maintainers. So please send a 
-> copy of the binding patch V3 to Rob Herring and Marc Rutland.
+Sorry, can we have real docs? I tried to decipher it from jtag.h, but
+its not easy. We should have API docs...
 
-I'll be happy to see patch 1-3 go through the GPIO tree, and we'd take
-#4 in the 2835 tree.  The only risk I see is if we need patch 1 for some
-other change in this cycle -- seems unlikely, but if Linus applied the
-series starting from a rc1 tag and merged it in, then we'll also be able
-to merge that patch over to any other branch we need without duplicating
-it in git history.
 
-Once you get this resent with the DT folks Cced, hopefully it'll be
-pretty quick.
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/b094e1b4/attachment.sig>
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/e4452250/attachment-0001.sig>
