@@ -1,82 +1,208 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Thu, 18 Jan 2018 10:27:45 +0100
-Subject: [PATCH RESEND] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux
- mode
-In-Reply-To: <1516265435.7607.1.camel@pengutronix.de>
-References: <20180117232347.24513-1-joerg.krause@embedded.rocks>
- <1516263957.13152.2.camel@embedded.rocks>
- <1516265435.7607.1.camel@pengutronix.de>
-Message-ID: <1516267665.3727.4.camel@embedded.rocks>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 18 Jan 2018 09:31:08 +0000
+Subject: [PATCH v3 33/41] KVM: arm64: Configure FPSIMD traps on vcpu
+ load/put
+In-Reply-To: <20180112120747.27999-34-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-34-christoffer.dall@linaro.org>
+Message-ID: <4d830032-6510-7ce5-b9d3-436ac95a8c81@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
 
-On Thu, 2018-01-18 at 09:50 +0100, Philipp Zabel wrote:
-> On Thu, 2018-01-18 at 09:25 +0100, J?rg Krause wrote:
-> > Hi,
-> > 
-> > On Thu, 2018-01-18 at 00:23 +0100, J?rg Krause wrote:
-> > > RESEND because of missing Ccs. Original patch is [0].
-> > > 
-> > > The 32 kHz reference clock on the i.MX6UL(L) can be output by
-> > > setting the external signal XTALOSC_REF_CLK_32K in one of the
-> > > following ways [1]:
-> > > 
-> > > > ----------------------------------------------------------|
-> > > > Signal              | Pad             | Mode | Direction |
-> > > > ----------------------------------------------------------|
-> > > > XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
-> > > >                     | GPIO1_IO03      | ALT3 |           |
-> > > >                     | JTAG_TCK        | ALT6 |           |
-> > > > ----------------------------------------------------------|
-> > > 
-> > > [0] https://patchwork.ozlabs.org/patch/816108/
-> > > [1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
-> > > 
-> > > Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
-> > > ---
-> > >  arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
-> > >  1 file changed, 3 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> > > index 0034eeb84542..e12654018c23 100644
-> > > --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-> > > +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> > > @@ -63,6 +63,7 @@
-> > >  #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
-> > >  #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
-> > >  #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
-> > > +#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
-> > >  #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
-> > >  #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
-> > >  #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
-> > > @@ -101,6 +102,7 @@
-> > >  #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
-> > >  #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
-> > >  #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
-> > > +#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
-> > >  #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
-> > >  #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
-> > >  #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
-> > > @@ -316,6 +318,7 @@
-> > >  #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
-> > >  #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
-> > >  #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
-> > > +#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
-> > >  #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
-> > >  #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
-> > >  #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
-> > 
-> > Just noticed the pin is named REF_CLK_32K instead of OSC32K_32K_OUT in
-> > the vendor Linux kernel. So better use their pin naming, right?
+
+On 12/01/18 12:07, Christoffer Dall wrote:
+> There is no need to enable/disable traps to FP registers on every switch
+> to/from the VM, because the host kernel does not use this resource
+> without calling vcpu_put.  We can therefore move things around enough
+> that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
+> only program these during vcpu load/put.
 > 
-> The i.MX 6UltraLite Applications Processor Reference Manual, Rev. 1
-> (Chapters 30.5.17, SW_MUX_CTL_PAD_JTAG_TCK SW MUX Control Register, and
-> 30.5.47, SW_MUX_CTL_PAD_ENET1_RX_EN SW MUX Control Register) calls this
-> OSC32K_32K_OUT.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Thanks for the reference! I guess this is why I named it this way in
-the first place.
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
-J?rg
+> ---
+>   arch/arm64/include/asm/kvm_hyp.h |  6 +++++
+>   arch/arm64/kvm/hyp/switch.c      | 51 +++++++++++++++++++++++++++++-----------
+>   arch/arm64/kvm/hyp/sysreg-sr.c   | 12 ++++++++--
+>   3 files changed, 53 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index 3f54c55f77a1..ffd62e31f134 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -148,6 +148,12 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+>   void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+>   bool __fpsimd_enabled(void);
+>   
+> +void __activate_traps_nvhe_load(struct kvm_vcpu *vcpu);
+> +void __deactivate_traps_nvhe_put(void);
+> +
+> +void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
+> +void deactivate_traps_vhe_put(void);
+> +
+>   u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+>   void __noreturn __hyp_do_panic(unsigned long, ...);
+>   
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index c01bcfc3fb52..d14ab9650f81 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -24,22 +24,25 @@
+>   #include <asm/fpsimd.h>
+>   #include <asm/debug-monitors.h>
+>   
+> -static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
+> +static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
+>   {
+>   	/*
+> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> -	 * register accesses to EL2, however, the ARM ARM clearly states that
+> -	 * traps are only taken to EL2 if the operation would not otherwise
+> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> -	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+> -	 * it will cause an exception.
+> +	 * We are about to trap all floating point register accesses to EL2,
+> +	 * however, traps are only taken to EL2 if the operation would not
+> +	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
+> +	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
+> +	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
+> +	 * any access to it will cause an exception.
+>   	 */
+>   	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
+>   	    !vcpu->arch.guest_vfp_loaded) {
+>   		write_sysreg(1 << 30, fpexc32_el2);
+>   		isb();
+>   	}
+> +}
+> +
+> +static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
+> +{
+>   	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+>   
+>   	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+> @@ -61,10 +64,12 @@ static void __hyp_text __deactivate_traps_common(void)
+>   	write_sysreg(0, pmuserenr_el0);
+>   }
+>   
+> -static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+> +void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
+>   {
+>   	u64 val;
+>   
+> +	__activate_traps_fpsimd32(vcpu);
+> +
+>   	val = read_sysreg(cpacr_el1);
+>   	val |= CPACR_EL1_TTA;
+>   	val &= ~CPACR_EL1_ZEN;
+> @@ -73,14 +78,26 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+>   	else
+>   		val &= ~CPACR_EL1_FPEN;
+>   	write_sysreg(val, cpacr_el1);
+> +}
+>   
+> +void deactivate_traps_vhe_put(void)
+> +{
+> +	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+> +}
+> +
+> +static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+> +{
+>   	write_sysreg(__kvm_hyp_vector, vbar_el1);
+>   }
+>   
+> -static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+> +void __hyp_text __activate_traps_nvhe_load(struct kvm_vcpu *vcpu)
+>   {
+>   	u64 val;
+>   
+> +	vcpu = kern_hyp_va(vcpu);
+> +
+> +	__activate_traps_fpsimd32(vcpu);
+> +
+>   	val = CPTR_EL2_DEFAULT;
+>   	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+>   	if (vcpu->arch.guest_vfp_loaded)
+> @@ -90,6 +107,15 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+>   	write_sysreg(val, cptr_el2);
+>   }
+>   
+> +void __hyp_text __deactivate_traps_nvhe_put(void)
+> +{
+> +	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+> +}
+> +
+> +static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> +
+>   static hyp_alternate_select(__activate_traps_arch,
+>   			    __activate_traps_nvhe, __activate_traps_vhe,
+>   			    ARM64_HAS_VIRT_HOST_EXTN);
+> @@ -111,12 +137,10 @@ static void __hyp_text __deactivate_traps_vhe(void)
+>   
+>   	write_sysreg(mdcr_el2, mdcr_el2);
+>   	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+> -	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+>   	write_sysreg(vectors, vbar_el1);
+>   }
+>   
+> -static void __hyp_text __deactivate_traps_nvhe(void)
+> -{
+> +static void __hyp_text __deactivate_traps_nvhe(void) {
+>   	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+>   
+>   	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
+> @@ -124,7 +148,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
+>   
+>   	write_sysreg(mdcr_el2, mdcr_el2);
+>   	write_sysreg(HCR_RW, hcr_el2);
+> -	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+>   }
+>   
+>   static hyp_alternate_select(__deactivate_traps_arch,
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index d225f5797651..7943d5b4dbcb 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -237,8 +237,10 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>   	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+>   	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+>   
+> -	if (!has_vhe())
+> +	if (!has_vhe()) {
+> +		kvm_call_hyp(__activate_traps_nvhe_load, vcpu);
+>   		return;
+> +	}
+>   
+>   	__sysreg_save_user_state(host_ctxt);
+>   
+> @@ -253,6 +255,8 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>   	__sysreg_restore_el1_state(guest_ctxt);
+>   
+>   	vcpu->arch.sysregs_loaded_on_cpu = true;
+> +
+> +	activate_traps_vhe_load(vcpu);
+>   }
+>   
+>   /**
+> @@ -282,8 +286,12 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+>   		vcpu->arch.guest_vfp_loaded = 0;
+>   	}
+>   
+> -	if (!has_vhe())
+> +	if (!has_vhe()) {
+> +		kvm_call_hyp(__deactivate_traps_nvhe_put);
+>   		return;
+> +	}
+> +
+> +	deactivate_traps_vhe_put();
+>   
+>   	__sysreg_save_el1_state(guest_ctxt);
+>   	__sysreg_save_user_state(guest_ctxt);
+> 
+
+-- 
+Julien Thierry
