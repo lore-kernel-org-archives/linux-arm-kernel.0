@@ -1,52 +1,76 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Thu, 18 Jan 2018 16:37:17 +0800
-Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
- predictor against aliasing attacks
-In-Reply-To: <20180117100715.GA27892@arm.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-8-git-send-email-will.deacon@arm.com>
- <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
- <20180117100715.GA27892@arm.com>
-Message-ID: <fe1a08a6-a60b-cea8-2a15-4e8d44e8b11f@huawei.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 18 Jan 2018 09:50:35 +0100
+Subject: [PATCH RESEND] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux
+ mode
+In-Reply-To: <1516263957.13152.2.camel@embedded.rocks>
+References: <20180117232347.24513-1-joerg.krause@embedded.rocks>
+ <1516263957.13152.2.camel@embedded.rocks>
+Message-ID: <1516265435.7607.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, 2018-01-18 at 09:25 +0100, J?rg Krause wrote:
+> Hi,
+> 
+> On Thu, 2018-01-18 at 00:23 +0100, J?rg Krause wrote:
+> > RESEND because of missing Ccs. Original patch is [0].
+> > 
+> > The 32 kHz reference clock on the i.MX6UL(L) can be output by
+> > setting the external signal XTALOSC_REF_CLK_32K in one of the
+> > following ways [1]:
+> > 
+> > > ----------------------------------------------------------|
+> > > Signal              | Pad             | Mode | Direction |
+> > > ----------------------------------------------------------|
+> > > XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
+> > >                     | GPIO1_IO03      | ALT3 |           |
+> > >                     | JTAG_TCK        | ALT6 |           |
+> > > ----------------------------------------------------------|
+> > 
+> > [0] https://patchwork.ozlabs.org/patch/816108/
+> > [1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
+> > 
+> > Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+> > ---
+> >  arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > index 0034eeb84542..e12654018c23 100644
+> > --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > @@ -63,6 +63,7 @@
+> >  #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
+> >  #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
+> >  #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
+> > +#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
+> >  #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
+> >  #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
+> >  #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
+> > @@ -101,6 +102,7 @@
+> >  #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
+> >  #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
+> >  #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
+> > +#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
+> >  #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
+> >  #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
+> >  #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
+> > @@ -316,6 +318,7 @@
+> >  #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
+> >  #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
+> >  #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
+> > +#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
+> >  #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
+> >  #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
+> >  #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
+> 
+> Just noticed the pin is named REF_CLK_32K instead of OSC32K_32K_OUT in
+> the vendor Linux kernel. So better use their pin naming, right?
 
-On 2018/1/17 18:07, Will Deacon wrote:
-> On Wed, Jan 17, 2018 at 12:10:33PM +0800, Yisheng Xie wrote:
->> Hi Will,
->>
->> On 2018/1/5 21:12, Will Deacon wrote:
->>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
->>> index 5f7097d0cd12..d99b36555a16 100644
->>> --- a/arch/arm64/mm/context.c
->>> +++ b/arch/arm64/mm/context.c
->>> @@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
->>>  			"ic iallu; dsb nsh; isb",
->>>  			ARM64_WORKAROUND_CAVIUM_27456,
->>>  			CONFIG_CAVIUM_ERRATUM_27456));
->>> +
->>> +	arm64_apply_bp_hardening();
->>>  }
->>
->> post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
->> means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
->> when mm_swtich and kernel_exit?
->>
->> From the code logical, it seems not only related to erratum 2745 anymore?
->> should it be renamed?
-> 
-> post_ttbr_update_workaround just runs code after a TTBR update, which
-> includes mitigations against variant 2 of "spectre" and also a workaround
-> for a Cavium erratum. These are separate issues.
+The i.MX 6UltraLite Applications Processor Reference Manual, Rev. 1
+(Chapters 30.5.17, SW_MUX_CTL_PAD_JTAG_TCK SW MUX Control Register, and
+30.5.47, SW_MUX_CTL_PAD_ENET1_RX_EN SW MUX Control Register) calls this
+OSC32K_32K_OUT.
 
-Get it, Thanks for your kind explain.
-
-Thanks
-Yisheng
-> 
-> Will
-> 
-> .
-> 
+regards
+Philipp
