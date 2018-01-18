@@ -1,69 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Jan 2018 11:16:44 +0100
-Subject: [RESEND RFC PATCH 0/2] fixing the gpio ownership
-In-Reply-To: <20180115162407.6314-1-ludovic.desroches@microchip.com>
-References: <20180115162407.6314-1-ludovic.desroches@microchip.com>
-Message-ID: <CACRpkdbNqn-MJuzq=BpbNYveD-F8Hee2NY6ny4-SJL+F=wHq7g@mail.gmail.com>
+From: ramana.radhakrishnan@arm.com (Ramana Radhakrishnan)
+Date: Thu, 18 Jan 2018 10:26:02 +0000
+Subject: per-task stack canaries for arm64
+In-Reply-To: <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
+References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+ <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
+ <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
+ <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
+Message-ID: <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic, thanks for your patches!
+On 1/17/18 8:45 PM, Kees Cook wrote:
+> On Wed, Jan 17, 2018 at 12:32 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 17 January 2018 at 19:10, Kees Cook <keescook@chromium.org> wrote:
+>>> On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
+>>> <ard.biesheuvel@linaro.org> wrote:
+>> [...]
+>>> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
+>>> which was done for x86 only, and provides both:
+>>>   -mstack-protector-guard-symbol=...
+>>>   -mstack-protector-guard-reg=...
+>>>
+>>> If this could be extended to arm64, I think we'd be in good shape (and
+>>> it could be trivially detected at build time).
+>>>
+>>
+>> I'm not entirely sure what the point is of specifying the name of the
+>> symbol on the command line. It is ultimately up to the GCC developers
+>> to decide how much point there is to maintaining parity with x86 here.
+>>
+>> [...]
+>>>> Ramana indicated at the time that he would be up for adding, e.g.,
+>>>> -fstack-protector-linux-kernel as a command line option, and add the
+>>>> contents of tpidr_el1 to every reference of __stack_chk_guard when
+>>>> set.
 
-On Mon, Jan 15, 2018 at 5:24 PM, Ludovic Desroches
-<ludovic.desroches@microchip.com> wrote:
+Wow, that was a hall-way conversation eons ago. It took me a while to
+page that in.
 
-> A few weeks ago, I have sent an RFC about adding bias support for GPIOs [1].
 
-I was confused I think, because the issue of ownership and adding
-bias support were conflated.
+>>>
+>>> I think we want to reuse the command-line names from the x86 options
+>>> above, unless there's a good reason not to?
+>>
+>> I'm perfectly happy to settle for whatever the GCC developers manage
+>> to agree on, as long as it gives us the ability to use tpidr_el1 as
+>> the offset.
+> 
+> Ramana, Uro?, what's the best next step? Should we open a GCC bug
+> specifically for arm64 here?
 
-I think I discussed properly the ideas I have for pin control properties
-vs the GPIOlib API/ABI in my response to patch 1.
+The next best step is someone opening a GCC feature request with some
+more details - CC'ing me on ramana at gcc.gnu.org should work. What I would
+like to see is a feature request on GCC bugzilla along with some
+comments / buyin from the AArch64 kernel maintainers whether they would
+like to see such a feature and what the behaviour should be and get some
+feedback from the AArch64 GCC maintainers upstream before starting the
+work.
 
-> It was motivated by the fact that I wanted to enable the pinmuxing strict mode
-> for my pin controller which can muxed a pin as a peripheral or as a GPIO.
+I think the following (unoptimized) or some derivative of this should work.
 
-So that is a different thing from bias support.
+        adrp    x19, __stack_chk_guard
+        add     x19, x19, :lo12:__stack_chk_guard
+	mrs 	x2, tpidr_el1
+	add	x2, x2, x19
+	ldr 	x2, [x2]
 
-> Enabling the strict mode prevents several devices to be probed because
-> requesting a GPIO fails. The pin request function complains about the
-> ownership of the GPIO which is different from the mux ownership. I have to
-> remove my pinctrl node to avoid this conflict but I need it to configure my
-> pins and to set a pull-up bias for my GPIOs.
 
-Okay I think the right solution is to fix the ownership issue, and set
-up bias using pin control/config but use the line through gpiolib for now.
+It's also not likely that this will be done in time for GCC 8 as we are
+now in stage 4 and we're probably looking at GCC 9 for this assuming
+this goes ahead.
 
-> The main issue is that enabling the strict mode will
-> break old DTBs.
+Hope this helps.
 
-Yeah we need to work around that.
+regards
+Ramana
 
-> I was going to submit patches for this but, after using the
-> sysfs which still show me a bad ownership, I decided that it should be fixed.
-
-Yep :)
-
-> So I did these patches. Unfortunately, there are several ways to lead to
-> gpiod_request(). It does the trick only for the gpiod_get family. The issue is
-> still present with legacy gpio_request and fwnode_get_named_gpiod.
-
-fwnode_get_named_gpiod() must really be fixed too. You probably
-want to have things like LEDs and GPIO keys working even if
-your pin controller is strict.
-
-I don't care so much about the old functions, I guess you just have
-to make sure that the drivers for *your* pin controller all use descriptors
-so that you can enable strict mode on *your* pin controller, right?
-
-Restrict your task to this, I'd say.
-
-> It seems
-> that more and more drivers are converted to use GPIO descriptors so there is
-> some hope.
-
-Yeah I'm doing this when I have time. There is plenty of work...
-Help appreciated.
-
-Yours,
-Linus Walleij
+> 
+> -Kees
+> 
