@@ -1,118 +1,190 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 18 Jan 2018 10:58:20 +0530
-Subject: [PATCH v2] irqchip/gic-v3-its: Add workaround for ThunderX2 erratum
- #174
-Message-ID: <20180118052820.30286-1-ganapatrao.kulkarni@cavium.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Thu, 18 Jan 2018 17:13:14 +1100
+Subject: [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps receiver) power
+ control driver
+In-Reply-To: <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost>
+ <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
+ <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+ <20180112153903.GB5992@localhost>
+ <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
+Message-ID: <20180118061314.GG3286@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This erratum is observed on the ThunderX2 GICv3 ITS. When a
-MOVI command is used to change affinity of a LPI to a collection/cpu
-on another node, the LPI is not delivered to the cpu.
-An additional INV command is required after the MOVI to deliver
-the LPI to the new destination.
+On Fri, Jan 12, 2018 at 06:59:59PM +0100, H. Nikolaus Schaller wrote:
+> Hi Johan,
+> 
+> > Am 12.01.2018 um 16:39 schrieb Johan Hovold <johan@kernel.org>:
+> > 
+> >> Let's restart this discussion and focus on the main roadblock (others
+> >> are minor details which can be sorted out later).
+> >> 
+> >> If it feels like a hack, the key issue seems to me to be the choice of
+> >> the API to present the GPS data to user space. Right?
+> > 
+> > Or even more fundamentally, does this belong in the kernel at all?
+> 
+> Yes, that can be questioned of course. It was questioned and discussed
+> several times and I thought the answer was a clear yes. But let's reiterate.
+> 
+> > Also it seems at least part of your specific problem is that you have
+> > failed to wire up the WAKEUP pin of the W2SG0004/84 properly,
+> 
+> The w2sg0004 has no wakeup pin. At least I can't find one in the data sheet.
 
-If we add INV after MOVI, there is a chance that we lose LPIs which
-are raised when the affinity is changed. So for now, adding workaround fix
-to disable inter node affinity change.
+I should have said w2sg0084 above, which is the only datasheet I have found.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
+> The two pins you refer to from the 0084 data sheet are called BootSelect0/1
+> in the 0004 and have a different function.
+> 
+> To be clear, we did not fail to wire it up. We did the design before the
+> 0084 was announced and available. We just had to swap in the 0084 into
+> existing PCBs during production because the 0004 became EOL. Otherwise
+> we would probably still use the 0004 without WAKEUP output.
+> 
+> To make it worse, we have no documentation for an individual board if
+> an 0004 or 0084 chip is installed and there is no means how a software
+> can find out which one it is talking to (especially before properly
+> powering on). Therefore we can not even provide two different device
+> trees or drivers or whatever, unless we ask people to open their device
+> and look on the chip. Quite crazy wrt. user-friendlyness of software
+> installation in 2018...
+> 
+> Therefore, a driver must be capable to handle both chips in the same way,
+> with minimalistic assumptions, even if the 0084 could provide a direct
+> signal to make it easier than using serdev to monitor the data stream.
 
-v2: Added workaround to avoid inter node affinity change.
+Fair enough.
 
-v1: Initial patch
+> >  which then
+> > forces you to look at the data stream to determine the power state of
+> > the chip. Judging from a quick look at the GTA04 schematics it seems
+> > you've even connected the WAKEUP output to the 1V8_OUT output?!
+> 
+> No. You failed to see that this is an optional 0R, which is not installed.
+> The 0R on pin 7 (BootSelect1) to GND was removed when we did switch from
+> 0004 to 0084. Pin 6 (BootSelect0/WAKEUP) was never connected.
 
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 10 ++++++++++
- drivers/irqchip/irq-gic-v3-its.c       | 21 ++++++++++++++++++++-
- 3 files changed, 31 insertions(+), 1 deletion(-)
+Ok.
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index fc1c884..fb27cb5 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -63,6 +63,7 @@ stable kernels.
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
- | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
-+| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
- | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
- | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
- |                |                 |                 |                             |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index c9a7e9e..0dbf3bd 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -461,6 +461,16 @@ config ARM64_ERRATUM_843419
- 
- 	  If unsure, say Y.
- 
-+config CAVIUM_ERRATUM_174
-+	bool "Cavium ThunderX2 erratum 174"
-+	default y
-+	help
-+	  Cavium ThunderX2 dual socket systems may loose interrupts
-+	  on affinity change to a cpu on other node.
-+	  This workaround fix avoids inter node affinity change.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_22375
- 	bool "Cavium erratum 22375, 24313"
- 	default y
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 06f025f..b0cb528 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -46,6 +46,7 @@
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
-+#define ITS_FLAGS_WORKAROUND_CAVIUM_174		(1ULL << 3)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -1102,7 +1103,8 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 		return -EINVAL;
- 
-        /* lpi cannot be routed to a redistributor that is on a foreign node */
--	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144 ||
-+			its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
- 		if (its_dev->its->numa_node >= 0) {
- 			cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 			if (!cpumask_intersects(mask_val, cpu_mask))
-@@ -2904,6 +2906,15 @@ static int its_force_quiescent(void __iomem *base)
- 	}
- }
- 
-+static bool __maybe_unused its_enable_quirk_cavium_174(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_174;
-+
-+	return true;
-+}
-+
- static bool __maybe_unused its_enable_quirk_cavium_22375(void *data)
- {
- 	struct its_node *its = data;
-@@ -3031,6 +3042,14 @@ static const struct gic_quirk its_quirks[] = {
- 		.init	= its_enable_quirk_hip07_161600802,
- 	},
- #endif
-+#ifdef CONFIG_CAVIUM_ERRATUM_174
-+	{
-+		.desc	= "ITS: Cavium ThunderX2 erratum 174",
-+		.iidr	= 0x13f,	/* ThunderX2 pass A1/A2/B0 */
-+		.mask	= 0xffffffff,
-+		.init	= its_enable_quirk_cavium_174,
-+	},
-+#endif
- 	{
- 	}
- };
--- 
-2.9.4
+> > The kernel is probably not the place to be working around issues like
+> > that,
+
+> > even if serdev at least allows for such hacks to be fairly
+> > isolated in drivers (unlike some of the earlier proposals touching core
+> > code).
+> 
+> Please tell me why there are so many hacks for hardware issues in certain
+> drivers. Any why those are good and this one (if it is one at all) is not.
+
+Hacks are never good, but sometimes needed. But we should try to keep
+them contained in drivers rather than allow them to spread to core code,
+was what I was trying to say above.
+
+> What I can learn from your discussion is that it might be considerable
+> to add an optional gpio for the 0084 WAKEUP and add some logic to
+> support users who have or will have that pin connected.
+> 
+> But even then we would need a driver to handle this gpio and issue
+> an on/off impulse on the other to switch states. It would be a different
+> driver (variant - maybe some CONFIG option or handled by code), but not
+> "no driver".
+
+Having a WAKEUP signal would allow for a more straight-forward
+implementation, be it in the kernel or in user space.
+
+> >> I see three reasonable options how this presentation can be done:
+> >> 
+> >> 1. char device
+> >> 2. tty device
+> >> 3. some new gps interface API (similar to network, bluetooth interfaces)
+> >> 4. no driver and use the UART tty directly
+> >> 
+> >> Pros and cons:
+> > 
+> >> 4. no driver and use UART directly
+> >> + a non-solution seems to be attractive
+> >> - must turn on/off chip by gpio hacks from user-space
+> > 
+> > I'm not sure that would amount to more of hack then doing it in the
+> > kernel would.
+> 
+> It might not be big effort in the user-space code/scripts.
+> 
+> But much effort to convince all the plethora of user-space client maintainers
+> to integrate something. And have them roll out. And have distributions take it.
+> And have users upgrade to it. 5 years later...
+> 
+> Do you think it is easier to convince them than you? They usually assume a
+> power management issue should be solved by the kernel driver.
+> 
+> That is what Andreas did remark as motivation: provide a solution
+> for *existing* user spaces.
+
+I understand that this is what you want, but that in itself is not a
+sufficient reason to put something in the kernel.
+
+> >> - can not guarantee (!) to power off the chip if the last user-space
+> >> process using it is killed (which is essential for power-management of
+> >> a handheld, battery operated device)
+> > 
+> > That depends on how you implement things (extending gpsd, wrapper
+> > script, pty daemon, ...).
+> 
+> No. You can of course cover all standard cases but there is one fundamental
+> issue which is IMHO a problem of any user-space implementation:
+> 
+> 	How can you guarantee that the chip is powered off if no
+> 	user-space process is using it or if the last process doing
+> 	this is killed by *whatever* reason?
+> 
+> E.g. after a kill -9. Or if someone deinstalls gpsd or whatever and assumes
+> (and wants a guarantee) that GPS is now turned off and never turned on drawing
+> precious milliamps from the battery for no use.
+
+Have something run at init to put the device in a low power state.
+
+> As it is well known, a user-space process can't protect itself against kill -9.
+> Or has this recently been changed and I am not aware of?
+> 
+> This is the fundamental reason why we need a kernel driver to provide
+> reliable, repeatable and trustable power management of this chip.
+> 
+> It is equally fundamental as a hard disk should spin down after the last
+> file is closed. Even if this process ends by a kill -9.
+> 
+> A second almost equally fundamental aspect to be considered is how you want
+> to automatically and reliably turn off the chip by pure user-space code when
+> entering suspend.
+
+Suspend is initiated by user space, so just power down the device before
+doing so.
+
+> >> If not, I want to suggest to accept the second-best choice 2. for now and we
+> >> will update the driver as soon as 3. appears. IMHO it would be a good test case
+> >> for a new subsystem.
+> > 
+> > Getting the interface right from the start is quite important, as
+> > otherwise we may end up having to support a superseded one for a long
+> > time.
+> 
+> This seems to contradict your argument that user-space can very easily
+> adapt to everything. If the latter were true there would be no need to
+> keep old interfaces supported for a long time.
+
+You probably know that we try hard never to change an interface that
+would break user space, and that's why we need to get it right.
+
+> So can you agree to that a battery powered portable device must have
+> reliable and trustable power management? And if it provable can't be
+> implemented in user-space (a single counter example suffices) it must
+> be a kernel driver?
+
+Having a kernel driver would make things easier for user space, sure,
+but again, that's not a sufficient reason to merge just any kernel
+implementation.
+
+Johan
