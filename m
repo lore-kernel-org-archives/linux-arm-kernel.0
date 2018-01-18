@@ -1,163 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 Jan 2018 11:07:45 +0100
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
-In-Reply-To: <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
-References: <1515747666-6597-1-git-send-email-stefan@olimex.com>
- <20180115095031.pzsgrp3tdmemotrs@flea.lan>
- <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
-Message-ID: <20180118100745.y62adzvfnrzqkagd@flea.lan>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 18 Jan 2018 10:14:06 +0000
+Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <15884ccc-2cfb-da91-5844-369d8237175d@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-3-jeremy.linton@arm.com>
+ <20180115123338.GB5473@e107155-lin>
+ <65f78c99-8b86-0098-7ced-899840a4bf16@arm.com>
+ <ca64334c-9345-705c-80d8-f2deb924a679@arm.com>
+ <15884ccc-2cfb-da91-5844-369d8237175d@arm.com>
+Message-ID: <05a8b375-70c4-34d4-6cde-8dd4cd62c10b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-On Mon, Jan 15, 2018 at 12:07:34PM +0200, Stefan Mavrodiev wrote:
-> > > +/dts-v1/;
-> > > +#include "sun7i-a20.dtsi"
-> > > +#include "sunxi-common-regulators.dtsi"
-> > > +
-> > > +
-> > > +#include <dt-bindings/gpio/gpio.h>
-> > > +#include <dt-bindings/interrupt-controller/irq.h>
-> > > +#include <dt-bindings/pwm/pwm.h>
-> > > +
-> > > +/ {
-> > > +	model = "Olimex A20-SOM204-EVB";
-> > > +	compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
-> > > +
-> > > +	aliases {
-> > > +		serial0 = &uart0;
-> > > +		serial1 = &uart4;
-> > > +		serial2 = &uart7;
-> > > +		spi0 = &spi1;
-> > > +		spi1 = &spi2;
-> > > +		ethernet1 = &rtl8723bs;
-> >
-> > ethernet1? if there's a single network interface, it should be
-> > ethernet0.
->
-> I think this will conflict the gmac alias defined in sun7i-a20.dtsi:
+
+On 17/01/18 18:51, Jeremy Linton wrote:
+> Hi,
 > 
-> aliases {
-> ??? ethernet0 = &gmac;
-> };
+> On 01/17/2018 12:20 PM, Sudeep Holla wrote:
+>>
+>>
+>> On 16/01/18 21:07, Jeremy Linton wrote:
+>>> Hi,
+>>>
+>>> On 01/15/2018 06:33 AM, Sudeep Holla wrote:
+>>>> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
+>>>>> The original intent in cacheinfo was that an architecture
+>>>>> specific populate_cache_leaves() would probe the hardware
+>>>>> and then cache_shared_cpu_map_setup() and
+>>>>> cache_override_properties() would provide firmware help to
+>>>>> extend/expand upon what was probed. Arm64 was really
+>>>>> the only architecture that was working this way, and
+>>>>> with the removal of most of the hardware probing logic it
+>>>>> became clear that it was possible to simplify the logic a bit.
+>>>>>
+>>>>> This patch combines the walk of the DT nodes with the
+>>>>> code updating the cache size/line_size and nr_sets.
+>>>>> cache_override_properties() (which was DT specific) is
+>>>>> then removed. The result is that cacheinfo.of_node is
+>>>>> no longer used as a temporary place to hold DT references
+>>>>> for future calls that update cache properties. That change
+>>>>> helps to clarify its one remaining use (matching
+>>>>> cacheinfo nodes that represent shared caches) which
+>>>>> will be used by the ACPI/PPTT code in the following patches.
+>>>>>
+>>>>> Cc: Palmer Dabbelt <palmer@sifive.com>
+>>>>> Cc: Albert Ou <albert@sifive.com>
+>>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>>>> ---
+>>>>> ?? arch/riscv/kernel/cacheinfo.c |? 1 +
+>>>>> ?? drivers/base/cacheinfo.c????? | 65
+>>>>> +++++++++++++++++++------------------------
+>>>>> ?? include/linux/cacheinfo.h???? |? 1 +
+>>>>> ?? 3 files changed, 31 insertions(+), 36 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/riscv/kernel/cacheinfo.c
+>>>>> b/arch/riscv/kernel/cacheinfo.c
+>>>>> index 10ed2749e246..6f4500233cf8 100644
+>>>>> --- a/arch/riscv/kernel/cacheinfo.c
+>>>>> +++ b/arch/riscv/kernel/cacheinfo.c
+>>>>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo
+>>>>> *this_leaf,
+>>>>> ?????????? CACHE_WRITE_BACK
+>>>>> ?????????? | CACHE_READ_ALLOCATE
+>>>>> ?????????? | CACHE_WRITE_ALLOCATE;
+>>>>> +??? cache_of_set_props(this_leaf, node);
+>>>>
+>>>> This may be necessary but can it be done as later patch ? So far
+>>>> nothing
+>>>> is added that may break riscv IIUC.
+>>>
+>>> Well I think you have a bisection issue where the additional information
+>>> will disappear between this patch and wherever we put this code back in.
+>>>
+>>
+>> Hmm, I am sorry but I fail to see the issue. Before this change,
+>> populate_cache_leaves just populated the info as per ci_leaf_init in
+>> arch/riscv/kernel/cacheinfo.c and cache_override_properties used to fill
+>> the remaining.
+>>
+>> After this patch, the same is achieved in cache_shared_cpu_map_setup.
+>>
+>> In both case, it was by the end of detect_cache_attributes, so I see no
+>> issue.
+>>
+> 
+> 
+> Hi,
+> 
+> I must be misunderstanding something.
+> 
 
-We have that? That's bad, but you're right :)
+Looks like I was missing to understand something :)
 
-> > > +		stat {
-> > > +			label = "a20-som204:green:stat";
-> > > +			gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
-> > > +			default-state = "on";
-> > > +		};
-> > > +
-> > > +		led1 {
-> > > +			label = "a20-som204-evb:green:led1";
-> > > +			gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
-> > > +			default-state = "on";
-> > > +		};
-> > > +
-> > > +		led2 {
-> > > +			label = "a20-som204-evb:yellow:led2";
-> > > +			gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
-> > > +			default-state = "on";
-> > > +		};
-> >
-> > You don't have the same prefix between stat and led1/led2. I'm fine
-> > with both, but you should be consistent :)
->
-> STAT led is on the SOM204 module, while led1/2 on the EVB. Thats why
-> they have different prefix.
+> AFAIK, The code in cache_setup_of_node() won't call cache_of_set_props()
+> because it returns when there is an existing of_node (fw_unique) created
+> by the riscv populate_cache_leaves(). That's why I'm making the direct
+> call here. If we fail to get that change in place before
+> cache_override_properties() is removed then the fields not set by the
+> riscv code (size/etc) will be missing.
 
-Still, the user and the system will see it as a single board, and the
-documentation states that it should be the board name. I'm not quite
-sure what a good rule would be here. Have you looked at how other
-boards dealt with it? Chen-Yu, any opinion on this?
-
-> > 
-> > > +	};
-> > > +
-> > > +	mmc2_pwrseq: mmc2_pwrseq {
-> > > +		compatible = "mmc-pwrseq-emmc";
-> > > +		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
-> > > +	};
-> > This is already declared in the emmc variant, isn't it?
-> > 
-> > > +	rtl_pwrseq: rtl_pwrseq {
-> > > +		compatible = "mmc-pwrseq-simple";
-> > > +		reset-gpios = <&pio 6 9 GPIO_ACTIVE_LOW>,
-> > > +			      <&pio 1 11 GPIO_ACTIVE_LOW>;
-> > > +	};
-> >
-> > It looks suspicious that you have two reset lines.
->
-> RTL8723BS is comblo WiFI/BT module. There is separate reset control
-> for each of the systems.
-
-You should tie the reset line to their associated device then. In this
-case, you're linking the BT reset line to the wifi device, which in
-turn means that if your MMC driver is not loaded / enabled, the BT
-part will not work. That's obviously not ideal.
-
-> > > +&spi1 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&spi1_pins_a>,
-> > > +		    <&spi1_cs0_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&spi2 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&spi2_pins_a>,
-> > > +		    <&spi2_cs0_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > What is connected on those buses
->
-> As mentioned SPI1/2 are exposed to UEXT1/2.
-
-Ok, please make that a comment.
-
-> > 
-> > > +&uart0 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&uart0_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&uart3 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&bt_uart_pins>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&uart4 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&uart4_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > > +
-> > > +&uart7 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&uart7_pins_a>;
-> > > +	status = "okay";
-> > > +};
-> > Same thing for these three UARTs
->
-> Uart3 is used for H5 BT protocol. UART4/7 are exposed to UEXT.
-
-Ok, comments for those as well then :)
-
-yyThanks!
-maxime
+Indeed. I am trying to avoid use of cache_of_set_props outside.
+How about skipping setting up of fw_unique in ci_leaf_init instead ?
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/2a834bd3/attachment.sig>
+Regards,
+Sudeep
