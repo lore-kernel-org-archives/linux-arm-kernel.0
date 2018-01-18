@@ -1,208 +1,121 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 18 Jan 2018 09:31:08 +0000
-Subject: [PATCH v3 33/41] KVM: arm64: Configure FPSIMD traps on vcpu
- load/put
-In-Reply-To: <20180112120747.27999-34-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-34-christoffer.dall@linaro.org>
-Message-ID: <4d830032-6510-7ce5-b9d3-436ac95a8c81@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Jan 2018 10:46:44 +0100
+Subject: [RFC PATCH 1/2] pinctrl: add consumer variant for gpio request
+In-Reply-To: <20180115162233.6205-2-ludovic.desroches@microchip.com>
+References: <20180115162233.6205-1-ludovic.desroches@microchip.com>
+ <20180115162233.6205-2-ludovic.desroches@microchip.com>
+Message-ID: <CACRpkdbceFf09UNRT=cmPq1caP=eiEJc_APi55p379AyJt-0Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 15, 2018 at 5:22 PM, Ludovic Desroches
+<ludovic.desroches@microchip.com> wrote:
 
+> Add a consumer variant to GPIO request relative functions. The goal
+> is to fix the bad ownership, which is arbitrary set to
+> "range->name:gpio", of a GPIO.
 
-On 12/01/18 12:07, Christoffer Dall wrote:
-> There is no need to enable/disable traps to FP registers on every switch
-> to/from the VM, because the host kernel does not use this resource
-> without calling vcpu_put.  We can therefore move things around enough
-> that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
-> only program these during vcpu load/put.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+For this patch on its own (apart from the context):
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+I what you want to achieve is to pass a consumer name from
+gpiolib to pinmux portions of pinctrl, then augment the existing
+pinctrl_gpio_request() to pass an optional consumer name,
+and change all existing in-kernel users to just pass NULL
+and then use the range name as fallback if the consumer
+name is NULL.
 
-> ---
->   arch/arm64/include/asm/kvm_hyp.h |  6 +++++
->   arch/arm64/kvm/hyp/switch.c      | 51 +++++++++++++++++++++++++++++-----------
->   arch/arm64/kvm/hyp/sysreg-sr.c   | 12 ++++++++--
->   3 files changed, 53 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index 3f54c55f77a1..ffd62e31f134 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -148,6 +148,12 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
->   void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
->   bool __fpsimd_enabled(void);
->   
-> +void __activate_traps_nvhe_load(struct kvm_vcpu *vcpu);
-> +void __deactivate_traps_nvhe_put(void);
-> +
-> +void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
-> +void deactivate_traps_vhe_put(void);
-> +
->   u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
->   void __noreturn __hyp_do_panic(unsigned long, ...);
->   
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index c01bcfc3fb52..d14ab9650f81 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -24,22 +24,25 @@
->   #include <asm/fpsimd.h>
->   #include <asm/debug-monitors.h>
->   
-> -static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
-> +static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
->   {
->   	/*
-> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> -	 * register accesses to EL2, however, the ARM ARM clearly states that
-> -	 * traps are only taken to EL2 if the operation would not otherwise
-> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> -	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
-> -	 * it will cause an exception.
-> +	 * We are about to trap all floating point register accesses to EL2,
-> +	 * however, traps are only taken to EL2 if the operation would not
-> +	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
-> +	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
-> +	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
-> +	 * any access to it will cause an exception.
->   	 */
->   	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
->   	    !vcpu->arch.guest_vfp_loaded) {
->   		write_sysreg(1 << 30, fpexc32_el2);
->   		isb();
->   	}
-> +}
-> +
-> +static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
-> +{
->   	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
->   
->   	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
-> @@ -61,10 +64,12 @@ static void __hyp_text __deactivate_traps_common(void)
->   	write_sysreg(0, pmuserenr_el0);
->   }
->   
-> -static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
-> +void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
->   {
->   	u64 val;
->   
-> +	__activate_traps_fpsimd32(vcpu);
-> +
->   	val = read_sysreg(cpacr_el1);
->   	val |= CPACR_EL1_TTA;
->   	val &= ~CPACR_EL1_ZEN;
-> @@ -73,14 +78,26 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
->   	else
->   		val &= ~CPACR_EL1_FPEN;
->   	write_sysreg(val, cpacr_el1);
-> +}
->   
-> +void deactivate_traps_vhe_put(void)
-> +{
-> +	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
-> +}
-> +
-> +static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
-> +{
->   	write_sysreg(__kvm_hyp_vector, vbar_el1);
->   }
->   
-> -static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
-> +void __hyp_text __activate_traps_nvhe_load(struct kvm_vcpu *vcpu)
->   {
->   	u64 val;
->   
-> +	vcpu = kern_hyp_va(vcpu);
-> +
-> +	__activate_traps_fpsimd32(vcpu);
-> +
->   	val = CPTR_EL2_DEFAULT;
->   	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
->   	if (vcpu->arch.guest_vfp_loaded)
-> @@ -90,6 +107,15 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
->   	write_sysreg(val, cptr_el2);
->   }
->   
-> +void __hyp_text __deactivate_traps_nvhe_put(void)
-> +{
-> +	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
-> +}
-> +
-> +static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
-> +{
-> +}
-> +
->   static hyp_alternate_select(__activate_traps_arch,
->   			    __activate_traps_nvhe, __activate_traps_vhe,
->   			    ARM64_HAS_VIRT_HOST_EXTN);
-> @@ -111,12 +137,10 @@ static void __hyp_text __deactivate_traps_vhe(void)
->   
->   	write_sysreg(mdcr_el2, mdcr_el2);
->   	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> -	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
->   	write_sysreg(vectors, vbar_el1);
->   }
->   
-> -static void __hyp_text __deactivate_traps_nvhe(void)
-> -{
-> +static void __hyp_text __deactivate_traps_nvhe(void) {
->   	u64 mdcr_el2 = read_sysreg(mdcr_el2);
->   
->   	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
-> @@ -124,7 +148,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
->   
->   	write_sysreg(mdcr_el2, mdcr_el2);
->   	write_sysreg(HCR_RW, hcr_el2);
-> -	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
->   }
->   
->   static hyp_alternate_select(__deactivate_traps_arch,
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index d225f5797651..7943d5b4dbcb 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -237,8 +237,10 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
->   	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
->   	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
->   
-> -	if (!has_vhe())
-> +	if (!has_vhe()) {
-> +		kvm_call_hyp(__activate_traps_nvhe_load, vcpu);
->   		return;
-> +	}
->   
->   	__sysreg_save_user_state(host_ctxt);
->   
-> @@ -253,6 +255,8 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
->   	__sysreg_restore_el1_state(guest_ctxt);
->   
->   	vcpu->arch.sysregs_loaded_on_cpu = true;
-> +
-> +	activate_traps_vhe_load(vcpu);
->   }
->   
->   /**
-> @@ -282,8 +286,12 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
->   		vcpu->arch.guest_vfp_loaded = 0;
->   	}
->   
-> -	if (!has_vhe())
-> +	if (!has_vhe()) {
-> +		kvm_call_hyp(__deactivate_traps_nvhe_put);
->   		return;
-> +	}
-> +
-> +	deactivate_traps_vhe_put();
->   
->   	__sysreg_save_el1_state(guest_ctxt);
->   	__sysreg_save_user_state(guest_ctxt);
-> 
+> There is a lack of configuration features for GPIO. For instance,
+> we can't set the bias. Some pin controllers manage both device's
+> pins and GPIOs. GPIOs can benefit from pin configuration. Usually,
+> a pinctrl node is used to mux the pin as a GPIO and to set up its
+> configuration.
 
--- 
-Julien Thierry
+Pin config takes care of bias, pull up/down, drive strength etc etc.
+
+GPIO hammers lines 0->1, 1->2, and reads them as 0 or 1.
+It can group lines into arrays etc but that is what it does.
+
+The two systems are cross-connected using the GPIO ranges.
+
+There are cross-calls for GPIO to ask pin controllers for favors:
+extern int pinctrl_gpio_request(unsigned gpio);
+extern void pinctrl_gpio_free(unsigned gpio);
+extern int pinctrl_gpio_direction_input(unsigned gpio);
+extern int pinctrl_gpio_direction_output(unsigned gpio);
+extern int pinctrl_gpio_set_config(unsigned gpio, unsigned long config);
+
+Note: when the GPIO hardware is very simple apart from some extra
+register or two providing open drain and/or debounce, the gpio driver
+can simply implement .set_config() itself so no pin control back-end
+is needed. We could require a separate pin config driver but why
+complicate things for the sake of abstraction. Nah.
+
+The last API (pinctrl_gpio_set_config()) should only be called
+to set up electrical properties under special circumstances.
+
+Those are as follows:
+
+1) When the in-kernel client needs to configure electrical properties,
+gpiolib exposes interfaces for this, such as:
+int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
+int gpiod_set_transitory(struct gpio_desc *desc, bool transitory);
+
+Likewise devm_gpiod_get() can pass flags such as
+GPIOD_OUT_LOW_OPEN_DRAIN to state that "I want this line,
+and I want it to be initialized logical low (deasserted), and it must
+be open drain" If the corresponding device tree phandle flag or board file
+description or whatever is not also flagging the line as
+open drain, gpiolib will protest with a warning print and
+enforce open drain. But it is clear that it *should* have been
+configured correctly in the device tree.
+
+This API is not all inclusive: notice that we just support open drain,
+not open source. (No upfront design: we just deal with what drivers
+need, not what they may theoretically need.)
+
+This is partly for historical reasons, but it also makes sense that things
+like I2C that can only work electrically with open drain, has a
+way to specify that these lines must really be configured as
+open drain for this thing to work.
+
+This is necessary when the logic of the code must tell gpiolib how to
+electrically use the pin, i.e. it is not a static configuration that comes
+from device tree or ACPI or a board file. This is why open
+drain/source and debounce can be set up from the in-kernel API.
+
+2) Userspace consumers.
+
+To be clear: these are not laptops, desktops, servers, set-top boxes,
+mobile phones etc. Anything comprising a mass-produced system
+should NOT use userspace GPIO. That is just WRONG. Real, widely
+deployed systems should have proper kernel drivers for their
+hardware and deploy their systems with pin config and GPIO use
+cases set up in device tree or ACPI or whatever. NOT in userspace
+scripts.
+
+Userpace consumers are automatic control: oil burners, electric
+bikes, door openers, alarms etc using some GPIO lines as, yeah,
+essentially as GPIO lines. "General purpose", as opposed to
+"dedicated purpose".
+
+These users include the maker community that do some
+fiddely-fiddling with GPIOs from userspace, and that is fine.
+
+Future of this ABI/API:
+
+I do not yet know how much pin config we should allow to come
+in from this end *ONLY*. What does userspace consumers really
+need?
+
+Also there is no reciprocation between userspace ABI and
+in-kernel API.
+
+If we for example decide to let bias and drive strength be set up
+from userspace, that does not necessarily mean that we must
+let all in-kernel drivers do that too. We can allow
+.set_config() to be called from the userspace ABI and down to
+.set_config() in the pin control driver ONLY without allowing the
+same path for in-kernel users.
+
+Yours,
+Linus Walleij
