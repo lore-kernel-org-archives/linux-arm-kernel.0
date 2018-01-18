@@ -1,305 +1,114 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 18 Jan 2018 13:31:44 +0100
-Subject: [net-next: PATCH v4 7/7] net: mvpp2: enable ACPI support in the driver
+Date: Thu, 18 Jan 2018 13:31:40 +0100
+Subject: [net-next: PATCH v4 3/7] device property: Introduce fwnode_irq_get()
 In-Reply-To: <1516278704-17141-1-git-send-email-mw@semihalf.com>
 References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
-Message-ID: <1516278704-17141-8-git-send-email-mw@semihalf.com>
+Message-ID: <1516278704-17141-4-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces an alternative way of obtaining resources - via
-ACPI tables provided by firmware. Enabling coexistence with the DT
-support, in addition to the OF_*->device_*/fwnode_* API replacement,
-required following steps to be taken:
+Until now there were two very similar functions allowing
+to get Linux IRQ number from ACPI handle (acpi_irq_get())
+and OF node (of_irq_get()). The first one appeared to be used
+only as a subroutine of platform_irq_get(), which (in the generic
+code) limited IRQ obtaining from _CRS method only to nodes
+associated to kernel's struct platform_device.
 
-* Add mvpp2_acpi_match table
-* Omit clock configuration and obtain tclk from the property - in ACPI
-  world, the firmware is responsible for clock maintenance.
-* Disable comphy and syscon handling as they are not available for ACPI.
-* Modify way of obtaining interrupts - use newly introduced
-  fwnode_irq_get() routine
-* Until proper MDIO bus and PHY handling with ACPI is established in the
-  kernel, use only link interrupts feature in the driver. For the RGMII
-  port it results in depending on GMAC settings done during firmware
-  stage.
-* When booting with ACPI MVPP2_QDIST_MULTI_MODE is picked by
-  default, as there is no need to keep any kind of the backward
-  compatibility.
+This patch introduces a new helper routine - fwnode_irq_get(),
+which allows to get the IRQ number directly from the fwnode
+to be used as common for OF/ACPI worlds. It is usable not
+only for the parents fwnodes, but also for the child nodes
+comprising their own _CRS methods with interrupts description.
 
-Moreover, a memory region used by mvmdio driver is usually placed in
-the middle of the address space of the PP2 network controller.
-The MDIO base address is obtained without requesting memory region
-(by devm_ioremap() call) in mvmdio.c, later overlapping resources are
-requested by the network driver, which is responsible for avoiding
-a concurrent access.
-
-In case the MDIO memory region is declared in the ACPI, it can
-already appear as 'in-use' in the OS. Because it is overlapped by second
-region of the network controller, make sure it is released, before
-requesting it again. The care is taken by mvpp2 driver to avoid
-concurrent access to this memory region.
+In order to be able o satisfy compilation with !CONFIG_ACPI
+and also simplify the new code, introduce a helper macro
+(ACPI_HANDLE_FWNODE), with which it is possible to reach
+an ACPI handle directly from its fwnode.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 133 ++++++++++++++------
- 1 file changed, 94 insertions(+), 39 deletions(-)
+ drivers/base/property.c  | 26 ++++++++++++++++++++
+ include/linux/acpi.h     |  3 +++
+ include/linux/property.h |  2 ++
+ 3 files changed, 31 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index f16448e..a1d7b88 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -10,6 +10,7 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/kernel.h>
- #include <linux/netdevice.h>
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index 7c4a53d..1d6c9d9 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -16,6 +16,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_graph.h>
++#include <linux/of_irq.h>
+ #include <linux/property.h>
  #include <linux/etherdevice.h>
-@@ -7502,7 +7503,10 @@ static int mvpp2_multi_queue_vectors_init(struct mvpp2_port *port,
- 			strncpy(irqname, "rx-shared", sizeof(irqname));
- 		}
+ #include <linux/phy.h>
+@@ -1230,6 +1231,31 @@ void *device_get_mac_address(struct device *dev, char *addr, int alen)
+ EXPORT_SYMBOL(device_get_mac_address);
  
--		v->irq = of_irq_get_byname(port_node, irqname);
-+		if (port_node)
-+			v->irq = of_irq_get_byname(port_node, irqname);
-+		else
-+			v->irq = fwnode_irq_get(port->fwnode, i);
- 		if (v->irq <= 0) {
- 			ret = -EINVAL;
- 			goto err;
-@@ -7746,7 +7750,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 			    struct mvpp2 *priv)
+ /**
++ * fwnode_irq_get - Get IRQ directly from a fwnode
++ * @fwnode:	Pointer to the firmware node
++ * @index:	Zero-based index of the IRQ
++ *
++ * Returns Linux IRQ number on success. Other values are determined
++ * accordingly to acpi_/of_ irq_get() operation.
++ */
++int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index)
++{
++	struct device_node *of_node = to_of_node(fwnode);
++	struct resource res;
++	int ret;
++
++	if (IS_ENABLED(CONFIG_OF) && of_node)
++		return of_irq_get(of_node, index);
++
++	ret = acpi_irq_get(ACPI_HANDLE_FWNODE(fwnode), index, &res);
++	if (ret)
++		return ret;
++
++	return res.start;
++}
++EXPORT_SYMBOL(fwnode_irq_get);
++
++/**
+  * device_graph_get_next_endpoint - Get next endpoint firmware node
+  * @fwnode: Pointer to the parent firmware node
+  * @prev: Previous endpoint node or %NULL to get the first
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index dc1ebfe..f05b9b6 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -56,6 +56,8 @@ static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
+ #define ACPI_COMPANION_SET(dev, adev)	set_primary_fwnode(dev, (adev) ? \
+ 	acpi_fwnode_handle(adev) : NULL)
+ #define ACPI_HANDLE(dev)		acpi_device_handle(ACPI_COMPANION(dev))
++#define ACPI_HANDLE_FWNODE(fwnode)	\
++				acpi_device_handle(to_acpi_device_node(fwnode))
+ 
+ static inline struct fwnode_handle *acpi_alloc_fwnode_static(void)
  {
- 	struct device_node *phy_node;
--	struct phy *comphy;
-+	struct phy *comphy = NULL;
- 	struct mvpp2_port *port;
- 	struct mvpp2_port_pcpu *port_pcpu;
- 	struct device_node *port_node = to_of_node(port_fwnode);
-@@ -7760,7 +7764,12 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	int phy_mode;
- 	int err, i, cpu;
+@@ -626,6 +628,7 @@ int acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem, int *timer_count)
+ #define ACPI_COMPANION(dev)		(NULL)
+ #define ACPI_COMPANION_SET(dev, adev)	do { } while (0)
+ #define ACPI_HANDLE(dev)		(NULL)
++#define ACPI_HANDLE_FWNODE(fwnode)	(NULL)
+ #define ACPI_DEVICE_CLASS(_cls, _msk)	.cls = (0), .cls_msk = (0),
  
--	has_tx_irqs = mvpp2_port_has_tx_irqs(priv, port_node);
-+	if (port_node) {
-+		has_tx_irqs = mvpp2_port_has_tx_irqs(priv, port_node);
-+	} else {
-+		has_tx_irqs = true;
-+		queue_mode = MVPP2_QDIST_MULTI_MODE;
-+	}
+ struct fwnode_handle;
+diff --git a/include/linux/property.h b/include/linux/property.h
+index 9b13332..e05889f 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -103,6 +103,8 @@ struct fwnode_handle *device_get_named_child_node(struct device *dev,
+ struct fwnode_handle *fwnode_handle_get(struct fwnode_handle *fwnode);
+ void fwnode_handle_put(struct fwnode_handle *fwnode);
  
- 	if (!has_tx_irqs)
- 		queue_mode = MVPP2_QDIST_SINGLE_MODE;
-@@ -7775,7 +7784,11 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	if (!dev)
- 		return -ENOMEM;
- 
--	phy_node = of_parse_phandle(port_node, "phy", 0);
-+	if (port_node)
-+		phy_node = of_parse_phandle(port_node, "phy", 0);
-+	else
-+		phy_node = NULL;
++int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index);
 +
- 	phy_mode = fwnode_get_phy_mode(port_fwnode);
- 	if (phy_mode < 0) {
- 		dev_err(&pdev->dev, "incorrect phy mode\n");
-@@ -7783,13 +7796,15 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		goto err_free_netdev;
- 	}
+ unsigned int device_get_child_node_count(struct device *dev);
  
--	comphy = devm_of_phy_get(&pdev->dev, port_node, NULL);
--	if (IS_ERR(comphy)) {
--		if (PTR_ERR(comphy) == -EPROBE_DEFER) {
--			err = -EPROBE_DEFER;
--			goto err_free_netdev;
-+	if (port_node) {
-+		comphy = devm_of_phy_get(&pdev->dev, port_node, NULL);
-+		if (IS_ERR(comphy)) {
-+			if (PTR_ERR(comphy) == -EPROBE_DEFER) {
-+				err = -EPROBE_DEFER;
-+				goto err_free_netdev;
-+			}
-+			comphy = NULL;
- 		}
--		comphy = NULL;
- 	}
- 
- 	if (fwnode_property_read_u32(port_fwnode, "port-id", &id)) {
-@@ -7805,6 +7820,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 
- 	port = netdev_priv(dev);
- 	port->dev = dev;
-+	port->fwnode = port_fwnode;
- 	port->ntxqs = ntxqs;
- 	port->nrxqs = nrxqs;
- 	port->priv = priv;
-@@ -7814,7 +7830,10 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	if (err)
- 		goto err_free_netdev;
- 
--	port->link_irq = of_irq_get_byname(port_node, "link");
-+	if (port_node)
-+		port->link_irq = of_irq_get_byname(port_node, "link");
-+	else
-+		port->link_irq = fwnode_irq_get(port_fwnode, port->nqvecs + 1);
- 	if (port->link_irq == -EPROBE_DEFER) {
- 		err = -EPROBE_DEFER;
- 		goto err_deinit_qvecs;
-@@ -8197,6 +8216,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 
- static int mvpp2_probe(struct platform_device *pdev)
- {
-+	const struct acpi_device_id *acpi_id;
- 	struct fwnode_handle *fwnode = pdev->dev.fwnode;
- 	struct fwnode_handle *port_fwnode;
- 	struct mvpp2 *priv;
-@@ -8209,8 +8229,14 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	if (!priv)
- 		return -ENOMEM;
- 
--	priv->hw_version =
--		(unsigned long)of_device_get_match_data(&pdev->dev);
-+	if (has_acpi_companion(&pdev->dev)) {
-+		acpi_id = acpi_match_device(pdev->dev.driver->acpi_match_table,
-+					    &pdev->dev);
-+		priv->hw_version = (unsigned long)acpi_id->driver_data;
-+	} else {
-+		priv->hw_version =
-+			(unsigned long)of_device_get_match_data(&pdev->dev);
-+	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
-@@ -8224,10 +8250,23 @@ static int mvpp2_probe(struct platform_device *pdev)
- 			return PTR_ERR(priv->lms_base);
- 	} else {
- 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+		if (has_acpi_companion(&pdev->dev)) {
-+			/* In case the MDIO memory region is declared in
-+			 * the ACPI, it can already appear as 'in-use'
-+			 * in the OS. Because it is overlapped by second
-+			 * region of the network controller, make
-+			 * sure it is released, before requesting it again.
-+			 * The care is taken by mvpp2 driver to avoid
-+			 * concurrent access to this memory region.
-+			 */
-+			release_resource(res);
-+		}
- 		priv->iface_base = devm_ioremap_resource(&pdev->dev, res);
- 		if (IS_ERR(priv->iface_base))
- 			return PTR_ERR(priv->iface_base);
-+	}
- 
-+	if (priv->hw_version == MVPP22 && dev_of_node(&pdev->dev)) {
- 		priv->sysctrl_base =
- 			syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
- 							"marvell,system-controller");
-@@ -8253,32 +8292,34 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	else
- 		priv->max_port_rxqs = 32;
- 
--	priv->pp_clk = devm_clk_get(&pdev->dev, "pp_clk");
--	if (IS_ERR(priv->pp_clk))
--		return PTR_ERR(priv->pp_clk);
--	err = clk_prepare_enable(priv->pp_clk);
--	if (err < 0)
--		return err;
--
--	priv->gop_clk = devm_clk_get(&pdev->dev, "gop_clk");
--	if (IS_ERR(priv->gop_clk)) {
--		err = PTR_ERR(priv->gop_clk);
--		goto err_pp_clk;
--	}
--	err = clk_prepare_enable(priv->gop_clk);
--	if (err < 0)
--		goto err_pp_clk;
-+	if (dev_of_node(&pdev->dev)) {
-+		priv->pp_clk = devm_clk_get(&pdev->dev, "pp_clk");
-+		if (IS_ERR(priv->pp_clk))
-+			return PTR_ERR(priv->pp_clk);
-+		err = clk_prepare_enable(priv->pp_clk);
-+		if (err < 0)
-+			return err;
- 
--	if (priv->hw_version == MVPP22) {
--		priv->mg_clk = devm_clk_get(&pdev->dev, "mg_clk");
--		if (IS_ERR(priv->mg_clk)) {
--			err = PTR_ERR(priv->mg_clk);
--			goto err_gop_clk;
-+		priv->gop_clk = devm_clk_get(&pdev->dev, "gop_clk");
-+		if (IS_ERR(priv->gop_clk)) {
-+			err = PTR_ERR(priv->gop_clk);
-+			goto err_pp_clk;
- 		}
--
--		err = clk_prepare_enable(priv->mg_clk);
-+		err = clk_prepare_enable(priv->gop_clk);
- 		if (err < 0)
--			goto err_gop_clk;
-+			goto err_pp_clk;
-+
-+		if (priv->hw_version == MVPP22) {
-+			priv->mg_clk = devm_clk_get(&pdev->dev, "mg_clk");
-+			if (IS_ERR(priv->mg_clk)) {
-+				err = PTR_ERR(priv->mg_clk);
-+				goto err_gop_clk;
-+			}
-+
-+			err = clk_prepare_enable(priv->mg_clk);
-+			if (err < 0)
-+				goto err_gop_clk;
-+		}
- 
- 		priv->axi_clk = devm_clk_get(&pdev->dev, "axi_clk");
- 		if (IS_ERR(priv->axi_clk)) {
-@@ -8291,10 +8332,14 @@ static int mvpp2_probe(struct platform_device *pdev)
- 			if (err < 0)
- 				goto err_gop_clk;
- 		}
--	}
- 
--	/* Get system's tclk rate */
--	priv->tclk = clk_get_rate(priv->pp_clk);
-+		/* Get system's tclk rate */
-+		priv->tclk = clk_get_rate(priv->pp_clk);
-+	} else if (device_property_read_u32(&pdev->dev, "clock-frequency",
-+					    &priv->tclk)) {
-+		dev_err(&pdev->dev, "missing clock-frequency value\n");
-+		return -EINVAL;
-+	}
- 
- 	if (priv->hw_version == MVPP22) {
- 		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
-@@ -8399,6 +8444,9 @@ static int mvpp2_remove(struct platform_device *pdev)
- 				  aggr_txq->descs_dma);
- 	}
- 
-+	if (is_acpi_node(port_fwnode))
-+		return 0;
-+
- 	clk_disable_unprepare(priv->axi_clk);
- 	clk_disable_unprepare(priv->mg_clk);
- 	clk_disable_unprepare(priv->pp_clk);
-@@ -8420,12 +8468,19 @@ static const struct of_device_id mvpp2_match[] = {
- };
- MODULE_DEVICE_TABLE(of, mvpp2_match);
- 
-+static const struct acpi_device_id mvpp2_acpi_match[] = {
-+	{ "MRVL0110", MVPP22 },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(acpi, mvpp2_acpi_match);
-+
- static struct platform_driver mvpp2_driver = {
- 	.probe = mvpp2_probe,
- 	.remove = mvpp2_remove,
- 	.driver = {
- 		.name = MVPP2_DRIVER_NAME,
- 		.of_match_table = mvpp2_match,
-+		.acpi_match_table = ACPI_PTR(mvpp2_acpi_match),
- 	},
- };
- 
+ static inline bool device_property_read_bool(struct device *dev,
 -- 
 2.7.4
