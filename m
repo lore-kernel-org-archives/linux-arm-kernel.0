@@ -1,50 +1,79 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 18 Jan 2018 22:17:57 +0800
-Subject: [PATCH] pinctrl: meson-axg: adjust uart_ao_b pin group naming
-Message-ID: <20180118141757.41290-1-yixun.lan@amlogic.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 18 Jan 2018 14:21:26 +0000
+Subject: [PATCH v2 0/2] arm64: Run enable method for errata work arounds
+ on late CPUs
+In-Reply-To: <851887b9-974a-6f20-920b-d9149d8122fe@arm.com>
+References: <20180117174220.7959-1-suzuki.poulose@arm.com>
+ <20180118114540.GL22781@e103592.cambridge.arm.com>
+ <5c1945a8-a66d-9306-1c6d-3c1c8febcab2@arm.com>
+ <851887b9-974a-6f20-920b-d9149d8122fe@arm.com>
+Message-ID: <20180118142125.GM22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply adjust the pin group to _x _y _z style, as to
-keep the consistency in DT with previous naming scheme.
+On Thu, Jan 18, 2018 at 12:08:43PM +0000, Robin Murphy wrote:
+> On 18/01/18 12:00, Robin Murphy wrote:
+> [...]
+> >>+struct enable_arg {
+> >>+??? int (*enable)(struct arm64_cpu_capabilities const *);
+> >>+??? struct arm64_cpu_capabilities const *cap;
+> >>+};
+> >>+
+> >>+static int __enable_cpu_capability(void *arg)
+> >>+{
+> >>+??? struct enable_arg const *e = arg;
+> >>+
+> >>+??? return e->enable(e->cap);
+> >>+}
+> >
+> >AFAICS, you shouldn't even need the intermediate struct - if you were
+> >instead to call stop_machine(&caps->enable, ...), the wrapper could be:
+> >
+> > ????<type> **fn = arg;
+> > ????*fn(container_of(fn, struct arm64_cpu_capabilities, enable));
+> >
+> >(cheaty pseudocode because there's no way I'm going to write a
+> >pointer-to-function-pointer type correctly in an email client...)
+> >
+> >That's certainly a fair bit simpler in terms of diffstat; whether it's
+> >really as intuitive as I think it is is perhaps another matter, though.
+> 
+> Ah, right, but then you'd be back to casting away const, and at that point
+> it makes no sense to do the container_of dance instead of just passing the
+> struct pointer itself around...
+> 
+> I shall now excuse myself from this discussion, as I'm clearly not helping
+> :)
+> 
+> Robin.
 
-Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+That's what I was about to say... but neat trick.
 
----
-Hi Linus,
+However, it does concentrate the type fudge in one place and keeps the
+arm64_cpu_capabilities::enable() prototype correct, so it's still better
+than the original.
 
- Please also consider merging this patch into 'for-next', since it
-fixes issue added in the same cycle.
- This patch will also obsolete previous one patches [1]
 
-[1] pinctrl: meson: use one uniform 'function' name
-http://lkml.kernel.org/r/20180108073328.205769-1-yixun.lan at amlogic.com
----
- drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thinking about it, the following is probably clearer and no worse:
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-index 1fda9d6c7ea3..4b91ff74779b 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-@@ -716,7 +716,7 @@ static const char * const uart_b_groups[] = {
- 	"uart_tx_b_x", "uart_rx_b_x", "uart_cts_b_x", "uart_rts_b_x",
- };
- 
--static const char * const uart_ao_b_gpioz_groups[] = {
-+static const char * const uart_ao_b_z_groups[] = {
- 	"uart_ao_tx_b_z", "uart_ao_rx_b_z",
- 	"uart_ao_cts_b_z", "uart_ao_rts_b_z",
- };
-@@ -855,7 +855,7 @@ static struct meson_pmx_func meson_axg_periphs_functions[] = {
- 	FUNCTION(nand),
- 	FUNCTION(uart_a),
- 	FUNCTION(uart_b),
--	FUNCTION(uart_ao_b_gpioz),
-+	FUNCTION(uart_ao_b_z),
- 	FUNCTION(i2c0),
- 	FUNCTION(i2c1),
- 	FUNCTION(i2c2),
--- 
-2.15.1
+static int __enable_cpu_capability(void *arg)
+{
+	struct arm64_cpu_capabilities const *cap = arg;
+
+	return cap->enable(cap);
+}
+
+...
+
+stop_machine(__enable_cpu_capability, (void *)caps, cpu_online_mask);
+
+
+In your version, the argument would be (void *)&caps->enable, which is
+really just a proxy for (void *)caps, unless I missed something.
+
+
+What do you think Suzuki?  I can respin my patch if you fancy picking it
+up.  Either way, it's not urgent.
+
+Cheers
+---Dave
