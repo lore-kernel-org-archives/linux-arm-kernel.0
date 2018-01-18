@@ -1,72 +1,30 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 18 Jan 2018 13:44:08 +0100
-Subject: [PATCH 2/2] pinctrl: imx: add driver for i.MX8MQ
-In-Reply-To: <253551c30748ebcb3777baa4a232f656@agner.ch>
-References: <20180117182804.26323-1-l.stach@pengutronix.de>
- <20180117182804.26323-2-l.stach@pengutronix.de>
- <253551c30748ebcb3777baa4a232f656@agner.ch>
-Message-ID: <1516279448.19307.7.camel@pengutronix.de>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Thu, 18 Jan 2018 10:45:27 -0200
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable AC97 codec support
+Message-ID: <1516279527-6516-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+imx6qdl udoo board has an AC97 codec. 
 
-Am Donnerstag, den 18.01.2018, 13:41 +0100 schrieb stefan at agner.ch:
-> Hi Lucas,
-> 
-> On 17.01.2018 19:28, Lucas Stach wrote:
-> > The i.MX8MQ pincontrol works in a similar way to the earlier i.MX
-> > SoCs.
-> > 
-> > The driver code is largely copied from NXP's downstream driver
-> > written
-> > by Anson Huang. Only some small changes for upstream adaption are
-> > done
-> > by myself.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-[...]
+Add support for it by default.
 
-> > +static struct imx_pinctrl_soc_info imx8mq_pinctrl_info = {
-> > +	.pins = imx8mq_pinctrl_pads,
-> > +	.npins = ARRAY_SIZE(imx8mq_pinctrl_pads),
-> > +	.gpr_compatible = "nxp,imx8mq-iomuxc-gpr",
-> > +};
-> 
-> I recently sent a patchset which allow to pass the struct
-> imx_pinctrl_soc_info as const to imx_pinctrl_probe, hence this should
-> be
-> const.
-> 
-> See:
-> https://lkml.org/lkml/2018/1/6/131
-> 
-> > +
-> > +static struct of_device_id imx8mq_pinctrl_of_match[] = {
-> > +	{ .compatible = "nxp,imx8mq-iomuxc", .data =
-> > &imx8mq_pinctrl_info, },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +static int imx8mq_pinctrl_probe(struct platform_device *pdev)
-> > +{
-> > +	const struct of_device_id *match;
-> > +	struct imx_pinctrl_soc_info *pinctrl_info;
-> > +
-> > +	match = of_match_device(imx8mq_pinctrl_of_match, &pdev-
-> > >dev);
-> > +
-> > +	if (!match)
-> > +		return -ENODEV;
-> > +
-> > +	pinctrl_info = (struct imx_pinctrl_soc_info *) match-
-> > >data;
-> 
-> ...and allow to make use of of_device_get_match_data?
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks for the hint, I'll change this for the next revision of this
-patch.
-
-Regards,
-Lucas
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 4cb9829..80ef9ed 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -285,6 +285,7 @@ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+ CONFIG_SND_SOC_IMX_MC13783=y
+ CONFIG_SND_SOC_FSL_ASOC_CARD=y
++CONFIG_SND_SOC_AC97_CODEC=y
+ CONFIG_SND_SOC_CS42XX8_I2C=y
+ CONFIG_SND_SOC_TLV320AIC3X=y
+ CONFIG_SND_SOC_WM8960=y
+-- 
+2.7.4
