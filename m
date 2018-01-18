@@ -1,119 +1,89 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 18 Jan 2018 09:34:37 +0200
-Subject: [PATCHv2 15/15] clk: ti: convert to use proper register
- definition for all accesses
-In-Reply-To: <CAHCN7xJ-NaKoeZOqrdc48fFCLNQvm_uRXC0ErtiG+Ac86a14+w@mail.gmail.com>
-References: <1489236606-24023-1-git-send-email-t-kristo@ti.com>
- <1489236606-24023-16-git-send-email-t-kristo@ti.com>
- <CAHCN7x+oKEmXBpogy4VOB8UgmTd6+X5fBiP66yzUqXmvDWdqaw@mail.gmail.com>
- <6b4c5bf2-1260-0e79-0414-9870f21e4a75@ti.com>
- <CAHCN7xLaP-th=vAzN8C1QXstf3c5SP4JADAZZXTb1Nd6N6QdsQ@mail.gmail.com>
- <20180117211907.GE4042@atomide.com>
- <CAHCN7xJ-NaKoeZOqrdc48fFCLNQvm_uRXC0ErtiG+Ac86a14+w@mail.gmail.com>
-Message-ID: <4f0f185a-2890-3747-7060-1f5b5a77022a@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 18 Jan 2018 15:53:12 +0800
+Subject: [PATCH v3 08/13] drm/sun4i: Add a driver for the display frontend
+In-Reply-To: <20180118072258.ucbchh32mhyln2qn@flea.lan>
+References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
+ <3b7164f4a5199f0499c6f41201b31bc471cb3af9.1515492513.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
+ <20180118072258.ucbchh32mhyln2qn@flea.lan>
+Message-ID: <CAGb2v64sp=fUi44Hge2qObva3XucnGXj=a+_wH-M4GraGmkYYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 23:44, Adam Ford wrote:
-> On Wed, Jan 17, 2018 at 3:19 PM, Tony Lindgren <tony@atomide.com> wrote:
->> * Adam Ford <aford173@gmail.com> [180117 15:15]:
->>> On Wed, Jan 17, 2018 at 8:02 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>> On 17/01/18 15:27, Adam Ford wrote:
->>>>>
->>>>> On Sat, Mar 11, 2017 at 6:50 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>>>>
->>>>>> Currently, TI clock driver uses an encapsulated struct that is cast into
->>>>>> a void pointer to store all register addresses. This can be considered
->>>>>> as rather nasty hackery, and prevents from expanding the register
->>>>>> address field also. Instead, replace all the code to use proper struct
->>>>>> in place for this, which contains all the previously used data.
->>>>>>
->>>>>> This patch is rather large as it is touching multiple files, but this
->>>>>> can't be split up as we need to avoid any boot breakage.
->>>>>>
->>>>>
->>>>> I know it's late coming, but according to git bisect, this patch is
->>>>> causing some problems with Logic PD Torpedo 37xx Dev kit.
->>>>
->>>>
->>>> Oh reporting bugs is never too late, thanks for posting this out.
->>>>
->>>>>
->>>>> It it is a DM3730 that has a WL1283 chipset attached to the SDIO
->>>>> interface on MMC3.  The driver seems to load properly, but when
->>>>> loading wpa_supplicant to activate the WL1283, we get a giant crash.
->>>>> I checked kernel revisions starting at 4.14 and working back to when
->>>>> it worked, then used git bisect from there.
->>>>>
->>>>> I am hoping it might be a simple fix for something that just needs to
->>>>> get added or tweaked in the device tree.
->>>>
->>>>
->>>> I don't have access to the specific hw, but can you try to dig out which
->>>> hwmod is causing the crash? Just print out the oh->name from the
->>>> _wait_softreset_complete. That would help root causing the issue.
->>>>
->>>
->>> With one small patch, I was able to make it work again.
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
->>> index 2dbd632..ed1f625 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->>> @@ -477,7 +477,7 @@ static int _wait_softreset_complete(struct omap_hwmod *oh)
->>>          int c = 0;
->>>
->>>          sysc = oh->class->sysc;
->>> -
->>> +pr_warn("_wait_softreset_complete: %s\n", oh->name);
->>>          if (sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
->>>                  omap_test_timeout((omap_hwmod_read(oh, sysc->syss_offs)
->>>                                     & SYSS_RESETDONE_MASK),
->>>
->>>
->>> This leads me to believe that the omap_test_timeout functions might
->>> not be working quite right.
+On Thu, Jan 18, 2018 at 3:22 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Jan 17, 2018 at 09:43:31PM +0800, Chen-Yu Tsai wrote:
+>> >         if (sun4i_drv_node_is_connector(node))
+>> >                 return 0;
+>> >
+>> > -       if (!sun4i_drv_node_is_frontend(node)) {
+>> > +       /*
+>> > +        * If the device is either just a regular device, or an
+>> > +        * enabled frontend supported by the driver, we add it to our
+>> > +        * component list.
+>> > +        */
+>> > +       if (!sun4i_drv_node_is_frontend(node) ||
+>> > +           (sun4i_drv_node_is_supported_frontend(node) &&
+>> > +            of_device_is_available(node))) {
 >>
->> There may be a srst_udelay needed for some module, see commit
->> ebf244148092 ("ARM: OMAP2+: Use srst_udelay for USB on dm814x")
->> for example.
+>> Nit: sun4i_drv_node_is_supported_frontend should be a subset of
+>> sun4i_drv_node_is_frontend, so of_device_is_available should always
+>> be true at this point.
+>
+> That's not really the condition though :)
+>
+> It's if the device is *not* a frontend or if it is a supported
+> frontend that is available, add it to the endpoints list.
+
+Right. I got confused by the inverted logic. Sorry.
+
+>
+>> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
+>> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
+>> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
+>> > +                    SUN4I_FRONTEND_INPUT_FMT_PS(1));
+>> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
+>> > +                    SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
 >>
->> You might be able to find which module it is by commenting out
->> postcore_initcall_sync(omap3_l3_init) in drivers/bus/omap_l3_smx.c
->> temporarily as the system will most likely hang right there.
-> 
-> I commented out that line as you suggested, but the system boots as
-> normal and I get the crash (as normal)
-> 
-> I am looking through the DM3730 and OMAP3630 TRM now.  Any thought on
-> a keyword search I should use to see which hwmods might require
-> srst_udelay?
+>> Seems that you also need to set the "ALPHA_EN" bit for ARGB.
+>
+> I have not seen that bit documented anywhere. Where is it coming from?
 
-Looking at the log you provided, it looks like only mmc1, mmc3 and i2c1 
-are reset during the wlan probe. Based on the prints coming out in the 
-failing case, it looks like the culprit might be mmc3 for some reason.
+The A31's user manual. I just checked all the datasheets, and only
+the A31 and the A80 have this bit (bit 7) defined. It says if the
+bit is cleared, alpha is replaced with 0xff. I assume it works either
+way on the A33, or you wouldn't be suprised. Leave it out for now then.
+(Or maybe a TODO note now that we know about it.)
 
-[   18.239746] _wait_softreset_complete: mmc3
-[   18.638580] _wait_softreset_complete: mmc3
-[   18.657562] _wait_softreset_complete: mmc1
-[   18.833374] wlcore: firmware booted (Rev 7.3.10.0.141)
+ChenYu
 
-^ the firmware notification above does not come out in the crash.
-
--Tero
-
-> 
-> adam
-> 
+>
+>> > +       frontend->reset = devm_reset_control_get(dev, NULL);
+>> > +       if (IS_ERR(frontend->reset)) {
+>> > +               dev_err(dev, "Couldn't get our reset line\n");
+>> > +               return PTR_ERR(frontend->reset);
+>> > +       }
+>> > +       reset_control_reset(frontend->reset);
 >>
->> Regards,
+>> reset_control_reset leaves the reset control deasserted. At this
+>> point the clock might not be running, which might mean the internal
+>> state is not completely wiped out. (Though this really depends on
+>> the design of the internal logic.)
 >>
->> Tony
+>> Maybe just assert it? It gets deasserted in the runtime PM callback
+>> later. And just to be safe, I would move it close to the end of the
+>> probe path, past all possible errors, so the hardware doesn't get
+>> touched until everything is ready. Or don't touch it anywhere in
+>> the probe path, and have the runtime PM resume function do a reset.
+>
+> That seems like the best solution yes.
+>
+> Thanks!
+> Maxime
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
