@@ -1,96 +1,71 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 18 Jan 2018 14:23:22 +0100
-Subject: [net-next: PATCH v4 0/7] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <1516278704-17141-1-git-send-email-mw@semihalf.com>
-References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
-Message-ID: <20180118132322.GE2690@kwain>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 18 Jan 2018 13:24:52 +0000
+Subject: [PATCH v2 03/15] mmc: mmci: Don't pretend all variants to have
+ OPENDRAIN bit
+In-Reply-To: <CAPDyKFrhBfGq0RBBdFLex+88XqrLB-Bm3rc2Q_UZCw8XB520ug@mail.gmail.com>
+References: <1516105859-3525-1-git-send-email-patrice.chotard@st.com>
+ <1516105859-3525-4-git-send-email-patrice.chotard@st.com>
+ <CAPDyKFrhBfGq0RBBdFLex+88XqrLB-Bm3rc2Q_UZCw8XB520ug@mail.gmail.com>
+Message-ID: <1fc0817f-2495-6996-4777-abc8c30c20d2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+Hi Ulf
 
-I tested the series on a MacchiatoBin to ensure the mvpp2 DT support was
-still working. I was able to use all supported ports as before, and saw
-no issue.
+On 01/17/2018 10:33 AM, Ulf Hansson wrote:
+> [...]
+> 
+>>   /* Busy detection for the ST Micro variant */
+>> @@ -1455,16 +1465,13 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>                                  ~MCI_ST_DATA2DIREN);
+>>          }
+>>
+>> -       if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN) {
+>> -               if (host->hw_designer != AMBA_VENDOR_ST)
+>> -                       pwr |= MCI_ROD;
+>> -               else {
+>> -                       /*
+>> -                        * The ST Micro variant use the ROD bit for something
+>> -                        * else and only has OD (Open Drain).
+>> -                        */
+>> -                       pwr |= MCI_OD;
+>> -               }
+>> +       if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN &&
+>> +           host->variant->opendrain) {
+> 
+> A few nitpicks (because I anyway had some comment on patch4):
+> 
+> The above can be written on one line and the brackets isn't needed.
+> 
+> Replace host->variant->opendrain with variant->opendrain. The same
+> applies to the below change.
 
-For all mvpp2 patches, you can add:
+Ah yes, i will fix it
 
-Tested-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> 
+>> +               /*
+>> +                * The ST Micro variant use the ROD bit for
+>> +                * something else and only has OD (Open Drain).
+>> +                */
+> 
+> I think we can remove this comment, as this information becomes
+> implicit when we start using the variant data.
 
-Thanks!
-Antoine
+Ok
 
-On Thu, Jan 18, 2018 at 01:31:37PM +0100, Marcin Wojtas wrote:
-> Hi,
-> 
-> I quickly resend the series, thanks to Antoine Tenart's remark,
-> who spotted !CONFIG_ACPI compilation issue after introducing
-> the new fwnode_irq_get() routine. Please see the details in the changelog
-> below and the 3/7 commit log.
-> 
-> mvpp2 driver can work with the ACPI representation, as exposed
-> on a public branch:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
-> It was compiled together with the most recent Tianocore EDK2 revision.
-> Please refer to the firmware build instruction on MacchiatoBin board:
-> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
-> 
-> ACPI representation of PP2 controllers (withouth PHY support) can
-> be viewed in the github:
-> * MacchiatoBin:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
-> 
-> * Armada 7040 DB:
-> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
-> 
-> I will appreciate any comments or remarks.
-> 
-> Best regards,
-> Marcin
-> 
-> Changelog:
-> v3 -> v4:
-> * 3/7
->     - add new macro (ACPI_HANDLE_FWNODE) and fix
->       compilation with !CONFIG_ACPI
->     - extend commit log and mention usability of fwnode_irq_get
->       for the child nodes as well
-> 
-> v2 -> v3:
-> * 1/7, 2/7
->     - Add Rafael's Acked-by's
-> * 3/7, 4/7
->     - New patches
-> * 6/7, 7/7
->     - Update driver with new helper routines usage
->     - Improve commit log.
-> 
-> v1 -> v2:
-> * Remove MDIO patches
-> * Use PP2 ports only with link interrupts
-> * Release second region resources in mvpp2 driver (code moved from
->   mvmdio), as explained in details in 5/5 commit message.
-> 
-> Marcin Wojtas (7):
->   device property: Introduce fwnode_get_mac_address()
->   device property: Introduce fwnode_get_phy_mode()
->   device property: Introduce fwnode_irq_get()
->   device property: Allow iterating over available child fwnodes
->   net: mvpp2: simplify maintaining enabled ports' list
->   net: mvpp2: use device_*/fwnode_* APIs instead of of_*
->   net: mvpp2: enable ACPI support in the driver
-> 
->  drivers/base/property.c              | 104 ++++++++--
->  drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
->  include/linux/acpi.h                 |   3 +
->  include/linux/property.h             |  11 ++
->  4 files changed, 232 insertions(+), 92 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
+Thanks
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Patrice
+
+> 
+>> +               pwr |= host->variant->opendrain;
+>>          }
+>>
+>>          /*
+>> --
+>> 1.9.1
+>>
+> 
+> Kind regards
+> Uffe
+> 
