@@ -1,74 +1,49 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 18 Jan 2018 15:34:16 +0100
-Subject: [PATCH v3 00/14] Add MMCI support for STM32F SoCs family
-Message-ID: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+Date: Thu, 18 Jan 2018 15:34:30 +0100
+Subject: [PATCH v3 14/14] clk: stm32: Add clk entry for SDMMC2 on stm32F769
+In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1516286070-24927-15-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-This series reworks patches submitted one year ago by Andrea Merello [1] 
-but without succeed to merged it.
+STM32F769 has 2 SDMMC port, add clock entry for the second one.
 
-STM32F4 and STM32F7 SoCs families embeds a variant of the ARM PrimeCell 
-PL18x SD host controller, for which the mmci driver exists. 
-This series adds support for these SoCs to the mmci driver.
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-As other variants, this one need some specific quirks, that this 
-series address. 
+v3: _ none
 
-This series has been tested on following boards :
-	_ stm32f429-eval
-	_ stm32f469-disco
-	_ stm32f746-eval
-	_ stm32f769-disco
+v2: _ Add Acked-by
 
-DT update for stm32f7 pinctrl, stm32f746-eval and stm32f769-disco boards
-will be sent later to avoid conflict with pending stm32f7 series [1] which
-is not yet merged on kernel mainline.
 
-[1] https://www.spinics.net/lists/linux-mmc/msg41616.html
-[2] https://patchwork.kernel.org/patch/10104447/
+ drivers/clk/clk-stm32f4.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-v3: _ patch 3: use variant->opendrain instead of host->variant->opendrain
-    _ patch 4: exit from probe() if no pinctrl dt node are found
-    _ previous patch 15: removed as already applied in pinctrl tree
-
-v2: _ add Revievied-by, Acked-by in some patches
-    _ replace bool by u32 for start_err and opendrain fields of struct variant_data
-    _ split previous patch 3 in two parts, first patch clean the open drain bit code
-      and second part add pinctrl pins management when no open drain bit is available.
-    _ replace "pl180" by "PL180" in patch "mmc: mmci: Add STM32 variant"
-
-Andrea Merello (2):
-  ARM: dts: stm32: Add pin map for SDIO controller on stm32f4
-  ARM: dts: stm32: Enable SDIO controller on stm32f469 disco board
-
-Patrice Chotard (12):
-  mmc: mmci: Don't pretend all variants to have MMCIMASK1 register
-  mmc: mmci: Don't pretend all variants to have MCI_STARBITERR flag
-  mmc: mmci: Don't pretend all variants to have OPENDRAIN bit
-  mmc: mmci: Add support for setting pad type via pinctrl
-  mmc: mmci: Add STM32 variant
-  ARM: dts: stm32: Add SDIO controller for stm32f746
-  ARM: dts: stm32: Add SDIO controller for stm32f429
-  ARM: dts: stm32: Enable SDIO controller on stm32429i-eval board
-  ARM: stm32: Add AMBA support for STM32F4 and STM32F7 SoCs
-  ARM: configs: stm32: Enable MMC_ARMMMCI support
-  ARM: configs: stm32: Enable EXT3_FS support
-  clk: stm32: Add clk entry for SDMMC2 on stm32F769
-
- arch/arm/boot/dts/stm32429i-eval.dts   |  19 +++++
- arch/arm/boot/dts/stm32f4-pinctrl.dtsi |  31 +++++++++
- arch/arm/boot/dts/stm32f429.dtsi       |  11 +++
- arch/arm/boot/dts/stm32f469-disco.dts  |  19 +++++
- arch/arm/boot/dts/stm32f746.dtsi       |  22 ++++++
- arch/arm/configs/stm32_defconfig       |   3 +
- arch/arm/mach-stm32/Kconfig            |   3 +
- drivers/clk/clk-stm32f4.c              |   3 +-
- drivers/mmc/host/mmci.c                | 124 ++++++++++++++++++++++++++++-----
- drivers/mmc/host/mmci.h                |   6 ++
- 10 files changed, 224 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+index da44f8d..e7e3965 100644
+--- a/drivers/clk/clk-stm32f4.c
++++ b/drivers/clk/clk-stm32f4.c
+@@ -282,6 +282,7 @@ struct stm32f4_gate_data {
+ 
+ 	{ STM32F4_RCC_APB2ENR,  0,	"tim1",		"apb2_mul" },
+ 	{ STM32F4_RCC_APB2ENR,  1,	"tim8",		"apb2_mul" },
++	{ STM32F4_RCC_APB2ENR,  7,	"sdmmc2",	"sdmux"    },
+ 	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
+@@ -315,7 +316,7 @@ struct stm32f4_gate_data {
+ 
+ static const u64 stm32f746_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
+ 						      0x0000000000000003ull,
+-						      0x04f77f033e01c9ffull };
++						      0x04f77f833e01c9ffull };
+ 
+ static const u64 *stm32f4_gate_map;
+ 
 -- 
 1.9.1
