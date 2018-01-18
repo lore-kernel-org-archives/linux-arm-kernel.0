@@ -1,33 +1,54 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 18 Jan 2018 12:46:16 +0100
-Subject: [PATCH v2 3/3] ARM: dts: at91: tse850: make the sound dai cell count
- explicit
-In-Reply-To: <20180118114616.6639-1-peda@axentia.se>
-References: <20180118114616.6639-1-peda@axentia.se>
-Message-ID: <20180118114616.6639-4-peda@axentia.se>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu, 18 Jan 2018 19:52:38 +0800
+Subject: [PATCH v4 00/13] iommu/rockchip: Use OF_IOMMU
+Message-ID: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The node is referred to as a DAI from the sound node and should
-therefore have a #sound-dai-cells property.
 
-Fixes: 21dd0ece34c2 ("ARM: dts: at91: add devicetree for the Axentia TSE-850")
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- arch/arm/boot/dts/at91-tse850-3.dts | 1 +
- 1 file changed, 1 insertion(+)
+This series fixes some issues in rockchip iommu driver, and add of_iommu
+support in it.
 
-diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-index 9b82cc8843e1..16e6e60aa67a 100644
---- a/arch/arm/boot/dts/at91-tse850-3.dts
-+++ b/arch/arm/boot/dts/at91-tse850-3.dts
-@@ -234,6 +234,7 @@
- 		compatible = "ti,pcm5142";
- 
- 		reg = <0x4c>;
-+		#sound-dai-cells = <0>;
- 
- 		AVDD-supply = <&reg_3v3>;
- 		DVDD-supply = <&reg_3v3>;
+Changes in v4:
+Rewrite commit message.
+
+Changes in v3:
+Also remove remove() and module_exit() as Tomasz suggested.
+Loop platform_get_irq() as Robin suggested.
+Add struct rk_iommudata.
+Squash iommu/rockchip: Use iommu_group_get_for_dev() for add_device
+Only call startup() and shutdown() when iommu attached.
+Remove pm_mutex.
+Check runtime PM disabled.
+Check pm_runtime in rk_iommu_irq().
+Remove rk_iommudata->domain.
+
+Changes in v2:
+Move irq request to probe(in patch[0])
+Move bus_set_iommu() to rk_iommu_probe().
+
+Jeffy Chen (9):
+  iommu/rockchip: Prohibit unbind and remove
+  iommu/rockchip: Fix error handling in probe
+  iommu/rockchip: Request irqs in rk_iommu_probe()
+  ARM: dts: rockchip: add clocks in vop iommu nodes
+  iommu/rockchip: Use IOMMU device for dma mapping operations
+  iommu/rockchip: Use OF_IOMMU to attach devices automatically
+  iommu/rockchip: Fix error handling in init
+  iommu/rockchip: Add runtime PM support
+  iommu/rockchip: Support sharing IOMMU between masters
+
+Tomasz Figa (4):
+  iommu/rockchip: Fix error handling in attach
+  iommu/rockchip: Use iopoll helpers to wait for hardware
+  iommu/rockchip: Fix TLB flush of secondary IOMMUs
+  iommu/rockchip: Control clocks needed to access the IOMMU
+
+ .../devicetree/bindings/iommu/rockchip,iommu.txt   |   8 +
+ arch/arm/boot/dts/rk3036.dtsi                      |   2 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   4 +
+ drivers/iommu/rockchip-iommu.c                     | 653 ++++++++++++---------
+ 4 files changed, 386 insertions(+), 281 deletions(-)
+
 -- 
 2.11.0
