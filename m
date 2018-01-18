@@ -1,48 +1,31 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 19 Jan 2018 00:58:36 +0100
-Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for i.MX6UL/ULL
-Message-ID: <20180118235836.17393-1-stefan@agner.ch>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Fri, 19 Jan 2018 00:56:15 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
+In-Reply-To: <CAOcK=CP=m0oBfvPuMEXLGG_5rxqchh5dg9SLbbiAUEvEyj=aMg@mail.gmail.com>
+References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
+ <84391569-cdb9-1c17-7e37-6fdad954d549@maciej.szmigiero.name>
+ <CAOcK=CNuopm0bq3s-jb2MJ0hHhLyYC1h3zquO__syN2=tU_nKQ@mail.gmail.com>
+ <513e5b07-0209-0d30-f8e2-5ff1799d8a2d@maciej.szmigiero.name>
+ <CAOcK=CP=m0oBfvPuMEXLGG_5rxqchh5dg9SLbbiAUEvEyj=aMg@mail.gmail.com>
+Message-ID: <301f56e0-00e5-ccb2-0d40-69fb53041800@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
-Use PLL1 sys clock for all operating points higher than 528MHz.
+On 19.01.2018 00:50, Markus Rathgeb wrote:
+>> Does applying Fabio's patch to the freezing 4.13 or 4.15-rc kernel cause it to boot
+> successfully?
+> 
+> 
+> AFAIK The latest series that Peter Chen to address the issue was posted was
+> v16 from June, 2017.
+> I didn't try it yet myself.
+> Will give it a try the next days.
 
-Note: For higher operating points VDD_SOC_IN needs to be 125mV
-higher than the ARM set-point (see datasheet). Specifically, the
-i.MX6UL/ULL EVK boards have an external DC regulator which needs
-adjustment. The regulator adjustment is not covered with this
-change.
+Peter's power sequence library patches do work, I'm using them on
+4.15-rc without problems.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+However, in my previous question I inquired whether the Fabio's "Disable usbh1 to
+avoid kernel hang" patch, that this email thread is about, when applied to the
+freezing 4.13 or 4.15-rc kernel, cause it to boot successfully - does it?
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 628fe899cb48..840f6386c780 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		 */
- 		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
- 		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
--			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
--		else
--			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(step_clk, secondary_sel_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
-+		if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
-+			if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-+				clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-+			else
-+				clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-+			clk_set_parent(step_clk, secondary_sel_clk);
-+			clk_set_parent(pll1_sw_clk, step_clk);
-+		}
- 	} else {
- 		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
- 		clk_set_parent(pll1_sw_clk, step_clk);
--- 
-2.15.1
+Maciej
