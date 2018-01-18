@@ -1,214 +1,126 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Jan 2018 13:09:27 +0000
-Subject: [PATCH v4 05/13] iommu/rockchip: Use iopoll helpers to wait for
- hardware
-In-Reply-To: <20180118115251.5542-6-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-6-jeffy.chen@rock-chips.com>
-Message-ID: <064794b9-98ae-221e-76bd-e11130514826@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 18 Jan 2018 14:12:07 +0100
+Subject: [PATCH v3 30/41] KVM: arm64: Prepare to handle deferred
+ save/restore of 32-bit registers
+In-Reply-To: <9a2edac8-29aa-ffac-a845-ef6090e2226c@arm.com>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-31-christoffer.dall@linaro.org>
+ <9a2edac8-29aa-ffac-a845-ef6090e2226c@arm.com>
+Message-ID: <20180118131207.GD27865@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 11:52, Jeffy Chen wrote:
-> From: Tomasz Figa <tfiga@chromium.org>
+On Wed, Jan 17, 2018 at 06:22:29PM +0000, Julien Thierry wrote:
+> Hi,
 > 
-> This patch converts the rockchip-iommu driver to use the in-kernel
-> iopoll helpers to wait for certain status bits to change in registers
-> instead of an open-coded custom macro.
+> On 12/01/18 12:07, Christoffer Dall wrote:
+> >32-bit registers are not used by a 64-bit host kernel and can be
+> >deferred, but we need to rework the accesses to this register to access
+> >the latest value depending on whether or not guest system registers are
+> >loaded on the CPU or only reside in memory.
+> >
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 > 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
+> >---
+> >  arch/arm64/include/asm/kvm_emulate.h | 32 +++++-------------
+> >  arch/arm64/kvm/regmap.c              | 65 ++++++++++++++++++++++++++----------
+> >  arch/arm64/kvm/sys_regs.c            |  6 ++--
+> >  3 files changed, 60 insertions(+), 43 deletions(-)
+> >
 > 
->   drivers/iommu/rockchip-iommu.c | 68 ++++++++++++++++++++----------------------
->   1 file changed, 32 insertions(+), 36 deletions(-)
+> [...]
 > 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 37065a7127c9..4a1c710408af 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -13,7 +13,7 @@
->   #include <linux/interrupt.h>
->   #include <linux/io.h>
->   #include <linux/iommu.h>
-> -#include <linux/jiffies.h>
-> +#include <linux/iopoll.h>
->   #include <linux/list.h>
->   #include <linux/mm.h>
->   #include <linux/module.h>
-> @@ -36,7 +36,8 @@
->   #define RK_MMU_AUTO_GATING	0x24
->   
->   #define DTE_ADDR_DUMMY		0xCAFEBABE
-> -#define FORCE_RESET_TIMEOUT	100	/* ms */
-> +#define FORCE_RESET_TIMEOUT	100000	/* us */
-> +#define POLL_TIMEOUT		1000	/* us */
+> >diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
+> >index bbc6ae32e4af..3f65098aff8d 100644
+> >--- a/arch/arm64/kvm/regmap.c
+> >+++ b/arch/arm64/kvm/regmap.c
+> >@@ -141,28 +141,59 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
+> >  /*
+> >   * Return the SPSR for the current mode of the virtual CPU.
+> >   */
+> >-unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
+> >+static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
+> >  {
+> >  	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
+> >  	switch (mode) {
+> >-	case COMPAT_PSR_MODE_SVC:
+> >-		mode = KVM_SPSR_SVC;
+> >-		break;
+> >-	case COMPAT_PSR_MODE_ABT:
+> >-		mode = KVM_SPSR_ABT;
+> >-		break;
+> >-	case COMPAT_PSR_MODE_UND:
+> >-		mode = KVM_SPSR_UND;
+> >-		break;
+> >-	case COMPAT_PSR_MODE_IRQ:
+> >-		mode = KVM_SPSR_IRQ;
+> >-		break;
+> >-	case COMPAT_PSR_MODE_FIQ:
+> >-		mode = KVM_SPSR_FIQ;
+> >-		break;
+> >+	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
+> >+	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
+> >+	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
+> >+	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
+> >+	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
+> >+	default: BUG();
+> >+	}
+> >+}
+> >+
+> >+unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
+> >+{
+> >+	int spsr_idx = vcpu_spsr32_mode(vcpu);
+> >+
+> >+	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> >+		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
+> >+
+> >+	switch (spsr_idx) {
+> >+	case KVM_SPSR_SVC:
+> >+		return read_sysreg_el1(spsr);
+> >+	case KVM_SPSR_ABT:
+> >+		return read_sysreg(spsr_abt);
+> >+	case KVM_SPSR_UND:
+> >+		return read_sysreg(spsr_und);
+> >+	case KVM_SPSR_IRQ:
+> >+		return read_sysreg(spsr_irq);
+> >+	case KVM_SPSR_FIQ:
+> >+		return read_sysreg(spsr_fiq);
+> >  	default:
+> >  		BUG();
+> 
+> Nit:
+> 
+> Since the BUG() is in vcpu_spsr32_mode now, you can probably remove it here
+> (or add it to vcpu_write_sprsr32 for consistency).
+> 
+> >  	}
 
-Nit: the callsites look a bit odd with the combination of POLL_TIMEOUT 
-and the magic number 100 - should we not also define something like 
-POLL_PERIOD for that? Also POLL_TIMEOUT is a rather generic name and 
-overlaps with several other drivers, so a namespace prefix would be 
-helpful (i.e. RK_IOMMU_POLL*, or at least RK_POLL*).
+Yes, I'll remove it.
 
-FWIW, my personal preference would be to also suffix these with _US for 
-absolute clarity, but it's not essential (especially if longer names 
-lead to more linebreaks at the callsites).
+Thanks,
+-Christoffer
 
-With those undocumented "100"s fixed up,
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
->   /* RK_MMU_STATUS fields */
->   #define RK_MMU_STATUS_PAGING_ENABLED       BIT(0)
-> @@ -73,8 +74,6 @@
->     */
->   #define RK_IOMMU_PGSIZE_BITMAP 0x007ff000
->   
-> -#define IOMMU_REG_POLL_COUNT_FAST 1000
-> -
->   struct rk_iommu_domain {
->   	struct list_head iommus;
->   	struct platform_device *pdev;
-> @@ -109,27 +108,6 @@ static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
->   	return container_of(dom, struct rk_iommu_domain, domain);
->   }
->   
-> -/**
-> - * Inspired by _wait_for in intel_drv.h
-> - * This is NOT safe for use in interrupt context.
-> - *
-> - * Note that it's important that we check the condition again after having
-> - * timed out, since the timeout could be due to preemption or similar and
-> - * we've never had a chance to check the condition before the timeout.
-> - */
-> -#define rk_wait_for(COND, MS) ({ \
-> -	unsigned long timeout__ = jiffies + msecs_to_jiffies(MS) + 1;	\
-> -	int ret__ = 0;							\
-> -	while (!(COND)) {						\
-> -		if (time_after(jiffies, timeout__)) {			\
-> -			ret__ = (COND) ? 0 : -ETIMEDOUT;		\
-> -			break;						\
-> -		}							\
-> -		usleep_range(50, 100);					\
-> -	}								\
-> -	ret__;								\
-> -})
-> -
->   /*
->    * The Rockchip rk3288 iommu uses a 2-level page table.
->    * The first level is the "Directory Table" (DT).
-> @@ -333,9 +311,21 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu *iommu)
->   	return enable;
->   }
->   
-> +static bool rk_iommu_is_reset_done(struct rk_iommu *iommu)
-> +{
-> +	bool done = true;
-> +	int i;
-> +
-> +	for (i = 0; i < iommu->num_mmu; i++)
-> +		done &= rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0;
-> +
-> +	return done;
-> +}
-> +
->   static int rk_iommu_enable_stall(struct rk_iommu *iommu)
->   {
->   	int ret, i;
-> +	bool val;
->   
->   	if (rk_iommu_is_stall_active(iommu))
->   		return 0;
-> @@ -346,7 +336,8 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
->   
->   	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
->   
-> -	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
-> +	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
-> +				 val, 100, POLL_TIMEOUT);
->   	if (ret)
->   		for (i = 0; i < iommu->num_mmu; i++)
->   			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
-> @@ -358,13 +349,15 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
->   static int rk_iommu_disable_stall(struct rk_iommu *iommu)
->   {
->   	int ret, i;
-> +	bool val;
->   
->   	if (!rk_iommu_is_stall_active(iommu))
->   		return 0;
->   
->   	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_STALL);
->   
-> -	ret = rk_wait_for(!rk_iommu_is_stall_active(iommu), 1);
-> +	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
-> +				 !val, 100, POLL_TIMEOUT);
->   	if (ret)
->   		for (i = 0; i < iommu->num_mmu; i++)
->   			dev_err(iommu->dev, "Disable stall request timed out, status: %#08x\n",
-> @@ -376,13 +369,15 @@ static int rk_iommu_disable_stall(struct rk_iommu *iommu)
->   static int rk_iommu_enable_paging(struct rk_iommu *iommu)
->   {
->   	int ret, i;
-> +	bool val;
->   
->   	if (rk_iommu_is_paging_enabled(iommu))
->   		return 0;
->   
->   	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_PAGING);
->   
-> -	ret = rk_wait_for(rk_iommu_is_paging_enabled(iommu), 1);
-> +	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
-> +				 val, 100, POLL_TIMEOUT);
->   	if (ret)
->   		for (i = 0; i < iommu->num_mmu; i++)
->   			dev_err(iommu->dev, "Enable paging request timed out, status: %#08x\n",
-> @@ -394,13 +389,15 @@ static int rk_iommu_enable_paging(struct rk_iommu *iommu)
->   static int rk_iommu_disable_paging(struct rk_iommu *iommu)
->   {
->   	int ret, i;
-> +	bool val;
->   
->   	if (!rk_iommu_is_paging_enabled(iommu))
->   		return 0;
->   
->   	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_PAGING);
->   
-> -	ret = rk_wait_for(!rk_iommu_is_paging_enabled(iommu), 1);
-> +	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
-> +				 !val, 100, POLL_TIMEOUT);
->   	if (ret)
->   		for (i = 0; i < iommu->num_mmu; i++)
->   			dev_err(iommu->dev, "Disable paging request timed out, status: %#08x\n",
-> @@ -413,6 +410,7 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
->   {
->   	int ret, i;
->   	u32 dte_addr;
-> +	bool val;
->   
->   	if (iommu->reset_disabled)
->   		return 0;
-> @@ -433,13 +431,11 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
->   
->   	rk_iommu_command(iommu, RK_MMU_CMD_FORCE_RESET);
->   
-> -	for (i = 0; i < iommu->num_mmu; i++) {
-> -		ret = rk_wait_for(rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0x00000000,
-> -				  FORCE_RESET_TIMEOUT);
-> -		if (ret) {
-> -			dev_err(iommu->dev, "FORCE_RESET command timed out\n");
-> -			return ret;
-> -		}
-> +	ret = readx_poll_timeout(rk_iommu_is_reset_done, iommu, val,
-> +				 val, 100, FORCE_RESET_TIMEOUT);
-> +	if (ret) {
-> +		dev_err(iommu->dev, "FORCE_RESET command timed out\n");
-> +		return ret;
->   	}
->   
->   	return 0;
-> 
+> >+}
+> >-	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
+> >+void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
+> >+{
+> >+	int spsr_idx = vcpu_spsr32_mode(vcpu);
+> >+
+> >+	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> >+		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
+> >+
+> >+	switch (spsr_idx) {
+> >+	case KVM_SPSR_SVC:
+> >+		write_sysreg_el1(v, spsr);
+> >+	case KVM_SPSR_ABT:
+> >+		write_sysreg(v, spsr_abt);
+> >+	case KVM_SPSR_UND:
+> >+		write_sysreg(v, spsr_und);
+> >+	case KVM_SPSR_IRQ:
+> >+		write_sysreg(v, spsr_irq);
+> >+	case KVM_SPSR_FIQ:
+> >+		write_sysreg(v, spsr_fiq);
+> >+	}
+> >  }
