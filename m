@@ -1,33 +1,25 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 18 Jan 2018 23:02:42 +1100
-Subject: [PATCH 0/7] arm64: move literal data into .rodata section
-In-Reply-To: <CAKv+Gu_oh7q81mr=XPW+HM9zewETtbL=mnN0mkr83f5=n4zr6Q@mail.gmail.com>
-References: <20180110121142.18291-1-ard.biesheuvel@linaro.org>
- <20180118114112.GA20091@gondor.apana.org.au>
- <CAKv+Gu_oh7q81mr=XPW+HM9zewETtbL=mnN0mkr83f5=n4zr6Q@mail.gmail.com>
-Message-ID: <20180118120242.GE20717@gondor.apana.org.au>
+Date: Thu, 18 Jan 2018 23:01:46 +1100
+Subject: [PATCH 1/2] crypto: exynos-rng - Add SPDX license identifier and
+ correct module license
+In-Reply-To: <20180109175736.6885-1-krzk@kernel.org>
+References: <20180109175736.6885-1-krzk@kernel.org>
+Message-ID: <20180118120146.GA20717@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 11:46:07AM +0000, Ard Biesheuvel wrote:
-> On 18 January 2018 at 11:41, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> > On Wed, Jan 10, 2018 at 12:11:35PM +0000, Ard Biesheuvel wrote:
-> >> Prevent inadvertently creating speculative gadgets by moving literal data
-> >> into the .rodata section.
-> >>
-> >> Patch #1 enables this for C code, by reverting a change that disables the
-> >> GCC feature implementing this. Note that this conflicts with the mitigation
-> >> of erratum #843419 for Cortex-A53.
-> >
-> > Ard, which tree is this supposed to go through?
-> >
+On Tue, Jan 09, 2018 at 06:57:35PM +0100, Krzysztof Kozlowski wrote:
+> Replace GPL license statement with SPDX GPL-2.0 license identifier and
+> correct the module license to GPLv2.
 > 
-> Hi Herbert,
+> The license itself was a generic GPL because of copy-and-paste from old
+> drivers/char/hw_random/exynos-rng.c driver (on which this was based on).
+> However the module license indicated GPL-2.0 or later.  GPL-2.0 was
+> intended by author so fix up this mess.
 > 
-> I am going to drop that first patch, the remaining 6 patches can go
-> through the crypto tree as they are independent.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Patches 2-7 applied.  Thanks.
+All applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
