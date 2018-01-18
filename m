@@ -1,220 +1,300 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 18 Jan 2018 19:52:47 +0800
-Subject: [PATCH v4 09/13] iommu/rockchip: Use IOMMU device for dma mapping
- operations
-In-Reply-To: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180118115251.5542-10-jeffy.chen@rock-chips.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Jan 2018 12:00:07 +0000
+Subject: [PATCH v2 0/2] arm64: Run enable method for errata work arounds
+ on late CPUs
+In-Reply-To: <20180118114540.GL22781@e103592.cambridge.arm.com>
+References: <20180117174220.7959-1-suzuki.poulose@arm.com>
+ <20180118114540.GL22781@e103592.cambridge.arm.com>
+Message-ID: <5c1945a8-a66d-9306-1c6d-3c1c8febcab2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the first registered IOMMU device for dma mapping operations, and
-drop the domain platform device.
+On 18/01/18 11:45, Dave Martin wrote:
+> On Wed, Jan 17, 2018 at 05:42:19PM +0000, Suzuki K Poulose wrote:
+>> We issue the enable() call back for all CPU hwcaps capabilities
+>> available on the system, on all the CPUs. So far we have ignored
+>> the argument passed to the call back, which had a prototype to
+>> accept a "void *" for use with on_each_cpu() and later with
+>> stop_machine(). However, with commit 0a0d111d40fd1
+>> ("arm64: cpufeature: Pass capability structure to ->enable callback"),
+>> there are some users of the argument who wants the matching capability
+>> struct pointer where there are multiple matching criteria for a single
+>> capability. Changing the prototype is quite an invasive change and
+> 
+> It's not that bad, though it's debatable whether it's really worth
+> it.  See the appended patch below.
+> 
+>> will be part of a future series. For now, add a comment to clarify
+>> what is expected.
+> 
+> With the type change, it becomes more obvious what should be passed,
+> and the comment can probably be trimmed down.  I omit the comment
+> from my patch (I'm lazy).
+> 
+> Without it, I would prefer a comment alongside the (void *) cast,
+> something like "enable methods expect this to be passed as a void *,
+> for compatibility with stop_machine()".
+> 
+> For consistency, the stop_machine() call should also be changed to
+> pass the cap pointer instead of NULL, even if we don't actually rely
+> on that for any purpose today -- it will help avoid surprises in the
+> future.  (My patch does makes an equivalent change.)
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index ac67cfc2585a..c049e28274d4 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -97,7 +97,14 @@ struct arm64_cpu_capabilities {
+>>   	u16 capability;
+>>   	int def_scope;			/* default scope */
+>>   	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+>> -	int (*enable)(void *);		/* Called on all active CPUs */
+>> +	/*
+>> +	 * For each @capability set in CPU hwcaps, @enable() is called on all
+>> +	 * active CPUs with const struct arm64_cpu_capabilities * as argument.
+> 
+> The declaration tells us the type, so we don't need that in the comment.
+> But what object should the pointer point to?
+> 
+>> +	 * It is upto the callback (especially when multiple entries for the
+> 
+> up to
+> 
+>> +	 * same capability exists) to determine if any action should be taken
+>> +	 * based on @matches() applies to thie CPU.
+>> +	 */
+>> +	int (*enable)(void *caps);
+>>   	union {
+>>   		struct {	/* To be used for erratum handling only */
+>>   			u32 midr_model;
+> 
+> Cheers
+> ---Dave
+> 
+> 
+> --8<--
+> 
+>  From 04a4bd998d02e339341db250e66b0d34a7c4e042 Mon Sep 17 00:00:00 2001
+> From: Dave Martin <Dave.Martin@arm.com>
+> Date: Thu, 18 Jan 2018 11:29:14 +0000
+> Subject: [PATCH] arm64: cpufeature: Formalise capability enable method type
+> 
+> Currently, all cpufeature enable methods specify their argument as
+> a void *, while what is actually passed is a pointer to a const
+> struct arm64_cpu_capabilities object.
+> 
+> Hiding the type information from the compiler increases the risk
+> of incorrect code.
+> 
+> Instead of requiring care to be taken in every enable method, this
+> patch makes the type of the argument explicitly struct
+> arm64_cpu_capabilities const *.
+> 
+> Since we need to call these methods via stop_machine(), a single
+> proxy function __cpu_enable_capability() is added which is passed
+> to stop_machine() to allow it to call feature enable methods
+> without defeating type checking in the compiler (except in this
+> one place).
+> 
+> This patch should not change the behaviour of the kernel.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> ---
+> 
+> Build-tested only.
+> 
+>   arch/arm64/include/asm/cpufeature.h |  4 +++-
+>   arch/arm64/include/asm/fpsimd.h     |  4 +++-
+>   arch/arm64/include/asm/processor.h  |  5 +++--
+>   arch/arm64/kernel/cpu_errata.c      |  3 ++-
+>   arch/arm64/kernel/cpufeature.c      | 20 +++++++++++++++++++-
+>   arch/arm64/kernel/fpsimd.c          |  3 ++-
+>   arch/arm64/kernel/traps.c           |  3 ++-
+>   arch/arm64/mm/fault.c               |  2 +-
+>   8 files changed, 35 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 060e3a4..98d22ce 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -100,7 +100,9 @@ struct arm64_cpu_capabilities {
+>   	u16 capability;
+>   	int def_scope;			/* default scope */
+>   	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+> -	int (*enable)(void *);		/* Called on all active CPUs */
+> +	/* Called on all active CPUs: */
+> +	int (*enable)(struct arm64_cpu_capabilities const *);
+> +
+>   	union {
+>   		struct {	/* To be used for erratum handling only */
+>   			u32 midr_model;
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index 74f3439..ac9902d 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -83,7 +83,9 @@ extern void sve_save_state(void *state, u32 *pfpsr);
+>   extern void sve_load_state(void const *state, u32 const *pfpsr,
+>   			   unsigned long vq_minus_1);
+>   extern unsigned int sve_get_vl(void);
+> -extern int sve_kernel_enable(void *);
+> +
+> +struct arm64_cpu_capabilities;
+> +extern int sve_kernel_enable(struct arm64_cpu_capabilities const *);
+>   
+>   extern int __ro_after_init sve_max_vl;
+>   
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 023cacb..46959651a 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -34,6 +34,7 @@
+>   #include <linux/string.h>
+>   
+>   #include <asm/alternative.h>
+> +#include <asm/cpufeature.h>
+>   #include <asm/fpsimd.h>
+>   #include <asm/hw_breakpoint.h>
+>   #include <asm/lse.h>
+> @@ -214,8 +215,8 @@ static inline void spin_lock_prefetch(const void *ptr)
+>   
+>   #endif
+>   
+> -int cpu_enable_pan(void *__unused);
+> -int cpu_enable_cache_maint_trap(void *__unused);
+> +int cpu_enable_pan(struct arm64_cpu_capabilities const *__unused);
+> +int cpu_enable_cache_maint_trap(struct arm64_cpu_capabilities const *__unused);
+>   
+>   /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
+>   #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 0e27f86..addd7fd 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -39,7 +39,8 @@ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
+>   		(arm64_ftr_reg_ctrel0.sys_val & arm64_ftr_reg_ctrel0.strict_mask);
+>   }
+>   
+> -static int cpu_enable_trap_ctr_access(void *__unused)
+> +static int cpu_enable_trap_ctr_access(
+> +	struct arm64_cpu_capabilities const *__unused)
+>   {
+>   	/* Clear SCTLR_EL1.UCT */
+>   	config_sctlr_el1(SCTLR_EL1_UCT, 0);
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index a73a592..05486a9 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1084,6 +1084,18 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>   	}
+>   }
+>   
+> +struct enable_arg {
+> +	int (*enable)(struct arm64_cpu_capabilities const *);
+> +	struct arm64_cpu_capabilities const *cap;
+> +};
+> +
+> +static int __enable_cpu_capability(void *arg)
+> +{
+> +	struct enable_arg const *e = arg;
+> +
+> +	return e->enable(e->cap);
+> +}
 
-This is similar to exynos iommu driver.
+AFAICS, you shouldn't even need the intermediate struct - if you were 
+instead to call stop_machine(&caps->enable, ...), the wrapper could be:
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
----
+	<type> **fn = arg;
+	*fn(container_of(fn, struct arm64_cpu_capabilities, enable));
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+(cheaty pseudocode because there's no way I'm going to write a 
+pointer-to-function-pointer type correctly in an email client...)
 
- drivers/iommu/rockchip-iommu.c | 85 ++++++++++++------------------------------
- 1 file changed, 24 insertions(+), 61 deletions(-)
+That's certainly a fair bit simpler in terms of diffstat; whether it's 
+really as intuitive as I think it is is perhaps another matter, though.
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 9b85a3050449..bdb7c5de6fc2 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -77,7 +77,6 @@
- 
- struct rk_iommu_domain {
- 	struct list_head iommus;
--	struct platform_device *pdev;
- 	u32 *dt; /* page directory table */
- 	dma_addr_t dt_dma;
- 	spinlock_t iommus_lock; /* lock for iommus list */
-@@ -98,12 +97,14 @@ struct rk_iommu {
- 	struct iommu_domain *domain; /* domain to which iommu is attached */
- };
- 
-+static struct device *dma_dev;
-+
- static inline void rk_table_flush(struct rk_iommu_domain *dom, dma_addr_t dma,
- 				  unsigned int count)
- {
- 	size_t size = count * sizeof(u32); /* count of u32 entry */
- 
--	dma_sync_single_for_device(&dom->pdev->dev, dma, size, DMA_TO_DEVICE);
-+	dma_sync_single_for_device(dma_dev, dma, size, DMA_TO_DEVICE);
- }
- 
- static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
-@@ -690,7 +691,6 @@ static void rk_iommu_zap_iova_first_last(struct rk_iommu_domain *rk_domain,
- static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
- 				  dma_addr_t iova)
- {
--	struct device *dev = &rk_domain->pdev->dev;
- 	u32 *page_table, *dte_addr;
- 	u32 dte_index, dte;
- 	phys_addr_t pt_phys;
-@@ -708,9 +708,9 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
- 	if (!page_table)
- 		return ERR_PTR(-ENOMEM);
- 
--	pt_dma = dma_map_single(dev, page_table, SPAGE_SIZE, DMA_TO_DEVICE);
--	if (dma_mapping_error(dev, pt_dma)) {
--		dev_err(dev, "DMA mapping error while allocating page table\n");
-+	pt_dma = dma_map_single(dma_dev, page_table, SPAGE_SIZE, DMA_TO_DEVICE);
-+	if (dma_mapping_error(dma_dev, pt_dma)) {
-+		dev_err(dma_dev, "DMA mapping error while allocating page table\n");
- 		free_page((unsigned long)page_table);
- 		return ERR_PTR(-ENOMEM);
- 	}
-@@ -982,29 +982,20 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
- static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
- {
- 	struct rk_iommu_domain *rk_domain;
--	struct platform_device *pdev;
--	struct device *iommu_dev;
- 
- 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
- 		return NULL;
- 
--	/* Register a pdev per domain, so DMA API can base on this *dev
--	 * even some virtual master doesn't have an iommu slave
--	 */
--	pdev = platform_device_register_simple("rk_iommu_domain",
--					       PLATFORM_DEVID_AUTO, NULL, 0);
--	if (IS_ERR(pdev))
-+	if (!dma_dev)
- 		return NULL;
- 
--	rk_domain = devm_kzalloc(&pdev->dev, sizeof(*rk_domain), GFP_KERNEL);
-+	rk_domain = devm_kzalloc(dma_dev, sizeof(*rk_domain), GFP_KERNEL);
- 	if (!rk_domain)
--		goto err_unreg_pdev;
--
--	rk_domain->pdev = pdev;
-+		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
- 	    iommu_get_dma_cookie(&rk_domain->domain))
--		goto err_unreg_pdev;
-+		return NULL;
- 
- 	/*
- 	 * rk32xx iommus use a 2 level pagetable.
-@@ -1015,11 +1006,10 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
- 	if (!rk_domain->dt)
- 		goto err_put_cookie;
- 
--	iommu_dev = &pdev->dev;
--	rk_domain->dt_dma = dma_map_single(iommu_dev, rk_domain->dt,
-+	rk_domain->dt_dma = dma_map_single(dma_dev, rk_domain->dt,
- 					   SPAGE_SIZE, DMA_TO_DEVICE);
--	if (dma_mapping_error(iommu_dev, rk_domain->dt_dma)) {
--		dev_err(iommu_dev, "DMA map error for DT\n");
-+	if (dma_mapping_error(dma_dev, rk_domain->dt_dma)) {
-+		dev_err(dma_dev, "DMA map error for DT\n");
- 		goto err_free_dt;
- 	}
- 
-@@ -1040,8 +1030,6 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
- err_put_cookie:
- 	if (type == IOMMU_DOMAIN_DMA)
- 		iommu_put_dma_cookie(&rk_domain->domain);
--err_unreg_pdev:
--	platform_device_unregister(pdev);
- 
- 	return NULL;
- }
-@@ -1058,20 +1046,18 @@ static void rk_iommu_domain_free(struct iommu_domain *domain)
- 		if (rk_dte_is_pt_valid(dte)) {
- 			phys_addr_t pt_phys = rk_dte_pt_address(dte);
- 			u32 *page_table = phys_to_virt(pt_phys);
--			dma_unmap_single(&rk_domain->pdev->dev, pt_phys,
-+			dma_unmap_single(dma_dev, pt_phys,
- 					 SPAGE_SIZE, DMA_TO_DEVICE);
- 			free_page((unsigned long)page_table);
- 		}
- 	}
- 
--	dma_unmap_single(&rk_domain->pdev->dev, rk_domain->dt_dma,
-+	dma_unmap_single(dma_dev, rk_domain->dt_dma,
- 			 SPAGE_SIZE, DMA_TO_DEVICE);
- 	free_page((unsigned long)rk_domain->dt);
- 
- 	if (domain->type == IOMMU_DOMAIN_DMA)
- 		iommu_put_dma_cookie(&rk_domain->domain);
--
--	platform_device_unregister(rk_domain->pdev);
- }
- 
- static bool rk_iommu_is_dev_iommu_master(struct device *dev)
-@@ -1194,30 +1180,6 @@ static const struct iommu_ops rk_iommu_ops = {
- 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
- };
- 
--static int rk_iommu_domain_probe(struct platform_device *pdev)
--{
--	struct device *dev = &pdev->dev;
--
--	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms), GFP_KERNEL);
--	if (!dev->dma_parms)
--		return -ENOMEM;
--
--	/* Set dma_ops for dev, otherwise it would be dummy_dma_ops */
--	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), NULL, false);
--
--	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
--	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
--
--	return 0;
--}
--
--static struct platform_driver rk_iommu_domain_driver = {
--	.probe = rk_iommu_domain_probe,
--	.driver = {
--		   .name = "rk_iommu_domain",
--	},
--};
--
- static int rk_iommu_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -1278,6 +1240,14 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (err)
- 		goto err_remove_sysfs;
- 
-+	/*
-+	 * Use the first registered IOMMU device for domain to use with DMA
-+	 * API, since a domain might not physically correspond to a single
-+	 * IOMMU device..
-+	 */
-+	if (!dma_dev)
-+		dma_dev = &pdev->dev;
-+
- 	return 0;
- err_remove_sysfs:
- 	iommu_device_sysfs_remove(&iommu->iommu);
-@@ -1316,14 +1286,7 @@ static int __init rk_iommu_init(void)
- 	if (ret)
- 		return ret;
- 
--	ret = platform_driver_register(&rk_iommu_domain_driver);
--	if (ret)
--		return ret;
--
--	ret = platform_driver_register(&rk_iommu_driver);
--	if (ret)
--		platform_driver_unregister(&rk_iommu_domain_driver);
--	return ret;
-+	return platform_driver_register(&rk_iommu_driver);
- }
- subsys_initcall(rk_iommu_init);
- 
--- 
-2.11.0
+Robin.
+
+> +
+>   /*
+>    * Run through the enabled capabilities and enable() it on all active
+>    * CPUs
+> @@ -1100,13 +1112,19 @@ void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+>   		static_branch_enable(&cpu_hwcap_keys[num]);
+>   
+>   		if (caps->enable) {
+> +			struct enable_arg e = {
+> +				.enable	= caps->enable,
+> +				.cap	= caps,
+> +			};
+> +
+>   			/*
+>   			 * Use stop_machine() as it schedules the work allowing
+>   			 * us to modify PSTATE, instead of on_each_cpu() which
+>   			 * uses an IPI, giving us a PSTATE that disappears when
+>   			 * we return.
+>   			 */
+> -			stop_machine(caps->enable, NULL, cpu_online_mask);
+> +			stop_machine(__enable_cpu_capability, &e,
+> +				     cpu_online_mask);
+>   		}
+>   	}
+>   }
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index fae81f7..b6dcfa3 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -40,6 +40,7 @@
+>   #include <linux/sysctl.h>
+>   
+>   #include <asm/fpsimd.h>
+> +#include <asm/cpufeature.h>
+>   #include <asm/cputype.h>
+>   #include <asm/simd.h>
+>   #include <asm/sigcontext.h>
+> @@ -757,7 +758,7 @@ static void __init sve_efi_setup(void)
+>    * Enable SVE for EL1.
+>    * Intended for use by the cpufeatures code during CPU boot.
+>    */
+> -int sve_kernel_enable(void *__always_unused p)
+> +int sve_kernel_enable(struct arm64_cpu_capabilities const *__always_unused p)
+>   {
+>   	write_sysreg(read_sysreg(CPACR_EL1) | CPACR_EL1_ZEN_EL1EN, CPACR_EL1);
+>   	isb();
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 3d3588f..2457514 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -38,6 +38,7 @@
+>   
+>   #include <asm/atomic.h>
+>   #include <asm/bug.h>
+> +#include <asm/cpufeature.h>
+>   #include <asm/daifflags.h>
+>   #include <asm/debug-monitors.h>
+>   #include <asm/esr.h>
+> @@ -374,7 +375,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>   	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+>   }
+>   
+> -int cpu_enable_cache_maint_trap(void *__unused)
+> +int cpu_enable_cache_maint_trap(struct arm64_cpu_capabilities const *__unused)
+>   {
+>   	config_sctlr_el1(SCTLR_EL1_UCI, 0);
+>   	return 0;
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 9b7f89d..82f6729 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -795,7 +795,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+>   NOKPROBE_SYMBOL(do_debug_exception);
+>   
+>   #ifdef CONFIG_ARM64_PAN
+> -int cpu_enable_pan(void *__unused)
+> +int cpu_enable_pan(struct arm64_cpu_capabilities const *__unused)
+>   {
+>   	/*
+>   	 * We modify PSTATE. This won't work from irq context as the PSTATE
+> 
