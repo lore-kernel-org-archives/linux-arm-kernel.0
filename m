@@ -1,62 +1,76 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Thu, 18 Jan 2018 15:55:59 +0300
-Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <974305384.15547.1516259017873@email.1und1.de>
-References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
- <1059643032.72553.1516136078614@email.1und1.de>
- <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
- <1199109167.10232.1516213158515@email.1und1.de>
- <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
- <998321576.11526.1516217542223@email.1und1.de>
- <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
- <974305384.15547.1516259017873@email.1und1.de>
-Message-ID: <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 18 Jan 2018 13:57:49 +0100
+Subject: [PATCH v3 08/41] KVM: arm/arm64: Introduce vcpu_el1_is_32bit
+In-Reply-To: <4a3fa63c-5925-e406-26dd-da4e9765e7fa@arm.com>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-9-christoffer.dall@linaro.org>
+ <4a3fa63c-5925-e406-26dd-da4e9765e7fa@arm.com>
+Message-ID: <20180118125749.GB27865@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stefan
+On Wed, Jan 17, 2018 at 02:44:32PM +0000, Julien Thierry wrote:
+> Hi Christoffer,
+> 
+> On 12/01/18 12:07, Christoffer Dall wrote:
+> >We have numerous checks around that checks if the HCR_EL2 has the RW bit
+> >set to figure out if we're running an AArch64 or AArch32 VM.  In some
+> >cases, directly checking the RW bit (given its unintuitive name), is a
+> >bit confusing, and that's not going to improve as we move logic around
+> >for the following patches that optimize KVM on AArch64 hosts with VHE.
+> >
+> >Therefore, introduce a helper, vcpu_el1_is_32bit, and replace existing
+> >direct checks of HCR_EL2.RW with the helper.
+> >
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >  arch/arm64/include/asm/kvm_emulate.h | 7 ++++++-
+> >  arch/arm64/kvm/hyp/switch.c          | 8 ++------
+> >  arch/arm64/kvm/hyp/sysreg-sr.c       | 5 +++--
+> >  arch/arm64/kvm/inject_fault.c        | 6 +++---
+> >  4 files changed, 14 insertions(+), 12 deletions(-)
+> >
+> >diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> >index b36aaa1fe332..e07bf463ac58 100644
+> >--- a/arch/arm64/include/asm/kvm_emulate.h
+> >+++ b/arch/arm64/include/asm/kvm_emulate.h
+> >@@ -45,6 +45,11 @@ void kvm_inject_undef32(struct kvm_vcpu *vcpu);
+> >  void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+> >  void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
+> >+static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
+> >+{
+> >+	return !(vcpu->arch.hcr_el2 & HCR_RW);
+> >+}
+> >+
+> 
+> Just so I understand, the difference between this and vcpu_mode_is_32bit is
+> that vcpu_mode_is_32bit might return true because an interrupt/exception
+> occured while guest was executing 32bit EL0 but guest EL1 is still 64bits,
+> is that correct?
 
-On 01/18/2018 10:03 AM, Stefan Wahren wrote:
-> Hi Sergey,
->
->> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 21:04 geschrieben:
->>
->>
->> Hi Stefan,
->>
->> On 01/17/2018 10:32 PM, Stefan Wahren wrote:
->>> Hi Sergey,
->>>
->>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 19:49 geschrieben:
->>>>
->>>>
->>>> Hi Stefan
->>>>
->>>> wifi network was working fine when I used a raspbian image downloaded
->>>> from official site.
->>>>
->>>> Here is my config https://pastebin.com/7XRpmM0X  and cpuinfo
->>>> https://pastebin.com/08Z6gDZ9
->>>>
->>>> I have no idea about version you are talking about.
->>> please stop top-posting.
->>>
->>> I was talking about the board revision of your RPi. You can get this information by looking at the PCB.
->>>
->>> I updated to the last firmware and your config but i'm unable to reproduce this issue.
->>>
->>> Do you use U-Boot or only the Raspberry Pi bootloader?
->>> What are your modifications to config.txt?
->>>
->>>> Thanks.
->>>>
->>>>
->> I am using u-boot tagged 2018.01.
-> interesting. I don't use u-boot as second stage bootloader. Maybe it messed up the pin configuration of the GPIO expander. Could you please try without u-boot?
+Yes.
 
-but how can u-boot influence that ? As far as I understand the error 
-happens in a very late boot stage, actually in the end. At this time 
-bcm2837-rpi-3-b device tree file from kernel is already loaded. Do you 
-think this DTB is incorrect ?
+> 
+> Also, it seems the process controlling KVM is supposed to provide the
+> information of whether the vcpu runs a 32bit el1, would it be better to do:
+> 
+> 	return test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features);
+> 
+> instead of looking at the hcr? Or is there a case where those might differ?
 
-Thanks
+I think in the current implementation, both would work fine, and they
+shouldn't differ.  I prefer checking the HCR, because we then know we'll
+be consistent with what the hardware does, and the feature array is
+mostly there to negotiate between userspace and the kernel.  Also, we
+were already using the HCR.
+
+If there's an argument for checking the feature bits instead, I'm open
+to that idea, potentially as a separate patch explaining the rationale.
+
+> 
+> Otherwise:
+> 
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+> 
+Thanks!
+-Christoffer
