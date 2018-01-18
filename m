@@ -1,89 +1,133 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Thu, 18 Jan 2018 16:37:28 +0000
-Subject: [PATCH 2/2] clk: stm32: Add DSI clock for STM32F469 Board
-In-Reply-To: <1516286980-8603-3-git-send-email-gabriel.fernandez@st.com>
-References: <1516286980-8603-1-git-send-email-gabriel.fernandez@st.com>
- <1516286980-8603-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <69b40967-b334-5e94-0d57-e23944c30b17@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 18 Jan 2018 16:37:36 +0000
+Subject: [PATCH] efi: arm64: Check whether x18 is preserved by runtime
+ services calls
+Message-ID: <20180118163736.1253-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+Whether or not we will ever decide to start using x18 as a platform
+register in Linux is uncertain, but by that time, we will need to
+ensure that UEFI runtime services calls don't corrupt it. So let's
+start issuing warnings now for this, and increase the likelihood that
+these firmware images have all been replaced by that time.
 
-Tested successfully on f469 disco board.
+This has been fixed on the EDK2 side in commit 6d73863b5464
+("BaseTools/tools_def AARCH64: mark register x18 as reserved").,
+dated July 13, 2017.
 
-Tested-by: Philippe Cornu <philippe.cornu@st.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/efi.h            |  4 +++-
+ drivers/firmware/efi/Makefile           |  2 +-
+ drivers/firmware/efi/arm-runtime.c      | 10 +++++++++
+ drivers/firmware/efi/arm64-rt-wrapper.S | 40 +++++++++++++++++++++++++++++++++
+ 4 files changed, 54 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/firmware/efi/arm64-rt-wrapper.S
 
-Many thanks,
-Philippe :-)
-
-On 01/18/2018 03:49 PM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch adds DSI clock for STM32F469 board
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
->   drivers/clk/clk-stm32f4.c                 | 11 ++++++++++-
->   include/dt-bindings/clock/stm32fx-clock.h |  3 ++-
->   2 files changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-> index da44f8d..3c28798 100644
-> --- a/drivers/clk/clk-stm32f4.c
-> +++ b/drivers/clk/clk-stm32f4.c
-> @@ -521,7 +521,7 @@ struct stm32f4_pll_data {
->   };
->   
->   static const struct stm32f4_pll_data stm32f469_pll[MAX_PLL_DIV] = {
-> -	{ PLL,	   50, { "pll",	     "pll-q",    NULL	    } },
-> +	{ PLL,	   50, { "pll",	     "pll-q",    "pll-r"    } },
->   	{ PLL_I2S, 50, { "plli2s-p", "plli2s-q", "plli2s-r" } },
->   	{ PLL_SAI, 50, { "pllsai-p", "pllsai-q", "pllsai-r" } },
->   };
-> @@ -1047,6 +1047,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
->   	"no-clock", "lse", "lsi", "hse-rtc"
->   };
->   
-> +static const char *dsi_parent[2] = { NULL, "pll-r" };
-> +
->   static const char *lcd_parent[1] = { "pllsai-r-div" };
->   
->   static const char *i2s_parents[2] = { "plli2s-r", NULL };
-> @@ -1156,6 +1158,12 @@ struct stm32f4_clk_data {
->   		NO_GATE, 0,
->   		0
->   	},
-> +	{
-> +		CLK_F469_DSI, "dsi", dsi_parent, ARRAY_SIZE(dsi_parent),
-> +		STM32F4_RCC_DCKCFGR, 29, 1,
-> +		STM32F4_RCC_APB2ENR, 27,
-> +		CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT
-> +	},
->   };
->   
->   static const struct stm32_aux_clk stm32f746_aux_clk[] = {
-> @@ -1450,6 +1458,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
->   	stm32f4_gate_map = data->gates_map;
->   
->   	hse_clk = of_clk_get_parent_name(np, 0);
-> +	dsi_parent[0] = hse_clk;
->   
->   	i2s_in_clk = of_clk_get_parent_name(np, 1);
->   
-> diff --git a/include/dt-bindings/clock/stm32fx-clock.h b/include/dt-bindings/clock/stm32fx-clock.h
-> index 4d523b0..58d8b51 100644
-> --- a/include/dt-bindings/clock/stm32fx-clock.h
-> +++ b/include/dt-bindings/clock/stm32fx-clock.h
-> @@ -35,8 +35,9 @@
->   #define CLK_SAIQ_PDIV		13
->   #define CLK_HSI			14
->   #define CLK_SYSCLK		15
-> +#define CLK_F469_DSI		16
->   
-> -#define END_PRIMARY_CLK		16
-> +#define END_PRIMARY_CLK		17
->   
->   #define CLK_HDMI_CEC		16
->   #define CLK_SPDIF		17
-> 
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 8389050328bb..2278e4bf270a 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -31,7 +31,7 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+ ({									\
+ 	efi_##f##_t *__f;						\
+ 	__f = p->f;							\
+-	__f(args);							\
++	__efi_rt_asm_wrapper(__f, args);				\
+ })
+ 
+ #define arch_efi_call_virt_teardown()					\
+@@ -40,6 +40,8 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+ 	efi_virtmap_unload();						\
+ })
+ 
++efi_status_t __efi_rt_asm_wrapper(void *, ...);
++
+ #define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
+ 
+ /* arch specific definitions used by the stub code */
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index 269501dfba53..eb8be0a00931 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -28,5 +28,5 @@ obj-$(CONFIG_APPLE_PROPERTIES)		+= apple-properties.o
+ 
+ arm-obj-$(CONFIG_EFI)			:= arm-init.o arm-runtime.o
+ obj-$(CONFIG_ARM)			+= $(arm-obj-y)
+-obj-$(CONFIG_ARM64)			+= $(arm-obj-y)
++obj-$(CONFIG_ARM64)			+= $(arm-obj-y) arm64-rt-wrapper.o
+ obj-$(CONFIG_EFI_CAPSULE_LOADER)	+= capsule-loader.o
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index 1cc41c3d6315..de84b490a844 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -11,6 +11,8 @@
+  *
+  */
+ 
++#define pr_fmt(fmt)	"efi: " fmt
++
+ #include <linux/dmi.h>
+ #include <linux/efi.h>
+ #include <linux/io.h>
+@@ -182,3 +184,11 @@ static int __init arm_dmi_init(void)
+ 	return 0;
+ }
+ core_initcall(arm_dmi_init);
++
++#ifdef CONFIG_ARM64
++efi_status_t efi_handle_corrupted_x18(efi_status_t s)
++{
++	pr_warn_ratelimited(FW_BUG "x18 corrupted by EFI firmware!");
++	return s;
++}
++#endif
+diff --git a/drivers/firmware/efi/arm64-rt-wrapper.S b/drivers/firmware/efi/arm64-rt-wrapper.S
+new file mode 100644
+index 000000000000..a6a2b64134c9
+--- /dev/null
++++ b/drivers/firmware/efi/arm64-rt-wrapper.S
+@@ -0,0 +1,40 @@
++/*
++ * Copyright (C) 2018 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++ENTRY(__efi_rt_asm_wrapper)
++	stp	x29, x30, [sp, #-32]!
++	mov	x29, sp
++
++	/*
++	 * Register x18 is designated as the 'platform' register by the AAPCS,
++	 * which means firmware running at the same exception level as the OS
++	 * (such as UEFI) should never touch it.
++	 */
++	str	x18, [sp, #16]
++
++	/*
++	 * We are lucky enough that no EFI runtime services take more than
++	 * 5 arguments, so all are passed in registers rather than via the
++	 * stack.
++	 */
++	mov	x8, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	mov	x3, x4
++	mov	x4, x5
++	blr	x8
++
++	ldr	x1, [sp, #16]
++	cmp	x1, x18
++	ldp	x29, x30, [sp], #32
++	b.ne	efi_handle_corrupted_x18	// tail call
++	ret
++ENDPROC(__efi_rt_asm_wrapper)
+-- 
+2.11.0
