@@ -1,109 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 18 Jan 2018 14:45:24 +0000
-Subject: [RFC PATCH v2 3/3] arm64/kernel: enable A53 erratum #8434319 handling
- at runtime
-In-Reply-To: <20180118144524.18704-1-ard.biesheuvel@linaro.org>
-References: <20180118144524.18704-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180118144524.18704-4-ard.biesheuvel@linaro.org>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Thu, 18 Jan 2018 15:49:39 +0100
+Subject: [PATCH 1/2] clk: stm32: END_PRIMARY_CLK should be declare after
+ CLK_SYSCLK
+In-Reply-To: <1516286980-8603-1-git-send-email-gabriel.fernandez@st.com>
+References: <1516286980-8603-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1516286980-8603-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Omit patching of ADRP instruction at module load time if the current
-CPUs are not susceptible to the erratum.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Update of END_PRIMARY_CLK was missed, it should be after CLK_SYSCLK
+hsi and sysclk are overwritten by gpioa and gpiob.
+
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/kernel/cpu_errata.c   | 26 ++++++++++++++++++++
- arch/arm64/kernel/module-plts.c  |  3 ++-
- arch/arm64/kernel/module.c       |  3 ++-
- 4 files changed, 32 insertions(+), 3 deletions(-)
+ include/dt-bindings/clock/stm32fx-clock.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index bb263820de13..39134c46bb13 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -45,7 +45,8 @@
- #define ARM64_HARDEN_BRANCH_PREDICTOR		24
- #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
- #define ARM64_HAS_RAS_EXTN			26
-+#define ARM64_WORKAROUND_843419			27
- 
--#define ARM64_NCAPS				27
-+#define ARM64_NCAPS				28
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 90a9e465339c..5f742b518901 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -181,6 +181,23 @@ static int qcom_enable_link_stack_sanitization(void *data)
- }
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
- 
-+static bool __maybe_unused
-+needs_erratum_843419_workaround(const struct arm64_cpu_capabilities *entry,
-+				int scope)
-+{
-+	u32 cpuid = read_cpuid_id();
+diff --git a/include/dt-bindings/clock/stm32fx-clock.h b/include/dt-bindings/clock/stm32fx-clock.h
+index 49bb3c2..4d523b0 100644
+--- a/include/dt-bindings/clock/stm32fx-clock.h
++++ b/include/dt-bindings/clock/stm32fx-clock.h
+@@ -33,11 +33,11 @@
+ #define CLK_SAI2		11
+ #define CLK_I2SQ_PDIV		12
+ #define CLK_SAIQ_PDIV		13
+-
+-#define END_PRIMARY_CLK		14
+-
+ #define CLK_HSI			14
+ #define CLK_SYSCLK		15
 +
-+	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
++#define END_PRIMARY_CLK		16
 +
-+	if ((cpuid & MIDR_CPU_MODEL_MASK) != MIDR_CORTEX_A53)
-+		return false;
-+	else if ((cpuid & (MIDR_REVISION_MASK | MIDR_VARIANT_MASK)) == 0x4)
-+		/* erratum was fixed in some versions of r0p4 */
-+		return !(read_cpuid(REVIDR_EL1) & BIT(8));
-+	else
-+		return true;
-+}
-+
- #define MIDR_RANGE(model, min, max) \
- 	.def_scope = SCOPE_LOCAL_CPU, \
- 	.matches = is_affected_midr_range, \
-@@ -236,6 +253,15 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 			   MIDR_CPU_VAR_REV(1, 2)),
- 	},
- #endif
-+#ifdef CONFIG_ARM64_ERRATUM_843419
-+	{
-+	/* Cortex-A53 r0p[01234] */
-+		.desc = "ARM erratum 843419",
-+		.capability = ARM64_WORKAROUND_843419,
-+		.def_scope = SCOPE_LOCAL_CPU,
-+		.matches = needs_erratum_843419_workaround,
-+	},
-+#endif
- #ifdef CONFIG_ARM64_ERRATUM_845719
- 	{
- 	/* Cortex-A53 r0p[01234] */
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index 865094a0181e..c8f5795fc43d 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -158,7 +158,8 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
- 			break;
- 		case R_AARCH64_ADR_PREL_PG_HI21_NC:
- 		case R_AARCH64_ADR_PREL_PG_HI21:
--			if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
-+			if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-+			    !cpus_have_const_cap(ARM64_WORKAROUND_843419))
- 				break;
- 
- 			/*
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index 000196fe8f82..2f35884df886 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -204,7 +204,8 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, __le32 *place, u64 val,
- static bool reloc_adrp_erratum_843419(struct module *mod, __le32 *place,
- 				      u64 val)
- {
--	if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419))
-+	if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-+	    !cpus_have_const_cap(ARM64_WORKAROUND_843419))
- 		return false;
- 
- 	/* only ADRP instructions at the end of a 4k page are affected */
+ #define CLK_HDMI_CEC		16
+ #define CLK_SPDIF		17
+ #define CLK_USART1		18
 -- 
-2.11.0
+1.9.1
