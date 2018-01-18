@@ -1,45 +1,50 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 18 Jan 2018 11:14:23 -0300
-Subject: [PATCH v2 01/10] perf tools: Integrating the CoreSight decoding
- library
-In-Reply-To: <20180118135948.GA2940@krava>
-References: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
- <1516039994-314-2-git-send-email-mathieu.poirier@linaro.org>
- <20180116121500.GB26643@krava>
- <CANLsYkyEnJ5QzYyuGwhCB5p_2mE+8DdjaU6=Vpa6=CeKR+DzWg@mail.gmail.com>
- <20180117080640.GD6183@krava> <20180118134139.GC18383@kernel.org>
- <20180118135948.GA2940@krava>
-Message-ID: <20180118141423.GE18383@kernel.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 18 Jan 2018 22:17:57 +0800
+Subject: [PATCH] pinctrl: meson-axg: adjust uart_ao_b pin group naming
+Message-ID: <20180118141757.41290-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, Jan 18, 2018 at 02:59:48PM +0100, Jiri Olsa escreveu:
-> On Thu, Jan 18, 2018 at 10:41:39AM -0300, Arnaldo Carvalho de Melo wrote:
-> > 	Shouldn't libopencsd be treated like libbabeltrace was before
-> > the required version was widely available in distros?
+Simply adjust the pin group to _x _y _z style, as to
+keep the consistency in DT with previous naming scheme.
 
-> > 	I.e. these csets should have the rationale for that:
+Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-> > Enabling it once it became widely available:
+---
+Hi Linus,
 
-> >    24787afbcd01 ("perf tools: Enable LIBBABELTRACE by default")
+ Please also consider merging this patch into 'for-next', since it
+fixes issue added in the same cycle.
+ This patch will also obsolete previous one patches [1]
 
-> > Disabling it because we would need to get things from tarballs/git
-> > repos, build it in our machines, as requested by Ingo:
+[1] pinctrl: meson: use one uniform 'function' name
+http://lkml.kernel.org/r/20180108073328.205769-1-yixun.lan at amlogic.com
+---
+ drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> >   6ab2b762befd ("perf build: Disable libbabeltrace check by default")
-> 
-> I think at that time we did not have a way to hide the check,
-> now we have FEATURE_DISPLAY seprated so we can still check
-> for it, but users won't be bothered with [ FAIL ] output
-
-Ok, users won't be bothered with the fail output, but we tried hard to
-get the build fast by having it only test for things that are widely
-available, right? I.e. if we know something is not widely available then
-we better not try to build with it and get faster builds, wasn't that
-part of the rationale in the babeltrace case?
-
-If one has to build from sources some library, then its not a problem to
-have in the make command line a LIBOPENCSD=1 switch?
-
-- Arnaldo
+diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
+index 1fda9d6c7ea3..4b91ff74779b 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
++++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
+@@ -716,7 +716,7 @@ static const char * const uart_b_groups[] = {
+ 	"uart_tx_b_x", "uart_rx_b_x", "uart_cts_b_x", "uart_rts_b_x",
+ };
+ 
+-static const char * const uart_ao_b_gpioz_groups[] = {
++static const char * const uart_ao_b_z_groups[] = {
+ 	"uart_ao_tx_b_z", "uart_ao_rx_b_z",
+ 	"uart_ao_cts_b_z", "uart_ao_rts_b_z",
+ };
+@@ -855,7 +855,7 @@ static struct meson_pmx_func meson_axg_periphs_functions[] = {
+ 	FUNCTION(nand),
+ 	FUNCTION(uart_a),
+ 	FUNCTION(uart_b),
+-	FUNCTION(uart_ao_b_gpioz),
++	FUNCTION(uart_ao_b_z),
+ 	FUNCTION(i2c0),
+ 	FUNCTION(i2c1),
+ 	FUNCTION(i2c2),
+-- 
+2.15.1
