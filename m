@@ -1,19 +1,24 @@
 From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 18 Jan 2018 01:30:31 +0100
-Subject: [PATCH v2 04/16] ARM: dts: r8a7790: sort subnodes of root node
-In-Reply-To: <20180117161717.14589-5-horms+renesas@verge.net.au>
+Date: Thu, 18 Jan 2018 01:31:23 +0100
+Subject: [PATCH v2 05/16] ARM: dts: r8a7791: consistently use single
+ space after =
+In-Reply-To: <20180117161717.14589-6-horms+renesas@verge.net.au>
 References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-5-horms+renesas@verge.net.au>
-Message-ID: <20180118003031.GD11924@bigcity.dyn.berto.se>
+ <20180117161717.14589-6-horms+renesas@verge.net.au>
+Message-ID: <20180118003122.GE11924@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Simon,
 
-Thanks for your patch.
+Thanks for your work.
 
-On 2018-01-17 17:17:05 +0100, Simon Horman wrote:
-> Sort subnodes of root node to aid maintenance.
+On 2018-01-17 17:17:06 +0100, Simon Horman wrote:
+> Consistently use a single space after a =.
+> 
+> This patch removes instances where a tab or multiple spaces are used
+> instead.  It also avoids running over 80 columns in width in one of the
+> lines where whitespace is updated.
 > 
 > This patch should not introduce any functional change.
 > 
@@ -25,142 +30,116 @@ Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 > v2
 > * New patch
 > ---
->  arch/arm/boot/dts/r8a7790.dtsi | 104 ++++++++++++++++++++---------------------
->  1 file changed, 52 insertions(+), 52 deletions(-)
+>  arch/arm/boot/dts/r8a7791.dtsi | 75 +++++++++++++++++++++---------------------
+>  1 file changed, 38 insertions(+), 37 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index 54c5a2d7ea89..3bbcc0b93f1c 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -40,6 +40,35 @@
->  		vin3 = &vin3;
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index 8266a9b7cafd..38a9b8cb736d 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -237,9 +237,9 @@
 >  	};
 >  
-> +	/*
-> +	 * The external audio clocks are configured as 0 Hz fixed frequency
-> +	 * clocks by default.
-> +	 * Boards that provide audio clocks should override them.
-> +	 */
-> +	audio_clk_a: audio_clk_a {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <0>;
-> +	};
-> +	audio_clk_b: audio_clk_b {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <0>;
-> +	};
-> +	audio_clk_c: audio_clk_c {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <0>;
-> +	};
-> +
-> +	/* External CAN clock */
-> +	can_clk: can {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		/* This value must be overridden by the board. */
-> +		clock-frequency = <0>;
-> +	};
-> +
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> @@ -158,6 +187,29 @@
->  		};
->  	};
+>  	thermal: thermal at e61f0000 {
+> -		compatible =	"renesas,thermal-r8a7791",
+> -				"renesas,rcar-gen2-thermal",
+> -				"renesas,rcar-thermal";
+> +		compatible = "renesas,thermal-r8a7791",
+> +			     "renesas,rcar-gen2-thermal",
+> +			     "renesas,rcar-thermal";
+>  		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
+>  		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cpg CPG_MOD 522>;
+> @@ -375,20 +375,20 @@
+>  	audma0: dma-controller at ec700000 {
+>  		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
+>  		reg = <0 0xec700000 0 0x10000>;
+> -		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "error",
+>  				"ch0", "ch1", "ch2", "ch3",
+>  				"ch4", "ch5", "ch6", "ch7",
+> @@ -405,20 +405,20 @@
+>  	audma1: dma-controller at ec720000 {
+>  		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
+>  		reg = <0 0xec720000 0 0x10000>;
+> -		interrupts =	<GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
+> -				 GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
+> +			      GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "error",
+>  				"ch0", "ch1", "ch2", "ch3",
+>  				"ch4", "ch5", "ch6", "ch7",
+> @@ -1487,12 +1487,13 @@
+>  		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
+>  		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
+>  		 */
+> -		compatible =  "renesas,rcar_sound-r8a7791", "renesas,rcar_sound-gen2";
+> -		reg =	<0 0xec500000 0 0x1000>, /* SCU */
+> -			<0 0xec5a0000 0 0x100>,  /* ADG */
+> -			<0 0xec540000 0 0x1000>, /* SSIU */
+> -			<0 0xec541000 0 0x280>,  /* SSI */
+> -			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
+> +		compatible = "renesas,rcar_sound-r8a7791",
+> +			     "renesas,rcar_sound-gen2";
+> +		reg = <0 0xec500000 0 0x1000>, /* SCU */
+> +		      <0 0xec5a0000 0 0x100>,  /* ADG */
+> +		      <0 0xec540000 0 0x1000>, /* SSIU */
+> +		      <0 0xec541000 0 0x280>,  /* SSI */
+> +		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
+>  		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
 >  
-> +	/* External root clock */
-> +	extal_clk: extal {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		/* This value must be overridden by the board. */
-> +		clock-frequency = <0>;
-> +	};
-> +
-> +	/* External PCIe clock - can be overridden by the board */
-> +	pcie_bus_clk: pcie_bus {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <0>;
-> +	};
-> +
-> +	/* External SCIF clock */
-> +	scif_clk: scif {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		/* This value must be overridden by the board. */
-> +		clock-frequency = <0>;
-> +	};
-> +
->  	soc {
->  		compatible = "simple-bus";
->  		interrupt-parent = <&gic>;
-> @@ -1678,62 +1730,10 @@
->  				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
->  	};
->  
-> -	/* External root clock */
-> -	extal_clk: extal {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		/* This value must be overridden by the board. */
-> -		clock-frequency = <0>;
-> -	};
-> -
-> -	/* External PCIe clock - can be overridden by the board */
-> -	pcie_bus_clk: pcie_bus {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <0>;
-> -	};
-> -
-> -	/*
-> -	 * The external audio clocks are configured as 0 Hz fixed frequency
-> -	 * clocks by default.
-> -	 * Boards that provide audio clocks should override them.
-> -	 */
-> -	audio_clk_a: audio_clk_a {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <0>;
-> -	};
-> -	audio_clk_b: audio_clk_b {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <0>;
-> -	};
-> -	audio_clk_c: audio_clk_c {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		clock-frequency = <0>;
-> -	};
-> -
-> -	/* External SCIF clock */
-> -	scif_clk: scif {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		/* This value must be overridden by the board. */
-> -		clock-frequency = <0>;
-> -	};
-> -
->  	/* External USB clock - can be overridden by the board */
->  	usb_extal_clk: usb_extal {
->  		compatible = "fixed-clock";
->  		#clock-cells = <0>;
->  		clock-frequency = <48000000>;
->  	};
-> -
-> -	/* External CAN clock */
-> -	can_clk: can {
-> -		compatible = "fixed-clock";
-> -		#clock-cells = <0>;
-> -		/* This value must be overridden by the board. */
-> -		clock-frequency = <0>;
-> -	};
->  };
+>  		clocks = <&cpg CPG_MOD 1005>,
 > -- 
 > 2.11.0
 > 
