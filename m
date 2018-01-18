@@ -1,82 +1,25 @@
-From: ramana.radhakrishnan@arm.com (Ramana Radhakrishnan)
-Date: Thu, 18 Jan 2018 10:26:02 +0000
-Subject: per-task stack canaries for arm64
-In-Reply-To: <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
-References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
- <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
- <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
- <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
-Message-ID: <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 18 Jan 2018 13:28:23 +0300
+Subject: [PATCH] soc: xilinx: xlnx_vcu: Fix && vs & typo
+Message-ID: <20180118102823.GA21064@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/17/18 8:45 PM, Kees Cook wrote:
-> On Wed, Jan 17, 2018 at 12:32 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 17 January 2018 at 19:10, Kees Cook <keescook@chromium.org> wrote:
->>> On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->> [...]
->>> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
->>> which was done for x86 only, and provides both:
->>>   -mstack-protector-guard-symbol=...
->>>   -mstack-protector-guard-reg=...
->>>
->>> If this could be extended to arm64, I think we'd be in good shape (and
->>> it could be trivially detected at build time).
->>>
->>
->> I'm not entirely sure what the point is of specifying the name of the
->> symbol on the command line. It is ultimately up to the GCC developers
->> to decide how much point there is to maintaining parity with x86 here.
->>
->> [...]
->>>> Ramana indicated at the time that he would be up for adding, e.g.,
->>>> -fstack-protector-linux-kernel as a command line option, and add the
->>>> contents of tpidr_el1 to every reference of __stack_chk_guard when
->>>> set.
+We accidentally used a logical AND instead of a bitwise AND here.
 
-Wow, that was a hall-way conversation eons ago. It took me a while to
-page that in.
+Fixes: cee8113a295a ("soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver")
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-
->>>
->>> I think we want to reuse the command-line names from the x86 options
->>> above, unless there's a good reason not to?
->>
->> I'm perfectly happy to settle for whatever the GCC developers manage
->> to agree on, as long as it gives us the ability to use tpidr_el1 as
->> the offset.
-> 
-> Ramana, Uro?, what's the best next step? Should we open a GCC bug
-> specifically for arm64 here?
-
-The next best step is someone opening a GCC feature request with some
-more details - CC'ing me on ramana at gcc.gnu.org should work. What I would
-like to see is a feature request on GCC bugzilla along with some
-comments / buyin from the AArch64 kernel maintainers whether they would
-like to see such a feature and what the behaviour should be and get some
-feedback from the AArch64 GCC maintainers upstream before starting the
-work.
-
-I think the following (unoptimized) or some derivative of this should work.
-
-        adrp    x19, __stack_chk_guard
-        add     x19, x19, :lo12:__stack_chk_guard
-	mrs 	x2, tpidr_el1
-	add	x2, x2, x19
-	ldr 	x2, [x2]
-
-
-It's also not likely that this will be done in time for GCC 8 as we are
-now in stage 4 and we're probably looking at GCC 9 for this assuming
-this goes ahead.
-
-Hope this helps.
-
-regards
-Ramana
-
-> 
-> -Kees
-> 
+diff --git a/drivers/soc/xilinx/xlnx_vcu.c b/drivers/soc/xilinx/xlnx_vcu.c
+index c1d6f1b190b6..a840c0272135 100644
+--- a/drivers/soc/xilinx/xlnx_vcu.c
++++ b/drivers/soc/xilinx/xlnx_vcu.c
+@@ -334,7 +334,7 @@ static int xvcu_set_vcu_pll_info(struct xvcu_device *xvcu)
+ 	 */
+ 	vcu_pll_ctrl = xvcu_read(xvcu->vcu_slcr_ba, VCU_PLL_CTRL);
+ 	clkoutdiv = vcu_pll_ctrl >> VCU_PLL_CTRL_CLKOUTDIV_SHIFT;
+-	clkoutdiv = clkoutdiv && VCU_PLL_CTRL_CLKOUTDIV_MASK;
++	clkoutdiv = clkoutdiv & VCU_PLL_CTRL_CLKOUTDIV_MASK;
+ 	if (clkoutdiv != 1) {
+ 		dev_err(xvcu->dev, "clkoutdiv value is invalid\n");
+ 		return -EINVAL;
