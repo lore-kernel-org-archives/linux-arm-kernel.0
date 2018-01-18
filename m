@@ -1,330 +1,214 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 18 Jan 2018 14:08:23 +0100
-Subject: [PATCH v3 26/41] KVM: arm64: Introduce framework for accessing
- deferred sysregs
-In-Reply-To: <dce891ed-3e43-a136-9d7b-c7186fe2ff3c@arm.com>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-27-christoffer.dall@linaro.org>
- <dce891ed-3e43-a136-9d7b-c7186fe2ff3c@arm.com>
-Message-ID: <20180118130823.GC27865@cbox>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Jan 2018 13:09:27 +0000
+Subject: [PATCH v4 05/13] iommu/rockchip: Use iopoll helpers to wait for
+ hardware
+In-Reply-To: <20180118115251.5542-6-jeffy.chen@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-6-jeffy.chen@rock-chips.com>
+Message-ID: <064794b9-98ae-221e-76bd-e11130514826@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 05:52:21PM +0000, Julien Thierry wrote:
+On 18/01/18 11:52, Jeffy Chen wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
 > 
+> This patch converts the rockchip-iommu driver to use the in-kernel
+> iopoll helpers to wait for certain status bits to change in registers
+> instead of an open-coded custom macro.
 > 
-> On 12/01/18 12:07, Christoffer Dall wrote:
-> >We are about to defer saving and restoring some groups of system
-> >registers to vcpu_put and vcpu_load on supported systems.  This means
-> >that we need some infrastructure to access system registes which
-> >supports either accessing the memory backing of the register or directly
-> >accessing the system registers, depending on the state of the system
-> >when we access the register.
-> >
-> >We do this by defining a set of read/write accessors for each system
-> >register, and letting each system register be defined as "immediate" or
-> >"deferrable".  Immediate registers are always saved/restored in the
-> >world-switch path, but deferrable registers are only saved/restored in
-> >vcpu_put/vcpu_load when supported and sysregs_loaded_on_cpu will be set
-> >in that case.
-> >
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
 > 
-> The patch is fine, however I'd suggest adding a comment in the pointing out
-> that the IMMEDIATE/DEFERRABLE apply to save/restore to the vcpu struct.
-> Instinctively I would expect the deferrable/immediate to apply to the actual
-> hardware register access, so a comment would prevent people like me to get
-> on the wrong track.
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
 > 
-
-I tried to explain that a bit in the first sentence of the commit
-message, but I can try to make it more clear that we introduce
-terminology.
-
-> >Not that we don't use the deferred mechanism yet in this patch, but only
-> >introduce infrastructure.  This is to improve convenience of review in
-> >the subsequent patches where it is clear which registers become
-> >deferred.
-> >
-> >  [ Most of this logic was contributed by Marc Zyngier ]
-> >
-> >Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>   drivers/iommu/rockchip-iommu.c | 68 ++++++++++++++++++++----------------------
+>   1 file changed, 32 insertions(+), 36 deletions(-)
 > 
-> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 37065a7127c9..4a1c710408af 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -13,7 +13,7 @@
+>   #include <linux/interrupt.h>
+>   #include <linux/io.h>
+>   #include <linux/iommu.h>
+> -#include <linux/jiffies.h>
+> +#include <linux/iopoll.h>
+>   #include <linux/list.h>
+>   #include <linux/mm.h>
+>   #include <linux/module.h>
+> @@ -36,7 +36,8 @@
+>   #define RK_MMU_AUTO_GATING	0x24
+>   
+>   #define DTE_ADDR_DUMMY		0xCAFEBABE
+> -#define FORCE_RESET_TIMEOUT	100	/* ms */
+> +#define FORCE_RESET_TIMEOUT	100000	/* us */
+> +#define POLL_TIMEOUT		1000	/* us */
+
+Nit: the callsites look a bit odd with the combination of POLL_TIMEOUT 
+and the magic number 100 - should we not also define something like 
+POLL_PERIOD for that? Also POLL_TIMEOUT is a rather generic name and 
+overlaps with several other drivers, so a namespace prefix would be 
+helpful (i.e. RK_IOMMU_POLL*, or at least RK_POLL*).
+
+FWIW, my personal preference would be to also suffix these with _US for 
+absolute clarity, but it's not essential (especially if longer names 
+lead to more linebreaks at the callsites).
+
+With those undocumented "100"s fixed up,
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+>   /* RK_MMU_STATUS fields */
+>   #define RK_MMU_STATUS_PAGING_ENABLED       BIT(0)
+> @@ -73,8 +74,6 @@
+>     */
+>   #define RK_IOMMU_PGSIZE_BITMAP 0x007ff000
+>   
+> -#define IOMMU_REG_POLL_COUNT_FAST 1000
+> -
+>   struct rk_iommu_domain {
+>   	struct list_head iommus;
+>   	struct platform_device *pdev;
+> @@ -109,27 +108,6 @@ static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
+>   	return container_of(dom, struct rk_iommu_domain, domain);
+>   }
+>   
+> -/**
+> - * Inspired by _wait_for in intel_drv.h
+> - * This is NOT safe for use in interrupt context.
+> - *
+> - * Note that it's important that we check the condition again after having
+> - * timed out, since the timeout could be due to preemption or similar and
+> - * we've never had a chance to check the condition before the timeout.
+> - */
+> -#define rk_wait_for(COND, MS) ({ \
+> -	unsigned long timeout__ = jiffies + msecs_to_jiffies(MS) + 1;	\
+> -	int ret__ = 0;							\
+> -	while (!(COND)) {						\
+> -		if (time_after(jiffies, timeout__)) {			\
+> -			ret__ = (COND) ? 0 : -ETIMEDOUT;		\
+> -			break;						\
+> -		}							\
+> -		usleep_range(50, 100);					\
+> -	}								\
+> -	ret__;								\
+> -})
+> -
+>   /*
+>    * The Rockchip rk3288 iommu uses a 2-level page table.
+>    * The first level is the "Directory Table" (DT).
+> @@ -333,9 +311,21 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu *iommu)
+>   	return enable;
+>   }
+>   
+> +static bool rk_iommu_is_reset_done(struct rk_iommu *iommu)
+> +{
+> +	bool done = true;
+> +	int i;
+> +
+> +	for (i = 0; i < iommu->num_mmu; i++)
+> +		done &= rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0;
+> +
+> +	return done;
+> +}
+> +
+>   static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+>   {
+>   	int ret, i;
+> +	bool val;
+>   
+>   	if (rk_iommu_is_stall_active(iommu))
+>   		return 0;
+> @@ -346,7 +336,8 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+>   
+>   	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
+>   
+> -	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
+> +	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
+> +				 val, 100, POLL_TIMEOUT);
+>   	if (ret)
+>   		for (i = 0; i < iommu->num_mmu; i++)
+>   			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
+> @@ -358,13 +349,15 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+>   static int rk_iommu_disable_stall(struct rk_iommu *iommu)
+>   {
+>   	int ret, i;
+> +	bool val;
+>   
+>   	if (!rk_iommu_is_stall_active(iommu))
+>   		return 0;
+>   
+>   	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_STALL);
+>   
+> -	ret = rk_wait_for(!rk_iommu_is_stall_active(iommu), 1);
+> +	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
+> +				 !val, 100, POLL_TIMEOUT);
+>   	if (ret)
+>   		for (i = 0; i < iommu->num_mmu; i++)
+>   			dev_err(iommu->dev, "Disable stall request timed out, status: %#08x\n",
+> @@ -376,13 +369,15 @@ static int rk_iommu_disable_stall(struct rk_iommu *iommu)
+>   static int rk_iommu_enable_paging(struct rk_iommu *iommu)
+>   {
+>   	int ret, i;
+> +	bool val;
+>   
+>   	if (rk_iommu_is_paging_enabled(iommu))
+>   		return 0;
+>   
+>   	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_PAGING);
+>   
+> -	ret = rk_wait_for(rk_iommu_is_paging_enabled(iommu), 1);
+> +	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
+> +				 val, 100, POLL_TIMEOUT);
+>   	if (ret)
+>   		for (i = 0; i < iommu->num_mmu; i++)
+>   			dev_err(iommu->dev, "Enable paging request timed out, status: %#08x\n",
+> @@ -394,13 +389,15 @@ static int rk_iommu_enable_paging(struct rk_iommu *iommu)
+>   static int rk_iommu_disable_paging(struct rk_iommu *iommu)
+>   {
+>   	int ret, i;
+> +	bool val;
+>   
+>   	if (!rk_iommu_is_paging_enabled(iommu))
+>   		return 0;
+>   
+>   	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_PAGING);
+>   
+> -	ret = rk_wait_for(!rk_iommu_is_paging_enabled(iommu), 1);
+> +	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
+> +				 !val, 100, POLL_TIMEOUT);
+>   	if (ret)
+>   		for (i = 0; i < iommu->num_mmu; i++)
+>   			dev_err(iommu->dev, "Disable paging request timed out, status: %#08x\n",
+> @@ -413,6 +410,7 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+>   {
+>   	int ret, i;
+>   	u32 dte_addr;
+> +	bool val;
+>   
+>   	if (iommu->reset_disabled)
+>   		return 0;
+> @@ -433,13 +431,11 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+>   
+>   	rk_iommu_command(iommu, RK_MMU_CMD_FORCE_RESET);
+>   
+> -	for (i = 0; i < iommu->num_mmu; i++) {
+> -		ret = rk_wait_for(rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0x00000000,
+> -				  FORCE_RESET_TIMEOUT);
+> -		if (ret) {
+> -			dev_err(iommu->dev, "FORCE_RESET command timed out\n");
+> -			return ret;
+> -		}
+> +	ret = readx_poll_timeout(rk_iommu_is_reset_done, iommu, val,
+> +				 val, 100, FORCE_RESET_TIMEOUT);
+> +	if (ret) {
+> +		dev_err(iommu->dev, "FORCE_RESET command timed out\n");
+> +		return ret;
+>   	}
+>   
+>   	return 0;
 > 
-> >---
-> >  arch/arm64/include/asm/kvm_host.h |   8 +-
-> >  arch/arm64/kvm/sys_regs.c         | 160 ++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 166 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >index 91272c35cc36..4b5ef82f6bdb 100644
-> >--- a/arch/arm64/include/asm/kvm_host.h
-> >+++ b/arch/arm64/include/asm/kvm_host.h
-> >@@ -281,6 +281,10 @@ struct kvm_vcpu_arch {
-> >  	/* Detect first run of a vcpu */
-> >  	bool has_run_once;
-> >+
-> >+	/* True when deferrable sysregs are loaded on the physical CPU,
-> >+	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
-> >+	bool sysregs_loaded_on_cpu;
-> >  };
-> >  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-> >@@ -293,8 +297,8 @@ struct kvm_vcpu_arch {
-> >   */
-> >  #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
-> >-#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
-> >-#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
-> >+u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
-> >+void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
-> >  /*
-> >   * CP14 and CP15 live in the same array, as they are backed by the
-> >diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >index 96398d53b462..9d353a6a55c9 100644
-> >--- a/arch/arm64/kvm/sys_regs.c
-> >+++ b/arch/arm64/kvm/sys_regs.c
-> >@@ -35,6 +35,7 @@
-> >  #include <asm/kvm_coproc.h>
-> >  #include <asm/kvm_emulate.h>
-> >  #include <asm/kvm_host.h>
-> >+#include <asm/kvm_hyp.h>
-> >  #include <asm/kvm_mmu.h>
-> >  #include <asm/perf_event.h>
-> >  #include <asm/sysreg.h>
-> >@@ -76,6 +77,165 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
-> >  	return false;
-> >  }
-> >+struct sys_reg_accessor {
-> >+	u64	(*rdsr)(struct kvm_vcpu *, int);
-> >+	void	(*wrsr)(struct kvm_vcpu *, int, u64);
-> 
-> Nit:
-> 
-> Why use a signed integer for the register index argument?
-> 
-
-The type name is short? ;)  No particular reason, could be an unsigned
-int, but I don't think it matters here does it?
-
-> >+};
-> >+
-> >+#define DECLARE_IMMEDIATE_SR(i)						\
-> >+	static u64 __##i##_read(struct kvm_vcpu *vcpu, int r)		\
-> >+	{								\
-> >+		return __vcpu_sys_reg(vcpu, r);				\
-> >+	}								\
-> >+									\
-> >+	static void __##i##_write(struct kvm_vcpu *vcpu, int r, u64 v)	\
-> >+	{								\
-> >+		__vcpu_sys_reg(vcpu, r) = v;				\
-> >+	}								\
-> >+
-> >+#define DECLARE_DEFERRABLE_SR(i, s)					\
-> >+	static u64 __##i##_read(struct kvm_vcpu *vcpu, int r)		\
-> >+	{								\
-> >+		if (vcpu->arch.sysregs_loaded_on_cpu) {			\
-> >+			WARN_ON(kvm_arm_get_running_vcpu() != vcpu);	\
-> >+			return read_sysreg_s((s));			\
-> >+		}							\
-> >+		return __vcpu_sys_reg(vcpu, r);				\
-> >+	}								\
-> >+									\
-> >+	static void __##i##_write(struct kvm_vcpu *vcpu, int r, u64 v)	\
-> >+	{								\
-> >+		if (vcpu->arch.sysregs_loaded_on_cpu) {			\
-> >+			WARN_ON(kvm_arm_get_running_vcpu() != vcpu);	\
-> >+			write_sysreg_s(v, (s));				\
-> >+		} else {						\
-> >+			__vcpu_sys_reg(vcpu, r) = v;			\
-> >+		}							\
-> >+	}								\
-> >+
-> >+
-> >+#define SR_HANDLER_RANGE(i,e)						\
-> >+	[i ... e] =  (struct sys_reg_accessor) {			\
-> >+		.rdsr = __##i##_read,					\
-> >+		.wrsr = __##i##_write,					\
-> 
-> Nit:
-> Could we have __vcpu_##i##_read and __vcpu_##i##_write?
-> 
-
-They don't necessarily read from the vcpu do they?
-
-Unrelated: I also thought about just having a single function a switch
-statement instead, which may make it easier to follow the code as there
-would be no macros generating functions, but it would be slightly less
-declarative.
-
-For example:
-
-u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-{
-	if (!vcpu->arch.sysregs_loaded_on_cpu)
-		goto immediate_read;
-	
-	/*
-	 * All system registers listed in the switch are deferred
-	 * save/restored on VHE systems.
-	 */
-	switch (reg) {
-	case CSSELR_EL1:	return read_sysreg_s(SYS_CSSELR_EL1));
-	case SCTLR_EL1:		return read_sysreg_s(sctlr_EL12));
-	case ACTLR_EL1:		return read_sysreg_s(SYS_ACTLR_EL1));
-	case CPACR_EL1:		return read_sysreg_s(cpacr_EL12));
-	case TTBR0_EL1:		return read_sysreg_s(ttbr0_EL12));
-	case TTBR1_EL1:		return read_sysreg_s(ttbr1_EL12));
-	case TCR_EL1:		return read_sysreg_s(tcr_EL12));
-	case ESR_EL1:		return read_sysreg_s(esr_EL12));
-	case AFSR0_EL1:		return read_sysreg_s(afsr0_EL12));
-	case AFSR1_EL1:		return read_sysreg_s(afsr1_EL12));
-	case FAR_EL1:		return read_sysreg_s(far_EL12));
-	case MAIR_EL1:		return read_sysreg_s(mair_EL12));
-	case VBAR_EL1:		return read_sysreg_s(vbar_EL12));
-	case CONTEXTIDR_EL1:	return read_sysreg_s(contextidr_EL12));
-	case TPIDR_EL0:		return read_sysreg_s(SYS_TPIDR_EL0));
-	case TPIDRRO_EL0:	return read_sysreg_s(SYS_TPIDRRO_EL0));
-	case TPIDR_EL1:		return read_sysreg_s(SYS_TPIDR_EL1));
-	case AMAIR_EL1:		return read_sysreg_s(amair_EL12));
-	case CNTKCTL_EL1:	return read_sysreg_s(cntkctl_EL12));
-	case PAR_EL1:		return read_sysreg_s(SYS_PAR_EL1));
-	case DACR32_EL2:	return read_sysreg_s(SYS_DACR32_EL2));
-	case IFSR32_EL2:	return read_sysreg_s(SYS_IFSR32_EL2));
-	case DBGVCR32_EL2:	return read_sysreg_s(SYS_DBGVCR32_EL2));
-	}
-
-immediate_read:
-	return __vcpu_sys_reg(vcpu, reg);
-}
-
-Since you're having a look at this, what are your thoughts?
-
-Marc, what's your preference?
-
-Thanks,
--Christoffer
-
-> >+	}
-> >+
-> >+#define SR_HANDLER(i)	SR_HANDLER_RANGE(i, i)
-> >+
-> >+static void bad_sys_reg(int reg)
-> >+{
-> >+	WARN_ONCE(1, "Bad system register access %d\n", reg);
-> >+}
-> >+
-> >+static u64 __default_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-> >+{
-> >+	bad_sys_reg(reg);
-> >+	return 0;
-> >+}
-> >+
-> >+static void __default_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
-> >+{
-> >+	bad_sys_reg(reg);
-> >+}
-> >+
-> >+/* Ordered as in enum vcpu_sysreg */
-> >+DECLARE_IMMEDIATE_SR(MPIDR_EL1);
-> >+DECLARE_IMMEDIATE_SR(CSSELR_EL1);
-> >+DECLARE_IMMEDIATE_SR(SCTLR_EL1);
-> >+DECLARE_IMMEDIATE_SR(ACTLR_EL1);
-> >+DECLARE_IMMEDIATE_SR(CPACR_EL1);
-> >+DECLARE_IMMEDIATE_SR(TTBR0_EL1);
-> >+DECLARE_IMMEDIATE_SR(TTBR1_EL1);
-> >+DECLARE_IMMEDIATE_SR(TCR_EL1);
-> >+DECLARE_IMMEDIATE_SR(ESR_EL1);
-> >+DECLARE_IMMEDIATE_SR(AFSR0_EL1);
-> >+DECLARE_IMMEDIATE_SR(AFSR1_EL1);
-> >+DECLARE_IMMEDIATE_SR(FAR_EL1);
-> >+DECLARE_IMMEDIATE_SR(MAIR_EL1);
-> >+DECLARE_IMMEDIATE_SR(VBAR_EL1);
-> >+DECLARE_IMMEDIATE_SR(CONTEXTIDR_EL1);
-> >+DECLARE_IMMEDIATE_SR(TPIDR_EL0);
-> >+DECLARE_IMMEDIATE_SR(TPIDRRO_EL0);
-> >+DECLARE_IMMEDIATE_SR(TPIDR_EL1);
-> >+DECLARE_IMMEDIATE_SR(AMAIR_EL1);
-> >+DECLARE_IMMEDIATE_SR(CNTKCTL_EL1);
-> >+DECLARE_IMMEDIATE_SR(PAR_EL1);
-> >+DECLARE_IMMEDIATE_SR(MDSCR_EL1);
-> >+DECLARE_IMMEDIATE_SR(MDCCINT_EL1);
-> >+DECLARE_IMMEDIATE_SR(PMCR_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMSELR_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMEVCNTR0_EL0);
-> >+/* PMEVCNTR30_EL0 */
-> >+DECLARE_IMMEDIATE_SR(PMCCNTR_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMEVTYPER0_EL0);
-> >+/* PMEVTYPER30_EL0 */
-> >+DECLARE_IMMEDIATE_SR(PMCCFILTR_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMCNTENSET_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMINTENSET_EL1);
-> >+DECLARE_IMMEDIATE_SR(PMOVSSET_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMSWINC_EL0);
-> >+DECLARE_IMMEDIATE_SR(PMUSERENR_EL0);
-> >+DECLARE_IMMEDIATE_SR(DACR32_EL2);
-> >+DECLARE_IMMEDIATE_SR(IFSR32_EL2);
-> >+DECLARE_IMMEDIATE_SR(FPEXC32_EL2);
-> >+DECLARE_IMMEDIATE_SR(DBGVCR32_EL2);
-> >+
-> >+static const struct sys_reg_accessor sys_reg_accessors[NR_SYS_REGS] = {
-> >+	[0 ... NR_SYS_REGS - 1] = {
-> >+		.rdsr = __default_read_sys_reg,
-> >+		.wrsr = __default_write_sys_reg,
-> >+	},
-> >+
-> >+	SR_HANDLER(MPIDR_EL1),
-> >+	SR_HANDLER(CSSELR_EL1),
-> >+	SR_HANDLER(SCTLR_EL1),
-> >+	SR_HANDLER(ACTLR_EL1),
-> >+	SR_HANDLER(CPACR_EL1),
-> >+	SR_HANDLER(TTBR0_EL1),
-> >+	SR_HANDLER(TTBR1_EL1),
-> >+	SR_HANDLER(TCR_EL1),
-> >+	SR_HANDLER(ESR_EL1),
-> >+	SR_HANDLER(AFSR0_EL1),
-> >+	SR_HANDLER(AFSR1_EL1),
-> >+	SR_HANDLER(FAR_EL1),
-> >+	SR_HANDLER(MAIR_EL1),
-> >+	SR_HANDLER(VBAR_EL1),
-> >+	SR_HANDLER(CONTEXTIDR_EL1),
-> >+	SR_HANDLER(TPIDR_EL0),
-> >+	SR_HANDLER(TPIDRRO_EL0),
-> >+	SR_HANDLER(TPIDR_EL1),
-> >+	SR_HANDLER(AMAIR_EL1),
-> >+	SR_HANDLER(CNTKCTL_EL1),
-> >+	SR_HANDLER(PAR_EL1),
-> >+	SR_HANDLER(MDSCR_EL1),
-> >+	SR_HANDLER(MDCCINT_EL1),
-> >+	SR_HANDLER(PMCR_EL0),
-> >+	SR_HANDLER(PMSELR_EL0),
-> >+	SR_HANDLER_RANGE(PMEVCNTR0_EL0, PMEVCNTR30_EL0),
-> >+	SR_HANDLER(PMCCNTR_EL0),
-> >+	SR_HANDLER_RANGE(PMEVTYPER0_EL0, PMEVTYPER30_EL0),
-> >+	SR_HANDLER(PMCCFILTR_EL0),
-> >+	SR_HANDLER(PMCNTENSET_EL0),
-> >+	SR_HANDLER(PMINTENSET_EL1),
-> >+	SR_HANDLER(PMOVSSET_EL0),
-> >+	SR_HANDLER(PMSWINC_EL0),
-> >+	SR_HANDLER(PMUSERENR_EL0),
-> >+	SR_HANDLER(DACR32_EL2),
-> >+	SR_HANDLER(IFSR32_EL2),
-> >+	SR_HANDLER(FPEXC32_EL2),
-> >+	SR_HANDLER(DBGVCR32_EL2),
-> >+};
-> >+
-> >+u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
-> >+{
-> >+	return sys_reg_accessors[reg].rdsr(vcpu, reg);
-> >+}
-> >+
-> >+void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val)
-> >+{
-> >+	sys_reg_accessors[reg].wrsr(vcpu, reg, val);
-> >+}
-> >+
-> >  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
-> >  static u32 cache_levels;
-> >
-> 
-> -- 
-> Julien Thierry
