@@ -1,163 +1,93 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Thu, 18 Jan 2018 21:48:09 +0900
-Subject: [PATCH 2/2] arm64: dts: uniphier: add AVE ethernet node
-In-Reply-To: <1516279689-3119-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1516279689-3119-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1516279689-3119-3-git-send-email-hayashi.kunihiko@socionext.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Jan 2018 12:49:46 +0000
+Subject: [PATCH v4 13/13] iommu/rockchip: Support sharing IOMMU between
+ masters
+In-Reply-To: <20180118115251.5542-14-jeffy.chen@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-14-jeffy.chen@rock-chips.com>
+Message-ID: <50529cf2-72ed-e991-7639-79b5d74c7853@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes of the AVE ethernet controller for LD11 and LD20 SoCs
-and the boards.
+On 18/01/18 11:52, Jeffy Chen wrote:
+> There would be some masters sharing the same IOMMU device. Put them in
+> the same iommu group and share the same iommu domain.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
----
- arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 15 +++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts    | 15 +++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi       | 10 ++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 17 +++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts    | 15 +++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi       | 12 ++++++++++++
- 6 files changed, 84 insertions(+)
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-index 2452b22..60de0b0 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-@@ -72,3 +72,18 @@
- &nand {
- 	status = "okay";
- };
-+
-+&ether {
-+	status = "okay";
-+	local-mac-address = [00 00 00 00 00 00];
-+	phy-handle = <&ethphy>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy: ethphy at 1 {
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-index 54c5317..e6e8477 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-@@ -70,3 +70,18 @@
- &usb2 {
- 	status = "okay";
- };
-+
-+&ether {
-+	status = "okay";
-+	local-mac-address = [00 00 00 00 00 00];
-+	phy-handle = <&ethphy>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy: ethphy at 1 {
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index cd7c2d0..862a618 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -460,6 +460,16 @@
- 			};
- 		};
- 
-+		ether: ethernet at 65000000 {
-+			compatible = "socionext,uniphier-ld11-ave4";
-+			status = "disabled";
-+			reg = <0x65000000 0x8500>;
-+			interrupts = <0 66 4>;
-+			clocks = <&sys_clk 6>;
-+			resets = <&sys_rst 6>;
-+			phy-mode = "rmii";
-+		};
-+
- 		nand: nand at 68000000 {
- 			compatible = "socionext,uniphier-denali-nand-v5b";
- 			status = "disabled";
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-index fc2bc9d..6566fd5 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-@@ -54,3 +54,20 @@
- &nand {
- 	status = "okay";
- };
-+
-+&ether {
-+	status = "okay";
-+	local-mac-address = [00 00 00 00 00 00];
-+	phy-mode = "rmii";
-+	pinctrl-0 = <&pinctrl_ether_rmii>;
-+	phy-handle = <&ethphy>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy: ethphy at 1 {
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-index 6933710..6f971c6 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-@@ -58,3 +58,18 @@
- &i2c0 {
- 	status = "okay";
- };
-+
-+&ether {
-+	status = "okay";
-+	local-mac-address = [00 00 00 00 00 00];
-+	phy-handle = <&ethphy>;
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy: ethphy at 0 {
-+			reg = <0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index 8a3276b..3edcd54 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -513,6 +513,18 @@
- 			};
- 		};
- 
-+		ether: ethernet at 65000000 {
-+			compatible = "socionext,uniphier-ld20-ave4";
-+			status = "disabled";
-+			reg = <0x65000000 0x8500>;
-+			interrupts = <0 66 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_ether_rgmii>;
-+			clocks = <&sys_clk 6>;
-+			resets = <&sys_rst 6>;
-+			phy-mode = "rgmii";
-+		};
-+
- 		nand: nand at 68000000 {
- 			compatible = "socionext,uniphier-denali-nand-v5b";
- 			status = "disabled";
--- 
-2.7.4
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3:
+> Remove rk_iommudata->domain.
+> 
+> Changes in v2: None
+> 
+>   drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
+>   1 file changed, 20 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index e2e7acc3039d..e07929bbcc2a 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -97,6 +97,7 @@ struct rk_iommu {
+>   	struct iommu_device iommu;
+>   	struct list_head node; /* entry in rk_iommu_domain.iommus */
+>   	struct iommu_domain *domain; /* domain to which iommu is attached */
+> +	struct iommu_group *group;
+>   };
+>   
+>   struct rk_iommudata {
+> @@ -1157,6 +1158,15 @@ static void rk_iommu_remove_device(struct device *dev)
+>   	iommu_group_remove_device(dev);
+>   }
+>   
+> +static struct iommu_group *rk_iommu_device_group(struct device *dev)
+> +{
+> +	struct rk_iommu *iommu;
+> +
+> +	iommu = rk_iommu_from_dev(dev);
+> +
+> +	return iommu->group;
+> +}
+> +
+>   static int rk_iommu_of_xlate(struct device *dev,
+>   			     struct of_phandle_args *args)
+>   {
+> @@ -1192,7 +1202,7 @@ static const struct iommu_ops rk_iommu_ops = {
+>   	.add_device = rk_iommu_add_device,
+>   	.remove_device = rk_iommu_remove_device,
+>   	.iova_to_phys = rk_iommu_iova_to_phys,
+> -	.device_group = generic_device_group,
+> +	.device_group = rk_iommu_device_group,
+>   	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
+>   	.of_xlate = rk_iommu_of_xlate,
+>   };
+> @@ -1248,9 +1258,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	iommu->reset_disabled = device_property_read_bool(dev,
+>   					"rockchip,disable-mmu-reset");
+>   
+> +	iommu->group = iommu_group_alloc();
+> +	if (IS_ERR(iommu->group)) {
+> +		err = PTR_ERR(iommu->group);
+> +		goto err_put_clocks;
+> +	}
+> +
+>   	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+>   	if (err)
+> -		goto err_put_clocks;
+> +		goto err_put_group;
+>   
+>   	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+>   	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
+> @@ -1274,6 +1290,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>   	return 0;
+>   err_remove_sysfs:
+>   	iommu_device_sysfs_remove(&iommu->iommu);
+> +err_put_group:
+> +	iommu_group_put(iommu->group);
+>   err_put_clocks:
+>   	rk_iommu_put_clocks(iommu);
+>   	return err;
+> 
