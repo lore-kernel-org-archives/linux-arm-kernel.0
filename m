@@ -1,79 +1,37 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 18 Jan 2018 14:21:26 +0000
-Subject: [PATCH v2 0/2] arm64: Run enable method for errata work arounds
- on late CPUs
-In-Reply-To: <851887b9-974a-6f20-920b-d9149d8122fe@arm.com>
-References: <20180117174220.7959-1-suzuki.poulose@arm.com>
- <20180118114540.GL22781@e103592.cambridge.arm.com>
- <5c1945a8-a66d-9306-1c6d-3c1c8febcab2@arm.com>
- <851887b9-974a-6f20-920b-d9149d8122fe@arm.com>
-Message-ID: <20180118142125.GM22781@e103592.cambridge.arm.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Thu, 18 Jan 2018 22:22:53 +0800
+Subject: [PATCH v4 04/13] iommu/rockchip: Fix error handling in attach
+In-Reply-To: <fa4277ef-ddfe-e23b-034c-167281cf0db1@arm.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-5-jeffy.chen@rock-chips.com>
+ <fa4277ef-ddfe-e23b-034c-167281cf0db1@arm.com>
+Message-ID: <5A60ADBD.4050303@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 12:08:43PM +0000, Robin Murphy wrote:
-> On 18/01/18 12:00, Robin Murphy wrote:
-> [...]
-> >>+struct enable_arg {
-> >>+??? int (*enable)(struct arm64_cpu_capabilities const *);
-> >>+??? struct arm64_cpu_capabilities const *cap;
-> >>+};
-> >>+
-> >>+static int __enable_cpu_capability(void *arg)
-> >>+{
-> >>+??? struct enable_arg const *e = arg;
-> >>+
-> >>+??? return e->enable(e->cap);
-> >>+}
-> >
-> >AFAICS, you shouldn't even need the intermediate struct - if you were
-> >instead to call stop_machine(&caps->enable, ...), the wrapper could be:
-> >
-> > ????<type> **fn = arg;
-> > ????*fn(container_of(fn, struct arm64_cpu_capabilities, enable));
-> >
-> >(cheaty pseudocode because there's no way I'm going to write a
-> >pointer-to-function-pointer type correctly in an email client...)
-> >
-> >That's certainly a fair bit simpler in terms of diffstat; whether it's
-> >really as intuitive as I think it is is perhaps another matter, though.
-> 
-> Ah, right, but then you'd be back to casting away const, and at that point
-> it makes no sense to do the container_of dance instead of just passing the
-> struct pointer itself around...
-> 
-> I shall now excuse myself from this discussion, as I'm clearly not helping
-> :)
-> 
-> Robin.
+Hi Robin,
 
-That's what I was about to say... but neat trick.
-
-However, it does concentrate the type fudge in one place and keeps the
-arm64_cpu_capabilities::enable() prototype correct, so it's still better
-than the original.
-
-
-Thinking about it, the following is probably clearer and no worse:
-
-static int __enable_cpu_capability(void *arg)
-{
-	struct arm64_cpu_capabilities const *cap = arg;
-
-	return cap->enable(cap);
-}
-
-...
-
-stop_machine(__enable_cpu_capability, (void *)caps, cpu_online_mask);
-
-
-In your version, the argument would be (void *)&caps->enable, which is
-really just a proxy for (void *)caps, unless I missed something.
-
-
-What do you think Suzuki?  I can respin my patch if you fancy picking it
-up.  Either way, it's not urgent.
-
-Cheers
----Dave
+On 01/18/2018 09:23 PM, Robin Murphy wrote:
+>>
+>> @@ -837,7 +837,7 @@ static int rk_iommu_attach_device(struct
+>> iommu_domain *domain,
+>>       ret = rk_iommu_enable_paging(iommu);
+>>       if (ret)
+>> -        return ret;
+>> +        goto err_disable_stall;
+>>       spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+>>       list_add_tail(&iommu->node, &rk_domain->iommus);
+>> @@ -848,6 +848,11 @@ static int rk_iommu_attach_device(struct
+>> iommu_domain *domain,
+>>       rk_iommu_disable_stall(iommu);
+>>       return 0;
+>
+> Nit: if you like, it looks reasonable to name the label
+> "out_disable_stall" and remove these lines above here, to save the
+> duplication between the error and success paths (since ret will already
+> be 0 on the latter).
+>
+right, i think so, will do it in the next version.
+> Either way,
+>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
