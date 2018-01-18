@@ -1,50 +1,69 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 18 Jan 2018 15:34:23 +0100
-Subject: [PATCH v3 07/14] ARM: dts: stm32: Add SDIO controller for stm32f429
+Date: Thu, 18 Jan 2018 15:34:21 +0100
+Subject: [PATCH v3 05/14] mmc: mmci: Add STM32 variant
 In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
 References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1516286070-24927-8-git-send-email-patrice.chotard@st.com>
+Message-ID: <1516286070-24927-6-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-stm32f429 embeds ARM_PL180 sdi IP, adds SDIO controller
-node to allow MMC support.
+STM32F4 and STM32F7 MCUs has a SDIO controller that looks like
+an ARM PL810.
+This patch adds the STM32 variant so that mmci driver supports it.
 
 Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 
 v3: _ none
 
-v2: _ none
+v2: _ Replace "pl180" by "PL180" in commit message
 
+ drivers/mmc/host/mmci.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
- arch/arm/boot/dts/stm32f429.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 10099df..ede77e0 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -511,6 +511,17 @@
- 			};
- 		};
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 9918a5f..30c93c9 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -244,6 +244,23 @@ struct variant_data {
+ 	.opendrain		= MCI_OD,
+ };
  
-+		sdio: sdio at 40012c00 {
-+			compatible = "arm,pl180", "arm,primecell";
-+			arm,primecell-periphid = <0x00880180>;
-+			reg = <0x40012c00 0x400>;
-+			clocks = <&rcc 0 STM32F4_APB2_CLOCK(SDIO)>;
-+			clock-names = "apb_pclk";
-+			interrupts = <49>;
-+			max-frequency = <48000000>;
-+			status = "disabled";
-+		};
++static struct variant_data variant_stm32 = {
++	.fifosize		= 32 * 4,
++	.fifohalfsize		= 8 * 4,
++	.clkreg			= MCI_CLK_ENABLE,
++	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
++	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
++	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
++	.datalength_bits	= 24,
++	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
++	.st_sdio		= true,
++	.st_clkdiv		= true,
++	.pwrreg_powerup		= MCI_PWR_ON,
++	.f_max			= 48000000,
++	.pwrreg_clkgate		= true,
++	.pwrreg_nopower		= true,
++};
 +
- 		syscfg: system-config at 40013800 {
- 			compatible = "syscon";
- 			reg = <0x40013800 0x400>;
+ static struct variant_data variant_qcom = {
+ 	.fifosize		= 16 * 4,
+ 	.fifohalfsize		= 8 * 4,
+@@ -2021,6 +2038,11 @@ static int mmci_runtime_resume(struct device *dev)
+ 		.mask   = 0xf0ffffff,
+ 		.data	= &variant_ux500v2,
+ 	},
++	{
++		.id     = 0x00880180,
++		.mask   = 0x00ffffff,
++		.data	= &variant_stm32,
++	},
+ 	/* Qualcomm variants */
+ 	{
+ 		.id     = 0x00051180,
 -- 
 1.9.1
