@@ -1,47 +1,77 @@
-From: nbd@nbd.name (Felix Fietkau)
-Date: Thu, 18 Jan 2018 18:31:36 +0100
-Subject: [PATCH] [wireless-next] mt76: fix building without
- CONFIG_LEDS_CLASS
-In-Reply-To: <20180118131524.817297-1-arnd@arndb.de>
-References: <20180118131524.817297-1-arnd@arndb.de>
-Message-ID: <f5b35785-2c80-da12-607c-02c253c22f39@nbd.name>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Thu, 18 Jan 2018 09:36:42 -0800 (PST)
+Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
+ properties early
+In-Reply-To: <a7d2910e-ae73-61de-9349-c5d804269695@arm.com>
+Message-ID: <mhng-758d7724-dc4c-4d08-adf2-967862df2925@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-18 14:14, Arnd Bergmann wrote:
-> When CONFIG_LEDS_CLASS is disabled, or it is a loadable module while
-> mt76 is built-in, we run into a link error:
-> 
-> drivers/net/wireless/mediatek/mt76/mac80211.o: In function `mt76_register_device':
-> mac80211.c:(.text+0xb78): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `devm_of_led_classdev_register'
-> 
-> We don't really need a hard dependency here as the driver can presumably
-> work just fine without LEDs, so this follows the iwlwifi example and
-> adds a separate Kconfig option for the LED support, this will be available
-> whenever it will link, and otherwise the respective code gets left out from
-> the driver object.
-> 
-> Fixes: 17f1de56df05 ("mt76: add common code shared between multiple chipsets")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/net/wireless/mediatek/mt76/Kconfig       | 5 +++++
->  drivers/net/wireless/mediatek/mt76/mac80211.c    | 8 +++++---
->  drivers/net/wireless/mediatek/mt76/mt76x2_init.c | 6 ++++--
->  3 files changed, 14 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/net/wireless/mediatek/mt76/Kconfig b/drivers/net/wireless/mediatek/mt76/Kconfig
-> index fc05d79c80d0..9d12c1f5284e 100644
-> --- a/drivers/net/wireless/mediatek/mt76/Kconfig
-> +++ b/drivers/net/wireless/mediatek/mt76/Kconfig
-> @@ -8,3 +8,8 @@ config MT76x2E
->  	depends on PCI
->  	---help---
->  	  This adds support for MT7612/MT7602/MT7662-based wireless PCIe devices.
-> +
-> +config MT76_LEDS
-> +	bool "LED support for MT76"
-> +	depends on MT76_CORE
-> +	depends on LEDS_CLASS=y || MT76_CORE=LEDS_CLASS
-I think this should have a 'default y'
+On Wed, 17 Jan 2018 10:08:27 PST (-0800), sudeep.holla at arm.com wrote:
+> (Sorry, somehow I missed this email until I saw Jeremy's reply today)
+>
+> On 15/01/18 16:07, Palmer Dabbelt wrote:
+>> On Mon, 15 Jan 2018 04:33:38 PST (-0800), sudeep.holla at arm.com wrote:
+>>> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
+>>>> The original intent in cacheinfo was that an architecture
+>>>> specific populate_cache_leaves() would probe the hardware
+>>>> and then cache_shared_cpu_map_setup() and
+>>>> cache_override_properties() would provide firmware help to
+>>>> extend/expand upon what was probed. Arm64 was really
+>>>> the only architecture that was working this way, and
+>>>> with the removal of most of the hardware probing logic it
+>>>> became clear that it was possible to simplify the logic a bit.
+>>>>
+>>>> This patch combines the walk of the DT nodes with the
+>>>> code updating the cache size/line_size and nr_sets.
+>>>> cache_override_properties() (which was DT specific) is
+>>>> then removed. The result is that cacheinfo.of_node is
+>>>> no longer used as a temporary place to hold DT references
+>>>> for future calls that update cache properties. That change
+>>>> helps to clarify its one remaining use (matching
+>>>> cacheinfo nodes that represent shared caches) which
+>>>> will be used by the ACPI/PPTT code in the following patches.
+>>>>
+>>>> Cc: Palmer Dabbelt <palmer@sifive.com>
+>>>> Cc: Albert Ou <albert@sifive.com>
+>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>>> ---
+>>>> ?arch/riscv/kernel/cacheinfo.c |? 1 +
+>>>> ?drivers/base/cacheinfo.c????? | 65
+>>>> +++++++++++++++++++------------------------
+>>>> ?include/linux/cacheinfo.h???? |? 1 +
+>>>> ?3 files changed, 31 insertions(+), 36 deletions(-)
+>>>>
+>>>> diff --git a/arch/riscv/kernel/cacheinfo.c
+>>>> b/arch/riscv/kernel/cacheinfo.c
+>>>> index 10ed2749e246..6f4500233cf8 100644
+>>>> --- a/arch/riscv/kernel/cacheinfo.c
+>>>> +++ b/arch/riscv/kernel/cacheinfo.c
+>>>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
+>>>> ???????? CACHE_WRITE_BACK
+>>>> ???????? | CACHE_READ_ALLOCATE
+>>>> ???????? | CACHE_WRITE_ALLOCATE;
+>>>> +??? cache_of_set_props(this_leaf, node);
+>>>
+>>> This may be necessary but can it be done as later patch ? So far nothing
+>>> is added that may break riscv IIUC.
+>>>
+>>> Palmer, Albert,
+>>>
+>>> Can you confirm ? Also, as I see we can thin down arch specific
+>>> implementation on riscv if it's just using DT like ARM64. Sorry if
+>>> I am missing to see something, so thought of checking.
+>>>
+>>> [...]
+>>
+>> Sorry, I guess I'm a bit confused as to what's going on here.? RISC-V
+>> uses device tree on all Linux systems.
+>>
+>
+> Good. By thin down, I was thinking of moving the init_cache_level and
+> populate_cache_leaves implementation of riscv to generic weak function
+> under CONFIG_OF. You may even endup deleting riscv cacheinfo.c
+>
+> Just a thought, sorry for not being clear earlier.
 
-- Felix
+OK, well, I'm always happy to convert things to generic implementations.
