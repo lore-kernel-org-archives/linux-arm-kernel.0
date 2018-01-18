@@ -1,40 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 18 Jan 2018 14:16:38 +0100
-Subject: [PATCH] scsi: fas216: fix sense buffer initialization
-Message-ID: <20180118131650.893849-1-arnd@arndb.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 18 Jan 2018 14:19:09 +0100
+Subject: [Patch v6 02/12] [media] s5p-mfc: Adding initial support for MFC
+ v10.10
+In-Reply-To: <1516278981.22129.12.camel@smitha-fedora>
+References: <CGME20171208093637epcas1p217ea0e337333ebf6918bc0418753d2af@epcas1p2.samsung.com>
+ <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
+ <1512724105-1778-3-git-send-email-smitha.t@samsung.com>
+ <CAOFm3uHyNt3k+_n3SvSP-BNFeEeu1CO6PpEbxs9JU0MxsHm=Jg@mail.gmail.com>
+ <1516278981.22129.12.camel@smitha-fedora>
+Message-ID: <332f1f0e-bfa9-4102-6c0d-28cf13eeeaad@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While testing with the ARM specific memset() macro removed, I ran
-into a compiler warning that shows an old bug:
+On 01/18/18 13:36, Smitha T Murthy wrote:
+> On Fri, 2017-12-08 at 14:25 +0100, Philippe Ombredanne wrote:
+>> Smitha,
+>>
+>> On Fri, Dec 8, 2017 at 10:08 AM, Smitha T Murthy <smitha.t@samsung.com> wrote:
+>>> Adding the support for MFC v10.10, with new register file and
+>>> necessary hw control, decoder, encoder and structural changes.
+>>>
+>>> CC: Rob Herring <robh+dt@kernel.org>
+>>> CC: devicetree at vger.kernel.org
+>>> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>> []
+>>> --- /dev/null
+>>> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+>>> @@ -0,0 +1,36 @@
+>>> +/*
+>>> + * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
+>>> + *
+>>> + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+>>> + *     http://www.samsung.com/
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>
+>> Have you considered using the new SPDX ids instead of this fine legalese? e.g.:
+>>
+>> // SPDX-License-Identifier: GPL-2.0
+>>
+>> This is much shorter and neater (unless you are a legalese lover of
+>> course!)  Check also Thomas doc patches and Linus comments on why he
+>> prefers the C++ comment style for these.
+>>
+>> And even better could be this more compact form? I am a big fan of the
+>> C++ style comments for these (and so is Linus)
+>>
+>> // SPDX-License-Identifier: GPL-2.0
+>> // Copyright (c) 2017 Samsung Electronics Co., Ltd.
+>> // Register definition file for Samsung MFC V10.x Interface (FIMV) driver
+>>
+>> You can also read this fine article from a fellow Samsung colleague
+>> [1]. And if you ever consider doing this for all Samsung's past,
+>> present and future contributions, you will have my deep gratitude
+>>
+>> [1] https://blogs.s-osg.org/linux-kernel-license-practices-revisited-spdx/
+>>
+> Ok I will change to the SPDX license in the next patch series for the
+> v10 register file. Correspondingly for the MFC driver's files I will
+> update the license as a separate patch and submit.
+> 
 
-drivers/scsi/arm/fas216.c: In function 'fas216_rq_sns_done':
-drivers/scsi/arm/fas216.c:2014:40: error: argument to 'sizeof' in 'memset' call is the same expression as the destination; did you mean to provide an explicit length? [-Werror=sizeof-pointer-memaccess]
+Ah, I forgot about this series. I'll try to review it tomorrow or Monday.
 
-It turns out that the definition of the scsi_cmd structure changed back
-in linux-2.6.25, so now we clear only four bytes (sizeof(pointer)) instead
-of 96 (SCSI_SENSE_BUFFERSIZE). I did not check whether we actually need
-to initialize the buffer here, but it's clear that if we do it, we
-should use the correct size.
+Sorry about the delay,
 
-Fixes: de25deb18016 ("[SCSI] use dynamically allocated sense buffer")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/scsi/arm/fas216.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/scsi/arm/fas216.c b/drivers/scsi/arm/fas216.c
-index f4775ca70bab..27bda2b05de6 100644
---- a/drivers/scsi/arm/fas216.c
-+++ b/drivers/scsi/arm/fas216.c
-@@ -2011,7 +2011,7 @@ static void fas216_rq_sns_done(FAS216_Info *info, struct scsi_cmnd *SCpnt,
- 		 * have valid data in the sense buffer that could
- 		 * confuse the higher levels.
- 		 */
--		memset(SCpnt->sense_buffer, 0, sizeof(SCpnt->sense_buffer));
-+		memset(SCpnt->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
- //printk("scsi%d.%c: sense buffer: ", info->host->host_no, '0' + SCpnt->device->id);
- //{ int i; for (i = 0; i < 32; i++) printk("%02x ", SCpnt->sense_buffer[i]); printk("\n"); }
- 	/*
--- 
-2.9.0
+	Hans
