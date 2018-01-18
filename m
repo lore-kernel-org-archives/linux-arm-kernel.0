@@ -1,69 +1,166 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Thu, 18 Jan 2018 09:25:57 +0100
-Subject: [PATCH RESEND] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux
- mode
-In-Reply-To: <20180117232347.24513-1-joerg.krause@embedded.rocks>
-References: <20180117232347.24513-1-joerg.krause@embedded.rocks>
-Message-ID: <1516263957.13152.2.camel@embedded.rocks>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 18 Jan 2018 09:28:02 +0100
+Subject: [PATCH v2 16/16] ARM: dts: r8a7794: sort subnodes of root node
+In-Reply-To: <20180118022000.GQ11924@bigcity.dyn.berto.se>
+References: <20180117161717.14589-1-horms+renesas@verge.net.au>
+ <20180117161717.14589-17-horms+renesas@verge.net.au>
+ <20180118022000.GQ11924@bigcity.dyn.berto.se>
+Message-ID: <20180118082802.zdnhkheaqjb5k3j5@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 18, 2018 at 03:20:00AM +0100, Niklas S?derlund wrote:
+> Hi Simon,
+> 
+> Thanks for your patch.
+> 
+> On 2018-01-17 17:17:17 +0100, Simon Horman wrote:
+> > Sort the subnodes of the soc node to improve maintainability.
+> > The sort key is the address on the bus with instances of the same
+> > IP block grouped together.
+> > 
+> > This patch should not introduce any functional change.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> This patch also aligns the comment for audio_clka. This is good but not 
+> mentioned in the commit message which confused the review bot, i.e me :-)
 
-On Thu, 2018-01-18 at 00:23 +0100, J?rg Krause wrote:
-> RESEND because of missing Ccs. Original patch is [0].
-> 
-> The 32 kHz reference clock on the i.MX6UL(L) can be output by
-> setting the external signal XTALOSC_REF_CLK_32K in one of the
-> following ways [1]:
-> 
-> > ----------------------------------------------------------|
-> > Signal              | Pad             | Mode | Direction |
-> > ----------------------------------------------------------|
-> > XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
-> >                     | GPIO1_IO03      | ALT3 |           |
-> >                     | JTAG_TCK        | ALT6 |           |
-> > ----------------------------------------------------------|
-> 
-> [0] https://patchwork.ozlabs.org/patch/816108/
-> [1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
-> 
-> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
-> ---
->  arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> index 0034eeb84542..e12654018c23 100644
-> --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> @@ -63,6 +63,7 @@
->  #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
->  #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
->  #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
-> +#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
->  #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
->  #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
->  #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
-> @@ -101,6 +102,7 @@
->  #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
->  #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
->  #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
-> +#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
->  #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
->  #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
->  #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
-> @@ -316,6 +318,7 @@
->  #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
->  #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
->  #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
-> +#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
->  #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
->  #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
->  #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
+Sorry, its probably worth adding that to the changelog.
 
-Just noticed the pin is named REF_CLK_32K instead of OSC32K_32K_OUT in
-the vendor Linux kernel. So better use their pin naming, right?
-
-Best regards,
-J?rg Krause
+> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+> 
+> > ---
+> > v2
+> > * New patch
+> > ---
+> >  arch/arm/boot/dts/r8a7794.dtsi | 90 +++++++++++++++++++++---------------------
+> >  1 file changed, 45 insertions(+), 45 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> > index 9e5f886f53c5..d588efa6aeaa 100644
+> > --- a/arch/arm/boot/dts/r8a7794.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> > @@ -33,6 +33,35 @@
+> >  		vin1 = &vin1;
+> >  	};
+> >  
+> > +	/*
+> > +	 * The external audio clocks are configured as 0 Hz fixed frequency
+> > +	 * clocks by default.
+> > +	 * Boards that provide audio clocks should override them.
+> > +	 */
+> > +	audio_clka: audio_clka {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		clock-frequency = <0>;
+> > +	};
+> > +	audio_clkb: audio_clkb {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		clock-frequency = <0>;
+> > +	};
+> > +	audio_clkc: audio_clkc {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		clock-frequency = <0>;
+> > +	};
+> > +
+> > +	/* External CAN clock */
+> > +	can_clk: can {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		/* This value must be overridden by the board. */
+> > +		clock-frequency = <0>;
+> > +	};
+> > +
+> >  	cpus {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <0>;
+> > @@ -66,6 +95,22 @@
+> >  		};
+> >  	};
+> >  
+> > +	/* External root clock */
+> > +	extal_clk: extal {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		/* This value must be overridden by the board. */
+> > +		clock-frequency = <0>;
+> > +	};
+> > +
+> > +	/* External SCIF clock */
+> > +	scif_clk: scif {
+> > +		compatible = "fixed-clock";
+> > +		#clock-cells = <0>;
+> > +		/* This value must be overridden by the board. */
+> > +		clock-frequency = <0>;
+> > +	};
+> > +
+> >  	soc {
+> >  		compatible = "simple-bus";
+> >  		interrupt-parent = <&gic>;
+> > @@ -1353,55 +1398,10 @@
+> >  				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+> >  	};
+> >  
+> > -	/* External root clock */
+> > -	extal_clk: extal {
+> > -		compatible = "fixed-clock";
+> > -		#clock-cells = <0>;
+> > -		/* This value must be overridden by the board. */
+> > -		clock-frequency = <0>;
+> > -	};
+> > -
+> >  	/* External USB clock - can be overridden by the board */
+> >  	usb_extal_clk: usb_extal {
+> >  		compatible = "fixed-clock";
+> >  		#clock-cells = <0>;
+> >  		clock-frequency = <48000000>;
+> >  	};
+> > -
+> > -	/* External CAN clock */
+> > -	can_clk: can {
+> > -		compatible = "fixed-clock";
+> > -		#clock-cells = <0>;
+> > -		/* This value must be overridden by the board. */
+> > -		clock-frequency = <0>;
+> > -	};
+> > -
+> > -	/* External SCIF clock */
+> > -	scif_clk: scif {
+> > -		compatible = "fixed-clock";
+> > -		#clock-cells = <0>;
+> > -		/* This value must be overridden by the board. */
+> > -		clock-frequency = <0>;
+> > -	};
+> > -
+> > -	/*
+> > -	 * The external audio clocks are configured  as 0 Hz fixed
+> > -	 * frequency clocks by default.  Boards that provide audio
+> > -	 * clocks should override them.
+> > -	 */
+> > -	audio_clka: audio_clka {
+> > -		compatible = "fixed-clock";
+> > -		#clock-cells = <0>;
+> > -		clock-frequency = <0>;
+> > -	};
+> > -	audio_clkb: audio_clkb {
+> > -		compatible = "fixed-clock";
+> > -		#clock-cells = <0>;
+> > -		clock-frequency = <0>;
+> > -	};
+> > -	audio_clkc: audio_clkc {
+> > -		compatible = "fixed-clock";
+> > -		#clock-cells = <0>;
+> > -		clock-frequency = <0>;
+> > -	};
+> >  };
+> > -- 
+> > 2.11.0
+> > 
+> 
+> -- 
+> Regards,
+> Niklas S?derlund
+> 
