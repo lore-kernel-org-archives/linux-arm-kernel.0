@@ -1,77 +1,36 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Thu, 18 Jan 2018 09:36:42 -0800 (PST)
-Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <a7d2910e-ae73-61de-9349-c5d804269695@arm.com>
-Message-ID: <mhng-758d7724-dc4c-4d08-adf2-967862df2925@palmer-si-x1c4>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Thu, 18 Jan 2018 18:43:42 +0100
+Subject: [PATCH 0/3] Improved perf support for imx53/ppd
+Message-ID: <20180118174345.26620-1-sebastian.reichel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jan 2018 10:08:27 PST (-0800), sudeep.holla at arm.com wrote:
-> (Sorry, somehow I missed this email until I saw Jeremy's reply today)
->
-> On 15/01/18 16:07, Palmer Dabbelt wrote:
->> On Mon, 15 Jan 2018 04:33:38 PST (-0800), sudeep.holla at arm.com wrote:
->>> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
->>>> The original intent in cacheinfo was that an architecture
->>>> specific populate_cache_leaves() would probe the hardware
->>>> and then cache_shared_cpu_map_setup() and
->>>> cache_override_properties() would provide firmware help to
->>>> extend/expand upon what was probed. Arm64 was really
->>>> the only architecture that was working this way, and
->>>> with the removal of most of the hardware probing logic it
->>>> became clear that it was possible to simplify the logic a bit.
->>>>
->>>> This patch combines the walk of the DT nodes with the
->>>> code updating the cache size/line_size and nr_sets.
->>>> cache_override_properties() (which was DT specific) is
->>>> then removed. The result is that cacheinfo.of_node is
->>>> no longer used as a temporary place to hold DT references
->>>> for future calls that update cache properties. That change
->>>> helps to clarify its one remaining use (matching
->>>> cacheinfo nodes that represent shared caches) which
->>>> will be used by the ACPI/PPTT code in the following patches.
->>>>
->>>> Cc: Palmer Dabbelt <palmer@sifive.com>
->>>> Cc: Albert Ou <albert@sifive.com>
->>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>> ---
->>>> ?arch/riscv/kernel/cacheinfo.c |? 1 +
->>>> ?drivers/base/cacheinfo.c????? | 65
->>>> +++++++++++++++++++------------------------
->>>> ?include/linux/cacheinfo.h???? |? 1 +
->>>> ?3 files changed, 31 insertions(+), 36 deletions(-)
->>>>
->>>> diff --git a/arch/riscv/kernel/cacheinfo.c
->>>> b/arch/riscv/kernel/cacheinfo.c
->>>> index 10ed2749e246..6f4500233cf8 100644
->>>> --- a/arch/riscv/kernel/cacheinfo.c
->>>> +++ b/arch/riscv/kernel/cacheinfo.c
->>>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo *this_leaf,
->>>> ???????? CACHE_WRITE_BACK
->>>> ???????? | CACHE_READ_ALLOCATE
->>>> ???????? | CACHE_WRITE_ALLOCATE;
->>>> +??? cache_of_set_props(this_leaf, node);
->>>
->>> This may be necessary but can it be done as later patch ? So far nothing
->>> is added that may break riscv IIUC.
->>>
->>> Palmer, Albert,
->>>
->>> Can you confirm ? Also, as I see we can thin down arch specific
->>> implementation on riscv if it's just using DT like ARM64. Sorry if
->>> I am missing to see something, so thought of checking.
->>>
->>> [...]
->>
->> Sorry, I guess I'm a bit confused as to what's going on here.? RISC-V
->> uses device tree on all Linux systems.
->>
->
-> Good. By thin down, I was thinking of moving the init_cache_level and
-> populate_cache_leaves implementation of riscv to generic weak function
-> under CONFIG_OF. You may even endup deleting riscv cacheinfo.c
->
-> Just a thought, sorry for not being clear earlier.
+Hi,
 
-OK, well, I'm always happy to convert things to generic implementations.
+This improves perf on imx53 by adding support for enabling the Secure
+Debug Enable Register (SDER) SUNIDEN bit. This unlocks new
+functionality:
+
+ppd before patchset# perf stat -e cycles,instructions sleep 1 2>&1 | grep instructions
+                 0      instructions              #    0.00  insn per cycle
+
+ppd  after patchset# perf stat -e cycles,instructions sleep 1 2>&1 | grep instructions
+            177864      instructions              #    0.05  insn per cycle
+
+-- Sebastian
+
+Peter Senna Tschudin (2):
+  ARM: imx53: add SoC specific PMU setup
+  ARM: dts: imx53: PPD: Enable secure-reg-access
+
+Sebastian Reichel (1):
+  drivers/perf: arm_pmu: Add platform hardware setup hooks.
+
+ arch/arm/boot/dts/imx53-ppd.dts |  6 ++++
+ arch/arm/mach-imx/mach-imx53.c  | 68 +++++++++++++++++++++++++++++++++++++++++
+ drivers/perf/arm_pmu.c          | 13 ++++++++
+ include/linux/perf/arm_pmu.h    |  5 +++
+ 4 files changed, 92 insertions(+)
+
+-- 
+2.15.1
