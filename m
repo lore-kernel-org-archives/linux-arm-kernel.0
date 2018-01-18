@@ -1,93 +1,62 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Jan 2018 12:49:46 +0000
-Subject: [PATCH v4 13/13] iommu/rockchip: Support sharing IOMMU between
- masters
-In-Reply-To: <20180118115251.5542-14-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-14-jeffy.chen@rock-chips.com>
-Message-ID: <50529cf2-72ed-e991-7639-79b5d74c7853@arm.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Thu, 18 Jan 2018 15:55:59 +0300
+Subject: mmc1 timeout issue with rpi3
+In-Reply-To: <974305384.15547.1516259017873@email.1und1.de>
+References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
+ <1059643032.72553.1516136078614@email.1und1.de>
+ <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
+ <1199109167.10232.1516213158515@email.1und1.de>
+ <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
+ <998321576.11526.1516217542223@email.1und1.de>
+ <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
+ <974305384.15547.1516259017873@email.1und1.de>
+Message-ID: <c578616d-3eb9-0b5c-c4be-1bad0d9052e9@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 11:52, Jeffy Chen wrote:
-> There would be some masters sharing the same IOMMU device. Put them in
-> the same iommu group and share the same iommu domain.
+Hi, Stefan
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+On 01/18/2018 10:03 AM, Stefan Wahren wrote:
+> Hi Sergey,
+>
+>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 21:04 geschrieben:
+>>
+>>
+>> Hi Stefan,
+>>
+>> On 01/17/2018 10:32 PM, Stefan Wahren wrote:
+>>> Hi Sergey,
+>>>
+>>>> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 19:49 geschrieben:
+>>>>
+>>>>
+>>>> Hi Stefan
+>>>>
+>>>> wifi network was working fine when I used a raspbian image downloaded
+>>>> from official site.
+>>>>
+>>>> Here is my config https://pastebin.com/7XRpmM0X  and cpuinfo
+>>>> https://pastebin.com/08Z6gDZ9
+>>>>
+>>>> I have no idea about version you are talking about.
+>>> please stop top-posting.
+>>>
+>>> I was talking about the board revision of your RPi. You can get this information by looking at the PCB.
+>>>
+>>> I updated to the last firmware and your config but i'm unable to reproduce this issue.
+>>>
+>>> Do you use U-Boot or only the Raspberry Pi bootloader?
+>>> What are your modifications to config.txt?
+>>>
+>>>> Thanks.
+>>>>
+>>>>
+>> I am using u-boot tagged 2018.01.
+> interesting. I don't use u-boot as second stage bootloader. Maybe it messed up the pin configuration of the GPIO expander. Could you please try without u-boot?
 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3:
-> Remove rk_iommudata->domain.
-> 
-> Changes in v2: None
-> 
->   drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
->   1 file changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index e2e7acc3039d..e07929bbcc2a 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -97,6 +97,7 @@ struct rk_iommu {
->   	struct iommu_device iommu;
->   	struct list_head node; /* entry in rk_iommu_domain.iommus */
->   	struct iommu_domain *domain; /* domain to which iommu is attached */
-> +	struct iommu_group *group;
->   };
->   
->   struct rk_iommudata {
-> @@ -1157,6 +1158,15 @@ static void rk_iommu_remove_device(struct device *dev)
->   	iommu_group_remove_device(dev);
->   }
->   
-> +static struct iommu_group *rk_iommu_device_group(struct device *dev)
-> +{
-> +	struct rk_iommu *iommu;
-> +
-> +	iommu = rk_iommu_from_dev(dev);
-> +
-> +	return iommu->group;
-> +}
-> +
->   static int rk_iommu_of_xlate(struct device *dev,
->   			     struct of_phandle_args *args)
->   {
-> @@ -1192,7 +1202,7 @@ static const struct iommu_ops rk_iommu_ops = {
->   	.add_device = rk_iommu_add_device,
->   	.remove_device = rk_iommu_remove_device,
->   	.iova_to_phys = rk_iommu_iova_to_phys,
-> -	.device_group = generic_device_group,
-> +	.device_group = rk_iommu_device_group,
->   	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
->   	.of_xlate = rk_iommu_of_xlate,
->   };
-> @@ -1248,9 +1258,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   	iommu->reset_disabled = device_property_read_bool(dev,
->   					"rockchip,disable-mmu-reset");
->   
-> +	iommu->group = iommu_group_alloc();
-> +	if (IS_ERR(iommu->group)) {
-> +		err = PTR_ERR(iommu->group);
-> +		goto err_put_clocks;
-> +	}
-> +
->   	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
->   	if (err)
-> -		goto err_put_clocks;
-> +		goto err_put_group;
->   
->   	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
->   	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
-> @@ -1274,6 +1290,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   	return 0;
->   err_remove_sysfs:
->   	iommu_device_sysfs_remove(&iommu->iommu);
-> +err_put_group:
-> +	iommu_group_put(iommu->group);
->   err_put_clocks:
->   	rk_iommu_put_clocks(iommu);
->   	return err;
-> 
+but how can u-boot influence that ? As far as I understand the error 
+happens in a very late boot stage, actually in the end. At this time 
+bcm2837-rpi-3-b device tree file from kernel is already loaded. Do you 
+think this DTB is incorrect ?
+
+Thanks
