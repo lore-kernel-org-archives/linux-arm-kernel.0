@@ -1,34 +1,20 @@
-From: chrisadr@gentoo.org (=?UTF-8?q?Christopher=20D=C3=ADaz=20Riveros?=)
-Date: Thu, 18 Jan 2018 18:44:15 -0500
-Subject: [PATCH-next] IIO: ADC: drop unused 'of_id' struct
-Message-ID: <20180118234415.32410-1-chrisadr@gentoo.org>
+From: maggu2810@gmail.com (Markus Rathgeb)
+Date: Fri, 19 Jan 2018 00:50:25 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
+In-Reply-To: <513e5b07-0209-0d30-f8e2-5ff1799d8a2d@maciej.szmigiero.name>
+References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
+ <84391569-cdb9-1c17-7e37-6fdad954d549@maciej.szmigiero.name>
+ <CAOcK=CNuopm0bq3s-jb2MJ0hHhLyYC1h3zquO__syN2=tU_nKQ@mail.gmail.com>
+ <513e5b07-0209-0d30-f8e2-5ff1799d8a2d@maciej.szmigiero.name>
+Message-ID: <CAOcK=CP=m0oBfvPuMEXLGG_5rxqchh5dg9SLbbiAUEvEyj=aMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_STM32_DFSDM_CORE is enabled, stm32-dfsdm-core.o is compiled,
-which raises a next warning:
+> Does applying Fabio's patch to the freezing 4.13 or 4.15-rc kernel cause it to boot
+successfully?
 
-drivers/iio/adc/stm32-dfsdm-core.c: In function ?stm32_dfsdm_probe?:
-drivers/iio/adc/stm32-dfsdm-core.c:245:29: warning: unused variable ?of_id? [-Wunused-variable]
-  const struct of_device_id *of_id;
-                             ^~~~~
 
-Signed-off-by: Christopher D?az Riveros <chrisadr@gentoo.org>
----
- drivers/iio/adc/stm32-dfsdm-core.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-index 84277bcc465f..6290332cfd3f 100644
---- a/drivers/iio/adc/stm32-dfsdm-core.c
-+++ b/drivers/iio/adc/stm32-dfsdm-core.c
-@@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
- static int stm32_dfsdm_probe(struct platform_device *pdev)
- {
- 	struct dfsdm_priv *priv;
--	const struct of_device_id *of_id;
- 	const struct stm32_dfsdm_dev_data *dev_data;
- 	struct stm32_dfsdm *dfsdm;
- 	int ret;
--- 
-2.15.1
+AFAIK The latest series that Peter Chen to address the issue was posted was
+v16 from June, 2017.
+I didn't try it yet myself.
+Will give it a try the next days.
