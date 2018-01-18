@@ -1,34 +1,50 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 18 Jan 2018 12:37:14 +0100
-Subject: [PATCH] soc: xilinx: xlnx_vcu: Fix && vs & typo
-In-Reply-To: <20180118102823.GA21064@mwanda>
-References: <20180118102823.GA21064@mwanda>
-Message-ID: <7bea45bc-a684-3c6e-c818-c2428a5990b5@xilinx.com>
+From: tanhuazhong@huawei.com (Huazhong Tan)
+Date: Thu, 18 Jan 2018 20:31:37 +0800
+Subject: [PATCH] arm64: dts: hisi: add hns-dsaf cpld control for the hip07 SoC
+Message-ID: <1516278697-244377-1-git-send-email-tanhuazhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.1.2018 11:28, Dan Carpenter wrote:
-> We accidentally used a logical AND instead of a bitwise AND here.
-> 
-> Fixes: cee8113a295a ("soc: xilinx: xlnx_vcu: Add Xilinx ZYNQMP VCU logicoreIP init driver")
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> diff --git a/drivers/soc/xilinx/xlnx_vcu.c b/drivers/soc/xilinx/xlnx_vcu.c
-> index c1d6f1b190b6..a840c0272135 100644
-> --- a/drivers/soc/xilinx/xlnx_vcu.c
-> +++ b/drivers/soc/xilinx/xlnx_vcu.c
-> @@ -334,7 +334,7 @@ static int xvcu_set_vcu_pll_info(struct xvcu_device *xvcu)
->  	 */
->  	vcu_pll_ctrl = xvcu_read(xvcu->vcu_slcr_ba, VCU_PLL_CTRL);
->  	clkoutdiv = vcu_pll_ctrl >> VCU_PLL_CTRL_CLKOUTDIV_SHIFT;
-> -	clkoutdiv = clkoutdiv && VCU_PLL_CTRL_CLKOUTDIV_MASK;
-> +	clkoutdiv = clkoutdiv & VCU_PLL_CTRL_CLKOUTDIV_MASK;
->  	if (clkoutdiv != 1) {
->  		dev_err(xvcu->dev, "clkoutdiv value is invalid\n");
->  		return -EINVAL;
-> 
+Add cpld-syscon node to support the cpld control for hns-dsaf
+on the hip07 SoC.
 
-Already fixed by https://www.spinics.net/lists/arm-kernel/msg628989.html
+Signed-off-by: Huazhong Tan <tanhuazhong@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Thanks,
-Michal
+diff --git a/arch/arm64/boot/dts/hisilicon/hip07.dtsi b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+index 2c01a21..4bd6416 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip07.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+@@ -1127,6 +1127,12 @@
+ 			reg = <0x0 0xc0000000 0x0 0x10000>;
+ 		};
+ 
++		dsa_cpld: dsa_cpld at 78000010 {
++			compatible = "syscon";
++			reg = <0x0 0x78000010 0x0 0x100>;
++			reg-io-width = <2>;
++		};
++
+ 		pcie_subctl: pcie_subctl at a0000000 {
+ 			compatible = "hisilicon,pcie-sas-subctrl", "syscon";
+ 			reg = <0x0 0xa0000000 0x0 0x10000>;
+@@ -1258,6 +1264,7 @@
+ 			port at 0 {
+ 				reg = <0>;
+ 				serdes-syscon = <&serdes_ctrl>;
++				cpld-syscon = <&dsa_cpld 0x0>;
+ 				port-rst-offset = <0>;
+ 				port-mode-offset = <0>;
+ 				mc-mac-mask = [ff f0 00 00 00 00];
+@@ -1267,6 +1274,7 @@
+ 			port at 1 {
+ 				reg = <1>;
+ 				serdes-syscon= <&serdes_ctrl>;
++				cpld-syscon = <&dsa_cpld 0x4>;
+ 				port-rst-offset = <1>;
+ 				port-mode-offset = <1>;
+ 				mc-mac-mask = [ff f0 00 00 00 00];
+-- 
+1.9.1
