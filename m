@@ -1,67 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 18 Jan 2018 12:31:46 +0900
-Subject: [PATCH] kbuild: fix W= option checks for extra DTC warnings
-Message-ID: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 18 Jan 2018 13:17:52 +0900
+Subject: [PATCH v3 01/12] iommu/rockchip: Prohibiat unbind and remove
+In-Reply-To: <20180117152542.26429-2-jeffy.chen@rock-chips.com>
+References: <20180117152542.26429-1-jeffy.chen@rock-chips.com>
+ <20180117152542.26429-2-jeffy.chen@rock-chips.com>
+Message-ID: <CAAFQd5B24j6OSStpYWiO-xfhH131mwNRk3=cEBakMpvsEkQ7wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kbuild supports 3 levels of extra warnings, and multiple levels can
-be combined, like W=12, W=123.  It was added by commit a6de553da01c
-("kbuild: Allow to combine multiple W= levels").
+On Thu, Jan 18, 2018 at 12:25 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> Removal the IOMMUs cannot be done reliably.
 
->From the log of commit 8654cb8d0371 ("dtc: update warning settings
-for new bus and node/property name checks"), I assume:
+nit: Perhaps "Removal of IOMMUs"?
 
- - unit_address_vs_reg, simple_bus_reg, etc. belong to level 1
- - node_name_chars_strict, property_name_chars_strict belong to level 2
+>
+> This is similar to exynos iommu driver.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+> Changes in v3:
+> Also remove remove() and module_exit() as Tomasz suggested.
+>
+> Changes in v2: None
+>
+>  drivers/iommu/rockchip-iommu.c | 21 +--------------------
+>  1 file changed, 1 insertion(+), 20 deletions(-)
 
-However, the level 1 warnings are displayed by any argument to W=.
-On the other hand, the level 2 warnings are displayed by W=2, but
-not by W=12, or W=123.
+nit: Typo in subject: s/Prohibiat/Prohibit/
 
-Use $(findstring ...) like scripts/Makefile.extrawarn.
+Otherwise,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 
-Side Notes for possible additional works:
-
- [1] I implemented DTC extra warnings differently in U-Boot:
-
-    https://github.com/u-boot/u-boot/blob/v2018.01/scripts/Makefile.extrawarn#L64
-
-    Better to collect extra warning stuff into scripts/Makefile.extrawarn ?
-
- [2] KBUILD_ENABLE_EXTRA_GCC_CHECKS is getting a historical misnomer
-     because we use it for Clang and DTC too.
-
-     Better to rename?  (keeping backward-compatibility for a while)?
-
-
- scripts/Makefile.lib | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 1ca4dcd..7dee1da 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -264,7 +264,7 @@ cmd_gzip = (cat $(filter-out FORCE,$^) | gzip -n -f -9 > $@) || \
- DTC ?= $(objtree)/scripts/dtc/dtc
- 
- # Disable noisy checks by default
--ifeq ($(KBUILD_ENABLE_EXTRA_GCC_CHECKS),)
-+ifeq ($(findstring 1,$(KBUILD_ENABLE_EXTRA_GCC_CHECKS)),)
- DTC_FLAGS += -Wno-unit_address_vs_reg \
- 	-Wno-simple_bus_reg \
- 	-Wno-unit_address_format \
-@@ -273,7 +273,7 @@ DTC_FLAGS += -Wno-unit_address_vs_reg \
- 	-Wno-pci_device_reg
- endif
- 
--ifeq ($(KBUILD_ENABLE_EXTRA_GCC_CHECKS),2)
-+ifneq ($(findstring 2,$(KBUILD_ENABLE_EXTRA_GCC_CHECKS)),)
- DTC_FLAGS += -Wnode_name_chars_strict \
- 	-Wproperty_name_chars_strict
- endif
--- 
-2.7.4
+Best regards,
+Tomasz
