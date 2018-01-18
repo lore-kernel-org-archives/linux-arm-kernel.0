@@ -1,59 +1,89 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 18 Jan 2018 19:52:49 +0800
-Subject: [PATCH v4 11/13] iommu/rockchip: Fix error handling in init
+Date: Thu, 18 Jan 2018 19:52:51 +0800
+Subject: [PATCH v4 13/13] iommu/rockchip: Support sharing IOMMU between masters
 In-Reply-To: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
 References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180118115251.5542-12-jeffy.chen@rock-chips.com>
+Message-ID: <20180118115251.5542-14-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's hard to undo bus_set_iommu() in the error path, so move it to the
-end of rk_iommu_probe().
+There would be some masters sharing the same IOMMU device. Put them in
+the same iommu group and share the same iommu domain.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 ---
 
 Changes in v4: None
-Changes in v3: None
-Changes in v2:
-Move bus_set_iommu() to rk_iommu_probe().
+Changes in v3:
+Remove rk_iommudata->domain.
 
- drivers/iommu/rockchip-iommu.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+Changes in v2: None
+
+ drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index b1f177ae03c7..2c095f96c033 100644
+index e2e7acc3039d..e07929bbcc2a 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -1195,6 +1195,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (!dma_dev)
- 		dma_dev = &pdev->dev;
+@@ -97,6 +97,7 @@ struct rk_iommu {
+ 	struct iommu_device iommu;
+ 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+ 	struct iommu_domain *domain; /* domain to which iommu is attached */
++	struct iommu_group *group;
+ };
  
-+	bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
+ struct rk_iommudata {
+@@ -1157,6 +1158,15 @@ static void rk_iommu_remove_device(struct device *dev)
+ 	iommu_group_remove_device(dev);
+ }
+ 
++static struct iommu_group *rk_iommu_device_group(struct device *dev)
++{
++	struct rk_iommu *iommu;
 +
++	iommu = rk_iommu_from_dev(dev);
++
++	return iommu->group;
++}
++
+ static int rk_iommu_of_xlate(struct device *dev,
+ 			     struct of_phandle_args *args)
+ {
+@@ -1192,7 +1202,7 @@ static const struct iommu_ops rk_iommu_ops = {
+ 	.add_device = rk_iommu_add_device,
+ 	.remove_device = rk_iommu_remove_device,
+ 	.iova_to_phys = rk_iommu_iova_to_phys,
+-	.device_group = generic_device_group,
++	.device_group = rk_iommu_device_group,
+ 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
+ 	.of_xlate = rk_iommu_of_xlate,
+ };
+@@ -1248,9 +1258,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	iommu->reset_disabled = device_property_read_bool(dev,
+ 					"rockchip,disable-mmu-reset");
+ 
++	iommu->group = iommu_group_alloc();
++	if (IS_ERR(iommu->group)) {
++		err = PTR_ERR(iommu->group);
++		goto err_put_clocks;
++	}
++
+ 	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+ 	if (err)
+-		goto err_put_clocks;
++		goto err_put_group;
+ 
+ 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+ 	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
+@@ -1274,6 +1290,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
  	return 0;
  err_remove_sysfs:
  	iommu_device_sysfs_remove(&iommu->iommu);
-@@ -1220,19 +1222,6 @@ static struct platform_driver rk_iommu_driver = {
- 
- static int __init rk_iommu_init(void)
- {
--	struct device_node *np;
--	int ret;
--
--	np = of_find_matching_node(NULL, rk_iommu_dt_ids);
--	if (!np)
--		return 0;
--
--	of_node_put(np);
--
--	ret = bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
--	if (ret)
--		return ret;
--
- 	return platform_driver_register(&rk_iommu_driver);
- }
- subsys_initcall(rk_iommu_init);
++err_put_group:
++	iommu_group_put(iommu->group);
+ err_put_clocks:
+ 	rk_iommu_put_clocks(iommu);
+ 	return err;
 -- 
 2.11.0
