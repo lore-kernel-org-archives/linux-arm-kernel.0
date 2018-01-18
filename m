@@ -1,89 +1,220 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 18 Jan 2018 19:52:51 +0800
-Subject: [PATCH v4 13/13] iommu/rockchip: Support sharing IOMMU between masters
+Date: Thu, 18 Jan 2018 19:52:47 +0800
+Subject: [PATCH v4 09/13] iommu/rockchip: Use IOMMU device for dma mapping
+ operations
 In-Reply-To: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
 References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180118115251.5542-14-jeffy.chen@rock-chips.com>
+Message-ID: <20180118115251.5542-10-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There would be some masters sharing the same IOMMU device. Put them in
-the same iommu group and share the same iommu domain.
+Use the first registered IOMMU device for dma mapping operations, and
+drop the domain platform device.
+
+This is similar to exynos iommu driver.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 ---
 
 Changes in v4: None
-Changes in v3:
-Remove rk_iommudata->domain.
-
+Changes in v3: None
 Changes in v2: None
 
- drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 85 ++++++++++++------------------------------
+ 1 file changed, 24 insertions(+), 61 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index e2e7acc3039d..e07929bbcc2a 100644
+index 9b85a3050449..bdb7c5de6fc2 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -97,6 +97,7 @@ struct rk_iommu {
- 	struct iommu_device iommu;
- 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+@@ -77,7 +77,6 @@
+ 
+ struct rk_iommu_domain {
+ 	struct list_head iommus;
+-	struct platform_device *pdev;
+ 	u32 *dt; /* page directory table */
+ 	dma_addr_t dt_dma;
+ 	spinlock_t iommus_lock; /* lock for iommus list */
+@@ -98,12 +97,14 @@ struct rk_iommu {
  	struct iommu_domain *domain; /* domain to which iommu is attached */
-+	struct iommu_group *group;
  };
  
- struct rk_iommudata {
-@@ -1157,6 +1158,15 @@ static void rk_iommu_remove_device(struct device *dev)
- 	iommu_group_remove_device(dev);
++static struct device *dma_dev;
++
+ static inline void rk_table_flush(struct rk_iommu_domain *dom, dma_addr_t dma,
+ 				  unsigned int count)
+ {
+ 	size_t size = count * sizeof(u32); /* count of u32 entry */
+ 
+-	dma_sync_single_for_device(&dom->pdev->dev, dma, size, DMA_TO_DEVICE);
++	dma_sync_single_for_device(dma_dev, dma, size, DMA_TO_DEVICE);
  }
  
-+static struct iommu_group *rk_iommu_device_group(struct device *dev)
-+{
-+	struct rk_iommu *iommu;
-+
-+	iommu = rk_iommu_from_dev(dev);
-+
-+	return iommu->group;
-+}
-+
- static int rk_iommu_of_xlate(struct device *dev,
- 			     struct of_phandle_args *args)
+ static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
+@@ -690,7 +691,6 @@ static void rk_iommu_zap_iova_first_last(struct rk_iommu_domain *rk_domain,
+ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
+ 				  dma_addr_t iova)
  {
-@@ -1192,7 +1202,7 @@ static const struct iommu_ops rk_iommu_ops = {
- 	.add_device = rk_iommu_add_device,
- 	.remove_device = rk_iommu_remove_device,
- 	.iova_to_phys = rk_iommu_iova_to_phys,
--	.device_group = generic_device_group,
-+	.device_group = rk_iommu_device_group,
+-	struct device *dev = &rk_domain->pdev->dev;
+ 	u32 *page_table, *dte_addr;
+ 	u32 dte_index, dte;
+ 	phys_addr_t pt_phys;
+@@ -708,9 +708,9 @@ static u32 *rk_dte_get_page_table(struct rk_iommu_domain *rk_domain,
+ 	if (!page_table)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	pt_dma = dma_map_single(dev, page_table, SPAGE_SIZE, DMA_TO_DEVICE);
+-	if (dma_mapping_error(dev, pt_dma)) {
+-		dev_err(dev, "DMA mapping error while allocating page table\n");
++	pt_dma = dma_map_single(dma_dev, page_table, SPAGE_SIZE, DMA_TO_DEVICE);
++	if (dma_mapping_error(dma_dev, pt_dma)) {
++		dev_err(dma_dev, "DMA mapping error while allocating page table\n");
+ 		free_page((unsigned long)page_table);
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+@@ -982,29 +982,20 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
+ {
+ 	struct rk_iommu_domain *rk_domain;
+-	struct platform_device *pdev;
+-	struct device *iommu_dev;
+ 
+ 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+ 
+-	/* Register a pdev per domain, so DMA API can base on this *dev
+-	 * even some virtual master doesn't have an iommu slave
+-	 */
+-	pdev = platform_device_register_simple("rk_iommu_domain",
+-					       PLATFORM_DEVID_AUTO, NULL, 0);
+-	if (IS_ERR(pdev))
++	if (!dma_dev)
+ 		return NULL;
+ 
+-	rk_domain = devm_kzalloc(&pdev->dev, sizeof(*rk_domain), GFP_KERNEL);
++	rk_domain = devm_kzalloc(dma_dev, sizeof(*rk_domain), GFP_KERNEL);
+ 	if (!rk_domain)
+-		goto err_unreg_pdev;
+-
+-	rk_domain->pdev = pdev;
++		return NULL;
+ 
+ 	if (type == IOMMU_DOMAIN_DMA &&
+ 	    iommu_get_dma_cookie(&rk_domain->domain))
+-		goto err_unreg_pdev;
++		return NULL;
+ 
+ 	/*
+ 	 * rk32xx iommus use a 2 level pagetable.
+@@ -1015,11 +1006,10 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
+ 	if (!rk_domain->dt)
+ 		goto err_put_cookie;
+ 
+-	iommu_dev = &pdev->dev;
+-	rk_domain->dt_dma = dma_map_single(iommu_dev, rk_domain->dt,
++	rk_domain->dt_dma = dma_map_single(dma_dev, rk_domain->dt,
+ 					   SPAGE_SIZE, DMA_TO_DEVICE);
+-	if (dma_mapping_error(iommu_dev, rk_domain->dt_dma)) {
+-		dev_err(iommu_dev, "DMA map error for DT\n");
++	if (dma_mapping_error(dma_dev, rk_domain->dt_dma)) {
++		dev_err(dma_dev, "DMA map error for DT\n");
+ 		goto err_free_dt;
+ 	}
+ 
+@@ -1040,8 +1030,6 @@ static struct iommu_domain *rk_iommu_domain_alloc(unsigned type)
+ err_put_cookie:
+ 	if (type == IOMMU_DOMAIN_DMA)
+ 		iommu_put_dma_cookie(&rk_domain->domain);
+-err_unreg_pdev:
+-	platform_device_unregister(pdev);
+ 
+ 	return NULL;
+ }
+@@ -1058,20 +1046,18 @@ static void rk_iommu_domain_free(struct iommu_domain *domain)
+ 		if (rk_dte_is_pt_valid(dte)) {
+ 			phys_addr_t pt_phys = rk_dte_pt_address(dte);
+ 			u32 *page_table = phys_to_virt(pt_phys);
+-			dma_unmap_single(&rk_domain->pdev->dev, pt_phys,
++			dma_unmap_single(dma_dev, pt_phys,
+ 					 SPAGE_SIZE, DMA_TO_DEVICE);
+ 			free_page((unsigned long)page_table);
+ 		}
+ 	}
+ 
+-	dma_unmap_single(&rk_domain->pdev->dev, rk_domain->dt_dma,
++	dma_unmap_single(dma_dev, rk_domain->dt_dma,
+ 			 SPAGE_SIZE, DMA_TO_DEVICE);
+ 	free_page((unsigned long)rk_domain->dt);
+ 
+ 	if (domain->type == IOMMU_DOMAIN_DMA)
+ 		iommu_put_dma_cookie(&rk_domain->domain);
+-
+-	platform_device_unregister(rk_domain->pdev);
+ }
+ 
+ static bool rk_iommu_is_dev_iommu_master(struct device *dev)
+@@ -1194,30 +1180,6 @@ static const struct iommu_ops rk_iommu_ops = {
  	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
- 	.of_xlate = rk_iommu_of_xlate,
  };
-@@ -1248,9 +1258,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	iommu->reset_disabled = device_property_read_bool(dev,
- 					"rockchip,disable-mmu-reset");
  
-+	iommu->group = iommu_group_alloc();
-+	if (IS_ERR(iommu->group)) {
-+		err = PTR_ERR(iommu->group);
-+		goto err_put_clocks;
-+	}
-+
- 	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+-static int rk_iommu_domain_probe(struct platform_device *pdev)
+-{
+-	struct device *dev = &pdev->dev;
+-
+-	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms), GFP_KERNEL);
+-	if (!dev->dma_parms)
+-		return -ENOMEM;
+-
+-	/* Set dma_ops for dev, otherwise it would be dummy_dma_ops */
+-	arch_setup_dma_ops(dev, 0, DMA_BIT_MASK(32), NULL, false);
+-
+-	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+-	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(32));
+-
+-	return 0;
+-}
+-
+-static struct platform_driver rk_iommu_domain_driver = {
+-	.probe = rk_iommu_domain_probe,
+-	.driver = {
+-		   .name = "rk_iommu_domain",
+-	},
+-};
+-
+ static int rk_iommu_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1278,6 +1240,14 @@ static int rk_iommu_probe(struct platform_device *pdev)
  	if (err)
--		goto err_put_clocks;
-+		goto err_put_group;
+ 		goto err_remove_sysfs;
  
- 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
- 	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
-@@ -1274,6 +1290,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
++	/*
++	 * Use the first registered IOMMU device for domain to use with DMA
++	 * API, since a domain might not physically correspond to a single
++	 * IOMMU device..
++	 */
++	if (!dma_dev)
++		dma_dev = &pdev->dev;
++
  	return 0;
  err_remove_sysfs:
  	iommu_device_sysfs_remove(&iommu->iommu);
-+err_put_group:
-+	iommu_group_put(iommu->group);
- err_put_clocks:
- 	rk_iommu_put_clocks(iommu);
- 	return err;
+@@ -1316,14 +1286,7 @@ static int __init rk_iommu_init(void)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = platform_driver_register(&rk_iommu_domain_driver);
+-	if (ret)
+-		return ret;
+-
+-	ret = platform_driver_register(&rk_iommu_driver);
+-	if (ret)
+-		platform_driver_unregister(&rk_iommu_domain_driver);
+-	return ret;
++	return platform_driver_register(&rk_iommu_driver);
+ }
+ subsys_initcall(rk_iommu_init);
+ 
 -- 
 2.11.0
