@@ -1,52 +1,81 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 18 Jan 2018 08:03:37 +0100 (CET)
-Subject: mmc1 timeout issue with rpi3
-In-Reply-To: <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
-References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
- <1059643032.72553.1516136078614@email.1und1.de>
- <5ab12aa4-57a9-55b5-ef43-43b2eac9c1b7@orpaltech.com>
- <1199109167.10232.1516213158515@email.1und1.de>
- <665b39ed-e42e-4bd5-36ba-65e733089537@orpaltech.com>
- <998321576.11526.1516217542223@email.1und1.de>
- <b094ab76-8a4e-b47b-4266-4c401f62b8ce@orpaltech.com>
-Message-ID: <974305384.15547.1516259017873@email.1und1.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 18 Jan 2018 08:22:58 +0100
+Subject: [PATCH v3 08/13] drm/sun4i: Add a driver for the display frontend
+In-Reply-To: <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
+References: <cover.8538fc1191390239557a21e2b0444c81eef1c581.1515492513.git-series.maxime.ripard@free-electrons.com>
+ <3b7164f4a5199f0499c6f41201b31bc471cb3af9.1515492513.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65o-fYvP6Qf8gq=eceAG4oqq7E-r4hyxq4xe+fm0sKfqg@mail.gmail.com>
+Message-ID: <20180118072258.ucbchh32mhyln2qn@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergey,
+Hi,
 
-> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 21:04 geschrieben:
+On Wed, Jan 17, 2018 at 09:43:31PM +0800, Chen-Yu Tsai wrote:
+> >         if (sun4i_drv_node_is_connector(node))
+> >                 return 0;
+> >
+> > -       if (!sun4i_drv_node_is_frontend(node)) {
+> > +       /*
+> > +        * If the device is either just a regular device, or an
+> > +        * enabled frontend supported by the driver, we add it to our
+> > +        * component list.
+> > +        */
+> > +       if (!sun4i_drv_node_is_frontend(node) ||
+> > +           (sun4i_drv_node_is_supported_frontend(node) &&
+> > +            of_device_is_available(node))) {
 > 
-> 
-> Hi Stefan,
-> 
-> On 01/17/2018 10:32 PM, Stefan Wahren wrote:
-> > Hi Sergey,
-> >
-> >> Sergey Suloev <ssuloev@orpaltech.com> hat am 17. Januar 2018 um 19:49 geschrieben:
-> >>
-> >>
-> >> Hi Stefan
-> >>
-> >> wifi network was working fine when I used a raspbian image downloaded
-> >> from official site.
-> >>
-> >> Here is my config https://pastebin.com/7XRpmM0X  and cpuinfo
-> >> https://pastebin.com/08Z6gDZ9
-> >>
-> >> I have no idea about version you are talking about.
-> > please stop top-posting.
-> >
-> > I was talking about the board revision of your RPi. You can get this information by looking at the PCB.
-> >
-> > I updated to the last firmware and your config but i'm unable to reproduce this issue.
-> >
-> > Do you use U-Boot or only the Raspberry Pi bootloader?
-> > What are your modifications to config.txt?
-> >
-> >> Thanks.
-> >>
-> >>
-> I am using u-boot tagged 2018.01.
+> Nit: sun4i_drv_node_is_supported_frontend should be a subset of
+> sun4i_drv_node_is_frontend, so of_device_is_available should always
+> be true at this point.
 
-interesting. I don't use u-boot as second stage bootloader. Maybe it messed up the pin configuration of the GPIO expander. Could you please try without u-boot?
+That's not really the condition though :)
+
+It's if the device is *not* a frontend or if it is a supported
+frontend that is available, add it to the endpoints list.
+
+> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
+> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
+> > +                    SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
+> > +                    SUN4I_FRONTEND_INPUT_FMT_PS(1));
+> > +       regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
+> > +                    SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
+> 
+> Seems that you also need to set the "ALPHA_EN" bit for ARGB.
+
+I have not seen that bit documented anywhere. Where is it coming from?
+
+> > +       frontend->reset = devm_reset_control_get(dev, NULL);
+> > +       if (IS_ERR(frontend->reset)) {
+> > +               dev_err(dev, "Couldn't get our reset line\n");
+> > +               return PTR_ERR(frontend->reset);
+> > +       }
+> > +       reset_control_reset(frontend->reset);
+> 
+> reset_control_reset leaves the reset control deasserted. At this
+> point the clock might not be running, which might mean the internal
+> state is not completely wiped out. (Though this really depends on
+> the design of the internal logic.)
+> 
+> Maybe just assert it? It gets deasserted in the runtime PM callback
+> later. And just to be safe, I would move it close to the end of the
+> probe path, past all possible errors, so the hardware doesn't get
+> touched until everything is ready. Or don't touch it anywhere in
+> the probe path, and have the runtime PM resume function do a reset.
+
+That seems like the best solution yes.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/bc349914/attachment.sig>
