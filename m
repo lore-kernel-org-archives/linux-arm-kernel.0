@@ -1,174 +1,111 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 18 Jan 2018 13:31:43 +0100
-Subject: [net-next: PATCH v4 6/7] net: mvpp2: use device_*/fwnode_* APIs
- instead of of_*
+Date: Thu, 18 Jan 2018 13:31:38 +0100
+Subject: [net-next: PATCH v4 1/7] device property: Introduce
+ fwnode_get_mac_address()
 In-Reply-To: <1516278704-17141-1-git-send-email-mw@semihalf.com>
 References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
-Message-ID: <1516278704-17141-7-git-send-email-mw@semihalf.com>
+Message-ID: <1516278704-17141-2-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OF functions can be used only for the driver using DT.
-As a preparation for introducing ACPI support in mvpp2
-driver, use struct fwnode_handle in order to obtain
-properties from the hardware description.
+Until now there were two almost identical functions for
+obtaining MAC address - of_get_mac_address() and, more generic,
+device_get_mac_address(). However it is not uncommon,
+that the network interface is represented as a child
+of the actual controller, hence it is not associated
+directly to any struct device, required by the latter
+routine.
 
-This patch replaces of_* function with device_*/fwnode_*
-where possible in the mvpp2.
+This commit allows for getting the MAC address for
+children nodes in the ACPI world by introducing a new function -
+fwnode_get_mac_address(). This commit also changes
+device_get_mac_address() routine to be its wrapper, in order
+to prevent unnecessary duplication.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 45 +++++++++++---------
- 1 file changed, 24 insertions(+), 21 deletions(-)
+ drivers/base/property.c  | 28 ++++++++++++++------
+ include/linux/property.h |  2 ++
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 7f42d90..f16448e 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -932,6 +932,9 @@ struct mvpp2_port {
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index 851b1b6..f261d1a 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -1153,11 +1153,11 @@ int device_get_phy_mode(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(device_get_phy_mode);
  
- 	struct mvpp2 *priv;
+-static void *device_get_mac_addr(struct device *dev,
++static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
+ 				 const char *name, char *addr,
+ 				 int alen)
+ {
+-	int ret = device_property_read_u8_array(dev, name, addr, alen);
++	int ret = fwnode_property_read_u8_array(fwnode, name, addr, alen);
  
-+	/* Firmware node associated to the port */
-+	struct fwnode_handle *fwnode;
-+
- 	/* Per-port registers' base address */
- 	void __iomem *base;
- 	void __iomem *stats_base;
-@@ -7711,17 +7714,16 @@ static bool mvpp2_port_has_tx_irqs(struct mvpp2 *priv,
+ 	if (ret == 0 && alen == ETH_ALEN && is_valid_ether_addr(addr))
+ 		return addr;
+@@ -1165,8 +1165,8 @@ static void *device_get_mac_addr(struct device *dev,
  }
  
- static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
--				     struct device_node *port_node,
-+				     struct fwnode_handle *fwnode,
- 				     char **mac_from)
+ /**
+- * device_get_mac_address - Get the MAC for a given device
+- * @dev:	Pointer to the device
++ * fwnode_get_mac_address - Get the MAC from the firmware node
++ * @fwnode:	Pointer to the firmware node
+  * @addr:	Address of buffer to store the MAC in
+  * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
+  *
+@@ -1187,19 +1187,31 @@ static void *device_get_mac_addr(struct device *dev,
+  * In this case, the real MAC is in 'local-mac-address', and 'mac-address'
+  * exists but is all zeros.
+ */
+-void *device_get_mac_address(struct device *dev, char *addr, int alen)
++void *fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr, int alen)
  {
- 	struct mvpp2_port *port = netdev_priv(dev);
- 	char hw_mac_addr[ETH_ALEN] = {0};
--	const char *dt_mac_addr;
-+	char fw_mac_addr[ETH_ALEN];
+ 	char *res;
  
--	dt_mac_addr = of_get_mac_address(port_node);
--	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr)) {
--		*mac_from = "device tree";
--		ether_addr_copy(dev->dev_addr, dt_mac_addr);
-+	if (fwnode_get_mac_address(fwnode, fw_mac_addr, ETH_ALEN)) {
-+		*mac_from = "firmware node";
-+		ether_addr_copy(dev->dev_addr, fw_mac_addr);
- 		return;
- 	}
+-	res = device_get_mac_addr(dev, "mac-address", addr, alen);
++	res = fwnode_get_mac_addr(fwnode, "mac-address", addr, alen);
+ 	if (res)
+ 		return res;
  
-@@ -7740,13 +7742,14 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
+-	res = device_get_mac_addr(dev, "local-mac-address", addr, alen);
++	res = fwnode_get_mac_addr(fwnode, "local-mac-address", addr, alen);
+ 	if (res)
+ 		return res;
  
- /* Ports initialization */
- static int mvpp2_port_probe(struct platform_device *pdev,
--			    struct device_node *port_node,
-+			    struct fwnode_handle *port_fwnode,
- 			    struct mvpp2 *priv)
- {
- 	struct device_node *phy_node;
- 	struct phy *comphy;
- 	struct mvpp2_port *port;
- 	struct mvpp2_port_pcpu *port_pcpu;
-+	struct device_node *port_node = to_of_node(port_fwnode);
- 	struct net_device *dev;
- 	struct resource *res;
- 	char *mac_from = "";
-@@ -7773,7 +7776,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		return -ENOMEM;
+-	return device_get_mac_addr(dev, "address", addr, alen);
++	return fwnode_get_mac_addr(fwnode, "address", addr, alen);
++}
++EXPORT_SYMBOL(fwnode_get_mac_address);
++
++/**
++ * device_get_mac_address - Get the MAC for a given device
++ * @dev:	Pointer to the device
++ * @addr:	Address of buffer to store the MAC in
++ * @alen:	Length of the buffer pointed to by addr, should be ETH_ALEN
++ */
++void *device_get_mac_address(struct device *dev, char *addr, int alen)
++{
++	return fwnode_get_mac_address(dev_fwnode(dev), addr, alen);
+ }
+ EXPORT_SYMBOL(device_get_mac_address);
  
- 	phy_node = of_parse_phandle(port_node, "phy", 0);
--	phy_mode = of_get_phy_mode(port_node);
-+	phy_mode = fwnode_get_phy_mode(port_fwnode);
- 	if (phy_mode < 0) {
- 		dev_err(&pdev->dev, "incorrect phy mode\n");
- 		err = phy_mode;
-@@ -7789,7 +7792,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		comphy = NULL;
- 	}
+diff --git a/include/linux/property.h b/include/linux/property.h
+index f6189a3..35620e0 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -279,6 +279,8 @@ int device_get_phy_mode(struct device *dev);
  
--	if (of_property_read_u32(port_node, "port-id", &id)) {
-+	if (fwnode_property_read_u32(port_fwnode, "port-id", &id)) {
- 		err = -EINVAL;
- 		dev_err(&pdev->dev, "missing port-id value\n");
- 		goto err_free_netdev;
-@@ -7820,7 +7823,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		/* the link irq is optional */
- 		port->link_irq = 0;
+ void *device_get_mac_address(struct device *dev, char *addr, int alen);
  
--	if (of_property_read_bool(port_node, "marvell,loopback"))
-+	if (fwnode_property_read_bool(port_fwnode, "marvell,loopback"))
- 		port->flags |= MVPP2_F_LOOPBACK;
- 
- 	port->id = id;
-@@ -7845,8 +7848,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 				   MVPP21_MIB_COUNTERS_OFFSET +
- 				   port->gop_id * MVPP21_MIB_COUNTERS_PORT_SZ;
- 	} else {
--		if (of_property_read_u32(port_node, "gop-port-id",
--					 &port->gop_id)) {
-+		if (fwnode_property_read_u32(port_fwnode, "gop-port-id",
-+					     &port->gop_id)) {
- 			err = -EINVAL;
- 			dev_err(&pdev->dev, "missing gop-port-id value\n");
- 			goto err_deinit_qvecs;
-@@ -7876,7 +7879,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	mutex_init(&port->gather_stats_lock);
- 	INIT_DELAYED_WORK(&port->stats_work, mvpp2_gather_hw_statistics);
- 
--	mvpp2_port_copy_mac_addr(dev, priv, port_node, &mac_from);
-+	mvpp2_port_copy_mac_addr(dev, priv, port_fwnode, &mac_from);
- 
- 	port->tx_ring_size = MVPP2_MAX_TXD_DFLT;
- 	port->rx_ring_size = MVPP2_MAX_RXD_DFLT;
-@@ -8194,8 +8197,8 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 
- static int mvpp2_probe(struct platform_device *pdev)
- {
--	struct device_node *dn = pdev->dev.of_node;
--	struct device_node *port_node;
-+	struct fwnode_handle *fwnode = pdev->dev.fwnode;
-+	struct fwnode_handle *port_fwnode;
- 	struct mvpp2 *priv;
- 	struct resource *res;
- 	void __iomem *base;
-@@ -8315,8 +8318,8 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Initialize ports */
--	for_each_available_child_of_node(dn, port_node) {
--		err = mvpp2_port_probe(pdev, port_node, priv);
-+	fwnode_for_each_available_child_node(fwnode, port_fwnode) {
-+		err = mvpp2_port_probe(pdev, port_fwnode, priv);
- 		if (err < 0)
- 			goto err_port_probe;
- 	}
-@@ -8347,7 +8350,7 @@ static int mvpp2_probe(struct platform_device *pdev)
- 
- err_port_probe:
- 	i = 0;
--	for_each_available_child_of_node(dn, port_node) {
-+	fwnode_for_each_available_child_node(fwnode, port_fwnode) {
- 		if (priv->port_list[i])
- 			mvpp2_port_remove(priv->port_list[i]);
- 		i++;
-@@ -8366,14 +8369,14 @@ static int mvpp2_probe(struct platform_device *pdev)
- static int mvpp2_remove(struct platform_device *pdev)
- {
- 	struct mvpp2 *priv = platform_get_drvdata(pdev);
--	struct device_node *dn = pdev->dev.of_node;
--	struct device_node *port_node;
-+	struct fwnode_handle *fwnode = pdev->dev.fwnode;
-+	struct fwnode_handle *port_fwnode;
- 	int i = 0;
- 
- 	flush_workqueue(priv->stats_queue);
- 	destroy_workqueue(priv->stats_queue);
- 
--	for_each_available_child_of_node(dn, port_node) {
-+	fwnode_for_each_available_child_node(fwnode, port_fwnode) {
- 		if (priv->port_list[i]) {
- 			mutex_destroy(&priv->port_list[i]->gather_stats_lock);
- 			mvpp2_port_remove(priv->port_list[i]);
++void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
++			     char *addr, int alen);
+ struct fwnode_handle *fwnode_graph_get_next_endpoint(
+ 	const struct fwnode_handle *fwnode, struct fwnode_handle *prev);
+ struct fwnode_handle *
 -- 
 2.7.4
