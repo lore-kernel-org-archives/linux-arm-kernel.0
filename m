@@ -1,96 +1,94 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 18 Jan 2018 02:46:46 +0100
-Subject: [PATCH v2 13/16] ARM: dts: r8a7794: consistently use single
- space after =
-In-Reply-To: <20180117161717.14589-14-horms+renesas@verge.net.au>
-References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-14-horms+renesas@verge.net.au>
-Message-ID: <20180118014646.GM11924@bigcity.dyn.berto.se>
+From: fugang.duan@nxp.com (Andy Duan)
+Date: Thu, 18 Jan 2018 01:49:49 +0000
+Subject: [PATCH] net: fec: add necessary defines to work on ARM64
+In-Reply-To: <20180117183055.27602-1-l.stach@pengutronix.de>
+References: <20180117183055.27602-1-l.stach@pengutronix.de>
+Message-ID: <AM4PR0401MB2260FA4491320B2A9384DB96FFE80@AM4PR0401MB2260.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Lucas Stach <l.stach@pengutronix.de> Sent: Thursday, January 18, 2018 2:31 AM
+>The i.MX8 is a ARMv8 based SoC, that uses the same FEC IP as the earlier,
+>ARMv7 based, i.MX SoCs. Allow the driver to work on ARM64.
+>
+>Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>---
+> drivers/net/ethernet/freescale/fec.h      | 5 +++--
+> drivers/net/ethernet/freescale/fec_main.c | 8 +++++---
+> 2 files changed, 8 insertions(+), 5 deletions(-)
+>
+>diff --git a/drivers/net/ethernet/freescale/fec.h
+>b/drivers/net/ethernet/freescale/fec.h
+>index 5385074b3b7d..e7381f8ef89d 100644
+>--- a/drivers/net/ethernet/freescale/fec.h
+>+++ b/drivers/net/ethernet/freescale/fec.h
+>@@ -20,7 +20,8 @@
+> #include <linux/timecounter.h>
+>
+> #if defined(CONFIG_M523x) || defined(CONFIG_M527x) ||
+>defined(CONFIG_M528x) || \
+>-    defined(CONFIG_M520x) || defined(CONFIG_M532x) ||
+>defined(CONFIG_ARM)
+>+    defined(CONFIG_M520x) || defined(CONFIG_M532x) ||
+>defined(CONFIG_ARM) || \
+>+    defined(CONFIG_ARM64)
+> /*
+>  *	Just figures, Motorola would have to change the offsets for
+>  *	registers in the same peripheral device on different models
+>@@ -195,7 +196,7 @@
+>  *	Evidently, ARM SoCs have the FEC block generated in a
+>  *	little endian mode so adjust endianness accordingly.
+>  */
+>-#if defined(CONFIG_ARM)
+>+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+> #define fec32_to_cpu le32_to_cpu
+> #define fec16_to_cpu le16_to_cpu
+> #define cpu_to_fec32 cpu_to_le32
+>diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>b/drivers/net/ethernet/freescale/fec_main.c
+>index a74300a4459c..45eed37373a9 100644
+>--- a/drivers/net/ethernet/freescale/fec_main.c
+>+++ b/drivers/net/ethernet/freescale/fec_main.c
+>@@ -195,7 +195,8 @@ MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC
+>address");
+>  * account when setting it.
+>  */
+> #if defined(CONFIG_M523x) || defined(CONFIG_M527x) ||
+>defined(CONFIG_M528x) || \
+>-    defined(CONFIG_M520x) || defined(CONFIG_M532x) ||
+>defined(CONFIG_ARM)
+>+    defined(CONFIG_M520x) || defined(CONFIG_M532x) ||
+>defined(CONFIG_ARM) || \
+>+    defined(CONFIG_ARM64)
+> #define	OPT_FRAME_SIZE	(PKT_MAXBUF_SIZE << 16)
+> #else
+> #define	OPT_FRAME_SIZE	0
+>@@ -2107,7 +2108,8 @@ static int fec_enet_get_regs_len(struct net_device
+>*ndev)
+>
+> /* List of registers that can be safety be read to dump them with ethtool */
+>#if defined(CONFIG_M523x) || defined(CONFIG_M527x) ||
+>defined(CONFIG_M528x) || \
+>-	defined(CONFIG_M520x) || defined(CONFIG_M532x) ||
+>defined(CONFIG_ARM)
+>+	defined(CONFIG_M520x) || defined(CONFIG_M532x) ||
+>defined(CONFIG_ARM) || \
+>+	defined(CONFIG_ARM64)
+> static u32 fec_enet_register_offset[] = {
+> 	FEC_IEVENT, FEC_IMASK, FEC_R_DES_ACTIVE_0,
+>FEC_X_DES_ACTIVE_0,
+> 	FEC_ECNTRL, FEC_MII_DATA, FEC_MII_SPEED, FEC_MIB_CTRLSTAT,
+>FEC_R_CNTRL, @@ -3119,7 +3121,7 @@ static int fec_enet_init(struct
+>net_device *ndev)
+> 	unsigned dsize_log2 = __fls(dsize);
+>
+> 	WARN_ON(dsize != (1 << dsize_log2));
+>-#if defined(CONFIG_ARM)
+>+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+> 	fep->rx_align = 0xf;
+> 	fep->tx_align = 0xf;
+> #else
+>--
+>2.11.0
 
-Thanks for your work.
-
-On 2018-01-17 17:17:14 +0100, Simon Horman wrote:
-> Consistently use a single space after a =.
-> 
-> This patch removes instances where a tab is used instead.
-> 
-> This patch should not introduce any functional change.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
-> ---
-> v2
-> * New patch
-> ---
->  arch/arm/boot/dts/r8a7794.dtsi | 38 +++++++++++++++++++-------------------
->  1 file changed, 19 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index 106b4e1649ff..79263377ded3 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -319,20 +319,20 @@
->  	audma0: dma-controller at ec700000 {
->  		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
->  		reg = <0 0xec700000 0 0x10000>;
-> -		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-> -				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-> +			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
->  		interrupt-names = "error",
->  				  "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
->  				  "ch6", "ch7", "ch8", "ch9", "ch10", "ch11",
-> @@ -1186,11 +1186,11 @@
->  		 */
->  		compatible = "renesas,rcar_sound-r8a7794",
->  			     "renesas,rcar_sound-gen2";
-> -		reg =	<0 0xec500000 0 0x1000>, /* SCU */
-> -			<0 0xec5a0000 0 0x100>,  /* ADG */
-> -			<0 0xec540000 0 0x1000>, /* SSIU */
-> -			<0 0xec541000 0 0x280>,  /* SSI */
-> -			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
-> +		reg = <0 0xec500000 0 0x1000>, /* SCU */
-> +		      <0 0xec5a0000 0 0x100>,  /* ADG */
-> +		      <0 0xec540000 0 0x1000>, /* SSIU */
-> +		      <0 0xec541000 0 0x280>,  /* SSI */
-> +		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
->  		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
->  
->  		clocks = <&cpg CPG_MOD 1005>,
-> -- 
-> 2.11.0
-> 
-
--- 
-Regards,
-Niklas S?derlund
+Kconfig also need to add ARM64 support.
