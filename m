@@ -1,16 +1,16 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 18 Jan 2018 15:34:28 +0100
-Subject: [PATCH v3 12/14] ARM: configs: stm32: Enable MMC_ARMMMCI support
+Date: Thu, 18 Jan 2018 15:34:29 +0100
+Subject: [PATCH v3 13/14] ARM: configs: stm32: Enable EXT3_FS support
 In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
 References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1516286070-24927-13-git-send-email-patrice.chotard@st.com>
+Message-ID: <1516286070-24927-14-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Enable MMC_ARMMCI support to add SDIO support for
-STM32F4 and STM32F7 SoCs family
+Enable EXT3_FS support to be able to read rootfs from MMC partition
+formatted in EXT2/3/4 .
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
@@ -20,21 +20,20 @@ v3: _ none
 v2: _ none
 
 
- arch/arm/configs/stm32_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 21b2bf7..8b64a9e 100644
+index 8b64a9e..b736823 100644
 --- a/arch/arm/configs/stm32_defconfig
 +++ b/arch/arm/configs/stm32_defconfig
-@@ -56,6 +56,8 @@ CONFIG_MFD_STMPE=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
+@@ -72,6 +72,7 @@ CONFIG_STM32_MDMA=y
+ CONFIG_IIO=y
+ CONFIG_STM32_ADC_CORE=y
+ CONFIG_STM32_ADC=y
++CONFIG_EXT3_FS=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
 -- 
 1.9.1
