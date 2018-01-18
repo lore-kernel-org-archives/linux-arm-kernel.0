@@ -1,36 +1,70 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Jan 2018 20:20:53 +0000
-Subject: [PATCH] arm64: Stop printing the virtual memory layout
-In-Reply-To: <94d6b5c8-07c4-32b5-9746-646b0021d2e9@gmail.com>
-References: <20171219192810.22537-1-labbott@redhat.com>
- <94d6b5c8-07c4-32b5-9746-646b0021d2e9@gmail.com>
-Message-ID: <20180118202053.GR17719@n2100.armlinux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 18 Jan 2018 21:28:05 +0100
+Subject: [PATCH v4 16/19] arm64: insn: Allow ADD/SUB (immediate) with LSL
+ #12
+In-Reply-To: <20180104184334.16571-17-marc.zyngier@arm.com>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-17-marc.zyngier@arm.com>
+Message-ID: <20180118202805.GD21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 12:01:31PM -0800, Florian Fainelli wrote:
-> On 12/19/2017 11:28 AM, Laura Abbott wrote:
-> > Printing kernel addresses should be done in limited circumstances, mostly
-> > for debugging purposes. Printing out the virtual memory layout at every
-> > kernel bootup doesn't really fall into this category so delete the prints.
-> > There are other ways to get the same information.
+On Thu, Jan 04, 2018 at 06:43:31PM +0000, Marc Zyngier wrote:
+> The encoder for ADD/SUB (immediate) can only cope with 12bit
+> immediates, while there is an encoding for a 12bit immediate shifted
+> by 12 bits to the left.
 > 
-> This really has some value when debugging systems, could we possibly
-> just hide that behind an appropriate configuration option instead of
-> completely removing this?
+> Let's fix this small oversight by allowing the LSL_12 bit to be set.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kernel/insn.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 59669d7d4383..20655537cdd1 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -35,6 +35,7 @@
+>  
+>  #define AARCH64_INSN_SF_BIT	BIT(31)
+>  #define AARCH64_INSN_N_BIT	BIT(22)
+> +#define AARCH64_INSN_LSL_12	BIT(22)
+>  
+>  static int aarch64_insn_encoding_class[] = {
+>  	AARCH64_INSN_CLS_UNKNOWN,
+> @@ -903,9 +904,18 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
+>  		return AARCH64_BREAK_FAULT;
+>  	}
+>  
+> +	/* We can't encode more than a 24bit value (12bit + 12bit shift) */
+> +	if (imm & ~(BIT(24) - 1))
+> +		goto out;
+> +
+> +	/* If we have something in the top 12 bits... */
+>  	if (imm & ~(SZ_4K - 1)) {
+> -		pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
+> -		return AARCH64_BREAK_FAULT;
+> +		/* ... and in the low 12 bits -> error */
+> +		if (imm & (SZ_4K - 1))
+> +			goto out;
+> +
+> +		imm >>= 12;
+> +		insn |= AARCH64_INSN_LSL_12;
+>  	}
+>  
+>  	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, dst);
+> @@ -913,6 +923,10 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
+>  	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, src);
+>  
+>  	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_12, insn, imm);
+> +
+> +out:
+> +	pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
+> +	return AARCH64_BREAK_FAULT;
+>  }
+>  
+>  u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
 
-I've already ended up having to revert the vsprintf() change nobbling
-%p for that very reason when debugging the BPF code.  It's easier to
-do that while debugging than remember about the %px thing - and lets
-face it, probably less error prone if it leaks out.
 
-Otherwise we'll just end up with everyone spelling %p as %px in their
-debug statements... or using %lx and casting to unsigned long.
-
-So yes, I do think a Kconfig option (defaulting to obscuring kernel
-addresses of course) would have been very sensible for this.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
