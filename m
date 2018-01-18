@@ -1,46 +1,97 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Thu, 18 Jan 2018 07:53:09 -0800
-Subject: [PATCH v2] net: ethernet: cavium: Correct Cavium Thunderx nicvf/nicpf
- modules names
-In-Reply-To: <1516290160-3396-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
-References: <1516290160-3396-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <1516290789-3585-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+From: graeme.gregory@linaro.org (graeme.gregory at linaro.org)
+Date: Thu, 18 Jan 2018 15:53:16 +0000
+Subject: [net-next: PATCH v3 0/7] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <1516208146-4144-1-git-send-email-mw@semihalf.com>
+References: <1516208146-4144-1-git-send-email-mw@semihalf.com>
+Message-ID: <20180118155316.GA32010@xora-haswell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+On Wed, Jan 17, 2018 at 05:55:39PM +0100, Marcin Wojtas wrote:
+> Hi,
+> 
+> This is a third version of the patchset introducing mvpp2 driver ability
+> to operate with ACPI. Until follow-up generic MDIO is introduced
+> it can using the link interrupt capability (a.k.a. in-band management)
+> on all ports, 1000BaseT RGMII included.
+> Driver operation was tested on top of the net-next branch
+> with both DT and ACPI on MacchiatoBin and Armada 7040 DB boards.
+> 
+> The main changes were requested during v2 review, which was
+> adding generic helper routines for:
+> * interating over available fwnodes (new patch 4/7)
+> * getting IRQ directly from fwnode (new patch 3/7)
+> Thanks to the latter the driver code could be simplified
+> and allowed to drop formula-based IRQ obtaining. Changes are
+> summarized in the changelog below.
+> 
+> mvpp2 driver can work with the ACPI representation, as exposed
+> on a public branch:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
+> It was compiled together with the most recent Tianocore EDK2 revision.
+> Please refer to the firmware build instruction on MacchiatoBin board:
+> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
+> 
+> ACPI representation of PP2 controllers (withouth PHY support) can
+> be viewed in the github:
+> * MacchiatoBin:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
+> 
+> * Armada 7040 DB:
+> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
+> 
+> I will appreciate any comments or remarks.
+> 
 
-It was found that ethtool provides unexisting module name while
-it queries the specified network device for associated driver
-information.
+Nice work, this looks pretty neat to me, for series.
 
-This patch is to correct Cavium CN88xx Thunder nicvf/nicpf modules
-names 'nicvf' to 'thunder_nicvf' and 'nicpf' to 'thunder_nicpf'.
+Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
 
-Signed-off-by: Dean Nelson <dnelson@redhat.com>
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/Makefile | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Thanks
 
-diff --git a/drivers/net/ethernet/cavium/thunder/Makefile b/drivers/net/ethernet/cavium/thunder/Makefile
-index 6b4d4add7353..f5642337d0fe 100644
---- a/drivers/net/ethernet/cavium/thunder/Makefile
-+++ b/drivers/net/ethernet/cavium/thunder/Makefile
-@@ -4,9 +4,9 @@
- 
- obj-$(CONFIG_THUNDER_NIC_RGX) += thunder_xcv.o
- obj-$(CONFIG_THUNDER_NIC_BGX) += thunder_bgx.o
--obj-$(CONFIG_THUNDER_NIC_PF) += nicpf.o
--obj-$(CONFIG_THUNDER_NIC_VF) += nicvf.o
-+obj-$(CONFIG_THUNDER_NIC_PF) += thunder_nicpf.o
-+obj-$(CONFIG_THUNDER_NIC_VF) += thunder_nicvf.o
- 
--nicpf-y := nic_main.o
--nicvf-y := nicvf_main.o nicvf_queues.o
--nicvf-y += nicvf_ethtool.o
-+thunder_nicpf-y := nic_main.o
-+thunder_nicvf-y := nicvf_main.o nicvf_queues.o
-+thunder_nicvf-y += nicvf_ethtool.o
--- 
-2.14.3
+Graeme
+
+> Best regards,
+> Marcin
+> 
+> Changelog:
+> v2 -> v3:
+> * 1/7, 2/7
+>     - Add Rafael's Acked-by's
+> * 3/7, 4/7
+>     - New patches
+> * 6/7, 7/7
+>     - Update driver with new helper routines usage
+>     - Improve commit log.
+> 
+> v1 -> v2:
+> * Remove MDIO patches
+> * Use PP2 ports only with link interrupts
+> * Release second region resources in mvpp2 driver (code moved from
+>   mvmdio), as explained in details in 5/5 commit message.
+> 
+> 
+> Marcin Wojtas (7):
+>   device property: Introduce fwnode_get_mac_address()
+>   device property: Introduce fwnode_get_phy_mode()
+>   device property: Introduce fwnode_irq_get()
+>   device property: Allow iterating over available child fwnodes
+>   net: mvpp2: simplify maintaining enabled ports' list
+>   net: mvpp2: use device_*/fwnode_* APIs instead of of_*
+>   net: mvpp2: enable ACPI support in the driver
+> 
+>  drivers/base/property.c              | 105 ++++++++--
+>  drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
+>  include/linux/property.h             |  11 ++
+>  3 files changed, 230 insertions(+), 92 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180118/94426c35/attachment.sig>
