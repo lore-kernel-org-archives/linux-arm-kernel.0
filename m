@@ -1,49 +1,71 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Thu, 18 Jan 2018 15:34:30 +0100
-Subject: [PATCH v3 14/14] clk: stm32: Add clk entry for SDMMC2 on stm32F769
+Date: Thu, 18 Jan 2018 15:34:25 +0100
+Subject: [PATCH v3 09/14] ARM: dts: stm32: Enable SDIO controller on stm32f469
+ disco board
 In-Reply-To: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
 References: <1516286070-24927-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1516286070-24927-15-git-send-email-patrice.chotard@st.com>
+Message-ID: <1516286070-24927-10-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+From: Andrea Merello <andrea.merello@gmail.com>
 
-STM32F769 has 2 SDMMC port, add clock entry for the second one.
+This patch adds SDIO-related DT nodes required by stm32f469 board
 
+There is a hardware issue on these boards, it misses a pullup on
+the GPIO line used as card detect to allow correct SD card
+detection. To allow correct card detection "broken-cd" property
+is used.
+
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
 
 v3: _ none
 
-v2: _ Add Acked-by
+v2: _ none
 
 
- drivers/clk/clk-stm32f4.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/stm32f469-disco.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index da44f8d..e7e3965 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -282,6 +282,7 @@ struct stm32f4_gate_data {
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index 318fb12..ebb97c3 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -66,6 +66,13 @@
+ 		serial0 = &usart3;
+ 	};
  
- 	{ STM32F4_RCC_APB2ENR,  0,	"tim1",		"apb2_mul" },
- 	{ STM32F4_RCC_APB2ENR,  1,	"tim8",		"apb2_mul" },
-+	{ STM32F4_RCC_APB2ENR,  7,	"sdmmc2",	"sdmux"    },
- 	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
- 	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
- 	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
-@@ -315,7 +316,7 @@ struct stm32f4_gate_data {
++	mmc_vcard: mmc_vcard {
++		compatible = "regulator-fixed";
++		regulator-name = "mmc_vcard";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
+ 	soc {
+ 		dma-ranges = <0xc0000000 0x0 0x10000000>;
+ 	};
+@@ -120,6 +127,18 @@
+ 	};
+ };
  
- static const u64 stm32f746_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
- 						      0x0000000000000003ull,
--						      0x04f77f033e01c9ffull };
-+						      0x04f77f833e01c9ffull };
- 
- static const u64 *stm32f4_gate_map;
- 
++&sdio {
++	status = "okay";
++	vmmc-supply = <&mmc_vcard>;
++	cd-gpios = <&gpiog 2 0>;
++	cd-inverted;
++	broken-cd;
++	pinctrl-names = "default", "opendrain";
++	pinctrl-0 = <&sdio_pins>;
++	pinctrl-1 = <&sdio_pins_od>;
++	bus-width = <4>;
++};
++
+ &usart3 {
+ 	pinctrl-0 = <&usart3_pins_a>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
