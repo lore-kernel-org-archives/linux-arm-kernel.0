@@ -1,282 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Jan 2018 12:27:53 +0000
-Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <20180118115251.5542-9-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-9-jeffy.chen@rock-chips.com>
-Message-ID: <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 18 Jan 2018 12:31:41 +0000
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20180109130012.GA27447@lunn.ch>
+References: <20180104160939.GA7785@xora-haswell>
+ <20180104162036.GL3401@lunn.ch>
+ <20180108144548.GA31502@xora-haswell>
+ <20180108145312.GH10940@lunn.ch>
+ <20180108151453.GB31502@xora-haswell>
+ <20180108154243.GA30962@lunn.ch>
+ <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
+ <20180109101941.GD31502@xora-haswell>
+ <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
+ <20180109130012.GA27447@lunn.ch>
+Message-ID: <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 11:52, Jeffy Chen wrote:
-> From: Tomasz Figa <tfiga@chromium.org>
-> 
-> Current code relies on master driver enabling necessary clocks before
-> IOMMU is accessed, however there are cases when the IOMMU should be
-> accessed while the master is not running yet, for example allocating
-> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
-> mapping API and doesn't engage the master driver at all.
-> 
-> This patch fixes the problem by letting clocks needed for IOMMU
-> operation to be listed in Device Tree and making the driver enable them
-> for the time of accessing the hardware.
+[+cc Mika]
 
-Is it worth using the clk_bulk_*() APIs for this? At a glance, most of 
-the code being added here appears to duplicate what those functions 
-already do (but I'm no clk API expert, for sure).
+On Tue, Jan 09, 2018 at 02:00:12PM +0100, Andrew Lunn wrote:
+> On Tue, Jan 09, 2018 at 11:22:00AM +0100, Marcin Wojtas wrote:
+> > 2018-01-09 11:19 GMT+01:00 Graeme Gregory <graeme.gregory@linaro.org>:
+> > > On Mon, Jan 08, 2018 at 06:17:06PM +0100, Marcin Wojtas wrote:
+> > >> Hi Andrew,
+> > >>
+> > >>
+> > >>
+> > >> 2018-01-08 16:42 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+> > >> > w> I am not familiar with MDIO, but if its similar or a specific
+> > >> >> implementation of a serial bus that does sound sane!
+> > >> >
+> > >>
+> > >> Thanks for digging, I will check if and how we can use
+> > >> GenericSerialBus with MDIO.
+> > >>
+> > > Maybe Lorenzo, Hanjun, Sudeep can comment here they might have come
+> > > across similar on other ARM boards.
+> > >
+> > 
+> > I'm looking forward to their feedback, however, what I've noticed,
+> > each driver handles mdio/phys on its own, not using any generic
+> > solution, which is what I need to actually avoid :)
+> 
+> Agreed. Lets define it once for all drivers using phylib/phylink.
 
-Robin.
+To start with, I am not entirely familiar with MDIO, apologies in
+advance. Building something on top of GenericSerialBus sounds correct
+but if I am not mistaken you would need a new bus type in the ACPI
+specs.
 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->   .../devicetree/bindings/iommu/rockchip,iommu.txt   |   8 ++
->   drivers/iommu/rockchip-iommu.c                     | 114 +++++++++++++++++++--
->   2 files changed, 116 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
-> index 2098f7732264..33dd853359fa 100644
-> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
-> @@ -14,6 +14,13 @@ Required properties:
->                       "single-master" device, and needs no additional information
->                       to associate with its master device.  See:
->                       Documentation/devicetree/bindings/iommu/iommu.txt
-> +Optional properties:
-> +- clocks : A list of master clocks requires for the IOMMU to be accessible
-> +           by the host CPU. The number of clocks depends on the master
-> +           block and might as well be zero. See [1] for generic clock
-> +           bindings description.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->   
->   Optional properties:
->   - rockchip,disable-mmu-reset : Don't use the mmu reset operation.
-> @@ -27,5 +34,6 @@ Example:
->   		reg = <0xff940300 0x100>;
->   		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
->   		interrupt-names = "vopl_mmu";
-> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
->   		#iommu-cells = <0>;
->   	};
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 1914ac52042c..9b85a3050449 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -4,6 +4,7 @@
->    * published by the Free Software Foundation.
->    */
->   
-> +#include <linux/clk.h>
->   #include <linux/compiler.h>
->   #include <linux/delay.h>
->   #include <linux/device.h>
-> @@ -89,6 +90,8 @@ struct rk_iommu {
->   	struct device *dev;
->   	void __iomem **bases;
->   	int num_mmu;
-> +	struct clk **clocks;
-> +	int num_clocks;
->   	bool reset_disabled;
->   	struct iommu_device iommu;
->   	struct list_head node; /* entry in rk_iommu_domain.iommus */
-> @@ -443,6 +446,83 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
->   	return 0;
->   }
->   
-> +static void rk_iommu_put_clocks(struct rk_iommu *iommu)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < iommu->num_clocks; ++i) {
-> +		clk_unprepare(iommu->clocks[i]);
-> +		clk_put(iommu->clocks[i]);
-> +	}
-> +}
-> +
-> +static int rk_iommu_get_clocks(struct rk_iommu *iommu)
-> +{
-> +	struct device_node *np = iommu->dev->of_node;
-> +	int ret;
-> +	int i;
-> +
-> +	ret = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-> +	if (ret == -ENOENT)
-> +		return 0;
-> +	else if (ret < 0)
-> +		return ret;
-> +
-> +	iommu->num_clocks = ret;
-> +	iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
-> +				     sizeof(*iommu->clocks), GFP_KERNEL);
-> +	if (!iommu->clocks)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < iommu->num_clocks; ++i) {
-> +		iommu->clocks[i] = of_clk_get(np, i);
-> +		if (IS_ERR(iommu->clocks[i])) {
-> +			iommu->num_clocks = i;
-> +			goto err_clk_put;
-> +		}
-> +		ret = clk_prepare(iommu->clocks[i]);
-> +		if (ret) {
-> +			clk_put(iommu->clocks[i]);
-> +			iommu->num_clocks = i;
-> +			goto err_clk_put;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +
-> +err_clk_put:
-> +	rk_iommu_put_clocks(iommu);
-> +
-> +	return ret;
-> +}
-> +
-> +static int rk_iommu_enable_clocks(struct rk_iommu *iommu)
-> +{
-> +	int i, ret;
-> +
-> +	for (i = 0; i < iommu->num_clocks; ++i) {
-> +		ret = clk_enable(iommu->clocks[i]);
-> +		if (ret)
-> +			goto err_disable;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_disable:
-> +	for (--i; i >= 0; --i)
-> +		clk_disable(iommu->clocks[i]);
-> +
-> +	return ret;
-> +}
-> +
-> +static void rk_iommu_disable_clocks(struct rk_iommu *iommu)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < iommu->num_clocks; ++i)
-> +		clk_disable(iommu->clocks[i]);
-> +}
-> +
->   static void log_iova(struct rk_iommu *iommu, int index, dma_addr_t iova)
->   {
->   	void __iomem *base = iommu->bases[index];
-> @@ -499,6 +579,8 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
->   	irqreturn_t ret = IRQ_NONE;
->   	int i;
->   
-> +	WARN_ON(rk_iommu_enable_clocks(iommu));
-> +
->   	for (i = 0; i < iommu->num_mmu; i++) {
->   		int_status = rk_iommu_read(iommu->bases[i], RK_MMU_INT_STATUS);
->   		if (int_status == 0)
-> @@ -545,6 +627,8 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
->   		rk_iommu_write(iommu->bases[i], RK_MMU_INT_CLEAR, int_status);
->   	}
->   
-> +	rk_iommu_disable_clocks(iommu);
-> +
->   	return ret;
->   }
->   
-> @@ -587,7 +671,9 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
->   	list_for_each(pos, &rk_domain->iommus) {
->   		struct rk_iommu *iommu;
->   		iommu = list_entry(pos, struct rk_iommu, node);
-> +		rk_iommu_enable_clocks(iommu);
->   		rk_iommu_zap_lines(iommu, iova, size);
-> +		rk_iommu_disable_clocks(iommu);
->   	}
->   	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
->   }
-> @@ -816,10 +902,14 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->   	if (!iommu)
->   		return 0;
->   
-> -	ret = rk_iommu_enable_stall(iommu);
-> +	ret = rk_iommu_enable_clocks(iommu);
->   	if (ret)
->   		return ret;
->   
-> +	ret = rk_iommu_enable_stall(iommu);
-> +	if (ret)
-> +		goto err_disable_clocks;
-> +
->   	ret = rk_iommu_force_reset(iommu);
->   	if (ret)
->   		goto err_disable_stall;
-> @@ -844,11 +934,14 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->   	dev_dbg(dev, "Attached to iommu domain\n");
->   
->   	rk_iommu_disable_stall(iommu);
-> +	rk_iommu_disable_clocks(iommu);
->   
->   	return 0;
->   
->   err_disable_stall:
->   	rk_iommu_disable_stall(iommu);
-> +err_disable_clocks:
-> +	rk_iommu_disable_clocks(iommu);
->   
->   	return ret;
->   }
-> @@ -871,6 +964,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
->   	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
->   
->   	/* Ignore error while disabling, just keep going */
-> +	WARN_ON(rk_iommu_enable_clocks(iommu));
->   	rk_iommu_enable_stall(iommu);
->   	rk_iommu_disable_paging(iommu);
->   	for (i = 0; i < iommu->num_mmu; i++) {
-> @@ -878,6 +972,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
->   		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
->   	}
->   	rk_iommu_disable_stall(iommu);
-> +	rk_iommu_disable_clocks(iommu);
->   
->   	iommu->domain = NULL;
->   
-> @@ -1167,21 +1262,28 @@ static int rk_iommu_probe(struct platform_device *pdev)
->   			return err;
->   	}
->   
-> +	err = rk_iommu_get_clocks(iommu);
-> +	if (err)
-> +		return err;
-> +
->   	iommu->reset_disabled = device_property_read_bool(dev,
->   					"rockchip,disable-mmu-reset");
->   
->   	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
->   	if (err)
-> -		return err;
-> +		goto err_put_clocks;
->   
->   	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
->   	err = iommu_device_register(&iommu->iommu);
-> -	if (err) {
-> -		iommu_device_sysfs_remove(&iommu->iommu);
-> -		return err;
-> -	}
-> +	if (err)
-> +		goto err_remove_sysfs;
->   
->   	return 0;
-> +err_remove_sysfs:
-> +	iommu_device_sysfs_remove(&iommu->iommu);
-> +err_put_clocks:
-> +	rk_iommu_put_clocks(iommu);
-> +	return err;
->   }
->   
->   static const struct of_device_id rk_iommu_dt_ids[] = {
-> 
+I CC'ed Mika since he is more familiar with handling these bits of ACPI
+specs - I wonder whether this is a problem that cropped up on x86
+systems too.
+
+I do not think there is one and only answer but there must be a single
+set of bindings and if the ACPI specs already cater for some of them
+we have to reuse them.
+
+Please take some time to ensure the solution you are pushing is widely
+deployable.
+
+Thanks,
+Lorenzo
