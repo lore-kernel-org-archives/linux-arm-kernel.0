@@ -1,75 +1,32 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Jan 2018 13:23:00 +0000
-Subject: [PATCH v4 04/13] iommu/rockchip: Fix error handling in attach
-In-Reply-To: <20180118115251.5542-5-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-5-jeffy.chen@rock-chips.com>
-Message-ID: <fa4277ef-ddfe-e23b-034c-167281cf0db1@arm.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Thu, 18 Jan 2018 15:23:23 +0200
+Subject: [PATCH] [wireless-next] mt76: fix building without
+ CONFIG_LEDS_CLASS
+In-Reply-To: <20180118131524.817297-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Thu, 18 Jan 2018 14:14:11 +0100")
+References: <20180118131524.817297-1-arnd@arndb.de>
+Message-ID: <87bmhrb8s4.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/18 11:52, Jeffy Chen wrote:
-> From: Tomasz Figa <tfiga@chromium.org>
-> 
-> Currently if the driver encounters an error while attaching device, it
-> will leave the IOMMU in an inconsistent state. Even though it shouldn't
-> really happen in reality, let's just add proper error path to keep
-> things consistent.
-> 
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2:
-> Move irq request to probe(in patch[0])
-> 
->   drivers/iommu/rockchip-iommu.c | 9 +++++++--
->   1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index b743d82e6fe1..37065a7127c9 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -824,7 +824,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->   
->   	ret = rk_iommu_force_reset(iommu);
->   	if (ret)
-> -		return ret;
-> +		goto err_disable_stall;
->   
->   	iommu->domain = domain;
->   
-> @@ -837,7 +837,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->   
->   	ret = rk_iommu_enable_paging(iommu);
->   	if (ret)
-> -		return ret;
-> +		goto err_disable_stall;
->   
->   	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
->   	list_add_tail(&iommu->node, &rk_domain->iommus);
-> @@ -848,6 +848,11 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
->   	rk_iommu_disable_stall(iommu);
->   
->   	return 0;
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Nit: if you like, it looks reasonable to name the label 
-"out_disable_stall" and remove these lines above here, to save the 
-duplication between the error and success paths (since ret will already 
-be 0 on the latter).
+> When CONFIG_LEDS_CLASS is disabled, or it is a loadable module while
+> mt76 is built-in, we run into a link error:
+>
+> drivers/net/wireless/mediatek/mt76/mac80211.o: In function `mt76_register_device':
+> mac80211.c:(.text+0xb78): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `devm_of_led_classdev_register'
+>
+> We don't really need a hard dependency here as the driver can presumably
+> work just fine without LEDs, so this follows the iwlwifi example and
+> adds a separate Kconfig option for the LED support, this will be available
+> whenever it will link, and otherwise the respective code gets left out from
+> the driver object.
+>
+> Fixes: 17f1de56df05 ("mt76: add common code shared between multiple chipsets")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Either way,
+I'm planning to queue this for 4.16.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> +
-> +err_disable_stall:
-> +	rk_iommu_disable_stall(iommu);
-> +
-> +	return ret;
->   }
->   
->   static void rk_iommu_detach_device(struct iommu_domain *domain,
-> 
+-- 
+Kalle Valo
