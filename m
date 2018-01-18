@@ -1,5 +1,5 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Thu, 18 Jan 2018 18:09:58 +0000
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Thu, 18 Jan 2018 21:15:48 +0300
 Subject: mmc1 timeout issue with rpi3
 In-Reply-To: <206582731.31195.1516298825692@email.1und1.de>
 References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
@@ -14,33 +14,31 @@ References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
  <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
  <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
  <206582731.31195.1516298825692@email.1und1.de>
-Message-ID: <36bbbc0f-9f50-1567-d5a0-548cd77fd615@raspberrypi.org>
+Message-ID: <a7ec0ce1-322a-d896-e363-affdaf7885ea@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/2018 18:07, Stefan Wahren wrote:
+Hi Stefan
+
+On 01/18/2018 09:07 PM, Stefan Wahren wrote:
 > Hi Sergey,
-> 
+>
 >> Sergey Suloev <ssuloev@orpaltech.com> hat am 18. Januar 2018 um 18:56 geschrieben:
 >>
 >>
 >> Hi, Stefan,
 >>
 >>
->> no I haven't checked it yet. I'm going to find information about setting 
+>> no I haven't checked it yet. I'm going to find information about setting
 >> it up w/o u-boot since I've never tried it before.
 >>
 >>
-> 
 > store the kernel zImage as /boot/kernel7.img
-> 
-> and define the DT within config.txt 
-> 
+>
+> and define the DT within config.txt
+>
 > device_tree=bcm2837-rpi-3-b.dtb
-> 
 
-And comment out or delete:
+it isn't working that way. I am getting kernel panics.
 
-#kernel=u-boot.bin
-
-Phil
+Thanks
