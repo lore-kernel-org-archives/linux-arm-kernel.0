@@ -1,84 +1,228 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 18 Jan 2018 10:36:03 -0300
-Subject: [PATCH v3 00/10] perf tools: Add support for CoreSight trace
- decoding
-In-Reply-To: <20180117200440.GH12842@kernel.org>
-References: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
- <20180117200440.GH12842@kernel.org>
-Message-ID: <20180118133603.GB18383@kernel.org>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 18 Jan 2018 13:39:16 +0000
+Subject: [PATCH v3 26/41] KVM: arm64: Introduce framework for accessing
+ deferred sysregs
+In-Reply-To: <20180118130823.GC27865@cbox>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-27-christoffer.dall@linaro.org>
+ <dce891ed-3e43-a136-9d7b-c7186fe2ff3c@arm.com> <20180118130823.GC27865@cbox>
+Message-ID: <48d6c906-d3b3-5566-5be9-b4cbc99b202d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, Jan 17, 2018 at 05:04:40PM -0300, Arnaldo Carvalho de Melo escreveu:
-> Em Wed, Jan 17, 2018 at 10:52:09AM -0700, Mathieu Poirier escreveu:
-> > This patchset adds support for per-thread CoreSight trace decoding from the
-> > "perf report" interface.  It is largely modelled on what has been done for
-> > intelPT traces and currently targets the ETMv4 architecture.  Support for
-> > cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
-> > 
-> > The trace decoding support is done using the Open CoreSight Decoding
-> > Library (openCSD), a stand alone open source project available here [1].
-> > Integration of the openCSD library with the perf tools follow what has
-> > been done for other support libraries.  If the library has been installed
-> > on a system the build scripts will automatially include support for
-> > CoreSight trace decoding.  The status of the library on the system is
-> > displayed when adding the VF=1 option as per Jiri's patch [2]:
-> > 
-> > ...			timerfd: [ on  ]
-> > ...			sched_getcpu: [ on  ]
-> > ...			sdt: [ OFF ]
-> > ...			setns: [ on  ]
-> > ...			libopencsd: [ on  ] <---
-> > 
-> > Instructions on how to build and install the openCSD library are provided
-> > in the HOWTO.md of the project repository.  We elected to keep the decoder
-> > library independent of the kernel tree as it is also used outside of the
-> > perf toolset and various non-linux projects.
-> > 
-> > The work applies cleanly to [3] and depend on the following patches [4, 5].
-> > 
-> > Lastly there is a divergence of opinions on whether the decoding library
-> > should be part of the kernel tree or live on its own as we chose to do -
-> > your point of view on the matter would be greatly appreciated.
+
+
+On 18/01/18 13:08, Christoffer Dall wrote:
+> On Wed, Jan 17, 2018 at 05:52:21PM +0000, Julien Thierry wrote:
+>>
+>>
+>> On 12/01/18 12:07, Christoffer Dall wrote:
+>>> We are about to defer saving and restoring some groups of system
+>>> registers to vcpu_put and vcpu_load on supported systems.  This means
+>>> that we need some infrastructure to access system registes which
+>>> supports either accessing the memory backing of the register or directly
+>>> accessing the system registers, depending on the state of the system
+>>> when we access the register.
+>>>
+>>> We do this by defining a set of read/write accessors for each system
+>>> register, and letting each system register be defined as "immediate" or
+>>> "deferrable".  Immediate registers are always saved/restored in the
+>>> world-switch path, but deferrable registers are only saved/restored in
+>>> vcpu_put/vcpu_load when supported and sysregs_loaded_on_cpu will be set
+>>> in that case.
+>>>
+>>
+>> The patch is fine, however I'd suggest adding a comment in the pointing out
+>> that the IMMEDIATE/DEFERRABLE apply to save/restore to the vcpu struct.
+>> Instinctively I would expect the deferrable/immediate to apply to the actual
+>> hardware register access, so a comment would prevent people like me to get
+>> on the wrong track.
+>>
 > 
-> We have all sorts of models with perf:
+> I tried to explain that a bit in the first sentence of the commit
+> message, but I can try to make it more clear that we introduce
+> terminology.
 > 
-> 1) Code that perf has that other projects expressed interest in using in
-> the past but that we so far failed to make generic in a way that
-> external projects could use, with proper versioning, etc.
+
+The commit message is fine, I just think it would be nice to have it in 
+the code so you don't have to look for the commit to understand.
+
+>>> Not that we don't use the deferred mechanism yet in this patch, but only
+>>> introduce infrastructure.  This is to improve convenience of review in
+>>> the subsequent patches where it is clear which registers become
+>>> deferred.
+>>>
+>>>   [ Most of this logic was contributed by Marc Zyngier ]
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+>>
+>>> ---
+>>>   arch/arm64/include/asm/kvm_host.h |   8 +-
+>>>   arch/arm64/kvm/sys_regs.c         | 160 ++++++++++++++++++++++++++++++++++++++
+>>>   2 files changed, 166 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index 91272c35cc36..4b5ef82f6bdb 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -281,6 +281,10 @@ struct kvm_vcpu_arch {
+>>>   	/* Detect first run of a vcpu */
+>>>   	bool has_run_once;
+>>> +
+>>> +	/* True when deferrable sysregs are loaded on the physical CPU,
+>>> +	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
+>>> +	bool sysregs_loaded_on_cpu;
+>>>   };
+>>>   #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+>>> @@ -293,8 +297,8 @@ struct kvm_vcpu_arch {
+>>>    */
+>>>   #define __vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+>>> -#define vcpu_read_sys_reg(v,r)	__vcpu_sys_reg(v,r)
+>>> -#define vcpu_write_sys_reg(v,r,n)	do { __vcpu_sys_reg(v,r) = n; } while (0)
+>>> +u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg);
+>>> +void vcpu_write_sys_reg(struct kvm_vcpu *vcpu, int reg, u64 val);
+>>>   /*
+>>>    * CP14 and CP15 live in the same array, as they are backed by the
+>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>> index 96398d53b462..9d353a6a55c9 100644
+>>> --- a/arch/arm64/kvm/sys_regs.c
+>>> +++ b/arch/arm64/kvm/sys_regs.c
+>>> @@ -35,6 +35,7 @@
+>>>   #include <asm/kvm_coproc.h>
+>>>   #include <asm/kvm_emulate.h>
+>>>   #include <asm/kvm_host.h>
+>>> +#include <asm/kvm_hyp.h>
+>>>   #include <asm/kvm_mmu.h>
+>>>   #include <asm/perf_event.h>
+>>>   #include <asm/sysreg.h>
+>>> @@ -76,6 +77,165 @@ static bool write_to_read_only(struct kvm_vcpu *vcpu,
+>>>   	return false;
+>>>   }
+>>> +struct sys_reg_accessor {
+>>> +	u64	(*rdsr)(struct kvm_vcpu *, int);
+>>> +	void	(*wrsr)(struct kvm_vcpu *, int, u64);
+>>
+>> Nit:
+>>
+>> Why use a signed integer for the register index argument?
+>>
 > 
-> It lives in tools/perf/util/ but should move to tools/lib/ while
-> transitioning in the direction of a lib external projects could use
-> (evsel, evlist, for instance). I'm not in a hurry to make that happen,
-> lots of other stuff sucking my time.
- 
-> 2) Code that we moved to tools/lib/ and that are since being used by
-> other projects, such as tools/lib/subcmd/ that is used by tools/objtool/
- 
-> 3) Code that we started directly in tools/lib/ and that now are even
-> maintained outside the perf tools group, but continue being used by
-> perf, such as tools/lib/bpf/
- 
-> 4) Code that we try to share with the kernel, but using a copy that we
-> automatically check for drift so that we can analyse how to update our
-> copy, such as tools/include/ and tools/lib/rbtree.c
- 
-> And of course we use a ton of external libraries, some that are mature,
-> like the elf libraries and that probably people are used to have
-> installed already and some that are more recent, like libbabeltrace.
- 
-> Then there is the public you want to please, how easy they will find to
-> use your work, think of what would happen if Linus Torvalds or Ingo
-> Molnar would try to, out of the blue, use this ARM trace decoding
-> support in perf, would they get it working super fast and without the
-> slighest amount of hassle?
+> The type name is short? ;)  No particular reason, could be an unsigned
+> int, but I don't think it matters here does it?
+> 
 
-> If you think they would be pleased, you're on to a winner! :-)
+Probably not, just personal preference I guess.
 
-To make things clearer, I don't think you have to include this in the
-kernel sources if you don't want to, we've been accomodating multiple
-ways of doing this integration.
+>>> +};
+>>> +
+>>> +#define DECLARE_IMMEDIATE_SR(i)						\
+>>> +	static u64 __##i##_read(struct kvm_vcpu *vcpu, int r)		\
+>>> +	{								\
+>>> +		return __vcpu_sys_reg(vcpu, r);				\
+>>> +	}								\
+>>> +									\
+>>> +	static void __##i##_write(struct kvm_vcpu *vcpu, int r, u64 v)	\
+>>> +	{								\
+>>> +		__vcpu_sys_reg(vcpu, r) = v;				\
+>>> +	}								\
+>>> +
+>>> +#define DECLARE_DEFERRABLE_SR(i, s)					\
+>>> +	static u64 __##i##_read(struct kvm_vcpu *vcpu, int r)		\
+>>> +	{								\
+>>> +		if (vcpu->arch.sysregs_loaded_on_cpu) {			\
+>>> +			WARN_ON(kvm_arm_get_running_vcpu() != vcpu);	\
+>>> +			return read_sysreg_s((s));			\
+>>> +		}							\
+>>> +		return __vcpu_sys_reg(vcpu, r);				\
+>>> +	}								\
+>>> +									\
+>>> +	static void __##i##_write(struct kvm_vcpu *vcpu, int r, u64 v)	\
+>>> +	{								\
+>>> +		if (vcpu->arch.sysregs_loaded_on_cpu) {			\
+>>> +			WARN_ON(kvm_arm_get_running_vcpu() != vcpu);	\
+>>> +			write_sysreg_s(v, (s));				\
+>>> +		} else {						\
+>>> +			__vcpu_sys_reg(vcpu, r) = v;			\
+>>> +		}							\
+>>> +	}								\
+>>> +
+>>> +
+>>> +#define SR_HANDLER_RANGE(i,e)						\
+>>> +	[i ... e] =  (struct sys_reg_accessor) {			\
+>>> +		.rdsr = __##i##_read,					\
+>>> +		.wrsr = __##i##_write,					\
+>>
+>> Nit:
+>> Could we have __vcpu_##i##_read and __vcpu_##i##_write?
+>>
+> 
+> They don't necessarily read from the vcpu do they?
+> 
 
-I'll make some comments on the other thread about feature detection.
+Hmmm, from my understanding they do, but the action the vcpu can be 
+immediate or deferred. But from the semantics you give to 
+IMMEDIATE/DEFERRABLE, I'd say the actions are related to vcpu.
 
-- Arnaldo
+I don't know if that makes sense.
+
+> Unrelated: I also thought about just having a single function a switch
+> statement instead, which may make it easier to follow the code as there
+> would be no macros generating functions, but it would be slightly less
+> declarative.
+> 
+> For example:
+> 
+> u64 vcpu_read_sys_reg(struct kvm_vcpu *vcpu, int reg)
+> {
+> 	if (!vcpu->arch.sysregs_loaded_on_cpu)
+> 		goto immediate_read;
+> 	
+> 	/*
+> 	 * All system registers listed in the switch are deferred
+> 	 * save/restored on VHE systems.
+> 	 */
+> 	switch (reg) {
+> 	case CSSELR_EL1:	return read_sysreg_s(SYS_CSSELR_EL1));
+> 	case SCTLR_EL1:		return read_sysreg_s(sctlr_EL12));
+> 	case ACTLR_EL1:		return read_sysreg_s(SYS_ACTLR_EL1));
+> 	case CPACR_EL1:		return read_sysreg_s(cpacr_EL12));
+> 	case TTBR0_EL1:		return read_sysreg_s(ttbr0_EL12));
+> 	case TTBR1_EL1:		return read_sysreg_s(ttbr1_EL12));
+> 	case TCR_EL1:		return read_sysreg_s(tcr_EL12));
+> 	case ESR_EL1:		return read_sysreg_s(esr_EL12));
+> 	case AFSR0_EL1:		return read_sysreg_s(afsr0_EL12));
+> 	case AFSR1_EL1:		return read_sysreg_s(afsr1_EL12));
+> 	case FAR_EL1:		return read_sysreg_s(far_EL12));
+> 	case MAIR_EL1:		return read_sysreg_s(mair_EL12));
+> 	case VBAR_EL1:		return read_sysreg_s(vbar_EL12));
+> 	case CONTEXTIDR_EL1:	return read_sysreg_s(contextidr_EL12));
+> 	case TPIDR_EL0:		return read_sysreg_s(SYS_TPIDR_EL0));
+> 	case TPIDRRO_EL0:	return read_sysreg_s(SYS_TPIDRRO_EL0));
+> 	case TPIDR_EL1:		return read_sysreg_s(SYS_TPIDR_EL1));
+> 	case AMAIR_EL1:		return read_sysreg_s(amair_EL12));
+> 	case CNTKCTL_EL1:	return read_sysreg_s(cntkctl_EL12));
+> 	case PAR_EL1:		return read_sysreg_s(SYS_PAR_EL1));
+> 	case DACR32_EL2:	return read_sysreg_s(SYS_DACR32_EL2));
+> 	case IFSR32_EL2:	return read_sysreg_s(SYS_IFSR32_EL2));
+> 	case DBGVCR32_EL2:	return read_sysreg_s(SYS_DBGVCR32_EL2));
+> 	}
+> 
+> immediate_read:
+> 	return __vcpu_sys_reg(vcpu, reg);
+> }
+> 
+> Since you're having a look at this, what are your thoughts?
+
+I like that suggestion, very easy to follow. Of course negative side is 
+that you'll need two of those switch... But yes I still prefer this new 
+suggestion.
+
+So if you go with this you can ignore my other comments ;) .
+
+Thanks,
+
+-- 
+Julien Thierry
