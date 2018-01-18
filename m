@@ -1,57 +1,28 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Thu, 18 Jan 2018 10:18:57 -0800
-Subject: [PATCH v2] net: ethernet: cavium: Correct Cavium Thunderx
- nicvf/nicpf modules names
-In-Reply-To: <1516290789-3585-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
-References: <1516290160-3396-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <1516290789-3585-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180118181857.GA4207@localhost.localdomain>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 18 Jan 2018 12:40:05 -0600
+Subject: [PATCH v5 43/44] ARM: da8xx-dt: switch to device tree clocks
+In-Reply-To: <8b30f1e6-74dc-3fd6-71a6-c9ceaf77a9d1@ti.com>
+References: <1515378307-23718-1-git-send-email-david@lechnology.com>
+ <1515378307-23718-4-git-send-email-david@lechnology.com>
+ <8b30f1e6-74dc-3fd6-71a6-c9ceaf77a9d1@ti.com>
+Message-ID: <b9443e4c-b8c6-5388-955e-696d0f7b3151@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/18/2018 09:27 AM, Sekhar Nori wrote:
+> On Monday 08 January 2018 07:55 AM, David Lechner wrote:
+>> This removes all of the clock init code from da8xx-dt.c. This includes
+>> all of the OF_DEV_AUXDATA that was just used for looking up clocks.
+>>
+>> Note: You need to have clocks defined in your device tree or your system
+>> won't boot after this patch.
+> 
+> I am not sure we can do this then, as we cannot break DT compatibility.
+> 
 
-Self NACK here: modules names has to contain dashes instead
-of underscores, as it defined at sources (or update modules
-DRV_NAME definitions whithin the source files with underscores).
-Shame on me.
+In the past, you have told me that you don't want the .dts changes and code
+changes in the same patch. In this case, if you apply either one separately,
+it will break clocks. It does not matter which one is first.
 
-Vadim
-
-On Thu, Jan 18, 2018 at 07:53:09AM -0800, Vadim Lomovtsev wrote:
-> From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
-> 
-> It was found that ethtool provides unexisting module name while
-> it queries the specified network device for associated driver
-> information.
-> 
-> This patch is to correct Cavium CN88xx Thunder nicvf/nicpf modules
-> names 'nicvf' to 'thunder_nicvf' and 'nicpf' to 'thunder_nicpf'.
-> 
-> Signed-off-by: Dean Nelson <dnelson@redhat.com>
-> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
-> ---
->  drivers/net/ethernet/cavium/thunder/Makefile | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/cavium/thunder/Makefile b/drivers/net/ethernet/cavium/thunder/Makefile
-> index 6b4d4add7353..f5642337d0fe 100644
-> --- a/drivers/net/ethernet/cavium/thunder/Makefile
-> +++ b/drivers/net/ethernet/cavium/thunder/Makefile
-> @@ -4,9 +4,9 @@
->  
->  obj-$(CONFIG_THUNDER_NIC_RGX) += thunder_xcv.o
->  obj-$(CONFIG_THUNDER_NIC_BGX) += thunder_bgx.o
-> -obj-$(CONFIG_THUNDER_NIC_PF) += nicpf.o
-> -obj-$(CONFIG_THUNDER_NIC_VF) += nicvf.o
-> +obj-$(CONFIG_THUNDER_NIC_PF) += thunder_nicpf.o
-> +obj-$(CONFIG_THUNDER_NIC_VF) += thunder_nicvf.o
->  
-> -nicpf-y := nic_main.o
-> -nicvf-y := nicvf_main.o nicvf_queues.o
-> -nicvf-y += nicvf_ethtool.o
-> +thunder_nicpf-y := nic_main.o
-> +thunder_nicvf-y := nicvf_main.o nicvf_queues.o
-> +thunder_nicvf-y += nicvf_ethtool.o
-> -- 
-> 2.14.3
-> 
+So either we have to squash [PATCH v5 44/44] ARM: dts: da850: Add clocks
+into this patch or deal with the breakage.
