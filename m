@@ -1,5 +1,5 @@
 From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Thu, 18 Jan 2018 21:15:48 +0300
+Date: Thu, 18 Jan 2018 21:31:06 +0300
 Subject: mmc1 timeout issue with rpi3
 In-Reply-To: <206582731.31195.1516298825692@email.1und1.de>
 References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
@@ -14,7 +14,7 @@ References: <5d800b63-d45d-d4e4-214c-3ebf602c79e9@orpaltech.com>
  <fe2e55f8-a048-9973-5274-e16e2732f841@i2se.com>
  <e476d6a3-a397-64a0-d7ad-2fba66fb276e@orpaltech.com>
  <206582731.31195.1516298825692@email.1und1.de>
-Message-ID: <a7ec0ce1-322a-d896-e363-affdaf7885ea@orpaltech.com>
+Message-ID: <35416c80-bd7f-cee3-7491-c03d891ac4da@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -39,6 +39,18 @@ On 01/18/2018 09:07 PM, Stefan Wahren wrote:
 >
 > device_tree=bcm2837-rpi-3-b.dtb
 
-it isn't working that way. I am getting kernel panics.
+ok, what I tried:
+
+1) copied dtbs from firmware github repo
+
+2) copied kernel and kernel7 files
+
+3) modified config.txt? to add
+
+device_tree=bcm2710-rpi-3-b.dtb
+
+4) boot successful
+
+5) here is my dmesg https://pastebin.com/CK33EcgD
 
 Thanks
