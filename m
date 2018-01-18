@@ -1,230 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 18 Jan 2018 14:32:24 +0100
-Subject: [PATCH v3 00/41] Optimize KVM/ARM for VHE systems
-In-Reply-To: <20180118121821.gkfgvynco4b723nf@yury-thinkpad>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180115141423.5qho7xvmikq27jvs@yury-thinkpad>
- <20180118111632.GA27865@cbox>
- <20180118121821.gkfgvynco4b723nf@yury-thinkpad>
-Message-ID: <20180118133224.GE27865@cbox>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 18 Jan 2018 13:35:05 +0000
+Subject: [PATCH v2 04/15] mmc: mmci: Add support for setting pad type via
+ pinctrl
+In-Reply-To: <CAPDyKFoVT7rqLVzYVrO8JTD_MVLxr_R8PO=fWqLVG4DB1MpnTQ@mail.gmail.com>
+References: <1516105859-3525-1-git-send-email-patrice.chotard@st.com>
+ <1516105859-3525-5-git-send-email-patrice.chotard@st.com>
+ <CAPDyKFoVT7rqLVzYVrO8JTD_MVLxr_R8PO=fWqLVG4DB1MpnTQ@mail.gmail.com>
+Message-ID: <0c73774b-f06e-2db8-ef50-3bf590b57cff@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 03:18:21PM +0300, Yury Norov wrote:
-> On Thu, Jan 18, 2018 at 12:16:32PM +0100, Christoffer Dall wrote:
-> > Hi Yury,
-> > 
-> > [cc'ing Alex Bennee who had some thoughts on this]
-> > 
-> > On Mon, Jan 15, 2018 at 05:14:23PM +0300, Yury Norov wrote:
-> > > On Fri, Jan 12, 2018 at 01:07:06PM +0100, Christoffer Dall wrote:
-> > > > This series redesigns parts of KVM/ARM to optimize the performance on
-> > > > VHE systems.  The general approach is to try to do as little work as
-> > > > possible when transitioning between the VM and the hypervisor.  This has
-> > > > the benefit of lower latency when waiting for interrupts and delivering
-> > > > virtual interrupts, and reduces the overhead of emulating behavior and
-> > > > I/O in the host kernel.
-> > > > 
-> > > > Patches 01 through 06 are not VHE specific, but rework parts of KVM/ARM
-> > > > that can be generally improved.  We then add infrastructure to move more
-> > > > logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
-> > > > registers.
-> > > > 
-> > > > We then introduce a new world-switch function for VHE systems, which we
-> > > > can tweak and optimize for VHE systems.  To do that, we rework a lot of
-> > > > the system register save/restore handling and emulation code that may
-> > > > need access to system registers, so that we can defer as many system
-> > > > register save/restore operations to vcpu_load and vcpu_put, and move
-> > > > this logic out of the VHE world switch function.
-> > > > 
-> > > > We then optimize the configuration of traps.  On non-VHE systems, both
-> > > > the host and VM kernels run in EL1, but because the host kernel should
-> > > > have full access to the underlying hardware, but the VM kernel should
-> > > > not, we essentially make the host kernel more privileged than the VM
-> > > > kernel despite them both running at the same privilege level by enabling
-> > > > VE traps when entering the VM and disabling those traps when exiting the
-> > > > VM.  On VHE systems, the host kernel runs in EL2 and has full access to
-> > > > the hardware (as much as allowed by secure side software), and is
-> > > > unaffected by the trap configuration.  That means we can configure the
-> > > > traps for VMs running in EL1 once, and don't have to switch them on and
-> > > > off for every entry/exit to/from the VM.
-> > > > 
-> > > > Finally, we improve our VGIC handling by moving all save/restore logic
-> > > > out of the VHE world-switch, and we make it possible to truly only
-> > > > evaluate if the AP list is empty and not do *any* VGIC work if that is
-> > > > the case, and only do the minimal amount of work required in the course
-> > > > of the VGIC processing when we have virtual interrupts in flight.
-> > > > 
-> > > > The patches are based on v4.15-rc3, v9 of the level-triggered mapped
-> > > > interrupts support series [1], and the first five patches of James' SDEI
-> > > > series [2].
-> > > > 
-> > > > I've given the patches a fair amount of testing on Thunder-X, Mustang,
-> > > > Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
-> > > > functionality on the Foundation model, running both 64-bit VMs and
-> > > > 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
-> > > > GICv2-on-GICv3.
-> > > > 
-> > > > The patches are also available in the vhe-optimize-v3 branch on my
-> > > > kernel.org repository [3].  The vhe-optimize-v3-base branch contains
-> > > > prerequisites of this series.
-> > > > 
-> > > > Changes since v2:
-> > > >  - Rebased on v4.15-rc3.
-> > > >  - Includes two additional patches that only does vcpu_load after
-> > > >    kvm_vcpu_first_run_init and only for KVM_RUN.
-> > > >  - Addressed review comments from v2 (detailed changelogs are in the
-> > > >    individual patches).
-> > > > 
-> > > > Thanks,
-> > > > -Christoffer
-> > > > 
-> > > > [1]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v9
-> > > > [2]: git://linux-arm.org/linux-jm.git sdei/v5/base
-> > > > [3]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v3
-> > > 
-> > > I tested this v3 series on ThunderX2 with IPI benchmark:
-> > > https://lkml.org/lkml/2017/12/11/364
-> > > 
-> > > I tried to address your comments in discussion to v2, like pinning
-> > > the module to specific CPU (with taskset), increasing the number of
-> > > iterations, tuning governor to max performance. Results didn't change
-> > > much, and are pretty stable.
-> > > 
-> > > Comparing to vanilla guest, Norml IPI delivery for v3 is 20% slower.
-> > > For v2 it was 27% slower, and for v1 - 42% faster. What's interesting,
-> > > the acknowledge time is much faster for v3, so overall time to
-> > > deliver and acknowledge IPI (2nd column) is less than vanilla
-> > > 4.15-rc3 kernel.
-> > > 
-> > > Test setup is not changed since v2: ThunderX2, 112 online CPUs,
-> > > guest is running under qemu-kvm, emulating gic version 3.
-> > > 
-> > > Below is test results for v1-3 normalized to host vanilla kernel
-> > > dry-run time.
-> > > 
-> > > Yury
-> > > 
-> > > Host, v4.14:
-> > > Dry-run:          0         1
-> > > Self-IPI:         9        18
-> > > Normal IPI:      81       110
-> > > Broadcast IPI:    0      2106
-> > > 
-> > > Guest, v4.14:
-> > > Dry-run:          0         1
-> > > Self-IPI:        10        18
-> > > Normal IPI:     305       525
-> > > Broadcast IPI:    0      9729
-> > > 
-> > > Guest, v4.14 + VHE:
-> > > Dry-run:          0         1
-> > > Self-IPI:         9        18
-> > > Normal IPI:     176       343
-> > > Broadcast IPI:    0      9885
-> > > 
-> > > And for v2.
-> > > 
-> > > Host, v4.15:                   
-> > > Dry-run:          0         1
-> > > Self-IPI:         9        18
-> > > Normal IPI:      79       108
-> > > Broadcast IPI:    0      2102
-> > >                         
-> > > Guest, v4.15-rc:
-> > > Dry-run:          0         1
-> > > Self-IPI:         9        18
-> > > Normal IPI:     291       526
-> > > Broadcast IPI:    0     10439
-> > > 
-> > > Guest, v4.15-rc + VHE:
-> > > Dry-run:          0         2
-> > > Self-IPI:        14        28
-> > > Normal IPI:     370       569
-> > > Broadcast IPI:    0     11688
-> > > 
-> > > And for v3.
-> > > 
-> > > Host 4.15-rc3					
-> > > Dry-run:	  0	    1
-> > > Self-IPI:	  9	   18
-> > > Normal IPI:	 80	  110
-> > > Broadcast IPI:	  0	 2088
-> > > 		
-> > > Guest, 4.15-rc3	
-> > > Dry-run:	  0	    1
-> > > Self-IPI:	  9	   18
-> > > Normal IPI:	289	  497
-> > > Broadcast IPI:	  0	 9999
-> > > 		
-> > > Guest, 4.15-rc3	+ VHE
-> > > Dry-run:	  0	    2
-> > > Self-IPI:	 12	   24
-> > > Normal IPI:	347	  490
-> > > Broadcast IPI:	  0	11906
-> > 
-> > So, I had a look at your measurement code, and just want to make a
-> > sanity check that I understand the measurements correctly.
-> > 
-> > Firstly, if we execute something 100,000 times and summarize the result
-> > for each run, and get anything less than 100,000 (in this case ~300),
-> > without scaling the value, doesn't that mean that in the vast majority
-> > of cases, you are getting 0 as your measurement?
-> 
-> I cannot report absolute numbers so I posted normalized values to dry-run
-> case. 300 for IPI delivery means that it 300 times slower than no-op
-> (dry-run case). Absolute numbers looks quite reasonable, few useconds
-> for normal IPI.
+Hi Ulf
 
-Ah, I see, you normalized it after the output from your benchmark.  I
-thought you normalized it in the benchmark code originally, but then I
-didn't see it in the patch you linked to, so wasn't sure what was going
-on.
+On 01/17/2018 10:34 AM, Ulf Hansson wrote:
+> [...]
+> 
+>>          /*
+>> @@ -1616,6 +1625,32 @@ static int mmci_probe(struct amba_device *dev,
+>>          host = mmc_priv(mmc);
+>>          host->mmc = mmc;
+>>
+>> +       /*
+>> +        * Some variant (STM32) doesn't have opendrain bit, nevertheless
+>> +        * pins can be set accordingly using pinctrl
+>> +        */
+>> +       if (!variant->opendrain) {
+>> +               host->pinctrl = devm_pinctrl_get(&dev->dev);
+>> +               if (IS_ERR(host->pinctrl)) {
+>> +                       dev_err(&dev->dev, "failed to get pinctrl");
+>> +                       goto host_free;
+>> +               }
+>> +
+>> +               host->pins_default = pinctrl_lookup_state(host->pinctrl,
+>> +                                                         PINCTRL_STATE_DEFAULT);
+>> +               if (IS_ERR(host->pins_default)) {
+>> +                       dev_warn(mmc_dev(mmc), "Can't select default pins\n");
+>> +                       host->pins_default = NULL;
+> 
+> This is wrong, I think you should bail out and return the error code instead.
+
+Ok
 
 > 
-> Let me know if you need absolute numbers.
-> https://lkml.org/lkml/2017/12/13/301
->  
+> Moreover, calling pinctrl_select_state() from ->set_ios by using a
+> NULL state, will likely trigger a NULL pointer deference bug in the
+> pinctrl layer.
 
-I trust you, that's fine.
+Regarding pinctrl_select_state() call with a NULL state, this case is 
+managed inside pinctrl_state(), but ok, it will be more elegant to exit 
+directly in case of no DT pins definition found.
 
-> > Secondly, are we sure all the required memory barriers are in place?
-> > I know that the IPI send contains an smp_wmb(), but when you read back
-> > the value in the caller, do you have the necessary smp_wmb() on the
-> > handler side and a corresponding smp_rmb() on the sending side?  I'm not
-> > sure what kind of effect missing barriers for a measurement framework
-> > like this would have, but it's worth making sure we're not chasing red
-> > herrings here.
 > 
-> I don't share memory between PMUs. 
-
-PMUs?
-
-You do share memory between your CPUs, it's the little piece of memory
-that your time variable points to.
-
-I was concerned if the read back from your sender CPU of the value
-written by the receiving CPU was properly ordered, but looking at
-handle_IPI and smp_call_function_single, there are barriers pretty much
-all over, and I don't think a missing barrier would result in what we
-see here (given that I understand the normalization above).
-
-
->  
-> > That obviously doesn't change that the overall turnaround time is
-> > improved more in the v1 case than in the v3 case, which I'd like to
-> > explore/bisect in any case.
+>> +               }
+>> +
+>> +               host->pins_opendrain = pinctrl_lookup_state(host->pinctrl,
+>> +                                                           MMCI_PINCTRL_STATE_OPENDRAIN);
+>> +               if (IS_ERR(host->pins_opendrain)) {
+>> +                       dev_warn(mmc_dev(mmc), "Can't select opendrain pins\n");
+>> +                       host->pins_opendrain = NULL;
 > 
-> So me. For any idea, let me know, I'll check it.
+> Ditto.
+
+ok
+
+Thanks
+
+Patrice
 > 
-So another thing that would be very useful (which I would do myself if I
-had access to a TX2) would be to simply bisect the series and run
-the benchmark and see where the regression is introduced.
-
-In case you have time for that, I have a bisectable series with the
-recent KVM/ARM fixes in the 'vhe-optimize-v3-with-fixes' branch on:
-git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git
-
-
-Thanks,
--Christoffer
+>> +               }
+>> +       }
+>> +
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
