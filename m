@@ -1,68 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Jan 2018 15:45:12 +0100
-Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33
- when driving VBUS
-In-Reply-To: <20180119092541.7508-1-wens@csie.org>
-References: <20180119092541.7508-1-wens@csie.org>
-Message-ID: <20180119144512.dqqbywavhwsyma2f@flea.lan>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 19 Jan 2018 20:21:29 +0530
+Subject: [PATCH] ARM: davinci: board-da830-evm: fix unused const variable
+ warning
+Message-ID: <20180119145129.16818-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 05:25:41PM +0800, Chen-Yu Tsai wrote:
-> The AXP223 PMIC, like the AXP221, does not generate VBUS change
-> interrupts when N_VBUSEN is used to drive VBUS for the OTG port
-> on the board.
-> 
-> This was not noticed until recently, as most A23/A33 boards use
-> a GPIO pin that does not support interrupts for OTG ID detection.
-> This forces the driver to use polling. However the A33-OlinuXino
-> uses a pin that does support interrupts, so the driver uses them.
-> However the VBUS interrupt never fires, and the driver never gets
-> to update the VBUS status. This results in musb timing out waiting
-> for VBUS to rise.
-> 
-> This was worked around for the AXP221 by resorting to polling
-> changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
-> missing Vbus det interrupts on A31"). This patch adds the A23 and
-> A33 to the list of SoCs that need the workaround.
-> 
-> Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
-> 		      sun8i-a33 SoC")
-> Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
-> 		      sun8i-a23 SoC")
-> Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
-> 		Use of_match_node to get model specific config data
-> Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
-> 		Fix optional gpios failing probe
-> Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
-> 		Fix irq free conditions to match request conditions
-> Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
-> 		Add workaround for missing Vbus det interrupts on A31
-> Cc: <stable@vger.kernel.org> # 4.3.x
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> This list might get longer if the newer AXP8xx PMICs also have this
-> behavior. We could switch to a boolean in the per-compatible data,
-> or just always use polling. The yet-merged R40 support will have this
-> issue as well, as the R40 is paired with the AXP221. But for now,
-> I'd like to have something that is easier to backport to stable, so
-> we can at least fix this for the A23 and A33.
-> 
-> Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
+da830_evm_emif25_pins[] is used only when CONFIG_DA830_UI_NAND
+is enabled. It gives the following warning when the config is
+switched off. Fix it.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+arch/arm/mach-davinci/board-da830-evm.c:245:20: warning: ?da830_evm_emif25_pins? defined but not used [-Wunused-const-variable=]
+ static const short da830_evm_emif25_pins[] = {
+                    ^~~~~~~~~~~~~~~~~~~~~
 
-Maxime
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/board-da830-evm.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index a58bfcac8e9c..3c12e239f279 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -239,20 +239,6 @@ static inline void da830_evm_init_mmc(void)
+ 	}
+ }
+ 
+-/*
+- * UI board NAND/NOR flashes only use 8-bit data bus.
+- */
+-static const short da830_evm_emif25_pins[] = {
+-	DA830_EMA_D_0, DA830_EMA_D_1, DA830_EMA_D_2, DA830_EMA_D_3,
+-	DA830_EMA_D_4, DA830_EMA_D_5, DA830_EMA_D_6, DA830_EMA_D_7,
+-	DA830_EMA_A_0, DA830_EMA_A_1, DA830_EMA_A_2, DA830_EMA_A_3,
+-	DA830_EMA_A_4, DA830_EMA_A_5, DA830_EMA_A_6, DA830_EMA_A_7,
+-	DA830_EMA_A_8, DA830_EMA_A_9, DA830_EMA_A_10, DA830_EMA_A_11,
+-	DA830_EMA_A_12, DA830_EMA_BA_0, DA830_EMA_BA_1, DA830_NEMA_WE,
+-	DA830_NEMA_CS_2, DA830_NEMA_CS_3, DA830_NEMA_OE, DA830_EMA_WAIT_0,
+-	-1
+-};
+-
+ #define HAS_MMC		IS_ENABLED(CONFIG_MMC_DAVINCI)
+ 
+ #ifdef CONFIG_DA830_UI_NAND
+@@ -357,6 +343,20 @@ static struct platform_device da830_evm_nand_device = {
+ 	.resource	= da830_evm_nand_resources,
+ };
+ 
++/*
++ * UI board NAND/NOR flashes only use 8-bit data bus.
++ */
++static const short da830_evm_emif25_pins[] = {
++	DA830_EMA_D_0, DA830_EMA_D_1, DA830_EMA_D_2, DA830_EMA_D_3,
++	DA830_EMA_D_4, DA830_EMA_D_5, DA830_EMA_D_6, DA830_EMA_D_7,
++	DA830_EMA_A_0, DA830_EMA_A_1, DA830_EMA_A_2, DA830_EMA_A_3,
++	DA830_EMA_A_4, DA830_EMA_A_5, DA830_EMA_A_6, DA830_EMA_A_7,
++	DA830_EMA_A_8, DA830_EMA_A_9, DA830_EMA_A_10, DA830_EMA_A_11,
++	DA830_EMA_A_12, DA830_EMA_BA_0, DA830_EMA_BA_1, DA830_NEMA_WE,
++	DA830_NEMA_CS_2, DA830_NEMA_CS_3, DA830_NEMA_OE, DA830_EMA_WAIT_0,
++	-1
++};
++
+ static inline void da830_evm_init_nand(int mux_mode)
+ {
+ 	int ret;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180119/f0f5bc8f/attachment.sig>
+2.9.0
