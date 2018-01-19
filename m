@@ -1,39 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 19 Jan 2018 19:53:53 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <CAPv3WKcYrbfKjsnwZ39Tyq3HN0aneUQZdbeUzLbFgLUbMc3w8Q@mail.gmail.com>
-References: <20180108145312.GH10940@lunn.ch>
- <20180108151453.GB31502@xora-haswell>
- <20180108154243.GA30962@lunn.ch>
- <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
- <20180109101941.GD31502@xora-haswell>
- <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
- <20180109130012.GA27447@lunn.ch>
- <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
- <20180118130026.GG32299@lunn.ch>
- <CAPv3WKcYrbfKjsnwZ39Tyq3HN0aneUQZdbeUzLbFgLUbMc3w8Q@mail.gmail.com>
-Message-ID: <20180119185353.GF13094@lunn.ch>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Fri, 19 Jan 2018 14:08:56 -0500
+Subject: [PATCH v3 1/2] arm64: Branch predictor hardening for Cavium
+ ThunderX2
+In-Reply-To: <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
+References: <20180118135354.GB20783@arm.com>
+ <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <9be02a5d-7d2d-7c61-e593-056be65ff26b@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Since I have a code that can be tested and easily modified to use
-> different ACPI approaches with real platform MDIO controller
-> (mvmdio.c) and NIC (mvpp2.c), in coming weeks I may be able to find
-> some time to prepare a proof of concept based on GenericSerialBus.
-> Please expect some RFC patches hopefully right after the coming merge
-> window is closed.
+On 01/19/2018 07:22 AM, Jayachandran C wrote:
+> Use PSCI based mitigation for speculative execution attacks targeting
+> the branch predictor. We use the same mechanism as the one used for
+> Cortex-A CPUs, we expect the PSCI version call to have a side effect
+> of clearing the BTBs.
+> 
+> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 70e5f18..45ff9a2 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -338,6 +338,16 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+>  		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+>  	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+> +		.enable = enable_psci_bp_hardening,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+> +		.enable = enable_psci_bp_hardening,
+> +	},
+>  #endif
+>  	{
+>  	}
+> 
 
-It would also be interesting to know how the standardisation process
-works.
-
-I'm sure these is a FAQs, so maybe somebody could point us towards it.
-
-Do we need to submit a proposed extension to the ACPI standard at the
-same time as the patch? Should we not accept the code into Linux until
-the proposal has been accepted? Or can we accept the code
-provisionally, with the understanding that if the ACPI committee
-rejects the extension, or suggest alternations, we can take the code
-out of Linux without having to worry about backwards compatibility?
-
-Thanks
-      Andrew
+Both of these patches seem reasonable to me.
