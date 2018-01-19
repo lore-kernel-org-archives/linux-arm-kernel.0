@@ -1,585 +1,280 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 19 Jan 2018 21:11:10 +0800
-Subject: [PATCH V3 10/10] add imx7ulp support
+Date: Fri, 19 Jan 2018 21:11:04 +0800
+Subject: [PATCH V3 04/10] clk: imx: add pfdv2 support
 In-Reply-To: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
 References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1516367470-24340-11-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1516367470-24340-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- arch/arm/boot/dts/Makefile           |   2 +
- arch/arm/boot/dts/imx7ulp-evk.dts    |  87 +++++++++++++++
- arch/arm/boot/dts/imx7ulp.dtsi       | 202 +++++++++++++++++++++++++++++++++++
- arch/arm/configs/imx_v6_v7_defconfig |  16 ++-
- arch/arm/mach-imx/Kconfig            |   9 ++
- arch/arm/mach-imx/Makefile           |   1 +
- arch/arm/mach-imx/common.h           |   1 +
- arch/arm/mach-imx/cpu.c              |   3 +
- arch/arm/mach-imx/mach-imx7ulp.c     |  37 +++++++
- arch/arm/mach-imx/mxc.h              |   1 +
- arch/arm/mach-imx/pm-imx7ulp.c       |  32 ++++++
- 11 files changed, 381 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
- create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
- create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
- create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
+The pfdv2 is designed for PLL Fractional Divide (PFD) observed in System
+Clock Generation (SCG) module in IMX ULP SoC series. e.g. i.MX7ULP.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..3257e71 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -519,6 +519,8 @@ dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-sdb-sht11.dtb \
- 	imx7s-colibri-eval-v3.dtb \
- 	imx7s-warp.dtb
-+dtb-$(CONFIG_SOC_IMX7ULP) += \
-+	imx7ulp-evk.dtb
- dtb-$(CONFIG_SOC_LS1021A) += \
- 	ls1021a-qds.dtb \
- 	ls1021a-twr.dtb
-diff --git a/arch/arm/boot/dts/imx7ulp-evk.dts b/arch/arm/boot/dts/imx7ulp-evk.dts
+NOTE pfdv2 can only be operated when clk is gated.
+
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Anson Huang <Anson.Huang@nxp.com>
+Cc: Bai Ping <ping.bai@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+---
+ChangeLog:
+v2->v3:
+ * no changes
+v1->v2:
+ * change to readl_poll_timeout
+ * add pfd lock to protect share reg access between rate and enable/disable
+   operations and multiple pfd instances.
+ * use clk_hw_register
+---
+ drivers/clk/imx/Makefile    |   3 +-
+ drivers/clk/imx/clk-pfdv2.c | 207 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h       |   3 +
+ 3 files changed, 212 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/clk-pfdv2.c
+
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index 2f00b03..9c04ae4 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -12,7 +12,8 @@ obj-y += \
+ 	clk-pllv2.o \
+ 	clk-pllv3.o \
+ 	clk-pllv4.o \
+-	clk-pfd.o
++	clk-pfd.o \
++	clk-pfdv2.o
+ 
+ obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
+ obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
+diff --git a/drivers/clk/imx/clk-pfdv2.c b/drivers/clk/imx/clk-pfdv2.c
 new file mode 100644
-index 0000000..cc4e6ef
+index 0000000..5421bdf
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx7ulp-evk.dts
-@@ -0,0 +1,87 @@
++++ b/drivers/clk/imx/clk-pfdv2.c
+@@ -0,0 +1,207 @@
 +/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017 NXP
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx7ulp.dtsi"
-+
-+/ {
-+	model = "NXP i.MX7ULP EVK";
-+	compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp", "Generic DT based system";
-+
-+	chosen {
-+		bootargs = "console=ttyLP0,115200 earlycon=lpuart32,0x402D0010,115200";
-+		stdout-path = &lpuart4;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x60000000 0x40000000>;
-+	};
-+};
-+
-+&lpuart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lpuart4>;
-+	status = "okay";
-+};
-+
-+&usdhc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <>;
-+	pinctrl-0 = <&pinctrl_usdhc0_cmd_data>, <&pinctrl_usdhc0_clk>;
-+//		    <&pinctrl_usdhc0_cd>, <&pinctrl_usdhc0_rst>;
-+	status = "okay";
-+};
-+
-+&iomuxc1 {
-+	pinctrl_lpuart4: lpuart4grp {
-+		pins = <
-+			IMX7ULP_PAD_PTC3__LPUART4_RX
-+			IMX7ULP_PAD_PTC2__LPUART4_TX
-+		>;
-+		bias-pull-up;
-+	};
-+
-+	pinctrl_usdhc0_cmd_data: usdhc0_cmd_data_0_3_grp {
-+		pins = <
-+			IMX7ULP_PAD_PTD1__SDHC0_CMD
-+			IMX7ULP_PAD_PTD2__SDHC0_CLK
-+			IMX7ULP_PAD_PTD7__SDHC0_D3
-+			IMX7ULP_PAD_PTD8__SDHC0_D2
-+			IMX7ULP_PAD_PTD9__SDHC0_D1
-+			IMX7ULP_PAD_PTD10__SDHC0_D0
-+		>;
-+		drive-strength = <1>;
-+		bias-pull-up;
-+	};
-+
-+	pinctrl_usdhc0_clk: usdhc0_clk_grp {
-+		pins = <
-+			IMX7ULP_PAD_PTD2__SDHC0_CLK
-+		>;
-+		drive-strength = <1>;
-+		bias-pull-down;
-+	};
-+
-+	pinctrl_usdhc0_cd: usdhc0_gpios_cd_grp {
-+		pins = <
-+			IMX7ULP_PAD_PTC10__PTC10		/* USDHC0 CD */
-+		>;
-+		nxp,input-buffer-enable;
-+		bias-pull-up;
-+	};
-+
-+	pinctrl_usdhc0_rst: usdhc0_gpios_rst_grp {
-+		pins = <
-+			IMX7ULP_PAD_PTD0__PTD0		/* USDHC0 RST */
-+		>;
-+		nxp,output-buffer-enable;
-+		bias-pull-up;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx7ulp.dtsi b/arch/arm/boot/dts/imx7ulp.dtsi
-new file mode 100644
-index 0000000..05410ba
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7ulp.dtsi
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright NXP
++ * Author: Dong Aisheng <aisheng.dong@nxp.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <dt-bindings/clock/imx7ulp-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+#include "imx7ulp-pinfunc.h"
-+
-+/ {
-+	interrupt-parent = <&intc>;
-+
-+	aliases {
-+		serial0 = &lpuart4;
-+		serial1 = &lpuart6;
-+		serial2 = &lpuart5;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+	};
-+
-+	intc: interrupt-controller at 40021000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x40021000 0x1000>,
-+		      <0x40022000 0x100>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		rosc: clock at 0 {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			clock-frequency = <32768>;
-+			clock-output-names = "rosc";
-+			#clock-cells = <0>;
-+		};
-+
-+		sosc: clock at 1 {
-+			compatible = "fixed-clock";
-+			reg = <1>;
-+			clock-frequency = <24000000>;
-+			clock-output-names = "sosc";
-+			#clock-cells = <0>;
-+		};
-+
-+		sirc: clock at 2 {
-+			compatible = "fixed-clock";
-+			reg = <2>;
-+			clock-frequency = <16000000>;
-+			clock-output-names = "sirc";
-+			#clock-cells = <0>;
-+		};
-+
-+		firc: clock at 3 {
-+			compatible = "fixed-clock";
-+			reg = <3>;
-+			clock-frequency = <48000000>;
-+			clock-output-names = "firc";
-+			#clock-cells = <0>;
-+		};
-+
-+		upll: clock at 4 {
-+			compatible = "fixed-clock";
-+			reg = <4>;
-+			clock-frequency = <480000000>;
-+			clock-output-names = "upll";
-+			#clock-cells = <0>;
-+		};
-+
-+		mpll: clock at 5 {
-+			compatible = "fixed-clock";
-+			reg = <5>;
-+			clock-frequency = <480000000>;
-+			clock-output-names = "mpll";
-+			#clock-cells = <0>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		arm,cpu-registers-not-fw-configured;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupt-parent = <&intc>;
-+		clock-frequency = <1000000>;
-+		status = "disabled";
-+	};
-+
-+	sram: sram at 20000000 {
-+		compatible = "fsl,lpm-sram";
-+		reg = <0x20008000 0x4000>;
-+	};
-+
-+	ahbbridge0: ahb-bridge0 at 40000000 {
-+		compatible = "fsl,aips-bus", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x40000000 0x800000>;
-+		ranges;
-+
-+		lpuart4: serial at 402D0000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x402D0000 0x1000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_LPUART4>;
-+			clock-names = "ipg";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPUART4>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_SOSC_BUS_CLK>;
-+			assigned-clock-rates = <24000000>;
-+			status = "disabled";
-+		};
-+
-+		lpuart5: serial at 402E0000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x402E0000 0x1000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPUART5>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_FIRC>;
-+			assigned-clock-rates = <48000000>;
-+			status = "disabled";
-+		};
-+
-+		tpm5: tpm at 40260000 {
-+			compatible = "fsl,imx7ulp-tpm";
-+			reg = <0x40260000 0x1000>;
-+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&clks IMX7ULP_CLK_LPTPM5>;
-+			clock-names = "ipg", "per";
-+		};
-+
-+		usdhc0: usdhc at 40370000 {
-+			compatible = "fsl,imx7ulp-usdhc", "fsl,imx6sl-usdhc";
-+			reg = <0x40370000 0x10000>;
-+			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks IMX7ULP_CLK_NIC1_BUS_DIV>,
-+				 <&clks IMX7ULP_CLK_NIC1_DIV>,
-+				 <&clks IMX7ULP_CLK_USDHC0>;
-+			clock-names ="ipg", "ahb", "per";
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		clks: scg1 at 403e0000 {
-+			compatible = "fsl,imx7ulp-clock";
-+			reg = <0x403e0000 0x10000>,
-+			      <0x403f0000 0x10000>,
-+			      <0x40b30000 0x10000>;
-+			reg-names = "scg1", "pcc2", "pcc3";
-+			clocks = <&rosc>, <&sosc>, <&sirc>,
-+				 <&firc>, <&upll>, <&mpll>;
-+			clock-names = "rosc", "sosc", "sirc",
-+				      "firc", "upll", "mpll";
-+			assigned-clocks = <&clks IMX7ULP_CLK_LPTPM5>,
-+					  <&clks IMX7ULP_CLK_USDHC1>;
-+			assigned-clock-parents = <&clks IMX7ULP_CLK_SOSC_BUS_CLK>,
-+						 <&clks IMX7ULP_CLK_NIC1_DIV>;
-+			#clock-cells = <1>;
-+		};
-+
-+		smc1: smc1 at 40410000 {
-+			compatible = "fsl,imx7ulp-smc1";
-+			reg = <0x40410000 0x1000>;
-+		};
-+	};
-+
-+	ahbbridge1: ahb-bridge1 at 40800000 {
-+		compatible = "fsl,aips-bus", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x40800000 0x800000>;
-+		ranges;
-+
-+		iomuxc1: iomuxc1 at 40ac0000 {
-+			compatible = "fsl,imx7ulp-iomuxc1";
-+			reg = <0x40ac0000 0x1000>;
-+		};
-+
-+		lpuart6: serial at 40A60000 {
-+			compatible = "fsl,imx7ulp-lpuart";
-+			reg = <0x40A60000 0x1000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0d44949..3ce8ff6 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -41,6 +41,7 @@ CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_IMX6UL=y
- CONFIG_SOC_IMX7D=y
-+CONFIG_SOC_IMX7ULP=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
-@@ -48,9 +49,7 @@ CONFIG_PCI_IMX6=y
- CONFIG_SMP=y
- CONFIG_ARM_PSCI=y
- CONFIG_PREEMPT_VOLUNTARY=y
--CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
--CONFIG_CMA=y
- CONFIG_FORCE_MAX_ZONEORDER=14
- CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
- CONFIG_KEXEC=y
-@@ -81,7 +80,6 @@ CONFIG_CAN_FLEXCAN=y
- CONFIG_BT=y
- CONFIG_BT_HCIUART=y
- CONFIG_BT_HCIUART_H4=y
--CONFIG_BT_HCIUART_LL=y
- CONFIG_CFG80211=y
- CONFIG_CFG80211_WEXT=y
- CONFIG_MAC80211=y
-@@ -90,7 +88,6 @@ CONFIG_RFKILL_INPUT=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
--CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_IMX_WEIM=y
- CONFIG_CONNECTOR=y
-@@ -167,9 +164,9 @@ CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=y
- CONFIG_TOUCHSCREEN_EGALAX=y
-+CONFIG_TOUCHSCREEN_MAX11801=y
- CONFIG_TOUCHSCREEN_IMX6UL_TSC=y
- CONFIG_TOUCHSCREEN_EDT_FT5X06=y
--CONFIG_TOUCHSCREEN_MAX11801=y
- CONFIG_TOUCHSCREEN_MC13783=y
- CONFIG_TOUCHSCREEN_TSC2004=y
- CONFIG_TOUCHSCREEN_TSC2007=y
-@@ -178,7 +175,6 @@ CONFIG_TOUCHSCREEN_SX8654=y
- CONFIG_TOUCHSCREEN_COLIBRI_VF50=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
--CONFIG_HID_MULTITOUCH=y
- CONFIG_SERIO_SERPORT=m
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_IMX=y
-@@ -228,13 +224,13 @@ CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_REGULATOR_PFUZE100=y
-+CONFIG_RC_CORE=y
-+CONFIG_RC_DEVICES=y
-+CONFIG_IR_GPIO_CIR=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
--CONFIG_RC_CORE=y
- CONFIG_MEDIA_CONTROLLER=y
- CONFIG_VIDEO_V4L2_SUBDEV_API=y
--CONFIG_RC_DEVICES=y
--CONFIG_IR_GPIO_CIR=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
-@@ -245,7 +241,6 @@ CONFIG_VIDEO_CODA=m
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
- CONFIG_VIDEO_ADV7180=m
- CONFIG_VIDEO_OV5640=m
--CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-@@ -283,6 +278,7 @@ CONFIG_SND_SOC_CS42XX8_I2C=y
- CONFIG_SND_SOC_TLV320AIC3X=y
- CONFIG_SND_SOC_WM8960=y
- CONFIG_SND_SIMPLE_CARD=y
-+CONFIG_HID_MULTITOUCH=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 782699e..54002c3 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -554,6 +554,15 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
- 
- if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
- 
-+config SOC_IMX7ULP
-+	bool "i.MX7ULP support"
-+	select ARM_GIC
-+	select CLKSRC_IMX_TPM
-+	select HAVE_ARM_ARCH_TIMER
-+	select PINCTRL_IMX7ULP
-+	help
-+	  This enables support for Freescale i.MX7 Ultra Low Power processor.
-+
- config SOC_VF610
- 	bool "Vybrid Family VF610 support"
- 	select ARM_GIC if ARCH_MULTI_V7
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 8ff7105..69c2517 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -81,6 +81,7 @@ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
- obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
- obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
-+obj-$(CONFIG_SOC_IMX7ULP) += mach-imx7ulp.o pm-imx7ulp.o
- 
- ifeq ($(CONFIG_SUSPEND),y)
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index b09a2ec..b0e85df 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -128,6 +128,7 @@ void imx6dl_pm_init(void);
- void imx6sl_pm_init(void);
- void imx6sx_pm_init(void);
- void imx6ul_pm_init(void);
-+void imx7ulp_pm_init(void);
- 
- #ifdef CONFIG_PM
- void imx51_pm_init(void);
-diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
-index d4e55f2..46f344f 100644
---- a/arch/arm/mach-imx/cpu.c
-+++ b/arch/arm/mach-imx/cpu.c
-@@ -138,6 +138,9 @@ struct device * __init imx_soc_device_init(void)
- 	case MXC_CPU_IMX7D:
- 		soc_id = "i.MX7D";
- 		break;
-+	case MXC_CPU_IMX7ULP:
-+		soc_id = "i.MX7ULP";
-+		break;
- 	default:
- 		soc_id = "Unknown";
- 	}
-diff --git a/arch/arm/mach-imx/mach-imx7ulp.c b/arch/arm/mach-imx/mach-imx7ulp.c
-new file mode 100644
-index 0000000..9f7a25c
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx7ulp.c
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2017 NXP
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
 + *
 + * http://www.opensource.org/licenses/gpl-license.html
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+#include <linux/irqchip.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/iopoll.h>
++#include <linux/slab.h>
 +
-+#include "common.h"
-+#include "hardware.h"
-+
-+static void __init imx7ulp_init_machine(void)
-+{
-+	imx7ulp_pm_init();
-+
-+	mxc_set_cpu_type(MXC_CPU_IMX7ULP);
-+	imx_print_silicon_rev("i.MX7ULP", IMX_CHIP_REVISION_1_0);
-+	of_platform_default_populate(NULL, NULL, imx_soc_device_init());
-+}
-+
-+static const char *const imx7ulp_dt_compat[] __initconst = {
-+	"fsl,imx7ulp",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(IMX7ulp, "Freescale i.MX7ULP (Device Tree)")
-+	.init_machine	= imx7ulp_init_machine,
-+	.dt_compat	= imx7ulp_dt_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-index e00d626..ac9677b 100644
---- a/arch/arm/mach-imx/mxc.h
-+++ b/arch/arm/mach-imx/mxc.h
-@@ -41,6 +41,7 @@
- #define MXC_CPU_IMX6UL		0x64
- #define MXC_CPU_IMX6ULL		0x65
- #define MXC_CPU_IMX7D		0x72
-+#define MXC_CPU_IMX7ULP		0xff
- 
- #define IMX_DDR_TYPE_LPDDR2		1
- 
-diff --git a/arch/arm/mach-imx/pm-imx7ulp.c b/arch/arm/mach-imx/pm-imx7ulp.c
-new file mode 100644
-index 0000000..00401e0
---- /dev/null
-+++ b/arch/arm/mach-imx/pm-imx7ulp.c
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2017 NXP
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++/**
++ * struct clk_pfdv2 - IMX PFD clock
++ * @clk_hw:	clock source
++ * @reg:	PFD register address
++ * @gate_bit:	Gate bit offset
++ * @vld_bit:	Valid bit offset
++ * @frac_off:	PLL Fractional Divider offset
 + */
 +
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++struct clk_pfdv2 {
++	struct clk_hw	hw;
++	void __iomem	*reg;
++	u8		gate_bit;
++	u8		vld_bit;
++	u8		frac_off;
++};
 +
-+#define SMC_PMCTRL		0x10
-+#define BP_PMCTRL_PSTOPO        16
-+#define PSTOPO_PSTOP3		0x3
++#define to_clk_pfdv2(_hw) container_of(_hw, struct clk_pfdv2, hw)
 +
-+void __init imx7ulp_pm_init(void)
++#define CLK_PFDV2_FRAC_MASK 0x3f
++
++#define LOCK_TIMEOUT_US		USEC_PER_MSEC
++
++static DEFINE_SPINLOCK(pfd_lock);
++
++static int clk_pfdv2_wait(struct clk_pfdv2 *pfd)
 +{
-+	struct device_node *np;
-+	void __iomem *smc1_base;
++	u32 val;
 +
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx7ulp-smc1");
-+	smc1_base = of_iomap(np, 0);
-+	WARN_ON(!smc1_base);
-+
-+	/* Partial Stop mode 3 with system/bus clock enabled */
-+	writel_relaxed(PSTOPO_PSTOP3 << BP_PMCTRL_PSTOPO, smc1_base + SMC_PMCTRL);
++	return readl_poll_timeout(pfd->reg, val, val & pfd->vld_bit,
++				  0, LOCK_TIMEOUT_US);
 +}
++
++static int clk_pfdv2_enable(struct clk_hw *hw)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(&pfd_lock, flags);
++	val = readl_relaxed(pfd->reg);
++	val &= ~pfd->gate_bit;
++	writel_relaxed(val, pfd->reg);
++	spin_unlock_irqrestore(&pfd_lock, flags);
++
++	return clk_pfdv2_wait(pfd);
++}
++
++static void clk_pfdv2_disable(struct clk_hw *hw)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(&pfd_lock, flags);
++	val = readl_relaxed(pfd->reg);
++	val |= pfd->gate_bit;
++	writel_relaxed(val, pfd->reg);
++	spin_unlock_irqrestore(&pfd_lock, flags);
++}
++
++static unsigned long clk_pfdv2_recalc_rate(struct clk_hw *hw,
++					   unsigned long parent_rate)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	u64 tmp = parent_rate;
++	u8 frac;
++
++	frac = (readl_relaxed(pfd->reg) >> pfd->frac_off)
++		& CLK_PFDV2_FRAC_MASK;
++
++	if (!frac) {
++		pr_debug("clk_pfdv2: %s invalid pfd frac value 0\n",
++			 clk_hw_get_name(hw));
++		return 0;
++	}
++
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
++}
++
++static long clk_pfdv2_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *prate)
++{
++	u64 tmp = *prate;
++	u8 frac;
++
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++
++	if (frac < 12)
++		frac = 12;
++	else if (frac > 35)
++		frac = 35;
++
++	tmp = *prate;
++	tmp *= 18;
++	do_div(tmp, frac);
++
++	return tmp;
++}
++
++static int clk_pfdv2_is_enabled(struct clk_hw *hw)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++
++	if (readl_relaxed(pfd->reg) & pfd->gate_bit)
++		return 0;
++
++	return 1;
++}
++
++static int clk_pfdv2_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
++	unsigned long flags;
++	u64 tmp = parent_rate;
++	u32 val;
++	u8 frac;
++
++	tmp = tmp * 18 + rate / 2;
++	do_div(tmp, rate);
++	frac = tmp;
++	if (frac < 12)
++		frac = 12;
++	else if (frac > 35)
++		frac = 35;
++
++	spin_lock_irqsave(&pfd_lock, flags);
++	val = readl_relaxed(pfd->reg);
++	val &= ~(CLK_PFDV2_FRAC_MASK << pfd->frac_off);
++	val |= frac << pfd->frac_off;
++	writel_relaxed(val, pfd->reg);
++	spin_unlock_irqrestore(&pfd_lock, flags);
++
++	return 0;
++}
++
++static const struct clk_ops clk_pfdv2_ops = {
++	.enable		= clk_pfdv2_enable,
++	.disable	= clk_pfdv2_disable,
++	.recalc_rate	= clk_pfdv2_recalc_rate,
++	.round_rate	= clk_pfdv2_round_rate,
++	.set_rate	= clk_pfdv2_set_rate,
++	.is_enabled     = clk_pfdv2_is_enabled,
++};
++
++struct clk_hw *imx_clk_pfdv2(const char *name, const char *parent_name,
++			     void __iomem *reg, u8 idx)
++{
++	struct clk_init_data init;
++	struct clk_pfdv2 *pfd;
++	struct clk_hw *hw;
++	int ret;
++
++	WARN_ON(idx > 3);
++
++	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
++	if (!pfd)
++		return ERR_PTR(-ENOMEM);
++
++	pfd->reg = reg;
++	pfd->gate_bit = 1 << ((idx + 1) * 8 - 1);
++	pfd->vld_bit = pfd->gate_bit - 1;
++	pfd->frac_off = idx * 8;
++
++	init.name = name;
++	init.ops = &clk_pfdv2_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++	init.flags = CLK_SET_RATE_GATE;
++
++	pfd->hw.init = &init;
++
++	hw = &pfd->hw;
++	ret = clk_hw_register(NULL, hw);
++	if (ret) {
++		kfree(pfd);
++		hw = ERR_PTR(ret);
++	}
++
++	return hw;
++}
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 52f7c9d..ccd7181 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -60,6 +60,9 @@ struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
+ struct clk *imx_clk_pfd(const char *name, const char *parent_name,
+ 		void __iomem *reg, u8 idx);
+ 
++struct clk_hw *imx_clk_pfdv2(const char *name, const char *parent_name,
++			     void __iomem *reg, u8 idx);
++
+ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+ 				 void __iomem *reg, u8 shift, u8 width,
+ 				 void __iomem *busy_reg, u8 busy_shift);
 -- 
 2.7.4
