@@ -1,40 +1,87 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Jan 2018 15:49:16 -0600
-Subject: [PATCH 1/3] dt-bindings: phy: phy-rockchip-typec: add usb3 otg
- reset
-In-Reply-To: <20180118174748.GA63108@google.com>
-References: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
- <1515751704-13213-2-git-send-email-william.wu@rock-chips.com>
- <20180117220715.GA112833@google.com>
- <CAFqH_52KiHQzEeaX5rFN66pMqAuVVKeWJhxnS5L4hY4XiVG8mw@mail.gmail.com>
- <20180118174748.GA63108@google.com>
-Message-ID: <20180119214916.fegrzgcmbbdiesyz@rob-hp-laptop>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Sat, 20 Jan 2018 00:53:15 +0300
+Subject: [PATCH] crypto: picoxcell - Fix error handling in spacc_probe()
+Message-ID: <1516398795-9018-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 09:47:50AM -0800, Brian Norris wrote:
-> On Thu, Jan 18, 2018 at 06:20:09PM +0100, Enric Balletbo Serra wrote:
-> > As Brian said commit 06c47e6286d5 'usb: dwc3: of-simple: Add support
-> > to get resets for the device' introduced the support to get the resets
-> > from dwc3-of-simple and the queued commit 'b7e63d95c14d arm64: dts:
-> > rockchip: add reset property for dwc3 controllers on rk3399' started
-> > using it. Without the latest I get errors like this doing bind/unbind
-> > tests.
-> > 
-> >    dwc3: probe of fe900000.dwc3 failed with error -110
-> > 
-> > I just tested these series on top of mainline, I reverted my patch
-> > because otherwise two drivers are requesting the same reset and fails,
-> > and I did some of the bind/unbind test. They just worked fine, and
-> > seems that this is right way, so this makes me think some questions.
-> 
-> Actually, this was intended to coexist with DWC3 optionally controlling
-> the same reset. It was written before the reset framework was rewritten
-> to have shared and exclusive resets. Should this be rewritten to use
-> shared resets? We'd have to modify both dwc3 core and the PHY driver.
+If clk_get() fails, device_remove_file() looks inappropriate.
 
-Seems like abuse of DT to me. If you need to control the controller's 
-reset from the phy driver, then get the reset out of the controller 
-node. The phy node should describe the connections to the phy.
+The error path, where all crypto_register fail, misses resource
+deallocations.
 
-Rob
+Found by Linux Driver Verification project (linuxtesting.org).
+
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+---
+ drivers/crypto/picoxcell_crypto.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
+index 5a6dc53b2b9d..4ef52c9d72fc 100644
+--- a/drivers/crypto/picoxcell_crypto.c
++++ b/drivers/crypto/picoxcell_crypto.c
+@@ -1618,7 +1618,7 @@ MODULE_DEVICE_TABLE(of, spacc_of_id_table);
+ 
+ static int spacc_probe(struct platform_device *pdev)
+ {
+-	int i, err, ret = -EINVAL;
++	int i, err, ret;
+ 	struct resource *mem, *irq;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct spacc_engine *engine = devm_kzalloc(&pdev->dev, sizeof(*engine),
+@@ -1679,22 +1679,18 @@ static int spacc_probe(struct platform_device *pdev)
+ 	engine->clk = clk_get(&pdev->dev, "ref");
+ 	if (IS_ERR(engine->clk)) {
+ 		dev_info(&pdev->dev, "clk unavailable\n");
+-		device_remove_file(&pdev->dev, &dev_attr_stat_irq_thresh);
+ 		return PTR_ERR(engine->clk);
+ 	}
+ 
+ 	if (clk_prepare_enable(engine->clk)) {
+ 		dev_info(&pdev->dev, "unable to prepare/enable clk\n");
+-		clk_put(engine->clk);
+-		return -EIO;
++		ret = -EIO;
++		goto err_clk_put;
+ 	}
+ 
+-	err = device_create_file(&pdev->dev, &dev_attr_stat_irq_thresh);
+-	if (err) {
+-		clk_disable_unprepare(engine->clk);
+-		clk_put(engine->clk);
+-		return err;
+-	}
++	ret = device_create_file(&pdev->dev, &dev_attr_stat_irq_thresh);
++	if (ret)
++		goto err_clk_disable;
+ 
+ 
+ 	/*
+@@ -1725,6 +1721,7 @@ static int spacc_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, engine);
+ 
++	ret = -EINVAL;
+ 	INIT_LIST_HEAD(&engine->registered_algs);
+ 	for (i = 0; i < engine->num_algs; ++i) {
+ 		engine->algs[i].engine = engine;
+@@ -1759,6 +1756,16 @@ static int spacc_probe(struct platform_device *pdev)
+ 				engine->aeads[i].alg.base.cra_name);
+ 	}
+ 
++	if (!ret)
++		return 0;
++
++	del_timer_sync(&engine->packet_timeout);
++	device_remove_file(&pdev->dev, &dev_attr_stat_irq_thresh);
++err_clk_disable:
++	clk_disable_unprepare(engine->clk);
++err_clk_put:
++	clk_put(engine->clk);
++
+ 	return ret;
+ }
+ 
+-- 
+2.7.4
