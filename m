@@ -1,148 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 19 Jan 2018 20:20:55 +0100
-Subject: [PATCH v6 11/13] KVM: arm64: Handle RAS SErrors from EL1 on
- guest exit
-In-Reply-To: <20180115193906.30053-12-james.morse@arm.com>
-References: <20180115193906.30053-1-james.morse@arm.com>
- <20180115193906.30053-12-james.morse@arm.com>
-Message-ID: <20180119192055.GH21802@cbox>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Fri, 19 Jan 2018 11:47:54 -0800
+Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for inbound
+ traffic
+In-Reply-To: <20180118152331.GA24461@lst.de>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
+ <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
+ <20180118073123.GA15766@lst.de>
+ <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
+ <20180118152331.GA24461@lst.de>
+Message-ID: <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 07:39:04PM +0000, James Morse wrote:
-> We expect to have firmware-first handling of RAS SErrors, with errors
-> notified via an APEI method. For systems without firmware-first, add
-> some minimal handling to KVM.
+On 01/18/2018 07:23 AM, Christoph Hellwig wrote:
+> On Thu, Jan 18, 2018 at 07:09:23AM -0800, Florian Fainelli wrote:
+>>> But in this case it actually is the example to follow as told
+>>> previously.
+>>>
+>>> NAK again for these chained dma ops that only create problems.
+>>
+>> Care to explain what should be done instead?
 > 
-> There are two ways KVM can take an SError due to a guest, either may be a
-> RAS error: we exit the guest due to an SError routed to EL2 by HCR_EL2.AMO,
-> or we take an SError from EL2 when we unmask PSTATE.A from __guest_exit.
-> 
-> For SError that interrupt a guest and are routed to EL2 the existing
-> behaviour is to inject an impdef SError into the guest.
-> 
-> Add code to handle RAS SError based on the ESR. For uncontained and
-> uncategorized errors arm64_is_fatal_ras_serror() will panic(), these
-> errors compromise the host too. All other error types are contained:
-> For the fatal errors the vCPU can't make progress, so we inject a virtual
-> SError. We ignore contained errors where we can make progress as if
-> we're lucky, we may not hit them again.
-> 
-> If only some of the CPUs support RAS the guest will see the cpufeature
-> sanitised version of the id registers, but we may still take RAS SError
-> on this CPU. Move the SError handling out of handle_exit() into a new
-> handler that runs before we can be preempted. This allows us to use
-> this_cpu_has_cap(), via arm64_is_ras_serror().
+> Override phys_to_dma and dma_to_phys as mips and x86 do for similar
+> situations.
 
-Would it be possible to optimize this a bit later on by caching
-this_cpu_has_cap() in vcpu_load() so that we can use a single
-handle_exit function to process all exits?
+How can this work well in the context of a loadable module for instance?
+For MIPS, this would mean that we have to override phys_to_dma() and
+dma_to_phys() in the platform that is *susceptible* to use this PCIe
+controller (arch/mips/bmips) which is fine, but there, we essentially
+need to find a way to make this dynamic based on whether the PCIe
+controller is loaded or not.
 
-Thanks,
--Christoffer
+As you might have seen from this patch, what needs to be done is highly
+dependent on the processor architecture and its memory controller
+physical memory map, so I don't see how we are in any better situation
+if we need to replicate 3 times across MIPS, ARM and ARM64 how the
+addresses need to be mangled.
+
+Are you suggesting we somehow decouple the memory mangling part into a
+portion that can be built into the kernel image (so phys_to_dma() and
+dma_to_phys() is resolved at vmlinux link time) and can be selected by
+different architectures that need it? If so, yikes.
 
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> Changes since v4:
->  * Moved SError handling into handle_exit_early(). This will need to move
->    earlier, into an SError-masked region once we support kernel-first.
->    (hence the vauge name)
->  * Dropped Marc & Christoffer's Reviewed-by due to handle_exit_early().
+> Bonous points of finding some generic way of doing it instead of
+> hiding it in arch code.
 > 
->  arch/arm/include/asm/kvm_host.h   |  3 +++
->  arch/arm64/include/asm/kvm_host.h |  2 ++
->  arch/arm64/kvm/handle_exit.c      | 18 +++++++++++++++++-
->  virt/kvm/arm/arm.c                |  3 +++
->  4 files changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index b86fc4162539..acbf9ec7b396 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -238,6 +238,9 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
->  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		int exception_index);
->  
-> +static inline void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +				     int exception_index) {}
-> +
->  static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
->  				       unsigned long hyp_stack_ptr,
->  				       unsigned long vector_ptr)
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 84fcb2a896a1..abcfd164e690 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -347,6 +347,8 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->  
->  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		int exception_index);
-> +void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		       int exception_index);
->  
->  int kvm_perf_init(void);
->  int kvm_perf_teardown(void);
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 304203fa9e33..6a5a5db4292f 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -29,12 +29,19 @@
->  #include <asm/kvm_mmu.h>
->  #include <asm/kvm_psci.h>
->  #include <asm/debug-monitors.h>
-> +#include <asm/traps.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
->  
->  typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
->  
-> +static void kvm_handle_guest_serror(struct kvm_vcpu *vcpu, u32 esr)
-> +{
-> +	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(NULL, esr))
-> +		kvm_inject_vabt(vcpu);
-> +}
-> +
->  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
->  	int ret;
-> @@ -252,7 +259,6 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	case ARM_EXCEPTION_IRQ:
->  		return 1;
->  	case ARM_EXCEPTION_EL1_SERROR:
-> -		kvm_inject_vabt(vcpu);
->  		/* We may still need to return for single-step */
->  		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
->  			&& kvm_arm_handle_step_debug(vcpu, run))
-> @@ -275,3 +281,13 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		return 0;
->  	}
->  }
-> +
-> +/* For exit types that need handling before we can be preempted */
-> +void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		       int exception_index)
-> +{
-> +	exception_index = ARM_EXCEPTION_CODE(exception_index);
-> +
-> +	if (exception_index == ARM_EXCEPTION_EL1_SERROR)
-> +		kvm_handle_guest_serror(vcpu, kvm_vcpu_get_hsr(vcpu));
-> +}
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 38e81631fc91..15bf026eb182 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -763,6 +763,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		guest_exit();
->  		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->  
-> +		/* Exit types that need handling before we can be preempted */
-> +		handle_exit_early(vcpu, run, ret);
-> +
->  		preempt_enable();
->  
->  		ret = handle_exit(vcpu, run, ret);
-> -- 
-> 2.15.1
-> 
+
+I can see value in having a generic mechanism, ala X86_DMA_REMAP
+allowing architectures to have the ability to override phys_to_dma() and
+dma_to_phys() but right now, especially if we look at
+arch/x86/pci/sta2x11-fixup.c this really appears to be quite messy and
+equally ugly than stacking operations...
+
+What is the actual problem you want to avoid with the stacking of DMA
+operations, is it because it becomes harder to audit, or are there are
+other reasons?
+-- 
+Florian
