@@ -1,39 +1,73 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 19 Jan 2018 18:18:53 +0100
-Subject: [PATCH] ARM: pxa/tosa-bt: add MODULE_LICENSE tag
-In-Reply-To: <CAK8P3a1VeN0kLrJ5T57y46NR1GNviwZ=6baaXgSm9ZqYBnGuVA@mail.gmail.com>
- (Arnd Bergmann's message of "Fri, 19 Jan 2018 17:02:25 +0100")
-References: <20180110162816.431038-1-arnd@arndb.de>
- <87vag9bh1g.fsf@belgarion.home>
- <CAK8P3a1VeN0kLrJ5T57y46NR1GNviwZ=6baaXgSm9ZqYBnGuVA@mail.gmail.com>
-Message-ID: <87bmhpahs2.fsf@belgarion.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 19 Jan 2018 10:28:24 -0700
+Subject: [PATCH v2 01/10] perf tools: Integrating the CoreSight decoding
+ library
+In-Reply-To: <20180119155535.GE23453@kernel.org>
+References: <20180116121500.GB26643@krava>
+ <CANLsYkyEnJ5QzYyuGwhCB5p_2mE+8DdjaU6=Vpa6=CeKR+DzWg@mail.gmail.com>
+ <20180117080640.GD6183@krava> <20180118134139.GC18383@kernel.org>
+ <20180118135948.GA2940@krava> <20180118141423.GE18383@kernel.org>
+ <20180118142743.GD2940@krava> <20180119145819.GC23453@kernel.org>
+ <20180119151237.GA13089@krava>
+ <CANLsYkx5VPw6croP2SrxJ0HU=sC9HT1NdkknHuE_z=PiPGafjA@mail.gmail.com>
+ <20180119155535.GE23453@kernel.org>
+Message-ID: <CANLsYkwTZ8WCen12oDGSQAdwP4Ut8Z=xcq-54SJiWKDJvo_L2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Wed, Jan 10, 2018 at 9:22 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
+On 19 January 2018 at 08:55, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Fri, Jan 19, 2018 at 08:24:56AM -0700, Mathieu Poirier escreveu:
+>> On 19 January 2018 at 08:12, Jiri Olsa <jolsa@redhat.com> wrote:
+>> > On Fri, Jan 19, 2018 at 11:58:19AM -0300, Arnaldo Carvalho de Melo wrote:
+>> >> Em Thu, Jan 18, 2018 at 03:27:43PM +0100, Jiri Olsa escreveu:
+>> >> > On Thu, Jan 18, 2018 at 11:14:23AM -0300, Arnaldo Carvalho de Melo wrote:
+>> >> > > Em Thu, Jan 18, 2018 at 02:59:48PM +0100, Jiri Olsa escreveu:
+>> >> > > > On Thu, Jan 18, 2018 at 10:41:39AM -0300, Arnaldo Carvalho de Melo wrote:
+>> >> > > > >       Shouldn't libopencsd be treated like libbabeltrace was before
+>> >> > > > > the required version was widely available in distros?
+>> >> > >
+>> >> > > > >       I.e. these csets should have the rationale for that:
+>> >> > >
+>> >> > > > > Enabling it once it became widely available:
+>> >> > >
+>> >> > > > >    24787afbcd01 ("perf tools: Enable LIBBABELTRACE by default")
+>> >> > >
+>> >> > > > > Disabling it because we would need to get things from tarballs/git
+>> >> > > > > repos, build it in our machines, as requested by Ingo:
+>> >> > >
+>> >> > > > >   6ab2b762befd ("perf build: Disable libbabeltrace check by default")
+>> >> > > >
+>> >> > > > I think at that time we did not have a way to hide the check,
+>> >> > > > now we have FEATURE_DISPLAY seprated so we can still check
+>> >> > > > for it, but users won't be bothered with [ FAIL ] output
+>> >> > >
+>> >> > > Ok, users won't be bothered with the fail output, but we tried hard to
+>> >> > > get the build fast by having it only test for things that are widely
+>> >> > > available, right? I.e. if we know something is not widely available then
+>> >> > > we better not try to build with it and get faster builds, wasn't that
+>> >> > > part of the rationale in the babeltrace case?
+>> >> > >
+>> >> > > If one has to build from sources some library, then its not a problem to
+>> >> > > have in the make command line a LIBOPENCSD=1 switch?
+>> >> >
+>> >> > right, we can do it like that
+>> >>
+>> >> So I'm applying v2 and we can go on from there, to make progress, ok?
+>> >> I'm adding your Acked-by to all but the build ones, ok?
+>> >
+>> > I think v3 was in better shape.. wrt tabs and overall display
+>> >
+>> > jirka
 >>
->>> Without this tag, we get a build warning:
->>>
->>> WARNING: modpost: missing MODULE_LICENSE() in arch/arm/mach-pxa/tosa-bt.o
->>>
->>> For completeness, I'm also adding author and description fields.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Queued into pxa/for-next, thanks.
+>> Jiri is correct - V3 should be considered.
 >
-> I see now that you didn't send this back to arm at kernel.org. I assume you planned
-> to send it for 4.17, but kernelci now still reports the warning for
-> both 4.15 and
-> linux-next (4.16). Should we just include this patch in the 4.16 fixes
-> instead?
-Yeah sure, go ahead and merge it into 4.16 staging branch, with my :
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> So, please take a look at my perf/core branch, hopefully my mistake was
+> just on the message saying I would apply v2, check that v3 was what I
+> applied.
 
-Cheers.
+The correct version was applied - thanks.
 
--- 
-Robert
+Mathieu
+
+>
+> - Arnaldo
