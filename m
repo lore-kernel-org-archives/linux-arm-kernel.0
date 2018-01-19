@@ -1,33 +1,20 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 20 Jan 2018 05:17:25 +0800
-Subject: [PATCH v5 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20180119211409.ubysuyvhkmfotbdg@rob-hp-laptop>
-References: <1515639823-35782-1-git-send-email-yong.deng@magewell.com>
- <20180119211409.ubysuyvhkmfotbdg@rob-hp-laptop>
-Message-ID: <2315959.AJds7mCBWN@ice-x220i>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 19 Jan 2018 15:21:45 -0600
+Subject: [PATCH v1 1/4] dt-bindings: pwm: binding allwinner sun8i
+ R40/V40/T3.
+In-Reply-To: <20180111113157.GA21913@arx-s1>
+References: <20180111113157.GA21913@arx-s1>
+Message-ID: <20180119212145.ll6hqyhqwesmo4ge@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018?1?20???? CST ??5:14:09?Rob Herring ???
-> On Thu, Jan 11, 2018 at 11:03:43AM +0800, Yong Deng wrote:
-> > Add binding documentation for Allwinner V3s CSI.
-> > 
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/media/sun6i-csi.txt        | 59
-> >  ++++++++++++++++++++++ 1 file changed, 59 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+On Thu, Jan 11, 2018 at 07:31:57PM +0800, hao_zhang wrote:
+> This patch adds allwinner R40, V40, T3 pwm binding documents.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: hao_zhang <hao5781286@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-sun8i.txt | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
 
-I think other subsystem's maintainer may expect a Acked-by from you here.
-
-Why do you use Reviewed-by here instead?
-
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Reviewed-by: Rob Herring <robh@kernel.org>
