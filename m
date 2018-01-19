@@ -1,43 +1,31 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 19 Jan 2018 14:15:18 +0100
-Subject: [PATCH-next] IIO: ADC: drop unused 'of_id' struct
-In-Reply-To: <20180118234415.32410-1-chrisadr@gentoo.org>
-References: <20180118234415.32410-1-chrisadr@gentoo.org>
-Message-ID: <667a16d3-5b23-76d7-0206-6ebd5a001c79@st.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 19 Jan 2018 13:19:21 +0000
+Subject: [PATCH V3 10/10] add imx7ulp support
+In-Reply-To: <1516367470-24340-11-git-send-email-aisheng.dong@nxp.com>
+References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
+ <1516367470-24340-11-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM3PR04MB3069917299D8F2F7AFEB8A180EF0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
+Hi Stephen,
 
-On 01/19/2018 12:44 AM, Christopher D?az Riveros wrote:
-> When CONFIG_STM32_DFSDM_CORE is enabled, stm32-dfsdm-core.o is compiled,
-> which raises a next warning:
-> 
-> drivers/iio/adc/stm32-dfsdm-core.c: In function ?stm32_dfsdm_probe?:
-> drivers/iio/adc/stm32-dfsdm-core.c:245:29: warning: unused variable ?of_id? [-Wunused-variable]
->   const struct of_device_id *of_id;
->                              ^~~~~
-> 
-> Signed-off-by: Christopher D?az Riveros <chrisadr@gentoo.org>
-> ---
->  drivers/iio/adc/stm32-dfsdm-core.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/iio/adc/stm32-dfsdm-core.c b/drivers/iio/adc/stm32-dfsdm-core.c
-> index 84277bcc465f..6290332cfd3f 100644
-> --- a/drivers/iio/adc/stm32-dfsdm-core.c
-> +++ b/drivers/iio/adc/stm32-dfsdm-core.c
-> @@ -242,7 +242,6 @@ MODULE_DEVICE_TABLE(of, stm32_dfsdm_of_match);
->  static int stm32_dfsdm_probe(struct platform_device *pdev)
->  {
->  	struct dfsdm_priv *priv;
-> -	const struct of_device_id *of_id;
->  	const struct stm32_dfsdm_dev_data *dev_data;
->  	struct stm32_dfsdm *dfsdm;
->  	int ret;
-> 
-Arnd was faster :)
-https://patchwork.kernel.org/patch/10172885/
+> -----Original Message-----
+> From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
+> Sent: Friday, January 19, 2018 9:11 PM
+> To: linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> sboyd at codeaurora.org; mturquette at baylibre.com; shawnguo at kernel.org;
+> Anson Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-
+> linux-imx <linux-imx@nxp.com>; Fabio Estevam <fabio.estevam@nxp.com>;
+> A.s. Dong <aisheng.dong@nxp.com>
+> Subject: [PATCH V3 10/10] add imx7ulp support
+>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>
+
+I'm sorry that this one is for test and was sent out by accidently and should not belong
+to the clk series. So you can ignore this one. Others, patch 1~9, are fine.
 
 Regards
-Arnaud
+Dong Aisheng
