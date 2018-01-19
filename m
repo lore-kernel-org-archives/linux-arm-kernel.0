@@ -1,50 +1,68 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri, 19 Jan 2018 14:38:37 +0000
-Subject: [PATCH] efi: arm: stop printing addresses of virtual mappings
-In-Reply-To: <20180119122619.16023-1-ard.biesheuvel@linaro.org>
-References: <20180119122619.16023-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180119143836.uxcv4smmu2gewasj@bivouac.eciton.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 Jan 2018 15:45:12 +0100
+Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33
+ when driving VBUS
+In-Reply-To: <20180119092541.7508-1-wens@csie.org>
+References: <20180119092541.7508-1-wens@csie.org>
+Message-ID: <20180119144512.dqqbywavhwsyma2f@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 12:26:19PM +0000, Ard Biesheuvel wrote:
-> With the recent %p -> %px changes, we now get something like this in
-> the kernel boot log on ARM/arm64 EFI systems:
+On Fri, Jan 19, 2018 at 05:25:41PM +0800, Chen-Yu Tsai wrote:
+> The AXP223 PMIC, like the AXP221, does not generate VBUS change
+> interrupts when N_VBUSEN is used to drive VBUS for the OTG port
+> on the board.
 > 
->      Remapping and enabling EFI services.
->        EFI remap 0x00000087fb830000 =>         (ptrval)
->        EFI remap 0x00000087fbdb0000 =>         (ptrval)
->        EFI remap 0x00000087fffc0000 =>         (ptrval)
+> This was not noticed until recently, as most A23/A33 boards use
+> a GPIO pin that does not support interrupts for OTG ID detection.
+> This forces the driver to use polling. However the A33-OlinuXino
+> uses a pin that does support interrupts, so the driver uses them.
+> However the VBUS interrupt never fires, and the driver never gets
+> to update the VBUS status. This results in musb timing out waiting
+> for VBUS to rise.
 > 
-> The physical addresses of the UEFI runtime regions will also be
-> printed when booting with the efi=debug command line option, and the
-> virtual addresses can be inspected via /sys/kernel/debug/efi_page_tables
-> (if enabled). So let's just remove the lines above.
-
-As long as the efi=debug functionality is kept, I have no issue with this.
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> This was worked around for the AXP221 by resorting to polling
+> changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
+> missing Vbus det interrupts on A31"). This patch adds the A23 and
+> A33 to the list of SoCs that need the workaround.
+> 
+> Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
+> 		      sun8i-a33 SoC")
+> Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
+> 		      sun8i-a23 SoC")
+> Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
+> 		Use of_match_node to get model specific config data
+> Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
+> 		Fix optional gpios failing probe
+> Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
+> 		Fix irq free conditions to match request conditions
+> Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
+> 		Add workaround for missing Vbus det interrupts on A31
+> Cc: <stable@vger.kernel.org> # 4.3.x
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/firmware/efi/arm-runtime.c | 5 +----
->  1 file changed, 1 insertion(+), 4 deletions(-)
 > 
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 1cc41c3d6315..5d4c8b661548 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -80,10 +80,7 @@ static bool __init efi_virtmap_init(void)
->  			return false;
->  
->  		ret = efi_create_mapping(&efi_mm, md);
-> -		if  (!ret) {
-> -			pr_info("  EFI remap %pa => %p\n",
-> -				&phys, (void *)(unsigned long)md->virt_addr);
-> -		} else {
-> +		if (ret) {
->  			pr_warn("  EFI remap %pa: failed to create mapping (%d)\n",
->  				&phys, ret);
->  			return false;
-> -- 
-> 2.11.0
+> This list might get longer if the newer AXP8xx PMICs also have this
+> behavior. We could switch to a boolean in the per-compatible data,
+> or just always use polling. The yet-merged R40 support will have this
+> issue as well, as the R40 is paired with the AXP221. But for now,
+> I'd like to have something that is easier to backport to stable, so
+> we can at least fix this for the A23 and A33.
 > 
+> Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
+
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180119/f0f5bc8f/attachment.sig>
