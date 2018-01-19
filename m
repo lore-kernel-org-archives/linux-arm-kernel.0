@@ -1,32 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 19 Jan 2018 09:59:54 +0100
-Subject: [PATCH v2 16/16] ARM: dts: r8a7794: sort subnodes of root node
-In-Reply-To: <20180117161717.14589-17-horms+renesas@verge.net.au>
-References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-17-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUF_bScpCTx8Do95xGQrQZgB4dfHPy41eO5nKNe6GxsYQ@mail.gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Fri, 19 Jan 2018 18:25:27 +0900
+Subject: [PATCH v2 0/9] add UniPhier audio system support
+Message-ID: <20180119092536.22501-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Sort the subnodes of the soc node to improve maintainability.
-> The sort key is the address on the bus with instances of the same
-> IP block grouped together.
->
-> This patch should not introduce any functional change.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+This series adds support for Socionext audio system for
+UniPhier LD11/LD20 SoCs. This driver supports I2S output
+for Line-In, Line-Out and S/PDIF output.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+UniPhier AIO DAI driver provides sound devices such as I2S, S/PDIF.
+Since the AIO has mixed register map for those I/Os, it is hard to
+split register areas for each sound devices.
 
-Gr{oetje,eeting}s,
+---
 
-                        Geert
+Changes in v2:
+  - Add comments to aiodma_irq()
+  - Add members to struct uniphier_aio_sub and add methods
+    for compress audio
+  - Expose clocking to userspace
+  - Fix bad name 'srcport' to 'src'
+  - Split DMA, DAI patches from large one
+  - Validate parameters in hw_params()
+  - Add error checks
+  - Fix typo in error messages
+  - Change license comment style to C++ from C
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Katsuhiro Suzuki (9):
+  ASoC: uniphier: add DT bindings documentation for UniPhier AIO
+  ASoC: uniphier: add support for UniPhier AIO common driver
+  ASoC: uniphier: add support for UniPhier AIO DMA driver
+  ASoC: uniphier: add support for UniPhier AIO CPU DAI driver
+  ASoC: uniphier: add support for UniPhier AIO compress audio
+  ASoC: uniphier: add support for UniPhier LD11/LD20 AIO driver
+  arm64: dts: uniphier: add sound node for UniPhier
+  arm64: dts: uniphier: add speaker out for UniPhier LD11/LD20 boards
+  arm64: dts: uniphier: add compress audio out for UniPhier LD11/LD20
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+ .../devicetree/bindings/sound/uniphier,aio.txt     |   36 +
+ .../boot/dts/socionext/uniphier-ld11-global.dts    |  120 +++
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   |   31 +
+ .../boot/dts/socionext/uniphier-ld20-global.dts    |  120 +++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |   35 +
+ sound/soc/uniphier/Kconfig                         |   22 +
+ sound/soc/uniphier/Makefile                        |    6 +
+ sound/soc/uniphier/aio-compress.c                  |  440 ++++++++
+ sound/soc/uniphier/aio-core.c                      | 1104 ++++++++++++++++++++
+ sound/soc/uniphier/aio-cpu.c                       |  570 ++++++++++
+ sound/soc/uniphier/aio-dma.c                       |  318 ++++++
+ sound/soc/uniphier/aio-ld11.c                      |  431 ++++++++
+ sound/soc/uniphier/aio-reg.h                       |  462 ++++++++
+ sound/soc/uniphier/aio.h                           |  355 +++++++
+ 14 files changed, 4050 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/uniphier,aio.txt
+ create mode 100644 sound/soc/uniphier/aio-compress.c
+ create mode 100644 sound/soc/uniphier/aio-core.c
+ create mode 100644 sound/soc/uniphier/aio-cpu.c
+ create mode 100644 sound/soc/uniphier/aio-dma.c
+ create mode 100644 sound/soc/uniphier/aio-ld11.c
+ create mode 100644 sound/soc/uniphier/aio-reg.h
+ create mode 100644 sound/soc/uniphier/aio.h
+
+-- 
+2.15.0
