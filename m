@@ -1,41 +1,61 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Fri, 19 Jan 2018 14:38:46 +0100
-Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
-In-Reply-To: <CAOMZO5DQ9T_003gzq-0Q-HrUEhzoZOHd-647DkUCQP9ka9ti4w@mail.gmail.com>
-References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
- <84391569-cdb9-1c17-7e37-6fdad954d549@maciej.szmigiero.name>
- <CAOMZO5DQ9T_003gzq-0Q-HrUEhzoZOHd-647DkUCQP9ka9ti4w@mail.gmail.com>
-Message-ID: <0006d513-3ab5-d2b6-1caa-5d480dfadfaf@maciej.szmigiero.name>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 19 Jan 2018 14:03:09 +0000
+Subject: [PATCH] arm64: setup: Check for overlapping dtb and Image load
+ addresses
+In-Reply-To: <20180119065637.12789-1-clingutla@codeaurora.org>
+References: <20180119065637.12789-1-clingutla@codeaurora.org>
+Message-ID: <CAKv+Gu-2m+kt6vB5FXsHFwT5DjCk7_rcMRBYxaEG2RMFz7vbGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.01.2018 12:59, Fabio Estevam wrote:
-> Hi Maciej,
-> 
-> On Thu, Jan 18, 2018 at 9:11 PM, Maciej S. Szmigiero
-> <mail@maciej.szmigiero.name> wrote:
-> 
->> Hmm, did you get reports or checked that it actually hangs?
-> 
-> Both :-)
-> 
->>
->> As far as I remember last time I ran a kernel without Peter's power
->> sequence library on this board it only wasn't able to communicate with
->> the on-board USB hub (and devices behind it), but besides this was
->> able to boot successfully.
->> But my memory may be wrong since it was some time ago.
-> 
-> Currently we are not able to reach the prompt without this patch as
-> the system hangs.
-> 
+On 19 January 2018 at 06:56, Lingutla Chandrasekhar
+<clingutla@codeaurora.org> wrote:
+> Sometime kernel image and dtb load offsets can overlap due to
+> dynamically increased Image or dtb size if both load addresses
+> are near to each other, which leads to bootup failures.
+>
+> So validate dtb load address and kernel image, if they overlap
+> do not proceed to boot.
+>
+> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 30ad2f085d1f..c9dd699f09ab 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -181,11 +181,17 @@ static void __init smp_build_mpidr_hash(void)
+>  static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>  {
+>         void *dt_virt = fixmap_remap_fdt(dt_phys);
+> +       u64 end_phys = __pa_symbol(_end);
+> +       u64 start_phys = __pa_symbol(_text);
+>         const char *name;
+>
+> -       if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+> +       if (!dt_virt || ((dt_phys < start_phys) &&
+> +               ((dt_phys + fdt_totalsize(dt_virt)) > start_phys)) ||
+> +               ((dt_phys > start_phys) && (dt_phys < end_phys)) ||
+> +               !early_init_dt_scan(dt_virt)) {
+>                 pr_crit("\n"
+>                         "Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
+> +                       "The dtb load address should not overlap with kernel image\n"
+>                         "The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
+>                         "\nPlease check your bootloader.",
+>                         &dt_phys, dt_virt);
 
-Okay, then:
-Acked-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+Paradoxically, this pr_crit() will only ever be able to produce
+readable output if early_init_dt_scan() returns success. If not, no
+early DT parsing will have occurred, and we will have no idea where
+the UART is nor whether earlycon was passed via /chosen/bootargs.
 
-@Peter:
-If you are going to submit your power sequence library once again could
-you please add this patch reversion to your UDOO DT changes in that
-series for completeness?
+That means adding the check before the call to early_init_dt_scan() is
+not very helpful, since the system will just hang with no output.
 
-Maciej
+If you really want to check for overlap, please do it *after* the
+if(), as a separate WARN_ON() that does not force the boot to fail.
+This has a much higher likelihood of anyone ever reading your error
+message, and being able to do something about it.
+
+Also, checking for overlap can be done using two comparisons:
+
+end1 > start2 && end2 > start1
