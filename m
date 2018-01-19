@@ -1,31 +1,50 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 19 Jan 2018 13:19:21 +0000
-Subject: [PATCH V3 10/10] add imx7ulp support
-In-Reply-To: <1516367470-24340-11-git-send-email-aisheng.dong@nxp.com>
-References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
- <1516367470-24340-11-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <AM3PR04MB3069917299D8F2F7AFEB8A180EF0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 Jan 2018 14:32:08 +0100
+Subject: [PATCH] ARM: sunxi_defconfig: Enable CMA
+Message-ID: <20180119133208.12873-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The DRM driver most notably, but also out of tree drivers (for now) like
+the VPU or GPU drivers, are quite big consumers of large, contiguous memory
+buffers. However, the sunxi_defconfig doesn't enable CMA in order to
+mitigate that, which makes them almost unusable.
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
-> Sent: Friday, January 19, 2018 9:11 PM
-> To: linux-clk at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> sboyd at codeaurora.org; mturquette at baylibre.com; shawnguo at kernel.org;
-> Anson Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-
-> linux-imx <linux-imx@nxp.com>; Fabio Estevam <fabio.estevam@nxp.com>;
-> A.s. Dong <aisheng.dong@nxp.com>
-> Subject: [PATCH V3 10/10] add imx7ulp support
->
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->
+Enable it to make sure it somewhat works.
 
-I'm sorry that this one is for test and was sent out by accidently and should not belong
-to the clk series. So you can ignore this one. Others, patch 1~9, are fine.
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
 
-Regards
-Dong Aisheng
+Hi Arnd, Olof,
+
+Could you queue that patch as a fix?
+
+Thanks!
+Maxime
+
+ arch/arm/configs/sunxi_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 5caaf971fb50..df433abfcb02 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -10,6 +10,7 @@ CONFIG_SMP=y
+ CONFIG_NR_CPUS=8
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
++CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CPU_FREQ=y
+@@ -33,6 +34,7 @@ CONFIG_CAN_SUN4I=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_DMA_CMA=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ CONFIG_AHCI_SUNXI=y
+-- 
+2.14.3
