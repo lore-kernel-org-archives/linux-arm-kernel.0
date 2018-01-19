@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 19 Jan 2018 09:59:02 +0100
-Subject: [PATCH v2 15/16] ARM: dts: r8a7794: sort subnodes of soc node
-In-Reply-To: <20180117161717.14589-16-horms+renesas@verge.net.au>
+Date: Fri, 19 Jan 2018 09:59:54 +0100
+Subject: [PATCH v2 16/16] ARM: dts: r8a7794: sort subnodes of root node
+In-Reply-To: <20180117161717.14589-17-horms+renesas@verge.net.au>
 References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-16-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUTvP4Qwfe12EZtxOZh0QOD07tMgytK9NaJpfZqd4L9TQ@mail.gmail.com>
+ <20180117161717.14589-17-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUF_bScpCTx8Do95xGQrQZgB4dfHPy41eO5nKNe6GxsYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,8 +19,6 @@ On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-SCIF sort order?
 
 Gr{oetje,eeting}s,
 
