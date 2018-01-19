@@ -1,40 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Jan 2018 16:34:52 -0600
-Subject: [PATCH v2 10/16] pwm: Add PWM modes
-In-Reply-To: <1515766983-15151-11-git-send-email-claudiu.beznea@microchip.com>
-References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
- <1515766983-15151-11-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20180119223452.doeqfd4aewkf5fla@rob-hp-laptop>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 19 Jan 2018 14:37:11 -0800
+Subject: [PATCH net-next] net: stmmac: Fix reception of Broadcom switches
+ tags
+In-Reply-To: <201801200543.cKHnq3PE%fengguang.wu@intel.com>
+References: <20180116232545.22054-1-f.fainelli@gmail.com>
+ <201801200543.cKHnq3PE%fengguang.wu@intel.com>
+Message-ID: <1fc8e687-882c-3700-02e2-cfc10fca95dc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 04:22:57PM +0200, Claudiu Beznea wrote:
-> Define a macros for PWM modes to be used by device tree sources.
+On 01/19/2018 02:06 PM, kbuild test robot wrote:
+> Hi Florian,
 > 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
->  include/dt-bindings/pwm/pwm.h | 3 +++
->  1 file changed, 3 insertions(+)
+> I love your patch! Perhaps something to improve:
 > 
-> diff --git a/include/dt-bindings/pwm/pwm.h b/include/dt-bindings/pwm/pwm.h
-> index ab9a077e3c7d..b8617431f8ec 100644
-> --- a/include/dt-bindings/pwm/pwm.h
-> +++ b/include/dt-bindings/pwm/pwm.h
-> @@ -12,4 +12,7 @@
->  
->  #define PWM_POLARITY_INVERTED			(1 << 0)
->  
-> +#define PWM_DTMODE_NORMAL			(1 << 0)
-
-Bit 0 is already taken. I think you mean (0 << 1)?
-
-Personally, I'd just drop this define. A define for a 0 value makes more 
-sense when each state is equally used (like active high or low), but if 
-0 is the more common case, then I don't the need for a define.
-
-> +#define PWM_DTMODE_COMPLEMENTARY		(1 << 1)
-> +
->  #endif
-> -- 
-> 2.7.4
+> [auto build test WARNING on net-next/master]
 > 
+> url:    https://github.com/0day-ci/linux/commits/Florian-Fainelli/net-stmmac-Fix-reception-of-Broadcom-switches-tags/20180120-044006
+> config: x86_64-randconfig-x002-201802 (attached as .config)
+> compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=x86_64 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    In file included from include/asm-generic/bug.h:5:0,
+>                     from arch/x86/include/asm/bug.h:82,
+>                     from include/linux/bug.h:5,
+>                     from include/linux/mmdebug.h:5,
+>                     from include/linux/gfp.h:5,
+>                     from include/linux/slab.h:15,
+>                     from drivers/net//ethernet/stmicro/stmmac/dwmac4_core.c:17:
+>    drivers/net//ethernet/stmicro/stmmac/dwmac4_core.c: In function 'dwmac4_core_init':
+>    drivers/net//ethernet/stmicro/stmmac/dwmac4_core.c:36:6: error: implicit declaration of function 'netdev_uses_dsa'; did you mean 'netdev_reset_tc'? [-Werror=implicit-function-declaration]
+>      if (netdev_uses_dsa(dev))
+
+This was fixed in v2 that David applied, thanks!
+-- 
+Florian
