@@ -1,30 +1,26 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 19 Jan 2018 09:55:07 +0100
-Subject: [PATCH v2 10/16] ARM: dts: r8a7793: add soc node
-In-Reply-To: <20180117161717.14589-11-horms+renesas@verge.net.au>
+Date: Fri, 19 Jan 2018 09:55:35 +0100
+Subject: [PATCH v2 11/16] ARM: dts: r8a7793: sort subnodes of soc node
+In-Reply-To: <20180117161717.14589-12-horms+renesas@verge.net.au>
 References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-11-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWTORWxPXT5GyLtGjSefFik-d-XTqRE7WFhKD5QmbbqQA@mail.gmail.com>
+ <20180117161717.14589-12-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWGS6g-vwFvxUs5sJLMOkg9S6tB-zZSP6Xv69TpKEwqyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Add soc node to represent the bus and move all nodes with a base address
-> into this node. This is consistent with handling of R-Car Gen3, RZ/G1, and
-> R-Car V2H (R8A77920) SoCs upstream. It is intended to migrate other R-Car
-> Gen2 SoCs to this scheme.
->
-> The ordering is derived from simply moving each node with an address up to
-> before any nodes without a base address that occur before the soc node.  To
-> improve maintainability follow-up patches will sort subnodes of both the
-> new soc node and the root node.
+> Sort the subnodes of the soc node to improve maintainability.
+> The sort key is the address on the bus with instances of the same
+> IP block grouped together.
 >
 > This patch should not introduce any functional change.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Same comment for SCIF variant sort order.
 
 Gr{oetje,eeting}s,
 
