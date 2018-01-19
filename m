@@ -1,54 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 19 Jan 2018 16:43:35 -0600
-Subject: [PATCH v2] dt-bindings: display: stm32: add pixel clock
- mandatory property
-In-Reply-To: <20180112153034.20353-1-philippe.cornu@st.com>
-References: <20180112153034.20353-1-philippe.cornu@st.com>
-Message-ID: <20180119224335.exrxcfq3xc6op6iy@rob-hp-laptop>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 19 Jan 2018 16:54:05 -0600
+Subject: [PATCH v2 00/10] ARM: dts: keystone*: Continued warnings cleanups
+In-Reply-To: <20180104195701.4042-1-afd@ti.com>
+References: <20180104195701.4042-1-afd@ti.com>
+Message-ID: <ecde90ae-7456-cadb-5ce4-6b63f4ed036a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 12, 2018 at 04:30:34PM +0100, Philippe Cornu wrote:
-> Add the DPI/RGB input pixel clock in mandatory properties
-> because it really offers a better preciseness for timing
-> computations.
-> Note: Fix also the DSI panel example where "ref" & "pclk"
-> clocks were swapped.
+On 01/04/2018 01:56 PM, Andrew F. Davis wrote:
+> Hello all,
 > 
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
-> Changes in v2: put new clock in last position (Rob Herring)
+> Just a couple cleanups for DT warnings when compiling with W=1.
 > 
->  Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> This clears up 51 more warnings when building keystone_defconfig.
 > 
-> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> index 029252253ad4..942b7237ae87 100644
-> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> @@ -29,6 +29,7 @@ Mandatory properties specific to STM32 DSI:
->  - compatible: "st,stm32-dsi".
->  - clock-names:
->    - phy pll reference clock string name, must be "ref".
-> +  - DPI/RGB input pixel clock string name, must be "px_clk".
->  - resets: see [5].
->  - reset-names: see [5].
->  
-> @@ -97,8 +98,9 @@ Example 2: DSI panel
->  			#size-cells = <0>;
->  			compatible = "st,stm32-dsi";
->  			reg = <0x40016c00 0x800>;
-> -			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-> -			clock-names = "ref", "pclk";
-> +			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>,
-> +				 <&rcc 1 CLK_LCD>;
-> +			clock-names = "pclk", "ref", "px_clk";
+> Based on Santosh's "for_4.16/keystone-dts" branch.
+> 
+> Thanks,
+> Andrew
+> 
+> Changes from v1:
+>  - Added to more patches from Suman
+>  - Reworded commit message to include "address space" distinction
 
-You have the existing names reversed here.
+Thanks, you still have left in the "and simply use get_resource() in
+the driver." part in the commit descriptions though, which is not right.
+Otherwise, the changes look good.
 
->  			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
->  			reset-names = "apb";
->  
-> -- 
-> 2.15.1
+
+>  - Added "ranges" property
+>  - Reordered #address/size-cells
+
+For the entire series,
+Tested-by: Suman Anna <s-anna@ti.com>
+
+regards
+Suman
+
+> 
+> Andrew F. Davis (8):
+>   ARM: dts: keystone: Move keystone_irq to under device-state-control
+>   ARM: dts: keystone: Move reset-controller to under
+>     device-state-control
+>   ARM: dts: keystone-k2e: Move keystone_dsp_gpio to under
+>     device-state-control
+>   ARM: dts: keystone-k2l: Move keystone_dsp_gpio to under
+>     device-state-control
+>   ARM: dts: keystone-k2hk: Move keystone_dsp_gpio to under
+>     device-state-control
+>   ARM: dts: keystone-k2g: Move keystone_irq to under
+>     device-state-control
+>   ARM: dts: keystone-k2g: Move keystone_dsp_gpio to under
+>     device-state-control
+>   ARM: dts: keystone-k2g: Move usb-phy nodes out of soc0
+> 
+> Suman Anna (2):
+>   ARM: dts: keystone-k2g: Fix unit-address formatting for serial nodes
+>   ARM: dts: keystone-k2e-clocks: Fix missing unit address separator
+> 
+>  arch/arm/boot/dts/keystone-k2e-clocks.dtsi |   2 +-
+>  arch/arm/boot/dts/keystone-k2e.dtsi        |  13 ++--
+>  arch/arm/boot/dts/keystone-k2g.dtsi        |  69 +++++++++++--------
+>  arch/arm/boot/dts/keystone-k2hk.dtsi       | 104 ++++++++++++++++-------------
+>  arch/arm/boot/dts/keystone-k2l.dtsi        |  52 ++++++++-------
+>  arch/arm/boot/dts/keystone.dtsi            |  35 +++++-----
+>  6 files changed, 156 insertions(+), 119 deletions(-)
 > 
