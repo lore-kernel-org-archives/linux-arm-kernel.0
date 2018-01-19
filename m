@@ -1,48 +1,29 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 19 Jan 2018 16:01:38 +0000
-Subject: [1/3] arm64: defconfig: enable CONFIG_ACPI_APEI_MEMORY_FAILURE
-In-Reply-To: <CAK8P3a1qYJ5C=rbFWMEompKMbcJfZKTdkxrOcUs1DSQLA6Th1Q@mail.gmail.com>
-References: <9fdbf03c-1e70-fc45-b218-404294d4bdb1@huawei.com>
- <67045853-42e1-8246-8789-309d1d233659@codeaurora.org>
- <CAK8P3a1qYJ5C=rbFWMEompKMbcJfZKTdkxrOcUs1DSQLA6Th1Q@mail.gmail.com>
-Message-ID: <5A621662.1020507@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Jan 2018 17:02:25 +0100
+Subject: [PATCH] ARM: pxa/tosa-bt: add MODULE_LICENSE tag
+In-Reply-To: <87vag9bh1g.fsf@belgarion.home>
+References: <20180110162816.431038-1-arnd@arndb.de>
+ <87vag9bh1g.fsf@belgarion.home>
+Message-ID: <CAK8P3a1VeN0kLrJ5T57y46NR1GNviwZ=6baaXgSm9ZqYBnGuVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 2018/1/19 15:06, Arnd Bergmann wrote:
-> On Tue, Jan 16, 2018 at 5:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
->> On 01/16/2018 09:45 AM, shiju.jose at huawei.com wrote:
->>>
->>> Enable ACPI APEI MEMORY FAILURE option for ARM64,
->>> so that memory errors will be handled.
->>>
->>> Signed-off-by: Shiju Jose<shiju.jose@huawei.com>
+On Wed, Jan 10, 2018 at 9:22 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+>> Without this tag, we get a build warning:
 >>
+>> WARNING: modpost: missing MODULE_LICENSE() in arch/arm/mach-pxa/tosa-bt.o
 >>
->> All three patches:
+>> For completeness, I'm also adding author and description fields.
 >>
->> Acked-by: Timur Tabi <timur@codeaurora.org>
->>
->> QDT definitely would like to see these patches merged into 4.16.
-> 
-> Applied all three to next/soc with your ack, thanks!
-> 
-> Shiju, there was a small problem with the second patch, which did not
-> apply cleanly, but I fixed it up. It might have been easier to get a pull
-> request through Wei Xu for this, and it would also help to send things
-> a lot earlier rather than just before the merge window.
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Queued into pxa/for-next, thanks.
 
-Thank you so much!
-I planned to pick up them after 4.16-rc1
-since it is too close to the merge window.
+I see now that you didn't send this back to arm at kernel.org. I assume you planned
+to send it for 4.17, but kernelci now still reports the warning for
+both 4.15 and
+linux-next (4.16). Should we just include this patch in the 4.16 fixes instead?
 
-Best Regards,
-Wei
-
-> 
->       Arnd
-> 
-> .
-> 
+       Arnd
