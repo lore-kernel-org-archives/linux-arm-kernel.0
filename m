@@ -1,50 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Jan 2018 14:32:08 +0100
-Subject: [PATCH] ARM: sunxi_defconfig: Enable CMA
-Message-ID: <20180119133208.12873-1-maxime.ripard@free-electrons.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Fri, 19 Jan 2018 21:37:15 +0800
+Subject: [PATCH 1/1] Documentation: clk: enable lock is not held for
+ clk_is_enabled API
+Message-ID: <1516369035-24740-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRM driver most notably, but also out of tree drivers (for now) like
-the VPU or GPU drivers, are quite big consumers of large, contiguous memory
-buffers. However, the sunxi_defconfig doesn't enable CMA in order to
-mitigate that, which makes them almost unusable.
+The core does not need to hold enable lock for clk_is_enabled API.
+Update the doc to reflect it.
 
-Enable it to make sure it somewhat works.
-
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Jonathan Corbet <corbet@lwn.net>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
+ Documentation/clk.txt | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-Hi Arnd, Olof,
-
-Could you queue that patch as a fix?
-
-Thanks!
-Maxime
-
- arch/arm/configs/sunxi_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 5caaf971fb50..df433abfcb02 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -10,6 +10,7 @@ CONFIG_SMP=y
- CONFIG_NR_CPUS=8
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
-+CONFIG_CMA=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CPU_FREQ=y
-@@ -33,6 +34,7 @@ CONFIG_CAN_SUN4I=y
- # CONFIG_WIRELESS is not set
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_DMA_CMA=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_AHCI_SUNXI=y
+diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+index be909ed..f286ff5 100644
+--- a/Documentation/clk.txt
++++ b/Documentation/clk.txt
+@@ -268,9 +268,17 @@ The common clock framework uses two global locks, the prepare lock and the
+ enable lock.
+ 
+ The enable lock is a spinlock and is held across calls to the .enable,
+-.disable and .is_enabled operations. Those operations are thus not allowed to
+-sleep, and calls to the clk_enable(), clk_disable() and clk_is_enabled() API
+-functions are allowed in atomic context.
++.disable operations. Those operations are thus not allowed to sleep,
++and calls to the clk_enable(), clk_disable() API functions are allowed in
++atomic context.
++
++For clk_is_enabled() API, it is also designed to be allowed to be used in
++atomic context. However, it doesn't really make any sense to hold the enable
++lock in core, unless you want to do something else with the information of
++the enable state with that lock held. Otherwise, seeing if a clk is enabled is
++a one-shot read of the enabled state, which could just as easily change after
++the function returns because the lock is released. Thus driver onwer needs
++judge and take care of it in their driver if it needs lock.
+ 
+ The prepare lock is a mutex and is held across calls to all other operations.
+ All those operations are allowed to sleep, and calls to the corresponding API
 -- 
-2.14.3
+2.7.4
