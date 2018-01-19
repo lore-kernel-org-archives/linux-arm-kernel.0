@@ -1,269 +1,140 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Jan 2018 22:53:38 -0500 (EST)
-Subject: [PATCH] ARM: get rid of __memzero()
-Message-ID: <nycvar.YSQ.7.76.1801182243150.1558@knanqh.ubzr>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 19 Jan 2018 13:01:33 +0900
+Subject: [PATCH v4 12/13] iommu/rockchip: Add runtime PM support
+In-Reply-To: <20180118115251.5542-13-jeffy.chen@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-13-jeffy.chen@rock-chips.com>
+Message-ID: <CAAFQd5A71m5jFD8NaXWyi3g7ssg=nETRhtn2wYp8p_6qJcWu4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __memzero assembly code is almost identical to memset's except for 
-two orr instructions. The runtime performance of __memset(p, n) and 
-memset(p, 0, n) is accordingly almost identical.
+On Thu, Jan 18, 2018 at 8:52 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> When the power domain is powered off, the IOMMU cannot be accessed and
+> register programming must be deferred until the power domain becomes
+> enabled.
+>
+> Add runtime PM support, and use runtime PM device link from IOMMU to
+> master to startup and shutdown IOMMU.
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+>
+> Changes in v4: None
+> Changes in v3:
+> Only call startup() and shutdown() when iommu attached.
+> Remove pm_mutex.
+> Check runtime PM disabled.
+> Check pm_runtime in rk_iommu_irq().
+>
+> Changes in v2: None
+>
+>  drivers/iommu/rockchip-iommu.c | 180 ++++++++++++++++++++++++++++++++---------
+>  1 file changed, 141 insertions(+), 39 deletions(-)
+>
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 2c095f96c033..e2e7acc3039d 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/of_iommu.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/slab.h>
+>  #include <linux/spinlock.h>
+>
+> @@ -99,6 +100,7 @@ struct rk_iommu {
+>  };
+>
+>  struct rk_iommudata {
+> +       struct device_link *link; /* runtime PM link from IOMMU to master */
+>         struct rk_iommu *iommu;
+>  };
+>
+> @@ -583,7 +585,11 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>         u32 int_status;
+>         dma_addr_t iova;
+>         irqreturn_t ret = IRQ_NONE;
+> -       int i;
+> +       int i, err;
+> +
+> +       err = pm_runtime_get_if_in_use(iommu->dev);
+> +       if (err <= 0 && err != -EINVAL)
+> +               return ret;
+>
+>         WARN_ON(rk_iommu_enable_clocks(iommu));
+>
+> @@ -635,6 +641,9 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>
+>         rk_iommu_disable_clocks(iommu);
+>
+> +       if (pm_runtime_enabled(iommu->dev))
+> +               pm_runtime_put(iommu->dev);
 
-However, the memset() macro used to guard against a zero length and to 
-call __memzero at compile time when the fill value is a constant zero 
-interferes with compiler optimizations.
+I think this might be racy. There are some places where
+pm_runtime_enable/disable() are called on devices implicitly and I'm
+not sure if we're guaranteed that they don't happen between our
+pm_runtime_get_if_in_use() and pm_runtime_enabled() calls.
 
-Arnd found tha the test against a zero length brings up some new 
-warnings with gcc v8:
+An example of a race-free solution would be to save the
+pm_runtime_get_if_in_use() result to a local variable (e.g. bool
+need_runtime_put) and then call pm_runtime_put() based on that.
 
-  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82103
+> +
+>         return ret;
+>  }
+>
+> @@ -676,10 +685,20 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
+>         spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+>         list_for_each(pos, &rk_domain->iommus) {
+>                 struct rk_iommu *iommu;
+> +               int ret;
+> +
+>                 iommu = list_entry(pos, struct rk_iommu, node);
+> -               rk_iommu_enable_clocks(iommu);
+> -               rk_iommu_zap_lines(iommu, iova, size);
+> -               rk_iommu_disable_clocks(iommu);
+> +
+> +               /* Only zap TLBs of IOMMUs that are powered on. */
+> +               ret = pm_runtime_get_if_in_use(iommu->dev);
+> +               if (ret > 0 || ret == -EINVAL) {
+> +                       rk_iommu_enable_clocks(iommu);
+> +                       rk_iommu_zap_lines(iommu, iova, size);
+> +                       rk_iommu_disable_clocks(iommu);
+> +               }
+> +
+> +               if (ret > 0)
+> +                       pm_runtime_put(iommu->dev);
 
-And successively rremoving the test against a zero length and the call 
-to __memzero optimization produces the following kernel sizes for 
-defconfig with gcc 6:
+This one nicely avoids the race I mentioned above. :)
 
-    text     data     bss       dec       hex  filename
-12248142  6278960  413588  18940690   1210312  vmlinux.orig
-12244474  6278960  413588  18937022   120f4be  vmlinux.no_zero_test
-12239160  6278960  413588  18931708   120dffc  vmlinux.no_memzero
+>         }
+>         spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+>  }
+> @@ -882,22 +901,30 @@ static struct rk_iommu *rk_iommu_from_dev(struct device *dev)
+>         return data ? data->iommu : NULL;
+>  }
+>
+[snip]
+> +       spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+> +       list_add_tail(&iommu->node, &rk_domain->iommus);
+> +       spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+>
+> -       dev_dbg(dev, "Detached from iommu domain\n");
+> +       ret = pm_runtime_get_if_in_use(iommu->dev);
+> +       if (ret <= 0 && ret != -EINVAL)
+> +               return 0;
+> +
+> +       ret = rk_iommu_startup(iommu);
+> +       if (ret)
+> +               rk_iommu_detach_device(iommu->domain, dev);
+> +
+> +       if (pm_runtime_enabled(iommu->dev))
+> +               pm_runtime_put(iommu->dev);
 
-So it is probably not worth keeping __memzero around given that the 
-compiler can do a better job at inlining trivial memset(p,0,n) on its 
-own. And the memset code already handles a zero length just fine.
+Here we should also probably act based on what
+pm_runtime_get_if_in_use() returned rather than asking
+pm_runtime_enabled().
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
-index 309e1bbad7..13c90abc68 100644
---- a/arch/arm/boot/compressed/string.c
-+++ b/arch/arm/boot/compressed/string.c
-@@ -130,8 +130,3 @@ void *memset(void *s, int c, size_t count)
- 		*xs++ = c;
- 	return s;
- }
--
--void __memzero(void *s, size_t count)
--{
--	memset(s, 0, count);
--}
-diff --git a/arch/arm/include/asm/string.h b/arch/arm/include/asm/string.h
-index f54a3136aa..111a1d8a41 100644
---- a/arch/arm/include/asm/string.h
-+++ b/arch/arm/include/asm/string.h
-@@ -39,18 +39,4 @@ static inline void *memset64(uint64_t *p, uint64_t v, __kernel_size_t n)
- 	return __memset64(p, v, n * 8, v >> 32);
- }
- 
--extern void __memzero(void *ptr, __kernel_size_t n);
--
--#define memset(p,v,n)							\
--	({								\
--	 	void *__p = (p); size_t __n = n;			\
--		if ((__n) != 0) {					\
--			if (__builtin_constant_p((v)) && (v) == 0)	\
--				__memzero((__p),(__n));			\
--			else						\
--				memset((__p),(v),(__n));		\
--		}							\
--		(__p);							\
--	})
--
- #endif
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index 5266fd9ad6..783fbb4de5 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -92,7 +92,6 @@ EXPORT_SYMBOL(__memset64);
- EXPORT_SYMBOL(memcpy);
- EXPORT_SYMBOL(memmove);
- EXPORT_SYMBOL(memchr);
--EXPORT_SYMBOL(__memzero);
- 
- EXPORT_SYMBOL(mmioset);
- EXPORT_SYMBOL(mmiocpy);
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 21dde771a7..d7eb3c4db5 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -105,8 +105,9 @@ __mmap_switched:
-    ARM(	ldmia	r4!, {r0, r1, sp} )
-  THUMB(	ldmia	r4!, {r0, r1, r3} )
-  THUMB(	mov	sp, r3 )
--	sub	r1, r1, r0
--	bl	__memzero			@ clear .bss
-+	sub	r2, r1, r0
-+	mov	r1, #0
-+	bl	memset			@ clear .bss
- 
- 	ldmia	r4, {r0, r1, r2, r3}
- 	str	r9, [r0]			@ Save processor ID
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index 4cb0b9624d..ad25fd1872 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -8,7 +8,7 @@
- lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
- 		   delay.o delay-loop.o findbit.o memchr.o memcpy.o   \
--		   memmove.o memset.o memzero.o setbit.o              \
-+		   memmove.o memset.o setbit.o                        \
- 		   strchr.o strrchr.o                                 \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
-diff --git a/arch/arm/lib/memzero.S b/arch/arm/lib/memzero.S
-deleted file mode 100644
-index 0eded952e0..0000000000
---- a/arch/arm/lib/memzero.S
-+++ /dev/null
-@@ -1,137 +0,0 @@
--/*
-- *  linux/arch/arm/lib/memzero.S
-- *
-- *  Copyright (C) 1995-2000 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <asm/assembler.h>
--#include <asm/unwind.h>
--
--	.text
--	.align	5
--	.word	0
--/*
-- * Align the pointer in r0.  r3 contains the number of bytes that we are
-- * mis-aligned by, and r1 is the number of bytes.  If r1 < 4, then we
-- * don't bother; we use byte stores instead.
-- */
--UNWIND(	.fnstart			)
--1:	subs	r1, r1, #4		@ 1 do we have enough
--	blt	5f			@ 1 bytes to align with?
--	cmp	r3, #2			@ 1
--	strltb	r2, [r0], #1		@ 1
--	strleb	r2, [r0], #1		@ 1
--	strb	r2, [r0], #1		@ 1
--	add	r1, r1, r3		@ 1 (r1 = r1 - (4 - r3))
--/*
-- * The pointer is now aligned and the length is adjusted.  Try doing the
-- * memzero again.
-- */
--
--ENTRY(__memzero)
--	mov	r2, #0			@ 1
--	ands	r3, r0, #3		@ 1 unaligned?
--	bne	1b			@ 1
--/*
-- * r3 = 0, and we know that the pointer in r0 is aligned to a word boundary.
-- */
--	cmp	r1, #16			@ 1 we can skip this chunk if we
--	blt	4f			@ 1 have < 16 bytes
--
--#if ! CALGN(1)+0
--
--/*
-- * We need an extra register for this loop - save the return address and
-- * use the LR
-- */
--	str	lr, [sp, #-4]!		@ 1
--UNWIND(	.fnend				)
--UNWIND(	.fnstart			)
--UNWIND(	.save 	{lr}			)
--	mov	ip, r2			@ 1
--	mov	lr, r2			@ 1
--
--3:	subs	r1, r1, #64		@ 1 write 32 bytes out per loop
--	stmgeia	r0!, {r2, r3, ip, lr}	@ 4
--	stmgeia	r0!, {r2, r3, ip, lr}	@ 4
--	stmgeia	r0!, {r2, r3, ip, lr}	@ 4
--	stmgeia	r0!, {r2, r3, ip, lr}	@ 4
--	bgt	3b			@ 1
--	ldmeqfd	sp!, {pc}		@ 1/2 quick exit
--/*
-- * No need to correct the count; we're only testing bits from now on
-- */
--	tst	r1, #32			@ 1
--	stmneia	r0!, {r2, r3, ip, lr}	@ 4
--	stmneia	r0!, {r2, r3, ip, lr}	@ 4
--	tst	r1, #16			@ 1 16 bytes or more?
--	stmneia	r0!, {r2, r3, ip, lr}	@ 4
--	ldr	lr, [sp], #4		@ 1
--UNWIND(	.fnend				)
--
--#else
--
--/*
-- * This version aligns the destination pointer in order to write
-- * whole cache lines@once.
-- */
--
--	stmfd	sp!, {r4-r7, lr}
--UNWIND(	.fnend		       )
--UNWIND(	.fnstart	       )
--UNWIND(	.save 	{r4-r7, lr}    )
--	mov	r4, r2
--	mov	r5, r2
--	mov	r6, r2
--	mov	r7, r2
--	mov	ip, r2
--	mov	lr, r2
--
--	cmp	r1, #96
--	andgts	ip, r0, #31
--	ble	3f
--
--	rsb	ip, ip, #32
--	sub	r1, r1, ip
--	movs	ip, ip, lsl #(32 - 4)
--	stmcsia	r0!, {r4, r5, r6, r7}
--	stmmiia	r0!, {r4, r5}
--	movs	ip, ip, lsl #2
--	strcs	r2, [r0], #4
--
--3:	subs	r1, r1, #64
--	stmgeia	r0!, {r2-r7, ip, lr}
--	stmgeia	r0!, {r2-r7, ip, lr}
--	bgt	3b
--	ldmeqfd	sp!, {r4-r7, pc}
--
--	tst	r1, #32
--	stmneia	r0!, {r2-r7, ip, lr}
--	tst	r1, #16
--	stmneia	r0!, {r4-r7}
--	ldmfd	sp!, {r4-r7, lr}
--UNWIND(	.fnend		       )
--
--#endif
--
--UNWIND(	.fnstart			)
--4:	tst	r1, #8			@ 1 8 bytes or more?
--	stmneia	r0!, {r2, r3}		@ 2
--	tst	r1, #4			@ 1 4 bytes or more?
--	strne	r2, [r0], #4		@ 1
--/*
-- * When we get here, we've got less than 4 bytes to zero.  We
-- * may have an unaligned pointer as well.
-- */
--5:	tst	r1, #2			@ 1 2 bytes or more?
--	strneb	r2, [r0], #1		@ 1
--	strneb	r2, [r0], #1		@ 1
--	tst	r1, #1			@ 1 a byte left over
--	strneb	r2, [r0], #1		@ 1
--	ret	lr			@ 1
--UNWIND(	.fnend				)
--ENDPROC(__memzero)
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 331f863c60..715b39ae5a 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -765,7 +765,7 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
- 		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
- 		if (!desc)
- 			break;
--		__memzero(&desc->desc, sizeof(struct dma_async_tx_descriptor));
-+		memset(&desc->desc, 0, sizeof(struct dma_async_tx_descriptor));
- 		dma_async_tx_descriptor_init(&desc->desc, chan);
- 		desc->desc.tx_submit = imxdma_tx_submit;
- 		/* txd.flags will be overwritten in prep funcs */
+Best regards,
+Tomasz
