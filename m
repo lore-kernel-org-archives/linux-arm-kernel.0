@@ -1,189 +1,89 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 19 Jan 2018 21:11:08 +0800
-Subject: [PATCH V3 08/10] clk: imx: implement new clk_hw based APIs
-In-Reply-To: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
-References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1516367470-24340-9-git-send-email-aisheng.dong@nxp.com>
+Date: Fri, 19 Jan 2018 21:11:00 +0800
+Subject: [PATCH V3 00/10] clk: add imx7ulp clk support
+Message-ID: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock providers are recommended to use the new struct clk_hw based API,
-so implement IMX clk_hw based provider helpers functions to the new
-approach.
+This patch series intends to add imx7ulp clk support.
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+i.MX7ULP Clock functions are under joint control of the System
+Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+modules, and Core Mode Controller (CMC)1 blocks
 
----
-ChangeLog:
+The clocking scheme provides clear separation between M4 domain
+and A7 domain. Except for a few clock sources shared between two
+domains, such as the System Oscillator clock, the Slow IRC (SIRC),
+and and the Fast IRC clock (FIRCLK), clock sources and clock
+management are separated and contained within each domain.
+
+M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+
+Note: this series only adds A7 clock domain support as M4 clock
+domain will be handled by M4 seperately.
+
+Change Log:
 v2->v3:
- * no changes
-v1->v2:  new patches
----
- drivers/clk/imx/clk.c | 22 ++++++++++++++++++
- drivers/clk/imx/clk.h | 62 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 84 insertions(+)
+ * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
+   Others no changes.
 
-diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
-index 9074e69..1efed86 100644
---- a/drivers/clk/imx/clk.c
-+++ b/drivers/clk/imx/clk.c
-@@ -18,6 +18,16 @@ void __init imx_check_clocks(struct clk *clks[], unsigned int count)
- 			       i, PTR_ERR(clks[i]));
- }
- 
-+void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < count; i++)
-+		if (IS_ERR(clks[i]))
-+			pr_err("i.MX clk %u: register failed with %ld\n",
-+			       i, PTR_ERR(clks[i]));
-+}
-+
- static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
- {
- 	struct of_phandle_args phandle;
-@@ -49,6 +59,18 @@ struct clk * __init imx_obtain_fixed_clock(
- 	return clk;
- }
- 
-+struct clk_hw * __init imx_obtain_fixed_clk_hw(struct device_node *np,
-+					       const char *name)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get_by_name(np, name);
-+	if (IS_ERR(clk))
-+		return ERR_PTR(-ENOENT);
-+
-+	return __clk_get_hw(clk);
-+}
-+
- /*
-  * This fixups the register CCM_CSCMR1 write value.
-  * The write/read/divider values of the aclk_podf field
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 956155c..3d58420 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -8,6 +8,7 @@
- extern spinlock_t imx_ccm_lock;
- 
- void imx_check_clocks(struct clk *clks[], unsigned int count);
-+void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count);
- void imx_register_uart_clocks(struct clk ** const clks[]);
- 
- extern void imx_cscmr1_fixup(u32 *val);
-@@ -54,6 +55,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- struct clk * imx_obtain_fixed_clock(
- 			const char *name, unsigned long rate);
- 
-+struct clk_hw *imx_obtain_fixed_clk_hw(struct device_node *np,
-+				       const char *name);
-+
- struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
- 	 void __iomem *reg, u8 shift, u32 exclusive_mask);
- 
-@@ -90,6 +94,16 @@ static inline struct clk *imx_clk_fixed(const char *name, int rate)
- 	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_fixed(const char *name, int rate)
-+{
-+	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
-+}
-+
-+static inline struct clk_hw *imx_get_clk_hw_fixed(const char *name, int rate)
-+{
-+	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
-+}
-+
- static inline struct clk *imx_clk_mux_ldb(const char *name, void __iomem *reg,
- 			u8 shift, u8 width, const char * const *parents,
- 			int num_parents)
-@@ -113,6 +127,15 @@ static inline struct clk *imx_clk_divider(const char *name, const char *parent,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_divider(const char *name,
-+						const char *parent,
-+						void __iomem *reg, u8 shift,
-+						u8 width)
-+{
-+	return clk_hw_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-+				       reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_divider_flags(const char *name,
- 		const char *parent, void __iomem *reg, u8 shift, u8 width,
- 		unsigned long flags)
-@@ -121,6 +144,15 @@ static inline struct clk *imx_clk_divider_flags(const char *name,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_divider_flags(const char *name,
-+						   const char *parent,
-+						   void __iomem *reg, u8 shift,
-+						   u8 width, unsigned long flags)
-+{
-+	return clk_hw_register_divider(NULL, name, parent, flags,
-+				       reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
-@@ -136,6 +168,13 @@ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
- 			shift, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_gate(const char *name, const char *parent,
-+					     void __iomem *reg, u8 shift)
-+{
-+	return clk_hw_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+				    shift, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
-@@ -208,6 +247,17 @@ static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_mux2(const char *name, void __iomem *reg,
-+					     u8 shift, u8 width,
-+					     const char * const *parents,
-+					     int num_parents)
-+{
-+	return clk_hw_register_mux(NULL, name, parents, num_parents,
-+				   CLK_SET_RATE_NO_REPARENT |
-+				   CLK_OPS_PARENT_ENABLE,
-+				   reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_mux_flags(const char *name,
- 			void __iomem *reg, u8 shift, u8 width,
- 			const char * const *parents, int num_parents,
-@@ -218,6 +268,18 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
- 			&imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_mux_flags(const char *name,
-+						  void __iomem *reg, u8 shift,
-+						  u8 width,
-+						  const char * const *parents,
-+						  int num_parents,
-+						  unsigned long flags)
-+{
-+	return clk_hw_register_mux(NULL, name, parents, num_parents,
-+				   flags | CLK_SET_RATE_NO_REPARENT,
-+				   reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- struct clk *imx_clk_cpu(const char *name, const char *parent_name,
- 		struct clk *div, struct clk *mux, struct clk *pll,
- 		struct clk *step);
+v1->v2:
+ * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+ * use clk_hw apis to register clocks
+ * use of_clk_add_hw_provider
+ * split the clocks register process into two parts: early part for possible
+   timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
+   the left normal peripheral clocks registered by a platform driver.
+
+Dong Aisheng (10):
+  clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+  clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+  clk: imx: add pllv4 support
+  clk: imx: add pfdv2 support
+  clk: imx: add composite clk support
+  dt-bindings: clock: add imx7ulp clock binding doc
+  clk: imx: make mux parent strings const
+  clk: imx: implement new clk_hw based APIs
+  clk: imx: add imx7ulp clk driver
+  add imx7ulp support
+
+ .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts                  |  87 ++++++++
+ arch/arm/boot/dts/imx7ulp.dtsi                     | 202 ++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |  16 +-
+ arch/arm/mach-imx/Kconfig                          |   9 +
+ arch/arm/mach-imx/Makefile                         |   1 +
+ arch/arm/mach-imx/common.h                         |   1 +
+ arch/arm/mach-imx/cpu.c                            |   3 +
+ arch/arm/mach-imx/mach-imx7ulp.c                   |  37 ++++
+ arch/arm/mach-imx/mxc.h                            |   1 +
+ arch/arm/mach-imx/pm-imx7ulp.c                     |  32 +++
+ drivers/clk/clk-divider.c                          | 152 ++++++++++++++
+ drivers/clk/clk-fractional-divider.c               |  10 +
+ drivers/clk/imx/Makefile                           |   6 +-
+ drivers/clk/imx/clk-busy.c                         |   2 +-
+ drivers/clk/imx/clk-composite.c                    |  90 ++++++++
+ drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+ drivers/clk/imx/clk-imx7ulp.c                      | 232 +++++++++++++++++++++
+ drivers/clk/imx/clk-pfdv2.c                        | 207 ++++++++++++++++++
+ drivers/clk/imx/clk-pllv4.c                        | 188 +++++++++++++++++
+ drivers/clk/imx/clk.c                              |  22 ++
+ drivers/clk/imx/clk.h                              |  92 +++++++-
+ include/dt-bindings/clock/imx7ulp-clock.h          | 108 ++++++++++
+ include/linux/clk-provider.h                       |  17 ++
+ 25 files changed, 1561 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
+ create mode 100644 drivers/clk/imx/clk-composite.c
+ create mode 100644 drivers/clk/imx/clk-imx7ulp.c
+ create mode 100644 drivers/clk/imx/clk-pfdv2.c
+ create mode 100644 drivers/clk/imx/clk-pllv4.c
+ create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
+
 -- 
 2.7.4
