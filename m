@@ -1,55 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Jan 2018 14:39:30 +0100
-Subject: [PATCH v2] arm64: dts: salvator-common: Enable HS400 of SDHI2
-Message-ID: <20180119133930.11410-1-horms+renesas@verge.net.au>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Fri, 19 Jan 2018 14:38:46 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
+In-Reply-To: <CAOMZO5DQ9T_003gzq-0Q-HrUEhzoZOHd-647DkUCQP9ka9ti4w@mail.gmail.com>
+References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
+ <84391569-cdb9-1c17-7e37-6fdad954d549@maciej.szmigiero.name>
+ <CAOMZO5DQ9T_003gzq-0Q-HrUEhzoZOHd-647DkUCQP9ka9ti4w@mail.gmail.com>
+Message-ID: <0006d513-3ab5-d2b6-1caa-5d480dfadfaf@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On 19.01.2018 12:59, Fabio Estevam wrote:
+> Hi Maciej,
+> 
+> On Thu, Jan 18, 2018 at 9:11 PM, Maciej S. Szmigiero
+> <mail@maciej.szmigiero.name> wrote:
+> 
+>> Hmm, did you get reports or checked that it actually hangs?
+> 
+> Both :-)
+> 
+>>
+>> As far as I remember last time I ran a kernel without Peter's power
+>> sequence library on this board it only wasn't able to communicate with
+>> the on-board USB hub (and devices behind it), but besides this was
+>> able to boot successfully.
+>> But my memory may be wrong since it was some time ago.
+> 
+> Currently we are not able to reach the prompt without this patch as
+> the system hangs.
+> 
 
-This patch adds the mmc-hs400-1_8v property to SDHI2 and enable eMMC
-HS400.
+Okay, then:
+Acked-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Based on renesas-devel-20180119-v4.15-rc8
+@Peter:
+If you are going to submit your power sequence library once again could
+you please add this patch reversion to your UDOO DT changes in that
+series for completeness?
 
-Dependencies for testing and applying this patch upstream:
-* [PATCH v2 0/3] mmc: renesas_sdhi: add eMMC HS400 mode support
-* [PATCH] clk: renesas: rcar-gen3: Fix SD divider setting
-
-To assist testing and review this patch and the above mentioned
-dependencies, which are necessary and sufficient to enable HS400 on H3 /
-Salvator-X, M3-W 1.0 / Salvator-X and H3 ES2.0 Salvator-XS are available
-at:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/hs400-v2
-
-v2 [Simon Horman]
-* Broke out of larger patchset
-
-v1 [Simon Horman]
-* Rebase
-
-v0 [Takeshi Kihara]
-
-
----
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 89cbb3b95acd..34847c3653b8 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -631,6 +631,7 @@
- 	vqmmc-supply = <&reg_1p8v>;
- 	bus-width = <8>;
- 	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
- 	non-removable;
- 	fixed-emmc-driver-type = <1>;
- 	status = "okay";
--- 
-2.11.0
+Maciej
