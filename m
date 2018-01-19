@@ -1,24 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Jan 2018 16:08:26 +0100
-Subject: [PATCH] ARM: sunxi_defconfig: Enable CMA
-In-Reply-To: <20180119133208.12873-1-maxime.ripard@free-electrons.com>
-References: <20180119133208.12873-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAK8P3a1B5A0rXP7MvLp+wMokz=BjK8LA7eay3EmnTfn94TD2ig@mail.gmail.com>
+Date: Fri, 19 Jan 2018 16:09:02 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.16 (#3)
+In-Reply-To: <87bmhs7c5t.fsf@free-electrons.com>
+References: <87bmhs7c5t.fsf@free-electrons.com>
+Message-ID: <CAK8P3a2CJvFNQZ=cWZ7t3O2Cjo0K0SaQkJgmRDfwCba2uLQ2yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 2:32 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The DRM driver most notably, but also out of tree drivers (for now) like
-> the VPU or GPU drivers, are quite big consumers of large, contiguous memory
-> buffers. However, the sunxi_defconfig doesn't enable CMA in order to
-> mitigate that, which makes them almost unusable.
+On Wed, Jan 17, 2018 at 4:11 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi,
 >
-> Enable it to make sure it somewhat works.
->
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Here is the late pull request for dt64 for mvebu for v4.16, actually
+> it is a fix needed for what we have currently in linux-next.
 
-Applied to fixes, thanks!
+Pulled into next/dt, thanks!
 
-      Arnd
+        Arnd
