@@ -1,28 +1,21 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 19 Jan 2018 09:59:07 -0200
+Date: Fri, 19 Jan 2018 10:03:14 -0200
 Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
-In-Reply-To: <84391569-cdb9-1c17-7e37-6fdad954d549@maciej.szmigiero.name>
+In-Reply-To: <CAOcK=COGi6AmhemVAkGirLoMhMo3Bg4Uy+2bOkK2o7+_dMmTPg@mail.gmail.com>
 References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
  <84391569-cdb9-1c17-7e37-6fdad954d549@maciej.szmigiero.name>
-Message-ID: <CAOMZO5DQ9T_003gzq-0Q-HrUEhzoZOHd-647DkUCQP9ka9ti4w@mail.gmail.com>
+ <CAOcK=COGi6AmhemVAkGirLoMhMo3Bg4Uy+2bOkK2o7+_dMmTPg@mail.gmail.com>
+Message-ID: <CAOMZO5DwTbWh3W7tiLqrvAzqUck0rY78OUt1b6KqZG0tFHEB9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maciej,
+Hi Markus,
 
-On Thu, Jan 18, 2018 at 9:11 PM, Maciej S. Szmigiero
-<mail@maciej.szmigiero.name> wrote:
+On Thu, Jan 18, 2018 at 9:29 PM, Markus Rathgeb <maggu2810@gmail.com> wrote:
 
-> Hmm, did you get reports or checked that it actually hangs?
+> Please let me know if I could add more information or could do some
+> further tests etc.
 
-Both :-)
+Please test my patch and send your Tested-by tag if it works for you.
 
->
-> As far as I remember last time I ran a kernel without Peter's power
-> sequence library on this board it only wasn't able to communicate with
-> the on-board USB hub (and devices behind it), but besides this was
-> able to boot successfully.
-> But my memory may be wrong since it was some time ago.
-
-Currently we are not able to reach the prompt without this patch as
-the system hangs.
+It allows to boot fine on my imx6q-udoo board.
