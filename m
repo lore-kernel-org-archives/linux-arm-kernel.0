@@ -1,566 +1,97 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 19 Jan 2018 13:55:43 +0100
-Subject: [PATCH 4/7] arm64: zynqmp: Add support for Xilinx zcu106-revA
-In-Reply-To: <cover.1516366474.git.michal.simek@xilinx.com>
-References: <cover.1516366474.git.michal.simek@xilinx.com>
-Message-ID: <3de2fd99cc6f9c423f36229454aaf014c92ff846.1516366474.git.michal.simek@xilinx.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Fri, 19 Jan 2018 08:07:21 -0500
+Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
+ from devices
+In-Reply-To: <e2753b59-2b9e-ffc6-a7b8-0ed23df38e10@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-6-jean-philippe.brucker@arm.com>
+ <0772e71e-4861-1e7b-f248-88aaba8bf2fc@codeaurora.org>
+ <e2753b59-2b9e-ffc6-a7b8-0ed23df38e10@arm.com>
+Message-ID: <c0e39c5a69a6f612e11c6076be9c5d53@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xilinx zcu106 is a customer board. It is reusing some parts from zcu102.
+On 2018-01-19 05:27, Jean-Philippe Brucker wrote:
+> Hi Sinan,
+> 
+> On 19/01/18 04:52, Sinan Kaya wrote:
+>> Hi Jean-Philippe,
+>> 
+>> On 10/6/2017 9:31 AM, Jean-Philippe Brucker wrote:
+>>>  /**
+>>> + * iommu_process_bind_device - Bind a process address space to a 
+>>> device
+>>> + * @dev: the device
+>>> + * @task: the process to bind
+>>> + * @pasid: valid address where the PASID will be stored
+>>> + * @flags: bond properties (IOMMU_PROCESS_BIND_*)
+>>> + *
+>>> + * Create a bond between device and task, allowing the device to 
+>>> access the
+>>> + * process address space using the returned PASID.
+>>> + *
+>>> + * On success, 0 is returned and @pasid contains a valid ID. 
+>>> Otherwise, an error
+>>> + * is returned.
+>>> + */
+>>> +int iommu_process_bind_device(struct device *dev, struct task_struct 
+>>> *task,
+>>> +			      int *pasid, int flags)
+>> 
+>> This API doesn't play nice with endpoint device drivers that have 
+>> PASID limitations.
+>> 
+>> The AMD driver seems to have PASID limitations per product that are 
+>> not being
+>> advertised in the PCI capability.
+>> 
+>> device_iommu_pasid_init()
+>> {
+>>         pasid_limit = min_t(unsigned int,
+>>                         (unsigned int)(1 << 
+>> kfd->device_info->max_pasid_bits),
+>>                         iommu_info.max_pasids);
+>>         /*
+>>          * last pasid is used for kernel queues doorbells
+>>          * in the future the last pasid might be used for a kernel 
+>> thread.
+>>          */
+>>         pasid_limit = min_t(unsigned int,
+>>                                 pasid_limit,
+>>                                 kfd->doorbell_process_limit - 1);
+>> }
+>> 
+>> kfd->device_info->max_pasid_bits seems to contain per device 
+>> limitations.
+>> 
+>> Would you be willing to extend the API so that the requester can 
+>> impose some limit
+>> on the PASID value that is getting allocated.
+> 
+> Good point. Following the feedback for this series, next version adds
+> another public function:
+> 
+> int iommu_sva_device_init(struct device *dev, int features);
+> 
+> that has to be called by the device driver before any bind(). The 
+> intent
+> is to let some IOMMU drivers initialize PASID tables and other features
+> lazily, only if the device driver actually intends to use them. Maybe I
+> could change this function to:
+> 
+> int iommu_sva_device_init(struct device *dev, int features, unsigned 
+> int
+> max_pasid);
+> 
+> @features is a bitmask telling what the device driver needs (PASID 
+> and/or
+> page faults). If features has IOMMU_SVA_FEAT_PASID set, then device 
+> driver
+> can set a max_pasid limit, that we'd store in our private device-iommu
+> data. If max_pasid is 0, then we'd use the PCI limit.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Yes, this should work.
 
- arch/arm64/boot/dts/xilinx/Makefile               |   1 +
- arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts | 530 ++++++++++++++++++++++
- 2 files changed, 531 insertions(+)
- create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts
-
-diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
-index 1c039e59c7c3..922c5da39600 100644
---- a/arch/arm64/boot/dts/xilinx/Makefile
-+++ b/arch/arm64/boot/dts/xilinx/Makefile
-@@ -5,3 +5,4 @@ dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revA.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revB.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-rev1.0.dtb
- dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu104-revA.dtb
-+dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu106-revA.dtb
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts
-new file mode 100644
-index 000000000000..2676931c3c07
---- /dev/null
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts
-@@ -0,0 +1,530 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * dts file for Xilinx ZynqMP ZCU106
-+ *
-+ * (C) Copyright 2016, Xilinx, Inc.
-+ *
-+ * Michal Simek <michal.simek@xilinx.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "zynqmp.dtsi"
-+#include "zynqmp-clk.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "ZynqMP ZCU106 RevA";
-+	compatible = "xlnx,zynqmp-zcu106-revA", "xlnx,zynqmp-zcu106", "xlnx,zynqmp";
-+
-+	aliases {
-+		ethernet0 = &gem3;
-+		gpio0 = &gpio;
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		mmc0 = &sdhci1;
-+		rtc0 = &rtc;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &dcc;
-+		usb0 = &usb0;
-+	};
-+
-+	chosen {
-+		bootargs = "earlycon";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+		sw19 {
-+			label = "sw19";
-+			gpios = <&gpio 22 GPIO_ACTIVE_HIGH>;
-+			linux,code = <KEY_DOWN>;
-+			gpio-key,wakeup;
-+			autorepeat;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		heartbeat_led {
-+			label = "heartbeat";
-+			gpios = <&gpio 23 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&dcc {
-+	status = "okay";
-+};
-+
-+/* fpd_dma clk 667MHz, lpd_dma 500MHz */
-+&fpd_dma_chan1 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan2 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan3 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan4 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan5 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan6 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan7 {
-+	status = "okay";
-+};
-+
-+&fpd_dma_chan8 {
-+	status = "okay";
-+};
-+
-+&gem3 {
-+	status = "okay";
-+	phy-handle = <&phy0>;
-+	phy-mode = "rgmii-id";
-+	phy0: phy at c {
-+		reg = <0xc>;
-+		ti,rx-internal-delay = <0x8>;
-+		ti,tx-internal-delay = <0xa>;
-+		ti,fifo-depth = <0x1>;
-+	};
-+};
-+
-+&gpio {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tca6416_u97: gpio at 20 {
-+		/*
-+		 * Enable all GTs to out from U-Boot
-+		 * i2c mw 20 6 0  - setup IO to output
-+		 * i2c mw 20 2 ef - setup output values on pins 0-7
-+		 * i2c mw 20 3 ff - setup output values on pins 10-17
-+		 */
-+		compatible = "ti,tca6416";
-+		reg = <0x20>;
-+		gpio-controller; /* interrupt not connected */
-+		#gpio-cells = <2>;
-+		/*
-+		 * IRQ not connected
-+		 * Lines:
-+		 * 0 - SFP_SI5328_INT_ALM
-+		 * 1 - HDMI_SI5328_INT_ALM
-+		 * 5 - IIC_MUX_RESET_B
-+		 * 6 - GEM3_EXP_RESET_B
-+		 * 10 - FMC_HPC0_PRSNT_M2C_B
-+		 * 11 - FMC_HPC1_PRSNT_M2C_B
-+		 * 2-4, 7, 12-17 - not connected
-+		 */
-+	};
-+
-+	tca6416_u61: gpio at 21 { /* enable it by i2c mw 21 6 0 */
-+		compatible = "ti,tca6416";
-+		reg = <0x21>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		/*
-+		 * IRQ not connected
-+		 * Lines:
-+		 * 0 - VCCPSPLL_EN
-+		 * 1 - MGTRAVCC_EN
-+		 * 2 - MGTRAVTT_EN
-+		 * 3 - VCCPSDDRPLL_EN
-+		 * 4 - MIO26_PMU_INPUT_LS
-+		 * 5 - PL_PMBUS_ALERT
-+		 * 6 - PS_PMBUS_ALERT
-+		 * 7 - MAXIM_PMBUS_ALERT
-+		 * 10 - PL_DDR4_VTERM_EN
-+		 * 11 - PL_DDR4_VPP_2V5_EN
-+		 * 12 - PS_DIMM_VDDQ_TO_PSVCCO_ON
-+		 * 13 - PS_DIMM_SUSPEND_EN
-+		 * 14 - PS_DDR4_VTERM_EN
-+		 * 15 - PS_DDR4_VPP_2V5_EN
-+		 * 16 - 17 - not connected
-+		 */
-+	};
-+
-+	i2cswitch at 75 { /* u60 */
-+		compatible = "nxp,pca9544";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x75>;
-+		i2c at 0 { /* i2c mw 75 0 1 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			/* PS_PMBUS */
-+			ina226 at 40 { /* u76 */
-+				compatible = "ti,ina226";
-+				reg = <0x40>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 41 { /* u77 */
-+				compatible = "ti,ina226";
-+				reg = <0x41>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 42 { /* u78 */
-+				compatible = "ti,ina226";
-+				reg = <0x42>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 43 { /* u87 */
-+				compatible = "ti,ina226";
-+				reg = <0x43>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 44 { /* u85 */
-+				compatible = "ti,ina226";
-+				reg = <0x44>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 45 { /* u86 */
-+				compatible = "ti,ina226";
-+				reg = <0x45>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 46 { /* u93 */
-+				compatible = "ti,ina226";
-+				reg = <0x46>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 47 { /* u88 */
-+				compatible = "ti,ina226";
-+				reg = <0x47>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 4a { /* u15 */
-+				compatible = "ti,ina226";
-+				reg = <0x4a>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 4b { /* u92 */
-+				compatible = "ti,ina226";
-+				reg = <0x4b>;
-+				shunt-resistor = <5000>;
-+			};
-+		};
-+		i2c at 1 { /* i2c mw 75 0 1 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			/* PL_PMBUS */
-+			ina226 at 40 { /* u79 */
-+				compatible = "ti,ina226";
-+				reg = <0x40>;
-+				shunt-resistor = <2000>;
-+			};
-+			ina226 at 41 { /* u81 */
-+				compatible = "ti,ina226";
-+				reg = <0x41>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 42 { /* u80 */
-+				compatible = "ti,ina226";
-+				reg = <0x42>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 43 { /* u84 */
-+				compatible = "ti,ina226";
-+				reg = <0x43>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 44 { /* u16 */
-+				compatible = "ti,ina226";
-+				reg = <0x44>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 45 { /* u65 */
-+				compatible = "ti,ina226";
-+				reg = <0x45>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 46 { /* u74 */
-+				compatible = "ti,ina226";
-+				reg = <0x46>;
-+				shunt-resistor = <5000>;
-+			};
-+			ina226 at 47 { /* u75 */
-+				compatible = "ti,ina226";
-+				reg = <0x47>;
-+				shunt-resistor = <5000>;
-+			};
-+		};
-+		i2c at 2 { /* i2c mw 75 0 1 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+			/* MAXIM_PMBUS - 00 */
-+			max15301 at a { /* u46 */
-+				compatible = "maxim,max15301";
-+				reg = <0xa>;
-+			};
-+			max15303 at b { /* u4 */
-+				compatible = "maxim,max15303";
-+				reg = <0xb>;
-+			};
-+			max15303 at 10 { /* u13 */
-+				compatible = "maxim,max15303";
-+				reg = <0x10>;
-+			};
-+			max15301 at 13 { /* u47 */
-+				compatible = "maxim,max15301";
-+				reg = <0x13>;
-+			};
-+			max15303 at 14 { /* u7 */
-+				compatible = "maxim,max15303";
-+				reg = <0x14>;
-+			};
-+			max15303 at 15 { /* u6 */
-+				compatible = "maxim,max15303";
-+				reg = <0x15>;
-+			};
-+			max15303 at 16 { /* u10 */
-+				compatible = "maxim,max15303";
-+				reg = <0x16>;
-+			};
-+			max15303 at 17 { /* u9 */
-+				compatible = "maxim,max15303";
-+				reg = <0x17>;
-+			};
-+			max15301 at 18 { /* u63 */
-+				compatible = "maxim,max15301";
-+				reg = <0x18>;
-+			};
-+			max15303 at 1a { /* u49 */
-+				compatible = "maxim,max15303";
-+				reg = <0x1a>;
-+			};
-+			max15303 at 1b { /* u8 */
-+				compatible = "maxim,max15303";
-+				reg = <0x1b>;
-+			};
-+			max15303 at 1d { /* u18 */
-+				compatible = "maxim,max15303";
-+				reg = <0x1d>;
-+			};
-+
-+			max20751 at 72 { /* u95 */
-+				compatible = "maxim,max20751";
-+				reg = <0x72>;
-+			};
-+			max20751 at 73 { /* u96 */
-+				compatible = "maxim,max20751";
-+				reg = <0x73>;
-+			};
-+		};
-+		/* Bus 3 is not connected */
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	/* PL i2c via PCA9306 - u45 */
-+	i2cswitch at 74 { /* u34 */
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x74>;
-+		i2c at 0 { /* i2c mw 74 0 1 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			/*
-+			 * IIC_EEPROM 1kB memory which uses 256B blocks
-+			 * where every block has different address.
-+			 *    0 - 256B address 0x54
-+			 * 256B - 512B address 0x55
-+			 * 512B - 768B address 0x56
-+			 * 768B - 1024B address 0x57
-+			 */
-+			eeprom: eeprom at 54 { /* u23 */
-+				compatible = "atmel,24c08";
-+				reg = <0x54>;
-+			};
-+		};
-+		i2c at 1 { /* i2c mw 74 0 2 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			si5341: clock-generator1 at 36 { /* SI5341 - u69 */
-+				reg = <0x36>;
-+			};
-+
-+		};
-+		i2c at 2 { /* i2c mw 74 0 4 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+			si570_1: clock-generator2 at 5d { /* USER SI570 - u42 */
-+				#clock-cells = <0>;
-+				compatible = "silabs,si570";
-+				reg = <0x5d>;
-+				temperature-stability = <50>;
-+				factory-fout = <300000000>;
-+				clock-frequency = <300000000>;
-+			};
-+		};
-+		i2c at 3 { /* i2c mw 74 0 8 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+			si570_2: clock-generator3 at 5d { /* USER MGT SI570 - u56 */
-+				#clock-cells = <0>;
-+				compatible = "silabs,si570";
-+				reg = <0x5d>;
-+				temperature-stability = <50>; /* copy from zc702 */
-+				factory-fout = <156250000>;
-+				clock-frequency = <148500000>;
-+			};
-+		};
-+		i2c at 4 { /* i2c mw 74 0 10 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+			si5328: clock-generator4 at 69 {/* SI5328 - u20 */
-+				reg = <0x69>;
-+			};
-+		};
-+		i2c at 5 { /* i2c mw 74 0 11 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>; /* FAN controller */
-+			temp at 4c {/* lm96163 - u128 */
-+				compatible = "national,lm96163";
-+				reg = <0x4c>;
-+			};
-+		};
-+		/* 6 - 7 unconnected */
-+	};
-+
-+	i2cswitch at 75 {
-+		compatible = "nxp,pca9548"; /* u135 */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x75>;
-+
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			/* HPC0_IIC */
-+		};
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			/* HPC1_IIC */
-+		};
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+			/* SYSMON */
-+		};
-+		i2c at 3 { /* i2c mw 75 0 8 */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+			/* DDR4 SODIMM */
-+		};
-+		i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+			/* SEP 3 */
-+		};
-+		i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+			/* SEP 2 */
-+		};
-+		i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+			/* SEP 1 */
-+		};
-+		i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+			/* SEP 0 */
-+		};
-+	};
-+};
-+
-+&rtc {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+	/* SATA OOB timing settings */
-+	ceva,p0-cominit-params = /bits/ 8 <0x18 0x40 0x18 0x28>;
-+	ceva,p0-comwake-params = /bits/ 8 <0x06 0x14 0x08 0x0E>;
-+	ceva,p0-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
-+	ceva,p0-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
-+	ceva,p1-cominit-params = /bits/ 8 <0x18 0x40 0x18 0x28>;
-+	ceva,p1-comwake-params = /bits/ 8 <0x06 0x14 0x08 0x0E>;
-+	ceva,p1-burst-params = /bits/ 8 <0x13 0x08 0x4A 0x06>;
-+	ceva,p1-retry-params = /bits/ 16 <0x96A4 0x3FFC>;
-+};
-+
-+/* SD1 with level shifter */
-+&sdhci1 {
-+	status = "okay";
-+	no-1-8-v;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+/* ULPI SMSC USB3320 */
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&watchdog0 {
-+	status = "okay";
-+};
--- 
-1.9.1
+> 
+> Thanks,
+> Jean
