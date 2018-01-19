@@ -1,96 +1,67 @@
 From: jcm@jonmasters.org (Jon Masters)
-Date: Thu, 18 Jan 2018 20:00:47 -0500
-Subject: [v2,03/11] arm64: Take into account ID_AA64PFR0_EL1.CSV3
-In-Reply-To: <20180109100034.GD4297@arm.com>
-References: <1515157961-20963-4-git-send-email-will.deacon@arm.com>
- <20180108072253.GA178830@jc-sabre>
- <9bc1f137-d78c-e46e-e1bc-f49160d5f289@arm.com>
- <20180108174016.GB180149@jc-sabre> <20180108175100.GW25869@arm.com>
- <20180109040626.GB4924@jc-sabre> <20180109100034.GD4297@arm.com>
-Message-ID: <b0edc0ab-c61e-e70b-f339-5777add46575@jonmasters.org>
+Date: Thu, 18 Jan 2018 20:17:13 -0500
+Subject: [PATCH v2] arm64: Branch predictor hardening for Cavium ThunderX2
+In-Reply-To: <20180118232816.GA93910@jc-sabre>
+References: <20180108164651.GQ25869@arm.com>
+ <1515502022-7376-1-git-send-email-jnair@caviumnetworks.com>
+ <e9a192da-f603-6523-6d2e-858eb9c7d1b2@jonmasters.org>
+ <20180116234554.GA38392@jc-sabre> <20180118135354.GB20783@arm.com>
+ <20180118175615.GF38392@jc-sabre>
+ <cd75aa1e-10ec-2e40-3136-a34d4ec2258f@jonmasters.org>
+ <20180118232816.GA93910@jc-sabre>
+Message-ID: <4317e419-ddb1-b5b8-35a5-0cc227e1d217@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2018 05:00 AM, Will Deacon wrote:
-> On Mon, Jan 08, 2018 at 08:06:27PM -0800, Jayachandran C wrote:
->> On Mon, Jan 08, 2018 at 05:51:00PM +0000, Will Deacon wrote:
->>> On Mon, Jan 08, 2018 at 09:40:17AM -0800, Jayachandran C wrote:
->>>> On Mon, Jan 08, 2018 at 09:20:09AM +0000, Marc Zyngier wrote:
->>>>> On 08/01/18 07:24, Jayachandran C wrote:
->>>>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>>>>> index 19ed09b..202b037 100644
->>>>>> --- a/arch/arm64/kernel/cpufeature.c
->>>>>> +++ b/arch/arm64/kernel/cpufeature.c
->>>>>> @@ -862,6 +862,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->>>>>>                 return __kpti_forced > 0;
->>>>>>         }
->>>>>>  
->>>>>> +       /* Don't force KPTI for CPUs that are not vulnerable */
->>>>>> +       switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
->>>>>> +               case MIDR_CAVIUM_THUNDERX2:
->>>>>> +               case MIDR_BRCM_VULCAN:
->>>>>> +                       return false;
->>>>>> +       }
->>>>>> +
->>>>>>         /* Useful for KASLR robustness */
->>>>>>         if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->>>>>>                 return true;
->>>>>>
->>>>>
->>>>> KPTI is also an improvement for KASLR. Why would you deprive a user of
->>>>> the choice to further secure their system?
->>>>
->>>> The user has a choice with kpti= at the kernel command line, so we are
->>>> not depriving the user of a choice. KASLR is expected to be enabled by
->>>> distributions, and KPTI will be enabled by default as well.
->>>>
->>>> On systems that are not vulnerable to variant 3, this is an unnecessary
->>>> overhead.
->>>
->>> KASLR can be bypassed on CPUs that are not vulnerable to variant 3 simply
->>> by timing how long accesses to kernel addresses from EL0 take -- please read
->>> the original KAISER paper for details about that attack on x86. kpti
->>> mitigates that. If you don't care about KASLR, don't enable it (arguably
->>> it's useless without kpti).
->>
->> The code above assumes that all ARM CPUs (now and future) will be vulnerable
->> to timing attacks that can bypass KASLR. I don't think that is a correct
->> assumption to make.
-> 
-> Well, the code is assuming that the difference between a TLB hit and a miss
-> can be measured and that permission faulting entries can be cached in the
-> TLB. I think that's a safe assumption for the moment. You can also disable
-> kaslr on the command line and at compile-time if you don't want to use it,
-> and the same thing applies to kpti. I really see this more as user
-> preference, rather than something that should be keyed off the MIDR and we
-> already provide those controls via the command line.
-> 
-> To be clear: I'll take the MIDR whitelisting, but only after the KASLR check
-> above.
-> 
->> If ThunderX2 is shown to be vulnerable to any timing based attack we can
->> certainly move the MIDR check after the check for the CONFIG_RANDOMIZE_BASE.
->> But I don't think that is the case now, if you have any PoC code to check
->> this I can run on the processor and make the change.
-> 
-> I haven't tried, but if you have a TLB worth its salt, I suspect you can
-> defeat kaslr by timing prefetches or faulting loads to kernel addresses.
-> 
->> It is pretty clear that we need a whitelist check either before or after the
->> CONFIG_RANDOMIZE_BASE check.
-> 
-> Please send a patch implementing this after the check.
+Hi JC, Will,
 
-JC: what's the plan here from Cavium? I didn't see such a patch (but
-might have missed it). I've asked that we follow the same logic as on
-x86 within Red Hat and default to disabling (k)pti on hardware known not
-to be vulnerable to that explicit attack. Sure, KASLR bypass is "not
-good"(TM) and there are ton(ne)s of new ways to do that found all the
-time, but the performance hit is non-zero and there is a difference
-between breaking randomization vs. leaking cache data, and HPC folks are
-among those who are going to come asking why they need to turn off PTI
-all over the place. The equivalent would be on x86 where one vendor
-always has PTI enabled, the other only if the user explicitly requests
-that it be turned on at boot time.
+On 01/18/2018 06:28 PM, Jayachandran C wrote:
+> On Thu, Jan 18, 2018 at 01:27:15PM -0500, Jon Masters wrote:
+>> On 01/18/2018 12:56 PM, Jayachandran C wrote:
+>>> On Thu, Jan 18, 2018 at 01:53:55PM +0000, Will Deacon wrote:
+
+>>> I think in this case we have to choose between crashing or giving a false
+>>> sense of security when a guest compiled with HARDEN_BRANCH_PREDICTOR is
+>>> booted on an hypervisor that does not support hardening. Crashing maybe
+>>> a reasonable option.
+>>
+>> Crashing is a completely unreasonable option and is totally
+>> unacceptable. We never do this in enterprise, period.
+>>
+>> It's reasonable to give an output in dmesg that a system isn't hardened,
+>> but it's not reasonable to crash. On x86, we added a new qemu machine
+>> type for those guests that would have IBRS exposed, and ask users to
+>> switch that on explicitly, but even if they boot the new kernels on
+>> unpatched infrastructure, we'll detect the lack of the branch predictor
+>> control interface and just log that.
+>>
+>> The exact same thing should happen on ARM.
+> 
+> With the current patchset from ARM, there is no way of detecting if the
+> hypervisor is hardened or not, to provide the warning.  The only other
+> option I have call get version blindly and provide a false sense of
+> security.
+
+Agreed that (unless) I'm missing something, the current arm patchset
+doesn't have an enumeration mechanism to see if firmware supports the
+branch predictor hardening or not. Am I missing something there?
+
+On the three other affected arches we're tracking, there's an
+enumeration mechanism. On x86, there's a new set of CPUID bits. On
+POWER, there's a new hcall that tells us whether the millicode supports
+what we need, and on z there's a new facility code we can test for that
+is also passed into VMs. So we need to have a similar enumeration
+mechanism on ARM that is passed into guests as well.
+
+> Since both options are bad, I don't have a good solution here. If RedHat
+> has a preference here on what would be better, I can go with that.
+
+We need an enumeration mechanism that determines whether the hypervisor
+is patched. In the absence of that, blindly calling in and hoping that
+the firmware is updated is better than nothing. I'll look to see if
+there's a generic upstream solution for enumeration that I've missed (or
+that can be added, perhaps a new SMC enumeration mechanism). If there
+isn't a short term fix, we'll work with you guys directly to add
+something RHEL specific by checking some firmware version somehow.
 
 Jon.
