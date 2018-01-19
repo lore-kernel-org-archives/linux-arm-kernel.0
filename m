@@ -1,44 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 19 Jan 2018 10:26:48 +0100
-Subject: [PATCH v2 03/16] ARM: dts: r8a7790: sort subnodes of soc node
-In-Reply-To: <CAMuHMdV65W0jAH9u3vGyrZrD3VjV_4XotFKdsNx6gVCU8nyJQw@mail.gmail.com>
-References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-4-horms+renesas@verge.net.au>
- <CAMuHMdV65W0jAH9u3vGyrZrD3VjV_4XotFKdsNx6gVCU8nyJQw@mail.gmail.com>
-Message-ID: <20180119092647.iumaljyi5mtwa4gr@verge.net.au>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 19 Jan 2018 09:49:55 +0000
+Subject: [PATCH] arm64: setup: Check for overlapping dtb and Image load
+ addresses
+In-Reply-To: <20180119065637.12789-1-clingutla@codeaurora.org>
+References: <20180119065637.12789-1-clingutla@codeaurora.org>
+Message-ID: <52502bba-97dc-c955-fa37-0212d39ddacd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 09:39:24AM +0100, Geert Uytterhoeven wrote:
-> On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Sort the subnodes of the soc node to improve maintainability.
-> > The sort key is the addresss on the bus with instances of the same
-> > IP block grouped together.
-> >
-> > This patch should not introduce any functional change.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> The sort order for the various SCIF variants is still a bit odd:
-> 
->         scifa0: serial at e6c40000 {
->         scifa1: serial at e6c50000 {
->         scifa2: serial at e6c60000 {
->         scifb0: serial at e6c20000 {
->         scifb1: serial at e6c30000 {
->         scifb2: serial at e6ce0000 {
->         scif0: serial at e6e60000 {
->         scif1: serial at e6e68000 {
->         scif2: serial at e6e56000 {
->         hscif0: serial at e62c0000 {
->         hscif1: serial at e62c8000 {
-> 
-> (hscif0 has the lowest address)
-> 
-> But hey, SCIF is special ;-)
+Hi Lingutla,
 
-Right, I decided to keep the SCIF ordering as is.
-My preference is to address this later if we come up with a better scheme.
+On 19/01/18 06:56, Lingutla Chandrasekhar wrote:
+> Sometime kernel image and dtb load offsets can overlap due to
+> dynamically increased Image or dtb size if both load addresses
+> are near to each other, which leads to bootup failures.
+> 
+> So validate dtb load address and kernel image, if they overlap
+> do not proceed to boot.
+> 
+> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 30ad2f085d1f..c9dd699f09ab 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -181,11 +181,17 @@ static void __init smp_build_mpidr_hash(void)
+>   static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>   {
+>   	void *dt_virt = fixmap_remap_fdt(dt_phys);
+> +	u64 end_phys = __pa_symbol(_end);
+> +	u64 start_phys = __pa_symbol(_text);
+>   	const char *name;
+>   
+> -	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+> +	if (!dt_virt || ((dt_phys < start_phys) &&
+> +		((dt_phys + fdt_totalsize(dt_virt)) > start_phys)) ||
+> +		((dt_phys > start_phys) && (dt_phys < end_phys)) ||
+> +		!early_init_dt_scan(dt_virt)) {
+>   		pr_crit("\n"
+>   			"Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
+> +			"The dtb load address should not overlap with kernel image\n"
+>   			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
+>   			"\nPlease check your bootloader.",
+>   			&dt_phys, dt_virt);
+> 
+
+Could this be checked separately?
+
+When you get that error message you don't know whether the issue is an 
+ill formed dtb or overlapping with the kernel.
+
+So it'd be nice to have a separate message (and maybe add info of how 
+many bytes are overlapping?).
+
+Cheers,
+
+-- 
+Julien Thierry
