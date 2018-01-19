@@ -1,78 +1,97 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 19 Jan 2018 10:27:53 +0000
-Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
- from devices
-In-Reply-To: <0772e71e-4861-1e7b-f248-88aaba8bf2fc@codeaurora.org>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-6-jean-philippe.brucker@arm.com>
- <0772e71e-4861-1e7b-f248-88aaba8bf2fc@codeaurora.org>
-Message-ID: <e2753b59-2b9e-ffc6-a7b8-0ed23df38e10@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 19 Jan 2018 10:27:26 +0000
+Subject: Tegra baseline test results for v4.15-rc8
+Message-ID: <4ca0095b-0c28-2a87-83ae-7b20a9df8d65@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Here are some basic Tegra test results for Linux v4.15-rc8.
+Logs and other details at:
 
-On 19/01/18 04:52, Sinan Kaya wrote:
-> Hi Jean-Philippe,
-> 
-> On 10/6/2017 9:31 AM, Jean-Philippe Brucker wrote:
->>  /**
->> + * iommu_process_bind_device - Bind a process address space to a device
->> + * @dev: the device
->> + * @task: the process to bind
->> + * @pasid: valid address where the PASID will be stored
->> + * @flags: bond properties (IOMMU_PROCESS_BIND_*)
->> + *
->> + * Create a bond between device and task, allowing the device to access the
->> + * process address space using the returned PASID.
->> + *
->> + * On success, 0 is returned and @pasid contains a valid ID. Otherwise, an error
->> + * is returned.
->> + */
->> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
->> +			      int *pasid, int flags)
-> 
-> This API doesn't play nice with endpoint device drivers that have PASID limitations.
-> 
-> The AMD driver seems to have PASID limitations per product that are not being
-> advertised in the PCI capability.
-> 
-> device_iommu_pasid_init()
-> {
->         pasid_limit = min_t(unsigned int,
->                         (unsigned int)(1 << kfd->device_info->max_pasid_bits),
->                         iommu_info.max_pasids);
->         /*
->          * last pasid is used for kernel queues doorbells
->          * in the future the last pasid might be used for a kernel thread.
->          */
->         pasid_limit = min_t(unsigned int,
->                                 pasid_limit,
->                                 kfd->doorbell_process_limit - 1);
-> }
-> 
-> kfd->device_info->max_pasid_bits seems to contain per device limitations.
-> 
-> Would you be willing to extend the API so that the requester can impose some limit
-> on the PASID value that is getting allocated.
+    https://nvtb.github.io//linux/test_v4.15-rc8/20180114163103/
 
-Good point. Following the feedback for this series, next version adds
-another public function:
 
-int iommu_sva_device_init(struct device *dev, int features);
+Test summary - 100% Success*
+----------------------------
 
-that has to be called by the device driver before any bind(). The intent
-is to let some IOMMU drivers initialize PASID tables and other features
-lazily, only if the device driver actually intends to use them. Maybe I
-could change this function to:
+Build: zImage:
+    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
+		   tegra_defconfig%tegra-fw
 
-int iommu_sva_device_init(struct device *dev, int features, unsigned int
-max_pasid);
+Build: Image:
+    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
+		   defconfig%jetson-tx1
 
-@features is a bitmask telling what the device driver needs (PASID and/or
-page faults). If features has IOMMU_SVA_FEAT_PASID set, then device driver
-can set a max_pasid limit, that we'd store in our private device-iommu
-data. If max_pasid is 0, then we'd use the PCI limit.
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
 
-Thanks,
-Jean
+Boot to userspace: defconfig%jetson-tx1:
+    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
+
+Boot to userspace: defconfig%jetson-tx2:
+    Pass: ( 1/ 1): tegra186-p2771-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig%tegra-fw:
+    Pass: ( 2/ 2): tegra124-jetson-tk1, tegra124-nyan-big
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig%tegra-fw:
+    Pass: ( 2/ 2): tegra124-jetson-tk1, tegra124-nyan-big
+
+
+vmlinux object size
+(delta in bytes from test_v4.15-rc7 (b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d)):
+   text     data      bss    total  kernel
+   -184     +200        0      +16  defconfig
+   +728      +12        0     +740  multi_v7_defconfig
+   +604      +20        0     +624  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.15-rc7 (b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+
+* kernelci.org is reporting failures for tegra124-nyan-big which is 
+  caused by nouvueau. There is a workaround available [0] but has not 
+  been picked up yet.
+
+[0] https://www.spinics.net/lists/dri-devel/msg161277.html
+
+--
+nvpublic
