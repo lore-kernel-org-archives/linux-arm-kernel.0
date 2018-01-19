@@ -1,36 +1,63 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 19 Jan 2018 10:38:08 +0530
-Subject: [PATCH v5 29/44] ARM: da8xx: add new USB PHY clock init using
- common clock framework
-In-Reply-To: <c31d26b6-fb79-4581-039f-b977d737da2d@lechnology.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-30-git-send-email-david@lechnology.com>
- <83dfab9a-be30-6313-d756-50fa018e757e@ti.com>
- <c31d26b6-fb79-4581-039f-b977d737da2d@lechnology.com>
-Message-ID: <e549631a-b969-a1d3-ff7e-91ef65c5621a@ti.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 19 Jan 2018 14:12:39 +0900
+Subject: [PATCH v4 07/13] ARM: dts: rockchip: add clocks in vop iommu nodes
+In-Reply-To: <5A617A5E.6070606@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-8-jeffy.chen@rock-chips.com>
+ <CAAFQd5ACbV6Q2Jwze=hoG=13jSJKkYyDDs2HzvvdSK-RGK+w2g@mail.gmail.com>
+ <5A617A5E.6070606@rock-chips.com>
+Message-ID: <CAAFQd5D2FO4bXh7djKyyE0s_pq8N_9YxxmkDJizoem_fLxTk0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 January 2018 12:13 AM, David Lechner wrote:
-> On 01/18/2018 09:14 AM, Sekhar Nori wrote:
->> On Monday 08 January 2018 07:47 AM, David Lechner wrote:
->>> +int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
->>> +{
->>> +??? struct regmap *cfgchip;
->>> +??? struct clk *usb0_psc_clk, *clk;
->>> +??? struct clk_hw *parent;
->>> +
->>> +??? cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
+On Fri, Jan 19, 2018 at 1:55 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
+> Hi Tomasz,
+>
+> Thanks for your reply.
+>
+>
+> On 01/19/2018 11:23 AM, Tomasz Figa wrote:
 >>
->> Am I right in understanding that this API is only called for non-DT
->> boot? If yes, do we really need the lookup by compatible?
-> 
-> This code is used in DT boot until [PATCH v5 43/44] "ARM: da8xx-dt:
-> switch to device tree clocks". So, yes it is needed temporarily to
-> prevent breaking USB.
+>> On Thu, Jan 18, 2018 at 8:52 PM, Jeffy Chen <jeffy.chen@rock-chips.com>
+>> wrote:
+>>>
+>>> Add clocks in vop iommu nodes, since we are going to control clocks in
+>>> rockchip iommu driver.
+>>>
+>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>> ---
+>>>
+>>> Changes in v4: None
+>>> Changes in v3: None
+>>> Changes in v2: None
+>>>
+>>>   arch/arm/boot/dts/rk3036.dtsi | 2 ++
+>>>   arch/arm/boot/dts/rk3288.dtsi | 4 ++++
+>>>   2 files changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/rk3036.dtsi
+>>> b/arch/arm/boot/dts/rk3036.dtsi
+>>> index 3b704cfed69a..95b0ebc7a40f 100644
+>>> --- a/arch/arm/boot/dts/rk3036.dtsi
+>>> +++ b/arch/arm/boot/dts/rk3036.dtsi
+>>> @@ -197,6 +197,8 @@
+>>>                  reg = <0x10118300 0x100>;
+>>>                  interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+>>>                  interrupt-names = "vop_mmu";
+>>> +               clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru
+>>> HCLK_LCDC>;
+>>> +               clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
+>>
+>>
+>> We should remove clock-names from IOMMU nodes. The Rockchip IOMMU
+>> bindings don't define clock names and only the clocks property should
+>> be given.
+>>
+> hmmm, i'm trying to switch to clk_bulk APIs, the get and put are name based.
+> or maybe i can use clk_get/put along with other clk_bulk APIs
 
-Alright, so this line should probably be dropped either as part of 43/44
-or later.
-
-Thanks,
-Sekhar
+I think it should be possible to just put the clock pointers to the
+clk_bulk_data struct manually. Otherwise, I'm not sure what names we
+could use for clock-names, since the clocks depend on master.
+(Something like "clock0, clock1, clock2, ..., clockN" could work, but
+it doesn't add any value IMHO...).
