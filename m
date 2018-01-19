@@ -1,118 +1,55 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 19 Jan 2018 17:27:21 -0600
-Subject: [PATCH v6 02/12] drivers: base: cacheinfo: setup DT cache
- properties early
-In-Reply-To: <05a8b375-70c4-34d4-6cde-8dd4cd62c10b@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-3-jeremy.linton@arm.com>
- <20180115123338.GB5473@e107155-lin>
- <65f78c99-8b86-0098-7ced-899840a4bf16@arm.com>
- <ca64334c-9345-705c-80d8-f2deb924a679@arm.com>
- <15884ccc-2cfb-da91-5844-369d8237175d@arm.com>
- <05a8b375-70c4-34d4-6cde-8dd4cd62c10b@arm.com>
-Message-ID: <6627a9ef-8d62-3cdf-dbea-390770991f30@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 20 Jan 2018 07:17:35 +0800
+Subject: [RFC PATCH 9/9] ARM: suniv: f1c100s: add device tree for Lichee Pi
+ Nano
+In-Reply-To: <20180119231735.61504-1-icenowy@aosc.io>
+References: <20180119231735.61504-1-icenowy@aosc.io>
+Message-ID: <20180119231735.61504-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Lichee Pi Nano is a F1C100s board by Lichee Pi.
 
-On 01/18/2018 04:14 AM, Sudeep Holla wrote:
-> 
-> 
-> On 17/01/18 18:51, Jeremy Linton wrote:
->> Hi,
->>
->> On 01/17/2018 12:20 PM, Sudeep Holla wrote:
->>>
->>>
->>> On 16/01/18 21:07, Jeremy Linton wrote:
->>>> Hi,
->>>>
->>>> On 01/15/2018 06:33 AM, Sudeep Holla wrote:
->>>>> On Fri, Jan 12, 2018 at 06:59:10PM -0600, Jeremy Linton wrote:
->>>>>> The original intent in cacheinfo was that an architecture
->>>>>> specific populate_cache_leaves() would probe the hardware
->>>>>> and then cache_shared_cpu_map_setup() and
->>>>>> cache_override_properties() would provide firmware help to
->>>>>> extend/expand upon what was probed. Arm64 was really
->>>>>> the only architecture that was working this way, and
->>>>>> with the removal of most of the hardware probing logic it
->>>>>> became clear that it was possible to simplify the logic a bit.
->>>>>>
->>>>>> This patch combines the walk of the DT nodes with the
->>>>>> code updating the cache size/line_size and nr_sets.
->>>>>> cache_override_properties() (which was DT specific) is
->>>>>> then removed. The result is that cacheinfo.of_node is
->>>>>> no longer used as a temporary place to hold DT references
->>>>>> for future calls that update cache properties. That change
->>>>>> helps to clarify its one remaining use (matching
->>>>>> cacheinfo nodes that represent shared caches) which
->>>>>> will be used by the ACPI/PPTT code in the following patches.
->>>>>>
->>>>>> Cc: Palmer Dabbelt <palmer@sifive.com>
->>>>>> Cc: Albert Ou <albert@sifive.com>
->>>>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>>>>> ---
->>>>>>  ?? arch/riscv/kernel/cacheinfo.c |? 1 +
->>>>>>  ?? drivers/base/cacheinfo.c????? | 65
->>>>>> +++++++++++++++++++------------------------
->>>>>>  ?? include/linux/cacheinfo.h???? |? 1 +
->>>>>>  ?? 3 files changed, 31 insertions(+), 36 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/riscv/kernel/cacheinfo.c
->>>>>> b/arch/riscv/kernel/cacheinfo.c
->>>>>> index 10ed2749e246..6f4500233cf8 100644
->>>>>> --- a/arch/riscv/kernel/cacheinfo.c
->>>>>> +++ b/arch/riscv/kernel/cacheinfo.c
->>>>>> @@ -30,6 +30,7 @@ static void ci_leaf_init(struct cacheinfo
->>>>>> *this_leaf,
->>>>>>  ?????????? CACHE_WRITE_BACK
->>>>>>  ?????????? | CACHE_READ_ALLOCATE
->>>>>>  ?????????? | CACHE_WRITE_ALLOCATE;
->>>>>> +??? cache_of_set_props(this_leaf, node);
->>>>>
->>>>> This may be necessary but can it be done as later patch ? So far
->>>>> nothing
->>>>> is added that may break riscv IIUC.
->>>>
->>>> Well I think you have a bisection issue where the additional information
->>>> will disappear between this patch and wherever we put this code back in.
->>>>
->>>
->>> Hmm, I am sorry but I fail to see the issue. Before this change,
->>> populate_cache_leaves just populated the info as per ci_leaf_init in
->>> arch/riscv/kernel/cacheinfo.c and cache_override_properties used to fill
->>> the remaining.
->>>
->>> After this patch, the same is achieved in cache_shared_cpu_map_setup.
->>>
->>> In both case, it was by the end of detect_cache_attributes, so I see no
->>> issue.
->>>
->>
->>
->> Hi,
->>
->> I must be misunderstanding something.
->>
-> 
-> Looks like I was missing to understand something :)
-> 
->> AFAIK, The code in cache_setup_of_node() won't call cache_of_set_props()
->> because it returns when there is an existing of_node (fw_unique) created
->> by the riscv populate_cache_leaves(). That's why I'm making the direct
->> call here. If we fail to get that change in place before
->> cache_override_properties() is removed then the fields not set by the
->> riscv code (size/etc) will be missing.
-> 
-> Indeed. I am trying to avoid use of cache_of_set_props outside.
-> How about skipping setting up of fw_unique in ci_leaf_init instead ?
-> 
+Add initial device tree for it.
 
-I've been thinking about this, but I'm hesitant because I don't have a 
-good test platform for this code. Plus, I'm not 100% sure that the 
-results are the same (is it possible that the platform setup node isn't 
-the same as the one the the common code would find?).
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 27 +++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
 
-I also think I'm getting a little off topic with these patches in 
-relation to what the core goal is (adding PPTT parsing).
+diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+new file mode 100644
+index 000000000000..11c891716acc
+--- /dev/null
++++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+@@ -0,0 +1,27 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
++ */
++
++/dts-v1/;
++#include "suniv-f1c100s.dtsi"
++
++/ {
++	model = "Lichee Pi Nano";
++	compatible = "licheepi,licheepi-nano", "allwinner,suniv-f1c100s",
++		     "allwinner,suniv";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
+-- 
+2.14.2
