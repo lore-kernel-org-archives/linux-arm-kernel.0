@@ -1,41 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Jan 2018 16:14:23 +0100
-Subject: [PATCH] phy: work around 'phys' references to usb-nop-xceiv
- devices
-In-Reply-To: <c38e54f7-4dbd-72dc-e1fb-9003435cbe0e@i2se.com>
-References: <20180112101223.3661181-1-arnd@arndb.de>
- <CAL_JsqKi30aUiJUdjnen+sty_2horaTVs5LFaFJdxACsvEQpkg@mail.gmail.com>
- <c38e54f7-4dbd-72dc-e1fb-9003435cbe0e@i2se.com>
-Message-ID: <CAK8P3a2FEdhVXGHT3VE43LE9Rn-WNp+woasb9EwVAr8twVw2Dw@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 19 Jan 2018 16:18:21 +0100
+Subject: [PATCH 3/3] soc/tegra: pmc: Use of_clk_get_parent_count() instead of
+ open coding
+In-Reply-To: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
+References: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1516375101-29836-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 11:35 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Am 12.01.2018 um 20:54 schrieb Rob Herring:
->> On Fri, Jan 12, 2018 at 4:12 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+As of_clk_get_parent_count() returns zero on failure, while
+of_count_phandle_with_args() might return a negative error code, this
+also fixes the issue of possibly using a very big number in the
+allocation below.
 
->>> ---
->>> Hans tested the earlier version of this patch, I'd like one more
->>> confirmation from Hans or Stefan (or anyone else) that this version
->>> addresses the regression as well before this gets merged.
->>>
->>> Greg, can you pick this up into usb-linus for v4.15 once the fix
->>> has been confirmed, or should I merge it through arm-soc?
->>> ---
->>>  drivers/phy/phy-core.c | 4 ++++
->>>  1 file changed, 4 insertions(+)
->> Thanks for fixing this.
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->>
->> Rob
->
-> ping ...
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/soc/tegra/pmc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-I ended up putting it into arm-soc/fixes. I assume that Greg missed it
-while he was
-busy getting the latest stable kernels out. I'll send a pull request
-to Linus and
-explain it there today.
-
-     Arnd
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index ce62a47a6647a817..4379e4d602bc5428 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/clk/tegra.h>
+ #include <linux/debugfs.h>
+ #include <linux/delay.h>
+@@ -743,7 +744,7 @@ static int tegra_powergate_of_get_clks(struct tegra_powergate *pg,
+ 	unsigned int i, count;
+ 	int err;
+ 
+-	count = of_count_phandle_with_args(np, "clocks", "#clock-cells");
++	count = of_clk_get_parent_count(np);
+ 	if (count == 0)
+ 		return -ENODEV;
+ 
+-- 
+2.7.4
