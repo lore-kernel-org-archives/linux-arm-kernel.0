@@ -1,29 +1,45 @@
-From: martin.petersen@oracle.com (Martin K. Petersen)
-Date: Thu, 18 Jan 2018 21:43:59 -0500
-Subject: [PATCH] scsi: fas216: fix sense buffer initialization
-In-Reply-To: <20180118131650.893849-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Thu, 18 Jan 2018 14:16:38 +0100")
-References: <20180118131650.893849-1-arnd@arndb.de>
-Message-ID: <yq13732o9e8.fsf@oracle.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 19 Jan 2018 12:23:11 +0900
+Subject: [PATCH v4 07/13] ARM: dts: rockchip: add clocks in vop iommu nodes
+In-Reply-To: <20180118115251.5542-8-jeffy.chen@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-8-jeffy.chen@rock-chips.com>
+Message-ID: <CAAFQd5ACbV6Q2Jwze=hoG=13jSJKkYyDDs2HzvvdSK-RGK+w2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Arnd,
-
-> While testing with the ARM specific memset() macro removed, I ran
-> into a compiler warning that shows an old bug:
+On Thu, Jan 18, 2018 at 8:52 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> Add clocks in vop iommu nodes, since we are going to control clocks in
+> rockchip iommu driver.
 >
-> drivers/scsi/arm/fas216.c: In function 'fas216_rq_sns_done':
-> drivers/scsi/arm/fas216.c:2014:40: error: argument to 'sizeof' in 'memset' call is the same expression as the destination; did you mean to provide an explicit length? [-Werror=sizeof-pointer-memaccess]
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
 >
-> It turns out that the definition of the scsi_cmd structure changed back
-> in linux-2.6.25, so now we clear only four bytes (sizeof(pointer)) instead
-> of 96 (SCSI_SENSE_BUFFERSIZE). I did not check whether we actually need
-> to initialize the buffer here, but it's clear that if we do it, we
-> should use the correct size.
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+>
+>  arch/arm/boot/dts/rk3036.dtsi | 2 ++
+>  arch/arm/boot/dts/rk3288.dtsi | 4 ++++
+>  2 files changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index 3b704cfed69a..95b0ebc7a40f 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -197,6 +197,8 @@
+>                 reg = <0x10118300 0x100>;
+>                 interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+>                 interrupt-names = "vop_mmu";
+> +               clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru HCLK_LCDC>;
+> +               clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
 
-Applied to 4.16/scsi-queue. Thanks!
+We should remove clock-names from IOMMU nodes. The Rockchip IOMMU
+bindings don't define clock names and only the clocks property should
+be given.
 
--- 
-Martin K. Petersen	Oracle Linux Engineering
+Not even saying that the names currently listed are not good examples,
+they name SoC clock controller output, rather than device inputs.
+
+Best regards,
+Tomasz
