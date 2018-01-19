@@ -1,22 +1,26 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 19 Jan 2018 09:48:14 +0100
-Subject: [PATCH v2 07/16] ARM: dts: r8a7791: sort subnodes of root node
-In-Reply-To: <20180117161717.14589-8-horms+renesas@verge.net.au>
+Date: Fri, 19 Jan 2018 09:50:37 +0100
+Subject: [PATCH v2 08/16] ARM: dts: r8a7792: sort subnodes of soc node
+In-Reply-To: <20180117161717.14589-9-horms+renesas@verge.net.au>
 References: <20180117161717.14589-1-horms+renesas@verge.net.au>
- <20180117161717.14589-8-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXWKgkBJf-choEKiQspEj_Tk6-rDr6qRd835m9JY=Q8Fg@mail.gmail.com>
+ <20180117161717.14589-9-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU5vfMq3_frVJseM9sbRUM62gKrwX-m0QVbR3evhWoCpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Sort subnodes of root node to aid maintenance.
+> Sort the subnodes of the soc node to improve maintainability.
+> The sort key is the address on the bus with instances of the same
+> IP block grouped together.
 >
 > This patch should not introduce any functional change.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Albeit the same comment about SCIF variant sort order as for r8a7790.
 
 Gr{oetje,eeting}s,
 
