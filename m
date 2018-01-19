@@ -1,59 +1,180 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 19 Jan 2018 09:49:55 +0000
-Subject: [PATCH] arm64: setup: Check for overlapping dtb and Image load
- addresses
-In-Reply-To: <20180119065637.12789-1-clingutla@codeaurora.org>
-References: <20180119065637.12789-1-clingutla@codeaurora.org>
-Message-ID: <52502bba-97dc-c955-fa37-0212d39ddacd@arm.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Fri, 19 Jan 2018 10:53:37 +0100
+Subject: [PATCH net-next v2] net: stmmac: Fix reception of Broadcom
+ switches tags
+In-Reply-To: <20180118231222.19394-1-f.fainelli@gmail.com>
+References: <20180118231222.19394-1-f.fainelli@gmail.com>
+Message-ID: <48d19daf-0b66-ea5b-9ccb-12f5d2f9f196@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lingutla,
+On 1/19/2018 12:12 AM, Florian Fainelli wrote:
+> Broadcom tags inserted by Broadcom switches put a 4 byte header after
+> the MAC SA and before the EtherType, which may look like some sort of 0
+> length LLC/SNAP packet (tcpdump and wireshark do think that way). With
+> ACS enabled in stmmac the packets were truncated to 8 bytes on
+> reception, whereas clearing this bit allowed normal reception to occur.
+>
+> In order to make that possible, we need to pass a net_device argument to
+> the different core_init() functions and we are dependent on the Broadcom
+> tagger padding packets correctly (which it now does). To be as little
+> invasive as possible, this is only done for gmac1000 when the network
+> device is DSA-enabled (netdev_uses_dsa() returns true).
+>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-On 19/01/18 06:56, Lingutla Chandrasekhar wrote:
-> Sometime kernel image and dtb load offsets can overlap due to
-> dynamically increased Image or dtb size if both load addresses
-> are near to each other, which leads to bootup failures.
-> 
-> So validate dtb load address and kernel image, if they overlap
-> do not proceed to boot.
-> 
-> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
-> 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 30ad2f085d1f..c9dd699f09ab 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -181,11 +181,17 @@ static void __init smp_build_mpidr_hash(void)
->   static void __init setup_machine_fdt(phys_addr_t dt_phys)
->   {
->   	void *dt_virt = fixmap_remap_fdt(dt_phys);
-> +	u64 end_phys = __pa_symbol(_end);
-> +	u64 start_phys = __pa_symbol(_text);
->   	const char *name;
+Acked-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+
+> ---
+> Changes in v2:
+>
+> - fixed build failure in dwmac4_core.c
+> - updated dwmac100_core.c to also clear the ASTP bit
+>
+>   drivers/net/ethernet/stmicro/stmmac/common.h         |  2 +-
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c    |  3 ++-
+>   drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c | 12 +++++++++++-
+>   drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c  | 15 +++++++++++++--
+>   drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c    | 12 +++++++++++-
+>   drivers/net/ethernet/stmicro/stmmac/stmmac_main.c    |  2 +-
+>   6 files changed, 39 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/common.h b/drivers/net/ethernet/stmicro/stmmac/common.h
+> index ce2ea2d491ac..2ffe76c0ff74 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/common.h
+> +++ b/drivers/net/ethernet/stmicro/stmmac/common.h
+> @@ -474,7 +474,7 @@ struct mac_device_info;
+>   /* Helpers to program the MAC core */
+>   struct stmmac_ops {
+>   	/* MAC core initialization */
+> -	void (*core_init)(struct mac_device_info *hw, int mtu);
+> +	void (*core_init)(struct mac_device_info *hw, struct net_device *dev);
+>   	/* Enable the MAC RX/TX */
+>   	void (*set_mac)(void __iomem *ioaddr, bool enable);
+>   	/* Enable and verify that the IPC module is supported */
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> index 9eb7f65d8000..a3fa65b1ca8e 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> @@ -483,7 +483,8 @@ static int sun8i_dwmac_init(struct platform_device *pdev, void *priv)
+>   	return 0;
+>   }
 >   
-> -	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
-> +	if (!dt_virt || ((dt_phys < start_phys) &&
-> +		((dt_phys + fdt_totalsize(dt_virt)) > start_phys)) ||
-> +		((dt_phys > start_phys) && (dt_phys < end_phys)) ||
-> +		!early_init_dt_scan(dt_virt)) {
->   		pr_crit("\n"
->   			"Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
-> +			"The dtb load address should not overlap with kernel image\n"
->   			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
->   			"\nPlease check your bootloader.",
->   			&dt_phys, dt_virt);
-> 
-
-Could this be checked separately?
-
-When you get that error message you don't know whether the issue is an 
-ill formed dtb or overlapping with the kernel.
-
-So it'd be nice to have a separate message (and maybe add info of how 
-many bytes are overlapping?).
-
-Cheers,
-
--- 
-Julien Thierry
+> -static void sun8i_dwmac_core_init(struct mac_device_info *hw, int mtu)
+> +static void sun8i_dwmac_core_init(struct mac_device_info *hw,
+> +				  struct net_device *dev)
+>   {
+>   	void __iomem *ioaddr = hw->pcsr;
+>   	u32 v;
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
+> index 8a86340ff2d3..540d21786a43 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac1000_core.c
+> @@ -25,18 +25,28 @@
+>   #include <linux/crc32.h>
+>   #include <linux/slab.h>
+>   #include <linux/ethtool.h>
+> +#include <net/dsa.h>
+>   #include <asm/io.h>
+>   #include "stmmac_pcs.h"
+>   #include "dwmac1000.h"
+>   
+> -static void dwmac1000_core_init(struct mac_device_info *hw, int mtu)
+> +static void dwmac1000_core_init(struct mac_device_info *hw,
+> +				struct net_device *dev)
+>   {
+>   	void __iomem *ioaddr = hw->pcsr;
+>   	u32 value = readl(ioaddr + GMAC_CONTROL);
+> +	int mtu = dev->mtu;
+>   
+>   	/* Configure GMAC core */
+>   	value |= GMAC_CORE_INIT;
+>   
+> +	/* Clear ACS bit because Ethernet switch tagging formats such as
+> +	 * Broadcom tags can look like invalid LLC/SNAP packets and cause the
+> +	 * hardware to truncate packets on reception.
+> +	 */
+> +	if (netdev_uses_dsa(dev))
+> +		value &= ~GMAC_CONTROL_ACS;
+> +
+>   	if (mtu > 1500)
+>   		value |= GMAC_CONTROL_2K;
+>   	if (mtu > 2000)
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c b/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
+> index 8ef517356313..91b23f9db31a 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac100_core.c
+> @@ -25,15 +25,26 @@
+>   *******************************************************************************/
+>   
+>   #include <linux/crc32.h>
+> +#include <net/dsa.h>
+>   #include <asm/io.h>
+>   #include "dwmac100.h"
+>   
+> -static void dwmac100_core_init(struct mac_device_info *hw, int mtu)
+> +static void dwmac100_core_init(struct mac_device_info *hw,
+> +			       struct net_device *dev)
+>   {
+>   	void __iomem *ioaddr = hw->pcsr;
+>   	u32 value = readl(ioaddr + MAC_CONTROL);
+>   
+> -	writel((value | MAC_CORE_INIT), ioaddr + MAC_CONTROL);
+> +	value |= MAC_CORE_INIT;
+> +
+> +	/* Clear ASTP bit because Ethernet switch tagging formats such as
+> +	 * Broadcom tags can look like invalid LLC/SNAP packets and cause the
+> +	 * hardware to truncate packets on reception.
+> +	 */
+> +	if (netdev_uses_dsa(dev))
+> +		value &= ~MAC_CONTROL_ASTP;
+> +
+> +	writel(value, ioaddr + MAC_CONTROL);
+>   
+>   #ifdef STMMAC_VLAN_TAG_USED
+>   	writel(ETH_P_8021Q, ioaddr + MAC_VLAN1);
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c b/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
+> index f3ed8f7853eb..ed222b20fcf1 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c
+> @@ -17,16 +17,26 @@
+>   #include <linux/slab.h>
+>   #include <linux/ethtool.h>
+>   #include <linux/io.h>
+> +#include <net/dsa.h>
+>   #include "stmmac_pcs.h"
+>   #include "dwmac4.h"
+>   
+> -static void dwmac4_core_init(struct mac_device_info *hw, int mtu)
+> +static void dwmac4_core_init(struct mac_device_info *hw,
+> +			     struct net_device *dev)
+>   {
+>   	void __iomem *ioaddr = hw->pcsr;
+>   	u32 value = readl(ioaddr + GMAC_CONFIG);
+> +	int mtu = dev->mtu;
+>   
+>   	value |= GMAC_CORE_INIT;
+>   
+> +	/* Clear ACS bit because Ethernet switch tagging formats such as
+> +	 * Broadcom tags can look like invalid LLC/SNAP packets and cause the
+> +	 * hardware to truncate packets on reception.
+> +	 */
+> +	if (netdev_uses_dsa(dev))
+> +		value &= ~GMAC_CONFIG_ACS;
+> +
+>   	if (mtu > 1500)
+>   		value |= GMAC_CONFIG_2K;
+>   	if (mtu > 2000)
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> index f99f14c35063..7ad841434ec8 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> @@ -2527,7 +2527,7 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
+>   	}
+>   
+>   	/* Initialize the MAC Core */
+> -	priv->hw->mac->core_init(priv->hw, dev->mtu);
+> +	priv->hw->mac->core_init(priv->hw, dev);
+>   
+>   	/* Initialize MTL*/
+>   	if (priv->synopsys_id >= DWMAC_CORE_4_00)
