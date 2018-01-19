@@ -1,38 +1,36 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Fri, 19 Jan 2018 14:16:09 -0800
-Subject: [PATCH v5 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <2315959.AJds7mCBWN@ice-x220i>
-References: <1515639823-35782-1-git-send-email-yong.deng@magewell.com>
- <20180119211409.ubysuyvhkmfotbdg@rob-hp-laptop>
- <2315959.AJds7mCBWN@ice-x220i>
-Message-ID: <2134527e-cb44-1c4d-0ac9-8bbfc71b8ce8@infradead.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 19 Jan 2018 16:30:24 -0600
+Subject: [PATCH v2 02/16] pwm: pxa: update documentation regarding
+ pwm-cells
+In-Reply-To: <1515766983-15151-3-git-send-email-claudiu.beznea@microchip.com>
+References: <1515766983-15151-1-git-send-email-claudiu.beznea@microchip.com>
+ <1515766983-15151-3-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20180119223024.m5kuc6467xmgkgac@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2018 01:17 PM, Icenowy Zheng wrote:
-> ? 2018?1?20???? CST ??5:14:09?Rob Herring ???
->> On Thu, Jan 11, 2018 at 11:03:43AM +0800, Yong Deng wrote:
->>> Add binding documentation for Allwinner V3s CSI.
->>>
->>> Signed-off-by: Yong Deng <yong.deng@magewell.com>
->>> ---
->>>
->>>  .../devicetree/bindings/media/sun6i-csi.txt        | 59
->>>  ++++++++++++++++++++++ 1 file changed, 59 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
->>
->> Reviewed-by: Rob Herring <robh@kernel.org>
+On Fri, Jan 12, 2018 at 04:22:49PM +0200, Claudiu Beznea wrote:
+> pwm-cells should be at least 2 to provide channel number and period value.
 > 
-> I think other subsystem's maintainer may expect a Acked-by from you here.
+> Cc: Mike Dunn <mikedunn@newsguy.com>
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pxa-pwm.txt | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> Why do you use Reviewed-by here instead?
+> diff --git a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> index 5ae9f1e3c338..a0e20edeeebc 100644
+> --- a/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pxa-pwm.txt
+> @@ -10,7 +10,7 @@ Required properties:
+>    Note that one device instance must be created for each PWM that is used, so the
+>    length covers only the register window for one PWM output, not that of the
+>    entire PWM controller.  Currently length is 0x10 for all supported devices.
+> -- #pwm-cells: Should be 1.  This cell is used to specify the period in
+> +- #pwm-cells: Should be 2.  This cell is used to specify the period in
+>    nanoseconds.
 
-The Reviewed-by: tag is a stronger ACK than the Acked-by: tag, so this
-should be sufficient for other subsystem maintainers.
+What's the new cell? channel? Does the PXA PWM have more than one 
+channel? If not, then you shouldn't add a cell.
 
-Please see Documentation/process/submitting-patches.rst, section 13.
-
-
--- 
-~Randy
+Rob
