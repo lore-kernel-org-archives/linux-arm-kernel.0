@@ -1,52 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Jan 2018 14:28:15 +0000
-Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
- predictor against aliasing attacks
-In-Reply-To: <a8f3579a-9afd-c39a-fad7-826eba8e9ac8@huawei.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-8-git-send-email-will.deacon@arm.com>
- <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
- <20180117100715.GA27892@arm.com>
- <a8f3579a-9afd-c39a-fad7-826eba8e9ac8@huawei.com>
-Message-ID: <20180119142814.GA8421@arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Fri, 19 Jan 2018 14:38:37 +0000
+Subject: [PATCH] efi: arm: stop printing addresses of virtual mappings
+In-Reply-To: <20180119122619.16023-1-ard.biesheuvel@linaro.org>
+References: <20180119122619.16023-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180119143836.uxcv4smmu2gewasj@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 11:37:24AM +0800, Li Kun wrote:
-> ? 2018/1/17 18:07, Will Deacon ??:
-> >On Wed, Jan 17, 2018 at 12:10:33PM +0800, Yisheng Xie wrote:
-> >>On 2018/1/5 21:12, Will Deacon wrote:
-> >>>diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-> >>>index 5f7097d0cd12..d99b36555a16 100644
-> >>>--- a/arch/arm64/mm/context.c
-> >>>+++ b/arch/arm64/mm/context.c
-> >>>@@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
-> >>>  			"ic iallu; dsb nsh; isb",
-> >>>  			ARM64_WORKAROUND_CAVIUM_27456,
-> >>>  			CONFIG_CAVIUM_ERRATUM_27456));
-> >>>+
-> >>>+	arm64_apply_bp_hardening();
-> >>>  }
-> >>post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
-> >>means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
-> >>when mm_swtich and kernel_exit?
-> >>
-> >> From the code logical, it seems not only related to erratum 2745 anymore?
-> >>should it be renamed?
-> >post_ttbr_update_workaround just runs code after a TTBR update, which
-> >includes mitigations against variant 2 of "spectre" and also a workaround
-> >for a Cavium erratum. These are separate issues.
-> But AFAIU, according to the theory of spectre, we don't need to clear the
-> BTB every time we return to user?
-> If we enable CONFIG_ARM64_SW_TTBR0_PAN, there will be a call to
-> arm64_apply_bp_hardening every time kernel exit to el0.
-> kernel_exit
->     post_ttbr_update_workaround
->         arm64_apply_bp_hardening
+On Fri, Jan 19, 2018 at 12:26:19PM +0000, Ard Biesheuvel wrote:
+> With the recent %p -> %px changes, we now get something like this in
+> the kernel boot log on ARM/arm64 EFI systems:
+> 
+>      Remapping and enabling EFI services.
+>        EFI remap 0x00000087fb830000 =>         (ptrval)
+>        EFI remap 0x00000087fbdb0000 =>         (ptrval)
+>        EFI remap 0x00000087fffc0000 =>         (ptrval)
+> 
+> The physical addresses of the UEFI runtime regions will also be
+> printed when booting with the efi=debug command line option, and the
+> virtual addresses can be inspected via /sys/kernel/debug/efi_page_tables
+> (if enabled). So let's just remove the lines above.
 
-That's a really good point, thanks. What it means is that
-post_ttbr_update_workaround is actually the wrong place for this, and we
-should be doing it more directly on the switch_mm path -- probably in
-check_and_switch_context.
+As long as the efi=debug functionality is kept, I have no issue with this.
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
 
-Will
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/arm-runtime.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 1cc41c3d6315..5d4c8b661548 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -80,10 +80,7 @@ static bool __init efi_virtmap_init(void)
+>  			return false;
+>  
+>  		ret = efi_create_mapping(&efi_mm, md);
+> -		if  (!ret) {
+> -			pr_info("  EFI remap %pa => %p\n",
+> -				&phys, (void *)(unsigned long)md->virt_addr);
+> -		} else {
+> +		if (ret) {
+>  			pr_warn("  EFI remap %pa: failed to create mapping (%d)\n",
+>  				&phys, ret);
+>  			return false;
+> -- 
+> 2.11.0
+> 
