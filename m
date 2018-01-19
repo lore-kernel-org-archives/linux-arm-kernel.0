@@ -1,23 +1,33 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Fri, 19 Jan 2018 12:01:55 -0300
-Subject: [PATCH v3 00/10] perf tools: Add support for CoreSight trace
- decoding
-In-Reply-To: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1516211539-5166-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180119150155.GD23453@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Jan 2018 16:06:52 +0100
+Subject: [1/3] arm64: defconfig: enable CONFIG_ACPI_APEI_MEMORY_FAILURE
+In-Reply-To: <67045853-42e1-8246-8789-309d1d233659@codeaurora.org>
+References: <9fdbf03c-1e70-fc45-b218-404294d4bdb1@huawei.com>
+ <67045853-42e1-8246-8789-309d1d233659@codeaurora.org>
+Message-ID: <CAK8P3a1qYJ5C=rbFWMEompKMbcJfZKTdkxrOcUs1DSQLA6Th1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, Jan 17, 2018 at 10:52:09AM -0700, Mathieu Poirier escreveu:
-> Hi Arnaldo,
-> 
-> This patchset adds support for per-thread CoreSight trace decoding from the
-> "perf report" interface.  It is largely modelled on what has been done for
-> intelPT traces and currently targets the ETMv4 architecture.  Support for
-> cpu-wide scenarios and ETMv3/PTMv1.1 will follow shortly.
+On Tue, Jan 16, 2018 at 5:10 PM, Timur Tabi <timur@codeaurora.org> wrote:
+> On 01/16/2018 09:45 AM, shiju.jose at huawei.com wrote:
+>>
+>> Enable ACPI APEI MEMORY FAILURE option for ARM64,
+>> so that memory errors will be handled.
+>>
+>> Signed-off-by: Shiju Jose<shiju.jose@huawei.com>
+>
+>
+> All three patches:
+>
+> Acked-by: Timur Tabi <timur@codeaurora.org>
+>
+> QDT definitely would like to see these patches merged into 4.16.
 
-Adrian, have you had the time to give this a quick look, in the spirit
-of checking if the Intel PT abstractions they followed are ok in their
-implementation?
+Applied all three to next/soc with your ack, thanks!
 
-- Arnaldo
+Shiju, there was a small problem with the second patch, which did not
+apply cleanly, but I fixed it up. It might have been easier to get a pull
+request through Wei Xu for this, and it would also help to send things
+a lot earlier rather than just before the merge window.
+
+      Arnd
