@@ -1,57 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Jan 2018 07:38:06 -0800
-Subject: [GIT PULL] dts driver fixes for omaps for v4.16 merge window
-Message-ID: <pull-1516376193-270253@atomide.com>
+Date: Fri, 19 Jan 2018 07:43:25 -0800
+Subject: [PATCH] Nokia N9: add support for up/down keys in the dts
+In-Reply-To: <20180118220348.GD17196@amd>
+References: <20180102125948.GA20051@amd>
+ <20180102194236.ahrhkvnefre2l6gf@earth.universe>
+ <20180118220348.GD17196@amd>
+Message-ID: <20180119154325.GF4042@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+* Pavel Machek <pavel@ucw.cz> [180118 22:04]:
+> On Tue 2018-01-02 20:42:36, Sebastian Reichel wrote:
+> > Hi,
+> > 
+> > On Tue, Jan 02, 2018 at 01:59:48PM +0100, Pavel Machek wrote:
+> > > 
+> > > This adds support for volume up/down keys in the dts.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> 
+> Tony, ping? Can I get you to apply this one?
 
-The following changes since commit 80a06c0d8357d1e75a8fbc10813fcdada4d897fb:
+OK applying that for v4.16 so we have some kind of control of the
+device without having to rely on the touch screen :)
 
-  ARM: dts: dm816x: add clkctrl nodes (2017-12-11 08:28:37 -0800)
+> [PATCHv2] nokia N9: Add support for magnetometer
+> 
+> should be good to go, too...
 
-are available in the Git repository at:
+I have that tagged for next after -rc1 thanks.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/dt-clk-dts-signed
+Regards,
 
-for you to fetch changes up to e14d7e5320ebae9bffe4fbd585dfdd9d6de2550f:
-
-  ARM: dts: Update ti-sysc data for existing users (2018-01-12 15:16:57 -0800)
-
-----------------------------------------------------------------
-Few omap interconnect dts fixes for v4.16 merge window
-
-Now that we have the dts clocks for the clkctrl clock and the
-interconnect binding, we need to update the existing ti-sysc
-users according to the binding to make it usable for drivers.
-
-Apologies for not being able to send this earlier but it took
-me few revisions to get the smartreflex changes right and
-tested with yet to be posted patches to make smartreflex probe
-with dts and I wanted to have it sit in next for a while to make
-sure we're not introducing regressions for legacy platform data
-based booting.
-
-Note that this is based on a merge with commit 20a2742e5784
-("dt-bindings: ti-sysc: Update binding for timers and capabilities")
-to avoid a merge conflict with the binding changes.
-
-----------------------------------------------------------------
-Tony Lindgren (4):
-      dt-bindings: ti-sysc: Update binding for timers and capabilities
-      Merge commit '20a2742e5784295b9197250b50c40f6d38a55880' into omap-for-v4.16/dt-clk
-      ARM: dts: Fix smartreflex compatible for omap3 shared mpu-iva instance
-      ARM: dts: Update ti-sysc data for existing users
-
- Documentation/devicetree/bindings/bus/ti-sysc.txt  |  36 +++++++
- .../devicetree/bindings/power/ti-smartreflex.txt   |   2 +-
- arch/arm/boot/dts/am3517.dtsi                      |   4 -
- arch/arm/boot/dts/dra7.dtsi                        |  26 ++++--
- arch/arm/boot/dts/omap3.dtsi                       |  14 ---
- arch/arm/boot/dts/omap34xx.dtsi                    |  39 ++++++++
- arch/arm/boot/dts/omap36xx.dtsi                    |  46 +++++++++
- arch/arm/boot/dts/omap4.dtsi                       | 104 ++++++++++++++++++---
- include/dt-bindings/bus/ti-sysc.h                  |  22 +++++
- 9 files changed, 257 insertions(+), 36 deletions(-)
- create mode 100644 include/dt-bindings/bus/ti-sysc.h
+Tony
