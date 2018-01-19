@@ -1,55 +1,80 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 19 Jan 2018 10:04:19 -0800
-Subject: [PATCH 00/12] firmware: arm_scpi: series with smaller improvements
-In-Reply-To: <db85dc34-5755-c48d-8a23-379d95fc0342@arm.com> (Sudeep Holla's
- message of "Wed, 10 Jan 2018 16:56:49 +0000")
-References: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
- <db85dc34-5755-c48d-8a23-379d95fc0342@arm.com>
-Message-ID: <7hbmhpybbw.fsf@baylibre.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 19 Jan 2018 19:07:29 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <20180118130026.GG32299@lunn.ch>
+References: <20180104162036.GL3401@lunn.ch>
+ <20180108144548.GA31502@xora-haswell>
+ <20180108145312.GH10940@lunn.ch> <20180108151453.GB31502@xora-haswell>
+ <20180108154243.GA30962@lunn.ch>
+ <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
+ <20180109101941.GD31502@xora-haswell>
+ <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
+ <20180109130012.GA27447@lunn.ch>
+ <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
+ <20180118130026.GG32299@lunn.ch>
+Message-ID: <CAPv3WKcYrbfKjsnwZ39Tyq3HN0aneUQZdbeUzLbFgLUbMc3w8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sudeep Holla <sudeep.holla@arm.com> writes:
+Hi Mika,
 
-> Hi Heiner,
+2018-01-18 14:00 GMT+01:00 Andrew Lunn <andrew@lunn.ch>:
+>> I CC'ed Mika since he is more familiar with handling these bits of ACPI
+>> specs - I wonder whether this is a problem that cropped up on x86
+>> systems too.
 >
-> (Sorry for the late response, was off for a month)
+> Hi Lorenzo
 >
-> On 05/12/17 21:54, Heiner Kallweit wrote:
->> After recent revert of all changes since 4.14 this is a resubmit of
->> the patch series, reduced to patches which should not cause any
->> regression.
->> Based on a remark from Kevin I added one patch for improving the
->> version info for pre-1.0 firmware that doesn't provide version
->> information.
->> 
->> Best should be to apply it to a devel branch first so that the
->> Baylibre Amlogic team can test before mainlining.
->> 
+> There is nothing about MDIO, PHYs, Ethernet switches, etc in version
+> 6.2 of the spec. If x86 has this, it must be after 6.2 was released.
+> I would not be too surprised if x86 has none of this. If you look at
+> the typical drives used on x86, i210, e1000e, ixgb, r8169, etc. They
+> are all PCI devices, and hide all this.
 >
-> I am still waiting for tested by from Amlogic team for this series.
+>> I do not think there is one and only answer but there must be a single
+>> set of bindings and if the ACPI specs already cater for some of them
+>> we have to reuse them.
+>
+> Agreed. Due diligence so far suggests there is nothing already
+> defined. But im a newbie to ACPI, so could be looking in the wrong
+> place. I really hope there is somebody like Rob Herring, the DT
+> maintainer, who keeps an eye on all ACPI talk and would tell us if we
+> are heading off in the wrong direction.
+>
 
-I (finally) tested this series on a few of the boards that were failing
-last time, and those issues are gone.
+My initial approach with MDIO bus with PHYs as child nodes was super
+easy to describe and handle in Linux - please refer to:
+- typical representation of mdio bus with the phys -
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/net/mdio.txt?h=v4.15-rc8
+- my patches in the initial series
+However I guess it would be more proper to use the
+GenericSerialBus-based description, as advised in ACPI Spec. The
+question is, whether we should define new type of a bus or not
+(MdioSerialBus, similar to e.g. I2cSerialBus).
 
-So, for the series...
+Since I have a code that can be tested and easily modified to use
+different ACPI approaches with real platform MDIO controller
+(mvmdio.c) and NIC (mvpp2.c), in coming weeks I may be able to find
+some time to prepare a proof of concept based on GenericSerialBus.
+Please expect some RFC patches hopefully right after the coming merge
+window is closed.
 
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+Of course, if I come up on some ACPI - specific implementation
+questions, I won't hesitate to ask in this thred. I will also
+appreciate any hints. For now my two main concerns are:
+- The PHY address on the mdio bus - should it be put into _CRS ->
+GenericSerialBus() field or separate _ADR? I'd lean towards first
+option.
+- The PHY type - in Linux it's resolved basing on two generic
+compatible strings
+(https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/net/phy.txt?h=v4.15-rc8).
+I'd put it as a sort of ID into GenericSerialBus(). If you agree - any
+specific filed that you would try to use?
 
+Do I understand correctly that the MDIO controller node should
+comprise OperationRegion() definition of the GenericSerialBus?
 
-> However I prefer even the patch you dropped as causing the issue to
-> be tested as it's nice cleanup to have. I strongly think that the issue
-> Kevin reported was due to broken DVFS in the scp firmware in which case
-> the solution is to have the dvfs node in DT removed or disabled rather
-> than not having that patch at all.
-
-Yes, I suspect we're up against broken firmware also.
-
-> Please post that patch on rebased on top of this series and get it
-> tested with DVFS nodes disabled.
-
-I'll give that a test as well,
+I'm looking forward to your feedback.
 
 Thanks,
-
-Kevin
+Marcin
