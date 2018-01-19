@@ -1,38 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 19 Jan 2018 13:43:57 +0530
-Subject: [RESEND] phy: sun4i-usb: add support for R40 USB PHY
-In-Reply-To: <CAGb2v64DuqTv49CfOMhovdikc9iUGCfLRSmJ+FEeF5ct+-YzEw@mail.gmail.com>
-References: <20180103084944.3145-1-icenowy@aosc.io>
- <20180115150656.bibc4draok4i4oae@lemon.iwr.uni-heidelberg.de>
- <CAGb2v64DuqTv49CfOMhovdikc9iUGCfLRSmJ+FEeF5ct+-YzEw@mail.gmail.com>
-Message-ID: <993f82ad-befe-05fb-351d-8fd31d8bc132@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 19 Jan 2018 09:19:02 +0100
+Subject: [PATCH v2 02/16] ARM: dts: r8a7790: add soc node
+In-Reply-To: <20180117161717.14589-3-horms+renesas@verge.net.au>
+References: <20180117161717.14589-1-horms+renesas@verge.net.au>
+ <20180117161717.14589-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdW6k-qQnEJOgJh9AafzU4hO99qiCFw8D4rSn_Z9t5ZhTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add soc node to represent the bus and move all nodes with a base address
+> into this node. This is consistent with handling of R-Car Gen3, RZ/G1, and
+> R-Car V2H (R8A77920) SoCs upstream. It is intended to migrate other R-Car
+> Gen2 SoCs to this scheme.
+>
+> The ordering is derived from simply moving each node with an address up to
+> before any nodes without a base address that occur before the soc node.  To
+> improve maintainability follow-up patches will sort subnodes of both the
+> new soc node and the root node.
+>
+> This patch should not introduce any functional change.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-On Friday 19 January 2018 11:55 AM, Chen-Yu Tsai wrote:
-> Hi Kishon,
-> 
-> On Mon, Jan 15, 2018 at 11:06 PM, Hermann Lauer
-> <Hermann.Lauer@iwr.uni-heidelberg.de> wrote:
->> On Wed, Jan 03, 2018 at 04:49:44PM +0800, Icenowy Zheng wrote:
->>> Allwinner R40 features a USB PHY like the one in A64, but with 3 PHYs.
->>>
->>> Add support for it.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>
->> You may add
->>
->> Tested-by: Hermann.Lauer at iwr.uni-heidelberg.de
-> 
-> Gentle ping for this patch to be included in 4.16
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Sent the pull request for 4.16 to Greg on Jan 2nd. So this can't be included in
-4.16. Sorry.
+Gr{oetje,eeting}s,
 
-Thanks
-Kishon
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
