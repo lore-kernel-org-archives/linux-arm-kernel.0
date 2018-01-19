@@ -1,43 +1,43 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 19 Jan 2018 14:30:23 +0800
-Subject: [RESEND] phy: sun4i-usb: add support for R40 USB PHY
-In-Reply-To: <CAGb2v64DuqTv49CfOMhovdikc9iUGCfLRSmJ+FEeF5ct+-YzEw@mail.gmail.com>
-References: <20180103084944.3145-1-icenowy@aosc.io>
- <20180115150656.bibc4draok4i4oae@lemon.iwr.uni-heidelberg.de>
- <CAGb2v64DuqTv49CfOMhovdikc9iUGCfLRSmJ+FEeF5ct+-YzEw@mail.gmail.com>
-Message-ID: <87E279B2-5893-412F-A157-5E58581CF98A@aosc.io>
+From: clingutla@codeaurora.org (Lingutla Chandrasekhar)
+Date: Fri, 19 Jan 2018 12:26:37 +0530
+Subject: [PATCH] arm64: setup: Check for overlapping dtb and Image load
+ addresses
+Message-ID: <20180119065637.12789-1-clingutla@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sometime kernel image and dtb load offsets can overlap due to
+dynamically increased Image or dtb size if both load addresses
+are near to each other, which leads to bootup failures.
 
+So validate dtb load address and kernel image, if they overlap
+do not proceed to boot.
 
-? 2018?1?19? GMT+08:00 ??2:25:09, Chen-Yu Tsai <wens@csie.org> ??:
->Hi Kishon,
->
->On Mon, Jan 15, 2018 at 11:06 PM, Hermann Lauer
-><Hermann.Lauer@iwr.uni-heidelberg.de> wrote:
->> On Wed, Jan 03, 2018 at 04:49:44PM +0800, Icenowy Zheng wrote:
->>> Allwinner R40 features a USB PHY like the one in A64, but with 3
->PHYs.
->>>
->>> Add support for it.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>
->> You may add
->>
->> Tested-by: Hermann.Lauer at iwr.uni-heidelberg.de
->
->Gentle ping for this patch to be included in 4.16
+Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
 
-I think maybe I forgot PATCH in title so it didn't enter patchwork?
-
->
->ChenYu
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 30ad2f085d1f..c9dd699f09ab 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -181,11 +181,17 @@ static void __init smp_build_mpidr_hash(void)
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
++	u64 end_phys = __pa_symbol(_end);
++	u64 start_phys = __pa_symbol(_text);
+ 	const char *name;
+ 
+-	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
++	if (!dt_virt || ((dt_phys < start_phys) &&
++		((dt_phys + fdt_totalsize(dt_virt)) > start_phys)) ||
++		((dt_phys > start_phys) && (dt_phys < end_phys)) ||
++		!early_init_dt_scan(dt_virt)) {
+ 		pr_crit("\n"
+ 			"Error: invalid device tree blob@physical address %pa (virtual address 0x%p)\n"
++			"The dtb load address should not overlap with kernel image\n"
+ 			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
+ 			"\nPlease check your bootloader.",
+ 			&dt_phys, dt_virt);
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+ a Linux Foundation Collaborative Project.
