@@ -1,63 +1,18 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 19 Jan 2018 14:12:39 +0900
-Subject: [PATCH v4 07/13] ARM: dts: rockchip: add clocks in vop iommu nodes
-In-Reply-To: <5A617A5E.6070606@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-8-jeffy.chen@rock-chips.com>
- <CAAFQd5ACbV6Q2Jwze=hoG=13jSJKkYyDDs2HzvvdSK-RGK+w2g@mail.gmail.com>
- <5A617A5E.6070606@rock-chips.com>
-Message-ID: <CAAFQd5D2FO4bXh7djKyyE0s_pq8N_9YxxmkDJizoem_fLxTk0g@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 19 Jan 2018 11:08:54 +0530
+Subject: [PATCH -next] dmaengine: stm32-dmamux: Remove unnecessary
+ platform_get_resource() error check
+In-Reply-To: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
+References: <1516188430-145326-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20180119053854.GU18649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 1:55 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
-> Hi Tomasz,
->
-> Thanks for your reply.
->
->
-> On 01/19/2018 11:23 AM, Tomasz Figa wrote:
->>
->> On Thu, Jan 18, 2018 at 8:52 PM, Jeffy Chen <jeffy.chen@rock-chips.com>
->> wrote:
->>>
->>> Add clocks in vop iommu nodes, since we are going to control clocks in
->>> rockchip iommu driver.
->>>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>> ---
->>>
->>> Changes in v4: None
->>> Changes in v3: None
->>> Changes in v2: None
->>>
->>>   arch/arm/boot/dts/rk3036.dtsi | 2 ++
->>>   arch/arm/boot/dts/rk3288.dtsi | 4 ++++
->>>   2 files changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/rk3036.dtsi
->>> b/arch/arm/boot/dts/rk3036.dtsi
->>> index 3b704cfed69a..95b0ebc7a40f 100644
->>> --- a/arch/arm/boot/dts/rk3036.dtsi
->>> +++ b/arch/arm/boot/dts/rk3036.dtsi
->>> @@ -197,6 +197,8 @@
->>>                  reg = <0x10118300 0x100>;
->>>                  interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
->>>                  interrupt-names = "vop_mmu";
->>> +               clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru
->>> HCLK_LCDC>;
->>> +               clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
->>
->>
->> We should remove clock-names from IOMMU nodes. The Rockchip IOMMU
->> bindings don't define clock names and only the clocks property should
->> be given.
->>
-> hmmm, i'm trying to switch to clk_bulk APIs, the get and put are name based.
-> or maybe i can use clk_get/put along with other clk_bulk APIs
+On Wed, Jan 17, 2018 at 11:27:10AM +0000, Wei Yongjun wrote:
+> devm_ioremap_resource() already checks if the resource is NULL, so
+> remove the unnecessary platform_get_resource() error check.
 
-I think it should be possible to just put the clock pointers to the
-clk_bulk_data struct manually. Otherwise, I'm not sure what names we
-could use for clock-names, since the clocks depend on master.
-(Something like "clock0, clock1, clock2, ..., clockN" could work, but
-it doesn't add any value IMHO...).
+Applied, thanks
+
+-- 
+~Vinod
