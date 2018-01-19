@@ -1,97 +1,63 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 19 Jan 2018 10:27:26 +0000
-Subject: Tegra baseline test results for v4.15-rc8
-Message-ID: <4ca0095b-0c28-2a87-83ae-7b20a9df8d65@nvidia.com>
+From: clingutla@codeaurora.org (Chandra Sekhar Lingutla)
+Date: Fri, 19 Jan 2018 16:03:02 +0530
+Subject: [PATCH] arm64: setup: Check for overlapping dtb and Image load
+ addresses
+In-Reply-To: <52502bba-97dc-c955-fa37-0212d39ddacd@arm.com>
+References: <20180119065637.12789-1-clingutla@codeaurora.org>
+ <52502bba-97dc-c955-fa37-0212d39ddacd@arm.com>
+Message-ID: <d68219c9-1456-feda-8227-901e9a8d6f70@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.15-rc8.
-Logs and other details at:
-
-    https://nvtb.github.io//linux/test_v4.15-rc8/20180114163103/
-
-
-Test summary - 100% Success*
-----------------------------
-
-Build: zImage:
-    Pass: ( 3/ 3): multi_v7_defconfig, tegra_defconfig,
-		   tegra_defconfig%tegra-fw
-
-Build: Image:
-    Pass: ( 3/ 3): defconfig, defconfig%jetson-tx2,
-		   defconfig%jetson-tx1
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: defconfig%jetson-tx1:
-    Pass: ( 2/ 2): tegra210-p2371-0000, tegra210-p2371-2180
-
-Boot to userspace: defconfig%jetson-tx2:
-    Pass: ( 1/ 1): tegra186-p2771-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig%tegra-fw:
-    Pass: ( 2/ 2): tegra124-jetson-tk1, tegra124-nyan-big
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig%tegra-fw:
-    Pass: ( 2/ 2): tegra124-jetson-tk1, tegra124-nyan-big
-
-
-vmlinux object size
-(delta in bytes from test_v4.15-rc7 (b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d)):
-   text     data      bss    total  kernel
-   -184     +200        0      +16  defconfig
-   +728      +12        0     +740  multi_v7_defconfig
-   +604      +20        0     +624  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.15-rc7 (b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
-
-* kernelci.org is reporting failures for tegra124-nyan-big which is 
-  caused by nouvueau. There is a workaround available [0] but has not 
-  been picked up yet.
-
-[0] https://www.spinics.net/lists/dri-devel/msg161277.html
-
---
-nvpublic
+Hi Julien,
+On 1/19/2018 3:19 PM, Julien Thierry wrote:
+> Hi Lingutla,
+>
+> On 19/01/18 06:56, Lingutla Chandrasekhar wrote:
+>> Sometime kernel image and dtb load offsets can overlap due to
+>> dynamically increased Image or dtb size if both load addresses
+>> are near to each other, which leads to bootup failures.
+>>
+>> So validate dtb load address and kernel image, if they overlap
+>> do not proceed to boot.
+>>
+>> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
+>>
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 30ad2f085d1f..c9dd699f09ab 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -181,11 +181,17 @@ static void __init smp_build_mpidr_hash(void)
+>> ? static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>> ? {
+>> ????? void *dt_virt = fixmap_remap_fdt(dt_phys);
+>> +??? u64 end_phys = __pa_symbol(_end);
+>> +??? u64 start_phys = __pa_symbol(_text);
+>> ????? const char *name;
+>> ? -??? if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+>> +??? if (!dt_virt || ((dt_phys < start_phys) &&
+>> +??????? ((dt_phys + fdt_totalsize(dt_virt)) > start_phys)) ||
+>> +??????? ((dt_phys > start_phys) && (dt_phys < end_phys)) ||
+>> +??????? !early_init_dt_scan(dt_virt)) {
+>> ????????? pr_crit("\n"
+>> ????????????? "Error: invalid device tree blob at physical address 
+>> %pa (virtual address 0x%p)\n"
+>> +??????????? "The dtb load address should not overlap with kernel 
+>> image\n"
+>> ????????????? "The dtb must be 8-byte aligned and must not exceed 2 
+>> MB in size\n"
+>> ????????????? "\nPlease check your bootloader.",
+>> ????????????? &dt_phys, dt_virt);
+>>
+>
+> Could this be checked separately?
+>
+> When you get that error message you don't know whether the issue is an 
+> ill formed dtb or overlapping with the kernel.
+>
+> So it'd be nice to have a separate message (and maybe add info of how 
+> many bytes are overlapping?).
+>
+Sure, will do.
+> Cheers,
+>
