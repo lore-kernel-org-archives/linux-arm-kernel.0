@@ -1,82 +1,55 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 19 Jan 2018 09:32:12 -0800
-Subject: [PATCH] input: touchscreen: remove atmel-wm97xx
-In-Reply-To: <20180119105058.bjh2gatrmga5yrni@samfundet.no>
-References: <20180119081745.17557-1-clabbe.montjoie@gmail.com>
- <20180119105058.bjh2gatrmga5yrni@samfundet.no>
-Message-ID: <20180119173212.jpztigqxjti5taq6@dtor-ws>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 19 Jan 2018 10:04:19 -0800
+Subject: [PATCH 00/12] firmware: arm_scpi: series with smaller improvements
+In-Reply-To: <db85dc34-5755-c48d-8a23-379d95fc0342@arm.com> (Sudeep Holla's
+ message of "Wed, 10 Jan 2018 16:56:49 +0000")
+References: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
+ <db85dc34-5755-c48d-8a23-379d95fc0342@arm.com>
+Message-ID: <7hbmhpybbw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 11:50:58AM +0100, Hans-Christian Noren Egtvedt wrote:
-> Around Fri 19 Jan 2018 09:17:45 +0100 or thereabout, Corentin Labbe wrote:
-> > Since AVR32 arch is gone, atmel-wm97xx driver is useless.
-> > Remove it.
-> 
-> In theory it could have been rewritten to work with AT91 devices, but I would
-> recommend starting from scratch. This driver is from the platform data era,
-> and IIRC a bit hard coded to work on AVR32 hardware variant of the AC97C
-> peripheral.
-> 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> >
-> 
-> Acked-by: Hans-Christian Noren Egtvedt <egtvedt@samfundet.no>
+Sudeep Holla <sudeep.holla@arm.com> writes:
 
-Applied, thank you.
+> Hi Heiner,
+>
+> (Sorry for the late response, was off for a month)
+>
+> On 05/12/17 21:54, Heiner Kallweit wrote:
+>> After recent revert of all changes since 4.14 this is a resubmit of
+>> the patch series, reduced to patches which should not cause any
+>> regression.
+>> Based on a remark from Kevin I added one patch for improving the
+>> version info for pre-1.0 firmware that doesn't provide version
+>> information.
+>> 
+>> Best should be to apply it to a devel branch first so that the
+>> Baylibre Amlogic team can test before mainlining.
+>> 
+>
+> I am still waiting for tested by from Amlogic team for this series.
 
-> 
-> > ---
-> >  drivers/input/touchscreen/Kconfig        |  15 --
-> >  drivers/input/touchscreen/Makefile       |   1 -
-> >  drivers/input/touchscreen/atmel-wm97xx.c | 436 -------------------------------
-> >  3 files changed, 452 deletions(-)
-> >  delete mode 100644 drivers/input/touchscreen/atmel-wm97xx.c
-> > 
-> > diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> > index 38a226f9fcbd..4f15496fec8b 100644
-> > --- a/drivers/input/touchscreen/Kconfig
-> > +++ b/drivers/input/touchscreen/Kconfig
-> > @@ -795,21 +795,6 @@ config TOUCHSCREEN_WM9713
-> >  	  Say Y here to enable support for the Wolfson Microelectronics
-> >  	  WM9713 touchscreen controller.
-> >  
-> > -config TOUCHSCREEN_WM97XX_ATMEL
-> > -	tristate "WM97xx Atmel accelerated touch"
-> > -	depends on TOUCHSCREEN_WM97XX && AVR32
-> > -	help
-> > -	  Say Y here for support for streaming mode with WM97xx touchscreens
-> > -	  on Atmel AT91 or AVR32 systems with an AC97C module.
-> > -
-> > -	  Be aware that this will use channel B in the controller for
-> > -	  streaming data, this must not conflict with other AC97C drivers.
-> > -
-> > -	  If unsure, say N.
-> > -
-> > -	  To compile this driver as a module, choose M here: the module will
-> > -	  be called atmel-wm97xx.
-> > -
-> >  config TOUCHSCREEN_WM97XX_MAINSTONE
-> >  	tristate "WM97xx Mainstone/Palm accelerated touch"
-> >  	depends on TOUCHSCREEN_WM97XX && ARCH_PXA
-> > diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-> > index d2a2b3b7af27..dddae7973436 100644
-> > --- a/drivers/input/touchscreen/Makefile
-> > +++ b/drivers/input/touchscreen/Makefile
-> > @@ -97,7 +97,6 @@ obj-$(CONFIG_TOUCHSCREEN_WM97XX)	+= wm97xx-ts.o
-> >  wm97xx-ts-$(CONFIG_TOUCHSCREEN_WM9705)	+= wm9705.o
-> >  wm97xx-ts-$(CONFIG_TOUCHSCREEN_WM9712)	+= wm9712.o
-> >  wm97xx-ts-$(CONFIG_TOUCHSCREEN_WM9713)	+= wm9713.o
-> > -obj-$(CONFIG_TOUCHSCREEN_WM97XX_ATMEL)	+= atmel-wm97xx.o
-> >  obj-$(CONFIG_TOUCHSCREEN_WM97XX_MAINSTONE)	+= mainstone-wm97xx.o
-> >  obj-$(CONFIG_TOUCHSCREEN_WM97XX_ZYLONITE)	+= zylonite-wm97xx.o
-> >  obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
-> 
-> <snipp diff>
-> 
-> -- 
-> mvh
-> Hans-Christian Noren Egtvedt
+I (finally) tested this series on a few of the boards that were failing
+last time, and those issues are gone.
 
--- 
-Dmitry
+So, for the series...
+
+Tested-by: Kevin Hilman <khilman@baylibre.com>
+
+
+> However I prefer even the patch you dropped as causing the issue to
+> be tested as it's nice cleanup to have. I strongly think that the issue
+> Kevin reported was due to broken DVFS in the scp firmware in which case
+> the solution is to have the dvfs node in DT removed or disabled rather
+> than not having that patch at all.
+
+Yes, I suspect we're up against broken firmware also.
+
+> Please post that patch on rebased on top of this series and get it
+> tested with DVFS nodes disabled.
+
+I'll give that a test as well,
+
+Thanks,
+
+Kevin
