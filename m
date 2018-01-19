@@ -1,86 +1,91 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 19 Jan 2018 17:25:41 +0800
-Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33 when
- driving VBUS
-Message-ID: <20180119092541.7508-1-wens@csie.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 19 Jan 2018 10:41:17 +0100
+Subject: [PATCH v2 0/16] ARM: r8a7790: add soc node
+In-Reply-To: <20180117161717.14589-1-horms+renesas@verge.net.au>
+References: <20180117161717.14589-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWGZ-kN1Kb-w9KAWD+0c8ccF7B5WE0gLhv4PNi41B6XWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 PMIC, like the AXP221, does not generate VBUS change
-interrupts when N_VBUSEN is used to drive VBUS for the OTG port
-on the board.
+Hi Simon,
 
-This was not noticed until recently, as most A23/A33 boards use
-a GPIO pin that does not support interrupts for OTG ID detection.
-This forces the driver to use polling. However the A33-OlinuXino
-uses a pin that does support interrupts, so the driver uses them.
-However the VBUS interrupt never fires, and the driver never gets
-to update the VBUS status. This results in musb timing out waiting
-for VBUS to rise.
+On Wed, Jan 17, 2018 at 5:17 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> this patchset adds an soc node, moves all nodes for IP blocks with an
+> address on the bus to be sub nodes of the soc node, and sorts subnodes of
+> the root and soc nodes.
+>
+> The use of an soc node is consistent with handling of R-Car Gen3, RZ/G1,
+> and R-Car V2H (R8A77920) SoCs upstream. This patch-set adds it for all
+> other R-Car Gen2 SoCs: r8a7790 (H2), r8a7791 (M2-W), r8a7793 (M2-N),
+> r8a7794 (E2).
+>
+> Sorting of nodes is also done for the R-Car V2H (R8A77920), making it
+> consistent across all R-Car Gen2 SoCs and thus allowing easier comparison
+> of DTs of different R-Car Gen2 SoCs.
+>
+> The patchset also fixes some minor whitespace problems.
 
-This was worked around for the AXP221 by resorting to polling
-changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
-missing Vbus det interrupts on A31"). This patch adds the A23 and
-A33 to the list of SoCs that need the workaround.
+Thank you, this is a great cleanup!
 
-Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
-		      sun8i-a33 SoC")
-Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
-		      sun8i-a23 SoC")
-Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
-		Use of_match_node to get model specific config data
-Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
-		Fix optional gpios failing probe
-Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
-		Fix irq free conditions to match request conditions
-Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
-		Add workaround for missing Vbus det interrupts on A31
-Cc: <stable@vger.kernel.org> # 4.3.x
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+Now the structure of the DTSes is the same for all SoCs, they can be
+compared more easily using my soc-dts-diff script (which BTW also works
+for e.g. driver source files using the <soc>-<module>.c pattern).
 
-This list might get longer if the newer AXP8xx PMICs also have this
-behavior. We could switch to a boolean in the per-compatible data,
-or just always use polling. The yet-merged R40 support will have this
-issue as well, as the R40 is paired with the AXP221. But for now,
-I'd like to have something that is easier to backport to stable, so
-we can at least fix this for the A23 and A33.
+$ cat $(type -p soc-dts-diff)
+#!/bin/bash
 
-Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
+set -e
 
----
- drivers/phy/allwinner/phy-sun4i-usb.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+function usage()
+{
+        cat <<END
 
-diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
-index aa857be692cf..d5ae307ef4e1 100644
---- a/drivers/phy/allwinner/phy-sun4i-usb.c
-+++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-@@ -410,11 +410,13 @@ static bool sun4i_usb_phy0_poll(struct sun4i_usb_phy_data *data)
- 		return true;
- 
- 	/*
--	 * The A31 companion pmic (axp221) does not generate vbus change
--	 * interrupts when the board is driving vbus, so we must poll
-+	 * The A31/A23/A33 companion pmics (AXP221/AXP223) do not
-+	 * generate vbus change interrupts when the board is driving
-+	 * vbus using the N_VBUSEN pin on the pmic, so we must poll
- 	 * when using the pmic for vbus-det _and_ we're driving vbus.
- 	 */
--	if (data->cfg->type == sun6i_a31_phy &&
-+	if ((data->cfg->type == sun6i_a31_phy ||
-+	     data->cfg->type == sun8i_a33_phy) &&
- 	    data->vbus_power_supply && data->phys[0].regulator_on)
- 		return true;
- 
-@@ -885,7 +887,7 @@ static const struct sun4i_usb_phy_cfg sun7i_a20_cfg = {
- 
- static const struct sun4i_usb_phy_cfg sun8i_a23_cfg = {
- 	.num_phys = 2,
--	.type = sun4i_a10_phy,
-+	.type = sun6i_a31_phy,
- 	.disc_thresh = 3,
- 	.phyctl_offset = REG_PHYCTL_A10,
- 	.dedicated_clocks = true,
--- 
-2.15.1
+Usage: $(basename $0) [options...] <dts1> <dts2>
+
+END
+        exit -1
+}
+
+for i in $*; do
+        case $i in
+        -*)
+                options="$options $i"
+                ;;
+
+        *)
+                if [ "$dts1" == "" ]; then
+                        dts1=$i
+                elif [ "$dts2" == "" ]; then
+                        dts2=$i
+                else
+                        usage
+                fi
+                ;;
+        esac
+done
+
+if [ "$dts1" == "" -o "$dts2" == "" ]; then
+        usage
+fi
+
+soc1=$(basename $dts1)
+soc2=$(basename $dts2)
+soc1=${soc1%%[-.]*}
+soc2=${soc2%%[-.]*}
+
+colordiff -u $options \
+        --label $dts1 <(sed -e "s/$soc1/<SOC>/gi" $dts1) \
+        --label $dts2 <(sed -e "s/$soc2/<SOC>/gi" $dts2)
+$
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
