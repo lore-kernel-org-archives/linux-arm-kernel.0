@@ -1,144 +1,189 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 19 Jan 2018 19:52:34 +0530
-Subject: [PATCH v2] irqchip/gic-v3-its: Add workaround for ThunderX2
- erratum #174
-In-Reply-To: <7752cf1b-b929-738b-9e3c-fe379a8c251b@arm.com>
-References: <20180118052820.30286-1-ganapatrao.kulkarni@cavium.com>
- <7752cf1b-b929-738b-9e3c-fe379a8c251b@arm.com>
-Message-ID: <CAKTKpr4rZMJVTN0DaKXhwV1WzUiU=j4X_KVRJ1z5dogLVWN+8w@mail.gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Fri, 19 Jan 2018 21:11:08 +0800
+Subject: [PATCH V3 08/10] clk: imx: implement new clk_hw based APIs
+In-Reply-To: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
+References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1516367470-24340-9-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 5:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 18/01/18 05:28, Ganapatrao Kulkarni wrote:
->> This erratum is observed on the ThunderX2 GICv3 ITS. When a
->> MOVI command is used to change affinity of a LPI to a collection/cpu
->> on another node, the LPI is not delivered to the cpu.
->> An additional INV command is required after the MOVI to deliver
->> the LPI to the new destination.
->>
->> If we add INV after MOVI, there is a chance that we lose LPIs which
->> are raised when the affinity is changed. So for now, adding workaround fix
->> to disable inter node affinity change.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>
->> v2: Added workaround to avoid inter node affinity change.
->>
->> v1: Initial patch
->>
->>  Documentation/arm64/silicon-errata.txt |  1 +
->>  arch/arm64/Kconfig                     | 10 ++++++++++
->>  drivers/irqchip/irq-gic-v3-its.c       | 21 ++++++++++++++++++++-
->>  3 files changed, 31 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->> index fc1c884..fb27cb5 100644
->> --- a/Documentation/arm64/silicon-errata.txt
->> +++ b/Documentation/arm64/silicon-errata.txt
->> @@ -63,6 +63,7 @@ stable kernels.
->>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
->>  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
->>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
->> +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
->>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
->>  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
->>  |                |                 |                 |                             |
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index c9a7e9e..0dbf3bd 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -461,6 +461,16 @@ config ARM64_ERRATUM_843419
->>
->>         If unsure, say Y.
->>
->> +config CAVIUM_ERRATUM_174
->> +     bool "Cavium ThunderX2 erratum 174"
->> +     default y
->> +     help
->> +       Cavium ThunderX2 dual socket systems may loose interrupts
->> +       on affinity change to a cpu on other node.
->> +       This workaround fix avoids inter node affinity change.
->> +
->> +       If unsure, say Y.
->> +
->>  config CAVIUM_ERRATUM_22375
->>       bool "Cavium erratum 22375, 24313"
->>       default y
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 06f025f..b0cb528 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -46,6 +46,7 @@
->>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING                (1ULL << 0)
->>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375    (1ULL << 1)
->>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144    (1ULL << 2)
->> +#define ITS_FLAGS_WORKAROUND_CAVIUM_174              (1ULL << 3)
->
-> Instead of inventing a new flag, please rename the existing one to
-> ITS_FLAG_WORKAROUND_RESTRICT_NODE_AFFINITY (or something similar). There
-> is really no need to have two flags that do the exact same thing,
+Clock providers are recommended to use the new struct clk_hw based API,
+so implement IMX clk_hw based provider helpers functions to the new
+approach.
 
-#23144 is used to restrict ITS to collection mapping too,
-where as 174 is only restricts cross node affinity.
-Having said that, Since we are restricting affinity in #174,
-i see there is no use of having ITS to other node collection mapping.
-There should not be any issue if we club flag. I will post this change
-in next version.
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
->
->>
->>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING  (1 << 0)
->>
->> @@ -1102,7 +1103,8 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>               return -EINVAL;
->>
->>         /* lpi cannot be routed to a redistributor that is on a foreign node */
->> -     if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
->> +     if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144 ||
->> +                     its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_174) {
->>               if (its_dev->its->numa_node >= 0) {
->>                       cpu_mask = cpumask_of_node(its_dev->its->numa_node);
->>                       if (!cpumask_intersects(mask_val, cpu_mask))
->> @@ -2904,6 +2906,15 @@ static int its_force_quiescent(void __iomem *base)
->>       }
->>  }
->>
->> +static bool __maybe_unused its_enable_quirk_cavium_174(void *data)
->> +{
->> +     struct its_node *its = data;
->> +
->> +     its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_174;
->> +
->> +     return true;
->> +}
->> +
->>  static bool __maybe_unused its_enable_quirk_cavium_22375(void *data)
->>  {
->>       struct its_node *its = data;
->> @@ -3031,6 +3042,14 @@ static const struct gic_quirk its_quirks[] = {
->>               .init   = its_enable_quirk_hip07_161600802,
->>       },
->>  #endif
->> +#ifdef CONFIG_CAVIUM_ERRATUM_174
->> +     {
->> +             .desc   = "ITS: Cavium ThunderX2 erratum 174",
->> +             .iidr   = 0x13f,        /* ThunderX2 pass A1/A2/B0 */
->> +             .mask   = 0xffffffff,
->> +             .init   = its_enable_quirk_cavium_174,
->> +     },
->> +#endif
->>       {
->>       }
->>  };
->>
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+---
+ChangeLog:
+v2->v3:
+ * no changes
+v1->v2:  new patches
+---
+ drivers/clk/imx/clk.c | 22 ++++++++++++++++++
+ drivers/clk/imx/clk.h | 62 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
 
-thanks
-Ganapat
+diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
+index 9074e69..1efed86 100644
+--- a/drivers/clk/imx/clk.c
++++ b/drivers/clk/imx/clk.c
+@@ -18,6 +18,16 @@ void __init imx_check_clocks(struct clk *clks[], unsigned int count)
+ 			       i, PTR_ERR(clks[i]));
+ }
+ 
++void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count)
++{
++	unsigned int i;
++
++	for (i = 0; i < count; i++)
++		if (IS_ERR(clks[i]))
++			pr_err("i.MX clk %u: register failed with %ld\n",
++			       i, PTR_ERR(clks[i]));
++}
++
+ static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
+ {
+ 	struct of_phandle_args phandle;
+@@ -49,6 +59,18 @@ struct clk * __init imx_obtain_fixed_clock(
+ 	return clk;
+ }
+ 
++struct clk_hw * __init imx_obtain_fixed_clk_hw(struct device_node *np,
++					       const char *name)
++{
++	struct clk *clk;
++
++	clk = of_clk_get_by_name(np, name);
++	if (IS_ERR(clk))
++		return ERR_PTR(-ENOENT);
++
++	return __clk_get_hw(clk);
++}
++
+ /*
+  * This fixups the register CCM_CSCMR1 write value.
+  * The write/read/divider values of the aclk_podf field
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 956155c..3d58420 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -8,6 +8,7 @@
+ extern spinlock_t imx_ccm_lock;
+ 
+ void imx_check_clocks(struct clk *clks[], unsigned int count);
++void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count);
+ void imx_register_uart_clocks(struct clk ** const clks[]);
+ 
+ extern void imx_cscmr1_fixup(u32 *val);
+@@ -54,6 +55,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ struct clk * imx_obtain_fixed_clock(
+ 			const char *name, unsigned long rate);
+ 
++struct clk_hw *imx_obtain_fixed_clk_hw(struct device_node *np,
++				       const char *name);
++
+ struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
+ 	 void __iomem *reg, u8 shift, u32 exclusive_mask);
+ 
+@@ -90,6 +94,16 @@ static inline struct clk *imx_clk_fixed(const char *name, int rate)
+ 	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_fixed(const char *name, int rate)
++{
++	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
++}
++
++static inline struct clk_hw *imx_get_clk_hw_fixed(const char *name, int rate)
++{
++	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
++}
++
+ static inline struct clk *imx_clk_mux_ldb(const char *name, void __iomem *reg,
+ 			u8 shift, u8 width, const char * const *parents,
+ 			int num_parents)
+@@ -113,6 +127,15 @@ static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_divider(const char *name,
++						const char *parent,
++						void __iomem *reg, u8 shift,
++						u8 width)
++{
++	return clk_hw_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
++				       reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_divider_flags(const char *name,
+ 		const char *parent, void __iomem *reg, u8 shift, u8 width,
+ 		unsigned long flags)
+@@ -121,6 +144,15 @@ static inline struct clk *imx_clk_divider_flags(const char *name,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_divider_flags(const char *name,
++						   const char *parent,
++						   void __iomem *reg, u8 shift,
++						   u8 width, unsigned long flags)
++{
++	return clk_hw_register_divider(NULL, name, parent, flags,
++				       reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift, u8 width)
+ {
+@@ -136,6 +168,13 @@ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
+ 			shift, 0, &imx_ccm_lock);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_gate(const char *name, const char *parent,
++					     void __iomem *reg, u8 shift)
++{
++	return clk_hw_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++				    shift, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
+@@ -208,6 +247,17 @@ static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_mux2(const char *name, void __iomem *reg,
++					     u8 shift, u8 width,
++					     const char * const *parents,
++					     int num_parents)
++{
++	return clk_hw_register_mux(NULL, name, parents, num_parents,
++				   CLK_SET_RATE_NO_REPARENT |
++				   CLK_OPS_PARENT_ENABLE,
++				   reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 			void __iomem *reg, u8 shift, u8 width,
+ 			const char * const *parents, int num_parents,
+@@ -218,6 +268,18 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 			&imx_ccm_lock);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_mux_flags(const char *name,
++						  void __iomem *reg, u8 shift,
++						  u8 width,
++						  const char * const *parents,
++						  int num_parents,
++						  unsigned long flags)
++{
++	return clk_hw_register_mux(NULL, name, parents, num_parents,
++				   flags | CLK_SET_RATE_NO_REPARENT,
++				   reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ struct clk *imx_clk_cpu(const char *name, const char *parent_name,
+ 		struct clk *div, struct clk *mux, struct clk *pll,
+ 		struct clk *step);
+-- 
+2.7.4
