@@ -1,52 +1,31 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 19 Jan 2018 12:05:27 +0000
-Subject: [PATCH 08/11] signal/arm: Document conflicts with SI_USER and
- SIGFPE
-In-Reply-To: <20180115174947.GH17719@n2100.armlinux.org.uk>
-References: <87373b6ghs.fsf@xmission.com>
- <20180112005940.23279-8-ebiederm@xmission.com>
- <20180115174947.GH17719@n2100.armlinux.org.uk>
-Message-ID: <20180119120525.GN22781@e103592.cambridge.arm.com>
+From: jwboyer@kernel.org (Josh Boyer)
+Date: Fri, 19 Jan 2018 07:11:19 -0500
+Subject: pull request: linux-firmware: Update Mediatek MT8173 VPU firmware
+In-Reply-To: <1516196123-24327-1-git-send-email-pochun.lin@mediatek.com>
+References: <1516196123-24327-1-git-send-email-pochun.lin@mediatek.com>
+Message-ID: <CA+5PVA6np4ZCCxE6Qk9s7UpN3By-3g1sqSg90xrD7BVjKu8ubw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 15, 2018 at 05:49:47PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 11, 2018 at 06:59:37PM -0600, Eric W. Biederman wrote:
-> > Setting si_code to 0 results in a userspace seeing an si_code of 0.
-> > This is the same si_code as SI_USER.  Posix and common sense requires
-> > that SI_USER not be a signal specific si_code.  As such this use of 0
-> > for the si_code is a pretty horribly broken ABI.
-> > 
-> > Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
-> > value of __SI_KILL and now sees a value of SIL_KILL with the result
-> > that uid and pid fields are copied and which might copying the si_addr
-> > field by accident but certainly not by design.  Making this a very
-> > flakey implementation.
-> > 
-> > Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
-> > appropriate fields will be reliably copied.
-> 
-> So what do you suggest when none of the SIGFPE FPE_xxx codes match the
-> condition that "we don't know what happened" ?  Raise a SIGKILL instead
-> maybe?  We will have dumped the VFP state into the kernel log at this
-> point, things are pretty much fscked.
-> 
-> It's probably an impossible condition unless the hardware has failed,
-> no one has knowingly reported getting such a dump in their kernel log,
-> so it's something that could very likely be changed in some way
-> without anyone noticing.
+On Wed, Jan 17, 2018 at 8:35 AM,  <pochun.lin@mediatek.com> wrote:
+> The following changes since commit 65b1c68c63f974d72610db38dfae49861117cae2:
+>
+>   wl18xx: update firmware file 8.9.0.0.76 (2018-01-04 10:06:01 -0500)
+>
+> are available in the git repository at:
+>
+>   https://github.com/pochun-lin/linux_fw_vpu_v1.0.8.git v1.0.8
+>
+> for you to fetch changes up to e72c23c9ff2ceeb3509cb6441cc81f0227edf06d:
+>
+>   mediatek: update MT8173 VPU firmware to 1.0.8 (2018-01-17 20:19:56 +0800)
+>
+> ----------------------------------------------------------------
+> pochun.lin (1):
+>       mediatek: update MT8173 VPU firmware to 1.0.8
 
-Relating to this, what's your view on how to clean up the si_code zeros
-in fsr-2level.c and fsr-3level.c?
+Pulled and pushed out.  If the firmware is versioned, perhaps that
+version should be listed in the WHENCE file?  You might want to add
+that in a future patch.
 
-Due to the historical evolution of the fault codes I'm less
-confident of getting these right than for arm64.
-
-Many are things that shouldn't happen and likely indicate a kernel bug
-or system failure if they do, so at least some of the
-{ do_bad, SIGxxx, 0, ... } entries can probably be changed to
-{ do_bad, SIGKILL, SI_KERNEL, ... } with no ill effects.  But there
-are many fault codes whose meaning has changed over time.
-
-Cheers
----Dave
+josh
