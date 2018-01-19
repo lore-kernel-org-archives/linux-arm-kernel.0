@@ -1,59 +1,23 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 19 Jan 2018 11:17:35 -0800
-Subject: [PATCH] pinctrl: meson-axg: adjust uart_ao_b pin group naming
-In-Reply-To: <20180118141757.41290-1-yixun.lan@amlogic.com> (Yixun Lan's
- message of "Thu, 18 Jan 2018 22:17:57 +0800")
-References: <20180118141757.41290-1-yixun.lan@amlogic.com>
-Message-ID: <7hzi59wtdc.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 19 Jan 2018 13:20:26 -0600
+Subject: [PATCH v4 2/8] dt-bindings: pci: Add DT docs for Brcmstb PCIe
+ device
+In-Reply-To: <1516058925-46522-3-git-send-email-jim2101024@gmail.com>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-3-git-send-email-jim2101024@gmail.com>
+Message-ID: <20180119192026.b3bhiercl45u2mga@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yixun Lan <yixun.lan@amlogic.com> writes:
-
-> Simply adjust the pin group to _x _y _z style, as to
-> keep the consistency in DT with previous naming scheme.
->
-> Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-
-Thanks for cleaning this up before we have any DT users.
-
-Kevin
-
+On Mon, Jan 15, 2018 at 06:28:39PM -0500, Jim Quinlan wrote:
+> The DT bindings description of the Brcmstb PCIe device is described.  This
+> node can be used by almost all Broadcom settop box chips, using
+> ARM, ARM64, or MIPS CPU architectures.
+> 
+> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
 > ---
-> Hi Linus,
->
->  Please also consider merging this patch into 'for-next', since it
-> fixes issue added in the same cycle.
->  This patch will also obsolete previous one patches [1]
->
-> [1] pinctrl: meson: use one uniform 'function' name
-> http://lkml.kernel.org/r/20180108073328.205769-1-yixun.lan at amlogic.com
-> ---
->  drivers/pinctrl/meson/pinctrl-meson-axg.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-> index 1fda9d6c7ea3..4b91ff74779b 100644
-> --- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
-> +++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-> @@ -716,7 +716,7 @@ static const char * const uart_b_groups[] = {
->  	"uart_tx_b_x", "uart_rx_b_x", "uart_cts_b_x", "uart_rts_b_x",
->  };
->  
-> -static const char * const uart_ao_b_gpioz_groups[] = {
-> +static const char * const uart_ao_b_z_groups[] = {
->  	"uart_ao_tx_b_z", "uart_ao_rx_b_z",
->  	"uart_ao_cts_b_z", "uart_ao_rts_b_z",
->  };
-> @@ -855,7 +855,7 @@ static struct meson_pmx_func meson_axg_periphs_functions[] = {
->  	FUNCTION(nand),
->  	FUNCTION(uart_a),
->  	FUNCTION(uart_b),
-> -	FUNCTION(uart_ao_b_gpioz),
-> +	FUNCTION(uart_ao_b_z),
->  	FUNCTION(i2c0),
->  	FUNCTION(i2c1),
->  	FUNCTION(i2c2),
+>  .../devicetree/bindings/pci/brcmstb-pcie.txt       | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+
+I acked v3. Please add acks when posting new versions.
