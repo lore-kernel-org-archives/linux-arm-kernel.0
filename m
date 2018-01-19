@@ -1,27 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Jan 2018 16:11:01 +0100
-Subject: [GIT PULL] Ethernet DTS changes for Gemini
-In-Reply-To: <CACRpkda3QXbbxrJgi+g5ZtFcGmTAq5LjTOX5DNCe+VAcKLmcEA@mail.gmail.com>
-References: <CACRpkda3QXbbxrJgi+g5ZtFcGmTAq5LjTOX5DNCe+VAcKLmcEA@mail.gmail.com>
-Message-ID: <CAK8P3a1Q9=1WCNAiLS02hTO_abMn3hrz3Qs=BT7GbJ860Hjiqg@mail.gmail.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Fri, 19 Jan 2018 16:12:37 +0100
+Subject: [PATCH v2 01/10] perf tools: Integrating the CoreSight decoding
+ library
+In-Reply-To: <20180119145819.GC23453@kernel.org>
+References: <1516039994-314-1-git-send-email-mathieu.poirier@linaro.org>
+ <1516039994-314-2-git-send-email-mathieu.poirier@linaro.org>
+ <20180116121500.GB26643@krava>
+ <CANLsYkyEnJ5QzYyuGwhCB5p_2mE+8DdjaU6=Vpa6=CeKR+DzWg@mail.gmail.com>
+ <20180117080640.GD6183@krava> <20180118134139.GC18383@kernel.org>
+ <20180118135948.GA2940@krava> <20180118141423.GE18383@kernel.org>
+ <20180118142743.GD2940@krava> <20180119145819.GC23453@kernel.org>
+Message-ID: <20180119151237.GA13089@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 12:38 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> Hi ARM SoC folks,
->
-> I realize it's late. Like really late. But Dmiller merged the ethernet
-> bindings and the driver for Gemini ethernet, and Gemini is all about
-> networking.
->
-> So for a late merge consideration here are the two patches giving
-> ethernet on Gemini, on top of what is already merged.
->
-> If they don't get in now I just send them next time. No super big
-> deal.
+On Fri, Jan 19, 2018 at 11:58:19AM -0300, Arnaldo Carvalho de Melo wrote:
+> Em Thu, Jan 18, 2018 at 03:27:43PM +0100, Jiri Olsa escreveu:
+> > On Thu, Jan 18, 2018 at 11:14:23AM -0300, Arnaldo Carvalho de Melo wrote:
+> > > Em Thu, Jan 18, 2018 at 02:59:48PM +0100, Jiri Olsa escreveu:
+> > > > On Thu, Jan 18, 2018 at 10:41:39AM -0300, Arnaldo Carvalho de Melo wrote:
+> > > > > 	Shouldn't libopencsd be treated like libbabeltrace was before
+> > > > > the required version was widely available in distros?
+> > > 
+> > > > > 	I.e. these csets should have the rationale for that:
+> > > 
+> > > > > Enabling it once it became widely available:
+> > > 
+> > > > >    24787afbcd01 ("perf tools: Enable LIBBABELTRACE by default")
+> > > 
+> > > > > Disabling it because we would need to get things from tarballs/git
+> > > > > repos, build it in our machines, as requested by Ingo:
+> > > 
+> > > > >   6ab2b762befd ("perf build: Disable libbabeltrace check by default")
+> > > > 
+> > > > I think at that time we did not have a way to hide the check,
+> > > > now we have FEATURE_DISPLAY seprated so we can still check
+> > > > for it, but users won't be bothered with [ FAIL ] output
+> > > 
+> > > Ok, users won't be bothered with the fail output, but we tried hard to
+> > > get the build fast by having it only test for things that are widely
+> > > available, right? I.e. if we know something is not widely available then
+> > > we better not try to build with it and get faster builds, wasn't that
+> > > part of the rationale in the babeltrace case?
+> > > 
+> > > If one has to build from sources some library, then its not a problem to
+> > > have in the make command line a LIBOPENCSD=1 switch?
+> > 
+> > right, we can do it like that
+> 
+> So I'm applying v2 and we can go on from there, to make progress, ok?
+> I'm adding your Acked-by to all but the build ones, ok?
 
-Since it's only a small change on top of what you already had, I
-pulled it in, no worries.
+I think v3 was in better shape.. wrt tabs and overall display
 
-      Arnd
+jirka
