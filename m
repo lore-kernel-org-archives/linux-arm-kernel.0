@@ -1,45 +1,59 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 19 Jan 2018 12:23:11 +0900
-Subject: [PATCH v4 07/13] ARM: dts: rockchip: add clocks in vop iommu nodes
-In-Reply-To: <20180118115251.5542-8-jeffy.chen@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-8-jeffy.chen@rock-chips.com>
-Message-ID: <CAAFQd5ACbV6Q2Jwze=hoG=13jSJKkYyDDs2HzvvdSK-RGK+w2g@mail.gmail.com>
+From: hw.likun@huawei.com (Li Kun)
+Date: Fri, 19 Jan 2018 11:37:24 +0800
+Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
+ predictor against aliasing attacks
+In-Reply-To: <20180117100715.GA27892@arm.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+ <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
+ <20180117100715.GA27892@arm.com>
+Message-ID: <a8f3579a-9afd-c39a-fad7-826eba8e9ac8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 8:52 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> Add clocks in vop iommu nodes, since we are going to control clocks in
-> rockchip iommu driver.
->
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
->
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
->
->  arch/arm/boot/dts/rk3036.dtsi | 2 ++
->  arch/arm/boot/dts/rk3288.dtsi | 4 ++++
->  2 files changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-> index 3b704cfed69a..95b0ebc7a40f 100644
-> --- a/arch/arm/boot/dts/rk3036.dtsi
-> +++ b/arch/arm/boot/dts/rk3036.dtsi
-> @@ -197,6 +197,8 @@
->                 reg = <0x10118300 0x100>;
->                 interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
->                 interrupt-names = "vop_mmu";
-> +               clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru HCLK_LCDC>;
-> +               clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
+Hi will,
 
-We should remove clock-names from IOMMU nodes. The Rockchip IOMMU
-bindings don't define clock names and only the clocks property should
-be given.
 
-Not even saying that the names currently listed are not good examples,
-they name SoC clock controller output, rather than device inputs.
+? 2018/1/17 18:07, Will Deacon ??:
+> On Wed, Jan 17, 2018 at 12:10:33PM +0800, Yisheng Xie wrote:
+>> Hi Will,
+>>
+>> On 2018/1/5 21:12, Will Deacon wrote:
+>>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+>>> index 5f7097d0cd12..d99b36555a16 100644
+>>> --- a/arch/arm64/mm/context.c
+>>> +++ b/arch/arm64/mm/context.c
+>>> @@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
+>>>   			"ic iallu; dsb nsh; isb",
+>>>   			ARM64_WORKAROUND_CAVIUM_27456,
+>>>   			CONFIG_CAVIUM_ERRATUM_27456));
+>>> +
+>>> +	arm64_apply_bp_hardening();
+>>>   }
+>> post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
+>> means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
+>> when mm_swtich and kernel_exit?
+>>
+>>  From the code logical, it seems not only related to erratum 2745 anymore?
+>> should it be renamed?
+> post_ttbr_update_workaround just runs code after a TTBR update, which
+> includes mitigations against variant 2 of "spectre" and also a workaround
+> for a Cavium erratum. These are separate issues.
+But AFAIU, according to the theory of spectre, we don't need to clear 
+the BTB every time we return to user?
+If we enable CONFIG_ARM64_SW_TTBR0_PAN, there will be a call to 
+arm64_apply_bp_hardening every time kernel exit to el0.
+kernel_exit
+     post_ttbr_update_workaround
+         arm64_apply_bp_hardening
+>
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Best regards,
-Tomasz
+-- 
+Best Regards
+Li Kun
