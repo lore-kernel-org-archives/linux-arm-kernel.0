@@ -1,23 +1,91 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 19 Jan 2018 08:59:30 -0800
-Subject: [PATCH 1/3] soc-knav_dma: Use seq_putc() in
- dma_debug_show_channels()
-In-Reply-To: <54a54866-6828-1ae5-6524-ca3f0dc4ab33@users.sourceforge.net>
-References: <eddc35f7-a04b-42f5-ad8b-d345ca0b57b4@users.sourceforge.net>
- <54a54866-6828-1ae5-6524-ca3f0dc4ab33@users.sourceforge.net>
-Message-ID: <01885292-d7a1-1b5c-d176-86e82af90a70@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Jan 2018 18:01:40 +0100
+Subject: [GIT PULL] ARM: SoC fixes for 4.15
+Message-ID: <CAK8P3a25cLtLJ0aTOd5jAoy7fEMjbgTSh_315ybMZKtEZarbRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/1/2017 12:27 PM, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Mon, 1 May 2017 20:55:55 +0200
-> 
-> A single character (line break) should be put into a sequence.
-> Thus use the corresponding function "seq_putc".
-> 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
-Will pick all three patches. Thanks !!
+The following changes since commit b2cd1df66037e7c4697c7e40496bf7e4a5e16a2d:
+
+  Linux 4.15-rc7 (2018-01-07 14:22:41 -0800)
+
+are available in the git repository at:
+
+ git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to b7563e2796f8b23c98afcfea7363194227fa089d:
+
+  phy: work around 'phys' references to usb-nop-xceiv devices
+(2018-01-19 16:12:37 +0100)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.15
+
+We have various small DT fixes, and one important regression fix:
+
+The recent device tree bugfixes that were intended to address issues that
+'dtc' started warning about in 4.15 fixed various USB PHY device nodes,
+but it turns out that we had code that depended on those nodes being
+incorrect and the probe failing with a particular error code. With the
+workaround we can also deal with correct device nodes.
+
+The DT fixes include:
+ - Allwinner A10 and A20 had the display pipeline set up incorrectly
+   (introduced in v4.15)
+ - The Altera PMU lacked an interrupt-parent (never worked)
+ - Pin muxing on the Openblocks A7 (never worked)
+ - Clocks might get set up wrong on Armada 7K/8K (4.15 regression)
+
+We now have  additional device tree patches to address all the remaining
+warnings introduced in 4.15, but decided to queue them for 4.16 instead,
+to avoid risking another regression like the USB PHY thing mentioned
+above.
+
+----------------------------------------------------------------
+
+[note: I originally sent the phy-core patch to Greg with Kishon's
+ ack, as drivers/phy stuff tends to go that route but got no reply
+ over the last week, so I'm including it here instead. As the bug
+ was introduced through arm-soc, this seems like the best way
+ to now make sure we fix it before the release.]
+
+[note2: Subject and URL were both wrong, resending to make
+ sure it gets noticed, please ignore the other one]
+
+Arnd Bergmann (2):
+      arm64: dts: socfpga: add missing interrupt-parent
+      phy: work around 'phys' references to usb-nop-xceiv devices
+
+Chen-Yu Tsai (1):
+      ARM: dts: sun[47]i: Fix display backend 1 output to TCON0 remote endpoint
+
+Gregory CLEMENT (1):
+      ARM64: dts: marvell: armada-cp110: Fix clock resources for various node
+
+Mathieu Malaterre (1):
+      ARM: dts: da850-lcdk: Remove leading 0x and 0s from unit address
+
+Maxime Ripard (1):
+      ARM: sunxi_defconfig: Enable CMA
+
+Olof Johansson (3):
+      Merge tag 'davinci-for-v4.16/dt' of
+https://git.kernel.org/.../nsekhar/linux-davinci into fixes
+      Merge tag 'mvebu-fixes-4.15-1' of
+git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'sunxi-fixes-for-4.15-2' of
+https://git.kernel.org/.../sunxi/linux into fixes
+
+Thomas Petazzoni (1):
+      ARM: dts: kirkwood: fix pin-muxing of MPP7 on OpenBlocks A7
+
+ arch/arm/boot/dts/da850-lcdk.dts                     |  4 ++--
+ arch/arm/boot/dts/kirkwood-openblocks_a7.dts         | 10 ++++++++--
+ arch/arm/boot/dts/sun4i-a10.dtsi                     |  2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                     |  2 +-
+ arch/arm/configs/sunxi_defconfig                     |  2 ++
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    |  1 +
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 13 ++++++++-----
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  |  9 ++++++---
+ drivers/phy/phy-core.c                               |  4 ++++
+ 9 files changed, 33 insertions(+), 14 deletions(-)
