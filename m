@@ -1,52 +1,27 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Fri, 19 Jan 2018 15:09:54 +0000
-Subject: [1/3] arm64: defconfig: enable CONFIG_ACPI_APEI_MEMORY_FAILURE
-In-Reply-To: <CAK8P3a1qYJ5C=rbFWMEompKMbcJfZKTdkxrOcUs1DSQLA6Th1Q@mail.gmail.com>
-References: <9fdbf03c-1e70-fc45-b218-404294d4bdb1@huawei.com>
- <67045853-42e1-8246-8789-309d1d233659@codeaurora.org>
- <CAK8P3a1qYJ5C=rbFWMEompKMbcJfZKTdkxrOcUs1DSQLA6Th1Q@mail.gmail.com>
-Message-ID: <86258A5CC0A3704780874CF6004BA8A64EDC5C93@FRAEML521-MBX.china.huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Jan 2018 16:11:01 +0100
+Subject: [GIT PULL] Ethernet DTS changes for Gemini
+In-Reply-To: <CACRpkda3QXbbxrJgi+g5ZtFcGmTAq5LjTOX5DNCe+VAcKLmcEA@mail.gmail.com>
+References: <CACRpkda3QXbbxrJgi+g5ZtFcGmTAq5LjTOX5DNCe+VAcKLmcEA@mail.gmail.com>
+Message-ID: <CAK8P3a1Q9=1WCNAiLS02hTO_abMn3hrz3Qs=BT7GbJ860Hjiqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Arnd.
+On Wed, Jan 17, 2018 at 12:38 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> Hi ARM SoC folks,
+>
+> I realize it's late. Like really late. But Dmiller merged the ethernet
+> bindings and the driver for Gemini ethernet, and Gemini is all about
+> networking.
+>
+> So for a late merge consideration here are the two patches giving
+> ethernet on Gemini, on top of what is already merged.
+>
+> If they don't get in now I just send them next time. No super big
+> deal.
 
-Regards,
-Shiju
+Since it's only a small change on top of what you already had, I
+pulled it in, no worries.
 
-> -----Original Message-----
-> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On Behalf
-> Of Arnd Bergmann
-> Sent: 19 January 2018 15:07
-> To: Timur Tabi
-> Cc: Shiju Jose; Linux ARM; Linux Kernel Mailing List; Catalin Marinas;
-> Will Deacon; Gregory CLEMENT; xuwei (O); Olof Johansson; Masahiro
-> Yamada; Rob Herring; Heiko Stuebner; Krzysztof Kozlowski; Ard
-> Biesheuvel; tbaicar at codeaurora.org; Linuxarm; Zhengqiang (turing)
-> Subject: Re: [1/3] arm64: defconfig: enable
-> CONFIG_ACPI_APEI_MEMORY_FAILURE
-> 
-> On Tue, Jan 16, 2018 at 5:10 PM, Timur Tabi <timur@codeaurora.org>
-> wrote:
-> > On 01/16/2018 09:45 AM, shiju.jose at huawei.com wrote:
-> >>
-> >> Enable ACPI APEI MEMORY FAILURE option for ARM64, so that memory
-> >> errors will be handled.
-> >>
-> >> Signed-off-by: Shiju Jose<shiju.jose@huawei.com>
-> >
-> >
-> > All three patches:
-> >
-> > Acked-by: Timur Tabi <timur@codeaurora.org>
-> >
-> > QDT definitely would like to see these patches merged into 4.16.
-> 
-> Applied all three to next/soc with your ack, thanks!
-> 
-> Shiju, there was a small problem with the second patch, which did not
-> apply cleanly, but I fixed it up. It might have been easier to get a
-> pull request through Wei Xu for this, and it would also help to send
-> things a lot earlier rather than just before the merge window.
-> 
->       Arnd
+      Arnd
