@@ -1,35 +1,87 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 20 Jan 2018 14:34:57 +0100
-Subject: [PATCH] Exynos-IOMMU: Delete an error message for a failed memory
- allocation in exynos_iommu_init()
-Message-ID: <1cdc825c-66d2-03ec-f7e5-935ca8d01f7e@users.sourceforge.net>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sat, 20 Jan 2018 15:33:51 +0100
+Subject: [PATCH] acpi, spcr: Make SPCR available to x86
+In-Reply-To: <20180118150951.28964-1-prarit@redhat.com>
+References: <20180118150951.28964-1-prarit@redhat.com>
+Message-ID: <20180120143351.gmjpnqczaa2zov4o@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 20 Jan 2018 14:28:13 +0100
 
-Omit an extra message for a memory allocation failure in this function.
+* Prarit Bhargava <prarit@redhat.com> wrote:
 
-This issue was detected by using the Coccinelle software.
+> Note on testing:  I've tested this on several ARM64 and x86 boxes (only
+> earlycon, console=ttyS0,115200, and with both options), verified that
+> functionality on ARM64 has not changed (ie, CONFIG_ACPI_SPCR_TABLE is
+> always =y), and verified functionality when !CONFIG_ACPI_SPCR_TABLE on
+> x86.
+> 
+> P.
+> 
+> ----8<----
+> 
+> SPCR is currently only enabled or ARM64 and x86 can use SPCR to setup an
+> early console.
+> 
+> General fixes include updating Documentation & Kconfig (for x86), updating
+> comments, and changing parse_spcr() to acpi_parse_spcr(), and
+> earlycon_init_is_deferred to earlycon_acpi_spcr_enable to be more
+> descriptive.
+> 
+> On x86, many systems have a valid SPCR table but the table version is not
+> 2 so the table version check must be a warning.
+> 
+> On ARM64 when the kernel parameter earlycon is used both the early console
+> and console are enabled.  On x86, only the earlycon should be enabled by
+> by default.  Modify acpi_parse_spcr() to allow options for initializing
+> the early console and console separately.
+> 
+> Signed-off-by: Prarit Bhargava <prarit@redhat.com>
+> Cc: linux-acpi at vger.kernel.org
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-serial at vger.kernel.org
+> Cc: Bhupesh Sharma <bhsharma@redhat.com>
+> Cc: Lv Zheng <lv.zheng@intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: x86 at kernel.org
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: "Rafael J. Wysocki" Mrjw at rjwysocki.net>
+> Cc: Timur Tabi <timur@codeaurora.org>
+> Cc: graeme.gregory at linaro.org
+> Cc: mark.salter at redhat.com
+> ---
+>  Documentation/admin-guide/kernel-parameters.txt |  9 +++++---
+>  arch/arm64/kernel/acpi.c                        |  4 ++--
+>  arch/x86/kernel/acpi/boot.c                     |  3 +++
+>  drivers/acpi/Kconfig                            |  7 +++++-
+>  drivers/acpi/spcr.c                             | 29 +++++++++++++------------
+>  drivers/tty/serial/earlycon.c                   | 15 +++++--------
+>  include/linux/acpi.h                            |  7 ++++--
+>  include/linux/serial_core.h                     |  4 ++--
+>  8 files changed, 44 insertions(+), 34 deletions(-)
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/iommu/exynos-iommu.c | 2 --
- 1 file changed, 2 deletions(-)
+I'm fine with the x86 aspect of this:
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 79c45650f8de..456a88483089 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1370,8 +1370,6 @@ static int __init exynos_iommu_init(void)
- 
- 	zero_lv2_table = kmem_cache_zalloc(lv2table_kmem_cache, GFP_KERNEL);
- 	if (zero_lv2_table == NULL) {
--		pr_err("%s: Failed to allocate zero level2 page table\n",
--			__func__);
- 		ret = -ENOMEM;
- 		goto err_zero_lv2;
- 	}
--- 
-2.15.1
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+>  	earlycon=	[KNL] Output early console device and options.
+>  
+> -			When used with no options, the early console is
+> -			determined by the stdout-path property in device
+> -			tree's chosen node.
+> +			[ARM64] The early console is determined by the
+> +			stdout-path property in device tree's chosen node,
+> +			or determined by the ACPI SPCR table.
+
+s/in device tree's chosen node
+ /in the device tree's chosen node
+
+Thanks,
+
+	Ingo
