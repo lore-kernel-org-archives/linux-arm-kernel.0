@@ -1,166 +1,132 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 20 Jan 2018 11:13:45 -0600
-Subject: [PATCH v6 06/41] clk: davinci: Add platform information for TI DM365
- PLL
+Date: Sat, 20 Jan 2018 11:13:56 -0600
+Subject: [PATCH v6 17/41] dt-bindings: clock: Add bindings for DA8XX CFGCHIP
+ clocks
 In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
-Message-ID: <1516468460-4908-7-git-send-email-david@lechnology.com>
+Message-ID: <1516468460-4908-18-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds platform-specific declarations for the PLL clocks on TI
-DM365 based systems.
+This adds a new binding for the clocks present in the CFGCHIP syscon
+registers in TI DA8XX SoCs.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v6 changes:
-- Added dm365_pll{1,2}_info with controller-specific information
-- Changed OBSCLK data
-- Add empty lines between function calls
+- combine "dt-bindings: clock: Add bindings for DA8XX CFGCHIP gate clocks",
+  "dt-bindings: clock: Add binding for TI DA8XX CFGCHIP mux clocks" and
+  "dt-bindings: clock: Add bindings for TI DA8XX USB PHY clocks" into a single
+  file containing all CFGCHIP clocks bindings
+- added compatible = "ti,da830-div4p5ena"
+- added compatible = "ti,da850-async1-clksrc"
+- renamed other compatible strings
+- changed and added some clk-names strings
+- USB PHY clocks are combined into a single node with #clock-cells = <1>
 
- drivers/clk/davinci/Makefile    |   1 +
- drivers/clk/davinci/pll-dm365.c | 110 ++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/davinci.h     |   1 +
- 3 files changed, 112 insertions(+)
- create mode 100644 drivers/clk/davinci/pll-dm365.c
+ .../bindings/clock/ti/davinci/da8xx-cfgchip.txt    | 93 ++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt
 
-diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
-index 6720bd0..353aa02 100644
---- a/drivers/clk/davinci/Makefile
-+++ b/drivers/clk/davinci/Makefile
-@@ -5,4 +5,5 @@ obj-y += pll.o
- obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
- obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= pll-da850.o
- obj-$(CONFIG_ARCH_DAVINCI_DM355)	+= pll-dm355.o
-+obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= pll-dm365.o
- endif
-diff --git a/drivers/clk/davinci/pll-dm365.c b/drivers/clk/davinci/pll-dm365.c
+diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt b/Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt
 new file mode 100644
-index 0000000..1be7785
+index 0000000..1e03dce
 --- /dev/null
-+++ b/drivers/clk/davinci/pll-dm365.c
-@@ -0,0 +1,110 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * PLL clock descriptions for TI DM365
-+ *
-+ * Copyright (C) 2018 David Lechner <david@lechnology.com>
-+ */
++++ b/Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt
+@@ -0,0 +1,93 @@
++Binding for TI DA8XX/OMAP-L13X/AM17XX/AM18XX CFGCHIP clocks
 +
-+#include <linux/bitops.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/types.h>
++TI DA8XX/OMAP-L13X/AM17XX/AM18XX SoCs contain a general purpose set of
++registers call CFGCHIPn. Some of these registers function as clock
++gates. This document describes the bindings for those clocks.
 +
-+#include "pll.h"
++All of the clock nodes described below must be child nodes of a CFGCHIP node
++(compatible = "ti,da830-cfgchip").
 +
-+#define OCSEL_OCSRC_ENABLE	0
++USB PHY clocks
++--------------
++Required properties:
++- compatible: shall be "ti,da830-usb-phy-clocks".
++- #clock-cells: from common clock binding; shall be set to 1.
++- clocks: phandles to the parent clocks corresponding to clock-names
++- clock-names: shall be "fck", "usb_refclkin", "auxclk"
 +
-+static const struct davinci_pll_clk_info dm365_pll1_info __initconst = {
-+	.name = "pll1",
-+	.pllm_mask = GENMASK(9, 0),
-+	.pllm_min = 1,
-+	.pllm_max = 1023,
-+	.flags = PLL_HAS_OSCIN | PLL_HAS_PREDIV | PLL_HAS_POSTDIV |
-+		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_PLLM_2X,
-+};
++This node provides two clocks. The clock at index 0 is the USB 2.0 PHY 48MHz
++clock and the clock at index 1 is the USB 1.1 PHY 48MHz clock.
 +
-+static const struct davinci_pll_sysclk_info dm365_pll1_sysclk_info[] __initconst = {
-+	SYSCLK(1, pll1_sysclk1, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(2, pll1_sysclk2, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(3, pll1_sysclk3, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(4, pll1_sysclk4, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(5, pll1_sysclk5, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(6, pll1_sysclk6, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(7, pll1_sysclk7, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(8, pll1_sysclk8, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(9, pll1_sysclk9, pll1_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	{ }
-+};
++eHRPWM Time Base Clock (TBCLK)
++------------------------------
++Required properties:
++- compatible: shall be "ti,da830-tbclksync".
++- #clock-cells: from common clock binding; shall be set to 0.
++- clocks: phandle to the parent clock
++- clock-names: shall be "fck"
 +
-+/*
-+ * This is a bit of a hack to make OCSEL[OCSRC] on DM365 look like OCSEL[OCSRC]
-+ * on DA850. On DM365, OCSEL[OCSRC] is just an enable/disable bit instead of a
-+ * multiplexer. By modeling it as a single parent mux clock, the clock code will
-+ * still do the right thing in this case.
-+ */
-+static const char * const dm365_pll_obsclk_parent_names[] __initconst = {
-+	"oscin",
-+};
++PLL DIV4.5 divider
++------------------
++Required properties:
++- compatible: shall be "ti,da830-div4p5ena".
++- #clock-cells: from common clock binding; shall be set to 0.
++- clocks: phandle to the parent clock
++- clock-names: shall be "pll0_pllout"
 +
-+static u32 dm365_pll_obsclk_table[] = {
-+	OCSEL_OCSRC_ENABLE,
-+};
++EMIFA clock source (ASYNC1)
++---------------------------
++Required properties:
++- compatible: shall be "ti,da850-async1-clksrc".
++- #clock-cells: from common clock binding; shall be set to 0.
++- clocks: phandles to the parent clocks corresponding to clock-names
++- clock-names: shall be "pll0_sysclk3", "div4.5"
 +
-+static const struct davinci_pll_obsclk_info dm365_pll1_obsclk_info __initconst = {
-+	.name = "pll1_obsclk",
-+	.parent_names = dm365_pll_obsclk_parent_names,
-+	.num_parents = ARRAY_SIZE(dm365_pll_obsclk_parent_names),
-+	.table = dm365_pll_obsclk_table,
-+	.ocsrc_mask = BIT(4),
-+};
++ASYNC3 clock source
++-------------------
++Required properties:
++- compatible: shall be "ti,da850-async3-clksrc".
++- #clock-cells: from common clock binding; shall be set to 0.
++- clocks: phandles to the parent clocks corresponding to clock-names
++- clock-names: shall be "pll0_sysclk2", "pll1_sysclk2"
 +
-+static const struct davinci_pll_clk_info dm365_pll2_info __initconst = {
-+	.name = "pll2",
-+	.pllm_mask = GENMASK(9, 0),
-+	.pllm_min = 1,
-+	.pllm_max = 1023,
-+	.flags = PLL_HAS_PREDIV | PLL_HAS_POSTDIV | PLL_POSTDIV_ALWAYS_ENABLED |
-+		 PLL_PLLM_2X,
-+};
++Examples:
 +
-+static const struct davinci_pll_sysclk_info dm365_pll2_sysclk_info[] __initconst = {
-+	SYSCLK(1, pll2_sysclk1, pll2_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(2, pll2_sysclk2, pll2_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(3, pll2_sysclk3, pll2_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(4, pll2_sysclk4, pll2_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	SYSCLK(5, pll2_sysclk5, pll2_pllen, 5, SYSCLK_ALWAYS_ENABLED),
-+	{ }
-+};
++	cfgchip: syscon at 1417c {
++		compatible = "ti,da830-cfgchip", "syscon", "simple-mfd";
++		reg = <0x1417c 0x14>;
 +
-+static const struct davinci_pll_obsclk_info dm365_pll2_obsclk_info __initconst = {
-+	.name = "pll2_obsclk",
-+	.parent_names = dm365_pll_obsclk_parent_names,
-+	.num_parents = ARRAY_SIZE(dm365_pll_obsclk_parent_names),
-+	.table = dm365_pll_obsclk_table,
-+	.ocsrc_mask = BIT(4),
-+};
++		usb_phy_clk: usb-phy-clocks {
++			compatible = "ti,da830-usb-phy-clocks";
++			#clock-cells = <1>;
++			clocks = <&psc1 1>, <&usb_refclkin>, <&pll0_auxclk>;
++			clock-names = "fck", "usb_refclkin", "auxclk";
++		};
++		ehrpwm_tbclk: ehrpwm_tbclk {
++			compatible = "ti,da830-tbclksync";
++			#clock-cells = <0>;
++			clocks = <&psc1 17>;
++			clock-names = "fck";
++		};
++		div4p5_clk: div4.5 {
++			compatible = "ti,da830-div4p5ena";
++			#clock-cells = <0>;
++			clocks = <&pll0_pllout>;
++			clock-names = "pll0_pllout";
++		};
++		async1_clk: async1 {
++			compatible = "ti,da850-async1-clksrc";
++			#clock-cells = <0>;
++			clocks = <&pll0_sysclk 3>, <&div4p5_clk>;
++			clock-names = "pll0_sysclk3", "div4.5";
++		};
++		async3_clk: async3 {
++			compatible = "ti,da850-async3-clksrc";
++			#clock-cells = <0>;
++			clocks = <&pll0_sysclk 2>, <&pll1_sysclk 2>;
++			clock-names = "pll0_sysclk2", "pll1_sysclk2";
++		};
++	};
 +
-+void __init dm365_pll_clk_init(void __iomem *pll1, void __iomem *pll2)
-+{
-+	const struct davinci_pll_sysclk_info *info;
++Also see:
++- Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
-+	davinci_pll_clk_register(&dm365_pll1_info, "ref_clk", pll1);
-+
-+	davinci_pll_auxclk_register("pll1_auxclk", pll1);
-+
-+	davinci_pll_sysclkbp_clk_register("pll1_sysclkbp", pll1);
-+
-+	davinci_pll_obsclk_register(&dm365_pll1_obsclk_info, pll1);
-+
-+	for (info = dm365_pll1_sysclk_info; info->name; info++)
-+		davinci_pll_sysclk_register(info, pll1);
-+
-+	davinci_pll_clk_register(&dm365_pll2_info, "oscin", pll2);
-+
-+	davinci_pll_auxclk_register("pll2_auxclk", pll2);
-+
-+	davinci_pll_obsclk_register(&dm365_pll2_obsclk_info, pll2);
-+
-+	for (info = dm365_pll2_sysclk_info; info->name; info++)
-+		davinci_pll_sysclk_register(info, pll2);
-+}
-diff --git a/include/linux/clk/davinci.h b/include/linux/clk/davinci.h
-index 95333fe..5bf60a7 100644
---- a/include/linux/clk/davinci.h
-+++ b/include/linux/clk/davinci.h
-@@ -12,5 +12,6 @@
- void da830_pll_clk_init(void __iomem *pll);
- void da850_pll_clk_init(void __iomem *pll0, void __iomem *pll1);
- void dm355_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
-+void dm365_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
- 
- #endif /* __LINUX_CLK_DAVINCI_H__ */
 -- 
 2.7.4
