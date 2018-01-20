@@ -1,123 +1,140 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 20 Jan 2018 11:14:04 -0600
-Subject: [PATCH v6 25/41] ARM: dm646x: add new clock init using common clock
- framework
+Date: Sat, 20 Jan 2018 11:13:40 -0600
+Subject: [PATCH v6 01/41] dt-bindings: clock: Add new bindings for TI Davinci
+ PLL clocks
 In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
-Message-ID: <1516468460-4908-26-git-send-email-david@lechnology.com>
+Message-ID: <1516468460-4908-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new board-specific clock init in mach-davinci/dm646x.c
-using the new common clock framework drivers.
+This adds a new binding for the PLL IP blocks in the mach-davinci
+family of processors. Currently, only da850 has device tree support
+but these bindings can also work for other SoCs in this family just
+by adding new compatible strings.
 
-The #ifdefs are needed to prevent compile errors until the entire
-ARCH_DAVINCI is converted.
-
-Also clean up the #includes since we are adding some here.
+Note: Although these PLL controllers are very similar to the TI Keystone
+SoCs, we are not re-using those bindings. The Keystone bindings use a
+legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
+have a slightly different PLL register layout and a number of quirks
+that can't be handled by the existing bindings, so the keystone bindings
+could not be used as-is anyway.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v6 changes:
-- add blank lines between function calls
+- Added clock-names property
+- Added ti,clkmode-square-wave property
+- Added pllout child node
+- Added obsclk child node
+- Expanded examples
 
- arch/arm/mach-davinci/dm646x.c | 44 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 36 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/clock/ti/davinci/pll.txt   | 96 ++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
 
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 109ab1f..ee07e41 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -8,29 +8,35 @@
-  * is licensed "as is" without any warranty of any kind, whether express
-  * or implied.
-  */
-+#include <linux/clk-provider.h>
-+#include <linux/clk.h>
-+#include <linux/clk/davinci.h>
-+#include <linux/clkdev.h>
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
- #include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/serial_8250.h>
--#include <linux/platform_device.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/gpio-davinci.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
- 
- #include <asm/mach/map.h>
- 
-+#include <mach/common.h>
- #include <mach/cputype.h>
- #include <mach/irqs.h>
--#include "psc.h"
- #include <mach/mux.h>
--#include <mach/time.h>
- #include <mach/serial.h>
--#include <mach/common.h>
-+#include <mach/time.h>
- 
-+#include "asp.h"
- #include "davinci.h"
--#include "clock.h"
- #include "mux.h"
--#include "asp.h"
+diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+new file mode 100644
+index 0000000..36998e1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+@@ -0,0 +1,96 @@
++Binding for TI DaVinci PLL Controllers
 +
-+#ifndef CONFIG_COMMON_CLK
-+#include "clock.h"
-+#include "psc.h"
-+#endif
- 
- #define DAVINCI_VPIF_BASE       (0x01C12000)
- 
-@@ -46,6 +52,7 @@
- #define DM646X_EMAC_CNTRL_RAM_OFFSET	0x2000
- #define DM646X_EMAC_CNTRL_RAM_SIZE	0x2000
- 
-+#ifndef CONFIG_COMMON_CLK
- static struct pll_data pll1_data = {
- 	.num       = 1,
- 	.phys_base = DAVINCI_PLL1_BASE,
-@@ -356,6 +363,7 @@ static struct clk_lookup dm646x_clks[] = {
- 	CLK(NULL, "vpif1", &vpif1_clk),
- 	CLK(NULL, NULL, NULL),
- };
-+#endif
- 
- static struct emac_platform_data dm646x_emac_pdata = {
- 	.ctrl_reg_offset	= DM646X_EMAC_CNTRL_OFFSET,
-@@ -953,9 +961,29 @@ void __init dm646x_init(void)
- void __init dm646x_init_time(unsigned long ref_clk_rate,
- 			     unsigned long aux_clkin_rate)
- {
-+#ifdef CONFIG_COMMON_CLK
-+	void __iomem *pll1, *pll2, *psc;
-+	struct clk *clk;
++The PLL provides clocks to most of the components on the SoC. In addition
++to the PLL itself, this controller also contains bypasses, gates, dividers,
++an multiplexers for various clock signals.
 +
-+	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_4K);
-+	pll2 = ioremap(DAVINCI_PLL2_BASE, SZ_4K);
-+	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
++Required properties:
++- compatible: shall be one of:
++	- "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
++	- "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
++- reg: physical base address and size of the controller's register area.
++- clocks: phandles corresponding to the clock names
++- clock-names: names of the clock sources - depends on compatible string
++	- for "ti,da850-pll0", shall be "clksrc", "extclksrc"
++	- for "ti,da850-pll1", shall be "clksrc"
 +
-+	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, ref_clk_rate);
-+	clk_register_fixed_rate(NULL, "aux_clkin", NULL, 0, aux_clkin_rate);
++Optional properties:
++- ti,clkmode-square-wave: Indicates that the the board is supplying a square
++	wave input on the OSCIN pin instead of using a crystal oscillator.
++	This property is only valid when compatible = "ti,da850-pll0".
 +
-+	dm646x_pll_clk_init(pll1, pll2);
 +
-+	dm646x_psc_clk_init(psc);
++Optional child nodes:
 +
-+	/* no LPSC, always enabled; c.f. spruep9a */
-+	clk = clk_register_fixed_factor(NULL, "timer2", "pll1_sysclk3", 0, 1, 1);
-+	clk_register_clkdev(clk, NULL, "davinci-wdt");
-+#else
- 	ref_clk.rate = ref_clk_rate;
- 	aux_clkin.rate = aux_clkin_rate;
- 	davinci_clk_init(dm646x_clks);
-+#endif
- 	davinci_timer_init();
- }
- 
++pllout
++	Describes the main PLL clock output (before POSTDIV). The node name must
++	be "pllout".
++
++	Required properties:
++	- #clock-cells: shall be 0
++
++sysclk
++	Describes the PLLDIVn divider clocks that provide the SYSCLKn clock
++	domains. The node name must be "sysclk". Consumers of this node should
++	use "n" in "SYSCLKn" as the index parameter for the clock cell.
++
++	Required properties:
++	- #clock-cells: shall be 1
++
++auxclk
++	Describes the AUXCLK output of the PLL. The node name must be "auxclk".
++	This child node is only valid when compatible = "ti,da850-pll0".
++
++	Required properties:
++	- #clock-cells: shall be 0
++
++obsclk
++	Describes the OBSCLK output of the PLL. The node name must be "obsclk".
++
++	Required properties:
++	- #clock-cells: shall be 0
++
++
++Examples:
++
++	pll0: clock-controller at 11000 {
++		compatible = "ti,da850-pll0";
++		reg = <0x11000 0x1000>;
++		clocks = <&ref_clk>, <&pll1_sysclk 3>;
++		clock-names = "clksrc", "extclksrc";
++		ti,clkmode-square-wave;
++
++		pll0_pllout: pllout {
++			#clock-cells = <0>;
++		};
++
++		pll0_sysclk: sysclk {
++			#clock-cells = <1>;
++		};
++
++		pll0_auxclk: auxclk {
++			#clock-cells = <0>;
++		};
++
++		pll0_obsclk: obsclk {
++			#clock-cells = <0>;
++		};
++	};
++
++	pll1: clock-controller at 21a000 {
++		compatible = "ti,da850-pll1";
++		reg = <0x21a000 0x1000>;
++		clocks = <&ref_clk>;
++		clock-names = "clksrc";
++
++		pll0_sysclk: sysclk {
++			#clock-cells = <1>;
++		};
++
++		pll0_obsclk: obsclk {
++			#clock-cells = <0>;
++		};
++	};
++
++Also see:
++- Documentation/devicetree/bindings/clock/clock-bindings.txt
 -- 
 2.7.4
