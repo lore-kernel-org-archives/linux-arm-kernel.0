@@ -1,132 +1,123 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 20 Jan 2018 11:13:56 -0600
-Subject: [PATCH v6 17/41] dt-bindings: clock: Add bindings for DA8XX CFGCHIP
- clocks
+Date: Sat, 20 Jan 2018 11:13:59 -0600
+Subject: [PATCH v6 20/41] ARM: da830: add new clock init using common clock
+ framework
 In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
-Message-ID: <1516468460-4908-18-git-send-email-david@lechnology.com>
+Message-ID: <1516468460-4908-21-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new binding for the clocks present in the CFGCHIP syscon
-registers in TI DA8XX SoCs.
+This adds the new board-specific clock init in mach-davinci/da830.c
+using the new common clock framework drivers.
+
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
+
+Also clean up the #includes since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v6 changes:
-- combine "dt-bindings: clock: Add bindings for DA8XX CFGCHIP gate clocks",
-  "dt-bindings: clock: Add binding for TI DA8XX CFGCHIP mux clocks" and
-  "dt-bindings: clock: Add bindings for TI DA8XX USB PHY clocks" into a single
-  file containing all CFGCHIP clocks bindings
-- added compatible = "ti,da830-div4p5ena"
-- added compatible = "ti,da850-async1-clksrc"
-- renamed other compatible strings
-- changed and added some clk-names strings
-- USB PHY clocks are combined into a single node with #clock-cells = <1>
+- add blank lines between function calls
+- include da8xx_register_cfgchip()
 
- .../bindings/clock/ti/davinci/da8xx-cfgchip.txt    | 93 ++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt
+ arch/arm/mach-davinci/da830.c | 49 +++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 43 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt b/Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt
-new file mode 100644
-index 0000000..1e03dce
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/davinci/da8xx-cfgchip.txt
-@@ -0,0 +1,93 @@
-+Binding for TI DA8XX/OMAP-L13X/AM17XX/AM18XX CFGCHIP clocks
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 39de5a6..0b6d0f3 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -8,23 +8,29 @@
+  * is licensed "as is" without any warranty of any kind, whether express
+  * or implied.
+  */
++#include <linux/clk-provider.h>
++#include <linux/clk.h>
++#include <linux/clk/davinci.h>
++#include <linux/clkdev.h>
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+-#include <linux/clk.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ 
+ #include <asm/mach/map.h>
+ 
+-#include "psc.h"
+-#include <mach/irqs.h>
+-#include <mach/cputype.h>
+ #include <mach/common.h>
+-#include <mach/time.h>
++#include <mach/cputype.h>
+ #include <mach/da8xx.h>
++#include <mach/irqs.h>
++#include <mach/time.h>
+ 
+-#include "clock.h"
+ #include "mux.h"
+ 
++#ifndef CONFIG_COMMON_CLK
++#include "clock.h"
++#include "psc.h"
++#endif
 +
-+TI DA8XX/OMAP-L13X/AM17XX/AM18XX SoCs contain a general purpose set of
-+registers call CFGCHIPn. Some of these registers function as clock
-+gates. This document describes the bindings for those clocks.
+ /* Offsets of the 8 compare registers on the da830 */
+ #define DA830_CMP12_0		0x60
+ #define DA830_CMP12_1		0x64
+@@ -37,6 +43,7 @@
+ 
+ #define DA830_REF_FREQ		24000000
+ 
++#ifndef CONFIG_COMMON_CLK
+ static struct pll_data pll0_data = {
+ 	.num		= 1,
+ 	.phys_base	= DA8XX_PLL0_BASE,
+@@ -432,6 +439,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK(NULL,		"rmii",		&rmii_clk),
+ 	CLK(NULL,		NULL,		NULL),
+ };
++#endif
+ 
+ /*
+  * Device specific mux setup
+@@ -1223,7 +1231,36 @@ void __init da830_init(void)
+ 
+ void __init da830_init_time(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	void __iomem *pll0, *psc0, *psc1;
++	struct clk *clk;
 +
-+All of the clock nodes described below must be child nodes of a CFGCHIP node
-+(compatible = "ti,da830-cfgchip").
++	pll0 = ioremap(DA8XX_PLL0_BASE, SZ_4K);
++	psc0 = ioremap(DA8XX_PSC0_BASE, SZ_4K);
++	psc1 = ioremap(DA8XX_PSC1_BASE, SZ_4K);
 +
-+USB PHY clocks
-+--------------
-+Required properties:
-+- compatible: shall be "ti,da830-usb-phy-clocks".
-+- #clock-cells: from common clock binding; shall be set to 1.
-+- clocks: phandles to the parent clocks corresponding to clock-names
-+- clock-names: shall be "fck", "usb_refclkin", "auxclk"
++	da8xx_register_cfgchip();
 +
-+This node provides two clocks. The clock at index 0 is the USB 2.0 PHY 48MHz
-+clock and the clock at index 1 is the USB 1.1 PHY 48MHz clock.
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA830_REF_FREQ);
 +
-+eHRPWM Time Base Clock (TBCLK)
-+------------------------------
-+Required properties:
-+- compatible: shall be "ti,da830-tbclksync".
-+- #clock-cells: from common clock binding; shall be set to 0.
-+- clocks: phandle to the parent clock
-+- clock-names: shall be "fck"
++	da830_pll_clk_init(pll0);
 +
-+PLL DIV4.5 divider
-+------------------
-+Required properties:
-+- compatible: shall be "ti,da830-div4p5ena".
-+- #clock-cells: from common clock binding; shall be set to 0.
-+- clocks: phandle to the parent clock
-+- clock-names: shall be "pll0_pllout"
++	da830_psc_clk_init(psc0, psc1);
 +
-+EMIFA clock source (ASYNC1)
-+---------------------------
-+Required properties:
-+- compatible: shall be "ti,da850-async1-clksrc".
-+- #clock-cells: from common clock binding; shall be set to 0.
-+- clocks: phandles to the parent clocks corresponding to clock-names
-+- clock-names: shall be "pll0_sysclk3", "div4.5"
++	clk = clk_register_fixed_factor(NULL, "i2c0", "pll0_aux_clk", 0, 1, 1);
++	clk_register_clkdev(clk, NULL, "i2c_davinci.1");
 +
-+ASYNC3 clock source
-+-------------------
-+Required properties:
-+- compatible: shall be "ti,da850-async3-clksrc".
-+- #clock-cells: from common clock binding; shall be set to 0.
-+- clocks: phandles to the parent clocks corresponding to clock-names
-+- clock-names: shall be "pll0_sysclk2", "pll1_sysclk2"
++	clk = clk_register_fixed_factor(NULL, "timer0", "pll0_aux_clk", 0, 1, 1);
++	clk_register_clkdev(clk, "timer0", NULL);
 +
-+Examples:
++	clk = clk_register_fixed_factor(NULL, "timer1", "pll0_aux_clk", 0, 1, 1);
++	clk_register_clkdev(clk, NULL, "davinci-wdt");
 +
-+	cfgchip: syscon at 1417c {
-+		compatible = "ti,da830-cfgchip", "syscon", "simple-mfd";
-+		reg = <0x1417c 0x14>;
-+
-+		usb_phy_clk: usb-phy-clocks {
-+			compatible = "ti,da830-usb-phy-clocks";
-+			#clock-cells = <1>;
-+			clocks = <&psc1 1>, <&usb_refclkin>, <&pll0_auxclk>;
-+			clock-names = "fck", "usb_refclkin", "auxclk";
-+		};
-+		ehrpwm_tbclk: ehrpwm_tbclk {
-+			compatible = "ti,da830-tbclksync";
-+			#clock-cells = <0>;
-+			clocks = <&psc1 17>;
-+			clock-names = "fck";
-+		};
-+		div4p5_clk: div4.5 {
-+			compatible = "ti,da830-div4p5ena";
-+			#clock-cells = <0>;
-+			clocks = <&pll0_pllout>;
-+			clock-names = "pll0_pllout";
-+		};
-+		async1_clk: async1 {
-+			compatible = "ti,da850-async1-clksrc";
-+			#clock-cells = <0>;
-+			clocks = <&pll0_sysclk 3>, <&div4p5_clk>;
-+			clock-names = "pll0_sysclk3", "div4.5";
-+		};
-+		async3_clk: async3 {
-+			compatible = "ti,da850-async3-clksrc";
-+			#clock-cells = <0>;
-+			clocks = <&pll0_sysclk 2>, <&pll1_sysclk 2>;
-+			clock-names = "pll0_sysclk2", "pll1_sysclk2";
-+		};
-+	};
-+
-+Also see:
-+- Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
++	clk = clk_register_fixed_factor(NULL, "rmii", "pll0_sysclk7", 0, 1, 1);
++	clk_register_clkdev(clk, "rmii", NULL);
++#else
+ 	da8xx_register_cfgchip();
+ 	davinci_clk_init(da830_clks);
++#endif
+ 	davinci_timer_init();
+ }
 -- 
 2.7.4
