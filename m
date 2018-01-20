@@ -1,58 +1,131 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 20 Jan 2018 12:52:34 +0800
-Subject: [nomadik:gemini-ethernet-rtl8366rb 11/16] ERROR: "of_irq_count"
- [net/dsa/dsa_core.ko] undefined!
-Message-ID: <201801201232.HtwAR2cV%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 20 Jan 2018 14:08:56 +0800
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
+In-Reply-To: <548d57b7-4db1-a9ee-369e-9067f981162d@olimex.com>
+References: <1515747666-6597-1-git-send-email-stefan@olimex.com>
+ <20180115095031.pzsgrp3tdmemotrs@flea.lan>
+ <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
+ <20180118100745.y62adzvfnrzqkagd@flea.lan>
+ <CAGb2v66U9ziFhU5n6haTA3LGNX7BavmfXiiCmvebtqaMxcN0-w@mail.gmail.com>
+ <548d57b7-4db1-a9ee-369e-9067f981162d@olimex.com>
+Message-ID: <CAGb2v67BARS-kOH06DzkYH-_7h_18yrEpc0c_diXVvRxZPn_4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-ethernet-rtl8366rb
-head:   e79f5ccab09cd07654d73e9f0bf730a536cfc98a
-commit: d88475d19900612b808775a73b3495e9b3598b26 [11/16] RFC: net/dsa: Allow DSA PHYs to define link IRQs
-config: x86_64-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        git checkout d88475d19900612b808775a73b3495e9b3598b26
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Fri, Jan 19, 2018 at 9:27 PM, Stefan Mavrodiev <stefan@olimex.com> wrote:
+> On 01/18/2018 04:28 PM, Chen-Yu Tsai wrote:
+>>
+>> On Thu, Jan 18, 2018 at 6:07 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>>
+>>> Hi!
+>>>
+>>> On Mon, Jan 15, 2018 at 12:07:34PM +0200, Stefan Mavrodiev wrote:
+>>>>>>
+>>>>>> +/dts-v1/;
+>>>>>> +#include "sun7i-a20.dtsi"
+>>>>>> +#include "sunxi-common-regulators.dtsi"
+>>>>>> +
+>>>>>> +
+>>>>>> +#include <dt-bindings/gpio/gpio.h>
+>>>>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>>>>> +#include <dt-bindings/pwm/pwm.h>
+>>>>>> +
+>>>>>> +/ {
+>>>>>> + model = "Olimex A20-SOM204-EVB";
+>>>>>> + compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
+>>>>>> +
+>>>>>> + aliases {
+>>>>>> +         serial0 = &uart0;
+>>>>>> +         serial1 = &uart4;
+>>>>>> +         serial2 = &uart7;
+>>>>>> +         spi0 = &spi1;
+>>>>>> +         spi1 = &spi2;
+>>>>>> +         ethernet1 = &rtl8723bs;
+>>>>>
+>>>>> ethernet1? if there's a single network interface, it should be
+>>>>> ethernet0.
+>>>>
+>>>> I think this will conflict the gmac alias defined in sun7i-a20.dtsi:
+>>>>
+>>>> aliases {
+>>>>      ethernet0 = &gmac;
+>>>> };
+>>>
+>>> We have that? That's bad, but you're right :)
+>>>
+>>>>>> +         stat {
+>>>>>> +                 label = "a20-som204:green:stat";
+>>>>>> +                 gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
+>>>>>> +                 default-state = "on";
+>>>>>> +         };
+>>>>>> +
+>>>>>> +         led1 {
+>>>>>> +                 label = "a20-som204-evb:green:led1";
+>>>>>> +                 gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
+>>>>>> +                 default-state = "on";
+>>>>>> +         };
+>>>>>> +
+>>>>>> +         led2 {
+>>>>>> +                 label = "a20-som204-evb:yellow:led2";
+>>>>>> +                 gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
+>>>>>> +                 default-state = "on";
+>>>>>> +         };
+>>>>>
+>>>>> You don't have the same prefix between stat and led1/led2. I'm fine
+>>>>> with both, but you should be consistent :)
+>>>>
+>>>> STAT led is on the SOM204 module, while led1/2 on the EVB. Thats why
+>>>> they have different prefix.
+>>>
+>>> Still, the user and the system will see it as a single board, and the
+>>> documentation states that it should be the board name. I'm not quite
+>>> sure what a good rule would be here. Have you looked at how other
+>>> boards dealt with it? Chen-Yu, any opinion on this?
+>>
+>> Follow the bindings, I guess? I don't think we (sunxi) have dealt
+>> with modules that have LEDs or anything that needs to be named after
+>> the board.
+>>
+>> On a related topic, I don't know if you (Stefan / Olimex) want to split
+>> this into a .dtsi file for the SoM, and a .dts file for the EVB. It might
+>> help your customers?
+>
+> I'm not sure this will be good ideal. We will have one EVB with all
+> possible peripheries. On the other hand, we are planning 3-4 different
+> SOM204 modules (A20, A64, RK....). I think this will make the dtsi
+> incompatible.
 
-All errors (new ones prefixed by >>):
+Yes. That was what I mentioned in the second half of my reply.
 
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/auxdisplay/img-ascii-lcd.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-ath79.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/gpio/gpio-iop.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/accel/kxsd9-i2c.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/iio/adc/qcom-vadc-common.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/mtk-vcodec/mtk-vcodec-common.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/soc_camera/soc_scale_crop.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/tegra-cec/tegra_cec.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/mtd/nand/denali_pci.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/power/reset/zx-reboot.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in net/9p/9pnet_xen.o
-   see include/linux/module.h for more information
-   WARNING: modpost: missing MODULE_LICENSE() in sound/soc/codecs/snd-soc-pcm512x-spi.o
-   see include/linux/module.h for more information
->> ERROR: "of_irq_count" [net/dsa/dsa_core.ko] undefined!
+>
+> Maybe if there is one dtsi for the base SOM204 module (one for each arch)
+> and
+> multiple dts for boards with additional features. But this will generate
+> 10-20
+> dts files. I think this will be better handled using overlays in the uboot.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62413 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180120/5b06dd1f/attachment-0001.gz>
+OK. I'm guessing there's the possibility that some pins or GPIOs get muxed
+to different functions depending on what base board is used? How would
+you list them, if you only had one .dts file, say for the EVB? Clearly
+the SoM cannot work by itself, so it probably doesn't get its own .dts
+file.
+
+>
+> About the leds, I'm ok to be named after full board name (a20-som204-evb).
+
+Cool.
+
+ChenYu
+
+>>
+>> I've tried it previously, and it helps in some ways
+>> when you're matching the files to the schematics. But it is confusing
+>> when you want the big picture. On the other hand, this is not going to
+>> help with supporting different modules on the same baseboard, as the
+>> routing, peripherals and labels likely won't match up. Just my two cents.
+>>
+>> ChenYu
+>
+> Regards,
+> Stefan Mavrodiev
