@@ -1,151 +1,123 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 20 Jan 2018 11:14:05 -0600
-Subject: [PATCH v6 26/41] ARM: da8xx: add new USB PHY clock init using common
- clock framework
+Date: Sat, 20 Jan 2018 11:14:04 -0600
+Subject: [PATCH v6 25/41] ARM: dm646x: add new clock init using common clock
+ framework
 In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
-Message-ID: <1516468460-4908-27-git-send-email-david@lechnology.com>
+Message-ID: <1516468460-4908-26-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new USB PHY clock init in mach-davinci/usb-da8xx.c using
-the new common clock framework drivers.
+This adds the new board-specific clock init in mach-davinci/dm646x.c
+using the new common clock framework drivers.
 
 The #ifdefs are needed to prevent compile errors until the entire
 ARCH_DAVINCI is converted.
+
+Also clean up the #includes since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
 v6 changes:
-- rename stuff to match changes in "clk: davinci: New driver for TI DA8XX USB
-  PHY clocks"
-- take advantage of syscon lookup changes in "mfd: syscon: Add syscon_register()
-  function"
+- add blank lines between function calls
 
- arch/arm/mach-davinci/usb-da8xx.c | 78 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 77 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/dm646x.c | 44 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 36 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index fb31f6e..b960609 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -2,28 +2,36 @@
- /*
-  * DA8xx USB
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 109ab1f..ee07e41 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -8,29 +8,35 @@
+  * is licensed "as is" without any warranty of any kind, whether express
+  * or implied.
   */
 +#include <linux/clk-provider.h>
- #include <linux/clk.h>
++#include <linux/clk.h>
 +#include <linux/clk/davinci.h>
 +#include <linux/clkdev.h>
- #include <linux/delay.h>
  #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
  #include <linux/init.h>
- #include <linux/mfd/da8xx-cfgchip.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_data/usb-davinci.h>
- #include <linux/platform_device.h>
- #include <linux/usb/musb.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
+-#include <linux/platform_device.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
  
--#include <mach/clock.h>
- #include <mach/common.h>
+ #include <asm/mach/map.h>
+ 
++#include <mach/common.h>
  #include <mach/cputype.h>
- #include <mach/da8xx.h>
  #include <mach/irqs.h>
+-#include "psc.h"
+ #include <mach/mux.h>
+-#include <mach/time.h>
+ #include <mach/serial.h>
+-#include <mach/common.h>
++#include <mach/time.h>
  
++#include "asp.h"
+ #include "davinci.h"
+-#include "clock.h"
+ #include "mux.h"
+-#include "asp.h"
++
 +#ifndef CONFIG_COMMON_CLK
-+#include <mach/clock.h>
- #include "clock.h"
++#include "clock.h"
++#include "psc.h"
 +#endif
  
- #define DA8XX_USB0_BASE		0x01e00000
- #define DA8XX_USB1_BASE		0x01e25000
+ #define DAVINCI_VPIF_BASE       (0x01C12000)
+ 
+@@ -46,6 +52,7 @@
+ #define DM646X_EMAC_CNTRL_RAM_OFFSET	0x2000
+ #define DM646X_EMAC_CNTRL_RAM_SIZE	0x2000
  
 +#ifndef CONFIG_COMMON_CLK
- static struct clk *usb20_clk;
+ static struct pll_data pll1_data = {
+ 	.num       = 1,
+ 	.phys_base = DAVINCI_PLL1_BASE,
+@@ -356,6 +363,7 @@ static struct clk_lookup dm646x_clks[] = {
+ 	CLK(NULL, "vpif1", &vpif1_clk),
+ 	CLK(NULL, NULL, NULL),
+ };
 +#endif
  
- static struct platform_device da8xx_usb_phy = {
- 	.name		= "da8xx-usb-phy",
-@@ -128,6 +136,7 @@ int __init da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata)
- 	return platform_device_register(&da8xx_usb11_device);
- }
- 
-+#ifndef CONFIG_COMMON_CLK
- static struct clk usb_refclkin = {
- 	.name		= "usb_refclkin",
- 	.set_rate	= davinci_simple_set_rate,
-@@ -354,3 +363,70 @@ int __init da8xx_register_usb11_phy_clk(bool use_usb_refclkin)
- 
- 	return ret;
- }
-+#else
-+/**
-+ * da8xx_register_usb20_phy_clk - register USB0PHYCLKMUX clock
-+ *
-+ * @use_usb_refclkin: Selects the parent clock - either "usb_refclkin" if true
-+ *	or "pll0_aux_clk" if false.
-+ */
-+int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
-+{
-+	struct regmap *cfgchip;
-+	struct clk *fck_clk, *clk;
-+	struct clk_hw *parent;
-+
-+	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
-+	if (IS_ERR(cfgchip))
-+		return PTR_ERR(cfgchip);
-+
-+	fck_clk = clk_get_sys("musb-da8xx", NULL);
-+	if (IS_ERR(fck_clk))
-+		return PTR_ERR(fck_clk);
-+
-+	clk = da8xx_cfgchip_register_usb0_clk48(cfgchip, fck_clk);
-+	if (IS_ERR(clk)) {
-+		clk_put(fck_clk);
-+		return PTR_ERR(clk);
-+	}
-+
-+	parent = clk_hw_get_parent_by_index(__clk_get_hw(clk),
-+					    use_usb_refclkin ? 0 : 1);
-+	if (parent)
-+		clk_set_parent(clk, parent->clk);
-+	else
-+		pr_warn("%s: Failed to find parent clock\n", __func__);
-+
-+	return clk_register_clkdev(clk, "usb0_clk48", "da8xx-usb-phy");
-+}
-+
-+/**
-+ * da8xx_register_usb11_phy_clk - register USB1PHYCLKMUX clock
-+ *
-+ * @use_usb_refclkin: Selects the parent clock - either "usb_refclkin" if true
-+ *	or "usb0_phy_clk" if false.
-+ */
-+int __init da8xx_register_usb11_phy_clk(bool use_usb_refclkin)
-+{
-+	struct regmap *cfgchip;
+ static struct emac_platform_data dm646x_emac_pdata = {
+ 	.ctrl_reg_offset	= DM646X_EMAC_CNTRL_OFFSET,
+@@ -953,9 +961,29 @@ void __init dm646x_init(void)
+ void __init dm646x_init_time(unsigned long ref_clk_rate,
+ 			     unsigned long aux_clkin_rate)
+ {
++#ifdef CONFIG_COMMON_CLK
++	void __iomem *pll1, *pll2, *psc;
 +	struct clk *clk;
-+	struct clk_hw *parent;
 +
-+	cfgchip = syscon_regmap_lookup_by_compatible("ti,da830-cfgchip");
-+	if (IS_ERR(cfgchip))
-+		return PTR_ERR(cfgchip);
++	pll1 = ioremap(DAVINCI_PLL1_BASE, SZ_4K);
++	pll2 = ioremap(DAVINCI_PLL2_BASE, SZ_4K);
++	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
 +
-+	clk = da8xx_cfgchip_register_usb1_clk48(cfgchip);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
++	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, ref_clk_rate);
++	clk_register_fixed_rate(NULL, "aux_clkin", NULL, 0, aux_clkin_rate);
 +
-+	parent = clk_hw_get_parent_by_index(__clk_get_hw(clk),
-+					    use_usb_refclkin ? 1 : 0);
-+	if (parent)
-+		clk_set_parent(clk, parent->clk);
-+	else
-+		pr_warn("%s: Failed to find parent clock\n", __func__);
++	dm646x_pll_clk_init(pll1, pll2);
 +
-+	return clk_register_clkdev(clk, "usb1_clk48", "da8xx-usb-phy");
-+}
++	dm646x_psc_clk_init(psc);
++
++	/* no LPSC, always enabled; c.f. spruep9a */
++	clk = clk_register_fixed_factor(NULL, "timer2", "pll1_sysclk3", 0, 1, 1);
++	clk_register_clkdev(clk, NULL, "davinci-wdt");
++#else
+ 	ref_clk.rate = ref_clk_rate;
+ 	aux_clkin.rate = aux_clkin_rate;
+ 	davinci_clk_init(dm646x_clks);
 +#endif
+ 	davinci_timer_init();
+ }
+ 
 -- 
 2.7.4
