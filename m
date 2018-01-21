@@ -1,39 +1,58 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Sun, 21 Jan 2018 16:02:37 -0600
-Subject: [GIT PULL] Qualcomm Fixes for 4.16
-Message-ID: <1516572157-968-1-git-send-email-andy.gross@linaro.org>
+From: david@lechnology.com (David Lechner)
+Date: Sun, 21 Jan 2018 17:03:13 -0600
+Subject: [PATCH] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
+ bits_per_mux != 0
+Message-ID: <1516575793-30526-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd/Olof/Kevin,
+This fixes pcs_request_gpio() in the pinctrl-single driver when
+bits_per_mux != 0. It appears this was overlooked when the multiple
+pins per register feature was added.
 
-Please take this fix for 4.16.  This applies on top of the current next
-(next-20190119).
+Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure
+multiple pins of different modules")
 
-Thanks,
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ drivers/pinctrl/pinctrl-single.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-Andy
-
-The following changes since commit 761914dd2975bc443024f0ec10a66a26b7186ec2:
-
-  Add linux-next specific files for 20180119 (2018-01-19 17:51:17 +1100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.16
-
-for you to fetch changes up to a218c67e4eb95287129b56c20a94b9ea0d8917e5:
-
-  of: platform: fix OF node refcount leak (2018-01-21 15:01:34 -0600)
-
-----------------------------------------------------------------
-Qualcomm Fixes for 4.16
-
-* Fix OF node refcount leak
-
-----------------------------------------------------------------
-Sudeep Holla (1):
-      of: platform: fix OF node refcount leak
-
- drivers/of/platform.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 3501491..7a5e2f1 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -391,9 +391,25 @@ static int pcs_request_gpio(struct pinctrl_dev *pctldev,
+ 			|| pin < frange->offset)
+ 			continue;
+ 		mux_bytes = pcs->width / BITS_PER_BYTE;
+-		data = pcs->read(pcs->base + pin * mux_bytes) & ~pcs->fmask;
+-		data |= frange->gpiofunc;
+-		pcs->write(data, pcs->base + pin * mux_bytes);
++
++		if (pcs->bits_per_mux) {
++			int byte_num, offset, pin_shift;
++
++			byte_num = (pcs->bits_per_pin * pin) / BITS_PER_BYTE;
++			offset = (byte_num / mux_bytes) * mux_bytes;
++			pin_shift = pin % (pcs->width / pcs->bits_per_pin) *
++				    pcs->bits_per_pin;
++
++			data = pcs->read(pcs->base + offset);
++			data &= ~(pcs->fmask << pin_shift);
++			data |= frange->gpiofunc << pin_shift;
++			pcs->write(data, pcs->base + offset);
++		} else {
++			data = pcs->read(pcs->base + pin * mux_bytes);
++			data &= ~pcs->fmask;
++			data |= frange->gpiofunc;
++			pcs->write(data, pcs->base + pin * mux_bytes);
++		}
+ 		break;
+ 	}
+ 	return 0;
+-- 
+2.7.4
