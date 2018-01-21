@@ -1,69 +1,76 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Sun, 21 Jan 2018 11:10:38 +0800
-Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
- categorization
-In-Reply-To: <20180115083335.GC21403@cbox>
-References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
- <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
- <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
- <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
- <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com> <5A58F8E3.5060002@arm.com>
- <20180115083335.GC21403@cbox>
-Message-ID: <CAMj-D2AypmVjSeimhqSEqhsrQfDwCeV+F85WYzLQ61crtCEhJg@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Sat, 20 Jan 2018 23:00:48 -0800
+Subject: [PATCH v2] irqchip/gic-v3-its: Add workaround for ThunderX2
+ erratum #174
+In-Reply-To: <20180118052820.30286-1-ganapatrao.kulkarni@cavium.com>
+References: <20180118052820.30286-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20180121070038.GA4450@jc-sabre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-15 16:33 GMT+08:00 Christoffer Dall <christoffer.dall@linaro.org>:
-> On Fri, Jan 12, 2018 at 06:05:23PM +0000, James Morse wrote:
->> On 15/12/17 03:30, gengdongjiu wrote:
->> > On 2017/12/7 14:37, gengdongjiu wrote:
->
-> [...]
->
->>
->> (I recall someone saying migration is needed for any new KVM/cpu features, but I
->> can't find the thread)
->>
->
-> I don't know of any hard set-in-stone rule for this, but I have
-> certainly argued that since migration is a popular technique in data
-> centers and often a key motivation behind using virtual machines as it
-> provides both load-balancing and high availability, we should think
-> about migration support for all features and state.  Further, experience
-> has shown that retroactively trying to support migration can result in
-> really complex interfaces for saving/restoring state (see the ITS
-> ordering requirements in
-> Documentation/virtual/kvm/devices/arm-vgic-its.txt as an example) so
-> thinking about this problem when introducing functionality is a good
-> idea.
-yes, agree it.
+On Thu, Jan 18, 2018 at 10:58:20AM +0530, Ganapatrao Kulkarni wrote:
+> This erratum is observed on the ThunderX2 GICv3 ITS. When a
+> MOVI command is used to change affinity of a LPI to a collection/cpu
+> on another node, the LPI is not delivered to the cpu.
+> An additional INV command is required after the MOVI to deliver
+> the LPI to the new destination.
+> 
+> If we add INV after MOVI, there is a chance that we lose LPIs which
+> are raised when the affinity is changed. So for now, adding workaround fix
+> to disable inter node affinity change.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+> 
+> v2: Added workaround to avoid inter node affinity change.
+> 
+> v1: Initial patch
+> 
+>  Documentation/arm64/silicon-errata.txt |  1 +
+>  arch/arm64/Kconfig                     | 10 ++++++++++
+>  drivers/irqchip/irq-gic-v3-its.c       | 21 ++++++++++++++++++++-
+>  3 files changed, 31 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index fc1c884..fb27cb5 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -63,6 +63,7 @@ stable kernels.
+>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+>  | Cavium         | ThunderX Core   | #30115          | CAVIUM_ERRATUM_30115        |
+>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
+> +| Cavium         | ThunderX2 ITS   | #174            | CAVIUM_ERRATUM_174          |
+>  | Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
+>  | Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+>  |                |                 |                 |                             |
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index c9a7e9e..0dbf3bd 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -461,6 +461,16 @@ config ARM64_ERRATUM_843419
+>  
+>  	  If unsure, say Y.
+>  
+> +config CAVIUM_ERRATUM_174
+> +	bool "Cavium ThunderX2 erratum 174"
+> +	default y
+> +	help
+> +	  Cavium ThunderX2 dual socket systems may loose interrupts
+> +	  on affinity change to a cpu on other node.
+> +	  This workaround fix avoids inter node affinity change.
 
->
-> Of course, if there are really good arguments for having some state that
-> simply cannot be migrated, then that's fine, and we should just make
-> sure that userspace (e.g. QEMU) and higher level components in the
-> stack (libvirt, openstack, etc.) can detect this state being used, and
-> ideally enable/disable it, so that it can predict that a particular VM
-> cannot be migrated off a particular host, or between a particular set of
-> two hosts.  As an example, migration is typically prohibited when using
-> VFIO direct device assignment, but userspace etc. are already aware of
-> this.
-Ok,  I think this problem is similar to migrating a VM that uses an irqchip in
- userspace and has set the IRQ or FIQ lines using KVM_IRQ_LINE.
+This has to be fixed up to match the commit message (and for spelling).
+I have seen some questions offlist about how important this fix is,
+and how it can affect users - so that would be useful to have in the
+description as well.
 
->
-> As a final note, if we add support for some architectural feature, which
-> may be present on some particular hardware and/or implementation, if the
-> KVM support for said feature is automatically enabled (and not
-> selectively from userspace), I would push back quite strongly on
-> something that doesn't support migration, because it would effectively
-> prevent migration of VMs on ARM.
-Ok, got it.
+To clarify, this errata comes into play only when the irq affinity is
+forced from the node given by the device (and ITS) affinity to another
+node.  This should not happen in normal, useful configurations.
 
->
-> Thanks,
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Also, we will hold further posting of this errata until we do another
+round of investigation with the hardware team for a better solution.
+If we can handle the pending interrupts for the small window of MOVI/INV
+in first workaround, we will not need this restriction at all.
+
+JC.
