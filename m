@@ -1,62 +1,195 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Jan 2018 02:08:40 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180120195246.GC27654@lahna.fi.intel.com>
-References: <20180108151453.GB31502@xora-haswell>
- <20180108154243.GA30962@lunn.ch>
- <CAPv3WKewA+7WabMYN1w=9fOxe6zOKDbxcjX0VipumQmfZtJKjQ@mail.gmail.com>
- <20180109101941.GD31502@xora-haswell>
- <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
- <20180109130012.GA27447@lunn.ch>
- <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
- <20180118130026.GG32299@lunn.ch>
- <CAPv3WKcYrbfKjsnwZ39Tyq3HN0aneUQZdbeUzLbFgLUbMc3w8Q@mail.gmail.com>
- <20180120195246.GC27654@lahna.fi.intel.com>
-Message-ID: <20180121010840.GB1217@lunn.ch>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Sun, 21 Jan 2018 10:45:36 +0800
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <5A58F8E3.5060002@arm.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+ <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
+ <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com> <5A58F8E3.5060002@arm.com>
+Message-ID: <CAMj-D2C5Bz3r-w9v3QasZKK-W2JBY7Mx9W=yCDBnPYyk99gGzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm not familiar with MDIO bus but an alternative to GeneriSerialBus
-> would be to follow what SDIO is doing, e.g have the PHY devices listed
-> below the MDIO controller and use _ADR to describe their "address" on
-> that bus. You can see how _ADR applies to SDIO bus from ACPI spec.
+Hi James,
+   Sorry for my late response due to out of office recently.
 
-Hi Mika
+2018-01-13 2:05 GMT+08:00 James Morse <james.morse@arm.com>:
+> Hi gengdongjiu,
+>
+> On 15/12/17 03:30, gengdongjiu wrote:
+>> On 2017/12/7 14:37, gengdongjiu wrote:
+>>>> We need to tackle (1) and (3) separately. For (3) we need some API that lets
+>>>> Qemu _trigger_ an SError in the guest, with a specified ESR. But, we don't have
+>>>> a way of migrating pending SError yet... which is where I got stuck last time I
+>>>> was looking at this.
+>>> I understand you most idea.
+>>>
+>>> But In the Qemu one signal type can only correspond to one behavior, can not correspond to two behaviors,
+>>> otherwise Qemu will do not know how to do.
+>>>
+>>> For the Qemu, if it receives the SIGBUS_MCEERR_AR signal, it will populate the CPER
+>>> records and inject a SEA to guest through KVM IOCTL "KVM_SET_ONE_REG"; if receives the SIGBUS_MCEERR_AO
+>>> signal, it will record the CPER and trigger a IRQ to notify guest, as shown below:
+>>>
+>>> SIGBUS_MCEERR_AR trigger Synchronous External Abort.
+>>> SIGBUS_MCEERR_AO trigger GPIO IRQ.
+>>>
+>>> For the SIGBUS_MCEERR_AO and SIGBUS_MCEERR_AR, we have already specify trigger method, which all
+>>>
+>>> not involve _trigger_ an SError.
+>>>
+>>> so there is no chance for Qemu to trigger the SError when gets the SIGBUS_MCEERR_A{O,R}.
+>>
+>> As I explained above:
+>>
+>> If Qemu received SIGBUS_MCEERR_AR, it will record CPER and trigger Synchronous External Abort;
+>> If Qemu received SIGBUS_MCEERR_AO, it will record CPER and trigger GPIO IRQ;
+>
+>> So Qemu does not know when to _trigger_ an SError.
+>
+> There is no answer to this. How the CPU decides is specific to the CPU design.
+> How Qemu decides is going to be specific to the machine it emulates.
+>
+> My understanding is there is some overlap for which RAS errors are reported as
+> synchronous external abort, and which use SError. (Obviously the imprecise ones
+> are all SError). Which one the CPU uses depends on how the CPU is designed.
+>
+> When you take an SIGBUS_MCEERR_AR from KVM, its because KVM can't complete a
+> stage2 fault because the page is marked with PG_poisoned. These started out as a
+> synchronous exception, but you could still report these with SError.
 
-SDIO is not a serial bus, well it can be in its simplest form, but
-high speed implementations have 4 data lines. So i can understand them
-not using GenericSerialBus.
+yes, I agree, it is policy choice.
 
-MDIO is a serial bus, very similar to SPI, I2C, and UART.
+>
+> We don't have a way to signal user-space about imprecise exceptions, this isn't
+> a KVM specific problem.
+>
+>
+>> so here I "return a error" to Qemu if ghes_notify_sei() return failure in [1], if you opposed KVM "return error",
+>> do you have a better idea about it? thanks
+>
+> If ghes_notify_sei() fails to claim the error, we should drop through to
+> kernel-first-handling. We don't have that yet, just the stub that ignores errors
+> where we can make progress.
+>
+> If neither firmware-first nor kernel-first claim a RAS error, we're in trouble.
+> I'd like to panic() as we got a RAS notification but no description of the
+> error. We can't do this until we have kernel-first support, hence that stub.
+>
+>
+>> About the way of migrating pending SError, I think it is a separate case, because Qemu still does not know
+>> how and when to trigger the SError.
+>
+> I agree, but I think we should fix this first before we add another user of this
+> unmigratable hypervisor state.
+>
+> (I recall someone saying migration is needed for any new KVM/cpu features, but I
+> can't find the thread)
+>
+>
+>> [1]:
+>> static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> {
+>>         .......................
+>> +       case ESR_ELx_AET_UER:   /* The error has not been propagated */
+>> +               /*
+>> +                * Userspace only handle the guest SError Interrupt(SEI) if the
+>> +                * error has not been propagated
+>> +                */
+>> +               run->exit_reason = KVM_EXIT_EXCEPTION;
+>> +               run->ex.exception = ESR_ELx_EC_SERROR;
+>
+> I'm against telling user space RAS errors ever happened, only the final
+> user-visible error when the kernel can't fix it.
 
-> If you go with the SDIO way then each PHY is described as normal ACPI
-> device and you can use ACPI _HID/_CID to match the device to the
-> corresponding driver.
+thanks for the explanation.
+For the ESR_ELx_AET_UER, this exception is precise, closing the VM may
+be better[1].
+But if you think panic is better until we support kernel-first, it is
+also OK to me.
 
-Just some background here. If you have a plain PHY as a device on an
-MDIO bus, you don't need to match it to a driver within ACPI.
-Registers 2 and 3 contain a vendor and product ID. That is what it
-used to match the device to the driver.
 
-What you might need to know is the protocol to talk on the bus. Most
-devices use clause 22 protocol. A few devices are clause 45. 22 is the
-default in Linux, and you need to indicate if 45 should be used. You
-can also indicate 22.
++static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++     unsigned int esr = kvm_vcpu_get_hsr(vcpu);
++     bool impdef_syndrome =  esr & ESR_ELx_ISV; /* aka IDS */
++     unsigned int aet = esr & ESR_ELx_AET;
++
++     /*
++     * This is not RAS SError
++     */
++     if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++         kvm_inject_vabt(vcpu);
++         return 1;
++     }
++
++     /* For RAS the host kernel may handle this abort. */
++     if (!handle_guest_sei())
++         return 1;
++
++     /*
++     * In below two conditions, it will directly inject the
++     * virtual SError:
++     * 1. The Syndrome is IMPLEMENTATION DEFINED
++     * 2. It is Uncategorized SEI
++     */
++     if (impdef_syndrome ||
++          ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR)) {
++         kvm_inject_vabt(vcpu);
++         return 1;
++ }
++
++ switch (aet) {
++     case ESR_ELx_AET_CE: /* corrected error */
++     case ESR_ELx_AET_UEO: /* restartable error, not yet consumed */
++         return 1; /* continue processing the guest exit */
++     case ESR_ELx_AET_UER: /* recoverable error */
++         /*
++         * the exception is precise, not been silently propagated
++         * and not been consumed by the CPU, temporarily shut down
++         * the VM to isolated the error, hope not touch it again.
++         */
++     run->exit_reason = KVM_EXIT_EXCEPTION;
++     return 0;
++     default:
++     /*
++     * Until now, the CPU supports RAS, SError interrupt is fatal
++     * and host does not successfully handle it.
++     */
++     panic("This Asynchronous SError interrupt is dangerous, panic");
++    }
++
++     return 0;
++}
++
 
-It gets more complex when the device on the bus is not a PHY. It is a
-generic bus, you can connect anything to it. Ethernet switches can be
-on the bus. They generally cannot be identified using registers 2 and
-3. So you do need to match the device to the driver. Most do have ID
-registers, so the driver can work out what specific device is on the
-bus. However, Marvell moved the ID registers on there newer generation
-of devices, so we need to give the driver a hint where to look. So in
-device tree, we have two different compatible string.
+>
+> This is inventing something new for RAS errors not claimed by firmware-first.
+> If we have kernel-first too, this will never happen. (unless your system is
+> losing the error description).
+In fact, if we have kernel-first, I think we still need to judge the
+error type by ESR, right?
+If the handle_guest_sei() , may be the system does not support firmware-first,
+so we judge the ESR value,
 
-Broadcom really do use it as a generic bus. They have their USB PHYs
-and PCIE PHYs on an MDIO bus. In DT, they have compatible strings to
-match the device to the driver, as normal.
-
-We need to ensure what we define for ACPI has the same level of
-flexibility.
-
-	Andrew
+>
+>
+> Your system has firmware-first, why isn't it claiming the notification?
+> If its not finding CPER records written by firmware, check firmware and the UEFI
+> memory map agree on the attributes to be used when read/writing that area.
+>
+>
+>> +               run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
+>> +               return 0;
+>
+>
+> Thanks,
+>
+> James
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
