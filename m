@@ -1,93 +1,70 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 21 Jan 2018 17:39:42 +0100
-Subject: [PATCH] ARM: dts: owl: Convert to new-style SPDX license identifiers
-Message-ID: <20180121163943.27330-1-afaerber@suse.de>
+Date: Sun, 21 Jan 2018 18:01:43 +0100
+Subject: [PATCH] soc: actions: Convert to SPDX license identifiers
+Message-ID: <20180121170143.29915-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the SPDX-License-Identifier lines to the top.
+Replace textual license notices with SPDX-License-Identifier lines.
+Add an SPDX-License-Identifier for the Makefile.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/owl-s500-cubieboard6.dts     | 3 +--
- arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts | 3 +--
- arch/arm/boot/dts/owl-s500-guitar.dtsi         | 3 +--
- arch/arm/boot/dts/owl-s500-sparky.dts          | 3 +--
- arch/arm/boot/dts/owl-s500.dtsi                | 3 +--
- 5 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/soc/actions/Makefile         | 2 ++
+ drivers/soc/actions/owl-sps-helper.c | 6 +-----
+ drivers/soc/actions/owl-sps.c        | 6 +-----
+ 3 files changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/owl-s500-cubieboard6.dts b/arch/arm/boot/dts/owl-s500-cubieboard6.dts
-index 396c55622fbd..0196523007d9 100644
---- a/arch/arm/boot/dts/owl-s500-cubieboard6.dts
-+++ b/arch/arm/boot/dts/owl-s500-cubieboard6.dts
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+diff --git a/drivers/soc/actions/Makefile b/drivers/soc/actions/Makefile
+index 1e101b06bab1..4db9e7b050e5 100644
+--- a/drivers/soc/actions/Makefile
++++ b/drivers/soc/actions/Makefile
+@@ -1,2 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0+
++
+ obj-$(CONFIG_OWL_PM_DOMAINS_HELPER) += owl-sps-helper.o
+ obj-$(CONFIG_OWL_PM_DOMAINS) += owl-sps.o
+diff --git a/drivers/soc/actions/owl-sps-helper.c b/drivers/soc/actions/owl-sps-helper.c
+index 9d7a2c2b44ec..291a206d6f04 100644
+--- a/drivers/soc/actions/owl-sps-helper.c
++++ b/drivers/soc/actions/owl-sps-helper.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0+
  /*
-  * Cubietech CubieBoard6
+  * Actions Semi Owl Smart Power System (SPS) shared helpers
+  *
+@@ -5,11 +6,6 @@
+  * Author: Actions Semi, Inc.
   *
   * Copyright (c) 2017 Andreas F?rber
 - *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+- * This program is free software; you can redistribute  it and/or modify it
+- * under  the terms of  the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
   */
  
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts b/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
-index abd9ba1f9e5d..89f14abf75e9 100644
---- a/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
-+++ b/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
-@@ -1,7 +1,6 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ #include <linux/delay.h>
+diff --git a/drivers/soc/actions/owl-sps.c b/drivers/soc/actions/owl-sps.c
+index 8477f0f18e24..38b276e6f319 100644
+--- a/drivers/soc/actions/owl-sps.c
++++ b/drivers/soc/actions/owl-sps.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0+
  /*
-  * Copyright (c) 2016-2017 Andreas F?rber
-- *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/owl-s500-guitar.dtsi b/arch/arm/boot/dts/owl-s500-guitar.dtsi
-index 079b2c02cc13..81cc39871f17 100644
---- a/arch/arm/boot/dts/owl-s500-guitar.dtsi
-+++ b/arch/arm/boot/dts/owl-s500-guitar.dtsi
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * LeMaker Guitar SoM
+  * Actions Semi Owl Smart Power System (SPS)
   *
-  * Copyright (c) 2016-2017 Andreas F?rber
-- *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
- #include "owl-s500.dtsi"
-diff --git a/arch/arm/boot/dts/owl-s500-sparky.dts b/arch/arm/boot/dts/owl-s500-sparky.dts
-index 9e1a3ad29575..e2c7a699e152 100644
---- a/arch/arm/boot/dts/owl-s500-sparky.dts
-+++ b/arch/arm/boot/dts/owl-s500-sparky.dts
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Allo.com Sparky
+@@ -5,11 +6,6 @@
+  * Author: Actions Semi, Inc.
   *
   * Copyright (c) 2017 Andreas F?rber
 - *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+- * This program is free software; you can redistribute  it and/or modify it
+- * under  the terms of  the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
   */
  
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/owl-s500.dtsi b/arch/arm/boot/dts/owl-s500.dtsi
-index 007c8d86d247..70ca1eaba8ed 100644
---- a/arch/arm/boot/dts/owl-s500.dtsi
-+++ b/arch/arm/boot/dts/owl-s500.dtsi
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Actions Semi S500 SoC
-  *
-  * Copyright (c) 2016-2017 Andreas F?rber
-- *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <linux/of_address.h>
 -- 
 2.13.6
