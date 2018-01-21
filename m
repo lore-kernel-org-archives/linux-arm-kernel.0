@@ -1,52 +1,80 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Jan 2018 19:55:59 +0100
-Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <CAKv+Gu-LCmYnTWfft=ODqY97gNeD+kzJr_Ni88nwQT72eX7XdQ@mail.gmail.com>
-References: <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
- <20180109130012.GA27447@lunn.ch>
- <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
- <20180118130026.GG32299@lunn.ch>
- <CAPv3WKcYrbfKjsnwZ39Tyq3HN0aneUQZdbeUzLbFgLUbMc3w8Q@mail.gmail.com>
- <20180120195246.GC27654@lahna.fi.intel.com>
- <20180121010840.GB1217@lunn.ch>
- <20180121102700.GF27654@lahna.fi.intel.com>
- <20180121161319.GA8017@lunn.ch>
- <CAKv+Gu-LCmYnTWfft=ODqY97gNeD+kzJr_Ni88nwQT72eX7XdQ@mail.gmail.com>
-Message-ID: <20180121185559.GC9004@lunn.ch>
+From: david@lechnology.com (David Lechner)
+Date: Sun, 21 Jan 2018 14:09:36 -0600
+Subject: [PATCH] mmc: davinci: dont' use module_platform_driver_probe()
+Message-ID: <1516565376-9960-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> However interesting as an example, I'm not convinced this is what we
-> should aim for.
-> 
-> ACPI is not a replacement for DT, and it is unlikely that people would
-> be interested in running ACPI-only distros such as RHEL on their
-> Ethernet switch. DT is excellent at describing this, and there is no
-> need to replace it.
+This changes module_platform_driver_probe() to module_platform_driver()
+in the TI DaVinci MMC driver.
 
-I however do know of somebody who is building an industrial wireless
-access point, with a Marvell Ethernet switch. They have chosen to use
-an Intel CPU, and want to run CentOS on it, because that is what they
-know.
+On device tree systems, we can get a -EPROBE_DEFER when using a pinmux
+for the CD GPIO, which results in the driver never loading because
+module_platform_driver_probe() prevents it from being re-probed.
 
-So they will be using ACPI whatever, for the basic board support. They
-then have a choice of either ACPI for the switch, or having device
-tree as well as ACPI for the switch. And it will be interesting to see
-how that works. Can DT reference GPIOs and I2C busses in ACPI?
+So, we replace module_platform_driver_probe() with
+module_platform_driver() and removed the __init attributes accordingly.
 
-> Also, please bear in mind that the ACPI spec is owned by the UEFI/ACPI
-> forum, and only members (who are all under a contract regarding
-> reasonable and non-discriminatory (RAND) licensing terms to IP they
-> own that is covered by the spec) can contribute. Individuals can
-> become members for free AFAIR, but that doesn't mean individuals are
-> typically interested in getting involved in a process that is rather
-> tedious and bureaucratic.
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ drivers/mmc/host/davinci_mmc.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-And this is a bit what i'm worried about. How you represent MDIO
-busses, PHYs, Ethernet switches is implemented once in the core Linux
-code. So i would be interested in knowing what happens if the Linux
-community defines and implements something, boards start using it, but
-a year later the tedious and bureaucratic process rejects it,
-re-writes it, in an incompatible way.
-
-	     Andrew
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 351330d..c5309cc 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -174,7 +174,7 @@ module_param(poll_loopcount, uint, S_IRUGO);
+ MODULE_PARM_DESC(poll_loopcount,
+ 		 "Maximum polling loop count. Default = 32");
+ 
+-static unsigned __initdata use_dma = 1;
++static unsigned use_dma = 1;
+ module_param(use_dma, uint, 0);
+ MODULE_PARM_DESC(use_dma, "Whether to use DMA or not. Default = 1");
+ 
+@@ -496,8 +496,7 @@ static int mmc_davinci_start_dma_transfer(struct mmc_davinci_host *host,
+ 	return ret;
+ }
+ 
+-static void __init_or_module
+-davinci_release_dma_channels(struct mmc_davinci_host *host)
++static void davinci_release_dma_channels(struct mmc_davinci_host *host)
+ {
+ 	if (!host->use_dma)
+ 		return;
+@@ -506,7 +505,7 @@ davinci_release_dma_channels(struct mmc_davinci_host *host)
+ 	dma_release_channel(host->dma_rx);
+ }
+ 
+-static int __init davinci_acquire_dma_channels(struct mmc_davinci_host *host)
++static int davinci_acquire_dma_channels(struct mmc_davinci_host *host)
+ {
+ 	host->dma_tx = dma_request_chan(mmc_dev(host->mmc), "tx");
+ 	if (IS_ERR(host->dma_tx)) {
+@@ -1201,7 +1200,7 @@ static int mmc_davinci_parse_pdata(struct mmc_host *mmc)
+ 	return 0;
+ }
+ 
+-static int __init davinci_mmcsd_probe(struct platform_device *pdev)
++static int davinci_mmcsd_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *match;
+ 	struct mmc_davinci_host *host = NULL;
+@@ -1414,11 +1413,12 @@ static struct platform_driver davinci_mmcsd_driver = {
+ 		.pm	= davinci_mmcsd_pm_ops,
+ 		.of_match_table = davinci_mmc_dt_ids,
+ 	},
++	.probe		= davinci_mmcsd_probe,
+ 	.remove		= __exit_p(davinci_mmcsd_remove),
+ 	.id_table	= davinci_mmc_devtype,
+ };
+ 
+-module_platform_driver_probe(davinci_mmcsd_driver, davinci_mmcsd_probe);
++module_platform_driver(davinci_mmcsd_driver);
+ 
+ MODULE_AUTHOR("Texas Instruments India");
+ MODULE_LICENSE("GPL");
+-- 
+2.7.4
