@@ -1,67 +1,52 @@
-From: michael.weiser@gmx.de (Michael Weiser)
-Date: Sun, 21 Jan 2018 18:44:01 +0100
-Subject: arm64: Unimplemented syscall kernel message
-Message-ID: <20180121174401.GA44039@dinsnail.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 21 Jan 2018 19:55:59 +0100
+Subject: [net-next: PATCH 0/8] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAKv+Gu-LCmYnTWfft=ODqY97gNeD+kzJr_Ni88nwQT72eX7XdQ@mail.gmail.com>
+References: <CAPv3WKehwsrxuxemgL_5fKtUT2xjqkE6yf9DMcCcO2WRJ6nQaQ@mail.gmail.com>
+ <20180109130012.GA27447@lunn.ch>
+ <20180118123141.GA2839@e107981-ln.cambridge.arm.com>
+ <20180118130026.GG32299@lunn.ch>
+ <CAPv3WKcYrbfKjsnwZ39Tyq3HN0aneUQZdbeUzLbFgLUbMc3w8Q@mail.gmail.com>
+ <20180120195246.GC27654@lahna.fi.intel.com>
+ <20180121010840.GB1217@lunn.ch>
+ <20180121102700.GF27654@lahna.fi.intel.com>
+ <20180121161319.GA8017@lunn.ch>
+ <CAKv+Gu-LCmYnTWfft=ODqY97gNeD+kzJr_Ni88nwQT72eX7XdQ@mail.gmail.com>
+Message-ID: <20180121185559.GC9004@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Catalin and Will,
+> However interesting as an example, I'm not convinced this is what we
+> should aim for.
+> 
+> ACPI is not a replacement for DT, and it is unlikely that people would
+> be interested in running ACPI-only distros such as RHEL on their
+> Ethernet switch. DT is excellent at describing this, and there is no
+> need to replace it.
 
-I'd like ask your opinion as arm64 Linux port maintainers and initial
-authors of the code in question regarding kernel messages on
-unimplemented system calls. I apologise in advance if that isn't the
-right approach (and Cc: linux-arm :).
+I however do know of somebody who is building an industrial wireless
+access point, with a Marvell Ethernet switch. They have chosen to use
+an Intel CPU, and want to run CentOS on it, because that is what they
+know.
 
-Currently, a programm doing an unimplemented syscall triggers a rather
-scary looking kernel message:
+So they will be using ACPI whatever, for the basic board support. They
+then have a choice of either ACPI for the switch, or having device
+tree as well as ACPI for the switch. And it will be interesting to see
+how that works. Can DT reference GPIOs and I2C busses in ACPI?
 
-[  189.143682] glibc-test[2118]: syscall 1000
-[  189.143728] Code: aa0503e4 aa0603e5 aa0703e6 d4000001 (b13ffc1f) 
-[  189.143750] CPU: 1 PID: 2118 Comm: glibc-test Not tainted 4.15.0-rc7-00232-g2c1cfa499018 #3
-[  189.143755] Hardware name: SoPine with baseboard (DT)
-[  189.143762] pstate: 80000000 (Nzcv daif -PAN -UAO)
-[  189.143774] pc : 0xffffb8fb0104
-[  189.143779] lr : 0xaaaab43c563c
-[  189.143781] sp : 0000ffffd4fa1180
-[  189.143786] x29: 0000ffffd4fa1190 x28: 0000000000000000 
-[  189.143795] x27: 0000000000000000 x26: 0000000000000000 
-[  189.143802] x25: 0000000000000000 x24: 0000000000000000 
-[  189.143809] x23: 0000000000000000 x22: 0000000000000000 
-[  189.143816] x21: 0000aaaab43c564c x20: 0000000000000000 
-[  189.143823] x19: 0000aaaab43c5770 x18: 0000000000000a03 
-[  189.143829] x17: 0000aaaab43d6020 x16: 0000ffffb8fb00e0 
-[  189.143837] x15: 0000ffffb8ed4000 x14: 0000ffffb8ed7540 
-[  189.143844] x13: 0000ffffb8ee45d8 x12: 0000000000000000 
-[  189.143851] x11: 0000000000000020 x10: 0000000000000000 
-[  189.143857] x9 : 00000000000000ff x8 : 00000000000003e8 
-[  189.143864] x7 : e607cc2262a01600 x6 : e607cc2262a01600 
-[  189.143872] x5 : 0000ffffd4fa12c0 x4 : 0000000000000000 
-[  189.143879] x3 : 0000000000000000 x2 : 0000aaaab43c5630 
-[  189.143886] x1 : 0000ffffd4fa12d8 x0 : 0000ffffd4fa12c8 
+> Also, please bear in mind that the ACPI spec is owned by the UEFI/ACPI
+> forum, and only members (who are all under a contract regarding
+> reasonable and non-discriminatory (RAND) licensing terms to IP they
+> own that is covered by the spec) can contribute. Individuals can
+> become members for free AFAIR, but that doesn't mean individuals are
+> typically interested in getting involved in a process that is rather
+> tedious and bureaucratic.
 
-It requires some digging to find that this basically is a
-debugging/warning message and can be disabled using
-/proc/sys/debug/exception-trace
-(arm64/kernel/traps.c:do_ni_syscall,show_unhandled_signals_ratelimited).
+And this is a bit what i'm worried about. How you represent MDIO
+busses, PHYs, Ethernet switches is implemented once in the core Linux
+code. So i would be interested in knowing what happens if the Linux
+community defines and implements something, boards start using it, but
+a year later the tedious and bureaucratic process rejects it,
+re-writes it, in an incompatible way.
 
-Other platforms do not seem to do this, even with exception-trace
-enabled - x86_64 and arm for sure. Instead they silently return -ENOSYS.
-
-There are a number of other kernel messages governed by the same sysctl
-(fault.c:__do_user_fault,do_sp_pc_abort, traps.c:force_signal_inject,
-signal.c:sys_rt_sigreturn).
-
-Can I in good conscience disable exception-trace on the affected
-(production) systems or would this mask other, more critical
-misbehaviour?
-
-Is it actually considered misbehaviour for arm64 userland to even
-attempt such a call? Or is the message maybe just a left-over development
-aid?
-
-Can it perhaps be removed or disabled by default, considering that with
-future addition of syscalls userland will likely start triggering this
-message a lot when run on older kernels?
--- 
-Thanks,
-Michael
+	     Andrew
