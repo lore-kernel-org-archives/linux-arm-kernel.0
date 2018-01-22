@@ -1,140 +1,240 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 22 Jan 2018 11:39:37 +0100
-Subject: [PATCH 3/3] clocksource: timer-dm: Make unexported functions
- static
-In-Reply-To: <755fca20-7544-1655-47c7-83b1a2669adc@microchip.com>
-References: <20180117214629.GA11952@lenoch> <20180117214826.GD11952@lenoch>
- <755fca20-7544-1655-47c7-83b1a2669adc@microchip.com>
-Message-ID: <20180122103936.GB19401@lenoch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Jan 2018 11:35:45 +0100
+Subject: [PATCH v2 16/19] drm/sun4i: backend: Assign the pipes automatically
+In-Reply-To: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
+References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d4ae26685ad75bd2dde3c3c3b7d086fb544347cc.1516617243.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 11:26:44AM +0200, Claudiu Beznea wrote:
-> On 17.01.2018 23:48, Ladislav Michl wrote:
-> > As dmtimer no longer exports functions, make those previously
-> > exported static.
-> > 
-> > Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
-> > ---
-> >  Note: only those functions assigned to timer ops are made static
-> >        as some others will be needed later for event capture.
-> > 
-> >  drivers/clocksource/timer-dm.c |  218 ++++++++++++++++++++---------------------
-> >  include/clocksource/dmtimer.h  |   24 ----
-> >  2 files changed, 109 insertions(+), 133 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-> > index 324ec93d3dd2..8de9e543d129 100644
-> > --- a/drivers/clocksource/timer-dm.c
-> > +++ b/drivers/clocksource/timer-dm.c
-> > @@ -163,6 +163,92 @@ static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
-> >  	return ret;
-> >  }
-> >  
-> > +static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
-> > +{
-> > +	int ret;
-> > +	char *parent_name = NULL;
-> Could be declared as const: const char *parent_name = NULL;
-> 
-> > +	struct clk *parent;
-> > +	struct dmtimer_platform_data *pdata;
-> > +
-> > +	if (unlikely(!timer))
-> > +		return -EINVAL;
-> > +
-> > +	pdata = timer->pdev->dev.platform_data;
-> > +
-> > +	if (source < 0 || source >= 3)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * FIXME: Used for OMAP1 devices only because they do not currently
-> > +	 * use the clock framework to set the parent clock. To be removed
-> > +	 * once OMAP1 migrated to using clock framework for dmtimers
-> > +	 */
-> > +	if (pdata && pdata->set_timer_src)
-> > +		return pdata->set_timer_src(timer->pdev, source);
-> > +
-> > +	if (IS_ERR(timer->fclk))
-> > +		return -EINVAL;
-> Souldn't this check be done at the beginning of the function?
+Since we now have a way to enforce the zpos, check for the number of alpha
+planes, the only missing part is to assign our pipe automatically instead
+of hardcoding it.
 
-Well, this patch only moves existing functions around, just to make it
-compile after declarations are removed from header file.
+The algorithm is quite simple, but requires two iterations over the list of
+planes.
 
-Fixes should be sent separately as this is not the only problem with
-clocksource code :)
+In the first one (which is the same one that we've had to check for alpha,
+the frontend usage, and so on), we order the planes by their zpos.
 
-Anyway, thank you for review, this one could be addressed by a following
-patch:
+We can then do a second iteration over that array by ascending zpos
+starting with the pipe 0. When and if we encounter our alpha plane, we put
+it and all the other subsequent planes in the second pipe.
 
-diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
-index dbf2b1f6a941..02b3436db70e 100644
---- a/drivers/clocksource/timer-dm.c
-+++ b/drivers/clocksource/timer-dm.c
-@@ -166,17 +166,30 @@ static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
- static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+And since we have runtime checks and pipe assignments now, we can just
+remove the static declaration of the planes we used to have.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 41 +++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_layer.c   | 50 ++++------------------------
+ drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +-
+ 3 files changed, 48 insertions(+), 44 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index eb1749d2c0d5..38c4b44f6ff5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -276,12 +276,16 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
+ 				    struct drm_plane *plane)
  {
- 	int ret;
--	char *parent_name = NULL;
-+	const char *parent_name;
- 	struct clk *parent;
- 	struct dmtimer_platform_data *pdata;
+ 	struct drm_plane_state *state = plane->state;
++	struct sun4i_layer_state *p_state = state_to_sun4i_layer_state(state);
+ 	unsigned int priority = state->normalized_zpos;
++	unsigned int pipe = p_state->pipe;
  
--	if (unlikely(!timer))
-+	if (unlikely(!timer) || IS_ERR(timer->fclk))
- 		return -EINVAL;
+-	DRM_DEBUG_DRIVER("Setting layer %d priority to %d\n", layer, priority);
+-
++	DRM_DEBUG_DRIVER("Setting layer %d priority to %d and pipe %d\n",
++			 layer, priority, pipe);
+ 	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK |
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(p_state->pipe) |
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
  
--	pdata = timer->pdev->dev.platform_data;
-+	switch (source) {
-+	case OMAP_TIMER_SRC_SYS_CLK:
-+		parent_name = "timer_sys_ck";
-+		break;
+ 	return 0;
+@@ -326,12 +330,15 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 				      struct drm_crtc_state *crtc_state)
+ {
++	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
+ 	struct drm_atomic_state *state = crtc_state->state;
+ 	struct drm_device *drm = state->dev;
+ 	struct drm_plane *plane;
+ 	unsigned int num_planes = 0;
+ 	unsigned int num_alpha_planes = 0;
+ 	unsigned int num_frontend_planes = 0;
++	unsigned int current_pipe = 0;
++	unsigned int i;
  
--	if (source < 0 || source >= 3)
-+	case OMAP_TIMER_SRC_32_KHZ:
-+		parent_name = "timer_32k_ck";
-+		break;
+ 	DRM_DEBUG_DRIVER("Starting checking our planes\n");
+ 
+@@ -344,6 +351,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		struct sun4i_layer_state *layer_state =
+ 			state_to_sun4i_layer_state(plane_state);
+ 		struct drm_framebuffer *fb = plane_state->fb;
++		struct drm_format_name_buf format_name;
+ 
+ 		if (sun4i_backend_plane_uses_frontend(plane_state)) {
+ 			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
+@@ -361,9 +369,19 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		if (fb->format->has_alpha)
+ 			num_alpha_planes++;
+ 
++		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
++				 plane_state->normalized_zpos);
 +
-+	case OMAP_TIMER_SRC_EXT_CLK:
-+		parent_name = "timer_ext_ck";
-+		break;
-+	default:
++		/* Sort our planes by Zpos */
++		plane_states[plane_state->normalized_zpos] = plane_state;
++
+ 		num_planes++;
+ 	}
+ 
++	/* All our planes were disabled, bail out */
++	if (!num_planes)
++		return 0;
++
+ 	/*
+ 	 * The hardware is a bit unusual here.
+ 	 *
+@@ -400,6 +418,25 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
  		return -EINVAL;
+ 	}
+ 
++	/* We can't have an alpha plane at the lowest position */
++	if (plane_states[0]->fb->format->has_alpha)
++		return -EINVAL;
++
++	for (i = 1; i < num_planes; i++) {
++		struct drm_plane_state *p_state = plane_states[i];
++		struct drm_framebuffer *fb = p_state->fb;
++		struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(p_state);
++
++		/*
++		 * The only alpha position is the lowest plane of the
++		 * second pipe.
++		 */
++		if (fb->format->has_alpha)
++			current_pipe++;
++
++		s_state->pipe = current_pipe;
 +	}
 +
-+	pdata = timer->pdev->dev.platform_data;
+ 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
+ 		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
+ 		return -EINVAL;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 900e716443b8..ec7b906dbb84 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -19,13 +19,6 @@
+ #include "sun4i_layer.h"
+ #include "sunxi_engine.h"
  
- 	/*
- 	 * FIXME: Used for OMAP1 devices only because they do not currently
-@@ -186,29 +199,12 @@ static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
- 	if (pdata && pdata->set_timer_src)
- 		return pdata->set_timer_src(timer->pdev, source);
+-struct sun4i_plane_desc {
+-	enum drm_plane_type     type;
+-	u8                      pipe;
+-	const uint32_t          *formats;
+-	uint32_t                nformats;
+-};
+-
+ static void sun4i_backend_layer_reset(struct drm_plane *plane)
+ {
+ 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
+@@ -133,14 +126,7 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+ 	.update_plane		= drm_atomic_helper_update_plane,
+ };
  
--	if (IS_ERR(timer->fclk))
--		return -EINVAL;
+-static const uint32_t sun4i_backend_layer_formats_primary[] = {
+-	DRM_FORMAT_ARGB8888,
+-	DRM_FORMAT_RGB888,
+-	DRM_FORMAT_RGB565,
+-	DRM_FORMAT_XRGB8888,
+-};
 -
- #if defined(CONFIG_COMMON_CLK)
- 	/* Check if the clock has configurable parents */
- 	if (clk_hw_get_num_parents(__clk_get_hw(timer->fclk)) < 2)
- 		return 0;
- #endif
+-static const uint32_t sun4i_backend_layer_formats_overlay[] = {
++static const uint32_t sun4i_backend_layer_formats[] = {
+ 	DRM_FORMAT_ARGB8888,
+ 	DRM_FORMAT_ARGB4444,
+ 	DRM_FORMAT_ARGB1555,
+@@ -151,24 +137,9 @@ static const uint32_t sun4i_backend_layer_formats_overlay[] = {
+ 	DRM_FORMAT_XRGB8888,
+ };
  
--	switch (source) {
--	case OMAP_TIMER_SRC_SYS_CLK:
--		parent_name = "timer_sys_ck";
--		break;
+-static const struct sun4i_plane_desc sun4i_backend_planes[] = {
+-	{
+-		.type = DRM_PLANE_TYPE_PRIMARY,
+-		.pipe = 0,
+-		.formats = sun4i_backend_layer_formats_primary,
+-		.nformats = ARRAY_SIZE(sun4i_backend_layer_formats_primary),
+-	},
+-	{
+-		.type = DRM_PLANE_TYPE_OVERLAY,
+-		.pipe = 1,
+-		.formats = sun4i_backend_layer_formats_overlay,
+-		.nformats = ARRAY_SIZE(sun4i_backend_layer_formats_overlay),
+-	},
+-};
 -
--	case OMAP_TIMER_SRC_32_KHZ:
--		parent_name = "timer_32k_ck";
--		break;
+ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 						struct sun4i_backend *backend,
+-						const struct sun4i_plane_desc *plane)
++						enum drm_plane_type type)
+ {
+ 	struct sun4i_layer *layer;
+ 	int ret;
+@@ -180,8 +151,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 	/* possible crtcs are set later */
+ 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun4i_backend_layer_funcs,
+-				       plane->formats, plane->nformats,
+-				       NULL, plane->type, NULL);
++				       sun4i_backend_layer_formats,
++				       ARRAY_SIZE(sun4i_backend_layer_formats),
++				       NULL, type, NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
+ 		return ERR_PTR(ret);
+@@ -206,11 +178,11 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
+-		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
++	for (i = 0; i < SUN4I_BACKEND_NUM_LAYERS; i++) {
++		enum drm_plane_type type = i ? DRM_PLANE_TYPE_OVERLAY : DRM_PLANE_TYPE_PRIMARY;
+ 		struct sun4i_layer *layer;
+ 
+-		layer = sun4i_layer_init_one(drm, backend, plane);
++		layer = sun4i_layer_init_one(drm, backend, type);
+ 		if (IS_ERR(layer)) {
+ 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
+ 				i ? "overlay" : "primary");
+@@ -219,12 +191,6 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 
+ 		drm_plane_create_zpos_immutable_property(&layer->plane, i);
+ 
+-		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+-				 i ? "overlay" : "primary", plane->pipe);
+-		regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
+-				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
+-				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
 -
--	case OMAP_TIMER_SRC_EXT_CLK:
--		parent_name = "timer_ext_ck";
--		break;
--	}
--
- 	parent = clk_get(&timer->pdev->dev, parent_name);
- 	if (IS_ERR(parent)) {
- 		pr_err("%s: %s not found\n", __func__, parent_name);
+ 		layer->id = i;
+ 		planes[i] = &layer->plane;
+ 	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 75b4868ba87c..36b20265bd31 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -24,6 +24,7 @@ struct sun4i_layer {
+ 
+ struct sun4i_layer_state {
+ 	struct drm_plane_state	state;
++	unsigned int		pipe;
+ 	bool			uses_frontend;
+ };
+ 
+-- 
+git-series 0.9.1
