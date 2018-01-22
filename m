@@ -1,57 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 22 Jan 2018 12:23:16 +0000
-Subject: [RFC PATCH 0/2] arm64: Fix invalid si_codes for fault signals
-Message-ID: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 22 Jan 2018 23:26:36 +1100
+Subject: per-task stack canaries for arm64
+In-Reply-To: <CAKv+Gu8P6OZDSMw7oA+5_RgGLkeOwoaEPb_5c510uoBAJY7MeA@mail.gmail.com>
+References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+ <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
+ <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
+ <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
+ <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
+ <CAKv+Gu-TtJ7Pxa7+qOX7MiQwPFwsNOup2Q=0TvjCO4xHxf3QQA@mail.gmail.com>
+ <CAKv+Gu8P6OZDSMw7oA+5_RgGLkeOwoaEPb_5c510uoBAJY7MeA@mail.gmail.com>
+Message-ID: <CAGXu5j+erd-=LqZdxEDUQnHhtsEbZ1YNch4sToKk+MWzybvQWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by Eric Biederman, [1], [2], [3] etc., several architectures
-are inappropriately setting si_code to 0 when signaling faults to
-userspace, which will interpret this value as SI_USER leading to garbage
-being read out of siginfo fields that the kernel doesn't initialise.
+On Mon, Jan 22, 2018 at 9:59 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> OK, so I have done a bit of homework, and I think this shouldn't be
+> too difficult after all.
+>
+> I realized that we don't really need per-CPU references to
+> __stack_chk_guard, given that we already keep the task struct pointer
+> in sp_el0. This means we should be able to do
+>
+> mrs   x0, sp_el0
+> movz  x1, :abs_g0:__stack_chk_guard_tsk_offset
+> add   x0, x0, x1
+> ldr   x2, [x0]
+>
+> where __stack_chk_guard_tsk_offset is exposed via an ELF symbol.
+> (Analogous to x86, this could be implemented at the GCC level using
+> arbitrary sysreg and symbol names to remain flexible)
+>
+> So my next question (mainly to Ramana): would it be possible to emit
+> the mrs/movz/add sequence above from targetm.stack_protect_guard() in
+> a way that will allow expand_normal() to expand it in a useful manner
+> (e.g., as an INDIRECT_REF that can be matched by the memory_operand in
+> Aarch64's stack_protect_set)? If that is the case, we could implement
+> this in a GCC plugin in the kernel rather than relying on upstream GCC
+> changes (and having to commit to this ABI long term)
 
-This seems not to be a huge problem in practice, since many affected
-faults should only happen if the kernel or hardware is buggy or broken.
-However, there are some cases that don't fall under this.
+Though this would ultimately be implemented in core GCC, yes? (I don't
+want to have GCC plugins be a dependency for stack protector...)
 
-This RFC series proposes fixes to eliminate these si_code == 0 cases
-from arm64.  Some of the changes may be controversial.
-
-There are two main headlines here, which may be applicable to other
-architectures:
-
- * addition of a new code FPE_UNKNOWN for undiagnosable floating-point
-   exception traps;
-
- * delivering SIGKILL instead of SIGSEGV/BUS/TRAP etc. for "impossible"
-   exceptions that are not feasible to recover from and likely indicate
-   a kernel or system bug or failure.
-
-In particular there is likely to be a fair amount of overlap between arm
-and arm64 here, but due to the longer history and evolution of the arm
-tree and 32-bit architecture I'm less confident in making correct
-judgements for that case.  This series doesn't touch arm, for now.
-
-This series has been build-tested only.
-
-[1] [PATCH 00/11] siginfo fixes/cleanups esp SI_USER
-https://marc.info/?l=linux-kernel&m=151571871109016&w=2
-
-[2] [PATCH 08/11] signal/arm: Document conflicts with SI_USER and SIGFPE
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/553574.html
-
-[3] [PATCH 07/11] signal/arm64: Document conflicts with SI_USER and SIGFPE, SIGTRAP, SIGBUS
-lists.infradead.org/pipermail/linux-arm-kernel/2018-January/553573.html
-
-Dave Martin (2):
-  arm64: fpsimd: Fix bad si_code for undiagnosed SIGFPE
-  arm64: signal: Ensure si_code is valid for all fault signals
-
- arch/arm64/include/asm/esr.h       |   9 +++
- arch/arm64/kernel/fpsimd.c         |  31 +++++-----
- arch/arm64/mm/fault.c              | 114 ++++++++++++++++++-------------------
- include/uapi/asm-generic/siginfo.h |   3 +-
- 4 files changed, 85 insertions(+), 72 deletions(-)
+-Kees
 
 -- 
-2.1.4
+Kees Cook
+Pixel Security
