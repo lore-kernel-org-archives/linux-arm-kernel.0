@@ -1,114 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 22 Jan 2018 11:47:13 +0000
-Subject: [PATCH] ARM-SMMU: Delete error messages for a failed memory
- allocation in three functions
-In-Reply-To: <c3e91414-dd5b-2889-d86c-b19aff56571b@users.sourceforge.net>
-References: <c3e91414-dd5b-2889-d86c-b19aff56571b@users.sourceforge.net>
-Message-ID: <ac171b23-624d-2df3-d1d1-8e9479ae03bc@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Jan 2018 12:51:23 +0100
+Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180117183244.28303-2-l.stach@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-2-l.stach@pengutronix.de>
+Message-ID: <CAK8P3a0WGrmDp_CbQjDVc_dGNyBN4A4h5HJqUeFygO3RFHuCxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/18 14:36, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Sat, 20 Jan 2018 15:30:17 +0100
-> 
-> Omit extra messages for a memory allocation failure in these functions.
+On Wed, Jan 17, 2018 at 7:32 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> This adds the basic DTS for the i.MX8MQ.
+> For now only the following peripherals are supported:
+> - IOMUXC (pin controller)
+> - CCM (clock controller)
+> - GPIO
+> - UART
+> - uSDHC (SD/eMMC controller)
+> - FEC (ethernet controller)
+> - i2c
+>
+> This is enough to get a very basic board support up and running.
+>
+> One known limitation is that the driver for the GPC interrupt
+> controller is still missing, rendering the CPU sleep states unusable
+> as there is nothing waking them up anymore. This will be fixed in
+> due course.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Why?
+I wonder if there is anything preventing us from putting it all into linux-4.16.
+This is low-risk (nothing would break), and the other three arch/arm64 patches
+are trivial, so if someone can do a review quickly, I'd be willing to pick the
+arm-soc portion up.
 
-It's your job as patch author to convince reviewers and maintainers why 
-your change is a good thing and they should spend their time looking at 
-it, much less consider merging it. This may as well be "delete some 
-stuff because I feel like it".
+I suppose we need the clk and pintrl drivers to also get merged at the
+same time to make it usable, and we also want the bindings for pinctrl
+and clk to be properly reviewed before adding the nodes to the DT
+so it depends a, bit on the other maintainers.
 
-Do bear in mind the nature of these drivers; Arm SMMUs are not something 
-you find in microcontrollers. On systems using these drivers, it will 
-make no difference whatsoever to anyone if the many-megabyte kernel 
-image is 47 bytes (or whatever) smaller.
+To me it looks like the drivers are just "yet another i.MX variant" for them,
+it should make little difference that this one is 64-bit.
 
-> This issue was detected by using the Coccinelle software.
-
-I think I'm going to have to start treating mention of Coccinelle as a 
-potential disclaimer saying "I haven't attempted to understand the code 
-I'm changing" :(
-
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->   drivers/iommu/arm-smmu-v3.c | 9 +++------
->   drivers/iommu/arm-smmu.c    | 9 +++------
->   2 files changed, 6 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index f122071688fd..5c2a7103d494 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -2134,10 +2134,8 @@ static int arm_smmu_init_l1_strtab(struct arm_smmu_device *smmu)
->   	void *strtab = smmu->strtab_cfg.strtab;
->   
->   	cfg->l1_desc = devm_kzalloc(smmu->dev, size, GFP_KERNEL);
-> -	if (!cfg->l1_desc) {
-> -		dev_err(smmu->dev, "failed to allocate l1 stream table desc\n");
-
-OK, I'll stop playing *completely* dumb; I do know you would get a splat 
-if kmalloc() ever did fail. But what you're removing isn't 
-printk("failed to allocate memory\n"), it's a message which says exactly 
-what allocation failed *for which device*. Can you clarify how I'm going 
-to diagnose this particular problem from the generic splat when all I 
-have is en email from a customer with a dmesg dump?
-
-> +	if (!cfg->l1_desc)
->   		return -ENOMEM;
-> -	}
->   
->   	for (i = 0; i < cfg->num_l1_ents; ++i) {
->   		arm_smmu_write_strtab_l1_desc(strtab, &cfg->l1_desc[i]);
-> @@ -2828,10 +2826,9 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->   	bool bypass;
->   
->   	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
-> -	if (!smmu) {
-> -		dev_err(dev, "failed to allocate arm_smmu_device\n");
-> +	if (!smmu)
->   		return -ENOMEM;
-> -	}
-> +
->   	smmu->dev = dev;
->   
->   	if (dev->of_node) {
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 78d4c6b8f1ba..a4da4a870a2e 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2048,10 +2048,9 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->   	int num_irqs, i, err;
->   
->   	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
-> -	if (!smmu) {
-> -		dev_err(dev, "failed to allocate arm_smmu_device\n");
-> +	if (!smmu)
->   		return -ENOMEM;
-> -	}
-> +
->   	smmu->dev = dev;
->   
->   	if (dev->of_node)
-> @@ -2084,10 +2083,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->   
->   	smmu->irqs = devm_kzalloc(dev, sizeof(*smmu->irqs) * num_irqs,
->   				  GFP_KERNEL);
-> -	if (!smmu->irqs) {
-> -		dev_err(dev, "failed to allocate %d irqs\n", num_irqs);
-
-This more than any other is removing potentially useful information: 
-"failed to allocate 37890756 irqs", for instance, would indicate a bug 
-which is very much *not* an out-of-memory condition.
-
-Robin.
-
-> +	if (!smmu->irqs)
->   		return -ENOMEM;
-> -	}
->   
->   	for (i = 0; i < num_irqs; ++i) {
->   		int irq = platform_get_irq(pdev, i);
-> 
+     Arnd
