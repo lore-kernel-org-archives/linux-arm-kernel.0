@@ -1,84 +1,100 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 11:35:34 +0100
-Subject: [PATCH v2 05/19] drm/vc4: Use the alpha format field in
- drm_format_info
+Date: Mon, 22 Jan 2018 11:35:43 +0100
+Subject: [PATCH v2 14/19] drm/sun4i: backend: Add support for zpos
 In-Reply-To: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <38d4d0a085634a0b8308e819c846b9173d4d93df.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <b006853e908bd06661c5bc1f2191121523bce0e4.1516617243.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the drm_format_info has a alpha field to tell if a format embeds
-an alpha component in it, let's use it.
+Our various planes have a configurable zpos, that combined with the pipes
+allow to configure the composition.
 
-Cc: Eric Anholt <eric@anholt.net>
-Reviewed-by: Daniel Vetter <daniel.vetter@intel.com>
+Since the interaction between the pipes, zpos and alphas framebuffers are
+not trivials, let's just enable the zpos as an immutable property for now,
+and use that zpos in our atomic_update part.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/vc4/vc4_plane.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c     | 15 +++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_backend.h     |  2 ++
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c |  4 ++++
+ drivers/gpu/drm/sun4i/sun4i_layer.c       |  3 +++
+ 4 files changed, 24 insertions(+)
 
-diff --git a/drivers/gpu/drm/vc4/vc4_plane.c b/drivers/gpu/drm/vc4/vc4_plane.c
-index 423a23ed8fc2..a0a626242bcd 100644
---- a/drivers/gpu/drm/vc4/vc4_plane.c
-+++ b/drivers/gpu/drm/vc4/vc4_plane.c
-@@ -85,40 +85,39 @@ static const struct hvs_format {
- 	u32 drm; /* DRM_FORMAT_* */
- 	u32 hvs; /* HVS_FORMAT_* */
- 	u32 pixel_order;
--	bool has_alpha;
- 	bool flip_cbcr;
- } hvs_formats[] = {
- 	{
- 		.drm = DRM_FORMAT_XRGB8888, .hvs = HVS_PIXEL_FORMAT_RGBA8888,
--		.pixel_order = HVS_PIXEL_ORDER_ABGR, .has_alpha = false,
-+		.pixel_order = HVS_PIXEL_ORDER_ABGR,
- 	},
- 	{
- 		.drm = DRM_FORMAT_ARGB8888, .hvs = HVS_PIXEL_FORMAT_RGBA8888,
--		.pixel_order = HVS_PIXEL_ORDER_ABGR, .has_alpha = true,
-+		.pixel_order = HVS_PIXEL_ORDER_ABGR,
- 	},
- 	{
- 		.drm = DRM_FORMAT_ABGR8888, .hvs = HVS_PIXEL_FORMAT_RGBA8888,
--		.pixel_order = HVS_PIXEL_ORDER_ARGB, .has_alpha = true,
-+		.pixel_order = HVS_PIXEL_ORDER_ARGB,
- 	},
- 	{
- 		.drm = DRM_FORMAT_XBGR8888, .hvs = HVS_PIXEL_FORMAT_RGBA8888,
--		.pixel_order = HVS_PIXEL_ORDER_ARGB, .has_alpha = false,
-+		.pixel_order = HVS_PIXEL_ORDER_ARGB,
- 	},
- 	{
- 		.drm = DRM_FORMAT_RGB565, .hvs = HVS_PIXEL_FORMAT_RGB565,
--		.pixel_order = HVS_PIXEL_ORDER_XRGB, .has_alpha = false,
-+		.pixel_order = HVS_PIXEL_ORDER_XRGB,
- 	},
- 	{
- 		.drm = DRM_FORMAT_BGR565, .hvs = HVS_PIXEL_FORMAT_RGB565,
--		.pixel_order = HVS_PIXEL_ORDER_XBGR, .has_alpha = false,
-+		.pixel_order = HVS_PIXEL_ORDER_XBGR,
- 	},
- 	{
- 		.drm = DRM_FORMAT_ARGB1555, .hvs = HVS_PIXEL_FORMAT_RGBA5551,
--		.pixel_order = HVS_PIXEL_ORDER_ABGR, .has_alpha = true,
-+		.pixel_order = HVS_PIXEL_ORDER_ABGR,
- 	},
- 	{
- 		.drm = DRM_FORMAT_XRGB1555, .hvs = HVS_PIXEL_FORMAT_RGBA5551,
--		.pixel_order = HVS_PIXEL_ORDER_ABGR, .has_alpha = false,
-+		.pixel_order = HVS_PIXEL_ORDER_ABGR,
- 	},
- 	{
- 		.drm = DRM_FORMAT_YUV422,
-@@ -601,7 +600,7 @@ static int vc4_plane_mode_set(struct drm_plane *plane,
- 	/* Position Word 2: Source Image Size, Alpha Mode */
- 	vc4_state->pos2_offset = vc4_state->dlist_count;
- 	vc4_dlist_write(vc4_state,
--			VC4_SET_FIELD(format->has_alpha ?
-+			VC4_SET_FIELD(fb->format->has_alpha ?
- 				      SCALER_POS2_ALPHA_MODE_PIPELINE :
- 				      SCALER_POS2_ALPHA_MODE_FIXED,
- 				      SCALER_POS2_ALPHA_MODE) |
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index a18c86a15748..c4986054909b 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -272,6 +272,21 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 	return 0;
+ }
+ 
++int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
++				    struct drm_plane *plane)
++{
++	struct drm_plane_state *state = plane->state;
++	unsigned int priority = state->normalized_zpos;
++
++	DRM_DEBUG_DRIVER("Setting layer %d priority to %d\n", layer, priority);
++
++	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
++
++	return 0;
++}
++
+ static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
+ {
+ 	u16 src_h = state->src_h >> 16;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+index 1ca8b7db6807..04a4f11b87a8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+@@ -182,5 +182,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 				      int layer, struct drm_plane *plane);
+ int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
+ 					int layer, uint32_t in_fmt);
++int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
++				    int layer, struct drm_plane *plane);
+ 
+ #endif /* _SUN4I_BACKEND_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+index e68004844abe..5b3986437a50 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+@@ -35,6 +35,10 @@ static int sun4i_de_atomic_check(struct drm_device *dev,
+ 	if (ret)
+ 		return ret;
+ 
++	ret = drm_atomic_normalize_zpos(dev, state);
++	if (ret)
++		return ret;
++
+ 	return drm_atomic_helper_check_planes(dev, state);
+ }
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 03549646528a..fbf25d59cf88 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -115,6 +115,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+ 	}
+ 
+ 	sun4i_backend_update_layer_coord(backend, layer->id, plane);
++	sun4i_backend_update_layer_zpos(backend, layer->id, plane);
+ 	sun4i_backend_layer_enable(backend, layer->id, true);
+ }
+ 
+@@ -237,6 +238,8 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 			return ERR_CAST(layer);
+ 		};
+ 
++		drm_plane_create_zpos_immutable_property(&layer->plane, i);
++
+ 		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+ 				 i ? "overlay" : "primary", plane->pipe);
+ 		regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
 -- 
 git-series 0.9.1
