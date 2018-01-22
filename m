@@ -1,128 +1,98 @@
-From: michael.weiser@gmx.de (Michael Weiser)
-Date: Mon, 22 Jan 2018 22:20:26 +0100
-Subject: [PATCH 2/2] arm64: Mirror arm for unimplemented compat syscalls
-In-Reply-To: <20180122212026.26262-1-michael.weiser@gmx.de>
-References: <20180122212026.26262-1-michael.weiser@gmx.de>
-Message-ID: <20180122212026.26262-3-michael.weiser@gmx.de>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 23 Jan 2018 00:06:54 +0200
+Subject: [BISECTED] kexec issue with v4.15-rc on N8x0
+In-Reply-To: <20180115181508.GM4821@atomide.com>
+References: <20180111194747.k5qwz66mfntj6v2g@darkstar.musicnaut.iki.fi>
+ <20180115181508.GM4821@atomide.com>
+Message-ID: <20180122220654.k6atriweesf2qmw4@darkstar.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mirror arm behaviour for unimplemented syscalls: Below 2048 return
--ENOSYS. Above 2048 raise SIGILL and print a ratelimited message with
-details. dump_instr() is made non-static and added to system_misc.h so
-it can be used in compat_arm_syscall(). Also it is synced with the arm
-implementation to support thumb instructions.
+Hi,
 
-Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
----
- arch/arm64/include/asm/system_misc.h |  1 +
- arch/arm64/kernel/sys_compat.c       | 27 ++++++++++++++++++++++++++-
- arch/arm64/kernel/traps.c            | 14 ++++++++++----
- 3 files changed, 37 insertions(+), 5 deletions(-)
+On Mon, Jan 15, 2018 at 10:15:08AM -0800, Tony Lindgren wrote:
+> * Aaro Koskinen <aaro.koskinen@iki.fi> [180111 11:48]:
+> > When booting v4.15-rc kernel with kexec (kexec-tools 2.0.16) on N8x0, I get:
+> > 
+> >     Uncompressing Linux... done, booting the kernel.
+> >     no ATAGS support: can't continue
+> > 
+> > v4.14 kernel works OK.
+> > 
+> > I bisected this to:
+> > 
+> > commit c772568788b5f0cbaac7c8d4111d7173bfc90673
+> > Author: Russell King <rmk+kernel@armlinux.org.uk>
+> > Date:   Thu Sep 21 18:10:19 2017 +0100
+> > 
+> >     ARM: add additional table to compressed kernel
+> > 
+> > If I revert the commit, kexec booting starts to work. Interesting,
+> > the patch mentions "This is necessary for correct behaviour of kexec.",
+> > so I wonder what could be wrong...
+> 
+> So care to post what you get if you load with kexec -d -l options
+> before and after this commit?
 
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 07aa8e3c5630..0f73b6c1ca63 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -42,6 +42,7 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
- struct mm_struct;
- extern void show_pte(unsigned long addr);
- extern void __show_regs(struct pt_regs *);
-+extern void dump_instr(const char *lvl, struct pt_regs *regs);
- 
- extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- 
-diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-index 8b8bbd3eaa52..3a5b3809b671 100644
---- a/arch/arm64/kernel/sys_compat.c
-+++ b/arch/arm64/kernel/sys_compat.c
-@@ -27,6 +27,7 @@
- #include <linux/uaccess.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/system_misc.h>
- #include <asm/unistd.h>
- 
- static long
-@@ -67,6 +68,7 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
-  */
- long compat_arm_syscall(struct pt_regs *regs)
- {
-+	siginfo_t info;
- 	unsigned int no = regs->regs[7];
- 
- 	switch (no) {
-@@ -99,6 +101,31 @@ long compat_arm_syscall(struct pt_regs *regs)
- 		return 0;
- 
- 	default:
--		return -ENOSYS;
-+		/*
-+		 * Calls 9f00xx..9f07ff are defined to return -ENOSYS
-+		 * if not implemented, rather than raising SIGILL. This
-+		 * way the calling program can gracefully determine whether
-+		 * a feature is supported.
-+		 */
-+		if ((no & 0xffff) <= 0x7ff)
-+			return -ENOSYS;
-+		break;
- 	}
-+
-+	if (show_unhandled_signals_ratelimited()) {
-+		pr_err("[%d] %s: arm syscall %d\n",
-+		       task_pid_nr(current), current->comm, no);
-+		dump_instr("", regs);
-+		if (user_mode(regs))
-+			__show_regs(regs);
-+	}
-+
-+	info.si_signo = SIGILL;
-+	info.si_errno = 0;
-+	info.si_code  = ILL_ILLTRP;
-+	info.si_addr  = (void __user *)instruction_pointer(regs) -
-+			 (compat_thumb_mode(regs) ? 2 : 4);
-+
-+	arm64_notify_die("Oops - bad syscall(2)", regs, &info, no);
-+	return 0;
- }
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 0ef28b7f6aa7..2ee511243140 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -67,16 +67,22 @@ static void dump_backtrace_entry(unsigned long where)
- static void __dump_instr(const char *lvl, struct pt_regs *regs)
- {
- 	unsigned long addr = instruction_pointer(regs);
-+	const int thumb = compat_thumb_mode(regs);
-+	const int width = thumb ? 4 : 8;
- 	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
- 	int i;
- 
--	for (i = -4; i < 1; i++) {
-+	for (i = -4; i < 1 + !!thumb; i++) {
- 		unsigned int val, bad;
- 
--		bad = get_user(val, &((u32 *)addr)[i]);
-+		if (thumb)
-+			bad = get_user(val, &((u16 *)addr)[i]);
-+		else
-+			bad = get_user(val, &((u32 *)addr)[i]);
- 
- 		if (!bad)
--			p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
-+			p += sprintf(p, i == 0 ? "(%0*x) " : "%0*x ",
-+					width, val);
- 		else {
- 			p += sprintf(p, "bad PC value");
- 			break;
-@@ -85,7 +91,7 @@ static void __dump_instr(const char *lvl, struct pt_regs *regs)
- 	printk("%sCode: %s\n", lvl, str);
- }
- 
--static void dump_instr(const char *lvl, struct pt_regs *regs)
-+void dump_instr(const char *lvl, struct pt_regs *regs)
- {
- 	if (!user_mode(regs)) {
- 		mm_segment_t fs = get_fs();
--- 
-2.16.0
+See below. I guess the interesting part is the "zImage has tags" with the
+bad kernel.
+
+Bad (plain v4.15-rc9)
+---------------------
+kernel: 0xb6a25008 kernel_size: 0x3ce605
+MEMORY RANGES
+0000000080000000-0000000087ffffff (0)
+zImage header: 0x016f2818 0x00000000 0x003c59d0
+zImage size 0x3c59d0, file size 0x3ce605
+zImage has tags
+  offset 0x00003be0 tag 0x5a534c4b size 8
+kernel image size: 0x00c5c6ec
+kexec_load: entry = 0x80008000 flags = 0x280000
+nr_segments = 2
+segment[0].buf   = 0xb6a25008
+segment[0].bufsz = 0x3c59d0
+segment[0].mem   = 0x80008000
+segment[0].memsz = 0x3c6000
+segment[1].buf   = 0x1ed52b8
+segment[1].bufsz = 0x8c35
+segment[1].mem   = 0x80c66000
+segment[1].memsz = 0x9000
+[    4.850341] kexec_core: Starting new kernel
+[    4.854766] Bye!
+
+(kernel fails to boot)
+
+Good (v4.15-rc9 and c772568788b5f0cbaac7c8d4111d7173bfc90673 reverted)
+-----------------------------
+kernel: 0xb6999008 kernel_size: 0x3ce9bd
+MEMORY RANGES
+0000000080000000-0000000087ffffff (0)
+zImage header: 0x016f2818 0x00000000 0x003c5d88
+zImage size 0x3c5d88, file size 0x3ce9bd
+kexec_load: entry = 0x80008000 flags = 0x280000
+nr_segments = 2
+segment[0].buf   = 0xb6999008
+segment[0].bufsz = 0x3c5d88
+segment[0].mem   = 0x80008000
+segment[0].memsz = 0x3c6000
+segment[1].buf   = 0x14192b8
+segment[1].bufsz = 0x8c35
+segment[1].mem   = 0x812e7000
+segment[1].memsz = 0x9000
+[    4.860473] kexec_core: Starting new kernel
+[    4.864898] Bye!
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.15.0-rc9-n8x0-los_ecc96+-00001-g0a003b4 (aaro at amd-fx-6350) (gcc version 6.4.0 (GCC)) #1 Mon Jan 22 23:43:19 EET 2018
+[    0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2 (ARMv6TEJ), cr=00c5387d
+[    0.000000] CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
+[    0.000000] OF: fdt: Machine model: Nokia N810
+[...]
+
+(kernel boots fine)
+
+> Also, I wonder if Linux next commit 55e7cff44c7c ("ARM: verify
+> size of zImage") helps here?
+
+No difference.
+
+A.
