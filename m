@@ -1,20 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Jan 2018 09:55:33 +0100
-Subject: [PATCH 1/3] pinctrl: sunxi: Use of_clk_get_parent_count() instead
- of open coding
-In-Reply-To: <1516375101-29836-2-git-send-email-geert+renesas@glider.be>
-References: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
- <1516375101-29836-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <CACRpkdZMSU1GUbEaJs0H2upGLmWYtp188awMESGfn+fVVTODrQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Jan 2018 09:55:37 +0100
+Subject: sun4i drm device tree
+In-Reply-To: <70275161-0167-fa2e-3557-d15b8244c04d@orpaltech.com>
+References: <70275161-0167-fa2e-3557-d15b8244c04d@orpaltech.com>
+Message-ID: <20180122085537.2cenqvvpjrbrzf7g@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 4:18 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
+Hi,
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Mon, Jan 22, 2018 at 11:15:58AM +0300, Sergey Suloev wrote:
+> as far as I understand it is possible now to compile sun4i-drm for
+> a64 SoC.
 
-Patch applied.
+Well, compile yes, but the A64 isn't supported at the moment, so
+compiling it won't get you very far. Where did you get that info from?
 
-Yours,
-Linus Walleij
+> But it seems that there should be changes to device tree files
+> (arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi,
+> arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi) too.
+> 
+> Can you PLEASE give a ref to a patch or explain device tree changes
+> needed?
+
+And even if it was supported, we'd need a lot more informations to
+help you. For example, which boards, with which video outputs
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/b2cd32fa/attachment.sig>
