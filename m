@@ -1,39 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Jan 2018 12:36:32 +0100
-Subject: [PATCH] ARM: pxa/tosa-bt: add MODULE_LICENSE tag
-In-Reply-To: <87bmhpahs2.fsf@belgarion.home>
-References: <20180110162816.431038-1-arnd@arndb.de>
- <87vag9bh1g.fsf@belgarion.home>
- <CAK8P3a1VeN0kLrJ5T57y46NR1GNviwZ=6baaXgSm9ZqYBnGuVA@mail.gmail.com>
- <87bmhpahs2.fsf@belgarion.home>
-Message-ID: <CAK8P3a0e18Jsi+mndFoNY5pGmQw389MWyHv+aeXk=6Y9NY3oMw@mail.gmail.com>
+Date: Mon, 22 Jan 2018 12:37:46 +0100
+Subject: [GIT PULL] dts driver fixes for omaps for v4.16 merge window
+In-Reply-To: <pull-1516376193-270253@atomide.com>
+References: <pull-1516376193-270253@atomide.com>
+Message-ID: <CAK8P3a2jjpo0R8iQPd+HP-e20Pe2BC9pBbWsoTpXVDanKfffNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 6:18 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Fri, Jan 19, 2018 at 4:38 PM, Tony Lindgren <tony@atomide.com> wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 >
->> On Wed, Jan 10, 2018 at 9:22 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->>> Arnd Bergmann <arnd@arndb.de> writes:
->>>
->>>> Without this tag, we get a build warning:
->>>>
->>>> WARNING: modpost: missing MODULE_LICENSE() in arch/arm/mach-pxa/tosa-bt.o
->>>>
->>>> For completeness, I'm also adding author and description fields.
->>>>
->>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>
->>> Queued into pxa/for-next, thanks.
->>
->> I see now that you didn't send this back to arm at kernel.org. I assume you planned
->> to send it for 4.17, but kernelci now still reports the warning for
->> both 4.15 and
->> linux-next (4.16). Should we just include this patch in the 4.16 fixes
->> instead?
-> Yeah sure, go ahead and merge it into 4.16 staging branch, with my :
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> The following changes since commit 80a06c0d8357d1e75a8fbc10813fcdada4d897fb:
+>
+>   ARM: dts: dm816x: add clkctrl nodes (2017-12-11 08:28:37 -0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/dt-clk-dts-signed
+>
+> for you to fetch changes up to e14d7e5320ebae9bffe4fbd585dfdd9d6de2550f:
+>
+>   ARM: dts: Update ti-sysc data for existing users (2018-01-12 15:16:57 -0800)
+>
+> ----------------------------------------------------------------
+> Few omap interconnect dts fixes for v4.16 merge window
+>
+> Now that we have the dts clocks for the clkctrl clock and the
+> interconnect binding, we need to update the existing ti-sysc
+> users according to the binding to make it usable for drivers.
+>
+> Apologies for not being able to send this earlier but it took
+> me few revisions to get the smartreflex changes right and
+> tested with yet to be posted patches to make smartreflex probe
+> with dts and I wanted to have it sit in next for a while to make
+> sure we're not introducing regressions for legacy platform data
+> based booting.
+>
+> Note that this is based on a merge with commit 20a2742e5784
+> ("dt-bindings: ti-sysc: Update binding for timers and capabilities")
+> to avoid a merge conflict with the binding changes.
 
-Applied to next/soc now, thanks!
+Pulled into next/dt, thanks!
 
-     Arnd
+       Arnd
