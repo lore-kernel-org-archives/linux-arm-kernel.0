@@ -1,79 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Jan 2018 12:42:15 +0000
-Subject: [PATCH v2 1/2] arm64: capabilities: Clarify argument passed to
- enable call back
-In-Reply-To: <20180117174220.7959-2-suzuki.poulose@arm.com>
-References: <20180117174220.7959-1-suzuki.poulose@arm.com>
- <20180117174220.7959-2-suzuki.poulose@arm.com>
-Message-ID: <20180122124214.GA28589@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 22 Jan 2018 12:42:10 +0000
+Subject: per-task stack canaries for arm64
+In-Reply-To: <CAGXu5j+erd-=LqZdxEDUQnHhtsEbZ1YNch4sToKk+MWzybvQWA@mail.gmail.com>
+References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
+ <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
+ <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
+ <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
+ <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
+ <CAKv+Gu-TtJ7Pxa7+qOX7MiQwPFwsNOup2Q=0TvjCO4xHxf3QQA@mail.gmail.com>
+ <CAKv+Gu8P6OZDSMw7oA+5_RgGLkeOwoaEPb_5c510uoBAJY7MeA@mail.gmail.com>
+ <CAGXu5j+erd-=LqZdxEDUQnHhtsEbZ1YNch4sToKk+MWzybvQWA@mail.gmail.com>
+Message-ID: <CAKv+Gu_qERYZu5-cWbo3DuuqrS5d1JhRHhpNAL0kurg93m=MNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 05:42:19PM +0000, Suzuki K Poulose wrote:
-> We issue the enable() call back for all CPU hwcaps capabilities
-> available on the system, on all the CPUs. So far we have ignored
-> the argument passed to the call back, which had a prototype to
-> accept a "void *" for use with on_each_cpu() and later with
-> stop_machine(). However, with commit 0a0d111d40fd1
-> ("arm64: cpufeature: Pass capability structure to ->enable callback"),
-> there are some users of the argument who wants the matching capability
-> struct pointer where there are multiple matching criteria for a single
-> capability. Changing the prototype is quite an invasive change and
-> will be part of a future series. For now, add a comment to clarify
-> what is expected.
-> 
-> Suggested-by: Dave Martin <dave.martin@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index ac67cfc2585a..c049e28274d4 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -97,7 +97,14 @@ struct arm64_cpu_capabilities {
->  	u16 capability;
->  	int def_scope;			/* default scope */
->  	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
-> -	int (*enable)(void *);		/* Called on all active CPUs */
-> +	/*
-> +	 * For each @capability set in CPU hwcaps, @enable() is called on all
-> +	 * active CPUs with const struct arm64_cpu_capabilities * as argument.
+On 22 January 2018 at 12:26, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, Jan 22, 2018 at 9:59 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> OK, so I have done a bit of homework, and I think this shouldn't be
+>> too difficult after all.
+>>
+>> I realized that we don't really need per-CPU references to
+>> __stack_chk_guard, given that we already keep the task struct pointer
+>> in sp_el0. This means we should be able to do
+>>
+>> mrs   x0, sp_el0
+>> movz  x1, :abs_g0:__stack_chk_guard_tsk_offset
+>> add   x0, x0, x1
+>> ldr   x2, [x0]
+>>
+>> where __stack_chk_guard_tsk_offset is exposed via an ELF symbol.
+>> (Analogous to x86, this could be implemented at the GCC level using
+>> arbitrary sysreg and symbol names to remain flexible)
+>>
+>> So my next question (mainly to Ramana): would it be possible to emit
+>> the mrs/movz/add sequence above from targetm.stack_protect_guard() in
+>> a way that will allow expand_normal() to expand it in a useful manner
+>> (e.g., as an INDIRECT_REF that can be matched by the memory_operand in
+>> Aarch64's stack_protect_set)? If that is the case, we could implement
+>> this in a GCC plugin in the kernel rather than relying on upstream GCC
+>> changes (and having to commit to this ABI long term)
+>
+> Though this would ultimately be implemented in core GCC, yes? (I don't
+> want to have GCC plugins be a dependency for stack protector...)
+>
 
-its argument.
-
-> +	 * It is upto the callback (especially when multiple entries for the
-
-s/upto/up to/
-
-> +	 * same capability exists) to determine if any action should be taken
-
-s/exists/exit/
-
-> +	 * based on @matches() applies to thie CPU.
-
-s/thie/this/
-
-Still, the second half of the sentence doesn't really make a lot of
-sense. Instead of:
-
-  "to determine if any action should be taken based on @matches() applies
-   to this CPU"
-
-how about:
-
-  "to determine if any action should be taken based on the result of
-   @matches() for the local CPU."
-
-Otherwise:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Oh absolutely. But being able to expose this more widely early on,
+while GCC 9 is still under development, would help prevent cockups
+where we end up with a flawed ABI and it's too late to do something
+about it.
