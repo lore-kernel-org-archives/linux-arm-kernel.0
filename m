@@ -1,42 +1,40 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 22 Jan 2018 17:09:29 +0100
-Subject: [net-next: PATCH v4 0/7] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180122.105750.1953487955261969355.davem@davemloft.net>
-References: <CAPv3WKeqEd6Hcy0NdPpiVVA1ioUYY4zs_0zai2gwkCPtM1yaJg@mail.gmail.com>
- <20180122.093525.1549534484738907077.davem@davemloft.net>
- <20180122144342.GB16923@lunn.ch>
- <20180122.105750.1953487955261969355.davem@davemloft.net>
-Message-ID: <CAPv3WKey+JHrgasLigMFH5vAdjfz0Z18z0BVF1AQ_poV5CgQbg@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 22 Jan 2018 10:14:45 -0600
+Subject: [GIT PULL] Qualcomm Fixes for 4.16
+In-Reply-To: <CAK8P3a2M4xqHO3tRokqaudxO8=+ifj6Ve3vW1L_Dv2KCykbUtw@mail.gmail.com>
+References: <1516572157-968-1-git-send-email-andy.gross@linaro.org>
+ <CAK8P3a2M4xqHO3tRokqaudxO8=+ifj6Ve3vW1L_Dv2KCykbUtw@mail.gmail.com>
+Message-ID: <20180122161445.GB4402@hector>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-22 16:57 GMT+01:00 David Miller <davem@davemloft.net>:
-> From: Andrew Lunn <andrew@lunn.ch>
-> Date: Mon, 22 Jan 2018 15:43:42 +0100
->
->> On Mon, Jan 22, 2018 at 09:35:25AM -0500, David Miller wrote:
->>> From: Marcin Wojtas <mw@semihalf.com>
->>> Date: Mon, 22 Jan 2018 14:00:37 +0100
->>>
->>> > There's a discussion about the ACPI vs generic MDIO/PHY change under
->>> > initial version of the patchset, however the patches in question were
->>> > for now abandoned from further re-sends.
->>>
->>> But doesn't the results of that discussion determine whether the way ACPI
->>> is being used in this patch series is what we want to do or not?
->>
->> Hi David
->>
->> The patches submitted here don't involve any ACPI for MDIO or PHY. It
->> is all MAC. And it is using standard ACPI primitives for devices,
->> nothing new.
->>
->> It is not setting any precedence for MDIO and PHY. That is totally out
->> of scope for these patches. Whatever is decided for MDIO and PHY can
->> be added later.
->
-> Thanks for all of the clarifications.
->
-> Series applied to net-next, thank you.
+On Mon, Jan 22, 2018 at 12:33:11PM +0100, Arnd Bergmann wrote:
+> On Sun, Jan 21, 2018 at 11:02 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> > Arnd/Olof/Kevin,
+> >
+> > Please take this fix for 4.16.  This applies on top of the current next
+> > (next-20190119).
+> >
+> > Thanks,
+> >
+> > Andy
+> >
+> > The following changes since commit 761914dd2975bc443024f0ec10a66a26b7186ec2:
+> >
+> >   Add linux-next specific files for 20180119 (2018-01-19 17:51:17 +1100)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.16
+> 
+> I assume you didn't actually mean to send a pull request based on top
+> of linux-next
+> but instead had a branch on top of the one you sent previously.
+> 
+> I cherry-picked the one commit you want into the next/drivers branch!
 
-Great, thanks!
+Ack, not sure what I was thinking.  Glad you sorted it out.
+
+Thanks for taking this in!
+
+Andy
