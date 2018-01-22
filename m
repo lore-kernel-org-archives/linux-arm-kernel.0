@@ -1,43 +1,43 @@
 From: michael.weiser@gmx.de (Michael Weiser)
-Date: Mon, 22 Jan 2018 22:20:24 +0100
-Subject: [PATCH 0/2] arm64: Unimplemented syscall kernel message
-In-Reply-To: <20180122131851.GA28638@arm.com>
-References: <20180122131851.GA28638@arm.com>
-Message-ID: <20180122212026.26262-1-michael.weiser@gmx.de>
+Date: Mon, 22 Jan 2018 22:20:25 +0100
+Subject: [PATCH 1/2] arm64: Remove unimplemented syscall log message
+In-Reply-To: <20180122212026.26262-1-michael.weiser@gmx.de>
+References: <20180122212026.26262-1-michael.weiser@gmx.de>
+Message-ID: <20180122212026.26262-2-michael.weiser@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Stop printing a (ratelimited) kernel message for each instance of an
+unimplemented syscall being called. Userland making an unimplemented
+syscall is not necessarily misbehaviour and to be expected with a
+current userland running on an older kernel. Also, the current message
+looks scary to users but does not actually indicate a real problem nor
+help them narrow down the cause. Just rely on sys_ni_syscall() to return
+-ENOSYS.
 
-I'm not pretending to fully understand the semantics of what I've done
-but I've tried to make a start on implementing both changes anyway.
+Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+---
+ arch/arm64/kernel/traps.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-The first is straightforward in dropping the offending log message from
-do_ni_syscall().
-
-The second mirrors arm behaviour in compat_arm_syscall() in raising
-SIGILL for (most) unimplemented syscalls. I've intentionally kept the
-arm message format in case anyone has a script filtering for it.
-
-Syncing __dump_instr() with arm to support thumb instructions was done
-on the assumption that arm-eabi code may obviously contain thumb
-instructions.
-
-Both are compile-tested as well as manually prodded with some randomly
-chosen syscall numbers from aarch64 and arm-eabi binaries while running
-under qemu-system-aarch64.
-
-Thanks,
-Michael
-
-Michael Weiser (2):
-  arm64: Remove unimplemented syscall log message
-  arm64: Mirror arm for unimplemented compat syscalls
-
- arch/arm64/include/asm/system_misc.h |  1 +
- arch/arm64/kernel/sys_compat.c       | 27 ++++++++++++++++++++++++++-
- arch/arm64/kernel/traps.c            | 22 ++++++++++------------
- 3 files changed, 37 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index bbb0fde2780e..0ef28b7f6aa7 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -526,14 +526,6 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+ 	}
+ #endif
+ 
+-	if (show_unhandled_signals_ratelimited()) {
+-		pr_info("%s[%d]: syscall %d\n", current->comm,
+-			task_pid_nr(current), regs->syscallno);
+-		dump_instr("", regs);
+-		if (user_mode(regs))
+-			__show_regs(regs);
+-	}
+-
+ 	return sys_ni_syscall();
+ }
+ 
 -- 
 2.16.0
