@@ -1,95 +1,84 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 22 Jan 2018 09:05:03 -0600
-Subject: [PATCH v6 09/41] dt-bindings: clock: New bindings for TI Davinci
- PSC
-In-Reply-To: <1516468460-4908-10-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-10-git-send-email-david@lechnology.com>
-Message-ID: <20180122150503.ciavehj5dd22535n@rob-hp-laptop>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 22 Jan 2018 07:07:47 -0800
+Subject: [PATCH v2 1/2] soc: imx: gpcv2: Do not pass static memory as platform
+ data
+Message-ID: <20180122150748.1742-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 20, 2018 at 11:13:48AM -0600, David Lechner wrote:
-> This adds a new binding for the Power Sleep Controller (PSC) for the
-> mach-davinci family of processors.
-> 
-> Note: Although TI Keystone has a very similar PSC, we are not using the
-> existing bindings. Keystone is using a legacy one-node-per-clock binding
-> (actually two nodes if you count the separate reset binding for the same
-> IP block). Also, some davinci LPSCs have quirks that aren't handled by
-> the keystone bindings, so we would be adding one compatible string per
-> clock with quirks instead of just a new compatible string for each
-> controller.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
-> 
-> v6 changes:
-> - added clocks and clock-names properties
-> - expanded examples
-> 
->  .../devicetree/bindings/clock/ti/davinci/psc.txt   | 66 ++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/psc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/psc.txt b/Documentation/devicetree/bindings/clock/ti/davinci/psc.txt
-> new file mode 100644
-> index 0000000..0c2d2bd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/ti/davinci/psc.txt
-> @@ -0,0 +1,66 @@
-> +Binding for TI DaVinci Power Sleep Controller (PSC)
-> +
-> +The PSC provides power management, clock gating and reset functionality. It is
-> +primarily used for clocking.
-> +
-> +Required properties:
-> +- compatible: shall be one of:
-> +	- "ti,da850-psc0" for PSC0 on DA850/OMAP-L138/AM18XX
-> +	- "ti,da850-psc1" for PSC1 on DA850/OMAP-L138/AM18XX
-> +- reg: physical base address and size of the controller's register area
-> +- #clock-cells: from common clock binding; shall be set to 1
-> +- clocks: phandles to clocks corresponding to the clock-names property
-> +- clock-names: list of parent clock names - depends on compatible value
-> +	- for "ti,da850-psc0", shall be "pll0_sysclk1", "pll0_sysclk2",
-> +	  "pll0_sysclk4", "pll0_sysclk6", "async1"
-> +	- for "ti,da850-psc1", shall be "pll0_sysclk2", "pll0_sysclk4", "async3"
-> +
-> +Optional properties:
-> +- #reset-cells: from reset binding; shall be set to 1 - only applicable when
-> +  at least one local domain provides a local reset.
-> +
-> +Consumers:
-> +
-> +	Clock and reset consumers shall use the local power domain module ID
-> +	(LPSC) as the index corresponding to the clock cell. Refer to the
-> +	device-specific	datasheet to find these numbers. NB: Most local domains
-> +	only provide a clock and not a reset.
-> +
-> +Examples:
-> +
-> +	psc0: clock-controller at 10000 {
-> +		compatible = "ti,da850-psc0";
-> +		reg = <0x10000 0x1000>;
-> +		#clock-cells = <1>;
-> +		#reset-cells = <1>;
-> +		clocks = <&pll0_sysclk 1>, <&pll0_sysclk 2>,
-> +			 <&pll0_sysclk 4>, <&pll0_sysclk 6>, <&async1_clk>;
-> +		clock_names = "pll0_sysclk1", "pll0_sysclk2",
+Platform device core assumes the ownership of dev.platform_data as
+well as that it is dynamically allocated and it will try to kfree it
+as a part of platform_device_release(). Change the code to pass
+kzalloc'ed chunk of memory instead of a pointer to a static memory to
+avoid causing a BUG() when calling platform_device_put().
 
-Should be clock-names
+The problem can be reproduced by artificially enabling the error path
+of platform_device_add() call (around line 357).
 
-> +			      "pll0_sysclk4", "pll0_sysclk6", "async1";
-> +	};
-> +	psc1: clock-controller at 227000 {
-> +		compatible = "ti,da850-psc1";
-> +		reg = <0x227000 0x1000>;
-> +		#clock-cells = <1>;
-> +		clocks = <&pll0_sysclk 2>, <&pll0_sysclk 4>, <&async3_clk>;
-> +		clock_names = "pll0_sysclk2", "pll0_sysclk4", "async3";
+Note that this change also allows us to constify imx7_pgc_domains,
+since we no longer need to be able to modify it.
 
-ditto
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
-With that,
+Changes since [v1]:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+    - Replaced devm_kzalloc() with devm_kmalloc() as per suggestion from Stefan
+
+[1] lkml.kernel.org/r/20180110161608.13015-1-andrew.smirnov at gmail.com
+
+ drivers/soc/imx/gpcv2.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
+index afc7ecc3c187..9947598ec4b5 100644
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -18,6 +18,7 @@
+ #include <linux/pm_domain.h>
+ #include <linux/regmap.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/slab.h>
+ #include <dt-bindings/power/imx7-power.h>
+ 
+ #define GPC_LPCR_A7_BSC			0x000
+@@ -155,7 +156,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
+ 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+ }
+ 
+-static struct imx7_pgc_domain imx7_pgc_domains[] = {
++static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
+ 		.genpd = {
+ 			.name      = "mipi-phy",
+@@ -321,7 +322,14 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
+-		domain = &imx7_pgc_domains[domain_index];
++		domain = kmalloc(sizeof(*domain), GFP_KERNEL);
++		if (!domain) {
++			of_node_put(np);
++			return -ENOMEM;
++		}
++		memcpy(domain, &imx7_pgc_domains[domain_index],
++		       sizeof(*domain));
++
+ 		domain->regmap = regmap;
+ 		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
+ 		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
+@@ -330,6 +338,7 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+ 						domain_index);
+ 		if (!pd_pdev) {
+ 			dev_err(dev, "Failed to allocate platform device\n");
++			kfree(domain);
+ 			of_node_put(np);
+ 			return -ENOMEM;
+ 		}
+-- 
+2.14.3
