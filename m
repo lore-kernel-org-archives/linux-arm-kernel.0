@@ -1,59 +1,122 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 22 Jan 2018 14:29:17 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
-Message-ID: <CAMRc=MesQTvkVtPLOGr2G7-KSR=k35y24SsO4s8rDbCv=2-G7A@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 22 Jan 2018 13:38:48 +0000
+Subject: [PATCH v2 1/6] arm64: cpufeature: Allow early detect of specific
+ features
+In-Reply-To: <2f2a406b-fddf-6c30-4052-650f57ac317a@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <1516190084-18978-2-git-send-email-julien.thierry@arm.com>
+ <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
+ <2f2a406b-fddf-6c30-4052-650f57ac317a@arm.com>
+Message-ID: <20180122133848.546zixs3crkwvuid@oak.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
-> This series converts mach-davinci to use the common clock framework.
->
-> The series works like this, the first 19 patches create new clock drivers
-> using the common clock framework. There are basically 3 groups of clocks -
-> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
-> unique init data, which is the reason for so many patches.
->
-> Then, starting with "ARM: da830: add new clock init using common clock",
-> we get the mach code ready for the switch by adding the code needed for
-> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
-> legacy clocks so that we can switch easily between the old and the new.
->
-> "ARM: davinci: switch to common clock framework" actually flips the switch
-> to start using the new clock drivers. Then the next 8 patches remove all
-> of the old clock code.
->
-> The final three patches add device tree clock support to the one SoC that
-> supports it.
->
-> v6 changes (also see individual patches for details):
-> - All of the device tree bindings are changed
-> - All of the clock drivers are changed significantly
-> - Fixed issues brought up during review of v5
-> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
->   series and submitted separately
->
-> v5 changes:
-> - Basically, this is an entirely new series
-> - Patches are broken up into bite-sized pieces
-> - Converted PSC clock driver to use regmap
-> - Restored "force" flag for certain DA850 clocks
-> - Added device tree bindings
-> - Moved more of the clock init to drivers/clk
-> - Fixed frequency scaling (maybe*)
->
-> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
->   what they need to do to make this work, but I haven't figured out how to
->   test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
->   sent separately after this series has landed.)
->
+On Mon, Jan 22, 2018 at 12:21:55PM +0000, Julien Thierry wrote:
+> On 22/01/18 12:05, Suzuki K Poulose wrote:
+> > On 17/01/18 11:54, Julien Thierry wrote:
+> > > From: Daniel Thompson <daniel.thompson@linaro.org>
+> > > 
+> > > Currently it is not possible to detect features of the boot CPU
+> > > until the other CPUs have been brought up.
+> > > 
+> > > This prevents us from reacting to features of the boot CPU until
+> > > fairly late in the boot process. To solve this we allow a subset
+> > > of features (that are likely to be common to all clusters) to be
+> > > detected based on the boot CPU alone.
+> > > 
+> > > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> > > [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
+> > >              duplicates between early features and normal
+> > >              features]
+> > > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > >   arch/arm64/kernel/cpufeature.c | 69
+> > > ++++++++++++++++++++++++++++--------------
+> > >   1 file changed, 47 insertions(+), 22 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/cpufeature.c
+> > > b/arch/arm64/kernel/cpufeature.c
+> > > index a73a592..6698404 100644
+> > > --- a/arch/arm64/kernel/cpufeature.c
+> > > +++ b/arch/arm64/kernel/cpufeature.c
+> > > @@ -52,6 +52,8 @@
+> > >   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+> > >   EXPORT_SYMBOL(cpu_hwcaps);
+> > > 
+> > > +static void __init setup_early_feature_capabilities(void);
+> > > +
+> > >   /*
+> > >    * Flag to indicate if we have computed the system wide
+> > >    * capabilities based on the boot time active CPUs. This
+> > > @@ -542,6 +544,8 @@ void __init init_cpu_features(struct
+> > > cpuinfo_arm64 *info)
+> > >           init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
+> > >           sve_init_vq_map();
+> > >       }
+> > > +
+> > > +    setup_early_feature_capabilities();
+> > >   }
+> > > 
+> > >   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+> > > @@ -846,7 +850,7 @@ static bool has_no_fpsimd(const struct
+> > > arm64_cpu_capabilities *entry, int __unus
+> > >                       ID_AA64PFR0_FP_SHIFT) < 0;
+> > >   }
+> > > 
+> > > -static const struct arm64_cpu_capabilities arm64_features[] = {
+> > > +static const struct arm64_cpu_capabilities arm64_early_features[] = {
+> > >       {
+> > >           .desc = "GIC system register CPU interface",
+> > >           .capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+> > > @@ -857,6 +861,10 @@ static bool has_no_fpsimd(const struct
+> > > arm64_cpu_capabilities *entry, int __unus
+> > >           .sign = FTR_UNSIGNED,
+> > >           .min_field_value = 1,
+> > >       },
+> > > +    {}
+> > > +};
+> > > +
+> > 
+> > 
+> > Julien,
+> > 
+> > One potential problem with this is that we don't have a way
+> > to make this work on a "theoretical" system with and without
+> > GIC system reg interface. i.e, if we don't have the CONFIG
+> > enabled for using ICC system regs for IRQ flags, the kernel
+> > could still panic. I understand this is not a "normal" configuration
+> > but, may be we could make the panic option based on whether
+> > we actually use the system regs early enough ?
+> > 
+> 
+> I see, however I'm not sure what happens in the GIC drivers if we have a CPU
+> running with a GICv3 and other CPUs with something else... But of course
+> this is not technically limited by the arm64 capabilities handling.
 
-This driver doesn't have DT support - I suppose it would be useful to
-add it and also add the corresponding DT node to da850.dtsi. If you're
-ok with it, I can start working on it. I also have a patch for the i2c
-cpufreq issue and it would be nice to test it with it.
+Shouldn't each CPU be sharing the same GIC anyway? It so its not some
+have GICv3+ and some have GICv2. The theoretical system described above 
+*has* a GICv3+ but some participants in the cluster are not able to 
+talk to it as like a co-processor.
 
-Thanks,
-Bartosz
+The ARM ARM is a little vague about whether, if a GIC implements a
+system register interface, then a core must provide access to it. Even
+so, first question is whether such a system is architecture compliant?
+
+
+Daniel.
+
+
+> What behaviour would you be looking for? A way to prevent the CPU to be
+> brought up instead of panicking?
+> 
+> > Btw, I am rewriting the capabilities infrastructure to allow per-cap
+> > control on how it should be treated. I might add an EARLY scope for
+> > caps which could cover this and may be VHE.
+> 
+> Thanks,
+> 
+> -- 
+> Julien Thierry
