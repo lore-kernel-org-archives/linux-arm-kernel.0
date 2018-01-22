@@ -1,37 +1,70 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 22 Jan 2018 16:43:55 +0530
-Subject: [PATCH 0/6] ARM: davinci: common clock prep work
-In-Reply-To: <1516418424-28686-1-git-send-email-david@lechnology.com>
-References: <1516418424-28686-1-git-send-email-david@lechnology.com>
-Message-ID: <28bb9f44-c6b5-e2e9-2d13-5b50dbceac7b@ti.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 22 Jan 2018 12:14:53 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+Message-ID: <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 January 2018 08:50 AM, David Lechner wrote:
-> This series contains some changes needed for the conversion of arch/arm/mach-
-> davinci to the common clock framework.
-> 
-> Most of the boards in mach-davinci do not have device tree support. However,
-> CFGCHIP, which is a syscon regmap, is needed during clock init in early boot.
-> Using a platform device for the syscon at this point is not an option. So,
-> this series introduces a new way to register a syscon regmap on non-DT systems.
-> 
-> The DA8XX USB PHY driver is a consumer of the CFGCHIP syscon regmap, so some
-> changes are needed in that driver as well since we are removing the syscon
-> platform devices. The patch "phy: da8xx-usb: rename clock con_ids" doesn't
-> have anything to do with syscon, but I included in this series because we are
-> touching PHY code here anyway and it is also a dependency for the upcoming
-> common clock framework conversion changes.
-> 
-> Maintainers, please coordinate with Sekhar before committing. We will probably
-> want everything to go through the linux-davinci tree if possible.
+2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
+> This series converts mach-davinci to use the common clock framework.
+>
+> The series works like this, the first 19 patches create new clock drivers
+> using the common clock framework. There are basically 3 groups of clocks -
+> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
+> unique init data, which is the reason for so many patches.
+>
+> Then, starting with "ARM: da830: add new clock init using common clock",
+> we get the mach code ready for the switch by adding the code needed for
+> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
+> legacy clocks so that we can switch easily between the old and the new.
+>
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
+>
+> The final three patches add device tree clock support to the one SoC that
+> supports it.
+>
+> v6 changes (also see individual patches for details):
+> - All of the device tree bindings are changed
+> - All of the clock drivers are changed significantly
+> - Fixed issues brought up during review of v5
+> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
+>   series and submitted separately
+>
+> v5 changes:
+> - Basically, this is an entirely new series
+> - Patches are broken up into bite-sized pieces
+> - Converted PSC clock driver to use regmap
+> - Restored "force" flag for certain DA850 clocks
+> - Added device tree bindings
+> - Moved more of the clock init to drivers/clk
+> - Fixed frequency scaling (maybe*)
+>
+> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
+>   what they need to do to make this work, but I haven't figured out how to
+>   test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
+>   sent separately after this series has landed.)
+>
+> Dependencies:
+>
+> This series applies on top of linux-davinci/master plus the following patches:
+> - [1] "clk: fix reentrancy of clk_enable() on UP systems" (in clk-next)
+> - [2] "clk: add helper functions for managing clk_onecell_data"
+> - [3] "clk: divider: read-only divider can propagate rate change"
+> - [4],[5],[6],[7],[8],[9] series "ARM: davinci: common clock prep work"
+>
 
-You should wait for some more feedback before resending anything, but I
-think it will be easier to reivew/accept this if the changes are just
-related to removal of "syscon" platform device from devices-da8xx.c.
+Hi David,
 
-It _seems_ like this series does more than just that, and I hope it can
-be pared down.
+I'm getting a splat[1] when trying to mount the rootfs over nfs on a da850-lcdk.
 
-Thanks,
-Sekhar
+I'll try to figure out what's happening.
+
+Best regards,
+Bartosz Golaszewski
+
+[1] https://pastebin.com/D94z8SAe
