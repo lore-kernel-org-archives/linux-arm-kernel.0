@@ -1,60 +1,75 @@
-From: hw.likun@huawei.com (Li Kun)
-Date: Mon, 22 Jan 2018 14:52:18 +0800
-Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
- predictor against aliasing attacks
-In-Reply-To: <20180119142814.GA8421@arm.com>
-References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
- <1515157961-20963-8-git-send-email-will.deacon@arm.com>
- <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
- <20180117100715.GA27892@arm.com>
- <a8f3579a-9afd-c39a-fad7-826eba8e9ac8@huawei.com>
- <20180119142814.GA8421@arm.com>
-Message-ID: <7cb8f7d6-8f81-efa8-3a83-f95c5af7e8ab@huawei.com>
+From: clingutla@codeaurora.org (Chandra Sekhar Lingutla)
+Date: Mon, 22 Jan 2018 12:23:10 +0530
+Subject: [PATCH] arm64: setup: Check for overlapping dtb and Image load
+ addresses
+In-Reply-To: <CAKv+Gu-2m+kt6vB5FXsHFwT5DjCk7_rcMRBYxaEG2RMFz7vbGg@mail.gmail.com>
+References: <20180119065637.12789-1-clingutla@codeaurora.org>
+ <CAKv+Gu-2m+kt6vB5FXsHFwT5DjCk7_rcMRBYxaEG2RMFz7vbGg@mail.gmail.com>
+Message-ID: <e5fefb53-aa46-c373-ca68-c59a74b1e30f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2018/1/19 22:28, Will Deacon Wrote:
-> On Fri, Jan 19, 2018 at 11:37:24AM +0800, Li Kun wrote:
->> ? 2018/1/17 18:07, Will Deacon ??:
->>> On Wed, Jan 17, 2018 at 12:10:33PM +0800, Yisheng Xie wrote:
->>>> On 2018/1/5 21:12, Will Deacon wrote:
->>>>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
->>>>> index 5f7097d0cd12..d99b36555a16 100644
->>>>> --- a/arch/arm64/mm/context.c
->>>>> +++ b/arch/arm64/mm/context.c
->>>>> @@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
->>>>>   			"ic iallu; dsb nsh; isb",
->>>>>   			ARM64_WORKAROUND_CAVIUM_27456,
->>>>>   			CONFIG_CAVIUM_ERRATUM_27456));
->>>>> +
->>>>> +	arm64_apply_bp_hardening();
->>>>>   }
->>>> post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
->>>> means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
->>>> when mm_swtich and kernel_exit?
->>>>
->>>>  From the code logical, it seems not only related to erratum 2745 anymore?
->>>> should it be renamed?
->>> post_ttbr_update_workaround just runs code after a TTBR update, which
->>> includes mitigations against variant 2 of "spectre" and also a workaround
->>> for a Cavium erratum. These are separate issues.
->> But AFAIU, according to the theory of spectre, we don't need to clear the
->> BTB every time we return to user?
->> If we enable CONFIG_ARM64_SW_TTBR0_PAN, there will be a call to
->> arm64_apply_bp_hardening every time kernel exit to el0.
->> kernel_exit
->>      post_ttbr_update_workaround
->>          arm64_apply_bp_hardening
-> That's a really good point, thanks. What it means is that
-> post_ttbr_update_workaround is actually the wrong place for this, and we
-> should be doing it more directly on the switch_mm path -- probably in
-> check_and_switch_context.
-Yes, that's exactly what i mean.:-)
+On 1/19/2018 7:33 PM, Ard Biesheuvel wrote:
+> On 19 January 2018 at 06:56, Lingutla Chandrasekhar
+> <clingutla@codeaurora.org> wrote:
+>> Sometime kernel image and dtb load offsets can overlap due to
+>> dynamically increased Image or dtb size if both load addresses
+>> are near to each other, which leads to bootup failures.
+>>
+>> So validate dtb load address and kernel image, if they overlap
+>> do not proceed to boot.
+>>
+>> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
+>>
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 30ad2f085d1f..c9dd699f09ab 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -181,11 +181,17 @@ static void __init smp_build_mpidr_hash(void)
+>>   static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>>   {
+>>          void *dt_virt = fixmap_remap_fdt(dt_phys);
+>> +       u64 end_phys = __pa_symbol(_end);
+>> +       u64 start_phys = __pa_symbol(_text);
+>>          const char *name;
+>>
+>> -       if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+>> +       if (!dt_virt || ((dt_phys < start_phys) &&
+>> +               ((dt_phys + fdt_totalsize(dt_virt)) > start_phys)) ||
+>> +               ((dt_phys > start_phys) && (dt_phys < end_phys)) ||
+>> +               !early_init_dt_scan(dt_virt)) {
+>>                  pr_crit("\n"
+>>                          "Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
+>> +                       "The dtb load address should not overlap with kernel image\n"
+>>                          "The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
+>>                          "\nPlease check your bootloader.",
+>>                          &dt_phys, dt_virt);
+> Paradoxically, this pr_crit() will only ever be able to produce
+> readable output if early_init_dt_scan() returns success. If not, no
+> early DT parsing will have occurred, and we will have no idea where
+> the UART is nor whether earlycon was passed via /chosen/bootargs.
 >
-> Will
+> That means adding the check before the call to early_init_dt_scan() is
+> not very helpful, since the system will just hang with no output.
+>
+> If you really want to check for overlap, please do it *after* the
+> if(), as a separate WARN_ON() that does not force the boot to fail.
+> This has a much higher likelihood of anyone ever reading your error
+> message, and being able to do something about it.
+If overlap happens, we can't predict the behavior,
+ex: in our case, image size increased such that dtb load offset falls 
+under bss section,
+because of that, initial dtb is been zeroed while clearing the bss 
+section, which fails
+the early_init_dt_scan() and system hangs there.
 
--- 
-Best Regards
-Li Kun
+In this case, If we put check *after* the if(), it would not be useful 
+right?
+I think, if we have all check together,? based on PC we could find 
+possible failures of system hang.
+And if early_init_dt_scan() is success, then we would get overlapped 
+bytes (new patchset have this) at pr_crit().
+> Also, checking for overlap can be done using two comparisons:
+>
+> end1 > start2 && end2 > start1
+sure, will update.
