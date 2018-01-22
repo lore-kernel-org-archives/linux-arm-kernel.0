@@ -1,626 +1,427 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:22 +0100
-Subject: [PATCH v4 08/13] drm/sun4i: Add a driver for the display frontend
-In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <029cdc3478bf89d422f5e8d9e600baf5e48ce4db.1516613040.git-series.maxime.ripard@free-electrons.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Mon, 22 Jan 2018 11:26:44 +0200
+Subject: [PATCH 3/3] clocksource: timer-dm: Make unexported functions
+ static
+In-Reply-To: <20180117214826.GD11952@lenoch>
+References: <20180117214629.GA11952@lenoch> <20180117214826.GD11952@lenoch>
+Message-ID: <755fca20-7544-1655-47c7-83b1a2669adc@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display frontend is an hardware block that can be used to implement
-some more advanced features like hardware scaling or colorspace
-conversions. It can also be used to implement the output format of the VPU.
 
-Let's create a minimal driver for it that will only enable the hardware
-scaling features.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/Makefile         |   3 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c      |  27 +-
- drivers/gpu/drm/sun4i/sun4i_drv.h      |   1 +-
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 389 ++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  99 +++++++-
- 5 files changed, 514 insertions(+), 5 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
+On 17.01.2018 23:48, Ladislav Michl wrote:
+> As dmtimer no longer exports functions, make those previously
+> exported static.
+> 
+> Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> ---
+>  Note: only those functions assigned to timer ops are made static
+>        as some others will be needed later for event capture.
+> 
+>  drivers/clocksource/timer-dm.c |  218 ++++++++++++++++++++---------------------
+>  include/clocksource/dmtimer.h  |   24 ----
+>  2 files changed, 109 insertions(+), 133 deletions(-)
+> 
+> diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+> index 324ec93d3dd2..8de9e543d129 100644
+> --- a/drivers/clocksource/timer-dm.c
+> +++ b/drivers/clocksource/timer-dm.c
+> @@ -163,6 +163,92 @@ static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
+>  	return ret;
+>  }
+>  
+> +static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+> +{
+> +	int ret;
+> +	char *parent_name = NULL;
+Could be declared as const: const char *parent_name = NULL;
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 0c2f8c7facae..b660d82011f4 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- sun4i-backend-y			+= sun4i_backend.o sun4i_layer.o
-+sun4i-frontend-y		+= sun4i_frontend.o
- 
- sun4i-drm-y			+= sun4i_drv.o
- sun4i-drm-y			+= sun4i_framebuffer.o
-@@ -21,6 +22,6 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-tcon.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
- 
--obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
-+obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o sun4i-frontend.o
- obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
- obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 75c76cdd82bc..42e68cf3a2e8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -23,6 +23,7 @@
- #include <drm/drm_of.h>
- 
- #include "sun4i_drv.h"
-+#include "sun4i_frontend.h"
- #include "sun4i_framebuffer.h"
- #include "sun4i_tcon.h"
- 
-@@ -98,6 +99,7 @@ static int sun4i_drv_bind(struct device *dev)
- 		goto free_drm;
- 	}
- 	drm->dev_private = drv;
-+	INIT_LIST_HEAD(&drv->frontend_list);
- 	INIT_LIST_HEAD(&drv->engine_list);
- 	INIT_LIST_HEAD(&drv->tcon_list);
- 
-@@ -185,6 +187,14 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
- 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
- }
- 
-+static bool sun4i_drv_node_is_supported_frontend(struct device_node *node)
-+{
-+	if (IS_ENABLED(CONFIG_DRM_SUN4I_BACKEND))
-+		return !!of_match_node(sun4i_frontend_of_table, node);
-+
-+	return false;
-+}
-+
- static bool sun4i_drv_node_is_tcon(struct device_node *node)
- {
- 	return of_device_is_compatible(node, "allwinner,sun4i-a10-tcon") ||
-@@ -239,9 +249,11 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 	int count = 0;
- 
- 	/*
--	 * We don't support the frontend for now, so we will never
--	 * have a device bound. Just skip over it, but we still want
--	 * the rest our pipeline to be added.
-+	 * The frontend has been disabled in some of our old device
-+	 * trees. If we find a node that is the frontend and is
-+	 * disabled, we should just follow through and parse its
-+	 * child, but without adding it to the component list.
-+	 * Otherwise, we obviously want to add it to the list.
- 	 */
- 	if (!sun4i_drv_node_is_frontend(node) &&
- 	    !of_device_is_available(node))
-@@ -254,7 +266,14 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 	if (sun4i_drv_node_is_connector(node))
- 		return 0;
- 
--	if (!sun4i_drv_node_is_frontend(node)) {
-+	/*
-+	 * If the device is either just a regular device, or an
-+	 * enabled frontend supported by the driver, we add it to our
-+	 * component list.
-+	 */
-+	if (!sun4i_drv_node_is_frontend(node) ||
-+	    (sun4i_drv_node_is_supported_frontend(node) &&
-+	     of_device_is_available(node))) {
- 		/* Add current component */
- 		DRM_DEBUG_DRIVER("Adding component %pOF\n", node);
- 		drm_of_component_match_add(dev, match, compare_of, node);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
-index a960c89270cc..9c26a345f85c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
-@@ -19,6 +19,7 @@
- 
- struct sun4i_drv {
- 	struct list_head	engine_list;
-+	struct list_head	frontend_list;
- 	struct list_head	tcon_list;
- 
- 	struct drm_fbdev_cma	*fbdev;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-new file mode 100644
-index 000000000000..ddf6cfa6dd23
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -0,0 +1,389 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2017 Free Electrons
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ */
-+#include <drm/drmP.h>
-+#include <drm/drm_gem_cma_helper.h>
-+#include <drm/drm_fb_cma_helper.h>
-+
-+#include <linux/clk.h>
-+#include <linux/component.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+
-+#include "sun4i_drv.h"
-+#include "sun4i_frontend.h"
-+
-+static const u32 sun4i_frontend_vert_coef[32] = {
-+	0x00004000, 0x000140ff, 0x00033ffe, 0x00043ffd,
-+	0x00063efc, 0xff083dfc, 0x000a3bfb, 0xff0d39fb,
-+	0xff0f37fb, 0xff1136fa, 0xfe1433fb, 0xfe1631fb,
-+	0xfd192ffb, 0xfd1c2cfb, 0xfd1f29fb, 0xfc2127fc,
-+	0xfc2424fc, 0xfc2721fc, 0xfb291ffd, 0xfb2c1cfd,
-+	0xfb2f19fd, 0xfb3116fe, 0xfb3314fe, 0xfa3611ff,
-+	0xfb370fff, 0xfb390dff, 0xfb3b0a00, 0xfc3d08ff,
-+	0xfc3e0600, 0xfd3f0400, 0xfe3f0300, 0xff400100,
-+};
-+
-+static const u32 sun4i_frontend_horz_coef[64] = {
-+	0x40000000, 0x00000000, 0x40fe0000, 0x0000ff03,
-+	0x3ffd0000, 0x0000ff05, 0x3ffc0000, 0x0000ff06,
-+	0x3efb0000, 0x0000ff08, 0x3dfb0000, 0x0000ff09,
-+	0x3bfa0000, 0x0000fe0d, 0x39fa0000, 0x0000fe0f,
-+	0x38fa0000, 0x0000fe10, 0x36fa0000, 0x0000fe12,
-+	0x33fa0000, 0x0000fd16, 0x31fa0000, 0x0000fd18,
-+	0x2ffa0000, 0x0000fd1a, 0x2cfa0000, 0x0000fc1e,
-+	0x29fa0000, 0x0000fc21, 0x27fb0000, 0x0000fb23,
-+	0x24fb0000, 0x0000fb26, 0x21fb0000, 0x0000fb29,
-+	0x1ffc0000, 0x0000fa2b, 0x1cfc0000, 0x0000fa2e,
-+	0x19fd0000, 0x0000fa30, 0x16fd0000, 0x0000fa33,
-+	0x14fd0000, 0x0000fa35, 0x11fe0000, 0x0000fa37,
-+	0x0ffe0000, 0x0000fa39, 0x0dfe0000, 0x0000fa3b,
-+	0x0afe0000, 0x0000fa3e, 0x08ff0000, 0x0000fb3e,
-+	0x06ff0000, 0x0000fb40, 0x05ff0000, 0x0000fc40,
-+	0x03ff0000, 0x0000fd41, 0x01ff0000, 0x0000fe42,
-+};
-+
-+static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
-+{
-+	int i;
-+
-+	for (i = 0; i < 32; i++) {
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
-+			     sun4i_frontend_horz_coef[2 * i]);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZCOEF0_REG(i),
-+			     sun4i_frontend_horz_coef[2 * i]);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF1_REG(i),
-+			     sun4i_frontend_horz_coef[2 * i + 1]);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZCOEF1_REG(i),
-+			     sun4i_frontend_horz_coef[2 * i + 1]);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTCOEF_REG(i),
-+			     sun4i_frontend_vert_coef[i]);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTCOEF_REG(i),
-+			     sun4i_frontend_vert_coef[i]);
-+	}
-+
-+	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+			   SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
-+			   SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
-+}
-+
-+int sun4i_frontend_init(struct sun4i_frontend *frontend)
-+{
-+	return pm_runtime_get_sync(frontend->dev);
-+}
-+EXPORT_SYMBOL(sun4i_frontend_init);
-+
-+void sun4i_frontend_exit(struct sun4i_frontend *frontend)
-+{
-+	pm_runtime_put(frontend->dev);
-+}
-+EXPORT_SYMBOL(sun4i_frontend_exit);
-+
-+void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
-+				  struct drm_plane *plane)
-+{
-+	struct drm_plane_state *state = plane->state;
-+	struct drm_framebuffer *fb = state->fb;
-+	dma_addr_t paddr;
-+
-+	/* Set the line width */
-+	DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
-+		     fb->pitches[0]);
-+
-+	/* Set the physical address of the buffer in memory */
-+	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
-+	paddr -= PHYS_OFFSET;
-+	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR0_REG, paddr);
-+}
-+EXPORT_SYMBOL(sun4i_frontend_update_buffer);
-+
-+static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
-+{
-+	switch (fmt) {
-+	case DRM_FORMAT_ARGB8888:
-+		*val = 5;
-+		return 0;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
-+{
-+	switch (fmt) {
-+	case DRM_FORMAT_XRGB8888:
-+	case DRM_FORMAT_ARGB8888:
-+		*val = 2;
-+		return 0;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
-+				  struct drm_plane *plane, uint32_t out_fmt)
-+{
-+	struct drm_plane_state *state = plane->state;
-+	struct drm_framebuffer *fb = state->fb;
-+	u32 out_fmt_val;
-+	u32 in_fmt_val;
-+	int ret;
-+
-+	ret = sun4i_frontend_drm_format_to_input_fmt(fb->format->format,
-+						     &in_fmt_val);
-+	if (ret) {
-+		DRM_DEBUG_DRIVER("Invalid input format\n");
-+		return ret;
-+	}
-+
-+	ret = sun4i_frontend_drm_format_to_output_fmt(out_fmt, &out_fmt_val);
-+	if (ret) {
-+		DRM_DEBUG_DRIVER("Invalid output format\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * I have no idea what this does exactly, but it seems to be
-+	 * related to the scaler FIR filter phase parameters.
-+	 */
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
-+
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
-+		     SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(1) |
-+		     SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
-+		     SUN4I_FRONTEND_INPUT_FMT_PS(1));
-+
-+	/*
-+	 * TODO: It look like the A31 and A80 at least will need the
-+	 * bit 7 (ALPHA_EN) enabled when using a format with alpha (so
-+	 * ARGB8888).
-+	 */
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
-+		     SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(sun4i_frontend_update_formats);
-+
-+void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
-+				 struct drm_plane *plane)
-+{
-+	struct drm_plane_state *state = plane->state;
-+
-+	/* Set height and width */
-+	DRM_DEBUG_DRIVER("Frontend size W: %u H: %u\n",
-+			 state->crtc_w, state->crtc_h);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_INSIZE_REG,
-+		     SUN4I_FRONTEND_INSIZE(state->src_h >> 16,
-+					   state->src_w >> 16));
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_INSIZE_REG,
-+		     SUN4I_FRONTEND_INSIZE(state->src_h >> 16,
-+					   state->src_w >> 16));
-+
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_OUTSIZE_REG,
-+		     SUN4I_FRONTEND_OUTSIZE(state->crtc_h, state->crtc_w));
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_OUTSIZE_REG,
-+		     SUN4I_FRONTEND_OUTSIZE(state->crtc_h, state->crtc_w));
-+
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZFACT_REG,
-+		     state->src_w / state->crtc_w);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZFACT_REG,
-+		     state->src_w / state->crtc_w);
-+
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTFACT_REG,
-+		     state->src_h / state->crtc_h);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTFACT_REG,
-+		     state->src_h / state->crtc_h);
-+
-+	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+			  SUN4I_FRONTEND_FRM_CTRL_REG_RDY,
-+			  SUN4I_FRONTEND_FRM_CTRL_REG_RDY);
-+}
-+EXPORT_SYMBOL(sun4i_frontend_update_coord);
-+
-+int sun4i_frontend_enable(struct sun4i_frontend *frontend)
-+{
-+	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+			  SUN4I_FRONTEND_FRM_CTRL_FRM_START,
-+			  SUN4I_FRONTEND_FRM_CTRL_FRM_START);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(sun4i_frontend_enable);
-+
-+static struct regmap_config sun4i_frontend_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.max_register	= 0x0a14,
-+};
-+
-+static int sun4i_frontend_bind(struct device *dev, struct device *master,
-+			 void *data)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sun4i_frontend *frontend;
-+	struct drm_device *drm = data;
-+	struct sun4i_drv *drv = drm->dev_private;
-+	struct resource *res;
-+	void __iomem *regs;
-+
-+	frontend = devm_kzalloc(dev, sizeof(*frontend), GFP_KERNEL);
-+	if (!frontend)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(dev, frontend);
-+	frontend->dev = dev;
-+	frontend->node = dev->of_node;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	regs = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(regs))
-+		return PTR_ERR(regs);
-+
-+	frontend->regs = devm_regmap_init_mmio(dev, regs,
-+					       &sun4i_frontend_regmap_config);
-+	if (IS_ERR(frontend->regs)) {
-+		dev_err(dev, "Couldn't create the frontend regmap\n");
-+		return PTR_ERR(frontend->regs);
-+	}
-+
-+	frontend->reset = devm_reset_control_get(dev, NULL);
-+	if (IS_ERR(frontend->reset)) {
-+		dev_err(dev, "Couldn't get our reset line\n");
-+		return PTR_ERR(frontend->reset);
-+	}
-+
-+	frontend->bus_clk = devm_clk_get(dev, "ahb");
-+	if (IS_ERR(frontend->bus_clk)) {
-+		dev_err(dev, "Couldn't get our bus clock\n");
-+		return PTR_ERR(frontend->bus_clk);
-+	}
-+
-+	frontend->mod_clk = devm_clk_get(dev, "mod");
-+	if (IS_ERR(frontend->mod_clk)) {
-+		dev_err(dev, "Couldn't get our mod clock\n");
-+		return PTR_ERR(frontend->mod_clk);
-+	}
-+
-+	frontend->ram_clk = devm_clk_get(dev, "ram");
-+	if (IS_ERR(frontend->ram_clk)) {
-+		dev_err(dev, "Couldn't get our ram clock\n");
-+		return PTR_ERR(frontend->ram_clk);
-+	}
-+
-+	list_add_tail(&frontend->list, &drv->frontend_list);
-+	pm_runtime_enable(dev);
-+
-+	return 0;
-+}
-+
-+static void sun4i_frontend_unbind(struct device *dev, struct device *master,
-+			    void *data)
-+{
-+	struct sun4i_frontend *frontend = dev_get_drvdata(dev);
-+
-+	list_del(&frontend->list);
-+	pm_runtime_force_suspend(dev);
-+}
-+
-+static const struct component_ops sun4i_frontend_ops = {
-+	.bind	= sun4i_frontend_bind,
-+	.unbind	= sun4i_frontend_unbind,
-+};
-+
-+static int sun4i_frontend_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &sun4i_frontend_ops);
-+}
-+
-+static int sun4i_frontend_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &sun4i_frontend_ops);
-+
-+	return 0;
-+}
-+
-+static int sun4i_frontend_runtime_resume(struct device *dev)
-+{
-+	struct sun4i_frontend *frontend = dev_get_drvdata(dev);
-+	int ret;
-+
-+	clk_set_rate(frontend->mod_clk, 300000000);
-+
-+	clk_prepare_enable(frontend->bus_clk);
-+	clk_prepare_enable(frontend->mod_clk);
-+	clk_prepare_enable(frontend->ram_clk);
-+
-+	ret = reset_control_reset(frontend->reset);
-+	if (ret) {
-+		dev_err(dev, "Couldn't reset our device\n");
-+		return ret;
-+	}
-+
-+	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_EN_REG,
-+			   SUN4I_FRONTEND_EN_EN,
-+			   SUN4I_FRONTEND_EN_EN);
-+
-+	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_BYPASS_REG,
-+			   SUN4I_FRONTEND_BYPASS_CSC_EN,
-+			   SUN4I_FRONTEND_BYPASS_CSC_EN);
-+
-+	sun4i_frontend_scaler_init(frontend);
-+
-+	return 0;
-+}
-+
-+static int sun4i_frontend_runtime_suspend(struct device *dev)
-+{
-+	struct sun4i_frontend *frontend = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(frontend->ram_clk);
-+	clk_disable_unprepare(frontend->mod_clk);
-+	clk_disable_unprepare(frontend->bus_clk);
-+
-+	reset_control_assert(frontend->reset);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops sun4i_frontend_pm_ops = {
-+	.runtime_resume		= sun4i_frontend_runtime_resume,
-+	.runtime_suspend	= sun4i_frontend_runtime_suspend,
-+};
-+
-+const struct of_device_id sun4i_frontend_of_table[] = {
-+	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
-+	{ }
-+};
-+EXPORT_SYMBOL(sun4i_frontend_of_table);
-+MODULE_DEVICE_TABLE(of, sun4i_frontend_of_table);
-+
-+static struct platform_driver sun4i_frontend_driver = {
-+	.probe		= sun4i_frontend_probe,
-+	.remove		= sun4i_frontend_remove,
-+	.driver		= {
-+		.name		= "sun4i-frontend",
-+		.of_match_table	= sun4i_frontend_of_table,
-+		.pm		= &sun4i_frontend_pm_ops,
-+	},
-+};
-+module_platform_driver(sun4i_frontend_driver);
-+
-+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
-+MODULE_DESCRIPTION("Allwinner A10 Display Engine Frontend Driver");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-new file mode 100644
-index 000000000000..02661ce81f3e
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -0,0 +1,99 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2017 Free Electrons
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ */
-+
-+#ifndef _SUN4I_FRONTEND_H_
-+#define _SUN4I_FRONTEND_H_
-+
-+#include <linux/list.h>
-+
-+#define SUN4I_FRONTEND_EN_REG			0x000
-+#define SUN4I_FRONTEND_EN_EN				BIT(0)
-+
-+#define SUN4I_FRONTEND_FRM_CTRL_REG		0x004
-+#define SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL	BIT(23)
-+#define SUN4I_FRONTEND_FRM_CTRL_FRM_START		BIT(16)
-+#define SUN4I_FRONTEND_FRM_CTRL_COEF_RDY		BIT(1)
-+#define SUN4I_FRONTEND_FRM_CTRL_REG_RDY			BIT(0)
-+
-+#define SUN4I_FRONTEND_BYPASS_REG		0x008
-+#define SUN4I_FRONTEND_BYPASS_CSC_EN			BIT(1)
-+
-+#define SUN4I_FRONTEND_BUF_ADDR0_REG		0x020
-+
-+#define SUN4I_FRONTEND_LINESTRD0_REG		0x040
-+
-+#define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(mod)		((mod) << 8)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(fmt)		((fmt) << 4)
-+#define SUN4I_FRONTEND_INPUT_FMT_PS(ps)			(ps)
-+
-+#define SUN4I_FRONTEND_OUTPUT_FMT_REG		0x05c
-+#define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(fmt)		(fmt)
-+
-+#define SUN4I_FRONTEND_CH0_INSIZE_REG		0x100
-+#define SUN4I_FRONTEND_INSIZE(h, w)			((((h) - 1) << 16) | (((w) - 1)))
-+
-+#define SUN4I_FRONTEND_CH0_OUTSIZE_REG		0x104
-+#define SUN4I_FRONTEND_OUTSIZE(h, w)			((((h) - 1) << 16) | (((w) - 1)))
-+
-+#define SUN4I_FRONTEND_CH0_HORZFACT_REG		0x108
-+#define SUN4I_FRONTEND_HORZFACT(i, f)			(((i) << 16) | (f))
-+
-+#define SUN4I_FRONTEND_CH0_VERTFACT_REG		0x10c
-+#define SUN4I_FRONTEND_VERTFACT(i, f)			(((i) << 16) | (f))
-+
-+#define SUN4I_FRONTEND_CH0_HORZPHASE_REG	0x110
-+#define SUN4I_FRONTEND_CH0_VERTPHASE0_REG	0x114
-+#define SUN4I_FRONTEND_CH0_VERTPHASE1_REG	0x118
-+
-+#define SUN4I_FRONTEND_CH1_INSIZE_REG		0x200
-+#define SUN4I_FRONTEND_CH1_OUTSIZE_REG		0x204
-+#define SUN4I_FRONTEND_CH1_HORZFACT_REG		0x208
-+#define SUN4I_FRONTEND_CH1_VERTFACT_REG		0x20c
-+
-+#define SUN4I_FRONTEND_CH1_HORZPHASE_REG	0x210
-+#define SUN4I_FRONTEND_CH1_VERTPHASE0_REG	0x214
-+#define SUN4I_FRONTEND_CH1_VERTPHASE1_REG	0x218
-+
-+#define SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i)	(0x400 + i * 4)
-+#define SUN4I_FRONTEND_CH0_HORZCOEF1_REG(i)	(0x480 + i * 4)
-+#define SUN4I_FRONTEND_CH0_VERTCOEF_REG(i)	(0x500 + i * 4)
-+#define SUN4I_FRONTEND_CH1_HORZCOEF0_REG(i)	(0x600 + i * 4)
-+#define SUN4I_FRONTEND_CH1_HORZCOEF1_REG(i)	(0x680 + i * 4)
-+#define SUN4I_FRONTEND_CH1_VERTCOEF_REG(i)	(0x700 + i * 4)
-+
-+struct clk;
-+struct device_node;
-+struct drm_plane;
-+struct regmap;
-+struct reset_control;
-+
-+struct sun4i_frontend {
-+	struct list_head	list;
-+	struct device		*dev;
-+	struct device_node	*node;
-+
-+	struct clk		*bus_clk;
-+	struct clk		*mod_clk;
-+	struct clk		*ram_clk;
-+	struct regmap		*regs;
-+	struct reset_control	*reset;
-+};
-+
-+extern const struct of_device_id sun4i_frontend_of_table[];
-+
-+int sun4i_frontend_init(struct sun4i_frontend *frontend);
-+void sun4i_frontend_exit(struct sun4i_frontend *frontend);
-+int sun4i_frontend_enable(struct sun4i_frontend *frontend);
-+
-+void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
-+				  struct drm_plane *plane);
-+void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
-+				 struct drm_plane *plane);
-+int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
-+				  struct drm_plane *plane, uint32_t out_fmt);
-+
-+#endif /* _SUN4I_FRONTEND_H_ */
--- 
-git-series 0.9.1
+> +	struct clk *parent;
+> +	struct dmtimer_platform_data *pdata;
+> +
+> +	if (unlikely(!timer))
+> +		return -EINVAL;
+> +
+> +	pdata = timer->pdev->dev.platform_data;
+> +
+> +	if (source < 0 || source >= 3)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * FIXME: Used for OMAP1 devices only because they do not currently
+> +	 * use the clock framework to set the parent clock. To be removed
+> +	 * once OMAP1 migrated to using clock framework for dmtimers
+> +	 */
+> +	if (pdata && pdata->set_timer_src)
+> +		return pdata->set_timer_src(timer->pdev, source);
+> +
+> +	if (IS_ERR(timer->fclk))
+> +		return -EINVAL;
+Souldn't this check be done at the beginning of the function?
+
+> +
+> +#if defined(CONFIG_COMMON_CLK)
+> +	/* Check if the clock has configurable parents */
+> +	if (clk_hw_get_num_parents(__clk_get_hw(timer->fclk)) < 2)
+> +		return 0;
+> +#endif
+> +
+> +	switch (source) {
+> +	case OMAP_TIMER_SRC_SYS_CLK:
+> +		parent_name = "timer_sys_ck";
+> +		break;
+> +
+> +	case OMAP_TIMER_SRC_32_KHZ:
+> +		parent_name = "timer_32k_ck";
+> +		break;
+> +
+> +	case OMAP_TIMER_SRC_EXT_CLK:
+> +		parent_name = "timer_ext_ck";
+> +		break;
+> +	}
+> +
+> +	parent = clk_get(&timer->pdev->dev, parent_name);
+> +	if (IS_ERR(parent)) {
+> +		pr_err("%s: %s not found\n", __func__, parent_name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = clk_set_parent(timer->fclk, parent);
+> +	if (ret < 0)
+> +		pr_err("%s: failed to set %s as parent\n", __func__,
+> +			parent_name);
+> +
+> +	clk_put(parent);
+> +
+> +	return ret;
+> +}
+> +
+> +static void omap_dm_timer_enable(struct omap_dm_timer *timer)
+> +{
+> +	int c;
+> +
+> +	pm_runtime_get_sync(&timer->pdev->dev);
+> +
+> +	if (!(timer->capability & OMAP_TIMER_ALWON)) {
+> +		if (timer->get_context_loss_count) {
+> +			c = timer->get_context_loss_count(&timer->pdev->dev);
+> +			if (c != timer->ctx_loss_count) {
+> +				omap_timer_restore_context(timer);
+> +				timer->ctx_loss_count = c;
+> +			}
+> +		} else {
+> +			omap_timer_restore_context(timer);
+> +		}
+> +	}
+> +}
+> +
+> +static void omap_dm_timer_disable(struct omap_dm_timer *timer)
+> +{
+> +	pm_runtime_put_sync(&timer->pdev->dev);
+> +}
+> +
+>  static int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>  {
+>  	int rc;
+> @@ -298,16 +384,16 @@ static struct omap_dm_timer *_omap_dm_timer_request(int req_type, void *data)
+>  	return timer;
+>  }
+>  
+> -struct omap_dm_timer *omap_dm_timer_request(void)
+> +static struct omap_dm_timer *omap_dm_timer_request(void)
+>  {
+>  	return _omap_dm_timer_request(REQUEST_ANY, NULL);
+>  }
+>  
+> -struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+> +static struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+>  {
+>  	/* Requesting timer by ID is not supported when device tree is used */
+>  	if (of_have_populated_dt()) {
+> -		pr_warn("%s: Please use omap_dm_timer_request_by_cap/node()\n",
+> +		pr_warn("%s: Please use omap_dm_timer_request_by_node()\n",
+>  			__func__);
+>  		return NULL;
+>  	}
+> @@ -336,7 +422,7 @@ struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap)
+>   * Request a timer based upon a device node pointer. Returns pointer to
+>   * timer handle on success and a NULL pointer on failure.
+>   */
+> -struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
+> +static struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
+>  {
+>  	if (!np)
+>  		return NULL;
+> @@ -344,7 +430,7 @@ struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np)
+>  	return _omap_dm_timer_request(REQUEST_BY_NODE, np);
+>  }
+>  
+> -int omap_dm_timer_free(struct omap_dm_timer *timer)
+> +static int omap_dm_timer_free(struct omap_dm_timer *timer)
+>  {
+>  	if (unlikely(!timer))
+>  		return -EINVAL;
+> @@ -356,30 +442,6 @@ int omap_dm_timer_free(struct omap_dm_timer *timer)
+>  	return 0;
+>  }
+>  
+> -void omap_dm_timer_enable(struct omap_dm_timer *timer)
+> -{
+> -	int c;
+> -
+> -	pm_runtime_get_sync(&timer->pdev->dev);
+> -
+> -	if (!(timer->capability & OMAP_TIMER_ALWON)) {
+> -		if (timer->get_context_loss_count) {
+> -			c = timer->get_context_loss_count(&timer->pdev->dev);
+> -			if (c != timer->ctx_loss_count) {
+> -				omap_timer_restore_context(timer);
+> -				timer->ctx_loss_count = c;
+> -			}
+> -		} else {
+> -			omap_timer_restore_context(timer);
+> -		}
+> -	}
+> -}
+> -
+> -void omap_dm_timer_disable(struct omap_dm_timer *timer)
+> -{
+> -	pm_runtime_put_sync(&timer->pdev->dev);
+> -}
+> -
+>  int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
+>  {
+>  	if (timer)
+> @@ -424,7 +486,7 @@ __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
+>  
+>  #else
+>  
+> -struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+> +static struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
+>  {
+>  	if (timer && !IS_ERR(timer->fclk))
+>  		return timer->fclk;
+> @@ -451,7 +513,7 @@ int omap_dm_timer_trigger(struct omap_dm_timer *timer)
+>  	return 0;
+>  }
+>  
+> -int omap_dm_timer_start(struct omap_dm_timer *timer)
+> +static int omap_dm_timer_start(struct omap_dm_timer *timer)
+>  {
+>  	u32 l;
+>  
+> @@ -471,7 +533,7 @@ int omap_dm_timer_start(struct omap_dm_timer *timer)
+>  	return 0;
+>  }
+>  
+> -int omap_dm_timer_stop(struct omap_dm_timer *timer)
+> +static int omap_dm_timer_stop(struct omap_dm_timer *timer)
+>  {
+>  	unsigned long rate = 0;
+>  
+> @@ -494,70 +556,8 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+>  	return 0;
+>  }
+>  
+> -int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+> -{
+> -	int ret;
+> -	char *parent_name = NULL;
+> -	struct clk *parent;
+> -	struct dmtimer_platform_data *pdata;
+> -
+> -	if (unlikely(!timer))
+> -		return -EINVAL;
+> -
+> -	pdata = timer->pdev->dev.platform_data;
+> -
+> -	if (source < 0 || source >= 3)
+> -		return -EINVAL;
+> -
+> -	/*
+> -	 * FIXME: Used for OMAP1 devices only because they do not currently
+> -	 * use the clock framework to set the parent clock. To be removed
+> -	 * once OMAP1 migrated to using clock framework for dmtimers
+> -	 */
+> -	if (pdata && pdata->set_timer_src)
+> -		return pdata->set_timer_src(timer->pdev, source);
+> -
+> -	if (IS_ERR(timer->fclk))
+> -		return -EINVAL;
+> -
+> -#if defined(CONFIG_COMMON_CLK)
+> -	/* Check if the clock has configurable parents */
+> -	if (clk_hw_get_num_parents(__clk_get_hw(timer->fclk)) < 2)
+> -		return 0;
+> -#endif
+> -
+> -	switch (source) {
+> -	case OMAP_TIMER_SRC_SYS_CLK:
+> -		parent_name = "timer_sys_ck";
+> -		break;
+> -
+> -	case OMAP_TIMER_SRC_32_KHZ:
+> -		parent_name = "timer_32k_ck";
+> -		break;
+> -
+> -	case OMAP_TIMER_SRC_EXT_CLK:
+> -		parent_name = "timer_ext_ck";
+> -		break;
+> -	}
+> -
+> -	parent = clk_get(&timer->pdev->dev, parent_name);
+> -	if (IS_ERR(parent)) {
+> -		pr_err("%s: %s not found\n", __func__, parent_name);
+> -		return -EINVAL;
+> -	}
+> -
+> -	ret = clk_set_parent(timer->fclk, parent);
+> -	if (ret < 0)
+> -		pr_err("%s: failed to set %s as parent\n", __func__,
+> -			parent_name);
+> -
+> -	clk_put(parent);
+> -
+> -	return ret;
+> -}
+> -
+> -int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+> -			    unsigned int load)
+> +static int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+> +				  unsigned int load)
+>  {
+>  	u32 l;
+>  
+> @@ -609,9 +609,8 @@ int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+>  	timer->context.tcrr = load;
+>  	return 0;
+>  }
+> -
+> -int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+> -			     unsigned int match)
+> +static int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+> +				   unsigned int match)
+>  {
+>  	u32 l;
+>  
+> @@ -634,8 +633,8 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
+>  	return 0;
+>  }
+>  
+> -int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+> -			   int toggle, int trigger)
+> +static int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+> +				 int toggle, int trigger)
+>  {
+>  	u32 l;
+>  
+> @@ -659,7 +658,8 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on,
+>  	return 0;
+>  }
+>  
+> -int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+> +static int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer,
+> +					int prescaler)
+>  {
+>  	u32 l;
+>  
+> @@ -681,8 +681,8 @@ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler)
+>  	return 0;
+>  }
+>  
+> -int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+> -				  unsigned int value)
+> +static int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+> +					unsigned int value)
+>  {
+>  	if (unlikely(!timer))
+>  		return -EINVAL;
+> @@ -704,7 +704,7 @@ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+>   *
+>   * Disables the specified timer interrupts for a timer.
+>   */
+> -int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+> +static int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+>  {
+>  	u32 l = mask;
+>  
+> @@ -727,7 +727,7 @@ int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
+>  	return 0;
+>  }
+>  
+> -unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+> +static unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+>  {
+>  	unsigned int l;
+>  
+> @@ -741,7 +741,7 @@ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+>  	return l;
+>  }
+>  
+> -int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+> +static int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+>  {
+>  	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev)))
+>  		return -EINVAL;
+> @@ -751,7 +751,7 @@ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
+>  	return 0;
+>  }
+>  
+> -unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+> +static unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+>  {
+>  	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+>  		pr_err("%s: timer not iavailable or enabled.\n", __func__);
+> @@ -761,7 +761,7 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
+>  	return __omap_dm_timer_read_counter(timer, timer->posted);
+>  }
+>  
+> -int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+> +static int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value)
+>  {
+>  	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+>  		pr_err("%s: timer not available or enabled.\n", __func__);
+> diff --git a/include/clocksource/dmtimer.h b/include/clocksource/dmtimer.h
+> index 862ad62dab9d..ce596172a93a 100644
+> --- a/include/clocksource/dmtimer.h
+> +++ b/include/clocksource/dmtimer.h
+> @@ -125,37 +125,13 @@ struct omap_dm_timer {
+>  };
+>  
+>  int omap_dm_timer_reserve_systimer(int id);
+> -struct omap_dm_timer *omap_dm_timer_request(void);
+> -struct omap_dm_timer *omap_dm_timer_request_specific(int timer_id);
+>  struct omap_dm_timer *omap_dm_timer_request_by_cap(u32 cap);
+> -struct omap_dm_timer *omap_dm_timer_request_by_node(struct device_node *np);
+> -int omap_dm_timer_free(struct omap_dm_timer *timer);
+> -void omap_dm_timer_enable(struct omap_dm_timer *timer);
+> -void omap_dm_timer_disable(struct omap_dm_timer *timer);
+>  
+>  int omap_dm_timer_get_irq(struct omap_dm_timer *timer);
+>  
+>  u32 omap_dm_timer_modify_idlect_mask(u32 inputmask);
+> -struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer);
+>  
+>  int omap_dm_timer_trigger(struct omap_dm_timer *timer);
+> -int omap_dm_timer_start(struct omap_dm_timer *timer);
+> -int omap_dm_timer_stop(struct omap_dm_timer *timer);
+> -
+> -int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source);
+> -int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload, unsigned int value);
+> -int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload, unsigned int value);
+> -int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable, unsigned int match);
+> -int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on, int toggle, int trigger);
+> -int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
+> -
+> -int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
+> -int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask);
+> -
+> -unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
+> -int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
+> -unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer);
+> -int omap_dm_timer_write_counter(struct omap_dm_timer *timer, unsigned int value);
+>  
+>  int omap_dm_timers_active(void);
+>  
+> 
