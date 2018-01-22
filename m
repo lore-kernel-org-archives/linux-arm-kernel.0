@@ -1,42 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 11:35:42 +0100
-Subject: [PATCH v2 13/19] drm/sun4i: backend: Set a default zpos in our reset
- hook
+Date: Mon, 22 Jan 2018 11:35:41 +0100
+Subject: [PATCH v2 12/19] drm/sun4i: backend: Move the coord function in the
+ shared part
 In-Reply-To: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b6a183234f0ad5a9a58c780c9cabbe29cbf40888.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2cd57bcf13652109da7bd5bbe12fa1d29429f02f.1516617243.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The our plane state zpos value will be set only if there's an existing
-state attached to the plane when creating the property.
-
-However, this is not the case during the probe, and we therefore need to
-put our default value in our reset hook.
+The function supposed to update a plane's coordinates is called in both
+branches of our function. Let's move it out the if statement.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index c448cb6b9fa9..03549646528a 100644
+index f03da16eb92a..c448cb6b9fa9 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -28,6 +28,7 @@ struct sun4i_plane_desc {
- 
- static void sun4i_backend_layer_reset(struct drm_plane *plane)
- {
-+	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
- 	struct sun4i_layer_state *state;
- 
- 	if (plane->state) {
-@@ -43,6 +44,7 @@ static void sun4i_backend_layer_reset(struct drm_plane *plane)
- 	if (state) {
- 		plane->state = &state->state;
- 		plane->state->plane = plane;
-+		plane->state->zpos = layer->id;
+@@ -106,14 +106,13 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+ 					      DRM_FORMAT_ARGB8888);
+ 		sun4i_backend_update_layer_frontend(backend, layer->id,
+ 						    DRM_FORMAT_ARGB8888);
+-		sun4i_backend_update_layer_coord(backend, layer->id, plane);
+ 		sun4i_frontend_enable(frontend);
+ 	} else {
+-		sun4i_backend_update_layer_coord(backend, layer->id, plane);
+ 		sun4i_backend_update_layer_formats(backend, layer->id, plane);
+ 		sun4i_backend_update_layer_buffer(backend, layer->id, plane);
  	}
+ 
++	sun4i_backend_update_layer_coord(backend, layer->id, plane);
+ 	sun4i_backend_layer_enable(backend, layer->id, true);
  }
  
 -- 
