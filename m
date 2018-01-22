@@ -1,29 +1,43 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 22 Jan 2018 15:49:43 -0600
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <20180118150951.28964-1-prarit@redhat.com>
-References: <20180118150951.28964-1-prarit@redhat.com>
-Message-ID: <745c9e29-f0b4-775b-28f7-8712cdc90fe1@codeaurora.org>
+From: michael.weiser@gmx.de (Michael Weiser)
+Date: Mon, 22 Jan 2018 22:20:24 +0100
+Subject: [PATCH 0/2] arm64: Unimplemented syscall kernel message
+In-Reply-To: <20180122131851.GA28638@arm.com>
+References: <20180122131851.GA28638@arm.com>
+Message-ID: <20180122212026.26262-1-michael.weiser@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2018 09:09 AM, Prarit Bhargava wrote:
->   	if (acpi_disabled) {
-> -		if (earlycon_init_is_deferred)
-> +		if (earlycon_acpi_spcr_enable)
+Hi Will,
 
-This patch works for me, so I can ACK it, but first you might want to 
-rename earlycon_acpi_spcr_enable, because these two lines don't make 
-much sense.
+I'm not pretending to fully understand the semantics of what I've done
+but I've tried to make a start on implementing both changes anyway.
 
-"If ACPI is disabled, and ACPI SCPR is enabled, then ...."
+The first is straightforward in dropping the offending log message from
+do_ni_syscall().
 
-If ACPI is disabled, then how can a variable called 
-"earlycon_acpi_spcr_enable" be true?
+The second mirrors arm behaviour in compat_arm_syscall() in raising
+SIGILL for (most) unimplemented syscalls. I've intentionally kept the
+arm message format in case anyone has a script filtering for it.
 
-Would it make more sense to rename it to earlycon_spcr_enable?
+Syncing __dump_instr() with arm to support thumb instructions was done
+on the assumption that arm-eabi code may obviously contain thumb
+instructions.
+
+Both are compile-tested as well as manually prodded with some randomly
+chosen syscall numbers from aarch64 and arm-eabi binaries while running
+under qemu-system-aarch64.
+
+Thanks,
+Michael
+
+Michael Weiser (2):
+  arm64: Remove unimplemented syscall log message
+  arm64: Mirror arm for unimplemented compat syscalls
+
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/kernel/sys_compat.c       | 27 ++++++++++++++++++++++++++-
+ arch/arm64/kernel/traps.c            | 22 ++++++++++------------
+ 3 files changed, 37 insertions(+), 13 deletions(-)
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.16.0
