@@ -1,26 +1,37 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Mon, 22 Jan 2018 10:15:01 +0800
-Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <1f4b3c0d-1414-0012-a072-f4a11f432c21@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-9-jeffy.chen@rock-chips.com>
- <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
- <5A60AE41.2050101@rock-chips.com>
- <1f4b3c0d-1414-0012-a072-f4a11f432c21@rock-chips.com>
-Message-ID: <5A654925.9020203@rock-chips.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 22 Jan 2018 11:28:54 +0900
+Subject: [PATCH] PCI: exynos: fix the potential null pointer dereference
+References: <CGME20180122022856epcas1p494a9efeae478b299e3e8006adad71e6a@epcas1p4.samsung.com>
+Message-ID: <20180122022854.3634-1-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+Before calling the callback function, it needs to check whether
+init_clk_resources is assigned or not.
+Otherwise, it can be occurred the NULL pointer dereference when
+init_clk_resources is not assigned.
 
-On 01/22/2018 09:18 AM, Randy Li wrote:
->>
-> Also the power domain driver could manage the clocks as well, I would
-> suggest to use pm_runtime_*.
+Even though init_clk_resources is assigned now, it needs to prevent the
+potential NULL pointer dereference in future.
 
-actually the clocks required by pm domain may not be the same as what we 
-want to control here, there might be some clocks only be needed when 
-accessing mmu registers.
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+---
+ drivers/pci/dwc/pci-exynos.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-but i'm not very sure about that, will confirm it with Simon Xue.
+diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+index 56f32aeebd0a..39f08881f9a4 100644
+--- a/drivers/pci/dwc/pci-exynos.c
++++ b/drivers/pci/dwc/pci-exynos.c
+@@ -499,7 +499,8 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
+ 			return ret;
+ 	}
+ 
+-	if (ep->ops && ep->ops->get_clk_resources) {
++	if (ep->ops && ep->ops->get_clk_resources &&
++			ep->ops->init_clk_resources) {
+ 		ret = ep->ops->get_clk_resources(ep);
+ 		if (ret)
+ 			return ret;
+-- 
+2.15.1
