@@ -1,39 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 14:26:51 +0100
-Subject: [PATCH] clk: sunxi-ng: remove select on obsolete SUNXI_CCU_X
- kconfig name
-In-Reply-To: <20180119141906.7339-1-clabbe.montjoie@gmail.com>
-References: <20180119141906.7339-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180122132651.fuhkwwa43ewrzqzq@flea.lan>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 22 Jan 2018 21:28:52 +0800
+Subject: [PATCH v4 08/13] drm/sun4i: Add a driver for the display frontend
+In-Reply-To: <029cdc3478bf89d422f5e8d9e600baf5e48ce4db.1516613040.git-series.maxime.ripard@free-electrons.com>
+References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
+ <029cdc3478bf89d422f5e8d9e600baf5e48ce4db.1516613040.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64jwNkF1LmEF3Am0Kf7pFevDB1FOka574-F8zh=Phr-RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 03:19:06PM +0100, Corentin Labbe wrote:
-> The following symbols:
-> SUNXI_CCU_DIV
-> SUNXI_CCU_MULT
-> SUNXI_CCU_NK
-> SUNXI_CCU_NKM
-> SUNXI_CCU_NM
-> SUNXI_CCU_MP
-> SUNXI_CCU_PHASE
-> were removed with the commit 06e226c7fb23 ("clk: sunxi-ng: Move all clock types to a library")
-> So selecting them is useless.
-> 
-> Fixes: c84f5683f6e9 ("clk: sunxi-ng: Add sun4i/sun7i CCU driver")
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+On Mon, Jan 22, 2018 at 5:25 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The display frontend is an hardware block that can be used to implement
+> some more advanced features like hardware scaling or colorspace
+> conversions. It can also be used to implement the output format of the VPU.
+>
+> Let's create a minimal driver for it that will only enable the hardware
+> scaling features.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Queued for 4.17, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/429bc64f/attachment.sig>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
