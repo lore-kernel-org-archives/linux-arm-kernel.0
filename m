@@ -1,255 +1,90 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 22 Jan 2018 09:07:29 +0200
-Subject: [PATCHv2 15/15] clk: ti: convert to use proper register
- definition for all accesses
-In-Reply-To: <CAHCN7xJJ9U9ZS-Qs1MXLuxJzXJtejBmx_P=v+ERfiAehYKP_7w@mail.gmail.com>
-References: <1489236606-24023-1-git-send-email-t-kristo@ti.com>
- <1489236606-24023-16-git-send-email-t-kristo@ti.com>
- <CAHCN7x+oKEmXBpogy4VOB8UgmTd6+X5fBiP66yzUqXmvDWdqaw@mail.gmail.com>
- <6b4c5bf2-1260-0e79-0414-9870f21e4a75@ti.com>
- <CAHCN7xLaP-th=vAzN8C1QXstf3c5SP4JADAZZXTb1Nd6N6QdsQ@mail.gmail.com>
- <20180117211907.GE4042@atomide.com>
- <CAHCN7xJ-NaKoeZOqrdc48fFCLNQvm_uRXC0ErtiG+Ac86a14+w@mail.gmail.com>
- <4f0f185a-2890-3747-7060-1f5b5a77022a@ti.com>
- <CAHCN7x+hkCyrj1pH7f5DQia-1QgF3g-idAo0Sd-vY6u8iLufWA@mail.gmail.com>
- <cee43b44-1de6-a317-e89a-57f86607df86@ti.com>
- <CAHCN7xL0Y8z+QhCQC8GrDeqiiHPQwnemR5mwJYEGMxUPFZfe6Q@mail.gmail.com>
- <5cffb571-f3b0-1632-9f5c-d55e6068ce4f@ti.com>
- <CAHCN7xJJ9U9ZS-Qs1MXLuxJzXJtejBmx_P=v+ERfiAehYKP_7w@mail.gmail.com>
-Message-ID: <bd59e170-fff2-d431-f9af-3082ad36e891@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 22 Jan 2018 08:27:17 +0100
+Subject: [PATCH] mmc: davinci: dont' use module_platform_driver_probe()
+In-Reply-To: <1516565376-9960-1-git-send-email-david@lechnology.com>
+References: <1516565376-9960-1-git-send-email-david@lechnology.com>
+Message-ID: <CAPDyKFqgSc6Qbawi5hFj8MRWbd5iLXim4FnWw_ReLnjD2svZkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/18 18:43, Adam Ford wrote:
-> On Fri, Jan 19, 2018 at 3:42 AM, Tero Kristo <t-kristo@ti.com> wrote:
->> On 18/01/18 16:12, Adam Ford wrote:
->>>
->>> On Thu, Jan 18, 2018 at 7:29 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>>
->>>> On 18/01/18 15:26, Adam Ford wrote:
->>>>>
->>>>>
->>>>> On Thu, Jan 18, 2018 at 1:34 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>>>>
->>>>>>
->>>>>> On 17/01/18 23:44, Adam Ford wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> On Wed, Jan 17, 2018 at 3:19 PM, Tony Lindgren <tony@atomide.com>
->>>>>>> wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> * Adam Ford <aford173@gmail.com> [180117 15:15]:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> On Wed, Jan 17, 2018 at 8:02 AM, Tero Kristo <t-kristo@ti.com>
->>>>>>>>> wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> On 17/01/18 15:27, Adam Ford wrote:
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> On Sat, Mar 11, 2017 at 6:50 AM, Tero Kristo <t-kristo@ti.com>
->>>>>>>>>>> wrote:
->>>>>>>>>>>>
->>>>>>>>>>>>
->>>>>>>>>>>>
->>>>>>>>>>>>
->>>>>>>>>>>> Currently, TI clock driver uses an encapsulated struct that is
->>>>>>>>>>>> cast
->>>>>>>>>>>> into
->>>>>>>>>>>> a void pointer to store all register addresses. This can be
->>>>>>>>>>>> considered
->>>>>>>>>>>> as rather nasty hackery, and prevents from expanding the register
->>>>>>>>>>>> address field also. Instead, replace all the code to use proper
->>>>>>>>>>>> struct
->>>>>>>>>>>> in place for this, which contains all the previously used data.
->>>>>>>>>>>>
->>>>>>>>>>>> This patch is rather large as it is touching multiple files, but
->>>>>>>>>>>> this
->>>>>>>>>>>> can't be split up as we need to avoid any boot breakage.
->>>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> I know it's late coming, but according to git bisect, this patch
->>>>>>>>>>> is
->>>>>>>>>>> causing some problems with Logic PD Torpedo 37xx Dev kit.
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Oh reporting bugs is never too late, thanks for posting this out.
->>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> It it is a DM3730 that has a WL1283 chipset attached to the SDIO
->>>>>>>>>>> interface on MMC3.  The driver seems to load properly, but when
->>>>>>>>>>> loading wpa_supplicant to activate the WL1283, we get a giant
->>>>>>>>>>> crash.
->>>>>>>>>>> I checked kernel revisions starting at 4.14 and working back to
->>>>>>>>>>> when
->>>>>>>>>>> it worked, then used git bisect from there.
->>>>>>>>>>>
->>>>>>>>>>> I am hoping it might be a simple fix for something that just needs
->>>>>>>>>>> to
->>>>>>>>>>> get added or tweaked in the device tree.
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> I don't have access to the specific hw, but can you try to dig out
->>>>>>>>>> which
->>>>>>>>>> hwmod is causing the crash? Just print out the oh->name from the
->>>>>>>>>> _wait_softreset_complete. That would help root causing the issue.
->>>>>>>>>>
->>>>>>>>>
->>>>>>>>> With one small patch, I was able to make it work again.
->>>>>>>>>
->>>>>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c
->>>>>>>>> b/arch/arm/mach-omap2/omap_hwmod.c
->>>>>>>>> index 2dbd632..ed1f625 100644
->>>>>>>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
->>>>>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
->>>>>>>>> @@ -477,7 +477,7 @@ static int _wait_softreset_complete(struct
->>>>>>>>> omap_hwmod *oh)
->>>>>>>>>             int c = 0;
->>>>>>>>>
->>>>>>>>>             sysc = oh->class->sysc;
->>>>>>>>> -
->>>>>>>>> +pr_warn("_wait_softreset_complete: %s\n", oh->name);
->>>>>>>>>             if (sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
->>>>>>>>>                     omap_test_timeout((omap_hwmod_read(oh,
->>>>>>>>> sysc->syss_offs)
->>>>>>>>>                                        & SYSS_RESETDONE_MASK),
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> This leads me to believe that the omap_test_timeout functions might
->>>>>>>>> not be working quite right.
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> There may be a srst_udelay needed for some module, see commit
->>>>>>>> ebf244148092 ("ARM: OMAP2+: Use srst_udelay for USB on dm814x")
->>>>>>>> for example.
->>>>>>>>
->>>>>>>> You might be able to find which module it is by commenting out
->>>>>>>> postcore_initcall_sync(omap3_l3_init) in drivers/bus/omap_l3_smx.c
->>>>>>>> temporarily as the system will most likely hang right there.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> I commented out that line as you suggested, but the system boots as
->>>>>>> normal and I get the crash (as normal)
->>>>>>>
->>>>>>> I am looking through the DM3730 and OMAP3630 TRM now.  Any thought on
->>>>>>> a keyword search I should use to see which hwmods might require
->>>>>>> srst_udelay?
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> Looking at the log you provided, it looks like only mmc1, mmc3 and i2c1
->>>>>> are
->>>>>> reset during the wlan probe. Based on the prints coming out in the
->>>>>> failing
->>>>>> case, it looks like the culprit might be mmc3 for some reason.
->>>>>>
->>>>>> [   18.239746] _wait_softreset_complete: mmc3
->>>>>> [   18.638580] _wait_softreset_complete: mmc3
->>>>>> [   18.657562] _wait_softreset_complete: mmc1
->>>>>> [   18.833374] wlcore: firmware booted (Rev 7.3.10.0.141)
->>>>>>
->>>>>> ^ the firmware notification above does not come out in the crash.
->>>>>>
->>>>>
->>>>> I agree with your assessment.  Any ideas why moving the debug
->>>>> statement before the if statement would make it start working?  I
->>>>> added some artificial udelay at around 100, but I still got the crash.
->>>>> It seems like there is some timing issue, but at the same time just
->>>>> adding a delay isn't enough.
->>>>
->>>>
->>>>
->>>> The pr_warn does more than just delay, it accesses the io-space
->>>> potentially
->>>> causing a flush on certain IO ranges. There might be some OCP readback
->>>> missing for example, in which case a simple udelay may not help.
->>>>
->>>
->>> I am not very familiar with the OCP and/or how the flushing would
->>> impact this.  Do you have any suggestions on how I can troubleshoot?
->>
->>
->> Typically an OCP barrier is inserted in the code as an immediate readback of
->> the register in question, this effectively forces the register write all the
->> way to the IP.
->>
->> But, you said that the issue gets fixed with 4.15-rc? You could just simply
->> bisect the issue and see which exact patch fixes it.
->>
-> 
-> Good idea.  It looks like 3c4d296e58a2 ("ARM: OMAP3: hwmod_data: add
-> missing module_offs for MMC3") fixed the problem. I've tested that on
-> Linux 4.14.14 and it fixes my issues.  I'll e-mail stable and ask him
-> to backport this patch and I'll CC you on it.
+On 21 January 2018 at 21:09, David Lechner <david@lechnology.com> wrote:
+> This changes module_platform_driver_probe() to module_platform_driver()
+> in the TI DaVinci MMC driver.
+>
+> On device tree systems, we can get a -EPROBE_DEFER when using a pinmux
+> for the CD GPIO, which results in the driver never loading because
+> module_platform_driver_probe() prevents it from being re-probed.
+>
+> So, we replace module_platform_driver_probe() with
+> module_platform_driver() and removed the __init attributes accordingly.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-Oh yea, missing that patch would definitely cause some problems... Good 
-find, and sorry I didn't remember about that myself. >.<
+Thanks, applied for next!
 
--Tero
+Kind regards
+Uffe
 
-> 
-> adam
-> 
-> 
->> -Tero
->>
->>
->>>
->>> adam
->>>
->>>> -Tero
->>>>
->>>>
->>>>>
->>>>>> -Tero
->>>>>>
->>>>>
->>>>> adam
->>>>>
->>>>>>>
->>>>>>> adam
->>>>>>>
->>>>>>>>
->>>>>>>> Regards,
->>>>>>>>
->>>>>>>> Tony
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> --
->>>>>>> To unsubscribe from this list: send the line "unsubscribe linux-clk"
->>>>>>> in
->>>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>>>
->>>>>>
->>>>>> --
->>>>
->>>>
->>>>
->>>> --
->>
->>
->> --
-
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> ---
+>  drivers/mmc/host/davinci_mmc.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+> index 351330d..c5309cc 100644
+> --- a/drivers/mmc/host/davinci_mmc.c
+> +++ b/drivers/mmc/host/davinci_mmc.c
+> @@ -174,7 +174,7 @@ module_param(poll_loopcount, uint, S_IRUGO);
+>  MODULE_PARM_DESC(poll_loopcount,
+>                  "Maximum polling loop count. Default = 32");
+>
+> -static unsigned __initdata use_dma = 1;
+> +static unsigned use_dma = 1;
+>  module_param(use_dma, uint, 0);
+>  MODULE_PARM_DESC(use_dma, "Whether to use DMA or not. Default = 1");
+>
+> @@ -496,8 +496,7 @@ static int mmc_davinci_start_dma_transfer(struct mmc_davinci_host *host,
+>         return ret;
+>  }
+>
+> -static void __init_or_module
+> -davinci_release_dma_channels(struct mmc_davinci_host *host)
+> +static void davinci_release_dma_channels(struct mmc_davinci_host *host)
+>  {
+>         if (!host->use_dma)
+>                 return;
+> @@ -506,7 +505,7 @@ davinci_release_dma_channels(struct mmc_davinci_host *host)
+>         dma_release_channel(host->dma_rx);
+>  }
+>
+> -static int __init davinci_acquire_dma_channels(struct mmc_davinci_host *host)
+> +static int davinci_acquire_dma_channels(struct mmc_davinci_host *host)
+>  {
+>         host->dma_tx = dma_request_chan(mmc_dev(host->mmc), "tx");
+>         if (IS_ERR(host->dma_tx)) {
+> @@ -1201,7 +1200,7 @@ static int mmc_davinci_parse_pdata(struct mmc_host *mmc)
+>         return 0;
+>  }
+>
+> -static int __init davinci_mmcsd_probe(struct platform_device *pdev)
+> +static int davinci_mmcsd_probe(struct platform_device *pdev)
+>  {
+>         const struct of_device_id *match;
+>         struct mmc_davinci_host *host = NULL;
+> @@ -1414,11 +1413,12 @@ static struct platform_driver davinci_mmcsd_driver = {
+>                 .pm     = davinci_mmcsd_pm_ops,
+>                 .of_match_table = davinci_mmc_dt_ids,
+>         },
+> +       .probe          = davinci_mmcsd_probe,
+>         .remove         = __exit_p(davinci_mmcsd_remove),
+>         .id_table       = davinci_mmc_devtype,
+>  };
+>
+> -module_platform_driver_probe(davinci_mmcsd_driver, davinci_mmcsd_probe);
+> +module_platform_driver(davinci_mmcsd_driver);
+>
+>  MODULE_AUTHOR("Texas Instruments India");
+>  MODULE_LICENSE("GPL");
+> --
+> 2.7.4
+>
