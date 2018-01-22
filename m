@@ -1,47 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Jan 2018 09:29:03 -0800
-Subject: [GIT PULL] dts fixes for omaps for v4.16 merge window
-Message-ID: <pull-1516642112-325806@atomide.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 22 Jan 2018 17:29:20 +0000
+Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
+ define package boundaries
+In-Reply-To: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
+References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
+Message-ID: <c9ab384b-1408-eccb-b417-af9a8a22119c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
 
-The following changes since commit 1cadb0c341079785182a8d00d12ecb0bbef935fb:
 
-  Revert "ARM: dts: dra7: Add properties to enable PCIe x2 lane mode" (2017-12-23 08:18:15 -0800)
+On 22/01/18 17:15, Lorenzo Pieralisi wrote:
+> The current ARM DT topology description provides the operating system
+> with a topological view of the system that is based on leaf nodes
+> representing either cores or threads (in an SMT system) and a
+> hierarchical set of cluster nodes that creates a hierarchical topology
+> view of how those cores and threads are grouped.
+> 
+> As opposed to the ACPI topology description ([1], PPTT table), this
+> hierarchical representation of clusters does not allow to describe what
+> topology level actually represents the physical package boundary, which
+> is a key piece of information to be used by an operating system to
+> optimize resource allocation and scheduling.
+> 
+> Define an optional, backward compatible boolean property for cluster
+> nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+> topological description a binding to define what cluster level
+> represents a physical package boundary.
+> 
+> [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> index de9eb0486630..8e78d76b0671 100644
+> --- a/Documentation/devicetree/bindings/arm/topology.txt
+> +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+>  	The cluster node name must be "clusterN" as described in 2.1 above.
+>  	A cluster node can not be a leaf node.
+>  
+> +	Properties for cluster nodes:
+> +
+> +	- physical-package
+> +		Usage: optional
+> +		Value type: <empty>
 
-are available in the Git repository at:
+IIUC, value type must be specified as boolean in this case.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/dt-pt3-signed
+> +		Definition: if present the cluster node represents the
+> +			    boundary of a physical package, whether socketed
+> +			    or surface mounted.
+> +
+>  	A cluster node's child nodes must be:
+>  
+>  	- one or more cluster nodes; or
+> 
 
-for you to fetch changes up to 0e6e6dcce8d578516ef3aea2c9f9b4d0a0d53194:
+Otherwise looks good to me.
 
-  ARM: dts: Nokia N9: add support for up/down keys in the dts (2018-01-19 07:40:13 -0800)
-
-----------------------------------------------------------------
-Few omap dts fixes and n9 volume keys update for v4.16 merge window
-
-For now, we need to rely on dts alias for n900 lcd and tvout order
-to prevent occasional blank lcd. And we need to reduce the shut down
-temperature for dra7 for non-cpu thermal cases.
-
-And looks like we're missing the n9 volume key mappings and there is
-active work going happening for n9 at least for postmarketos. So let's
-make sure the keys can be actually used as they are the only buttons
-on n9 in addition to the power key.
-
-----------------------------------------------------------------
-Ivaylo Dimitrov (1):
-      ARM: dts: n900: Add aliases for lcd and tvout displays
-
-Pavel Machek (1):
-      ARM: dts: Nokia N9: add support for up/down keys in the dts
-
-Ravikumar Kattekola (1):
-      ARM: dts: dra7: Reduce shut down temperature of non-cpu thermal zones
-
- arch/arm/boot/dts/dra7.dtsi      | 16 ++++++++++++++++
- arch/arm/boot/dts/omap3-n9.dts   |  7 +++++++
- arch/arm/boot/dts/omap3-n900.dts |  4 +++-
- 3 files changed, 26 insertions(+), 1 deletion(-)
+-- 
+Regards,
+Sudeep
