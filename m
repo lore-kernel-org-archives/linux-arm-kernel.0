@@ -1,36 +1,35 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Mon, 22 Jan 2018 16:44:23 +0800
-Subject: [PATCH v1] arm: dts: ls1021a: Add configure-gfladj property to USB3
- node
-Message-ID: <20180122084423.10340-1-yinbo.zhu@nxp.com>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Mon, 22 Jan 2018 11:26:08 +0100
+Subject: [PATCH] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
+Message-ID: <20180122102608.12565-1-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: yinbo.zhu <yinbo.zhu@nxp.com>
+Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
+host controller driver.
 
-Add "configure-gfladj" boolean property to USB3 node. This property
-is used to determine whether frame length adjustent is required
-or not
-
-Signed-off-by: Review Code-CDREVIEW <CDREVIEW@freescale.com>
-Signed-off-by: Ramneek Mehresh <ramneek.mehresh@freescale.com>
-Signed-off-by: Honghua Yin <Hong-Hua.Yin@freescale.com>
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
 ---
- arch/arm/boot/dts/ls1021a.dtsi |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index f81fad2..a5ccf7a 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -707,6 +707,7 @@
- 			reg = <0x0 0x3100000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 			dr_mode = "host";
-+			configure-gfladj;
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
- 		};
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index 46b0e73404d1..e06836dec77c 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+  * Copyright (C) STMicroelectronics SA 2017
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+  * Modified by Philippe Cornu <philippe.cornu@st.com>
+  * This generic Synopsys DesignWare MIPI DSI host driver is based on the
+  * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
 -- 
-1.7.1
+2.15.1
