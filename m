@@ -1,22 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 22 Jan 2018 21:28:52 +0800
-Subject: [PATCH v4 08/13] drm/sun4i: Add a driver for the display frontend
-In-Reply-To: <029cdc3478bf89d422f5e8d9e600baf5e48ce4db.1516613040.git-series.maxime.ripard@free-electrons.com>
-References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
- <029cdc3478bf89d422f5e8d9e600baf5e48ce4db.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64jwNkF1LmEF3Am0Kf7pFevDB1FOka574-F8zh=Phr-RQ@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 22 Jan 2018 14:29:17 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+Message-ID: <CAMRc=MesQTvkVtPLOGr2G7-KSR=k35y24SsO4s8rDbCv=2-G7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 5:25 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The display frontend is an hardware block that can be used to implement
-> some more advanced features like hardware scaling or colorspace
-> conversions. It can also be used to implement the output format of the VPU.
+2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
+> This series converts mach-davinci to use the common clock framework.
 >
-> Let's create a minimal driver for it that will only enable the hardware
-> scaling features.
+> The series works like this, the first 19 patches create new clock drivers
+> using the common clock framework. There are basically 3 groups of clocks -
+> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
+> unique init data, which is the reason for so many patches.
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Then, starting with "ARM: da830: add new clock init using common clock",
+> we get the mach code ready for the switch by adding the code needed for
+> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
+> legacy clocks so that we can switch easily between the old and the new.
+>
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
+>
+> The final three patches add device tree clock support to the one SoC that
+> supports it.
+>
+> v6 changes (also see individual patches for details):
+> - All of the device tree bindings are changed
+> - All of the clock drivers are changed significantly
+> - Fixed issues brought up during review of v5
+> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
+>   series and submitted separately
+>
+> v5 changes:
+> - Basically, this is an entirely new series
+> - Patches are broken up into bite-sized pieces
+> - Converted PSC clock driver to use regmap
+> - Restored "force" flag for certain DA850 clocks
+> - Added device tree bindings
+> - Moved more of the clock init to drivers/clk
+> - Fixed frequency scaling (maybe*)
+>
+> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
+>   what they need to do to make this work, but I haven't figured out how to
+>   test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
+>   sent separately after this series has landed.)
+>
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+This driver doesn't have DT support - I suppose it would be useful to
+add it and also add the corresponding DT node to da850.dtsi. If you're
+ok with it, I can start working on it. I also have a patch for the i2c
+cpufreq issue and it would be nice to test it with it.
+
+Thanks,
+Bartosz
