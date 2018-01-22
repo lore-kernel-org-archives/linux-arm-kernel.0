@@ -1,100 +1,173 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 11:35:43 +0100
-Subject: [PATCH v2 14/19] drm/sun4i: backend: Add support for zpos
+Date: Mon, 22 Jan 2018 11:35:35 +0100
+Subject: [PATCH v2 06/19] drm/blend: Add a generic alpha property
 In-Reply-To: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b006853e908bd06661c5bc1f2191121523bce0e4.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <6a2988f34d6444febd637127a5c2474acb0a8c55.1516617243.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our various planes have a configurable zpos, that combined with the pipes
-allow to configure the composition.
+Some drivers duplicate the logic to create a property to store a per-plane
+alpha.
 
-Since the interaction between the pipes, zpos and alphas framebuffers are
-not trivials, let's just enable the zpos as an immutable property for now,
-and use that zpos in our atomic_update part.
+This is especially useful if we ever want to support extra protocols for
+Wayland like:
+https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
 
+Let's create a helper in order to move that to the core.
+
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c     | 15 +++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.h     |  2 ++
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c |  4 ++++
- drivers/gpu/drm/sun4i/sun4i_layer.c       |  3 +++
- 4 files changed, 24 insertions(+)
+ Documentation/gpu/kms-properties.csv |  2 +-
+ drivers/gpu/drm/drm_atomic.c         |  4 ++++-
+ drivers/gpu/drm/drm_atomic_helper.c  |  4 ++++-
+ drivers/gpu/drm/drm_blend.c          | 32 +++++++++++++++++++++++++++++-
+ include/drm/drm_blend.h              |  1 +-
+ include/drm/drm_plane.h              |  6 +++++-
+ 6 files changed, 48 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index a18c86a15748..c4986054909b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -272,6 +272,21 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	return 0;
+diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
+index 927b65e14219..25ad3503d663 100644
+--- a/Documentation/gpu/kms-properties.csv
++++ b/Documentation/gpu/kms-properties.csv
+@@ -99,5 +99,5 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
+ ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
+ ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
+ ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
+-rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
++,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the plane from transparent (0) to fully opaque (MAX). If this property is set to a value different than max, and that the pixel will define an alpha component, the property will have precendance and the pixel value will be ignored. The alpha value is represented as straight alpha, ie the colors haven't been pre-adjusted for their opacity by multiplication. Therefore, the equation to get a color value for one pixel, assuming two planes A and B, will be (color_a * alpha_a + color_b * alpha_b * (MAX - alpha_a) / MAX) / (alpha_a + alpha_b * (MAX - alpha_a) / MAX)
+ ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
+diff --git a/drivers/gpu/drm/drm_atomic.c b/drivers/gpu/drm/drm_atomic.c
+index c2da5585e201..ade18cf62c89 100644
+--- a/drivers/gpu/drm/drm_atomic.c
++++ b/drivers/gpu/drm/drm_atomic.c
+@@ -749,6 +749,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
+ 		state->src_w = val;
+ 	} else if (property == config->prop_src_h) {
+ 		state->src_h = val;
++	} else if (property == plane->alpha_property) {
++		state->alpha = val;
+ 	} else if (property == plane->rotation_property) {
+ 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK))
+ 			return -EINVAL;
+@@ -810,6 +812,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
+ 		*val = state->src_w;
+ 	} else if (property == config->prop_src_h) {
+ 		*val = state->src_h;
++	} else if (property == plane->alpha_property) {
++		*val = state->alpha;
+ 	} else if (property == plane->rotation_property) {
+ 		*val = state->rotation;
+ 	} else if (property == plane->zpos_property) {
+diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+index 71d712f1b56a..bad0af053384 100644
+--- a/drivers/gpu/drm/drm_atomic_helper.c
++++ b/drivers/gpu/drm/drm_atomic_helper.c
+@@ -3373,6 +3373,10 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
+ 	if (plane->state) {
+ 		plane->state->plane = plane;
+ 		plane->state->rotation = DRM_MODE_ROTATE_0;
++
++		/* Reset the alpha value to fully opaque if it matters */
++		if (plane->alpha_property)
++			plane->state->alpha = plane->alpha_property->values[1];
+ 	}
  }
+ EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
+diff --git a/drivers/gpu/drm/drm_blend.c b/drivers/gpu/drm/drm_blend.c
+index 2e5e089dd912..e6bfa618e902 100644
+--- a/drivers/gpu/drm/drm_blend.c
++++ b/drivers/gpu/drm/drm_blend.c
+@@ -104,6 +104,38 @@
+  */
  
-+int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
-+				    struct drm_plane *plane)
+ /**
++ * drm_plane_create_alpha_property - create a new alpha property
++ * @plane: drm plane
++ * @max_alpha: maximum value of alpha
++ *
++ * This function initializes a generic, mutable, alpha property and
++ * enables support for it in the DRM core.
++ *
++ * The alpha property will be allowed to be within the bounds of 0
++ * (transparent) to @max_alpha (opaque)
++ *
++ * Returns:
++ * 0 on success, negative error code on failure.
++ */
++int drm_plane_create_alpha_property(struct drm_plane *plane, u16 max_alpha)
 +{
-+	struct drm_plane_state *state = plane->state;
-+	unsigned int priority = state->normalized_zpos;
++	struct drm_property *prop;
 +
-+	DRM_DEBUG_DRIVER("Setting layer %d priority to %d\n", layer, priority);
++	prop = drm_property_create_range(plane->dev, 0, "alpha", 0, max_alpha);
++	if (!prop)
++		return -ENOMEM;
 +
-+	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
++	drm_object_attach_property(&plane->base, prop, max_alpha);
++	plane->alpha_property = prop;
++
++	if (plane->state)
++		plane->state->alpha = max_alpha;
 +
 +	return 0;
 +}
++EXPORT_SYMBOL(drm_plane_create_alpha_property);
 +
- static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
- {
- 	u16 src_h = state->src_h >> 16;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 1ca8b7db6807..04a4f11b87a8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -182,5 +182,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 				      int layer, struct drm_plane *plane);
- int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
- 					int layer, uint32_t in_fmt);
-+int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
-+				    int layer, struct drm_plane *plane);
- 
- #endif /* _SUN4I_BACKEND_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-index e68004844abe..5b3986437a50 100644
---- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-@@ -35,6 +35,10 @@ static int sun4i_de_atomic_check(struct drm_device *dev,
- 	if (ret)
- 		return ret;
- 
-+	ret = drm_atomic_normalize_zpos(dev, state);
-+	if (ret)
-+		return ret;
-+
- 	return drm_atomic_helper_check_planes(dev, state);
++/**
+  * drm_plane_create_rotation_property - create a new rotation property
+  * @plane: drm plane
+  * @rotation: initial value of the rotation property
+diff --git a/include/drm/drm_blend.h b/include/drm/drm_blend.h
+index 17606026590b..e5affba6ebde 100644
+--- a/include/drm/drm_blend.h
++++ b/include/drm/drm_blend.h
+@@ -36,6 +36,7 @@ static inline bool drm_rotation_90_or_270(unsigned int rotation)
+ 	return rotation & (DRM_MODE_ROTATE_90 | DRM_MODE_ROTATE_270);
  }
  
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 03549646528a..fbf25d59cf88 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -115,6 +115,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 	}
++int drm_plane_create_alpha_property(struct drm_plane *plane, u16 alpha);
+ int drm_plane_create_rotation_property(struct drm_plane *plane,
+ 				       unsigned int rotation,
+ 				       unsigned int supported_rotations);
+diff --git a/include/drm/drm_plane.h b/include/drm/drm_plane.h
+index 571615079230..a5e26064b132 100644
+--- a/include/drm/drm_plane.h
++++ b/include/drm/drm_plane.h
+@@ -42,6 +42,7 @@ struct drm_modeset_acquire_ctx;
+  *	plane (in 16.16)
+  * @src_w: width of visible portion of plane (in 16.16)
+  * @src_h: height of visible portion of plane (in 16.16)
++ * @alpha: opacity of the plane
+  * @rotation: rotation of the plane
+  * @zpos: priority of the given plane on crtc (optional)
+  *	Note that multiple active planes on the same crtc can have an identical
+@@ -105,6 +106,9 @@ struct drm_plane_state {
+ 	uint32_t src_x, src_y;
+ 	uint32_t src_h, src_w;
  
- 	sun4i_backend_update_layer_coord(backend, layer->id, plane);
-+	sun4i_backend_update_layer_zpos(backend, layer->id, plane);
- 	sun4i_backend_layer_enable(backend, layer->id, true);
- }
- 
-@@ -237,6 +238,8 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 			return ERR_CAST(layer);
- 		};
- 
-+		drm_plane_create_zpos_immutable_property(&layer->plane, i);
++	/* Plane opacity */
++	u8 alpha;
 +
- 		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
- 				 i ? "overlay" : "primary", plane->pipe);
- 		regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
+ 	/* Plane rotation */
+ 	unsigned int rotation;
+ 
+@@ -481,6 +485,7 @@ enum drm_plane_type {
+  * @funcs: helper functions
+  * @properties: property tracking for this plane
+  * @type: type of plane (overlay, primary, cursor)
++ * @alpha_property: alpha property for this plane
+  * @zpos_property: zpos property for this plane
+  * @rotation_property: rotation property for this plane
+  * @helper_private: mid-layer private data
+@@ -546,6 +551,7 @@ struct drm_plane {
+ 	 */
+ 	struct drm_plane_state *state;
+ 
++	struct drm_property *alpha_property;
+ 	struct drm_property *zpos_property;
+ 	struct drm_property *rotation_property;
+ };
 -- 
 git-series 0.9.1
