@@ -1,55 +1,50 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 22 Jan 2018 12:42:59 -0500
-Subject: [PATCH] drm/sun4i: Fix build warnings in sunxi_engine.h
-Message-ID: <20180122174306.231609-1-seanpaul@chromium.org>
+From: ayufan@ayufan.eu (=?UTF-8?q?Kamil=20Trzci=C5=84ski?=)
+Date: Mon, 22 Jan 2018 18:46:22 +0100
+Subject: [PATCH] rock64: dts: fix gmac2io stability issues
+Message-ID: <20180122174628.15613-1-ayufan@ayufan.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following build warnings:
-In file included from ../drivers/gpu/drm/sun4i/sun8i_mixer.h:18:0,
-                 from ../drivers/gpu/drm/sun4i/sun8i_vi_scaler.h:13,
-                 from ../drivers/gpu/drm/sun4i/sun8i_vi_scaler.c:12:
-../drivers/gpu/drm/sun4i/sunxi_engine.h:36:16: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
-         struct drm_crtc_state *old_state);
-                ^~~~~~~~~~~~~~
-../drivers/gpu/drm/sun4i/sunxi_engine.h:53:15: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
-        struct drm_crtc_state *state);
-               ^~~~~~~~~~~~~~
-In file included from ../drivers/gpu/drm/sun4i/sun8i_mixer.h:18:0,
-                 from ../drivers/gpu/drm/sun4i/sun8i_ui_scaler.h:12,
-                 from ../drivers/gpu/drm/sun4i/sun8i_ui_scaler.c:12:
-../drivers/gpu/drm/sun4i/sunxi_engine.h:36:16: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
-         struct drm_crtc_state *old_state);
-                ^~~~~~~~~~~~~~
-../drivers/gpu/drm/sun4i/sunxi_engine.h:53:15: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
-        struct drm_crtc_state *state);
-               ^~~~~~~~~~~~~~
+This commit enables thresh dma mode as this forces to disable checksuming,
+and chooses delay values which make the interface stable.
 
-Fixes: 6b8562c86e24 ("drm/sun4i: engine: Create an atomic_begin
-callback")
-Fixes: 656e5f654903 ("drm/sun4i: engine: Add a custom crtc
-atomic_check")
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Neil Armstrong <narmstrong@baylibre.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
+These changes are needed, because ROCK64 is faced with two problems:
+1. tx checksuming does not work with packets larger than 1498,
+2. the default delays for tx/rx are not stable when using 1Gbps connection.
+
+Delays were found out with:
+https://github.com/ayufan-rock64/linux-build/tree/master/recipes/gmac-delays-test
+
+Change-Id: Ie894df4b52122988da683c02e3a05d635a5c7b84
+Signed-off-by: Kamil Trzci?ski <ayufan@ayufan.eu>
 ---
- drivers/gpu/drm/sun4i/sunxi_engine.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
-index baa7a1f95300..d317ea04b8aa 100644
---- a/drivers/gpu/drm/sun4i/sunxi_engine.h
-+++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
-@@ -12,6 +12,7 @@
- 
- struct drm_plane;
- struct drm_device;
-+struct drm_crtc_state;
- 
- struct sunxi_engine;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+index 5602ec01fed9..bcc0bb35d840 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+@@ -132,8 +132,6 @@
+ 	assigned-clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_EXT>;
+ 	assigned-clock-parents = <&gmac_clkin>, <&gmac_clkin>;
+ 	clock_in_out = "input";
+-	/* shows instability at 1GBit right now */
+-	max-speed = <100>;
+ 	phy-supply = <&vcc_io>;
+ 	phy-mode = "rgmii";
+ 	pinctrl-names = "default";
+@@ -141,8 +139,9 @@
+ 	snps,reset-gpio = <&gpio1 RK_PC2 GPIO_ACTIVE_LOW>;
+ 	snps,reset-active-low;
+ 	snps,reset-delays-us = <0 10000 50000>;
+-	tx_delay = <0x26>;
+-	rx_delay = <0x11>;
++	snps,force_thresh_dma_mode;
++	tx_delay = <0x24>;
++	rx_delay = <0x18>;
+ 	status = "okay";
+ };
  
 -- 
-2.16.0.rc1.238.g530d649a79-goog
+2.14.1
