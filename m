@@ -1,44 +1,50 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Jan 2018 08:27:31 +0100
-Subject: [PATCH] mmc: davinci: suppress error message on EPROBE_DEFER
-In-Reply-To: <1516566493-31348-1-git-send-email-david@lechnology.com>
-References: <1516566493-31348-1-git-send-email-david@lechnology.com>
-Message-ID: <CAPDyKFqu42ophwEi7WTy6iW6nFF94qksAahW1y4qZv2Q=xEe-A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Jan 2018 08:34:00 +0100
+Subject: [PATCH] ARM: sunxi_defconfig: Enable CMA
+In-Reply-To: <CAGb2v67wwa30E2GFaWEuLe1fEvCBmEy7H_3ystv460+1SAJGuA@mail.gmail.com>
+References: <20180119133208.12873-1-maxime.ripard@free-electrons.com>
+ <CAGb2v67wwa30E2GFaWEuLe1fEvCBmEy7H_3ystv460+1SAJGuA@mail.gmail.com>
+Message-ID: <20180122073400.gplq23xai7rlt3jp@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 January 2018 at 21:28, David Lechner <david@lechnology.com> wrote:
-> This suppresses printing an error message during probe of the TI DaVinci
-> MMC driver when the error is EPROBE_DEFER.
->
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: David Lechner <david@lechnology.com>
+Hi,
 
-Thanks, applied for next!
+On Sat, Jan 20, 2018 at 11:37:28AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jan 19, 2018 at 9:32 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The DRM driver most notably, but also out of tree drivers (for now) like
+> > the VPU or GPU drivers, are quite big consumers of large, contiguous memory
+> > buffers. However, the sunxi_defconfig doesn't enable CMA in order to
+> > mitigate that, which makes them almost unusable.
+> >
+> > Enable it to make sure it somewhat works.
+> 
+> IIRC the default size for CMA pretty much limits it to small tablet
+> screen resolutions. Is this something we want to leave up to the
+> user?
 
-Kind regards
-Uffe
+That's one of the pain points of CMA in our case. The amount of memory
+you need depends on the resolution itself, but also the number of
+multiple buffers you want to use, and even the number of planes you
+want to use.
 
-> ---
->  drivers/mmc/host/davinci_mmc.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> index c5309cc..8e36317 100644
-> --- a/drivers/mmc/host/davinci_mmc.c
-> +++ b/drivers/mmc/host/davinci_mmc.c
-> @@ -1253,8 +1253,9 @@ static int davinci_mmcsd_probe(struct platform_device *pdev)
->                 pdev->id_entry = match->data;
->                 ret = mmc_of_parse(mmc);
->                 if (ret) {
-> -                       dev_err(&pdev->dev,
-> -                               "could not parse of data: %d\n", ret);
-> +                       if (ret != -EPROBE_DEFER)
-> +                               dev_err(&pdev->dev,
-> +                                       "could not parse of data: %d\n", ret);
->                         goto parse_fail;
->                 }
->         } else {
-> --
-> 2.7.4
->
+And then, you have to trade that off with the amount of RAM you have
+on your board in order to still have something that's usable.
+
+tl;dr: I don't really see how to define a value good enough for
+everyone.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/29f29666/attachment.sig>
