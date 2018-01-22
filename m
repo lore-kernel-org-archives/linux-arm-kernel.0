@@ -1,40 +1,66 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 22 Jan 2018 11:06:18 -0600
-Subject: [PATCH] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
- bits_per_mux != 0
-In-Reply-To: <CAHp75VdkShHhxL+3PyaPEC2Dyr8aWoEH8CQk+bEJ2WD4i6ojHg@mail.gmail.com>
-References: <1516575793-30526-1-git-send-email-david@lechnology.com>
- <CAHp75VdkShHhxL+3PyaPEC2Dyr8aWoEH8CQk+bEJ2WD4i6ojHg@mail.gmail.com>
-Message-ID: <d1426fbc-bc82-89cd-d08d-242b16d2c99d@lechnology.com>
+Date: Mon, 22 Jan 2018 11:11:01 -0600
+Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <CAMRc=MesQTvkVtPLOGr2G7-KSR=k35y24SsO4s8rDbCv=2-G7A@mail.gmail.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=MesQTvkVtPLOGr2G7-KSR=k35y24SsO4s8rDbCv=2-G7A@mail.gmail.com>
+Message-ID: <38b081e9-fe00-cf18-2d72-5ad1937c3800@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2018 08:49 AM, Andy Shevchenko wrote:
-> On Mon, Jan 22, 2018 at 1:03 AM, David Lechner <david@lechnology.com> wrote:
->> This fixes pcs_request_gpio() in the pinctrl-single driver when
->> bits_per_mux != 0. It appears this was overlooked when the multiple
->> pins per register feature was added.
+On 01/22/2018 07:29 AM, Bartosz Golaszewski wrote:
+> 2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
+>> This series converts mach-davinci to use the common clock framework.
 >>
->> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure
->> multiple pins of different modules")
+>> The series works like this, the first 19 patches create new clock drivers
+>> using the common clock framework. There are basically 3 groups of clocks -
+>> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
+>> unique init data, which is the reason for so many patches.
+>>
+>> Then, starting with "ARM: da830: add new clock init using common clock",
+>> we get the mach code ready for the switch by adding the code needed for
+>> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
+>> legacy clocks so that we can switch easily between the old and the new.
+>>
+>> "ARM: davinci: switch to common clock framework" actually flips the switch
+>> to start using the new clock drivers. Then the next 8 patches remove all
+>> of the old clock code.
+>>
+>> The final three patches add device tree clock support to the one SoC that
+>> supports it.
+>>
+>> v6 changes (also see individual patches for details):
+>> - All of the device tree bindings are changed
+>> - All of the clock drivers are changed significantly
+>> - Fixed issues brought up during review of v5
+>> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
+>>    series and submitted separately
+>>
+>> v5 changes:
+>> - Basically, this is an entirely new series
+>> - Patches are broken up into bite-sized pieces
+>> - Converted PSC clock driver to use regmap
+>> - Restored "force" flag for certain DA850 clocks
+>> - Added device tree bindings
+>> - Moved more of the clock init to drivers/clk
+>> - Fixed frequency scaling (maybe*)
+>>
+>> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
+>>    what they need to do to make this work, but I haven't figured out how to
+>>    test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
+>>    sent separately after this series has landed.)
+>>
 > 
-> One line?
-
-One line is more important that wrapping to 75 chars?
-
-> 
->> +                       byte_num = (pcs->bits_per_pin * pin) / BITS_PER_BYTE;
->> +                       offset = (byte_num / mux_bytes) * mux_bytes;
->> +                       pin_shift = pin % (pcs->width / pcs->bits_per_pin) *
->> +                                   pcs->bits_per_pin;
-> 
-> Sounds like playing around pretty well defined macro and functions,
-> e.g. DIV_ROUND_UP(), round_up().
+> This driver doesn't have DT support - I suppose it would be useful to
+> add it and also add the corresponding DT node to da850.dtsi. If you're
+> ok with it, I can start working on it. I also have a patch for the i2c
+> cpufreq issue and it would be nice to test it with it.
 > 
 
-I admit, I just copied existing code (which may be a reason to leave this the
-way it is). But, I only see once place to do this:
+Why not just use cpufreq-dt for the DT case? It seems to be working.
 
-	offset = round_down(byte_num, mux_bytes);
+I have preliminary patches on GitHub [1][2].
 
-Did I miss another?
+[1]: https://github.com/dlech/ev3dev-kernel/commit/e38897148a949b736ab135983887f9c81375f108
+[2]: https://github.com/dlech/ev3dev-kernel/commit/bab85f9e45450a36a7ea6f4407f89a75edb63761
