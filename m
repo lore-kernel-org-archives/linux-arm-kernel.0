@@ -1,116 +1,75 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 22 Jan 2018 14:00:37 +0100
-Subject: [net-next: PATCH v4 0/7] Armada 7k/8k PP2 ACPI support
-In-Reply-To: <20180118132322.GE2690@kwain>
-References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
- <20180118132322.GE2690@kwain>
-Message-ID: <CAPv3WKeqEd6Hcy0NdPpiVVA1ioUYY4zs_0zai2gwkCPtM1yaJg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Jan 2018 13:18:51 +0000
+Subject: arm64: Unimplemented syscall kernel message
+In-Reply-To: <20180121174401.GA44039@dinsnail.net>
+References: <20180121174401.GA44039@dinsnail.net>
+Message-ID: <20180122131851.GA28638@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Michael,
 
-There's a discussion about the ACPI vs generic MDIO/PHY change under
-initial version of the patchset, however the patches in question were
-for now abandoned from further re-sends.
+On Sun, Jan 21, 2018 at 06:44:01PM +0100, Michael Weiser wrote:
+> I'd like ask your opinion as arm64 Linux port maintainers and initial
+> authors of the code in question regarding kernel messages on
+> unimplemented system calls. I apologise in advance if that isn't the
+> right approach (and Cc: linux-arm :).
+> 
+> Currently, a programm doing an unimplemented syscall triggers a rather
+> scary looking kernel message:
+> 
+> [  189.143682] glibc-test[2118]: syscall 1000
+> [  189.143728] Code: aa0503e4 aa0603e5 aa0703e6 d4000001 (b13ffc1f) 
+> [  189.143750] CPU: 1 PID: 2118 Comm: glibc-test Not tainted 4.15.0-rc7-00232-g2c1cfa499018 #3
+> [  189.143755] Hardware name: SoPine with baseboard (DT)
+> [  189.143762] pstate: 80000000 (Nzcv daif -PAN -UAO)
+> [  189.143774] pc : 0xffffb8fb0104
+> [  189.143779] lr : 0xaaaab43c563c
+> [  189.143781] sp : 0000ffffd4fa1180
+> [  189.143786] x29: 0000ffffd4fa1190 x28: 0000000000000000 
+> [  189.143795] x27: 0000000000000000 x26: 0000000000000000 
+> [  189.143802] x25: 0000000000000000 x24: 0000000000000000 
+> [  189.143809] x23: 0000000000000000 x22: 0000000000000000 
+> [  189.143816] x21: 0000aaaab43c564c x20: 0000000000000000 
+> [  189.143823] x19: 0000aaaab43c5770 x18: 0000000000000a03 
+> [  189.143829] x17: 0000aaaab43d6020 x16: 0000ffffb8fb00e0 
+> [  189.143837] x15: 0000ffffb8ed4000 x14: 0000ffffb8ed7540 
+> [  189.143844] x13: 0000ffffb8ee45d8 x12: 0000000000000000 
+> [  189.143851] x11: 0000000000000020 x10: 0000000000000000 
+> [  189.143857] x9 : 00000000000000ff x8 : 00000000000003e8 
+> [  189.143864] x7 : e607cc2262a01600 x6 : e607cc2262a01600 
+> [  189.143872] x5 : 0000ffffd4fa12c0 x4 : 0000000000000000 
+> [  189.143879] x3 : 0000000000000000 x2 : 0000aaaab43c5630 
+> [  189.143886] x1 : 0000ffffd4fa12d8 x0 : 0000ffffd4fa12c8 
+> 
+> It requires some digging to find that this basically is a
+> debugging/warning message and can be disabled using
+> /proc/sys/debug/exception-trace
+> (arm64/kernel/traps.c:do_ni_syscall,show_unhandled_signals_ratelimited).
+> 
+> Other platforms do not seem to do this, even with exception-trace
+> enabled - x86_64 and arm for sure. Instead they silently return -ENOSYS.
+> 
+> There are a number of other kernel messages governed by the same sysctl
+> (fault.c:__do_user_fault,do_sp_pc_abort, traps.c:force_signal_inject,
+> signal.c:sys_rt_sigreturn).
+> 
+> Can I in good conscience disable exception-trace on the affected
+> (production) systems or would this mask other, more critical
+> misbehaviour?
+> 
+> Is it actually considered misbehaviour for arm64 userland to even
+> attempt such a call? Or is the message maybe just a left-over development
+> aid?
+> 
+> Can it perhaps be removed or disabled by default, considering that with
+> future addition of syscalls userland will likely start triggering this
+> message a lot when run on older kernels?
 
-As the v4 has had no objections until now and:
-- patches 1-2 were Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-- mvpp2 patches (5-7) were Tested-by: Antoine Tenart
-<antoine.tenart@free-electrons.com>
-- entire series was  Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-Do you see any chance that it lands in net-next before the coming
-merge window? It would be really much appreciated.
+I agree that printing this stuff is bogus. We should instead just return
+-ENOSYS via a redirect to sys_ni_syscall. The only corner case is for the
+compat private syscalls, where we should match 32-bit and dispatch SIGILL
+for that range (and then probably print the warning based on
+show_unhandled_signals_ratelimited because there's a signal involved).
 
-Thanks,
-Marcin
-
-
-2018-01-18 14:23 GMT+01:00 Antoine Tenart <antoine.tenart@free-electrons.com>:
-> Hi Marcin,
->
-> I tested the series on a MacchiatoBin to ensure the mvpp2 DT support was
-> still working. I was able to use all supported ports as before, and saw
-> no issue.
->
-> For all mvpp2 patches, you can add:
->
-> Tested-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->
-> Thanks!
-> Antoine
->
-> On Thu, Jan 18, 2018 at 01:31:37PM +0100, Marcin Wojtas wrote:
->> Hi,
->>
->> I quickly resend the series, thanks to Antoine Tenart's remark,
->> who spotted !CONFIG_ACPI compilation issue after introducing
->> the new fwnode_irq_get() routine. Please see the details in the changelog
->> below and the 3/7 commit log.
->>
->> mvpp2 driver can work with the ACPI representation, as exposed
->> on a public branch:
->> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/commits/marvell-armada-wip
->> It was compiled together with the most recent Tianocore EDK2 revision.
->> Please refer to the firmware build instruction on MacchiatoBin board:
->> http://wiki.macchiatobin.net/tiki-index.php?page=Build+from+source+-+UEFI+EDK+II
->>
->> ACPI representation of PP2 controllers (withouth PHY support) can
->> be viewed in the github:
->> * MacchiatoBin:
->> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada80x0McBin/Dsdt.asl#L201
->>
->> * Armada 7040 DB:
->> https://github.com/MarvellEmbeddedProcessors/edk2-open-platform/blob/71ae395da1661374b0f07d1602afb1eee56e9794/Platforms/Marvell/Armada/AcpiTables/Armada70x0/Dsdt.asl#L131
->>
->> I will appreciate any comments or remarks.
->>
->> Best regards,
->> Marcin
->>
->> Changelog:
->> v3 -> v4:
->> * 3/7
->>     - add new macro (ACPI_HANDLE_FWNODE) and fix
->>       compilation with !CONFIG_ACPI
->>     - extend commit log and mention usability of fwnode_irq_get
->>       for the child nodes as well
->>
->> v2 -> v3:
->> * 1/7, 2/7
->>     - Add Rafael's Acked-by's
->> * 3/7, 4/7
->>     - New patches
->> * 6/7, 7/7
->>     - Update driver with new helper routines usage
->>     - Improve commit log.
->>
->> v1 -> v2:
->> * Remove MDIO patches
->> * Use PP2 ports only with link interrupts
->> * Release second region resources in mvpp2 driver (code moved from
->>   mvmdio), as explained in details in 5/5 commit message.
->>
->> Marcin Wojtas (7):
->>   device property: Introduce fwnode_get_mac_address()
->>   device property: Introduce fwnode_get_phy_mode()
->>   device property: Introduce fwnode_irq_get()
->>   device property: Allow iterating over available child fwnodes
->>   net: mvpp2: simplify maintaining enabled ports' list
->>   net: mvpp2: use device_*/fwnode_* APIs instead of of_*
->>   net: mvpp2: enable ACPI support in the driver
->>
->>  drivers/base/property.c              | 104 ++++++++--
->>  drivers/net/ethernet/marvell/mvpp2.c | 206 ++++++++++++--------
->>  include/linux/acpi.h                 |   3 +
->>  include/linux/property.h             |  11 ++
->>  4 files changed, 232 insertions(+), 92 deletions(-)
->>
->> --
->> 2.7.4
->>
->
-> --
-> Antoine T?nart, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Will
