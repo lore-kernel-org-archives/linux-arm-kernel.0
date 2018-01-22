@@ -1,109 +1,144 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 22 Jan 2018 12:21:55 +0000
-Subject: [PATCH v2 1/6] arm64: cpufeature: Allow early detect of specific
- features
-In-Reply-To: <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <1516190084-18978-2-git-send-email-julien.thierry@arm.com>
- <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
-Message-ID: <2f2a406b-fddf-6c30-4052-650f57ac317a@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 22 Jan 2018 12:23:17 +0000
+Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed SIGFPE
+In-Reply-To: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
+References: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1516623798-25001-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently a SIGFPE delivered in response to a floating-point
+exception trap may have si_code set to 0 on arm64.  As reported by
+Eric, this is a bad idea since this is the value of SI_USER -- yet
+this signal is definitely not the result of kill(2), tgkill(2) etc.
+and si_uid and si_pid make limited sense whereas we do want to
+yield a value for si_addr (which doesn't exist for SI_USER).
 
+It's not entirely clear whether the architecure permits a
+"spurious" fp exception trap where none of the exception flag bits
+in ESR_ELx is set.  (IMHO the architectural intent is to forbid
+this.)  However, it does permit those bits to contain garbage if
+the TFV bit in ESR_ELx is 0.  That case isn't currently handled at
+all and may result in si_code == 0 or si_code containing a FPE_FLT*
+constant corresponding to an exception that did not in fact happen.
 
-On 22/01/18 12:05, Suzuki K Poulose wrote:
-> On 17/01/18 11:54, Julien Thierry wrote:
->> From: Daniel Thompson <daniel.thompson@linaro.org>
->>
->> Currently it is not possible to detect features of the boot CPU
->> until the other CPUs have been brought up.
->>
->> This prevents us from reacting to features of the boot CPU until
->> fairly late in the boot process. To solve this we allow a subset
->> of features (that are likely to be common to all clusters) to be
->> detected based on the boot CPU alone.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
->>              duplicates between early features and normal
->>              features]
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/kernel/cpufeature.c | 69 
->> ++++++++++++++++++++++++++++--------------
->>   1 file changed, 47 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/cpufeature.c 
->> b/arch/arm64/kernel/cpufeature.c
->> index a73a592..6698404 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -52,6 +52,8 @@
->>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->>   EXPORT_SYMBOL(cpu_hwcaps);
->>
->> +static void __init setup_early_feature_capabilities(void);
->> +
->>   /*
->>    * Flag to indicate if we have computed the system wide
->>    * capabilities based on the boot time active CPUs. This
->> @@ -542,6 +544,8 @@ void __init init_cpu_features(struct cpuinfo_arm64 
->> *info)
->>           init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
->>           sve_init_vq_map();
->>       }
->> +
->> +    setup_early_feature_capabilities();
->>   }
->>
->>   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
->> @@ -846,7 +850,7 @@ static bool has_no_fpsimd(const struct 
->> arm64_cpu_capabilities *entry, int __unus
->>                       ID_AA64PFR0_FP_SHIFT) < 0;
->>   }
->>
->> -static const struct arm64_cpu_capabilities arm64_features[] = {
->> +static const struct arm64_cpu_capabilities arm64_early_features[] = {
->>       {
->>           .desc = "GIC system register CPU interface",
->>           .capability = ARM64_HAS_SYSREG_GIC_CPUIF,
->> @@ -857,6 +861,10 @@ static bool has_no_fpsimd(const struct 
->> arm64_cpu_capabilities *entry, int __unus
->>           .sign = FTR_UNSIGNED,
->>           .min_field_value = 1,
->>       },
->> +    {}
->> +};
->> +
-> 
-> 
-> Julien,
-> 
-> One potential problem with this is that we don't have a way
-> to make this work on a "theoretical" system with and without
-> GIC system reg interface. i.e, if we don't have the CONFIG
-> enabled for using ICC system regs for IRQ flags, the kernel
-> could still panic. I understand this is not a "normal" configuration
-> but, may be we could make the panic option based on whether
-> we actually use the system regs early enough ?
-> 
+There is nothing sensible we can return for si_code in such cases,
+but SI_USER is certainly not appropriate and will lead to violation
+of legitimate userspace assumptions.
 
-I see, however I'm not sure what happens in the GIC drivers if we have a 
-CPU running with a GICv3 and other CPUs with something else... But of 
-course this is not technically limited by the arm64 capabilities handling.
+This patch allocates a new si_code value FPE_UNKNOWN that at least
+does not conflict with any existing SI_* or FPE_* code, and yields
+this in si_code for undiagnosable cases.  This is probably the best
+simplicity/incorrectness tradeoff achieveable without relying on
+implementation-dependent features or adding a lot of code.  In any
+case, there appears to be no perfect solution possible that would
+justify a lot of effort here.
 
-What behaviour would you be looking for? A way to prevent the CPU to be 
-brought up instead of panicking?
+Yielding FPE_UNKNOWN when some well-defined fp exception caused the
+trap is a violation of POSIX, but this is forced by the
+architecture.  We have no realistic prospect of yielding the
+correct code in such cases.  At present I am not aware of any ARMv8
+implementation that supports trapped floating-point exceptions in
+any case.
 
-> Btw, I am rewriting the capabilities infrastructure to allow per-cap
-> control on how it should be treated. I might add an EARLY scope for
-> caps which could cover this and may be VHE.
+The new code may be applicable to other architectures for similar
+reasons.
 
-Thanks,
+No attempt is made to provide ESR_ELx to userspace in the signal
+frame, since architectural limitations mean that it is unlikely to
+provide much diagnostic value, doesn't benefit existing software
+and would create ABI with no proven purpose.  The existing
+mechanism for passing it also has problems of its own which may
+result in the wrong value being passed to userspace due to
+interaction with mm faults.  The implied rework does not appear
+justified.
 
+Reported-by: Eric W. Biederman <ebiederm@xmission.com>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/esr.h       |  9 +++++++++
+ arch/arm64/kernel/fpsimd.c         | 27 +++++++++++++++------------
+ include/uapi/asm-generic/siginfo.h |  3 ++-
+ 3 files changed, 26 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 014d7d8..c585e91 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -220,6 +220,15 @@
+ 		(((e) & ESR_ELx_SYS64_ISS_OP2_MASK) >>		\
+ 		 ESR_ELx_SYS64_ISS_OP2_SHIFT))
+ 
++/*
++ * ISS field definitions for floating-point exception traps
++ * (FP_EXC_32/FP_EXC_64).
++ *
++ * (The FPEXC_* constants are used instead for common bits.)
++ */
++
++#define ESR_ELx_FP_EXC_TFV	(UL(1) << 23)
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index fae81f7..2d6ba9e 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -39,6 +39,7 @@
+ #include <linux/slab.h>
+ #include <linux/sysctl.h>
+ 
++#include <asm/esr.h>
+ #include <asm/fpsimd.h>
+ #include <asm/cputype.h>
+ #include <asm/simd.h>
+@@ -867,18 +868,20 @@ asmlinkage void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+ asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+-	unsigned int si_code = 0;
+-
+-	if (esr & FPEXC_IOF)
+-		si_code = FPE_FLTINV;
+-	else if (esr & FPEXC_DZF)
+-		si_code = FPE_FLTDIV;
+-	else if (esr & FPEXC_OFF)
+-		si_code = FPE_FLTOVF;
+-	else if (esr & FPEXC_UFF)
+-		si_code = FPE_FLTUND;
+-	else if (esr & FPEXC_IXF)
+-		si_code = FPE_FLTRES;
++	unsigned int si_code = FPE_UNKNOWN;
++
++	if (esr & ESR_ELx_FP_EXC_TFV) {
++		if (esr & FPEXC_IOF)
++			si_code = FPE_FLTINV;
++		else if (esr & FPEXC_DZF)
++			si_code = FPE_FLTDIV;
++		else if (esr & FPEXC_OFF)
++			si_code = FPE_FLTOVF;
++		else if (esr & FPEXC_UFF)
++			si_code = FPE_FLTUND;
++		else if (esr & FPEXC_IXF)
++			si_code = FPE_FLTRES;
++	}
+ 
+ 	memset(&info, 0, sizeof(info));
+ 	info.si_signo = SIGFPE;
+diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+index e447283..77edb00 100644
+--- a/include/uapi/asm-generic/siginfo.h
++++ b/include/uapi/asm-generic/siginfo.h
+@@ -193,7 +193,8 @@ typedef struct siginfo {
+ #define FPE_FLTRES	6	/* floating point inexact result */
+ #define FPE_FLTINV	7	/* floating point invalid operation */
+ #define FPE_FLTSUB	8	/* subscript out of range */
+-#define NSIGFPE		8
++#define FPE_UNKNOWN	9	/* undiagnosed floating-point exception */
++#define NSIGFPE		9
+ 
+ /*
+  * SIGSEGV si_codes
 -- 
-Julien Thierry
+2.1.4
