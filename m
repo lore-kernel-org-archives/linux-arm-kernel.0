@@ -1,134 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:24 +0100
-Subject: [PATCH v4 10/13] drm/sun4i: backend: Add a custom atomic_check for
- the frontend
+Date: Mon, 22 Jan 2018 10:25:15 +0100
+Subject: [PATCH v4 01/13] drm/sun4i: backend: Move line stride setup to buffer
+ setup function
 In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
 References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <278e6c514a8311750fe627c7f28d58b3e2cbd825.1516613040.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <cbec84125bc0d5a6cf1d856b8291fbf77b138881.1516613040.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have everything in place, we can start enabling the frontend.
-This is more difficult than one would assume since there can only be one
-plane using the frontend per-backend.
+Setup the line stride in the buffer setup function, since it's tied to the
+buffer itself, and is not needed when we do not set the buffer in the
+backend.
 
-We therefore need to make sure that the userspace will not try to setup
-multiple planes using it, since that would be impossible. In order to
-prevent that, we can create an atomic_check callback that will check that
-only one plane will effectively make use of the frontend in a given
-configuration, and will toggle the switch in that plane state so that the
-proper setup function can do their role.
+This is for example the case when using the frontend and then routing its
+output to the backend.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 65 ++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
- 2 files changed, 67 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 21b047e5b4b7..1b8e3dcbe47a 100644
+index 847eecbe4d14..c99d1a7e815a 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <drm/drmP.h>
-+#include <drm/drm_atomic.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-@@ -271,6 +272,69 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	return 0;
- }
- 
-+static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
-+{
-+	u16 src_h = state->src_h >> 16;
-+	u16 src_w = state->src_w >> 16;
-+
-+	DRM_DEBUG_DRIVER("Input size %dx%d, output size %dx%d\n",
-+			 src_w, src_h, state->crtc_w, state->crtc_h);
-+
-+	if ((state->crtc_h != src_h) || (state->crtc_w != src_w))
-+		return true;
-+
-+	return false;
-+}
-+
-+static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
-+{
-+	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
-+	struct sun4i_backend *backend = layer->backend;
-+
-+	if (IS_ERR(backend->frontend))
-+		return false;
-+
-+	return sun4i_backend_plane_uses_scaler(state);
-+}
-+
-+static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-+				      struct drm_crtc_state *crtc_state)
-+{
-+	struct drm_atomic_state *state = crtc_state->state;
-+	struct drm_device *drm = state->dev;
-+	struct drm_plane *plane;
-+	unsigned int num_frontend_planes = 0;
-+
-+	DRM_DEBUG_DRIVER("Starting checking our planes\n");
-+
-+	if (!crtc_state->planes_changed)
-+		return 0;
-+
-+	drm_for_each_plane_mask(plane, drm, crtc_state->plane_mask) {
-+		struct drm_plane_state *plane_state =
-+			drm_atomic_get_plane_state(state, plane);
-+		struct sun4i_layer_state *layer_state =
-+			state_to_sun4i_layer_state(plane_state);
-+
-+		if (sun4i_backend_plane_uses_frontend(plane_state)) {
-+			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
-+					 plane->index);
-+
-+			layer_state->uses_frontend = true;
-+			num_frontend_planes++;
-+		} else {
-+			layer_state->uses_frontend = false;
-+		}
-+	}
-+
-+	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
-+		DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
+@@ -141,7 +141,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+ 				     int layer, struct drm_plane *plane)
  {
- 	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
-@@ -415,6 +479,7 @@ static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
- }
+ 	struct drm_plane_state *state = plane->state;
+-	struct drm_framebuffer *fb = state->fb;
  
- static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
-+	.atomic_check			= sun4i_backend_atomic_check,
- 	.commit				= sun4i_backend_commit,
- 	.layers_init			= sun4i_layers_init,
- 	.apply_color_correction		= sun4i_backend_apply_color_correction,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 350a2dbde31a..b5edf2d50a24 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -144,6 +144,8 @@
- #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
- #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+ 	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
  
-+#define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
+@@ -153,12 +152,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+ 						   state->crtc_h));
+ 	}
+ 
+-	/* Set the line width */
+-	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
+-	regmap_write(backend->engine.regs,
+-		     SUN4I_BACKEND_LAYLINEWIDTH_REG(layer),
+-		     fb->pitches[0] * 8);
+-
+ 	/* Set height and width */
+ 	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n",
+ 			 state->crtc_w, state->crtc_h);
+@@ -218,6 +211,13 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+ 	u32 lo_paddr, hi_paddr;
+ 	dma_addr_t paddr;
+ 
++	/* Set the line width */
++	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
++	regmap_write(backend->engine.regs,
++		     SUN4I_BACKEND_LAYLINEWIDTH_REG(layer),
++		     fb->pitches[0] * 8);
 +
- struct sun4i_backend {
- 	struct sunxi_engine	engine;
- 	struct sun4i_frontend	*frontend;
++
+ 	/* Get the start of the displayed memory */
+ 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
+ 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
 -- 
 git-series 0.9.1
