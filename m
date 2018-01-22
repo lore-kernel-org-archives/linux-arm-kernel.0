@@ -1,35 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:27 +0100
-Subject: [PATCH v4 13/13] ARM: dts: sun8i: a33 Enable our display frontend
+Date: Mon, 22 Jan 2018 10:25:19 +0100
+Subject: [PATCH v4 05/13] drm/sun4i: engine: Add a custom crtc atomic_check
 In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
 References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <ee3bcabdaa48a50d65394848c8aff1423609033e.1516613040.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <e5f5f144e5c20d348cdb29933ae876c105bec017.1516613040.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display frontend can be used to do hardware scaling, colorspaces
-conversion or to implement the buffer format output by the Cedar VPU.
+We have some restrictions on what the planes and CRTC can provide that are
+tied to only one generation of display engines.
 
-Since we're starting to have some support for it in the DRM driver, let's
-enable its DT node.
+For example, on the first generation, we can only have one YUV plane or one
+plane that uses the frontend output.
+
+Let's allow our engines to provide an atomic_check callback to validate the
+current configuration.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c   | 14 ++++++++++++++
+ drivers/gpu/drm/sun4i/sunxi_engine.h | 17 +++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 50eb84fa246a..a21f2ed07a52 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -289,7 +289,6 @@
- 			clock-names = "ahb", "mod",
- 				      "ram";
- 			resets = <&ccu RST_BUS_DE_FE>;
--			status = "disabled";
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 5decae0069d0..2a565325714f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -46,6 +46,19 @@ static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
+ 	return NULL;
+ }
  
- 			ports {
- 				#address-cells = <1>;
++static int sun4i_crtc_atomic_check(struct drm_crtc *crtc,
++				    struct drm_crtc_state *state)
++{
++	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
++	struct sunxi_engine *engine = scrtc->engine;
++	int ret = 0;
++
++	if (engine && engine->ops && engine->ops->atomic_check)
++		ret = engine->ops->atomic_check(engine, state);
++
++	return ret;
++}
++
+ static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
+ {
+@@ -125,6 +138,7 @@ static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
+ }
+ 
+ static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
++	.atomic_check	= sun4i_crtc_atomic_check,
+ 	.atomic_begin	= sun4i_crtc_atomic_begin,
+ 	.atomic_flush	= sun4i_crtc_atomic_flush,
+ 	.atomic_enable	= sun4i_crtc_atomic_enable,
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index b374e074c7c3..b819d4f9f02f 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -23,6 +23,23 @@ struct sunxi_engine;
+  */
+ struct sunxi_engine_ops {
+ 	/**
++	 * @atomic_check:
++	 *
++	 * This callback allows to validate plane-update related CRTC
++	 * constraints specific to engines. This is mirroring the
++	 * &drm_crtc_helper_funcs.atomic_check callback, so any
++	 * documentation there applies.
++	 *
++	 * This function is optional.
++	 *
++	 * RETURNS:
++	 *
++	 * 0 on success or a negative error code.
++	 */
++	int (*atomic_check)(struct sunxi_engine *engine,
++			    struct drm_crtc_state *state);
++
++	/**
+ 	 * @commit:
+ 	 *
+ 	 * This callback will trigger the hardware switch to commit
 -- 
 git-series 0.9.1
