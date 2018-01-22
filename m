@@ -1,42 +1,85 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:17 +0100
-Subject: [PATCH v4 03/13] drm/sun4i: backend: Allow a NULL plane pointer to
- retrieve the format
+Date: Mon, 22 Jan 2018 10:25:16 +0100
+Subject: [PATCH v4 02/13] drm/sun4i: backend: Document the engine operations
 In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
 References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <bfbe4c2e8525a7542526b648d59a8f3546e905f1.1516613040.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <fdcd8ec3ae9ecd73ef089ede5218d3a41b49be05.1516613040.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function converting the DRM format to its equivalent in the backend
-registers was assuming that we were having a plane.
+Our operations were missing some documentation to explain what was expected
+from them.
 
-However, we might want to use that function when setting up a plane using
-the frontend, in which case we will not have a plane associated to the
-backend's layer. Yet, we still need to setup the format to the one output
-by the frontend.
+Let's make that clearer.
 
-Test for NULL plane pointers before referencing them, so that we can work
-around it.
-
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sunxi_engine.h | 46 +++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index c99d1a7e815a..f971d3fb5ee4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -93,7 +93,7 @@ void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
- 					     u32 format, u32 *mode)
- {
--	if ((plane->type == DRM_PLANE_TYPE_PRIMARY) &&
-+	if (plane && (plane->type == DRM_PLANE_TYPE_PRIMARY) &&
- 	    (format == DRM_FORMAT_ARGB8888))
- 		format = DRM_FORMAT_XRGB8888;
+diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 4cb70ae65c79..b374e074c7c3 100644
+--- a/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -15,12 +15,58 @@ struct drm_device;
+ 
+ struct sunxi_engine;
+ 
++/**
++ * struct sunxi_engine_ops - helper operations for sunXi engines
++ *
++ * These hooks are used by the common part of the DRM driver to
++ * implement the proper behaviour.
++ */
+ struct sunxi_engine_ops {
++	/**
++	 * @commit:
++	 *
++	 * This callback will trigger the hardware switch to commit
++	 * the new configuration that has been setup during the next
++	 * vblank period.
++	 *
++	 * This function is optional.
++	 */
+ 	void (*commit)(struct sunxi_engine *engine);
++
++	/**
++	 * @layers_init:
++	 *
++	 * This callback is used to allocate, initialize and register
++	 * the layers supported by that engine.
++	 *
++	 * This function is mandatory.
++	 *
++	 * RETURNS:
++	 *
++	 * The array of struct drm_plane backing the layers, or an
++	 * error pointer on failure.
++	 */
+ 	struct drm_plane **(*layers_init)(struct drm_device *drm,
+ 					  struct sunxi_engine *engine);
+ 
++	/**
++	 * @apply_color_correction:
++	 *
++	 * This callback will enable the color correction in the
++	 * engine. This is useful only for the composite output.
++	 *
++	 * This function is optional.
++	 */
+ 	void (*apply_color_correction)(struct sunxi_engine *engine);
++
++	/**
++	 * @disable_color_correction:
++	 *
++	 * This callback will stop the color correction in the
++	 * engine. This is useful only for the composite output.
++	 *
++	 * This function is optional.
++	 */
+ 	void (*disable_color_correction)(struct sunxi_engine *engine);
+ };
  
 -- 
 git-series 0.9.1
