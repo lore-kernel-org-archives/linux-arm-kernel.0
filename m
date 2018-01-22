@@ -1,72 +1,76 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 22 Jan 2018 17:29:20 +0000
-Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
- define package boundaries
-In-Reply-To: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
-References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
-Message-ID: <c9ab384b-1408-eccb-b417-af9a8a22119c@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 22 Jan 2018 11:30:15 -0600
+Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+Message-ID: <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/01/18 17:15, Lorenzo Pieralisi wrote:
-> The current ARM DT topology description provides the operating system
-> with a topological view of the system that is based on leaf nodes
-> representing either cores or threads (in an SMT system) and a
-> hierarchical set of cluster nodes that creates a hierarchical topology
-> view of how those cores and threads are grouped.
+On 01/22/2018 05:14 AM, Bartosz Golaszewski wrote:
+> 2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
+>> This series converts mach-davinci to use the common clock framework.
+>>
+>> The series works like this, the first 19 patches create new clock drivers
+>> using the common clock framework. There are basically 3 groups of clocks -
+>> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
+>> unique init data, which is the reason for so many patches.
+>>
+>> Then, starting with "ARM: da830: add new clock init using common clock",
+>> we get the mach code ready for the switch by adding the code needed for
+>> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
+>> legacy clocks so that we can switch easily between the old and the new.
+>>
+>> "ARM: davinci: switch to common clock framework" actually flips the switch
+>> to start using the new clock drivers. Then the next 8 patches remove all
+>> of the old clock code.
+>>
+>> The final three patches add device tree clock support to the one SoC that
+>> supports it.
+>>
+>> v6 changes (also see individual patches for details):
+>> - All of the device tree bindings are changed
+>> - All of the clock drivers are changed significantly
+>> - Fixed issues brought up during review of v5
+>> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
+>>    series and submitted separately
+>>
+>> v5 changes:
+>> - Basically, this is an entirely new series
+>> - Patches are broken up into bite-sized pieces
+>> - Converted PSC clock driver to use regmap
+>> - Restored "force" flag for certain DA850 clocks
+>> - Added device tree bindings
+>> - Moved more of the clock init to drivers/clk
+>> - Fixed frequency scaling (maybe*)
+>>
+>> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
+>>    what they need to do to make this work, but I haven't figured out how to
+>>    test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
+>>    sent separately after this series has landed.)
+>>
+>> Dependencies:
+>>
+>> This series applies on top of linux-davinci/master plus the following patches:
+>> - [1] "clk: fix reentrancy of clk_enable() on UP systems" (in clk-next)
+>> - [2] "clk: add helper functions for managing clk_onecell_data"
+>> - [3] "clk: divider: read-only divider can propagate rate change"
+>> - [4],[5],[6],[7],[8],[9] series "ARM: davinci: common clock prep work"
+>>
 > 
-> As opposed to the ACPI topology description ([1], PPTT table), this
-> hierarchical representation of clusters does not allow to describe what
-> topology level actually represents the physical package boundary, which
-> is a key piece of information to be used by an operating system to
-> optimize resource allocation and scheduling.
+> Hi David,
 > 
-> Define an optional, backward compatible boolean property for cluster
-> nodes that, by reusing the ACPI nomenclature, add to the ARM DT
-> topological description a binding to define what cluster level
-> represents a physical package boundary.
+> I'm getting a splat[1] when trying to mount the rootfs over nfs on a da850-lcdk.
 > 
-> [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> I'll try to figure out what's happening.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Jeremy Linton <jeremy.linton@arm.com>
-> Cc: Morten Rasmussen <morten.rasmussen@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> Best regards,
+> Bartosz Golaszewski
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
-> index de9eb0486630..8e78d76b0671 100644
-> --- a/Documentation/devicetree/bindings/arm/topology.txt
-> +++ b/Documentation/devicetree/bindings/arm/topology.txt
-> @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
->  	The cluster node name must be "clusterN" as described in 2.1 above.
->  	A cluster node can not be a leaf node.
->  
-> +	Properties for cluster nodes:
-> +
-> +	- physical-package
-> +		Usage: optional
-> +		Value type: <empty>
-
-IIUC, value type must be specified as boolean in this case.
-
-> +		Definition: if present the cluster node represents the
-> +			    boundary of a physical package, whether socketed
-> +			    or surface mounted.
-> +
->  	A cluster node's child nodes must be:
->  
->  	- one or more cluster nodes; or
+> [1] https://pastebin.com/D94z8SAe
 > 
 
-Otherwise looks good to me.
-
--- 
-Regards,
-Sudeep
+Could it have something to do with the "rmii" clock? I don't think I added that
+in the device tree.
