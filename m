@@ -1,40 +1,60 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 22 Jan 2018 07:06:07 +0100
-Subject: [PATCH] arm: Initialize hrtimer-based broadcast clockevent
-Message-ID: <86a7e675-11bd-3b8b-22a0-8f440db96293@siemens.com>
+From: hw.likun@huawei.com (Li Kun)
+Date: Mon, 22 Jan 2018 14:52:18 +0800
+Subject: [PATCH v2 07/11] arm64: Add skeleton to harden the branch
+ predictor against aliasing attacks
+In-Reply-To: <20180119142814.GA8421@arm.com>
+References: <1515157961-20963-1-git-send-email-will.deacon@arm.com>
+ <1515157961-20963-8-git-send-email-will.deacon@arm.com>
+ <01c224eb-9bec-6b16-7ecf-14837cc107b6@huawei.com>
+ <20180117100715.GA27892@arm.com>
+ <a8f3579a-9afd-c39a-fad7-826eba8e9ac8@huawei.com>
+ <20180119142814.GA8421@arm.com>
+Message-ID: <7cb8f7d6-8f81-efa8-3a83-f95c5af7e8ab@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analogously to 9358d755bd5c, this registers a broadcast clockevent in
-case no hardware broadcast timer is available and the per-CPU timers can
-be stopped in deep power states.
 
-Partitions of the Jailhouse hypervisor fall in this category.
-Registering the workaround timer allows to enter high-resolution mode in
-that case.
 
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
----
- arch/arm/kernel/time.c | 3 +++
- 1 file changed, 3 insertions(+)
+On 2018/1/19 22:28, Will Deacon Wrote:
+> On Fri, Jan 19, 2018 at 11:37:24AM +0800, Li Kun wrote:
+>> ? 2018/1/17 18:07, Will Deacon ??:
+>>> On Wed, Jan 17, 2018 at 12:10:33PM +0800, Yisheng Xie wrote:
+>>>> On 2018/1/5 21:12, Will Deacon wrote:
+>>>>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+>>>>> index 5f7097d0cd12..d99b36555a16 100644
+>>>>> --- a/arch/arm64/mm/context.c
+>>>>> +++ b/arch/arm64/mm/context.c
+>>>>> @@ -246,6 +246,8 @@ asmlinkage void post_ttbr_update_workaround(void)
+>>>>>   			"ic iallu; dsb nsh; isb",
+>>>>>   			ARM64_WORKAROUND_CAVIUM_27456,
+>>>>>   			CONFIG_CAVIUM_ERRATUM_27456));
+>>>>> +
+>>>>> +	arm64_apply_bp_hardening();
+>>>>>   }
+>>>> post_ttbr_update_workaround was used for fix Cavium erratum 2745? so does that
+>>>> means, if we do not have this erratum, we do not need arm64_apply_bp_hardening()?
+>>>> when mm_swtich and kernel_exit?
+>>>>
+>>>>  From the code logical, it seems not only related to erratum 2745 anymore?
+>>>> should it be renamed?
+>>> post_ttbr_update_workaround just runs code after a TTBR update, which
+>>> includes mitigations against variant 2 of "spectre" and also a workaround
+>>> for a Cavium erratum. These are separate issues.
+>> But AFAIU, according to the theory of spectre, we don't need to clear the
+>> BTB every time we return to user?
+>> If we enable CONFIG_ARM64_SW_TTBR0_PAN, there will be a call to
+>> arm64_apply_bp_hardening every time kernel exit to el0.
+>> kernel_exit
+>>      post_ttbr_update_workaround
+>>          arm64_apply_bp_hardening
+> That's a really good point, thanks. What it means is that
+> post_ttbr_update_workaround is actually the wrong place for this, and we
+> should be doing it more directly on the switch_mm path -- probably in
+> check_and_switch_context.
+Yes, that's exactly what i mean.:-)
+>
+> Will
 
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 629f8e9981f1..0a45d861ef8e 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -12,6 +12,7 @@
-  *  reading the RTC at bootup, etc...
-  */
- #include <linux/clk-provider.h>
-+#include <linux/clockchips.h>
- #include <linux/clocksource.h>
- #include <linux/errno.h>
- #include <linux/export.h>
-@@ -121,5 +122,7 @@ void __init time_init(void)
- 		of_clk_init(NULL);
- #endif
- 		timer_probe();
-+
-+		tick_setup_hrtimer_broadcast();
- 	}
- }
+-- 
+Best Regards
+Li Kun
