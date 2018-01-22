@@ -1,97 +1,39 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 22 Jan 2018 19:33:05 +0800
-Subject: [PATCH] ASoC: mediatek: fix double free in mt2701_afe_pcm_dev_probe()
-Message-ID: <2fd34b71f3c940186b99f799c3ed14a83ccc4bba.1516620578.git.ryder.lee@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Jan 2018 12:36:32 +0100
+Subject: [PATCH] ARM: pxa/tosa-bt: add MODULE_LICENSE tag
+In-Reply-To: <87bmhpahs2.fsf@belgarion.home>
+References: <20180110162816.431038-1-arnd@arndb.de>
+ <87vag9bh1g.fsf@belgarion.home>
+ <CAK8P3a1VeN0kLrJ5T57y46NR1GNviwZ=6baaXgSm9ZqYBnGuVA@mail.gmail.com>
+ <87bmhpahs2.fsf@belgarion.home>
+Message-ID: <CAK8P3a0e18Jsi+mndFoNY5pGmQw389MWyHv+aeXk=6Y9NY3oMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit dfa3cbb8(ASoC: mediatek: modify MT2701 AFE driver to adapt mfd device)
-leads to the following static checker warning:
+On Fri, Jan 19, 2018 at 6:18 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+>> On Wed, Jan 10, 2018 at 9:22 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>> Arnd Bergmann <arnd@arndb.de> writes:
+>>>
+>>>> Without this tag, we get a build warning:
+>>>>
+>>>> WARNING: modpost: missing MODULE_LICENSE() in arch/arm/mach-pxa/tosa-bt.o
+>>>>
+>>>> For completeness, I'm also adding author and description fields.
+>>>>
+>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>>
+>>> Queued into pxa/for-next, thanks.
+>>
+>> I see now that you didn't send this back to arm at kernel.org. I assume you planned
+>> to send it for 4.17, but kernelci now still reports the warning for
+>> both 4.15 and
+>> linux-next (4.16). Should we just include this patch in the 4.16 fixes
+>> instead?
+> Yeah sure, go ahead and merge it into 4.16 staging branch, with my :
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-	sound/soc/mediatek/mt2701/mt2701-afe-pcm.c:1535 mt2701_afe_pcm_dev_probe()
-	error: double free of 'component'
+Applied to next/soc now, thanks!
 
-This patch fixes that and adds a helper mt2701_afe_add_component() to setup
-component.
-
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 32 +++++++++++++++++-------------
- 1 file changed, 18 insertions(+), 14 deletions(-)
-
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index f0cd08f..ff15537 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -1405,9 +1405,24 @@ static int mt2701_afe_runtime_resume(struct device *dev)
- 	return mt2701_afe_enable_clock(afe);
- }
- 
--static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
-+static int mt2701_afe_add_component(struct mtk_base_afe *afe)
- {
- 	struct snd_soc_component *component;
-+
-+	component = kzalloc(sizeof(*component), GFP_KERNEL);
-+	if (!component)
-+		return -ENOMEM;
-+
-+	component->regmap = afe->regmap;
-+
-+	return snd_soc_add_component(afe->dev, component,
-+				     &mt2701_afe_pcm_dai_component,
-+				     mt2701_afe_pcm_dais,
-+				     ARRAY_SIZE(mt2701_afe_pcm_dais));
-+}
-+
-+static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
-+{
- 	struct mtk_base_afe *afe;
- 	struct mt2701_afe_private *afe_priv;
- 	struct device *dev;
-@@ -1477,12 +1492,6 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 			= &mt2701_i2s_data[i][I2S_IN];
- 	}
- 
--	component = kzalloc(sizeof(*component), GFP_KERNEL);
--	if (!component)
--		return -ENOMEM;
--
--	component->regmap = afe->regmap;
--
- 	afe->mtk_afe_hardware = &mt2701_afe_hardware;
- 	afe->memif_fs = mt2701_memif_fs;
- 	afe->irq_fs = mt2701_irq_fs;
-@@ -1495,7 +1504,7 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 	ret = mt2701_init_clock(afe);
- 	if (ret) {
- 		dev_err(dev, "init clock error\n");
--		goto err_init_clock;
-+		return ret;
- 	}
- 
- 	platform_set_drvdata(pdev, afe);
-@@ -1514,10 +1523,7 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 		goto err_platform;
- 	}
- 
--	ret = snd_soc_add_component(dev, component,
--				    &mt2701_afe_pcm_dai_component,
--				    mt2701_afe_pcm_dais,
--				    ARRAY_SIZE(mt2701_afe_pcm_dais));
-+	ret = mt2701_afe_add_component(afe);
- 	if (ret) {
- 		dev_warn(dev, "err_dai_component\n");
- 		goto err_dai_component;
-@@ -1531,8 +1537,6 @@ static int mt2701_afe_pcm_dev_probe(struct platform_device *pdev)
- 	pm_runtime_put_sync(dev);
- err_pm_disable:
- 	pm_runtime_disable(dev);
--err_init_clock:
--	kfree(component);
- 
- 	return ret;
- }
--- 
-1.9.1
+     Arnd
