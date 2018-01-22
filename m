@@ -1,44 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 22 Jan 2018 11:14:11 -0600
-Subject: [PATCH v6 41/41] ARM: dts: da850: Add clocks
-In-Reply-To: <1516468460-4908-42-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-42-git-send-email-david@lechnology.com>
-Message-ID: <20a164e1-2d78-8905-cada-ca02dbf3e5c3@lechnology.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 22 Jan 2018 17:15:34 +0000
+Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to define
+ package boundaries
+Message-ID: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2018 11:14 AM, David Lechner wrote:
-> This adds clock provider nodes for da850 and wires them up to all of the
-> devices.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
-> 
-> v6 changes:
-> - updated for device tree bindings changes earlier in this series
-> - use single async2 clock instead of duplicate fixed factor clocks
-> - add clock-names property to mdio node
-> 
->   arch/arm/boot/dts/da850.dtsi | 162 +++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 162 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+The current ARM DT topology description provides the operating system
+with a topological view of the system that is based on leaf nodes
+representing either cores or threads (in an SMT system) and a
+hierarchical set of cluster nodes that creates a hierarchical topology
+view of how those cores and threads are grouped.
 
-...
+As opposed to the ACPI topology description ([1], PPTT table), this
+hierarchical representation of clusters does not allow to describe what
+topology level actually represents the physical package boundary, which
+is a key piece of information to be used by an operating system to
+optimize resource allocation and scheduling.
 
->   		pmx_core: pinmux at 14120 {
->   			compatible = "pinctrl-single";
->   			reg = <0x14120 0x50>;
-> @@ -264,8 +325,43 @@
->   			usb_phy: usb-phy {
->   				compatible = "ti,da830-usb-phy";
->   				#phy-cells = <1>;
-> +				clocks = <&usb_phy_clk 0>, <&usb_phy_clk 1>;
-> +				clock-names = "usb20_phy", "usb11_phy";
+Define an optional, backward compatible boolean property for cluster
+nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+topological description a binding to define what cluster level
+represents a physical package boundary.
 
-This should be:
-				clock-names = "usb0_clk48", "usb1_clk48";
+[1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
 
->   				status = "disabled";
->   			};
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+index de9eb0486630..8e78d76b0671 100644
+--- a/Documentation/devicetree/bindings/arm/topology.txt
++++ b/Documentation/devicetree/bindings/arm/topology.txt
+@@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+ 	The cluster node name must be "clusterN" as described in 2.1 above.
+ 	A cluster node can not be a leaf node.
+ 
++	Properties for cluster nodes:
++
++	- physical-package
++		Usage: optional
++		Value type: <empty>
++		Definition: if present the cluster node represents the
++			    boundary of a physical package, whether socketed
++			    or surface mounted.
++
+ 	A cluster node's child nodes must be:
+ 
+ 	- one or more cluster nodes; or
+-- 
+2.15.0
