@@ -1,37 +1,18 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 22 Jan 2018 11:28:54 +0900
-Subject: [PATCH] PCI: exynos: fix the potential null pointer dereference
-References: <CGME20180122022856epcas1p494a9efeae478b299e3e8006adad71e6a@epcas1p4.samsung.com>
-Message-ID: <20180122022854.3634-1-jh80.chung@samsung.com>
+From: patch-notifications@ellerman.id.au (Michael Ellerman)
+Date: Mon, 22 Jan 2018 14:34:05 +1100 (AEDT)
+Subject: [v3, 3/6] dt: booting-without-of: DT fix
+ s/#interrupt-cell/#interrupt-cells/
+In-Reply-To: <1496407129-13527-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <3zPxqd70djz9sBd@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before calling the callback function, it needs to check whether
-init_clk_resources is assigned or not.
-Otherwise, it can be occurred the NULL pointer dereference when
-init_clk_resources is not assigned.
+On Fri, 2017-06-02 at 12:38:46 UTC, Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Even though init_clk_resources is assigned now, it needs to prevent the
-potential NULL pointer dereference in future.
+Applied to powerpc next, thanks.
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
----
- drivers/pci/dwc/pci-exynos.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+https://git.kernel.org/powerpc/c/4be4119d1fbd93c44d5c639735c312
 
-diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-index 56f32aeebd0a..39f08881f9a4 100644
---- a/drivers/pci/dwc/pci-exynos.c
-+++ b/drivers/pci/dwc/pci-exynos.c
-@@ -499,7 +499,8 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
- 			return ret;
- 	}
- 
--	if (ep->ops && ep->ops->get_clk_resources) {
-+	if (ep->ops && ep->ops->get_clk_resources &&
-+			ep->ops->init_clk_resources) {
- 		ret = ep->ops->get_clk_resources(ep);
- 		if (ret)
- 			return ret;
--- 
-2.15.1
+cheers
