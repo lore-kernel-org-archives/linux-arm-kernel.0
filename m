@@ -1,46 +1,20 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 22 Jan 2018 16:31:25 +0200
-Subject: [PATCH] ARM: dts: hummingboard: enable pwm3
-Message-ID: <ca77a0ea31bfc802d0a3192aef453c9e40e6040d.1516631485.git.baruch@tkos.co.il>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 22 Jan 2018 09:35:25 -0500 (EST)
+Subject: [net-next: PATCH v4 0/7] Armada 7k/8k PP2 ACPI support
+In-Reply-To: <CAPv3WKeqEd6Hcy0NdPpiVVA1ioUYY4zs_0zai2gwkCPtM1yaJg@mail.gmail.com>
+References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
+ <20180118132322.GE2690@kwain>
+ <CAPv3WKeqEd6Hcy0NdPpiVVA1ioUYY4zs_0zai2gwkCPtM1yaJg@mail.gmail.com>
+Message-ID: <20180122.093525.1549534484738907077.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm3 controls the backlight of the LVDS display.
+From: Marcin Wojtas <mw@semihalf.com>
+Date: Mon, 22 Jan 2018 14:00:37 +0100
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> There's a discussion about the ACPI vs generic MDIO/PHY change under
+> initial version of the patchset, however the patches in question were
+> for now abandoned from further re-sends.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 92583238ca4a..6834f4ce0c22 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -219,6 +219,12 @@
- 			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b1>;
- 		};
- 
-+		pinctrl_hummingboard_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT 0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_hummingboard_sgtl5000: hummingboard-sgtl5000 {
- 			fsl,pins = <
- 				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD 0x130b0
-@@ -291,6 +297,12 @@
- 	 status = "okay";
- };
- 
-+&pwm3 {
-+	 pinctrl-names = "default";
-+	 pinctrl-0 = <&pinctrl_hummingboard_pwm3>;
-+	 status = "okay";
-+};
-+
- &spdif {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard_spdif>;
--- 
-2.15.1
+But doesn't the results of that discussion determine whether the way ACPI
+is being used in this patch series is what we want to do or not?
