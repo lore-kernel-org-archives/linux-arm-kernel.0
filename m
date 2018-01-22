@@ -1,31 +1,43 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 22 Jan 2018 16:49:51 +0200
-Subject: [PATCH] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
- bits_per_mux != 0
-In-Reply-To: <1516575793-30526-1-git-send-email-david@lechnology.com>
-References: <1516575793-30526-1-git-send-email-david@lechnology.com>
-Message-ID: <CAHp75VdkShHhxL+3PyaPEC2Dyr8aWoEH8CQk+bEJ2WD4i6ojHg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Jan 2018 15:54:42 +0100
+Subject: [PATCH 0/8] crypto: arm64+generic - SHA3/SHA-512/SM-3 roundup
+In-Reply-To: <20180119120440.31556-1-ard.biesheuvel@linaro.org>
+References: <20180119120440.31556-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAK8P3a0HCr2zm40kqZWLCV=qPFkmAVDa5gDDKVU381pA3BjEHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 1:03 AM, David Lechner <david@lechnology.com> wrote:
-> This fixes pcs_request_gpio() in the pinctrl-single driver when
-> bits_per_mux != 0. It appears this was overlooked when the multiple
-> pins per register feature was added.
+On Fri, Jan 19, 2018 at 1:04 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> This supersedes all outstanding patches from me related to SHA-3, SHA-512
+> or SM-3.
 >
-> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure
-> multiple pins of different modules")
+> - fix a correctness issue in the SHA-3 code (#1) and a performance issue (#2),
+>   the first one is definitely a -stable candidate, the second one potentially
+>   as well
+> - patches #3 and #4 make the generic SHA-3 code reusable as a fallback for the
+>   accelerated code introduced in #6
+> - patch #5 adds some SHA-3 test cases
+> - patch #6 implements SHA-3 using special arm64 instructions
+> - patch #7 implements the Chinese SM3 secure hash algorithm using special
+>   arm64 instructions
+> - patch #8 contains some fixes for the recently queued SHA-512 arm64 code.
+>
+> Ard Biesheuvel (8):
+>   crypto/generic: sha3 - fixes for alignment and big endian operation
+>   crypto/generic: sha3: rewrite KECCAK transform to help the compiler
+>     optimize
+>   crypto/generic: sha3 - simplify code
+>   crypto/generic: sha3 - export init/update/final routines
+>   crypto/testmgr: sha3 - add new testcases
+>   crypto/arm64: sha3 - new v8.2 Crypto Extensions implementation
+>   crypto/arm64: sm3 - new v8.2 Crypto Extensions implementation
+>   crypto/arm64: sha512 - fix/improve new v8.2 Crypto Extensions code
 
-One line?
+I can confirm that patch 8 fixes the issues I saw earlier, it would be
+good to have that merged quickly.
 
-> +                       byte_num = (pcs->bits_per_pin * pin) / BITS_PER_BYTE;
-> +                       offset = (byte_num / mux_bytes) * mux_bytes;
-> +                       pin_shift = pin % (pcs->width / pcs->bits_per_pin) *
-> +                                   pcs->bits_per_pin;
+I'm doing a little more randconfig build testing here now, will write back by
+the end of today in the unlikely case that if I find anything else wrong.
 
-Sounds like playing around pretty well defined macro and functions,
-e.g. DIV_ROUND_UP(), round_up().
-
--- 
-With Best Regards,
-Andy Shevchenko
+      Arnd
