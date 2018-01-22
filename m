@@ -1,82 +1,109 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 22 Jan 2018 13:18:13 +0100
-Subject: [Patch v6 00/12] Add MFC v10.10 support
-In-Reply-To: <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
-References: <CGME20171208093612epcas1p1eda138655cf5397893fe1f2b2152bd1f@epcas1p1.samsung.com>
- <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
-Message-ID: <126f1982-060a-6fdb-e1b3-b5c81d65ca13@xs4all.nl>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 22 Jan 2018 12:21:55 +0000
+Subject: [PATCH v2 1/6] arm64: cpufeature: Allow early detect of specific
+ features
+In-Reply-To: <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <1516190084-18978-2-git-send-email-julien.thierry@arm.com>
+ <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
+Message-ID: <2f2a406b-fddf-6c30-4052-650f57ac317a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Smitha,
 
-Thank you for this v6 series!
 
-You can add my:
-
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-
-to patches 1-9 and 11. See my review for patches 10 and 12. The comments
-are minor, so I hope I can Ack v7 once it's posted and this can be merged
-for 4.17.
-
-Regards,
-
-	Hans
-
-On 08/12/17 10:08, Smitha T Murthy wrote:
-> This patch series adds MFC v10.10 support. MFC v10.10 is used in some
-> of Exynos7 variants.
+On 22/01/18 12:05, Suzuki K Poulose wrote:
+> On 17/01/18 11:54, Julien Thierry wrote:
+>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>
+>> Currently it is not possible to detect features of the boot CPU
+>> until the other CPUs have been brought up.
+>>
+>> This prevents us from reacting to features of the boot CPU until
+>> fairly late in the boot process. To solve this we allow a subset
+>> of features (that are likely to be common to all clusters) to be
+>> detected based on the boot CPU alone.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
+>>              duplicates between early features and normal
+>>              features]
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/kernel/cpufeature.c | 69 
+>> ++++++++++++++++++++++++++++--------------
+>>   1 file changed, 47 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/cpufeature.c 
+>> b/arch/arm64/kernel/cpufeature.c
+>> index a73a592..6698404 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -52,6 +52,8 @@
+>>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>>   EXPORT_SYMBOL(cpu_hwcaps);
+>>
+>> +static void __init setup_early_feature_capabilities(void);
+>> +
+>>   /*
+>>    * Flag to indicate if we have computed the system wide
+>>    * capabilities based on the boot time active CPUs. This
+>> @@ -542,6 +544,8 @@ void __init init_cpu_features(struct cpuinfo_arm64 
+>> *info)
+>>           init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
+>>           sve_init_vq_map();
+>>       }
+>> +
+>> +    setup_early_feature_capabilities();
+>>   }
+>>
+>>   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+>> @@ -846,7 +850,7 @@ static bool has_no_fpsimd(const struct 
+>> arm64_cpu_capabilities *entry, int __unus
+>>                       ID_AA64PFR0_FP_SHIFT) < 0;
+>>   }
+>>
+>> -static const struct arm64_cpu_capabilities arm64_features[] = {
+>> +static const struct arm64_cpu_capabilities arm64_early_features[] = {
+>>       {
+>>           .desc = "GIC system register CPU interface",
+>>           .capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+>> @@ -857,6 +861,10 @@ static bool has_no_fpsimd(const struct 
+>> arm64_cpu_capabilities *entry, int __unus
+>>           .sign = FTR_UNSIGNED,
+>>           .min_field_value = 1,
+>>       },
+>> +    {}
+>> +};
+>> +
 > 
-> This adds support for following:
 > 
-> * Add support for HEVC encoder and decoder
-> * Add support for VP9 decoder
-> * Update Documentation for control id definitions
-> * Update computation of min scratch buffer size requirement for V8 onwards
+> Julien,
 > 
-> Changes since v5:
->  - Addressed review comments by Kamil Debski <kamil@wypas.org>.
->  - Addressed review comments by 
->    Stanimir Varbanov <stanimir.varbanov@linaro.org>.
->  - Addressed review comments by Hans Verkuil <hverkuil@xs4all.nl>.
->  - Rebased on latest git://linuxtv.org/snawrocki/samsung.git
->    for-v4.15/media/next.
->  - Applied r-o-b from Andrzej, Stanimir on respective patches.
->  - Applied acked-by from Kamil, Hans on respective patches.
+> One potential problem with this is that we don't have a way
+> to make this work on a "theoretical" system with and without
+> GIC system reg interface. i.e, if we don't have the CONFIG
+> enabled for using ICC system regs for IRQ flags, the kernel
+> could still panic. I understand this is not a "normal" configuration
+> but, may be we could make the panic option based on whether
+> we actually use the system regs early enough ?
 > 
-> Smitha T Murthy (12):
->   [media] s5p-mfc: Rename IS_MFCV8 macro
->   [media] s5p-mfc: Adding initial support for MFC v10.10
->   [media] s5p-mfc: Use min scratch buffer size as provided by F/W
->   [media] s5p-mfc: Support MFCv10.10 buffer requirements
->   [media] videodev2.h: Add v4l2 definition for HEVC
->   [media] v4l2-ioctl: add HEVC format description
->   Documentation: v4l: Documentation for HEVC v4l2 definition
->   [media] s5p-mfc: Add support for HEVC decoder
->   [media] s5p-mfc: Add VP9 decoder support
->   [media] v4l2: Add v4l2 control IDs for HEVC encoder
->   [media] s5p-mfc: Add support for HEVC encoder
->   Documention: v4l: Documentation for HEVC CIDs
-> 
->  .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
->  Documentation/media/uapi/v4l/extended-controls.rst | 395 +++++++++++++++
->  Documentation/media/uapi/v4l/pixfmt-compressed.rst |   5 +
->  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  88 ++++
->  drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
->  drivers/media/platform/s5p-mfc/s5p_mfc.c           |  28 ++
->  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  68 ++-
->  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  48 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 555 ++++++++++++++++++++-
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 397 +++++++++++++--
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
->  drivers/media/v4l2-core/v4l2-ctrls.c               | 118 +++++
->  drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +
->  include/uapi/linux/v4l2-controls.h                 |  92 +++-
->  include/uapi/linux/videodev2.h                     |   1 +
->  18 files changed, 1765 insertions(+), 78 deletions(-)
->  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> 
+
+I see, however I'm not sure what happens in the GIC drivers if we have a 
+CPU running with a GICv3 and other CPUs with something else... But of 
+course this is not technically limited by the arm64 capabilities handling.
+
+What behaviour would you be looking for? A way to prevent the CPU to be 
+brought up instead of panicking?
+
+> Btw, I am rewriting the capabilities infrastructure to allow per-cap
+> control on how it should be treated. I might add an EARLY scope for
+> caps which could cover this and may be VHE.
+
+Thanks,
+
+-- 
+Julien Thierry
