@@ -1,60 +1,73 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 22 Jan 2018 16:39:29 +0800
-Subject: [PATCH v1 2/4] cpufreq: mediatek: Add mediatek related projects
- into blacklist
-In-Reply-To: <20171211075532.GB25177@vireshk-i7>
-References: <1512713278-17807-1-git-send-email-andrew-sh.cheng@mediatek.com>
- <1512713278-17807-3-git-send-email-andrew-sh.cheng@mediatek.com>
- <20171211075532.GB25177@vireshk-i7>
-Message-ID: <1516610369.12197.20.camel@mtkswgap22>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Jan 2018 09:45:45 +0100
+Subject: [PATCH 1/2] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE
+In-Reply-To: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180122084545.kdhrpr5mkqnvkj2o@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rafael and Viresh
+Hi,
 
-Can you kindly guide me how to let the patch also be applied to 4.14 and
-4.15 tree? Do I need to submit another patches for them?
-
-These trees really need them. Otherwise, multi_v7_defconfig setup will
-cause an occasional hang or unexpected behaviors on related boards as
-[1] kernelci reported :-(
-
-	Sean
-
-[1]
-https://kernelci.org/boot/mt7623n-bananapi-bpi-r2/
-
-
-On Mon, 2017-12-11 at 13:25 +0530, Viresh Kumar wrote:
-> On 08-12-17, 14:07, Andrew-sh Cheng wrote:
-> > mediatek projects will use mediate-cpufreq.c as cpufreq driver,
-> > instead of using cpufreq_dt.c
-> > Add mediatek related projects into cpufreq-dt blacklist
-> > 
-> > Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
-> > ---
-> >  drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > index ecc56e2..3b585e4 100644
-> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > @@ -108,6 +108,14 @@ static const struct of_device_id blacklist[] __initconst = {
-> >  
-> >  	{ .compatible = "marvell,armadaxp", },
-> >  
-> > +	{ .compatible = "mediatek,mt2701", },
-> > +	{ .compatible = "mediatek,mt2712", },
-> > +	{ .compatible = "mediatek,mt7622", },
-> > +	{ .compatible = "mediatek,mt7623", },
-> > +	{ .compatible = "mediatek,mt817x", },
-> > +	{ .compatible = "mediatek,mt8173", },
-> > +	{ .compatible = "mediatek,mt8176", },
-> > +
-> >  	{ .compatible = "nvidia,tegra124", },
-> >  
-> >  	{ .compatible = "st,stih407", },
+On Sat, Jan 20, 2018 at 07:50:20PM +0100, Giulio Benetti wrote:
+> Can't set dclk polarity on sun4i.
 > 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Handle both positive and negative dclk polarity,
+> according to bus_flags.
+
+It's not really that we can't set it, it's that it's been ignored.
+
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index f4284b5..6121210 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -17,6 +17,7 @@
+>  #include <drm/drm_encoder.h>
+>  #include <drm/drm_modes.h>
+>  #include <drm/drm_of.h>
+> +#include <drm/drm_panel.h>
+>  
+>  #include <uapi/drm/drm_mode.h>
+>  
+> @@ -173,6 +174,9 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+>  static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>  				     const struct drm_display_mode *mode)
+>  {
+> +	struct drm_panel *panel = tcon->panel;
+> +	struct drm_connector *connector = panel->connector;
+> +	struct drm_display_info display_info = connector->display_info;
+>  	unsigned int bp, hsync, vsync;
+>  	u8 clk_delay;
+>  	u32 val = 0;
+> @@ -226,8 +230,13 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>  	if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
+>  		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>  
+> +	if(display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
+> +		val |= SUN4I_TCON0_IO_POL_DCLK_PHASE(1);
+> +
+
+Checkpatch here returns:
+ERROR: space required before the open parenthesis '('
+
+And, where did you find that info? How does it interact with the
+set_phase callback of the dotclock driver?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/fb1e86d8/attachment.sig>
