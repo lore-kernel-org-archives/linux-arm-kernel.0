@@ -1,83 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Jan 2018 09:37:38 +0100
-Subject: [PATCH] pinctrl: at91-pio4: add support for drive-strength
- property
-In-Reply-To: <20180118160208.16461-1-ludovic.desroches@microchip.com>
-References: <20180118160208.16461-1-ludovic.desroches@microchip.com>
-Message-ID: <CACRpkdanweSmHd_M+feHauEHtvKSW+-W=djb186BFdbxTf20Jg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Jan 2018 09:38:33 +0100
+Subject: [PATCH] ARM: dts: sun9i: Enable USB support on Cubieboard4
+In-Reply-To: <CAGb2v66XNAHwAU1eosYjGKgYKkh9YiVEooE9e45RSVvPOvhYLg@mail.gmail.com>
+References: <20171216205809.5485-1-kettenis@openbsd.org>
+ <CAGb2v66XNAHwAU1eosYjGKgYKkh9YiVEooE9e45RSVvPOvhYLg@mail.gmail.com>
+Message-ID: <20180122083833.cnjsks3dj3uakcbt@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 5:02 PM, Ludovic Desroches
-<ludovic.desroches@microchip.com> wrote:
+On Sat, Jan 20, 2018 at 02:12:04PM +0800, Chen-Yu Tsai wrote:
+> Maxime,
+> 
+> On Sun, Dec 17, 2017 at 4:58 AM, Mark Kettenis <kettenis@openbsd.org> wrote:
+> > On the Cubieboard4 HCI0 is directly connected to a USB connector,
+> > and HCI2 is connected to a USB hub on the board.  HCI1 is available
+> > with HSIC throug 2 pins on the GPIO expansion header, but left
+> > disabled just like on the Optimus board.
+> >
+> > This patch also adds the VBUS regulators.
+> >
+> > Signed-off-by: Mark Kettenis <kettenis@openbsd.org>
+> 
+> Any thoughts on this patch?
+> 
+> It's similar to what I sent a few years back:
+> 
+>     https://patchwork.kernel.org/patch/6359461/
 
-> Add support for the drive-strength property. Usually its value is
-> expressed in mA. Since the numeric value depends on VDDIOP voltage,
-> the controller uses low, medium and high to define the drive-strengh.
+Given the previous discussion, I guess we should have much more
+comments on how it is designed.
 
-Aha I see. That's complex. It certainly results in a certain mA drive
-strength in the end, but what you're saying is that this is not usually
-what we configure.
+There was some effort to have power sequence for USB devices described
+in the DT here:
+https://patchwork.kernel.org/patch/9800887/
 
-> The PIO controller accepts two values for the low drive: 0 or 1. Most
-> of the time, we don't care about the drive strength, there is no need
-> to change it, so 0 is considered as the default value.
+I guess pinging Peter to know the current state would be a good way
+forward.
 
-Do you mean default value as in "whatever the hardware was set
-up as at boot time"?
+> >  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 36 +++++++++++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> > index 4024639aa005..e38623265695 100644
+> > --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> > +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> > @@ -74,6 +74,24 @@
+> >                 };
+> >         };
+> >
+> > +       reg_usb1_vbus: usb1-vbus {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "usb2-drvbus";
+> > +               regulator-min-microvolt = <5000000>;
+> > +               regulator-max-microvolt = <5000000>;
+> > +               enable-active-high;
+> > +               gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
+> > +       };
+> > +
+> > +       reg_usb3_vbus: usb3-vbus {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "usb1-drvbus";
+> > +               regulator-min-microvolt = <5000000>;
+> > +               regulator-max-microvolt = <5000000>;
+> > +               enable-active-high;
+> > +               gpio = <&pio 7 14 GPIO_ACTIVE_HIGH>; /* PH14 */
+> > +       };
 
-> The low-drive
-> value won't be advertised through pinconf-pins file excepted if it
+You should also have a proper parenthood relationship here, and not
+just leave these two regulators hanging around.
 
-except?
+Maxime
 
-> has been set explicitly in the device tree ie if its value is
-> different from 0.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-
-OK I think I get it.
-
->  Optional properties:
->  - GENERIC_PINCONFIG: generic pinconfig options to use, bias-disable,
-> -bias-pull-down, bias-pull-up, drive-open-drain, input-schmitt-enable,
-> -input-debounce, output-low, output-high.
-> +bias-pull-down, bias-pull-up, drive-open-drain, drive-strength,
-> +input-schmitt-enable, input-debounce, output-low, output-high.
-(...)
-> +                       drive-strength = <ATMEL_PIO_DRVSTR_LO>;
-
-So you say you support this argument and it will be something like
-
-include/dt-bindings/pinctrl/at91.h:#define ATMEL_PIO_DRVSTR_LO  1
-include/dt-bindings/pinctrl/at91.h:#define ATMEL_PIO_DRVSTR_ME  2
-include/dt-bindings/pinctrl/at91.h:#define ATMEL_PIO_DRVSTR_HI  3
-
-But the definition if generic drive strength is actually in mA.
-
-I think it is OK to deviate from stating it in mA, but you should
-write this in the DT bindings so people do not get confused.
-
-> @@ -814,6 +834,19 @@ static void atmel_conf_pin_config_dbg_show(struct pinctrl_dev *pctldev,
->                 seq_printf(s, "%s ", "open-drain");
->         if (conf & ATMEL_PIO_SCHMITT_MASK)
->                 seq_printf(s, "%s ", "schmitt");
-> +       if (conf & ATMEL_PIO_DRVSTR_MASK) {
-> +               switch ((conf & ATMEL_PIO_DRVSTR_MASK) >> ATMEL_PIO_DRVSTR_OFFSET) {
-> +               case ATMEL_PIO_DRVSTR_LO:
-> +                       seq_printf(s, "%s ", "low-drive");
-> +                       break;
-> +               case ATMEL_PIO_DRVSTR_ME:
-> +                       seq_printf(s, "%s ", "medium-drive");
-> +                       break;
-> +               case ATMEL_PIO_DRVSTR_HI:
-> +                       seq_printf(s, "%s ", "high-drive");
-> +                       break;
-
-But here you know what VDDIOP is, right?
-
-So in debugfs you could actually print the real drive strength
-in mA, or both "medium-drive, %u mA"?
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/1fd4e432/attachment.sig>
