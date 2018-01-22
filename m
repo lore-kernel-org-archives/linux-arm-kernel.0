@@ -1,70 +1,65 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 22 Jan 2018 19:32:12 +0000
-Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
- categorization
-In-Reply-To: <CAMj-D2C5Bz3r-w9v3QasZKK-W2JBY7Mx9W=yCDBnPYyk99gGzA@mail.gmail.com>
-References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
- <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
- <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
- <5A283F26.3020507@arm.com> <4b37e86d-eee3-c51e-eceb-5d0c7ad12886@huawei.com>
- <506cd212-3d16-ba2a-518f-34982bc162fc@huawei.com> <5A58F8E3.5060002@arm.com>
- <CAMj-D2C5Bz3r-w9v3QasZKK-W2JBY7Mx9W=yCDBnPYyk99gGzA@mail.gmail.com>
-Message-ID: <5A663C3C.7040904@arm.com>
+Date: Mon, 22 Jan 2018 19:32:41 +0000
+Subject: [PATCH v6 03/13] arm64: cpufeature: Detect CPU RAS Extentions
+In-Reply-To: <78d4374a-f75c-6860-38ab-6373ffae3eee@huawei.com>
+References: <20180115193906.30053-1-james.morse@arm.com>
+ <20180115193906.30053-4-james.morse@arm.com>
+ <78d4374a-f75c-6860-38ab-6373ffae3eee@huawei.com>
+Message-ID: <5A663C59.6030205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi gengdongjiu,
 
-On 21/01/18 02:45, gengdongjiu wrote:
-> For the ESR_ELx_AET_UER, this exception is precise, closing the VM may
-> be better[1].
-> But if you think panic is better until we support kernel-first, it is
-> also OK to me.
+On 16/01/18 11:17, gengdongjiu wrote:
+> Hi James,
+> 
+> On 2018/1/16 3:38, James Morse wrote:
+>> From: Xie XiuQi <xiexiuqi@huawei.com>
+>>
+>> ARM's v8.2 Extentions add support for Reliability, Availability and
+>> Serviceability (RAS). On CPUs with these extensions system software
+>> can use additional barriers to isolate errors and determine if faults
+>> are pending. Add cpufeature detection.
+>>
+>> Platform level RAS support may require additional firmware support.
 
-I'm not convinced SError while a guest was running means only guest memory could
-be affected. Mechanisms like KSM means the error could affect multiple guests.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 664fadc2aa2e..1d51c8edf34b 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -1062,6 +1062,22 @@ config ARM64_PMEM
+>>  	  operations if DC CVAP is not supported (following the behaviour of
+>>  	  DC CVAP itself if the system does not define a point of persistence).
+>>  
+>> +config ARM64_RAS_EXTN
+>> +	bool "Enable support for RAS CPU Extensions"
+>> +	default y
+>> +	help
+>> +	  CPUs that support the Reliability, Availability and Serviceability
+>> +	  (RAS) Extensions, part of ARMv8.2 are able to track faults and
+>> +	  errors, classify them and report them to software.
+>> +
+>> +	  On CPUs with these extensions system software can use additional
+>> +	  barriers to determine if faults are pending and read the
+>> +	  classification from a new set of registers.
+>> +
+>> +	  Selecting this feature will allow the kernel to use these barriers
+>> +	  and access the new registers if the system supports the extension.
+>> +	  Platform RAS features may additionally depend on firmware support.
+>> +
+>>  endmenu
+>>  
+> it seems this "CONFIG_ARM64_RAS_EXTN" is not enabled in the "arch/arm64/configs/defconfig",
+> if not, I want to enable this config to enable RAS feature in the defconfig. do you agree?
 
-Both firmware-fist and kernel-first will give us the address, with which we can
-know which processes are affected, isolated the memory and signal affected
-processes.
+Sure. This series doesn't do a lot on its own, it expects firmware-first or
+kernel-first support, which may in turn depend-on this feature. It means we
+don't panic() when notified of corrected errors, until we get the
+{firmware,kernel}-first support.
 
-Until we have one of these panic() is the only way we have to contain an error,
-but its an interim fix.
-Not panic()ing the host for an error that should be contained to the guest is a
-fudge, we don't actually know its safe (KSM, page-table etc). I want to improve
-on this with {firmware, kernel}-first support (or both!), I don't want to expose
-that this is happening to user-space, as once we have one of {firmware,
-kernel}-first, it shouldn't happen.
+Don't defconfig changes get collected by arm-soc? (I'm not sure how these get
+picked up...)
 
-
->> This is inventing something new for RAS errors not claimed by firmware-first.
->> If we have kernel-first too, this will never happen. (unless your system is
->> losing the error description).
-
-> In fact, if we have kernel-first, I think we still need to judge the
-> error type by ESR, right?
-
-The kernel-first mechanism should consider the ESR/FAR, yes, but once the error
-has been claimed and handled, KVM shouldn't care about any of these values.
-(maybe we'll sanity check for uncontained errors, just in case the error escaped
-to the RAS code...)
-
-My point here was exposing 'unhandled' (ignored) RAS errors to user-space
-creates an ABI: someone will complain once we start handling the error, and they
-no longer get a notification via this 'unhandled' interface. Code written to use
-this interface becomes useless/untested.
-
-
-> If the handle_guest_sei() , may be the system does not support firmware-first,
-> so we judge the ESR value,
-
-...and panic()/ignore as appropriate.
-
-I agree not all systems will support firmware-first, (big-endian is the obvious
-example), but if we get kernel-first support this ESR guessing can disappear,
-I'm against exposing it to user-space in the meantime.
-
-
-Thanks,
 
 James
