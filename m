@@ -1,33 +1,37 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 22 Jan 2018 16:12:37 -0500 (EST)
-Subject: [PATCH net-next v2] net: stmmac: Fix reception of Broadcom
- switches tags
-In-Reply-To: <20180118231222.19394-1-f.fainelli@gmail.com>
-References: <20180118231222.19394-1-f.fainelli@gmail.com>
-Message-ID: <20180122.161237.1482527198791478004.davem@davemloft.net>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 22 Jan 2018 15:13:08 -0600
+Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <1516623798-25001-2-git-send-email-Dave.Martin@arm.com> (Dave
+ Martin's message of "Mon, 22 Jan 2018 12:23:17 +0000")
+References: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
+ <1516623798-25001-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <878tcp8umz.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
-Date: Thu, 18 Jan 2018 15:12:21 -0800
 
-> Broadcom tags inserted by Broadcom switches put a 4 byte header after
-> the MAC SA and before the EtherType, which may look like some sort of 0
-> length LLC/SNAP packet (tcpdump and wireshark do think that way). With
-> ACS enabled in stmmac the packets were truncated to 8 bytes on
-> reception, whereas clearing this bit allowed normal reception to occur.
-> 
-> In order to make that possible, we need to pass a net_device argument to
-> the different core_init() functions and we are dependent on the Broadcom
-> tagger padding packets correctly (which it now does). To be as little
-> invasive as possible, this is only done for gmac1000 when the network
-> device is DSA-enabled (netdev_uses_dsa() returns true).
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> Changes in v2:
-> 
-> - fixed build failure in dwmac4_core.c
-> - updated dwmac100_core.c to also clear the ASTP bit
+> diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+> index e447283..77edb00 100644
+> --- a/include/uapi/asm-generic/siginfo.h
+> +++ b/include/uapi/asm-generic/siginfo.h
+> @@ -193,7 +193,8 @@ typedef struct siginfo {
+>  #define FPE_FLTRES	6	/* floating point inexact result */
+>  #define FPE_FLTINV	7	/* floating point invalid operation */
+>  #define FPE_FLTSUB	8	/* subscript out of range */
+> -#define NSIGFPE		8
+> +#define FPE_UNKNOWN	9	/* undiagnosed floating-point exception */
+> +#define NSIGFPE		9
 
-Applied, thanks Florian.
+Minor nit here.
+
+At least before this is final I would really appreciate if you could
+rebase this on top of my unificiation of siginfo.h that I posted on
+linux-arch and is in my siginfo-next branch.
+
+As that already pushes NSIGFPE up to 13.
+
+Which would make this patch change NSIGFPE to 14 and allocate the number
+14 for FPE_UNKNOWN
+
+Eric
