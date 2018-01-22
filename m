@@ -1,45 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Jan 2018 12:37:46 +0100
-Subject: [GIT PULL] dts driver fixes for omaps for v4.16 merge window
-In-Reply-To: <pull-1516376193-270253@atomide.com>
-References: <pull-1516376193-270253@atomide.com>
-Message-ID: <CAK8P3a2jjpo0R8iQPd+HP-e20Pe2BC9pBbWsoTpXVDanKfffNQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 22 Jan 2018 17:09:47 +0530
+Subject: [PATCH 1/6] mfd: syscon: Add syscon_register() function
+In-Reply-To: <CAK8P3a1AP1sz3nT8S6WMupo3iSVRsn2t9sPg2Mj1RAY1AS58UQ@mail.gmail.com>
+References: <1516418424-28686-1-git-send-email-david@lechnology.com>
+ <1516418424-28686-2-git-send-email-david@lechnology.com>
+ <75ad5a5e-319e-75d3-c1c7-15e7518d424b@ti.com>
+ <CAK8P3a1AP1sz3nT8S6WMupo3iSVRsn2t9sPg2Mj1RAY1AS58UQ@mail.gmail.com>
+Message-ID: <d991b10e-6078-3022-3b02-8fda014a90f2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 4:38 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
->
-> The following changes since commit 80a06c0d8357d1e75a8fbc10813fcdada4d897fb:
->
->   ARM: dts: dm816x: add clkctrl nodes (2017-12-11 08:28:37 -0800)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/dt-clk-dts-signed
->
-> for you to fetch changes up to e14d7e5320ebae9bffe4fbd585dfdd9d6de2550f:
->
->   ARM: dts: Update ti-sysc data for existing users (2018-01-12 15:16:57 -0800)
->
-> ----------------------------------------------------------------
-> Few omap interconnect dts fixes for v4.16 merge window
->
-> Now that we have the dts clocks for the clkctrl clock and the
-> interconnect binding, we need to update the existing ti-sysc
-> users according to the binding to make it usable for drivers.
->
-> Apologies for not being able to send this earlier but it took
-> me few revisions to get the smartreflex changes right and
-> tested with yet to be posted patches to make smartreflex probe
-> with dts and I wanted to have it sit in next for a while to make
-> sure we're not introducing regressions for legacy platform data
-> based booting.
->
-> Note that this is based on a merge with commit 20a2742e5784
-> ("dt-bindings: ti-sysc: Update binding for timers and capabilities")
-> to avoid a merge conflict with the binding changes.
+On Monday 22 January 2018 04:38 PM, Arnd Bergmann wrote:
+> On Mon, Jan 22, 2018 at 11:53 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On Saturday 20 January 2018 08:50 AM, David Lechner wrote:
+>>> This adds a new syscon_register() function that creates a new syscon
+>>> regmap and adds it to the lookup list.
+>>
+>> /*
+>>  * registers a "global" syscon "device", usually not backed by a real
+>>  * device. To be used only in cases where the syscon is not
+>>  * related to any actual device, like system clocks, for example.
+>>  *
+>>  * name passed here must be globally unique.
+>>  */
+>> struct regmap *syscon_register_by_name(resource_size_t start, size_t
+>>                                        size, const char *name);
+>>
+>> and
+>>
+>> struct regmap *syscon_regmap_lookup_by_name(const char *name);
+>>
+>> I understand, with this the driver becomes little more complicated and
+>> DT and non-DT cases still need to be handled differently. But I think
+>> thats not the main issue you are trying to solve.
+> 
+> I think the easiest way to handle this in traditional board files is to use
+> a platform_data structure: when the platform registers the syscon,
+> it holds a pointer to the regmap and can simply add pass it to any
+> device using the syscon through platform_data. The driver using it
+> then does:
+> 
+> if (dev->of_node) {
+>       priv->regmap = syscon_regmap_lookup_by_phandle(...);
+> else
+>       priv->regmap = pdata->regmap;
 
-Pulled into next/dt, thanks!
+I think this works as well and does not need any new API. For clocks,
+there is no platform data AFAICT, so it will have to be whatever
+structure is being used to pass clock info to CCF driver (like perhaps
+an addition parameter to da850_pll_clk_init() in David's under-review
+DaVinci CCF conversion series).
 
-       Arnd
+> At some point, we had a syscon_regmap_lookup_by_pdevname()
+> that was introduced for a similar case, but we should just kill that
+> now, after the platform that needed it is DT-only.
+
+Yeah, I just noticed that too. syscon_regmap_lookup_by_pdevname has only
+two callers in kernel. The call from clps711x.c UART driver does not
+seem to be needed anymore after clps711x was converted to DT-only in v4.8
+
+The other user is phy-da8xx-usb.c which this series is trying to get rid
+of. So, perhaps syscon_regmap_lookup_by_pdevname() should be dropped by
+v2 of this series.
+
+Thanks,
+Sekhar
