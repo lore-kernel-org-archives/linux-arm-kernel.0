@@ -1,28 +1,18 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 23 Jan 2018 07:35:10 +1100
-Subject: [PATCH v2 05/19] drm/vc4: Use the alpha format field in
- drm_format_info
-In-Reply-To: <38d4d0a085634a0b8308e819c846b9173d4d93df.1516617243.git-series.maxime.ripard@free-electrons.com>
-References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
- <38d4d0a085634a0b8308e819c846b9173d4d93df.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <87vaft7htt.fsf@anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Jan 2018 21:51:42 +0100
+Subject: [PATCH 0/8] crypto: arm64+generic - SHA3/SHA-512/SM-3 roundup
+In-Reply-To: <CAK8P3a0HCr2zm40kqZWLCV=qPFkmAVDa5gDDKVU381pA3BjEHA@mail.gmail.com>
+References: <20180119120440.31556-1-ard.biesheuvel@linaro.org>
+ <CAK8P3a0HCr2zm40kqZWLCV=qPFkmAVDa5gDDKVU381pA3BjEHA@mail.gmail.com>
+Message-ID: <CAK8P3a2BaL_wYDRJ+O0Dntcz6XkunrdAE-xDKwSgSEruNJ=Hvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On Mon, Jan 22, 2018 at 3:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Jan 19, 2018 at 1:04 PM, Ard Biesheuvel
+> I'm doing a little more randconfig build testing here now, will write back by
+> the end of today in the unlikely case that if I find anything else wrong.
 
-> Now that the drm_format_info has a alpha field to tell if a format embeds
-> an alpha component in it, let's use it.
->
-> Cc: Eric Anholt <eric@anholt.net>
-> Reviewed-by: Daniel Vetter <daniel.vetter@intel.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Did a few hundred randconfig builds, everything fine as expected.
 
-I had sent my r-b for the last version of this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180123/e660b02d/attachment.sig>
+       Arnd
