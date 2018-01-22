@@ -1,70 +1,67 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 22 Jan 2018 12:14:53 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <1516468460-4908-1-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
-Message-ID: <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Mon, 22 Jan 2018 15:25:48 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7s: add temperature monitor support
+Message-ID: <1516605949-14663-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
-> This series converts mach-davinci to use the common clock framework.
->
-> The series works like this, the first 19 patches create new clock drivers
-> using the common clock framework. There are basically 3 groups of clocks -
-> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
-> unique init data, which is the reason for so many patches.
->
-> Then, starting with "ARM: da830: add new clock init using common clock",
-> we get the mach code ready for the switch by adding the code needed for
-> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
-> legacy clocks so that we can switch easily between the old and the new.
->
-> "ARM: davinci: switch to common clock framework" actually flips the switch
-> to start using the new clock drivers. Then the next 8 patches remove all
-> of the old clock code.
->
-> The final three patches add device tree clock support to the one SoC that
-> supports it.
->
-> v6 changes (also see individual patches for details):
-> - All of the device tree bindings are changed
-> - All of the clock drivers are changed significantly
-> - Fixed issues brought up during review of v5
-> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
->   series and submitted separately
->
-> v5 changes:
-> - Basically, this is an entirely new series
-> - Patches are broken up into bite-sized pieces
-> - Converted PSC clock driver to use regmap
-> - Restored "force" flag for certain DA850 clocks
-> - Added device tree bindings
-> - Moved more of the clock init to drivers/clk
-> - Fixed frequency scaling (maybe*)
->
-> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
->   what they need to do to make this work, but I haven't figured out how to
->   test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
->   sent separately after this series has landed.)
->
-> Dependencies:
->
-> This series applies on top of linux-davinci/master plus the following patches:
-> - [1] "clk: fix reentrancy of clk_enable() on UP systems" (in clk-next)
-> - [2] "clk: add helper functions for managing clk_onecell_data"
-> - [3] "clk: divider: read-only divider can propagate rate change"
-> - [4],[5],[6],[7],[8],[9] series "ARM: davinci: common clock prep work"
->
+Add i.MX7 temperature monitor support.
 
-Hi David,
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ .../devicetree/bindings/thermal/imx-thermal.txt      |  5 +++--
+ arch/arm/boot/dts/imx7s.dtsi                         | 20 ++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-I'm getting a splat[1] when trying to mount the rootfs over nfs on a da850-lcdk.
-
-I'll try to figure out what's happening.
-
-Best regards,
-Bartosz Golaszewski
-
-[1] https://pastebin.com/D94z8SAe
+diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+index 28be51a..9575d45 100644
+--- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+@@ -1,8 +1,9 @@
+ * Temperature Monitor (TEMPMON) on Freescale i.MX SoCs
+ 
+ Required properties:
+-- compatible : "fsl,imx6q-tempmon" for i.MX6Q, "fsl,imx6sx-tempmon" for i.MX6SX.
+-  i.MX6SX has two more IRQs than i.MX6Q, one is IRQ_LOW and the other is IRQ_PANIC,
++- compatible : "fsl,imx6q-tempmon" for i.MX6Q, "fsl,imx6sx-tempmon" for i.MX6SX,
++  "fsl,imx7-tempmon" for i.MX7S/D.
++  i.MX6SX and i.MX7S/D have two more IRQs than i.MX6Q, one is IRQ_LOW and the other is IRQ_PANIC,
+   when temperature is below than low threshold, IRQ_LOW will be triggered, when temperature
+   is higher than panic threshold, system will auto reboot by SRC module.
+ - fsl,tempmon : phandle pointer to system controller that contains TEMPMON
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 82ad26e..2e2eda53 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -497,9 +497,29 @@
+ 			};
+ 
+ 			ocotp: ocotp-ctrl at 30350000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				compatible = "fsl,imx7d-ocotp", "syscon";
+ 				reg = <0x30350000 0x10000>;
+ 				clocks = <&clks IMX7D_OCOTP_CLK>;
++
++				tempmon_calib: calib at 3c {
++					reg = <0x3c 0x4>;
++				};
++
++				tempmon_temp_grade: temp-grade at 10 {
++					reg = <0x10 0x4>;
++				};
++			};
++
++			tempmon: tempmon {
++				compatible = "fsl,imx7-tempmon";
++				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++				fsl,tempmon =<&anatop>;
++				nvmem-cells = <&tempmon_calib>,
++					<&tempmon_temp_grade>;
++				nvmem-cell-names = "calib", "temp_grade";
++				clocks = <&clks IMX7D_PLL_SYS_MAIN_CLK>;
+ 			};
+ 
+ 			anatop: anatop at 30360000 {
+-- 
+2.7.4
