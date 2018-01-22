@@ -1,43 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 22 Jan 2018 22:47:31 +0800
-Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <20180117183244.28303-2-l.stach@pengutronix.de>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-2-l.stach@pengutronix.de>
-Message-ID: <20180122144729.GA27764@dragon>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 22 Jan 2018 16:49:51 +0200
+Subject: [PATCH] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
+ bits_per_mux != 0
+In-Reply-To: <1516575793-30526-1-git-send-email-david@lechnology.com>
+References: <1516575793-30526-1-git-send-email-david@lechnology.com>
+Message-ID: <CAHp75VdkShHhxL+3PyaPEC2Dyr8aWoEH8CQk+bEJ2WD4i6ojHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 07:32:42PM +0100, Lucas Stach wrote:
-> This adds the basic DTS for the i.MX8MQ.
-> For now only the following peripherals are supported:
-> - IOMUXC (pin controller)
-> - CCM (clock controller)
-> - GPIO
-> - UART
-> - uSDHC (SD/eMMC controller)
-> - FEC (ethernet controller)
-> - i2c
-> 
-> This is enough to get a very basic board support up and running.
-> 
-> One known limitation is that the driver for the GPC interrupt
-> controller is still missing, rendering the CPU sleep states unusable
-> as there is nothing waking them up anymore. This will be fixed in
-> due course.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm64/boot/dts/Makefile             |   1 +
->  arch/arm64/boot/dts/nxp/imx8mq-pinfunc.h | 632 +++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/nxp/imx8mq.dtsi      | 418 ++++++++++++++++++++
+On Mon, Jan 22, 2018 at 1:03 AM, David Lechner <david@lechnology.com> wrote:
+> This fixes pcs_request_gpio() in the pinctrl-single driver when
+> bits_per_mux != 0. It appears this was overlooked when the multiple
+> pins per register feature was added.
+>
+> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure
+> multiple pins of different modules")
 
-So we will have the following two folders for SoCs from the same company.
+One line?
 
- arch/arm64/boot/dts/nxp/
- arch/arm64/boot/dts/freescale/
+> +                       byte_num = (pcs->bits_per_pin * pin) / BITS_PER_BYTE;
+> +                       offset = (byte_num / mux_bytes) * mux_bytes;
+> +                       pin_shift = pin % (pcs->width / pcs->bits_per_pin) *
+> +                                   pcs->bits_per_pin;
 
-I'm a bit uncomfortable with that.  @Arnd, do you have an opinion how we
-should handle them?
+Sounds like playing around pretty well defined macro and functions,
+e.g. DIV_ROUND_UP(), round_up().
 
-Shawn
+-- 
+With Best Regards,
+Andy Shevchenko
