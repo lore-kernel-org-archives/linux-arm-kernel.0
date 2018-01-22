@@ -1,36 +1,47 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 22 Jan 2018 12:28:00 -0500
-Subject: [PATCH] PCI/ASPM: Suppress common clock mode setting failure
-Message-ID: <1516642093-15633-1-git-send-email-okaya@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Jan 2018 09:29:03 -0800
+Subject: [GIT PULL] dts fixes for omaps for v4.16 merge window
+Message-ID: <pull-1516642112-325806@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code is emitting warnings when it tries to set the common clock mode for
-ASPM and ASPM is already configured to common clock mode by the UEFI BIOS.
-Let's bail out silently in such a case.
+From: "Tony Lindgren" <tony@atomide.com>
 
-pci 0004:00:00.0: ASPM: Could not configure common clock
+The following changes since commit 1cadb0c341079785182a8d00d12ecb0bbef935fb:
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pcie/aspm.c | 5 +++++
- 1 file changed, 5 insertions(+)
+  Revert "ARM: dts: dra7: Add properties to enable PCIe x2 lane mode" (2017-12-23 08:18:15 -0800)
 
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index 9783e10..072178a 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -253,6 +253,11 @@ static void pcie_aspm_configure_common_clock(struct pcie_link_state *link)
- 
- 	/* Configure upstream component */
- 	pcie_capability_read_word(parent, PCI_EXP_LNKCTL, &reg16);
-+
-+	/* Port might be already in common clock mode */
-+	if ((same_clock) && (reg16 & PCI_EXP_LNKCTL_CCC))
-+		return;
-+
- 	parent_reg = reg16;
- 	if (same_clock)
- 		reg16 |= PCI_EXP_LNKCTL_CCC;
--- 
-1.9.1
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/dt-pt3-signed
+
+for you to fetch changes up to 0e6e6dcce8d578516ef3aea2c9f9b4d0a0d53194:
+
+  ARM: dts: Nokia N9: add support for up/down keys in the dts (2018-01-19 07:40:13 -0800)
+
+----------------------------------------------------------------
+Few omap dts fixes and n9 volume keys update for v4.16 merge window
+
+For now, we need to rely on dts alias for n900 lcd and tvout order
+to prevent occasional blank lcd. And we need to reduce the shut down
+temperature for dra7 for non-cpu thermal cases.
+
+And looks like we're missing the n9 volume key mappings and there is
+active work going happening for n9 at least for postmarketos. So let's
+make sure the keys can be actually used as they are the only buttons
+on n9 in addition to the power key.
+
+----------------------------------------------------------------
+Ivaylo Dimitrov (1):
+      ARM: dts: n900: Add aliases for lcd and tvout displays
+
+Pavel Machek (1):
+      ARM: dts: Nokia N9: add support for up/down keys in the dts
+
+Ravikumar Kattekola (1):
+      ARM: dts: dra7: Reduce shut down temperature of non-cpu thermal zones
+
+ arch/arm/boot/dts/dra7.dtsi      | 16 ++++++++++++++++
+ arch/arm/boot/dts/omap3-n9.dts   |  7 +++++++
+ arch/arm/boot/dts/omap3-n900.dts |  4 +++-
+ 3 files changed, 26 insertions(+), 1 deletion(-)
