@@ -1,159 +1,108 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 11:35:44 +0100
-Subject: [PATCH v2 15/19] drm/sun4i: backend: Check for the number of alpha
- planes
+Date: Mon, 22 Jan 2018 11:35:47 +0100
+Subject: [PATCH v2 18/19] drm/sun4i: Add support for plane alpha
 In-Reply-To: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <7371f62a1385f2cbe3ed75dfca2e746338eb2286.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <cf2e1340dfffcb0e1e2d35eb163004933dc3d126.1516617243.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the way the composition is done in hardware, we can only have a
-single alpha-enabled plane active at a time, placed in the second (highest
-priority) pipe.
-
-Make sure of that in our atomic_check to not end up in an impossible
-scenario.
+Our backend supports a per-plane alpha property. Support it through our new
+helper.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 50 ++++++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c   | 23 +-------------
- 3 files changed, 53 insertions(+), 22 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 16 +++++++++++++---
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  3 +++
+ drivers/gpu/drm/sun4i/sun4i_layer.c   |  2 ++
+ 3 files changed, 18 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index c4986054909b..eb1749d2c0d5 100644
+index 38c4b44f6ff5..f5beeec06fd5 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -329,6 +329,8 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 	struct drm_atomic_state *state = crtc_state->state;
- 	struct drm_device *drm = state->dev;
- 	struct drm_plane *plane;
-+	unsigned int num_planes = 0;
-+	unsigned int num_alpha_planes = 0;
- 	unsigned int num_frontend_planes = 0;
+@@ -191,6 +191,15 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 	DRM_DEBUG_DRIVER("Switching display backend interlaced mode %s\n",
+ 			 interlaced ? "on" : "off");
  
- 	DRM_DEBUG_DRIVER("Starting checking our planes\n");
-@@ -341,6 +343,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 			drm_atomic_get_plane_state(state, plane);
- 		struct sun4i_layer_state *layer_state =
- 			state_to_sun4i_layer_state(plane_state);
-+		struct drm_framebuffer *fb = plane_state->fb;
++	val = SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA(state->alpha);
++	if (state->alpha != 255)
++		val |= SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN;
++	regmap_update_bits(backend->engine.regs,
++			   SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_MASK |
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
++			   val);
++
+ 	ret = sun4i_backend_drm_format_to_layer(plane, fb->format->format,
+ 						&val);
+ 	if (ret) {
+@@ -366,7 +375,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
+ 				 drm_get_format_name(fb->format->format,
+ 						     &format_name));
+-		if (fb->format->has_alpha)
++		if (fb->format->has_alpha || (plane_state->alpha != 255))
+ 			num_alpha_planes++;
  
- 		if (sun4i_backend_plane_uses_frontend(plane_state)) {
- 			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
-@@ -351,6 +354,50 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		} else {
- 			layer_state->uses_frontend = false;
- 		}
-+
-+		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
-+				 drm_get_format_name(fb->format->format,
-+						     &format_name));
-+		if (fb->format->has_alpha)
-+			num_alpha_planes++;
-+
-+		num_planes++;
-+	}
-+
-+	/*
-+	 * The hardware is a bit unusual here.
-+	 *
-+	 * Even though it supports 4 layers, it does the composition
-+	 * in two separate steps.
-+	 *
-+	 * The first one is assigning a layer to one of its two
-+	 * pipes. If more that 1 layer is assigned to the same pipe,
-+	 * and if pixels overlaps, the pipe will take the pixel from
-+	 * the layer with the highest priority.
-+	 *
-+	 * The second step is the actual alpha blending, that takes
-+	 * the two pipes as input, and uses the eventual alpha
-+	 * component to do the transparency between the two.
-+	 *
-+	 * This two steps scenario makes us unable to guarantee a
-+	 * robust alpha blending between the 4 layers in all
-+	 * situations, since this means that we need to have one layer
-+	 * with alpha at the lowest position of our two pipes.
-+	 *
-+	 * However, we cannot even do that, since the hardware has a
-+	 * bug where the lowest plane of the lowest pipe (pipe 0,
-+	 * priority 0), if it has any alpha, will discard the pixel
-+	 * entirely and just display the pixels in the background
-+	 * color (black by default).
-+	 *
-+	 * Since means that we effectively have only three valid
-+	 * configurations with alpha, all of them with the alpha being
-+	 * on pipe1 with the lowest position, which can be 1, 2 or 3
-+	 * depending on the number of planes and their zpos.
-+	 */
-+	if (num_alpha_planes > SUN4I_BACKEND_NUM_ALPHA_LAYERS) {
-+		DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
-+		return -EINVAL;
+ 		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
+@@ -419,7 +428,8 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
  	}
  
- 	if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
-@@ -358,6 +405,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 	/* We can't have an alpha plane at the lowest position */
+-	if (plane_states[0]->fb->format->has_alpha)
++	if (plane_states[0]->fb->format->has_alpha ||
++	    (plane_states[0]->alpha != 255))
  		return -EINVAL;
- 	}
  
-+	DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video\n",
-+			 num_planes, num_alpha_planes, num_frontend_planes);
-+
- 	return 0;
- }
+ 	for (i = 1; i < num_planes; i++) {
+@@ -431,7 +441,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		 * The only alpha position is the lowest plane of the
+ 		 * second pipe.
+ 		 */
+-		if (fb->format->has_alpha)
++		if (fb->format->has_alpha || (p_state->alpha != 255))
+ 			current_pipe++;
  
+ 		s_state->pipe = current_pipe;
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 04a4f11b87a8..52e77591186a 100644
+index 52e77591186a..03294d5dd1a2 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -146,6 +146,8 @@
- #define SUN4I_BACKEND_HWCCOLORTAB_OFF		0x4c00
- #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+@@ -68,11 +68,14 @@
+ #define SUN4I_BACKEND_CKMIN_REG			0x884
+ #define SUN4I_BACKEND_CKCFG_REG			0x888
+ #define SUN4I_BACKEND_ATTCTL_REG0(l)		(0x890 + (0x4 * (l)))
++#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_MASK	GENMASK(31, 24)
++#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA(x)		((x) << 24)
+ #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK	BIT(15)
+ #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(x)		((x) << 15)
+ #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK	GENMASK(11, 10)
+ #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(x)			((x) << 10)
+ #define SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN		BIT(1)
++#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN	BIT(0)
  
-+#define SUN4I_BACKEND_NUM_LAYERS		4
-+#define SUN4I_BACKEND_NUM_ALPHA_LAYERS		1
- #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
- 
- struct sun4i_backend {
+ #define SUN4I_BACKEND_ATTCTL_REG1(l)		(0x8a0 + (0x4 * (l)))
+ #define SUN4I_BACKEND_ATTCTL_REG1_LAY_HSCAFCT		GENMASK(15, 14)
 diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index fbf25d59cf88..900e716443b8 100644
+index 9e538f761dcb..d5598de92f85 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -201,32 +201,11 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
- 	int i;
+@@ -37,6 +37,7 @@ static void sun4i_backend_layer_reset(struct drm_plane *plane)
+ 	if (state) {
+ 		plane->state = &state->state;
+ 		plane->state->plane = plane;
++		plane->state->alpha = 255;
+ 		plane->state->zpos = layer->id;
+ 	}
+ }
+@@ -163,6 +164,7 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 			     &sun4i_backend_layer_helper_funcs);
+ 	layer->backend = backend;
  
--	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
-+	planes = devm_kcalloc(drm->dev, SUN4I_BACKEND_NUM_LAYERS,
- 			      sizeof(*planes), GFP_KERNEL);
- 	if (!planes)
- 		return ERR_PTR(-ENOMEM);
++	drm_plane_create_alpha_property(&layer->plane, 255);
+ 	drm_plane_create_zpos_property(&layer->plane, 0, 0,
+ 				       SUN4I_BACKEND_NUM_LAYERS - 1);
  
--	/*
--	 * The hardware is a bit unusual here.
--	 *
--	 * Even though it supports 4 layers, it does the composition
--	 * in two separate steps.
--	 *
--	 * The first one is assigning a layer to one of its two
--	 * pipes. If more that 1 layer is assigned to the same pipe,
--	 * and if pixels overlaps, the pipe will take the pixel from
--	 * the layer with the highest priority.
--	 *
--	 * The second step is the actual alpha blending, that takes
--	 * the two pipes as input, and uses the eventual alpha
--	 * component to do the transparency between the two.
--	 *
--	 * This two steps scenario makes us unable to guarantee a
--	 * robust alpha blending between the 4 layers in all
--	 * situations. So we just expose two layers, one per pipe. On
--	 * SoCs that support it, sprites could fill the need for more
--	 * layers.
--	 */
- 	for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
- 		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
- 		struct sun4i_layer *layer;
 -- 
 git-series 0.9.1
