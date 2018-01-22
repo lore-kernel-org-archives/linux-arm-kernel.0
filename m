@@ -1,76 +1,76 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 22 Jan 2018 11:30:15 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
-Message-ID: <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 22 Jan 2018 17:33:28 +0000
+Subject: [PATCH v3 09/41] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20180112120747.27999-10-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-10-christoffer.dall@linaro.org>
+Message-ID: <20180122173326.GO22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2018 05:14 AM, Bartosz Golaszewski wrote:
-> 2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
->> This series converts mach-davinci to use the common clock framework.
->>
->> The series works like this, the first 19 patches create new clock drivers
->> using the common clock framework. There are basically 3 groups of clocks -
->> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
->> unique init data, which is the reason for so many patches.
->>
->> Then, starting with "ARM: da830: add new clock init using common clock",
->> we get the mach code ready for the switch by adding the code needed for
->> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
->> legacy clocks so that we can switch easily between the old and the new.
->>
->> "ARM: davinci: switch to common clock framework" actually flips the switch
->> to start using the new clock drivers. Then the next 8 patches remove all
->> of the old clock code.
->>
->> The final three patches add device tree clock support to the one SoC that
->> supports it.
->>
->> v6 changes (also see individual patches for details):
->> - All of the device tree bindings are changed
->> - All of the clock drivers are changed significantly
->> - Fixed issues brought up during review of v5
->> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from this
->>    series and submitted separately
->>
->> v5 changes:
->> - Basically, this is an entirely new series
->> - Patches are broken up into bite-sized pieces
->> - Converted PSC clock driver to use regmap
->> - Restored "force" flag for certain DA850 clocks
->> - Added device tree bindings
->> - Moved more of the clock init to drivers/clk
->> - Fixed frequency scaling (maybe*)
->>
->> * I have frequency scaling using cpufreq-dt, so I know the clocks are doing
->>    what they need to do to make this work, but I haven't figured out how to
->>    test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will be
->>    sent separately after this series has landed.)
->>
->> Dependencies:
->>
->> This series applies on top of linux-davinci/master plus the following patches:
->> - [1] "clk: fix reentrancy of clk_enable() on UP systems" (in clk-next)
->> - [2] "clk: add helper functions for managing clk_onecell_data"
->> - [3] "clk: divider: read-only divider can propagate rate change"
->> - [4],[5],[6],[7],[8],[9] series "ARM: davinci: common clock prep work"
->>
+On Fri, Jan 12, 2018 at 01:07:15PM +0100, Christoffer Dall wrote:
+> Avoid saving the guest VFP registers and restoring the host VFP
+> registers on every exit from the VM.  Only when we're about to run
+> userspace or other threads in the kernel do we really have to switch the
+> state back to the host state.
 > 
-> Hi David,
+> We still initially configure the VFP registers to trap when entering the
+> VM, but the difference is that we now leave the guest state in the
+> hardware registers as long as we're running this VCPU, even if we
+> occasionally trap to the host, and we only restore the host state when
+> we return to user space or when scheduling another thread.
 > 
-> I'm getting a splat[1] when trying to mount the rootfs over nfs on a da850-lcdk.
-> 
-> I'll try to figure out what's happening.
-> 
-> Best regards,
-> Bartosz Golaszewski
-> 
-> [1] https://pastebin.com/D94z8SAe
-> 
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Could it have something to do with the "rmii" clock? I don't think I added that
-in the device tree.
+[...]
+
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 883a6383cd36..848a46eb33bf 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+
+[...]
+
+> @@ -213,6 +215,19 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+>   */
+>  void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+>  {
+> +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+> +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+> +
+> +	/* Restore host FP/SIMD state */
+> +	if (vcpu->arch.guest_vfp_loaded) {
+> +		if (vcpu_el1_is_32bit(vcpu)) {
+> +			kvm_call_hyp(__fpsimd32_save_state,
+> +				     kern_hyp_va(guest_ctxt));
+> +		}
+> +		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> +		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> +		vcpu->arch.guest_vfp_loaded = 0;
+
+Provided we've already marked the host FPSIMD state as dirty on the way
+in, we probably don't need to restore it here.
+
+In v4.15, the kvm_fpsimd_flush_cpu_state() call in
+kvm_arch_vcpu_ioctl_run() is supposed to do this marking: currently
+it's only done for SVE, since KVM was previously restoring the host
+FPSIMD subset of the state anyway, but it could be made unconditional.
+
+For a returning run ioctl, this would have the effect of deferring the
+host FPSIMD reload until we return to userspace, which is probably
+no more costly since the kernel must check whether to do this in
+ret_to_user anyway; OTOH if the vcpu thread was preempted by some
+other thread we save the cost of restoring the host state entirely here
+... I think.
+
+Ultimately I'd like to go one better and actually treat a vcpu as a
+first-class fpsimd context, so that taking an interrupt to the host
+and then reentering the guest doesn't cause any reload at all.  But
+that feels like too big a step for this series, and there are likely
+side-issues I've not thought about yet.
+
+Cheers
+---Dave
