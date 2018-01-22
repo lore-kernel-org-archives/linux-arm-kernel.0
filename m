@@ -1,38 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 15:27:30 +0100
-Subject: [PATCH v4 00/13] drm/sun4i: Support the Display Engine frontend
-In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20180122142730.lsfxdhgeetmavwpj@flea.lan>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 22 Jan 2018 08:30:59 -0600
+Subject: [PATCH] dt-bindings: display: stm32: correct clock-names in dsi
+ panel example
+In-Reply-To: <20180121205807.30677-1-philippe.cornu@st.com>
+References: <20180121205807.30677-1-philippe.cornu@st.com>
+Message-ID: <CAL_JsqKfeSW1R4aSjeUnJ6b=NeQK0qHTuEV7y9Y4sAFiyzHLzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 10:25:14AM +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> This is a first serie to enable the display engine frontend.
-> 
-> This hardware block is found in the first generation Display Engine from
-> Allwinner. Its role is to implement more advanced features that the
-> associated backend, even though the backend alone can be used (and was used
-> so far) for basic composition.
-> 
-> Among those features, we will find hardware scaling, that is supported in
-> this serie, colorspace conversions, or more exotic formats support such as
-> the one output by the VPU.
+On Sun, Jan 21, 2018 at 2:58 PM, Philippe Cornu <philippe.cornu@st.com> wrote:
+> In the dsi panel example, clock names in the "clock-names"
+> field have been swapped:
+> * "pclk" (peripheral clock) is <&rcc 1 CLK_F469_DSI> on stm32f4
+> * "ref" (dsi phy pll ref clock) is <&clk_hse> on stm32f4
+>
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> ---
+>  Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> index 029252253ad4..3eb1b48b47dd 100644
+> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> @@ -98,7 +98,7 @@ Example 2: DSI panel
+>                         compatible = "st,stm32-dsi";
+>                         reg = <0x40016c00 0x800>;
+>                         clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+> -                       clock-names = "ref", "pclk";
+> +                       clock-names = "pclk", "ref";
 
-Applied the DRM patches to drm-misc-next, and queued the dt patch for 4.17.
+There is no way to tell they are reversed because pclk is not even
+documented. Please fix that too.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/3e48b2e1/attachment.sig>
+>                         resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+>                         reset-names = "apb";
+>
+> --
+> 2.15.1
+>
