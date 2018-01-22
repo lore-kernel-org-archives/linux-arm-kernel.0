@@ -1,35 +1,40 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Mon, 22 Jan 2018 12:09:30 +0800
-Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <5A654925.9020203@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-9-jeffy.chen@rock-chips.com>
- <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
- <5A60AE41.2050101@rock-chips.com>
- <1f4b3c0d-1414-0012-a072-f4a11f432c21@rock-chips.com>
- <5A654925.9020203@rock-chips.com>
-Message-ID: <5A6563FA.8080602@rock-chips.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Mon, 22 Jan 2018 07:06:07 +0100
+Subject: [PATCH] arm: Initialize hrtimer-based broadcast clockevent
+Message-ID: <86a7e675-11bd-3b8b-22a0-8f440db96293@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
+Analogously to 9358d755bd5c, this registers a broadcast clockevent in
+case no hardware broadcast timer is available and the per-CPU timers can
+be stopped in deep power states.
 
-On 01/22/2018 10:15 AM, JeffyChen wrote:
-> Hi Randy,
->
-> On 01/22/2018 09:18 AM, Randy Li wrote:
->>>
->> Also the power domain driver could manage the clocks as well, I would
->> suggest to use pm_runtime_*.
->
-> actually the clocks required by pm domain may not be the same as what we
-> want to control here, there might be some clocks only be needed when
-> accessing mmu registers.
->
-> but i'm not very sure about that, will confirm it with Simon Xue.
+Partitions of the Jailhouse hypervisor fall in this category.
+Registering the workaround timer allows to enter high-resolution mode in
+that case.
 
-confirmed with Simon, there might be some iommus don't have a pd, and 
-the CONFIG_PM could be disabled.
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+---
+ arch/arm/kernel/time.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-so it might be better to control clocks in iommu driver itself.
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 629f8e9981f1..0a45d861ef8e 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -12,6 +12,7 @@
+  *  reading the RTC at bootup, etc...
+  */
+ #include <linux/clk-provider.h>
++#include <linux/clockchips.h>
+ #include <linux/clocksource.h>
+ #include <linux/errno.h>
+ #include <linux/export.h>
+@@ -121,5 +122,7 @@ void __init time_init(void)
+ 		of_clk_init(NULL);
+ #endif
+ 		timer_probe();
++
++		tick_setup_hrtimer_broadcast();
+ 	}
+ }
