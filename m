@@ -1,117 +1,144 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Jan 2018 10:59:36 +0000
-Subject: per-task stack canaries for arm64
-In-Reply-To: <CAKv+Gu-TtJ7Pxa7+qOX7MiQwPFwsNOup2Q=0TvjCO4xHxf3QQA@mail.gmail.com>
-References: <CAKv+Gu_rdDEQeBYabZCOywws96mTWF4F=JEpVNXEW76tAwo1Rw@mail.gmail.com>
- <CAGXu5j+cJoc6o8d-hmLFj08r18GhEbKhVNA94LDKM5yqo9CbSQ@mail.gmail.com>
- <CAKv+Gu9vViZUBYJWnGdnewL9h-ahP0Hs8gU+3_QH76ROdQh1yQ@mail.gmail.com>
- <CAGXu5j+PO=Ben0J-xnOztrAdsku2SUKFiz6w7cqTEfHTveFFSg@mail.gmail.com>
- <f80404f3-985f-9e3b-2ad3-f2b0fc2a8b28@arm.com>
- <CAKv+Gu-TtJ7Pxa7+qOX7MiQwPFwsNOup2Q=0TvjCO4xHxf3QQA@mail.gmail.com>
-Message-ID: <CAKv+Gu8P6OZDSMw7oA+5_RgGLkeOwoaEPb_5c510uoBAJY7MeA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Jan 2018 09:01:58 -0200
+Subject: [PATCH] ARM: dts: mxs: add imx28 DNET01 board
+In-Reply-To: <325f427c-352b-e3d0-fa2f-3055f02d8c3f@gmail.com>
+References: <325f427c-352b-e3d0-fa2f-3055f02d8c3f@gmail.com>
+Message-ID: <CAOMZO5CbA4qdr+x2C6CijaFcfidkVDoZrQzM7WrMRXB73EYhuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 January 2018 at 13:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 18 January 2018 at 10:26, Ramana Radhakrishnan
-> <ramana.radhakrishnan@arm.com> wrote:
->> On 1/17/18 8:45 PM, Kees Cook wrote:
->>> On Wed, Jan 17, 2018 at 12:32 PM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->>>> On 17 January 2018 at 19:10, Kees Cook <keescook@chromium.org> wrote:
->>>>> On Wed, Jan 17, 2018 at 10:24 AM, Ard Biesheuvel
->>>>> <ard.biesheuvel@linaro.org> wrote:
->>>> [...]
->>>>> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81708
->>>>> which was done for x86 only, and provides both:
->>>>>   -mstack-protector-guard-symbol=...
->>>>>   -mstack-protector-guard-reg=...
->>>>>
->>>>> If this could be extended to arm64, I think we'd be in good shape (and
->>>>> it could be trivially detected at build time).
->>>>>
->>>>
->>>> I'm not entirely sure what the point is of specifying the name of the
->>>> symbol on the command line. It is ultimately up to the GCC developers
->>>> to decide how much point there is to maintaining parity with x86 here.
->>>>
->>>> [...]
->>>>>> Ramana indicated at the time that he would be up for adding, e.g.,
->>>>>> -fstack-protector-linux-kernel as a command line option, and add the
->>>>>> contents of tpidr_el1 to every reference of __stack_chk_guard when
->>>>>> set.
->>
->> Wow, that was a hall-way conversation eons ago. It took me a while to
->> page that in.
->>
->>
->>>>>
->>>>> I think we want to reuse the command-line names from the x86 options
->>>>> above, unless there's a good reason not to?
->>>>
->>>> I'm perfectly happy to settle for whatever the GCC developers manage
->>>> to agree on, as long as it gives us the ability to use tpidr_el1 as
->>>> the offset.
->>>
->>> Ramana, Uro?, what's the best next step? Should we open a GCC bug
->>> specifically for arm64 here?
->>
->> The next best step is someone opening a GCC feature request with some
->> more details - CC'ing me on ramana at gcc.gnu.org should work. What I would
->> like to see is a feature request on GCC bugzilla along with some
->> comments / buyin from the AArch64 kernel maintainers whether they would
->> like to see such a feature and what the behaviour should be and get some
->> feedback from the AArch64 GCC maintainers upstream before starting the
->> work.
->>
->> I think the following (unoptimized) or some derivative of this should work.
->>
->>         adrp    x19, __stack_chk_guard
->>         add     x19, x19, :lo12:__stack_chk_guard
->>         mrs     x2, tpidr_el1
->>         add     x2, x2, x19
->>         ldr     x2, [x2]
->>
->>
->> It's also not likely that this will be done in time for GCC 8 as we are
->> now in stage 4 and we're probably looking at GCC 9 for this assuming
->> this goes ahead.
->>
->> Hope this helps.
->>
+Hi Ga?tan,
+
+On Thu, Jan 18, 2018 at 7:26 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
+> Hi,
+
+This should not be part of the commit log.
+
+> The patch adds support of imx28 DNET01 board
+
+Here it would be nice to explain a little bit about the board and its features.
+
+If you have a URL for the board, you can add it too.
+
 >
-> Thanks Ramana.
+> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx28-dnet01.dts | 184 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 184 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx28-dnet01.dts
 >
-> I guess there is one snag here: if we get scheduled to another CPU
-> between the mrs and the ldr, we will load the wrong value. I guess
-> this is what Mark alluded to in his reference to atomics in the quoted
-> email thread.
->
-> Also, we select between tpidr_el2 and tpidr_el1 at runtime depending
-> on whether VHE is available.
->
-> So I guess it isn't as simple as I thought, unfortunately ...
+> diff --git a/arch/arm/boot/dts/imx28-dnet01.dts b/arch/arm/boot/dts/imx28-dnet01.dts
+> new file mode 100644
+> index 0000000..c502ca7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-dnet01.dts
+> @@ -0,0 +1,184 @@
+> +/*
+> + * Copyright (C) 2018 Gaetan Carlier <gcembed@gmail.com>
+> + *
+> + * based on imx28-m28evk.dts
+> + * Copyright (C) 2012 Marek Vasut <marex@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
 
-OK, so I have done a bit of homework, and I think this shouldn't be
-too difficult after all.
+Please use SPDX identifier instead.
 
-I realized that we don't really need per-CPU references to
-__stack_chk_guard, given that we already keep the task struct pointer
-in sp_el0. This means we should be able to do
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx28.dtsi"
+> +
+> +/ {
+> +       model = "Domintell DNET01";
+> +       compatible = "domintell,dnet01", "fsl,imx28";
 
-mrs   x0, sp_el0
-movz  x1, :abs_g0:__stack_chk_guard_tsk_offset
-add   x0, x0, x1
-ldr   x2, [x0]
 
-where __stack_chk_guard_tsk_offset is exposed via an ELF symbol.
-(Analogous to x86, this could be implemented at the GCC level using
-arbitrary sysreg and symbol names to remain flexible)
+Please add 'domintel' entry into
+Documentation/devicetree/bindings/vendor-prefixes.txt in a separate
+patch.
 
-So my next question (mainly to Ramana): would it be possible to emit
-the mrs/movz/add sequence above from targetm.stack_protect_guard() in
-a way that will allow expand_normal() to expand it in a useful manner
-(e.g., as an INDIRECT_REF that can be matched by the memory_operand in
-Aarch64's stack_protect_set)? If that is the case, we could implement
-this in a GCC plugin in the kernel rather than relying on upstream GCC
-changes (and having to commit to this ABI long term)
+
+> +
+> +       memory {
+> +               reg = <0x40000000 0x08000000>;
+> +       };
+> +
+> +       apb at 80000000 {
+> +               apbh at 80000000 {
+> +
+> +                       dcp: dcp at 80028000 {
+> +                               /*
+> +                                * Driver is not fully implemented.
+> +                                * [PATCH] crypto: mxs-dcp - Initialize .statesize fields
+> +                                * https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg17078.html
+> +                                */
+> +                               status = "disable";
+> +                       };
+> +
+> +                       ssp0: ssp at 80010000 {
+> +                               compatible = "fsl,imx28-mmc";
+> +                               pinctrl-names = "default";
+> +                               pinctrl-0 = <&mmc0_8bit_pins_a
+> +                                            &mmc0_sck_cfg>;
+> +                               bus-width = <8>;
+> +                               vmmc-supply = <&reg_3p3v>;
+> +                               broken-cd;
+> +                               disable-wp;
+> +                               cap-mmc-highspeed;
+> +                               non-removable;
+> +                               status = "okay";
+
+
+Please follow the style from arch/arm/boot/dts/imx28-tx28.dts, where
+&ssp0 is used.
+
+
+> +               apbx at 80040000 {
+> +                       mxs_rtc: rtc at 80056000 {
+> +                               /*
+> +                                * Overrides default state from imx28.dtsi
+> +                                * Internal RTC must be disable as a high
+> +                                * precision I2C is connected.
+> +                                */
+> +                               status = "disabled";
+> +                       };
+> +
+> +                       i2c0: i2c at 80058000 {
+> +                               pinctrl-names = "default";
+> +                               pinctrl-0 = <&i2c0_pins_a>;
+> +                               status = "okay";
+> +
+> +                               eeprom: eeprom at 57 {
+> +                                       compatible = "atmel,24c01";
+> +                                       reg = <0x57>;
+> +                                       pagesize = <8>;
+> +                                       readonly = <1>;
+> +                               };
+> +
+> +                               mcp7941x_rtc: rtc at 6f {
+> +                                       compatible = "dallas,mcp7941x";
+
+This compatible string is not documented.
+
+Do you mean "microchip,mcp7941x" instead?
+
+
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               reg_3p3v: regulator at 0 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <0>;
+> +                       regulator-name = "3P3V";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       regulator-always-on;
+
+regulators should not be placed under simple-bus.
