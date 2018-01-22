@@ -1,42 +1,56 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Mon, 22 Jan 2018 11:53:31 +0100
-Subject: [PATCH 2/3] pwm: pwm-omap-dmtimer: Fix frequency when using
- prescaler
-In-Reply-To: <3e00e721-984c-e8db-49f7-046d7b335404@microchip.com>
-References: <20180117214629.GA11952@lenoch> <20180117214737.GC11952@lenoch>
- <3e00e721-984c-e8db-49f7-046d7b335404@microchip.com>
-Message-ID: <20180122105331.GA21159@lenoch>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 22 Jan 2018 16:23:11 +0530
+Subject: [PATCH 1/6] mfd: syscon: Add syscon_register() function
+In-Reply-To: <1516418424-28686-2-git-send-email-david@lechnology.com>
+References: <1516418424-28686-1-git-send-email-david@lechnology.com>
+ <1516418424-28686-2-git-send-email-david@lechnology.com>
+Message-ID: <75ad5a5e-319e-75d3-c1c7-15e7518d424b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Claudiu,
+On Saturday 20 January 2018 08:50 AM, David Lechner wrote:
+> This adds a new syscon_register() function that creates a new syscon
+> regmap and adds it to the lookup list.
+> 
+> This function serves two purposes:
+> 
+> 1. This is needed for platforms without device tree support where the
+>    syscon regmap is needed in early boot (e.g. clocks), because using a
+>    platform driver at this point in boot is not an option.
 
-On Mon, Jan 22, 2018 at 11:17:08AM +0200, Claudiu Beznea wrote:
-> On 17.01.2018 23:47, Ladislav Michl wrote:
-> > @@ -334,18 +348,18 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
-> >  
-> >  	mutex_init(&omap->mutex);
-> >  
-> > -	status = pwmchip_add(&omap->chip);
-> > -	if (status < 0) {
-> > +	ret = pwmchip_add(&omap->chip);
-> > +	if (ret < 0) {
-> >  		dev_err(&pdev->dev, "failed to register PWM\n");
-> > -		omap->pdata->free(omap->dm_timer);
-> > -		ret = status;
-> > -		goto put;
-> > +		goto free;
-> >  	}
-> >  
-> >  	platform_set_drvdata(pdev, omap);
-> >From documentation: "of_parse_phandle(): Returns the device_node pointer with refcount
-> incremented. Use of_node_put() on it when done."
-> In case of success the of_node_put() should also be called as I see.
+Is this because platform_device_register() of the syscon device fails
+when called early on? It will be nice to document the exact failure case
+here (at least the return value) so its clear what the issue is.
 
-Based on you previous suggestions found here:
-https://patchwork.kernel.org/patch/10140209/
-I'd say this fix belongs to patch which introduces of_node_put() in the error
-path. I'll then rebase this patches on top of the fix.
+> 2. It allows other drivers to use syscon_regmap_lookup_by_compatible()
+>    for both device tree and non-DT platforms instead of having to have
+>    a separate case that calls syscon_regmap_lookup_by_pdevname().
 
-Thank you,
-	ladis
+"compatible" is a very device-tree specific terminology so I am afraid
+this is will actually turn out to be confusing.
+
+So, if we are doing this, I would rather be more explicit about it:
+
+/*
+ * registers a "global" syscon "device", usually not backed by a real
+ * device. To be used only in cases where the syscon is not
+ * related to any actual device, like system clocks, for example.
+ *
+ * name passed here must be globally unique.
+ */
+struct regmap *syscon_register_by_name(resource_size_t start, size_t
+				       size, const char *name);
+
+and
+
+struct regmap *syscon_regmap_lookup_by_name(const char *name);
+
+I understand, with this the driver becomes little more complicated and
+DT and non-DT cases still need to be handled differently. But I think
+thats not the main issue you are trying to solve.
+
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+
+Thanks,
+Sekhar
