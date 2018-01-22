@@ -1,23 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Jan 2018 11:53:31 +0000
-Subject: [PATCH] ARM-SMMU: Delete error messages for a failed memory
- allocation in three functions
-In-Reply-To: <ac171b23-624d-2df3-d1d1-8e9479ae03bc@arm.com>
-References: <c3e91414-dd5b-2889-d86c-b19aff56571b@users.sourceforge.net>
- <ac171b23-624d-2df3-d1d1-8e9479ae03bc@arm.com>
-Message-ID: <20180122115331.GE15456@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 22 Jan 2018 09:53:45 -0200
+Subject: [PATCH 1/4] ARM64: add basic Kconfig symbols for i.MX8
+In-Reply-To: <20180117183244.28303-1-l.stach@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5D_siLLeAKkqDYA3w=uRLnc+aV6G_JDQHuGcO2gmKL-+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 11:47:13AM +0000, Robin Murphy wrote:
-> On 20/01/18 14:36, SF Markus Elfring wrote:
-> >From: Markus Elfring <elfring@users.sourceforge.net>
-> >Date: Sat, 20 Jan 2018 15:30:17 +0100
-> >
-> >Omit extra messages for a memory allocation failure in these functions.
-> 
-> Why?
+On Wed, Jan 17, 2018 at 4:32 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm64/Kconfig.platforms |  6 ++++++
+>  drivers/soc/imx/Kconfig      | 12 ++++++++++++
+>  2 files changed, 18 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 2401373565ff..2a22802d1f9e 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -131,6 +131,12 @@ config ARCH_MVEBU
+>            - Armada 7K SoC Family
+>            - Armada 8K SoC Family
+>
+> +config ARCH_MXC
+> +       bool "ARMv8 based NXP i.MX SoC family"
+> +       help
+> +         This enabled support for the ARMv8 based SoCs in the
 
-Don't worry -- I was ignoring this patch (and I assume Joerg does the same).
+s/enabled/enables
 
-Will
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
