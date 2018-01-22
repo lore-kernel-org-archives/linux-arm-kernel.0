@@ -1,107 +1,46 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 23 Jan 2018 00:32:59 +0200
-Subject: [BISECTED] kexec issue with v4.15-rc on N8x0
-In-Reply-To: <20180122220654.k6atriweesf2qmw4@darkstar.musicnaut.iki.fi>
-References: <20180111194747.k5qwz66mfntj6v2g@darkstar.musicnaut.iki.fi>
- <20180115181508.GM4821@atomide.com>
- <20180122220654.k6atriweesf2qmw4@darkstar.musicnaut.iki.fi>
-Message-ID: <20180122223259.v5qumil2fvw2k7pt@darkstar.musicnaut.iki.fi>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 22 Jan 2018 15:04:09 -0800
+Subject: [PATCH 03/25] arm: bcm: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124628.30029-1-malat@debian.org>
+References: <20171215124628.30029-1-malat@debian.org>
+Message-ID: <20180122230410.8712-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 15 Dec 2017 13:46:28 +0100, Mathieu Malaterre <malat@debian.org> wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+> 
+> and
+> 
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> 
+> Converted using the following command:
+> 
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> 
+> For simplicity, two sed expressions were used to solve each warnings separately.
+> 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> ---
 
-(Adding also kexec people...)
-
-On Tue, Jan 23, 2018 at 12:06:54AM +0200, Aaro Koskinen wrote:
-> On Mon, Jan 15, 2018 at 10:15:08AM -0800, Tony Lindgren wrote:
-> > * Aaro Koskinen <aaro.koskinen@iki.fi> [180111 11:48]:
-> > > When booting v4.15-rc kernel with kexec (kexec-tools 2.0.16) on N8x0, I get:
-> > > 
-> > >     Uncompressing Linux... done, booting the kernel.
-> > >     no ATAGS support: can't continue
-> > > 
-> > > v4.14 kernel works OK.
-> > > 
-> > > I bisected this to:
-> > > 
-> > > commit c772568788b5f0cbaac7c8d4111d7173bfc90673
-> > > Author: Russell King <rmk+kernel@armlinux.org.uk>
-> > > Date:   Thu Sep 21 18:10:19 2017 +0100
-> > > 
-> > >     ARM: add additional table to compressed kernel
-> > > 
-> > > If I revert the commit, kexec booting starts to work. Interesting,
-> > > the patch mentions "This is necessary for correct behaviour of kexec.",
-> > > so I wonder what could be wrong...
-> > 
-> > So care to post what you get if you load with kexec -d -l options
-> > before and after this commit?
-> 
-> See below. I guess the interesting part is the "zImage has tags" with the
-> bad kernel.
-> 
-> Bad (plain v4.15-rc9)
-> ---------------------
-> kernel: 0xb6a25008 kernel_size: 0x3ce605
-> MEMORY RANGES
-> 0000000080000000-0000000087ffffff (0)
-> zImage header: 0x016f2818 0x00000000 0x003c59d0
-> zImage size 0x3c59d0, file size 0x3ce605
-> zImage has tags
->   offset 0x00003be0 tag 0x5a534c4b size 8
-> kernel image size: 0x00c5c6ec
-> kexec_load: entry = 0x80008000 flags = 0x280000
-> nr_segments = 2
-> segment[0].buf   = 0xb6a25008
-> segment[0].bufsz = 0x3c59d0
-> segment[0].mem   = 0x80008000
-> segment[0].memsz = 0x3c6000
-> segment[1].buf   = 0x1ed52b8
-> segment[1].bufsz = 0x8c35
-> segment[1].mem   = 0x80c66000
-> segment[1].memsz = 0x9000
-> [    4.850341] kexec_core: Starting new kernel
-> [    4.854766] Bye!
-> 
-> (kernel fails to boot)
-> 
-> Good (v4.15-rc9 and c772568788b5f0cbaac7c8d4111d7173bfc90673 reverted)
-> -----------------------------
-> kernel: 0xb6999008 kernel_size: 0x3ce9bd
-> MEMORY RANGES
-> 0000000080000000-0000000087ffffff (0)
-> zImage header: 0x016f2818 0x00000000 0x003c5d88
-> zImage size 0x3c5d88, file size 0x3ce9bd
-> kexec_load: entry = 0x80008000 flags = 0x280000
-> nr_segments = 2
-> segment[0].buf   = 0xb6999008
-> segment[0].bufsz = 0x3c5d88
-> segment[0].mem   = 0x80008000
-> segment[0].memsz = 0x3c6000
-> segment[1].buf   = 0x14192b8
-> segment[1].bufsz = 0x8c35
-> segment[1].mem   = 0x812e7000
-> segment[1].memsz = 0x9000
-> [    4.860473] kexec_core: Starting new kernel
-> [    4.864898] Bye!
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 4.15.0-rc9-n8x0-los_ecc96+-00001-g0a003b4 (aaro at amd-fx-6350) (gcc version 6.4.0 (GCC)) #1 Mon Jan 22 23:43:19 EET 2018
-> [    0.000000] CPU: ARMv6-compatible processor [4107b362] revision 2 (ARMv6TEJ), cr=00c5387d
-> [    0.000000] CPU: VIPT aliasing data cache, VIPT aliasing instruction cache
-> [    0.000000] OF: fdt: Machine model: Nokia N810
-> [...]
-> 
-> (kernel boots fine)
-> 
-> > Also, I wonder if Linux next commit 55e7cff44c7c ("ARM: verify
-> > size of zImage") helps here?
-> 
-> No difference.
-
-Looks like downgrading kexec-tools from .16 to 2.0.15 helps.
-
-So it seems the latest kexec-tools is incompatible with the latest kernel
-on ARM?
-
-A.
+Applied to devicetree/fixes, thanks!
+--
+Florian
