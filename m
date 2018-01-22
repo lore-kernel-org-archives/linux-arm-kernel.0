@@ -1,47 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Jan 2018 11:33:11 +0000
-Subject: [PATCH v3 1/2] arm64: Branch predictor hardening for Cavium
- ThunderX2
-In-Reply-To: <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
-References: <20180118135354.GB20783@arm.com>
- <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20180122113311.GB15456@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Jan 2018 12:33:11 +0100
+Subject: [GIT PULL] Qualcomm Fixes for 4.16
+In-Reply-To: <1516572157-968-1-git-send-email-andy.gross@linaro.org>
+References: <1516572157-968-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a2M4xqHO3tRokqaudxO8=+ifj6Ve3vW1L_Dv2KCykbUtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 04:22:47AM -0800, Jayachandran C wrote:
-> Use PSCI based mitigation for speculative execution attacks targeting
-> the branch predictor. We use the same mechanism as the one used for
-> Cortex-A CPUs, we expect the PSCI version call to have a side effect
-> of clearing the BTBs.
-> 
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> ---
->  arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 70e5f18..45ff9a2 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -338,6 +338,16 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
->  		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
->  	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-> +		.enable = enable_psci_bp_hardening,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-> +		.enable = enable_psci_bp_hardening,
-> +	},
->  #endif
+On Sun, Jan 21, 2018 at 11:02 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> Arnd/Olof/Kevin,
+>
+> Please take this fix for 4.16.  This applies on top of the current next
+> (next-20190119).
+>
+> Thanks,
+>
+> Andy
+>
+> The following changes since commit 761914dd2975bc443024f0ec10a66a26b7186ec2:
+>
+>   Add linux-next specific files for 20180119 (2018-01-19 17:51:17 +1100)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.16
 
-Thanks.
+I assume you didn't actually mean to send a pull request based on top
+of linux-next
+but instead had a branch on top of the one you sent previously.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I cherry-picked the one commit you want into the next/drivers branch!
 
-Will
+     Arnd
