@@ -1,63 +1,23 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 22 Jan 2018 11:51:34 +0000
-Subject: [PATCH v3 2/2] arm64: Turn on KPTI only on CPUs that need it
-In-Reply-To: <20180122114155.GC15456@arm.com>
-References: <20180118135354.GB20783@arm.com>
- <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
- <1516364568-95577-2-git-send-email-jnair@caviumnetworks.com>
- <20180122114155.GC15456@arm.com>
-Message-ID: <CAKv+Gu_kOYYx3Qa8OsfsxJDLMSrWVNrt7kmtJOue9sVaTdGqXg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Jan 2018 11:53:31 +0000
+Subject: [PATCH] ARM-SMMU: Delete error messages for a failed memory
+ allocation in three functions
+In-Reply-To: <ac171b23-624d-2df3-d1d1-8e9479ae03bc@arm.com>
+References: <c3e91414-dd5b-2889-d86c-b19aff56571b@users.sourceforge.net>
+ <ac171b23-624d-2df3-d1d1-8e9479ae03bc@arm.com>
+Message-ID: <20180122115331.GE15456@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2018 at 11:41, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 19, 2018 at 04:22:48AM -0800, Jayachandran C wrote:
->> Whitelist Broadcom Vulcan/Cavium ThunderX2 processors in
->> unmap_kernel_at_el0(). These CPUs are not vulnerable to
->> CVE-2017-5754 and do not need KPTI when KASLR is off.
->>
->> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
->> ---
->>  arch/arm64/kernel/cpufeature.c | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 647d44b..fb698ca 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -866,6 +866,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->>       if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->>               return true;
->>
->> +     /* Don't force KPTI for CPUs that are not vulnerable */
->> +     switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
->> +     case MIDR_CAVIUM_THUNDERX2:
->> +     case MIDR_BRCM_VULCAN:
->> +             return false;
->> +     }
->> +
->>       /* Defer to CPU feature registers */
->>       return !cpuid_feature_extract_unsigned_field(pfr0,
->>                                                    ID_AA64PFR0_CSV3_SHIFT);
->
-> We'll need to re-jig this to work properly with big/little because this is
-> only called once, but that's ok for now:
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Suzuki has a series reworking much of the cpufeatures code so that we can
-> do this properly for 4.17.
->
+On Mon, Jan 22, 2018 at 11:47:13AM +0000, Robin Murphy wrote:
+> On 20/01/18 14:36, SF Markus Elfring wrote:
+> >From: Markus Elfring <elfring@users.sourceforge.net>
+> >Date: Sat, 20 Jan 2018 15:30:17 +0100
+> >
+> >Omit extra messages for a memory allocation failure in these functions.
+> 
+> Why?
 
-If we start adding opt outs here, we should at least include A53, and
-probably replace
+Don't worry -- I was ignoring this patch (and I assume Joerg does the same).
 
->>       if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->>               return true;
-
-with
-
->>       if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && kaslr_offset() > 0)
->>               return true;
-
-so that adding 'nokaslr' to the command line also disables KPTI.
+Will
