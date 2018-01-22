@@ -1,46 +1,20 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 22 Jan 2018 15:04:09 -0800
-Subject: [PATCH 03/25] arm: bcm: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171215124628.30029-1-malat@debian.org>
-References: <20171215124628.30029-1-malat@debian.org>
-Message-ID: <20180122230410.8712-1-f.fainelli@gmail.com>
+Date: Mon, 22 Jan 2018 15:09:48 -0800
+Subject: [PATCH -next] hwrng: bcm2835 - Remove redundant dev_err call in
+ bcm2835_rng_probe()
+In-Reply-To: <1516189234-11957-1-git-send-email-weiyongjun1@huawei.com>
+References: <1516189234-11957-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <2f6aedf1-4712-73b9-6012-349cdcc2605a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Dec 2017 13:46:28 +0100, Mathieu Malaterre <malat@debian.org> wrote:
-> Improve the DTS files by removing all the leading "0x" and zeros to fix the
-> following dtc warnings:
+On 01/17/2018 03:40 AM, Wei Yongjun wrote:
+> There is a error message within devm_ioremap_resource
+> already, so remove the dev_err call to avoid redundant
+> error message.
 > 
-> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
-> 
-> and
-> 
-> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
-> 
-> Converted using the following command:
-> 
-> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
-> 
-> For simplicity, two sed expressions were used to solve each warnings separately.
-> 
-> To make the regex expression more robust a few other issues were resolved,
-> namely setting unit-address to lower case, and adding a whitespace before the
-> the opening curly brace:
-> 
-> https://elinux.org/Device_Tree_Linux#Linux_conventions
-> 
-> This will solve as a side effect warning:
-> 
-> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
-> 
-> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
-> 
-> Reported-by: David Daney <ddaney@caviumnetworks.com>
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Mathieu Malaterre <malat@debian.org>
-> ---
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-Applied to devicetree/fixes, thanks!
---
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+-- 
 Florian
