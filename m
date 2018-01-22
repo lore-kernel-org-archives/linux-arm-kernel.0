@@ -1,122 +1,172 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 22 Jan 2018 13:38:48 +0000
-Subject: [PATCH v2 1/6] arm64: cpufeature: Allow early detect of specific
- features
-In-Reply-To: <2f2a406b-fddf-6c30-4052-650f57ac317a@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <1516190084-18978-2-git-send-email-julien.thierry@arm.com>
- <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
- <2f2a406b-fddf-6c30-4052-650f57ac317a@arm.com>
-Message-ID: <20180122133848.546zixs3crkwvuid@oak.lan>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Mon, 22 Jan 2018 14:40:29 +0100
+Subject: [PATCH v3 00/41] Optimize KVM/ARM for VHE systems
+In-Reply-To: <20180115141423.5qho7xvmikq27jvs@yury-thinkpad>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180115141423.5qho7xvmikq27jvs@yury-thinkpad>
+Message-ID: <bff8c9e3-6821-0ad3-4a7d-804f13027569@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 12:21:55PM +0000, Julien Thierry wrote:
-> On 22/01/18 12:05, Suzuki K Poulose wrote:
-> > On 17/01/18 11:54, Julien Thierry wrote:
-> > > From: Daniel Thompson <daniel.thompson@linaro.org>
-> > > 
-> > > Currently it is not possible to detect features of the boot CPU
-> > > until the other CPUs have been brought up.
-> > > 
-> > > This prevents us from reacting to features of the boot CPU until
-> > > fairly late in the boot process. To solve this we allow a subset
-> > > of features (that are likely to be common to all clusters) to be
-> > > detected based on the boot CPU alone.
-> > > 
-> > > Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> > > [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
-> > >              duplicates between early features and normal
-> > >              features]
-> > > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > > ---
-> > >   arch/arm64/kernel/cpufeature.c | 69
-> > > ++++++++++++++++++++++++++++--------------
-> > >   1 file changed, 47 insertions(+), 22 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/cpufeature.c
-> > > b/arch/arm64/kernel/cpufeature.c
-> > > index a73a592..6698404 100644
-> > > --- a/arch/arm64/kernel/cpufeature.c
-> > > +++ b/arch/arm64/kernel/cpufeature.c
-> > > @@ -52,6 +52,8 @@
-> > >   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-> > >   EXPORT_SYMBOL(cpu_hwcaps);
-> > > 
-> > > +static void __init setup_early_feature_capabilities(void);
-> > > +
-> > >   /*
-> > >    * Flag to indicate if we have computed the system wide
-> > >    * capabilities based on the boot time active CPUs. This
-> > > @@ -542,6 +544,8 @@ void __init init_cpu_features(struct
-> > > cpuinfo_arm64 *info)
-> > >           init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
-> > >           sve_init_vq_map();
-> > >       }
-> > > +
-> > > +    setup_early_feature_capabilities();
-> > >   }
-> > > 
-> > >   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-> > > @@ -846,7 +850,7 @@ static bool has_no_fpsimd(const struct
-> > > arm64_cpu_capabilities *entry, int __unus
-> > >                       ID_AA64PFR0_FP_SHIFT) < 0;
-> > >   }
-> > > 
-> > > -static const struct arm64_cpu_capabilities arm64_features[] = {
-> > > +static const struct arm64_cpu_capabilities arm64_early_features[] = {
-> > >       {
-> > >           .desc = "GIC system register CPU interface",
-> > >           .capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-> > > @@ -857,6 +861,10 @@ static bool has_no_fpsimd(const struct
-> > > arm64_cpu_capabilities *entry, int __unus
-> > >           .sign = FTR_UNSIGNED,
-> > >           .min_field_value = 1,
-> > >       },
-> > > +    {}
-> > > +};
-> > > +
-> > 
-> > 
-> > Julien,
-> > 
-> > One potential problem with this is that we don't have a way
-> > to make this work on a "theoretical" system with and without
-> > GIC system reg interface. i.e, if we don't have the CONFIG
-> > enabled for using ICC system regs for IRQ flags, the kernel
-> > could still panic. I understand this is not a "normal" configuration
-> > but, may be we could make the panic option based on whether
-> > we actually use the system regs early enough ?
-> > 
+Hi Yury,
+
+On 15.01.2018 15:14, Yury Norov wrote:
+> Hi Christoffer,
 > 
-> I see, however I'm not sure what happens in the GIC drivers if we have a CPU
-> running with a GICv3 and other CPUs with something else... But of course
-> this is not technically limited by the arm64 capabilities handling.
-
-Shouldn't each CPU be sharing the same GIC anyway? It so its not some
-have GICv3+ and some have GICv2. The theoretical system described above 
-*has* a GICv3+ but some participants in the cluster are not able to 
-talk to it as like a co-processor.
-
-The ARM ARM is a little vague about whether, if a GIC implements a
-system register interface, then a core must provide access to it. Even
-so, first question is whether such a system is architecture compliant?
-
-
-Daniel.
-
-
-> What behaviour would you be looking for? A way to prevent the CPU to be
-> brought up instead of panicking?
+> [CC Sunil Goutham <Sunil.Goutham@cavium.com>]
 > 
-> > Btw, I am rewriting the capabilities infrastructure to allow per-cap
-> > control on how it should be treated. I might add an EARLY scope for
-> > caps which could cover this and may be VHE.
+> On Fri, Jan 12, 2018 at 01:07:06PM +0100, Christoffer Dall wrote:
+>> This series redesigns parts of KVM/ARM to optimize the performance on
+>> VHE systems.  The general approach is to try to do as little work as
+>> possible when transitioning between the VM and the hypervisor.  This has
+>> the benefit of lower latency when waiting for interrupts and delivering
+>> virtual interrupts, and reduces the overhead of emulating behavior and
+>> I/O in the host kernel.
+>>
+>> Patches 01 through 06 are not VHE specific, but rework parts of KVM/ARM
+>> that can be generally improved.  We then add infrastructure to move more
+>> logic into vcpu_load and vcpu_put, we improve handling of VFP and debug
+>> registers.
+>>
+>> We then introduce a new world-switch function for VHE systems, which we
+>> can tweak and optimize for VHE systems.  To do that, we rework a lot of
+>> the system register save/restore handling and emulation code that may
+>> need access to system registers, so that we can defer as many system
+>> register save/restore operations to vcpu_load and vcpu_put, and move
+>> this logic out of the VHE world switch function.
+>>
+>> We then optimize the configuration of traps.  On non-VHE systems, both
+>> the host and VM kernels run in EL1, but because the host kernel should
+>> have full access to the underlying hardware, but the VM kernel should
+>> not, we essentially make the host kernel more privileged than the VM
+>> kernel despite them both running at the same privilege level by enabling
+>> VE traps when entering the VM and disabling those traps when exiting the
+>> VM.  On VHE systems, the host kernel runs in EL2 and has full access to
+>> the hardware (as much as allowed by secure side software), and is
+>> unaffected by the trap configuration.  That means we can configure the
+>> traps for VMs running in EL1 once, and don't have to switch them on and
+>> off for every entry/exit to/from the VM.
+>>
+>> Finally, we improve our VGIC handling by moving all save/restore logic
+>> out of the VHE world-switch, and we make it possible to truly only
+>> evaluate if the AP list is empty and not do *any* VGIC work if that is
+>> the case, and only do the minimal amount of work required in the course
+>> of the VGIC processing when we have virtual interrupts in flight.
+>>
+>> The patches are based on v4.15-rc3, v9 of the level-triggered mapped
+>> interrupts support series [1], and the first five patches of James' SDEI
+>> series [2].
+>>
+>> I've given the patches a fair amount of testing on Thunder-X, Mustang,
+>> Seattle, and TC2 (32-bit) for non-VHE testing, and tested VHE
+>> functionality on the Foundation model, running both 64-bit VMs and
+>> 32-bit VMs side-by-side and using both GICv3-on-GICv3 and
+>> GICv2-on-GICv3.
+>>
+>> The patches are also available in the vhe-optimize-v3 branch on my
+>> kernel.org repository [3].  The vhe-optimize-v3-base branch contains
+>> prerequisites of this series.
+>>
+>> Changes since v2:
+>>   - Rebased on v4.15-rc3.
+>>   - Includes two additional patches that only does vcpu_load after
+>>     kvm_vcpu_first_run_init and only for KVM_RUN.
+>>   - Addressed review comments from v2 (detailed changelogs are in the
+>>     individual patches).
+>>
+>> Thanks,
+>> -Christoffer
+>>
+>> [1]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git level-mapped-v9
+>> [2]: git://linux-arm.org/linux-jm.git sdei/v5/base
+>> [3]: git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vhe-optimize-v3
 > 
-> Thanks,
+> I tested this v3 series on ThunderX2 with IPI benchmark:
+> https://lkml.org/lkml/2017/12/11/364
 > 
-> -- 
-> Julien Thierry
+> I tried to address your comments in discussion to v2, like pinning
+> the module to specific CPU (with taskset), increasing the number of
+> iterations, tuning governor to max performance. Results didn't change
+> much, and are pretty stable.
+> 
+> Comparing to vanilla guest, Norml IPI delivery for v3 is 20% slower.
+> For v2 it was 27% slower, and for v1 - 42% faster. What's interesting,
+> the acknowledge time is much faster for v3, so overall time to
+> deliver and acknowledge IPI (2nd column) is less than vanilla
+> 4.15-rc3 kernel.
+> 
+> Test setup is not changed since v2: ThunderX2, 112 online CPUs,
+> guest is running under qemu-kvm, emulating gic version 3.
+> 
+> Below is test results for v1-3 normalized to host vanilla kernel
+> dry-run time.
+> 
+> Yury
+> 
+> Host, v4.14:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:      81       110
+> Broadcast IPI:    0      2106
+> 
+> Guest, v4.14:
+> Dry-run:          0         1
+> Self-IPI:        10        18
+> Normal IPI:     305       525
+> Broadcast IPI:    0      9729
+> 
+> Guest, v4.14 + VHE:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:     176       343
+> Broadcast IPI:    0      9885
+> 
+> And for v2.
+> 
+> Host, v4.15:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:      79       108
+> Broadcast IPI:    0      2102
+>                          
+> Guest, v4.15-rc:
+> Dry-run:          0         1
+> Self-IPI:         9        18
+> Normal IPI:     291       526
+> Broadcast IPI:    0     10439
+> 
+> Guest, v4.15-rc + VHE:
+> Dry-run:          0         2
+> Self-IPI:        14        28
+> Normal IPI:     370       569
+> Broadcast IPI:    0     11688
+> 
+> And for v3.
+> 
+> Host 4.15-rc3					
+> Dry-run:	  0	    1
+> Self-IPI:	  9	   18
+> Normal IPI:	 80	  110
+> Broadcast IPI:	  0	 2088
+> 		
+> Guest, 4.15-rc3	
+> Dry-run:	  0	    1
+> Self-IPI:	  9	   18
+> Normal IPI:	289	  497
+> Broadcast IPI:	  0	 9999
+> 		
+> Guest, 4.15-rc3	+ VHE
+> Dry-run:	  0	    2
+> Self-IPI:	 12	   24
+> Normal IPI:	347	  490
+> Broadcast IPI:	  0	11906
+
+As I reported here:
+https://patchwork.kernel.org/patch/10125537/
+this might be because of WFI exits storm. Can you please check KVM exits 
+stats for completely idle VM ? Also, wait time from kvm_vcpu_wakeup() 
+trace point will be useful. I got lots of these:
+kvm_vcpu_wakeup: poll time 0 ns, polling valid
+
+Thanks,
+Tomasz
