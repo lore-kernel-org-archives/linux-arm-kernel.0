@@ -1,120 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:18 +0100
-Subject: [PATCH v4 04/13] drm/sun4i: backend: Add a custom plane state
+Date: Mon, 22 Jan 2018 10:25:26 +0100
+Subject: [PATCH v4 12/13] drm/sun4i: backend: Make sure we don't have a commit
+ pending
 In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
 References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <88dd9c2b0caa550595e7b2ff37dc9d0af2c78609.1516613040.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <35604307e5bde2b85c674de79fa7c4d55700f085.1516613040.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will need to store some additional data in the future to the state.
-Create a custom plane state that will embed those data, in order to store
-the pipe or whether or not that plane should use the frontend.
+If we try to read the backend registers while it fetches the new values, we
+end up with the value of some random register instead of the one we asked
+for.
+
+In order to prevent that, let's make sure that the very first thing we do
+during our atomic modesetting is to let the commit bit come to a rest.
+
+We don't have to worry about anything else since the only time we will
+trigger a new transaction is during the atomic_commit which comes much
+later.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 50 ++++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_layer.h | 10 ++++++-
- 2 files changed, 57 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 7bddf12548d3..b85a9a02d166 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -25,6 +25,50 @@ struct sun4i_plane_desc {
- 	       uint32_t                nformats;
- };
- 
-+static void sun4i_backend_layer_reset(struct drm_plane *plane)
-+{
-+	struct sun4i_layer_state *state;
-+
-+	if (plane->state) {
-+		state = state_to_sun4i_layer_state(plane->state);
-+
-+		__drm_atomic_helper_plane_destroy_state(&state->state);
-+
-+		kfree(state);
-+		plane->state = NULL;
-+	}
-+
-+	state = kzalloc(sizeof(*state), GFP_KERNEL);
-+	if (state) {
-+		plane->state = &state->state;
-+		plane->state->plane = plane;
-+	}
-+}
-+
-+static struct drm_plane_state *
-+sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
-+{
-+	struct sun4i_layer_state *copy;
-+
-+	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
-+	if (!copy)
-+		return NULL;
-+
-+	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
-+
-+	return &copy->state;
-+}
-+
-+static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
-+					      struct drm_plane_state *state)
-+{
-+	struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(state);
-+
-+	__drm_atomic_helper_plane_destroy_state(state);
-+
-+	kfree(s_state);
-+}
-+
- static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
- {
-@@ -52,11 +96,11 @@ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
- };
- 
- static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
--	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
--	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
-+	.atomic_destroy_state	= sun4i_backend_layer_destroy_state,
-+	.atomic_duplicate_state	= sun4i_backend_layer_duplicate_state,
- 	.destroy		= drm_plane_cleanup,
- 	.disable_plane		= drm_atomic_helper_disable_plane,
--	.reset			= drm_atomic_helper_plane_reset,
-+	.reset			= sun4i_backend_layer_reset,
- 	.update_plane		= drm_atomic_helper_update_plane,
- };
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index 4e84f438b346..d2c19348d1b0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -22,12 +22,22 @@ struct sun4i_layer {
- 	int			id;
- };
- 
-+struct sun4i_layer_state {
-+	struct drm_plane_state	state;
-+};
-+
- static inline struct sun4i_layer *
- plane_to_sun4i_layer(struct drm_plane *plane)
- {
- 	return container_of(plane, struct sun4i_layer, plane);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 1b8e3dcbe47a..5d4a49e9ccc3 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -297,6 +297,17 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+ 	return sun4i_backend_plane_uses_scaler(state);
  }
  
-+static inline struct sun4i_layer_state *
-+state_to_sun4i_layer_state(struct drm_plane_state *state)
++static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
++				       struct drm_crtc_state *old_state)
 +{
-+	return container_of(state, struct sun4i_layer_state, state);
++	u32 val;
++
++	WARN_ON(regmap_read_poll_timeout(engine->regs,
++					 SUN4I_BACKEND_REGBUFFCTL_REG,
++					 val, !(val & SUN4I_BACKEND_REGBUFFCTL_LOADCTL),
++					 100, 50000));
 +}
 +
- struct drm_plane **sun4i_layers_init(struct drm_device *drm,
- 				     struct sunxi_engine *engine);
+ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 				      struct drm_crtc_state *crtc_state)
+ {
+@@ -479,6 +490,7 @@ static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
+ }
  
+ static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
++	.atomic_begin			= sun4i_backend_atomic_begin,
+ 	.atomic_check			= sun4i_backend_atomic_check,
+ 	.commit				= sun4i_backend_commit,
+ 	.layers_init			= sun4i_layers_init,
 -- 
 git-series 0.9.1
