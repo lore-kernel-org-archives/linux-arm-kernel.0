@@ -1,88 +1,120 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:19 +0100
-Subject: [PATCH v4 05/13] drm/sun4i: engine: Add a custom crtc atomic_check
+Date: Mon, 22 Jan 2018 10:25:18 +0100
+Subject: [PATCH v4 04/13] drm/sun4i: backend: Add a custom plane state
 In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
 References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <e5f5f144e5c20d348cdb29933ae876c105bec017.1516613040.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <88dd9c2b0caa550595e7b2ff37dc9d0af2c78609.1516613040.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have some restrictions on what the planes and CRTC can provide that are
-tied to only one generation of display engines.
-
-For example, on the first generation, we can only have one YUV plane or one
-plane that uses the frontend output.
-
-Let's allow our engines to provide an atomic_check callback to validate the
-current configuration.
+We will need to store some additional data in the future to the state.
+Create a custom plane state that will embed those data, in order to store
+the pipe or whether or not that plane should use the frontend.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c   | 14 ++++++++++++++
- drivers/gpu/drm/sun4i/sunxi_engine.h | 17 +++++++++++++++++
- 2 files changed, 31 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 50 ++++++++++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_layer.h | 10 ++++++-
+ 2 files changed, 57 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 5decae0069d0..2a565325714f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -46,6 +46,19 @@ static struct drm_encoder *sun4i_crtc_get_encoder(struct drm_crtc *crtc)
- 	return NULL;
- }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 7bddf12548d3..b85a9a02d166 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -25,6 +25,50 @@ struct sun4i_plane_desc {
+ 	       uint32_t                nformats;
+ };
  
-+static int sun4i_crtc_atomic_check(struct drm_crtc *crtc,
-+				    struct drm_crtc_state *state)
++static void sun4i_backend_layer_reset(struct drm_plane *plane)
 +{
-+	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
-+	struct sunxi_engine *engine = scrtc->engine;
-+	int ret = 0;
++	struct sun4i_layer_state *state;
 +
-+	if (engine && engine->ops && engine->ops->atomic_check)
-+		ret = engine->ops->atomic_check(engine, state);
++	if (plane->state) {
++		state = state_to_sun4i_layer_state(plane->state);
 +
-+	return ret;
++		__drm_atomic_helper_plane_destroy_state(&state->state);
++
++		kfree(state);
++		plane->state = NULL;
++	}
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (state) {
++		plane->state = &state->state;
++		plane->state->plane = plane;
++	}
 +}
 +
- static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
- 				    struct drm_crtc_state *old_state)
++static struct drm_plane_state *
++sun4i_backend_layer_duplicate_state(struct drm_plane *plane)
++{
++	struct sun4i_layer_state *copy;
++
++	copy = kzalloc(sizeof(*copy), GFP_KERNEL);
++	if (!copy)
++		return NULL;
++
++	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
++
++	return &copy->state;
++}
++
++static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
++					      struct drm_plane_state *state)
++{
++	struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(state);
++
++	__drm_atomic_helper_plane_destroy_state(state);
++
++	kfree(s_state);
++}
++
+ static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
+ 					       struct drm_plane_state *old_state)
  {
-@@ -125,6 +138,7 @@ static void sun4i_crtc_mode_set_nofb(struct drm_crtc *crtc)
+@@ -52,11 +96,11 @@ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
+ };
+ 
+ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+-	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
+-	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
++	.atomic_destroy_state	= sun4i_backend_layer_destroy_state,
++	.atomic_duplicate_state	= sun4i_backend_layer_duplicate_state,
+ 	.destroy		= drm_plane_cleanup,
+ 	.disable_plane		= drm_atomic_helper_disable_plane,
+-	.reset			= drm_atomic_helper_plane_reset,
++	.reset			= sun4i_backend_layer_reset,
+ 	.update_plane		= drm_atomic_helper_update_plane,
+ };
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index 4e84f438b346..d2c19348d1b0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -22,12 +22,22 @@ struct sun4i_layer {
+ 	int			id;
+ };
+ 
++struct sun4i_layer_state {
++	struct drm_plane_state	state;
++};
++
+ static inline struct sun4i_layer *
+ plane_to_sun4i_layer(struct drm_plane *plane)
+ {
+ 	return container_of(plane, struct sun4i_layer, plane);
  }
  
- static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
-+	.atomic_check	= sun4i_crtc_atomic_check,
- 	.atomic_begin	= sun4i_crtc_atomic_begin,
- 	.atomic_flush	= sun4i_crtc_atomic_flush,
- 	.atomic_enable	= sun4i_crtc_atomic_enable,
-diff --git a/drivers/gpu/drm/sun4i/sunxi_engine.h b/drivers/gpu/drm/sun4i/sunxi_engine.h
-index b374e074c7c3..b819d4f9f02f 100644
---- a/drivers/gpu/drm/sun4i/sunxi_engine.h
-+++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
-@@ -23,6 +23,23 @@ struct sunxi_engine;
-  */
- struct sunxi_engine_ops {
- 	/**
-+	 * @atomic_check:
-+	 *
-+	 * This callback allows to validate plane-update related CRTC
-+	 * constraints specific to engines. This is mirroring the
-+	 * &drm_crtc_helper_funcs.atomic_check callback, so any
-+	 * documentation there applies.
-+	 *
-+	 * This function is optional.
-+	 *
-+	 * RETURNS:
-+	 *
-+	 * 0 on success or a negative error code.
-+	 */
-+	int (*atomic_check)(struct sunxi_engine *engine,
-+			    struct drm_crtc_state *state);
++static inline struct sun4i_layer_state *
++state_to_sun4i_layer_state(struct drm_plane_state *state)
++{
++	return container_of(state, struct sun4i_layer_state, state);
++}
 +
-+	/**
- 	 * @commit:
- 	 *
- 	 * This callback will trigger the hardware switch to commit
+ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+ 				     struct sunxi_engine *engine);
+ 
 -- 
 git-series 0.9.1
