@@ -1,42 +1,140 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 22 Jan 2018 11:40:47 +0100
-Subject: [PATCH v2] arm64: dts: rockchip: add roc-rk3328-cc board
-In-Reply-To: <20180120095404.32117-1-djw@t-chip.com.cn>
-References: <20180106094538.15568-1-djw@t-chip.com.cn>
- <20180120095404.32117-1-djw@t-chip.com.cn>
-Message-ID: <1977166.SIloaIvObo@phil>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Mon, 22 Jan 2018 11:39:37 +0100
+Subject: [PATCH 3/3] clocksource: timer-dm: Make unexported functions
+ static
+In-Reply-To: <755fca20-7544-1655-47c7-83b1a2669adc@microchip.com>
+References: <20180117214629.GA11952@lenoch> <20180117214826.GD11952@lenoch>
+ <755fca20-7544-1655-47c7-83b1a2669adc@microchip.com>
+Message-ID: <20180122103936.GB19401@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Levin,
-
-Am Samstag, 20. Januar 2018, 17:54:04 CET schrieb djw at t-chip.com.cn:
-> From: Levin Du <djw@t-chip.com.cn>
+On Mon, Jan 22, 2018 at 11:26:44AM +0200, Claudiu Beznea wrote:
+> On 17.01.2018 23:48, Ladislav Michl wrote:
+> > As dmtimer no longer exports functions, make those previously
+> > exported static.
+> > 
+> > Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> > ---
+> >  Note: only those functions assigned to timer ops are made static
+> >        as some others will be needed later for event capture.
+> > 
+> >  drivers/clocksource/timer-dm.c |  218 ++++++++++++++++++++---------------------
+> >  include/clocksource/dmtimer.h  |   24 ----
+> >  2 files changed, 109 insertions(+), 133 deletions(-)
+> > 
+> > diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+> > index 324ec93d3dd2..8de9e543d129 100644
+> > --- a/drivers/clocksource/timer-dm.c
+> > +++ b/drivers/clocksource/timer-dm.c
+> > @@ -163,6 +163,92 @@ static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
+> >  	return ret;
+> >  }
+> >  
+> > +static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+> > +{
+> > +	int ret;
+> > +	char *parent_name = NULL;
+> Could be declared as const: const char *parent_name = NULL;
 > 
-> Hi all,
->   This version uses SPDX license tag.
-> 
-> The roc-rk3328-cc is a credit card size single board computer using the
-> Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
-> up to 2GB 2133MHz LPDDR4 memory. It provides eMMC module socket, MicroSD
-> Card slot, USB 2.0/3.0, Gigabit Ethernet, HDMI/CVBS, Infrared Receiver,
-> SPDIF/I2S, and SPI/I2C/UART/PWM interfaces.
-> 
-> The devicetree currently supports basic peripherals.
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+> > +	struct clk *parent;
+> > +	struct dmtimer_platform_data *pdata;
+> > +
+> > +	if (unlikely(!timer))
+> > +		return -EINVAL;
+> > +
+> > +	pdata = timer->pdev->dev.platform_data;
+> > +
+> > +	if (source < 0 || source >= 3)
+> > +		return -EINVAL;
+> > +
+> > +	/*
+> > +	 * FIXME: Used for OMAP1 devices only because they do not currently
+> > +	 * use the clock framework to set the parent clock. To be removed
+> > +	 * once OMAP1 migrated to using clock framework for dmtimers
+> > +	 */
+> > +	if (pdata && pdata->set_timer_src)
+> > +		return pdata->set_timer_src(timer->pdev, source);
+> > +
+> > +	if (IS_ERR(timer->fclk))
+> > +		return -EINVAL;
+> Souldn't this check be done at the beginning of the function?
 
-> +&i2c1 {
-> +	status = "okay";
-> +
-> +	rk805: rk805 at 18 {
+Well, this patch only moves existing functions around, just to make it
+compile after declarations are removed from header file.
 
-As noted by Rob in his review, this should be
-	rk805: pmic at 18 {
+Fixes should be sent separately as this is not the only problem with
+clocksource code :)
 
-While I'd normally just change that myself when applying it looks like
-you also got comments from Andy to address, so you could change this too.
+Anyway, thank you for review, this one could be addressed by a following
+patch:
 
-
-Thanks
-Heiko
+diff --git a/drivers/clocksource/timer-dm.c b/drivers/clocksource/timer-dm.c
+index dbf2b1f6a941..02b3436db70e 100644
+--- a/drivers/clocksource/timer-dm.c
++++ b/drivers/clocksource/timer-dm.c
+@@ -166,17 +166,30 @@ static int omap_dm_timer_of_set_source(struct omap_dm_timer *timer)
+ static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ {
+ 	int ret;
+-	char *parent_name = NULL;
++	const char *parent_name;
+ 	struct clk *parent;
+ 	struct dmtimer_platform_data *pdata;
+ 
+-	if (unlikely(!timer))
++	if (unlikely(!timer) || IS_ERR(timer->fclk))
+ 		return -EINVAL;
+ 
+-	pdata = timer->pdev->dev.platform_data;
++	switch (source) {
++	case OMAP_TIMER_SRC_SYS_CLK:
++		parent_name = "timer_sys_ck";
++		break;
+ 
+-	if (source < 0 || source >= 3)
++	case OMAP_TIMER_SRC_32_KHZ:
++		parent_name = "timer_32k_ck";
++		break;
++
++	case OMAP_TIMER_SRC_EXT_CLK:
++		parent_name = "timer_ext_ck";
++		break;
++	default:
+ 		return -EINVAL;
++	}
++
++	pdata = timer->pdev->dev.platform_data;
+ 
+ 	/*
+ 	 * FIXME: Used for OMAP1 devices only because they do not currently
+@@ -186,29 +199,12 @@ static int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 	if (pdata && pdata->set_timer_src)
+ 		return pdata->set_timer_src(timer->pdev, source);
+ 
+-	if (IS_ERR(timer->fclk))
+-		return -EINVAL;
+-
+ #if defined(CONFIG_COMMON_CLK)
+ 	/* Check if the clock has configurable parents */
+ 	if (clk_hw_get_num_parents(__clk_get_hw(timer->fclk)) < 2)
+ 		return 0;
+ #endif
+ 
+-	switch (source) {
+-	case OMAP_TIMER_SRC_SYS_CLK:
+-		parent_name = "timer_sys_ck";
+-		break;
+-
+-	case OMAP_TIMER_SRC_32_KHZ:
+-		parent_name = "timer_32k_ck";
+-		break;
+-
+-	case OMAP_TIMER_SRC_EXT_CLK:
+-		parent_name = "timer_ext_ck";
+-		break;
+-	}
+-
+ 	parent = clk_get(&timer->pdev->dev, parent_name);
+ 	if (IS_ERR(parent)) {
+ 		pr_err("%s: %s not found\n", __func__, parent_name);
