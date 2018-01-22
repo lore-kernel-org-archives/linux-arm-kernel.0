@@ -1,53 +1,56 @@
 From: jcm@jonmasters.org (Jon Masters)
-Date: Mon, 22 Jan 2018 13:59:17 -0500
-Subject: [PATCH v3 2/2] arm64: Turn on KPTI only on CPUs that need it
-In-Reply-To: <20180122114155.GC15456@arm.com>
+Date: Mon, 22 Jan 2018 14:00:59 -0500
+Subject: [PATCH v3 1/2] arm64: Branch predictor hardening for Cavium
+ ThunderX2
+In-Reply-To: <20180122113311.GB15456@arm.com>
 References: <20180118135354.GB20783@arm.com>
  <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
- <1516364568-95577-2-git-send-email-jnair@caviumnetworks.com>
- <20180122114155.GC15456@arm.com>
-Message-ID: <13e17bd2-b83c-6c67-eb0c-c80604b7dcc3@jonmasters.org>
+ <20180122113311.GB15456@arm.com>
+Message-ID: <2232c6e4-c55f-4e57-c58f-2bfc02b2fac2@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2018 06:41 AM, Will Deacon wrote:
-> On Fri, Jan 19, 2018 at 04:22:48AM -0800, Jayachandran C wrote:
->> Whitelist Broadcom Vulcan/Cavium ThunderX2 processors in
->> unmap_kernel_at_el0(). These CPUs are not vulnerable to
->> CVE-2017-5754 and do not need KPTI when KASLR is off.
+On 01/22/2018 06:33 AM, Will Deacon wrote:
+> On Fri, Jan 19, 2018 at 04:22:47AM -0800, Jayachandran C wrote:
+>> Use PSCI based mitigation for speculative execution attacks targeting
+>> the branch predictor. We use the same mechanism as the one used for
+>> Cortex-A CPUs, we expect the PSCI version call to have a side effect
+>> of clearing the BTBs.
 >>
 >> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 >> ---
->>  arch/arm64/kernel/cpufeature.c | 7 +++++++
->>  1 file changed, 7 insertions(+)
+>>  arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
 >>
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 647d44b..fb698ca 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -866,6 +866,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->>  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->>  		return true;
->>  
->> +	/* Don't force KPTI for CPUs that are not vulnerable */
->> +	switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
->> +	case MIDR_CAVIUM_THUNDERX2:
->> +	case MIDR_BRCM_VULCAN:
->> +		return false;
->> +	}
->> +
->>  	/* Defer to CPU feature registers */
->>  	return !cpuid_feature_extract_unsigned_field(pfr0,
->>  						     ID_AA64PFR0_CSV3_SHIFT);
+>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>> index 70e5f18..45ff9a2 100644
+>> --- a/arch/arm64/kernel/cpu_errata.c
+>> +++ b/arch/arm64/kernel/cpu_errata.c
+>> @@ -338,6 +338,16 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>>  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+>>  		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+>>  	},
+>> +	{
+>> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>> +		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+>> +		.enable = enable_psci_bp_hardening,
+>> +	},
+>> +	{
+>> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>> +		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+>> +		.enable = enable_psci_bp_hardening,
+>> +	},
+>>  #endif
 > 
-> We'll need to re-jig this to work properly with big/little because this is
-> only called once, but that's ok for now:
+> Thanks.
 > 
 > Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Suzuki has a series reworking much of the cpufeatures code so that we can
-> do this properly for 4.17.
 
-Thanks, much appreciated.
+Thanks. I have separately asked for a specification tweak to allow us to
+discover whether firmware has been augmented to provide the necessary
+support that we need. That applies beyond Cavium.
+
+(for now in RHEL, we've asked the vendors to give us a temporary patch
+that we can match DMI or other data later in boot and warn users on)
 
 Jon.
