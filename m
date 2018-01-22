@@ -1,89 +1,54 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 22 Jan 2018 12:05:52 +0000
-Subject: [PATCH v2 1/6] arm64: cpufeature: Allow early detect of specific
- features
-In-Reply-To: <1516190084-18978-2-git-send-email-julien.thierry@arm.com>
-References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
- <1516190084-18978-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <ce6469ab-b864-fec7-7d97-d44340f5b2e0@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Jan 2018 13:14:35 +0100
+Subject: [RFC PATCH 0/9] initial support for "suniv" Allwinner new ARM9 SoC
+In-Reply-To: <20180119231735.61504-1-icenowy@aosc.io>
+References: <20180119231735.61504-1-icenowy@aosc.io>
+Message-ID: <20180122121435.bpayxk4uzfqbhqse@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/18 11:54, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
+On Sat, Jan 20, 2018 at 07:17:26AM +0800, Icenowy Zheng wrote:
+> This is the RFC initial patchset for the "new" Allwinner SUNIV ARM9 SoC.
 > 
-> Currently it is not possible to detect features of the boot CPU
-> until the other CPUs have been brought up.
-> 
-> This prevents us from reacting to features of the boot CPU until
-> fairly late in the boot process. To solve this we allow a subset
-> of features (that are likely to be common to all clusters) to be
-> detected based on the boot CPU alone.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> [julien.thierry at arm.com: check non-boot cpu missing early features, avoid
-> 			 duplicates between early features and normal
-> 			 features]
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arch/arm64/kernel/cpufeature.c | 69 ++++++++++++++++++++++++++++--------------
->   1 file changed, 47 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index a73a592..6698404 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -52,6 +52,8 @@
->   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->   EXPORT_SYMBOL(cpu_hwcaps);
-> 
-> +static void __init setup_early_feature_capabilities(void);
-> +
->   /*
->    * Flag to indicate if we have computed the system wide
->    * capabilities based on the boot time active CPUs. This
-> @@ -542,6 +544,8 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
->   		init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
->   		sve_init_vq_map();
->   	}
-> +
-> +	setup_early_feature_capabilities();
->   }
-> 
->   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-> @@ -846,7 +850,7 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
->   					ID_AA64PFR0_FP_SHIFT) < 0;
->   }
-> 
-> -static const struct arm64_cpu_capabilities arm64_features[] = {
-> +static const struct arm64_cpu_capabilities arm64_early_features[] = {
->   	{
->   		.desc = "GIC system register CPU interface",
->   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-> @@ -857,6 +861,10 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
->   		.sign = FTR_UNSIGNED,
->   		.min_field_value = 1,
->   	},
-> +	{}
-> +};
-> +
+> The same die is packaged differently, come with different co-packaged
+> DRAM or shipped with different SDK; and then made many model names: F23,
+> F25, F1C100A, F1C100S, F1C200S, F1C500, F1C600, R6, etc. These SoCs all
+> share a common feature set and are packaged similarly (eLQFP128 for SoCs
+> without co-packaged DRAM, QFN88 for with DRAM). As their's no
+> functionality hidden on the QFN88 models (except DRAM interface not
+> exported), it's not clever to differentiate them. So I will use suniv as
+> common name of all these SoCs.
 
+Where is that suniv prefix coming from?
 
-Julien,
+And you need to have a SoC in all your compatibles. This isn't about
+being clever or not, this is just a matter of being able to accurately
+read in a crystal ball. Or maybe it's just the same, in which case,
+I'd really like to have a course :)
 
-One potential problem with this is that we don't have a way
-to make this work on a "theoretical" system with and without
-GIC system reg interface. i.e, if we don't have the CONFIG
-enabled for using ICC system regs for IRQ flags, the kernel
-could still panic. I understand this is not a "normal" configuration
-but, may be we could make the panic option based on whether
-we actually use the system regs early enough ?
+You should really answer two questions here:
+  - Are you able to predict whether you'll find an SoC part of that
+    family in the future that derives a bit and will need a compatible
+    of its own?
+  - Are you able to predict which quirks we'll need along the way to
+    support all the SoCs you've listed there?
 
-Btw, I am rewriting the capabilities infrastructure to allow per-cap
-control on how it should be treated. I might add an EARLY scope for
-caps which could cover this and may be VHE.
+If you can't answer yes to both these questions, with a 100%
+certainty, then you'll need a SoC name in the compatible.
 
-Suzuki
+Which doesn't prevent you from sharing as much as possible the DT like
+we did between the A10s and the A13 for example.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180122/d268be23/attachment.sig>
