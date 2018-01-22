@@ -1,65 +1,93 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Jan 2018 10:25:15 +0100
-Subject: [PATCH v4 01/13] drm/sun4i: backend: Move line stride setup to buffer
- setup function
-In-Reply-To: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-References: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <cbec84125bc0d5a6cf1d856b8291fbf77b138881.1516613040.git-series.maxime.ripard@free-electrons.com>
+Date: Mon, 22 Jan 2018 10:25:14 +0100
+Subject: [PATCH v4 00/13] drm/sun4i: Support the Display Engine frontend
+Message-ID: <cover.671c2fcad4ca649d65bd2b9982a8361befa8bfd1.1516613040.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup the line stride in the buffer setup function, since it's tied to the
-buffer itself, and is not needed when we do not set the buffer in the
-backend.
+Hi,
 
-This is for example the case when using the frontend and then routing its
-output to the backend.
+This is a first serie to enable the display engine frontend.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+This hardware block is found in the first generation Display Engine from
+Allwinner. Its role is to implement more advanced features that the
+associated backend, even though the backend alone can be used (and was used
+so far) for basic composition.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 847eecbe4d14..c99d1a7e815a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -141,7 +141,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 				     int layer, struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
--	struct drm_framebuffer *fb = state->fb;
- 
- 	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
- 
-@@ -153,12 +152,6 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 						   state->crtc_h));
- 	}
- 
--	/* Set the line width */
--	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
--	regmap_write(backend->engine.regs,
--		     SUN4I_BACKEND_LAYLINEWIDTH_REG(layer),
--		     fb->pitches[0] * 8);
--
- 	/* Set height and width */
- 	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n",
- 			 state->crtc_w, state->crtc_h);
-@@ -218,6 +211,13 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	u32 lo_paddr, hi_paddr;
- 	dma_addr_t paddr;
- 
-+	/* Set the line width */
-+	DRM_DEBUG_DRIVER("Layer line width: %d bits\n", fb->pitches[0] * 8);
-+	regmap_write(backend->engine.regs,
-+		     SUN4I_BACKEND_LAYLINEWIDTH_REG(layer),
-+		     fb->pitches[0] * 8);
-+
-+
- 	/* Get the start of the displayed memory */
- 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
- 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+Among those features, we will find hardware scaling, that is supported in
+this serie, colorspace conversions, or more exotic formats support such as
+the one output by the VPU.
+
+Let me know what you think,
+Maxime
+
+Changes from v3:
+  - Added some TODO notes for the ALPHA_EN and pipelines bits
+  - Reset the frontend in the runtime_resume callback instead of probe
+
+Changes from v2:
+  - Substracted PHYS_OFFSET to the buffer address
+  - Make sure we only probe and add to the component list on frontends that
+    are supported, and not simply the one enabled in the DTs
+  - Reset the device at probe, and deassert the line after the clocks are
+    enabled
+  - Fixed the format value used
+  - Used drm_fb_cma_get_gem_addr
+  - Added a define for the COEF_ACCESS_CTRL bit
+  - Fixed a wrong comment
+  - Kept the ordering of the engine ops
+  - Reapplied the NULL plane pointer patch that got squashed in v2 somehow
+  - s/backend/engine/ in the engine_ops documentation
+
+Changes from v1:
+  - Fixed the unbind function to not disable the already disabled clocks,
+    and to remove ourself from the frontend list
+  - Changed the log level of the frontend disabled message
+  - Added blank lines where suggested by Neil
+  - Fixed an artifact that was happening when the plane using the frontend
+    was disabled. This was happening because the frontend was disabled
+    before the backend layer (that would be disabled at the next vblank).
+    This led to a significant rework of the patches, so I didn't apply all
+    the tags. I also had to take a few patches in.
+  - Added engine ops documentation
+  - Fixed a bug in our duplicate_state callback that wouldn't preserve the
+    frontend state
+  - Removed the hardcoded register values and used the real ones instead.
+  - Fixed some compilation errors reported by the 0-day bot.
+
+Maxime Ripard (13):
+  drm/sun4i: backend: Move line stride setup to buffer setup function
+  drm/sun4i: backend: Document the engine operations
+  drm/sun4i: backend: Allow a NULL plane pointer to retrieve the format
+  drm/sun4i: backend: Add a custom plane state
+  drm/sun4i: engine: Add a custom crtc atomic_check
+  drm/sun4i: engine: Add a VBLANK quirk callback
+  drm/sun4i: engine: Create an atomic_begin callback
+  drm/sun4i: Add a driver for the display frontend
+  drm/sun4i: backend: Wire in the frontend
+  drm/sun4i: backend: Add a custom atomic_check for the frontend
+  drm/sun4i: backend: Use runtime_pm variant of atomic_commit_tail
+  drm/sun4i: backend: Make sure we don't have a commit pending
+  ARM: dts: sun8i: a33 Enable our display frontend
+
+ arch/arm/boot/dts/sun8i-a33.dtsi          |   1 +-
+ drivers/gpu/drm/sun4i/Makefile            |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c     | 184 ++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h     |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.c        |  21 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c         |  27 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h         |   1 +-
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c |   6 +-
+ drivers/gpu/drm/sun4i/sun4i_frontend.c    | 389 +++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_frontend.h    |  99 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.c       |  83 ++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.h       |  11 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c        |   4 +-
+ drivers/gpu/drm/sun4i/sunxi_engine.h      |  89 +++++-
+ 14 files changed, 907 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_frontend.h
+
+base-commit: f2e323798ce2553a10ddc720879553642e05e619
 -- 
 git-series 0.9.1
