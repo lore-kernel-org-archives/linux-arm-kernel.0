@@ -1,49 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Jan 2018 11:41:55 +0000
-Subject: [PATCH v3 2/2] arm64: Turn on KPTI only on CPUs that need it
-In-Reply-To: <1516364568-95577-2-git-send-email-jnair@caviumnetworks.com>
-References: <20180118135354.GB20783@arm.com>
- <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
- <1516364568-95577-2-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20180122114155.GC15456@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 22 Jan 2018 11:45:14 +0000
+Subject: [PATCH v2] iommu/arm-smmu-v3: limit reporting of MSI allocation
+ failures
+In-Reply-To: <1516471684-25052-1-git-send-email-nwatters@codeaurora.org>
+References: <1516471684-25052-1-git-send-email-nwatters@codeaurora.org>
+Message-ID: <39eee30e-1298-24d5-926b-9cd7fe532e59@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 04:22:48AM -0800, Jayachandran C wrote:
-> Whitelist Broadcom Vulcan/Cavium ThunderX2 processors in
-> unmap_kernel_at_el0(). These CPUs are not vulnerable to
-> CVE-2017-5754 and do not need KPTI when KASLR is off.
+On 20/01/18 18:08, Nate Watterson wrote:
+> Currently, the arm-smmu-v3 driver expects to allocate MSIs for all SMMUs
+> with FEAT_MSI set. This results in unwarranted "failed to allocate MSIs"
+> warnings being printed on systems where FW was either deliberately
+> configured to force the use of SMMU wired interrupts -or- is altogether
+> incapable of describing SMMU MSI topology (ACPI IORT prior to rev.C).
 > 
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> Remedy this by checking msi_domain before attempting to allocate SMMU
+> MSIs.
+> 
+> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/arm64/kernel/cpufeature.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  drivers/iommu/arm-smmu-v3.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 647d44b..fb698ca 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -866,6 +866,13 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->  	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
->  		return true;
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 744592d..00de028 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2328,10 +2328,15 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
+>  	if (!(smmu->features & ARM_SMMU_FEAT_MSI))
+>  		return;
 >  
-> +	/* Don't force KPTI for CPUs that are not vulnerable */
-> +	switch (read_cpuid_id() & MIDR_CPU_MODEL_MASK) {
-> +	case MIDR_CAVIUM_THUNDERX2:
-> +	case MIDR_BRCM_VULCAN:
-> +		return false;
+> +	if (!dev->msi_domain) {
+> +		dev_info(smmu->dev, "msi_domain absent - falling back to wired irqs\n");
+> +		return;
 > +	}
 > +
->  	/* Defer to CPU feature registers */
->  	return !cpuid_feature_extract_unsigned_field(pfr0,
->  						     ID_AA64PFR0_CSV3_SHIFT);
+>  	/* Allocate MSIs for evtq, gerror and priq. Ignore cmdq */
+>  	ret = platform_msi_domain_alloc_irqs(dev, nvec, arm_smmu_write_msi_msg);
+>  	if (ret) {
+> -		dev_warn(dev, "failed to allocate MSIs\n");
+> +		dev_warn(dev, "failed to allocate MSIs - falling back to wired irqs\n");
+>  		return;
+>  	}
+>  
+> 
 
-We'll need to re-jig this to work properly with big/little because this is
-only called once, but that's ok for now:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Suzuki has a series reworking much of the cpufeatures code so that we can
-do this properly for 4.17.
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
