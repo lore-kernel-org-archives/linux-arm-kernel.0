@@ -1,30 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 23 Jan 2018 18:50:33 +0000
-Subject: [PATCH] efi/arm*: Only register page tables when they exist
-In-Reply-To: <CAKv+Gu_xB2XywijC0VMY48uR212pOnm7dFzOAp2ozevHC7fRSA@mail.gmail.com>
-References: <20180116140832.26731-1-mark.rutland@arm.com>
- <20180117101922.GB27892@arm.com>
- <CAKv+Gu_xB2XywijC0VMY48uR212pOnm7dFzOAp2ozevHC7fRSA@mail.gmail.com>
-Message-ID: <CAKv+Gu8kKW41ZEmyTi-OiwAuxPvObOj+b-QtNvXAN7Oc4kRHyg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 23 Jan 2018 19:05:35 +0000
+Subject: [PATCH v6 03/13] arm64: cpufeature: Detect CPU RAS Extentions
+In-Reply-To: <2fbdd6f2-3225-1993-cae5-0bc435189d36@huawei.com>
+References: <20180115193906.30053-1-james.morse@arm.com>
+ <20180115193906.30053-4-james.morse@arm.com>
+ <78d4374a-f75c-6860-38ab-6373ffae3eee@huawei.com> <5A663C59.6030205@arm.com>
+ <2fbdd6f2-3225-1993-cae5-0bc435189d36@huawei.com>
+Message-ID: <5A67877F.5090300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2018 at 12:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 17 January 2018 at 10:19, Will Deacon <will.deacon@arm.com> wrote:
->> On Tue, Jan 16, 2018 at 02:08:32PM +0000, Mark Rutland wrote:
->>> Currently the arm/arm64 runtime code registers the runtime servies
->>> pagetables with ptdump regardless of whether runtime services page
->>> tables have been created.
->>>
->>> As efi_mm.pgd is NULL in these cases, attempting to dump the efi page
->>> tables results in a NULL pointer dereference in the ptdump code:
->>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->>
->> Ard -- please can you pick this one up?
->>
->
-> I'll see if I can manage applying it.
->
+Hi gengdongjiu,
 
-Applied for -next, thanks.
+On 23/01/18 09:06, gengdongjiu wrote:
+> On 2018/1/23 3:32, James Morse wrote:
+>>> it seems this "CONFIG_ARM64_RAS_EXTN" is not enabled in the "arch/arm64/configs/defconfig",
+>>> if not, I want to enable this config to enable RAS feature in the defconfig. do you agree?
+>> Sure. This series doesn't do a lot on its own, it expects firmware-first or
+>> kernel-first support, which may in turn depend-on this feature. It means we
+>> don't panic() when notified of corrected errors, until we get the
+>> {firmware,kernel}-first support.
+>>
+>> Don't defconfig changes get collected by arm-soc? (I'm not sure how these get
+>> picked up...)
+> 
+> Now we should have supported firmware-first,
+
+For NOTIFY_SEI? We don't have that yet.
+This series was about the minimal handling for systems with neither firmware or
+kernel first handling. This stops us panic()ing on corrected errors.
+It also enables IESB which benefits firmware first handling using the
+notification types we already support. (SEA, POLL, IRQ etc)
+
+>From here we can add KVM APIs, firmware-first notification support and
+kernel-first support as independent series.
+
+
+> do you mean we do not enable "CONFIG_ARM64_RAS_EXTN" in the
+> defconfig for ARM's SOC until kernel-first RAS is supported?
+
+I've no idea if or when we will do kernel-first, when I bring it up, its so we
+don't build a hybrid model, and we consider how we going to add kernel-first
+support if/when it comes along.
+
+If you want it turned on in defconfig please submit a patch to do that. I
+haven't because I don't know where they go!
+
+
+Thanks,
+
+James
