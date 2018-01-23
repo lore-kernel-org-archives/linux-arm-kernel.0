@@ -1,84 +1,68 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 23 Jan 2018 13:38:25 -0800
-Subject: [PATCH v1 1/2] drm/bridge/synopsys: dsi: Fix dsi_host_transfer()
- return value
-In-Reply-To: <20180123142618.28384-2-philippe.cornu@st.com>
-References: <20180123142618.28384-1-philippe.cornu@st.com>
- <20180123142618.28384-2-philippe.cornu@st.com>
-Message-ID: <CA+ASDXNDpmVdARLCD-A6nfADgmomuscpwekb8M-j=MFJhpeC4Q@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 24 Jan 2018 01:32:08 +0200
+Subject: [PATCH] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
+In-Reply-To: <2bf185e2-9b02-3632-dc9a-baf8f4109b44@st.com>
+References: <20180122102608.12565-1-philippe.cornu@st.com>
+ <3169703.7pajs7FEnH@avalon> <2bf185e2-9b02-3632-dc9a-baf8f4109b44@st.com>
+Message-ID: <2205915.z0ubSpqczI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Philippe,
 
-On Tue, Jan 23, 2018 at 6:26 AM, Philippe Cornu <philippe.cornu@st.com> wrote:
-> The dw_mipi_dsi_host_transfer() must return the number of
-> bytes transmitted/received on success instead of 0.
+On Tuesday, 23 January 2018 12:25:51 EET Philippe CORNU wrote:
+> On 01/23/2018 12:30 AM, Laurent Pinchart wrote:
+> > On Monday, 22 January 2018 12:26:08 EET Philippe Cornu wrote:
+> >> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
+> >> host controller driver.
+> >>
+> >> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> >> ---
+> >> 
+> >>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
+> >>   1 file changed, 1 insertion(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> >> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
+> >> 46b0e73404d1..e06836dec77c 100644
+> >> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> >> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> >> @@ -1,12 +1,8 @@
+> >> +// SPDX-License-Identifier: GPL-2.0
+> > 
+> > According to Documentation/process/license-rules.txt this would change
+> > the existing license. The correct identifier is GPL-2.0+.
+> 
+> You are right, I did not put the correct identifier :(
+> 
+> After reading more spdx.org, I wonder if the correct value should be 
+> GPL-2.0-or-later instead of GPL-2.0+
+> 
+> https://spdx.org/licenses/GPL-2.0-or-later.html
+> https://spdx.org/licenses/GPL-2.0+.html
+> 
+> What is your opinion?
 
-I'm a little confused. As of the latest drm-misc-next I'm looking at,
-this still has conflicting documentation.
+I agree in principle, and I've even asked for that before, but I've been told 
+that we should stick to the license identifiers defined in Documentation/
+process/license-rules.txt. The file might get updated to use GPL-2.0-or-later 
+and GPL-2.0-only later, and kernel sources will likely then get patched in one 
+go.
 
-For ->transfer():
+> >>  /*
+> >>   * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+> >>   * Copyright (C) STMicroelectronics SA 2017
+> >>   *
+> >> - * This program is free software; you can redistribute it and/or modify
+> >> - * it under the terms of the GNU General Public License as published by
+> >> - * the Free Software Foundation; either version 2 of the License, or
+> >> - * (at your option) any later version.
+> >> - *
+> >>   * Modified by Philippe Cornu <philippe.cornu@st.com>
+> >>   * This generic Synopsys DesignWare MIPI DSI host driver is based on the
+> >>   * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
 
-On success it shall return the number of bytes
- * transmitted for write packets or the number of bytes received for read
- * packets.
+-- 
+Regards,
 
-While mipi_dsi_generic_read() says:
-
- * Return: The number of bytes successfully read or a negative error code on
- * failure.
-
-But it just returns the value that ->transfer() returns.
-
-So I'm not sure whether the documentation is still wrong, or if the
-implementation is.
-
-Anyway, I guess maybe that isn't super-critical to *this* patch, since
-we don't have RX support yet...
-
-> Note: nb_bytes is introduced in this patch as it will be
-> re-used with the future dcs/generic dsi read feature.
-
-It feels like you could just wait to add that when you need it? It
-really feels trivial and useless right now :)
-
-Brian
-
->
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index f458798af788..096cf5e5bb30 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -403,7 +403,7 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->  {
->         struct dw_mipi_dsi *dsi = host_to_dsi(host);
->         struct mipi_dsi_packet packet;
-> -       int ret;
-> +       int ret, nb_bytes;
->
->         ret = mipi_dsi_create_packet(&packet, msg);
->         if (ret) {
-> @@ -413,7 +413,13 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->
->         dw_mipi_message_config(dsi, msg);
->
-> -       return dw_mipi_dsi_write(dsi, &packet);
-> +       ret = dw_mipi_dsi_write(dsi, &packet);
-> +       if (ret)
-> +               return ret;
-> +
-> +       nb_bytes = packet.size;
-> +
-> +       return nb_bytes;
->  }
->
->  static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
-> --
-> 2.15.1
->
+Laurent Pinchart
