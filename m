@@ -1,18 +1,19 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 Jan 2018 23:33:07 +0800
-Subject: [PATCH v3 04/16] ARM: dtsi: axp209: add node for ADC
-In-Reply-To: <ea299dca30bb3d0413d35717522643b5a00e731c.1516012352.git-series.quentin.schulz@free-electrons.com>
+Date: Tue, 23 Jan 2018 23:50:37 +0800
+Subject: [linux-sunxi] [PATCH v3 13/16] mfd: axp20x: add battery power
+ supply cell for AXP813
+In-Reply-To: <76855b0d3b9eb75e00eb6a058db5b4a33b0558c6.1516012352.git-series.quentin.schulz@free-electrons.com>
 References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
- <ea299dca30bb3d0413d35717522643b5a00e731c.1516012352.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <CAGb2v65pjtL+2fu5XQG+hs65=0p05WRJ62gF74O07SsZuVuaSg@mail.gmail.com>
+ <76855b0d3b9eb75e00eb6a058db5b4a33b0558c6.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v67f5q52OXbsHsA7DP12bn+PvLzBX_q8oN8GO0rnXkUbxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jan 15, 2018 at 6:33 PM, Quentin Schulz
 <quentin.schulz@free-electrons.com> wrote:
-> This adds a DT node for the ADC of the PMIC so that there can be
-> consumers of its IIO channels declaring their consumptions via DT.
+> As axp20x-battery-power-supply now supports AXP813, add a cell for it.
 >
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
