@@ -1,127 +1,71 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 23 Jan 2018 19:07:50 +0000
-Subject: [PATCH v9 6/7] arm64: kvm: Set Virtual SError Exception Syndrome
- for guest
-In-Reply-To: <1515254577-6460-7-git-send-email-gengdongjiu@huawei.com>
-References: <1515254577-6460-1-git-send-email-gengdongjiu@huawei.com>
- <1515254577-6460-7-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <5A678806.8030108@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 23 Jan 2018 13:24:41 -0600
+Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+ <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
+ <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
+ <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
+ <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
+ <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
+ <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
+ <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
+ <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
+Message-ID: <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu Geng,
-
-On 06/01/18 16:02, Dongjiu Geng wrote:
-> RAS Extension add a VSESR_EL2 register which can provide
-> the syndrome value reported to software on taking a virtual
-> SError interrupt exception. This patch supports to specify
-> this Syndrome.
+On 01/23/2018 12:34 PM, Bartosz Golaszewski wrote:
+> 2018-01-23 19:26 GMT+01:00 David Lechner <david@lechnology.com>:
+>> On 01/23/2018 12:10 PM, Bartosz Golaszewski wrote:
+>>>
+>>> 2018-01-23 18:03 GMT+01:00 Adam Ford <aford173@gmail.com>:
+>>>>
+>>>> On Tue, Jan 23, 2018 at 10:06 AM, David Lechner <david@lechnology.com>
+>>>> wrote:
+>>>>>
+>>>>> On 01/23/2018 10:03 AM, David Lechner wrote:
+>>>>>>
+>>>>>>
+>>>>>> You can see if the clock is enabled by running:
+>>>>>>
+>>>>>>        cat /sys/kernel/debug/clk/clk_summary
+>>>>>>
+>>>>>
+>>>>> I just realized if you can't boot, you can't do this. :-/
+>>>>
+>>>>
+>>>> I can boot with the latest set in your git repo, but the Ethernet
+>>>> doesn't apparently fully operate.  I don't get errors, but I cannot
+>>>> get a dhcp address.
+>>>>
+>>>> I'll try to do a more exhaustive test later today to get an idea of
+>>>> what works and what doesn't.  When I ran my basic tests, I just did a
+>>>> feel-good boot test (and reboot test)
+>>>>
+>>>> adam
+>>>
+>>>
+>>> FYI: manually calling clk_prepare_enable() in the davinci_mdio driver
+>>> seems to at least fix the ethernet. In master branch it's done by
+>>> pm_runtime_get_sync() (in davinci_mdio_reset()). However I'm still
+>>> getting several oopses and WARNs so there's some more work to do.
+>>>
+>>
+>> Hmm... I'm wondering if we need to also add #power-domain-cells to the
+>> PSC clocks and power-domains properties to the consumers.
+>>
+>> For this specific case though, it seems strange to me that the drivers
+>> to clk_get() and clk_get_rate() but never enable the clocks.
+>>
+>>
+>> Also, are the oopses and WARNs the same as before?
 > 
-> In the RAS Extensions we can not set all-zero syndrome value
-> for SError, which means 'RAS error: Uncategorized' instead of
-> 'no valid ISS'. So set it to IMPLEMENTATION DEFINED syndrome
-> by default.
+> No, the ones before were all related to the ethernet failing, now I
+> get several stack traces from drm. Posted them on pastebin[1].
 > 
-> We also need to support userspace to specify a valid syndrome
-> value, Because in some case, the recovery is driven by userspace.
-> This patch can support that userspace specify it.
-> 
-> In the guest/host world switch, restore this value to VSESR_EL2
-> only when HCR_EL2.VSE is set. This value no need to be saved
-> because it is stale vale when guest exit.
 
-A version of this patch has been queued by Catalin.
-
-Now that the cpufeature bits are queued, I think this can be split up into two
-separate series for v4.16-rc1, one to tackle NOTIFY_SEI and the associated
-plumbing. The second for the KVM 'make SError pending' API.
-
-
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> [Set an impdef ESR for Virtual-SError]
-> Signed-off-by: James Morse <james.morse@arm.com>
-
-I didn't sign-off this patch. If you pick some bits from another version and
-want to credit someone else you can 'CC:' them or just mention it in the
-commit-message.
-
-
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 47b967d..3b035cc 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -86,6 +86,9 @@
->  #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
->  #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
->  
-> +/* virtual SError exception syndrome register */
-> +#define REG_VSESR_EL2                  sys_reg(3, 4, 5, 2, 3)
-
-Irrelevant-Nit: sys-regs usually have a 'SYS_' prefix, and are in instruction
-encoding order lower down the file.
-
-(These PSTATE PAN things are a bit odd as they were used to generate and
-instruction before the fancy {read,write}_sysreg() helpers were added).
-
-
->  #define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
->  				      (!!x)<<8 | 0x1f)
->  #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 738ae90..ffad42b 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -279,7 +279,16 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->  
->  int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u32 *syndrome)
-
-Bits of this are spread between patches 5 and 6. If you put them in the other
-order this wouldn't happen.
-
-(but after a rebase most of this patch should disappear)
-
->  {
-> -	return -EINVAL;
-> +	u64 reg = *syndrome;
-> +
-> +	/* inject virtual system Error or asynchronous abort */
-> +	kvm_inject_vabt(vcpu);
-
-So this writes an impdef ESR, because its the existing code-path in KVM.
-
-
-> +	if (reg)
-> +		/* set vsesr_el2[24:0] with value that user space specified */
-> +		kvm_vcpu_set_vsesr(vcpu, reg & ESR_ELx_ISS_MASK);
-
-And then you overwrite it. Which is a bit odd as there is a helper to do both in
-one go:
-
-
-> +
-> +	return 0;
->  }
-
->  int __attribute_const__ kvm_target_cpu(void)
-
-> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-> index 3556715..fb94b5e 100644
-> --- a/arch/arm64/kvm/inject_fault.c
-> +++ b/arch/arm64/kvm/inject_fault.c
-> @@ -246,14 +246,25 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->  		inject_undef64(vcpu);
->  }
->  
-> +static void pend_guest_serror(struct kvm_vcpu *vcpu, u64 esr)
-> +{
-> +	kvm_vcpu_set_vsesr(vcpu, esr);
-> +	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
-> +}
-
-How come you don't use this in kvm_arm_set_sei_esr()?
-
-
-
-Thanks,
-
-James
+It looks like the LCDC driver is the same way. It does clk_get() but
+not clk_prepare_enable().
