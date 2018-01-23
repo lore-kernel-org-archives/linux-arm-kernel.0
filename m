@@ -1,123 +1,125 @@
 From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 23 Jan 2018 01:01:09 +0100
-Subject: [net-next: PATCH v4 3/7] device property: Introduce
- fwnode_irq_get()
-In-Reply-To: <1516278704-17141-4-git-send-email-mw@semihalf.com>
+Date: Tue, 23 Jan 2018 01:03:39 +0100
+Subject: [net-next: PATCH v4 1/7] device property: Introduce
+ fwnode_get_mac_address()
+In-Reply-To: <1516278704-17141-2-git-send-email-mw@semihalf.com>
 References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
- <1516278704-17141-4-git-send-email-mw@semihalf.com>
-Message-ID: <CAJZ5v0h29=dD9eJ=6qPTzGPiuC9yYZYkrb38iV66CqgvE=P_gg@mail.gmail.com>
+ <1516278704-17141-2-git-send-email-mw@semihalf.com>
+Message-ID: <CAJZ5v0j=4Lvaf49oeDqVmYP5nyAs-E9E8xdgyfL7=J_46X5TMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jan 18, 2018 at 1:31 PM, Marcin Wojtas <mw@semihalf.com> wrote:
-> Until now there were two very similar functions allowing
-> to get Linux IRQ number from ACPI handle (acpi_irq_get())
-> and OF node (of_irq_get()). The first one appeared to be used
-> only as a subroutine of platform_irq_get(), which (in the generic
-> code) limited IRQ obtaining from _CRS method only to nodes
-> associated to kernel's struct platform_device.
+> Until now there were two almost identical functions for
+> obtaining MAC address - of_get_mac_address() and, more generic,
+> device_get_mac_address(). However it is not uncommon,
+> that the network interface is represented as a child
+> of the actual controller, hence it is not associated
+> directly to any struct device, required by the latter
+> routine.
 >
-> This patch introduces a new helper routine - fwnode_irq_get(),
-> which allows to get the IRQ number directly from the fwnode
-> to be used as common for OF/ACPI worlds. It is usable not
-> only for the parents fwnodes, but also for the child nodes
-> comprising their own _CRS methods with interrupts description.
->
-> In order to be able o satisfy compilation with !CONFIG_ACPI
-> and also simplify the new code, introduce a helper macro
-> (ACPI_HANDLE_FWNODE), with which it is possible to reach
-> an ACPI handle directly from its fwnode.
+> This commit allows for getting the MAC address for
+> children nodes in the ACPI world by introducing a new function -
+> fwnode_get_mac_address(). This commit also changes
+> device_get_mac_address() routine to be its wrapper, in order
+> to prevent unnecessary duplication.
 >
 > Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 > ---
->  drivers/base/property.c  | 26 ++++++++++++++++++++
->  include/linux/acpi.h     |  3 +++
+>  drivers/base/property.c  | 28 ++++++++++++++------
 >  include/linux/property.h |  2 ++
->  3 files changed, 31 insertions(+)
+>  2 files changed, 22 insertions(+), 8 deletions(-)
 >
 > diff --git a/drivers/base/property.c b/drivers/base/property.c
-> index 7c4a53d..1d6c9d9 100644
+> index 851b1b6..f261d1a 100644
 > --- a/drivers/base/property.c
 > +++ b/drivers/base/property.c
-> @@ -16,6 +16,7 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_graph.h>
-> +#include <linux/of_irq.h>
->  #include <linux/property.h>
->  #include <linux/etherdevice.h>
->  #include <linux/phy.h>
-> @@ -1230,6 +1231,31 @@ void *device_get_mac_address(struct device *dev, char *addr, int alen)
->  EXPORT_SYMBOL(device_get_mac_address);
+> @@ -1153,11 +1153,11 @@ int device_get_phy_mode(struct device *dev)
+>  }
+>  EXPORT_SYMBOL_GPL(device_get_phy_mode);
+>
+> -static void *device_get_mac_addr(struct device *dev,
+> +static void *fwnode_get_mac_addr(struct fwnode_handle *fwnode,
+>                                  const char *name, char *addr,
+>                                  int alen)
+>  {
+> -       int ret = device_property_read_u8_array(dev, name, addr, alen);
+> +       int ret = fwnode_property_read_u8_array(fwnode, name, addr, alen);
+>
+>         if (ret == 0 && alen == ETH_ALEN && is_valid_ether_addr(addr))
+>                 return addr;
+> @@ -1165,8 +1165,8 @@ static void *device_get_mac_addr(struct device *dev,
+>  }
 >
 >  /**
-> + * fwnode_irq_get - Get IRQ directly from a fwnode
+> - * device_get_mac_address - Get the MAC for a given device
+> - * @dev:       Pointer to the device
+> + * fwnode_get_mac_address - Get the MAC from the firmware node
 > + * @fwnode:    Pointer to the firmware node
-> + * @index:     Zero-based index of the IRQ
-> + *
-> + * Returns Linux IRQ number on success. Other values are determined
-> + * accordingly to acpi_/of_ irq_get() operation.
-> + */
-> +int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index)
-> +{
-> +       struct device_node *of_node = to_of_node(fwnode);
-> +       struct resource res;
-> +       int ret;
-> +
-> +       if (IS_ENABLED(CONFIG_OF) && of_node)
-> +               return of_irq_get(of_node, index);
-> +
-> +       ret = acpi_irq_get(ACPI_HANDLE_FWNODE(fwnode), index, &res);
-> +       if (ret)
-> +               return ret;
-> +
-> +       return res.start;
+>   * @addr:      Address of buffer to store the MAC in
+>   * @alen:      Length of the buffer pointed to by addr, should be ETH_ALEN
+>   *
+> @@ -1187,19 +1187,31 @@ static void *device_get_mac_addr(struct device *dev,
+>   * In this case, the real MAC is in 'local-mac-address', and 'mac-address'
+>   * exists but is all zeros.
+>  */
+> -void *device_get_mac_address(struct device *dev, char *addr, int alen)
+> +void *fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr, int alen)
+>  {
+>         char *res;
+>
+> -       res = device_get_mac_addr(dev, "mac-address", addr, alen);
+> +       res = fwnode_get_mac_addr(fwnode, "mac-address", addr, alen);
+>         if (res)
+>                 return res;
+>
+> -       res = device_get_mac_addr(dev, "local-mac-address", addr, alen);
+> +       res = fwnode_get_mac_addr(fwnode, "local-mac-address", addr, alen);
+>         if (res)
+>                 return res;
+>
+> -       return device_get_mac_addr(dev, "address", addr, alen);
+> +       return fwnode_get_mac_addr(fwnode, "address", addr, alen);
 > +}
-> +EXPORT_SYMBOL(fwnode_irq_get);
+> +EXPORT_SYMBOL(fwnode_get_mac_address);
 
-EXPORT_SYMBOL_GPL(), please.
+That should be EXPORT_SYMBOL_GPL().
+
+I have overlooked that previously, sorry about that.
 
 > +
 > +/**
->   * device_graph_get_next_endpoint - Get next endpoint firmware node
->   * @fwnode: Pointer to the parent firmware node
->   * @prev: Previous endpoint node or %NULL to get the first
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index dc1ebfe..f05b9b6 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -56,6 +56,8 @@ static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
->  #define ACPI_COMPANION_SET(dev, adev)  set_primary_fwnode(dev, (adev) ? \
->         acpi_fwnode_handle(adev) : NULL)
->  #define ACPI_HANDLE(dev)               acpi_device_handle(ACPI_COMPANION(dev))
-> +#define ACPI_HANDLE_FWNODE(fwnode)     \
-> +                               acpi_device_handle(to_acpi_device_node(fwnode))
->
+> + * device_get_mac_address - Get the MAC for a given device
+> + * @dev:       Pointer to the device
+> + * @addr:      Address of buffer to store the MAC in
+> + * @alen:      Length of the buffer pointed to by addr, should be ETH_ALEN
+> + */
+> +void *device_get_mac_address(struct device *dev, char *addr, int alen)
+> +{
+> +       return fwnode_get_mac_address(dev_fwnode(dev), addr, alen);
+>  }
+>  EXPORT_SYMBOL(device_get_mac_address);
 
-This change should go as a separate patch with a clear explanation why
-it is needed in the changelog.
+Same here.
 
->  static inline struct fwnode_handle *acpi_alloc_fwnode_static(void)
->  {
-> @@ -626,6 +628,7 @@ int acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem, int *timer_count)
->  #define ACPI_COMPANION(dev)            (NULL)
->  #define ACPI_COMPANION_SET(dev, adev)  do { } while (0)
->  #define ACPI_HANDLE(dev)               (NULL)
-> +#define ACPI_HANDLE_FWNODE(fwnode)     (NULL)
->  #define ACPI_DEVICE_CLASS(_cls, _msk)  .cls = (0), .cls_msk = (0),
+Generally speaking, you should use EXPORT_SYMBOL_GPL() everywhere
+unless there's a specific reason for not doing that in which cases
+that specific reason has to be clearly spelled out at least in the
+changelog of the patch, but really better in a code comment.
+
 >
->  struct fwnode_handle;
 > diff --git a/include/linux/property.h b/include/linux/property.h
-> index 9b13332..e05889f 100644
+> index f6189a3..35620e0 100644
 > --- a/include/linux/property.h
 > +++ b/include/linux/property.h
-> @@ -103,6 +103,8 @@ struct fwnode_handle *device_get_named_child_node(struct device *dev,
->  struct fwnode_handle *fwnode_handle_get(struct fwnode_handle *fwnode);
->  void fwnode_handle_put(struct fwnode_handle *fwnode);
+> @@ -279,6 +279,8 @@ int device_get_phy_mode(struct device *dev);
 >
-> +int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index);
-> +
->  unsigned int device_get_child_node_count(struct device *dev);
+>  void *device_get_mac_address(struct device *dev, char *addr, int alen);
 >
->  static inline bool device_property_read_bool(struct device *dev,
+> +void *fwnode_get_mac_address(struct fwnode_handle *fwnode,
+> +                            char *addr, int alen);
+>  struct fwnode_handle *fwnode_graph_get_next_endpoint(
+>         const struct fwnode_handle *fwnode, struct fwnode_handle *prev);
+>  struct fwnode_handle *
 > --
