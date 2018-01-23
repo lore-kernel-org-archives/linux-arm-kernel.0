@@ -1,70 +1,59 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 23 Jan 2018 10:42:05 +0100
-Subject: [PATCH] cpufreq: mediatek: Add mediatek related projects into
- blacklist
-In-Reply-To: <1516700314.12197.48.camel@mtkswgap22>
-References: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
- <20180123084651.GA26581@kroah.com>
- <1516700314.12197.48.camel@mtkswgap22>
-Message-ID: <20180123094205.GA14587@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Jan 2018 09:51:01 +0000
+Subject: [PATCH v3 1/2] arm64: Branch predictor hardening for Cavium
+ ThunderX2
+In-Reply-To: <2232c6e4-c55f-4e57-c58f-2bfc02b2fac2@jonmasters.org>
+References: <20180118135354.GB20783@arm.com>
+ <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
+ <20180122113311.GB15456@arm.com>
+ <2232c6e4-c55f-4e57-c58f-2bfc02b2fac2@jonmasters.org>
+Message-ID: <20180123095101.GA1686@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 05:38:34PM +0800, Sean Wang wrote:
-> On Tue, 2018-01-23 at 09:46 +0100, Greg KH wrote:
-> > On Tue, Jan 23, 2018 at 04:31:11PM +0800, sean.wang at mediatek.com wrote:
-> > > From: Sean Wang <sean.wang@mediatek.com>
-> > > 
-> > > commit 6066998cbd2b1012a8d5bc9a2957cfd0ad53150e upstream.
-> > > 
-> > > commit edeec420de24 ("cpufreq: dt-platdev: Automatically create cpufreq
-> > > device with OPP v2") not added MediaTek SoCs to the blacklist that would
-> > > lead to cause an occasional hang or unexpected behaviors on related boards
-> > > as kernelci reported and complained on [1] specifically for 4.14 and 4.15
-> > > tree.
-> > > 
-> > > For those reasons, add MediaTek SoCs into cpufreq-dt blacklist and wish
-> > > the patch be applied to 4.14 and 4.15 tree to allow kernelci able to
-> > > complete following automated kernel testing.
-> > > 
-> > > [1] https://kernelci.org/boot/mt7623n-bananapi-bpi-r2/
-> > > 
-> > > Fixes: edeec420de24 (cpufreq: dt-cpufreq: platdev Automatically create device with OPP v2)
-> > > Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
-> > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > > Cc: Kevin Hilman <khilman@baylibre.com>
-> > > ---
-> > >  drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
-> > >  1 file changed, 8 insertions(+)
+On Mon, Jan 22, 2018 at 02:00:59PM -0500, Jon Masters wrote:
+> On 01/22/2018 06:33 AM, Will Deacon wrote:
+> > On Fri, Jan 19, 2018 at 04:22:47AM -0800, Jayachandran C wrote:
+> >> Use PSCI based mitigation for speculative execution attacks targeting
+> >> the branch predictor. We use the same mechanism as the one used for
+> >> Cortex-A CPUs, we expect the PSCI version call to have a side effect
+> >> of clearing the BTBs.
+> >>
+> >> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> >> ---
+> >>  arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> >> index 70e5f18..45ff9a2 100644
+> >> --- a/arch/arm64/kernel/cpu_errata.c
+> >> +++ b/arch/arm64/kernel/cpu_errata.c
+> >> @@ -338,6 +338,16 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+> >>  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+> >>  		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+> >>  	},
+> >> +	{
+> >> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> >> +		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+> >> +		.enable = enable_psci_bp_hardening,
+> >> +	},
+> >> +	{
+> >> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> >> +		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+> >> +		.enable = enable_psci_bp_hardening,
+> >> +	},
+> >>  #endif
 > > 
-> > What stable kernel tree(s) are you wanting this backported to?
+> > Thanks.
 > > 
-> > thanks,
-> > 
-> > greg k-h
+> > Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Hi, Greg,
-> 
-> thanks for your help!
-> 
-> stable and stable-rc are those trees I want this backported to 
+> Thanks. I have separately asked for a specification tweak to allow us to
+> discover whether firmware has been augmented to provide the necessary
+> support that we need. That applies beyond Cavium.
 
-I don't understand, what exactly do you mean by this?
+AFAIK, there's already an SMCCC/PSCI proposal doing the rounds that is
+discoverable and does what we need. Have you seen it? We should be posting
+code this week.
 
-Have you read:
-    https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-for how to do this properly?
-
-> Hi, Viresh
-> 
-> currently, can the patch be permitted to go through tree linux-pm branch
-> master to be part of mainline? 
-
-Wait, this is not in Linus's tree already?  If not, what is that big
-"commit XXXX upstream" in the changelog for?
-
-I don't see that commit in Linus's tree at all.
-
-totally confused,
-
-greg k-h
+Will
