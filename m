@@ -1,43 +1,73 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 17:40:14 -0600
-Subject: [PATCH 0/6] ARM: davinci: common clock prep work
-In-Reply-To: <28bb9f44-c6b5-e2e9-2d13-5b50dbceac7b@ti.com>
-References: <1516418424-28686-1-git-send-email-david@lechnology.com>
- <28bb9f44-c6b5-e2e9-2d13-5b50dbceac7b@ti.com>
-Message-ID: <d6af2867-0ef4-595b-970a-44509f7d7c8f@lechnology.com>
+From: mkelly@xevo.com (Martin Kelly)
+Date: Tue, 23 Jan 2018 15:58:44 -0800
+Subject: [PATCH v3] ARM: dts: sun8i: NanoPi NEO Air add WiFi / eMMC
+Message-ID: <20180123235844.5511-1-mkelly@xevo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2018 05:13 AM, Sekhar Nori wrote:
-> On Saturday 20 January 2018 08:50 AM, David Lechner wrote:
->> This series contains some changes needed for the conversion of arch/arm/mach-
->> davinci to the common clock framework.
->>
->> Most of the boards in mach-davinci do not have device tree support. However,
->> CFGCHIP, which is a syscon regmap, is needed during clock init in early boot.
->> Using a platform device for the syscon at this point is not an option. So,
->> this series introduces a new way to register a syscon regmap on non-DT systems.
->>
->> The DA8XX USB PHY driver is a consumer of the CFGCHIP syscon regmap, so some
->> changes are needed in that driver as well since we are removing the syscon
->> platform devices. The patch "phy: da8xx-usb: rename clock con_ids" doesn't
->> have anything to do with syscon, but I included in this series because we are
->> touching PHY code here anyway and it is also a dependency for the upcoming
->> common clock framework conversion changes.
->>
->> Maintainers, please coordinate with Sekhar before committing. We will probably
->> want everything to go through the linux-davinci tree if possible.
-> 
-> You should wait for some more feedback before resending anything, but I
-> think it will be easier to reivew/accept this if the changes are just
-> related to removal of "syscon" platform device from devices-da8xx.c.
-> 
-> It _seems_ like this series does more than just that, and I hope it can
-> be pared down.
-> 
+From: Jelle van der Waa <jelle@vdwaa.nl>
 
-This series has been split out into "ARM: da8xx: use platform data for CFGCHIP
-syscon regmap" [1] and "phy: da8xx-usb: rename clock con_ids" [2].
+Enable the WiFi (AP6212) chip and eMMC support for the NanoPi NEO Air.
 
-[1]: https://patchwork.kernel.org/patch/10181147/
-[2]: https://patchwork.kernel.org/patch/10180897/
+This patch was originally submitted by Jelle van der Waa. Martin Kelly
+modified it to compile on the latest kernel, fixed up some review
+comments from Maxime Ripard, and re-tested the patch.
+
+These are the original patch submissions:
+
+https://patchwork.kernel.org/patch/9581613/
+https://patchwork.kernel.org/patch/9642071/
+
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: linux-sunxi at googlegroups.com
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
+Signed-off-by: Martin Kelly <mkelly@xevo.com>
+---
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+index 03ff6f8b93ff..920849092cc8 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+@@ -72,6 +72,11 @@
+ 			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
+ 		};
+ 	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
++	};
+ };
+ 
+ &mmc0 {
+@@ -84,6 +89,25 @@
+ 	status = "okay";
+ };
+ 
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	brcmf: bcrmf at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&pio>;
++		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
++		interrupt-names = "host-wake";
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.11.0
