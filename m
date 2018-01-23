@@ -1,228 +1,63 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 23 Jan 2018 10:12:44 -0300
-Subject: [PATCH 36/43] perf tools: Add mechanic to synthesise CoreSight trace
- packets
-In-Reply-To: <20180123131251.28197-1-acme@kernel.org>
-References: <20180123131251.28197-1-acme@kernel.org>
-Message-ID: <20180123131251.28197-37-acme@kernel.org>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 23 Jan 2018 14:20:33 +0100
+Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for inbound
+ traffic
+In-Reply-To: <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
+ <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
+ <20180118073123.GA15766@lst.de>
+ <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
+ <20180118152331.GA24461@lst.de>
+ <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
+Message-ID: <20180123132033.GA21438@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+On Fri, Jan 19, 2018 at 11:47:54AM -0800, Florian Fainelli wrote:
+> How can this work well in the context of a loadable module for instance?
+> For MIPS, this would mean that we have to override phys_to_dma() and
+> dma_to_phys() in the platform that is *susceptible* to use this PCIe
+> controller (arch/mips/bmips) which is fine, but there, we essentially
+> need to find a way to make this dynamic based on whether the PCIe
+> controller is loaded or not.
+> 
+> As you might have seen from this patch, what needs to be done is highly
+> dependent on the processor architecture and its memory controller
+> physical memory map, so I don't see how we are in any better situation
+> if we need to replicate 3 times across MIPS, ARM and ARM64 how the
+> addresses need to be mangled.
+> 
+> Are you suggesting we somehow decouple the memory mangling part into a
+> portion that can be built into the kernel image (so phys_to_dma() and
+> dma_to_phys() is resolved at vmlinux link time) and can be selected by
+> different architectures that need it? If so, yikes.
 
-Once decoded from trace packets information on trace range needs
-to be communicated to the perf synthesis infrastructure so that it
-is available to the perf tools built-in rendering tools and scripts.
+On architectures with crazy PCIe controllers (this seems to include
+mips, arm, arm64 and x86 thanks to the weird SOCs) we will need a
+a few different memory maps, yes.  Take a look at
+arch/x86/pci/sta2x11-fixup.c, preferably from a tree where the worst
+issues are fixed:
 
-Co-authored-by: Tor Jeremiassen <tor@ti.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Jiri Olsa <jolsa@redhat.com>
-Cc: Adrian Hunter <adrian.hunter@intel.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Kim Phillips <kim.phillips@arm.com>
-Cc: Mike Leach <mike.leach@arm.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Suzuki Poulouse <suzuki.poulose@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1516211539-5166-10-git-send-email-mathieu.poirier at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/util/cs-etm.c | 168 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 168 insertions(+)
+http://git.infradead.org/users/hch/misc.git/blob/refs/heads/dma-direct-all:/arch/x86/pci/sta2x11-fixup.c
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 407095af1456..b9f0a53dfa65 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -453,6 +453,157 @@ static void  cs_etm__set_pid_tid_cpu(struct cs_etm_auxtrace *etm,
- 	}
- }
- 
-+/*
-+ * The cs etm packet encodes an instruction range between a branch target
-+ * and the next taken branch. Generate sample accordingly.
-+ */
-+static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq,
-+				       struct cs_etm_packet *packet)
-+{
-+	int ret = 0;
-+	struct cs_etm_auxtrace *etm = etmq->etm;
-+	struct perf_sample sample = {.ip = 0,};
-+	union perf_event *event = etmq->event_buf;
-+	u64 start_addr = packet->start_addr;
-+	u64 end_addr = packet->end_addr;
-+
-+	event->sample.header.type = PERF_RECORD_SAMPLE;
-+	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.size = sizeof(struct perf_event_header);
-+
-+	sample.ip = start_addr;
-+	sample.pid = etmq->pid;
-+	sample.tid = etmq->tid;
-+	sample.addr = end_addr;
-+	sample.id = etmq->etm->branches_id;
-+	sample.stream_id = etmq->etm->branches_id;
-+	sample.period = 1;
-+	sample.cpu = packet->cpu;
-+	sample.flags = 0;
-+	sample.cpumode = PERF_RECORD_MISC_USER;
-+
-+	ret = perf_session__deliver_synth_event(etm->session, event, &sample);
-+
-+	if (ret)
-+		pr_err(
-+		"CS ETM Trace: failed to deliver instruction event, error %d\n",
-+		ret);
-+
-+	return ret;
-+}
-+
-+struct cs_etm_synth {
-+	struct perf_tool dummy_tool;
-+	struct perf_session *session;
-+};
-+
-+static int cs_etm__event_synth(struct perf_tool *tool,
-+			       union perf_event *event,
-+			       struct perf_sample *sample __maybe_unused,
-+			       struct machine *machine __maybe_unused)
-+{
-+	struct cs_etm_synth *cs_etm_synth =
-+		      container_of(tool, struct cs_etm_synth, dummy_tool);
-+
-+	return perf_session__deliver_synth_event(cs_etm_synth->session,
-+						 event, NULL);
-+}
-+
-+static int cs_etm__synth_event(struct perf_session *session,
-+			       struct perf_event_attr *attr, u64 id)
-+{
-+	struct cs_etm_synth cs_etm_synth;
-+
-+	memset(&cs_etm_synth, 0, sizeof(struct cs_etm_synth));
-+	cs_etm_synth.session = session;
-+
-+	return perf_event__synthesize_attr(&cs_etm_synth.dummy_tool, attr, 1,
-+					   &id, cs_etm__event_synth);
-+}
-+
-+static int cs_etm__synth_events(struct cs_etm_auxtrace *etm,
-+				struct perf_session *session)
-+{
-+	struct perf_evlist *evlist = session->evlist;
-+	struct perf_evsel *evsel;
-+	struct perf_event_attr attr;
-+	bool found = false;
-+	u64 id;
-+	int err;
-+
-+	evlist__for_each_entry(evlist, evsel) {
-+		if (evsel->attr.type == etm->pmu_type) {
-+			found = true;
-+			break;
-+		}
-+	}
-+
-+	if (!found) {
-+		pr_debug("No selected events with CoreSight Trace data\n");
-+		return 0;
-+	}
-+
-+	memset(&attr, 0, sizeof(struct perf_event_attr));
-+	attr.size = sizeof(struct perf_event_attr);
-+	attr.type = PERF_TYPE_HARDWARE;
-+	attr.sample_type = evsel->attr.sample_type & PERF_SAMPLE_MASK;
-+	attr.sample_type |= PERF_SAMPLE_IP | PERF_SAMPLE_TID |
-+			    PERF_SAMPLE_PERIOD;
-+	if (etm->timeless_decoding)
-+		attr.sample_type &= ~(u64)PERF_SAMPLE_TIME;
-+	else
-+		attr.sample_type |= PERF_SAMPLE_TIME;
-+
-+	attr.exclude_user = evsel->attr.exclude_user;
-+	attr.exclude_kernel = evsel->attr.exclude_kernel;
-+	attr.exclude_hv = evsel->attr.exclude_hv;
-+	attr.exclude_host = evsel->attr.exclude_host;
-+	attr.exclude_guest = evsel->attr.exclude_guest;
-+	attr.sample_id_all = evsel->attr.sample_id_all;
-+	attr.read_format = evsel->attr.read_format;
-+
-+	/* create new id val to be a fixed offset from evsel id */
-+	id = evsel->id[0] + 1000000000;
-+
-+	if (!id)
-+		id = 1;
-+
-+	if (etm->synth_opts.branches) {
-+		attr.config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS;
-+		attr.sample_period = 1;
-+		attr.sample_type |= PERF_SAMPLE_ADDR;
-+		err = cs_etm__synth_event(session, &attr, id);
-+		if (err)
-+			return err;
-+		etm->sample_branches = true;
-+		etm->branches_sample_type = attr.sample_type;
-+		etm->branches_id = id;
-+	}
-+
-+	return 0;
-+}
-+
-+static int cs_etm__sample(struct cs_etm_queue *etmq)
-+{
-+	int ret;
-+	struct cs_etm_packet packet;
-+
-+	while (1) {
-+		ret = cs_etm_decoder__get_packet(etmq->decoder, &packet);
-+		if (ret <= 0)
-+			return ret;
-+
-+		/*
-+		 * If the packet contains an instruction range, generate an
-+		 * instruction sequence event.
-+		 */
-+		if (packet.sample_type & CS_ETM_RANGE)
-+			cs_etm__synth_branch_sample(etmq, &packet);
-+	}
-+
-+	return 0;
-+}
-+
- static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- {
- 	struct cs_etm_auxtrace *etm = etmq->etm;
-@@ -494,6 +645,12 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- 
- 		etmq->offset += processed;
- 		buffer_used += processed;
-+
-+		/*
-+		 * Nothing to do with an error condition, let's hope the next
-+		 * chunk will be better.
-+		 */
-+		err = cs_etm__sample(etmq);
- 	} while (buffer.len > buffer_used);
- 
- goto more;
-@@ -828,6 +985,17 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 		return 0;
- 	}
- 
-+	if (session->itrace_synth_opts && session->itrace_synth_opts->set) {
-+		etm->synth_opts = *session->itrace_synth_opts;
-+	} else {
-+		itrace_synth_opts__set_default(&etm->synth_opts);
-+		etm->synth_opts.callchain = false;
-+	}
-+
-+	err = cs_etm__synth_events(etm, session);
-+	if (err)
-+		goto err_free_queues;
-+
- 	err = auxtrace_queues__process_index(&etm->queues, session);
- 	if (err)
- 		goto err_free_queues;
--- 
-2.14.3
+Overriding phys_to_dma and dma_to_phys is required if you need to
+support swiotlb, and chances are with a broken PCIe controller on
+arm64 or mips64 you eventuall will.
+
+This sta2x11 code should probably be lifted to common code in
+one form or another eventually, althought it will need another
+fair round of cleanups for now.
+
+> I can see value in having a generic mechanism, ala X86_DMA_REMAP
+> allowing architectures to have the ability to override phys_to_dma() and
+> dma_to_phys() but right now, especially if we look at
+> arch/x86/pci/sta2x11-fixup.c this really appears to be quite messy and
+> equally ugly than stacking operations...
+> 
+> What is the actual problem you want to avoid with the stacking of DMA
+> operations, is it because it becomes harder to audit, or are there are
+> other reasons?
+
+Audit, consolidate into a single dma-direct implementation and properly
+support swiotlb out of the box.
