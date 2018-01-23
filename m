@@ -1,71 +1,40 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 13:24:41 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
- <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
- <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
-Message-ID: <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Tue, 23 Jan 2018 13:44:19 -0600
+Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <20180123.132916.1025436873838680654.davem@davemloft.net> (David
+ Miller's message of "Tue, 23 Jan 2018 13:29:16 -0500 (EST)")
+References: <878tcp8umz.fsf@xmission.com>
+ <20180123101446.GP22781@e103592.cambridge.arm.com>
+ <87tvvc77nf.fsf@xmission.com>
+ <20180123.132916.1025436873838680654.davem@davemloft.net>
+Message-ID: <87lggo7430.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 12:34 PM, Bartosz Golaszewski wrote:
-> 2018-01-23 19:26 GMT+01:00 David Lechner <david@lechnology.com>:
->> On 01/23/2018 12:10 PM, Bartosz Golaszewski wrote:
->>>
->>> 2018-01-23 18:03 GMT+01:00 Adam Ford <aford173@gmail.com>:
->>>>
->>>> On Tue, Jan 23, 2018 at 10:06 AM, David Lechner <david@lechnology.com>
->>>> wrote:
->>>>>
->>>>> On 01/23/2018 10:03 AM, David Lechner wrote:
->>>>>>
->>>>>>
->>>>>> You can see if the clock is enabled by running:
->>>>>>
->>>>>>        cat /sys/kernel/debug/clk/clk_summary
->>>>>>
->>>>>
->>>>> I just realized if you can't boot, you can't do this. :-/
->>>>
->>>>
->>>> I can boot with the latest set in your git repo, but the Ethernet
->>>> doesn't apparently fully operate.  I don't get errors, but I cannot
->>>> get a dhcp address.
->>>>
->>>> I'll try to do a more exhaustive test later today to get an idea of
->>>> what works and what doesn't.  When I ran my basic tests, I just did a
->>>> feel-good boot test (and reboot test)
->>>>
->>>> adam
->>>
->>>
->>> FYI: manually calling clk_prepare_enable() in the davinci_mdio driver
->>> seems to at least fix the ethernet. In master branch it's done by
->>> pm_runtime_get_sync() (in davinci_mdio_reset()). However I'm still
->>> getting several oopses and WARNs so there's some more work to do.
->>>
->>
->> Hmm... I'm wondering if we need to also add #power-domain-cells to the
->> PSC clocks and power-domains properties to the consumers.
->>
->> For this specific case though, it seems strange to me that the drivers
->> to clk_get() and clk_get_rate() but never enable the clocks.
->>
->>
->> Also, are the oopses and WARNs the same as before?
-> 
-> No, the ones before were all related to the ethernet failing, now I
-> get several stack traces from drm. Posted them on pastebin[1].
-> 
+David Miller <davem@davemloft.net> writes:
 
-It looks like the LCDC driver is the same way. It does clk_get() but
-not clk_prepare_enable().
+> From: ebiederm at xmission.com (Eric W. Biederman)
+> Date: Tue, 23 Jan 2018 12:27:16 -0600
+>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>> 
+>>> On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
+>>> However, the purpose of this as an RFC was to get feedback on whether
+>>> adding FPE_UNKNOWN is considered acceptable at all from an API
+>>> perspective -- the precise number doesn't matter for that discussion.
+>>>
+>>> Do you have any view on this?
+>> 
+>> That seems as good a solution as any too me.  It is reality and it
+>> happens in the code and there are several places of the same form I
+>> would use it, just to get rid of the FPE_FIXME.
+>
+> Eric, feel free to do something similar on Sparc.
+
+Will do.
+
+This sounds like a good solution for this weird corner case, that
+appears on multiple architectures.
+
+Eric
