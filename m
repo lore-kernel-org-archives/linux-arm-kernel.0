@@ -1,103 +1,64 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 23 Jan 2018 22:00:53 +0900
-Subject: [PATCH 3/4] ARM: dts: uniphier: add dwc3 usb node for PXs2
-In-Reply-To: <1516712454-2915-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1516712454-2915-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1516712454-2915-4-git-send-email-hayashi.kunihiko@socionext.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 23 Jan 2018 13:03:00 +0000
+Subject: [RFC/RFT PATCH 0/2] arm64: per-task stack canaries
+Message-ID: <20180123130302.29409-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb node for PXs2 SoC which has 2 dwc3 controller instances, and
-enable this for PXs2 boards.
+This is a proof of concept implementation of per-task stack canaries for
+arm64. The purpose is to reach agreement between the arm64 kernel and GCC
+maintainers on how to implement support for this in the compiler.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts |  8 ++++++
- arch/arm/boot/dts/uniphier-pxs2-vodka.dts  |  4 +++
- arch/arm/boot/dts/uniphier-pxs2.dtsi       | 43 ++++++++++++++++++++++++++++++
- 3 files changed, 55 insertions(+)
+What these patches show is that we can support per-task stack canaries
+on arm64 using only very minor changes on the kernel side, i.e., all
+that is needed is exposing the offset of stack_canary in task_struct
+via an ELF symbol. With that in place, the compiler needs to emit the
+following sequence when -fstack-protector-guard=tls is enabled
 
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-index 7dfae26..91cc7c5 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-@@ -53,3 +53,11 @@
- &i2c2 {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-index 0cf6154..ed5395b 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-@@ -41,3 +41,7 @@
- &i2c0 {
- 	status = "okay";
- };
-+
-+&usb0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index c083468..b65bf1c 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -446,6 +446,49 @@
- 			};
- 		};
- 
-+		usb0: usb at 65b00000 {
-+			compatible = "socionext,uniphier-pxs2-dwc3";
-+			status = "disabled";
-+			reg = <0x65b00000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb0>, <&pinctrl_usb2>;
-+			clocks = <&sys_clk 14>, <&sys_clk 16>;
-+			resets = <&sys_rst 14>, <&sys_rst 16>,
-+				 <&sys_rst 17>, <&sys_rst 18>;
-+			ranges;
-+
-+			dwc3 at 65a00000 {
-+				compatible = "snps,dwc3";
-+				reg = <0x65a00000 0xcd00>;
-+				interrupt-names = "host", "peripheral";
-+				interrupts = <0 134 4>, <0 135 4>;
-+				dr_mode = "host";
-+			};
-+		};
-+
-+		usb1: usb at 65d00000 {
-+			compatible = "socionext,uniphier-pxs2-dwc3";
-+			status = "disabled";
-+			reg = <0x65d00000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb1>, <&pinctrl_usb3>;
-+			clocks = <&sys_clk 15>, <&sys_clk 20>;
-+			resets = <&sys_rst 15>, <&sys_rst 20>, <&sys_rst 21>;
-+			ranges;
-+
-+			dwc3 at 65c00000 {
-+				compatible = "snps,dwc3";
-+				reg = <0x65c00000 0xcd00>;
-+				interrupt-names = "host", "peripheral";
-+				interrupts = <0 137 4>, <0 138 4>;
-+				dr_mode = "host";
-+			};
-+		};
-+
- 		nand: nand at 68000000 {
- 			compatible = "socionext,uniphier-denali-nand-v5b";
- 			status = "disabled";
+  movz    xN, :abs_g0:__stack_chk_guard_offset
+  msr     xM, sp_el0
+  ldr     xM, [xM, xN]
+
+Note that this does not involve per-CPU variables, and so there are no
+concurrency issues to be addressed. sp_el0 is the current task pointer,
+whose value never changes from the POV of the task, even when migrating
+to another CPU.
+
+Patch #1 implements a GCC plugin that patches the sequence
+
+  adrp    xN, __stack_chk_guard
+  add     xN, Xn, :lo12:__stack_chk_guard
+
+into
+
+  mrs     xN, sp_el0
+  add     xN, xN, :lo12:__stack_chk_guard_offset
+
+which is a poor man's version of the movz/msr/ldr sequence above (and only
+works for small model code), but is sufficient as a proof of concept.
+
+Patch #2 exposes the __stack_chk_guard_offset symbol and wires up the plugin
+(if enabled in Kconfig)
+
+Again, the point is not to use GCC plugin based hacks, but to reach agreement
+on how to proceed with this for GCC.
+
+Comments welcome.
+
+Ard Biesheuvel (2):
+  gcc-plugins: add support plugin for arm64 per-task stack canaries
+  arm64: kernel: use a unique stack canary value for each task
+
+ arch/Kconfig                                    |   4 +
+ arch/arm64/Kconfig                              |   7 ++
+ arch/arm64/include/asm/stackprotector.h         |   4 +-
+ arch/arm64/kernel/asm-offsets.c                 |   3 +
+ arch/arm64/kernel/process.c                     |   4 +
+ arch/arm64/kernel/vmlinux.lds.S                 |   8 ++
+ scripts/Makefile.gcc-plugins                    |   2 +
+ scripts/gcc-plugins/arm64_ssp_per_task_plugin.c | 121 ++++++++++++++++++++
+ 8 files changed, 152 insertions(+), 1 deletion(-)
+ create mode 100644 scripts/gcc-plugins/arm64_ssp_per_task_plugin.c
+
 -- 
-2.7.4
+2.11.0
