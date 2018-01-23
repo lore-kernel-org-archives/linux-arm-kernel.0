@@ -1,57 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 23 Jan 2018 10:58:10 +0100
-Subject: [PATCH] drm/sun4i: Fix build warnings in sunxi_engine.h
-In-Reply-To: <20180122174306.231609-1-seanpaul@chromium.org>
-References: <20180122174306.231609-1-seanpaul@chromium.org>
-Message-ID: <20180123095810.pkuqgagqs6atnbeg@flea.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Jan 2018 10:04:47 +0000
+Subject: [PATCH v3 11/20] arm64: mm: Map entry trampoline into trampoline
+ and kernel page tables
+In-Reply-To: <ca66f10b-50b6-b876-3dac-4ecd981903cf@huawei.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <1512563739-25239-12-git-send-email-will.deacon@arm.com>
+ <ca66f10b-50b6-b876-3dac-4ecd981903cf@huawei.com>
+Message-ID: <20180123100447.GB1686@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 12:42:59PM -0500, Sean Paul wrote:
-> Fixes the following build warnings:
-> In file included from ../drivers/gpu/drm/sun4i/sun8i_mixer.h:18:0,
->                  from ../drivers/gpu/drm/sun4i/sun8i_vi_scaler.h:13,
->                  from ../drivers/gpu/drm/sun4i/sun8i_vi_scaler.c:12:
-> ../drivers/gpu/drm/sun4i/sunxi_engine.h:36:16: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
->          struct drm_crtc_state *old_state);
->                 ^~~~~~~~~~~~~~
-> ../drivers/gpu/drm/sun4i/sunxi_engine.h:53:15: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
->         struct drm_crtc_state *state);
->                ^~~~~~~~~~~~~~
-> In file included from ../drivers/gpu/drm/sun4i/sun8i_mixer.h:18:0,
->                  from ../drivers/gpu/drm/sun4i/sun8i_ui_scaler.h:12,
->                  from ../drivers/gpu/drm/sun4i/sun8i_ui_scaler.c:12:
-> ../drivers/gpu/drm/sun4i/sunxi_engine.h:36:16: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
->          struct drm_crtc_state *old_state);
->                 ^~~~~~~~~~~~~~
-> ../drivers/gpu/drm/sun4i/sunxi_engine.h:53:15: warning: ?struct drm_crtc_state? declared inside parameter list will not be visible outside of this definition or declaration
->         struct drm_crtc_state *state);
->                ^~~~~~~~~~~~~~
+On Tue, Jan 23, 2018 at 04:28:45PM +0800, Yisheng Xie wrote:
+> On 2017/12/6 20:35, Will Deacon wrote:
+> > +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> > +static int __init map_entry_trampoline(void)
+> > +{
+> > +	extern char __entry_tramp_text_start[];
+> > +
+> > +	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+> > +	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
+> > +
+> > +	/* The trampoline is always mapped and can therefore be global */
+> > +	pgprot_val(prot) &= ~PTE_NG;
+> > +
+> > +	/* Map only the text into the trampoline page table */
+> > +	memset(tramp_pg_dir, 0, PGD_SIZE);
+> > +	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+> > +			     prot, pgd_pgtable_alloc, 0);
 > 
-> Fixes: 6b8562c86e24 ("drm/sun4i: engine: Create an atomic_begin
-> callback")
-> Fixes: 656e5f654903 ("drm/sun4i: engine: Add a custom crtc
-> atomic_check")
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> How the tramp_pg_dir is used, should it be set to ttbr1 when exit kernel? Sorry
+> for I do not find where it is used.
 
-Sorry for that, I just pushed it.
+Yes, that's what happens when we return to userspace. The code is a little
+convoluted, but the tramp_pg_dir is placed at a fixed offset from swapper
+(see the linker script) so the sub instruction in tramp_unmap_kernel is what
+gives us the ttbr1 value we need.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180123/a94e6b47/attachment.sig>
+Will
