@@ -1,134 +1,77 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 23 Jan 2018 20:50:41 +0800
-Subject: [RFC PATCH 2/2] video: simplefb: switch to use clk_bulk API to
- simplify clock operations
-In-Reply-To: <1516711841-25234-1-git-send-email-aisheng.dong@nxp.com>
-References: <1516711841-25234-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1516711841-25234-3-git-send-email-aisheng.dong@nxp.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jan 2018 16:41:21 +0000
+Subject: [PATCH 4/8] mfd: stm32-timers: add support for dmas
+In-Reply-To: <ee021839-3298-d01b-8890-619aca0399a7@st.com>
+References: <1516106631-18722-1-git-send-email-fabrice.gasnier@st.com>
+ <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
+ <20180123133234.xmep76cgdremnj47@dell>
+ <e611b40f-bd37-aa2d-afd9-997b86d55441@st.com>
+ <20180123153035.2rvhspe2m5ej57op@dell>
+ <ee021839-3298-d01b-8890-619aca0399a7@st.com>
+Message-ID: <20180123164121.xjzhypqe2u5c7zza@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching to use clk_bulk API to simplify clock operations.
+On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
+> On 01/23/2018 04:30 PM, Lee Jones wrote:
+> > On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
+> > 
+> >> On 01/23/2018 02:32 PM, Lee Jones wrote:
+> >>> On Tue, 16 Jan 2018, Fabrice Gasnier wrote:
+> >>>
+> >>>> STM32 Timers can support up to 7 dma requests:
+> >>>> 4 channels, update, compare and trigger.
+> >>>> Optionally request part, or all dmas from stm32-timers MFD core.
+> >>>> Also, keep reference of device's bus address to allow child drivers to
+> >>>> transfer data from/to device by using dma.
+> >>>>
+> >>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >>>> ---
+> >>>>  drivers/mfd/stm32-timers.c       | 37 ++++++++++++++++++++++++++++++++++++-
+> >>>>  include/linux/mfd/stm32-timers.h | 14 ++++++++++++++
+> >>>>  2 files changed, 50 insertions(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> >>>>  static int stm32_timers_probe(struct platform_device *pdev)
+> >>>>  {
+> >>>>  	struct device *dev = &pdev->dev;
+> >>>> @@ -44,6 +61,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+> >>>>  	mmio = devm_ioremap_resource(dev, res);
+> >>>>  	if (IS_ERR(mmio))
+> >>>>  		return PTR_ERR(mmio);
+> >>>> +	ddata->phys_base = res->start;
+> >>>
+> >>> What do you use this for?
+> >>
+> >> This is used in in child driver (pwm) for capture data transfer by dma.
+> > 
+> > Might be worth being clear about that.
+> > 
+> > Perhaps pass in 'dma_base' (phys_base + offset) instead?
+> 
+> I guess you've had a look at [PATCH 5/8] pwm: stm32: add capture
+> support. Are you talking about passing phys_base + TIM_DMAR ?
 
-Cc: Hans de Goede <hdegoede@redhat.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/video/fbdev/simplefb.c | 70 ++++++++----------------------------------
- 1 file changed, 13 insertions(+), 57 deletions(-)
+I have and I am.
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index a3c44ec..3ce2e5b 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -181,8 +181,7 @@ struct simplefb_par {
- 	u32 palette[PSEUDO_PALETTE_SIZE];
- #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
- 	bool clks_enabled;
--	unsigned int clk_count;
--	struct clk **clks;
-+	struct clk_bulk *clk_bulk;
- #endif
- #if defined CONFIG_OF && defined CONFIG_REGULATOR
- 	bool regulators_enabled;
-@@ -214,37 +213,13 @@ static int simplefb_clocks_get(struct simplefb_par *par,
- 			       struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct clk *clock;
--	int i;
- 
- 	if (dev_get_platdata(&pdev->dev) || !np)
- 		return 0;
- 
--	par->clk_count = of_clk_get_parent_count(np);
--	if (!par->clk_count)
--		return 0;
--
--	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
--	if (!par->clks)
--		return -ENOMEM;
--
--	for (i = 0; i < par->clk_count; i++) {
--		clock = of_clk_get(np, i);
--		if (IS_ERR(clock)) {
--			if (PTR_ERR(clock) == -EPROBE_DEFER) {
--				while (--i >= 0) {
--					if (par->clks[i])
--						clk_put(par->clks[i]);
--				}
--				kfree(par->clks);
--				return -EPROBE_DEFER;
--			}
--			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
--				__func__, i, PTR_ERR(clock));
--			continue;
--		}
--		par->clks[i] = clock;
--	}
-+	par->clk_bulk = of_clk_bulk_get_all(np);
-+	if (IS_ERR(par->clk_bulk) && PTR_ERR(par->clk_bulk) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
- 
- 	return 0;
- }
-@@ -252,45 +227,26 @@ static int simplefb_clocks_get(struct simplefb_par *par,
- static void simplefb_clocks_enable(struct simplefb_par *par,
- 				   struct platform_device *pdev)
- {
--	int i, ret;
-+	int ret;
-+
-+	ret = clk_bulk_enable_all(par->clk_bulk);
-+	if (ret)
-+		dev_warn(&pdev->dev, "failed to enable clocks\n");
- 
--	for (i = 0; i < par->clk_count; i++) {
--		if (par->clks[i]) {
--			ret = clk_prepare_enable(par->clks[i]);
--			if (ret) {
--				dev_err(&pdev->dev,
--					"%s: failed to enable clock %d: %d\n",
--					__func__, i, ret);
--				clk_put(par->clks[i]);
--				par->clks[i] = NULL;
--			}
--		}
--	}
- 	par->clks_enabled = true;
- }
- 
- static void simplefb_clocks_destroy(struct simplefb_par *par)
- {
--	int i;
--
--	if (!par->clks)
--		return;
-+	if (par->clks_enabled)
-+		clk_bulk_disable_all(par->clk_bulk);
- 
--	for (i = 0; i < par->clk_count; i++) {
--		if (par->clks[i]) {
--			if (par->clks_enabled)
--				clk_disable_unprepare(par->clks[i]);
--			clk_put(par->clks[i]);
--		}
--	}
--
--	kfree(par->clks);
-+	of_clk_bulk_put_all(par->clk_bulk);
- }
- #else
- static int simplefb_clocks_get(struct simplefb_par *par,
- 	struct platform_device *pdev) { return 0; }
--static void simplefb_clocks_enable(struct simplefb_par *par,
--	struct platform_device *pdev) { }
-+static int simplefb_clocks_enable(struct simplefb_par *par) { }
- static void simplefb_clocks_destroy(struct simplefb_par *par) { }
- #endif
- 
+> If this is the case, I'd prefer to keep phys base only if you don't
+> mind, and handle TIM_DMAR offset in pwm driver. This way, all dma slave
+> config is kept locally at one place.
+> Or do you mean something else ?
+> 
+> Maybe I can add a comment here about this ?
+> Something like:
+> /* phys_base to be used by child driver, e.g. DMA burst mode */
+
+I haven't seen the memory map for this device, so it's not easy for me
+to comment, but passing in the physical address of the parent MFD into
+a child device doesn't quite sit right with me.
+
+At what level does TIM_DMAR sit?  Is it a child (PWM) specific
+property, or is it described at parent (Timer) level?
+
 -- 
-2.7.4
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
