@@ -1,51 +1,123 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 23 Jan 2018 01:30:51 +0200
-Subject: [PATCH] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
-In-Reply-To: <20180122102608.12565-1-philippe.cornu@st.com>
-References: <20180122102608.12565-1-philippe.cornu@st.com>
-Message-ID: <3169703.7pajs7FEnH@avalon>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 23 Jan 2018 01:01:09 +0100
+Subject: [net-next: PATCH v4 3/7] device property: Introduce
+ fwnode_irq_get()
+In-Reply-To: <1516278704-17141-4-git-send-email-mw@semihalf.com>
+References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
+ <1516278704-17141-4-git-send-email-mw@semihalf.com>
+Message-ID: <CAJZ5v0h29=dD9eJ=6qPTzGPiuC9yYZYkrb38iV66CqgvE=P_gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
-
-Thank you for the patch.
-
-On Monday, 22 January 2018 12:26:08 EET Philippe Cornu wrote:
-> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
-> host controller driver.
-> 
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+On Thu, Jan 18, 2018 at 1:31 PM, Marcin Wojtas <mw@semihalf.com> wrote:
+> Until now there were two very similar functions allowing
+> to get Linux IRQ number from ACPI handle (acpi_irq_get())
+> and OF node (of_irq_get()). The first one appeared to be used
+> only as a subroutine of platform_irq_get(), which (in the generic
+> code) limited IRQ obtaining from _CRS method only to nodes
+> associated to kernel's struct platform_device.
+>
+> This patch introduces a new helper routine - fwnode_irq_get(),
+> which allows to get the IRQ number directly from the fwnode
+> to be used as common for OF/ACPI worlds. It is usable not
+> only for the parents fwnodes, but also for the child nodes
+> comprising their own _CRS methods with interrupts description.
+>
+> In order to be able o satisfy compilation with !CONFIG_ACPI
+> and also simplify the new code, introduce a helper macro
+> (ACPI_HANDLE_FWNODE), with which it is possible to reach
+> an ACPI handle directly from its fwnode.
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 > ---
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
-> 46b0e73404d1..e06836dec77c 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -1,12 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0
+>  drivers/base/property.c  | 26 ++++++++++++++++++++
+>  include/linux/acpi.h     |  3 +++
+>  include/linux/property.h |  2 ++
+>  3 files changed, 31 insertions(+)
+>
+> diff --git a/drivers/base/property.c b/drivers/base/property.c
+> index 7c4a53d..1d6c9d9 100644
+> --- a/drivers/base/property.c
+> +++ b/drivers/base/property.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_graph.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/property.h>
+>  #include <linux/etherdevice.h>
+>  #include <linux/phy.h>
+> @@ -1230,6 +1231,31 @@ void *device_get_mac_address(struct device *dev, char *addr, int alen)
+>  EXPORT_SYMBOL(device_get_mac_address);
+>
+>  /**
+> + * fwnode_irq_get - Get IRQ directly from a fwnode
+> + * @fwnode:    Pointer to the firmware node
+> + * @index:     Zero-based index of the IRQ
+> + *
+> + * Returns Linux IRQ number on success. Other values are determined
+> + * accordingly to acpi_/of_ irq_get() operation.
+> + */
+> +int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index)
+> +{
+> +       struct device_node *of_node = to_of_node(fwnode);
+> +       struct resource res;
+> +       int ret;
+> +
+> +       if (IS_ENABLED(CONFIG_OF) && of_node)
+> +               return of_irq_get(of_node, index);
+> +
+> +       ret = acpi_irq_get(ACPI_HANDLE_FWNODE(fwnode), index, &res);
+> +       if (ret)
+> +               return ret;
+> +
+> +       return res.start;
+> +}
+> +EXPORT_SYMBOL(fwnode_irq_get);
 
-According to Documentation/process/license-rules.txt this would change the 
-existing license. The correct identifier is GPL-2.0+.
+EXPORT_SYMBOL_GPL(), please.
 
->  /*
->   * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
->   * Copyright (C) STMicroelectronics SA 2017
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - *
->   * Modified by Philippe Cornu <philippe.cornu@st.com>
->   * This generic Synopsys DesignWare MIPI DSI host driver is based on the
->   * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
+> +
+> +/**
+>   * device_graph_get_next_endpoint - Get next endpoint firmware node
+>   * @fwnode: Pointer to the parent firmware node
+>   * @prev: Previous endpoint node or %NULL to get the first
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index dc1ebfe..f05b9b6 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -56,6 +56,8 @@ static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
+>  #define ACPI_COMPANION_SET(dev, adev)  set_primary_fwnode(dev, (adev) ? \
+>         acpi_fwnode_handle(adev) : NULL)
+>  #define ACPI_HANDLE(dev)               acpi_device_handle(ACPI_COMPANION(dev))
+> +#define ACPI_HANDLE_FWNODE(fwnode)     \
+> +                               acpi_device_handle(to_acpi_device_node(fwnode))
+>
 
+This change should go as a separate patch with a clear explanation why
+it is needed in the changelog.
 
--- 
-Regards,
-
-Laurent Pinchart
+>  static inline struct fwnode_handle *acpi_alloc_fwnode_static(void)
+>  {
+> @@ -626,6 +628,7 @@ int acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem, int *timer_count)
+>  #define ACPI_COMPANION(dev)            (NULL)
+>  #define ACPI_COMPANION_SET(dev, adev)  do { } while (0)
+>  #define ACPI_HANDLE(dev)               (NULL)
+> +#define ACPI_HANDLE_FWNODE(fwnode)     (NULL)
+>  #define ACPI_DEVICE_CLASS(_cls, _msk)  .cls = (0), .cls_msk = (0),
+>
+>  struct fwnode_handle;
+> diff --git a/include/linux/property.h b/include/linux/property.h
+> index 9b13332..e05889f 100644
+> --- a/include/linux/property.h
+> +++ b/include/linux/property.h
+> @@ -103,6 +103,8 @@ struct fwnode_handle *device_get_named_child_node(struct device *dev,
+>  struct fwnode_handle *fwnode_handle_get(struct fwnode_handle *fwnode);
+>  void fwnode_handle_put(struct fwnode_handle *fwnode);
+>
+> +int fwnode_irq_get(struct fwnode_handle *fwnode, unsigned int index);
+> +
+>  unsigned int device_get_child_node_count(struct device *dev);
+>
+>  static inline bool device_property_read_bool(struct device *dev,
+> --
