@@ -1,40 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 23 Jan 2018 09:46:51 +0100
-Subject: [PATCH] cpufreq: mediatek: Add mediatek related projects into
- blacklist
-In-Reply-To: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
-References: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
-Message-ID: <20180123084651.GA26581@kroah.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 23 Jan 2018 17:06:53 +0800
+Subject: [PATCH v6 03/13] arm64: cpufeature: Detect CPU RAS Extentions
+In-Reply-To: <5A663C59.6030205@arm.com>
+References: <20180115193906.30053-1-james.morse@arm.com>
+ <20180115193906.30053-4-james.morse@arm.com>
+ <78d4374a-f75c-6860-38ab-6373ffae3eee@huawei.com> <5A663C59.6030205@arm.com>
+Message-ID: <2fbdd6f2-3225-1993-cae5-0bc435189d36@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 04:31:11PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> commit 6066998cbd2b1012a8d5bc9a2957cfd0ad53150e upstream.
-> 
-> commit edeec420de24 ("cpufreq: dt-platdev: Automatically create cpufreq
-> device with OPP v2") not added MediaTek SoCs to the blacklist that would
-> lead to cause an occasional hang or unexpected behaviors on related boards
-> as kernelci reported and complained on [1] specifically for 4.14 and 4.15
-> tree.
-> 
-> For those reasons, add MediaTek SoCs into cpufreq-dt blacklist and wish
-> the patch be applied to 4.14 and 4.15 tree to allow kernelci able to
-> complete following automated kernel testing.
-> 
-> [1] https://kernelci.org/boot/mt7623n-bananapi-bpi-r2/
-> 
-> Fixes: edeec420de24 (cpufreq: dt-cpufreq: platdev Automatically create device with OPP v2)
-> Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> ---
->  drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+Hi James,
 
-What stable kernel tree(s) are you wanting this backported to?
+On 2018/1/23 3:32, James Morse wrote:
+>> it seems this "CONFIG_ARM64_RAS_EXTN" is not enabled in the "arch/arm64/configs/defconfig",
+>> if not, I want to enable this config to enable RAS feature in the defconfig. do you agree?
+> Sure. This series doesn't do a lot on its own, it expects firmware-first or
+> kernel-first support, which may in turn depend-on this feature. It means we
+> don't panic() when notified of corrected errors, until we get the
+> {firmware,kernel}-first support.
+> 
+> Don't defconfig changes get collected by arm-soc? (I'm not sure how these get
+> picked up...)
 
-thanks,
+Now we should have supported firmware-first, do you mean we do not enable "CONFIG_ARM64_RAS_EXTN" in the
+defconfig for ARM's SOC until kernel-first RAS is supported?
 
-greg k-h
+> 
+> 
+> James
