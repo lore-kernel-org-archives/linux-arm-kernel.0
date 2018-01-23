@@ -1,70 +1,66 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 23 Jan 2018 19:34:36 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
- <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
-Message-ID: <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 24 Jan 2018 02:44:27 +0800
+Subject: [PATCH 05/12] arm64: dts: mt7622: add PMIC MT6380 related nodes
+In-Reply-To: <CAOFm3uHnUk8BwDVR0F+5VqTB+8qFKz23ooX3o9G_RCbVqpbQPw@mail.gmail.com>
+References: <CAOFm3uHnUk8BwDVR0F+5VqTB+8qFKz23ooX3o9G_RCbVqpbQPw@mail.gmail.com>
+Message-ID: <1516733067.15199.41.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-23 19:26 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 01/23/2018 12:10 PM, Bartosz Golaszewski wrote:
->>
->> 2018-01-23 18:03 GMT+01:00 Adam Ford <aford173@gmail.com>:
->>>
->>> On Tue, Jan 23, 2018 at 10:06 AM, David Lechner <david@lechnology.com>
->>> wrote:
->>>>
->>>> On 01/23/2018 10:03 AM, David Lechner wrote:
->>>>>
->>>>>
->>>>> You can see if the clock is enabled by running:
->>>>>
->>>>>       cat /sys/kernel/debug/clk/clk_summary
->>>>>
->>>>
->>>> I just realized if you can't boot, you can't do this. :-/
->>>
->>>
->>> I can boot with the latest set in your git repo, but the Ethernet
->>> doesn't apparently fully operate.  I don't get errors, but I cannot
->>> get a dhcp address.
->>>
->>> I'll try to do a more exhaustive test later today to get an idea of
->>> what works and what doesn't.  When I ran my basic tests, I just did a
->>> feel-good boot test (and reboot test)
->>>
->>> adam
->>
->>
->> FYI: manually calling clk_prepare_enable() in the davinci_mdio driver
->> seems to at least fix the ethernet. In master branch it's done by
->> pm_runtime_get_sync() (in davinci_mdio_reset()). However I'm still
->> getting several oopses and WARNs so there's some more work to do.
->>
->
-> Hmm... I'm wondering if we need to also add #power-domain-cells to the
-> PSC clocks and power-domains properties to the consumers.
->
-> For this specific case though, it seems strange to me that the drivers
-> to clk_get() and clk_get_rate() but never enable the clocks.
->
->
-> Also, are the oopses and WARNs the same as before?
 
-No, the ones before were all related to the ethernet failing, now I
-get several stack traces from drm. Posted them on pastebin[1].
+Hi, Philippe
 
-Thanks,
-Bartosz
+Really appreciate your info and detailed explanation. it's clear how
+correct way to add GPDX license identifier. I will have a follow-up.
 
-[1] https://pastebin.com/H3yZ5xHv
+	Sean
+
+On Tue, 2018-01-23 at 11:46 +0100, Philippe Ombredanne wrote:
+> Sean,
+> sorry for the late reply and thanks you for this research.
+> 
+> On Fri, Jan 12, 2018 at 4:33 AM, Sean Wang <sean.wang@mediatek.com> wrote:
+> > Currently, I'm really confused about what usage STYLE of SPDX license
+> > identifier I should use for each type of file.
+> >
+> > could you point me where I can find the related document describing SPDX
+> > usage style for those files expected by the community in the future?
+> 
+> The doc is in this patchset [1]
+> 
+> [1] https://lkml.org/lkml/2017/12/28/326
+> 
+> 
+> > I found more than one way STYLE of SPDX present at current code, for
+> > example as below. If there's no absolute definition for them, and then
+> > which way that is better?
+> > 1)
+> > for *.dts, applied with "// " at head or within " /* */ " not at head
+> > such as
+> >
+> > arch/arm/boot/dts/bcm953012hr.dts:2: *  SPDX-License-Identifier:
+> > BSD-3-Clause
+> 
+> This is a "style bug". The comment style for .dts should be //
+> 
+> > 2)
+> > for *.c, applied with "// " at head or within " /* */ " not at head
+> > such as
+> > drivers/soc/xilinx/zynqmp/pm.c:10: * SPDX-License-Identifier:   GPL-2.0+
+> 
+> This is a "style bug". The comment style for .c should be //
+> 
+> > 3)
+> > for *.h, applied with "// " at head or within " /* */ " at head
+> > such as
+> > drivers/usb/dwc3/gadget.h:1:// SPDX-License-Identifier: GPL-2.0
+> 
+> This is a "style bug". The comment style for .h should be /**/
+> 
+> > 4)
+> > no issue, Makefile, or Kconfig, definitely applied with "# " at head
+> 
+> That's the correct way.
+> 
+> So the net-net is that these "style bugs" should be fixed.
+> 
