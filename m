@@ -1,59 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Jan 2018 09:51:01 +0000
-Subject: [PATCH v3 1/2] arm64: Branch predictor hardening for Cavium
- ThunderX2
-In-Reply-To: <2232c6e4-c55f-4e57-c58f-2bfc02b2fac2@jonmasters.org>
-References: <20180118135354.GB20783@arm.com>
- <1516364568-95577-1-git-send-email-jnair@caviumnetworks.com>
- <20180122113311.GB15456@arm.com>
- <2232c6e4-c55f-4e57-c58f-2bfc02b2fac2@jonmasters.org>
-Message-ID: <20180123095101.GA1686@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jan 2018 09:53:05 +0000
+Subject: [PATCH v3 09/16] mfd: axp20x: probe axp20x_adc driver for AXP813
+In-Reply-To: <d5792ed6e1e989dde3c9ecdd018286109dfc101d.1516012352.git-series.quentin.schulz@free-electrons.com>
+References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
+ <d5792ed6e1e989dde3c9ecdd018286109dfc101d.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20180123095305.lgxpq5gyzlo5cked@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 02:00:59PM -0500, Jon Masters wrote:
-> On 01/22/2018 06:33 AM, Will Deacon wrote:
-> > On Fri, Jan 19, 2018 at 04:22:47AM -0800, Jayachandran C wrote:
-> >> Use PSCI based mitigation for speculative execution attacks targeting
-> >> the branch predictor. We use the same mechanism as the one used for
-> >> Cortex-A CPUs, we expect the PSCI version call to have a side effect
-> >> of clearing the BTBs.
-> >>
-> >> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> >> ---
-> >>  arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> >> index 70e5f18..45ff9a2 100644
-> >> --- a/arch/arm64/kernel/cpu_errata.c
-> >> +++ b/arch/arm64/kernel/cpu_errata.c
-> >> @@ -338,6 +338,16 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
-> >>  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-> >>  		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-> >>  	},
-> >> +	{
-> >> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> >> +		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-> >> +		.enable = enable_psci_bp_hardening,
-> >> +	},
-> >> +	{
-> >> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> >> +		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-> >> +		.enable = enable_psci_bp_hardening,
-> >> +	},
-> >>  #endif
-> > 
-> > Thanks.
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
+On Mon, 15 Jan 2018, Quentin Schulz wrote:
+
+> This makes the axp20x_adc driver probe with platform device id
+> "axp813-adc".
 > 
-> Thanks. I have separately asked for a specification tweak to allow us to
-> discover whether firmware has been augmented to provide the necessary
-> support that we need. That applies beyond Cavium.
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 
-AFAIK, there's already an SMCCC/PSCI proposal doing the rounds that is
-discoverable and does what we need. Have you seen it? We should be posting
-code this week.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Will
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
