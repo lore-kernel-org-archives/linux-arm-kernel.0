@@ -1,135 +1,150 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Jan 2018 12:28:00 +0000
-Subject: [PATCH 07/16] arm64: capabilities: Filter the entries based on a
- given type
+Date: Tue, 23 Jan 2018 12:28:05 +0000
+Subject: [PATCH 12/16] arm64: Add helpers for checking CPU MIDR against a range
 In-Reply-To: <20180123122809.16269-1-suzuki.poulose@arm.com>
 References: <20180123122809.16269-1-suzuki.poulose@arm.com>
-Message-ID: <20180123122809.16269-8-suzuki.poulose@arm.com>
+Message-ID: <20180123122809.16269-13-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While processing the list of capabilities, it is useful to
-filter out some of the entries based on the given type to
-allow better control. This can be used later for handling
-LOCAL vs SYSTEM wide capabilities and more.
+Add helpers for checking if the given CPU midr falls in a range
+of variants/revisions for a given model.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |  5 +++++
- arch/arm64/kernel/cpufeature.c      | 30 ++++++++++++++++++++----------
- 2 files changed, 25 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |  7 ++-----
+ arch/arm64/include/asm/cputype.h    | 38 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu_errata.c      | 16 +++++-----------
+ 3 files changed, 45 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 27d037bb0451..a621d2184227 100644
+index 4c3d6987acfc..a3d54c2c411f 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -99,6 +99,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
- /* Is it safe for a late CPU to miss this capability when system has it */
- #define ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	BIT(3)
+@@ -10,6 +10,7 @@
+ #define __ASM_CPUFEATURE_H
  
-+#define ARM64_CPUCAP_TYPE_ALL			 \
-+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|\
-+	 ARM64_CPUCAP_SCOPE_SYSTEM		|\
-+	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE	|\
-+	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
+ #include <asm/cpucaps.h>
++#include <asm/cputype.h>
+ #include <asm/fpsimd.h>
+ #include <asm/hwcap.h>
+ #include <asm/sigcontext.h>
+@@ -134,11 +135,7 @@ struct arm64_cpu_capabilities {
+ 	/* Called on all active CPUs for all  "available" capabilities */
+ 	int (*enable)(const struct arm64_cpu_capabilities *caps);
+ 	union {
+-		struct {	/* To be used for erratum handling only */
+-			u32 midr_model;
+-			u32 midr_range_min, midr_range_max;
+-		};
+-
++		struct midr_range midr_range;	/* To be used for erratum handling only */
+ 		struct {	/* Feature register checking */
+ 			u32 sys_reg;
+ 			u8 field_pos;
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 2f8d39ed9c2e..26bc5b302060 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -116,6 +116,44 @@
+ #define read_cpuid(reg)			read_sysreg_s(SYS_ ## reg)
+ 
  /*
-  * CPU errata detected at boot time based on feature of one or more CPUs.
-  * It is not safe for a late CPU to have this feature when the system doesn't
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 79737034a628..198c5daddd65 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1180,9 +1180,11 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
- }
- 
- static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
--			    const char *info)
-+				    u16 cap_type, const char *info)
- {
- 	for (; caps->matches; caps++) {
-+		if (!(caps->type & cap_type))
-+			continue;
- 		if (!caps->matches(caps, cpucap_default_scope(caps)))
- 			continue;
- 
-@@ -1204,12 +1206,13 @@ static int __enable_cpu_capability(void *arg)
-  * Run through the enabled capabilities and enable() it on all active
-  * CPUs
-  */
--static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
-+static void __init
-+enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 caps_type)
- {
- 	for (; caps->matches; caps++) {
- 		unsigned int num = caps->capability;
- 
--		if (!cpus_have_cap(num))
-+		if (!(caps->type & caps_type) || !cpus_have_cap(num))
- 			continue;
- 
- 		/* Ensure cpus_have_const_cap(num) works */
-@@ -1231,12 +1234,16 @@ static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *
-  * Run through the list of capabilities to check for conflicts.
-  * Returns "false" on conflicts.
-  */
--static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
-+static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list,
-+				    u16 caps_type)
- {
- 	bool cpu_has_cap, system_has_cap;
- 	const struct arm64_cpu_capabilities *caps = caps_list;
- 
- 	for (; caps->matches; caps++) {
-+		if (!(caps->type & caps_type))
-+			continue;
++ * Represent a range of MIDR values for a given CPU model and a
++ * range of variant/revision values.
++ *
++ * @model	- CPU model as defined by MIDR_CPU_MODEL
++ * @rv_min	- Minimum value for the revision/variant as defined by
++ *		  MIDR_CPU_VAR_REV
++ * @rv_max	- Maximum value for the variant/revision for the range.
++ */
++struct midr_range {
++	u32 model;
++	u32 rv_min;
++	u32 rv_max;
++};
 +
- 		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
- 		system_has_cap =  cpus_have_cap(caps->capability);
- 
-@@ -1299,7 +1306,7 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
- 
- static void verify_local_cpu_features(void)
++#define MIDR_RANGE(m, v_min, r_min, v_max, r_max)		\
++	{							\
++		.model = m,					\
++		.rv_min = MIDR_CPU_VAR_REV(v_min, r_min),	\
++		.rv_max = MIDR_CPU_VAR_REV(v_max, r_max),	\
++	}
++
++#define MIDR_ALL_VERSIONS(m) MIDR_RANGE(m, 0, 0, 0xf, 0xf)
++
++static inline bool is_midr_in_range(u32 midr, struct midr_range const *range)
++{
++	return MIDR_IS_CPU_MODEL_RANGE(midr, range->model,
++				 range->rv_min, range->rv_max);
++}
++
++static inline bool is_midr_in_range_list(u32 midr, struct midr_range const *ranges)
++{
++	while (ranges->model)
++		if (is_midr_in_range(midr, ranges++))
++			return true;
++	return false;
++}
++
++/*
+  * The CPU ID never changes at run time, so we might as well tell the
+  * compiler that it's constant.  Use this function to read the CPU ID
+  * rather than directly reading processor_id or read_cpuid() directly.
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 054b17009f41..10eb7fa0d0d7 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -25,9 +25,7 @@ static bool __maybe_unused
+ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
  {
--	if (!__verify_local_cpu_caps(arm64_features))
-+	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_TYPE_ALL))
- 		cpu_die_early();
+ 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+-	return MIDR_IS_CPU_MODEL_RANGE(read_cpuid_id(), entry->midr_model,
+-				       entry->midr_range_min,
+-				       entry->midr_range_max);
++	return is_midr_in_range(read_cpuid_id(), &entry->midr_range);
  }
  
-@@ -1327,18 +1334,20 @@ static void verify_sve_features(void)
-  */
- static void verify_local_cpu_errata_workarounds(void)
- {
--	if (__verify_local_cpu_caps(arm64_errata))
-+	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_TYPE_ALL))
- 		cpu_die_early();
+ static bool __maybe_unused
+@@ -41,7 +39,7 @@ is_kryo_midr(const struct arm64_cpu_capabilities *entry, int scope)
+ 	model &= MIDR_IMPLEMENTOR_MASK | (0xf00 << MIDR_PARTNUM_SHIFT) |
+ 		 MIDR_ARCHITECTURE_MASK;
+ 
+-	return model == entry->midr_model;
++	return model == entry->midr_range.model;
  }
  
- static void update_cpu_errata_workarounds(void)
- {
--	update_cpu_capabilities(arm64_errata, "enabling workaround for");
-+	update_cpu_capabilities(arm64_errata,
-+				ARM64_CPUCAP_TYPE_ALL,
-+				"enabling workaround for");
- }
+ static bool
+@@ -182,9 +180,7 @@ static int qcom_enable_link_stack_sanitization(
+ #define ERRATA_MIDR_RANGE(model, v_min, r_min, v_max, r_max) \
+ 	.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM, \
+ 	.matches = is_affected_midr_range, \
+-	.midr_model = model, \
+-	.midr_range_min = MIDR_CPU_VAR_REV(v_min, r_min), \
+-	.midr_range_max = MIDR_CPU_VAR_REV(v_max, r_max)
++	.midr_range =  MIDR_RANGE(model, v_min, r_min, v_max, r_max)
  
- static void __init enable_errata_workarounds(void)
- {
--	enable_cpu_capabilities(arm64_errata);
-+	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_TYPE_ALL);
- }
+ /* Errata affecting a range of revisions of  given model variant */
+ #define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max) \
+@@ -198,9 +194,7 @@ static int qcom_enable_link_stack_sanitization(
+ #define ERRATA_MIDR_ALL_VERSIONS(model) \
+ 	.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM, \
+ 	.matches = is_affected_midr_range, \
+-	.midr_model = model, \
+-	.midr_range_min = 0, \
+-	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
++	.midr_range = MIDR_ALL_VERSIONS(model)
  
- /*
-@@ -1387,8 +1396,9 @@ void check_local_cpu_capabilities(void)
- 
- static void __init setup_feature_capabilities(void)
- {
--	update_cpu_capabilities(arm64_features, "detected feature:");
--	enable_cpu_capabilities(arm64_features);
-+	update_cpu_capabilities(arm64_features,
-+				ARM64_CPUCAP_TYPE_ALL, "detected feature:");
-+	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_TYPE_ALL);
- }
- 
- DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+@@ -314,7 +308,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.desc = "Qualcomm Technologies Kryo erratum 1003",
+ 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
+ 		.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM,
+-		.midr_model = MIDR_QCOM_KRYO,
++		.midr_range.model = MIDR_QCOM_KRYO,
+ 		.matches = is_kryo_midr,
+ 	},
+ #endif
 -- 
 2.13.6
