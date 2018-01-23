@@ -1,53 +1,49 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 23 Jan 2018 09:54:34 -0600
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.16
-Message-ID: <1516722874-15698-1-git-send-email-dinguyen@kernel.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 23 Jan 2018 23:55:31 +0800
+Subject: [PATCH v3 00/16] add support for AXP813 ADC and battery power
+ supply
+In-Reply-To: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
+References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v669fXk45X5oKTRXcRSqmOK8GkexGJ747E0S9t0ZdkV9_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+On Mon, Jan 15, 2018 at 6:33 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> The AXP813 PMIC is relatively close to the already supported AXP20X and
+> AXP22X. It provides three different power outputs: battery, AC and USB, and
+> measures a few different things: temperature, power supply status, current
+> current and voltage supplied, maximum current limit, battery capacity, min
+> and max voltage limits.
+>
+> One of its two GPIOs can be used as an ADC.
+>
+> There are a few differences with AXP20X/AXP22X PMICs though:
+>   - a different constant charge current formula,
+>   - battery temperature, GPIO0 and battery voltages are the only voltages
+>   measurable,
+>   - all data are stored on 12 bits (AXP20X/AXP22X had one type of data that
+>   was stored on 13 bits),
+>   - different scales and offsets,
+>   - a different ADC rate formula and register,
+>
+> This patch series adds support for the PMIC's ADC and battery power supply
+> in the existing drivers.
+>
+> Make the axp20x MFD automatically probe the ADC driver, add the battery
+> power supply node in axp81x node and enable it for the TBS A711 since it
+> has a soldered battery.
+>
+> I suggest patches:
+>   - 4,5,8,14,15,16 go through Maxime and Chen-Yu's tree,
+>   - 1,2,3,7 go through Jonathan's tree,
+>   - 6,9,13 go through Lee's tree,
+>   - 10,11,12 go through Sebastian's tree,
 
-I apologize for the late request! I figure these changes are mostly trivial
-DTS updates, perhaps you can consider pulling them in for v4.16? If not, they can
-wait.
+I think I've reviewed or acked all the patches that haven't been merged.
+The different drivers are bound together through the device tree, so the
+various patches are safe to go through their respective trees, as Quentin
+suggested.
 
-Thanks,
-Dinh
-
-
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.16
-
-for you to fetch changes up to 889d1509042096f6ccd082655997aeff8457fe1c:
-
-  arm64: dts: stratix10: fix SPI settings (2018-01-23 09:37:29 -0600)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.16
-- Stratix10 platform updates
-  - Fix SPI interrupt numbers
-  - Enable USB
-- Disable over-current for Arria10 devkit
-
-----------------------------------------------------------------
-Dinh Nguyen (3):
-      ARM: dts: socfpga: disable over-current for Arria10 USB devkit
-      arm64: dts: stratix10: enable USB on the devkit
-      arm64: dts: stratix10: add USB ECC reset bit
-
-Thor Thayer (1):
-      arm64: dts: stratix10: fix SPI settings
-
-Tim Sander (1):
-      ARM: dts: socfpga: add i2c reset signals
-
- arch/arm/boot/dts/socfpga.dtsi                         |  4 ++++
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi           |  1 +
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi      | 16 ++++++++++------
- arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts |  4 ++++
- 4 files changed, 19 insertions(+), 6 deletions(-)
+Thanks!
+ChenYu
