@@ -1,60 +1,56 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Jan 2018 12:28:03 +0000
-Subject: [PATCH 10/16] arm64: Make KPTI strict CPU local feature
+Date: Tue, 23 Jan 2018 12:28:02 +0000
+Subject: [PATCH 09/16] arm64: capabilities: Introduce strict features based on
+ local CPU
 In-Reply-To: <20180123122809.16269-1-suzuki.poulose@arm.com>
 References: <20180123122809.16269-1-suzuki.poulose@arm.com>
-Message-ID: <20180123122809.16269-11-suzuki.poulose@arm.com>
+Message-ID: <20180123122809.16269-10-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KPTI capability is a security feature which should be enabled
-when at least one CPU on the system needs it. Any late CPU
-which needs the kernel support, should be prevented from
-booting (and thus making the system unsecure) if the feature
-was not already enabled.
+Add type for features that are detected on individual CPUs,
+rather than on a system wide safe features. This behavior
+is similar to that of a strict cpu erratum, where a later
+CPU is not allowed to boot if the system doesn't posses it.
 
-Cc: Will Deacon <will.deacon@arm.com>
+Use this for software prefetching capability.
+
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 7 +++++++
+ arch/arm64/kernel/cpufeature.c      | 2 +-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index a621d2184227..4c3d6987acfc 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -118,6 +118,13 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+  */
+ #define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	\
+ 	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE)
++/*
++ * CPU feature detected at boot time based on feature of one or more CPUs.
++ * It is not safe for a late CPU to have this feature, when the system doesn't
++ * have it. But it is safe to miss the feature if the system has it.
++ */
++#define ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE	\
++	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
+ 
+ struct arm64_cpu_capabilities {
+ 	const char *desc;
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 111f6c4b4cd7..2627a836e99d 100644
+index 7ae5cf9092d0..111f6c4b4cd7 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -862,9 +862,8 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- 
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
--				int __unused)
-+				int scope)
- {
--	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
- 
- 	/* Forced on command line? */
- 	if (__kpti_forced) {
-@@ -878,8 +877,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 		return true;
- 
- 	/* Defer to CPU feature registers */
--	return !cpuid_feature_extract_unsigned_field(pfr0,
--						     ID_AA64PFR0_CSV3_SHIFT);
-+	return !has_cpuid_feature(entry, scope);
- }
- 
- static int __init parse_kpti(char *str)
-@@ -1003,7 +1001,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+@@ -951,7 +951,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
  	{
- 		.desc = "Kernel page table isolation (KPTI)",
- 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+ 		.desc = "Software prefetching using PRFM",
+ 		.capability = ARM64_HAS_NO_HW_PREFETCH,
 -		.type = ARM64_CPUCAP_BOOT_SYSTEM_FEATURE,
 +		.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
-+		.min_field_value = 1,
- 		.matches = unmap_kernel_at_el0,
+ 		.matches = has_no_hw_prefetch,
  	},
- #endif
+ #ifdef CONFIG_ARM64_UAO
 -- 
 2.13.6
