@@ -1,47 +1,67 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 23 Jan 2018 10:14:48 +0000
-Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
- SIGFPE
-In-Reply-To: <878tcp8umz.fsf@xmission.com>
-References: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
- <1516623798-25001-2-git-send-email-Dave.Martin@arm.com>
- <878tcp8umz.fsf@xmission.com>
-Message-ID: <20180123101446.GP22781@e103592.cambridge.arm.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Tue, 23 Jan 2018 10:25:51 +0000
+Subject: [PATCH] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
+In-Reply-To: <3169703.7pajs7FEnH@avalon>
+References: <20180122102608.12565-1-philippe.cornu@st.com>
+ <3169703.7pajs7FEnH@avalon>
+Message-ID: <2bf185e2-9b02-3632-dc9a-baf8f4109b44@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
-> 
-> > diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
-> > index e447283..77edb00 100644
-> > --- a/include/uapi/asm-generic/siginfo.h
-> > +++ b/include/uapi/asm-generic/siginfo.h
-> > @@ -193,7 +193,8 @@ typedef struct siginfo {
-> >  #define FPE_FLTRES	6	/* floating point inexact result */
-> >  #define FPE_FLTINV	7	/* floating point invalid operation */
-> >  #define FPE_FLTSUB	8	/* subscript out of range */
-> > -#define NSIGFPE		8
-> > +#define FPE_UNKNOWN	9	/* undiagnosed floating-point exception */
-> > +#define NSIGFPE		9
-> 
-> Minor nit here.
-> 
-> At least before this is final I would really appreciate if you could
-> rebase this on top of my unificiation of siginfo.h that I posted on
-> linux-arch and is in my siginfo-next branch.
-> 
-> As that already pushes NSIGFPE up to 13.
-> 
-> Which would make this patch change NSIGFPE to 14 and allocate the number
-> 14 for FPE_UNKNOWN
+Hi Laurent,
 
-My bad -- I hadn't looked in detail at the whole series.
+A big *thank* for your review
 
-However, the purpose of this as an RFC was to get feedback on whether
-adding FPE_UNKNOWN is considered acceptable at all from an API
-perspective -- the precise number doesn't matter for that discussion.
+On 01/23/2018 12:30 AM, Laurent Pinchart wrote:
+> Hi Philippe,
+> 
+> Thank you for the patch.
+> 
+> On Monday, 22 January 2018 12:26:08 EET Philippe Cornu wrote:
+>> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
+>> host controller driver.
+>>
+>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>> ---
+>>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
+>>   1 file changed, 1 insertion(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
+>> 46b0e73404d1..e06836dec77c 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> @@ -1,12 +1,8 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+> 
+> According to Documentation/process/license-rules.txt this would change the
+> existing license. The correct identifier is GPL-2.0+.
+> 
 
-Do you have any view on this?
+You are right, I did not put the correct identifier :(
 
-Cheers
----Dave
+After reading more spdx.org, I wonder if the correct value should be 
+GPL-2.0-or-later instead of GPL-2.0+
+
+https://spdx.org/licenses/GPL-2.0-or-later.html
+https://spdx.org/licenses/GPL-2.0+.html
+
+What is your opinion?
+
+Many thanks,
+Philippe :-)
+
+>>   /*
+>>    * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+>>    * Copyright (C) STMicroelectronics SA 2017
+>>    *
+>> - * This program is free software; you can redistribute it and/or modify
+>> - * it under the terms of the GNU General Public License as published by
+>> - * the Free Software Foundation; either version 2 of the License, or
+>> - * (at your option) any later version.
+>> - *
+>>    * Modified by Philippe Cornu <philippe.cornu@st.com>
+>>    * This generic Synopsys DesignWare MIPI DSI host driver is based on the
+>>    * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
+> 
+> 
