@@ -1,113 +1,116 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 23 Jan 2018 01:11:57 +0100
-Subject: [PATCH v6 07/12] drivers: base cacheinfo: Add support for ACPI
- based firmware tables
-In-Reply-To: <1485ab78-4b43-b703-ca48-4e2cb2059e51@arm.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-8-jeremy.linton@arm.com>
- <20180122155022.GA7714@kroah.com>
- <1485ab78-4b43-b703-ca48-4e2cb2059e51@arm.com>
-Message-ID: <CAJZ5v0i12FXkfvMe2y_aqZ8XKYbZYzxjS_bUEByWinYjzaQURA@mail.gmail.com>
+From: sgoel@codeaurora.org (Goel, Sameer)
+Date: Mon, 22 Jan 2018 18:19:32 -0700
+Subject: [PATCH] arm64: kdump: retain reserved memory regions
+In-Reply-To: <20180110100943.6082-1-takahiro.akashi@linaro.org>
+References: <20180110100943.6082-1-takahiro.akashi@linaro.org>
+Message-ID: <a2813fed-648e-3904-f8a9-72dd97e31d9f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 10:14 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> Hi,
->
-> Thanks for taking a look at this.
->
->
-> On 01/22/2018 09:50 AM, Greg KH wrote:
->>
->> On Fri, Jan 12, 2018 at 06:59:15PM -0600, Jeremy Linton wrote:
->>>
->>> Add a entry to to struct cacheinfo to maintain a reference to the PPTT
->>> node which can be used to match identical caches across cores. Also
->>> stub out cache_setup_acpi() so that individual architectures can
->>> enable ACPI topology parsing.
->>>
->>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->>> ---
->>>   drivers/acpi/pptt.c       |  1 +
->>>   drivers/base/cacheinfo.c  | 20 +++++++++++++-------
->>>   include/linux/cacheinfo.h |  9 +++++++++
->>>   3 files changed, 23 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
->>> index 2c4b3ed862a8..4f5ab19c3a08 100644
->>> --- a/drivers/acpi/pptt.c
->>> +++ b/drivers/acpi/pptt.c
->>> @@ -329,6 +329,7 @@ static void update_cache_properties(struct cacheinfo
->>> *this_leaf,
->>>   {
->>>         int valid_flags = 0;
->>>   +     this_leaf->fw_unique = cpu_node;
->>>         if (found_cache->flags & ACPI_PPTT_SIZE_PROPERTY_VALID) {
->>>                 this_leaf->size = found_cache->size;
->>>                 valid_flags++;
->>> diff --git a/drivers/base/cacheinfo.c b/drivers/base/cacheinfo.c
->>> index 217aa90fb036..ee51e33cc37c 100644
->>> --- a/drivers/base/cacheinfo.c
->>> +++ b/drivers/base/cacheinfo.c
->>> @@ -208,16 +208,16 @@ static int cache_setup_of_node(unsigned int cpu)
->>>         if (index != cache_leaves(cpu)) /* not all OF nodes populated */
->>>                 return -ENOENT;
->>> -
->>>         return 0;
->>>   }
->>> +
->>
->>
->> Whitespace changes not needed for this patch :(
->
->
-> Sure.
->
->
->>
->>
->>>   #else
->>>   static inline int cache_setup_of_node(unsigned int cpu) { return 0; }
->>>   static inline bool cache_leaves_are_shared(struct cacheinfo *this_leaf,
->>>                                            struct cacheinfo *sib_leaf)
->>>   {
->>>         /*
->>> -        * For non-DT systems, assume unique level 1 cache, system-wide
->>> +        * For non-DT/ACPI systems, assume unique level 1 caches,
->>> system-wide
->>>          * shared caches for all other levels. This will be used only if
->>>          * arch specific code has not populated shared_cpu_map
->>>          */
->>> @@ -225,6 +225,11 @@ static inline bool cache_leaves_are_shared(struct
->>> cacheinfo *this_leaf,
->>>   }
->>>   #endif
->>>   +int __weak cache_setup_acpi(unsigned int cpu)
->>> +{
->>> +       return -ENOTSUPP;
->>> +}
->>> +
->>>   static int cache_shared_cpu_map_setup(unsigned int cpu)
->>>   {
->>>         struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
->>> @@ -235,11 +240,11 @@ static int cache_shared_cpu_map_setup(unsigned int
->>> cpu)
->>>         if (this_cpu_ci->cpu_map_populated)
->>>                 return 0;
->>>   -     if (of_have_populated_dt())
->>> +       if (!acpi_disabled)
->>> +               ret = cache_setup_acpi(cpu);
->>
->>
->> Why does acpi go first?  :)
->
->
-> This sounds like a joke i heard...
->
-> OTOH, given that we have machines with both ACPI and DT tables, it seemed a
-> little clearer and a little more robust to code that so that if ACPI is
-> enabled to prefer it over DT information. As long as the routines which set
-> of of_root are protected by if (acpi_disabled) checks it should be safe to
-> do it either way.
+Hi Akashi,
+ Thanks for posting the patch. I tested the patch on Qualcomm Centriq system.
+Thanks,
+Sameer
 
-I guess adding a comment about that might help.
+On 1/10/2018 3:09 AM, AKASHI Takahiro wrote:
+> This is a fix against the issue that crash dump kernel may hang up
+> during booting, which can happen on any ACPI-based system with "ACPI
+> Reclaim Memory."
+> 
+> 	<kicking off kdump after panic>
+> 	Bye!
+> 	   (snip...)
+> 	ACPI: Core revision 20170728
+> 	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
+> 	Internal error: Oops: 96000021 [#1] SMP
+> 	Modules linked in:
+> 	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
+> 	task: ffff000008d05180 task.stack: ffff000008cc0000
+> 	PC is at acpi_ns_lookup+0x25c/0x3c0
+> 	LR is at acpi_ds_load1_begin_op+0xa4/0x294
+> 	   (snip...)
+> 	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
+> 	Call trace:
+> 	   (snip...)
+> 	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
+> 	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
+> 	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
+> 	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
+> 	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
+> 	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
+> 	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
+> 	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
+> 	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
+> 	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
+> 	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
+> 	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
+> 	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
+> 	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
+> 	---[ end trace c46ed37f9651c58e ]---
+> 	Kernel panic - not syncing: Fatal exception
+> 	Rebooting in 10 seconds..
+> 
+> (diagnosis)
+> * This fault is a data abort, alignment fault (ESR=0x96000021)
+>   during reading out ACPI table.
+> * Initial ACPI tables are normally stored in system ram and marked as
+>   "ACPI Reclaim memory" by the firmware.
+> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+>   memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
+>   removing NOMAP bit and they are instead "memblock-reserved".
+> * When crash dump kernel boots up, it tries to accesses ACPI tables by
+>   ioremap'ing them (through acpi_os_ioremap()).
+> * Since those regions are not included in device tree's
+>   "usable-memory-range" and so not recognized as part of crash dump
+>   kernel's system ram, ioremap() will create a non-cacheable mapping here.
+> * ACPI accessor/helper functions are compiled in without unaligned access
+>   support (ACPI_MISALIGNMENT_NOT_SUPPORTED), eventually ending up a fatal
+>   panic when accessing ACPI tables.
+> 
+> With this patch, all the reserved memory regions, as well as NOMAP-
+> attributed ones which are presumably ACPI runtime code and data, are set
+> to be retained in system ram even if they are outside of usable memory
+> range specified by device tree blob. Accordingly, ACPI tables are mapped
+> as cacheable and can be safely accessed without causing unaligned access
+> faults.
+> 
+> Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/mm/init.c | 16 ++++++++++++++--
+>  1 file changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 2d5a443b205c..e4a8b64a09b1 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -352,11 +352,23 @@ static void __init fdt_enforce_memory_region(void)
+>  	struct memblock_region reg = {
+>  		.size = 0,
+>  	};
+> +	u64 idx;
+> +	phys_addr_t start, end;
+>  
+>  	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
+>  
+> -	if (reg.size)
+> -		memblock_cap_memory_range(reg.base, reg.size);
+> +	if (reg.size) {
+> +retry:
+> +		/* exclude usable & !reserved memory */
+> +		for_each_free_mem_range(idx, NUMA_NO_NODE, MEMBLOCK_NONE,
+> +					&start, &end, NULL) {
+> +			memblock_remove(start, end - start);
+> +			goto retry;
+> +		}
+> +
+> +		/* add back fdt's usable memory */
+> +		memblock_add(reg.base, reg.size);
+> +	}
+>  }
+>  
+>  void __init arm64_memblock_init(void)
+> 
+
+-- 
+ Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
