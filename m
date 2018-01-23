@@ -1,160 +1,173 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Tue, 23 Jan 2018 16:04:14 +0200
-Subject: [PATCH 1/1] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
-In-Reply-To: <CAGb2v67BARS-kOH06DzkYH-_7h_18yrEpc0c_diXVvRxZPn_4Q@mail.gmail.com>
-References: <1515747666-6597-1-git-send-email-stefan@olimex.com>
- <20180115095031.pzsgrp3tdmemotrs@flea.lan>
- <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
- <20180118100745.y62adzvfnrzqkagd@flea.lan>
- <CAGb2v66U9ziFhU5n6haTA3LGNX7BavmfXiiCmvebtqaMxcN0-w@mail.gmail.com>
- <548d57b7-4db1-a9ee-369e-9067f981162d@olimex.com>
- <CAGb2v67BARS-kOH06DzkYH-_7h_18yrEpc0c_diXVvRxZPn_4Q@mail.gmail.com>
-Message-ID: <bfe19092-a43f-be80-0ee4-c76d45208c24@olimex.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 23 Jan 2018 15:22:17 +0100
+Subject: [PATCH v2 3/6] arm: KVM: Invalidate BTB on guest exit
+In-Reply-To: <20180108185533.9698-4-marc.zyngier@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-4-marc.zyngier@arm.com>
+Message-ID: <20180123142217.GK21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2018 08:08 AM, Chen-Yu Tsai wrote:
-> On Fri, Jan 19, 2018 at 9:27 PM, Stefan Mavrodiev <stefan@olimex.com> wrote:
->> On 01/18/2018 04:28 PM, Chen-Yu Tsai wrote:
->>> On Thu, Jan 18, 2018 at 6:07 PM, Maxime Ripard
->>> <maxime.ripard@free-electrons.com> wrote:
->>>> Hi!
->>>>
->>>> On Mon, Jan 15, 2018 at 12:07:34PM +0200, Stefan Mavrodiev wrote:
->>>>>>> +/dts-v1/;
->>>>>>> +#include "sun7i-a20.dtsi"
->>>>>>> +#include "sunxi-common-regulators.dtsi"
->>>>>>> +
->>>>>>> +
->>>>>>> +#include <dt-bindings/gpio/gpio.h>
->>>>>>> +#include <dt-bindings/interrupt-controller/irq.h>
->>>>>>> +#include <dt-bindings/pwm/pwm.h>
->>>>>>> +
->>>>>>> +/ {
->>>>>>> + model = "Olimex A20-SOM204-EVB";
->>>>>>> + compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
->>>>>>> +
->>>>>>> + aliases {
->>>>>>> +         serial0 = &uart0;
->>>>>>> +         serial1 = &uart4;
->>>>>>> +         serial2 = &uart7;
->>>>>>> +         spi0 = &spi1;
->>>>>>> +         spi1 = &spi2;
->>>>>>> +         ethernet1 = &rtl8723bs;
->>>>>> ethernet1? if there's a single network interface, it should be
->>>>>> ethernet0.
->>>>> I think this will conflict the gmac alias defined in sun7i-a20.dtsi:
->>>>>
->>>>> aliases {
->>>>>       ethernet0 = &gmac;
->>>>> };
->>>> We have that? That's bad, but you're right :)
->>>>
->>>>>>> +         stat {
->>>>>>> +                 label = "a20-som204:green:stat";
->>>>>>> +                 gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
->>>>>>> +                 default-state = "on";
->>>>>>> +         };
->>>>>>> +
->>>>>>> +         led1 {
->>>>>>> +                 label = "a20-som204-evb:green:led1";
->>>>>>> +                 gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
->>>>>>> +                 default-state = "on";
->>>>>>> +         };
->>>>>>> +
->>>>>>> +         led2 {
->>>>>>> +                 label = "a20-som204-evb:yellow:led2";
->>>>>>> +                 gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
->>>>>>> +                 default-state = "on";
->>>>>>> +         };
->>>>>> You don't have the same prefix between stat and led1/led2. I'm fine
->>>>>> with both, but you should be consistent :)
->>>>> STAT led is on the SOM204 module, while led1/2 on the EVB. Thats why
->>>>> they have different prefix.
->>>> Still, the user and the system will see it as a single board, and the
->>>> documentation states that it should be the board name. I'm not quite
->>>> sure what a good rule would be here. Have you looked at how other
->>>> boards dealt with it? Chen-Yu, any opinion on this?
->>> Follow the bindings, I guess? I don't think we (sunxi) have dealt
->>> with modules that have LEDs or anything that needs to be named after
->>> the board.
->>>
->>> On a related topic, I don't know if you (Stefan / Olimex) want to split
->>> this into a .dtsi file for the SoM, and a .dts file for the EVB. It might
->>> help your customers?
->> I'm not sure this will be good ideal. We will have one EVB with all
->> possible peripheries. On the other hand, we are planning 3-4 different
->> SOM204 modules (A20, A64, RK....). I think this will make the dtsi
->> incompatible.
-> Yes. That was what I mentioned in the second half of my reply.
->
->> Maybe if there is one dtsi for the base SOM204 module (one for each arch)
->> and
->> multiple dts for boards with additional features. But this will generate
->> 10-20
->> dts files. I think this will be better handled using overlays in the uboot.
-> OK. I'm guessing there's the possibility that some pins or GPIOs get muxed
-> to different functions depending on what base board is used? How would
-> you list them, if you only had one .dts file, say for the EVB? Clearly
-> the SoM cannot work by itself, so it probably doesn't get its own .dts
-> file.
-Yes, the SoM cannot work by itself. I'm thinking to follow the current 
-practice:
- ??? - One dts for base board + evb
- ??? - One dts for the above + eMMC.
+On Mon, Jan 08, 2018 at 06:55:30PM +0000, Marc Zyngier wrote:
+> In order to avoid aliasing attacks against the branch predictor,
+> let's invalidate the BTB on guest exit. This is made complicated
+> by the fact that we cannot take a branch before invalidating the
+> BTB.
 
-There is also possibility (a real one) some periphery to work with one 
-SoM, and
-other - not. For example A20-SOM204 or A64-SOM204 doesn't have PCIe 
-support, but
-RKxxxx-SOM204 will.
+...because that would defeat the overall purpose of what we're trying to
+do?
 
-On second re-read of the comments:
->> +};
->> +
->> +&ahci {
->> +	target-supply = <&reg_ahci_5v>;
-> You should use the regulators you defined in your PMIC there.
-The power comes from the DC jack not from PCIM. In this case, is this OK?
+> 
+> Another thing is that we perform the invalidation on all
+> implementations, no matter if they are affected or not.
 
->
->> +&usb_otg {
->> +	dr_mode = "otg";
->> +	status = "okay";
->> +};
->> +
->> +&usb_power_supply {
->> +	status = "okay";
->> +};
->> +
->> +&usbphy {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&usb0_id_detect_pin>,
->> +		    <&usb0_vbus_detect_pin>;
->> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
->> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
->> +	usb0_vbus_power-supply = <&usb_power_supply>;
->> +	usb0_vbus-supply = <&reg_usb0_vbus>;
->> +	usb1_vbus-supply = <&reg_usb1_vbus>;
->> +	usb2_vbus-supply = <&reg_usb2_vbus>;
-> You should also use one of the PMIC regulators here.
-Same here. Power comes from DC jack, not PMIC.
+I don't understand this comment, it seems like the logic below is
+limited to A12 and A17 for now?
 
-Regards,
-Stefan Mavrodiev
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_asm.h |  2 --
+>  arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
+>  arch/arm/kvm/hyp/hyp-entry.S   | 64 ++++++++++++++++++++++++++++++++++++++++--
+>  3 files changed, 74 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 36dd2962a42d..df24ed48977d 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -61,8 +61,6 @@ struct kvm_vcpu;
+>  extern char __kvm_hyp_init[];
+>  extern char __kvm_hyp_init_end[];
+>  
+> -extern char __kvm_hyp_vector[];
+> -
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index eb46fc81a440..b47db5b9e407 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -37,6 +37,7 @@
+>  
+>  #include <linux/highmem.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+>  #include <asm/pgalloc.h>
+>  #include <asm/stage2_pgtable.h>
+>  
+> @@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>  
+>  static inline void *kvm_get_hyp_vector(void)
+>  {
+> -	return kvm_ksym_ref(__kvm_hyp_vector);
+> +	extern char __kvm_hyp_vector[];
+> +	extern char __kvm_hyp_vector_bp_inv[];
+> +
+> +	switch(read_cpuid_part()) {
+> +	case ARM_CPU_PART_CORTEX_A12:
+> +	case ARM_CPU_PART_CORTEX_A17:
+> +		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+> +
+> +	default:
+> +		return kvm_ksym_ref(__kvm_hyp_vector);
+> +	}
+>  }
+>  
+>  static inline int kvm_map_vectors(void)
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> index 95a2faefc070..2e8d2179eb70 100644
+> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -70,6 +70,59 @@ __kvm_hyp_vector:
+>  	W(b)	hyp_hvc
+>  	W(b)	hyp_irq
+>  	W(b)	hyp_fiq
+> +	
+> +	.align 5
+> +__kvm_hyp_vector_bp_inv:
+> +	.global __kvm_hyp_vector_bp_inv
+> +
+> +	/*
+> +	 * We encode the exception entry in the bottom 3 bits of
+> +	 * SP, and we have to guarantee to be 8 bytes aligned.
+> +	 */
+> +	W(add)	sp, sp, #1	/* Reset 	  7 */
+> +	W(add)	sp, sp, #1	/* Undef	  6 */
+> +	W(add)	sp, sp, #1	/* Syscall	  5 */
+> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
+> +	W(add)	sp, sp, #1	/* Data abort	  3 */
+> +	W(add)	sp, sp, #1	/* HVC		  2 */
+> +	W(add)	sp, sp, #1	/* IRQ		  1 */
+> +	W(add)	sp, sp, #1	/* FIQ		  0 */
+> +
+> +	sub	sp, sp, #1
+> +
+> +	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+> +	isb
+> +
+> +	/*
+> +	 * Yet another silly hack: Use VPIDR as a temp register.
+> +	 * Thumb2 is really a pain, as SP cannot be used with most
+> +	 * of the bitwise instructions. The vect_br macro ensures
+> +	 * things gets cleaned-up.
+> +	 */
+> +	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
+> +	mov	r0, sp
+> +	and	r0, r0, #7
+> +	sub	sp, sp, r0
+> +	push	{r1, r2}
+> +	mov	r1, r0
+> +	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+> +	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+> +	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+> +
+> +.macro vect_br val, targ
+> +	cmp	r1, #\val
+> +	popeq	{r1, r2}
+> +	beq	\targ
+> +.endm
+> +
+> +	vect_br	0, hyp_fiq
+> +	vect_br	1, hyp_irq
+> +	vect_br	2, hyp_hvc
+> +	vect_br	3, hyp_dabt
+> +	vect_br	4, hyp_pabt
+> +	vect_br	5, hyp_svc
+> +	vect_br	6, hyp_undef
+> +	vect_br	7, hyp_reset
+>  
+>  .macro invalid_vector label, cause
+>  	.align
+> @@ -149,7 +202,14 @@ hyp_hvc:
+>  	bx	ip
+>  
+>  1:
+> -	push	{lr}
+> +	/*
+> +	 * Pushing r2 here is just a way of keeping the stack aligned to
+> +	 * 8 bytes on any path that can trigger a HYP exception. Here,
+> +	 * we may well be about to jump into the guest, and the guest
+> +	 * exit would otherwise be badly decoded by our fancy
+> +	 * "decode-exception-without-a-branch" code...
+> +	 */
+> +	push	{r2, lr}
+>  
+>  	mov	lr, r0
+>  	mov	r0, r1
+> @@ -159,7 +219,7 @@ hyp_hvc:
+>  THUMB(	orr	lr, #1)
+>  	blx	lr			@ Call the HYP function
+>  
+> -	pop	{lr}
+> +	pop	{r2, lr}
+>  	eret
+>  
+>  guest_trap:
+> -- 
+> 2.14.2
+> 
 
->
->> About the leds, I'm ok to be named after full board name (a20-som204-evb).
-> Cool.
->
-> ChenYu
->
->>> I've tried it previously, and it helps in some ways
->>> when you're matching the files to the schematics. But it is confusing
->>> when you want the big picture. On the other hand, this is not going to
->>> help with supporting different modules on the same baseboard, as the
->>> routing, peripherals and labels likely won't match up. Just my two cents.
->>>
->>> ChenYu
->> Regards,
->> Stefan Mavrodiev
+Otherwise this looks 'good' to me.
+-Christoffer
