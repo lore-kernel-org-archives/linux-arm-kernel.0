@@ -1,17 +1,17 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 23 Jan 2018 15:54:55 +0100
+Date: Tue, 23 Jan 2018 15:56:47 +0100
 Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
  =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
+In-Reply-To: <38b081e9-fe00-cf18-2d72-5ad1937c3800@lechnology.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
-Message-ID: <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
+ <CAMRc=MesQTvkVtPLOGr2G7-KSR=k35y24SsO4s8rDbCv=2-G7A@mail.gmail.com>
+ <38b081e9-fe00-cf18-2d72-5ad1937c3800@lechnology.com>
+Message-ID: <CAMRc=McKvPzL3rp32+yuL12gf3YcH52QswU61pACmAMhB8sLsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-22 18:30 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 01/22/2018 05:14 AM, Bartosz Golaszewski wrote:
+2018-01-22 18:11 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 01/22/2018 07:29 AM, Bartosz Golaszewski wrote:
 >>
 >> 2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
 >>>
@@ -62,44 +62,24 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >>> be
 >>>    sent separately after this series has landed.)
 >>>
->>> Dependencies:
->>>
->>> This series applies on top of linux-davinci/master plus the following
->>> patches:
->>> - [1] "clk: fix reentrancy of clk_enable() on UP systems" (in clk-next)
->>> - [2] "clk: add helper functions for managing clk_onecell_data"
->>> - [3] "clk: divider: read-only divider can propagate rate change"
->>> - [4],[5],[6],[7],[8],[9] series "ARM: davinci: common clock prep work"
->>>
 >>
->> Hi David,
->>
->> I'm getting a splat[1] when trying to mount the rootfs over nfs on a
->> da850-lcdk.
->>
->> I'll try to figure out what's happening.
->>
->> Best regards,
->> Bartosz Golaszewski
->>
->> [1] https://pastebin.com/D94z8SAe
+>> This driver doesn't have DT support - I suppose it would be useful to
+>> add it and also add the corresponding DT node to da850.dtsi. If you're
+>> ok with it, I can start working on it. I also have a patch for the i2c
+>> cpufreq issue and it would be nice to test it with it.
 >>
 >
-> Could it have something to do with the "rmii" clock? I don't think I added
-> that
-> in the device tree.
+> Why not just use cpufreq-dt for the DT case? It seems to be working.
+>
+> I have preliminary patches on GitHub [1][2].
+>
+> [1]:
+> https://github.com/dlech/ev3dev-kernel/commit/e38897148a949b736ab135983887f9c81375f108
+> [2]:
+> https://github.com/dlech/ev3dev-kernel/commit/bab85f9e45450a36a7ea6f4407f89a75edb63761
 >
 
-I'm looking at it now. There are problems with emac & mdio both in
-legacy and in DT mode.
-
-The davinci_mdio driver seems to not get an actual functional clock
-(phy is reported as down). I'm seeing that in old legacy code,
-mdio_clk has emac_clk as parent, while after your changes they share
-pll0_sysclk4 as parent, although I'm not sure if that has anything to
-do with it.
-
-I'll see about the rmii clock too.
+No problem with that - I'll test them as soon as I'll be able to boot my lcdk.
 
 Thanks,
 Bartosz
