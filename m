@@ -1,44 +1,44 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 23 Jan 2018 23:12:23 +0800
-Subject: [PATCH] ARM: dts: imx6sx: add pu power domain support
-Message-ID: <1516720343-21933-1-git-send-email-Anson.Huang@nxp.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 23 Jan 2018 18:39:32 +0800
+Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20180117183244.28303-3-l.stach@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-3-l.stach@pengutronix.de>
+Message-ID: <20180123103931.GE27764@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PU power domain support, GPU is the only
-module inside PU power domain, and PU power
-is supplied by LDO_SOC.
+On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> +	pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
+> +		fsl,pins = <
+> +			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
+> +			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
+> +			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
+> +			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
+> +			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
+> +			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
+> +			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
+> +		>;
+> +		};
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index fd78793..42ef4c6 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -188,6 +188,7 @@
- 				 <&clks IMX6SX_CLK_GPU>,
- 				 <&clks IMX6SX_CLK_GPU>;
- 			clock-names = "bus", "core", "shader";
-+			power-domains = <&pd_pu>;
- 		};
- 
- 		dma_apbh: dma-apbh at 1804000 {
-@@ -767,6 +768,13 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 
-+					pd_pu: power-domain at 1 {
-+						reg = <1>;
-+						#power-domain-cells = <0>;
-+						power-supply = <&reg_soc>;
-+						clocks = <&clks IMX6SX_CLK_GPU>;
-+					};
-+
- 					pd_pci: power-domain at 3 {
- 						reg = <3>;
- 						#power-domain-cells = <0>;
--- 
-2.7.4
+Bad indentation.
+
+Shawn
+
+> +
+> +	pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
+> +		fsl,pins = <
+> +			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
+> +			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
+> +			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
+> +			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
+> +			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
+> +			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
+> +			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
+> +		>;
+> +	};
+> +};
+> -- 
+> 2.11.0
+> 
