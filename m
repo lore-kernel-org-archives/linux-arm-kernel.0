@@ -1,85 +1,103 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 23 Jan 2018 22:00:51 +0900
-Subject: [PATCH 1/4] dt-bindings: dwc3: add binding documentation for UniPhier
- dwc3 glue driver
+Date: Tue, 23 Jan 2018 22:00:53 +0900
+Subject: [PATCH 3/4] ARM: dts: uniphier: add dwc3 usb node for PXs2
 In-Reply-To: <1516712454-2915-1-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1516712454-2915-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1516712454-2915-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1516712454-2915-4-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree binding documentation for dwc3 glue driver implemented
-on Socionext UniPhier SoCs.
+Add usb node for PXs2 SoC which has 2 dwc3 controller instances, and
+enable this for PXs2 boards.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- .../devicetree/bindings/usb/dwc3-uniphier.txt      | 58 ++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/dwc3-uniphier.txt
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts |  8 ++++++
+ arch/arm/boot/dts/uniphier-pxs2-vodka.dts  |  4 +++
+ arch/arm/boot/dts/uniphier-pxs2.dtsi       | 43 ++++++++++++++++++++++++++++++
+ 3 files changed, 55 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc3-uniphier.txt b/Documentation/devicetree/bindings/usb/dwc3-uniphier.txt
-new file mode 100644
-index 0000000..677e072
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/dwc3-uniphier.txt
-@@ -0,0 +1,58 @@
-+UniPhier DWC3 glue layer
+diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+index 7dfae26..91cc7c5 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
++++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+@@ -53,3 +53,11 @@
+ &i2c2 {
+ 	status = "okay";
+ };
 +
-+This describes the devicetree bindings for dwc3-uniphier driver implemented on
-+Socionext UniPhier SoCs.
++&usb0 {
++	status = "okay";
++};
 +
-+Required properties:
-+- compatible:
-+  - "socionext,uniphier-pxs2-dwc3" : For UniPhier PXs2 SoC
-+  - "socionext,uniphier-ld20-dwc3" : For UniPhier LD20 SoC
-+- reg: Address and range of the glue logic
-+- clocks: List of phandles for the clocks, and the number of phandles depends
-+	  on SoC platform.
++&usb1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
+index 0cf6154..ed5395b 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
++++ b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
+@@ -41,3 +41,7 @@
+ &i2c0 {
+ 	status = "okay";
+ };
 +
-+Optional properties:
-+- resets: List of phandles for the resets, and the number of phandles depends
-+	on SoC platform.
-+- nvmem-cells: Phandles to nvmem cell that contains the trimming data.
-+	Available only for LD20, and if unspecified, default value is used.
-+- nvmem-cell-names: Should be the following names, which correspond to each
-+	nvmem-cells. N is the number indicating a port of phy.
-+	All of the 3 parameters associated with the following names are
-+	required for each port, if any one is omitted, the trimming data
-+	of the port will not be set at all.
-+	- "rtermN", "sel_tN", "hs_iN" : Each cell name for phy parameters
++&usb0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+index c083468..b65bf1c 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
++++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+@@ -446,6 +446,49 @@
+ 			};
+ 		};
+ 
++		usb0: usb at 65b00000 {
++			compatible = "socionext,uniphier-pxs2-dwc3";
++			status = "disabled";
++			reg = <0x65b00000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb0>, <&pinctrl_usb2>;
++			clocks = <&sys_clk 14>, <&sys_clk 16>;
++			resets = <&sys_rst 14>, <&sys_rst 16>,
++				 <&sys_rst 17>, <&sys_rst 18>;
++			ranges;
 +
-+Required child node:
-+A child node must exist to represent the core DWC3 IP block. The name of
-+the node is not important. The content of the node is defined in dwc3.txt.
-+
-+Example:
-+
-+	usb: usb at 65b00000 {
-+		compatible = "socionext,uniphier-ld20-dwc3";
-+		reg = <0x65b00000 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		clocks = <&sys_clk 14>, <&sys_clk 16>, <&sys_clk 17>;
-+		resets = <&sys_rst 12>, <&sys_rst 16>, <&sys_rst 17>,
-+			 <&sys_rst 18>, <&sys_rst 19>;
-+		nvmem-cells = <&usb_rterm0>, <&usb_rterm1>,
-+			      <&usb_rterm2>, <&usb_rterm3>,
-+			      <&usb_sel_t0>, <&usb_sel_t1>,
-+			      <&usb_sel_t2>, <&usb_sel_t3>,
-+			      <&usb_hs_i0>,  <&usb_hs_i0>,
-+			      <&usb_hs_i2>,  <&usb_hs_i2>;
-+		nvmem-cell-names = "rterm0", "rterm1", "rterm2", "rterm3",
-+				   "sel_t0", "sel_t1", "sel_t2", "sel_t3",
-+				   "hs_i0",  "hs_i1",  "hs_i2",  "hs_i3";
-+		ranges;
-+
-+		dwc3 at 65a00000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x65a00000 0xcd00>;
-+			interrupt-names = "host";
-+			interrupts = <0 134 4>;
-+			dr_mode = "host";
++			dwc3 at 65a00000 {
++				compatible = "snps,dwc3";
++				reg = <0x65a00000 0xcd00>;
++				interrupt-names = "host", "peripheral";
++				interrupts = <0 134 4>, <0 135 4>;
++				dr_mode = "host";
++			};
 +		};
-+	};
++
++		usb1: usb at 65d00000 {
++			compatible = "socionext,uniphier-pxs2-dwc3";
++			status = "disabled";
++			reg = <0x65d00000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb1>, <&pinctrl_usb3>;
++			clocks = <&sys_clk 15>, <&sys_clk 20>;
++			resets = <&sys_rst 15>, <&sys_rst 20>, <&sys_rst 21>;
++			ranges;
++
++			dwc3 at 65c00000 {
++				compatible = "snps,dwc3";
++				reg = <0x65c00000 0xcd00>;
++				interrupt-names = "host", "peripheral";
++				interrupts = <0 137 4>, <0 138 4>;
++				dr_mode = "host";
++			};
++		};
++
+ 		nand: nand at 68000000 {
+ 			compatible = "socionext,uniphier-denali-nand-v5b";
+ 			status = "disabled";
 -- 
 2.7.4
