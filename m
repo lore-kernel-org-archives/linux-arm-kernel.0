@@ -1,96 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 23 Jan 2018 15:26:04 +0100
-Subject: [PATCH v2 6/6] arm: KVM: Invalidate icache on guest exit for
- Cortex-A15
-In-Reply-To: <20180108185533.9698-7-marc.zyngier@arm.com>
-References: <20180108185533.9698-1-marc.zyngier@arm.com>
- <20180108185533.9698-7-marc.zyngier@arm.com>
-Message-ID: <20180123142604.GL21802@cbox>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Tue, 23 Jan 2018 15:26:17 +0100
+Subject: [PATCH v1 1/2] drm/bridge/synopsys: dsi: Fix dsi_host_transfer()
+ return value
+In-Reply-To: <20180123142618.28384-1-philippe.cornu@st.com>
+References: <20180123142618.28384-1-philippe.cornu@st.com>
+Message-ID: <20180123142618.28384-2-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 06:55:33PM +0000, Marc Zyngier wrote:
-> In order to avoid aliasing attacks against the branch predictor
-> on Cortex-A15, let's invalidate the BTB on guest exit, which can
-> only be done by invalidating the icache (with ACTLR[0] being set).
-> 
-> We use the same hack as for A12/A17 to perform the vector decoding.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+The dw_mipi_dsi_host_transfer() must return the number of
+bytes transmitted/received on success instead of 0.
+Note: nb_bytes is introduced in this patch as it will be
+re-used with the future dcs/generic dsi read feature.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-> ---
->  arch/arm/include/asm/kvm_mmu.h |  4 ++++
->  arch/arm/kvm/hyp/hyp-entry.S   | 27 ++++++++++++++++++++++++++-
->  2 files changed, 30 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index b47db5b9e407..72ffb4d27fde 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -226,12 +226,16 @@ static inline void *kvm_get_hyp_vector(void)
->  {
->  	extern char __kvm_hyp_vector[];
->  	extern char __kvm_hyp_vector_bp_inv[];
-> +	extern char __kvm_hyp_vector_ic_inv[];
->  
->  	switch(read_cpuid_part()) {
->  	case ARM_CPU_PART_CORTEX_A12:
->  	case ARM_CPU_PART_CORTEX_A17:
->  		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
->  
-> +	case ARM_CPU_PART_CORTEX_A15:
-> +		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
-> +
->  	default:
->  		return kvm_ksym_ref(__kvm_hyp_vector);
->  	}
-> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-> index 2e8d2179eb70..7c0059927e2e 100644
-> --- a/arch/arm/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm/kvm/hyp/hyp-entry.S
-> @@ -70,7 +70,31 @@ __kvm_hyp_vector:
->  	W(b)	hyp_hvc
->  	W(b)	hyp_irq
->  	W(b)	hyp_fiq
-> -	
-> +
-> +	.align 5
-> +__kvm_hyp_vector_ic_inv:
-> +	.global __kvm_hyp_vector_ic_inv
-> +
-> +	/*
-> +	 * We encode the exception entry in the bottom 3 bits of
-> +	 * SP, and we have to guarantee to be 8 bytes aligned.
-> +	 */
-> +	W(add)	sp, sp, #1	/* Reset 	  7 */
-> +	W(add)	sp, sp, #1	/* Undef	  6 */
-> +	W(add)	sp, sp, #1	/* Syscall	  5 */
-> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-> +	W(add)	sp, sp, #1	/* Data abort	  3 */
-> +	W(add)	sp, sp, #1	/* HVC		  2 */
-> +	W(add)	sp, sp, #1	/* IRQ		  1 */
-> +	W(add)	sp, sp, #1	/* FIQ		  0 */
-> +
-> +	sub	sp, sp, #1
-> +
-> +	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
-> +	isb
-> +
-> +	b	decode_vectors
-> +
->  	.align 5
->  __kvm_hyp_vector_bp_inv:
->  	.global __kvm_hyp_vector_bp_inv
-> @@ -93,6 +117,7 @@ __kvm_hyp_vector_bp_inv:
->  	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
->  	isb
->  
-> +decode_vectors:
->  	/*
->  	 * Yet another silly hack: Use VPIDR as a temp register.
->  	 * Thumb2 is really a pain, as SP cannot be used with most
-> -- 
-> 2.14.2
-> 
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index f458798af788..096cf5e5bb30 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -403,7 +403,7 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ {
+ 	struct dw_mipi_dsi *dsi = host_to_dsi(host);
+ 	struct mipi_dsi_packet packet;
+-	int ret;
++	int ret, nb_bytes;
+ 
+ 	ret = mipi_dsi_create_packet(&packet, msg);
+ 	if (ret) {
+@@ -413,7 +413,13 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 
+ 	dw_mipi_message_config(dsi, msg);
+ 
+-	return dw_mipi_dsi_write(dsi, &packet);
++	ret = dw_mipi_dsi_write(dsi, &packet);
++	if (ret)
++		return ret;
++
++	nb_bytes = packet.size;
++
++	return nb_bytes;
+ }
+ 
+ static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
+-- 
+2.15.1
