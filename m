@@ -1,121 +1,53 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 23 Jan 2018 16:52:49 +0100
-Subject: [PATCH 4/8] mfd: stm32-timers: add support for dmas
-In-Reply-To: <20180123153035.2rvhspe2m5ej57op@dell>
-References: <1516106631-18722-1-git-send-email-fabrice.gasnier@st.com>
- <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
- <20180123133234.xmep76cgdremnj47@dell>
- <e611b40f-bd37-aa2d-afd9-997b86d55441@st.com>
- <20180123153035.2rvhspe2m5ej57op@dell>
-Message-ID: <ee021839-3298-d01b-8890-619aca0399a7@st.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 23 Jan 2018 09:54:34 -0600
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.16
+Message-ID: <1516722874-15698-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 04:30 PM, Lee Jones wrote:
-> On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
-> 
->> On 01/23/2018 02:32 PM, Lee Jones wrote:
->>> On Tue, 16 Jan 2018, Fabrice Gasnier wrote:
->>>
->>>> STM32 Timers can support up to 7 dma requests:
->>>> 4 channels, update, compare and trigger.
->>>> Optionally request part, or all dmas from stm32-timers MFD core.
->>>> Also, keep reference of device's bus address to allow child drivers to
->>>> transfer data from/to device by using dma.
->>>>
->>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>>> ---
->>>>  drivers/mfd/stm32-timers.c       | 37 ++++++++++++++++++++++++++++++++++++-
->>>>  include/linux/mfd/stm32-timers.h | 14 ++++++++++++++
->>>>  2 files changed, 50 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
->>>> index a6675a4..372b51e 100644
->>>> --- a/drivers/mfd/stm32-timers.c
->>>> +++ b/drivers/mfd/stm32-timers.c
->>>> @@ -29,6 +29,23 @@ static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
->>>>  	regmap_write(ddata->regmap, TIM_ARR, 0x0);
->>>>  }
->>>>  
->>>> +static void stm32_timers_dma_probe(struct device *dev,
->>>> +				   struct stm32_timers *ddata)
->>>> +{
->>>> +	int i;
->>>> +	char name[4];
->>>> +
->>>> +	for (i = STM32_TIMERS_DMA_CH1; i <= STM32_TIMERS_DMA_CH4; i++) {
->>>> +		snprintf(name, ARRAY_SIZE(name), "ch%1d", i + 1);
->>>> +		ddata->dmas[i] = dma_request_slave_channel(dev, name);
->>>
->>> And if any of them fail?
->>
->> Hi Lee,
->>
->> If some of these fails, reference will be NULL. It is checked in child
->> driver (pwm for instance) at runtime. Support is being added as an
->> option: pwm capture will simply be unavailable in this case (fail with
->> error).
-> 
-> Can you place a simple one-line comment in here please.  Or else
-> someone will come along and add error handling for you.
+Hi Arnd, Kevin, and Olof:
 
-Hi Lee,
+I apologize for the late request! I figure these changes are mostly trivial
+DTS updates, perhaps you can consider pulling them in for v4.16? If not, they can
+wait.
 
-Ok, I'll add a comment in v2.
-
-> 
->>>> +	}
->>>> +	ddata->dmas[STM32_TIMERS_DMA_UP] = dma_request_slave_channel(dev, "up");
->>>> +	ddata->dmas[STM32_TIMERS_DMA_TRIG] =
->>>> +		dma_request_slave_channel(dev, "trig");
->>>> +	ddata->dmas[STM32_TIMERS_DMA_COM] =
->>>> +		dma_request_slave_channel(dev, "com");
->>>
->>> Can you format these in the same why.  This hurts my eyes.
->>
->> I use enum values and try to match as possible with reference manual for
->> "up", "trig" & "com" names.
->> Would have some suggestion to beautify this?
-> 
-> I just mean, can you push the first  dma_request_slave_channel() call
-> on to the next line, so each of the calls are formatted in the same
-> manner please?
-
-Ok, got it now. I'll do this in v2.
-
-> 
->>>> +}
->>>> +
->>>>  static int stm32_timers_probe(struct platform_device *pdev)
->>>>  {
->>>>  	struct device *dev = &pdev->dev;
->>>> @@ -44,6 +61,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
->>>>  	mmio = devm_ioremap_resource(dev, res);
->>>>  	if (IS_ERR(mmio))
->>>>  		return PTR_ERR(mmio);
->>>> +	ddata->phys_base = res->start;
->>>
->>> What do you use this for?
->>
->> This is used in in child driver (pwm) for capture data transfer by dma.
-> 
-> Might be worth being clear about that.
-> 
-> Perhaps pass in 'dma_base' (phys_base + offset) instead?
-> 
-
-I guess you've had a look at [PATCH 5/8] pwm: stm32: add capture
-support. Are you talking about passing phys_base + TIM_DMAR ?
-
-If this is the case, I'd prefer to keep phys base only if you don't
-mind, and handle TIM_DMAR offset in pwm driver. This way, all dma slave
-config is kept locally at one place.
-Or do you mean something else ?
-
-Maybe I can add a comment here about this ?
-Something like:
-/* phys_base to be used by child driver, e.g. DMA burst mode */
-
-Please advise,
 Thanks,
-Fabrice
+Dinh
+
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.16
+
+for you to fetch changes up to 889d1509042096f6ccd082655997aeff8457fe1c:
+
+  arm64: dts: stratix10: fix SPI settings (2018-01-23 09:37:29 -0600)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.16
+- Stratix10 platform updates
+  - Fix SPI interrupt numbers
+  - Enable USB
+- Disable over-current for Arria10 devkit
+
+----------------------------------------------------------------
+Dinh Nguyen (3):
+      ARM: dts: socfpga: disable over-current for Arria10 USB devkit
+      arm64: dts: stratix10: enable USB on the devkit
+      arm64: dts: stratix10: add USB ECC reset bit
+
+Thor Thayer (1):
+      arm64: dts: stratix10: fix SPI settings
+
+Tim Sander (1):
+      ARM: dts: socfpga: add i2c reset signals
+
+ arch/arm/boot/dts/socfpga.dtsi                         |  4 ++++
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi           |  1 +
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi      | 16 ++++++++++------
+ arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts |  4 ++++
+ 4 files changed, 19 insertions(+), 6 deletions(-)
