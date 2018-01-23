@@ -1,63 +1,187 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 23 Jan 2018 14:20:33 +0100
-Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for inbound
- traffic
-In-Reply-To: <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
-References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
- <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
- <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
- <20180118073123.GA15766@lst.de>
- <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
- <20180118152331.GA24461@lst.de>
- <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
-Message-ID: <20180123132033.GA21438@lst.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Jan 2018 14:22:20 +0100
+Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
+Message-ID: <20180123132220.29886-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 11:47:54AM -0800, Florian Fainelli wrote:
-> How can this work well in the context of a loadable module for instance?
-> For MIPS, this would mean that we have to override phys_to_dma() and
-> dma_to_phys() in the platform that is *susceptible* to use this PCIe
-> controller (arch/mips/bmips) which is fine, but there, we essentially
-> need to find a way to make this dynamic based on whether the PCIe
-> controller is loaded or not.
-> 
-> As you might have seen from this patch, what needs to be done is highly
-> dependent on the processor architecture and its memory controller
-> physical memory map, so I don't see how we are in any better situation
-> if we need to replicate 3 times across MIPS, ARM and ARM64 how the
-> addresses need to be mangled.
-> 
-> Are you suggesting we somehow decouple the memory mangling part into a
-> portion that can be built into the kernel image (so phys_to_dma() and
-> dma_to_phys() is resolved at vmlinux link time) and can be selected by
-> different architectures that need it? If so, yikes.
+We were previously selecting 1024x768 and 32BPP as the default
+set-up for the PL111 consumers.
 
-On architectures with crazy PCIe controllers (this seems to include
-mips, arm, arm64 and x86 thanks to the weird SOCs) we will need a
-a few different memory maps, yes.  Take a look at
-arch/x86/pci/sta2x11-fixup.c, preferably from a tree where the worst
-issues are fixed:
+This does not work on elder systems: the device tree bindings
+support a property "max-memory-bandwidth" in bytes/second that
+states that if you exceed this the memory bus will saturate.
+The result is flickering and unstable images.
 
-http://git.infradead.org/users/hch/misc.git/blob/refs/heads/dma-direct-all:/arch/x86/pci/sta2x11-fixup.c
+Parse the "max-memory-bandwidth" and respect it when
+intializing the driver. On the RealView PB11MP we get a nice
+1024x768 console with RGB565 as default with this code.
 
-Overriding phys_to_dma and dma_to_phys is required if you need to
-support swiotlb, and chances are with a broken PCIe controller on
-arm64 or mips64 you eventuall will.
+If the device tree does not specify the maximum memory
+bandwidth we keep the old assumption that we can support
+1024x768, 32BPP.
 
-This sta2x11 code should probably be lifted to common code in
-one form or another eventually, althought it will need another
-fair round of cleanups for now.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpu/drm/pl111/pl111_drm.h |  1 +
+ drivers/gpu/drm/pl111/pl111_drv.c | 99 +++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 97 insertions(+), 3 deletions(-)
 
-> I can see value in having a generic mechanism, ala X86_DMA_REMAP
-> allowing architectures to have the ability to override phys_to_dma() and
-> dma_to_phys() but right now, especially if we look at
-> arch/x86/pci/sta2x11-fixup.c this really appears to be quite messy and
-> equally ugly than stacking operations...
-> 
-> What is the actual problem you want to avoid with the stacking of DMA
-> operations, is it because it becomes harder to audit, or are there are
-> other reasons?
-
-Audit, consolidate into a single dma-direct implementation and properly
-support swiotlb out of the box.
+diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+index 440f53ebee8c..770ef5ce3645 100644
+--- a/drivers/gpu/drm/pl111/pl111_drm.h
++++ b/drivers/gpu/drm/pl111/pl111_drm.h
+@@ -56,6 +56,7 @@ struct pl111_drm_dev_private {
+ 	struct drm_fbdev_cma *fbdev;
+ 
+ 	void *regs;
++	u32 memory_bw;
+ 	u32 ienb;
+ 	u32 ctrl;
+ 	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
+diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+index 101a9c7db6ff..1b47ee67097d 100644
+--- a/drivers/gpu/drm/pl111/pl111_drv.c
++++ b/drivers/gpu/drm/pl111/pl111_drv.c
+@@ -58,6 +58,7 @@
+ #include <linux/dma-buf.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ 
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic_helper.h>
+@@ -80,21 +81,107 @@ static const struct drm_mode_config_funcs mode_config_funcs = {
+ 	.atomic_commit = drm_atomic_helper_commit,
+ };
+ 
++/**
++ * pl111_choose_max_resolution() - choose max resolution
++ * @dev: DRM device
++ * @memory_bw: the graphics maximum memory bandwidth in bytes/s
++ * @max_width: returns the maximum width
++ * @max_height: returns the maximum height
++ * @bpp: returns the maximum bips per pixed (32 or 16)
++ *
++ * This function attempts to cut down the maximum supported resolution
++ * to something the system memory bus can handle. The PL111 and pixel
++ * clocks may be able to support higher resolutions and color depths
++ * but as we go up the memory bus get saturated and becomes the
++ * bottleneck for the resolution. On several systems using e.g.
++ * 1024x768 with 32 BPP results in instable flickering images.
++ */
++static void pl111_choose_max_resolution(struct drm_device *dev,
++					u32 memory_bw,
++					int *max_width,
++					int *max_height,
++					unsigned int *bpp)
++{
++	/* No limitations, this is the most aggressive */
++	if (!memory_bw) {
++		*max_width = 1024;
++		*max_height = 768;
++		*bpp = 32;
++		return;
++	}
++
++	/*
++	 * 1024x768 with RGBX8888 requires a memory bandwidth of
++	 * 65Mhz * 4 bytes = 260000000 bytes per second.
++	 */
++	if (memory_bw >= 260000000) {
++		*max_width = 1024;
++		*max_height = 768;
++		*bpp = 32;
++		return;
++	}
++
++	/*
++	 * 800x600 with RGB8888 requires a memory bandwidth of
++	 * 36Mhz * 4 bytes = 144000000 bytes per second. But we
++	 * assume the user prefer higher resolution over more
++	 * color depth, so we do not add this mode here.
++	 */
++
++	/*
++	 * 1024x768 with RGB565 requires a memory bandwidth of
++	 * 65Mhz * 2 bytes = 130000000 bytes per second.
++	 */
++	if (memory_bw >= 130000000) {
++		*max_width = 1024;
++		*max_height = 768;
++		*bpp = 16;
++		return;
++	}
++
++	/*
++	 * 800x600 with RGB565 requires a memory bandwidth of
++	 * 36Mhz * 2 bytes = 72000000 bytes per second.
++	 */
++	if (memory_bw >= 72000000) {
++		*max_width = 800;
++		*max_height = 600;
++		*bpp = 16;
++		return;
++	}
++
++	/*
++	 * 640x480 with RGB565 requires a memory bandwidth of
++	 * 25.175Mhz * 2 bytes = 50350000 bytes per second.
++	 */
++	if (memory_bw < 50350000)
++		dev_err(dev->dev, "can't even do 640x480 VGA RGB565, proceed anyway\n");
++
++	*max_width = 640;
++	*max_height = 480;
++	*bpp = 16;
++}
++
+ static int pl111_modeset_init(struct drm_device *dev)
+ {
+ 	struct drm_mode_config *mode_config;
+ 	struct pl111_drm_dev_private *priv = dev->dev_private;
+ 	struct drm_panel *panel;
+ 	struct drm_bridge *bridge;
++	unsigned int bpp; /* bits per pixel */
+ 	int ret = 0;
+ 
+ 	drm_mode_config_init(dev);
+ 	mode_config = &dev->mode_config;
+ 	mode_config->funcs = &mode_config_funcs;
+ 	mode_config->min_width = 1;
+-	mode_config->max_width = 1024;
+ 	mode_config->min_height = 1;
+-	mode_config->max_height = 768;
++
++	pl111_choose_max_resolution(dev, priv->memory_bw,
++				    &mode_config->max_width,
++				    &mode_config->max_height, &bpp);
++	dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
++		 mode_config->max_width, mode_config->max_height, bpp);
+ 
+ 	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
+ 					  0, 0, &panel, &bridge);
+@@ -139,7 +226,7 @@ static int pl111_modeset_init(struct drm_device *dev)
+ 
+ 	drm_mode_config_reset(dev);
+ 
+-	priv->fbdev = drm_fbdev_cma_init(dev, 32,
++	priv->fbdev = drm_fbdev_cma_init(dev, bpp,
+ 					 dev->mode_config.num_connector);
+ 
+ 	drm_kms_helper_poll_init(dev);
+@@ -216,6 +303,12 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
+ 	drm->dev_private = priv;
+ 	priv->variant = variant;
+ 
++	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
++				 &priv->memory_bw)) {
++		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
++		priv->memory_bw = 0;
++	}
++
+ 	/*
+ 	 * The PL110 and PL111 variants have two registers
+ 	 * swapped: interrupt enable and control. For this reason
+-- 
+2.14.3
