@@ -1,8 +1,8 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 14:05:22 -0600
+Date: Tue, 23 Jan 2018 14:23:10 -0600
 Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
  =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
+In-Reply-To: <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
  <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
  <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
@@ -16,27 +16,33 @@ References: <1516468460-4908-1-git-send-email-david@lechnology.com>
  <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
  <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
  <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
-Message-ID: <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
+ <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
+Message-ID: <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 02:01 PM, David Lechner wrote:
-> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
+On 01/23/2018 02:05 PM, David Lechner wrote:
+> On 01/23/2018 02:01 PM, David Lechner wrote:
+>> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
+>>>
+>>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
+>>> but somehow the clock doesn't end up in the list of the device's
+>>> clocks - which is why it's not enabled by pm_runtime_get_sync().
+>>>
 >>
->> In the mdio case - the problem is that devm_clk_get() doesn't fail,
->> but somehow the clock doesn't end up in the list of the device's
->> clocks - which is why it's not enabled by pm_runtime_get_sync().
+>>
+>> Right. This is because devm_clk_get() now finds the clock via device
+>> tree instead of a clkdev lookup entry. However, I think that the PM
+>> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
+>> the clkdev lookup to match the con_id and does not use device tree.
+>> The same thing is happing in mdio, emac and lcdc.
 >>
 > 
-> 
-> Right. This is because devm_clk_get() now finds the clock via device
-> tree instead of a clkdev lookup entry. However, I think that the PM
-> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
-> the clkdev lookup to match the con_id and does not use device tree.
-> The same thing is happing in mdio, emac and lcdc.
-> 
+> Minor correction: It looks like emac doesn't do this because it doesn't
+> have a con_id of "fck". But, the same clock is shared by emac and mdio, so
+> since mdio enables the clock, emac doesn't notice or care that it did
+> not enable the clock itself.
 
-Minor correction: It looks like emac doesn't do this because it doesn't
-have a con_id of "fck". But, the same clock is shared by emac and mdio, so
-since mdio enables the clock, emac doesn't notice or care that it did
-not enable the clock itself.
+How about using pm_clk_add_clk() in these drivers to explicitly use the
+clocks for power management instead of relying on pm_clk_add_notifier()
+to do this implicitly?
