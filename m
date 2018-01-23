@@ -1,26 +1,102 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 Jan 2018 23:32:46 +0800
-Subject: [PATCH v3 09/16] mfd: axp20x: probe axp20x_adc driver for AXP813
-In-Reply-To: <20180123095305.lgxpq5gyzlo5cked@dell>
-References: <cover.2e5329bf5475a5160e613a4eb1e1377c662ce56e.1516012352.git-series.quentin.schulz@free-electrons.com>
- <d5792ed6e1e989dde3c9ecdd018286109dfc101d.1516012352.git-series.quentin.schulz@free-electrons.com>
- <20180123095305.lgxpq5gyzlo5cked@dell>
-Message-ID: <CAGb2v67gba1i=g3t7sTscOp690xLMceiGNed_60f6FRORk9MQw@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 23 Jan 2018 15:38:37 +0000
+Subject: [PATCH 01/16] arm64: capabilities: Update prototype for enable
+ call back
+In-Reply-To: <20180123145204.GR22781@e103592.cambridge.arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-2-suzuki.poulose@arm.com>
+ <20180123145204.GR22781@e103592.cambridge.arm.com>
+Message-ID: <5d32970c-ef6b-791b-4140-0e7de37364c8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 15 Jan 2018, Quentin Schulz wrote:
->
->> This makes the axp20x_adc driver probe with platform device id
->> "axp813-adc".
+On 23/01/18 14:52, Dave Martin wrote:
+> On Tue, Jan 23, 2018 at 12:27:54PM +0000, Suzuki K Poulose wrote:
+>> From: Dave Martin <dave.martin@arm.com>
 >>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> We issue the enable() call back for all CPU hwcaps capabilities
+>> available on the system, on all the CPUs. So far we have ignored
+>> the argument passed to the call back, which had a prototype to
+>> accept a "void *" for use with on_each_cpu() and later with
+>> stop_machine(). However, with commit 0a0d111d40fd1
+>> ("arm64: cpufeature: Pass capability structure to ->enable callback"),
+>> there are some users of the argument who wants the matching capability
+>> struct pointer where there are multiple matching criteria for a single
+>> capability. Update the prototype for enable to accept a const pointer.
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Andre Przywara <andre.przywara@arm.com>
+>> Cc: James Morse <james.morse@arm.com>
+>> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+>> Signed-off-by: Dave Martin <dave.martin@arm.com>
+>> [ Rebased to for-next/core converting more users ]
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >> ---
->>  drivers/mfd/axp20x.c | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> For my own reference:
->   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+>>   arch/arm64/include/asm/cpufeature.h |  3 ++-
+>>   arch/arm64/include/asm/fpsimd.h     |  4 +++-
+>>   arch/arm64/include/asm/processor.h  |  7 ++++---
+>>   arch/arm64/kernel/cpu_errata.c      | 14 ++++++--------
+>>   arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++----
+>>   arch/arm64/kernel/fpsimd.c          |  3 ++-
+>>   arch/arm64/kernel/traps.c           |  3 ++-
+>>   arch/arm64/mm/fault.c               |  2 +-
+>>   8 files changed, 32 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index ac67cfc2585a..cefbd685292c 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -97,7 +97,8 @@ struct arm64_cpu_capabilities {
+>>   	u16 capability;
+>>   	int def_scope;			/* default scope */
+>>   	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+>> -	int (*enable)(void *);		/* Called on all active CPUs */
+>> +	/* Called on all active CPUs for all  "available" capabilities */
+> 
+> Nit: Odd spacing?  Also, "available" doesn't really make sense for errata
+> workarounds.
+> 
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Thanks for spotting, will fix it.
+
+> Maybe applicable would be a better word?
+> 
+
+There is a subtle difference. If there are two entries for a capability,
+with only one of them matches, we end up calling the enable() for both
+the entries. "Applicable" could potentially be misunderstood, leading
+to assumption that the enable() is called only if that "entry" matches,
+which is not true. I accept that "available" doesn't sound any better either.
+
+
+>> +	int (*enable)(const struct arm64_cpu_capabilities *caps);
+> 
+> Alternatively, if the comment is liable to be ambiguous, maybe it would
+> be better to delete it.  The explicit argument type already makes this
+> more self-documenting than previously.
+
+I think we still need to make it clear that the enable is called on
+all active CPUs. It is not about the argument anymore.
+
+How about :
+
+/*
+  * Called on all active CPUs if the capability associated with
+  * this entry is set.
+  */
+
+
+> 
+> I don't feel that strongly either way though; probably not worth a
+> respin unless you have other things to change.
+> 
+> Also please note that I didn't test the original patch here (in case
+> I didn't point that out already...)
+
+I think I did test it using the HW DBM feature (see the patch at the end).
+However, will do some more testing with it. Thanks for mentioning.
+
+Suzuki
