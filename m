@@ -1,96 +1,147 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 23 Jan 2018 14:23:19 +0100
-Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <20180123103609.GD27764@dragon>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-2-l.stach@pengutronix.de>
- <20180123103609.GD27764@dragon>
-Message-ID: <1516713799.25726.21.camel@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jan 2018 13:32:34 +0000
+Subject: [PATCH 4/8] mfd: stm32-timers: add support for dmas
+In-Reply-To: <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
+References: <1516106631-18722-1-git-send-email-fabrice.gasnier@st.com>
+ <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180123133234.xmep76cgdremnj47@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 23.01.2018, 18:36 +0800 schrieb Shawn Guo:
-> On Wed, Jan 17, 2018 at 07:32:42PM +0100, Lucas Stach wrote:
-> > This adds the basic DTS for the i.MX8MQ.
-> > For now only the following peripherals are supported:
-> > - IOMUXC (pin controller)
-> > - CCM (clock controller)
-> > - GPIO
-> > - UART
-> > - uSDHC (SD/eMMC controller)
-> > - FEC (ethernet controller)
-> > - i2c
-> > 
-> > This is enough to get a very basic board support up and running.
-> > 
-> > One known limitation is that the driver for the GPC interrupt
-> > controller is still missing, rendering the CPU sleep states unusable
-> > as there is nothing waking them up anymore. This will be fixed in
-> > due course.
-> > 
-> > > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> > ?arch/arm64/boot/dts/Makefile?????????????|???1 +
-> > ?arch/arm64/boot/dts/nxp/imx8mq-pinfunc.h | 632 +++++++++++++++++++++++++++++++
-> > ?arch/arm64/boot/dts/nxp/imx8mq.dtsi??????| 418 ++++++++++++++++++++
-> > ?3 files changed, 1051 insertions(+)
-> > ?create mode 100644 arch/arm64/boot/dts/nxp/imx8mq-pinfunc.h
-> > ?create mode 100644 arch/arm64/boot/dts/nxp/imx8mq.dtsi
-> 
-> <snip>
+On Tue, 16 Jan 2018, Fabrice Gasnier wrote:
 
-> > +	timer {
-> > > > +		compatible = "arm,armv8-timer";
-> > > > +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Secure */
-> > > > +		?????????????<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Non-Secure */
-> > > > +		?????????????<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Virtual */
-> > > > +		?????????????<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>; /* Hypervisor */
-> > > > +		clock-frequency = <8333333>;
-> > > > +		interrupt-parent = <&gic>;
-> > > > +		arm,no-tick-in-suspend;
-> > > > +	};
-> > +
-> > +	peripherals at 0 {
+> STM32 Timers can support up to 7 dma requests:
+> 4 channels, update, compare and trigger.
+> Optionally request part, or all dmas from stm32-timers MFD core.
+> Also, keep reference of device's bus address to allow child drivers to
+> transfer data from/to device by using dma.
 > 
-> What's the reason of using 'peripherals' rather than 'soc' which is the
-> case for most device trees?
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  drivers/mfd/stm32-timers.c       | 37 ++++++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/stm32-timers.h | 14 ++++++++++++++
+>  2 files changed, 50 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> index a6675a4..372b51e 100644
+> --- a/drivers/mfd/stm32-timers.c
+> +++ b/drivers/mfd/stm32-timers.c
+> @@ -29,6 +29,23 @@ static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
+>  	regmap_write(ddata->regmap, TIM_ARR, 0x0);
+>  }
+>  
+> +static void stm32_timers_dma_probe(struct device *dev,
+> +				   struct stm32_timers *ddata)
+> +{
+> +	int i;
+> +	char name[4];
+> +
+> +	for (i = STM32_TIMERS_DMA_CH1; i <= STM32_TIMERS_DMA_CH4; i++) {
+> +		snprintf(name, ARRAY_SIZE(name), "ch%1d", i + 1);
+> +		ddata->dmas[i] = dma_request_slave_channel(dev, name);
 
-Just personal preference. I find it a bit confusing to have a soc node,
-that doesn't include a lot of stuff (e.g CPUs) that are found on the
-SoC. I someone feels strongly about this I'll change it.
+And if any of them fail?
 
-> > +		compatible = "simple-bus";
-> > +
-> 
-> Drop the newline.
-> 
-> > > > +		#address-cells = <1>;
-> > > > +		#size-cells = <1>;
-> > > > +		ranges = <0x0 0x0 0x0 0x3e000000>;
-> > +
-> > +
-> 
-> One newline is enough.
-> 
-> > > > +		aips-bus at 30000000 { /* AIPS1 */
-> > > > +			compatible = "nxp,imx8mq-aips-bus", "simple-bus";
-> > +
-> 
-> Drop the newline.
-> 
-> > > > +			#address-cells = <1>;
-> > > > +			#size-cells = <1>;
-> > > > +			ranges = <0x30000000 0x30000000 0x400000>;
-> > +
-> > > > > > +			gpio1: gpio at 30200000 {
-> > +				compatible = "nxp,imx8mq-gpio", "fsl,imx35-gpio";
-> 
-> It looks a bit odd to have different vendor prefix for the same device.
-> But we can understand the reason.??Just curious if this is what vendor
-> kernel does?
+> +	}
+> +	ddata->dmas[STM32_TIMERS_DMA_UP] = dma_request_slave_channel(dev, "up");
+> +	ddata->dmas[STM32_TIMERS_DMA_TRIG] =
+> +		dma_request_slave_channel(dev, "trig");
+> +	ddata->dmas[STM32_TIMERS_DMA_COM] =
+> +		dma_request_slave_channel(dev, "com");
 
-No, I did it mostly to be consistent with the location of the DT files
-under "nxp". I'll change this to match the "freescale" location.
+Can you format these in the same why.  This hurts my eyes.
 
-Regards,
-Lucas
+> +}
+> +
+>  static int stm32_timers_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -44,6 +61,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>  	mmio = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(mmio))
+>  		return PTR_ERR(mmio);
+> +	ddata->phys_base = res->start;
+
+What do you use this for?
+
+>  	ddata->regmap = devm_regmap_init_mmio_clk(dev, "int", mmio,
+>  						  &stm32_timers_regmap_cfg);
+> @@ -56,9 +74,25 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>  
+>  	stm32_timers_get_arr_size(ddata);
+>  
+> +	stm32_timers_dma_probe(dev, ddata);
+> +
+
+Surely this can fail?
+
+>  	platform_set_drvdata(pdev, ddata);
+>  
+> -	return devm_of_platform_populate(&pdev->dev);
+> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> +}
+> +
+> +static int stm32_timers_remove(struct platform_device *pdev)
+> +{
+> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
+> +	int i;
+> +
+> +	of_platform_depopulate(&pdev->dev);
+> +
+> +	for (i = 0; i < STM32_TIMERS_MAX_DMAS; i++)
+> +		if (ddata->dmas[i])
+> +			dma_release_channel(ddata->dmas[i]);
+> +
+> +	return 0;
+>  }
+>  
+>  static const struct of_device_id stm32_timers_of_match[] = {
+> @@ -69,6 +103,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>  
+>  static struct platform_driver stm32_timers_driver = {
+>  	.probe = stm32_timers_probe,
+> +	.remove = stm32_timers_remove,
+>  	.driver	= {
+>  		.name = "stm32-timers",
+>  		.of_match_table = stm32_timers_of_match,
+> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
+> index ce7346e..2b4ffb9 100644
+> --- a/include/linux/mfd/stm32-timers.h
+> +++ b/include/linux/mfd/stm32-timers.h
+> @@ -10,6 +10,7 @@
+>  #define _LINUX_STM32_GPTIMER_H_
+>  
+>  #include <linux/clk.h>
+> +#include <linux/dmaengine.h>
+>  #include <linux/regmap.h>
+>  
+>  #define TIM_CR1		0x00	/* Control Register 1      */
+> @@ -67,9 +68,22 @@
+>  #define TIM_BDTR_BKF_SHIFT	16
+>  #define TIM_BDTR_BK2F_SHIFT	20
+>  
+> +enum stm32_timers_dmas {
+> +	STM32_TIMERS_DMA_CH1,
+> +	STM32_TIMERS_DMA_CH2,
+> +	STM32_TIMERS_DMA_CH3,
+> +	STM32_TIMERS_DMA_CH4,
+> +	STM32_TIMERS_DMA_UP,
+> +	STM32_TIMERS_DMA_TRIG,
+> +	STM32_TIMERS_DMA_COM,
+> +	STM32_TIMERS_MAX_DMAS,
+> +};
+> +
+>  struct stm32_timers {
+>  	struct clk *clk;
+>  	struct regmap *regmap;
+> +	phys_addr_t phys_base;
+>  	u32 max_arr;
+> +	struct dma_chan *dmas[STM32_TIMERS_MAX_DMAS];
+>  };
+>  #endif
+
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
