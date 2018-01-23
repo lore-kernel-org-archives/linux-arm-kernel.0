@@ -1,41 +1,39 @@
-From: philippe.cornu@st.com (Philippe Cornu)
-Date: Tue, 23 Jan 2018 15:26:18 +0100
-Subject: [PATCH v1 2/2] drm/bridge/synopsys: dsi: Add a warning msg on dsi
- read operations
-In-Reply-To: <20180123142618.28384-1-philippe.cornu@st.com>
-References: <20180123142618.28384-1-philippe.cornu@st.com>
-Message-ID: <20180123142618.28384-3-philippe.cornu@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 Jan 2018 14:38:22 +0000
+Subject: [PATCH v2 3/6] arm: KVM: Invalidate BTB on guest exit
+In-Reply-To: <20180123142217.GK21802@cbox>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-4-marc.zyngier@arm.com> <20180123142217.GK21802@cbox>
+Message-ID: <98145da8-d172-7d80-5125-a150860d517a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCS/GENERIC DSI read feature is not yet implemented so it
-is important to warn the host_transfer() caller in case of
-read operation requests.
+On 23/01/18 14:22, Christoffer Dall wrote:
+> On Mon, Jan 08, 2018 at 06:55:30PM +0000, Marc Zyngier wrote:
+>> In order to avoid aliasing attacks against the branch predictor,
+>> let's invalidate the BTB on guest exit. This is made complicated
+>> by the fact that we cannot take a branch before invalidating the
+>> BTB.
+> 
+> ...because that would defeat the overall purpose of what we're trying to
+> do?
 
-Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
----
- drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Indeed. Even direct branches could potentially be unsafe, so branching
+at that stage is not a good idea.
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-index 096cf5e5bb30..e46ddff8601c 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-@@ -417,7 +417,14 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
- 	if (ret)
- 		return ret;
- 
--	nb_bytes = packet.size;
-+	if (msg->rx_buf && msg->rx_len > 0) {
-+		/* TODO dw drv improvements: implement read feature */
-+		dev_warn(dsi->dev, "read operations not yet implemented\n");
-+		return -EPERM;
-+
-+	} else {
-+		nb_bytes = packet.size;
-+	}
- 
- 	return nb_bytes;
- }
+> 
+>>
+>> Another thing is that we perform the invalidation on all
+>> implementations, no matter if they are affected or not.
+> 
+> I don't understand this comment, it seems like the logic below is
+> limited to A12 and A17 for now?
+
+Ah, that's a leftover from the first version (before I discovered that
+A15 needed a different method). I'll amend that when I repost the patches.
+
+Thanks,
+
+	M.
 -- 
-2.15.1
+Jazz is not dead. It just smells funny...
