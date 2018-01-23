@@ -1,53 +1,83 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 12:26:33 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
-Message-ID: <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 24 Jan 2018 02:26:54 +0800
+Subject: [PATCH] cpufreq: mediatek: Add mediatek related projects into
+ blacklist
+In-Reply-To: <20180123094205.GA14587@kroah.com>
+References: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
+ <20180123084651.GA26581@kroah.com> <1516700314.12197.48.camel@mtkswgap22>
+ <20180123094205.GA14587@kroah.com>
+Message-ID: <1516732014.15199.38.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 12:10 PM, Bartosz Golaszewski wrote:
-> 2018-01-23 18:03 GMT+01:00 Adam Ford <aford173@gmail.com>:
->> On Tue, Jan 23, 2018 at 10:06 AM, David Lechner <david@lechnology.com> wrote:
->>> On 01/23/2018 10:03 AM, David Lechner wrote:
->>>>
->>>> You can see if the clock is enabled by running:
->>>>
->>>>       cat /sys/kernel/debug/clk/clk_summary
->>>>
->>>
->>> I just realized if you can't boot, you can't do this. :-/
->>
->> I can boot with the latest set in your git repo, but the Ethernet
->> doesn't apparently fully operate.  I don't get errors, but I cannot
->> get a dhcp address.
->>
->> I'll try to do a more exhaustive test later today to get an idea of
->> what works and what doesn't.  When I ran my basic tests, I just did a
->> feel-good boot test (and reboot test)
->>
->> adam
+On Tue, 2018-01-23 at 10:42 +0100, Greg KH wrote:
+> On Tue, Jan 23, 2018 at 05:38:34PM +0800, Sean Wang wrote:
+> > On Tue, 2018-01-23 at 09:46 +0100, Greg KH wrote:
+> > > On Tue, Jan 23, 2018 at 04:31:11PM +0800, sean.wang at mediatek.com wrote:
+> > > > From: Sean Wang <sean.wang@mediatek.com>
+> > > > 
+> > > > commit 6066998cbd2b1012a8d5bc9a2957cfd0ad53150e upstream.
+> > > > 
+> > > > commit edeec420de24 ("cpufreq: dt-platdev: Automatically create cpufreq
+> > > > device with OPP v2") not added MediaTek SoCs to the blacklist that would
+> > > > lead to cause an occasional hang or unexpected behaviors on related boards
+> > > > as kernelci reported and complained on [1] specifically for 4.14 and 4.15
+> > > > tree.
+> > > > 
+> > > > For those reasons, add MediaTek SoCs into cpufreq-dt blacklist and wish
+> > > > the patch be applied to 4.14 and 4.15 tree to allow kernelci able to
+> > > > complete following automated kernel testing.
+> > > > 
+> > > > [1] https://kernelci.org/boot/mt7623n-bananapi-bpi-r2/
+> > > > 
+> > > > Fixes: edeec420de24 (cpufreq: dt-cpufreq: platdev Automatically create device with OPP v2)
+> > > > Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
+> > > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > > > Cc: Kevin Hilman <khilman@baylibre.com>
+> > > > ---
+> > > >  drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
+> > > >  1 file changed, 8 insertions(+)
+> > > 
+> > > What stable kernel tree(s) are you wanting this backported to?
+> > > 
+> > > thanks,
+> > > 
+> > > greg k-h
+> > 
+> > Hi, Greg,
+> > 
+> > thanks for your help!
+> > 
+> > stable and stable-rc are those trees I want this backported to 
 > 
-> FYI: manually calling clk_prepare_enable() in the davinci_mdio driver
-> seems to at least fix the ethernet. In master branch it's done by
-> pm_runtime_get_sync() (in davinci_mdio_reset()). However I'm still
-> getting several oopses and WARNs so there's some more work to do.
+> I don't understand, what exactly do you mean by this?
 > 
+> Have you read:
+>     https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
+> for how to do this properly?
+> 
+> > Hi, Viresh
+> > 
+> > currently, can the patch be permitted to go through tree linux-pm branch
+> > master to be part of mainline? 
+> 
+> Wait, this is not in Linus's tree already?  If not, what is that big
+> "commit XXXX upstream" in the changelog for?
+> 
+> I don't see that commit in Linus's tree at all.
+> 
+> totally confused,
+> 
+> greg k-h
 
-Hmm... I'm wondering if we need to also add #power-domain-cells to the
-PSC clocks and power-domains properties to the consumers.
 
-For this specific case though, it seems strange to me that the drivers
-to clk_get() and clk_get_rate() but never enable the clocks.
+Hi Greg,
 
+thanks for your instructions
 
-Also, are the oopses and WARNs the same as before?
+Sorry for that I missed one thing: The patch is currently not in Linus
+tree, but it is already in linux-next tree. So, I will wait until the
+patch ends up in Linus's tree and submit again to wish the patch be
+applied into 4.14.y tree or 4.15.y tree in the near future.
+
+	Sean
