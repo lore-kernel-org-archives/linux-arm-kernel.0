@@ -1,166 +1,160 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 23 Jan 2018 14:57:49 +0100
-Subject: [PATCH 4/8] mfd: stm32-timers: add support for dmas
-In-Reply-To: <20180123133234.xmep76cgdremnj47@dell>
-References: <1516106631-18722-1-git-send-email-fabrice.gasnier@st.com>
- <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
- <20180123133234.xmep76cgdremnj47@dell>
-Message-ID: <e611b40f-bd37-aa2d-afd9-997b86d55441@st.com>
+From: stefan@olimex.com (Stefan Mavrodiev)
+Date: Tue, 23 Jan 2018 16:04:14 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
+In-Reply-To: <CAGb2v67BARS-kOH06DzkYH-_7h_18yrEpc0c_diXVvRxZPn_4Q@mail.gmail.com>
+References: <1515747666-6597-1-git-send-email-stefan@olimex.com>
+ <20180115095031.pzsgrp3tdmemotrs@flea.lan>
+ <1b9667a4-75de-4ece-069d-7ec33b7e2f8d@olimex.com>
+ <20180118100745.y62adzvfnrzqkagd@flea.lan>
+ <CAGb2v66U9ziFhU5n6haTA3LGNX7BavmfXiiCmvebtqaMxcN0-w@mail.gmail.com>
+ <548d57b7-4db1-a9ee-369e-9067f981162d@olimex.com>
+ <CAGb2v67BARS-kOH06DzkYH-_7h_18yrEpc0c_diXVvRxZPn_4Q@mail.gmail.com>
+Message-ID: <bfe19092-a43f-be80-0ee4-c76d45208c24@olimex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 02:32 PM, Lee Jones wrote:
-> On Tue, 16 Jan 2018, Fabrice Gasnier wrote:
-> 
->> STM32 Timers can support up to 7 dma requests:
->> 4 channels, update, compare and trigger.
->> Optionally request part, or all dmas from stm32-timers MFD core.
->> Also, keep reference of device's bus address to allow child drivers to
->> transfer data from/to device by using dma.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>  drivers/mfd/stm32-timers.c       | 37 ++++++++++++++++++++++++++++++++++++-
->>  include/linux/mfd/stm32-timers.h | 14 ++++++++++++++
->>  2 files changed, 50 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
->> index a6675a4..372b51e 100644
->> --- a/drivers/mfd/stm32-timers.c
->> +++ b/drivers/mfd/stm32-timers.c
->> @@ -29,6 +29,23 @@ static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
->>  	regmap_write(ddata->regmap, TIM_ARR, 0x0);
->>  }
->>  
->> +static void stm32_timers_dma_probe(struct device *dev,
->> +				   struct stm32_timers *ddata)
->> +{
->> +	int i;
->> +	char name[4];
->> +
->> +	for (i = STM32_TIMERS_DMA_CH1; i <= STM32_TIMERS_DMA_CH4; i++) {
->> +		snprintf(name, ARRAY_SIZE(name), "ch%1d", i + 1);
->> +		ddata->dmas[i] = dma_request_slave_channel(dev, name);
-> 
-> And if any of them fail?
+On 01/20/2018 08:08 AM, Chen-Yu Tsai wrote:
+> On Fri, Jan 19, 2018 at 9:27 PM, Stefan Mavrodiev <stefan@olimex.com> wrote:
+>> On 01/18/2018 04:28 PM, Chen-Yu Tsai wrote:
+>>> On Thu, Jan 18, 2018 at 6:07 PM, Maxime Ripard
+>>> <maxime.ripard@free-electrons.com> wrote:
+>>>> Hi!
+>>>>
+>>>> On Mon, Jan 15, 2018 at 12:07:34PM +0200, Stefan Mavrodiev wrote:
+>>>>>>> +/dts-v1/;
+>>>>>>> +#include "sun7i-a20.dtsi"
+>>>>>>> +#include "sunxi-common-regulators.dtsi"
+>>>>>>> +
+>>>>>>> +
+>>>>>>> +#include <dt-bindings/gpio/gpio.h>
+>>>>>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>>>>>> +#include <dt-bindings/pwm/pwm.h>
+>>>>>>> +
+>>>>>>> +/ {
+>>>>>>> + model = "Olimex A20-SOM204-EVB";
+>>>>>>> + compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
+>>>>>>> +
+>>>>>>> + aliases {
+>>>>>>> +         serial0 = &uart0;
+>>>>>>> +         serial1 = &uart4;
+>>>>>>> +         serial2 = &uart7;
+>>>>>>> +         spi0 = &spi1;
+>>>>>>> +         spi1 = &spi2;
+>>>>>>> +         ethernet1 = &rtl8723bs;
+>>>>>> ethernet1? if there's a single network interface, it should be
+>>>>>> ethernet0.
+>>>>> I think this will conflict the gmac alias defined in sun7i-a20.dtsi:
+>>>>>
+>>>>> aliases {
+>>>>>       ethernet0 = &gmac;
+>>>>> };
+>>>> We have that? That's bad, but you're right :)
+>>>>
+>>>>>>> +         stat {
+>>>>>>> +                 label = "a20-som204:green:stat";
+>>>>>>> +                 gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
+>>>>>>> +                 default-state = "on";
+>>>>>>> +         };
+>>>>>>> +
+>>>>>>> +         led1 {
+>>>>>>> +                 label = "a20-som204-evb:green:led1";
+>>>>>>> +                 gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
+>>>>>>> +                 default-state = "on";
+>>>>>>> +         };
+>>>>>>> +
+>>>>>>> +         led2 {
+>>>>>>> +                 label = "a20-som204-evb:yellow:led2";
+>>>>>>> +                 gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
+>>>>>>> +                 default-state = "on";
+>>>>>>> +         };
+>>>>>> You don't have the same prefix between stat and led1/led2. I'm fine
+>>>>>> with both, but you should be consistent :)
+>>>>> STAT led is on the SOM204 module, while led1/2 on the EVB. Thats why
+>>>>> they have different prefix.
+>>>> Still, the user and the system will see it as a single board, and the
+>>>> documentation states that it should be the board name. I'm not quite
+>>>> sure what a good rule would be here. Have you looked at how other
+>>>> boards dealt with it? Chen-Yu, any opinion on this?
+>>> Follow the bindings, I guess? I don't think we (sunxi) have dealt
+>>> with modules that have LEDs or anything that needs to be named after
+>>> the board.
+>>>
+>>> On a related topic, I don't know if you (Stefan / Olimex) want to split
+>>> this into a .dtsi file for the SoM, and a .dts file for the EVB. It might
+>>> help your customers?
+>> I'm not sure this will be good ideal. We will have one EVB with all
+>> possible peripheries. On the other hand, we are planning 3-4 different
+>> SOM204 modules (A20, A64, RK....). I think this will make the dtsi
+>> incompatible.
+> Yes. That was what I mentioned in the second half of my reply.
+>
+>> Maybe if there is one dtsi for the base SOM204 module (one for each arch)
+>> and
+>> multiple dts for boards with additional features. But this will generate
+>> 10-20
+>> dts files. I think this will be better handled using overlays in the uboot.
+> OK. I'm guessing there's the possibility that some pins or GPIOs get muxed
+> to different functions depending on what base board is used? How would
+> you list them, if you only had one .dts file, say for the EVB? Clearly
+> the SoM cannot work by itself, so it probably doesn't get its own .dts
+> file.
+Yes, the SoM cannot work by itself. I'm thinking to follow the current 
+practice:
+ ??? - One dts for base board + evb
+ ??? - One dts for the above + eMMC.
 
-Hi Lee,
+There is also possibility (a real one) some periphery to work with one 
+SoM, and
+other - not. For example A20-SOM204 or A64-SOM204 doesn't have PCIe 
+support, but
+RKxxxx-SOM204 will.
 
-If some of these fails, reference will be NULL. It is checked in child
-driver (pwm for instance) at runtime. Support is being added as an
-option: pwm capture will simply be unavailable in this case (fail with
-error).
-
-> 
->> +	}
->> +	ddata->dmas[STM32_TIMERS_DMA_UP] = dma_request_slave_channel(dev, "up");
->> +	ddata->dmas[STM32_TIMERS_DMA_TRIG] =
->> +		dma_request_slave_channel(dev, "trig");
->> +	ddata->dmas[STM32_TIMERS_DMA_COM] =
->> +		dma_request_slave_channel(dev, "com");
-> 
-> Can you format these in the same why.  This hurts my eyes.
-
-I use enum values and try to match as possible with reference manual for
-"up", "trig" & "com" names.
-Would have some suggestion to beautify this?
-
-> 
->> +}
->> +
->>  static int stm32_timers_probe(struct platform_device *pdev)
->>  {
->>  	struct device *dev = &pdev->dev;
->> @@ -44,6 +61,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
->>  	mmio = devm_ioremap_resource(dev, res);
->>  	if (IS_ERR(mmio))
->>  		return PTR_ERR(mmio);
->> +	ddata->phys_base = res->start;
-> 
-> What do you use this for?
-
-This is used in in child driver (pwm) for capture data transfer by dma.
-
-> 
->>  	ddata->regmap = devm_regmap_init_mmio_clk(dev, "int", mmio,
->>  						  &stm32_timers_regmap_cfg);
->> @@ -56,9 +74,25 @@ static int stm32_timers_probe(struct platform_device *pdev)
->>  
->>  	stm32_timers_get_arr_size(ddata);
->>  
->> +	stm32_timers_dma_probe(dev, ddata);
->> +
-> 
-> Surely this can fail?
-Yes. Same as above.
-
-Thanks for reviewing,
-Best Regards,
-Fabrice
-
-> 
->>  	platform_set_drvdata(pdev, ddata);
->>  
->> -	return devm_of_platform_populate(&pdev->dev);
->> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
->> +}
->> +
->> +static int stm32_timers_remove(struct platform_device *pdev)
->> +{
->> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
->> +	int i;
->> +
->> +	of_platform_depopulate(&pdev->dev);
->> +
->> +	for (i = 0; i < STM32_TIMERS_MAX_DMAS; i++)
->> +		if (ddata->dmas[i])
->> +			dma_release_channel(ddata->dmas[i]);
->> +
->> +	return 0;
->>  }
->>  
->>  static const struct of_device_id stm32_timers_of_match[] = {
->> @@ -69,6 +103,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
->>  
->>  static struct platform_driver stm32_timers_driver = {
->>  	.probe = stm32_timers_probe,
->> +	.remove = stm32_timers_remove,
->>  	.driver	= {
->>  		.name = "stm32-timers",
->>  		.of_match_table = stm32_timers_of_match,
->> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
->> index ce7346e..2b4ffb9 100644
->> --- a/include/linux/mfd/stm32-timers.h
->> +++ b/include/linux/mfd/stm32-timers.h
->> @@ -10,6 +10,7 @@
->>  #define _LINUX_STM32_GPTIMER_H_
->>  
->>  #include <linux/clk.h>
->> +#include <linux/dmaengine.h>
->>  #include <linux/regmap.h>
->>  
->>  #define TIM_CR1		0x00	/* Control Register 1      */
->> @@ -67,9 +68,22 @@
->>  #define TIM_BDTR_BKF_SHIFT	16
->>  #define TIM_BDTR_BK2F_SHIFT	20
->>  
->> +enum stm32_timers_dmas {
->> +	STM32_TIMERS_DMA_CH1,
->> +	STM32_TIMERS_DMA_CH2,
->> +	STM32_TIMERS_DMA_CH3,
->> +	STM32_TIMERS_DMA_CH4,
->> +	STM32_TIMERS_DMA_UP,
->> +	STM32_TIMERS_DMA_TRIG,
->> +	STM32_TIMERS_DMA_COM,
->> +	STM32_TIMERS_MAX_DMAS,
+On second re-read of the comments:
 >> +};
 >> +
->>  struct stm32_timers {
->>  	struct clk *clk;
->>  	struct regmap *regmap;
->> +	phys_addr_t phys_base;
->>  	u32 max_arr;
->> +	struct dma_chan *dmas[STM32_TIMERS_MAX_DMAS];
->>  };
->>  #endif
-> 
+>> +&ahci {
+>> +	target-supply = <&reg_ahci_5v>;
+> You should use the regulators you defined in your PMIC there.
+The power comes from the DC jack not from PCIM. In this case, is this OK?
+
+>
+>> +&usb_otg {
+>> +	dr_mode = "otg";
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usb_power_supply {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbphy {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&usb0_id_detect_pin>,
+>> +		    <&usb0_vbus_detect_pin>;
+>> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+>> +	usb0_vbus_power-supply = <&usb_power_supply>;
+>> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>> +	usb1_vbus-supply = <&reg_usb1_vbus>;
+>> +	usb2_vbus-supply = <&reg_usb2_vbus>;
+> You should also use one of the PMIC regulators here.
+Same here. Power comes from DC jack, not PMIC.
+
+Regards,
+Stefan Mavrodiev
+
+>
+>> About the leds, I'm ok to be named after full board name (a20-som204-evb).
+> Cool.
+>
+> ChenYu
+>
+>>> I've tried it previously, and it helps in some ways
+>>> when you're matching the files to the schematics. But it is confusing
+>>> when you want the big picture. On the other hand, this is not going to
+>>> help with supporting different modules on the same baseboard, as the
+>>> routing, peripherals and labels likely won't match up. Just my two cents.
+>>>
+>>> ChenYu
+>> Regards,
+>> Stefan Mavrodiev
