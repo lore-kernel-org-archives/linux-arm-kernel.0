@@ -1,47 +1,21 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 23 Jan 2018 17:04:56 +0100
-Subject: [PATCH] iio: adc: stm32: fix stm32h7_adc_enable error handling
-Message-ID: <1516723497-9018-1-git-send-email-fabrice.gasnier@st.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 23 Jan 2018 10:06:27 -0600
+Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+ <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
+ <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
+ <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
+Message-ID: <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Error handling in stm32h7_adc_enable routine doesn't unwind enable
-sequence correctly. ADEN can only be cleared by hardware (e.g. by
-writing one to ADDIS).
-It's also better to clear ADRDY just after it's been set by hardware.
+On 01/23/2018 10:03 AM, David Lechner wrote:
+> You can see if the clock is enabled by running:
+> 
+>  ??? cat /sys/kernel/debug/clk/clk_summary
+> 
 
-Fixes: 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-adc.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index ca3b865..8177a92 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -735,8 +735,6 @@ static int stm32h7_adc_enable(struct stm32_adc *adc)
- 	int ret;
- 	u32 val;
- 
--	/* Clear ADRDY by writing one, then enable ADC */
--	stm32_adc_set_bits(adc, STM32H7_ADC_ISR, STM32H7_ADRDY);
- 	stm32_adc_set_bits(adc, STM32H7_ADC_CR, STM32H7_ADEN);
- 
- 	/* Poll for ADRDY to be set (after adc startup time) */
-@@ -744,8 +742,11 @@ static int stm32h7_adc_enable(struct stm32_adc *adc)
- 					   val & STM32H7_ADRDY,
- 					   100, STM32_ADC_TIMEOUT_US);
- 	if (ret) {
--		stm32_adc_clr_bits(adc, STM32H7_ADC_CR, STM32H7_ADEN);
-+		stm32_adc_set_bits(adc, STM32H7_ADC_CR, STM32H7_ADDIS);
- 		dev_err(&indio_dev->dev, "Failed to enable ADC\n");
-+	} else {
-+		/* Clear ADRDY by writing one */
-+		stm32_adc_set_bits(adc, STM32H7_ADC_ISR, STM32H7_ADRDY);
- 	}
- 
- 	return ret;
--- 
-1.9.1
+I just realized if you can't boot, you can't do this. :-/
