@@ -1,83 +1,54 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 24 Jan 2018 02:26:54 +0800
-Subject: [PATCH] cpufreq: mediatek: Add mediatek related projects into
- blacklist
-In-Reply-To: <20180123094205.GA14587@kroah.com>
-References: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
- <20180123084651.GA26581@kroah.com> <1516700314.12197.48.camel@mtkswgap22>
- <20180123094205.GA14587@kroah.com>
-Message-ID: <1516732014.15199.38.camel@mtkswgap22>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Tue, 23 Jan 2018 12:27:16 -0600
+Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <20180123101446.GP22781@e103592.cambridge.arm.com> (Dave Martin's
+ message of "Tue, 23 Jan 2018 10:14:48 +0000")
+References: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
+ <1516623798-25001-2-git-send-email-Dave.Martin@arm.com>
+ <878tcp8umz.fsf@xmission.com>
+ <20180123101446.GP22781@e103592.cambridge.arm.com>
+Message-ID: <87tvvc77nf.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-01-23 at 10:42 +0100, Greg KH wrote:
-> On Tue, Jan 23, 2018 at 05:38:34PM +0800, Sean Wang wrote:
-> > On Tue, 2018-01-23 at 09:46 +0100, Greg KH wrote:
-> > > On Tue, Jan 23, 2018 at 04:31:11PM +0800, sean.wang at mediatek.com wrote:
-> > > > From: Sean Wang <sean.wang@mediatek.com>
-> > > > 
-> > > > commit 6066998cbd2b1012a8d5bc9a2957cfd0ad53150e upstream.
-> > > > 
-> > > > commit edeec420de24 ("cpufreq: dt-platdev: Automatically create cpufreq
-> > > > device with OPP v2") not added MediaTek SoCs to the blacklist that would
-> > > > lead to cause an occasional hang or unexpected behaviors on related boards
-> > > > as kernelci reported and complained on [1] specifically for 4.14 and 4.15
-> > > > tree.
-> > > > 
-> > > > For those reasons, add MediaTek SoCs into cpufreq-dt blacklist and wish
-> > > > the patch be applied to 4.14 and 4.15 tree to allow kernelci able to
-> > > > complete following automated kernel testing.
-> > > > 
-> > > > [1] https://kernelci.org/boot/mt7623n-bananapi-bpi-r2/
-> > > > 
-> > > > Fixes: edeec420de24 (cpufreq: dt-cpufreq: platdev Automatically create device with OPP v2)
-> > > > Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
-> > > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > > > Cc: Kevin Hilman <khilman@baylibre.com>
-> > > > ---
-> > > >  drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
-> > > >  1 file changed, 8 insertions(+)
-> > > 
-> > > What stable kernel tree(s) are you wanting this backported to?
-> > > 
-> > > thanks,
-> > > 
-> > > greg k-h
-> > 
-> > Hi, Greg,
-> > 
-> > thanks for your help!
-> > 
-> > stable and stable-rc are those trees I want this backported to 
-> 
-> I don't understand, what exactly do you mean by this?
-> 
-> Have you read:
->     https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-> for how to do this properly?
-> 
-> > Hi, Viresh
-> > 
-> > currently, can the patch be permitted to go through tree linux-pm branch
-> > master to be part of mainline? 
-> 
-> Wait, this is not in Linus's tree already?  If not, what is that big
-> "commit XXXX upstream" in the changelog for?
-> 
-> I don't see that commit in Linus's tree at all.
-> 
-> totally confused,
-> 
-> greg k-h
+Dave Martin <Dave.Martin@arm.com> writes:
 
+> On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
+>> 
+>> > diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+>> > index e447283..77edb00 100644
+>> > --- a/include/uapi/asm-generic/siginfo.h
+>> > +++ b/include/uapi/asm-generic/siginfo.h
+>> > @@ -193,7 +193,8 @@ typedef struct siginfo {
+>> >  #define FPE_FLTRES	6	/* floating point inexact result */
+>> >  #define FPE_FLTINV	7	/* floating point invalid operation */
+>> >  #define FPE_FLTSUB	8	/* subscript out of range */
+>> > -#define NSIGFPE		8
+>> > +#define FPE_UNKNOWN	9	/* undiagnosed floating-point exception */
+>> > +#define NSIGFPE		9
+>> 
+>> Minor nit here.
+>> 
+>> At least before this is final I would really appreciate if you could
+>> rebase this on top of my unificiation of siginfo.h that I posted on
+>> linux-arch and is in my siginfo-next branch.
+>> 
+>> As that already pushes NSIGFPE up to 13.
+>> 
+>> Which would make this patch change NSIGFPE to 14 and allocate the number
+>> 14 for FPE_UNKNOWN
+>
+> My bad -- I hadn't looked in detail at the whole series.
+>
+> However, the purpose of this as an RFC was to get feedback on whether
+> adding FPE_UNKNOWN is considered acceptable at all from an API
+> perspective -- the precise number doesn't matter for that discussion.
+>
+> Do you have any view on this?
 
-Hi Greg,
+That seems as good a solution as any too me.  It is reality and it
+happens in the code and there are several places of the same form I
+would use it, just to get rid of the FPE_FIXME.
 
-thanks for your instructions
-
-Sorry for that I missed one thing: The patch is currently not in Linus
-tree, but it is already in linux-next tree. So, I will wait until the
-patch ends up in Linus's tree and submit again to wish the patch be
-applied into 4.14.y tree or 4.15.y tree in the near future.
-
-	Sean
+Eric
