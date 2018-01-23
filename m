@@ -1,67 +1,87 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Tue, 23 Jan 2018 10:25:51 +0000
-Subject: [PATCH] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
-In-Reply-To: <3169703.7pajs7FEnH@avalon>
-References: <20180122102608.12565-1-philippe.cornu@st.com>
- <3169703.7pajs7FEnH@avalon>
-Message-ID: <2bf185e2-9b02-3632-dc9a-baf8f4109b44@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 23 Jan 2018 10:35:32 +0000
+Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
+ define package boundaries
+In-Reply-To: <dcafd8bc-1c10-bdfa-e855-5d48cfe63381@arm.com>
+References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
+ <dcafd8bc-1c10-bdfa-e855-5d48cfe63381@arm.com>
+Message-ID: <09a288f7-44a5-8f2c-b568-ad117a2ef701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
 
-A big *thank* for your review
 
-On 01/23/2018 12:30 AM, Laurent Pinchart wrote:
-> Hi Philippe,
+On 22/01/18 23:25, Jeremy Linton wrote:
+> Hi,
 > 
-> Thank you for the patch.
-> 
-> On Monday, 22 January 2018 12:26:08 EET Philippe Cornu wrote:
->> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
->> host controller driver.
+> On 01/22/2018 11:15 AM, Lorenzo Pieralisi wrote:
+>> The current ARM DT topology description provides the operating system
+>> with a topological view of the system that is based on leaf nodes
+>> representing either cores or threads (in an SMT system) and a
+>> hierarchical set of cluster nodes that creates a hierarchical topology
+>> view of how those cores and threads are grouped.
 >>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>> As opposed to the ACPI topology description ([1], PPTT table), this
+>> hierarchical representation of clusters does not allow to describe what
+>> topology level actually represents the physical package boundary, which
+>> is a key piece of information to be used by an operating system to
+>> optimize resource allocation and scheduling.
+>>
+>> Define an optional, backward compatible boolean property for cluster
+>> nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+>> topological description a binding to define what cluster level
+>> represents a physical package boundary.
+>>
+>> [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Jeremy Linton <jeremy.linton@arm.com>
+>> Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
 >> ---
->>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
->>   1 file changed, 1 insertion(+), 5 deletions(-)
+>> ? Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
+>> ? 1 file changed, 9 insertions(+)
 >>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
->> 46b0e73404d1..e06836dec77c 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> @@ -1,12 +1,8 @@
->> +// SPDX-License-Identifier: GPL-2.0
+>> diff --git a/Documentation/devicetree/bindings/arm/topology.txt
+>> b/Documentation/devicetree/bindings/arm/topology.txt
+>> index de9eb0486630..8e78d76b0671 100644
+>> --- a/Documentation/devicetree/bindings/arm/topology.txt
+>> +++ b/Documentation/devicetree/bindings/arm/topology.txt
+>> @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined
+>> as follows:
+>> ????? The cluster node name must be "clusterN" as described in 2.1 above.
+>> ????? A cluster node can not be a leaf node.
+>> ? +??? Properties for cluster nodes:
+>> +
+>> +??? - physical-package
+>> +??????? Usage: optional
+>> +??????? Value type: <empty>
+>> +??????? Definition: if present the cluster node represents the
+>> +??????????????? boundary of a physical package, whether socketed
+>> +??????????????? or surface mounted.
+>> +
+>> ????? A cluster node's child nodes must be:
+>> ? ????? - one or more cluster nodes; or
+>>
 > 
-> According to Documentation/process/license-rules.txt this would change the
-> existing license. The correct identifier is GPL-2.0+.
+> Looks good so far, but I would worry about it being optional. 
+
+We have no choice, it has to be optional for compatibility reasons as
+stated in the commit message.
+
+> That seemed like a mistake on the ACPI side.
+
+Not necessarily. It's firmware choice as long as it knows how to deal
+with the default(absence in case of DT)
+
 > 
+> Assuming it is optional, it might be worth a sentence explaining what
+> the fallback behavior is if the property is missing.
 
-You are right, I did not put the correct identifier :(
+That would be helpful.
 
-After reading more spdx.org, I wonder if the correct value should be 
-GPL-2.0-or-later instead of GPL-2.0+
-
-https://spdx.org/licenses/GPL-2.0-or-later.html
-https://spdx.org/licenses/GPL-2.0+.html
-
-What is your opinion?
-
-Many thanks,
-Philippe :-)
-
->>   /*
->>    * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
->>    * Copyright (C) STMicroelectronics SA 2017
->>    *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License as published by
->> - * the Free Software Foundation; either version 2 of the License, or
->> - * (at your option) any later version.
->> - *
->>    * Modified by Philippe Cornu <philippe.cornu@st.com>
->>    * This generic Synopsys DesignWare MIPI DSI host driver is based on the
->>    * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
-> 
-> 
+-- 
+Regards,
+Sudeep
