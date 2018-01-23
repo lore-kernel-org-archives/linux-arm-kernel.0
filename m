@@ -1,46 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 23 Jan 2018 18:08:57 +0530
-Subject: [PATCH] i2c: davinci: fix the cpufreq transition
-In-Reply-To: <20180122144258.13627-1-brgl@bgdev.pl>
-References: <20180122144258.13627-1-brgl@bgdev.pl>
-Message-ID: <8323a87f-93fb-c1fd-4098-e47f0fcf5859@ti.com>
+From: prarit@redhat.com (Prarit Bhargava)
+Date: Tue, 23 Jan 2018 07:41:56 -0500
+Subject: [PATCH] acpi, spcr: Make SPCR available to x86
+In-Reply-To: <745c9e29-f0b4-775b-28f7-8712cdc90fe1@codeaurora.org>
+References: <20180118150951.28964-1-prarit@redhat.com>
+ <745c9e29-f0b4-775b-28f7-8712cdc90fe1@codeaurora.org>
+Message-ID: <5fab980d-d937-8806-9745-9850947a9096@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 January 2018 08:12 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+
+
+On 01/22/2018 04:49 PM, Timur Tabi wrote:
+> On 01/18/2018 09:09 AM, Prarit Bhargava wrote:
+>>       if (acpi_disabled) {
+>> -        if (earlycon_init_is_deferred)
+>> +        if (earlycon_acpi_spcr_enable)
 > 
-> i2c_davinci_cpufreq_transition() is implemented in a way that will
-> block if it ever gets called while no transfer is in progress.
-
-true!
-
+> This patch works for me, so I can ACK it, but first you might want to rename
+> earlycon_acpi_spcr_enable, because these two lines don't make much sense.
 > 
-> Not only that, but reinit_completion() is never called for xfr_complete.
-
-reinit_completion() use is must only with complete_all(). At least that
-bug is not obvious so needs more detail to be added here.
-
-> Use the fact that cpufreq uses an srcu_notifier (running in process
-> context) for transitions and that the bus_lock is taken during the call
-> to master_xfer() and simplify the code by removing the transfer
-> completion entirely and protecting i2c_davinci_cpufreq_transition()
-> with i2c_lock/unlock_adapter().
+> "If ACPI is disabled, and ACPI SCPR is enabled, then ...."
 > 
-> Reported-by: David Lechner <david@lechnology.com>
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> If ACPI is disabled, then how can a variable called "earlycon_acpi_spcr_enable"
+> be true?
+> 
+> Would it make more sense to rename it to earlycon_spcr_enable?
+> 
 
-I assume you tested this on a board where I2C-controlled PMIC changes
-voltage during CPUfreq (DA850 LogicPD EVM should have this hardware
-support).
+acpi_disabled is a global runtime flag that can be set via "acpi=off" on the
+command line.  It does not disable the tables, only the reading and interpreting
+of the data in the tables.
 
-Perhaps also add:
-
-Fixes: 82c0de11b734 ("i2c: davinci: Add cpufreq support")
-
-Apart from that:
-
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+P.
