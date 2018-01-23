@@ -1,46 +1,35 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 24 Jan 2018 00:42:13 +0800
-Subject: [PATCH 1/2] soc: imx: gpc: ARM power domain should be always-on
-Message-ID: <1516725734-32745-1-git-send-email-Anson.Huang@nxp.com>
+Date: Wed, 24 Jan 2018 00:42:14 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6sx: add ARM power domain support
+In-Reply-To: <1516725734-32745-1-git-send-email-Anson.Huang@nxp.com>
+References: <1516725734-32745-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1516725734-32745-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM power domain does NOT support runtime off, always-on
-flag should be set to avoid incorrect power state in
-pm_genpd_summary:
-
-Before:
-
-root at imx6qpdlsolox:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
-domain                          status          slaves
-    /device                                             runtime status
-----------------------------------------------------------------------
-ARM                             off-0
-
-After:
-
-root at imx6qpdlsolox:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
-domain                          status          slaves
-    /device                                             runtime status
-----------------------------------------------------------------------
-ARM                             on
+Add ARM power domain in PGC.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/soc/imx/gpc.c | 1 +
- 1 file changed, 1 insertion(+)
+this patch should be based on 0001-ARM-dts-imx6sx-add-pu-power-domain-support.patch
+ arch/arm/boot/dts/imx6sx.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 53f7275..6cafa9b 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -254,6 +254,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
- 	{
- 		.base = {
- 			.name = "ARM",
-+			.flags = GENPD_FLAG_ALWAYS_ON,
- 		},
- 	}, {
- 		.base = {
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 42ef4c6..aa29ca6 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -768,6 +768,11 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 
++					power-domain at 0 {
++						reg = <0>;
++						#power-domain-cells = <0>;
++					};
++
+ 					pd_pu: power-domain at 1 {
+ 						reg = <1>;
+ 						#power-domain-cells = <0>;
 -- 
 2.7.4
