@@ -1,71 +1,84 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 23 Jan 2018 13:28:20 -0800
-Subject: [PATCH v1 2/2] drm/bridge/synopsys: dsi: Add a warning msg on dsi
- read operations
-In-Reply-To: <20180123142618.28384-3-philippe.cornu@st.com>
+Date: Tue, 23 Jan 2018 13:38:25 -0800
+Subject: [PATCH v1 1/2] drm/bridge/synopsys: dsi: Fix dsi_host_transfer()
+ return value
+In-Reply-To: <20180123142618.28384-2-philippe.cornu@st.com>
 References: <20180123142618.28384-1-philippe.cornu@st.com>
- <20180123142618.28384-3-philippe.cornu@st.com>
-Message-ID: <CA+ASDXPJ9uPDwRhP2WbazjeT6o=6L0ttffWXjwjkD3KxB+1cuQ@mail.gmail.com>
+ <20180123142618.28384-2-philippe.cornu@st.com>
+Message-ID: <CA+ASDXNDpmVdARLCD-A6nfADgmomuscpwekb8M-j=MFJhpeC4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Philippe,
 
-I see you sent this out already today, while I only just responded
-(late) to your questions about it... oh well :)
-
 On Tue, Jan 23, 2018 at 6:26 AM, Philippe Cornu <philippe.cornu@st.com> wrote:
-> The DCS/GENERIC DSI read feature is not yet implemented so it
-> is important to warn the host_transfer() caller in case of
-> read operation requests.
->
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index 096cf5e5bb30..e46ddff8601c 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -417,7 +417,14 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->         if (ret)
->                 return ret;
->
-> -       nb_bytes = packet.size;
-> +       if (msg->rx_buf && msg->rx_len > 0) {
+> The dw_mipi_dsi_host_transfer() must return the number of
+> bytes transmitted/received on success instead of 0.
 
-It feels like you should do this check *before* you start writing
-anything. It's possible to have a combination TX/RX command, and it
-would be counterintuitive to only do half the operation then return
-with an argument error.
+I'm a little confused. As of the latest drm-misc-next I'm looking at,
+this still has conflicting documentation.
 
-> +               /* TODO dw drv improvements: implement read feature */
-> +               dev_warn(dsi->dev, "read operations not yet implemented\n");
-> +               return -EPERM;
+For ->transfer():
 
-I'm not sure -EPERM is right. Feels like -EINVAL, -ENOSYS, or
--EOPNOTSUPP. I think -ENOSYS actually has been abused somewhat, so
-maybe one of the other two.
+On success it shall return the number of bytes
+ * transmitted for write packets or the number of bytes received for read
+ * packets.
 
-> +
+While mipi_dsi_generic_read() says:
 
-Spurious blank line?
+ * Return: The number of bytes successfully read or a negative error code on
+ * failure.
 
-> +       } else {
-> +               nb_bytes = packet.size;
-> +       }
+But it just returns the value that ->transfer() returns.
 
-You don't actually need to put this sort of thing in the 'else' case.
-The other branch is an error-handling case, which definitely 'return's
-early, and it's pretty standard coding style to avoid indenting the
-"good" path like this.
+So I'm not sure whether the documentation is still wrong, or if the
+implementation is.
+
+Anyway, I guess maybe that isn't super-critical to *this* patch, since
+we don't have RX support yet...
+
+> Note: nb_bytes is introduced in this patch as it will be
+> re-used with the future dcs/generic dsi read feature.
+
+It feels like you could just wait to add that when you need it? It
+really feels trivial and useless right now :)
 
 Brian
 
 >
->         return nb_bytes;
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> index f458798af788..096cf5e5bb30 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> @@ -403,7 +403,7 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>  {
+>         struct dw_mipi_dsi *dsi = host_to_dsi(host);
+>         struct mipi_dsi_packet packet;
+> -       int ret;
+> +       int ret, nb_bytes;
+>
+>         ret = mipi_dsi_create_packet(&packet, msg);
+>         if (ret) {
+> @@ -413,7 +413,13 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>
+>         dw_mipi_message_config(dsi, msg);
+>
+> -       return dw_mipi_dsi_write(dsi, &packet);
+> +       ret = dw_mipi_dsi_write(dsi, &packet);
+> +       if (ret)
+> +               return ret;
+> +
+> +       nb_bytes = packet.size;
+> +
+> +       return nb_bytes;
 >  }
+>
+>  static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
 > --
 > 2.15.1
 >
