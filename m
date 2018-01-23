@@ -1,55 +1,55 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 23 Jan 2018 11:25:05 +0200
-Subject: [PATCH] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
- bits_per_mux != 0
-In-Reply-To: <d1426fbc-bc82-89cd-d08d-242b16d2c99d@lechnology.com>
-References: <1516575793-30526-1-git-send-email-david@lechnology.com>
- <CAHp75VdkShHhxL+3PyaPEC2Dyr8aWoEH8CQk+bEJ2WD4i6ojHg@mail.gmail.com>
- <d1426fbc-bc82-89cd-d08d-242b16d2c99d@lechnology.com>
-Message-ID: <CAHp75VetRjLioS1zAubZshggKTiWJ-KJ+HjTSkoK=6LVP6SY2g@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 23 Jan 2018 17:38:34 +0800
+Subject: [PATCH] cpufreq: mediatek: Add mediatek related projects into
+ blacklist
+In-Reply-To: <20180123084651.GA26581@kroah.com>
+References: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
+ <20180123084651.GA26581@kroah.com>
+Message-ID: <1516700314.12197.48.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 7:06 PM, David Lechner <david@lechnology.com> wrote:
-> On 01/22/2018 08:49 AM, Andy Shevchenko wrote:
->> On Mon, Jan 22, 2018 at 1:03 AM, David Lechner <david@lechnology.com>
->> wrote:
+On Tue, 2018-01-23 at 09:46 +0100, Greg KH wrote:
+> On Tue, Jan 23, 2018 at 04:31:11PM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > commit 6066998cbd2b1012a8d5bc9a2957cfd0ad53150e upstream.
+> > 
+> > commit edeec420de24 ("cpufreq: dt-platdev: Automatically create cpufreq
+> > device with OPP v2") not added MediaTek SoCs to the blacklist that would
+> > lead to cause an occasional hang or unexpected behaviors on related boards
+> > as kernelci reported and complained on [1] specifically for 4.14 and 4.15
+> > tree.
+> > 
+> > For those reasons, add MediaTek SoCs into cpufreq-dt blacklist and wish
+> > the patch be applied to 4.14 and 4.15 tree to allow kernelci able to
+> > complete following automated kernel testing.
+> > 
+> > [1] https://kernelci.org/boot/mt7623n-bananapi-bpi-r2/
+> > 
+> > Fixes: edeec420de24 (cpufreq: dt-cpufreq: platdev Automatically create device with OPP v2)
+> > Signed-off-by: Andrew-sh Cheng <andrew-sh.cheng@mediatek.com>
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Cc: Kevin Hilman <khilman@baylibre.com>
+> > ---
+> >  drivers/cpufreq/cpufreq-dt-platdev.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> 
+> What stable kernel tree(s) are you wanting this backported to?
+> 
+> thanks,
+> 
+> greg k-h
 
->>> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure
->>> multiple pins of different modules")
+Hi, Greg,
 
->> One line?
+thanks for your help!
 
-> One line is more important that wrapping to 75 chars?
+stable and stable-rc are those trees I want this backported to 
 
-It's *special* line, i.e. tag. Tag per line is a rule I know, did I
-miss any new change to that?
+Hi, Viresh
 
->>> +                       byte_num = (pcs->bits_per_pin * pin) /
->>> BITS_PER_BYTE;
->>> +                       offset = (byte_num / mux_bytes) * mux_bytes;
->>> +                       pin_shift = pin % (pcs->width /
->>> pcs->bits_per_pin) *
->>> +                                   pcs->bits_per_pin;
+currently, can the patch be permitted to go through tree linux-pm branch
+master to be part of mainline? 
 
->> Sounds like playing around pretty well defined macro and functions,
->> e.g. DIV_ROUND_UP(), round_up().
-
-> I admit, I just copied existing code (which may be a reason to leave this
-> the
-> way it is).
-
-Ah, fair enough.
-
->  But, I only see once place to do this:
->
->         offset = round_down(byte_num, mux_bytes);
->
-> Did I miss another?
-
-I meant that you may use macros to make code cleaner. Though, taking
-above into consideration, it would be done as a separate patch later.
-
--- 
-With Best Regards,
-Andy Shevchenko
+	Sean
