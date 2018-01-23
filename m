@@ -1,92 +1,182 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Tue, 23 Jan 2018 11:11:06 +0530
-Subject: [Patch v6 00/12] Add MFC v10.10 support
-In-Reply-To: <126f1982-060a-6fdb-e1b3-b5c81d65ca13@xs4all.nl>
-References: <CGME20171208093612epcas1p1eda138655cf5397893fe1f2b2152bd1f@epcas1p1.samsung.com>
- <1512724105-1778-1-git-send-email-smitha.t@samsung.com>
- <126f1982-060a-6fdb-e1b3-b5c81d65ca13@xs4all.nl>
-Message-ID: <1516686066.12482.148.camel@smitha-fedora>
+From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
+Date: Tue, 23 Jan 2018 10:38:14 +0530
+Subject: [PATCH][v2] arm64: Allocate elfcorehdr & crashkernel mem before
+ any reservation
+In-Reply-To: <5A61E19F.1000207@arm.com>
+References: <1515080048-9154-1-git-send-email-poonam.aggrwal@nxp.com>
+ <5A4F5C45.3090006@arm.com>
+ <DB5PR0401MB1733C9CB0DCDF94FCF3E4E1286130@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+ <5A58F75E.8030106@arm.com>
+ <DB5PR0401MB173376E6E9B45B871BD1A66086140@DB5PR0401MB1733.eurprd04.prod.outlook.com>
+ <CAFTCetQvrNG7fr2-y4wOmjgFyC6D1U18K3iq5--RcNwt+hEz2g@mail.gmail.com>
+ <20180116070703.GA15458@linaro.org> <5A61E19F.1000207@arm.com>
+Message-ID: <CAFTCetRSxh4CCYvUOFDmzKWcXdXU6bLzW8e2PpUBpOpJsDpY6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-01-22 at 13:18 +0100, Hans Verkuil wrote:
-> Hi Smitha,
-> 
-> Thank you for this v6 series!
-> 
-> You can add my:
-> 
-> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-> 
-> to patches 1-9 and 11. See my review for patches 10 and 12. The comments
-> are minor, so I hope I can Ack v7 once it's posted and this can be merged
-> for 4.17.
-> 
-> Regards,
-> 
-> 	Hans
-> 
-Thank you so much for the review.
-I will update the same by this week and post.
+Hi,
+
+On Fri, Jan 19, 2018 at 5:46 PM, James Morse <james.morse@arm.com> wrote:
+> Hello,
+>
+> On 16/01/18 07:07, takahiro.akashi at linaro.org wrote:
+>> On Mon, Jan 15, 2018 at 10:14:05AM +0530, Bhupesh SHARMA wrote:
+>>> On Sat, Jan 13, 2018 at 8:37 AM, Poonam Aggrwal <poonam.aggrwal@nxp.com> wrote:
+>>>>> On 08/01/18 04:31, Poonam Aggrwal wrote:
+>>>>>> Yeah, this is a good point. So ideally the address of the crash kernel
+>>>>>> should be diligently provided by the user based on the system.
+>
+>>>>> Even better: the region to store the crash kernel in should be chosen by the
+>>>>> kernel.
+>>>>> When using kdump I boot with 'crashkernel=1G', the kernel chooses where to
+>>>>> place the reserved region.
+>>>>> Even if I specified a reasonable physical address, the
+>>>>> efistub may relocate the kernel over the top during boot as part of its KASLR
+>>>>> work.
+>
+>>>> Agree
+>>>>>
+>>>>> (Why does anyone ever need to specify an offset here?)
+>>>> offset is normally an optional argument. Request Takahiro to provide his inputs.  Does this imply any updates in kexec design/implementation/documentation?
+>>>
+>>> offset is a optional argument. For relocatable kernels (and kernels
+>>> which support KASLR), specifying offset is normally not needed.
+>>>
+>>> Please refer to the 'Extended crashkernel syntax' documentation
+>>> (<https://github.com/torvalds/linux/blob/master/Documentation/kdump/kdump.txt#L259>):
+>>>
+>>> Extended crashkernel syntax
+>>> ===========================
+>>>
+>>> While the "crashkernel=size[@offset]" syntax is sufficient for most
+>>> configurations, sometimes it's handy to have the reserved memory dependent
+>>> on the value of System RAM -- that's mostly for distributors that pre-setup
+>>> the kernel command line to avoid a unbootable system after some memory has
+>>> been removed from the machine.
+>
+> This is to let the distribution provide a single value that works on machines
+> with very little RAM, and machines that need gigabytes in order to boot.
+>
+> Where does specifying the offset/absolute-address come in?
+
+It comes into picture where we know at compile time where we want to
+place the crashkernel at.
+I remember using it on a few arm 32-bit machines but they had a static
+and well defined layout of the memory
+map from the available system RAM, and required crashkernel to be
+placed at predefined offset to prevent 'undefined' behaviour.
+
+I don't think this is relevant though now with the newer KASLR enabled
+kernels where we can RANDOMIZE the _text and also the module load
+area.
+So using a static offset value in this case would be risky to say the least ...
+
+>
+>>> As James mentioned for arm64, in case of relocatable/kaslr kernels,
+>>> the efistub may relocate the kernel over the top during boot as part
+>>> of its KASLR.
+>>
+>> It would be sad if we couldn't specify kaslr and kdump at the same time.
+>
+> We can. The problem comes when you specify an absolute-address that should be
+> reserved for user-space to eventually load the kdump kernel into. This is
+> fragile for a number of reasons.
+
+... Fedora allows using kdump and KASLR both, so I am not sure that's a problem.
+
+>> Since kaslr will skip any of memory regions whose attributes are not
+>> CONVENTIONAL_MEMORY for allocating a relocated kernel image, we will be
+>> able to have a dedicated range of memory reserved for kdump.
+>> In this case, using an "offset" in "crashkernel=" will be crucial.
+>>
+>> (I don't know how we can notify uefi of the region though.)
+>
+> I'm confused. panic()->kdump:boot doesn't go via UEFI. It passes information in
+> the DT:/chosen that may have been generated by the EFIStub, but it doesn't (and
+> must not) change the EFI memory map.
+>
+> We need to decide where the crashdump kernel region is when the first-kernel
+> generates its page tables, as the protect/unprotect mechanism wants to be able
+> to unmap them.
+> There is no reason for UEFI to know about the kdump region, BootServices are
+> long-gone by the time its location has to be decided.
+
+>>> So, the offset field may make more sense for
+>>> non-relocatable/static kernels, but for newer kernels, its better to
+>>> use the 'Extended crashkernel syntax' syntax which is also supported
+>>> by newer distribution versions.
+>
+> (this extended crashkernel syntax looks like a tangent: its about specifying
+> one-value string to specify a reservation-size on both small-memory and
+> large-memory machines).
+>
+> I don't think 'relocatable kernels' are relevant here. The KASLR series changed
+> the kernel to no longer run from the linear map, so where in the linear map we
+> allocate memory for the crash-kernel to boot from can't matter. These changes
+> were merged before kexec/kdump support was added.
+
+Agreed.
+
+> Even before this change, (I recall that:) the kernel would discard memory below
+> its text. This isn't a problem as kexec-tools (typically) locates the kernel at
+> the bottom of the region, and physical memory outside this range isn't
+> accessible anyway because of the "linux,usable-memory" property. When we do want
+> to access it, we remap it using the vmcore helpers.
+>
+> I think this @offset must be for kernels that have to run from a
+> physical/virtual address that is known at compile time. We don't have this
+> problem on arm64, and specifying @offset makes kdump less reliable:
+> | cannot reserve crashkernel: region overlaps reserved memory
+>
+>
+>> How better is it for the case?
+>>
+>> I don't know exactly what you mean by "newer kernel/distribution", but
+>> kdump on arm64 supports this feature from the day one.
+>> (It is basically independent from architectures.)
+>
+> Support @offset? Yes, its core code allowing this.
+>
+>
+>>> For e.g. see ubuntu trusty kdump-config man page -
+>>> <http://manpages.ubuntu.com/manpages/trusty/man8/kdump-config.8.html>:
+>>>
+>>>   kdump kernel relocation address does not match crashkernel= parameter:
+>>>               For non-relocatable architectures,  the  kdump  kernel  must  be
+>>>               built   with   a  predetermined  start  address.   This  message
+>>>               indicates that the start address of the  kdump  kernel  and  the
+>>>               start address in the crashkernel= parameter do not match.
+>
+> arm64 doesn't have this issue. The 'predetermined start address' is a relative
+> value stored in the header. This is so the bootloader can place the kernel
+> anywhere in memory and still have it boot.
+>
+> I think we're in the weeds here: adding @offset to your 'crashkernel=' cmdline
+> option tells the kernel you know this address will be free and not-reserved when
+> it comes to reservation time. This isn't generally true.
+> Unless you wrote the DT and the bootloader, you can't know this.
+
+Agreed. See my comments above. What I meant was that using @offset with newer
+kernels/distributions which support KASLR can lead to undefined
+behavior. What I tried to capture
+from the ubuntu trusty man-page was that "kdump kernel must be built
+with a predetermined start  address
+for non-relocatable architectures".
+
+Normally we use the same primary kernel as the kdump kernel, so if the
+primary kernels is Relocatable + KASLR enabled,
+the kdump kernel would support the same as well. In that case assuming
+a fixed offset at which the kdump kernel can be loaded at or assuming
+a static
+start address for the kdump kernel can lead to issues.
 
 Regards,
-Smitha
-> On 08/12/17 10:08, Smitha T Murthy wrote:
-> > This patch series adds MFC v10.10 support. MFC v10.10 is used in some
-> > of Exynos7 variants.
-> > 
-> > This adds support for following:
-> > 
-> > * Add support for HEVC encoder and decoder
-> > * Add support for VP9 decoder
-> > * Update Documentation for control id definitions
-> > * Update computation of min scratch buffer size requirement for V8 onwards
-> > 
-> > Changes since v5:
-> >  - Addressed review comments by Kamil Debski <kamil@wypas.org>.
-> >  - Addressed review comments by 
-> >    Stanimir Varbanov <stanimir.varbanov@linaro.org>.
-> >  - Addressed review comments by Hans Verkuil <hverkuil@xs4all.nl>.
-> >  - Rebased on latest git://linuxtv.org/snawrocki/samsung.git
-> >    for-v4.15/media/next.
-> >  - Applied r-o-b from Andrzej, Stanimir on respective patches.
-> >  - Applied acked-by from Kamil, Hans on respective patches.
-> > 
-> > Smitha T Murthy (12):
-> >   [media] s5p-mfc: Rename IS_MFCV8 macro
-> >   [media] s5p-mfc: Adding initial support for MFC v10.10
-> >   [media] s5p-mfc: Use min scratch buffer size as provided by F/W
-> >   [media] s5p-mfc: Support MFCv10.10 buffer requirements
-> >   [media] videodev2.h: Add v4l2 definition for HEVC
-> >   [media] v4l2-ioctl: add HEVC format description
-> >   Documentation: v4l: Documentation for HEVC v4l2 definition
-> >   [media] s5p-mfc: Add support for HEVC decoder
-> >   [media] s5p-mfc: Add VP9 decoder support
-> >   [media] v4l2: Add v4l2 control IDs for HEVC encoder
-> >   [media] s5p-mfc: Add support for HEVC encoder
-> >   Documention: v4l: Documentation for HEVC CIDs
-> > 
-> >  .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
-> >  Documentation/media/uapi/v4l/extended-controls.rst | 395 +++++++++++++++
-> >  Documentation/media/uapi/v4l/pixfmt-compressed.rst |   5 +
-> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  88 ++++
-> >  drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc.c           |  28 ++
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  68 ++-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  48 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 555 ++++++++++++++++++++-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 397 +++++++++++++--
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
-> >  drivers/media/v4l2-core/v4l2-ctrls.c               | 118 +++++
-> >  drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +
-> >  include/uapi/linux/v4l2-controls.h                 |  92 +++-
-> >  include/uapi/linux/videodev2.h                     |   1 +
-> >  18 files changed, 1765 insertions(+), 78 deletions(-)
-> >  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > 
-> 
-> 
-> 
+Bhupesh
+
+> Wasn't this patch moving the elfcorehdr reservation up to be before any dynamic
+> reservations, to prevent them overlapping?
+>
+>
+> Thanks,
+>
+> James
