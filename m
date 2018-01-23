@@ -1,35 +1,43 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 24 Jan 2018 00:42:14 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6sx: add ARM power domain support
-In-Reply-To: <1516725734-32745-1-git-send-email-Anson.Huang@nxp.com>
-References: <1516725734-32745-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1516725734-32745-2-git-send-email-Anson.Huang@nxp.com>
+From: luisbg@kernel.org (Luis de Bethencourt)
+Date: Tue, 23 Jan 2018 11:41:12 +0000
+Subject: [PATCH] clocksource/drivers/timer_sun5i: Fix trailing semicolon
+Message-ID: <20180123114112.31297-1-luisbg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM power domain in PGC.
+The trailing semicolon is an empty statement that does no operation.
+Removing it since it doesn't do anything.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Luis de Bethencourt <luisbg@kernel.org>
 ---
-this patch should be based on 0001-ARM-dts-imx6sx-add-pu-power-domain-support.patch
- arch/arm/boot/dts/imx6sx.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 42ef4c6..aa29ca6 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -768,6 +768,11 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
+Hi,
+
+After fixing the same thing in drivers/staging/rtl8723bs/, Joe Perches
+suggested I fix it treewide [0].
+
+Best regards 
+Luis
+
+
+[0] http://driverdev.linuxdriverproject.org/pipermail/driverdev-devel/2018-January/115410.html
+[1] http://driverdev.linuxdriverproject.org/pipermail/driverdev-devel/2018-January/115390.html
+
+ drivers/clocksource/timer-sun5i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+index 2a3fe83ec337..3b56ea3f52af 100644
+--- a/drivers/clocksource/timer-sun5i.c
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -334,7 +334,7 @@ static int __init sun5i_timer_init(struct device_node *node)
+ 	timer_base = of_io_request_and_map(node, 0, of_node_full_name(node));
+ 	if (IS_ERR(timer_base)) {
+ 		pr_err("Can't map registers\n");
+-		return PTR_ERR(timer_base);;
++		return PTR_ERR(timer_base);
+ 	}
  
-+					power-domain at 0 {
-+						reg = <0>;
-+						#power-domain-cells = <0>;
-+					};
-+
- 					pd_pu: power-domain at 1 {
- 						reg = <1>;
- 						#power-domain-cells = <0>;
+ 	irq = irq_of_parse_and_map(node, 0);
 -- 
-2.7.4
+2.15.1
