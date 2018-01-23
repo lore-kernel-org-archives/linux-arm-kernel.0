@@ -1,150 +1,98 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Jan 2018 12:28:05 +0000
-Subject: [PATCH 12/16] arm64: Add helpers for checking CPU MIDR against a range
+Date: Tue, 23 Jan 2018 12:28:06 +0000
+Subject: [PATCH 13/16] arm64: Add support for checking errata based on a list
+ of MIDRS
 In-Reply-To: <20180123122809.16269-1-suzuki.poulose@arm.com>
 References: <20180123122809.16269-1-suzuki.poulose@arm.com>
-Message-ID: <20180123122809.16269-13-suzuki.poulose@arm.com>
+Message-ID: <20180123122809.16269-14-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helpers for checking if the given CPU midr falls in a range
-of variants/revisions for a given model.
+Add helpers for detecting an errata on list of midr ranges
+of affected CPUs.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |  7 ++-----
- arch/arm64/include/asm/cputype.h    | 38 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu_errata.c      | 16 +++++-----------
- 3 files changed, 45 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |  1 +
+ arch/arm64/kernel/cpu_errata.c      | 40 ++++++++++++++++++++++---------------
+ 2 files changed, 25 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 4c3d6987acfc..a3d54c2c411f 100644
+index a3d54c2c411f..70712de687c7 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -10,6 +10,7 @@
- #define __ASM_CPUFEATURE_H
- 
- #include <asm/cpucaps.h>
-+#include <asm/cputype.h>
- #include <asm/fpsimd.h>
- #include <asm/hwcap.h>
- #include <asm/sigcontext.h>
-@@ -134,11 +135,7 @@ struct arm64_cpu_capabilities {
- 	/* Called on all active CPUs for all  "available" capabilities */
+@@ -136,6 +136,7 @@ struct arm64_cpu_capabilities {
  	int (*enable)(const struct arm64_cpu_capabilities *caps);
  	union {
--		struct {	/* To be used for erratum handling only */
--			u32 midr_model;
--			u32 midr_range_min, midr_range_max;
--		};
--
-+		struct midr_range midr_range;	/* To be used for erratum handling only */
+ 		struct midr_range midr_range;	/* To be used for erratum handling only */
++		const struct midr_range *midr_range_list;
  		struct {	/* Feature register checking */
  			u32 sys_reg;
  			u8 field_pos;
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 2f8d39ed9c2e..26bc5b302060 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -116,6 +116,44 @@
- #define read_cpuid(reg)			read_sysreg_s(SYS_ ## reg)
- 
- /*
-+ * Represent a range of MIDR values for a given CPU model and a
-+ * range of variant/revision values.
-+ *
-+ * @model	- CPU model as defined by MIDR_CPU_MODEL
-+ * @rv_min	- Minimum value for the revision/variant as defined by
-+ *		  MIDR_CPU_VAR_REV
-+ * @rv_max	- Maximum value for the variant/revision for the range.
-+ */
-+struct midr_range {
-+	u32 model;
-+	u32 rv_min;
-+	u32 rv_max;
-+};
-+
-+#define MIDR_RANGE(m, v_min, r_min, v_max, r_max)		\
-+	{							\
-+		.model = m,					\
-+		.rv_min = MIDR_CPU_VAR_REV(v_min, r_min),	\
-+		.rv_max = MIDR_CPU_VAR_REV(v_max, r_max),	\
-+	}
-+
-+#define MIDR_ALL_VERSIONS(m) MIDR_RANGE(m, 0, 0, 0xf, 0xf)
-+
-+static inline bool is_midr_in_range(u32 midr, struct midr_range const *range)
-+{
-+	return MIDR_IS_CPU_MODEL_RANGE(midr, range->model,
-+				 range->rv_min, range->rv_max);
-+}
-+
-+static inline bool is_midr_in_range_list(u32 midr, struct midr_range const *ranges)
-+{
-+	while (ranges->model)
-+		if (is_midr_in_range(midr, ranges++))
-+			return true;
-+	return false;
-+}
-+
-+/*
-  * The CPU ID never changes at run time, so we might as well tell the
-  * compiler that it's constant.  Use this function to read the CPU ID
-  * rather than directly reading processor_id or read_cpuid() directly.
 diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 054b17009f41..10eb7fa0d0d7 100644
+index 10eb7fa0d0d7..8472d156c225 100644
 --- a/arch/arm64/kernel/cpu_errata.c
 +++ b/arch/arm64/kernel/cpu_errata.c
-@@ -25,9 +25,7 @@ static bool __maybe_unused
- is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
- {
- 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
--	return MIDR_IS_CPU_MODEL_RANGE(read_cpuid_id(), entry->midr_model,
--				       entry->midr_range_min,
--				       entry->midr_range_max);
-+	return is_midr_in_range(read_cpuid_id(), &entry->midr_range);
+@@ -29,6 +29,13 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
  }
  
  static bool __maybe_unused
-@@ -41,7 +39,7 @@ is_kryo_midr(const struct arm64_cpu_capabilities *entry, int scope)
- 	model &= MIDR_IMPLEMENTOR_MASK | (0xf00 << MIDR_PARTNUM_SHIFT) |
- 		 MIDR_ARCHITECTURE_MASK;
- 
--	return model == entry->midr_model;
-+	return model == entry->midr_range.model;
- }
- 
- static bool
-@@ -182,9 +180,7 @@ static int qcom_enable_link_stack_sanitization(
- #define ERRATA_MIDR_RANGE(model, v_min, r_min, v_max, r_max) \
- 	.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM, \
++is_affected_midr_range_list(const struct arm64_cpu_capabilities *entry, int scope)
++{
++	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
++	return is_midr_in_range_list(read_cpuid_id(), entry->midr_range_list);
++}
++
++static bool __maybe_unused
+ is_kryo_midr(const struct arm64_cpu_capabilities *entry, int scope)
+ {
+ 	u32 model;
+@@ -196,6 +203,22 @@ static int qcom_enable_link_stack_sanitization(
  	.matches = is_affected_midr_range, \
--	.midr_model = model, \
--	.midr_range_min = MIDR_CPU_VAR_REV(v_min, r_min), \
--	.midr_range_max = MIDR_CPU_VAR_REV(v_max, r_max)
-+	.midr_range =  MIDR_RANGE(model, v_min, r_min, v_max, r_max)
+ 	.midr_range = MIDR_ALL_VERSIONS(model)
  
- /* Errata affecting a range of revisions of  given model variant */
- #define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max) \
-@@ -198,9 +194,7 @@ static int qcom_enable_link_stack_sanitization(
- #define ERRATA_MIDR_ALL_VERSIONS(model) \
- 	.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM, \
- 	.matches = is_affected_midr_range, \
--	.midr_model = model, \
--	.midr_range_min = 0, \
--	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
-+	.midr_range = MIDR_ALL_VERSIONS(model)
- 
++/* Errata affecting a list of midr ranges, with same work around */
++#define ERRATA_MIDR_RANGE_LIST(midr_list) \
++	.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM, \
++	.matches = is_affected_midr_range_list, \
++	.midr_range_list = midr_list
++
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++static const struct midr_range cortex_bp_harden_cpus[] = {
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
++	MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
++	{},
++};
++#endif
++
  const struct arm64_cpu_capabilities arm64_errata[] = {
  #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
-@@ -314,7 +308,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.desc = "Qualcomm Technologies Kryo erratum 1003",
- 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
- 		.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM,
--		.midr_model = MIDR_QCOM_KRYO,
-+		.midr_range.model = MIDR_QCOM_KRYO,
- 		.matches = is_kryo_midr,
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+@@ -330,22 +353,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+-		.enable = enable_psci_bp_hardening,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+-		.enable = enable_psci_bp_hardening,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+-		.enable = enable_psci_bp_hardening,
+-	},
+-	{
+-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
++		ERRATA_MIDR_RANGE_LIST(cortex_bp_harden_cpus),
+ 		.enable = enable_psci_bp_hardening,
  	},
- #endif
+ 	{
 -- 
 2.13.6
