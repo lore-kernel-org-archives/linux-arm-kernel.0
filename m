@@ -1,105 +1,53 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 12:14:43 -0600
-Subject: [RESEND] phy: da8xx-usb: rename clock con_ids
-Message-ID: <1516731283-26388-1-git-send-email-david@lechnology.com>
+Date: Tue, 23 Jan 2018 12:26:33 -0600
+Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+ <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
+ <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
+ <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
+ <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
+ <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
+ <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
+Message-ID: <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This renames the clock con_ids in the DA8XX USB PHY driver as well as
-the matching names in the mach clock registration code.
+On 01/23/2018 12:10 PM, Bartosz Golaszewski wrote:
+> 2018-01-23 18:03 GMT+01:00 Adam Ford <aford173@gmail.com>:
+>> On Tue, Jan 23, 2018 at 10:06 AM, David Lechner <david@lechnology.com> wrote:
+>>> On 01/23/2018 10:03 AM, David Lechner wrote:
+>>>>
+>>>> You can see if the clock is enabled by running:
+>>>>
+>>>>       cat /sys/kernel/debug/clk/clk_summary
+>>>>
+>>>
+>>> I just realized if you can't boot, you can't do this. :-/
+>>
+>> I can boot with the latest set in your git repo, but the Ethernet
+>> doesn't apparently fully operate.  I don't get errors, but I cannot
+>> get a dhcp address.
+>>
+>> I'll try to do a more exhaustive test later today to get an idea of
+>> what works and what doesn't.  When I ran my basic tests, I just did a
+>> feel-good boot test (and reboot test)
+>>
+>> adam
+> 
+> FYI: manually calling clk_prepare_enable() in the davinci_mdio driver
+> seems to at least fix the ethernet. In master branch it's done by
+> pm_runtime_get_sync() (in davinci_mdio_reset()). However I'm still
+> getting several oopses and WARNs so there's some more work to do.
+> 
 
-This is in preparation for using device tree clocks where these names
-will become part of the device tree bindings. The new names more closely
-match the names used in the USB clock diagram in the SoC TRM.
+Hmm... I'm wondering if we need to also add #power-domain-cells to the
+PSC clocks and power-domains properties to the consumers.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
-
-This patch was originally submitted in the series "ARM: davinci: common
-clock prep work". However, that series ended up mostly dealing with syscon
-stuff that need to be reworked, so I am resubmitting this as a stand-alone
-patch since it doesn't have any dependencies.
+For this specific case though, it seems strange to me that the drivers
+to clk_get() and clk_get_rate() but never enable the clocks.
 
 
- arch/arm/mach-davinci/usb-da8xx.c | 12 ++++++------
- drivers/phy/ti/phy-da8xx-usb.c    |  8 ++++----
- 2 files changed, 10 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index d480a02..fb31f6e 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -256,14 +256,14 @@ static int usb20_phy_clk_set_parent(struct clk *clk, struct clk *parent)
- }
- 
- static struct clk usb20_phy_clk = {
--	.name		= "usb20_phy",
-+	.name		= "usb0_clk48",
- 	.clk_enable	= usb20_phy_clk_enable,
- 	.clk_disable	= usb20_phy_clk_disable,
- 	.set_parent	= usb20_phy_clk_set_parent,
- };
- 
- static struct clk_lookup usb20_phy_clk_lookup =
--	CLK("da8xx-usb-phy", "usb20_phy", &usb20_phy_clk);
-+	CLK("da8xx-usb-phy", "usb0_clk48", &usb20_phy_clk);
- 
- /**
-  * da8xx_register_usb20_phy_clk - register USB0PHYCLKMUX clock
-@@ -320,18 +320,18 @@ static int usb11_phy_clk_set_parent(struct clk *clk, struct clk *parent)
- }
- 
- static struct clk usb11_phy_clk = {
--	.name		= "usb11_phy",
-+	.name		= "usb1_clk48",
- 	.set_parent	= usb11_phy_clk_set_parent,
- };
- 
- static struct clk_lookup usb11_phy_clk_lookup =
--	CLK("da8xx-usb-phy", "usb11_phy", &usb11_phy_clk);
-+	CLK("da8xx-usb-phy", "usb1_clk48", &usb11_phy_clk);
- 
- /**
-  * da8xx_register_usb11_phy_clk - register USB1PHYCLKMUX clock
-  *
-  * @use_usb_refclkin: Selects the parent clock - either "usb_refclkin" if true
-- *	or "usb20_phy" if false.
-+ *	or "usb0_clk48" if false.
-  */
- int __init da8xx_register_usb11_phy_clk(bool use_usb_refclkin)
- {
-@@ -341,7 +341,7 @@ int __init da8xx_register_usb11_phy_clk(bool use_usb_refclkin)
- 	if (use_usb_refclkin)
- 		parent = clk_get(NULL, "usb_refclkin");
- 	else
--		parent = clk_get(&da8xx_usb_phy.dev, "usb20_phy");
-+		parent = clk_get(&da8xx_usb_phy.dev, "usb0_clk48");
- 	if (IS_ERR(parent))
- 		return PTR_ERR(parent);
- 
-diff --git a/drivers/phy/ti/phy-da8xx-usb.c b/drivers/phy/ti/phy-da8xx-usb.c
-index d463587..4daa905 100644
---- a/drivers/phy/ti/phy-da8xx-usb.c
-+++ b/drivers/phy/ti/phy-da8xx-usb.c
-@@ -160,15 +160,15 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(d_phy->regmap);
- 	}
- 
--	d_phy->usb11_clk = devm_clk_get(dev, "usb11_phy");
-+	d_phy->usb11_clk = devm_clk_get(dev, "usb1_clk48");
- 	if (IS_ERR(d_phy->usb11_clk)) {
--		dev_err(dev, "Failed to get usb11_phy clock\n");
-+		dev_err(dev, "Failed to get usb1_clk48\n");
- 		return PTR_ERR(d_phy->usb11_clk);
- 	}
- 
--	d_phy->usb20_clk = devm_clk_get(dev, "usb20_phy");
-+	d_phy->usb20_clk = devm_clk_get(dev, "usb0_clk48");
- 	if (IS_ERR(d_phy->usb20_clk)) {
--		dev_err(dev, "Failed to get usb20_phy clock\n");
-+		dev_err(dev, "Failed to get usb0_clk48\n");
- 		return PTR_ERR(d_phy->usb20_clk);
- 	}
- 
--- 
-2.7.4
+Also, are the oopses and WARNs the same as before?
