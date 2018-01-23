@@ -1,48 +1,126 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 14:23:10 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
- <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
- <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
- <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
- <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
- <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
- <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
-Message-ID: <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Jan 2018 20:45:44 +0000
+Subject: [BISECTED] kexec issue with v4.15-rc on N8x0
+In-Reply-To: <20180122220654.k6atriweesf2qmw4@darkstar.musicnaut.iki.fi>
+References: <20180111194747.k5qwz66mfntj6v2g@darkstar.musicnaut.iki.fi>
+ <20180115181508.GM4821@atomide.com>
+ <20180122220654.k6atriweesf2qmw4@darkstar.musicnaut.iki.fi>
+Message-ID: <20180123204544.GM28231@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 02:05 PM, David Lechner wrote:
-> On 01/23/2018 02:01 PM, David Lechner wrote:
->> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
->>>
->>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
->>> but somehow the clock doesn't end up in the list of the device's
->>> clocks - which is why it's not enabled by pm_runtime_get_sync().
->>>
->>
->>
->> Right. This is because devm_clk_get() now finds the clock via device
->> tree instead of a clkdev lookup entry. However, I think that the PM
->> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
->> the clkdev lookup to match the con_id and does not use device tree.
->> The same thing is happing in mdio, emac and lcdc.
->>
+On Tue, Jan 23, 2018 at 12:06:54AM +0200, Aaro Koskinen wrote:
+> Hi,
 > 
-> Minor correction: It looks like emac doesn't do this because it doesn't
-> have a con_id of "fck". But, the same clock is shared by emac and mdio, so
-> since mdio enables the clock, emac doesn't notice or care that it did
-> not enable the clock itself.
+> On Mon, Jan 15, 2018 at 10:15:08AM -0800, Tony Lindgren wrote:
+> > * Aaro Koskinen <aaro.koskinen@iki.fi> [180111 11:48]:
+> > > When booting v4.15-rc kernel with kexec (kexec-tools 2.0.16) on N8x0, I get:
+> > > 
+> > >     Uncompressing Linux... done, booting the kernel.
+> > >     no ATAGS support: can't continue
+> > > 
+> > > v4.14 kernel works OK.
+> > > 
+> > > I bisected this to:
+> > > 
+> > > commit c772568788b5f0cbaac7c8d4111d7173bfc90673
+> > > Author: Russell King <rmk+kernel@armlinux.org.uk>
+> > > Date:   Thu Sep 21 18:10:19 2017 +0100
+> > > 
+> > >     ARM: add additional table to compressed kernel
+> > > 
+> > > If I revert the commit, kexec booting starts to work. Interesting,
+> > > the patch mentions "This is necessary for correct behaviour of kexec.",
+> > > so I wonder what could be wrong...
+> > 
+> > So care to post what you get if you load with kexec -d -l options
+> > before and after this commit?
+> 
+> See below. I guess the interesting part is the "zImage has tags" with the
+> bad kernel.
+> 
+> Bad (plain v4.15-rc9)
+> ---------------------
+> kernel: 0xb6a25008 kernel_size: 0x3ce605
+> MEMORY RANGES
+> 0000000080000000-0000000087ffffff (0)
+> zImage header: 0x016f2818 0x00000000 0x003c59d0
+> zImage size 0x3c59d0, file size 0x3ce605
 
-How about using pm_clk_add_clk() in these drivers to explicitly use the
-clocks for power management instead of relying on pm_clk_add_notifier()
-to do this implicitly?
+This looks like you've appended a DTB blob to the zImage as the file
+is larger than the zImage says it should be.
+
+> zImage has tags
+>   offset 0x00003be0 tag 0x5a534c4b size 8
+
+Right, so this says that this is a "modern" kernel that's being loaded
+with the additional tags in that tell kexec how much space the
+decompressed kernel requires.
+
+> kernel image size: 0x00c5c6ec
+
+and it requires this amount of space.
+
+> kexec_load: entry = 0x80008000 flags = 0x280000
+> nr_segments = 2
+> segment[0].buf   = 0xb6a25008
+> segment[0].bufsz = 0x3c59d0
+> segment[0].mem   = 0x80008000
+> segment[0].memsz = 0x3c6000
+
+This is the kernel, with the appended dtb removed.
+
+> segment[1].buf   = 0x1ed52b8
+> segment[1].bufsz = 0x8c35
+> segment[1].mem   = 0x80c66000
+> segment[1].memsz = 0x9000
+
+This is the DTB, placed out of the way from the kernel (the highest
+address the kernel will use while decompressing is 0x00c5c6ec +
+0x80008000.  Everything here looks correct.
+
+> [    4.850341] kexec_core: Starting new kernel
+> [    4.854766] Bye!
+> 
+> (kernel fails to boot)
+> 
+> Good (v4.15-rc9 and c772568788b5f0cbaac7c8d4111d7173bfc90673 reverted)
+> -----------------------------
+> kernel: 0xb6999008 kernel_size: 0x3ce9bd
+> MEMORY RANGES
+> 0000000080000000-0000000087ffffff (0)
+> zImage header: 0x016f2818 0x00000000 0x003c5d88
+> zImage size 0x3c5d88, file size 0x3ce9bd
+> kexec_load: entry = 0x80008000 flags = 0x280000
+> nr_segments = 2
+> segment[0].buf   = 0xb6999008
+> segment[0].bufsz = 0x3c5d88
+> segment[0].mem   = 0x80008000
+> segment[0].memsz = 0x3c6000
+
+Here we have the same thing for the kernel.
+
+> segment[1].buf   = 0x14192b8
+> segment[1].bufsz = 0x8c35
+> segment[1].mem   = 0x812e7000
+> segment[1].memsz = 0x9000
+
+Here, the DTB is placed much further away.
+
+Unfortunately, with this debug, it's still not possible to debug this.
+
+I'm rather sick of these image placement issues, there seems to be no
+solution here that works for everyone, no matter how hard I try with
+my knowledge of how the ARM kernel decompresses and places itself.
+
+It really doesn't help that it took ages for the kexec-tools patches
+to get merged, and when they did get merged, the wrong patch set was
+taken.  Consequently, the debug above does not match my local source
+tree, and neither does the code.
+
+Sorry, but I'm afraid I can't debug this at the moment.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
