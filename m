@@ -1,96 +1,90 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 23 Jan 2018 20:21:02 +0800
-Subject: [PATCH V3 01/10] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
- support
-In-Reply-To: <1516705426.7870.45.camel@baylibre.com>
-References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
- <1516367470-24340-2-git-send-email-aisheng.dong@nxp.com>
- <1516705426.7870.45.camel@baylibre.com>
-Message-ID: <20180123122102.GA16865@b29396-OptiPlex-7040>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 23 Jan 2018 12:27:53 +0000
+Subject: [PATCH 00/16] arm64: Rework cpu capabilities handling
+Message-ID: <20180123122809.16269-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:03:46PM +0100, Jerome Brunet wrote:
-> On Fri, 2018-01-19 at 21:11 +0800, Dong Aisheng wrote:
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index f711be6..68ccd36 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -360,6 +360,7 @@ struct clk_div_table {
-> >   * @shift:     shift to the divider bit field
-> >   * @width:     width of the divider bit field
-> >   * @table:     array of value/divider pairs, last entry should have div = 0
-> > + * @cached_val: cached div hw value used for CLK_DIVIDER_ZERO_GATE
-> >   * @lock:      register lock
-> >   *
-> >   * Clock with an adjustable divider affecting its output frequency.  Implements
-> > @@ -388,6 +389,12 @@ struct clk_div_table {
-> >   * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
-> >   *     except when the value read from the register is zero, the divisor is
-> >   *     2^width of the field.
-> > + * CLK_DIVIDER_ZERO_GATE - For dividers which are like CLK_DIVIDER_ONE_BASED
-> 
-> Unless I missed something in your patch, this comment says that, like
-> CLK_DIVIDER_MAX_AT_ZERO, CLK_DIVIDER_ZERO_GATE behave as a CLK_DIVIDER_ONE_BASED
-> clock
-> 
-> However, I don't see anything special done in _get_val() around
-> CLK_DIVIDER_ZERO_GATE which means that calling _get_val() with div=2 would give
-> val=1. This is more like a regular divider (when CLK_DIVIDER_ONE_BASED is not
-> set)
-> 
-> Also, when looking for the best divider, CCF could find that the best div is 1.
-> On a non-CLK_DIVIDER_ONE_BASED, this would translate to value 0 and
-> (accidentally) gate the clock .
-> 
-> all the occurrences of CLK_DIVIDER_ZERO_GATE I have seen in patch 9 are combined
-> with CLK_DIVIDER_ONE_BASED, which is probably why this potential issue has gone
-> unnoticed.
-> 
+This series reworks the arm64 CPU capabilities handling (which
+manages the system features and errata). The current infrastructure
+doesn't allow fine control for handling different features or errata.
+There is one rule for features and another rule for errata.
 
-Yes, this feature only works with CLK_DIVIDER_ONE_BASED in current design.
-Probably we should state more clearly in the code comments?
+* Features are checked only once, after all the boot time CPUs are
+  activated. Any new CPU that is brought up is prevented from booting
+  if it misses a feature already established. If the new CPU has a
+  feature not enabled already, it is allowed to boot.
 
-> I think CLK_DIVIDER_ZERO_GATE should just means that value 0 gate the clock, and
-> just that. It should not imply what the rest of values mean.
-> 
+* Errata checks are performed on all the CPUs and any new CPU is
+  OK to miss the capability. However if a late CPU requires a work around,
+  then we fail the CPU.
 
-It did not imply what the reset of values mean. User needs to specify the
-correct divider types. For current case, it should be CLK_DIVIDER_ONE_BASED
-only.
-e.g.
-000b - Clock disabled
-001b - Divide by 1
-010b - Divide by 2
+  This doesn't always apply to some features. e.g, KPTI is a security
+  feature which should be applied when at least one CPU needs it. So,
+  the tests should be performed on all the booting CPUs individually.
+  Also, if a CPU that needs this security feature is brought up later,
+  when the system has not enabled it, the CPU can boot making the system
+  insecure. Another exception is the hardware DBM for page tables. The
+  kernel can safely run with a mix of CPUs that have the feature turned
+  on and off. This again causes problem when a new CPU is brought up
+  which may not have the feature, which is killed.
 
-If anymore divider type want to use it, then we need extend the support
-accordingly.
+  Also there are other features like, GICV3 system register access,
+  which now need to be enabled very early based on the boot CPU to
+  allow the use of Priority handling to implement NMI.
 
-Theoretically any type of divider gets a 0 val (register value) is invalid for
-ZERO_GATE feature. We should avoid it.
+This calls for finer level of control per capability and the series
+implements the same by defining how to deal with a conflict of a
+given capability on a CPU with that of the system level state. It
+also consolidates the handling of features and errata into generic
+helpers. The table of features and errata are left as they are to
+allow easier look up for a given type.
+We also cleans up the MIDR range handling and cleans up some of the
+errata checks where the entries were duplicated for checking different
+CPU models. Finally it also implements a work around for Arm Cortex-A55
+erratum 1024718 based on the new infrastructure.
 
-> In a more general way, I'd love to see a feature such as CLK_DIVIDER_ZERO_GATE
-> added to the divider but I'm bit concerned of all the quirks we are slowly
-> adding to the generic divider. It seems we are all trying re-use the algorithm
-> of clk_divider_bestdiv() with different 'val-to-div' transfer function. Not too
-> sure what the best solution could be though.
-> 
+Applies on aarch64 for-next/core tree + [0]. The tree is also available
+at :
+	git://linux-arm.org/linux-skp.git cpu-caps-rework/v1
 
-IMHO CLK_DIVIDER_ZERO_GATE only indicates the 0 val means clk gate.
-It does not assume divider types. That looks like a generic way and is exactly
-what this patch intends to do. Does it make sense?
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/554754.html
 
-Regards
-Dong Aisheng
+Dave Martin (1):
+  arm64: capabilities: Update prototype for enable call back
 
-> > + *     when the value read from the register is zero, it means the divisor
-> > + *     is gated. For this case, the cached_val will be used to store the
-> > + *     intermediate div for the normal rate operation, like set_rate/get_rate/
-> > + *     recalc_rate. When the divider is ungated, the driver will actually
-> > + *     program the hardware to have the requested divider value.
-> >   */
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Suzuki K Poulose (15):
+  arm64: Move errata work around check on boot CPU
+  arm64: Move errata capability processing code
+  arm64: capabilities: Prepare for fine grained capabilities
+  arm64: Add flags to check the safety of a capability for late CPU
+  arm64: capabilities: Unify the verification
+  arm64: capabilities: Filter the entries based on a given type
+  arm64: capabilities: Group handling of features and errata
+  arm64: capabilities: Introduce strict features based on local CPU
+  arm64: Make KPTI strict CPU local feature
+  arm64: errata: Clean up midr range helpers
+  arm64: Add helpers for checking CPU MIDR against a range
+  arm64: Add support for checking errata based on a list of MIDRS
+  arm64: Add MIDR encoding for Arm Cortex-A55 and Cortex-A35
+  arm64: Delay enabling hardware DBM feature
+  arm64: Add work around for Arm Cortex-A55 Erratum 1024718
+
+ Documentation/arm64/silicon-errata.txt |   1 +
+ arch/arm64/Kconfig                     |  14 ++
+ arch/arm64/include/asm/cpucaps.h       |   3 +-
+ arch/arm64/include/asm/cpufeature.h    |  89 ++++++++---
+ arch/arm64/include/asm/cputype.h       |  42 ++++++
+ arch/arm64/include/asm/fpsimd.h        |   4 +-
+ arch/arm64/include/asm/processor.h     |   7 +-
+ arch/arm64/kernel/cpu_errata.c         | 173 +++++++++------------
+ arch/arm64/kernel/cpufeature.c         | 267 +++++++++++++++++++++++++--------
+ arch/arm64/kernel/fpsimd.c             |   3 +-
+ arch/arm64/kernel/smp.c                |   6 -
+ arch/arm64/kernel/traps.c              |   3 +-
+ arch/arm64/mm/fault.c                  |   2 +-
+ arch/arm64/mm/proc.S                   |   5 +-
+ 14 files changed, 422 insertions(+), 197 deletions(-)
+
+-- 
+2.13.6
