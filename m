@@ -1,21 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Jan 2018 10:16:09 +0100
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <20180123161633.4df47906@canb.auug.org.au>
-References: <20180123161633.4df47906@canb.auug.org.au>
-Message-ID: <CAK8P3a2iMM9ExhjCcP3V4Q-AUBKTr86sFf-sM4cnSy8AWR50Tw@mail.gmail.com>
+Date: Tue, 23 Jan 2018 10:18:16 +0100
+Subject: [GIT PULL v2] updates to soc/fsl drivers for v4.16
+In-Reply-To: <1516662726-12584-1-git-send-email-leoyang.li@nxp.com>
+References: <1516662726-12584-1-git-send-email-leoyang.li@nxp.com>
+Message-ID: <CAK8P3a0wi7pOe+OKejUcCtRewytWjs7LW124-2fro6-wA34XsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 6:16 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
+On Tue, Jan 23, 2018 at 12:12 AM, Li Yang <leoyang.li@nxp.com> wrote:
+> Hi arm-soc maintainer,
 >
-> Commit
+> Please merge the following tag to get updates to the soc/fsl/guts driver
+> for support of additional SoCs and more error path handling.
 >
->   8dd0e9b5f7fa ("of: platform: fix OF node refcount leak")
->
-> is missing a Signed-off-by from its committer.
+> v2: I have restored the baseline of the pull request to 4.15-rc2.  The two
+> patches are pretty simple and straightforward.  Please reconsider to merge it.
 
-Fixed now, thanks for pointing out my mistake.
+Pulled into next/drivers, thanks for the updated pull request!
 
-       Arnd
+     Arnd
