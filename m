@@ -1,52 +1,62 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Tue, 23 Jan 2018 18:43:49 +0800
-Subject: [PATCH v3 11/20] arm64: mm: Map entry trampoline into trampoline
- and kernel page tables
-In-Reply-To: <20180123100447.GB1686@arm.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
- <1512563739-25239-12-git-send-email-will.deacon@arm.com>
- <ca66f10b-50b6-b876-3dac-4ecd981903cf@huawei.com>
- <20180123100447.GB1686@arm.com>
-Message-ID: <09b4f791-241d-61f5-a6b5-889021a83fe4@huawei.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 23 Jan 2018 12:03:46 +0100
+Subject: [PATCH V3 01/10] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE
+ clk support
+In-Reply-To: <1516367470-24340-2-git-send-email-aisheng.dong@nxp.com>
+References: <1516367470-24340-1-git-send-email-aisheng.dong@nxp.com>
+ <1516367470-24340-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1516705426.7870.45.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, 2018-01-19 at 21:11 +0800, Dong Aisheng wrote:
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index f711be6..68ccd36 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -360,6 +360,7 @@ struct clk_div_table {
+>   * @shift:     shift to the divider bit field
+>   * @width:     width of the divider bit field
+>   * @table:     array of value/divider pairs, last entry should have div = 0
+> + * @cached_val: cached div hw value used for CLK_DIVIDER_ZERO_GATE
+>   * @lock:      register lock
+>   *
+>   * Clock with an adjustable divider affecting its output frequency.  Implements
+> @@ -388,6 +389,12 @@ struct clk_div_table {
+>   * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
+>   *     except when the value read from the register is zero, the divisor is
+>   *     2^width of the field.
+> + * CLK_DIVIDER_ZERO_GATE - For dividers which are like CLK_DIVIDER_ONE_BASED
 
-On 2018/1/23 18:04, Will Deacon wrote:
-> On Tue, Jan 23, 2018 at 04:28:45PM +0800, Yisheng Xie wrote:
->> On 2017/12/6 20:35, Will Deacon wrote:
->>> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
->>> +static int __init map_entry_trampoline(void)
->>> +{
->>> +	extern char __entry_tramp_text_start[];
->>> +
->>> +	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
->>> +	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
->>> +
->>> +	/* The trampoline is always mapped and can therefore be global */
->>> +	pgprot_val(prot) &= ~PTE_NG;
->>> +
->>> +	/* Map only the text into the trampoline page table */
->>> +	memset(tramp_pg_dir, 0, PGD_SIZE);
->>> +	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
->>> +			     prot, pgd_pgtable_alloc, 0);
->>
->> How the tramp_pg_dir is used, should it be set to ttbr1 when exit kernel? Sorry
->> for I do not find where it is used.
-> 
-> Yes, that's what happens when we return to userspace. The code is a little
-> convoluted, but the tramp_pg_dir is placed at a fixed offset from swapper
-> (see the linker script) so the sub instruction in tramp_unmap_kernel is what
-> gives us the ttbr1 value we need.
+Unless I missed something in your patch, this comment says that, like
+CLK_DIVIDER_MAX_AT_ZERO, CLK_DIVIDER_ZERO_GATE behave as a CLK_DIVIDER_ONE_BASED
+clock
 
-oh, I missed that. Maybe a comment inline is better to understand. Thanks once
-more for your help and explain :)
+However, I don't see anything special done in _get_val() around
+CLK_DIVIDER_ZERO_GATE which means that calling _get_val() with div=2 would give
+val=1. This is more like a regular divider (when CLK_DIVIDER_ONE_BASED is not
+set)
 
-Thanks
-Yisheng
-> 
-> Will
-> 
-> .
-> 
+Also, when looking for the best divider, CCF could find that the best div is 1.
+On a non-CLK_DIVIDER_ONE_BASED, this would translate to value 0 and
+(accidentally) gate the clock .
+
+all the occurrences of CLK_DIVIDER_ZERO_GATE I have seen in patch 9 are combined
+with CLK_DIVIDER_ONE_BASED, which is probably why this potential issue has gone
+unnoticed.
+
+I think CLK_DIVIDER_ZERO_GATE should just means that value 0 gate the clock, and
+just that. It should not imply what the rest of values mean.
+
+In a more general way, I'd love to see a feature such as CLK_DIVIDER_ZERO_GATE
+added to the divider but I'm bit concerned of all the quirks we are slowly
+adding to the generic divider. It seems we are all trying re-use the algorithm
+of clk_divider_bestdiv() with different 'val-to-div' transfer function. Not too
+sure what the best solution could be though.
+
+> + *     when the value read from the register is zero, it means the divisor
+> + *     is gated. For this case, the cached_val will be used to store the
+> + *     intermediate div for the normal rate operation, like set_rate/get_rate/
+> + *     recalc_rate. When the divider is ungated, the driver will actually
+> + *     program the hardware to have the requested divider value.
+>   */
