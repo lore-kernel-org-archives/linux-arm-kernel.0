@@ -1,28 +1,28 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 23 Jan 2018 09:40:55 +0800
-Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <1516643421.25726.17.camel@pengutronix.de>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-2-l.stach@pengutronix.de>
- <20180122144729.GA27764@dragon>
- <CAK8P3a0Yq1WuUYih6WKbbjoGRwq-rCQ8OEpuyu0=-SOVV2MNLg@mail.gmail.com>
- <1516643421.25726.17.camel@pengutronix.de>
-Message-ID: <20180123014054.GB27764@dragon>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Tue, 23 Jan 2018 02:09:02 +0000
+Subject: [PATCH -next] cpufreq: scpi: fix error return code in
+ scpi_cpufreq_init()
+Message-ID: <1516673342-170261-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 06:50:21PM +0100, Lucas Stach wrote:
-> The nice thing about the split into Freescale/NXP is that it nicely
-> separates the Layerscape and i.MX stuff, which are two quite different
-> architectures.
+Fix to return a negative error code from the clk_get() error handling
+case instead of 0, as done elsewhere in this function.
 
-With more and more IPs shared between Layerscape and i.MX, the boundary
-of these two architectures becomes blurry.
+Fixes: 343a8d17fa8d ("cpufreq: scpi: remove arm_big_little dependency")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/cpufreq/scpi-cpufreq.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> But that's just a nice coincidence and I'll happily
-> rework the patches to whatever suits the maintainers most. Please make
-> a judgement call.
-
-Let's put them into 'freescale' folder.  Thanks.
-
-Shawn
+diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+index 247fcbf..7095fc0 100644
+--- a/drivers/cpufreq/scpi-cpufreq.c
++++ b/drivers/cpufreq/scpi-cpufreq.c
+@@ -145,6 +145,7 @@ static int scpi_cpufreq_init(struct cpufreq_policy *policy)
+ 	if (IS_ERR(priv->clk)) {
+ 		dev_err(cpu_dev, "%s: Failed to get clk for cpu: %d\n",
+ 			__func__, cpu_dev->id);
++		ret = PTR_ERR(priv->clk);
+ 		goto out_free_cpufreq_table;
+ 	}
