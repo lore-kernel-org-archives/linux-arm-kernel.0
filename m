@@ -1,85 +1,79 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 23 Jan 2018 15:56:47 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <38b081e9-fe00-cf18-2d72-5ad1937c3800@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MesQTvkVtPLOGr2G7-KSR=k35y24SsO4s8rDbCv=2-G7A@mail.gmail.com>
- <38b081e9-fe00-cf18-2d72-5ad1937c3800@lechnology.com>
-Message-ID: <CAMRc=McKvPzL3rp32+yuL12gf3YcH52QswU61pACmAMhB8sLsg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 23 Jan 2018 14:59:34 +0000
+Subject: [PATCH 02/16] arm64: Move errata work around check on boot CPU
+In-Reply-To: <20180123122809.16269-3-suzuki.poulose@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-3-suzuki.poulose@arm.com>
+Message-ID: <20180123145934.GS22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-22 18:11 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 01/22/2018 07:29 AM, Bartosz Golaszewski wrote:
->>
->> 2018-01-20 18:13 GMT+01:00 David Lechner <david@lechnology.com>:
->>>
->>> This series converts mach-davinci to use the common clock framework.
->>>
->>> The series works like this, the first 19 patches create new clock drivers
->>> using the common clock framework. There are basically 3 groups of clocks
->>> -
->>> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each
->>> have
->>> unique init data, which is the reason for so many patches.
->>>
->>> Then, starting with "ARM: da830: add new clock init using common clock",
->>> we get the mach code ready for the switch by adding the code needed for
->>> the new clock drivers and adding #ifndef CONFIG_COMMON_CLK around the
->>> legacy clocks so that we can switch easily between the old and the new.
->>>
->>> "ARM: davinci: switch to common clock framework" actually flips the
->>> switch
->>> to start using the new clock drivers. Then the next 8 patches remove all
->>> of the old clock code.
->>>
->>> The final three patches add device tree clock support to the one SoC that
->>> supports it.
->>>
->>> v6 changes (also see individual patches for details):
->>> - All of the device tree bindings are changed
->>> - All of the clock drivers are changed significantly
->>> - Fixed issues brought up during review of v5
->>> - "ARM: davinci: move davinci_clk_init() to init_time" is removed from
->>> this
->>>    series and submitted separately
->>>
->>> v5 changes:
->>> - Basically, this is an entirely new series
->>> - Patches are broken up into bite-sized pieces
->>> - Converted PSC clock driver to use regmap
->>> - Restored "force" flag for certain DA850 clocks
->>> - Added device tree bindings
->>> - Moved more of the clock init to drivers/clk
->>> - Fixed frequency scaling (maybe*)
->>>
->>> * I have frequency scaling using cpufreq-dt, so I know the clocks are
->>> doing
->>>    what they need to do to make this work, but I haven't figured out how
->>> to
->>>    test davinci-cpufreq driver yet. (Patches to make cpufreq-dt work will
->>> be
->>>    sent separately after this series has landed.)
->>>
->>
->> This driver doesn't have DT support - I suppose it would be useful to
->> add it and also add the corresponding DT node to da850.dtsi. If you're
->> ok with it, I can start working on it. I also have a patch for the i2c
->> cpufreq issue and it would be nice to test it with it.
->>
->
-> Why not just use cpufreq-dt for the DT case? It seems to be working.
->
-> I have preliminary patches on GitHub [1][2].
->
-> [1]:
-> https://github.com/dlech/ev3dev-kernel/commit/e38897148a949b736ab135983887f9c81375f108
-> [2]:
-> https://github.com/dlech/ev3dev-kernel/commit/bab85f9e45450a36a7ea6f4407f89a75edb63761
->
+On Tue, Jan 23, 2018 at 12:27:55PM +0000, Suzuki K Poulose wrote:
+> We trigger CPU errata work around check on the boot CPU from
+> smp_prepare_boot_cpu() to make sure that we run the checks only
+> after the CPU feature infrastructure is initialised.
 
-No problem with that - I'll test them as soon as I'll be able to boot my lcdk.
+On the surface of it, this sounds like a bug fix.
 
-Thanks,
-Bartosz
+Should there be a Fixes tag if so?
+
+If this reordering doesn't matter for upstream, it would be good to have
+a quick explanation here as to why not.
+
+Cheers
+---Dave
+
+> 
+> We can do this from init_cpu_features() which is called only
+> on the boot CPU and does the initilisation of the infrastructure.
+> As we are consolidating the cpu capability handling, let us
+> move this to where it should belong. No functional changes.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 6 ++++++
+>  arch/arm64/kernel/smp.c        | 6 ------
+>  2 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 6a8dfdc532b1..ebb467340b9c 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -545,6 +545,12 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+>  		init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
+>  		sve_init_vq_map();
+>  	}
+> +
+> +	/*
+> +	 * Run the errata work around checks on the boot CPU, once we have
+> +	 * initialised the cpu feature infrastructure.
+> +	 */
+> +	update_cpu_errata_workarounds();
+>  }
+>  
+>  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 3b8ad7be9c33..5cef11450183 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -448,12 +448,6 @@ void __init smp_prepare_boot_cpu(void)
+>  	jump_label_init();
+>  	cpuinfo_store_boot_cpu();
+>  	save_boot_cpu_run_el();
+> -	/*
+> -	 * Run the errata work around checks on the boot CPU, once we have
+> -	 * initialised the cpu feature infrastructure from
+> -	 * cpuinfo_store_boot_cpu() above.
+> -	 */
+> -	update_cpu_errata_workarounds();
+>  }
+>  
+>  static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+> -- 
+> 2.13.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
