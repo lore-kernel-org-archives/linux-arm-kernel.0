@@ -1,45 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 23 Jan 2018 14:19:19 +0800
-Subject: [PATCH] ARM: sunxi_defconfig: Enable CMA
-In-Reply-To: <20180122073400.gplq23xai7rlt3jp@flea.lan>
-References: <20180119133208.12873-1-maxime.ripard@free-electrons.com>
- <CAGb2v67wwa30E2GFaWEuLe1fEvCBmEy7H_3ystv460+1SAJGuA@mail.gmail.com>
- <20180122073400.gplq23xai7rlt3jp@flea.lan>
-Message-ID: <CAGb2v67Gr5zdSO9oxARhRsDYJ0spVP0aNAO=yC2h_s28U8nyeA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 23 Jan 2018 15:11:50 +0800
+Subject: [PATCH v2] ARM: dts: ls1021a: add nodes for on-chip ram
+In-Reply-To: <1514994345-2471-1-git-send-email-rasmus.villemoes@prevas.dk>
+References: <1513870698-31264-1-git-send-email-rasmus.villemoes@prevas.dk>
+ <1514994345-2471-1-git-send-email-rasmus.villemoes@prevas.dk>
+Message-ID: <20180123071149.GC27764@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 3:34 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sat, Jan 20, 2018 at 11:37:28AM +0800, Chen-Yu Tsai wrote:
->> On Fri, Jan 19, 2018 at 9:32 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > The DRM driver most notably, but also out of tree drivers (for now) like
->> > the VPU or GPU drivers, are quite big consumers of large, contiguous memory
->> > buffers. However, the sunxi_defconfig doesn't enable CMA in order to
->> > mitigate that, which makes them almost unusable.
->> >
->> > Enable it to make sure it somewhat works.
->>
->> IIRC the default size for CMA pretty much limits it to small tablet
->> screen resolutions. Is this something we want to leave up to the
->> user?
->
-> That's one of the pain points of CMA in our case. The amount of memory
-> you need depends on the resolution itself, but also the number of
-> multiple buffers you want to use, and even the number of planes you
-> want to use.
->
-> And then, you have to trade that off with the amount of RAM you have
-> on your board in order to still have something that's usable.
->
-> tl;dr: I don't really see how to define a value good enough for
-> everyone.
+On Wed, Jan 03, 2018 at 04:45:45PM +0100, Rasmus Villemoes wrote:
+> Although the two nodes constitute one contiguous 128K region, still
+> describe them separately:
+> 
+> - That's how they are described in the reference manual: "Each OCRAM
+>   occupies a 64 KB of address region...", and the names ocram1 and
+>   ocram2 are also as used in the manual.
+> 
+> - The two areas are treated differently by the boot ROM code: OCRAM2 is
+>   zero-initialized, while, again quoting the RM, "software must perform
+>   the zero initialization of OCRAM1."
+> 
+> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
 
-Yeah, that's what I thought. On the other hand, I don't think any
-of the kernelci boards have display enabled? So either way we won't
-see any automated tests fail.
-
-ChenYu
+Applied, thanks.
