@@ -1,85 +1,140 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 23 Jan 2018 12:27:58 +0000
-Subject: [PATCH 05/16] arm64: Add flags to check the safety of a capability
- for late CPU
+Date: Tue, 23 Jan 2018 12:27:59 +0000
+Subject: [PATCH 06/16] arm64: capabilities: Unify the verification
 In-Reply-To: <20180123122809.16269-1-suzuki.poulose@arm.com>
 References: <20180123122809.16269-1-suzuki.poulose@arm.com>
-Message-ID: <20180123122809.16269-6-suzuki.poulose@arm.com>
+Message-ID: <20180123122809.16269-7-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two different flags to indicate if the conflict of a capability
-on a late CPU with the current system state
-
- 1) Can a CPU have a capability when the system doesn't have it ?
-
-    Most arm64 features could have this set. While erratum work arounds
-    cannot have this, as we may miss work arounds.
-
- 2) Can a CPU miss a capability when the system has it ?
-    This could be set for arm64 erratum work arounds as we don't
-    care if a CPU doesn't need the work around. However it should
-    be clear for features.
-
-These flags could be added to certain entries based on their nature.
+Now that each capability describes how to treat the conflicts
+of CPU cap state vs System wide cap state, we can unify the
+verification logic to a single place.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 35 +++++++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 87 ++++++++++++++++++++++++++----------------
+ 1 file changed, 54 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 4fd5de8ef33e..27d037bb0451 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -94,10 +94,25 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
- #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
- #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
- 
--/* CPU errata detected at boot time based on feature of one or more CPUs */
--#define ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM	(ARM64_CPUCAP_SCOPE_LOCAL_CPU)
--/* CPU feature detected at boot time based on system-wide value of a feature */
--#define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	(ARM64_CPUCAP_SCOPE_SYSTEM)
-+/* Is it safe for a late CPU to have this capability when system doesn't already have */
-+#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE	BIT(2)
-+/* Is it safe for a late CPU to miss this capability when system has it */
-+#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	BIT(3)
-+
-+/*
-+ * CPU errata detected at boot time based on feature of one or more CPUs.
-+ * It is not safe for a late CPU to have this feature when the system doesn't
-+ * have it. But it is safe to miss the feature if the system has it.
-+ */
-+#define ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM	\
-+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
-+/*
-+ * CPU feature detected at boot time based on system-wide value of a feature.
-+ * It is safe for a late CPU to have this feature even though the system doesn't
-+ * have it already. But the CPU must have this feature if the system does.
-+ */
-+#define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	\
-+	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE)
- 
- struct arm64_cpu_capabilities {
- 	const char *desc;
-@@ -128,6 +143,18 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
- 	return cap->type & ARM64_CPUCAP_SCOPE_MASK;
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 43c7e992d784..79737034a628 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1228,6 +1228,54 @@ static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *
  }
  
-+static inline bool
-+cpucap_late_cpu_missing_cap_safe(const struct arm64_cpu_capabilities *cap)
+ /*
++ * Run through the list of capabilities to check for conflicts.
++ * Returns "false" on conflicts.
++ */
++static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
 +{
-+	return !!(cap->type & ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS);
++	bool cpu_has_cap, system_has_cap;
++	const struct arm64_cpu_capabilities *caps = caps_list;
++
++	for (; caps->matches; caps++) {
++		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
++		system_has_cap =  cpus_have_cap(caps->capability);
++
++		if (system_has_cap) {
++			/*
++			 * Check if the new CPU misses an advertised feature, which is not
++			 * safe to miss.
++			 */
++			if (!cpu_has_cap && !cpucap_late_cpu_missing_cap_safe(caps))
++				break;
++			/*
++			 * We have to issue enable() irrespective of whether the CPU
++			 * has it or not, as it is enabeld system wide. It is upto
++			 * the call back to take appropriate action on this CPU.
++			 */
++			if (caps->enable)
++				caps->enable(caps);
++		} else {
++			/*
++			 * Check if the CPU has this capability if it isn't safe to
++			 * have when the system doesn't.
++			 */
++			if (cpu_has_cap && !cpucap_late_cpu_have_cap_safe(caps))
++				break;
++		}
++	}
++
++	if (caps->matches) {
++		pr_crit("CPU%d: Detected conflict for capability %d (%s), System: %d, CPU: %d\n",
++			smp_processor_id(), caps->capability,
++			caps->desc ? : "no description",
++			system_has_cap, cpu_has_cap);
++		return false;
++	}
++
++	return true;
 +}
 +
-+static inline bool
-+cpucap_late_cpu_have_cap_safe(const struct arm64_cpu_capabilities *cap)
-+{
-+	return !!(cap->type & ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE);
-+}
-+
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
- extern struct static_key_false arm64_const_caps_ready;
++/*
+  * Check for CPU features that are used in early boot
+  * based on the Boot CPU value.
+  */
+@@ -1249,25 +1297,10 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+ 		}
+ }
+ 
+-static void
+-verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
++static void verify_local_cpu_features(void)
+ {
+-	const struct arm64_cpu_capabilities *caps = caps_list;
+-	for (; caps->matches; caps++) {
+-		if (!cpus_have_cap(caps->capability))
+-			continue;
+-		/*
+-		 * If the new CPU misses an advertised feature, we cannot proceed
+-		 * further, park the cpu.
+-		 */
+-		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
+-			pr_crit("CPU%d: missing feature: %s\n",
+-					smp_processor_id(), caps->desc);
+-			cpu_die_early();
+-		}
+-		if (caps->enable)
+-			caps->enable(caps);
+-	}
++	if (!__verify_local_cpu_caps(arm64_features))
++		cpu_die_early();
+ }
+ 
+ static void verify_sve_features(void)
+@@ -1294,20 +1327,8 @@ static void verify_sve_features(void)
+  */
+ static void verify_local_cpu_errata_workarounds(void)
+ {
+-	const struct arm64_cpu_capabilities *caps = arm64_errata;
+-
+-	for (; caps->matches; caps++) {
+-		if (cpus_have_cap(caps->capability)) {
+-			if (caps->enable)
+-				caps->enable(caps);
+-		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
+-			pr_crit("CPU%d: Requires work around for %s, not detected"
+-					" at boot time\n",
+-				smp_processor_id(),
+-				caps->desc ? : "an erratum");
+-			cpu_die_early();
+-		}
+-	}
++	if (__verify_local_cpu_caps(arm64_errata))
++		cpu_die_early();
+ }
+ 
+ static void update_cpu_errata_workarounds(void)
+@@ -1331,7 +1352,7 @@ static void __init enable_errata_workarounds(void)
+ static void verify_local_cpu_capabilities(void)
+ {
+ 	verify_local_cpu_errata_workarounds();
+-	verify_local_cpu_features(arm64_features);
++	verify_local_cpu_features();
+ 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
+ 
+ 	if (system_supports_32bit_el0())
 -- 
 2.13.6
