@@ -1,21 +1,38 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 24 Jan 2018 07:30:19 +0100
-Subject: [PATCH v2 0/5]  i2c: meson-axg: add I2C controller driver
-In-Reply-To: <7ho9ltba6c.fsf@baylibre.com>
-References: <20171120145415.6581-1-yixun.lan@amlogic.com>
- <7ho9ltba6c.fsf@baylibre.com>
-Message-ID: <20180124063019.mzq7egwotn2uakr5@ninjato>
+Date: Wed, 24 Jan 2018 07:35:07 +0100
+Subject: [PATCH v4 0/3] i2c: mv64xxx: Fix clock resource for Armada 7K/8K
+In-Reply-To: <20180116163540.1092-1-gregory.clement@free-electrons.com>
+References: <20180116163540.1092-1-gregory.clement@free-electrons.com>
+Message-ID: <20180124063507.swvhh3cy5au2bfbu@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 16, 2018 at 05:35:37PM +0100, Gregory CLEMENT wrote:
 
-> >   ARM64: dts: meson-axg: add I2C DT info for Meson-AXG SoC
-> >   ARM64: dts: meson-axg: describe pin DT info for I2C controller
-> >   ARM64: dts: meson-axg: enable I2C Master-1 for the audio speaker
+> This short series fixes the way the clocks are used for the mv64xxx
+> controller embedded in the Marvell Armada 7K/8K SoCs. On these SoCs a
+> second one is needed in order to clock the registers. It was not
+> noticed until now because we relied on the bootloader and also because
+> the clock driver was wrong.
 > 
-> Once you've merged, I'll take the DT patches through my amlogic tree.
+> Thanks to this fix, it would be possible to fix the clock driver
+> without introducing a regression.
+> 
+> The first patch is just a small cleanup found when I wrote the main
+> patch.
+> 
+> The last patch is not related to the series but as Wolfram to have a
+> maintainer for this driver I added the patch here.
 
-Done now! Have fun with the patches...
+Thomas, Andrew, Maxime, any tags you'd like to donate?
+
+>  - Add a maintainer for the i2c-mv64xxx driver, requested
+
+Well, I'd say "asked for"...
+
+> by Woflram Sang
+
+... whoever that guy is ;)
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -23,4 +40,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/21b995c7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/a7061a6c/attachment.sig>
