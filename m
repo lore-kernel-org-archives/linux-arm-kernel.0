@@ -1,33 +1,34 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 24 Jan 2018 16:29:38 +0530
-Subject: [Patch v7 06/12] [media] v4l2-ioctl: add HEVC format description
+Date: Wed, 24 Jan 2018 16:29:37 +0530
+Subject: [Patch v7 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
 In-Reply-To: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
 References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
- <CGME20180124112340epcas2p4051efc01bcc004b78ef4f5a9cd810303@epcas2p4.samsung.com>
-Message-ID: <1516791584-7980-7-git-send-email-smitha.t@samsung.com>
+ <CGME20180124112337epcas1p492f7efc58b30253a881eae3d991d72b1@epcas1p4.samsung.com>
+Message-ID: <1516791584-7980-6-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HEVC is a video coding format
+Add V4L2 definition for HEVC compressed format
 
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Reviewed-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 ---
- drivers/media/v4l2-core/v4l2-ioctl.c | 1 +
+ include/uapi/linux/videodev2.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
-index 7961499..8a3c6a8 100644
---- a/drivers/media/v4l2-core/v4l2-ioctl.c
-+++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-@@ -1268,6 +1268,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
- 		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 (SMPTE 412M Annex L)"; break;
- 		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
- 		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
-+		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break; /* aka H.265 */
- 		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
- 		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
- 		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA SN9C10X"; break;
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 1c095b5..ba937f5 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -635,6 +635,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
+ #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+ #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
++#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC aka H.265 */
+ 
+ /*  Vendor-specific formats   */
+ #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
 -- 
 2.7.4
