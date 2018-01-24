@@ -1,16 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 24 Jan 2018 12:32:23 +0800
-Subject: [PATCH] clocksource/drivers/timer_sun5i: Fix trailing semicolon
-In-Reply-To: <20180123114112.31297-1-luisbg@kernel.org>
-References: <20180123114112.31297-1-luisbg@kernel.org>
-Message-ID: <CAGb2v66xSTNa=cqoRPGJwU5GO8AJoMKY6TzTV5XZC72VjOZ-MA@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 24 Jan 2018 10:56:07 +0530
+Subject: [PATCH 2/3] pwm: pwm-omap-dmtimer: Fix frequency when using
+ prescaler
+In-Reply-To: <20180122105331.GA21159@lenoch>
+References: <20180117214629.GA11952@lenoch> <20180117214737.GC11952@lenoch>
+ <3e00e721-984c-e8db-49f7-046d7b335404@microchip.com>
+ <20180122105331.GA21159@lenoch>
+Message-ID: <cc075969-872e-1ec1-a854-2e19f2c952fe@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 7:41 PM, Luis de Bethencourt <luisbg@kernel.org> wrote:
-> The trailing semicolon is an empty statement that does no operation.
-> Removing it since it doesn't do anything.
->
-> Signed-off-by: Luis de Bethencourt <luisbg@kernel.org>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+On Monday 22 January 2018 04:23 PM, Ladislav Michl wrote:
+> Dear Claudiu,
+> 
+> On Mon, Jan 22, 2018 at 11:17:08AM +0200, Claudiu Beznea wrote:
+>> On 17.01.2018 23:47, Ladislav Michl wrote:
+>>> @@ -334,18 +348,18 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>>>  
+>>>  	mutex_init(&omap->mutex);
+>>>  
+>>> -	status = pwmchip_add(&omap->chip);
+>>> -	if (status < 0) {
+>>> +	ret = pwmchip_add(&omap->chip);
+>>> +	if (ret < 0) {
+>>>  		dev_err(&pdev->dev, "failed to register PWM\n");
+>>> -		omap->pdata->free(omap->dm_timer);
+>>> -		ret = status;
+>>> -		goto put;
+>>> +		goto free;
+>>>  	}
+>>>  
+>>>  	platform_set_drvdata(pdev, omap);
+>> >From documentation: "of_parse_phandle(): Returns the device_node pointer with refcount
+>> incremented. Use of_node_put() on it when done."
+>> In case of success the of_node_put() should also be called as I see.
+> 
+> Based on you previous suggestions found here:
+> https://patchwork.kernel.org/patch/10140209/
+> I'd say this fix belongs to patch which introduces of_node_put() in the error
+> path. I'll then rebase this patches on top of the fix.
+
+Agreed. I missed the success path as i assumed only error paths needed
+te of_node_put(). I will post v8 of this patch alone as other patches
+can be left untouched. Hope that is okay.
+
+Regards,
+Keerthy
+> 
+> Thank you,
+> 	ladis
+> 
