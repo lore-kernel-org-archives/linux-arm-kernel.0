@@ -1,60 +1,61 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 24 Jan 2018 18:35:09 +0800
-Subject: [PATCH v5 06/13] iommu/rockchip: Fix TLB flush of secondary IOMMUs
+Date: Wed, 24 Jan 2018 18:35:14 +0800
+Subject: [PATCH v5 11/13] iommu/rockchip: Fix error handling in init
 In-Reply-To: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
 References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180124103516.2571-7-jeffy.chen@rock-chips.com>
+Message-ID: <20180124103516.2571-12-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+It's hard to undo bus_set_iommu() in the error path, so move it to the
+end of rk_iommu_probe().
 
-Due to the bug in current code, only first IOMMU has the TLB lines
-flushed in rk_iommu_zap_lines. This patch fixes the inner loop to
-execute for all IOMMUs and properly flush the TLB.
-
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
 Changes in v5: None
 Changes in v4: None
 Changes in v3: None
-Changes in v2: None
+Changes in v2:
+Move bus_set_iommu() to rk_iommu_probe().
 
- drivers/iommu/rockchip-iommu.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index baba283ccdf9..c4131ca792e0 100644
+index faebb6dd1f69..9fea7d8206e9 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -274,19 +274,21 @@ static void rk_iommu_base_command(void __iomem *base, u32 command)
- {
- 	writel(command, base + RK_MMU_COMMAND);
- }
--static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova,
-+static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova_start,
- 			       size_t size)
- {
- 	int i;
--
--	dma_addr_t iova_end = iova + size;
-+	dma_addr_t iova_end = iova_start + size;
- 	/*
- 	 * TODO(djkurtz): Figure out when it is more efficient to shootdown the
- 	 * entire iotlb rather than iterate over individual iovas.
- 	 */
--	for (i = 0; i < iommu->num_mmu; i++)
--		for (; iova < iova_end; iova += SPAGE_SIZE)
-+	for (i = 0; i < iommu->num_mmu; i++) {
-+		dma_addr_t iova;
-+
-+		for (iova = iova_start; iova < iova_end; iova += SPAGE_SIZE)
- 			rk_iommu_write(iommu->bases[i], RK_MMU_ZAP_ONE_LINE, iova);
-+	}
- }
+@@ -1151,6 +1151,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	if (!dma_dev)
+ 		dma_dev = &pdev->dev;
  
- static bool rk_iommu_is_stall_active(struct rk_iommu *iommu)
++	bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
++
+ 	return 0;
+ err_remove_sysfs:
+ 	iommu_device_sysfs_remove(&iommu->iommu);
+@@ -1178,19 +1180,6 @@ static struct platform_driver rk_iommu_driver = {
+ 
+ static int __init rk_iommu_init(void)
+ {
+-	struct device_node *np;
+-	int ret;
+-
+-	np = of_find_matching_node(NULL, rk_iommu_dt_ids);
+-	if (!np)
+-		return 0;
+-
+-	of_node_put(np);
+-
+-	ret = bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
+-	if (ret)
+-		return ret;
+-
+ 	return platform_driver_register(&rk_iommu_driver);
+ }
+ subsys_initcall(rk_iommu_init);
 -- 
 2.11.0
