@@ -1,187 +1,97 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Wed, 24 Jan 2018 15:11:00 +0100
-Subject: [PATCH 2/3] ASoC: sun4i-i2s: Do not divide clocks when slave
+Date: Wed, 24 Jan 2018 15:11:01 +0100
+Subject: [PATCH 3/3] ASoC: sun4i-i2s: Add regmap field to sign extend sample
 In-Reply-To: <20180124141101.12867-1-codekipper@gmail.com>
 References: <20180124141101.12867-1-codekipper@gmail.com>
-Message-ID: <20180124141101.12867-3-codekipper@gmail.com>
+Message-ID: <20180124141101.12867-4-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-There is no need to set the clock and calculate the division of
-the audio pll for the bclk and sync signals when they are not
-required.
+On the newer SoCs this is set by default to transfer a 0 after
+each sample in each slot. Add the regmap field to configure this
+and set it so that it pads the sample with 0s.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- sound/soc/sunxi/sun4i-i2s.c | 116 ++++++++++++++++++++++++--------------------
- 1 file changed, 64 insertions(+), 52 deletions(-)
+ sound/soc/sunxi/sun4i-i2s.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index d7a9141514cf..626679057d0f 100644
+index 626679057d0f..9fda1240b717 100644
 --- a/sound/soc/sunxi/sun4i-i2s.c
 +++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -195,6 +195,8 @@ struct sun4i_i2s {
+@@ -139,6 +139,7 @@
+  * @field_fmt_bclk: regmap field to set clk polarity.
+  * @field_fmt_lrclk: regmap field to set frame polarity.
+  * @field_fmt_mode: regmap field to set the operational mode.
++ * @field_fmt_sext: regmap field to set the sign extension.
+  * @field_txchanmap: location of the tx channel mapping register.
+  * @field_rxchanmap: location of the rx channel mapping register.
+  * @field_txchansel: location of the tx channel select bit fields.
+@@ -164,6 +165,7 @@ struct sun4i_i2s_quirks {
+ 	struct reg_field		field_fmt_bclk;
+ 	struct reg_field		field_fmt_lrclk;
+ 	struct reg_field		field_fmt_mode;
++	struct reg_field		field_fmt_sext;
+ 	struct reg_field		field_txchanmap;
+ 	struct reg_field		field_rxchanmap;
+ 	struct reg_field		field_txchansel;
+@@ -188,6 +190,7 @@ struct sun4i_i2s {
+ 	struct regmap_field	*field_fmt_bclk;
+ 	struct regmap_field	*field_fmt_lrclk;
+ 	struct regmap_field	*field_fmt_mode;
++	struct regmap_field	*field_fmt_sext;
+ 	struct regmap_field	*field_txchanmap;
+ 	struct regmap_field	*field_rxchanmap;
+ 	struct regmap_field	*field_txchansel;
+@@ -358,6 +361,9 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
+ 				   SUN8I_I2S_FMT0_LRCK_PERIOD_MASK,
+ 				   SUN8I_I2S_FMT0_LRCK_PERIOD(word_size));
  
- 	const struct sun4i_i2s_quirks	*variant;
- 
-+	bool bit_clk_master;
++	/* Set sign extension to pad out LSB with 0 */
++	regmap_field_write(i2s->field_fmt_sext, 0);
 +
- 	unsigned int	tdm_slots;
- 	unsigned int	slot_width;
- };
-@@ -282,67 +284,73 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
- 	int bclk_div, mclk_div;
- 	int ret;
+ 	return 0;
+ }
  
--	switch (rate) {
--	case 176400:
--	case 88200:
--	case 44100:
--	case 22050:
--	case 11025:
--		clk_rate = 22579200;
--		break;
-+	if (i2s->bit_clk_master) {
-+		switch (rate) {
-+		case 176400:
-+		case 88200:
-+		case 44100:
-+		case 22050:
-+		case 11025:
-+			clk_rate = 22579200;
-+			break;
+@@ -929,6 +935,7 @@ static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
+ 	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+ 	.has_slave_select_bit	= true,
+ 	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
++	.field_fmt_sext		= REG_FIELD(SUN4I_I2S_FMT1_REG, 8, 8),
+ 	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+ 	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+ 	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+@@ -946,6 +953,7 @@ static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
+ 	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+ 	.has_slave_select_bit	= true,
+ 	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
++	.field_fmt_sext		= REG_FIELD(SUN4I_I2S_FMT1_REG, 8, 8),
+ 	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+ 	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+ 	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+@@ -986,6 +994,7 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
+ 	.field_fmt_bclk		= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+ 	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 19, 19),
+ 	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_CTRL_REG, 4, 5),
++	.field_fmt_sext		= REG_FIELD(SUN4I_I2S_FMT1_REG, 4, 5),
+ 	.field_txchanmap	= REG_FIELD(SUN8I_I2S_TX_CHAN_MAP_REG, 0, 31),
+ 	.field_rxchanmap	= REG_FIELD(SUN8I_I2S_RX_CHAN_MAP_REG, 0, 31),
+ 	.field_txchansel	= REG_FIELD(SUN8I_I2S_TX_CHAN_SEL_REG, 0, 2),
+@@ -1031,6 +1040,12 @@ static int sun4i_i2s_init_regmap_fields(struct device *dev,
+ 	if (IS_ERR(i2s->field_fmt_mode))
+ 		return PTR_ERR(i2s->field_fmt_mode);
  
--	case 192000:
--	case 128000:
--	case 96000:
--	case 64000:
--	case 48000:
--	case 32000:
--	case 24000:
--	case 16000:
--	case 12000:
--	case 8000:
--		clk_rate = 24576000;
--		break;
-+		case 192000:
-+		case 128000:
-+		case 96000:
-+		case 64000:
-+		case 48000:
-+		case 32000:
-+		case 24000:
-+		case 16000:
-+		case 12000:
-+		case 8000:
-+			clk_rate = 24576000;
-+			break;
- 
--	default:
--		dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
--		return -EINVAL;
--	}
-+		default:
-+			dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
-+			return -EINVAL;
-+		}
- 
--	ret = clk_set_rate(i2s->mod_clk, clk_rate);
--	if (ret)
--		return ret;
-+		ret = clk_set_rate(i2s->mod_clk, clk_rate);
-+		if (ret) {
-+			dev_err(dai->dev, "Unable to set clock\n");
-+			return ret;
-+		}
- 
--	oversample_rate = i2s->mclk_freq / rate;
--	if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
--		dev_err(dai->dev, "Unsupported oversample rate: %d\n",
--			oversample_rate);
--		return -EINVAL;
--	}
-+		oversample_rate = i2s->mclk_freq / rate;
-+		if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
-+			dev_err(dai->dev, "Unsupported oversample rate: %d\n",
-+				oversample_rate);
-+			return -EINVAL;
-+		}
- 
--	bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
--					  word_size);
--	if (bclk_div < 0) {
--		dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
--		return -EINVAL;
--	}
-+		bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
-+						  word_size);
-+		if (bclk_div < 0) {
-+			dev_err(dai->dev, "Unsupported BCLK divider: %d\n",
-+				bclk_div);
-+			return -EINVAL;
-+		}
- 
--	mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
--					  clk_rate, rate);
--	if (mclk_div < 0) {
--		dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
--		return -EINVAL;
--	}
-+		mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
-+						  clk_rate, rate);
-+		if (mclk_div < 0) {
-+			dev_err(dai->dev, "Unsupported MCLK divider: %d\n",
-+				mclk_div);
-+			return -EINVAL;
-+		}
- 
--	/* Adjust the clock division values if needed */
--	bclk_div += i2s->variant->bclk_offset;
--	mclk_div += i2s->variant->mclk_offset;
-+		/* Adjust the clock division values if needed */
-+		bclk_div += i2s->variant->bclk_offset;
-+		mclk_div += i2s->variant->mclk_offset;
- 
--	regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
--		     SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
--		     SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
-+		regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
-+			     SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
-+			     SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
- 
--	regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
-+		regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
-+	}
- 
- 	/* Set sync period */
- 	if (i2s->variant->has_fmt_set_lrck_period)
-@@ -501,10 +509,12 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- 		case SND_SOC_DAIFMT_CBS_CFS:
- 			/* BCLK and LRCLK master */
- 			val = SUN4I_I2S_CTRL_MODE_MASTER;
-+			i2s->bit_clk_master = true;
- 			break;
- 		case SND_SOC_DAIFMT_CBM_CFM:
- 			/* BCLK and LRCLK slave */
- 			val = SUN4I_I2S_CTRL_MODE_SLAVE;
-+			i2s->bit_clk_master = false;
- 			break;
- 		default:
- 			dev_err(dai->dev, "Unsupported slave setting: %d\n",
-@@ -525,10 +535,12 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- 			/* BCLK and LRCLK master */
- 			val = SUN8I_I2S_CTRL_BCLK_OUT |
- 				SUN8I_I2S_CTRL_LRCK_OUT;
-+			i2s->bit_clk_master = true;
- 			break;
- 		case SND_SOC_DAIFMT_CBM_CFM:
- 			/* BCLK and LRCLK slave */
- 			val = 0;
-+			i2s->bit_clk_master = false;
- 			break;
- 		default:
- 			dev_err(dai->dev, "Unsupported slave setting: %d\n",
++	i2s->field_fmt_sext =
++			devm_regmap_field_alloc(dev, i2s->regmap,
++						i2s->variant->field_fmt_sext);
++	if (IS_ERR(i2s->field_fmt_sext))
++		return PTR_ERR(i2s->field_fmt_sext);
++
+ 	i2s->field_txchanmap =
+ 			devm_regmap_field_alloc(dev, i2s->regmap,
+ 						i2s->variant->field_txchanmap);
 -- 
 2.16.0
