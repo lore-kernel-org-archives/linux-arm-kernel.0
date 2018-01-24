@@ -1,88 +1,160 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 24 Jan 2018 12:16:25 +0100
-Subject: [PATCH 2/2] ARM: imx: cpuidle-imx6q: configure CCM to RUN mode
- when CPU is active
-In-Reply-To: <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
-References: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
- <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
-Message-ID: <1516792585.6411.2.camel@pengutronix.de>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 24 Jan 2018 16:49:24 +0530
+Subject: [PATCH v9 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer
+ pdata ops
+Message-ID: <1516792764-2203-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peng,
+Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
 
-Am Samstag, den 30.12.2017, 21:53 +0800 schrieb Peng Fan:
-> There are two states in i.MX6Q cpuidle driver.
-> state[1]: ARM WFI mode
-> state[2]: i.MX6Q WAIT mode
-> 
-> Take i.MX6DL as example, think out such a case:
-> 1. CPU0/1 both run at normal mode
-> 2. On CPU0, `sleep 1` is executed. And there are no workload on CPU1.
-> 3. CPU0 first runs into state[2] and 'wfi' instruction. Switched to
-> use
-> ???GPT broadcast.
-> 4. CPU1 runs into state[2] and configure CCM to WAIT MODE,
-> ???then 'wfi' instruction. Now arm_clk and local timer clock are
-> ???shutdown. Switched to use GPT broadcast
-> 5. GPT broadcast timer interrupt comes to GPC/GIC, then CPU0 wakes
-> up.
-> ???CPU0 switched to use arm local timer. CPU1 is still sleeping.
-> 6. No workload on CPU0, CPU0 runs into state[1]. But CCM register
-> ???is still not restored to Normal RUN mode. 'wfi' + CCM WAIT will
-> ???cause arm_clk and arm core clk.
-> ???Now CPU0 stops, which is not correct.
-> 
-> So, need to make sure CCM configured to RUN mode when any cpu exit
-> state[2].
-> 
-> In this patch,
-> When CPU exits state[2], it configures CCM to RUN mode.
-> When all CPUs enters state[2], the last CPU needs to check
-> whether it's ok to configure CCM to WAIT mode or not.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+Changes in v9:
 
-To me this patch seems like we are adding duct tape to fix the issue.?
+  * Reorganized the place where of_node_put was called.
 
-It seems the whole master_lock thing doesn't properly work when the CPU
-that is woken up by the timer broadcast isn't the last CPU going to
-sleep. We should probably try to come up with a way to simplify this
-whole master dance, instead of adding yet more complexity.
+Changes in v8:
 
-Regards,
-Lucas
+  * Added of_node_put call in success case of probe.
 
-> Signed-off-by: Peng Fan <peng.fan@nxp.com>
-> ---
-> 
-> V1:
-> ?This is to upstream patch:
-> ?http://git.freescale.com/git/cgit.cgi/imx/linux-imx.git/commit/?h=im
-> x_4.9.11_1.0.0_ga&id=0d980646ee068b92db71fd5e4e4efcbc33749cbd
-> 
-> ?arch/arm/mach-imx/cpuidle-imx6q.c | 3 +++
-> ?1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-
-> imx/cpuidle-imx6q.c
-> index bfeb25aaf9a2..4d342e2fdfe6 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-> @@ -30,6 +30,8 @@ static int imx6q_enter_wait(struct cpuidle_device
-> *dev,
-> ?		if (!spin_trylock(&master_lock))
-> ?			goto idle;
-> ?		imx6_set_lpm(WAIT_UNCLOCKED);
-> +		if (atomic_read(&master) != num_online_cpus())
-> +			imx6_set_lpm(WAIT_CLOCKED);
-> ?		cpu_do_idle();
-> ?		imx6_set_lpm(WAIT_CLOCKED);
-> ?		spin_unlock(&master_lock);
-> @@ -41,6 +43,7 @@ static int imx6q_enter_wait(struct cpuidle_device
-> *dev,
-> ?done:
-> ?	atomic_dec(&master);
-> ?
-> +	imx6_set_lpm(WAIT_CLOCKED);
-> ?	return index;
-> ?}
-> ?
+Boot tested on am437x-gp-evm and dra7xx-evm.
+Also compile tested omap1_defconfig with other patches of v7
+posted here:
+
+https://www.spinics.net/lists/linux-omap/msg141100.html
+
+With v9 version of Patch 8/9.
+
+ drivers/pwm/pwm-omap-dmtimer.c | 66 ++++++++++++++++++++++++++----------------
+ 1 file changed, 41 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 5ad42f3..aaf8d328 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -23,6 +23,7 @@
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/dmtimer-omap.h>
+ #include <linux/platform_data/pwm_omap_dmtimer.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+ 	struct pwm_chip chip;
+ 	struct mutex mutex;
+ 	pwm_omap_dmtimer *dm_timer;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	struct platform_device *dm_timer_pdev;
+ };
+ 
+@@ -242,19 +243,35 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *timer;
++	struct platform_device *timer_pdev;
+ 	struct pwm_omap_dmtimer_chip *omap;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct dmtimer_platform_data *timer_pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	pwm_omap_dmtimer *dm_timer;
+ 	u32 v;
+-	int status;
++	int ret = 0;
+ 
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+-		return -EINVAL;
++	timer = of_parse_phandle(np, "ti,timers", 0);
++	if (!timer)
++		return -ENODEV;
++
++	timer_pdev = of_find_device_by_node(timer);
++	if (!timer_pdev) {
++		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
++		ret = -ENODEV;
++		goto put;
+ 	}
+ 
+-	if (!pdata->request_by_node ||
++	timer_pdata = dev_get_platdata(&timer_pdev->dev);
++	if (!timer_pdata) {
++		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
++		ret = -EINVAL;
++		goto put;
++	}
++
++	pdata = timer_pdata->timer_ops;
++
++	if (!pdata || !pdata->request_by_node ||
+ 	    !pdata->free ||
+ 	    !pdata->enable ||
+ 	    !pdata->disable ||
+@@ -267,21 +284,26 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 	    !pdata->set_prescaler ||
+ 	    !pdata->write_counter) {
+ 		dev_err(&pdev->dev, "Incomplete dmtimer pdata structure\n");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto put;
+ 	}
+ 
+-	timer = of_parse_phandle(np, "ti,timers", 0);
+-	if (!timer)
+-		return -ENODEV;
+-
+ 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+ 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+-		return -ENODEV;
++		ret = -ENODEV;
++		goto put;
+ 	}
+ 
+ 	dm_timer = pdata->request_by_node(timer);
+-	if (!dm_timer)
+-		return -EPROBE_DEFER;
++	if (!dm_timer) {
++		ret = -EPROBE_DEFER;
++		goto put;
++	}
++
++put:
++	of_node_put(timer);
++	if (ret < 0)
++		return ret;
+ 
+ 	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
+ 	if (!omap) {
+@@ -291,13 +313,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 
+ 	omap->pdata = pdata;
+ 	omap->dm_timer = dm_timer;
+-
+-	omap->dm_timer_pdev = of_find_device_by_node(timer);
+-	if (!omap->dm_timer_pdev) {
+-		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+-		omap->pdata->free(dm_timer);
+-		return -EINVAL;
+-	}
++	omap->dm_timer_pdev = timer_pdev;
+ 
+ 	/*
+ 	 * Ensure that the timer is stopped before we allow PWM core to call
+@@ -322,8 +338,8 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 
+ 	mutex_init(&omap->mutex);
+ 
+-	status = pwmchip_add(&omap->chip);
+-	if (status < 0) {
++	ret = pwmchip_add(&omap->chip);
++	if (ret < 0) {
+ 		dev_err(&pdev->dev, "failed to register PWM\n");
+ 		omap->pdata->free(omap->dm_timer);
+ 		return status;
+-- 
+1.9.1
