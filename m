@@ -1,153 +1,77 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 24 Jan 2018 20:37:28 +0100
-Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
- correctly
-In-Reply-To: <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
-References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
- <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
- <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
- <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
-Message-ID: <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 24 Jan 2018 12:04:58 -0800
+Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for inbound
+ traffic
+In-Reply-To: <20180123132033.GA21438@lst.de>
+References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
+ <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
+ <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
+ <20180118073123.GA15766@lst.de>
+ <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
+ <20180118152331.GA24461@lst.de>
+ <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
+ <20180123132033.GA21438@lst.de>
+Message-ID: <f746f9d5-b12d-9ffc-83e3-3851b4de6e52@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/23/2018 05:20 AM, Christoph Hellwig wrote:
+> On Fri, Jan 19, 2018 at 11:47:54AM -0800, Florian Fainelli wrote:
+>> How can this work well in the context of a loadable module for instance?
+>> For MIPS, this would mean that we have to override phys_to_dma() and
+>> dma_to_phys() in the platform that is *susceptible* to use this PCIe
+>> controller (arch/mips/bmips) which is fine, but there, we essentially
+>> need to find a way to make this dynamic based on whether the PCIe
+>> controller is loaded or not.
+>>
+>> As you might have seen from this patch, what needs to be done is highly
+>> dependent on the processor architecture and its memory controller
+>> physical memory map, so I don't see how we are in any better situation
+>> if we need to replicate 3 times across MIPS, ARM and ARM64 how the
+>> addresses need to be mangled.
+>>
+>> Are you suggesting we somehow decouple the memory mangling part into a
+>> portion that can be built into the kernel image (so phys_to_dma() and
+>> dma_to_phys() is resolved at vmlinux link time) and can be selected by
+>> different architectures that need it? If so, yikes.
+> 
+> On architectures with crazy PCIe controllers (this seems to include
+> mips, arm, arm64 and x86 thanks to the weird SOCs) we will need a
+> a few different memory maps, yes.  Take a look at
+> arch/x86/pci/sta2x11-fixup.c, preferably from a tree where the worst
+> issues are fixed:
+> 
+> http://git.infradead.org/users/hch/misc.git/blob/refs/heads/dma-direct-all:/arch/x86/pci/sta2x11-fixup.c
+> 
+> Overriding phys_to_dma and dma_to_phys is required if you need to
+> support swiotlb, and chances are with a broken PCIe controller on
+> arm64 or mips64 you eventuall will.
+> 
+> This sta2x11 code should probably be lifted to common code in
+> one form or another eventually, althought it will need another
+> fair round of cleanups for now.
 
-Il 24/01/2018 18:38, Giulio Benetti ha scritto:
-> Hi,
-> 
-> Il 22/01/2018 21:27, Giulio Benetti ha scritto:
->> Hi,
->>
->> Il 22/01/2018 09:51, Maxime Ripard ha scritto:
->>> On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
->>>> On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
->>>> it was ignored,
->>>> because only PHSYNC and PVSYNC were taken into account.
->>>> DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
->>>>
->>>> If flags contains PVSYNC, it doesn't mean it is NVSYNC.
->>>> And it's true also the contrary.
->>>> Also, as I've checked with scope on A20,
->>>> if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
->>>> must be set, as name suggests.
->>>> It seems all display io polarities starts inverted if 0.
->>>>
->>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>>>
->>>> PVSYNC and PHSYNC only
->>>>
->>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>>
->>> Checkpatch:
->>> WARNING: Duplicate signature
->>
->> Sorry I didn't use ./scripts/checkpatch.pl
->>
->>>
->>>> ---
->>>> ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
->>>> ? 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c 
->>>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>> index 6121210..e873a37 100644
->>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>> @@ -224,10 +224,10 @@ static void sun4i_tcon0_mode_set_rgb(struct 
->>>> sun4i_tcon *tcon,
->>>> ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
->>>> ????? /* Setup the polarity of the various signals */
->>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
->>>> +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
->>>> ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
->>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
->>>> +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->>>> ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
->>>
->>> I'm not sure why you were talking of the differences between NVSYNC
->>> and PVSYNC if you're not making use of any of it here?
->>
->> Thinking about it more now, the point is that all Lcd IOs seem to be 
->> inverted by default(at least on A20).
->> With inverted, I mean that if for example PVSYNC,
->> I should see vsync line low and when asserted to give VSync,
->> it goes high.
->> This is what I've checked with oscilloscope on A20.
->> Can someone give a try on A33? Otherwise I will,
->> but I will take some time.
->> On uboot, everything is treated equal to kernel,
->> but to have my falling edge dclk and low h/vsync I had to specify:
->> CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
->> and
->> CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
->> but digging into code, I see "sync:3" means H/VSYNC HIGH,
->> but I experience both LOW during their pulse.
->>
->>>
->>> Also, how was it tested? This seems quite weird that we haven't caught
->>> that one sooner, and I'm a bit worried about the possible regressions
->>> here.
->>
->> It sounds really strange to me too,
->> because everybody under uboot use "sync:3"(HIGH).
->> I will retry to measure,
->> unfortunately at home I don't have a scope,
->> but I think I'm going to have one soon, because of this. :)
-> 
-> Here I am with scope captures and tcon0 registers dump:
-> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
-> dclk_d0 => https://pasteboard.co/H4r8QRe.png
-> dclk_de => https://pasteboard.co/H4r8zh4R.png
-> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
-> 
-> As you can see circled in reg on registers,
-> TCON0_IO_POL_REG = 0x00000000.
-> But on all the waveforms you can see:
-> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise 
-> the rising front overlaps dclk rising edge(not good), so to me this is 
-> falling, then I mean it Negative.
-> - dclk_de: de pulse is clearly negative, even if register is 0 and its' 
-> polarity bit is 0.
-> - dclk_vsnc: same as dclk_de
-> - dclk_hsync: I didn't take scope screenshot but I can assure you it's 
-> negative.
-> 
-> You can also check all the other registers about TCON0.
-> 
-> Now I proceed testing it on A33, maybe the peripheral is slightly 
-> different between Axx SoCs, if I find it that way,
-> it should be only a check about SoC or peripheral ID,
-> and treat polarity as it should be done.
-
-Here I am with A33 waveforms:
-tcon0_regs => https://pasteboard.co/H4rXfN0M.png
-dclk_d0 => https://pasteboard.co/H4rVXwy.png
-dclk_de => https://pasteboard.co/H4rWDt8.png
-dclk_vsnc => https://pasteboard.co/H4rWRACu.png
-dclk_hsync => https://pasteboard.co/H4rWK6I.png
-
-It behaves the same way as A20, so as I mean IO polarity,
-all signals(except D0-D23), are inverted.
-For A33 I've used A33-OLinuXino.
-For A20 our LiNova1.
-
-Do you agree with me?
+This looks nicer than the current shape, but this still requires to
+register a PCI fixup to override phys_to_dma() and dma_to_phys(), and it
+would appear that you have dodged my question about how this is supposed
+to fit with an entirely modular PCIe root complex driver? Are you
+suggesting that we split the module into a built-in part and a modular part?
 
 > 
-> Kind regards
+>> I can see value in having a generic mechanism, ala X86_DMA_REMAP
+>> allowing architectures to have the ability to override phys_to_dma() and
+>> dma_to_phys() but right now, especially if we look at
+>> arch/x86/pci/sta2x11-fixup.c this really appears to be quite messy and
+>> equally ugly than stacking operations...
+>>
+>> What is the actual problem you want to avoid with the stacking of DMA
+>> operations, is it because it becomes harder to audit, or are there are
+>> other reasons?
+> 
+> Audit, consolidate into a single dma-direct implementation and properly
+> support swiotlb out of the box.
+> 
 
-
+OK.
 -- 
-Giulio Benetti
-R&D Manager &
-Advanced Research
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+Florian
