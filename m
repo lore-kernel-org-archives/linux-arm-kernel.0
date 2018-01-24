@@ -1,153 +1,105 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 24 Jan 2018 14:55:38 +0000
-Subject: [PATCH v2] iommu/mediatek: Move attach_device after iommu-group
- is ready for M4Uv1
-In-Reply-To: <1516696788-8668-1-git-send-email-yong.wu@mediatek.com>
-References: <1516696788-8668-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <78721402-989d-d06a-18cc-dd6efd358dfd@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Jan 2018 14:56:33 +0000
+Subject: [PATCH 4/8] mfd: stm32-timers: add support for dmas
+In-Reply-To: <2e6afc46-9ad4-a858-29c7-692798ece82f@st.com>
+References: <1516106631-18722-1-git-send-email-fabrice.gasnier@st.com>
+ <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
+ <20180123133234.xmep76cgdremnj47@dell>
+ <e611b40f-bd37-aa2d-afd9-997b86d55441@st.com>
+ <20180123153035.2rvhspe2m5ej57op@dell>
+ <ee021839-3298-d01b-8890-619aca0399a7@st.com>
+ <20180123164121.xjzhypqe2u5c7zza@dell>
+ <2e6afc46-9ad4-a858-29c7-692798ece82f@st.com>
+Message-ID: <20180124145633.tnblnqau7ncju7dp@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/18 08:39, Yong Wu wrote:
-> In the commit 05f80300dc8b ("iommu: Finish making iommu_group support
-> mandatory"), the iommu framework has supposed all the iommu drivers have
-> their owner iommu-group, it get rid of the FIXME workarounds while the
-> group is NULL. But the flow of Mediatek M4U gen1 looks a bit trick that
-> it will hang at this case:
+On Wed, 24 Jan 2018, Fabrice Gasnier wrote:
+> On 01/23/2018 05:41 PM, Lee Jones wrote:
+> > On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
+> >> On 01/23/2018 04:30 PM, Lee Jones wrote:
+> >>> On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
+> >>>
+> >>>> On 01/23/2018 02:32 PM, Lee Jones wrote:
+> >>>>> On Tue, 16 Jan 2018, Fabrice Gasnier wrote:
+> >>>>>
+> >>>>>> STM32 Timers can support up to 7 dma requests:
+> >>>>>> 4 channels, update, compare and trigger.
+> >>>>>> Optionally request part, or all dmas from stm32-timers MFD core.
+> >>>>>> Also, keep reference of device's bus address to allow child drivers to
+> >>>>>> transfer data from/to device by using dma.
+> >>>>>>
+> >>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >>>>>> ---
+> >>>>>>  drivers/mfd/stm32-timers.c       | 37 ++++++++++++++++++++++++++++++++++++-
+> >>>>>>  include/linux/mfd/stm32-timers.h | 14 ++++++++++++++
+> >>>>>>  2 files changed, 50 insertions(+), 1 deletion(-)
+> >>>>>>
+> >>>>>> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> >>>>>>  static int stm32_timers_probe(struct platform_device *pdev)
+> >>>>>>  {
+> >>>>>>  	struct device *dev = &pdev->dev;
+> >>>>>> @@ -44,6 +61,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+> >>>>>>  	mmio = devm_ioremap_resource(dev, res);
+> >>>>>>  	if (IS_ERR(mmio))
+> >>>>>>  		return PTR_ERR(mmio);
+> >>>>>> +	ddata->phys_base = res->start;
+> >>>>>
+> >>>>> What do you use this for?
+> >>>>
+> >>>> This is used in in child driver (pwm) for capture data transfer by dma.
+> >>>
+> >>> Might be worth being clear about that.
+> >>>
+> >>> Perhaps pass in 'dma_base' (phys_base + offset) instead?
+> >>
+> >> I guess you've had a look at [PATCH 5/8] pwm: stm32: add capture
+> >> support. Are you talking about passing phys_base + TIM_DMAR ?
+> > 
+> > I have and I am.
+> > 
+> >> If this is the case, I'd prefer to keep phys base only if you don't
+> >> mind, and handle TIM_DMAR offset in pwm driver. This way, all dma slave
+> >> config is kept locally at one place.
+> >> Or do you mean something else ?
+> >>
+> >> Maybe I can add a comment here about this ?
+> >> Something like:
+> >> /* phys_base to be used by child driver, e.g. DMA burst mode */
+> > 
+> > I haven't seen the memory map for this device, so it's not easy for me
+> > to comment, but passing in the physical address of the parent MFD into
+> > a child device doesn't quite sit right with me.
+> > 
+> > At what level does TIM_DMAR sit?  Is it a child (PWM) specific
+> > property, or is it described at parent (Timer) level?
+> > 
+> Hi Lee,
 > 
-> ==========================================
-> Unable to handle kernel NULL pointer dereference at virtual address 00000030
-> PC is at mutex_lock+0x28/0x54
-> LR is at iommu_attach_device+0xa4/0xd4
-> pc : [<c07632e8>]    lr : [<c04736fc>]    psr: 60000013
-> sp : df0edbb8  ip : df0edbc8  fp : df0edbc4
-> r10: c114da14  r9 : df2a3e40  r8 : 00000003
-> r7 : df27a210  r6 : df2a90c4  r5 : 00000030  r4 : 00000000
-> r3 : df0f8000  r2 : fffff000  r1 : df29c610  r0 : 00000030
-> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> xxx
-> (mutex_lock) from [<c04736fc>] (iommu_attach_device+0xa4/0xd4)
-> (iommu_attach_device) from [<c011b9dc>] (__arm_iommu_attach_device+0x28/0x90)
-> (__arm_iommu_attach_device) from [<c011ba60>] (arm_iommu_attach_device+0x1c/0x30)
-> (arm_iommu_attach_device) from [<c04759ac>] (mtk_iommu_add_device+0xfc/0x214)
-> (mtk_iommu_add_device) from [<c0472aa4>] (add_iommu_group+0x3c/0x68)
-> (add_iommu_group) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> (bus_for_each_dev) from [<c04734a4>] (bus_set_iommu+0xb0/0xec)
-> (bus_set_iommu) from [<c0476310>] (mtk_iommu_probe+0x328/0x368)
-> (mtk_iommu_probe) from [<c048189c>] (platform_drv_probe+0x5c/0xc0)
-> (platform_drv_probe) from [<c047f510>] (driver_probe_device+0x2f4/0x4d8)
-> (driver_probe_device) from [<c047f800>] (__driver_attach+0x10c/0x128)
-> (__driver_attach) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> (bus_for_each_dev) from [<c047ec78>] (driver_attach+0x2c/0x30)
-> (driver_attach) from [<c047e640>] (bus_add_driver+0x1e0/0x278)
-> (bus_add_driver) from [<c048052c>] (driver_register+0x88/0x108)
-> (driver_register) from [<c04817ec>] (__platform_driver_register+0x50/0x58)
-> (__platform_driver_register) from [<c0b31380>] (m4u_init+0x24/0x28)
-> (m4u_init) from [<c0101c38>] (do_one_initcall+0xf0/0x17c)
-> =========================
+> This isn't child (PWM) specific. TIM_DMAR is described at timer level as
+> well as all timers DMA requests lines. Current patchset make it useful
+> for PWM capture. Basically, I think this can be seen as interrupts, as
+> each (0..7) dma request has an enable bit (in DIER: interrupt enable
+> register). This is similar as interrupts at timer level.
 > 
-> The root cause is that "arm_iommu_attach_device" is called before
-> "iommu_group_get_for_dev" in the interface "mtk_iommu_add_device". Thus,
-> We adjust the sequence of this two functions.
+> So, I understand your point regarding passing physical address of the
+> parent MFD... Speaking of interrupts, I'd probably have looked at
+> irq_chip. Regarding dma, i'm not sure what is preferred way ?
 > 
-> Unfortunately, there is another issue after the solution above, From the
-> function "iommu_attach_device", Only one device in each a iommu group is
-> allowed. In Mediatek case, there is only one m4u group, all the devices
-> are in one group. thus it get fail at this step.
+> Another way maybe to export a routine (export symbol) from MFD core, to
+> handle dma transfer from there?
+> By looking into drivers/mfd, I found similar approach, e.g.
+> rtsx_pci_dma_transfer(). Do you think this is better approach ?
 > 
-> In order to satisfy this requirement, a new iommu group is allocated for
-> each a iommu consumer device. But meanwhile, we still have to use the
-> same domain for all the iommu group. Use a global variable "mtk_domain_v1"
-> to save the global domain.
+> Please let me know your opinion.
 
-Argh, sorry for breaking it! Seems I managed to forget just how horrible 
-and fiddly all the arm_iommu_* stuff is :(
+It sounds fine in principle.  You are in a better position to make
+that decision as you know the H/W more intimately than I, however it
+does sound like a good idea to abstract the DMA handling from the
+device if these aren't device-{level|specific} operations.
 
-> CC: Robin Murphy <robin.murphy@arm.com>
-> CC: Honghui Zhang <honghui.zhang@mediatek.com>
-> Fixes: 05f80300dc8b ("iommu: Finish making iommu_group support mandatory")
-> Reported-by: Ryder Lee <ryder.lee@mediatek.com>
-> Tested-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
-> changes since v1:
->     Add mtk_domain_v1=NULL in domain_free for symmetry.
-> 
-> v1: https://patchwork.kernel.org/patch/10176255/
-> ---
->   drivers/iommu/mtk_iommu_v1.c | 42 +++++++++++++++++++-----------------------
->   1 file changed, 19 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> index 542930c..86106bf 100644
-> --- a/drivers/iommu/mtk_iommu_v1.c
-> +++ b/drivers/iommu/mtk_iommu_v1.c
-> @@ -103,6 +103,9 @@ struct mtk_iommu_domain {
->   	struct mtk_iommu_data		*data;
->   };
->   
-> +/* There is only a iommu domain in M4U gen1. */
-> +static struct mtk_iommu_domain *mtk_domain_v1;
-> +
->   static struct mtk_iommu_domain *to_mtk_domain(struct iommu_domain *dom)
->   {
->   	return container_of(dom, struct mtk_iommu_domain, domain);
-> @@ -251,10 +254,15 @@ static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
->   	if (type != IOMMU_DOMAIN_UNMANAGED)
->   		return NULL;
->   
-> +	/* Always return the same domain. */
-> +	if (mtk_domain_v1)
-> +		return &mtk_domain_v1->domain;
-
-This seems a bit too fragile (and I vaguely recall we may have discussed 
-and rejected this approach for the original driver), since any code doing:
-
-	unused = iommu_domain_alloc(bus);
-	iommu_domain_free(unused);
-
-will pull the rug out from under everyone's feet in a very nasty and 
-unexpected manner. Given that mtk_iommu_create_mapping() is already a 
-giant workaround for the ARM DMA code not understanding groups and 
-default domains, I'd prefer not to have to regress "correct" driver 
-behaviour for the sake of that; how about something like the below diff, 
-is that enough to make things work?
-
-Robin.
-
------>8-----
-diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-index 542930cd183d..8b90b7a72238 100644
---- a/drivers/iommu/mtk_iommu_v1.c
-+++ b/drivers/iommu/mtk_iommu_v1.c
-@@ -376,6 +376,7 @@ static int mtk_iommu_create_mapping(struct device *dev,
-  	struct platform_device *m4updev;
-  	struct dma_iommu_mapping *mtk_mapping;
-  	struct device *m4udev;
-+	struct iommu_group *group;
-  	int ret;
-
-  	if (args->args_count != 1) {
-@@ -418,6 +419,22 @@ static int mtk_iommu_create_mapping(struct device *dev,
-  		m4udev->archdata.iommu = mtk_mapping;
-  	}
-
-+	/*
-+	 * This is a short-term bodge because the ARM DMA code doesn't
-+	 * understand multi-device groups, but we have to call into it
-+	 * successfully (and not just rely on a normal IOMMU API attach
-+	 * here) in order to set the correct DMA API ops on @dev.
-+	 */
-+	group = iommu_group_alloc();
-+	if (IS_ERR(group)) {
-+		ret = ERR_PTR(group);
-+		goto err_release_mapping;
-+	}
-+	ret = iommu_group_add_device(group,  dev);
-+	iommu_group_put(group);
-+	if (ret)
-+		goto err_release_mapping;
-+
-  	ret = arm_iommu_attach_device(dev, mtk_mapping);
-  	if (ret)
-  		goto err_release_mapping;
+-- 
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
