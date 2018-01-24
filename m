@@ -1,47 +1,95 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 24 Jan 2018 22:31:21 +0800
-Subject: [PATCH] clk: imx: imx6sx: update cko mux options
-Message-ID: <1516804281-19123-1-git-send-email-Anson.Huang@nxp.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 24 Jan 2018 09:40:36 +0100
+Subject: [PATCH 4/8] mfd: stm32-timers: add support for dmas
+In-Reply-To: <20180123164121.xjzhypqe2u5c7zza@dell>
+References: <1516106631-18722-1-git-send-email-fabrice.gasnier@st.com>
+ <1516106631-18722-5-git-send-email-fabrice.gasnier@st.com>
+ <20180123133234.xmep76cgdremnj47@dell>
+ <e611b40f-bd37-aa2d-afd9-997b86d55441@st.com>
+ <20180123153035.2rvhspe2m5ej57op@dell>
+ <ee021839-3298-d01b-8890-619aca0399a7@st.com>
+ <20180123164121.xjzhypqe2u5c7zza@dell>
+Message-ID: <2e6afc46-9ad4-a858-29c7-692798ece82f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to latest reference manual (Rev.2, 9/2017),
-previous CKO1/2's mux options are incorrect, update
-them.
+On 01/23/2018 05:41 PM, Lee Jones wrote:
+> On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
+>> On 01/23/2018 04:30 PM, Lee Jones wrote:
+>>> On Tue, 23 Jan 2018, Fabrice Gasnier wrote:
+>>>
+>>>> On 01/23/2018 02:32 PM, Lee Jones wrote:
+>>>>> On Tue, 16 Jan 2018, Fabrice Gasnier wrote:
+>>>>>
+>>>>>> STM32 Timers can support up to 7 dma requests:
+>>>>>> 4 channels, update, compare and trigger.
+>>>>>> Optionally request part, or all dmas from stm32-timers MFD core.
+>>>>>> Also, keep reference of device's bus address to allow child drivers to
+>>>>>> transfer data from/to device by using dma.
+>>>>>>
+>>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>>>> ---
+>>>>>>  drivers/mfd/stm32-timers.c       | 37 ++++++++++++++++++++++++++++++++++++-
+>>>>>>  include/linux/mfd/stm32-timers.h | 14 ++++++++++++++
+>>>>>>  2 files changed, 50 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+>>>>>>  static int stm32_timers_probe(struct platform_device *pdev)
+>>>>>>  {
+>>>>>>  	struct device *dev = &pdev->dev;
+>>>>>> @@ -44,6 +61,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>>>>>>  	mmio = devm_ioremap_resource(dev, res);
+>>>>>>  	if (IS_ERR(mmio))
+>>>>>>  		return PTR_ERR(mmio);
+>>>>>> +	ddata->phys_base = res->start;
+>>>>>
+>>>>> What do you use this for?
+>>>>
+>>>> This is used in in child driver (pwm) for capture data transfer by dma.
+>>>
+>>> Might be worth being clear about that.
+>>>
+>>> Perhaps pass in 'dma_base' (phys_base + offset) instead?
+>>
+>> I guess you've had a look at [PATCH 5/8] pwm: stm32: add capture
+>> support. Are you talking about passing phys_base + TIM_DMAR ?
+> 
+> I have and I am.
+> 
+>> If this is the case, I'd prefer to keep phys base only if you don't
+>> mind, and handle TIM_DMAR offset in pwm driver. This way, all dma slave
+>> config is kept locally at one place.
+>> Or do you mean something else ?
+>>
+>> Maybe I can add a comment here about this ?
+>> Something like:
+>> /* phys_base to be used by child driver, e.g. DMA burst mode */
+> 
+> I haven't seen the memory map for this device, so it's not easy for me
+> to comment, but passing in the physical address of the parent MFD into
+> a child device doesn't quite sit right with me.
+> 
+> At what level does TIM_DMAR sit?  Is it a child (PWM) specific
+> property, or is it described at parent (Timer) level?
+> 
+Hi Lee,
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx6sx.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+This isn't child (PWM) specific. TIM_DMAR is described at timer level as
+well as all timers DMA requests lines. Current patchset make it useful
+for PWM capture. Basically, I think this can be seen as interrupts, as
+each (0..7) dma request has an enable bit (in DIER: interrupt enable
+register). This is similar as interrupts at timer level.
 
-diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
-index e6d389e..bc3f9eb 100644
---- a/drivers/clk/imx/clk-imx6sx.c
-+++ b/drivers/clk/imx/clk-imx6sx.c
-@@ -63,17 +63,17 @@ static const char *lcdif2_sels[]	= { "lcdif2_podf", "ipp_di0", "ipp_di1", "ldb_d
- static const char *display_sels[]	= { "pll2_bus", "pll2_pfd2_396m", "pll3_usb_otg", "pll3_pfd1_540m", };
- static const char *csi_sels[]		= { "osc", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
- static const char *cko1_sels[]		= {
--	"pll3_usb_otg", "pll2_bus", "pll1_sys", "pll5_video_div",
--	"dummy", "ocram", "dummy", "pxp_axi", "epdc_axi", "lcdif_pix",
--	"epdc_pix", "ahb", "ipg", "perclk", "ckil", "pll4_audio_div",
-+	"dummy", "dummy", "dummy", "dummy",
-+	"vadc", "ocram", "qspi2", "m4", "enet_ahb", "lcdif2_pix",
-+	"lcdif1_pix", "ahb", "ipg", "perclk", "ckil", "pll4_audio_div",
- };
- static const char *cko2_sels[]		= {
- 	"dummy", "mmdc_p0_fast", "usdhc4", "usdhc1", "dummy", "wrck",
- 	"ecspi_root", "dummy", "usdhc3", "pcie", "arm", "csi_core",
--	"lcdif_axi", "dummy", "osc", "dummy", "gpu2d_ovg_core",
--	"usdhc2", "ssi1", "ssi2", "ssi3", "gpu2d_core", "dummy",
--	"dummy", "dummy", "dummy", "esai_extal", "eim_slow", "uart_serial",
--	"spdif", "asrc", "dummy",
-+	"display_axi", "dummy", "osc", "dummy", "dummy",
-+	"usdhc2", "ssi1", "ssi2", "ssi3", "gpu_axi_podf", "dummy",
-+	"can_podf", "lvds1_out", "qspi1", "esai_extal", "eim_slow",
-+	"uart_serial", "spdif", "audio", "dummy",
- };
- static const char *cko_sels[] = { "cko1", "cko2", };
- static const char *lvds_sels[]	= {
--- 
-2.7.4
+So, I understand your point regarding passing physical address of the
+parent MFD... Speaking of interrupts, I'd probably have looked at
+irq_chip. Regarding dma, i'm not sure what is preferred way ?
+
+Another way maybe to export a routine (export symbol) from MFD core, to
+handle dma transfer from there?
+By looking into drivers/mfd, I found similar approach, e.g.
+rtsx_pci_dma_transfer(). Do you think this is better approach ?
+
+Please let me know your opinion.
+
+Best Regards,
+Fabrice
