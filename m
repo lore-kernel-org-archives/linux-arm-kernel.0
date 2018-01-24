@@ -1,55 +1,122 @@
-From: clingutla@codeaurora.org (Lingutla Chandrasekhar)
-Date: Wed, 24 Jan 2018 14:53:45 +0530
-Subject: [PATCH v1] arm64: setup: Check for overlapping dtb and Image load
- addresses
-Message-ID: <20180124092345.5072-1-clingutla@codeaurora.org>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Wed, 24 Jan 2018 09:24:06 +0000
+Subject: [PATCH v3] drm/bridge/synopsys: dsi: add optional pixel clock
+In-Reply-To: <20180123204939.qirvr34mlwgiwmqz@ban.mtv.corp.google.com>
+References: <20180123170806.5282-1-philippe.cornu@st.com>
+ <20180123204939.qirvr34mlwgiwmqz@ban.mtv.corp.google.com>
+Message-ID: <507552a3-c68f-d6ac-a747-b8f5168d0d41@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometime kernel image and dtb load offsets can overlap due to
-dynamically increased Image or dtb size if both load addresses
-are near to each other, which leads to bootup failures.
+Hi Brian,
 
-So validate dtb load address and kernel image, if they overlap
-do not proceed to boot.
 
-Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
----
+On 01/23/2018 09:49 PM, Brian Norris wrote:
+> Hi,
+> 
+> Philippe asked me to review the last version. I'm not sure I have a lot
+> to contribute. Maybe Rockchip folks who wrote this stuff in the first
+> place might. I've CC'd some.
+> 
+> On Tue, Jan 23, 2018 at 06:08:06PM +0100, Philippe Cornu wrote:
+>> The pixel clock is optional. When available, it offers a better
+>> preciseness for timing computations and allows to reduce the extra dsi
+>> bandwidth in burst mode (from ~20% to ~10-12%, hw platform dependant).
+>>
+>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>> ---
+>> Changes in v3: Simplify px_clk probing thanks to Andrzej Hajda comments
+>>
+>> Changes in v2: Improve px_clk probing in case of ENOENT dt returned value
+>> (thanks to Philipp Zabel & Andrzej Hajda comments)
+>>
+>>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 25 +++++++++++++++++++------
+>>   1 file changed, 19 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> index ed8af32f8e52..9fb35385c348 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> @@ -217,6 +217,7 @@ struct dw_mipi_dsi {
+>>   	void __iomem *base;
+>>   
+>>   	struct clk *pclk;
+>> +	struct clk *px_clk;
+>>   
+>>   	unsigned int lane_mbps; /* per lane */
+>>   	u32 channel;
+>> @@ -703,24 +704,28 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+>>   	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
+>>   	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
+>>   	void *priv_data = dsi->plat_data->priv_data;
+>> +	struct drm_display_mode px_clk_mode = *mode;
+>>   	int ret;
+>>   
+>>   	clk_prepare_enable(dsi->pclk);
+>>   
+>> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
+>> +	if (dsi->px_clk)
+>> +		px_clk_mode.clock = clk_get_rate(dsi->px_clk) / 1000;
+>> +
+>> +	ret = phy_ops->get_lane_mbps(priv_data, &px_clk_mode, dsi->mode_flags,
+>>   				     dsi->lanes, dsi->format, &dsi->lane_mbps);
+>>   	if (ret)
+>>   		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+>>   
+>>   	pm_runtime_get_sync(dsi->dev);
+>>   	dw_mipi_dsi_init(dsi);
+>> -	dw_mipi_dsi_dpi_config(dsi, mode);
+>> +	dw_mipi_dsi_dpi_config(dsi, &px_clk_mode);
+>>   	dw_mipi_dsi_packet_handler_config(dsi);
+>>   	dw_mipi_dsi_video_mode_config(dsi);
+>> -	dw_mipi_dsi_video_packet_config(dsi, mode);
+>> +	dw_mipi_dsi_video_packet_config(dsi, &px_clk_mode);
+>>   	dw_mipi_dsi_command_mode_config(dsi);
+>> -	dw_mipi_dsi_line_timer_config(dsi, mode);
+>> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
+>> +	dw_mipi_dsi_line_timer_config(dsi, &px_clk_mode);
+>> +	dw_mipi_dsi_vertical_timing_config(dsi, &px_clk_mode);
+>>   
+>>   	dw_mipi_dsi_dphy_init(dsi);
+>>   	dw_mipi_dsi_dphy_timing_config(dsi);
+>> @@ -734,7 +739,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+>>   
+>>   	dw_mipi_dsi_dphy_enable(dsi);
+>>   
+>> -	dw_mipi_dsi_wait_for_two_frames(mode);
+>> +	dw_mipi_dsi_wait_for_two_frames(&px_clk_mode);
+>>   
+>>   	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
+>>   	dw_mipi_dsi_set_mode(dsi, 0);
+>> @@ -828,6 +833,14 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
+>>   		return ERR_PTR(ret);
+>>   	}
+>>   
+>> +	dsi->px_clk = devm_clk_get(dev, "px_clk");
+> 
+> Did you write a device tree binding document update for this anywhere?
+> 
+> Brian
+> 
 
-Changes since v0:
-- Print overlap bytes.
-- Simplify ovelap checks.
+Many thanks for your review,
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 30ad2f085d1f..fd9be0ad4a78 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -181,14 +181,21 @@ static void __init smp_build_mpidr_hash(void)
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
- {
- 	void *dt_virt = fixmap_remap_fdt(dt_phys);
-+	u64 end_phys = __pa_symbol(_end);
-+	u64 start_phys = __pa_symbol(_text);
- 	const char *name;
- 
--	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
--		pr_crit("\n"
--			"Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
-+	if (!dt_virt || (end_phys > dt_phys &&
-+		(dt_phys + fdt_totalsize(dt_virt)) > start_phys) ||
-+		!early_init_dt_scan(dt_virt)) {
-+		pr_crit("Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
- 			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
-+			"The dtb load address overllaped %lld bytes with kernel image\n"
- 			"\nPlease check your bootloader.",
--			&dt_phys, dt_virt);
-+			&dt_phys, dt_virt,
-+			(dt_phys < start_phys) ?
-+			(dt_phys + fdt_totalsize(dt_virt) - start_phys) :
-+			(end_phys - dt_phys));
- 
- 		while (true)
- 			cpu_relax();
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
- a Linux Foundation Collaborative Project.
+yes, "px_clk" is already documented, please have a look to 
+Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+
+Philippe :-)
+
+>> +	if (IS_ERR(dsi->px_clk)) {
+>> +		ret = PTR_ERR(dsi->px_clk);
+>> +		if (ret != ENOENT)
+>> +			dev_err(dev, "Unable to get opt. px_clk: %d\n", ret);
+>> +		dsi->px_clk = NULL;
+>> +	}
+>> +
+>>   	/*
+>>   	 * Note that the reset was not defined in the initial device tree, so
+>>   	 * we have to be prepared for it not being found.
+>> -- 
+>> 2.15.1
+>>
