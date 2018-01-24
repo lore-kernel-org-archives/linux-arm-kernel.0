@@ -1,35 +1,54 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 24 Jan 2018 07:15:50 +0100
-Subject: [PATCH] i2c: davinci: fix the cpufreq transition
-In-Reply-To: <20180122144258.13627-1-brgl@bgdev.pl>
-References: <20180122144258.13627-1-brgl@bgdev.pl>
-Message-ID: <20180124061550.m4l3ogzpsbidajta@ninjato>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 24 Jan 2018 07:17:25 +0100
+Subject: [net-next: PATCH v4 1/7] device property: Introduce
+ fwnode_get_mac_address()
+In-Reply-To: <CAJZ5v0jpGb8_rSTdtoLJW9os0ufgwLTnbWAQq6MTy_ye6Hr6KA@mail.gmail.com>
+References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
+ <1516278704-17141-2-git-send-email-mw@semihalf.com>
+ <CAJZ5v0j=4Lvaf49oeDqVmYP5nyAs-E9E8xdgyfL7=J_46X5TMA@mail.gmail.com>
+ <CAPv3WKf0GUE508P8k1nExBA+h6pQr4UcaFPk+mps3xRepESQmw@mail.gmail.com>
+ <CAJZ5v0jpGb8_rSTdtoLJW9os0ufgwLTnbWAQq6MTy_ye6Hr6KA@mail.gmail.com>
+Message-ID: <CAPv3WKfCRE46W9kKCvffN+SuPBKF1bchUBJNjUuOMoPUj8H0qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 03:42:58PM +0100, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> i2c_davinci_cpufreq_transition() is implemented in a way that will
-> block if it ever gets called while no transfer is in progress.
-> 
-> Not only that, but reinit_completion() is never called for xfr_complete.
-> 
-> Use the fact that cpufreq uses an srcu_notifier (running in process
-> context) for transitions and that the bus_lock is taken during the call
-> to master_xfer() and simplify the code by removing the transfer
-> completion entirely and protecting i2c_davinci_cpufreq_transition()
-> with i2c_lock/unlock_adapter().
-> 
-> Reported-by: David Lechner <david@lechnology.com>
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi Rafael,
 
-Applied to for-next, thanks!
+2018-01-24 3:08 GMT+01:00 Rafael J. Wysocki <rafael@kernel.org>:
+> On Tue, Jan 23, 2018 at 7:12 AM, Marcin Wojtas <mw@semihalf.com> wrote:
+>> Hi Rafael,
+>>
+>>> >         if (res)
+>>> >                 return res;
+>>> >
+>>> > -       return device_get_mac_addr(dev, "address", addr, alen);
+>>> > +       return fwnode_get_mac_addr(fwnode, "address", addr, alen);
+>>> > +}
+>>> > +EXPORT_SYMBOL(fwnode_get_mac_address);
+>>>
+>>> That should be EXPORT_SYMBOL_GPL().
+>>>
+>>> I have overlooked that previously, sorry about that.
+>>
+>> The series landed yesterday in net-next, so I need to send a fix on
+>> top.
+>
+> OK
+>
+>> Would you be ok with single patch fixing all EXPORT_SYMBOL()
+>> occurences? Those would be 2 new routines:
+>> - fwnode_get_mac_address
+>> - fwnode_irq_get
+>> and  2 already existing in the file:
+>> - device_get_mac_address
+>> - fwnode_graph_parse_endpoint
+>>
+>> Please let know, how you prefer to handle it?
+>
+> I guess it's better to fix this up when the series gets merged.
+>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/c6444fb9/attachment.sig>
+Ok, I will do it at that time.
+
+Thanks,
+Marcin
