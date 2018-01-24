@@ -1,43 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 24 Jan 2018 07:35:07 +0100
-Subject: [PATCH v4 0/3] i2c: mv64xxx: Fix clock resource for Armada 7K/8K
-In-Reply-To: <20180116163540.1092-1-gregory.clement@free-electrons.com>
-References: <20180116163540.1092-1-gregory.clement@free-electrons.com>
-Message-ID: <20180124063507.swvhh3cy5au2bfbu@ninjato>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Wed, 24 Jan 2018 14:51:30 +0800
+Subject: [v2,2/5] i2c: meson: add configurable divider factors
+In-Reply-To: <20180124062830.vi52rtlgglryq3xz@ninjato>
+References: <20171120145415.6581-3-yixun.lan@amlogic.com>
+ <20180124062830.vi52rtlgglryq3xz@ninjato>
+Message-ID: <600c932f-59d6-d7ec-ec02-b92b275049d5@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 05:35:37PM +0100, Gregory CLEMENT wrote:
+Hi Wolfram?
 
-> This short series fixes the way the clocks are used for the mv64xxx
-> controller embedded in the Marvell Armada 7K/8K SoCs. On these SoCs a
-> second one is needed in order to clock the registers. It was not
-> noticed until now because we relied on the bootloader and also because
-> the clock driver was wrong.
+
+
+On 01/24/18 14:28, Wolfram Sang wrote:
+> On Mon, Nov 20, 2017 at 10:54:12PM +0800, Yixun Lan wrote:
+>> From: Jian Hu <jian.hu@amlogic.com>
+>>
+>> This patch try to add support for I2C controller in Meson-AXG SoC,
+>> Due to the IP changes between I2C controller, we need to introduce
+>> a compatible data to make the divider factor configurable.
+>>
+>> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+>> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > 
-> Thanks to this fix, it would be possible to fix the clock driver
-> without introducing a regression.
+> Applied to for-next, thanks!
 > 
-> The first patch is just a small cleanup found when I wrote the main
-> patch.
+> But I got two build warnings, please fix them with an incremental patch:
 > 
-> The last patch is not related to the series but as Wolfram to have a
-> maintainer for this driver I added the patch here.
+> drivers/i2c/busses/i2c-meson.c:103: warning: No description found for parameter 'data'
+> drivers/i2c/busses/i2c-meson.c:103: warning: Excess struct member 'irq' description in 'meson_i2c'
+> 
+first, many thanks for pushing this..
 
-Thomas, Andrew, Maxime, any tags you'd like to donate?
+I understand from above warnings, and can compose a patch to fix this.
 
->  - Add a maintainer for the i2c-mv64xxx driver, requested
+but, I didn't get this build warnings while test locally, so is there
+any specific compiler option that I need to pass to?
 
-Well, I'd say "asked for"...
-
-> by Woflram Sang
-
-... whoever that guy is ;)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/a7061a6c/attachment.sig>
+Yixun
