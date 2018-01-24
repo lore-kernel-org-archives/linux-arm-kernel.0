@@ -1,139 +1,103 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 24 Jan 2018 18:38:17 +0100
-Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
- correctly
-In-Reply-To: <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
-References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
- <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
- <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
-Message-ID: <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Wed, 24 Jan 2018 18:41:30 +0100
+Subject: [PATCH 3/3] ASoC: sun4i-i2s: Add regmap field to sign extend
+ sample
+In-Reply-To: <20180124141101.12867-4-codekipper@gmail.com>
+References: <20180124141101.12867-1-codekipper@gmail.com>
+ <20180124141101.12867-4-codekipper@gmail.com>
+Message-ID: <CAEKpxBnfBBrFPA+b3e27+A406_om6Eh5UyeZgV0LkeDJK89p7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Il 22/01/2018 21:27, Giulio Benetti ha scritto:
-> Hi,
-> 
-> Il 22/01/2018 09:51, Maxime Ripard ha scritto:
->> On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
->>> On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
->>> it was ignored,
->>> because only PHSYNC and PVSYNC were taken into account.
->>> DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
->>>
->>> If flags contains PVSYNC, it doesn't mean it is NVSYNC.
->>> And it's true also the contrary.
->>> Also, as I've checked with scope on A20,
->>> if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
->>> must be set, as name suggests.
->>> It seems all display io polarities starts inverted if 0.
->>>
->>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>>
->>> PVSYNC and PHSYNC only
->>>
->>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>
->> Checkpatch:
->> WARNING: Duplicate signature
-> 
-> Sorry I didn't use ./scripts/checkpatch.pl
-> 
->>
->>> ---
->>> ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
->>> ? 1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c 
->>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>> index 6121210..e873a37 100644
->>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>> @@ -224,10 +224,10 @@ static void sun4i_tcon0_mode_set_rgb(struct 
->>> sun4i_tcon *tcon,
->>> ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
->>> ????? /* Setup the polarity of the various signals */
->>> -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
->>> +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
->>> ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
->>> -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
->>> +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->>> ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
->>
->> I'm not sure why you were talking of the differences between NVSYNC
->> and PVSYNC if you're not making use of any of it here?
-> 
-> Thinking about it more now, the point is that all Lcd IOs seem to be 
-> inverted by default(at least on A20).
-> With inverted, I mean that if for example PVSYNC,
-> I should see vsync line low and when asserted to give VSync,
-> it goes high.
-> This is what I've checked with oscilloscope on A20.
-> Can someone give a try on A33? Otherwise I will,
-> but I will take some time.
-> On uboot, everything is treated equal to kernel,
-> but to have my falling edge dclk and low h/vsync I had to specify:
-> CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
-> and
-> CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
-> but digging into code, I see "sync:3" means H/VSYNC HIGH,
-> but I experience both LOW during their pulse.
-> 
->>
->> Also, how was it tested? This seems quite weird that we haven't caught
->> that one sooner, and I'm a bit worried about the possible regressions
->> here.
-> 
-> It sounds really strange to me too,
-> because everybody under uboot use "sync:3"(HIGH).
-> I will retry to measure,
-> unfortunately at home I don't have a scope,
-> but I think I'm going to have one soon, because of this. :)
-
-Here I am with scope captures and tcon0 registers dump:
-tcon0_regs => https://pasteboard.co/H4r8Zcs.png
-dclk_d0 => https://pasteboard.co/H4r8QRe.png
-dclk_de => https://pasteboard.co/H4r8zh4R.png
-dclk_vsnc => https://pasteboard.co/H4r8Hye.png
-
-As you can see circled in reg on registers,
-TCON0_IO_POL_REG = 0x00000000.
-But on all the waveforms you can see:
-- dclk_d0: clock phase is 0, but it starts with falling edge, otherwise 
-the rising front overlaps dclk rising edge(not good), so to me this is 
-falling, then I mean it Negative.
-- dclk_de: de pulse is clearly negative, even if register is 0 and its' 
-polarity bit is 0.
-- dclk_vsnc: same as dclk_de
-- dclk_hsync: I didn't take scope screenshot but I can assure you it's 
-negative.
-
-You can also check all the other registers about TCON0.
-
-Now I proceed testing it on A33, maybe the peripheral is slightly 
-different between Axx SoCs, if I find it that way,
-it should be only a check about SoC or peripheral ID,
-and treat polarity as it should be done.
-
-Kind regards
--- 
-Giulio Benetti
-R&D Manager &
-Advanced Research
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
-> 
->>
->> Maxime
->>
-> 
-> 
+On 24 January 2018 at 15:11,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> On the newer SoCs this is set by default to transfer a 0 after
+> each sample in each slot. Add the regmap field to configure this
+> and set it so that it pads the sample with 0s.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+NACK missing regmap field from A83t.
+CK
+> ---
+>  sound/soc/sunxi/sun4i-i2s.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> index 626679057d0f..9fda1240b717 100644
+> --- a/sound/soc/sunxi/sun4i-i2s.c
+> +++ b/sound/soc/sunxi/sun4i-i2s.c
+> @@ -139,6 +139,7 @@
+>   * @field_fmt_bclk: regmap field to set clk polarity.
+>   * @field_fmt_lrclk: regmap field to set frame polarity.
+>   * @field_fmt_mode: regmap field to set the operational mode.
+> + * @field_fmt_sext: regmap field to set the sign extension.
+>   * @field_txchanmap: location of the tx channel mapping register.
+>   * @field_rxchanmap: location of the rx channel mapping register.
+>   * @field_txchansel: location of the tx channel select bit fields.
+> @@ -164,6 +165,7 @@ struct sun4i_i2s_quirks {
+>         struct reg_field                field_fmt_bclk;
+>         struct reg_field                field_fmt_lrclk;
+>         struct reg_field                field_fmt_mode;
+> +       struct reg_field                field_fmt_sext;
+>         struct reg_field                field_txchanmap;
+>         struct reg_field                field_rxchanmap;
+>         struct reg_field                field_txchansel;
+> @@ -188,6 +190,7 @@ struct sun4i_i2s {
+>         struct regmap_field     *field_fmt_bclk;
+>         struct regmap_field     *field_fmt_lrclk;
+>         struct regmap_field     *field_fmt_mode;
+> +       struct regmap_field     *field_fmt_sext;
+>         struct regmap_field     *field_txchanmap;
+>         struct regmap_field     *field_rxchanmap;
+>         struct regmap_field     *field_txchansel;
+> @@ -358,6 +361,9 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
+>                                    SUN8I_I2S_FMT0_LRCK_PERIOD_MASK,
+>                                    SUN8I_I2S_FMT0_LRCK_PERIOD(word_size));
+>
+> +       /* Set sign extension to pad out LSB with 0 */
+> +       regmap_field_write(i2s->field_fmt_sext, 0);
+> +
+>         return 0;
+>  }
+>
+> @@ -929,6 +935,7 @@ static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
+>         .field_fmt_lrclk        = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+>         .has_slave_select_bit   = true,
+>         .field_fmt_mode         = REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
+> +       .field_fmt_sext         = REG_FIELD(SUN4I_I2S_FMT1_REG, 8, 8),
+>         .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+>         .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+>         .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+> @@ -946,6 +953,7 @@ static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
+>         .field_fmt_lrclk        = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+>         .has_slave_select_bit   = true,
+>         .field_fmt_mode         = REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
+> +       .field_fmt_sext         = REG_FIELD(SUN4I_I2S_FMT1_REG, 8, 8),
+>         .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+>         .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+>         .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+> @@ -986,6 +994,7 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
+>         .field_fmt_bclk         = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+>         .field_fmt_lrclk        = REG_FIELD(SUN4I_I2S_FMT0_REG, 19, 19),
+>         .field_fmt_mode         = REG_FIELD(SUN4I_I2S_CTRL_REG, 4, 5),
+> +       .field_fmt_sext         = REG_FIELD(SUN4I_I2S_FMT1_REG, 4, 5),
+>         .field_txchanmap        = REG_FIELD(SUN8I_I2S_TX_CHAN_MAP_REG, 0, 31),
+>         .field_rxchanmap        = REG_FIELD(SUN8I_I2S_RX_CHAN_MAP_REG, 0, 31),
+>         .field_txchansel        = REG_FIELD(SUN8I_I2S_TX_CHAN_SEL_REG, 0, 2),
+> @@ -1031,6 +1040,12 @@ static int sun4i_i2s_init_regmap_fields(struct device *dev,
+>         if (IS_ERR(i2s->field_fmt_mode))
+>                 return PTR_ERR(i2s->field_fmt_mode);
+>
+> +       i2s->field_fmt_sext =
+> +                       devm_regmap_field_alloc(dev, i2s->regmap,
+> +                                               i2s->variant->field_fmt_sext);
+> +       if (IS_ERR(i2s->field_fmt_sext))
+> +               return PTR_ERR(i2s->field_fmt_sext);
+> +
+>         i2s->field_txchanmap =
+>                         devm_regmap_field_alloc(dev, i2s->regmap,
+>                                                 i2s->variant->field_txchanmap);
+> --
+> 2.16.0
+>
