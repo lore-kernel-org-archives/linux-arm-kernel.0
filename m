@@ -1,61 +1,91 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 24 Jan 2018 18:35:14 +0800
-Subject: [PATCH v5 11/13] iommu/rockchip: Fix error handling in init
+Date: Wed, 24 Jan 2018 18:35:16 +0800
+Subject: [PATCH v5 13/13] iommu/rockchip: Support sharing IOMMU between masters
 In-Reply-To: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
 References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180124103516.2571-12-jeffy.chen@rock-chips.com>
+Message-ID: <20180124103516.2571-14-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's hard to undo bus_set_iommu() in the error path, so move it to the
-end of rk_iommu_probe().
+There would be some masters sharing the same IOMMU device. Put them in
+the same iommu group and share the same iommu domain.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
 Changes in v5: None
 Changes in v4: None
-Changes in v3: None
-Changes in v2:
-Move bus_set_iommu() to rk_iommu_probe().
+Changes in v3:
+Remove rk_iommudata->domain.
 
- drivers/iommu/rockchip-iommu.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+Changes in v2: None
+
+ drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index faebb6dd1f69..9fea7d8206e9 100644
+index f2a0f06d0a5f..eaa91108a4b0 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -1151,6 +1151,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (!dma_dev)
- 		dma_dev = &pdev->dev;
+@@ -99,6 +99,7 @@ struct rk_iommu {
+ 	struct iommu_device iommu;
+ 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+ 	struct iommu_domain *domain; /* domain to which iommu is attached */
++	struct iommu_group *group;
+ };
  
-+	bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
+ struct rk_iommudata {
+@@ -1110,6 +1111,15 @@ static void rk_iommu_remove_device(struct device *dev)
+ 	iommu_group_remove_device(dev);
+ }
+ 
++static struct iommu_group *rk_iommu_device_group(struct device *dev)
++{
++	struct rk_iommu *iommu;
 +
++	iommu = rk_iommu_from_dev(dev);
++
++	return iommu->group;
++}
++
+ static int rk_iommu_of_xlate(struct device *dev,
+ 			     struct of_phandle_args *args)
+ {
+@@ -1141,7 +1151,7 @@ static const struct iommu_ops rk_iommu_ops = {
+ 	.add_device = rk_iommu_add_device,
+ 	.remove_device = rk_iommu_remove_device,
+ 	.iova_to_phys = rk_iommu_iova_to_phys,
+-	.device_group = generic_device_group,
++	.device_group = rk_iommu_device_group,
+ 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
+ 	.of_xlate = rk_iommu_of_xlate,
+ };
+@@ -1201,9 +1211,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto err_put_clocks;
+ 
++	iommu->group = iommu_group_alloc();
++	if (IS_ERR(iommu->group)) {
++		err = PTR_ERR(iommu->group);
++		goto err_unprepare_clocks;
++	}
++
+ 	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
+ 	if (err)
+-		goto err_unprepare_clocks;
++		goto err_put_group;
+ 
+ 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+ 	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
+@@ -1227,6 +1243,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
  	return 0;
  err_remove_sysfs:
  	iommu_device_sysfs_remove(&iommu->iommu);
-@@ -1178,19 +1180,6 @@ static struct platform_driver rk_iommu_driver = {
- 
- static int __init rk_iommu_init(void)
- {
--	struct device_node *np;
--	int ret;
--
--	np = of_find_matching_node(NULL, rk_iommu_dt_ids);
--	if (!np)
--		return 0;
--
--	of_node_put(np);
--
--	ret = bus_set_iommu(&platform_bus_type, &rk_iommu_ops);
--	if (ret)
--		return ret;
--
- 	return platform_driver_register(&rk_iommu_driver);
- }
- subsys_initcall(rk_iommu_init);
++err_put_group:
++	iommu_group_put(iommu->group);
+ err_unprepare_clocks:
+ 	clk_bulk_unprepare(iommu->num_clocks, iommu->clocks);
+ err_put_clocks:
 -- 
 2.11.0
