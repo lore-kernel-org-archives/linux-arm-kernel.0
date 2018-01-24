@@ -1,169 +1,57 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 24 Jan 2018 16:59:53 +0530
-Subject: [PATCH v10 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-Message-ID: <1516793393-8574-1-git-send-email-j-keerthy@ti.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Wed, 24 Jan 2018 12:39:31 +0100
+Subject: [linux-sunxi][PATCH 5/5] arm64: allwinner: a64: Add DAI nodes
+In-Reply-To: <20180124110222.cdglyg5m7644xiem@flea.lan>
+References: <20180124103943.2062-1-codekipper@gmail.com>
+ <20180124103943.2062-6-codekipper@gmail.com>
+ <20180124110222.cdglyg5m7644xiem@flea.lan>
+Message-ID: <CAEKpxBk8NXJn4KxEGXx7UddqpUMC65kdEgx1phZDWyUd3ER_3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+On 24 January 2018 at 12:02, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Jan 24, 2018 at 11:39:43AM +0100, codekipper at gmail.com wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
+>>
+>> Add the DAI blocks to the device tree. I2S0 and I2S1 are for
+>> connecting to an external codec.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> ---
+>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
+>>  1 file changed, 26 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> index f060a58f374c..f3354f8c2026 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> @@ -419,6 +419,32 @@
+>>                       status = "disabled";
+>>               };
+>>
+>> +             i2s0: i2s at 1c22000 {
+>> +                     #sound-dai-cells = <0>;
+>> +                     compatible = "allwinner,sun8i-h3-i2s";
+>
+> Same remark than for the spdif, please add a soc-specific compatible.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
+Is that really necessary?..for example on the a20 the functionality of
+the i2s is the same as the a10 so it is down as
+"allwinner,sun4i-a10-i2s", likewise here it's the same as the changes
+required for the H3. I was planning on using the compatible
+"allwinner,sun50i-a64-i2s" for the audio codec as there are some
+quirks that need to be addressed.
 
-Changes in v10:
-
-  * Corrected a return variable.
-
-Changes in v9:
-
-  * Reorganized the place where of_node_put was called.
-
-Changes in v8:
-
-  * Added of_node_put call in success case of probe.
-
-Boot tested on am437x-gp-evm and dra7xx-evm.
-Also compile tested omap1_defconfig with other patches of v7
-posted here:
-
-https://www.spinics.net/lists/linux-omap/msg141100.html
-
-With v10 version of Patch 8/9.
-
- drivers/pwm/pwm-omap-dmtimer.c | 68 ++++++++++++++++++++++++++----------------
- 1 file changed, 42 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-index 5ad42f3..724b273 100644
---- a/drivers/pwm/pwm-omap-dmtimer.c
-+++ b/drivers/pwm/pwm-omap-dmtimer.c
-@@ -23,6 +23,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/dmtimer-omap.h>
- #include <linux/platform_data/pwm_omap_dmtimer.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
- 	struct pwm_chip chip;
- 	struct mutex mutex;
- 	pwm_omap_dmtimer *dm_timer;
--	struct pwm_omap_dmtimer_pdata *pdata;
-+	struct omap_dm_timer_ops *pdata;
- 	struct platform_device *dm_timer_pdev;
- };
- 
-@@ -242,19 +243,35 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *timer;
-+	struct platform_device *timer_pdev;
- 	struct pwm_omap_dmtimer_chip *omap;
--	struct pwm_omap_dmtimer_pdata *pdata;
-+	struct dmtimer_platform_data *timer_pdata;
-+	struct omap_dm_timer_ops *pdata;
- 	pwm_omap_dmtimer *dm_timer;
- 	u32 v;
--	int status;
-+	int ret = 0;
- 
--	pdata = dev_get_platdata(&pdev->dev);
--	if (!pdata) {
--		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
--		return -EINVAL;
-+	timer = of_parse_phandle(np, "ti,timers", 0);
-+	if (!timer)
-+		return -ENODEV;
-+
-+	timer_pdev = of_find_device_by_node(timer);
-+	if (!timer_pdev) {
-+		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
-+		ret = -ENODEV;
-+		goto put;
- 	}
- 
--	if (!pdata->request_by_node ||
-+	timer_pdata = dev_get_platdata(&timer_pdev->dev);
-+	if (!timer_pdata) {
-+		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
-+		ret = -EINVAL;
-+		goto put;
-+	}
-+
-+	pdata = timer_pdata->timer_ops;
-+
-+	if (!pdata || !pdata->request_by_node ||
- 	    !pdata->free ||
- 	    !pdata->enable ||
- 	    !pdata->disable ||
-@@ -267,21 +284,26 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 	    !pdata->set_prescaler ||
- 	    !pdata->write_counter) {
- 		dev_err(&pdev->dev, "Incomplete dmtimer pdata structure\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto put;
- 	}
- 
--	timer = of_parse_phandle(np, "ti,timers", 0);
--	if (!timer)
--		return -ENODEV;
--
- 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
- 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
--		return -ENODEV;
-+		ret = -ENODEV;
-+		goto put;
- 	}
- 
- 	dm_timer = pdata->request_by_node(timer);
--	if (!dm_timer)
--		return -EPROBE_DEFER;
-+	if (!dm_timer) {
-+		ret = -EPROBE_DEFER;
-+		goto put;
-+	}
-+
-+put:
-+	of_node_put(timer);
-+	if (ret < 0)
-+		return ret;
- 
- 	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
- 	if (!omap) {
-@@ -291,13 +313,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 
- 	omap->pdata = pdata;
- 	omap->dm_timer = dm_timer;
--
--	omap->dm_timer_pdev = of_find_device_by_node(timer);
--	if (!omap->dm_timer_pdev) {
--		dev_err(&pdev->dev, "Unable to find timer pdev\n");
--		omap->pdata->free(dm_timer);
--		return -EINVAL;
--	}
-+	omap->dm_timer_pdev = timer_pdev;
- 
- 	/*
- 	 * Ensure that the timer is stopped before we allow PWM core to call
-@@ -322,11 +338,11 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 
- 	mutex_init(&omap->mutex);
- 
--	status = pwmchip_add(&omap->chip);
--	if (status < 0) {
-+	ret = pwmchip_add(&omap->chip);
-+	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to register PWM\n");
- 		omap->pdata->free(omap->dm_timer);
--		return status;
-+		return ret;
- 	}
- 
- 	platform_set_drvdata(pdev, omap);
--- 
-1.9.1
+Thanks,
+CK
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
