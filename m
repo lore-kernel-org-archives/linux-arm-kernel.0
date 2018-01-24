@@ -1,131 +1,27 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 24 Jan 2018 14:16:24 +0800
-Subject: [PATCH] nvmem: sunxi-sid: fix H3 SID controller support
-Message-ID: <20180124061624.61951-1-icenowy@aosc.io>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 24 Jan 2018 07:26:53 +0100
+Subject: [v2, 1/5] dt-bindings: i2c: update documentation for the Meson-AXG
+In-Reply-To: <20171120145415.6581-2-yixun.lan@amlogic.com>
+References: <20171120145415.6581-2-yixun.lan@amlogic.com>
+Message-ID: <20180124062653.dietsdhvproltho6@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that doing some operation will make the value pre-read on H3
-SID controller wrong again, so all operation should be performed by
-register.
+On Mon, Nov 20, 2017 at 10:54:11PM +0800, Yixun Lan wrote:
+> From: Jian Hu <jian.hu@amlogic.com>
+> 
+> Update the doc to explicitly add Meson-AXG to support list
+> 
+> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Change the SID reading to use register only.
+Applied to for-next, thanks!
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/nvmem/sunxi_sid.c | 71 +++++++++++++++++++++++++++++++++--------------
- 1 file changed, 50 insertions(+), 21 deletions(-)
-
-diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-index 99bd54d85fcb..d4086d143ac1 100644
---- a/drivers/nvmem/sunxi_sid.c
-+++ b/drivers/nvmem/sunxi_sid.c
-@@ -85,13 +85,14 @@ static int sunxi_sid_read(void *context, unsigned int offset,
- }
- 
- static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
--				      const unsigned int word)
-+				      const unsigned int offset,
-+				      u32 *out)
- {
- 	u32 reg_val;
- 	int ret;
- 
- 	/* Set word, lock access, and set read command */
--	reg_val = (word & SUN8I_SID_OFFSET_MASK)
-+	reg_val = (offset & SUN8I_SID_OFFSET_MASK)
- 		  << SUN8I_SID_OFFSET_SHIFT;
- 	reg_val |= SUN8I_SID_OP_LOCK | SUN8I_SID_READ;
- 	writel(reg_val, sid->base + SUN8I_SID_PRCTL);
-@@ -101,7 +102,49 @@ static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
- 	if (ret)
- 		return ret;
- 
-+	if (out)
-+		*out = readl(sid->base + SUN8I_SID_RDKEY);
-+
- 	writel(0, sid->base + SUN8I_SID_PRCTL);
-+
-+	return 0;
-+}
-+
-+/*
-+ * On Allwinner H3, the value on the 0x200 offset of the SID controller seems to be
-+ * not reliable at all.
-+ * Read by the registers instead.
-+ */
-+static int sun8i_sid_read_byte_by_reg(const struct sunxi_sid *sid,
-+				      const unsigned int offset,
-+				      u8 *out)
-+{
-+	u32 word;
-+	int ret;
-+
-+	ret = sun8i_sid_register_readout(sid, offset & ~0x03, &word);
-+
-+	if (ret)
-+		return ret;
-+
-+	*out = (word >> ((offset & 0x3) * 8)) & 0xff;
-+
-+	return 0;
-+}
-+
-+static int sun8i_sid_read_by_reg(void *context, unsigned int offset,
-+				 void *val, size_t bytes)
-+{
-+	struct sunxi_sid *sid = context;
-+	u8 *buf = val;
-+	int ret;
-+
-+	while (bytes--) {
-+		ret = sun8i_sid_read_byte_by_reg(sid, offset++, buf++);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	return 0;
- }
- 
-@@ -131,26 +174,12 @@ static int sunxi_sid_probe(struct platform_device *pdev)
- 
- 	size = cfg->size;
- 
--	if (cfg->need_register_readout) {
--		/*
--		 * H3's SID controller have a bug that the value at 0x200
--		 * offset is not the correct value when the hardware is reseted.
--		 * However, after doing a register-based read operation, the
--		 * value become right.
--		 * Do a full read operation here, but ignore its value
--		 * (as it's more fast to read by direct MMIO value than
--		 * with registers)
--		 */
--		for (i = 0; i < (size >> 2); i++) {
--			ret = sun8i_sid_register_readout(sid, i);
--			if (ret)
--				return ret;
--		}
--	}
--
- 	econfig.size = size;
- 	econfig.dev = dev;
--	econfig.reg_read = sunxi_sid_read;
-+	if (cfg->need_register_readout)
-+		econfig.reg_read = sun8i_sid_read_by_reg;
-+	else
-+		econfig.reg_read = sunxi_sid_read;
- 	econfig.priv = sid;
- 	nvmem = nvmem_register(&econfig);
- 	if (IS_ERR(nvmem))
-@@ -163,7 +192,7 @@ static int sunxi_sid_probe(struct platform_device *pdev)
- 	}
- 
- 	for (i = 0; i < size; i++)
--		randomness[i] = sunxi_sid_read_byte(sid, i);
-+		econfig.reg_read(sid, i, &randomness[i], 1);
- 
- 	add_device_randomness(randomness, size);
- 	kfree(randomness);
--- 
-2.15.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/cc02a663/attachment.sig>
