@@ -1,72 +1,64 @@
-From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
-Date: Wed, 24 Jan 2018 13:34:33 +0100
-Subject: [PATCH 6/7] arm64: change arm_probe_decode_insn() function name
-In-Reply-To: <1516797274-20320-1-git-send-email-m.slodczyk2@partner.samsung.com>
-References: <1516797274-20320-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180124123456eucas1p152faddb1afc94d8841ebaf5112c6f26b@eucas1p1.samsung.com>
-Message-ID: <1516797274-20320-7-git-send-email-m.slodczyk2@partner.samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Jan 2018 12:36:44 +0000
+Subject: [PATCH 3/5] drm: add ARM64 flush implementations
+In-Reply-To: <2cf40ed8-cb7c-3f17-a8e4-2cbf2fb980e6@arm.com>
+References: <20180124025606.3020-2-gurchetansingh@chromium.org>
+ <20180124025606.3020-3-gurchetansingh@chromium.org>
+ <2cf40ed8-cb7c-3f17-a8e4-2cbf2fb980e6@arm.com>
+Message-ID: <20180124123644.GU17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM probe decoding function has similar name in arm32 -
-arm_probes_decode_insn(), and arm64 - arm_probe_decode_insn(). Change arm64
-probes decoding function name from arm_probe_decode_insn() to
-arm64_probes_decode_insn() to minimize the risk of confusion.
+On Wed, Jan 24, 2018 at 12:00:59PM +0000, Robin Murphy wrote:
+> On 24/01/18 02:56, Gurchetan Singh wrote:
+> >This patch uses the __dma_map_area function to flush the cache
+> >on ARM64.
+> >
+> >v2: Don't use DMA API, call functions directly (Daniel)
+> >
+> >Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
+> >---
+> >  drivers/gpu/drm/drm_cache.c | 13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> >
+> >diff --git a/drivers/gpu/drm/drm_cache.c b/drivers/gpu/drm/drm_cache.c
+> >index 5124582451c6..250cdfbb711f 100644
+> >--- a/drivers/gpu/drm/drm_cache.c
+> >+++ b/drivers/gpu/drm/drm_cache.c
+> >@@ -159,6 +159,12 @@ drm_flush_pages(struct page *pages[], unsigned long num_pages)
+> >  	for (i = 0; i < num_pages; i++)
+> >  		drm_cache_maint_page(pages[i], 0, PAGE_SIZE, DMA_TO_DEVICE,
+> >  				     dmac_map_area);
+> >+#elif defined(CONFIG_ARM64)
+> >+	unsigned long i;
+> >+
+> >+	for (i = 0; i < num_pages; i++)
+> >+		__dma_map_area(phys_to_virt(page_to_phys(pages[i])), PAGE_SIZE,
+> >+			       DMA_TO_DEVICE);
+> 
+> Note that this is not exactly equivalent to clflush - if it's at all
+> possible for a non-coherent GPU to write back to these pages and someone
+> somewhere expects to be able to read the updated data from a CPU, that's
+> going to be subtly broken.
+> 
+> This also breaks building DRM as a module. And I doubt that either of the
+> two easy solutions to that are going to fly with the respective
+> maintainers...
+> 
+> Given all the bodging around which seems to happen in DRM/ION/etc., it would
+> be really nice to pin down what exactly the shortcomings of the DMA API are
+> for these use-cases, and extend it to address them properly.
 
-Signed-off-by: Maciej Slodczyk <m.slodczyk2@partner.samsung.com>
----
- arch/arm64/kernel/probes/decode-insn.c | 4 ++--
- arch/arm64/kernel/probes/decode-insn.h | 2 +-
- arch/arm64/kernel/probes/uprobes.c     | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+Aren't the cache flushing instructions available from userspace on
+ARM64?  (I've certainly used them in my spectre/meltdown PoC).  If
+userspace wants to flush before reading a GPU buffer that has been
+writtent to, why can't it use the already available cache maintenance
+instructions?  It's likely to be quicker, and it can target just the
+area of the buffer it wants to read.
 
-diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-index a0597a2..37be1a9 100644
---- a/arch/arm64/kernel/probes/decode-insn.c
-+++ b/arch/arm64/kernel/probes/decode-insn.c
-@@ -78,7 +78,7 @@ static bool __kprobes aarch64_insn_is_steppable(u32 insn)
-  *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
-  */
- enum probes_insn __kprobes
--arm_probe_decode_insn(probes_opcode_t insn, struct arch_probes_insn *api)
-+arm64_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *api)
- {
- 	/*
- 	 * Instructions reading or modifying the PC won't work from the XOL
-@@ -162,7 +162,7 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
- 		else
- 			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
- 	}
--	decoded = arm_probe_decode_insn(insn, &asi->api);
-+	decoded = arm64_probes_decode_insn(insn, &asi->api);
- 
- 	if (decoded != INSN_REJECTED && scan_end)
- 		if (is_probed_address_atomic(addr - 1, scan_end))
-diff --git a/arch/arm64/kernel/probes/decode-insn.h b/arch/arm64/kernel/probes/decode-insn.h
-index 93e021f..e6c7b9e 100644
---- a/arch/arm64/kernel/probes/decode-insn.h
-+++ b/arch/arm64/kernel/probes/decode-insn.h
-@@ -32,7 +32,7 @@ enum probes_insn __kprobes
- arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi);
- #endif
- enum probes_insn __kprobes
--arm_probe_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi);
-+arm64_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi);
- 
- extern const union decode_action uprobes_probes_actions[];
- #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
-diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
-index f99b50b..e7b8912 100644
---- a/arch/arm64/kernel/probes/uprobes.c
-+++ b/arch/arm64/kernel/probes/uprobes.c
-@@ -47,7 +47,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 
- 	insn = *(probes_opcode_t *)(&auprobe->insn[0]);
- 
--	switch (arm_probe_decode_insn(insn, &auprobe->api)) {
-+	switch (arm64_probes_decode_insn(insn, &auprobe->api)) {
- 	case INSN_REJECTED:
- 		return -EINVAL;
- 
+32-bit ARM is a different matter, and I'll reply separately.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
