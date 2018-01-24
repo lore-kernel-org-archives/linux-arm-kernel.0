@@ -1,44 +1,36 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Wed, 24 Jan 2018 11:39:39 +0100
-Subject: [linux-sunxi][PATCH 1/5] arm64: allwinner: a64: Add the SPDIF block
+Date: Wed, 24 Jan 2018 11:39:42 +0100
+Subject: [linux-sunxi][PATCH 4/5] arm64: allwinner: a64: Add SPDIF to the
+ Pine64
 In-Reply-To: <20180124103943.2062-1-codekipper@gmail.com>
 References: <20180124103943.2062-1-codekipper@gmail.com>
-Message-ID: <20180124103943.2062-2-codekipper@gmail.com>
+Message-ID: <20180124103943.2062-5-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the SPDIF transceiver controller block to the A64 dtsi.
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index d783d164b9c3..c82979038b0b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -382,6 +382,19 @@
- 			};
- 		};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 604cdaedac38..70e8ff9a1f38 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -230,6 +230,13 @@
+ 	regulator-name = "vcc-rtc";
+ };
  
-+		spdif: spdif at 1c21000 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-h3-spdif";
-+			reg = <0x01c21000 0x400>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPDIF>, <&ccu CLK_SPDIF>;
-+			resets = <&ccu RST_BUS_SPDIF>;
-+			clock-names = "apb", "spdif";
-+			dmas = <&dma 2>;
-+			dma-names = "tx";
-+			status = "disabled";
-+		};
++/* On Euler connector */
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spdif_tx_pins_a>;
++	status = "disabled";
++};
 +
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
+ /* On Exp and Euler connectors */
+ &uart0 {
+ 	pinctrl-names = "default";
 -- 
 2.16.0
