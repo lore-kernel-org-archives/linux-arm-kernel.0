@@ -1,178 +1,58 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Wed, 24 Jan 2018 08:24:32 +0100
-Subject: [PATCH v8 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-In-Reply-To: <1516772680-28256-1-git-send-email-j-keerthy@ti.com>
-References: <1516772680-28256-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180124072432.GA11294@lenoch>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 24 Jan 2018 09:03:45 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v6_00=2F41=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
+ <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
+ <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
+ <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
+ <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
+ <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
+ <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
+ <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
+ <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
+ <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
+ <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
+ <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
+ <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
+ <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
+Message-ID: <CAMRc=Me1_i8qQE4GHeLiU2itHnp71Gt03UM6NhL=hA8Y6Pb0MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keerthy,
+2018-01-23 21:23 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 01/23/2018 02:05 PM, David Lechner wrote:
+>>
+>> On 01/23/2018 02:01 PM, David Lechner wrote:
+>>>
+>>> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
+>>>>
+>>>>
+>>>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
+>>>> but somehow the clock doesn't end up in the list of the device's
+>>>> clocks - which is why it's not enabled by pm_runtime_get_sync().
+>>>>
+>>>
+>>>
+>>> Right. This is because devm_clk_get() now finds the clock via device
+>>> tree instead of a clkdev lookup entry. However, I think that the PM
+>>> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
+>>> the clkdev lookup to match the con_id and does not use device tree.
+>>> The same thing is happing in mdio, emac and lcdc.
+>>>
+>>
+>> Minor correction: It looks like emac doesn't do this because it doesn't
+>> have a con_id of "fck". But, the same clock is shared by emac and mdio, so
+>> since mdio enables the clock, emac doesn't notice or care that it did
+>> not enable the clock itself.
+>
+>
+> How about using pm_clk_add_clk() in these drivers to explicitly use the
+> clocks for power management instead of relying on pm_clk_add_notifier()
+> to do this implicitly?
 
-On Wed, Jan 24, 2018 at 11:14:40AM +0530, Keerthy wrote:
-> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-> Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
-> 
-> Changes in v8:
-> 
->   * Added of_node_put call in success case of probe.
-> 
-> Boot tested on am437x-gp-evm and dra7xx-evm.
-> Also compile tested omap1_defconfig with other patches of v7
-> posted here:
-> 
-> https://www.spinics.net/lists/linux-omap/msg141100.html
-> 
-> With v8 version of Patch 8/9.
-> 
->  drivers/pwm/pwm-omap-dmtimer.c | 68 ++++++++++++++++++++++++++----------------
->  1 file changed, 42 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-> index 5ad42f3..c00e474 100644
-> --- a/drivers/pwm/pwm-omap-dmtimer.c
-> +++ b/drivers/pwm/pwm-omap-dmtimer.c
-> @@ -23,6 +23,7 @@
->  #include <linux/mutex.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/platform_data/dmtimer-omap.h>
->  #include <linux/platform_data/pwm_omap_dmtimer.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
-> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
->  	struct pwm_chip chip;
->  	struct mutex mutex;
->  	pwm_omap_dmtimer *dm_timer;
-> -	struct pwm_omap_dmtimer_pdata *pdata;
-> +	struct omap_dm_timer_ops *pdata;
->  	struct platform_device *dm_timer_pdev;
->  };
->  
-> @@ -242,19 +243,35 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
->  	struct device_node *timer;
-> +	struct platform_device *timer_pdev;
->  	struct pwm_omap_dmtimer_chip *omap;
-> -	struct pwm_omap_dmtimer_pdata *pdata;
-> +	struct dmtimer_platform_data *timer_pdata;
-> +	struct omap_dm_timer_ops *pdata;
->  	pwm_omap_dmtimer *dm_timer;
->  	u32 v;
-> -	int status;
-> +	int status, ret = 0;
->  
-> -	pdata = dev_get_platdata(&pdev->dev);
-> -	if (!pdata) {
-> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
-> -		return -EINVAL;
-> +	timer = of_parse_phandle(np, "ti,timers", 0);
-> +	if (!timer)
-> +		return -ENODEV;
-> +
-> +	timer_pdev = of_find_device_by_node(timer);
-> +	if (!timer_pdev) {
-> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
-> +		ret = -ENODEV;
-> +		goto put;
->  	}
->  
-> -	if (!pdata->request_by_node ||
-> +	timer_pdata = dev_get_platdata(&timer_pdev->dev);
-> +	if (!timer_pdata) {
-> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
-> +		ret = -EINVAL;
-> +		goto put;
-> +	}
-> +
-> +	pdata = timer_pdata->timer_ops;
-> +
-> +	if (!pdata || !pdata->request_by_node ||
->  	    !pdata->free ||
->  	    !pdata->enable ||
->  	    !pdata->disable ||
-> @@ -267,37 +284,32 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->  	    !pdata->set_prescaler ||
->  	    !pdata->write_counter) {
->  		dev_err(&pdev->dev, "Incomplete dmtimer pdata structure\n");
-> -		return -EINVAL;
-> +		ret = -EINVAL;
-> +		goto put;
->  	}
->  
-> -	timer = of_parse_phandle(np, "ti,timers", 0);
-> -	if (!timer)
-> -		return -ENODEV;
-> -
->  	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
->  		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
-> -		return -ENODEV;
-> +		ret = -ENODEV;
-> +		goto put;
+Yes, this sounds good.
 
-Should we call of_node_put() even from here? of_get_property() failed, so
-reference was not updated.
-
->  	}
->  
->  	dm_timer = pdata->request_by_node(timer);
-
-And timer seems to be used only here, so calling
-	of_node_put(timer);
-just here should be enough.
-
-> -	if (!dm_timer)
-> -		return -EPROBE_DEFER;
-> +	if (!dm_timer) {
-> +		ret = -EPROBE_DEFER;
-> +		goto put;
-> +	}
->  
->  	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
->  	if (!omap) {
->  		pdata->free(dm_timer);
-> -		return -ENOMEM;
-> +		ret = -ENOMEM;
-> +		goto put;
->  	}
->  
->  	omap->pdata = pdata;
->  	omap->dm_timer = dm_timer;
-> -
-> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
-> -	if (!omap->dm_timer_pdev) {
-> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
-> -		omap->pdata->free(dm_timer);
-> -		return -EINVAL;
-> -	}
-> +	omap->dm_timer_pdev = timer_pdev;
->  
->  	/*
->  	 * Ensure that the timer is stopped before we allow PWM core to call
-> @@ -326,12 +338,16 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->  	if (status < 0) {
->  		dev_err(&pdev->dev, "failed to register PWM\n");
->  		omap->pdata->free(omap->dm_timer);
-> -		return status;
-> +		ret = status;
-> +		goto put;
->  	}
->  
->  	platform_set_drvdata(pdev, omap);
->  
-> -	return 0;
-> +put:
-> +	of_node_put(timer);
-> +
-> +	return ret;
->  }
->  
->  static int pwm_omap_dmtimer_remove(struct platform_device *pdev)
-> -- 
-> 1.9.1
+Bartosz
