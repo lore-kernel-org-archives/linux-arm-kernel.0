@@ -1,48 +1,59 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 24 Jan 2018 09:53:44 +0000
-Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
- SIGFPE
-In-Reply-To: <87lggo7430.fsf@xmission.com>
-References: <878tcp8umz.fsf@xmission.com>
- <20180123101446.GP22781@e103592.cambridge.arm.com>
- <87tvvc77nf.fsf@xmission.com>
- <20180123.132916.1025436873838680654.davem@davemloft.net>
- <87lggo7430.fsf@xmission.com>
-Message-ID: <20180124095341.GC5862@e103592.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 24 Jan 2018 10:12:53 +0000
+Subject: [PATCH] arm64: Fix TTBR + PAN + 52-bit PA logic in
+ cpu_do_switch_mm
+In-Reply-To: <20180124082708.29038-1-steve.capper@arm.com>
+References: <20180124082708.29038-1-steve.capper@arm.com>
+Message-ID: <5fc3f4ac-1f97-a2fb-b611-78f2869c77a1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 01:44:19PM -0600, Eric W. Biederman wrote:
-> David Miller <davem@davemloft.net> writes:
+On 24/01/18 08:27, Steve Capper wrote:
+> In cpu_do_switch_mm(.) with ARM64_SW_TTBR0_PAN=y we apply phys_to_ttbr
+> to a value that already has an ASID inserted into the upper bits. For
+> 52-bit PA configurations this then can give us TTBR0_EL1 registers that
+> cause translation table walks to attempt to access non-zero PA[51:48]
+> spuriously. Ultimately leading to a Synchronous External Abort on level
+> 1 translation.
 > 
-> > From: ebiederm at xmission.com (Eric W. Biederman)
-> > Date: Tue, 23 Jan 2018 12:27:16 -0600
-> >
-> >> Dave Martin <Dave.Martin@arm.com> writes:
-> >> 
-> >>> On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
-> >>> However, the purpose of this as an RFC was to get feedback on whether
-> >>> adding FPE_UNKNOWN is considered acceptable at all from an API
-> >>> perspective -- the precise number doesn't matter for that discussion.
-> >>>
-> >>> Do you have any view on this?
-> >> 
-> >> That seems as good a solution as any too me.  It is reality and it
-> >> happens in the code and there are several places of the same form I
-> >> would use it, just to get rid of the FPE_FIXME.
-> >
-> > Eric, feel free to do something similar on Sparc.
+> This patch re-arranges the logic in cpu_do_switch_mm(.) such that
+> phys_to_ttbr is called before the ASID is inserted into the TTBR0 value.
 > 
-> Will do.
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
 > 
-> This sounds like a good solution for this weird corner case, that
-> appears on multiple architectures.
+> ---
+> 
+> This applies to the arm64 for-next/core branch.
+> ---
+>   arch/arm64/mm/proc.S | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index c6a12073ef46..9f177aac6390 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -153,14 +153,14 @@ ENDPROC(cpu_do_resume)
+>   ENTRY(cpu_do_switch_mm)
+>   	mrs	x2, ttbr1_el1
+>   	mmid	x1, x1				// get mm->context.id
+> +	phys_to_ttbr x0, x3
+>   #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+> -	bfi	x0, x1, #48, #16		// set the ASID field in TTBR0
+> +	bfi	x3, x1, #48, #16		// set the ASID field in TTBR0
+>   #endif
+>   	bfi	x2, x1, #48, #16		// set the ASID
+>   	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
+>   	isb
+> -	phys_to_ttbr x0, x2
+> -	msr	ttbr0_el1, x2			// now update TTBR0
+> +	msr	ttbr0_el1, x3			// now update TTBR0
+>   	isb
+>   	b	post_ttbr_update_workaround	// Back to C code...
+>   ENDPROC(cpu_do_switch_mm)
+> 
 
-OK, I'll rebase my patches onto your tree (though trivial here) and
-repost.
+Steve,
 
-I'm still waiting for feeback on the Arm specifics, but FPE_UNKNOWN
-could be picked up independently of that.
+Nice catch !
 
-Cheers
----Dave
+Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
