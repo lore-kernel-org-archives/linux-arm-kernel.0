@@ -1,81 +1,47 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Wed, 24 Jan 2018 09:35:05 +0800
-Subject: [PATCH 2/2] ARM: imx: cpuidle-imx6q: configure CCM to RUN mode
- when CPU is active
-In-Reply-To: <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
-References: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
- <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
-Message-ID: <20180124013505.GB9401@shlinux2>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 24 Jan 2018 03:08:04 +0100
+Subject: [net-next: PATCH v4 1/7] device property: Introduce
+ fwnode_get_mac_address()
+In-Reply-To: <CAPv3WKf0GUE508P8k1nExBA+h6pQr4UcaFPk+mps3xRepESQmw@mail.gmail.com>
+References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
+ <1516278704-17141-2-git-send-email-mw@semihalf.com>
+ <CAJZ5v0j=4Lvaf49oeDqVmYP5nyAs-E9E8xdgyfL7=J_46X5TMA@mail.gmail.com>
+ <CAPv3WKf0GUE508P8k1nExBA+h6pQr4UcaFPk+mps3xRepESQmw@mail.gmail.com>
+Message-ID: <CAJZ5v0jpGb8_rSTdtoLJW9os0ufgwLTnbWAQq6MTy_ye6Hr6KA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 23, 2018 at 7:12 AM, Marcin Wojtas <mw@semihalf.com> wrote:
+> Hi Rafael,
+>
+>> >         if (res)
+>> >                 return res;
+>> >
+>> > -       return device_get_mac_addr(dev, "address", addr, alen);
+>> > +       return fwnode_get_mac_addr(fwnode, "address", addr, alen);
+>> > +}
+>> > +EXPORT_SYMBOL(fwnode_get_mac_address);
+>>
+>> That should be EXPORT_SYMBOL_GPL().
+>>
+>> I have overlooked that previously, sorry about that.
+>
+> The series landed yesterday in net-next, so I need to send a fix on
+> top.
 
-For the two patch, ping..
+OK
 
-On Sat, Dec 30, 2017 at 09:53:19PM +0800, Peng Fan wrote:
->There are two states in i.MX6Q cpuidle driver.
->state[1]: ARM WFI mode
->state[2]: i.MX6Q WAIT mode
+> Would you be ok with single patch fixing all EXPORT_SYMBOL()
+> occurences? Those would be 2 new routines:
+> - fwnode_get_mac_address
+> - fwnode_irq_get
+> and  2 already existing in the file:
+> - device_get_mac_address
+> - fwnode_graph_parse_endpoint
 >
->Take i.MX6DL as example, think out such a case:
->1. CPU0/1 both run at normal mode
->2. On CPU0, `sleep 1` is executed. And there are no workload on CPU1.
->3. CPU0 first runs into state[2] and 'wfi' instruction. Switched to use
->   GPT broadcast.
->4. CPU1 runs into state[2] and configure CCM to WAIT MODE,
->   then 'wfi' instruction. Now arm_clk and local timer clock are
->   shutdown. Switched to use GPT broadcast
->5. GPT broadcast timer interrupt comes to GPC/GIC, then CPU0 wakes up.
->   CPU0 switched to use arm local timer. CPU1 is still sleeping.
->6. No workload on CPU0, CPU0 runs into state[1]. But CCM register
->   is still not restored to Normal RUN mode. 'wfi' + CCM WAIT will
->   cause arm_clk and arm core clk.
->   Now CPU0 stops, which is not correct.
->
->So, need to make sure CCM configured to RUN mode when any cpu exit
->state[2].
->
->In this patch,
->When CPU exits state[2], it configures CCM to RUN mode.
->When all CPUs enters state[2], the last CPU needs to check
->whether it's ok to configure CCM to WAIT mode or not.
->
->Signed-off-by: Peng Fan <peng.fan@nxp.com>
->---
->
->V1:
-> This is to upstream patch:
-> http://git.freescale.com/git/cgit.cgi/imx/linux-imx.git/commit/?h=imx_4.9.11_1.0.0_ga&id=0d980646ee068b92db71fd5e4e4efcbc33749cbd
->
-> arch/arm/mach-imx/cpuidle-imx6q.c | 3 +++
-> 1 file changed, 3 insertions(+)
->
->diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
->index bfeb25aaf9a2..4d342e2fdfe6 100644
->--- a/arch/arm/mach-imx/cpuidle-imx6q.c
->+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
->@@ -30,6 +30,8 @@ static int imx6q_enter_wait(struct cpuidle_device *dev,
-> 		if (!spin_trylock(&master_lock))
-> 			goto idle;
-> 		imx6_set_lpm(WAIT_UNCLOCKED);
->+		if (atomic_read(&master) != num_online_cpus())
->+			imx6_set_lpm(WAIT_CLOCKED);
-> 		cpu_do_idle();
-> 		imx6_set_lpm(WAIT_CLOCKED);
-> 		spin_unlock(&master_lock);
->@@ -41,6 +43,7 @@ static int imx6q_enter_wait(struct cpuidle_device *dev,
-> done:
-> 	atomic_dec(&master);
-> 
->+	imx6_set_lpm(WAIT_CLOCKED);
-> 	return index;
-> }
-> 
->-- 
->2.14.1
->
+> Please let know, how you prefer to handle it?
+
+I guess it's better to fix this up when the series gets merged.
 
 Thanks,
-Peng.
--- 
+Rafael
