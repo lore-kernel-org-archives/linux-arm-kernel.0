@@ -1,73 +1,60 @@
-From: mkelly@xevo.com (Martin Kelly)
-Date: Tue, 23 Jan 2018 15:58:44 -0800
-Subject: [PATCH v3] ARM: dts: sun8i: NanoPi NEO Air add WiFi / eMMC
-Message-ID: <20180123235844.5511-1-mkelly@xevo.com>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Wed, 24 Jan 2018 09:31:01 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable OP-TEE
+In-Reply-To: <1515145235-12062-1-git-send-email-peng.fan@nxp.com>
+References: <1515145235-12062-1-git-send-email-peng.fan@nxp.com>
+Message-ID: <20180124013101.GA9401@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jelle van der Waa <jelle@vdwaa.nl>
+Hi,
 
-Enable the WiFi (AP6212) chip and eMMC support for the NanoPi NEO Air.
+On Fri, Jan 05, 2018 at 05:40:35PM +0800, Peng Fan wrote:
+>This patch enables configs for Trusted Execution Environment(TEE) and
+>Open Portable Trusted Execution Environment(OP-TEE).
+>
+>With Linux running in Trustzone non-secure world, OP-TEE OS runs in
+>secure world, linux could use secure services provided by OP-TEE.
+>With TEE/OP-TEE options selected, use the bindings
+>in Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+>to let the driver probe work.
+>
+>On i.MX6/7, now the bootflow is U-Boot->OP-TEE->Linux, OP-TEE will
+>automatically create that node.
+>
+>Signed-off-by: Peng Fan <peng.fan@nxp.com>
+>---
+>
+>V1:
+> Tested on i.MX7D-SDB with/without OP-TEE OS.
+> OP-TEE needs https://github.com/OP-TEE/optee_os/pull/2052
 
-This patch was originally submitted by Jelle van der Waa. Martin Kelly
-modified it to compile on the latest kernel, fixed up some review
-comments from Maxime Ripard, and re-tested the patch.
+This OP-TEE OS change has been merged.
 
-These are the original patch submissions:
+Any comments on this patch to enable linux side driver?
 
-https://patchwork.kernel.org/patch/9581613/
-https://patchwork.kernel.org/patch/9642071/
+Thanks,
+Peng.
 
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: linux-sunxi at googlegroups.com
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
-Signed-off-by: Martin Kelly <mkelly@xevo.com>
----
- arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+>
+> arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+> 1 file changed, 2 insertions(+)
+>
+>diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+>index 29cd1ac48987..72c4231d1b62 100644
+>--- a/arch/arm/configs/imx_v6_v7_defconfig
+>+++ b/arch/arm/configs/imx_v6_v7_defconfig
+>@@ -368,6 +368,8 @@ CONFIG_PWM=y
+> CONFIG_PWM_FSL_FTM=y
+> CONFIG_PWM_IMX=y
+> CONFIG_NVMEM_IMX_OCOTP=y
+>+CONFIG_TEE=y
+>+CONFIG_OPTEE=y
+> CONFIG_MUX_MMIO=y
+> CONFIG_EXT2_FS=y
+> CONFIG_EXT2_FS_XATTR=y
+>-- 
+>2.14.1
+>
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-index 03ff6f8b93ff..920849092cc8 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-@@ -72,6 +72,11 @@
- 			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
- 		};
- 	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
-+	};
- };
- 
- &mmc0 {
-@@ -84,6 +89,25 @@
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	vqmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&pio>;
-+		interrupts = <6 10 IRQ_TYPE_LEVEL_LOW>; /* PG10 / EINT10 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
 -- 
-2.11.0
