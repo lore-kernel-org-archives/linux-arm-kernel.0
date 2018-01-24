@@ -1,202 +1,155 @@
-From: kdinh@apm.com (Khuong Dinh)
-Date: Tue, 23 Jan 2018 19:13:27 -0700
-Subject: [PATCH] arm64: turn off xgene branch prediction while in kernel space
-Message-ID: <1516760007-14670-1-git-send-email-kdinh@apm.com>
+From: gurchetansingh@chromium.org (Gurchetan Singh)
+Date: Tue, 23 Jan 2018 18:55:30 -0800
+Subject: [PATCH 1/5] drm: rename {drm_clflush_sg, drm_clflush_pages}
+Message-ID: <20180124025534.2964-1-gurchetansingh@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aliasing attacks against CPU branch predictors can allow an attacker to
-redirect speculative control flow on some CPUs and potentially divulge
-information from one context to another.
+Since clfush is an x86-only instruction, these function names won't
+make much sense if we start adding cases for other architectures.
 
-This patch only supports for XGene processors.
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Khuong Dinh <kdinh@apm.com>
+Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
 ---
- arch/arm64/include/asm/cpucaps.h |    3 ++-
- arch/arm64/include/asm/fixmap.h  |    4 ++++
- arch/arm64/kernel/cpu_errata.c   |   18 ++++++++++++++++++
- arch/arm64/kernel/entry.S        |   28 ++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c          |   34 ++++++++++++++++++++++++++++++++++
- 5 files changed, 86 insertions(+), 1 deletions(-)
+ drivers/gpu/drm/drm_cache.c                 | 12 ++++++------
+ drivers/gpu/drm/i915/i915_gem.c             |  2 +-
+ drivers/gpu/drm/i915/i915_gem_clflush.c     |  2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c |  2 +-
+ drivers/gpu/drm/ttm/ttm_tt.c                |  2 +-
+ drivers/gpu/drm/vgem/vgem_drv.c             |  2 +-
+ include/drm/drm_cache.h                     |  4 ++--
+ 7 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index bb26382..dc9ada1 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -45,7 +45,8 @@
- #define ARM64_HARDEN_BRANCH_PREDICTOR		24
- #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
- #define ARM64_HAS_RAS_EXTN			26
-+#define ARM64_XGENE_HARDEN_BRANCH_PREDICTOR	27
+diff --git a/drivers/gpu/drm/drm_cache.c b/drivers/gpu/drm/drm_cache.c
+index 3bd76e918b5d..89cdd32fe1f3 100644
+--- a/drivers/gpu/drm/drm_cache.c
++++ b/drivers/gpu/drm/drm_cache.c
+@@ -70,7 +70,7 @@ static void drm_cache_flush_clflush(struct page *pages[],
+ #endif
  
--#define ARM64_NCAPS				27
-+#define ARM64_NCAPS				28
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index ec1e6d6..d5400ca 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -63,6 +63,10 @@ enum fixed_addresses {
- 	FIX_ENTRY_TRAMP_TEXT,
- #define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
- #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-+
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	FIX_BOOT_CPU_BP_CTLREG,
-+#endif /* CONFIG_HARDEN_BRANCH_PREDICTOR */
- 	__end_of_permanent_fixed_addresses,
- 
- 	/*
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index ed68818..1554014 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,18 @@
- 		(arm64_ftr_reg_ctrel0.sys_val & arm64_ftr_reg_ctrel0.strict_mask);
- }
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+static bool is_xgene_cpu(const struct arm64_cpu_capabilities *entry, int scope)
-+{
-+	unsigned int midr = read_cpuid_id();
-+	unsigned int variant = MIDR_VARIANT(midr);
-+
-+	WARN_ON(scope != SCOPE_LOCAL_CPU);
-+	return MIDR_IMPLEMENTOR(midr) == ARM_CPU_IMP_APM && (variant <= 3) &&
-+					is_hyp_mode_available();
-+}
-+#endif
-+
- static int cpu_enable_trap_ctr_access(void *__unused)
+ /**
+- * drm_clflush_pages - Flush dcache lines of a set of pages.
++ * drm_flush_pages - Flush dcache lines of a set of pages.
+  * @pages: List of pages to be flushed.
+  * @num_pages: Number of pages in the array.
+  *
+@@ -78,7 +78,7 @@ static void drm_cache_flush_clflush(struct page *pages[],
+  * to a page in the array.
+  */
+ void
+-drm_clflush_pages(struct page *pages[], unsigned long num_pages)
++drm_flush_pages(struct page *pages[], unsigned long num_pages)
  {
- 	/* Clear SCTLR_EL1.UCT */
-@@ -369,6 +381,12 @@ static int qcom_enable_link_stack_sanitization(void *data)
- 		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
- 		.enable = enable_psci_bp_hardening,
- 	},
-+	{
-+		.desc = "ARM64 XGENE branch predictors control",
-+		.capability = ARM64_XGENE_HARDEN_BRANCH_PREDICTOR,
-+		.def_scope = SCOPE_LOCAL_CPU,
-+		.matches = is_xgene_cpu,
-+	},
+ 
+ #if defined(CONFIG_X86)
+@@ -109,17 +109,17 @@ drm_clflush_pages(struct page *pages[], unsigned long num_pages)
+ 	WARN_ON_ONCE(1);
  #endif
- 	{
- 	}
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b34e717..8c7d98e 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -62,6 +62,32 @@
+ }
+-EXPORT_SYMBOL(drm_clflush_pages);
++EXPORT_SYMBOL(drm_flush_pages);
+ 
+ /**
+- * drm_clflush_sg - Flush dcache lines pointing to a scather-gather.
++ * drm_flush_sg - Flush dcache lines pointing to a scather-gather.
+  * @st: struct sg_table.
+  *
+  * Flush every data cache line entry that points to an address in the
+  * sg.
+  */
+ void
+-drm_clflush_sg(struct sg_table *st)
++drm_flush_sg(struct sg_table *st)
+ {
+ #if defined(CONFIG_X86)
+ 	if (static_cpu_has(X86_FEATURE_CLFLUSH)) {
+@@ -140,7 +140,7 @@ drm_clflush_sg(struct sg_table *st)
+ 	WARN_ON_ONCE(1);
  #endif
- 	.endm
+ }
+-EXPORT_SYMBOL(drm_clflush_sg);
++EXPORT_SYMBOL(drm_flush_sg);
  
-+	.macro bp_disable, tmp1, tmp2
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	alternative_if ARM64_XGENE_HARDEN_BRANCH_PREDICTOR
-+	adr_l	x\tmp1, bp_ctlreg
-+	mrs	x\tmp2, tpidr_el1
-+	ldr	x\tmp1, [x\tmp1, x\tmp2]
-+	ldr	w\tmp2, [x\tmp1]
-+	orr	w\tmp2, w\tmp2, #(1 << 25)
-+	str	w\tmp2, [x\tmp1]
-+	alternative_else_nop_endif
-+#endif
-+	.endm
-+
-+	.macro bp_enable, tmp1, tmp2
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	alternative_if ARM64_XGENE_HARDEN_BRANCH_PREDICTOR
-+	adr_l	x\tmp1, bp_ctlreg
-+	mrs	x\tmp2, tpidr_el1
-+	ldr	x\tmp1, [x\tmp1, x\tmp2]
-+	ldr	w\tmp2, [x\tmp1]
-+	and	w\tmp2, w\tmp2, #~(1 << 25)
-+	str	w\tmp2, [x\tmp1]
-+	alternative_else_nop_endif
-+#endif
-+	.endm
-+
- /*
-  * Bad Abort numbers
-  *-----------------
-@@ -158,6 +184,7 @@ alternative_else_nop_endif
- 	stp	x28, x29, [sp, #16 * 14]
+ /**
+  * drm_clflush_virt_range - Flush dcache lines of a region
+diff --git a/drivers/gpu/drm/i915/i915_gem.c b/drivers/gpu/drm/i915/i915_gem.c
+index 8bc3283484be..a8c0703a096d 100644
+--- a/drivers/gpu/drm/i915/i915_gem.c
++++ b/drivers/gpu/drm/i915/i915_gem.c
+@@ -259,7 +259,7 @@ __i915_gem_object_release_shmem(struct drm_i915_gem_object *obj,
+ 	if (needs_clflush &&
+ 	    (obj->base.read_domains & I915_GEM_DOMAIN_CPU) == 0 &&
+ 	    !(obj->cache_coherent & I915_BO_CACHE_COHERENT_FOR_READ))
+-		drm_clflush_sg(pages);
++		drm_flush_sg(pages);
  
- 	.if	\el == 0
-+	bp_disable 20, 21
- 	mrs	x21, sp_el0
- 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
- 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-@@ -307,6 +334,7 @@ alternative_else_nop_endif
- 
- 	msr	elr_el1, x21			// set up the return data
- 	msr	spsr_el1, x22
-+	bp_enable 21, 22
- 	ldp	x0, x1, [sp, #16 * 0]
- 	ldp	x2, x3, [sp, #16 * 1]
- 	ldp	x4, x5, [sp, #16 * 2]
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 3b8ad7b..69646be 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -85,6 +85,38 @@ enum ipi_msg_type {
- 	IPI_WAKEUP
- };
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+DEFINE_PER_CPU_READ_MOSTLY(void __iomem *, bp_ctlreg);
-+
-+static void map_bp_ctlreg(void)
-+{
-+	if (cpus_have_const_cap(ARM64_XGENE_HARDEN_BRANCH_PREDICTOR)) {
-+		u64 mpidr = read_cpuid_mpidr();
-+		unsigned int idx;
-+		void __iomem *p;
-+		phys_addr_t pa;
-+
-+		idx =  (MPIDR_AFFINITY_LEVEL(mpidr, 1) << 1) +
-+			MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+		pa = 0x7c0c0000ULL | (0x100000ULL * idx);
-+		if (smp_processor_id())
-+			p = ioremap(pa, PAGE_SIZE);
-+		else {
-+			/* boot processor uses fixmap */
-+			set_fixmap_io(FIX_BOOT_CPU_BP_CTLREG, pa);
-+			p = (void __iomem *)__fix_to_virt(
-+						FIX_BOOT_CPU_BP_CTLREG);
-+		}
-+		__this_cpu_write(bp_ctlreg, p);
-+
-+		pr_debug("%s: cpu%d idx=%d pa=0x%llx %p", __func__,
-+			 smp_processor_id(), idx, pa, p);
-+	}
-+}
-+#else
-+static inline void map_bp_ctlreg(void) {}
-+#endif
-+
- #ifdef CONFIG_ARM64_VHE
- 
- /* Whether the boot CPU is running in HYP mode or not*/
-@@ -224,6 +256,7 @@ asmlinkage void secondary_start_kernel(void)
- 
- 	cpu = task_cpu(current);
- 	set_my_cpu_offset(per_cpu_offset(cpu));
-+	map_bp_ctlreg();
- 
- 	/*
- 	 * All kernel threads share the same mm context; grab a
-@@ -454,6 +487,7 @@ void __init smp_prepare_boot_cpu(void)
- 	 * cpuinfo_store_boot_cpu() above.
- 	 */
- 	update_cpu_errata_workarounds();
-+	map_bp_ctlreg();
+ 	__start_cpu_write(obj);
+ }
+diff --git a/drivers/gpu/drm/i915/i915_gem_clflush.c b/drivers/gpu/drm/i915/i915_gem_clflush.c
+index b9b53ac14176..f6cff6e5c520 100644
+--- a/drivers/gpu/drm/i915/i915_gem_clflush.c
++++ b/drivers/gpu/drm/i915/i915_gem_clflush.c
+@@ -71,7 +71,7 @@ static const struct dma_fence_ops i915_clflush_ops = {
+ static void __i915_do_clflush(struct drm_i915_gem_object *obj)
+ {
+ 	GEM_BUG_ON(!i915_gem_object_has_pages(obj));
+-	drm_clflush_sg(obj->mm.pages);
++	drm_flush_sg(obj->mm.pages);
+ 	intel_fb_obj_flush(obj, ORIGIN_CPU);
  }
  
- static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index 1d9655576b6e..8ac7eb25e46d 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -100,7 +100,7 @@ static int rockchip_gem_get_pages(struct rockchip_gem_object *rk_obj)
+ 	 * Fake up the SG table so that dma_sync_sg_for_device() can be used
+ 	 * to flush the pages associated with it.
+ 	 *
+-	 * TODO: Replace this by drm_clflush_sg() once it can be implemented
++	 * TODO: Replace this by drm_flush_sg() once it can be implemented
+ 	 * without relying on symbols that are not exported.
+ 	 */
+ 	for_each_sg(rk_obj->sgt->sgl, s, rk_obj->sgt->nents, i)
+diff --git a/drivers/gpu/drm/ttm/ttm_tt.c b/drivers/gpu/drm/ttm/ttm_tt.c
+index 5a046a3c543a..54b1971cd817 100644
+--- a/drivers/gpu/drm/ttm/ttm_tt.c
++++ b/drivers/gpu/drm/ttm/ttm_tt.c
+@@ -122,7 +122,7 @@ static int ttm_tt_set_caching(struct ttm_tt *ttm,
+ 	}
+ 
+ 	if (ttm->caching_state == tt_cached)
+-		drm_clflush_pages(ttm->pages, ttm->num_pages);
++		drm_flush_pages(ttm->pages, ttm->num_pages);
+ 
+ 	for (i = 0; i < ttm->num_pages; ++i) {
+ 		cur_page = ttm->pages[i];
+diff --git a/drivers/gpu/drm/vgem/vgem_drv.c b/drivers/gpu/drm/vgem/vgem_drv.c
+index 2524ff116f00..802a97e1a4bf 100644
+--- a/drivers/gpu/drm/vgem/vgem_drv.c
++++ b/drivers/gpu/drm/vgem/vgem_drv.c
+@@ -325,7 +325,7 @@ static int vgem_prime_pin(struct drm_gem_object *obj)
+ 	/* Flush the object from the CPU cache so that importers can rely
+ 	 * on coherent indirect access via the exported dma-address.
+ 	 */
+-	drm_clflush_pages(pages, n_pages);
++	drm_flush_pages(pages, n_pages);
+ 
+ 	return 0;
+ }
+diff --git a/include/drm/drm_cache.h b/include/drm/drm_cache.h
+index beab0f0d0cfb..25c029470315 100644
+--- a/include/drm/drm_cache.h
++++ b/include/drm/drm_cache.h
+@@ -35,8 +35,8 @@
+ 
+ #include <linux/scatterlist.h>
+ 
+-void drm_clflush_pages(struct page *pages[], unsigned long num_pages);
+-void drm_clflush_sg(struct sg_table *st);
++void drm_flush_pages(struct page *pages[], unsigned long num_pages);
++void drm_flush_sg(struct sg_table *st);
+ void drm_clflush_virt_range(void *addr, unsigned long length);
+ 
+ static inline bool drm_arch_can_wc_memory(void)
 -- 
-1.7.1
+2.13.5
