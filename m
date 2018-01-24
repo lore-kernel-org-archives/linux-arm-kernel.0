@@ -1,142 +1,62 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 24 Jan 2018 14:58:12 +0200
-Subject: [PATCH 2/4] usb: dwc3: add dwc3 glue layer for UniPhier SoCs
-In-Reply-To: <20180124215228.ED43.4A936039@socionext.com>
-References: <1516712454-2915-3-git-send-email-hayashi.kunihiko@socionext.com>
- <87o9lklnwb.fsf@linux.intel.com> <20180124215228.ED43.4A936039@socionext.com>
-Message-ID: <87a7x3l8gr.fsf@linux.intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 24 Jan 2018 14:00:42 +0100
+Subject: [PATCH 3/3] arm64: enable 128-bit memory read/write support
+In-Reply-To: <20180124090519.6680-4-ynorov@caviumnetworks.com>
+References: <20180124090519.6680-1-ynorov@caviumnetworks.com>
+ <20180124090519.6680-4-ynorov@caviumnetworks.com>
+Message-ID: <CAMuHMdU5AHC4ZYkvC=X4UUAnGyysHqayv4m+T5=1Grpo5Qez4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Yury,
 
-Hi,
+On Wed, Jan 24, 2018 at 10:05 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> Introduce __raw_writeo(), __raw_reado() and other arch-specific
+> RW functions for 128-bit memory access, and enable it for arm64.
+>
+> 128-bit I/O is required for example by Octeon TX2 device to access
+> some registers. According to Hardware Reference Manual:
+>
+> A 128-bit write to the OP_FREE0/1 registers frees a pointer into a
+> given [...] pool. All other accesses to these registers (e.g. reads
+> and 64-bit writes) are RAZ/WI.
+>
+> Starting from ARMv8.4, stp and ldp instructions become atomic, and
+> API for 128-bit access would be helpful for core code.
+>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 
-Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
-> Hello Felipe,
->
-> Thank you for your comments.
->
-> On Tue, 23 Jan 2018 15:12:36 +0200 <balbi@kernel.org> wrote:
->
->> 
->> Hi,
->> 
->> Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
->> > Add a specific glue layer for UniPhier SoC platform to support
->> > USB host mode. It manages hardware operating sequences to enable multiple
->> > clock gates and assert resets, and to prepare to use dwc3 controller
->> > on the SoC.
->> >
->> > This patch also handles the physical layer that has same register space
->> > as the glue layer, because it needs to integrate initialziation sequence
->> > between glue and phy.
->> >
->> > In case of some SoCs, since some initialization values for PHY are
->> > included in nvmem, this patch includes the way to get the values from nvmem.
->> >
->> > It supports PXs2 and LD20 SoCs.
->> >
->> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
->> > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
->> > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
->> > ---
->> >  drivers/usb/dwc3/Kconfig         |   9 +
->> >  drivers/usb/dwc3/Makefile        |   1 +
->> >  drivers/usb/dwc3/dwc3-uniphier.c | 554 +++++++++++++++++++++++++++++++++++++++
->> >  3 files changed, 564 insertions(+)
->> >  create mode 100644 drivers/usb/dwc3/dwc3-uniphier.c
->
-> ...snip...
->
->> > +
->> > +static void dwc3u_ssphy_testio_write(struct dwc3u_priv *priv, int port,
->> > +				     u32 data)
->> 
->> anything with sshphy or hsphy in the name should probably be part of a
->> PHY driver using drivers/phy/ framework.
->
-> I can try to separate phy control from this driver.
-> However, phy registers belongs to "dwc3-glue" IO map area (65b00000),
-> and this area also contains a reset bit for "dwc3-core" hardware.
->
-> Although the phy driver is called from dwc3-core driver,
-> we need to deassert the reset bit before probing dwc3-core driver.
->
-> As shown later, I think that it's difficut to determine the order of
-> initializing the registers in this area.
->
->> > +static void dwc3u_vbus_disable(struct dwc3u_priv *priv)
->> > +{
->> > +	int i;
->> > +
->> > +	for (i = 0; i < priv->nvbus; i++) {
->> > +		dwc3u_maskwrite(priv, VBUS_CONTROL(i),
->> > +				DRVVBUS_REG_EN | DRVVBUS_REG,
->> > +				DRVVBUS_REG_EN | 0);
->> > +	}
->> > +}
->> 
->> drivers/regulator maybe?
->
-> VBUS_CONTROL register is used for determing whether "dwc3-glue" hardware
-> enables vbus connected with "regulator" hardware.
->
-> The regulator driver should manage "regulator" hardware, and
-> I don't think that the driver should manage this register.
->
->> > +static void dwc3u_reset_init(struct dwc3u_priv *priv)
->> > +{
->> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
->> > +	usleep_range(1000, 2000);
->> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, LINK_RESET);
->> > +}
->> > +
->> > +static void dwc3u_reset_clear(struct dwc3u_priv *priv)
->> > +{
->> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
->> > +}
->> 
->> drivers/reset ?
->
-> The reset driver manages "sysctrl" IO map area in our SoC.
->
-> RESET_CTL register belongs to "dwc3-glue" IO map area,
-> and the kernel can't access this area until enabling usb clocks and
-> deasserting usb resets in "sysctrl".
->
-> I think that "dwc3-glue" register control should be separated from
-> "sysctrl".
+Thanks for your patch!
 
-Just split your address space and treat your glue as a device with
-several children:
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -116,6 +116,13 @@ config UPROBES
+>             managed by the kernel and kept transparent to the probed
+>             application. )
+>
+> +config HAVE_128BIT_ACCESS
+> +       def_bool ARM64
 
-glue at 65b00000 {
-	compatible = "foo"
+I think it's better to select this symbol from arch/arm64/Kconfig instead.
+Else this file has to be modified each and every time an architecture
+adds support for 128-bit, causing conflicts.
 
-	phy at bar {
-        	...
-	};
+> +       help
+> +         Architectures having 128-bit access require corresponding APIs,
+> +         like reado() and writeo(), which stands for reading and writing
+> +         the octet of bytes at once.
+> +
+>  config HAVE_64BIT_ALIGNED_ACCESS
+>         def_bool 64BIT && !HAVE_EFFICIENT_UNALIGNED_ACCESS
+>         help
 
-	sysctrl at baz {
-        	...
-	};
+Gr{oetje,eeting}s,
 
-	dwc3 at foo {
-        	compatible = "snps, dwc3";
-                ...
-	};
-};
+                        Geert
 
-Then you know that you can let dwc3/core.c handle the PHY for you. If we
-need to teach dwc3/core.c about regulators, we can do that. But we don't
-need SoC-specific hacks ;-)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/2d1c54b2/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
