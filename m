@@ -1,67 +1,31 @@
 From: maxime.chevallier@smile.fr (Maxime Chevallier)
-Date: Wed, 24 Jan 2018 15:10:48 +0100
-Subject: [PATCH 2/2] spi: a3700: Remove endianness swapping for full-duplex
- transfers
-In-Reply-To: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
-References: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
-Message-ID: <1516803048-26942-3-git-send-email-maxime.chevallier@smile.fr>
+Date: Wed, 24 Jan 2018 15:10:46 +0100
+Subject: [PATCH 0/2] spi: a3700: Remove endianness correction functions
+Message-ID: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following sparse warnings :
-line 767: warning: incorrect type in assignment (different base types)
-line 767:    expected unsigned int [unsigned] [assigned] [usertype] val_out
-line 767:    got restricted __le32 [usertype] <noident>
-line 776: warning: cast to restricted __le32
+This patchset removes un-necessary endianness swapping functions.
 
-This takes advantage of readl/writel to do the endianness reordering,
-and removes an extra variable in the function.
+This was detected by sparse, after the commit f68a7dcb91b7
+("spi: a3700: Add full-duplex support") introduced a new warning.
 
-Fixes: f68a7dcb91b7 ("spi: a3700: Add full-duplex support")
-Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
----
- drivers/spi/spi-armada-3700.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+This series fix this warning, plus some previously existing ones of
+the same nature.
 
-diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-index 43ee0b56fe1c..7dcb14d303eb 100644
---- a/drivers/spi/spi-armada-3700.c
-+++ b/drivers/spi/spi-armada-3700.c
-@@ -747,7 +747,7 @@ static int a3700_spi_transfer_one_full_duplex(struct spi_master *master,
- 				  struct spi_transfer *xfer)
- {
- 	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
--	u32 val_in, val_out;
-+	u32 val;
- 
- 	/* Disable FIFO mode */
- 	a3700_spi_fifo_mode_set(a3700_spi, false);
-@@ -761,21 +761,20 @@ static int a3700_spi_transfer_one_full_duplex(struct spi_master *master,
- 			a3700_spi_bytelen_set(a3700_spi, 1);
- 
- 		if (a3700_spi->byte_len == 1)
--			val_out = *a3700_spi->tx_buf;
-+			val = *a3700_spi->tx_buf;
- 		else
--			val_out = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
-+			val = *(u32 *)a3700_spi->tx_buf;
- 
--		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val_out);
-+		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
- 
- 		/* Wait for all the data to be shifted in / out */
- 		while (!(spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG) &
- 				A3700_SPI_XFER_DONE))
- 			cpu_relax();
- 
--		val_in = le32_to_cpu(spireg_read(a3700_spi,
--						 A3700_SPI_DATA_IN_REG));
-+		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
- 
--		memcpy(a3700_spi->rx_buf, &val_in, a3700_spi->byte_len);
-+		memcpy(a3700_spi->rx_buf, &val, a3700_spi->byte_len);
- 
- 		a3700_spi->buf_len -= a3700_spi->byte_len;
- 		a3700_spi->tx_buf += a3700_spi->byte_len;
+I split this into two patches, since the first applies on an already
+mainlined commit, and the other on a recent patch that I sent.
+
+Mark, if you wish I can resend this in another form (just one patch,
+or as a rework of my previous patchset
+"spi: a3700: Add improvements and full-duplex transfers").
+
+Maxime Chevallier (2):
+  spi: a3700: Remove endianness swapping functions when accessing FIFOs
+  spi: a3700: Remove endianness swapping for full-duplex transfers
+
+ drivers/spi/spi-armada-3700.c | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
+
 -- 
 2.1.4
