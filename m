@@ -1,122 +1,193 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Wed, 24 Jan 2018 09:24:06 +0000
-Subject: [PATCH v3] drm/bridge/synopsys: dsi: add optional pixel clock
-In-Reply-To: <20180123204939.qirvr34mlwgiwmqz@ban.mtv.corp.google.com>
-References: <20180123170806.5282-1-philippe.cornu@st.com>
- <20180123204939.qirvr34mlwgiwmqz@ban.mtv.corp.google.com>
-Message-ID: <507552a3-c68f-d6ac-a747-b8f5168d0d41@st.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Wed, 24 Jan 2018 10:32:43 +0100
+Subject: [PATCH v8 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <e90aed55-e8db-e849-0e07-cbeb453b583c@ti.com>
+References: <1516772680-28256-1-git-send-email-j-keerthy@ti.com>
+ <20180124072432.GA11294@lenoch>
+ <e90aed55-e8db-e849-0e07-cbeb453b583c@ti.com>
+Message-ID: <20180124093243.GA18581@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
-
-
-On 01/23/2018 09:49 PM, Brian Norris wrote:
-> Hi,
+On Wed, Jan 24, 2018 at 01:58:19PM +0530, Keerthy wrote:
+> On Wednesday 24 January 2018 12:54 PM, Ladislav Michl wrote:
+> > Keerthy,
+> > 
+> > On Wed, Jan 24, 2018 at 11:14:40AM +0530, Keerthy wrote:
+> >> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+> >>
+> >> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> >> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> >> Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> >> ---
+> >>
+> >> Changes in v8:
+> >>
+> >>   * Added of_node_put call in success case of probe.
+> >>
+> >> Boot tested on am437x-gp-evm and dra7xx-evm.
+> >> Also compile tested omap1_defconfig with other patches of v7
+> >> posted here:
+> >>
+> >> https://www.spinics.net/lists/linux-omap/msg141100.html
+> >>
+> >> With v8 version of Patch 8/9.
+> >>
+> >>  drivers/pwm/pwm-omap-dmtimer.c | 68 ++++++++++++++++++++++++++----------------
+> >>  1 file changed, 42 insertions(+), 26 deletions(-)
+> >>
+> >> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> >> index 5ad42f3..c00e474 100644
+> >> --- a/drivers/pwm/pwm-omap-dmtimer.c
+> >> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> >> @@ -23,6 +23,7 @@
+> >>  #include <linux/mutex.h>
+> >>  #include <linux/of.h>
+> >>  #include <linux/of_platform.h>
+> >> +#include <linux/platform_data/dmtimer-omap.h>
+> >>  #include <linux/platform_data/pwm_omap_dmtimer.h>
+> >>  #include <linux/platform_device.h>
+> >>  #include <linux/pm_runtime.h>
+> >> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+> >>  	struct pwm_chip chip;
+> >>  	struct mutex mutex;
+> >>  	pwm_omap_dmtimer *dm_timer;
+> >> -	struct pwm_omap_dmtimer_pdata *pdata;
+> >> +	struct omap_dm_timer_ops *pdata;
+> >>  	struct platform_device *dm_timer_pdev;
+> >>  };
+> >>  
+> >> @@ -242,19 +243,35 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> >>  {
+> >>  	struct device_node *np = pdev->dev.of_node;
+> >>  	struct device_node *timer;
+> >> +	struct platform_device *timer_pdev;
+> >>  	struct pwm_omap_dmtimer_chip *omap;
+> >> -	struct pwm_omap_dmtimer_pdata *pdata;
+> >> +	struct dmtimer_platform_data *timer_pdata;
+> >> +	struct omap_dm_timer_ops *pdata;
+> >>  	pwm_omap_dmtimer *dm_timer;
+> >>  	u32 v;
+> >> -	int status;
+> >> +	int status, ret = 0;
+> >>  
+> >> -	pdata = dev_get_platdata(&pdev->dev);
+> >> -	if (!pdata) {
+> >> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+> >> -		return -EINVAL;
+> >> +	timer = of_parse_phandle(np, "ti,timers", 0);
+> >> +	if (!timer)
+> >> +		return -ENODEV;
+> >> +
+> >> +	timer_pdev = of_find_device_by_node(timer);
+> >> +	if (!timer_pdev) {
+> >> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
+> >> +		ret = -ENODEV;
+> >> +		goto put;
+> >>  	}
+> >>  
+> >> -	if (!pdata->request_by_node ||
+> >> +	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+> >> +	if (!timer_pdata) {
+> >> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+> >> +		ret = -EINVAL;
+> >> +		goto put;
+> >> +	}
+> >> +
+> >> +	pdata = timer_pdata->timer_ops;
+> >> +
+> >> +	if (!pdata || !pdata->request_by_node ||
+> >>  	    !pdata->free ||
+> >>  	    !pdata->enable ||
+> >>  	    !pdata->disable ||
+> >> @@ -267,37 +284,32 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> >>  	    !pdata->set_prescaler ||
+> >>  	    !pdata->write_counter) {
+> >>  		dev_err(&pdev->dev, "Incomplete dmtimer pdata structure\n");
+> >> -		return -EINVAL;
+> >> +		ret = -EINVAL;
+> >> +		goto put;
+> >>  	}
+> >>  
+> >> -	timer = of_parse_phandle(np, "ti,timers", 0);
+> >> -	if (!timer)
+> >> -		return -ENODEV;
+> >> -
+> >>  	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+> >>  		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+> >> -		return -ENODEV;
+> >> +		ret = -ENODEV;
+> >> +		goto put;
+> > 
+> > Should we call of_node_put() even from here? of_get_property() failed, so
+> > reference was not updated.
 > 
-> Philippe asked me to review the last version. I'm not sure I have a lot
-> to contribute. Maybe Rockchip folks who wrote this stuff in the first
-> place might. I've CC'd some.
-> 
-> On Tue, Jan 23, 2018 at 06:08:06PM +0100, Philippe Cornu wrote:
->> The pixel clock is optional. When available, it offers a better
->> preciseness for timing computations and allows to reduce the extra dsi
->> bandwidth in burst mode (from ~20% to ~10-12%, hw platform dependant).
->>
->> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
->> ---
->> Changes in v3: Simplify px_clk probing thanks to Andrzej Hajda comments
->>
->> Changes in v2: Improve px_clk probing in case of ENOENT dt returned value
->> (thanks to Philipp Zabel & Andrzej Hajda comments)
->>
->>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 25 +++++++++++++++++++------
->>   1 file changed, 19 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> index ed8af32f8e52..9fb35385c348 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> @@ -217,6 +217,7 @@ struct dw_mipi_dsi {
->>   	void __iomem *base;
->>   
->>   	struct clk *pclk;
->> +	struct clk *px_clk;
->>   
->>   	unsigned int lane_mbps; /* per lane */
->>   	u32 channel;
->> @@ -703,24 +704,28 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
->>   	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
->>   	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
->>   	void *priv_data = dsi->plat_data->priv_data;
->> +	struct drm_display_mode px_clk_mode = *mode;
->>   	int ret;
->>   
->>   	clk_prepare_enable(dsi->pclk);
->>   
->> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
->> +	if (dsi->px_clk)
->> +		px_clk_mode.clock = clk_get_rate(dsi->px_clk) / 1000;
->> +
->> +	ret = phy_ops->get_lane_mbps(priv_data, &px_clk_mode, dsi->mode_flags,
->>   				     dsi->lanes, dsi->format, &dsi->lane_mbps);
->>   	if (ret)
->>   		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
->>   
->>   	pm_runtime_get_sync(dsi->dev);
->>   	dw_mipi_dsi_init(dsi);
->> -	dw_mipi_dsi_dpi_config(dsi, mode);
->> +	dw_mipi_dsi_dpi_config(dsi, &px_clk_mode);
->>   	dw_mipi_dsi_packet_handler_config(dsi);
->>   	dw_mipi_dsi_video_mode_config(dsi);
->> -	dw_mipi_dsi_video_packet_config(dsi, mode);
->> +	dw_mipi_dsi_video_packet_config(dsi, &px_clk_mode);
->>   	dw_mipi_dsi_command_mode_config(dsi);
->> -	dw_mipi_dsi_line_timer_config(dsi, mode);
->> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
->> +	dw_mipi_dsi_line_timer_config(dsi, &px_clk_mode);
->> +	dw_mipi_dsi_vertical_timing_config(dsi, &px_clk_mode);
->>   
->>   	dw_mipi_dsi_dphy_init(dsi);
->>   	dw_mipi_dsi_dphy_timing_config(dsi);
->> @@ -734,7 +739,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
->>   
->>   	dw_mipi_dsi_dphy_enable(dsi);
->>   
->> -	dw_mipi_dsi_wait_for_two_frames(mode);
->> +	dw_mipi_dsi_wait_for_two_frames(&px_clk_mode);
->>   
->>   	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
->>   	dw_mipi_dsi_set_mode(dsi, 0);
->> @@ -828,6 +833,14 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
->>   		return ERR_PTR(ret);
->>   	}
->>   
->> +	dsi->px_clk = devm_clk_get(dev, "px_clk");
-> 
-> Did you write a device tree binding document update for this anywhere?
-> 
-> Brian
-> 
+> The of_node_put to balance the of_parse_handle called for timer. I hope
+> that is what you wanted to check right?
 
-Many thanks for your review,
+Right, your code does it already, so please ignore my previous comment.
 
-yes, "px_clk" is already documented, please have a look to 
-Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+> > 
+> >>  	}
+> >>  
+> >>  	dm_timer = pdata->request_by_node(timer);
+> > 
+> > And timer seems to be used only here, so calling
+> > 	of_node_put(timer);
+> > just here should be enough.
+> 
+> Okay yes. This can be optimized. of_node_put(timer); can be called
+> here and the instances below need not have that additional step.
 
-Philippe :-)
+Yes, thank you. Then I'll send rebased patches.
 
->> +	if (IS_ERR(dsi->px_clk)) {
->> +		ret = PTR_ERR(dsi->px_clk);
->> +		if (ret != ENOENT)
->> +			dev_err(dev, "Unable to get opt. px_clk: %d\n", ret);
->> +		dsi->px_clk = NULL;
->> +	}
->> +
->>   	/*
->>   	 * Note that the reset was not defined in the initial device tree, so
->>   	 * we have to be prepared for it not being found.
->> -- 
->> 2.15.1
->>
+> >> -	if (!dm_timer)
+> >> -		return -EPROBE_DEFER;
+> >> +	if (!dm_timer) {
+> >> +		ret = -EPROBE_DEFER;
+> >> +		goto put;
+> >> +	}
+> >>  
+> >>  	omap = devm_kzalloc(&pdev->dev, sizeof(*omap), GFP_KERNEL);
+> >>  	if (!omap) {
+> >>  		pdata->free(dm_timer);
+> >> -		return -ENOMEM;
+> >> +		ret = -ENOMEM;
+> >> +		goto put;
+> >>  	}
+> >>  
+> >>  	omap->pdata = pdata;
+> >>  	omap->dm_timer = dm_timer;
+> >> -
+> >> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
+> >> -	if (!omap->dm_timer_pdev) {
+> >> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+> >> -		omap->pdata->free(dm_timer);
+> >> -		return -EINVAL;
+> >> -	}
+> >> +	omap->dm_timer_pdev = timer_pdev;
+> >>  
+> >>  	/*
+> >>  	 * Ensure that the timer is stopped before we allow PWM core to call
+> >> @@ -326,12 +338,16 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> >>  	if (status < 0) {
+> >>  		dev_err(&pdev->dev, "failed to register PWM\n");
+> >>  		omap->pdata->free(omap->dm_timer);
+> >> -		return status;
+> >> +		ret = status;
+> >> +		goto put;
+> >>  	}
+> >>  
+> >>  	platform_set_drvdata(pdev, omap);
+> >>  
+> >> -	return 0;
+> >> +put:
+> >> +	of_node_put(timer);
+> >> +
+> >> +	return ret;
+> >>  }
+> >>  
+> >>  static int pwm_omap_dmtimer_remove(struct platform_device *pdev)
+> >> -- 
+> >> 1.9.1
