@@ -1,99 +1,153 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Jan 2018 19:26:11 +0000
-Subject: [PATCH 2/5] drm: add ARM flush implementation
-In-Reply-To: <CAAfnVBkwmrcr14ZhmhgAnLHwL8zotnnCeWAVwBGmVcU9oGRerA@mail.gmail.com>
-References: <20180124025606.3020-2-gurchetansingh@chromium.org>
- <20180124124542.GV17719@n2100.armlinux.org.uk>
- <CAAfnVBkwmrcr14ZhmhgAnLHwL8zotnnCeWAVwBGmVcU9oGRerA@mail.gmail.com>
-Message-ID: <20180124192610.GA30716@n2100.armlinux.org.uk>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 24 Jan 2018 20:37:28 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+Message-ID: <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 24, 2018 at 10:45:28AM -0800, Gurchetan Singh wrote:
-> On Wed, Jan 24, 2018 at 4:45 AM, Russell King - ARM Linux <
-> linux at armlinux.org.uk> wrote:
-> > So no, this is not an acceptable approach.
-> >
-> > Secondly, in light of spectre and meltdown, do we _really_ want to
-> > export cache flushing to userspace in any case - these attacks rely
-> > on being able to flush specific cache lines from the caches in order
-> > to do the timing attacks (while leaving others in place.)
+Hi,
+
+Il 24/01/2018 18:38, Giulio Benetti ha scritto:
+> Hi,
 > 
-> > Currently, 32-bit ARM does not export such flushing capabilities to
-> > userspace, which makes it very difficult (I'm not going to say
-> > impossible) to get any working proof-of-code program that even
-> > illustrates the timing attack.  Exposing this functionality changes
-> > that game, and means that we're much more open to these exploits.
-> > (Some may say that you can flush cache lines by reading a large
-> > enough buffer - I'm aware, I've tried that, the results are too
-> > unreliable even for a simple attempt which doesn't involve crossing
-> > privilege boundaries.)
-> >
+> Il 22/01/2018 21:27, Giulio Benetti ha scritto:
+>> Hi,
+>>
+>> Il 22/01/2018 09:51, Maxime Ripard ha scritto:
+>>> On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
+>>>> On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
+>>>> it was ignored,
+>>>> because only PHSYNC and PVSYNC were taken into account.
+>>>> DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
+>>>>
+>>>> If flags contains PVSYNC, it doesn't mean it is NVSYNC.
+>>>> And it's true also the contrary.
+>>>> Also, as I've checked with scope on A20,
+>>>> if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
+>>>> must be set, as name suggests.
+>>>> It seems all display io polarities starts inverted if 0.
+>>>>
+>>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>>>
+>>>> PVSYNC and PHSYNC only
+>>>>
+>>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>>
+>>> Checkpatch:
+>>> WARNING: Duplicate signature
+>>
+>> Sorry I didn't use ./scripts/checkpatch.pl
+>>
+>>>
+>>>> ---
+>>>> ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+>>>> ? 1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c 
+>>>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>> index 6121210..e873a37 100644
+>>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>> @@ -224,10 +224,10 @@ static void sun4i_tcon0_mode_set_rgb(struct 
+>>>> sun4i_tcon *tcon,
+>>>> ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
+>>>> ????? /* Setup the polarity of the various signals */
+>>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
+>>>> +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
+>>>> ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
+>>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
+>>>> +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>>>> ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>>>
+>>> I'm not sure why you were talking of the differences between NVSYNC
+>>> and PVSYNC if you're not making use of any of it here?
+>>
+>> Thinking about it more now, the point is that all Lcd IOs seem to be 
+>> inverted by default(at least on A20).
+>> With inverted, I mean that if for example PVSYNC,
+>> I should see vsync line low and when asserted to give VSync,
+>> it goes high.
+>> This is what I've checked with oscilloscope on A20.
+>> Can someone give a try on A33? Otherwise I will,
+>> but I will take some time.
+>> On uboot, everything is treated equal to kernel,
+>> but to have my falling edge dclk and low h/vsync I had to specify:
+>> CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
+>> and
+>> CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
+>> but digging into code, I see "sync:3" means H/VSYNC HIGH,
+>> but I experience both LOW during their pulse.
+>>
+>>>
+>>> Also, how was it tested? This seems quite weird that we haven't caught
+>>> that one sooner, and I'm a bit worried about the possible regressions
+>>> here.
+>>
+>> It sounds really strange to me too,
+>> because everybody under uboot use "sync:3"(HIGH).
+>> I will retry to measure,
+>> unfortunately at home I don't have a scope,
+>> but I think I'm going to have one soon, because of this. :)
 > 
-> Will using the DMA API (dma_sync_single_for_device /
-> dma_sync_sg_for_device) mitigate your Meltdown / Spectre concerns in any
-> way?
-
-I see no point in answering that question based on what you've written
-below (see below for why).
-
-> > Do you really need cacheable GPU buffers, or will write combining
-> > buffers (as we use elsewhere such as etnaviv) suffice?  Please provide
-> > some _real_ _world_ performance measurements that demonstrate that
-> > there is a real need for this functionality.
+> Here I am with scope captures and tcon0 registers dump:
+> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+> dclk_d0 => https://pasteboard.co/H4r8QRe.png
+> dclk_de => https://pasteboard.co/H4r8zh4R.png
+> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
 > 
+> As you can see circled in reg on registers,
+> TCON0_IO_POL_REG = 0x00000000.
+> But on all the waveforms you can see:
+> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise 
+> the rising front overlaps dclk rising edge(not good), so to me this is 
+> falling, then I mean it Negative.
+> - dclk_de: de pulse is clearly negative, even if register is 0 and its' 
+> polarity bit is 0.
+> - dclk_vsnc: same as dclk_de
+> - dclk_hsync: I didn't take scope screenshot but I can assure you it's 
+> negative.
 > 
-> My desire is for the vgem driver to work correctly on ARM, which requires
-> cache flushing.  The mappings vgem itself creates are write combine.
+> You can also check all the other registers about TCON0.
+> 
+> Now I proceed testing it on A33, maybe the peripheral is slightly 
+> different between Axx SoCs, if I find it that way,
+> it should be only a check about SoC or peripheral ID,
+> and treat polarity as it should be done.
 
-If the pages are mapped write-combine, they are by definition *not*
-cacheable, so there should be no cache flushing required.
+Here I am with A33 waveforms:
+tcon0_regs => https://pasteboard.co/H4rXfN0M.png
+dclk_d0 => https://pasteboard.co/H4rVXwy.png
+dclk_de => https://pasteboard.co/H4rWDt8.png
+dclk_vsnc => https://pasteboard.co/H4rWRACu.png
+dclk_hsync => https://pasteboard.co/H4rWK6I.png
 
-> The
-> issue is the pages retrieved on ARM architecture usually have to be flushed
-> before they can be used (see rockchip_gem_get_pages / tegra_bo_get_pages).
-> This patch set attempts to do the flushing in an architecture independent
-> manner (since vgem is intended to work on ARM / x86).
+It behaves the same way as A20, so as I mean IO polarity,
+all signals(except D0-D23), are inverted.
+For A33 I've used A33-OLinuXino.
+For A20 our LiNova1.
 
-I see rockchip_gem_get_pages() using shmem_read_mapping_page() to get
-the pages.  That's more or less fine, we do that on Etnaviv too.
+Do you agree with me?
 
-(Side note: provided the pages are not coming from lowmem, as mapping
-lowmem pages are mapped cacheable, and if you also map them elsewhere
-as write-combine, you're stepping into some potential cache attribute
-issues.)
+> 
+> Kind regards
 
-How we deal with this in Etnaviv is to use dma_map_sg() after we get
-the pages - see
-
-  etnaviv_gem_get_pages(), which calls the memory specific .get_pages
-    method, and goes on to call etnaviv_gem_scatter_map().
-
-There's no need for the faking up of a SG table that way, just let
-dma_map_sg() do whatever it needs to do.  This means you're not abusing
-the DMA API, and if you have a system IOMMU in the way, as a bonus that
-gets setup for you.
-
-> There is some interest in cache-able DRM buffers (though, again, this
-> patchset is not about that).  Renderscript accesses are very slow on ARM
-> and we keep shadow buffers to improve performance (see
-> crrev.com/602736).
-
-404.
-
-> Jeffy
-> has done some tests with memcpys in our camera stack that shows
-> improvements (with caching --> 4 to 7 ms, without caching --> 20 to 90ms).
-> However, I do agree Spectre complicates things.
-
-At the moment, on 32-bit ARM, we have very little mitigation work for
-Spectre beyond the generic kernel work that is going on at the moment
-for all architectures, so I really do not want to introduce anything
-that makes 32-bit ARM more easily vulnerable to attack.  That may
-change in the future (sorry, I can't say when), but right now I don't
-think we have much of an option.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Giulio Benetti
+R&D Manager &
+Advanced Research
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
