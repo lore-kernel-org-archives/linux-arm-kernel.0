@@ -1,50 +1,48 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 24 Jan 2018 18:51:39 +0900
-Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <5A6563FA.8080602@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-9-jeffy.chen@rock-chips.com>
- <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
- <5A60AE41.2050101@rock-chips.com>
- <1f4b3c0d-1414-0012-a072-f4a11f432c21@rock-chips.com>
- <5A654925.9020203@rock-chips.com> <5A6563FA.8080602@rock-chips.com>
-Message-ID: <CAAFQd5AjisfRTefYthLgecRYroi4gVunEwX2DzhD0ywMOO5Yzg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 24 Jan 2018 09:53:44 +0000
+Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <87lggo7430.fsf@xmission.com>
+References: <878tcp8umz.fsf@xmission.com>
+ <20180123101446.GP22781@e103592.cambridge.arm.com>
+ <87tvvc77nf.fsf@xmission.com>
+ <20180123.132916.1025436873838680654.davem@davemloft.net>
+ <87lggo7430.fsf@xmission.com>
+Message-ID: <20180124095341.GC5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 1:09 PM, JeffyChen <jeffy.chen@rock-chips.com> wrote:
-> Hi Randy,
->
->
-> On 01/22/2018 10:15 AM, JeffyChen wrote:
->>
->> Hi Randy,
->>
->> On 01/22/2018 09:18 AM, Randy Li wrote:
->>>>
->>>>
->>> Also the power domain driver could manage the clocks as well, I would
->>> suggest to use pm_runtime_*.
->>
->>
->> actually the clocks required by pm domain may not be the same as what we
->> want to control here, there might be some clocks only be needed when
->> accessing mmu registers.
->>
->> but i'm not very sure about that, will confirm it with Simon Xue.
->
->
-> confirmed with Simon, there might be some iommus don't have a pd, and the
-> CONFIG_PM could be disabled.
->
-> so it might be better to control clocks in iommu driver itself.
->
+On Tue, Jan 23, 2018 at 01:44:19PM -0600, Eric W. Biederman wrote:
+> David Miller <davem@davemloft.net> writes:
+> 
+> > From: ebiederm at xmission.com (Eric W. Biederman)
+> > Date: Tue, 23 Jan 2018 12:27:16 -0600
+> >
+> >> Dave Martin <Dave.Martin@arm.com> writes:
+> >> 
+> >>> On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
+> >>> However, the purpose of this as an RFC was to get feedback on whether
+> >>> adding FPE_UNKNOWN is considered acceptable at all from an API
+> >>> perspective -- the precise number doesn't matter for that discussion.
+> >>>
+> >>> Do you have any view on this?
+> >> 
+> >> That seems as good a solution as any too me.  It is reality and it
+> >> happens in the code and there are several places of the same form I
+> >> would use it, just to get rid of the FPE_FIXME.
+> >
+> > Eric, feel free to do something similar on Sparc.
+> 
+> Will do.
+> 
+> This sounds like a good solution for this weird corner case, that
+> appears on multiple architectures.
 
-Agreed with Jeffy.
+OK, I'll rebase my patches onto your tree (though trivial here) and
+repost.
 
-I'd give Reviewed-by, but this is my own patch reposted by Jeffy
-(thanks!), so it wouldn't have any value. :)
+I'm still waiting for feeback on the Arm specifics, but FPE_UNKNOWN
+could be picked up independently of that.
 
-Best regards,
-Tomasz
+Cheers
+---Dave
