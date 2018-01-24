@@ -1,145 +1,75 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 24 Jan 2018 15:16:40 +0100
-Subject: [Patch v7 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <1516791584-7980-13-git-send-email-smitha.t@samsung.com>
-References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
- <CGME20180124112406epcas2p3820cea581731825c7ad72ebbb1ca060c@epcas2p3.samsung.com>
- <1516791584-7980-13-git-send-email-smitha.t@samsung.com>
-Message-ID: <127cfd7f-113f-6724-297c-6f3c3746a8ff@xs4all.nl>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Jan 2018 15:23:12 +0100
+Subject: [PATCH 1/2] spi: a3700: Remove endianness swapping functions when
+ accessing FIFOs
+In-Reply-To: <1516803048-26942-2-git-send-email-maxime.chevallier@smile.fr>
+ (Maxime Chevallier's message of "Wed, 24 Jan 2018 15:10:47 +0100")
+References: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
+ <1516803048-26942-2-git-send-email-maxime.chevallier@smile.fr>
+Message-ID: <87k1w749pr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/18 11:59, Smitha T Murthy wrote:
-> Added V4l2 controls for HEVC encoder
-> 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Hi Maxime,
+ 
+ On mer., janv. 24 2018, Maxime Chevallier <maxime.chevallier@smile.fr> wrote:
+
+> Fixes the following sparse warnings :
+> line 504: warning: incorrect type in assignment (different base types)
+> line 504:    expected unsigned int [unsigned] [usertype] val
+> line 504:    got restricted __le32 [usertype] <noident>
+> line 527: warning: cast to restricted __le32
+>
+> This is solved by removing endian-converson functions, since the
+> converted values are going through readl/writel anyway, which take care
+> of the conversion.
+>
+
+These changes look good for me:
+
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+
+> Fixes: 6fd6fd68c9e2 ("spi: armada-3700: Fix padding when sending not 4-byte aligned data")
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
 > ---
->  Documentation/media/uapi/v4l/extended-controls.rst | 400 +++++++++++++++++++++
->  1 file changed, 400 insertions(+)
-> 
-> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> index dfe49ae..46ee2bf 100644
-> --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> @@ -1960,6 +1960,406 @@ enum v4l2_vp8_golden_frame_sel -
->      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
+>  drivers/spi/spi-armada-3700.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
+> index a8576c89f713..43ee0b56fe1c 100644
+> --- a/drivers/spi/spi-armada-3700.c
+> +++ b/drivers/spi/spi-armada-3700.c
+> @@ -501,7 +501,7 @@ static int a3700_spi_fifo_write(struct a3700_spi *a3700_spi)
+>  	u32 val;
 >  
+>  	while (!a3700_is_wfifo_full(a3700_spi) && a3700_spi->buf_len) {
+> -		val = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
+> +		val = *(u32 *)a3700_spi->tx_buf;
+>  		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
+>  		a3700_spi->buf_len -= 4;
+>  		a3700_spi->tx_buf += 4;
+> @@ -524,9 +524,8 @@ static int a3700_spi_fifo_read(struct a3700_spi *a3700_spi)
+>  	while (!a3700_is_rfifo_empty(a3700_spi) && a3700_spi->buf_len) {
+>  		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
+>  		if (a3700_spi->buf_len >= 4) {
+> -			u32 data = le32_to_cpu(val);
 >  
-> +High Efficiency Video Coding (HEVC/H.265) Control Reference
-> +-----------------------------------------------------------
-> +
-> +The HEVC/H.265 controls include controls for encoding parameters of HEVC/H.265
-> +video codec.
-> +
-> +
-> +.. _hevc-control-id:
-> +
-> +HEVC/H.265 Control IDs
-> +^^^^^^^^^^^^^^^^^^^^^^
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP (integer)``
-> +    Minimum quantization parameter for HEVC.
-> +    Valid range: from 0 to 51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP (integer)``
-> +    Maximum quantization parameter for HEVC.
-> +    Valid range: from 0 to 51.
+> -			memcpy(a3700_spi->rx_buf, &data, 4);
+> +			memcpy(a3700_spi->rx_buf, &val, 4);
+>  
+>  			a3700_spi->buf_len -= 4;
+>  			a3700_spi->rx_buf += 4;
+> -- 
+> 2.1.4
+>
 
-You probably should mention the default values for MIN_QP and MAX_QP
-(I assume those are 0 and 51 and are not driver specific).
-
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP (integer)``
-> +    Quantization parameter for an I frame for HEVC.
-> +    Valid range: from 0 to 51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP (integer)``
-> +    Quantization parameter for a P frame for HEVC.
-> +    Valid range: from 0 to 51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP (integer)``
-> +    Quantization parameter for a B frame for HEVC.
-> +    Valid range: from 0 to 51.
-
-Sorry, this still isn't clear to me.
-
-If I set V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP to 50, can I then still set
-V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP to 51? Or is 50 then the maximum?
-
-In other words, what is the relationship between these three controls
-and the MIN_QP/MAX_QP controls.
-
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_QP (boolean)``
-> +    HIERARCHICAL_QP allows the host to specify the quantization parameter
-> +    values for each temporal layer through HIERARCHICAL_QP_LAYER. This is
-> +    valid only if HIERARCHICAL_CODING_LAYER is greater than 1. Setting the
-> +    control value to 1 enables setting of the QP values for the layers.
-> +
-> +.. _v4l2-hevc-hier-coding-type:
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE``
-> +    (enum)
-> +
-> +enum v4l2_mpeg_video_hevc_hier_coding_type -
-> +    Selects the hierarchical coding type for encoding. Possible values are:
-> +
-> +.. raw:: latex
-> +
-> +    \begin{adjustbox}{width=\columnwidth}
-> +
-> +.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-> +
-> +.. flat-table::
-> +    :header-rows:  0
-> +    :stub-columns: 0
-> +
-> +    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B``
-> +      - Use the B frame for hierarchical coding.
-> +    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P``
-> +      - Use the P frame for hierarchical coding.
-> +
-> +.. raw:: latex
-> +
-> +    \end{adjustbox}
-> +
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER (integer)``
-> +    Selects the hierarchical coding layer. In normal encoding
-> +    (non-hierarchial coding), it should be zero. Possible values are [0, 6].
-> +    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
-> +    LAYER 1 and so on.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 0.
-> +    For HEVC it can have a value of 0-51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 1.
-> +    For HEVC it can have a value of 0-51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 2.
-> +    For HEVC it can have a value of 0-51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 3.
-> +    For HEVC it can have a value of 0-51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 4.
-> +    For HEVC it can have a value of 0-51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 5.
-> +    For HEVC it can have a value of 0-51.
-> +
-> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP (integer)``
-> +    Indicates quantization parameter for hierarchical coding layer 6.
-> +    For HEVC it can have a value of 0-51.
-
-Same here: how does MIN_QP/MAX_QP influence these controls, if at all.
-
-Regards,
-
-	Hans
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
