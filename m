@@ -1,30 +1,20 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 23 Jan 2018 21:01:54 -0600
-Subject: [PATCH] i2c: davinci: fix the cpufreq transition
-In-Reply-To: <20180122144258.13627-1-brgl@bgdev.pl>
-References: <20180122144258.13627-1-brgl@bgdev.pl>
-Message-ID: <dcd94db0-37b0-5a31-6a36-facdf7f58ed3@lechnology.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 24 Jan 2018 08:33:13 +0530
+Subject: [PATCH] cpufreq: mediatek: Add mediatek related projects into
+ blacklist
+In-Reply-To: <1516700314.12197.48.camel@mtkswgap22>
+References: <8193c5fd73ee34b59799fdf5c6cc24ca60971d6e.1516693333.git.sean.wang@mediatek.com>
+ <20180123084651.GA26581@kroah.com>
+ <1516700314.12197.48.camel@mtkswgap22>
+Message-ID: <20180124030313.GA19483@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2018 08:42 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> i2c_davinci_cpufreq_transition() is implemented in a way that will
-> block if it ever gets called while no transfer is in progress.
-> 
-> Not only that, but reinit_completion() is never called for xfr_complete.
-> 
-> Use the fact that cpufreq uses an srcu_notifier (running in process
-> context) for transitions and that the bus_lock is taken during the call
-> to master_xfer() and simplify the code by removing the transfer
-> completion entirely and protecting i2c_davinci_cpufreq_transition()
-> with i2c_lock/unlock_adapter().
-> 
-> Reported-by: David Lechner <david@lechnology.com>
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
+On 23-01-18, 17:38, Sean Wang wrote:
+> currently, can the patch be permitted to go through tree linux-pm branch
+> master to be part of mainline? 
 
-Tested that it fixes the lockup when there is no active transfer.
+As you already said it is in pm/linux-next. It will get merged in 4.16-rc1.
 
-Tested-by: David Lechner <david@lechnology.com>
+-- 
+viresh
