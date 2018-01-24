@@ -1,168 +1,283 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 24 Jan 2018 16:29:41 +0530
-Subject: [Patch v7 09/12] [media] s5p-mfc: Add VP9 decoder support
+Date: Wed, 24 Jan 2018 16:29:42 +0530
+Subject: [Patch v7 10/12] [media] v4l2: Add v4l2 control IDs for HEVC encoder
 In-Reply-To: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
 References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
- <CGME20180124112351epcas2p2e111be35495863530b11043b3fccd795@epcas2p2.samsung.com>
-Message-ID: <1516791584-7980-10-git-send-email-smitha.t@samsung.com>
+ <CGME20180124112356epcas1p241c27446e9646b457fea474fdd5a9c6e@epcas1p2.samsung.com>
+Message-ID: <1516791584-7980-11-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for codec definition and corresponding buffer
-requirements for VP9 decoder.
+Add v4l2 controls for HEVC encoder
 
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 ---
- drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  6 ++++++
- drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |  3 +++
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  1 +
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |  7 +++++++
- drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |  2 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 26 +++++++++++++++++++++++++
- 6 files changed, 45 insertions(+)
+ drivers/media/v4l2-core/v4l2-ctrls.c | 119 +++++++++++++++++++++++++++++++++++
+ include/uapi/linux/v4l2-controls.h   |  93 ++++++++++++++++++++++++++-
+ 2 files changed, 211 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-index d905468..bbfa1cf 100644
---- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-+++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-@@ -17,6 +17,8 @@
- /* MFCv10 register definitions*/
- #define S5P_FIMV_MFC_CLOCK_OFF_V10			0x7120
- #define S5P_FIMV_MFC_STATE_V10				0x7124
-+#define S5P_FIMV_D_STATIC_BUFFER_ADDR_V10		0xF570
-+#define S5P_FIMV_D_STATIC_BUFFER_SIZE_V10		0xF574
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index cbb2ef4..e312f11 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -480,6 +480,57 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		NULL,
+ 	};
  
- /* MFCv10 Context buffer sizes */
- #define MFC_CTX_BUF_SIZE_V10		(30 * SZ_1K)
-@@ -33,8 +35,12 @@
++	static const char * const hevc_profile[] = {
++		"Main",
++		"Main Still Picture",
++		"Main 10",
++		NULL,
++	};
++	static const char * const hevc_level[] = {
++		"1",
++		"2",
++		"2.1",
++		"3",
++		"3.1",
++		"4",
++		"4.1",
++		"5",
++		"5.1",
++		"5.2",
++		"6",
++		"6.1",
++		"6.2",
++		NULL,
++	};
++	static const char * const hevc_hierarchial_coding_type[] = {
++		"B",
++		"P",
++		NULL,
++	};
++	static const char * const hevc_refresh_type[] = {
++		"None",
++		"CRA",
++		"IDR",
++		NULL,
++	};
++	static const char * const hevc_size_of_length_field[] = {
++		"0",
++		"1",
++		"2",
++		"4",
++		NULL,
++	};
++	static const char * const hevc_tier[] = {
++		"Main",
++		"High",
++		NULL,
++	};
++	static const char * const hevc_loop_filter_mode[] = {
++		"Disabled",
++		"Enabled",
++		"Disabled at slice boundary",
++		"NULL",
++	};
  
- /* MFCv10 codec defines*/
- #define S5P_FIMV_CODEC_HEVC_DEC		17
-+#define S5P_FIMV_CODEC_VP9_DEC		18
- #define S5P_FIMV_CODEC_HEVC_ENC         26
+ 	switch (id) {
+ 	case V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ:
+@@ -575,6 +626,20 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		return dv_it_content_type;
+ 	case V4L2_CID_DETECT_MD_MODE:
+ 		return detect_md_mode;
++	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
++		return hevc_profile;
++	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
++		return hevc_level;
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE:
++		return hevc_hierarchial_coding_type;
++	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:
++		return hevc_refresh_type;
++	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:
++		return hevc_size_of_length_field;
++	case V4L2_CID_MPEG_VIDEO_HEVC_TIER:
++		return hevc_tier;
++	case V4L2_CID_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE:
++		return hevc_loop_filter_mode;
  
-+/* Decoder buffer size for MFC v10 */
-+#define DEC_VP9_STATIC_BUFFER_SIZE	20480
+ 	default:
+ 		return NULL;
+@@ -776,6 +841,53 @@ const char *v4l2_ctrl_get_name(u32 id)
+ 	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+ 	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
+ 
++	/* HEVC controls */
++	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I-Frame QP Value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P-Frame QP Value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:		return "HEVC B-Frame QP Value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:			return "HEVC Minimum QP Value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:			return "HEVC Maximum QP Value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:			return "HEVC Profile";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:			return "HEVC Level";
++	case V4L2_CID_MPEG_VIDEO_HEVC_TIER:			return "HEVC Tier";
++	case V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION:	return "HEVC Frame Rate Resolution";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH:	return "HEVC Maximum Coding Unit Depth";
++	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:		return "HEVC Refresh Type";
++	case V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED:		return "HEVC Constant Intra Prediction";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU:		return "HEVC Lossless Encoding";
++	case V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT:		return "HEVC Wavefront";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE:		return "HEVC Loop Filter";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_QP:			return "HEVC QP Values";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE:		return "HEVC Hierarchical Coding Type";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER:	return "HEVC Hierarchical Coding Layer";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_QP:	return "HEVC Hierarchical Layer 0 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP:	return "HEVC Hierarchical Layer 1 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP:	return "HEVC Hierarchical Layer 2 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP:	return "HEVC Hierarchical Layer 3 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP:	return "HEVC Hierarchical Layer 4 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP:	return "HEVC Hierarchical Layer 5 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP:	return "HEVC Hierarchical Layer 6 QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR:	return "HEVC Hierarchical Lay 0 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_BR:	return "HEVC Hierarchical Lay 1 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_BR:	return "HEVC Hierarchical Lay 2 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_BR:	return "HEVC Hierarchical Lay 3 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_BR:	return "HEVC Hierarchical Lay 4 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_BR:	return "HEVC Hierarchical Lay 5 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BR:	return "HEVC Hierarchical Lay 6 BitRate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB:		return "HEVC General PB";
++	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID:		return "HEVC Temporal ID";
++	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING:		return "HEVC Strong Intra Smoothing";
++	case V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT:		return "HEVC Intra PU Split";
++	case V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION:		return "HEVC TMV Prediction";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "HEVC Max Num of Candidate MVs";
++	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE:	return "HEVC ENC Without Startcode";
++	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC Num of I-Frame b/w 2 IDR";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC Loop Filter Beta Offset";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC Loop Filter TC Offset";
++	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of Length Field";
++	case V4L2_CID_MPEG_VIDEO_REF_NUMBER_FOR_PFRAMES:	return "Reference Frames for a P-Frame";
++	case V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR:		return "Prepend SPS and PPS to IDR";
 +
- /* Encoder buffer size for MFC v10.0 */
- #define ENC_V100_BASE_SIZE(x, y) \
- 	(((x + 3) * (y + 3) * 8) \
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-index 76eca67..102b47e 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-@@ -104,6 +104,9 @@ static int s5p_mfc_open_inst_cmd_v6(struct s5p_mfc_ctx *ctx)
- 	case S5P_MFC_CODEC_HEVC_DEC:
- 		codec_type = S5P_FIMV_CODEC_HEVC_DEC;
+ 	/* CAMERA controls */
+ 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
+ 	case V4L2_CID_CAMERA_CLASS:		return "Camera Controls";
+@@ -1069,6 +1181,13 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+ 	case V4L2_CID_TUNE_DEEMPHASIS:
+ 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
+ 	case V4L2_CID_DETECT_MD_MODE:
++	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
++	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE:
++	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:
++	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:
++	case V4L2_CID_MPEG_VIDEO_HEVC_TIER:
++	case V4L2_CID_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE:
+ 		*type = V4L2_CTRL_TYPE_MENU;
  		break;
-+	case S5P_MFC_CODEC_VP9_DEC:
-+		codec_type = S5P_FIMV_CODEC_VP9_DEC;
-+		break;
- 	case S5P_MFC_CODEC_H264_ENC:
- 		codec_type = S5P_FIMV_CODEC_H264_ENC_V6;
- 		break;
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index 702e136..e748b99 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -73,6 +73,7 @@
- #define S5P_MFC_CODEC_VC1RCV_DEC	6
- #define S5P_MFC_CODEC_VP8_DEC		7
- #define S5P_MFC_CODEC_HEVC_DEC		17
-+#define S5P_MFC_CODEC_VP9_DEC		18
+ 	case V4L2_CID_LINK_FREQ:
+diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+index a692623..7b01621 100644
+--- a/include/uapi/linux/v4l2-controls.h
++++ b/include/uapi/linux/v4l2-controls.h
+@@ -589,6 +589,98 @@ enum v4l2_vp8_golden_frame_sel {
+ #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP		(V4L2_CID_MPEG_BASE+510)
+ #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE			(V4L2_CID_MPEG_BASE+511)
  
- #define S5P_MFC_CODEC_H264_ENC		20
- #define S5P_MFC_CODEC_H264_MVC_ENC	21
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 4749355..5cf4d99 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -151,6 +151,13 @@ static struct s5p_mfc_fmt formats[] = {
- 		.num_planes	= 1,
- 		.versions	= MFC_V10_BIT,
- 	},
-+	{
-+		.fourcc		= V4L2_PIX_FMT_VP9,
-+		.codec_mode	= S5P_FIMV_CODEC_VP9_DEC,
-+		.type		= MFC_FMT_DEC,
-+		.num_planes	= 1,
-+		.versions	= MFC_V10_BIT,
-+	},
- };
- 
- #define NUM_FORMATS ARRAY_SIZE(formats)
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-index e7a2d46..57f4560 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-@@ -170,6 +170,8 @@ struct s5p_mfc_regs {
- 	void __iomem *d_used_dpb_flag_upper;/* v7 and v8 */
- 	void __iomem *d_used_dpb_flag_lower;/* v7 and v8 */
- 	void __iomem *d_min_scratch_buffer_size; /* v10 */
-+	void __iomem *d_static_buffer_addr; /* v10 */
-+	void __iomem *d_static_buffer_size; /* v10 */
- 
- 	/* encoder registers */
- 	void __iomem *e_frame_width;
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index 8c47294..f47612c 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -226,6 +226,12 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
- 			ctx->scratch_buf_size +
- 			(ctx->mv_count * ctx->mv_size);
- 		break;
-+	case S5P_MFC_CODEC_VP9_DEC:
-+		mfc_debug(2, "Use min scratch buffer size\n");
-+		ctx->bank1.size =
-+			ctx->scratch_buf_size +
-+			DEC_VP9_STATIC_BUFFER_SIZE;
-+		break;
- 	case S5P_MFC_CODEC_H264_ENC:
- 		if (IS_MFCV10(dev)) {
- 			mfc_debug(2, "Use min scratch buffer size\n");
-@@ -336,6 +342,7 @@ static int s5p_mfc_alloc_instance_buffer_v6(struct s5p_mfc_ctx *ctx)
- 	case S5P_MFC_CODEC_VC1_DEC:
- 	case S5P_MFC_CODEC_MPEG2_DEC:
- 	case S5P_MFC_CODEC_VP8_DEC:
-+	case S5P_MFC_CODEC_VP9_DEC:
- 		ctx->ctx.size = buf_size->other_dec_ctx;
- 		break;
- 	case S5P_MFC_CODEC_H264_ENC:
-@@ -566,6 +573,13 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
- 			buf_size1 -= frame_size_mv;
- 		}
- 	}
-+	if (ctx->codec_mode == S5P_FIMV_CODEC_VP9_DEC) {
-+		writel(buf_addr1, mfc_regs->d_static_buffer_addr);
-+		writel(DEC_VP9_STATIC_BUFFER_SIZE,
-+				mfc_regs->d_static_buffer_size);
-+		buf_addr1 += DEC_VP9_STATIC_BUFFER_SIZE;
-+		buf_size1 -= DEC_VP9_STATIC_BUFFER_SIZE;
-+	}
- 
- 	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
- 			buf_addr1, buf_size1, ctx->total_dpb_count);
-@@ -2272,6 +2286,18 @@ const struct s5p_mfc_regs *s5p_mfc_init_regs_v6_plus(struct s5p_mfc_dev *dev)
- 	R(e_h264_options, S5P_FIMV_E_H264_OPTIONS_V8);
- 	R(e_min_scratch_buffer_size, S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8);
- 
-+	if (!IS_MFCV10(dev))
-+		goto done;
++/* CIDs for HEVC encoding. */
 +
-+	/* Initialize registers used in MFC v10 only.
-+	 * Also, over-write the registers which have
-+	 * a different offset for MFC v10.
-+	 */
++#define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP		(V4L2_CID_MPEG_BASE + 600)
++#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP		(V4L2_CID_MPEG_BASE + 601)
++#define V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP	(V4L2_CID_MPEG_BASE + 602)
++#define V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP	(V4L2_CID_MPEG_BASE + 603)
++#define V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP	(V4L2_CID_MPEG_BASE + 604)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_QP	(V4L2_CID_MPEG_BASE + 605)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE (V4L2_CID_MPEG_BASE + 606)
++enum v4l2_mpeg_video_hevc_hier_coding_type {
++	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B	= 0,
++	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P	= 1,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER	(V4L2_CID_MPEG_BASE + 607)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_QP	(V4L2_CID_MPEG_BASE + 608)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP	(V4L2_CID_MPEG_BASE + 609)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP	(V4L2_CID_MPEG_BASE + 610)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP	(V4L2_CID_MPEG_BASE + 611)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP	(V4L2_CID_MPEG_BASE + 612)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP	(V4L2_CID_MPEG_BASE + 613)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP	(V4L2_CID_MPEG_BASE + 614)
++#define V4L2_CID_MPEG_VIDEO_HEVC_PROFILE	(V4L2_CID_MPEG_BASE + 615)
++enum v4l2_mpeg_video_hevc_profile {
++	V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN = 0,
++	V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_STILL_PICTURE = 1,
++	V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_10 = 2,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_LEVEL		(V4L2_CID_MPEG_BASE + 616)
++enum v4l2_mpeg_video_hevc_level {
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_1	= 0,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_2	= 1,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_2_1	= 2,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_3	= 3,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_3_1	= 4,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_4	= 5,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_4_1	= 6,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_5	= 7,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1	= 8,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_5_2	= 9,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_6	= 10,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_6_1	= 11,
++	V4L2_MPEG_VIDEO_HEVC_LEVEL_6_2	= 12,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION	(V4L2_CID_MPEG_BASE + 617)
++#define V4L2_CID_MPEG_VIDEO_HEVC_TIER			(V4L2_CID_MPEG_BASE + 618)
++enum v4l2_mpeg_video_hevc_tier {
++	V4L2_MPEG_VIDEO_HEVC_TIER_MAIN = 0,
++	V4L2_MPEG_VIDEO_HEVC_TIER_HIGH = 1,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH	(V4L2_CID_MPEG_BASE + 619)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE	(V4L2_CID_MPEG_BASE + 620)
++enum v4l2_cid_mpeg_video_hevc_loop_filter_mode {
++	V4L2_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE_DISABLED			 = 0,
++	V4L2_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE_ENABLED			 = 1,
++	V4L2_MPEG_VIDEO_HEVC_LOOP_FILTER_MODE_DISABLED_AT_SLICE_BOUNDARY = 2,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2	(V4L2_CID_MPEG_BASE + 621)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2	(V4L2_CID_MPEG_BASE + 622)
++#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE		(V4L2_CID_MPEG_BASE + 623)
++enum v4l2_cid_mpeg_video_hevc_refresh_type {
++	V4L2_MPEG_VIDEO_HEVC_REFRESH_NONE		= 0,
++	V4L2_MPEG_VIDEO_HEVC_REFRESH_CRA		= 1,
++	V4L2_MPEG_VIDEO_HEVC_REFRESH_IDR		= 2,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD		(V4L2_CID_MPEG_BASE + 624)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU		(V4L2_CID_MPEG_BASE + 625)
++#define V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED	(V4L2_CID_MPEG_BASE + 626)
++#define V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT		(V4L2_CID_MPEG_BASE + 627)
++#define V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB		(V4L2_CID_MPEG_BASE + 628)
++#define V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID		(V4L2_CID_MPEG_BASE + 629)
++#define V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING	(V4L2_CID_MPEG_BASE + 630)
++#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1	(V4L2_CID_MPEG_BASE + 631)
++#define V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT		(V4L2_CID_MPEG_BASE + 632)
++#define V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION		(V4L2_CID_MPEG_BASE + 633)
++#define V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE	(V4L2_CID_MPEG_BASE + 634)
++#define V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD	(V4L2_CID_MPEG_BASE + 635)
++enum v4l2_cid_mpeg_video_hevc_size_of_length_field {
++	V4L2_MPEG_VIDEO_HEVC_SIZE_0		= 0,
++	V4L2_MPEG_VIDEO_HEVC_SIZE_1		= 1,
++	V4L2_MPEG_VIDEO_HEVC_SIZE_2		= 2,
++	V4L2_MPEG_VIDEO_HEVC_SIZE_4		= 3,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_BR	(V4L2_CID_MPEG_BASE + 636)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_BR	(V4L2_CID_MPEG_BASE + 637)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_BR	(V4L2_CID_MPEG_BASE + 638)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_BR	(V4L2_CID_MPEG_BASE + 639)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_BR	(V4L2_CID_MPEG_BASE + 640)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_BR	(V4L2_CID_MPEG_BASE + 641)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BR	(V4L2_CID_MPEG_BASE + 642)
++#define V4L2_CID_MPEG_VIDEO_REF_NUMBER_FOR_PFRAMES	(V4L2_CID_MPEG_BASE + 643)
++#define V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR	(V4L2_CID_MPEG_BASE + 644)
 +
-+	/* decoder registers */
-+	R(d_static_buffer_addr, S5P_FIMV_D_STATIC_BUFFER_ADDR_V10);
-+	R(d_static_buffer_size, S5P_FIMV_D_STATIC_BUFFER_SIZE_V10);
-+
- done:
- 	return &mfc_regs;
- #undef S5P_MFC_REG_ADDR
+ /*  MPEG-class control IDs specific to the CX2341x driver as defined by V4L2 */
+ #define V4L2_CID_MPEG_CX2341X_BASE 				(V4L2_CTRL_CLASS_MPEG | 0x1000)
+ #define V4L2_CID_MPEG_CX2341X_VIDEO_SPATIAL_FILTER_MODE 	(V4L2_CID_MPEG_CX2341X_BASE+0)
+@@ -657,7 +749,6 @@ enum v4l2_mpeg_mfc51_video_force_frame_type {
+ #define V4L2_CID_MPEG_MFC51_VIDEO_H264_ADAPTIVE_RC_STATIC		(V4L2_CID_MPEG_MFC51_BASE+53)
+ #define V4L2_CID_MPEG_MFC51_VIDEO_H264_NUM_REF_PIC_FOR_P		(V4L2_CID_MPEG_MFC51_BASE+54)
+ 
+-
+ /*  Camera class control IDs */
+ 
+ #define V4L2_CID_CAMERA_CLASS_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x900)
 -- 
 2.7.4
