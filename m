@@ -1,165 +1,139 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Wed, 24 Jan 2018 11:17:23 -0600
-Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
- SIGFPE
-In-Reply-To: <20180124171213.GG5862@e103592.cambridge.arm.com> (Dave Martin's
- message of "Wed, 24 Jan 2018 17:12:14 +0000")
-References: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
- <1516623798-25001-2-git-send-email-Dave.Martin@arm.com>
- <878tcp8umz.fsf@xmission.com>
- <20180124105704.GD5862@e103592.cambridge.arm.com>
- <87efmf2ogn.fsf@xmission.com>
- <20180124171213.GG5862@e103592.cambridge.arm.com>
-Message-ID: <87mv13yy58.fsf@xmission.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 24 Jan 2018 18:38:17 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+Message-ID: <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Hi,
 
-> On Wed, Jan 24, 2018 at 10:47:36AM -0600, Eric W. Biederman wrote:
->> Dave Martin <Dave.Martin@arm.com> writes:
->> 
->> > On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
->> >> 
->> >> > diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
->> >> > index e447283..77edb00 100644
->> >> > --- a/include/uapi/asm-generic/siginfo.h
->> >> > +++ b/include/uapi/asm-generic/siginfo.h
->> >> > @@ -193,7 +193,8 @@ typedef struct siginfo {
->> >> >  #define FPE_FLTRES	6	/* floating point inexact result */
->> >> >  #define FPE_FLTINV	7	/* floating point invalid operation */
->> >> >  #define FPE_FLTSUB	8	/* subscript out of range */
->> >> > -#define NSIGFPE		8
->> >> > +#define FPE_UNKNOWN	9	/* undiagnosed floating-point exception */
->> >> > +#define NSIGFPE		9
->> >> 
->> >> Minor nit here.
->> >> 
->> >> At least before this is final I would really appreciate if you could
->> >> rebase this on top of my unificiation of siginfo.h that I posted on
->> >> linux-arch and is in my siginfo-next branch.
->> >> 
->> >> As that already pushes NSIGFPE up to 13.
->> >> 
->> >> Which would make this patch change NSIGFPE to 14 and allocate the number
->> >> 14 for FPE_UNKNOWN
->> >
->> > Looking at this, I note a few things:
->> >
->> >  * For consistent naming, FPE_FLTUNK might be a better name for
->> >    FPE_UNKNOWN.
->> >
->> >    FPE_FLTUNK seems generic, tempting me to insert it as number 9
->> >    (since only the numbers up to 8 are ABI just now).
->> 
->> Except on ia64 and frv.  And who knows we might need it on one of those
->> architectures as well.
->
-> I thought those weren't actually upstreamed yet...
+Il 22/01/2018 21:27, Giulio Benetti ha scritto:
+> Hi,
+> 
+> Il 22/01/2018 09:51, Maxime Ripard ha scritto:
+>> On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
+>>> On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
+>>> it was ignored,
+>>> because only PHSYNC and PVSYNC were taken into account.
+>>> DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
+>>>
+>>> If flags contains PVSYNC, it doesn't mean it is NVSYNC.
+>>> And it's true also the contrary.
+>>> Also, as I've checked with scope on A20,
+>>> if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
+>>> must be set, as name suggests.
+>>> It seems all display io polarities starts inverted if 0.
+>>>
+>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>>
+>>> PVSYNC and PHSYNC only
+>>>
+>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>
+>> Checkpatch:
+>> WARNING: Duplicate signature
+> 
+> Sorry I didn't use ./scripts/checkpatch.pl
+> 
+>>
+>>> ---
+>>> ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+>>> ? 1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c 
+>>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> index 6121210..e873a37 100644
+>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>> @@ -224,10 +224,10 @@ static void sun4i_tcon0_mode_set_rgb(struct 
+>>> sun4i_tcon *tcon,
+>>> ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
+>>> ????? /* Setup the polarity of the various signals */
+>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
+>>> +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
+>>> ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
+>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
+>>> +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>>> ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>>
+>> I'm not sure why you were talking of the differences between NVSYNC
+>> and PVSYNC if you're not making use of any of it here?
+> 
+> Thinking about it more now, the point is that all Lcd IOs seem to be 
+> inverted by default(at least on A20).
+> With inverted, I mean that if for example PVSYNC,
+> I should see vsync line low and when asserted to give VSync,
+> it goes high.
+> This is what I've checked with oscilloscope on A20.
+> Can someone give a try on A33? Otherwise I will,
+> but I will take some time.
+> On uboot, everything is treated equal to kernel,
+> but to have my falling edge dclk and low h/vsync I had to specify:
+> CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
+> and
+> CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
+> but digging into code, I see "sync:3" means H/VSYNC HIGH,
+> but I experience both LOW during their pulse.
+> 
+>>
+>> Also, how was it tested? This seems quite weird that we haven't caught
+>> that one sooner, and I'm a bit worried about the possible regressions
+>> here.
+> 
+> It sounds really strange to me too,
+> because everybody under uboot use "sync:3"(HIGH).
+> I will retry to measure,
+> unfortunately at home I don't have a scope,
+> but I think I'm going to have one soon, because of this. :)
 
-Oh no.  Those have been upstream for a decade or so.  They just have not
-been in one unified file.
+Here I am with scope captures and tcon0 registers dump:
+tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+dclk_d0 => https://pasteboard.co/H4r8QRe.png
+dclk_de => https://pasteboard.co/H4r8zh4R.png
+dclk_vsnc => https://pasteboard.co/H4r8Hye.png
 
->> >    (The temptation to call it FPE_FLUNK is strong, but I can't argue
->> >    that's consistent...)
->> 
->> I totally understand the temptation.
->> 
->> >  * No distinction is drawn between generic and arch-dependent codes
->> >    here, so NSIGFPE will typically be too big.  The generic siginfo
->> >    handling code can detect random garbage in si_code this way, but
->> >    off-by-ones or misused arch-specific codes may slip through.
->> >
->> >    In particular, new x86-specific FPE_* codes will likely be
->> >    invisible to the BUILD_BUG_ON()s in arch/x86/kernel/signal_compat.c
->> >    unless so many are added that x86 overtakes ia64.
->> 
->> Long ago in a far off time, we had arch dependent system call numbers
->> and the like because that provided ABI compatibility with the existing
->> unix on the platform.
->> 
->> I don't see any of that with the siginfo si_codes.   In most cases
->> they are arch dependent extensions which is silly.  We should have
->> unconditionally extended the si_codes for all architectures in case
->> another architecture needs that si_code.
->> 
->> The fact we now have battling meanings for si_codes depending on the
->> architecture is an unfortunate mess.
->> 
->> So to me it looks most maintainable going forward to declare that all
->> si_codes should be allocated generically, from the same number space,
->> in the same header file.  While we live with the existing historic
->> mess.
->
-> I guess that's fair enough.  This also provides a consistent
-> interpretation for NSIGXXX.
->
->> >  * Should we reserve space for future generic codes (say up to 15)?
->> >    Downside: si_code validation is not a simple matter of checking
->> >    <= NSIGFPE in that case.  (Though <= is still better than no
->> >    check at all, and no worse than the current situation.)
->> 
->> I think new si_codes should be allocated where there are not conflicts
->> on any architecture.  Just in case they are useful on another
->> architecture in the future.
->> 
->> >  * What are NSIGFPE etc. doing in this header?  These aren't specified
->> >    by POSIX and I'm not sure what userspace would legitimately use them
->> >    for... though it may be too late to change this now.
->> >
->> >    Most instances on codeseaarch.debian.net are the kernel, copies
->> >    of kernel headers, and translated versions of kernel headers.
->> >    It's hard to be exhaustive though.
->> >
->> >
->> > We could have something like this:
->> >
->> > #define FPE_FLTUNK	9
->> > #define __NSIGFPE_GENERIC	9
->> > #define NSIGFPE		__NSIGFPE_GENERIC
->> >
->> > /* si_code <= 15 reserved for arch-independent codes */
->> >
->> > #if defined(__frv__)
->> >
->> > # define FPE_MDAOF	16
->> > # undef NSIGFPE
->> > # define NSIGFPE	16
->> >
->> > #elif define(__ia64__)
->> >
->> > # define __FPE_DECOVF	16
->> > # define __FPE_DECDIV	17
->> > # define __FPE_DECERR	18
->> > # define __FPR_INVASC	19
->> > # undef NSIGFPE
->> > # define NSIGFPE	19
->> >
->> > #endif
->> >
->> > (Avoiding a (base + offset) approach for the arch codes, since that
->> > would make it look like the codes can be renumbered safely without
->> > breaking anything).
->> >
->> > The generic vs. arch vs. NSIGFOO problem already exists for other
->> > signals.  We could take a similar approach for those, but OTOH it
->> > may just not be worth the effort.
->> 
->> What I have tried to do in my merger is discurage the idea that there
->> are any arch specific si_codes.  To set NSIGXXX to the largest value
->> from any of the architectures.  And to encourage new si_codes get
->> allocated after the current NSIGXXX.  So that they will work on all
->> architectures.
->> 
->> It is all a bit of a mess, but one unified mess seems like the best we
->> can do right now.
->
-> That sounds fair, now that I have a better understanding of the context
-> for all this.
->
-> If the policy is that all the codes are generic (even if not all can
-> happen on all arches) then FPE_FLTUNK may as well be 14.
+As you can see circled in reg on registers,
+TCON0_IO_POL_REG = 0x00000000.
+But on all the waveforms you can see:
+- dclk_d0: clock phase is 0, but it starts with falling edge, otherwise 
+the rising front overlaps dclk rising edge(not good), so to me this is 
+falling, then I mean it Negative.
+- dclk_de: de pulse is clearly negative, even if register is 0 and its' 
+polarity bit is 0.
+- dclk_vsnc: same as dclk_de
+- dclk_hsync: I didn't take scope screenshot but I can assure you it's 
+negative.
 
-Exactly.
+You can also check all the other registers about TCON0.
 
-Eric
+Now I proceed testing it on A33, maybe the peripheral is slightly 
+different between Axx SoCs, if I find it that way,
+it should be only a check about SoC or peripheral ID,
+and treat polarity as it should be done.
+
+Kind regards
+-- 
+Giulio Benetti
+R&D Manager &
+Advanced Research
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
+
+> 
+>>
+>> Maxime
+>>
+> 
+> 
