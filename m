@@ -1,69 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 24 Jan 2018 12:00:59 +0000
-Subject: [PATCH 3/5] drm: add ARM64 flush implementations
-In-Reply-To: <20180124025606.3020-3-gurchetansingh@chromium.org>
-References: <20180124025606.3020-2-gurchetansingh@chromium.org>
- <20180124025606.3020-3-gurchetansingh@chromium.org>
-Message-ID: <2cf40ed8-cb7c-3f17-a8e4-2cbf2fb980e6@arm.com>
+From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
+Date: Wed, 24 Jan 2018 14:04:06 +0200
+Subject: DRM: double free in rcar_du_vsp.c
+In-Reply-To: <234140a7-8538-3ec4-1c40-e6ebcc42be8f@epam.com>
+References: <234140a7-8538-3ec4-1c40-e6ebcc42be8f@epam.com>
+Message-ID: <f61c270f-219c-56e5-a03d-e9a3e122d4b4@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/18 02:56, Gurchetan Singh wrote:
-> This patch uses the __dma_map_area function to flush the cache
-> on ARM64.
+
+Looping in DRM maintainer.
+
+> Hello,
 > 
-> v2: Don't use DMA API, call functions directly (Daniel)
+> I have found issue with double free() in RCAR DU VSP driver. it is
+> caused by rcar_du_vsp_plane_atomic_duplicate_state(), which duplicates
+> struct rcar_du_vsp_plane_state. This struct holds sg_tables which are
+> then freed in rcar_du_vsp_plane_cleanup_fb(). This function is called
+> for every rcar_du_vsp_plane_state, so it calls sg_free_table() twice for
+> the same sg_table.
 > 
-> Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
-> ---
->   drivers/gpu/drm/drm_cache.c | 13 +++++++++++++
->   1 file changed, 13 insertions(+)
+> I'm not familiar with DRM, so I can't say why this does not occur every
+> time, but this bug caused problems on our setup from time to time. Looks
+> like it occurs only under heavy system load.
 > 
-> diff --git a/drivers/gpu/drm/drm_cache.c b/drivers/gpu/drm/drm_cache.c
-> index 5124582451c6..250cdfbb711f 100644
-> --- a/drivers/gpu/drm/drm_cache.c
-> +++ b/drivers/gpu/drm/drm_cache.c
-> @@ -159,6 +159,12 @@ drm_flush_pages(struct page *pages[], unsigned long num_pages)
->   	for (i = 0; i < num_pages; i++)
->   		drm_cache_maint_page(pages[i], 0, PAGE_SIZE, DMA_TO_DEVICE,
->   				     dmac_map_area);
-> +#elif defined(CONFIG_ARM64)
-> +	unsigned long i;
-> +
-> +	for (i = 0; i < num_pages; i++)
-> +		__dma_map_area(phys_to_virt(page_to_phys(pages[i])), PAGE_SIZE,
-> +			       DMA_TO_DEVICE);
-
-Note that this is not exactly equivalent to clflush - if it's at all 
-possible for a non-coherent GPU to write back to these pages and someone 
-somewhere expects to be able to read the updated data from a CPU, that's 
-  going to be subtly broken.
-
-This also breaks building DRM as a module. And I doubt that either of 
-the two easy solutions to that are going to fly with the respective 
-maintainers...
-
-Given all the bodging around which seems to happen in DRM/ION/etc., it 
-would be really nice to pin down what exactly the shortcomings of the 
-DMA API are for these use-cases, and extend it to address them properly.
-
-Robin.
-
->   #else
->   	pr_err("Architecture has no drm_cache.c support\n");
->   	WARN_ON_ONCE(1);
-> @@ -196,6 +202,13 @@ drm_flush_sg(struct sg_table *st)
->   	for_each_sg_page(st->sgl, &sg_iter, st->nents, 0)
->   		drm_cache_maint_page(sg_page_iter_page(&sg_iter), 0, PAGE_SIZE,
->   				     DMA_TO_DEVICE, dmac_map_area);
-> +#elif defined(CONFIG_ARM64)
-> +	int i;
-> +	struct scatterlist *sg;
-> +
-> +	for_each_sg(st->sgl, sg, st->nents, i)
-> +		__dma_map_area(phys_to_virt(sg_phys(sg)), sg->length,
-> +			       DMA_TO_DEVICE);
->   #else
->   	pr_err("Architecture has no drm_cache.c support\n");
->   	WARN_ON_ONCE(1);
+> As I said, I'm not good in DRM, so I don't know the proper fix. But you
+> can find workaround at [1]. I don't know how good it is, but at least
+> it resolved issue on our setup. If drm guys think that this fix is fine
+> enough, I can push it to the? ML for a proper review.
 > 
+> [1]
+> https://github.com/lorc/linux/commit/80155506d3499273155366a1d263a81baface718 
+> 
+> 
+> Cheers,
+> -- 
+> Volodymyr Babchuk
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
