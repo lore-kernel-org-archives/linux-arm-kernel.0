@@ -1,60 +1,106 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 24 Jan 2018 18:35:10 +0800
-Subject: [PATCH v5 07/13] ARM: dts: rockchip: add clocks in vop iommu nodes
-In-Reply-To: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180124103516.2571-8-jeffy.chen@rock-chips.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 24 Jan 2018 10:57:05 +0000
+Subject: [RFC PATCH 1/2] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <878tcp8umz.fsf@xmission.com>
+References: <1516623798-25001-1-git-send-email-Dave.Martin@arm.com>
+ <1516623798-25001-2-git-send-email-Dave.Martin@arm.com>
+ <878tcp8umz.fsf@xmission.com>
+Message-ID: <20180124105704.GD5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocks in vop iommu nodes, since we are going to control clocks in
-rockchip iommu driver.
+On Mon, Jan 22, 2018 at 03:13:08PM -0600, Eric W. Biederman wrote:
+> 
+> > diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+> > index e447283..77edb00 100644
+> > --- a/include/uapi/asm-generic/siginfo.h
+> > +++ b/include/uapi/asm-generic/siginfo.h
+> > @@ -193,7 +193,8 @@ typedef struct siginfo {
+> >  #define FPE_FLTRES	6	/* floating point inexact result */
+> >  #define FPE_FLTINV	7	/* floating point invalid operation */
+> >  #define FPE_FLTSUB	8	/* subscript out of range */
+> > -#define NSIGFPE		8
+> > +#define FPE_UNKNOWN	9	/* undiagnosed floating-point exception */
+> > +#define NSIGFPE		9
+> 
+> Minor nit here.
+> 
+> At least before this is final I would really appreciate if you could
+> rebase this on top of my unificiation of siginfo.h that I posted on
+> linux-arch and is in my siginfo-next branch.
+> 
+> As that already pushes NSIGFPE up to 13.
+> 
+> Which would make this patch change NSIGFPE to 14 and allocate the number
+> 14 for FPE_UNKNOWN
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Looking at this, I note a few things:
 
-Changes in v5:
-Remove clk names.
+ * For consistent naming, FPE_FLTUNK might be a better name for
+   FPE_UNKNOWN.
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+   FPE_FLTUNK seems generic, tempting me to insert it as number 9
+   (since only the numbers up to 8 are ABI just now).
 
- arch/arm/boot/dts/rk3036.dtsi | 1 +
- arch/arm/boot/dts/rk3288.dtsi | 2 ++
- 2 files changed, 3 insertions(+)
+   (The temptation to call it FPE_FLUNK is strong, but I can't argue
+   that's consistent...)
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index 3b704cfed69a..70fc72509fb2 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -197,6 +197,7 @@
- 		reg = <0x10118300 0x100>;
- 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "vop_mmu";
-+		clocks = <&cru ACLK_LCDC>, <&cru SCLK_LCDC>, <&cru HCLK_LCDC>;
- 		#iommu-cells = <0>;
- 		status = "disabled";
- 	};
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 6102e4e7f35c..e983ec13cd87 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -1026,6 +1026,7 @@
- 		reg = <0x0 0xff930300 0x0 0x100>;
- 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "vopb_mmu";
-+		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
- 		power-domains = <&power RK3288_PD_VIO>;
- 		#iommu-cells = <0>;
- 		status = "disabled";
-@@ -1074,6 +1075,7 @@
- 		reg = <0x0 0xff940300 0x0 0x100>;
- 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "vopl_mmu";
-+		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
- 		power-domains = <&power RK3288_PD_VIO>;
- 		#iommu-cells = <0>;
- 		status = "disabled";
--- 
-2.11.0
+ * No distinction is drawn between generic and arch-dependent codes
+   here, so NSIGFPE will typically be too big.  The generic siginfo
+   handling code can detect random garbage in si_code this way, but
+   off-by-ones or misused arch-specific codes may slip through.
+
+   In particular, new x86-specific FPE_* codes will likely be
+   invisible to the BUILD_BUG_ON()s in arch/x86/kernel/signal_compat.c
+   unless so many are added that x86 overtakes ia64.
+
+ * Should we reserve space for future generic codes (say up to 15)?
+   Downside: si_code validation is not a simple matter of checking
+   <= NSIGFPE in that case.  (Though <= is still better than no
+   check@all, and no worse than the current situation.)
+
+ * What are NSIGFPE etc. doing in this header?  These aren't specified
+   by POSIX and I'm not sure what userspace would legitimately use them
+   for... though it may be too late to change this now.
+
+   Most instances on codeseaarch.debian.net are the kernel, copies
+   of kernel headers, and translated versions of kernel headers.
+   It's hard to be exhaustive though.
+
+
+We could have something like this:
+
+#define FPE_FLTUNK	9
+#define __NSIGFPE_GENERIC	9
+#define NSIGFPE		__NSIGFPE_GENERIC
+
+/* si_code <= 15 reserved for arch-independent codes */
+
+#if defined(__frv__)
+
+# define FPE_MDAOF	16
+# undef NSIGFPE
+# define NSIGFPE	16
+
+#elif define(__ia64__)
+
+# define __FPE_DECOVF	16
+# define __FPE_DECDIV	17
+# define __FPE_DECERR	18
+# define __FPR_INVASC	19
+# undef NSIGFPE
+# define NSIGFPE	19
+
+#endif
+
+(Avoiding a (base + offset) approach for the arch codes, since that
+would make it look like the codes can be renumbered safely without
+breaking anything).
+
+The generic vs. arch vs. NSIGFOO problem already exists for other
+signals.  We could take a similar approach for those, but OTOH it
+may just not be worth the effort.
+
+Cheers
+---Dave
