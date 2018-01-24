@@ -1,42 +1,42 @@
-From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Wed, 24 Jan 2018 14:04:06 +0200
-Subject: DRM: double free in rcar_du_vsp.c
-In-Reply-To: <234140a7-8538-3ec4-1c40-e6ebcc42be8f@epam.com>
-References: <234140a7-8538-3ec4-1c40-e6ebcc42be8f@epam.com>
-Message-ID: <f61c270f-219c-56e5-a03d-e9a3e122d4b4@epam.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Wed, 24 Jan 2018 13:10:58 +0100
+Subject: [linux-sunxi][PATCH 4/5] arm64: allwinner: a64: Add SPDIF to the
+ Pine64
+In-Reply-To: <20180124103943.2062-5-codekipper@gmail.com>
+References: <20180124103943.2062-1-codekipper@gmail.com>
+ <20180124103943.2062-5-codekipper@gmail.com>
+Message-ID: <CAEKpxB=xB=2nJ1KjiDG=VoMT0TBdOO=rbBypWBr-o2Mag_fXew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Looping in DRM maintainer.
-
-> Hello,
-> 
-> I have found issue with double free() in RCAR DU VSP driver. it is
-> caused by rcar_du_vsp_plane_atomic_duplicate_state(), which duplicates
-> struct rcar_du_vsp_plane_state. This struct holds sg_tables which are
-> then freed in rcar_du_vsp_plane_cleanup_fb(). This function is called
-> for every rcar_du_vsp_plane_state, so it calls sg_free_table() twice for
-> the same sg_table.
-> 
-> I'm not familiar with DRM, so I can't say why this does not occur every
-> time, but this bug caused problems on our setup from time to time. Looks
-> like it occurs only under heavy system load.
-> 
-> As I said, I'm not good in DRM, so I don't know the proper fix. But you
-> can find workaround at [1]. I don't know how good it is, but at least
-> it resolved issue on our setup. If drm guys think that this fix is fine
-> enough, I can push it to the? ML for a proper review.
-> 
-> [1]
-> https://github.com/lorc/linux/commit/80155506d3499273155366a1d263a81baface718 
-> 
-> 
-> Cheers,
-> -- 
-> Volodymyr Babchuk
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 24 January 2018 at 11:39,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+NACK.....just noticed the lack of commit message...mmmm
+BR,
+CK
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> index 604cdaedac38..70e8ff9a1f38 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> @@ -230,6 +230,13 @@
+>         regulator-name = "vcc-rtc";
+>  };
+>
+> +/* On Euler connector */
+> +&spdif {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&spdif_tx_pins_a>;
+> +       status = "disabled";
+> +};
+> +
+>  /* On Exp and Euler connectors */
+>  &uart0 {
+>         pinctrl-names = "default";
+> --
+> 2.16.0
+>
