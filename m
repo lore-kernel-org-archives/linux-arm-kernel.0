@@ -1,66 +1,33 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 24 Jan 2018 16:29:32 +0530
-Subject: [Patch v7 00/12] Add MFC v10.10 support
-References: <CGME20180124112324epcas2p246e0983b55ae9d6923b537cb34d7346f@epcas2p2.samsung.com>
-Message-ID: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
+Date: Wed, 24 Jan 2018 16:29:38 +0530
+Subject: [Patch v7 06/12] [media] v4l2-ioctl: add HEVC format description
+In-Reply-To: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
+References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
+ <CGME20180124112340epcas2p4051efc01bcc004b78ef4f5a9cd810303@epcas2p4.samsung.com>
+Message-ID: <1516791584-7980-7-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds MFC v10.10 support. MFC v10.10 is used in some
-of Exynos7 variants.
+HEVC is a video coding format
 
-This adds support for following:
+Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+---
+ drivers/media/v4l2-core/v4l2-ioctl.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-* Add support for HEVC encoder and decoder
-* Add support for VP9 decoder
-* Update Documentation for control id definitions
-* Update computation of min scratch buffer size requirement for V8 onwards
-
-Changes since v6:
- - Addressed review comments by Kamil Debski <kamil@wypas.org>.
- - Addressed review comments by
-   Stanimir Varbanov <stanimir.varbanov@linaro.org>.
- - Addressed review comments by Hans Verkuil <hverkuil@xs4all.nl>.
- - Addressed review comments by Philippe Ombredanne <pombredanne@nexb.com>
- - Rebased on latest git://linuxtv.org/snawrocki/samsung.git
-   for-v4.16/media/next.
- - Applied r-o-b from Andrzej, Stanimir on respective patches.
- - Applied acked-by from Kamil, Hans on respective patches.
-
-Smitha T Murthy (12):
-  [media] s5p-mfc: Rename IS_MFCV8 macro
-  [media] s5p-mfc: Adding initial support for MFC v10.10
-  [media] s5p-mfc: Use min scratch buffer size as provided by F/W
-  [media] s5p-mfc: Support MFCv10.10 buffer requirements
-  [media] videodev2.h: Add v4l2 definition for HEVC
-  [media] v4l2-ioctl: add HEVC format description
-  Documentation: v4l: Documentation for HEVC v4l2 definition
-  [media] s5p-mfc: Add support for HEVC decoder
-  [media] s5p-mfc: Add VP9 decoder support
-  [media] v4l2: Add v4l2 control IDs for HEVC encoder
-  [media] s5p-mfc: Add support for HEVC encoder
-  Documention: v4l: Documentation for HEVC CIDs
-
- .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
- Documentation/media/uapi/v4l/extended-controls.rst | 400 +++++++++++++++
- Documentation/media/uapi/v4l/pixfmt-compressed.rst |   5 +
- drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  87 ++++
- drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
- drivers/media/platform/s5p-mfc/s5p_mfc.c           |  28 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  68 ++-
- drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  48 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 557 ++++++++++++++++++++-
- drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 397 +++++++++++++--
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
- drivers/media/v4l2-core/v4l2-ctrls.c               | 119 +++++
- drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +
- include/uapi/linux/v4l2-controls.h                 |  93 +++-
- include/uapi/linux/videodev2.h                     |   1 +
- 18 files changed, 1773 insertions(+), 78 deletions(-)
- create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-
+diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+index 7961499..8a3c6a8 100644
+--- a/drivers/media/v4l2-core/v4l2-ioctl.c
++++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+@@ -1268,6 +1268,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+ 		case V4L2_PIX_FMT_VC1_ANNEX_L:	descr = "VC-1 (SMPTE 412M Annex L)"; break;
+ 		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
+ 		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
++		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break; /* aka H.265 */
+ 		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
+ 		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
+ 		case V4L2_PIX_FMT_SN9C10X:	descr = "GSPCA SN9C10X"; break;
 -- 
 2.7.4
