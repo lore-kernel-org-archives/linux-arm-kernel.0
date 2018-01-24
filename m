@@ -1,41 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 24 Jan 2018 11:59:25 +0100
-Subject: [linux-sunxi][PATCH 1/5] arm64: allwinner: a64: Add the SPDIF
- block
-In-Reply-To: <20180124103943.2062-2-codekipper@gmail.com>
+Date: Wed, 24 Jan 2018 12:00:31 +0100
+Subject: [linux-sunxi][PATCH 2/5] arm64: allwinner: a64: Add SPDIF TX pin
+ to the A64
+In-Reply-To: <20180124103943.2062-3-codekipper@gmail.com>
 References: <20180124103943.2062-1-codekipper@gmail.com>
- <20180124103943.2062-2-codekipper@gmail.com>
-Message-ID: <20180124105925.t4khedfybyuhhzqk@flea.lan>
+ <20180124103943.2062-3-codekipper@gmail.com>
+Message-ID: <20180124110031.kksmh56krinaivh7@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jan 24, 2018 at 11:39:39AM +0100, codekipper at gmail.com wrote:
+On Wed, Jan 24, 2018 at 11:39:40AM +0100, codekipper at gmail.com wrote:
 > From: Marcus Cooper <codekipper@gmail.com>
 > 
-> Add the SPDIF transceiver controller block to the A64 dtsi.
+> Add the SPDIF TX pin to the A64 dtsi.
 > 
 > Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 > ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
 > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index d783d164b9c3..c82979038b0b 100644
+> index c82979038b0b..db1694ec3ee4 100644
 > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -382,6 +382,19 @@
+> @@ -336,6 +336,11 @@
+>  				drive-strength = <40>;
 >  			};
->  		};
 >  
-> +		spdif: spdif at 1c21000 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "allwinner,sun8i-h3-spdif";
+> +			spdif_tx_pins_a: spdif at 0 {
 
-Please add a SoC-specific compatible here, in addition the H3.
+This will generate a dtc warning, you should use a syntax similar to
+the other nodes there (ie. spdif if that's the only muxing option, or
+spdif-0).
 
-Thanks!
 Maxime
 
 -- 
@@ -48,4 +45,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/4c2b7f9c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/044d6642/attachment.sig>
