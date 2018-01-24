@@ -1,73 +1,109 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 24 Jan 2018 13:14:56 +0000
-Subject: [PATCH 3/5] drm: add ARM64 flush implementations
-In-Reply-To: <20180124123644.GU17719@n2100.armlinux.org.uk>
-References: <20180124025606.3020-2-gurchetansingh@chromium.org>
- <20180124025606.3020-3-gurchetansingh@chromium.org>
- <2cf40ed8-cb7c-3f17-a8e4-2cbf2fb980e6@arm.com>
- <20180124123644.GU17719@n2100.armlinux.org.uk>
-Message-ID: <e1bb338d-78a7-870e-20a1-756e9a36f1ed@arm.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Wed, 24 Jan 2018 13:22:04 +0000
+Subject: [PATCH v1 2/2] drm/bridge/synopsys: dsi: Add a warning msg on dsi
+ read operations
+In-Reply-To: <CA+ASDXPJ9uPDwRhP2WbazjeT6o=6L0ttffWXjwjkD3KxB+1cuQ@mail.gmail.com>
+References: <20180123142618.28384-1-philippe.cornu@st.com>
+ <20180123142618.28384-3-philippe.cornu@st.com>
+ <CA+ASDXPJ9uPDwRhP2WbazjeT6o=6L0ttffWXjwjkD3KxB+1cuQ@mail.gmail.com>
+Message-ID: <369181f6-1bb4-0559-86c9-5528be7fc459@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/18 12:36, Russell King - ARM Linux wrote:
-> On Wed, Jan 24, 2018 at 12:00:59PM +0000, Robin Murphy wrote:
->> On 24/01/18 02:56, Gurchetan Singh wrote:
->>> This patch uses the __dma_map_area function to flush the cache
->>> on ARM64.
->>>
->>> v2: Don't use DMA API, call functions directly (Daniel)
->>>
->>> Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
->>> ---
->>>   drivers/gpu/drm/drm_cache.c | 13 +++++++++++++
->>>   1 file changed, 13 insertions(+)
->>>
->>> diff --git a/drivers/gpu/drm/drm_cache.c b/drivers/gpu/drm/drm_cache.c
->>> index 5124582451c6..250cdfbb711f 100644
->>> --- a/drivers/gpu/drm/drm_cache.c
->>> +++ b/drivers/gpu/drm/drm_cache.c
->>> @@ -159,6 +159,12 @@ drm_flush_pages(struct page *pages[], unsigned long num_pages)
->>>   	for (i = 0; i < num_pages; i++)
->>>   		drm_cache_maint_page(pages[i], 0, PAGE_SIZE, DMA_TO_DEVICE,
->>>   				     dmac_map_area);
->>> +#elif defined(CONFIG_ARM64)
->>> +	unsigned long i;
->>> +
->>> +	for (i = 0; i < num_pages; i++)
->>> +		__dma_map_area(phys_to_virt(page_to_phys(pages[i])), PAGE_SIZE,
->>> +			       DMA_TO_DEVICE);
->>
->> Note that this is not exactly equivalent to clflush - if it's at all
->> possible for a non-coherent GPU to write back to these pages and someone
->> somewhere expects to be able to read the updated data from a CPU, that's
->> going to be subtly broken.
->>
->> This also breaks building DRM as a module. And I doubt that either of the
->> two easy solutions to that are going to fly with the respective
->> maintainers...
->>
->> Given all the bodging around which seems to happen in DRM/ION/etc., it would
->> be really nice to pin down what exactly the shortcomings of the DMA API are
->> for these use-cases, and extend it to address them properly.
-> 
-> Aren't the cache flushing instructions available from userspace on
-> ARM64?  (I've certainly used them in my spectre/meltdown PoC).  If
-> userspace wants to flush before reading a GPU buffer that has been
-> writtent to, why can't it use the already available cache maintenance
-> instructions?  It's likely to be quicker, and it can target just the
-> area of the buffer it wants to read.
+Hi Brian,
 
-Indeed, whilst the main reason we enable EL0 cache maintenance access is 
-for JITs cleaning to PoU, it inherently makes PoC operations available 
-as well. The semantics of drm_clflush_*() weren't immediately obvious, 
-but if it is purely a sync point around userspace reading/writing GPU 
-buffers directly, then what you suggest does sound ideal (and 
-__dma_map_area is definitely wrong for the read case as above).
 
+On 01/23/2018 10:28 PM, Brian Norris wrote:
+> Hi Philippe,
 > 
-> 32-bit ARM is a different matter, and I'll reply separately.
+> I see you sent this out already today, while I only just responded
+> (late) to your questions about it... oh well :)
 > 
 
-Thanks,
-Robin.
+I got a short period to clean-up and adds features to this driver (1.31 
+ip version + maybe the read feature), sorry to have not wait a single 
+day more.
+
+> On Tue, Jan 23, 2018 at 6:26 AM, Philippe Cornu <philippe.cornu@st.com> wrote:
+>> The DCS/GENERIC DSI read feature is not yet implemented so it
+>> is important to warn the host_transfer() caller in case of
+>> read operation requests.
+>>
+>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>> ---
+>>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 9 ++++++++-
+>>   1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> index 096cf5e5bb30..e46ddff8601c 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> @@ -417,7 +417,14 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>>          if (ret)
+>>                  return ret;
+>>
+>> -       nb_bytes = packet.size;
+>> +       if (msg->rx_buf && msg->rx_len > 0) {
+> 
+> It feels like you should do this check *before* you start writing
+> anything. It's possible to have a combination TX/RX command, and it
+> would be counterintuitive to only do half the operation then return
+> with an argument error.
+> 
+
+Many thanks for your review.
+
+I agree with your comments.
+
+Well, my patch is not good at all because it contains a small part of 
+the read feature I am writing... but it is not the purpose of this patch.
+
+No excuse, sorry guys for making you waste time.
+
+I will re-write a new patch 100% decorrelated from a possible future 
+read feature.
+
+I could also wait until I have a working read feature but as it could 
+take some times, I prefer warning users asap.
+
+>> +               /* TODO dw drv improvements: implement read feature */
+>> +               dev_warn(dsi->dev, "read operations not yet implemented\n");
+>> +               return -EPERM;
+> 
+> I'm not sure -EPERM is right. Feels like -EINVAL, -ENOSYS, or
+> -EOPNOTSUPP. I think -ENOSYS actually has been abused somewhat, so
+> maybe one of the other two.
+> 
+
+not easy to pick the right one. I will use -EINVAL.
+
+>> +
+> 
+> Spurious blank line?
+> 
+thanks
+
+>> +       } else {
+>> +               nb_bytes = packet.size;
+>> +       }
+> 
+> You don't actually need to put this sort of thing in the 'else' case.
+> The other branch is an error-handling case, which definitely 'return's
+> early, and it's pretty standard coding style to avoid indenting the
+> "good" path like this.
+> 
+> Brian
+> 
+
+The else part is linked to my "read feature" too, sorry for that. I will 
+do it simpler in next version.
+
+Thank you,
+Philippe :-)
+
+>>
+>>          return nb_bytes;
+>>   }
+>> --
+>> 2.15.1
+>>
