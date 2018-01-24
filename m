@@ -1,48 +1,25 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Wed, 24 Jan 2018 12:40:37 +0100
-Subject: [linux-sunxi][PATCH 2/5] arm64: allwinner: a64: Add SPDIF TX pin
- to the A64
-In-Reply-To: <CAGb2v67oFc0LRAcdvh-2F3HRkOui34ANp_-frB9exdvFBAirqg@mail.gmail.com>
-References: <20180124103943.2062-1-codekipper@gmail.com>
- <20180124103943.2062-3-codekipper@gmail.com>
- <20180124110031.kksmh56krinaivh7@flea.lan>
- <CAGb2v67oFc0LRAcdvh-2F3HRkOui34ANp_-frB9exdvFBAirqg@mail.gmail.com>
-Message-ID: <CAEKpxBk3E87i3oLACFxJs=_s7LO8Mr5N9ZsYunMna4CfQp31Gg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 24 Jan 2018 12:46:26 +0100
+Subject: [v2,2/5] i2c: meson: add configurable divider factors
+In-Reply-To: <600c932f-59d6-d7ec-ec02-b92b275049d5@amlogic.com>
+References: <20171120145415.6581-3-yixun.lan@amlogic.com>
+ <20180124062830.vi52rtlgglryq3xz@ninjato>
+ <600c932f-59d6-d7ec-ec02-b92b275049d5@amlogic.com>
+Message-ID: <20180124114626.mfckwbcacoyjzsin@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2018 at 12:02, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Wed, Jan 24, 2018 at 7:00 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Wed, Jan 24, 2018 at 11:39:40AM +0100, codekipper at gmail.com wrote:
->>> From: Marcus Cooper <codekipper@gmail.com>
->>>
->>> Add the SPDIF TX pin to the A64 dtsi.
->>>
->>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->>> ---
->>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> index c82979038b0b..db1694ec3ee4 100644
->>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> @@ -336,6 +336,11 @@
->>>                               drive-strength = <40>;
->>>                       };
->>>
->>> +                     spdif_tx_pins_a: spdif at 0 {
->>
->> This will generate a dtc warning, you should use a syntax similar to
->> the other nodes there (ie. spdif if that's the only muxing option, or
->> spdif-0).
->
-> Furthermore, if this is the only option, you should set it as the
-> default in the .dtsi, so boards don't have to, and possibly squash
-> this patch into the first one.
-ACK
-Thanks,
-CK
->
-> ChenYu
+> but, I didn't get this build warnings while test locally, so is there
+> any specific compiler option that I need to pass to?
+
+I used "W=1 C=1" when compiling. My gcc version is:
+
+(Debian 6.3.0-18) 6.3.0 20170516
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180124/ce69e414/attachment.sig>
