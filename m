@@ -1,7 +1,7 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 24 Jan 2018 22:23:46 +0100
-Subject: [PATCH] ARM: dts: use 'atmel' as at24 manufacturer for sama5d34ek
-Message-ID: <20180124212346.3823-1-brgl@bgdev.pl>
+Date: Wed, 24 Jan 2018 22:25:01 +0100
+Subject: [PATCH] ARM: dts: use 'atmel' as at24 manufacturer for at91sam9260ek
+Message-ID: <20180124212501.3911-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,21 @@ now deprecated. Use a correct 'atmel,<model>' value.
 
 Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
 ---
- arch/arm/boot/dts/sama5d34ek.dts | 2 +-
+ arch/arm/boot/dts/at91sam9260ek.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sama5d34ek.dts b/arch/arm/boot/dts/sama5d34ek.dts
-index c8b8449fdc3e..15d5c46013a4 100644
---- a/arch/arm/boot/dts/sama5d34ek.dts
-+++ b/arch/arm/boot/dts/sama5d34ek.dts
-@@ -38,7 +38,7 @@
- 				status = "okay";
+diff --git a/arch/arm/boot/dts/at91sam9260ek.dts b/arch/arm/boot/dts/at91sam9260ek.dts
+index e16c706d91ef..d2b865f60293 100644
+--- a/arch/arm/boot/dts/at91sam9260ek.dts
++++ b/arch/arm/boot/dts/at91sam9260ek.dts
+@@ -201,7 +201,7 @@
+ 		status = "okay";
  
- 				24c256 at 50 {
--					compatible = "24c256";
-+					compatible = "atmel,24c256";
- 					reg = <0x50>;
- 					pagesize = <64>;
- 				};
+ 		24c512 at 50 {
+-			compatible = "24c512";
++			compatible = "atmel,24c512";
+ 			reg = <0x50>;
+ 		};
+ 	};
 -- 
 2.16.1
