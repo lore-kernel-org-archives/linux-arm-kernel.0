@@ -1,87 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 Jan 2018 15:23:54 +0100
-Subject: [PATCH 2/2] spi: a3700: Remove endianness swapping for
- full-duplex transfers
-In-Reply-To: <1516803048-26942-3-git-send-email-maxime.chevallier@smile.fr>
- (Maxime Chevallier's message of "Wed, 24 Jan 2018 15:10:48 +0100")
-References: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
- <1516803048-26942-3-git-send-email-maxime.chevallier@smile.fr>
-Message-ID: <87fu6v49ol.fsf@free-electrons.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 24 Jan 2018 16:47:51 +0200
+Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20180117183244.28303-3-l.stach@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-3-l.stach@pengutronix.de>
+Message-ID: <20180124144751.jt6y3uayhplzbjxf@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
- 
- On mer., janv. 24 2018, Maxime Chevallier <maxime.chevallier@smile.fr> wrote:
+Hi Lucas,
 
-> Fixes the following sparse warnings :
-> line 767: warning: incorrect type in assignment (different base types)
-> line 767:    expected unsigned int [unsigned] [assigned] [usertype] val_out
-> line 767:    got restricted __le32 [usertype] <noident>
-> line 776: warning: cast to restricted __le32
->
-> This takes advantage of readl/writel to do the endianness reordering,
-> and removes an extra variable in the function.
->
-> Fixes: f68a7dcb91b7 ("spi: a3700: Add full-duplex support")
-> Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
+On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
+> This is the evaluation kit board for the i.MX8M. The current level of
+> support yields a working console and is able to boot userspace from
+> SD card or Network.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm64/boot/dts/nxp/Makefile       |   3 +
+>  arch/arm64/boot/dts/nxp/imx8mq-evk.dts | 287 +++++++++++++++++++++++++++++++++
+>  2 files changed, 290 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/nxp/Makefile
+>  create mode 100644 arch/arm64/boot/dts/nxp/imx8mq-evk.dts
+> 
+> diff --git a/arch/arm64/boot/dts/nxp/Makefile b/arch/arm64/boot/dts/nxp/Makefile
+> new file mode 100644
+> index 000000000000..1aebb1f16708
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/nxp/Makefile
+> @@ -0,0 +1,3 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +
+> +dtb-$(CONFIG_SOC_IMX8MQ) += imx8m-evk.dtb
 
-As for the previous patch:
+Typo, should be imx8mq-evk.dtb. Without this fix I'm getting:
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+make[2]: *** No rule to make target 'arch/arm64/boot/dts/nxp/imx8m-evk.dtb', needed by '__build'.  Stop.
 
-Thanks,
-
-Gregory> ---
->  drivers/spi/spi-armada-3700.c | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-> index 43ee0b56fe1c..7dcb14d303eb 100644
-> --- a/drivers/spi/spi-armada-3700.c
-> +++ b/drivers/spi/spi-armada-3700.c
-> @@ -747,7 +747,7 @@ static int a3700_spi_transfer_one_full_duplex(struct spi_master *master,
->  				  struct spi_transfer *xfer)
->  {
->  	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
-> -	u32 val_in, val_out;
-> +	u32 val;
->  
->  	/* Disable FIFO mode */
->  	a3700_spi_fifo_mode_set(a3700_spi, false);
-> @@ -761,21 +761,20 @@ static int a3700_spi_transfer_one_full_duplex(struct spi_master *master,
->  			a3700_spi_bytelen_set(a3700_spi, 1);
->  
->  		if (a3700_spi->byte_len == 1)
-> -			val_out = *a3700_spi->tx_buf;
-> +			val = *a3700_spi->tx_buf;
->  		else
-> -			val_out = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
-> +			val = *(u32 *)a3700_spi->tx_buf;
->  
-> -		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val_out);
-> +		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
->  
->  		/* Wait for all the data to be shifted in / out */
->  		while (!(spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG) &
->  				A3700_SPI_XFER_DONE))
->  			cpu_relax();
->  
-> -		val_in = le32_to_cpu(spireg_read(a3700_spi,
-> -						 A3700_SPI_DATA_IN_REG));
-> +		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
->  
-> -		memcpy(a3700_spi->rx_buf, &val_in, a3700_spi->byte_len);
-> +		memcpy(a3700_spi->rx_buf, &val, a3700_spi->byte_len);
->  
->  		a3700_spi->buf_len -= a3700_spi->byte_len;
->  		a3700_spi->tx_buf += a3700_spi->byte_len;
-> -- 
-> 2.1.4
->
+baruch
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
