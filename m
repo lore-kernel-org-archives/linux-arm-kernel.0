@@ -1,43 +1,68 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 24 Jan 2018 18:35:05 +0800
-Subject: [PATCH v5 02/13] iommu/rockchip: Fix error handling in probe
+Date: Wed, 24 Jan 2018 18:35:07 +0800
+Subject: [PATCH v5 04/13] iommu/rockchip: Fix error handling in attach
 In-Reply-To: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
 References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180124103516.2571-3-jeffy.chen@rock-chips.com>
+Message-ID: <20180124103516.2571-5-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing iommu_device_sysfs_remove in error path.
+From: Tomasz Figa <tfiga@chromium.org>
 
+Currently if the driver encounters an error while attaching device, it
+will leave the IOMMU in an inconsistent state. Even though it shouldn't
+really happen in reality, let's just add proper error path to keep
+things consistent.
+
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-Changes in v5: None
+Changes in v5:
+Use out labels to save the duplication between the error and success paths.
+
 Changes in v4: None
 Changes in v3: None
-Changes in v2: None
+Changes in v2:
+Move irq request to probe(in patch[0])
 
- drivers/iommu/rockchip-iommu.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/iommu/rockchip-iommu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 16cd8780c289..c2ef3cbd4401 100644
+index b743d82e6fe1..f7ff3a3645ea 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -1193,8 +1193,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
+@@ -824,7 +824,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
  
- 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
- 	err = iommu_device_register(&iommu->iommu);
-+	if (err) {
-+		iommu_device_sysfs_remove(&iommu->iommu);
-+		return err;
-+	}
+ 	ret = rk_iommu_force_reset(iommu);
+ 	if (ret)
+-		return ret;
++		goto out_disable_stall;
  
--	return err;
-+	return 0;
+ 	iommu->domain = domain;
+ 
+@@ -837,7 +837,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ 	ret = rk_iommu_enable_paging(iommu);
+ 	if (ret)
+-		return ret;
++		goto out_disable_stall;
+ 
+ 	spin_lock_irqsave(&rk_domain->iommus_lock, flags);
+ 	list_add_tail(&iommu->node, &rk_domain->iommus);
+@@ -845,9 +845,9 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ 	dev_dbg(dev, "Attached to iommu domain\n");
+ 
++out_disable_stall:
+ 	rk_iommu_disable_stall(iommu);
+-
+-	return 0;
++	return ret;
  }
  
- static const struct of_device_id rk_iommu_dt_ids[] = {
+ static void rk_iommu_detach_device(struct iommu_domain *domain,
 -- 
 2.11.0
