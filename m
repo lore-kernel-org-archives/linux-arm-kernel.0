@@ -1,95 +1,118 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Wed, 24 Jan 2018 23:33:50 +0000
-Subject: [PATCH v2 4/4] drivers: firmware: xilinx: Add debugfs interface
-In-Reply-To: <20180123084103.GC21463@kroah.com>
-References: <1516220434-22204-1-git-send-email-jollys@xilinx.com>
- <1516220434-22204-5-git-send-email-jollys@xilinx.com>
- <20180123084103.GC21463@kroah.com>
-Message-ID: <DM2PR0201MB0767AE5B7E37276806A3FED4B8E20@DM2PR0201MB0767.namprd02.prod.outlook.com>
+From: gurchetansingh@chromium.org (Gurchetan Singh)
+Date: Wed, 24 Jan 2018 15:43:00 -0800
+Subject: [PATCH 2/5] drm: add ARM flush implementation
+In-Reply-To: <20180124192610.GA30716@n2100.armlinux.org.uk>
+References: <20180124025606.3020-2-gurchetansingh@chromium.org>
+ <20180124124542.GV17719@n2100.armlinux.org.uk>
+ <CAAfnVBkwmrcr14ZhmhgAnLHwL8zotnnCeWAVwBGmVcU9oGRerA@mail.gmail.com>
+ <20180124192610.GA30716@n2100.armlinux.org.uk>
+Message-ID: <CAAfnVBki=_u3toVBTj0s-DsEcGn1K04VAYKbM=eh=FfrgDrJjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for review Greg,
+On Wed, Jan 24, 2018 at 11:26 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Jan 24, 2018 at 10:45:28AM -0800, Gurchetan Singh wrote:
+>> On Wed, Jan 24, 2018 at 4:45 AM, Russell King - ARM Linux <
+>> linux at armlinux.org.uk> wrote:
+>> > So no, this is not an acceptable approach.
+>> >
+>> > Secondly, in light of spectre and meltdown, do we _really_ want to
+>> > export cache flushing to userspace in any case - these attacks rely
+>> > on being able to flush specific cache lines from the caches in order
+>> > to do the timing attacks (while leaving others in place.)
+>>
+>> > Currently, 32-bit ARM does not export such flushing capabilities to
+>> > userspace, which makes it very difficult (I'm not going to say
+>> > impossible) to get any working proof-of-code program that even
+>> > illustrates the timing attack.  Exposing this functionality changes
+>> > that game, and means that we're much more open to these exploits.
+>> > (Some may say that you can flush cache lines by reading a large
+>> > enough buffer - I'm aware, I've tried that, the results are too
+>> > unreliable even for a simple attempt which doesn't involve crossing
+>> > privilege boundaries.)
+>> >
+>>
+>> Will using the DMA API (dma_sync_single_for_device /
+>> dma_sync_sg_for_device) mitigate your Meltdown / Spectre concerns in any
+>> way?
+>
+> I see no point in answering that question based on what you've written
+> below (see below for why).
+>
+>> > Do you really need cacheable GPU buffers, or will write combining
+>> > buffers (as we use elsewhere such as etnaviv) suffice?  Please provide
+>> > some _real_ _world_ performance measurements that demonstrate that
+>> > there is a real need for this functionality.
+>>
+>>
+>> My desire is for the vgem driver to work correctly on ARM, which requires
+>> cache flushing.  The mappings vgem itself creates are write combine.
+>
+> If the pages are mapped write-combine, they are by definition *not*
+> cacheable, so there should be no cache flushing required.
+>
+>> The
+>> issue is the pages retrieved on ARM architecture usually have to be flushed
+>> before they can be used (see rockchip_gem_get_pages / tegra_bo_get_pages).
+>> This patch set attempts to do the flushing in an architecture independent
+>> manner (since vgem is intended to work on ARM / x86).
+>
+> I see rockchip_gem_get_pages() using shmem_read_mapping_page() to get
+> the pages.  That's more or less fine, we do that on Etnaviv too.
+>
+> (Side note: provided the pages are not coming from lowmem, as mapping
+> lowmem pages are mapped cacheable, and if you also map them elsewhere
+> as write-combine, you're stepping into some potential cache attribute
+> issues.)
+>
+> How we deal with this in Etnaviv is to use dma_map_sg() after we get
+> the pages - see
+>
+>   etnaviv_gem_get_pages(), which calls the memory specific .get_pages
+>     method, and goes on to call etnaviv_gem_scatter_map().
+>
+> There's no need for the faking up of a SG table that way, just let
+> dma_map_sg() do whatever it needs to do.  This means you're not abusing
+> the DMA API, and if you have a system IOMMU in the way, as a bonus that
+> gets setup for you.
 
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Tuesday, January 23, 2018 12:41 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org; matt at codeblueprint.co.uk;
-> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
-> dmitry.torokhov at gmail.com; michal.simek at xilinx.com; robh+dt at kernel.org;
-> mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; Rajan Vaja
-> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>
-> Subject: Re: [PATCH v2 4/4] drivers: firmware: xilinx: Add debugfs interface
-> 
-> On Wed, Jan 17, 2018 at 12:20:34PM -0800, Jolly Shah wrote:
-> > +/* Setup debugfs fops */
-> > +static const struct file_operations fops_zynqmp_pm_dbgfs = {
-> > +       .owner  =       THIS_MODULE,
-> > +       .write  =       zynqmp_pm_debugfs_api_write,
-> > +       .read   =       zynqmp_pm_debugfs_api_version_read,
-> > +};
-> > +
-> > +/**
-> > + * zynqmp_pm_api_debugfs_init - Initialize debugfs interface
-> > + *
-> > + * Return:      Returns 0 on success
-> > + *             Corresponding error code otherwise
-> > + */
-> > +int zynqmp_pm_api_debugfs_init(void)
-> > +{
-> > +       int err;
-> > +
-> > +       /* Initialize debugfs interface */
-> > +       zynqmp_pm_debugfs_dir = debugfs_create_dir(DRIVER_NAME, NULL);
-> > +       if (!zynqmp_pm_debugfs_dir) {
-> > +               pr_err("debugfs_create_dir failed\n");
-> > +               return -ENODEV;
-> > +       }
-> 
-> No, you should NEVER care if a debugfs call returned an error or not, no need to
-> check it at all.  Your code path should not change based on the return value as
-> no code should depened on the functionality of debugfs.
-> 
-> Any error returned by a debugfs call can be passed right back into it with no
-> problems, so again, no need to check this.
-> 
+Okay, so the recommended solution to my problem (vgem doesn't work on
+ARM) is to:
 
-Fixed in v3 patch series. Not saving dentries anymore but added check to show warning message instead of error.
+1) Create vgem_get_pages / vgem_put_pages functions.  vgem_get_pages
+will be called from vgem_gem_fault (since currently vgem does delayed
+allocation) and vgem_pin_pages.
+2) Call dma_map_sg() / dma_unmap_sg in vgem_get_pages / vgem_put_pages
+if the architecture is ARM.
 
-> > +
-> > +       zynqmp_pm_debugfs_power =
-> > +               debugfs_create_file("pm", 0220,
-> > +                                   zynqmp_pm_debugfs_dir, NULL,
-> > +                                   &fops_zynqmp_pm_dbgfs);
-> > +       if (!zynqmp_pm_debugfs_power) {
-> > +               pr_err("debugfs_create_file power failed\n");
-> > +               err = -ENODEV;
-> > +               goto err_dbgfs;
-> > +       }
-> > +
-> > +       zynqmp_pm_debugfs_api_version =
-> > +               debugfs_create_file("api_version", 0444,
-> > +                                   zynqmp_pm_debugfs_dir, NULL,
-> > +                                   &fops_zynqmp_pm_dbgfs);
-> > +       if (!zynqmp_pm_debugfs_api_version) {
-> > +               pr_err("debugfs_create_file api_version failed\n");
-> > +               err = -ENODEV;
-> > +               goto err_dbgfs;
-> > +       }
-> 
-> Why do you save these dentries at all anyway?  You never do anything with
-> them, just create the files and away you go, no need to worry about anything.
-> 
-> Remember, debugfs was created to be very simple to use, don't make it more
-> complex than it has to be please.
-> 
-> thanks,
-> 
-> greg k-h
+That works for me, if that works for everyone else.
 
-Fixed in v3 patch series.
+>> There is some interest in cache-able DRM buffers (though, again, this
+>> patchset is not about that).  Renderscript accesses are very slow on ARM
+>> and we keep shadow buffers to improve performance (see
+>> crrev.com/602736).
+>
+> 404.
 
-Thanks,
-Jolly Shah
+Oops, the correct URL is crrev.com/c/602736.
+
+>> Jeffy
+>> has done some tests with memcpys in our camera stack that shows
+>> improvements (with caching --> 4 to 7 ms, without caching --> 20 to 90ms).
+>> However, I do agree Spectre complicates things.
+>
+> At the moment, on 32-bit ARM, we have very little mitigation work for
+> Spectre beyond the generic kernel work that is going on at the moment
+> for all architectures, so I really do not want to introduce anything
+> that makes 32-bit ARM more easily vulnerable to attack.
+
+Fair enough.
+
+>That may change in the future (sorry, I can't say when), but right now I don't
+> think we have much of an option.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
