@@ -1,31 +1,52 @@
 From: maxime.chevallier@smile.fr (Maxime Chevallier)
-Date: Wed, 24 Jan 2018 15:10:46 +0100
-Subject: [PATCH 0/2] spi: a3700: Remove endianness correction functions
-Message-ID: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
+Date: Wed, 24 Jan 2018 15:10:47 +0100
+Subject: [PATCH 1/2] spi: a3700: Remove endianness swapping functions when
+ accessing FIFOs
+In-Reply-To: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
+References: <1516803048-26942-1-git-send-email-maxime.chevallier@smile.fr>
+Message-ID: <1516803048-26942-2-git-send-email-maxime.chevallier@smile.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset removes un-necessary endianness swapping functions.
+Fixes the following sparse warnings :
+line 504: warning: incorrect type in assignment (different base types)
+line 504:    expected unsigned int [unsigned] [usertype] val
+line 504:    got restricted __le32 [usertype] <noident>
+line 527: warning: cast to restricted __le32
 
-This was detected by sparse, after the commit f68a7dcb91b7
-("spi: a3700: Add full-duplex support") introduced a new warning.
+This is solved by removing endian-converson functions, since the
+converted values are going through readl/writel anyway, which take care
+of the conversion.
 
-This series fix this warning, plus some previously existing ones of
-the same nature.
+Fixes: 6fd6fd68c9e2 ("spi: armada-3700: Fix padding when sending not 4-byte aligned data")
+Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
+---
+ drivers/spi/spi-armada-3700.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-I split this into two patches, since the first applies on an already
-mainlined commit, and the other on a recent patch that I sent.
-
-Mark, if you wish I can resend this in another form (just one patch,
-or as a rework of my previous patchset
-"spi: a3700: Add improvements and full-duplex transfers").
-
-Maxime Chevallier (2):
-  spi: a3700: Remove endianness swapping functions when accessing FIFOs
-  spi: a3700: Remove endianness swapping for full-duplex transfers
-
- drivers/spi/spi-armada-3700.c | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
+index a8576c89f713..43ee0b56fe1c 100644
+--- a/drivers/spi/spi-armada-3700.c
++++ b/drivers/spi/spi-armada-3700.c
+@@ -501,7 +501,7 @@ static int a3700_spi_fifo_write(struct a3700_spi *a3700_spi)
+ 	u32 val;
+ 
+ 	while (!a3700_is_wfifo_full(a3700_spi) && a3700_spi->buf_len) {
+-		val = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
++		val = *(u32 *)a3700_spi->tx_buf;
+ 		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
+ 		a3700_spi->buf_len -= 4;
+ 		a3700_spi->tx_buf += 4;
+@@ -524,9 +524,8 @@ static int a3700_spi_fifo_read(struct a3700_spi *a3700_spi)
+ 	while (!a3700_is_rfifo_empty(a3700_spi) && a3700_spi->buf_len) {
+ 		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
+ 		if (a3700_spi->buf_len >= 4) {
+-			u32 data = le32_to_cpu(val);
+ 
+-			memcpy(a3700_spi->rx_buf, &data, 4);
++			memcpy(a3700_spi->rx_buf, &val, 4);
+ 
+ 			a3700_spi->buf_len -= 4;
+ 			a3700_spi->rx_buf += 4;
 -- 
 2.1.4
