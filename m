@@ -1,296 +1,230 @@
 From: marcofrk@gmail.com (Marco Franchi)
-Date: Wed, 24 Jan 2018 10:21:23 -0200
-Subject: [PATCH v2 1/3] ARM: dts: imx: Pass empty memory size on board dts
-Message-ID: <1516796485-24912-1-git-send-email-marcofrk@gmail.com>
+Date: Wed, 24 Jan 2018 10:21:24 -0200
+Subject: [PATCH v2 2/3] ARM: dts: imx: Remove empty memory size nodes
+In-Reply-To: <1516796485-24912-1-git-send-email-marcofrk@gmail.com>
+References: <1516796485-24912-1-git-send-email-marcofrk@gmail.com>
+Message-ID: <1516796485-24912-2-git-send-email-marcofrk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for removing 'reg = <0 0>;' from the dtsi SoC files, pass
-'reg = <0 0 >;' to the dts/dtsi board files that do not pass the memory
-size.
+Remove the empty reg property from the SoC dtsi files in order to avoid
+duplicate memory nodes when the correct size is passed in board dts files.
 
 Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 ---
 Change since v1:
 -none
- arch/arm/boot/dts/imx51-zii-rdu1.dts         | 5 +++++
- arch/arm/boot/dts/imx53-tx53.dtsi            | 5 +++++
- arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 5 +++++
- arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts   | 5 +++++
- arch/arm/boot/dts/imx6dl-ts4900.dts          | 5 +++++
- arch/arm/boot/dts/imx6dl-ts7970.dts          | 5 +++++
- arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts    | 5 +++++
- arch/arm/boot/dts/imx6q-h100.dts             | 5 +++++
- arch/arm/boot/dts/imx6q-novena.dts           | 5 +++++
- arch/arm/boot/dts/imx6q-ts4900.dts           | 5 +++++
- arch/arm/boot/dts/imx6q-ts7970.dts           | 5 +++++
- arch/arm/boot/dts/imx6q-zii-rdu2.dts         | 5 +++++
- arch/arm/boot/dts/imx6qdl-apalis.dtsi        | 5 +++++
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi       | 5 +++++
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi  | 5 +++++
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 5 +++++
- arch/arm/boot/dts/imx6qp-zii-rdu2.dts        | 5 +++++
- 17 files changed, 85 insertions(+)
+ arch/arm/boot/dts/imx1.dtsi    | 2 +-
+ arch/arm/boot/dts/imx23.dtsi   | 2 +-
+ arch/arm/boot/dts/imx25.dtsi   | 2 +-
+ arch/arm/boot/dts/imx27.dtsi   | 2 +-
+ arch/arm/boot/dts/imx28.dtsi   | 2 +-
+ arch/arm/boot/dts/imx31.dtsi   | 2 +-
+ arch/arm/boot/dts/imx35.dtsi   | 2 +-
+ arch/arm/boot/dts/imx50.dtsi   | 2 +-
+ arch/arm/boot/dts/imx51.dtsi   | 2 +-
+ arch/arm/boot/dts/imx53.dtsi   | 2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ arch/arm/boot/dts/imx6sl.dtsi  | 2 +-
+ arch/arm/boot/dts/imx6sx.dtsi  | 2 +-
+ arch/arm/boot/dts/imx6ul.dtsi  | 2 +-
+ arch/arm/boot/dts/imx7s.dtsi   | 2 +-
+ 15 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 5306b78..f20fdd9 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -51,6 +51,11 @@
- 		stdout-path = &uart1;
- 	};
+diff --git a/arch/arm/boot/dts/imx1.dtsi b/arch/arm/boot/dts/imx1.dtsi
+index 20f6565..f7b9edf 100644
+--- a/arch/arm/boot/dts/imx1.dtsi
++++ b/arch/arm/boot/dts/imx1.dtsi
+@@ -25,7 +25,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
  	aliases {
- 		mdio-gpio0 = &mdio_gpio;
- 		rtc0 = &ds1341;
-diff --git a/arch/arm/boot/dts/imx53-tx53.dtsi b/arch/arm/boot/dts/imx53-tx53.dtsi
-index a22e461..82f036a 100644
---- a/arch/arm/boot/dts/imx53-tx53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tx53.dtsi
-@@ -49,6 +49,11 @@
- 	model = "Ka-Ro electronics TX53 module";
- 	compatible = "karo,tx53", "fsl,imx53";
+ 		gpio0 = &gpio1;
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 10d57f9..0aa111e 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -23,7 +23,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
  	aliases {
- 		can0 = &can2; /* Make the can interface indices consistent with TX28/TX48 modules */
- 		can1 = &can1;
-diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-index dcf9206..642b9cf 100644
---- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-@@ -53,6 +53,11 @@
- 	compatible = "toradex,colibri_imx6dl-eval-v3", "toradex,colibri_imx6dl",
- 		     "fsl,imx6dl";
+ 		gpio0 = &gpio0;
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 9445f8e..9725705 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -22,7 +22,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
  	aliases {
- 		i2c0 = &i2c2;
- 		i2c1 = &i2c3;
-diff --git a/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts b/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
-index 994f96a..fe09187 100644
---- a/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
-+++ b/arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dts
-@@ -20,4 +20,9 @@
- / {
- 	model = "DFI FS700-M60-6DL i.MX6dl Q7 Board";
- 	compatible = "dfi,fs700-m60-6dl", "dfi,fs700e-m60", "fsl,imx6dl";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx6dl-ts4900.dts b/arch/arm/boot/dts/imx6dl-ts4900.dts
-index 6ea0b78..04a765d 100644
---- a/arch/arm/boot/dts/imx6dl-ts4900.dts
-+++ b/arch/arm/boot/dts/imx6dl-ts4900.dts
-@@ -46,4 +46,9 @@
- / {
- 	model = "Technologic Systems i.MX6 Solo/DualLite TS-4900 (Default Device Tree)";
- 	compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx6dl-ts7970.dts b/arch/arm/boot/dts/imx6dl-ts7970.dts
-index d104daf..a2565b6 100644
---- a/arch/arm/boot/dts/imx6dl-ts7970.dts
-+++ b/arch/arm/boot/dts/imx6dl-ts7970.dts
-@@ -47,4 +47,9 @@
- / {
- 	model = "Technologic Systems i.MX6 Solo/DualLite TS-7970 (Default Device Tree)";
- 	compatible = "technologic,imx6dl-ts7970", "fsl,imx6dl";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts b/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
-index fd0ad9a..6845d71 100644
---- a/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
-+++ b/arch/arm/boot/dts/imx6q-dfi-fs700-m60.dts
-@@ -20,4 +20,9 @@
- / {
- 	model = "DFI FS700-M60-6QD i.MX6qd Q7 Board";
- 	compatible = "dfi,fs700-m60-6qd", "dfi,fs700e-m60", "fsl,imx6q";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
-index 8a2ea6c..9cd3abb 100644
---- a/arch/arm/boot/dts/imx6q-h100.dts
-+++ b/arch/arm/boot/dts/imx6q-h100.dts
-@@ -49,6 +49,11 @@
- 	model = "Auvidea H100";
- 	compatible = "auvidea,h100", "fsl,imx6q";
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 15d85f1..6585b00 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -26,7 +26,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
  	aliases {
- 		rtc0 = &rtc;
- 		rtc1 = &snvs_rtc;
-diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
-index 7d7dc59..9e88683 100644
---- a/arch/arm/boot/dts/imx6q-novena.dts
-+++ b/arch/arm/boot/dts/imx6q-novena.dts
-@@ -55,6 +55,11 @@
- 	model = "Kosagi Novena Dual/Quad";
- 	compatible = "kosagi,imx6q-novena", "fsl,imx6q";
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index e52e05c..42d9a89 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -24,7 +24,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
- 	chosen {
- 		stdout-path = &uart2;
- 	};
-diff --git a/arch/arm/boot/dts/imx6q-ts4900.dts b/arch/arm/boot/dts/imx6q-ts4900.dts
-index fab76f8..a949dac 100644
---- a/arch/arm/boot/dts/imx6q-ts4900.dts
-+++ b/arch/arm/boot/dts/imx6q-ts4900.dts
-@@ -46,6 +46,11 @@
- / {
- 	model = "Technologic Systems i.MX6 Quad TS-4900 (Default Device Tree)";
- 	compatible = "technologic,imx6q-ts4900", "fsl,imx6q";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
+ 	aliases {
+ 		ethernet0 = &mac0;
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index a720314..ebc3f2d 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -19,7 +19,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
- &sata {
-diff --git a/arch/arm/boot/dts/imx6q-ts7970.dts b/arch/arm/boot/dts/imx6q-ts7970.dts
-index f19e189..709a662 100644
---- a/arch/arm/boot/dts/imx6q-ts7970.dts
-+++ b/arch/arm/boot/dts/imx6q-ts7970.dts
-@@ -47,6 +47,11 @@
- / {
- 	model = "Technologic Systems i.MX6 Quad TS-7970 (Default Device Tree)";
- 	compatible = "technologic,imx6q-ts7970", "fsl,imx6q";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
+ 	aliases {
+ 		serial0 = &uart1;
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index e08c0c1..bf343195 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -20,7 +20,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
- &sata {
-diff --git a/arch/arm/boot/dts/imx6q-zii-rdu2.dts b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
-index 6be8a1e..8c81fbe 100644
---- a/arch/arm/boot/dts/imx6q-zii-rdu2.dts
-+++ b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
-@@ -47,4 +47,9 @@
- / {
- 	model = "ZII RDU2 Board";
- 	compatible = "zii,imx6q-zii-rdu2", "fsl,imx6q";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 4e776e0..3abcdfb 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -47,6 +47,11 @@
- 	model = "Toradex Apalis iMX6Q/D Module";
- 	compatible = "toradex,apalis_imx6q", "fsl,imx6q";
+ 	aliases {
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index 35955e6..7954e79 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -25,7 +25,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index d1cfdc2..c66c3d2 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -42,6 +42,11 @@
- #include <dt-bindings/gpio/gpio.h>
+ 	aliases {
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 00d30bd..5d390a6 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -26,7 +26,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
- / {
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
- 	ir_recv: ir-receiver {
- 		compatible = "gpio-ir-receiver";
- 		gpios = <&gpio3 9 1>;
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 9258323..bae4b29 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -40,6 +40,11 @@
-  */
+ 	aliases {
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 1040251..7d647d0 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -26,7 +26,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
- / {
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
- 	chosen {
- 		stdout-path = &uart1;
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index dffbc92..710b3cc 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -40,6 +40,11 @@
-  */
+ 	aliases {
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 59ff866..0c70ea8 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -23,7 +23,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
  
- / {
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
-+
- 	chosen {
- 		stdout-path = &uart1;
- 	};
-diff --git a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
-index 547a766..e035601 100644
---- a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
-+++ b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
-@@ -47,4 +47,9 @@
- / {
- 	model = "ZII RDU2+ Board";
- 	compatible = "zii,imx6qp-zii-rdu2", "fsl,imx6qp";
-+
-+	/* Will be filled by the bootloader */
-+	memory at 0 {
-+		reg = <0 0>;
-+	};
- };
+ 	aliases {
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index ae8df3c..ab6a7e2 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -21,7 +21,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
+ 
+ 	aliases {
+ 		ethernet0 = &fec;
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index fd78793..c486791 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -22,7 +22,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
+ 
+ 	aliases {
+ 		can0 = &flexcan1;
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 5d6c3ba..c6515a3 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -22,7 +22,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
+ 
+ 	aliases {
+ 		ethernet0 = &fec1;
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 9aa2bb9..ec6292c 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -58,7 +58,7 @@
+ 	 * Also for U-Boot there must be a pre-existing /memory node.
+ 	 */
+ 	chosen {};
+-	memory { device_type = "memory"; reg = <0 0>; };
++	memory { device_type = "memory"; };
+ 
+ 	aliases {
+ 		gpio0 = &gpio1;
 -- 
 2.7.4
