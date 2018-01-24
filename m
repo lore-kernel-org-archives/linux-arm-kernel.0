@@ -1,54 +1,131 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 24 Jan 2018 07:17:25 +0100
-Subject: [net-next: PATCH v4 1/7] device property: Introduce
- fwnode_get_mac_address()
-In-Reply-To: <CAJZ5v0jpGb8_rSTdtoLJW9os0ufgwLTnbWAQq6MTy_ye6Hr6KA@mail.gmail.com>
-References: <1516278704-17141-1-git-send-email-mw@semihalf.com>
- <1516278704-17141-2-git-send-email-mw@semihalf.com>
- <CAJZ5v0j=4Lvaf49oeDqVmYP5nyAs-E9E8xdgyfL7=J_46X5TMA@mail.gmail.com>
- <CAPv3WKf0GUE508P8k1nExBA+h6pQr4UcaFPk+mps3xRepESQmw@mail.gmail.com>
- <CAJZ5v0jpGb8_rSTdtoLJW9os0ufgwLTnbWAQq6MTy_ye6Hr6KA@mail.gmail.com>
-Message-ID: <CAPv3WKfCRE46W9kKCvffN+SuPBKF1bchUBJNjUuOMoPUj8H0qA@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 24 Jan 2018 14:16:24 +0800
+Subject: [PATCH] nvmem: sunxi-sid: fix H3 SID controller support
+Message-ID: <20180124061624.61951-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+It seems that doing some operation will make the value pre-read on H3
+SID controller wrong again, so all operation should be performed by
+register.
 
-2018-01-24 3:08 GMT+01:00 Rafael J. Wysocki <rafael@kernel.org>:
-> On Tue, Jan 23, 2018 at 7:12 AM, Marcin Wojtas <mw@semihalf.com> wrote:
->> Hi Rafael,
->>
->>> >         if (res)
->>> >                 return res;
->>> >
->>> > -       return device_get_mac_addr(dev, "address", addr, alen);
->>> > +       return fwnode_get_mac_addr(fwnode, "address", addr, alen);
->>> > +}
->>> > +EXPORT_SYMBOL(fwnode_get_mac_address);
->>>
->>> That should be EXPORT_SYMBOL_GPL().
->>>
->>> I have overlooked that previously, sorry about that.
->>
->> The series landed yesterday in net-next, so I need to send a fix on
->> top.
->
-> OK
->
->> Would you be ok with single patch fixing all EXPORT_SYMBOL()
->> occurences? Those would be 2 new routines:
->> - fwnode_get_mac_address
->> - fwnode_irq_get
->> and  2 already existing in the file:
->> - device_get_mac_address
->> - fwnode_graph_parse_endpoint
->>
->> Please let know, how you prefer to handle it?
->
-> I guess it's better to fix this up when the series gets merged.
->
+Change the SID reading to use register only.
 
-Ok, I will do it at that time.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/nvmem/sunxi_sid.c | 71 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 50 insertions(+), 21 deletions(-)
 
-Thanks,
-Marcin
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index 99bd54d85fcb..d4086d143ac1 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -85,13 +85,14 @@ static int sunxi_sid_read(void *context, unsigned int offset,
+ }
+ 
+ static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
+-				      const unsigned int word)
++				      const unsigned int offset,
++				      u32 *out)
+ {
+ 	u32 reg_val;
+ 	int ret;
+ 
+ 	/* Set word, lock access, and set read command */
+-	reg_val = (word & SUN8I_SID_OFFSET_MASK)
++	reg_val = (offset & SUN8I_SID_OFFSET_MASK)
+ 		  << SUN8I_SID_OFFSET_SHIFT;
+ 	reg_val |= SUN8I_SID_OP_LOCK | SUN8I_SID_READ;
+ 	writel(reg_val, sid->base + SUN8I_SID_PRCTL);
+@@ -101,7 +102,49 @@ static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
+ 	if (ret)
+ 		return ret;
+ 
++	if (out)
++		*out = readl(sid->base + SUN8I_SID_RDKEY);
++
+ 	writel(0, sid->base + SUN8I_SID_PRCTL);
++
++	return 0;
++}
++
++/*
++ * On Allwinner H3, the value on the 0x200 offset of the SID controller seems to be
++ * not reliable at all.
++ * Read by the registers instead.
++ */
++static int sun8i_sid_read_byte_by_reg(const struct sunxi_sid *sid,
++				      const unsigned int offset,
++				      u8 *out)
++{
++	u32 word;
++	int ret;
++
++	ret = sun8i_sid_register_readout(sid, offset & ~0x03, &word);
++
++	if (ret)
++		return ret;
++
++	*out = (word >> ((offset & 0x3) * 8)) & 0xff;
++
++	return 0;
++}
++
++static int sun8i_sid_read_by_reg(void *context, unsigned int offset,
++				 void *val, size_t bytes)
++{
++	struct sunxi_sid *sid = context;
++	u8 *buf = val;
++	int ret;
++
++	while (bytes--) {
++		ret = sun8i_sid_read_byte_by_reg(sid, offset++, buf++);
++		if (ret)
++			return ret;
++	}
++
+ 	return 0;
+ }
+ 
+@@ -131,26 +174,12 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 
+ 	size = cfg->size;
+ 
+-	if (cfg->need_register_readout) {
+-		/*
+-		 * H3's SID controller have a bug that the value at 0x200
+-		 * offset is not the correct value when the hardware is reseted.
+-		 * However, after doing a register-based read operation, the
+-		 * value become right.
+-		 * Do a full read operation here, but ignore its value
+-		 * (as it's more fast to read by direct MMIO value than
+-		 * with registers)
+-		 */
+-		for (i = 0; i < (size >> 2); i++) {
+-			ret = sun8i_sid_register_readout(sid, i);
+-			if (ret)
+-				return ret;
+-		}
+-	}
+-
+ 	econfig.size = size;
+ 	econfig.dev = dev;
+-	econfig.reg_read = sunxi_sid_read;
++	if (cfg->need_register_readout)
++		econfig.reg_read = sun8i_sid_read_by_reg;
++	else
++		econfig.reg_read = sunxi_sid_read;
+ 	econfig.priv = sid;
+ 	nvmem = nvmem_register(&econfig);
+ 	if (IS_ERR(nvmem))
+@@ -163,7 +192,7 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	for (i = 0; i < size; i++)
+-		randomness[i] = sunxi_sid_read_byte(sid, i);
++		econfig.reg_read(sid, i, &randomness[i], 1);
+ 
+ 	add_device_randomness(randomness, size);
+ 	kfree(randomness);
+-- 
+2.15.1
