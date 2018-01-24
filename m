@@ -1,105 +1,210 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed, 24 Jan 2018 18:35:06 +0800
-Subject: [PATCH v5 03/13] iommu/rockchip: Request irqs in rk_iommu_probe()
+Date: Wed, 24 Jan 2018 18:35:08 +0800
+Subject: [PATCH v5 05/13] iommu/rockchip: Use iopoll helpers to wait for
+ hardware
 In-Reply-To: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
 References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180124103516.2571-4-jeffy.chen@rock-chips.com>
+Message-ID: <20180124103516.2571-6-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move request_irq to the end of rk_iommu_probe().
+From: Tomasz Figa <tfiga@chromium.org>
 
-Suggested-by: Robin Murphy <robin.murphy@arm.com>
+This patch converts the rockchip-iommu driver to use the in-kernel
+iopoll helpers to wait for certain status bits to change in registers
+instead of an open-coded custom macro.
+
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-Loop platform_get_irq() as Robin suggested.
+Changes in v5:
+Use RK_MMU_POLL_PERIOD_US instead of 100.
 
+Changes in v4: None
+Changes in v3: None
 Changes in v2: None
 
- drivers/iommu/rockchip-iommu.c | 38 +++++++++-----------------------------
- 1 file changed, 9 insertions(+), 29 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 75 ++++++++++++++++++++++--------------------
+ 1 file changed, 39 insertions(+), 36 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index c2ef3cbd4401..b743d82e6fe1 100644
+index f7ff3a3645ea..baba283ccdf9 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -90,8 +90,6 @@ struct rk_iommu {
- 	struct device *dev;
- 	void __iomem **bases;
- 	int num_mmu;
--	int *irq;
--	int num_irq;
- 	bool reset_disabled;
- 	struct iommu_device iommu;
- 	struct list_head node; /* entry in rk_iommu_domain.iommus */
-@@ -830,13 +828,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+@@ -13,7 +13,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/iommu.h>
+-#include <linux/jiffies.h>
++#include <linux/iopoll.h>
+ #include <linux/list.h>
+ #include <linux/mm.h>
+ #include <linux/module.h>
+@@ -36,7 +36,10 @@
+ #define RK_MMU_AUTO_GATING	0x24
  
- 	iommu->domain = domain;
+ #define DTE_ADDR_DUMMY		0xCAFEBABE
+-#define FORCE_RESET_TIMEOUT	100	/* ms */
++
++#define RK_MMU_POLL_PERIOD_US		100
++#define RK_MMU_FORCE_RESET_TIMEOUT_US	100000
++#define RK_MMU_POLL_TIMEOUT_US		1000
  
--	for (i = 0; i < iommu->num_irq; i++) {
--		ret = devm_request_irq(iommu->dev, iommu->irq[i], rk_iommu_irq,
--				       IRQF_SHARED, dev_name(dev), iommu);
--		if (ret)
+ /* RK_MMU_STATUS fields */
+ #define RK_MMU_STATUS_PAGING_ENABLED       BIT(0)
+@@ -73,8 +76,6 @@
+   */
+ #define RK_IOMMU_PGSIZE_BITMAP 0x007ff000
+ 
+-#define IOMMU_REG_POLL_COUNT_FAST 1000
+-
+ struct rk_iommu_domain {
+ 	struct list_head iommus;
+ 	struct platform_device *pdev;
+@@ -109,27 +110,6 @@ static struct rk_iommu_domain *to_rk_domain(struct iommu_domain *dom)
+ 	return container_of(dom, struct rk_iommu_domain, domain);
+ }
+ 
+-/**
+- * Inspired by _wait_for in intel_drv.h
+- * This is NOT safe for use in interrupt context.
+- *
+- * Note that it's important that we check the condition again after having
+- * timed out, since the timeout could be due to preemption or similar and
+- * we've never had a chance to check the condition before the timeout.
+- */
+-#define rk_wait_for(COND, MS) ({ \
+-	unsigned long timeout__ = jiffies + msecs_to_jiffies(MS) + 1;	\
+-	int ret__ = 0;							\
+-	while (!(COND)) {						\
+-		if (time_after(jiffies, timeout__)) {			\
+-			ret__ = (COND) ? 0 : -ETIMEDOUT;		\
+-			break;						\
+-		}							\
+-		usleep_range(50, 100);					\
+-	}								\
+-	ret__;								\
+-})
+-
+ /*
+  * The Rockchip rk3288 iommu uses a 2-level page table.
+  * The first level is the "Directory Table" (DT).
+@@ -333,9 +313,21 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu *iommu)
+ 	return enable;
+ }
+ 
++static bool rk_iommu_is_reset_done(struct rk_iommu *iommu)
++{
++	bool done = true;
++	int i;
++
++	for (i = 0; i < iommu->num_mmu; i++)
++		done &= rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0;
++
++	return done;
++}
++
+ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (rk_iommu_is_stall_active(iommu))
+ 		return 0;
+@@ -346,7 +338,9 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
+ 
+-	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
++				 val, RK_MMU_POLL_PERIOD_US,
++				 RK_MMU_POLL_TIMEOUT_US);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
+@@ -358,13 +352,16 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+ static int rk_iommu_disable_stall(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (!rk_iommu_is_stall_active(iommu))
+ 		return 0;
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_STALL);
+ 
+-	ret = rk_wait_for(!rk_iommu_is_stall_active(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_stall_active, iommu, val,
++				 !val, RK_MMU_POLL_PERIOD_US,
++				 RK_MMU_POLL_TIMEOUT_US);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Disable stall request timed out, status: %#08x\n",
+@@ -376,13 +373,16 @@ static int rk_iommu_disable_stall(struct rk_iommu *iommu)
+ static int rk_iommu_enable_paging(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (rk_iommu_is_paging_enabled(iommu))
+ 		return 0;
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_PAGING);
+ 
+-	ret = rk_wait_for(rk_iommu_is_paging_enabled(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
++				 val, RK_MMU_POLL_PERIOD_US,
++				 RK_MMU_POLL_TIMEOUT_US);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Enable paging request timed out, status: %#08x\n",
+@@ -394,13 +394,16 @@ static int rk_iommu_enable_paging(struct rk_iommu *iommu)
+ static int rk_iommu_disable_paging(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
++	bool val;
+ 
+ 	if (!rk_iommu_is_paging_enabled(iommu))
+ 		return 0;
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_DISABLE_PAGING);
+ 
+-	ret = rk_wait_for(!rk_iommu_is_paging_enabled(iommu), 1);
++	ret = readx_poll_timeout(rk_iommu_is_paging_enabled, iommu, val,
++				 !val, RK_MMU_POLL_PERIOD_US,
++				 RK_MMU_POLL_TIMEOUT_US);
+ 	if (ret)
+ 		for (i = 0; i < iommu->num_mmu; i++)
+ 			dev_err(iommu->dev, "Disable paging request timed out, status: %#08x\n",
+@@ -413,6 +416,7 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+ {
+ 	int ret, i;
+ 	u32 dte_addr;
++	bool val;
+ 
+ 	if (iommu->reset_disabled)
+ 		return 0;
+@@ -433,13 +437,12 @@ static int rk_iommu_force_reset(struct rk_iommu *iommu)
+ 
+ 	rk_iommu_command(iommu, RK_MMU_CMD_FORCE_RESET);
+ 
+-	for (i = 0; i < iommu->num_mmu; i++) {
+-		ret = rk_wait_for(rk_iommu_read(iommu->bases[i], RK_MMU_DTE_ADDR) == 0x00000000,
+-				  FORCE_RESET_TIMEOUT);
+-		if (ret) {
+-			dev_err(iommu->dev, "FORCE_RESET command timed out\n");
 -			return ret;
--	}
--
- 	for (i = 0; i < iommu->num_mmu; i++) {
- 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
- 			       rk_domain->dt_dma);
-@@ -885,9 +876,6 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
- 	}
- 	rk_iommu_disable_stall(iommu);
- 
--	for (i = 0; i < iommu->num_irq; i++)
--		devm_free_irq(iommu->dev, iommu->irq[i], iommu);
--
- 	iommu->domain = NULL;
- 
- 	dev_dbg(dev, "Detached from iommu domain\n");
-@@ -1138,7 +1126,7 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	struct rk_iommu *iommu;
- 	struct resource *res;
- 	int num_res = pdev->num_resources;
--	int err, i;
-+	int err, i, irq;
- 
- 	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
- 	if (!iommu)
-@@ -1165,23 +1153,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (iommu->num_mmu == 0)
- 		return PTR_ERR(iommu->bases[0]);
- 
--	iommu->num_irq = platform_irq_count(pdev);
--	if (iommu->num_irq < 0)
--		return iommu->num_irq;
--	if (iommu->num_irq == 0)
--		return -ENXIO;
-+	i = 0;
-+	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO) {
-+		if (irq < 0)
-+			return irq;
- 
--	iommu->irq = devm_kcalloc(dev, iommu->num_irq, sizeof(*iommu->irq),
--				  GFP_KERNEL);
--	if (!iommu->irq)
--		return -ENOMEM;
--
--	for (i = 0; i < iommu->num_irq; i++) {
--		iommu->irq[i] = platform_get_irq(pdev, i);
--		if (iommu->irq[i] < 0) {
--			dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
--			return -ENXIO;
 -		}
-+		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
-+				       IRQF_SHARED, dev_name(dev), iommu);
-+		if (err)
-+			return err;
++	ret = readx_poll_timeout(rk_iommu_is_reset_done, iommu, val,
++				 val, RK_MMU_FORCE_RESET_TIMEOUT_US,
++				 RK_MMU_POLL_TIMEOUT_US);
++	if (ret) {
++		dev_err(iommu->dev, "FORCE_RESET command timed out\n");
++		return ret;
  	}
  
- 	iommu->reset_disabled = device_property_read_bool(dev,
+ 	return 0;
 -- 
 2.11.0
