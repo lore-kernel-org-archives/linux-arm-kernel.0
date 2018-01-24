@@ -1,86 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Jan 2018 15:36:23 +0000
-Subject: Applied "spi: a3700: Remove endianness swapping functions when
- accessing FIFOs" to the spi tree
-In-Reply-To: <1516803048-26942-2-git-send-email-maxime.chevallier@smile.fr>
-Message-ID: <E1eeN67-0004sJ-Dj@debutante>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 24 Jan 2018 17:42:15 +0200
+Subject: [RFC PATCH 2/2] gpio: provide a consumer when requesting a gpio
+In-Reply-To: <20180124130705.GN3055@rfolt0960.corp.atmel.com>
+References: <20180115162407.6314-1-ludovic.desroches@microchip.com>
+ <20180115162407.6314-3-ludovic.desroches@microchip.com>
+ <CACRpkdbsYyHRz826K0QA=Y7Dvf_sm714o5601KBD7Zo4+1hrQA@mail.gmail.com>
+ <20180118152228.GX2989@rfolt0960.corp.atmel.com>
+ <20180124130705.GN3055@rfolt0960.corp.atmel.com>
+Message-ID: <CAHp75VeuX8kGumtiu6iBhJ+AL+Ug3dm5Pb_tQ8YYYU9SH+QSZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Wed, Jan 24, 2018 at 3:07 PM, Ludovic Desroches
+<ludovic.desroches@microchip.com> wrote:
+> On Thu, Jan 18, 2018 at 04:22:28PM +0100, Ludovic Desroches wrote:
+>> On Thu, Jan 18, 2018 at 11:30:00AM +0100, Linus Walleij wrote:
+>> > On Mon, Jan 15, 2018 at 5:24 PM, Ludovic Desroches
+>> > <ludovic.desroches@microchip.com> wrote:
 
-   spi: a3700: Remove endianness swapping functions when accessing FIFOs
+>> > I think we need to think over what is a good way to share ownership
+>> > of a pin.
+>> >
+>> > Russell pointed me to a similar problem incidentally and I briefly looked
+>> > into it: there are cases when several devices may need to hold the
+>> > same pin.
+>> >
+>> > Can't we just look up the associated gpio_chip from the GPIO range,
+>> > and in case the pin is connected between the pin controller and
+>> > the GPIO chip, then we allow the gpiochip to also take a
+>> > reference?
 
-has been applied to the spi tree at
+How do you find my proposal about introducing ownership level (not
+requested yet; exclusive; shared)?
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+>> It's the probably the way to go, it was Maxime's proposal and Andy seems
+>> to agree this solution.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Confirm with caveat that this is a fix for subset of cases.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> If pin_request() is called with gpio_range not NULL, it means that the
+> requests comes from a GPIO chip and the pin controller handles this pin.
+> In this case, I would say the pin is connected between the pin
+> controller and the GPIO chip. Is my assumption right?
+>
+> I am not sure it will fit all the cases:
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+I think it doesn't cover cases when you have UART + UART + GPIO (I
+posted early a use case example).
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+But at least it doesn't move things in a wrong direction.
 
-Thanks,
-Mark
+> - case 1: device A requests the pin (pinctrl-default state) and mux it
+>   as a GPIO. Later,it requests the pin as a GPIO (gpiolib). This 'weird'
+>   situation happens because some strict pin controllers were not declared
+>   as strict and/or pinconf is needed.
+>
+> - case 2: device A requests the pin (pinctrl-default state). Device B
+>   requests the pin as a GPIO (gpiolib).
+>
+> In case 1, pin_request must not return an error. In case 2, pin_request
+> must return an error even if the pin is connected between the pin
+> controller and the GPIO chip.
 
->From 162f8debc01f48ac984ed6d7291743053ec90271 Mon Sep 17 00:00:00 2001
-From: Maxime Chevallier <maxime.chevallier@smile.fr>
-Date: Wed, 24 Jan 2018 15:10:47 +0100
-Subject: [PATCH] spi: a3700: Remove endianness swapping functions when
- accessing FIFOs
+For these cases looks OK to me.
 
-Fixes the following sparse warnings :
-line 504: warning: incorrect type in assignment (different base types)
-line 504:    expected unsigned int [unsigned] [usertype] val
-line 504:    got restricted __le32 [usertype] <noident>
-line 527: warning: cast to restricted __le32
+>> > I.e. in that case you just allow gpio_owner to proceed and take the
+>> > pin just like with a non-strict controller.
 
-This is solved by removing endian-converson functions, since the
-converted values are going through readl/writel anyway, which take care
-of the conversion.
-
-Fixes: 6fd6fd68c9e2 ("spi: armada-3700: Fix padding when sending not 4-byte aligned data")
-Signed-off-by: Maxime Chevallier <maxime.chevallier@smile.fr>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-armada-3700.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-index fdc35dabcda2..f32b83c7209f 100644
---- a/drivers/spi/spi-armada-3700.c
-+++ b/drivers/spi/spi-armada-3700.c
-@@ -493,7 +493,7 @@ static int a3700_spi_fifo_write(struct a3700_spi *a3700_spi)
- 	u32 val;
- 
- 	while (!a3700_is_wfifo_full(a3700_spi) && a3700_spi->buf_len) {
--		val = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
-+		val = *(u32 *)a3700_spi->tx_buf;
- 		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
- 		a3700_spi->buf_len -= 4;
- 		a3700_spi->tx_buf += 4;
-@@ -516,9 +516,8 @@ static int a3700_spi_fifo_read(struct a3700_spi *a3700_spi)
- 	while (!a3700_is_rfifo_empty(a3700_spi) && a3700_spi->buf_len) {
- 		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
- 		if (a3700_spi->buf_len >= 4) {
--			u32 data = le32_to_cpu(val);
- 
--			memcpy(a3700_spi->rx_buf, &data, 4);
-+			memcpy(a3700_spi->rx_buf, &val, 4);
- 
- 			a3700_spi->buf_len -= 4;
- 			a3700_spi->rx_buf += 4;
 -- 
-2.15.1
+With Best Regards,
+Andy Shevchenko
