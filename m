@@ -1,162 +1,158 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Jan 2018 16:21:17 +0100
-Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
- correctly
-In-Reply-To: <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
-References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
- <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
- <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
- <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
- <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
-Message-ID: <20180125152117.qikemrwl7f35ssjg@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 25 Jan 2018 15:21:36 +0000
+Subject: [PATCH v3 3/6] arm: KVM: Invalidate BTB on guest exit for
+ Cortex-A12/A17
+In-Reply-To: <20180125152139.32431-1-marc.zyngier@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+Message-ID: <20180125152139.32431-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In order to avoid aliasing attacks against the branch predictor,
+let's invalidate the BTB on guest exit. This is made complicated
+by the fact that we cannot take a branch before invalidating the
+BTB.
 
-On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
-> Hi,
-> 
-> Il 24/01/2018 18:38, Giulio Benetti ha scritto:
-> > Hi,
-> > 
-> > Il 22/01/2018 21:27, Giulio Benetti ha scritto:
-> > > Hi,
-> > > 
-> > > Il 22/01/2018 09:51, Maxime Ripard ha scritto:
-> > > > On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
-> > > > > On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
-> > > > > it was ignored,
-> > > > > because only PHSYNC and PVSYNC were taken into account.
-> > > > > DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
-> > > > > 
-> > > > > If flags contains PVSYNC, it doesn't mean it is NVSYNC.
-> > > > > And it's true also the contrary.
-> > > > > Also, as I've checked with scope on A20,
-> > > > > if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
-> > > > > must be set, as name suggests.
-> > > > > It seems all display io polarities starts inverted if 0.
-> > > > > 
-> > > > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> > > > > 
-> > > > > PVSYNC and PHSYNC only
-> > > > > 
-> > > > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> > > > 
-> > > > Checkpatch:
-> > > > WARNING: Duplicate signature
-> > > 
-> > > Sorry I didn't use ./scripts/checkpatch.pl
-> > > 
-> > > > 
-> > > > > ---
-> > > > > ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
-> > > > > ? 1 file changed, 2 insertions(+), 2 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > > b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > > index 6121210..e873a37 100644
-> > > > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > > > @@ -224,10 +224,10 @@ static void
-> > > > > sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
-> > > > > ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
-> > > > > ????? /* Setup the polarity of the various signals */
-> > > > > -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
-> > > > > +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
-> > > > > ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
-> > > > > -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
-> > > > > +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
-> > > > > ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
-> > > > 
-> > > > I'm not sure why you were talking of the differences between NVSYNC
-> > > > and PVSYNC if you're not making use of any of it here?
-> > > 
-> > > Thinking about it more now, the point is that all Lcd IOs seem to be
-> > > inverted by default(at least on A20).
-> > > With inverted, I mean that if for example PVSYNC,
-> > > I should see vsync line low and when asserted to give VSync,
-> > > it goes high.
-> > > This is what I've checked with oscilloscope on A20.
-> > > Can someone give a try on A33? Otherwise I will,
-> > > but I will take some time.
-> > > On uboot, everything is treated equal to kernel,
-> > > but to have my falling edge dclk and low h/vsync I had to specify:
-> > > CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
-> > > and
-> > > CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
-> > > but digging into code, I see "sync:3" means H/VSYNC HIGH,
-> > > but I experience both LOW during their pulse.
-> > > 
-> > > > 
-> > > > Also, how was it tested? This seems quite weird that we haven't caught
-> > > > that one sooner, and I'm a bit worried about the possible regressions
-> > > > here.
-> > > 
-> > > It sounds really strange to me too,
-> > > because everybody under uboot use "sync:3"(HIGH).
-> > > I will retry to measure,
-> > > unfortunately at home I don't have a scope,
-> > > but I think I'm going to have one soon, because of this. :)
-> > 
-> > Here I am with scope captures and tcon0 registers dump:
-> > tcon0_regs => https://pasteboard.co/H4r8Zcs.png
-> > dclk_d0 => https://pasteboard.co/H4r8QRe.png
-> > dclk_de => https://pasteboard.co/H4r8zh4R.png
-> > dclk_vsnc => https://pasteboard.co/H4r8Hye.png
-> > 
-> > As you can see circled in reg on registers,
-> > TCON0_IO_POL_REG = 0x00000000.
-> > But on all the waveforms you can see:
-> > - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
-> > the rising front overlaps dclk rising edge(not good), so to me this is
-> > falling, then I mean it Negative.
-> > - dclk_de: de pulse is clearly negative, even if register is 0 and its'
-> > polarity bit is 0.
-> > - dclk_vsnc: same as dclk_de
-> > - dclk_hsync: I didn't take scope screenshot but I can assure you it's
-> > negative.
-> > 
-> > You can also check all the other registers about TCON0.
-> > 
-> > Now I proceed testing it on A33, maybe the peripheral is slightly
-> > different between Axx SoCs, if I find it that way,
-> > it should be only a check about SoC or peripheral ID,
-> > and treat polarity as it should be done.
-> 
-> Here I am with A33 waveforms:
-> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
-> dclk_d0 => https://pasteboard.co/H4rVXwy.png
-> dclk_de => https://pasteboard.co/H4rWDt8.png
-> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
-> dclk_hsync => https://pasteboard.co/H4rWK6I.png
+We only apply this to A12 and A17, which are the only two ARM
+cores on which this useful.
 
-Thanks, that's really helpful.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_asm.h |  2 --
+ arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
+ arch/arm/kvm/hyp/hyp-entry.S   | 62 ++++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 72 insertions(+), 5 deletions(-)
 
-> It behaves the same way as A20, so as I mean IO polarity,
-> all signals(except D0-D23), are inverted.
-> For A33 I've used A33-OLinuXino.
-> For A20 our LiNova1.
-
-Indeed, HSYNC and VSYNC look inverted. I don't really know what the
-polarity of D0 would be just by judging at that capture, but we would
-have noticed if the colors were inverted for quite some time now.
-
-DE seems to be active high though, since it's only going to be at a
-logical low level when data are not transmitted, so during the blank
-periods.
-
-Maxime
-
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 36dd2962a42d..df24ed48977d 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -61,8 +61,6 @@ struct kvm_vcpu;
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
+ 
+-extern char __kvm_hyp_vector[];
+-
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index eb46fc81a440..b47db5b9e407 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -37,6 +37,7 @@
+ 
+ #include <linux/highmem.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/pgalloc.h>
+ #include <asm/stage2_pgtable.h>
+ 
+@@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 
+ static inline void *kvm_get_hyp_vector(void)
+ {
+-	return kvm_ksym_ref(__kvm_hyp_vector);
++	extern char __kvm_hyp_vector[];
++	extern char __kvm_hyp_vector_bp_inv[];
++
++	switch(read_cpuid_part()) {
++	case ARM_CPU_PART_CORTEX_A12:
++	case ARM_CPU_PART_CORTEX_A17:
++		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
++
++	default:
++		return kvm_ksym_ref(__kvm_hyp_vector);
++	}
+ }
+ 
+ static inline int kvm_map_vectors(void)
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 95a2faefc070..aab6b0c06a19 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -70,6 +70,57 @@ __kvm_hyp_vector:
+ 	W(b)	hyp_hvc
+ 	W(b)	hyp_irq
+ 	W(b)	hyp_fiq
++	
++	.align 5
++__kvm_hyp_vector_bp_inv:
++	.global __kvm_hyp_vector_bp_inv
++
++	/*
++	 * We encode the exception entry in the bottom 3 bits of
++	 * SP, and we have to guarantee to be 8 bytes aligned.
++	 */
++	W(add)	sp, sp, #1	/* Reset 	  7 */
++	W(add)	sp, sp, #1	/* Undef	  6 */
++	W(add)	sp, sp, #1	/* Syscall	  5 */
++	W(add)	sp, sp, #1	/* Prefetch abort 4 */
++	W(add)	sp, sp, #1	/* Data abort	  3 */
++	W(add)	sp, sp, #1	/* HVC		  2 */
++	W(add)	sp, sp, #1	/* IRQ		  1 */
++	W(nop)			/* FIQ		  0 */
++
++	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
++	isb
++
++	/*
++	 * Yet another silly hack: Use VPIDR as a temp register.
++	 * Thumb2 is really a pain, as SP cannot be used with most
++	 * of the bitwise instructions. The vect_br macro ensures
++	 * things gets cleaned-up.
++	 */
++	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
++	mov	r0, sp
++	and	r0, r0, #7
++	sub	sp, sp, r0
++	push	{r1, r2}
++	mov	r1, r0
++	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
++	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
++	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
++
++.macro vect_br val, targ
++	cmp	r1, #\val
++	popeq	{r1, r2}
++	beq	\targ
++.endm
++
++	vect_br	0, hyp_fiq
++	vect_br	1, hyp_irq
++	vect_br	2, hyp_hvc
++	vect_br	3, hyp_dabt
++	vect_br	4, hyp_pabt
++	vect_br	5, hyp_svc
++	vect_br	6, hyp_undef
++	vect_br	7, hyp_reset
+ 
+ .macro invalid_vector label, cause
+ 	.align
+@@ -149,7 +200,14 @@ hyp_hvc:
+ 	bx	ip
+ 
+ 1:
+-	push	{lr}
++	/*
++	 * Pushing r2 here is just a way of keeping the stack aligned to
++	 * 8 bytes on any path that can trigger a HYP exception. Here,
++	 * we may well be about to jump into the guest, and the guest
++	 * exit would otherwise be badly decoded by our fancy
++	 * "decode-exception-without-a-branch" code...
++	 */
++	push	{r2, lr}
+ 
+ 	mov	lr, r0
+ 	mov	r0, r1
+@@ -159,7 +217,7 @@ hyp_hvc:
+ THUMB(	orr	lr, #1)
+ 	blx	lr			@ Call the HYP function
+ 
+-	pop	{lr}
++	pop	{r2, lr}
+ 	eret
+ 
+ guest_trap:
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180125/b8de47ff/attachment-0001.sig>
+2.14.2
