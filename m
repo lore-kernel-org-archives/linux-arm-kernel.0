@@ -1,71 +1,54 @@
-From: aisheng.dong@codeaurora.org (aisheng.dong at codeaurora.org)
-Date: Thu, 25 Jan 2018 17:48:41 +0800
-Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <1516713799.25726.21.camel@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 25 Jan 2018 11:52:24 +0200
+Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20180124144751.jt6y3uayhplzbjxf@sapphire.tkos.co.il>
 References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-2-l.stach@pengutronix.de>
- <20180123103609.GD27764@dragon> <1516713799.25726.21.camel@pengutronix.de>
-Message-ID: <ebc8b28d5c2948131cc187ac8177395c@codeaurora.org>
+ <20180117183244.28303-3-l.stach@pengutronix.de>
+ <20180124144751.jt6y3uayhplzbjxf@sapphire.tkos.co.il>
+Message-ID: <20180125095224.npweaunijmesbmhs@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Lucas,
 
-First of all, good to see this patch series in community.
-
-Pengutronix has always been an active friendly contributor on IMX
-upstream activities.  You Did help us a lot!
-
-On 2018-01-23 21:23, Lucas Stach wrote:
-
-<snip>
-
->> > > > +			#address-cells = <1>;
->> > > > +			#size-cells = <1>;
->> > > > +			ranges = <0x30000000 0x30000000 0x400000>;
->> > +
->> > > > > > +			gpio1: gpio at 30200000 {
->> > +				compatible = "nxp,imx8mq-gpio", "fsl,imx35-gpio";
->> 
->> It looks a bit odd to have different vendor prefix for the same 
->> device.
->> But we can understand the reason.??Just curious if this is what vendor
->> kernel does?
+On Wed, Jan 24, 2018 at 04:47:51PM +0200, Baruch Siach wrote:
+> On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
+> > This is the evaluation kit board for the i.MX8M. The current level of
+> > support yields a working console and is able to boot userspace from
+> > SD card or Network.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  arch/arm64/boot/dts/nxp/Makefile       |   3 +
+> >  arch/arm64/boot/dts/nxp/imx8mq-evk.dts | 287 +++++++++++++++++++++++++++++++++
+> >  2 files changed, 290 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/nxp/Makefile
+> >  create mode 100644 arch/arm64/boot/dts/nxp/imx8mq-evk.dts
+> > 
+> > diff --git a/arch/arm64/boot/dts/nxp/Makefile b/arch/arm64/boot/dts/nxp/Makefile
+> > new file mode 100644
+> > index 000000000000..1aebb1f16708
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/nxp/Makefile
+> > @@ -0,0 +1,3 @@
+> > +# SPDX-License-Identifier: GPL-2.0
+> > +
+> > +dtb-$(CONFIG_SOC_IMX8MQ) += imx8m-evk.dtb
 > 
-> No, I did it mostly to be consistent with the location of the DT files
-> under "nxp". I'll change this to match the "freescale" location.
+> Typo, should be imx8mq-evk.dtb. Without this fix I'm getting:
 > 
+> make[2]: *** No rule to make target 'arch/arm64/boot/dts/nxp/imx8m-evk.dtb', needed by '__build'.  Stop.
 
-Vendor tree mostly is still using fsl,imx8mq-xx.
+With this fix and CONFIG_CPU_IDLE disabled:
 
-And many binding doc format is:"compatible : Should be "fsl,<soc>-gpio".
-So we can't use 'nxp' prefix here without changing binding doc.
+Tested-by: Baruch Siach <baruch@tkos.co.il>
 
-Then if we decided to use 'fsl' prefix, probably we may want to fix the
-rest of them in this file as well.
+On i.MX8MQ EVK rev B3.
 
-And i see the dtsi file does not include Freescale/NXP copyright,
-is there a reason?
+Thanks,
+baruch
 
-BTW it's quite strange that my gmail did not receive your MX8MQ patch
-series except clk part.
-Lucas, Could you help have me CCed next time?
-I'd like to help review and test the patch series.
-
-For this time, can you help send them all to me as attachment?
-
-(You can also send all IMX related patches to linux-imx at nxp.com maillist
-i created recently for tracking all IMX related upstream activities.
-Most Freescale/NXP driver owners are in this list that could help on
-the review. Shawn, do you think if i can put it in MAINTAINER file?)
-
-Regards
-Dong Aisheng
-
-> Regards,
-> Lucas
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
