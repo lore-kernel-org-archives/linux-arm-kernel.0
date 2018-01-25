@@ -1,75 +1,71 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Thu, 25 Jan 2018 10:46:15 +0100
-Subject: [linux-sunxi][PATCH 5/5] arm64: allwinner: a64: Add DAI nodes
-In-Reply-To: <20180125082904.t4sqob626kyzw4ga@flea.lan>
-References: <20180124103943.2062-1-codekipper@gmail.com>
- <20180124103943.2062-6-codekipper@gmail.com>
- <20180124110222.cdglyg5m7644xiem@flea.lan>
- <CAEKpxBk8NXJn4KxEGXx7UddqpUMC65kdEgx1phZDWyUd3ER_3Q@mail.gmail.com>
- <20180125082904.t4sqob626kyzw4ga@flea.lan>
-Message-ID: <CAEKpxBmbhtGxk7hZMt3h7M_ih9njrwbtR7ooP4PT2kRD6xf=rw@mail.gmail.com>
+From: aisheng.dong@codeaurora.org (aisheng.dong at codeaurora.org)
+Date: Thu, 25 Jan 2018 17:48:41 +0800
+Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <1516713799.25726.21.camel@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-2-l.stach@pengutronix.de>
+ <20180123103609.GD27764@dragon> <1516713799.25726.21.camel@pengutronix.de>
+Message-ID: <ebc8b28d5c2948131cc187ac8177395c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2018 at 09:29, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Jan 24, 2018 at 12:39:31PM +0100, Code Kipper wrote:
->> On 24 January 2018 at 12:02, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Wed, Jan 24, 2018 at 11:39:43AM +0100, codekipper at gmail.com wrote:
->> >> From: Marcus Cooper <codekipper@gmail.com>
->> >>
->> >> Add the DAI blocks to the device tree. I2S0 and I2S1 are for
->> >> connecting to an external codec.
->> >>
->> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->> >> ---
->> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
->> >>  1 file changed, 26 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >> index f060a58f374c..f3354f8c2026 100644
->> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> >> @@ -419,6 +419,32 @@
->> >>                       status = "disabled";
->> >>               };
->> >>
->> >> +             i2s0: i2s at 1c22000 {
->> >> +                     #sound-dai-cells = <0>;
->> >> +                     compatible = "allwinner,sun8i-h3-i2s";
->> >
->> > Same remark than for the spdif, please add a soc-specific compatible.
->>
->> Is that really necessary?..
->
-> Yes.
->
->> for example on the a20 the functionality of the i2s is the same as
->> the a10 so it is down as "allwinner,sun4i-a10-i2s", likewise here
->> it's the same as the changes required for the H3. I was planning on
->> using the compatible "allwinner,sun50i-a64-i2s" for the audio codec
->> as there are some quirks that need to be addressed.
->
-> And this is exactly why it is necessary. If we ever find a quirk in
-> the future, supporting that quirk will be smooth if we already have a
-> compatible for that SoC in the DT, and a pain if we don't.
-Hi Maxime,
-so just to comfirm. I'll make this change
-compatible = "allwinner,sun50i-a64-i2s", "allwinner,sun8i-h3-i2s"; to the dtsi
-and later will add to the i2s driver the compatible
-"allwinner,sun50i-a64-i2s-audio-codec"(or something other than
-allwinner,sun50i-a64-i2s) for the quirks required for the i2s block
-used for the audio codec.
-BR,
-CK
+Hi Lucas,
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+First of all, good to see this patch series in community.
+
+Pengutronix has always been an active friendly contributor on IMX
+upstream activities.  You Did help us a lot!
+
+On 2018-01-23 21:23, Lucas Stach wrote:
+
+<snip>
+
+>> > > > +			#address-cells = <1>;
+>> > > > +			#size-cells = <1>;
+>> > > > +			ranges = <0x30000000 0x30000000 0x400000>;
+>> > +
+>> > > > > > +			gpio1: gpio at 30200000 {
+>> > +				compatible = "nxp,imx8mq-gpio", "fsl,imx35-gpio";
+>> 
+>> It looks a bit odd to have different vendor prefix for the same 
+>> device.
+>> But we can understand the reason.??Just curious if this is what vendor
+>> kernel does?
+> 
+> No, I did it mostly to be consistent with the location of the DT files
+> under "nxp". I'll change this to match the "freescale" location.
+> 
+
+Vendor tree mostly is still using fsl,imx8mq-xx.
+
+And many binding doc format is:"compatible : Should be "fsl,<soc>-gpio".
+So we can't use 'nxp' prefix here without changing binding doc.
+
+Then if we decided to use 'fsl' prefix, probably we may want to fix the
+rest of them in this file as well.
+
+And i see the dtsi file does not include Freescale/NXP copyright,
+is there a reason?
+
+BTW it's quite strange that my gmail did not receive your MX8MQ patch
+series except clk part.
+Lucas, Could you help have me CCed next time?
+I'd like to help review and test the patch series.
+
+For this time, can you help send them all to me as attachment?
+
+(You can also send all IMX related patches to linux-imx at nxp.com maillist
+i created recently for tracking all IMX related upstream activities.
+Most Freescale/NXP driver owners are in this list that could help on
+the review. Shawn, do you think if i can put it in MAINTAINER file?)
+
+Regards
+Dong Aisheng
+
+> Regards,
+> Lucas
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
