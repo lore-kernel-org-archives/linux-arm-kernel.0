@@ -1,149 +1,93 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Thu, 25 Jan 2018 16:21:47 +0800
-Subject: [PATCH v9 6/7] arm64: kvm: Set Virtual SError Exception Syndrome
- for guest
-In-Reply-To: <5A678806.8030108@arm.com>
-References: <1515254577-6460-1-git-send-email-gengdongjiu@huawei.com>
- <1515254577-6460-7-git-send-email-gengdongjiu@huawei.com>
- <5A678806.8030108@arm.com>
-Message-ID: <3f699ce3-a552-0c6c-3425-d45d0d788406@huawei.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
+Date: Thu, 25 Jan 2018 13:56:57 +0530
+Subject: [PATCH] arm64: dts: ls1088a: Add qspi device node for ls1088a-rdb
+Message-ID: <1516868817-2327-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-  thanks for the review.
+Add nodes and properties for QSPI controller.
+Add support for spansion flash, s25fs512s, as slave device for
+QSPI controller.
 
-On 2018/1/24 3:07, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 06/01/18 16:02, Dongjiu Geng wrote:
->> RAS Extension add a VSESR_EL2 register which can provide
->> the syndrome value reported to software on taking a virtual
->> SError interrupt exception. This patch supports to specify
->> this Syndrome.
->>
->> In the RAS Extensions we can not set all-zero syndrome value
->> for SError, which means 'RAS error: Uncategorized' instead of
->> 'no valid ISS'. So set it to IMPLEMENTATION DEFINED syndrome
->> by default.
->>
->> We also need to support userspace to specify a valid syndrome
->> value, Because in some case, the recovery is driven by userspace.
->> This patch can support that userspace specify it.
->>
->> In the guest/host world switch, restore this value to VSESR_EL2
->> only when HCR_EL2.VSE is set. This value no need to be saved
->> because it is stale vale when guest exit.
-> 
-> A version of this patch has been queued by Catalin.
-yeah, I have seen that.
+Added entry of "fsl,ls1088a-qspi" in fsl-quadspi.txt binding file.
 
-> 
-> Now that the cpufeature bits are queued, I think this can be split up into two
-> separate series for v4.16-rc1, one to tackle NOTIFY_SEI and the associated
-> plumbing. The second for the KVM 'make SError pending' API.
-> 
-> 
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> [Set an impdef ESR for Virtual-SError]
->> Signed-off-by: James Morse <james.morse@arm.com>
-> 
-> I didn't sign-off this patch. If you pick some bits from another version and
-> want to credit someone else you can 'CC:' them or just mention it in the
-> commit-message.
+Signed-off-by: Suresh Gupta <suresh.gupta@nxp.com>
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+---
+Depends on
+ https://patchwork.ozlabs.org/project/linux-mtd/list/?series=25292
 
-I pick your modification of setting an impdef ESR for Virtual-SError, so add your name,
-I change it to 'CC'
+ .../devicetree/bindings/mtd/fsl-quadspi.txt         |  1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts   | 21 +++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi      | 12 ++++++++++++
+ 3 files changed, 34 insertions(+)
 
-> 
-> 
->> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
->> index 47b967d..3b035cc 100644
->> --- a/arch/arm64/include/asm/sysreg.h
->> +++ b/arch/arm64/include/asm/sysreg.h
->> @@ -86,6 +86,9 @@
->>  #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
->>  #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
->>  
->> +/* virtual SError exception syndrome register */
->> +#define REG_VSESR_EL2                  sys_reg(3, 4, 5, 2, 3)
-> 
-> Irrelevant-Nit: sys-regs usually have a 'SYS_' prefix, and are in instruction
-> encoding order lower down the file.
-will follow that.
-
-> 
-> (These PSTATE PAN things are a bit odd as they were used to generate and
-> instruction before the fancy {read,write}_sysreg() helpers were added).>
-> 
->>  #define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
->>  				      (!!x)<<8 | 0x1f)
->>  #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->> index 738ae90..ffad42b 100644
->> --- a/arch/arm64/kvm/guest.c
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -279,7 +279,16 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->>  
->>  int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u32 *syndrome)
-> 
-> Bits of this are spread between patches 5 and 6. If you put them in the other
-> order this wouldn't happen.
-
-Ok, I will adjust that.
-
-> 
-> (but after a rebase most of this patch should disappear)
-> 
->>  {
->> -	return -EINVAL;
->> +	u64 reg = *syndrome;
->> +
->> +	/* inject virtual system Error or asynchronous abort */
->> +	kvm_inject_vabt(vcpu);
-> 
-> So this writes an impdef ESR, because its the existing code-path in KVM.
-> 
-> 
->> +	if (reg)
->> +		/* set vsesr_el2[24:0] with value that user space specified */
->> +		kvm_vcpu_set_vsesr(vcpu, reg & ESR_ELx_ISS_MASK);
-> 
-> And then you overwrite it. Which is a bit odd as there is a helper to do both in
-> one go:
-thanks, I will directly call pend_guest_serror() in this function.
-
-> 
-> 
->> +
->> +	return 0;
->>  }
-> 
->>  int __attribute_const__ kvm_target_cpu(void)
-> 
->> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
->> index 3556715..fb94b5e 100644
->> --- a/arch/arm64/kvm/inject_fault.c
->> +++ b/arch/arm64/kvm/inject_fault.c
->> @@ -246,14 +246,25 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->>  		inject_undef64(vcpu);
->>  }
->>  
->> +static void pend_guest_serror(struct kvm_vcpu *vcpu, u64 esr)
->> +{
->> +	kvm_vcpu_set_vsesr(vcpu, esr);
->> +	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
->> +}
-> 
-> How come you don't use this in kvm_arm_set_sei_esr()?
-thanks, I will call pend_guest_serror() in the kvm_arm_set_sei_esr().
-
-> 
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> .
-> 
+diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+index 13a903e..927d65c 100644
+--- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
++++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+@@ -7,6 +7,7 @@ Required properties:
+ 		 or
+ 		 "fsl,ls2080a-qspi" followed by "fsl,ls1021a-qspi",
+ 		 "fsl,ls1043a-qspi" followed by "fsl,ls1021a-qspi"
++		 "fsl,ls2080a-qspi" followed by "fsl,ls1088a-qspi",
+   - reg : the first contains the register location and length,
+           the second contains the memory mapping address and length
+   - reg-names: Should contain the reg names "QuadSPI" and "QuadSPI-memory"
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+index 0f6fcda..3febb59 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+@@ -94,6 +94,27 @@
+ 	};
+ };
+ 
++&qspi {
++	status = "okay";
++	fsl,qspi-has-second-chip;
++	spi-rx-bus-width = <4>;
++	spi-tx-bus-width = <4>;
++	qflash0: s25fs512s at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++
++	qflash1: s25fs512s at 1 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <20000000>;
++		reg = <1>;
++	};
++
++};
++
+ &ifc {
+ 	ranges = <0 0 0x5 0x30000000 0x00010000
+ 		  2 0 0x5 0x20000000 0x00010000>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index bd80e9a..b45a522 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -394,6 +394,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		qspi: quadspi at 20c0000 {
++			compatible = "fsl,ls2080a-qspi", "fsl,ls1088a-qspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x20c0000 0x0 0x10000>,
++				<0x0 0x20000000 0x0 0x10000000>;
++			reg-names = "QuadSPI", "QuadSPI-memory";
++			interrupts = <0 25 0x4>; /* Level high type */
++			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++			clock-names = "qspi_en", "qspi";
++		};
++
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1088a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>,
+-- 
+1.9.1
