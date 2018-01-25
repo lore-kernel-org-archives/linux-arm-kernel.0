@@ -1,62 +1,101 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Thu, 25 Jan 2018 11:34:51 +0000
-Subject: [PATCH v3] drm/bridge/synopsys: dsi: add optional pixel clock
-In-Reply-To: <20180124180859.mr736rpzysq5vn54@ban.mtv.corp.google.com>
-References: <20180123170806.5282-1-philippe.cornu@st.com>
- <20180123204939.qirvr34mlwgiwmqz@ban.mtv.corp.google.com>
- <507552a3-c68f-d6ac-a747-b8f5168d0d41@st.com>
- <20180124180859.mr736rpzysq5vn54@ban.mtv.corp.google.com>
-Message-ID: <35d72e79-7200-dec7-2b53-a672f1c02b3b@st.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Thu, 25 Jan 2018 03:38:17 -0800
+Subject: [PATCH v4] net: ethernet: cavium: Correct Cavium Thunderx NIC driver
+ names accordingly to module name
+In-Reply-To: <1516630407-23161-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1516630407-23161-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <1516880297-6636-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-On 01/24/2018 07:09 PM, Brian Norris wrote:
-> On Wed, Jan 24, 2018 at 09:24:06AM +0000, Philippe CORNU wrote:
->> On 01/23/2018 09:49 PM, Brian Norris wrote:
->>> On Tue, Jan 23, 2018 at 06:08:06PM +0100, Philippe Cornu wrote:
->>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> 
->>>> @@ -828,6 +833,14 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
->>>>    		return ERR_PTR(ret);
->>>>    	}
->>>>    
->>>> +	dsi->px_clk = devm_clk_get(dev, "px_clk");
->>>
->>> Did you write a device tree binding document update for this anywhere?
->>
->> Many thanks for your review,
->>
->> yes, "px_clk" is already documented, please have a look to
->> Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-> 
-> Ah, I see. Normally I expect that the binding document is sent around
-> when the first user of it shows up, but I guess that's not a
-> requirement. Sorry I missed that!
-> 
-> Just a note: I don't think that Rockchip systems have an equivalent
-> clock from which to directly derive the pixel clock rate. I believe it's
-> controlled through additional dividers that are not part of the common
-> clock framework. So this isn't particularly useful for them.
-> 
-> I don't think it's worth very much in this case, but:
-> 
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
-> 
+It was found that ethtool provides unexisting module name while
+it queries the specified network device for associated driver
+information. Then user tries to unload that module by provided
+module name and fails.
 
-Many thanks for the review and your comments.
+This happens because ethtool reads value of DRV_NAME macro,
+while module name is defined at the driver's Makefile.
 
-Looking more deeply into the rockchip vop driver (in order to understand 
-how the px clock is used), I can see that adjusted_mode/mode_fixup is 
-(now) used.
+This patch is to correct Cavium CN88xx Thunder NIC driver names
+(DRV_NAME macro) 'thunder-nicvf' to 'nicvf' and 'thunder-nic'
+to 'nicpf', sync bgx and xcv driver names accordingly to their
+module names.
 
-I have already tried to use adjusted_mode/mode_fixup on stm32 but 
-without success.
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic_main.c      | 2 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c | 2 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c    | 2 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c   | 2 +-
+ drivers/net/ethernet/cavium/thunder/thunder_xcv.c   | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-Nevertheless, I will do more tests with adjusted_mode/mode_fixup as it 
-could help to have a simpler patch than adding the px_clk.
-
-Many thanks,
-Philippe :-)
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index 8f1dd55b3e08..159b422da7fa 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -18,7 +18,7 @@
+ #include "q_struct.h"
+ #include "thunder_bgx.h"
+ 
+-#define DRV_NAME	"thunder-nic"
++#define DRV_NAME	"nicpf"
+ #define DRV_VERSION	"1.0"
+ 
+ struct hw_info {
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+index b9ece9cbf98b..07f00558af9c 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+@@ -16,7 +16,7 @@
+ #include "q_struct.h"
+ #include "thunder_bgx.h"
+ 
+-#define DRV_NAME	"thunder-nicvf"
++#define DRV_NAME	"nicvf"
+ #define DRV_VERSION     "1.0"
+ 
+ struct nicvf_stat {
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 7cb7571f9ad9..0a8f3e3ce637 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -26,7 +26,7 @@
+ #include "nicvf_queues.h"
+ #include "thunder_bgx.h"
+ 
+-#define DRV_NAME	"thunder-nicvf"
++#define DRV_NAME	"nicvf"
+ #define DRV_VERSION	"1.0"
+ 
+ /* Supported devices */
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 5e5c4d7796b8..79fae7de3404 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -21,7 +21,7 @@
+ #include "nic.h"
+ #include "thunder_bgx.h"
+ 
+-#define DRV_NAME	"thunder-BGX"
++#define DRV_NAME	"thunder_bgx"
+ #define DRV_VERSION	"1.0"
+ 
+ struct lmac {
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_xcv.c b/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+index 578c7f8f11bf..2d5e8dab1f70 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+@@ -20,7 +20,7 @@
+ #include "nic.h"
+ #include "thunder_bgx.h"
+ 
+-#define DRV_NAME	"thunder-xcv"
++#define DRV_NAME	"thunder_xcv"
+ #define DRV_VERSION	"1.0"
+ 
+ /* Register offsets */
+-- 
+2.14.3
