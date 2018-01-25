@@ -1,56 +1,86 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 25 Jan 2018 11:31:40 +0100
-Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <278bb44610b8a27826550732095aba03@codeaurora.org>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-3-l.stach@pengutronix.de>
- <20180123103931.GE27764@dragon>
- <278bb44610b8a27826550732095aba03@codeaurora.org>
-Message-ID: <1516876300.6411.25.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 25 Jan 2018 10:31:31 +0000
+Subject: [PATCH 4/4] efi/arm64: unmap the kernel while executing UEFI services
+In-Reply-To: <20180125103131.19168-1-ard.biesheuvel@linaro.org>
+References: <20180125103131.19168-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180125103131.19168-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 25.01.2018, 18:10 +0800 schrieb aisheng.dong at codeaurora.org:
-> On 2018-01-23 18:39, Shawn Guo wrote:
-> > On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
-> > 
-> > > > > > +	pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
-> > > > > > +		fsl,pins = <
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
-> > > > > > > > > +			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
-> > > > > > +		>;
-> > > +		};
-> > 
-> > Bad indentation.
-> > 
-> > Shawn
-> > 
-> > > +
-> > > > > > +	pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
-> > > > > > +		fsl,pins = <
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
-> > > > > > > > > +			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
-> > > > > > > > > +			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
-> > > > > > +		>;
-> > > +	};
-> 
-> AFAIK we switched to generic pinconfig since MX7ULP as maintainer won't
-> access old binding pinctrl drivers.
+Now that all UEFI runtime service wrappers ensure that byref
+arguments are moved into the UEFI marshalling buffer (which
+is not part of the kernel mapping), we can proceed and unmap
+the kernel while UEFI runtime service calls are in progress.
 
-I'm not convinced that the generic pinconf is good fit. For pingroups
-with different configs for some of the pins, like the example above, we
-would need to split things into multiple DT nodes. This really hurts
-readability, so I'm not going to switch to the generic stuff without
-some really convincing arguments.
+This is done by setting the EPD1 bit and flushing the TLB of
+the local CPU. This makes it independent of KPTI or whether
+non-global mappings are being used.
 
-Regards,
-Lucas
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi-rt-wrapper.S | 22 ++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/arch/arm64/kernel/efi-rt-wrapper.S b/arch/arm64/kernel/efi-rt-wrapper.S
+index 09e77e5edd94..70af90ef914c 100644
+--- a/arch/arm64/kernel/efi-rt-wrapper.S
++++ b/arch/arm64/kernel/efi-rt-wrapper.S
+@@ -9,6 +9,24 @@
+ #include <linux/linkage.h>
+ #include <asm/efi.h>
+ 
++	.macro	sepd1, reg
++	mrs	\reg, tcr_el1			// read Translation Control Reg
++	orr	\reg, \reg, #1 << 23		// set EPD1 bit
++	msr	tcr_el1, \reg			// write back TCR
++	isb
++	tlbi	vmalle1
++	dsb	nsh
++	.endm
++
++	.macro	cepd1, reg
++	mrs	\reg, tcr_el1			// read Translation Control Reg
++	bic	\reg, \reg, #1 << 23		// clear EPD1 bit
++	msr	tcr_el1, \reg			// write back TCR
++	isb
++	tlbi	vmalle1
++	dsb	nsh
++	.endm
++
+ 	.section	".rodata", "a"
+ 	.align		PAGE_SHIFT
+ ENTRY(__efi_rt_asm_wrapper)
+@@ -27,6 +45,7 @@ ENTRY(__efi_rt_asm_wrapper)
+ 	adr	x1, __efi_rt_vectors
+ 	msr	vbar_el1, x1
+ 	isb
++	sepd1	x1
+ 
+ 	/*
+ 	 * We are lucky enough that no EFI runtime services take more than
+@@ -46,6 +65,7 @@ ENTRY(__efi_rt_asm_wrapper)
+ 	ldr	x1, 2f
+ 	msr	vbar_el1, x1
+ 	isb
++	cepd1	x1
+ 
+ 	ldp	x1, x2, [sp, #16]
+ 	cmp	x2, x18
+@@ -63,6 +83,7 @@ ENDPROC(__efi_rt_asm_wrapper)
+ 	.align	7
+ .Lv\@ :	stp	x29, x30, [sp, #-16]!		// preserve x29 and x30
+ 	mrs	x29, elr_el1			// preserve ELR
++	cepd1	x30
+ 	adr	x30, .Lret			// take return address
+ 	msr	elr_el1, x30			// set ELR to return address
+ 	ldr	x30, 2b				// take address of 'vectors'
+@@ -76,6 +97,7 @@ ENDPROC(__efi_rt_asm_wrapper)
+ 	adr	x30, __efi_rt_vectors
+ 	msr	vbar_el1, x30
+ 	isb
++	sepd1	x30
+ 	ldp	x29, x30, [sp], #16
+ 	eret
+ 
+-- 
+2.11.0
