@@ -1,96 +1,33 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 25 Jan 2018 10:18:19 -0600
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <597caa1a-a790-3629-3186-5d2152f45e06@ti.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
- <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
- <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
- <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
- <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
- <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
- <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
- <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
- <CAMRc=Me1_i8qQE4GHeLiU2itHnp71Gt03UM6NhL=hA8Y6Pb0MA@mail.gmail.com>
- <597caa1a-a790-3629-3186-5d2152f45e06@ti.com>
-Message-ID: <12b97dc0-84e9-decd-16c0-9656b8aee072@lechnology.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 25 Jan 2018 17:19:04 +0100
+Subject: [RFC 09/10] x86/enter: Create macros to restrict/unrestrict
+ Indirect Branch Speculation
+In-Reply-To: <1516699832.9521.123.camel@infradead.org>
+References: <1516476182-5153-1-git-send-email-karahmed@amazon.de>
+ <1516476182-5153-10-git-send-email-karahmed@amazon.de>
+ <CA+55aFxUEPHc7JRQG3zmxEsfmfJOiJa1QqFBKCBNb5Tt5vfiSg@mail.gmail.com>
+ <1516566497.9814.78.camel@infradead.org>
+ <CA+55aFwOkH8RH12Dzs=hT3e7eS3Ckz9Ed6x_-9a0zs1cw9zbKA@mail.gmail.com>
+ <1516572013.9814.109.camel@infradead.org>
+ <CA+55aFwoxXmY0u84iPT-RP8DoG+Qb8t-mh2r8RLhKVAH3jm6qg@mail.gmail.com>
+ <1516638426.9521.20.camel@infradead.org>
+ <20180123072930.soz25cyky3u4hpgv@gmail.com>
+ <20180123075358.nztpyxympwfkyi2a@gmail.com>
+ <1516699832.9521.123.camel@infradead.org>
+Message-ID: <d77abfaf-077a-0ae6-8ed7-3b5354938a52@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2018 06:53 AM, Sekhar Nori wrote:
-> On Wednesday 24 January 2018 01:33 PM, Bartosz Golaszewski wrote:
->> 2018-01-23 21:23 GMT+01:00 David Lechner <david@lechnology.com>:
->>> On 01/23/2018 02:05 PM, David Lechner wrote:
->>>>
->>>> On 01/23/2018 02:01 PM, David Lechner wrote:
->>>>>
->>>>> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
->>>>>>
->>>>>>
->>>>>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
->>>>>> but somehow the clock doesn't end up in the list of the device's
->>>>>> clocks - which is why it's not enabled by pm_runtime_get_sync().
->>>>>>
->>>>>
->>>>>
->>>>> Right. This is because devm_clk_get() now finds the clock via device
->>>>> tree instead of a clkdev lookup entry. However, I think that the PM
->>>>> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
->>>>> the clkdev lookup to match the con_id and does not use device tree.
->>>>> The same thing is happing in mdio, emac and lcdc.
->>>>>
->>>>
->>>> Minor correction: It looks like emac doesn't do this because it doesn't
->>>> have a con_id of "fck". But, the same clock is shared by emac and mdio, so
->>>> since mdio enables the clock, emac doesn't notice or care that it did
->>>> not enable the clock itself.
->>>
->>>
->>> How about using pm_clk_add_clk() in these drivers to explicitly use the
->>> clocks for power management instead of relying on pm_clk_add_notifier()
->>> to do this implicitly?
->>
->> Yes, this sounds good.
-> 
-> Looking at how pm_clk_notify() in clock_ops.c uses con_id[] list, right
-> now pm_runtime() will work only for clocks which have con_id (from the
-> list above) mentioned in DT. Since clk_find() mandates con_id match when
-> its available, NULL con_id does not match.
-> 
-> For simple devices like DaVinci which uses just one clock for power
-> management per device (multiple devices might share a clock, but not
-> other way around as far as I recall, anyway I will double check this
-> assertion), the attached patch should make EMAC work.
-> 
-> That still leaves why lcdc does not work. One difference is it uses
-> PSC1. Are there other devices in PSC1 which work (just to rule out any
-> thing wrong with PSC1 handling).
-> 
-> Thanks,
-> Sekhar
-> 
-> ---8<---
-> diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
-> index 78eac2c0c146..0dce7397856d 100644
-> --- a/arch/arm/mach-davinci/pm_domain.c
-> +++ b/arch/arm/mach-davinci/pm_domain.c
-> @@ -23,7 +23,6 @@ static struct dev_pm_domain davinci_pm_domain = {
->   
->   static struct pm_clk_notifier_block platform_bus_notifier = {
->   	.pm_domain = &davinci_pm_domain,
-> -	.con_ids = { "fck", "master", "slave", NULL },
->   };
->   
->   static int __init davinci_pm_runtime_init(void)
-> 
-> 
+On 23/01/2018 10:30, David Woodhouse wrote:
 
-Won't this cause *all* clocks, not just PSC clocks, to be used for power management?
+> Skylake takes predictions from the generic branch target buffer when
+> the RSB underflows.
 
-Some examples of devices with more than just the PSC clock are SATA and the USB PHY.
+Adding LAKML.
+
+AFAIU, some ARM Cortex cores have the same optimization.
+(A9 maybe, A17 probably, some recent 64-bit cores)
+
+Are there software work-arounds for Spectre planned for arm32 and arm64?
+
+Regards.
