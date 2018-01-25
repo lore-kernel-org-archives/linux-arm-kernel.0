@@ -1,117 +1,311 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 25 Jan 2018 22:35:42 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <12b97dc0-84e9-decd-16c0-9656b8aee072@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
- <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
- <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
- <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
- <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
- <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
- <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
- <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
- <CAMRc=Me1_i8qQE4GHeLiU2itHnp71Gt03UM6NhL=hA8Y6Pb0MA@mail.gmail.com>
- <597caa1a-a790-3629-3186-5d2152f45e06@ti.com>
- <12b97dc0-84e9-decd-16c0-9656b8aee072@lechnology.com>
-Message-ID: <58cb2650-8aa5-85f0-4ce4-0a388105c257@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 25 Jan 2018 17:08:58 +0000
+Subject: [PATCH 04/16] arm64: capabilities: Prepare for fine grained
+ capabilities
+In-Reply-To: <20180125134301.GH5862@e103592.cambridge.arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-5-suzuki.poulose@arm.com>
+ <20180123173346.GB5862@e103592.cambridge.arm.com>
+ <9a9e5aeb-dfc7-9602-c00e-80ea32d66c15@arm.com>
+ <20180125134301.GH5862@e103592.cambridge.arm.com>
+Message-ID: <728779ba-2a91-a391-4c34-46923882dc7d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 January 2018 09:48 PM, David Lechner wrote:
-> On 01/25/2018 06:53 AM, Sekhar Nori wrote:
->> On Wednesday 24 January 2018 01:33 PM, Bartosz Golaszewski wrote:
->>> 2018-01-23 21:23 GMT+01:00 David Lechner <david@lechnology.com>:
->>>> On 01/23/2018 02:05 PM, David Lechner wrote:
->>>>>
->>>>> On 01/23/2018 02:01 PM, David Lechner wrote:
->>>>>>
->>>>>> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
->>>>>>>
->>>>>>>
->>>>>>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
->>>>>>> but somehow the clock doesn't end up in the list of the device's
->>>>>>> clocks - which is why it's not enabled by pm_runtime_get_sync().
->>>>>>>
->>>>>>
->>>>>>
->>>>>> Right. This is because devm_clk_get() now finds the clock via device
->>>>>> tree instead of a clkdev lookup entry. However, I think that the PM
->>>>>> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
->>>>>> the clkdev lookup to match the con_id and does not use device tree.
->>>>>> The same thing is happing in mdio, emac and lcdc.
->>>>>>
->>>>>
->>>>> Minor correction: It looks like emac doesn't do this because it
->>>>> doesn't
->>>>> have a con_id of "fck". But, the same clock is shared by emac and
->>>>> mdio, so
->>>>> since mdio enables the clock, emac doesn't notice or care that it did
->>>>> not enable the clock itself.
+On 25/01/18 13:43, Dave Martin wrote:
+> On Wed, Jan 24, 2018 at 06:45:01PM +0000, Suzuki K Poulose wrote:
+>> Dave,
+>>
+>> Thanks a lot for taking the time to review the patch and for
+>> opening up the discussion ! See my comments below.
+>>
+>> On 23/01/18 17:33, Dave Martin wrote:
+>>> On Tue, Jan 23, 2018 at 12:27:57PM +0000, Suzuki K Poulose wrote:
+>>>> We use arm64_cpu_capabilities to represent CPU ELF HWCAPs exposed
+>>>> to the userspace and the CPU hwcaps used by the kernel, which
+>>>> include cpu features and CPU errata work arounds.
 >>>>
+>>>> At the moment we have the following restricions:
 >>>>
->>>> How about using pm_clk_add_clk() in these drivers to explicitly use the
->>>> clocks for power management instead of relying on pm_clk_add_notifier()
->>>> to do this implicitly?
+>>>>   a) CPU feature hwcaps (arm64_features) and ELF HWCAPs (arm64_elf_hwcap)
+>>>>     - Detected mostly on system wide CPU feature register. But
+>>>>       there are some which really uses a local CPU's value to
+>>>>       decide the availability (e.g, availability of hardware
+>>>>       prefetch). So, we run the check only once, after all the
+>>>>       boot-time active CPUs are turned on.
+>>>>     - Any late CPU which doesn't posses all the established features
+>>>>       is killed.
+>>>>     - Any late CPU which possess a feature *not* already available
+>>>>       is allowed to boot.
+>>>>
+>>>>   b) CPU Errata work arounds (arm64_errata)
+>>>>     - Detected mostly based on a local CPU's feature register.
+>>>>       The checks are run on each boot time activated CPUs.
+>>>>     - Any late CPU which doesn't have any of the established errata
+>>>>       work around capabilities is ignored and is allowed to boot.
+>>>>     - Any late CPU which has an errata work around not already available
+>>>>       is killed.
+>>>>
+>>>> However there are some exceptions to the cases above.
+>>>>
+>>>> 1) KPTI is a feature that we need to enable when at least one CPU needs it.
+>>>>     And any late CPU that has this "feature" should be killed.
+>>>> 2) Hardware DBM feature is a non-conflicting capability which could be
+>>>>     enabled on CPUs which has it without any issues, even if the CPU is
+>>>>     brought up late.
+>>>>
+>>>> So this calls for a lot more fine grained behavior for each capability.
+>>>> And if we define all the attributes to control their behavior properly,
+>>>> we may be able to use a single table for the CPU hwcaps (not the
+>>>> ELF HWCAPs, which cover errata and features). This is a prepartory step
+>>>> to get there. We define type for a capability, which for now encodes the
+>>>> scope of the check. i.e, whether it should be checked system wide or on
+>>>> each local CPU. We define two types :
+>>>>
+>>>>    1) ARM64_CPUCAP_BOOT_SYSTEM_FEATURE - Implies (a) as described above.
+>>>>    1) ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM - Implies (b) as described above.
 >>>
->>> Yes, this sounds good.
->>
->> Looking at how pm_clk_notify() in clock_ops.c uses con_id[] list, right
->> now pm_runtime() will work only for clocks which have con_id (from the
->> list above) mentioned in DT. Since clk_find() mandates con_id match when
->> its available, NULL con_id does not match.
->>
->> For simple devices like DaVinci which uses just one clock for power
->> management per device (multiple devices might share a clock, but not
->> other way around as far as I recall, anyway I will double check this
->> assertion), the attached patch should make EMAC work.
->>
->> That still leaves why lcdc does not work. One difference is it uses
->> PSC1. Are there other devices in PSC1 which work (just to rule out any
->> thing wrong with PSC1 handling).
->>
->> Thanks,
->> Sekhar
->>
->> ---8<---
->> diff --git a/arch/arm/mach-davinci/pm_domain.c
->> b/arch/arm/mach-davinci/pm_domain.c
->> index 78eac2c0c146..0dce7397856d 100644
->> --- a/arch/arm/mach-davinci/pm_domain.c
->> +++ b/arch/arm/mach-davinci/pm_domain.c
->> @@ -23,7 +23,6 @@ static struct dev_pm_domain davinci_pm_domain = {
->> ? ? static struct pm_clk_notifier_block platform_bus_notifier = {
->> ????? .pm_domain = &davinci_pm_domain,
->> -??? .con_ids = { "fck", "master", "slave", NULL },
->> ? };
->> ? ? static int __init davinci_pm_runtime_init(void)
+>>> I'm a bit confused by the naming here.
 >>
 >>
+>> I understand they are not well documented.  I will try to explain here and
+>> stick it in somewhere, in the next revision.
+>>
+>> There are 3 aspects for any capability.
+>>
+>> 1) SCOPE: How is the capability detected ?
+>> i.e, whether it should be detected based on at least one CPU's ID register
+>> (e.g, MIDR) (SCOPE_CPU_LOCAL) or System wide value (like ELF HWCAP)(SCOPE_SYSTEM)
+>>
+>> This is fairly straight forward and hasn't changed much. The only
+>> change we need is to allow for CPU "Features" that could be detected on
+>> a local CPU. So, "LOCAL" tag has been added to the capabilities which
+>> are CPU local.
 > 
-> Won't this cause *all* clocks, not just PSC clocks, to be used for power
-> management?
+> I think my confusion here is mostly semantic, so I won't worry too
+> much about it for now as I review the patches.
+> 
+> <aside>
+> 
+> It is confusing code to dive into though: there is too much overlap
+> and ambiguity between the intuitive meanings of "feature", "capability",
+> "erratum" etc.  I think this is just the way the code evolved:
+> "capability" is an intuitive word to describe that the system can do
+> something, but it's a strange word to use for the presence of an
+> erratum that must be worked around.
+> 
+> The immutable properties of CPUs, and the desicion taken by Linux about
+> what to do with them, are two quite different things.  I find it easy to
+> confuse myself about which is being referred to when we talk about
+> "capabilities", partly because the intuitive meaning of this word often
+> seems to point to the wrong answer.
+> 
+> Choosing different words might help, but precise definitions and
+> consistent would also help.
+> 
+> Here, "detecting" sounds like discovery of an immutable characteristic
+> of something, but really in the System-wide case you're talking about
+> making a policy decision (i.e., what tradeoff to make between working
+> with the boot and/or early CPUs, and working with late CPUs that we
+> haven't seen yet).  It would be equally valid to make a different
+> decision and reject some _early_ CPUs in the hopes that this will
+> result in a better performing system (perhaps because we can now
+> enable a desirable feature globally, or perhaps to minimise likelihood
+> of rejecting late CPUs).
+> 
+> </aside>
+> 
+> Anyway, this isn't a high priority.  It's just something that takes a
+> little time to get my head around...
+> 
+>> 2) WHEN: When is the capability "enabled" or in other words, when does the
+>> kernel start using the capability. At the moment there is only
+>> one place. After all the CPUs are brought up during the kernel init, from
+>> setup_cpu_features. (But this will change when we add support for enabling
+>> some capabilities very early during the boot, based on the boot CPU. e.g, VHE
+>> and GIC CPUIF - for NMI).
+>>
+>> For now, unless you see "EARLY", in the type, everything is enabled from
+>> setup_cpu_features.
+> 
+> Agreed -- I'd forgotten about this.  To what extent is this orthogonal
+> to 1/3/4?
 
-In case of DT, the first clock mentioned in 'clocks' property will get
-picked up since it will match with wildcard con_id. This unfortunately
-depends on how the clocks list is prepared so quite implementation
-dependent.
+Apologies for not posting the work here, it was delayed due to some
+issues with how we handle VHE. I will include it in the next version.
+
+The Early capabilities are based on Boot CPU, and is "detected" only on boot
+CPU. So, scope implies SCOPE_CPU_LOCAL. As for (2), the capability is enabled
+on the boot CPU right after it is detected, to allow early usage of the feature.
+For any other CPU (including the boot time activated ones) we make sure that
+they are verified against "early" capabilities.
+
+To make the rule a bit generic, any CPU is verified against the already
+"enabled" capabilities. There are two stages during the boot when the capabilities
+are enabled.
+  1) Early caps: Detected and Enabled on the boot CPU, before any other CPU is
+     brought up.
+  2) All the other caps: Could be detected on CPU / System wide. But enabled
+     only after all the boot time active CPUs are up.
+
+So, in any context, "LATE" tag now implies "after the particular capability"
+is enabled by the kernel.
+
+---------------------------------------------------------------
+Verification:  | Boot CPU | SMP CPUs by kernel | CPUs by user |
+---------------------------------------------------------------
+Early cap      |   n      |      y             |       y      |
+---------------------------------------------------------------
+All other cap  |   n      |      n             |       y      |
+---------------------------------------------------------------
+
+The above table kind of  shows how the capabilities are checked for conflicts.
+Any early capability is treated as critical and a conflict will result in a
+Panic, unless the non-compatible CPU is parked safely. (e.g, for VHE we park
+the late CPU with MMU off).
+
+>> 3) WHERE: Where all do we apply the "enable" for a given capability, when it
+>> is to be enabled. Do we run it on all CPUs or only on the CPUs with the capability.
+>> We don't deal with this in the infrastructure and we run the enable callback
+>> on all CPUs irrespective of when the CPU is booted. It is upto the callback
+>> to decide if it needs to take some action on a given CPU.
+>>
+>>
+>> 4) CONFLICT: How should we treat a conflict of a capability on a CPU which
+>> boots after the capability was enabled in the kernel (as per 2, it could
+>> be earlier or after smp CPUs are brought up) ?
+>>
+>> Here are the possible combinations, representing a Conflict:
+>>
+>> 	System		| Late Booting CPU
+>> a)	   y		|   n
+>> b) 	   n		|   y
+>>
+>> (a) Is considered safe for features like Erratum and KPTI where some
+>> actions have to be taken to make the system behave in desirable manner.
+>> However (a) is not considered safe for some features we advertise to the
+>> user (e.g, ELF HWCAP)
+>>
+>> (b) Is considered safe for most of the features (except KPTI and Software
+>> prefetching), while it is unsafe for Errata, as we couldn't possibly take
+>> any action as the time for applying the actions (enabling as per (2) above)
+>> has passed already.
+>>
+>>
+>> So we have the following cases :
+>>   i)   a_Safe && b_not_Safe
+>>   ii)  a_not_Safe && b_Safe
+>>   iii) a_Safe && b_Safe
+> 
+> Is this the same as saying that the CONFLICT type (iii) is not
+> applicable to capabilites that are not decided globally?
+
+Practically, yes. But we don't want to label it as such, as we don't know
+what future features could come with.
 
 > 
-> Some examples of devices with more than just the PSC clock are SATA and
-> the USB PHY.
+>> I have used "STRICT" tag for category (i) and "WEAK" for (iii). (ii) doesn't
+>> have any tag. I acknowledge that this scheme is not particularly intuitive.
+>> However I have tried to explain the behavior of "each" defined type in a
+>> comment above.
+>>
+>>>
+>>> I'm not keen on the word "strict" because it doesn't really mean
+>>> anything unless the rule to be strictly enforced is documented, and
+>>> then doesn't really add anything: you could take the view that either
+>>> there's an (enforced) rule or there's no rule at all.
+>>
+>> As I mentioned above, each type is documented on the rules. But the tags
+>> are not particularly helpful.
+>>
+>>>
+>>> In this case, (b) seems the "relaxed" case anyway: we allow these
+>>> capabilities to be enabled/disabled differently on different CPUs,
+>>> rather than requiring the same configuration on all CPUs (KPTI).
+>>>
+>>> I think there are 2 x 2 orthogonal options:
+>>>
+>>> A FEATURE capability must be disabled on every CPU where the feature is
+>>> not present.  A feature capability is considered desirable, and should
+>>> be enabled when possible.
+>>>
+>>> An ERRATUM capability must be enabled on every CPU where the erratum is
+>>> present.  An erratum capability is considered undesirable, and should
+>>> be disabled when possible.
+>>>
+>>> (An erratum is the inverse of a feature with respect to desirability,
+>>> enablement and presence.)
+>>
+>> I would really like to avoid tagging the capabilities FEATURE/ERRATUM
+>> to indicate their behavior, because :
+>>
+>> 1) We could be naming a "feature" ERRATUM, where it is really not one.
+>> e.g, KPTI is a security feature and not an erratum.
+>>
+>> 2) We could be "marking" all "CPU Errata" unsafe when detected late.
+>> e.g, Cortex-A55 errata 1024718, can be safely handled by disabling the
+>> DBM feature and the conflict can be "ignored" (even though it is not
+>> handled via capability).
+> 
+> That's a fair point.  "Erratum" is describing a set of constraints
+> between the CPUs and kernel that is typical of errata handing, but could
+> also apply to other features.  So I guess it's not the best choice of
+> word.
+> 
+>> So using the FEATURE/ERRATA will cause further confusion on the real
+>> type of the capability. Hence, it would be better if we came up with
+>> something other to make it clear.
+> 
+> I guess it may not be quite as clear-cut as I'm hoping...
+> 
+>>> and:
+>>>
+>>> A GLOBAL capability must be enabled on all CPUs or disabled on all CPUs.
+>>> (Thus, a decision must be taken during boot, based on desirability/
+>>> undesirability of each capability and based on the assumption that
+>>> late CPUs won't violate the decision -- unless this assumption is
+>>> overridden by a cmdline arg etc.)
+>>>
+>>> A LOCAL capability may freely be enabled on some CPUs while disabled on
+>>> other CPUs.
+>>
+>> As discussed in (3) above, I would like to leave it to the "enable()" method
+>> to decide where actions are need, to avoid adding more combinations of tags
+>> to the type names. We continue to invoke enable() on all CPUs.
+> 
+> Sure -- if the decisions are made enable() methods rather than blanket
+> rules, then we don't need a distinct capability type for every possible
+> case.  For the very common cases like the ELF HWCAPs it may be worth it,
+> but not for fiddly one-off things.
 
-Its not a problem to have more than one clock passed in device node as
-long as only one clock (the first clock) needs to participate in power
-management.
+The types are just a name for collective flags and sometimes there may be
+same bits in different names. This is for making it easier to add new
+entries to the table with the right bits set.
 
-This may work for the moment, but longer term I do think genpd
-implementation for DaVinci will be needed. Or may be there is breakage
-even today that I am not able to think on top of my head.
+> 
+>>> (Thus, LOCAL is precisely the inverse of GLOBAL.)
+>>>
+>>>
+>>> So:
+>>>
+>>> 	ARM64_CPUCAP_GLOBAL_FEATURE	(hwcap case)
+>>> 	ARM64_CPUCAP_LOCAL_FEATURE	(DBM case)
+>>> 	ARM64_CPUCAP_GLOBAL_ERRATUM	(KPTI case)
+>>> 	ARM64_CPUCAP_LOCAL_ERRATUM	(regular CPU erratum case).
+>>>
+>>> ("PERCPU" could be substituted for "LOCAL" if we want to be clearer
+>>> about the way in which LOCAL is more permissive.)
+>>
+>> In general, I understand the names could get some improved scheme.
+>> I think if we come up with some nice tag for types i, ii & ii in section (4)
+>> we should be good to go.
+> 
+> This is always something that could be reexamined later.
+> 
+> I think I understand the basic ideas here a bit better now -- thanks.
+> 
+> [...]
+> 
 
-Thanks,
-Sekhar
+Thanks
+Suzuki
