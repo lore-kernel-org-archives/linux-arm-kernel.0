@@ -1,92 +1,98 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 25 Jan 2018 18:23:23 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <CAMRc=Me1_i8qQE4GHeLiU2itHnp71Gt03UM6NhL=hA8Y6Pb0MA@mail.gmail.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <CAMRc=MexJTMiD=URw1bv-qfGaTntZRXgfsSb_beYGkvO+LrpgQ@mail.gmail.com>
- <d819e18f-7d74-d8c4-8056-bfc545f4d4e9@lechnology.com>
- <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
- <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
- <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
- <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
- <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
- <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
- <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
- <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
- <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
- <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
- <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
- <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
- <CAMRc=Me1_i8qQE4GHeLiU2itHnp71Gt03UM6NhL=hA8Y6Pb0MA@mail.gmail.com>
-Message-ID: <597caa1a-a790-3629-3186-5d2152f45e06@ti.com>
+From: aisheng.dong@codeaurora.org (Dong Aisheng)
+Date: Thu, 25 Jan 2018 21:03:26 +0800
+Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <1516878582.6411.27.camel@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-3-l.stach@pengutronix.de>
+ <20180123103931.GE27764@dragon>
+ <278bb44610b8a27826550732095aba03@codeaurora.org>
+ <1516876300.6411.25.camel@pengutronix.de>
+ <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
+ <1516878582.6411.27.camel@pengutronix.de>
+Message-ID: <2e5f5ec08b3165cb84115c12f9ddbd9e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 January 2018 01:33 PM, Bartosz Golaszewski wrote:
-> 2018-01-23 21:23 GMT+01:00 David Lechner <david@lechnology.com>:
->> On 01/23/2018 02:05 PM, David Lechner wrote:
->>>
->>> On 01/23/2018 02:01 PM, David Lechner wrote:
->>>>
->>>> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
->>>>>
->>>>>
->>>>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
->>>>> but somehow the clock doesn't end up in the list of the device's
->>>>> clocks - which is why it's not enabled by pm_runtime_get_sync().
->>>>>
->>>>
->>>>
->>>> Right. This is because devm_clk_get() now finds the clock via device
->>>> tree instead of a clkdev lookup entry. However, I think that the PM
->>>> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
->>>> the clkdev lookup to match the con_id and does not use device tree.
->>>> The same thing is happing in mdio, emac and lcdc.
->>>>
->>>
->>> Minor correction: It looks like emac doesn't do this because it doesn't
->>> have a con_id of "fck". But, the same clock is shared by emac and mdio, so
->>> since mdio enables the clock, emac doesn't notice or care that it did
->>> not enable the clock itself.
->>
->>
->> How about using pm_clk_add_clk() in these drivers to explicitly use the
->> clocks for power management instead of relying on pm_clk_add_notifier()
->> to do this implicitly?
+On 2018-01-25 19:09, Lucas Stach wrote:
+> Am Donnerstag, den 25.01.2018, 18:49 +0800 schrieb Dong Aisheng:
+>> On 2018-01-25 18:31, Lucas Stach wrote:
+>> > Am Donnerstag, den 25.01.2018, 18:10 +0800 schrieb?
+>> > aisheng.dong at codeaurora.org:
+> [...]
+>> AFAIK we switched to generic pinconfig since MX7ULP as maintainer?
+>> > > won't
+>> > > access old binding pinctrl drivers.
+>> >
+>> > I'm not convinced that the generic pinconf is good fit. For pingroups
+>> > with different configs for some of the pins, like the example above, we
+>> > would need to split things into multiple DT nodes. This really hurts
+>> > readability, so I'm not going to switch to the generic stuff without
+>> > some really convincing arguments.
+>> >
+>> 
+>> Per my understanding, based on the last discussion with Linus W, we?
+>> actually did this in order to increase the readability that 1) user 
+>> does
+>> not need?to see the 'ugly' unreadable raw data and refer to reference
+>> manual 2)?unified generic binding format which already exist in kernel
+>> and used by many platforms.
+>> 
+>> Actually MXS platform already used it for many years in a similar way.
+>> So IMHO a little hurt to add another node for different pad setting 
+>> in?
+>> the same group won't be enough reason to stop switching to generic 
+>> config.
+>> 
+>> Does it make sense?
 > 
-> Yes, this sounds good.
+> I know that Linus W is pushing for this common pinconf thing in the
+> name of readability. It's just that I don't think it's such a clear
+> win.
+> 
+> After all you still need to look into the reference manual or binding
+> to see which values in the common binding correspond to a specific
+> drive/pull strength, etc.
+> 
 
-Looking at how pm_clk_notify() in clock_ops.c uses con_id[] list, right 
-now pm_runtime() will work only for clocks which have con_id (from the 
-list above) mentioned in DT. Since clk_find() mandates con_id match when 
-its available, NULL con_id does not match.
+User don't need to look into reference manual and they don't need to
+compose the 'ulgy' raw data which is the most tough thing.
 
-For simple devices like DaVinci which uses just one clock for power 
-management per device (multiple devices might share a clock, but not 
-other way around as far as I recall, anyway I will double check this 
-assertion), the attached patch should make EMAC work.
+With generic binding, it probably can saving ~80% pad setting effort
+by refer to the defined generic config properties.
+And things can be even better when the reference code is already there
+as user becomes know which property supported.
 
-That still leaves why lcdc does not work. One difference is it uses 
-PSC1. Are there other devices in PSC1 which work (just to rule out any 
-thing wrong with PSC1 handling).
+> On the other hand it really bloats the DT description of the pin
+> configuration. If you want to look at an (IMHO) bad example, go look at
+> the Tegra DTs. The Tegra pincontrol implements the "separate properties
+> for each pinconf option" that is pushed by Linus W. This bloated the DT
+> description to the point that no-one is able/willing to write those
+> descriptions anymore and the only viable way to get them is to auto-
+> generate them from some spreadsheets. Not really what I would call an
+> readable...
+> 
 
-Thanks,
-Sekhar
+I wonder the worst case you're worrying whether exist in reality.
+Take imx6qdl-sabresd as an example, about half of pingroups having the 
+same
+pad setting while others have two different settings at most.
+That means it may not bloat the device tree too much.
 
----8<---
-diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
-index 78eac2c0c146..0dce7397856d 100644
---- a/arch/arm/mach-davinci/pm_domain.c
-+++ b/arch/arm/mach-davinci/pm_domain.c
-@@ -23,7 +23,6 @@ static struct dev_pm_domain davinci_pm_domain = {
- 
- static struct pm_clk_notifier_block platform_bus_notifier = {
- 	.pm_domain = &davinci_pm_domain,
--	.con_ids = { "fck", "master", "slave", NULL },
- };
- 
- static int __init davinci_pm_runtime_init(void)
+> Maybe I'm a little stubborn when it comes to this topic, but at
+> Pengutronix we see a lot of customer designs where we need to come up
+> with the board DT. Bloating each one of those and making the work of
+> the developers harder in the name of a readability win that I just
+> don't see doesn't sound like something I want to support. :)
+> 
 
+Hmm.. In contrast, what i feel currently is that it may ease the using 
+of
+pad setting, not make it harder. Not sure if i overlooked something.
 
-  
+Let's listen to Shawn and Linus W if they have some comments.
+
+Regards
+Dong Aisheng
+
+> Regards,
+> Lucas
