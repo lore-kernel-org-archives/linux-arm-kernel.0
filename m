@@ -1,353 +1,139 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 25 Jan 2018 12:11:14 +0000
-Subject: [PATCH RFC 0/3] API for 128-bit IO access
-In-Reply-To: <20180125113843.vgv6kyp7qjd75qif@yury-thinkpad>
-References: <CAK8P3a3TEV7Uyo_oBcMz_GYEYTB+V5AhDgbOgCEW-+X1h7sXEg@mail.gmail.com>
- <20180125113843.vgv6kyp7qjd75qif@yury-thinkpad>
-Message-ID: <8999df0f-910a-21f8-e66d-3deedecdad3d@arm.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Thu, 25 Jan 2018 20:15:21 +0800
+Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
+ topology
+In-Reply-To: <20180113005920.28658-12-jeremy.linton@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-12-jeremy.linton@arm.com>
+Message-ID: <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/18 11:38, Yury Norov wrote:
-> On Wed, Jan 24, 2018 at 11:28:55AM +0100, Arnd Bergmann wrote:
->> On Wed, Jan 24, 2018 at 10:05 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
->>> This series adds API for 128-bit memory IO access and enables it for ARM64.
->>> The original motivation for 128-bit API came from new Cavium network device
->>> driver. The hardware requires 128-bit access to make things work. See
->>> description in patch 3 for details.
->>
->> We might also want to do something similar to the
->> include/linux/io-64-nonatomic-lo-hi.h
->> and hi-lo.h files, to simulate 128-bit access using pairs of 64-bit access on
->> other targets. It's apparently driver specific which half you need to do first
->> to make it work, so we need both.
-> 
-> OK, will do.
->   
->>> Also, starting from ARMv8.4, stp and ldp instructions become atomic, and
->>> API for 128-bit access would be helpful in core arm64 code.
->>>
->>> This series is RFC. I'd like to collect opinions on idea and implementation
->>> details.
->>> * I didn't implement all 128-bit operations existing for 64-bit variables
->>> and other types (__swab128p etc). Do we need them all right now, or we
->>> can add them when actually needed?
->>
->> I think in this case it's better to do them all at once.
-> 
-> Ack.
-> 
->>> * u128 name is already used in crypto code. So here I use __uint128_t that
->>> comes from GCC for 128-bit types. Should I rename existing type in crypto
->>> and make core code for 128-bit variables consistent with u64, u32 etc? (I
->>> think yes, but would like to ask crypto people for it.)
->>
->> Hmm, that file probably predates the __uint128_t support. My guess would
->> be that the crypto code using it can actually benefit from the new types as
->> well, so maybe move the existing file to include/linux/int128.h and add
->> an #if/#else logic to it so we use 'typedef __uint128_t __u128' if that
->> is available.
-> 
-> It sounds reasonable. But I worry about testing that changes. Hope,
-> crypto community will help with it.
-> 
->>> * Some compilers don't support __uint128_t, so I protected all generic code
->>> with config option HAVE_128BIT_ACCESS. I think it's OK, but...
->>
->> That would be nicely solved by using the #if/#else definition above.
->>
->>> * For 128-bit read/write functions I take suffix 'o', which means read/write
->>> the octet of bytes. Is this name OK?
->>
->> Can't think of anything better. It's not an octet though, but 16 bytes
->> ('q' is for quadword, meaning four 16-bit words in Intel terminology).
-> 
-> Ah, sure. Octet of words. Will change it.
-> 
->>> * my mips-linux-gnu-gcc v6.3.0 doesn't support __uint128_t, and I
->>> don't have other BE setup on hand, so BE case is formally not tested.
->>> BE code for arm64 is looking well though.
->>
->> I've run it through my collection of compilers, it seems that most but not
->> all 64-bit targets support it (exceptions appear to be older versions of
->> gcc for s390x and parisc), and none of the 32-bit targets do:
-> 
-> Thanks for doing this test. Looking at this I realize that this is
-> not the architecture feature but compiler feature. So if we add
-> 128-bit interface, it would be reasonable to add it for all targets
-> that compiled with toolchain supporting 128-bit accesses.
-> 
-> There's already the option ARCH_SUPPORTS_INT128 that is enabled for
-> x86_64 in arch/x86/Kconfig and conditionally enabled for arm64 in
-> arch/arm64/Makefile:
-> KBUILD_CFLAGS    += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-> 
-> It is used in include/linux/math64.h and in lib/ubsan.c, not so wide.
-> 
-> So I find things little messed. Crypto code ignores compilers' ability
-> to operate with 128-bit numbers. Ubsan and math64 relies on compiler
-> version (at least for arm64, and I doubt it would work correctly with clang).
-> And now I introduce HAVE_128BIT_ACCESS with the same meaning for memory
-> access.
-> 
-> I think it's time to unify 128-bit code:
->   - enable CONFIG_ARCH_SUPPORTS_INT128 if compiler supports it, ie check
->     it like you do below;
->   - declare u128 as structure or typedef depending on ARCH_SUPPORTS_INT128
->     in generic include/linux/int128.h, as you suggest here;
->   - switch this series to ARCH_SUPPORTS_INT128.
-> 
-> Does it sound reasonable?
+Hi Jeremy,
 
-It probably is about time to formalise the current scattered fragments 
-of uint_128_t support, but to reiterate Will's comment it is almost 
-certainly not worth the effort to implement 'generic' I/O accessors 
-which only work under implementation-defined and undiscoverable hardware 
-conditions, and will be unusable on the overwhelming majority of 
-systems. Just open-code LDP/STP accessors in the one driver which needs 
-them and (by definition) only runs on SoCs where they *are* known to 
-work correctly.
+I have tested the patch with the newest UEFI. It prints the below error:
 
-Robin.
+[    4.017371] BUG: arch topology borken
+[    4.021069] BUG: arch topology borken
+[    4.024764] BUG: arch topology borken
+[    4.028460] BUG: arch topology borken
+[    4.032153] BUG: arch topology borken
+[    4.035849] BUG: arch topology borken
+[    4.039543] BUG: arch topology borken
+[    4.043239] BUG: arch topology borken
+[    4.046932] BUG: arch topology borken
+[    4.050629] BUG: arch topology borken
+[    4.054322] BUG: arch topology borken
 
+I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
+the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
+
+When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
+and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
+sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
+
+If we modify the UEFI to make NUMA sched_domain start from the layer of package, then all the topology information
+within the package will be discarded. I think we need to build the multi-core sched_domain using the cores within
+the cluster instead of the cores within the package. I think that's what 'multi-core' means. Multi cores form a cluster. I guess.
+If we build the multi-core sched_domain using the cores within a cluster, I think we need to add fields in struct cpu_topology
+to record which cores are in each cluster.
+
+
+Thanks,
+Xiongfeng
+
+On 2018/1/13 8:59, Jeremy Linton wrote:
+> Propagate the topology information from the PPTT tree to the
+> cpu_topology array. We can get the thread id, core_id and
+> cluster_id by assuming certain levels of the PPTT tree correspond
+> to those concepts. The package_id is flagged in the tree and can be
+> found by calling find_acpi_cpu_topology_package() which terminates
+> its search when it finds an ACPI node flagged as the physical
+> package. If the tree doesn't contain enough levels to represent
+> all of the requested levels then the root node will be returned
+> for all subsequent levels.
 > 
-> Yury
+> Cc: Juri Lelli <juri.lelli@arm.com>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 45 insertions(+), 1 deletion(-)
 > 
->> $ for i in /home/arnd/cross-gcc/bin/*gcc-[3-8]* ; do echo -n $i" " ;
->> echo '__uint128_t v;' | $i -xc -S - -o /dev/null && echo ok ; done
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-4.8.5 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-4.9.3 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-4.9.4 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-5.2.1 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-5.4.1 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-5.5.0 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-6.3.1 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.0.0 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.0.1 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.1.1 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-8.0.0 ok
->> /home/arnd/cross-gcc/bin/alpha-linux-gcc-4.1.3 ok
->> /home/arnd/cross-gcc/bin/alpha-linux-gcc-4.3.6 ok
->> /home/arnd/cross-gcc/bin/alpha-linux-gcc-4.9.3 ok
->> /home/arnd/cross-gcc/bin/alpha-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/am33_2.0-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/am33_2.0-linux-gcc-5.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/am33_2.0-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/arc-elf-gcc-7.2.1 <stdin>:1:1: error: unknown
->> type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-3.4.6 ok
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.4.7 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.5.4 <stdin>:1:13:
->> error: expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.6.4 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.7.4 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.8.5 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.0 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.2 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.3 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.4 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.0.0 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.1.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.2.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.3.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.4.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.5.0 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-6.0.0 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-6.1.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-6.3.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.0.0 <stdin>:1:1:
->> error: unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.0.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.1.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.2.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-8.0.0 <stdin>:1:1:
->> error: unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/bfin-uclinux-gcc-7.0.0
->> bfin-uclinux-gcc-7.0.0: error trying to exec 'cc1': execvp: No such
->> file or directory
->> /home/arnd/cross-gcc/bin/bfin-uclinux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/c6x-elf-gcc-7.2.1 <stdin>:1:1: error: unknown
->> type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/cris-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/cris-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/cris-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/cris-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/frv-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/frv-linux-gcc-4.3.6 <stdin>:1: internal
->> compiler error: in default_secondary_reload, at targhooks.c:618
->> Please submit a full bug report,
->> with preprocessed source if appropriate.
->> See <http://gcc.gnu.org/bugs.html> for instructions.
->> /home/arnd/cross-gcc/bin/frv-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/frv-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/h8300-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/hppa64-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/hppa64-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/hppa-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/hppa-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/hppa-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/hppa-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/i386-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/i386-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/ia64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/m32r-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/m32r-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/m32r-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/m32r-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/m68k-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/m68k-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/m68k-linux-gcc-6.0.0 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/m68k-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/microblaze-linux-gcc-4.9.3 <stdin>:1:1:
->> error: unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/microblaze-linux-gcc-7.2.1 <stdin>:1:1:
->> error: unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/mips64-linux-gcc-4.9.3 ok
->> /home/arnd/cross-gcc/bin/mips64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.0.4 <stdin>:1: error: syntax
->> error before 'v'
->> <stdin>:1: warning: data definition has no type or storage class
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-7.0.0 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-7.0.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/mips-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/nios2-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/parisc-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-4.1.3 ok
->> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-4.3.6 ok
->> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-4.9.3 ok
->> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/powerpc-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/powerpc-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/riscv32-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/riscv64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/s390-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/s390-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/s390-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/s390-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/sh2-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/sh3-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/sh3-linux-gcc-4.3.6 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/sh3-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/sh4-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/sh-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/sparc64-linux-gcc-4.9.3 ok
->> /home/arnd/cross-gcc/bin/sparc64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/sparc-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/sparc-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/sparc-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/tilegx-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/tilepro-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-3.4.6 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.0.4 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.1.3 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.2.5 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.3.6 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.4.7 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.5.4 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.6.4 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.7.4 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.8.5 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.9.3 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.9.4 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-5.4.1 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-5.5.0 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-6.1.1 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-6.3.1 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.0.0 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.0.1 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.1.1 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.2.1 ok
->> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-8.0.0 ok
->> /home/arnd/cross-gcc/bin/xtensa-linux-gcc-4.1.3 <stdin>:1: error:
->> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
->> /home/arnd/cross-gcc/bin/xtensa-linux-gcc-4.9.3 <stdin>:1:1: error:
->> unknown type name '__uint128_t'
->> /home/arnd/cross-gcc/bin/xtensa-linux-gcc-7.2.1 <stdin>:1:1: error:
->> unknown type name '__uint128_t'; did you mean '__int128'?
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 7b06e263fdd1..ce8ec7fd6b32 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -11,6 +11,7 @@
+>   * for more details.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/arch_topology.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpumask.h>
+> @@ -22,6 +23,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/sched/topology.h>
+>  #include <linux/slab.h>
+> +#include <linux/smp.h>
+>  #include <linux/string.h>
+>  
+>  #include <asm/cpu.h>
+> @@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +/*
+> + * Propagate the topology information of the processor_topology_node tree to the
+> + * cpu_topology array.
+> + */
+> +static int __init parse_acpi_topology(void)
+> +{
+> +	bool is_threaded;
+> +	int cpu, topology_id;
+> +
+> +	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		topology_id = find_acpi_cpu_topology(cpu, 0);
+> +		if (topology_id < 0)
+> +			return topology_id;
+> +
+> +		if (is_threaded) {
+> +			cpu_topology[cpu].thread_id = topology_id;
+> +			topology_id = find_acpi_cpu_topology(cpu, 1);
+> +			cpu_topology[cpu].core_id   = topology_id;
+> +			topology_id = find_acpi_cpu_topology_package(cpu);
+> +			cpu_topology[cpu].package_id = topology_id;
+> +		} else {
+> +			cpu_topology[cpu].thread_id  = -1;
+> +			cpu_topology[cpu].core_id    = topology_id;
+> +			topology_id = find_acpi_cpu_topology_package(cpu);
+> +			cpu_topology[cpu].package_id = topology_id;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +#else
+> +static inline int __init parse_acpi_topology(void)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif
+>  
+>  void __init init_cpu_topology(void)
+>  {
+> @@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
+>  	 * Discard anything that was parsed if we hit an error so we
+>  	 * don't use partial information.
+>  	 */
+> -	if (of_have_populated_dt() && parse_dt_topology())
+> +	if ((!acpi_disabled) && parse_acpi_topology())
+> +		reset_cpu_topology();
+> +	else if (of_have_populated_dt() && parse_dt_topology())
+>  		reset_cpu_topology();
+>  }
 > 
