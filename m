@@ -1,97 +1,182 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 25 Jan 2018 01:16:39 +0100
-Subject: [RFC/RFT usb-next v1 6/6] usb: core: hcd: remove support for
- initializing a single PHY
+Date: Thu, 25 Jan 2018 01:16:34 +0100
+Subject: [RFC/RFT usb-next v1 1/6] usb: mtu3: remove custom USB PHY handling
 In-Reply-To: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
 References: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180125001639.14681-7-martin.blumenstingl@googlemail.com>
+Message-ID: <20180125001639.14681-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new PHY wrapper in place we can now handle multiple PHYs.
-Remove the code which handles only one generic PHY as this is now
-covered (with support for multiple PHYs as well as suspend/resume
-support) by the new PHY wrapper.
+The new PHY wrapper is now wired up in the core HCD code. This means
+that PHYs are now controlled (initialized, enabled, disabled, exited)
+without requiring any host-driver specific code.
+Remove the custom USB PHY handling from the mtu3 driver as the core HCD
+code now handles this.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- drivers/usb/core/hcd.c  | 37 -------------------------------------
- include/linux/usb/hcd.h |  1 -
- 2 files changed, 38 deletions(-)
+ drivers/usb/mtu3/mtu3_plat.c | 101 -------------------------------------------
+ 1 file changed, 101 deletions(-)
 
-diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-index fc99cddc117e..5d59e0b4d463 100644
---- a/drivers/usb/core/hcd.c
-+++ b/drivers/usb/core/hcd.c
-@@ -2757,30 +2757,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
- 		}
- 	}
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 628d5ce356ca..a894ddf25bcd 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -44,62 +44,6 @@ int ssusb_check_clocks(struct ssusb_mtk *ssusb, u32 ex_clks)
+ 	return 0;
+ }
  
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->phy) {
--		struct phy *phy = phy_get(hcd->self.sysdev, "usb");
+-static int ssusb_phy_init(struct ssusb_mtk *ssusb)
+-{
+-	int i;
+-	int ret;
 -
--		if (IS_ERR(phy)) {
--			retval = PTR_ERR(phy);
--			if (retval == -EPROBE_DEFER)
--				goto err_phy;
--		} else {
--			retval = phy_init(phy);
--			if (retval) {
--				phy_put(phy);
--				goto err_phy;
--			}
--			retval = phy_power_on(phy);
--			if (retval) {
--				phy_exit(phy);
--				phy_put(phy);
--				goto err_phy;
--			}
--			hcd->phy = phy;
--			hcd->remove_phy = 1;
+-	for (i = 0; i < ssusb->num_phys; i++) {
+-		ret = phy_init(ssusb->phys[i]);
+-		if (ret)
+-			goto exit_phy;
+-	}
+-	return 0;
+-
+-exit_phy:
+-	for (; i > 0; i--)
+-		phy_exit(ssusb->phys[i - 1]);
+-
+-	return ret;
+-}
+-
+-static int ssusb_phy_exit(struct ssusb_mtk *ssusb)
+-{
+-	int i;
+-
+-	for (i = 0; i < ssusb->num_phys; i++)
+-		phy_exit(ssusb->phys[i]);
+-
+-	return 0;
+-}
+-
+-static int ssusb_phy_power_on(struct ssusb_mtk *ssusb)
+-{
+-	int i;
+-	int ret;
+-
+-	for (i = 0; i < ssusb->num_phys; i++) {
+-		ret = phy_power_on(ssusb->phys[i]);
+-		if (ret)
+-			goto power_off_phy;
+-	}
+-	return 0;
+-
+-power_off_phy:
+-	for (; i > 0; i--)
+-		phy_power_off(ssusb->phys[i - 1]);
+-
+-	return ret;
+-}
+-
+-static void ssusb_phy_power_off(struct ssusb_mtk *ssusb)
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < ssusb->num_phys; i++)
+-		phy_power_off(ssusb->phys[i]);
+-}
+-
+ static int ssusb_clks_enable(struct ssusb_mtk *ssusb)
+ {
+ 	int ret;
+@@ -162,24 +106,8 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+ 	if (ret)
+ 		goto clks_err;
+ 
+-	ret = ssusb_phy_init(ssusb);
+-	if (ret) {
+-		dev_err(ssusb->dev, "failed to init phy\n");
+-		goto phy_init_err;
+-	}
+-
+-	ret = ssusb_phy_power_on(ssusb);
+-	if (ret) {
+-		dev_err(ssusb->dev, "failed to power on phy\n");
+-		goto phy_err;
+-	}
+-
+ 	return 0;
+ 
+-phy_err:
+-	ssusb_phy_exit(ssusb);
+-phy_init_err:
+-	ssusb_clks_disable(ssusb);
+ clks_err:
+ 	regulator_disable(ssusb->vusb33);
+ vusb33_err:
+@@ -190,8 +118,6 @@ static void ssusb_rscs_exit(struct ssusb_mtk *ssusb)
+ {
+ 	ssusb_clks_disable(ssusb);
+ 	regulator_disable(ssusb->vusb33);
+-	ssusb_phy_power_off(ssusb);
+-	ssusb_phy_exit(ssusb);
+ }
+ 
+ static void ssusb_ip_sw_reset(struct ssusb_mtk *ssusb)
+@@ -222,7 +148,6 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	struct device *dev = &pdev->dev;
+ 	struct regulator *vbus;
+ 	struct resource *res;
+-	int i;
+ 	int ret;
+ 
+ 	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
+@@ -249,25 +174,6 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	if (IS_ERR(ssusb->dma_clk))
+ 		return PTR_ERR(ssusb->dma_clk);
+ 
+-	ssusb->num_phys = of_count_phandle_with_args(node,
+-			"phys", "#phy-cells");
+-	if (ssusb->num_phys > 0) {
+-		ssusb->phys = devm_kcalloc(dev, ssusb->num_phys,
+-					sizeof(*ssusb->phys), GFP_KERNEL);
+-		if (!ssusb->phys)
+-			return -ENOMEM;
+-	} else {
+-		ssusb->num_phys = 0;
+-	}
+-
+-	for (i = 0; i < ssusb->num_phys; i++) {
+-		ssusb->phys[i] = devm_of_phy_get_by_index(dev, node, i);
+-		if (IS_ERR(ssusb->phys[i])) {
+-			dev_err(dev, "failed to get phy-%d\n", i);
+-			return PTR_ERR(ssusb->phys[i]);
 -		}
 -	}
 -
- 	hcd->phy_roothub = usb_phy_roothub_init(hcd->self.sysdev);
- 	if (IS_ERR(hcd->phy_roothub)) {
- 		retval = PTR_ERR(hcd->phy_roothub);
-@@ -2959,13 +2935,6 @@ int usb_add_hcd(struct usb_hcd *hcd,
- err_usb_phy_roothub_power_on:
- 	usb_phy_roothub_exit(hcd->phy_roothub);
- err_phy_roothub_init:
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && hcd->remove_phy && hcd->phy) {
--		phy_power_off(hcd->phy);
--		phy_exit(hcd->phy);
--		phy_put(hcd->phy);
--		hcd->phy = NULL;
--	}
--err_phy:
- 	if (hcd->remove_phy && hcd->usb_phy) {
- 		usb_phy_shutdown(hcd->usb_phy);
- 		usb_put_phy(hcd->usb_phy);
-@@ -3046,12 +3015,6 @@ void usb_remove_hcd(struct usb_hcd *hcd)
- 	usb_phy_roothub_power_off(hcd->phy_roothub);
- 	usb_phy_roothub_exit(hcd->phy_roothub);
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
+ 	ssusb->ippc_base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(ssusb->ippc_base))
+@@ -457,7 +363,6 @@ static int __maybe_unused mtu3_suspend(struct device *dev)
+ 		return 0;
  
--	if (IS_ENABLED(CONFIG_GENERIC_PHY) && hcd->remove_phy && hcd->phy) {
--		phy_power_off(hcd->phy);
--		phy_exit(hcd->phy);
--		phy_put(hcd->phy);
--		hcd->phy = NULL;
--	}
- 	if (hcd->remove_phy && hcd->usb_phy) {
- 		usb_phy_shutdown(hcd->usb_phy);
- 		usb_put_phy(hcd->usb_phy);
-diff --git a/include/linux/usb/hcd.h b/include/linux/usb/hcd.h
-index 9e8fc9c5f394..e464c7384bd5 100644
---- a/include/linux/usb/hcd.h
-+++ b/include/linux/usb/hcd.h
-@@ -103,7 +103,6 @@ struct usb_hcd {
- 	 * other external phys should be software-transparent
- 	 */
- 	struct usb_phy		*usb_phy;
--	struct phy		*phy;
- 	struct usb_phy_roothub	*phy_roothub;
+ 	ssusb_host_disable(ssusb, true);
+-	ssusb_phy_power_off(ssusb);
+ 	ssusb_clks_disable(ssusb);
+ 	ssusb_wakeup_set(ssusb, true);
  
- 	/* Flags that need to be manipulated atomically because they can
+@@ -480,16 +385,10 @@ static int __maybe_unused mtu3_resume(struct device *dev)
+ 	if (ret)
+ 		goto clks_err;
+ 
+-	ret = ssusb_phy_power_on(ssusb);
+-	if (ret)
+-		goto phy_err;
+-
+ 	ssusb_host_enable(ssusb);
+ 
+ 	return 0;
+ 
+-phy_err:
+-	ssusb_clks_disable(ssusb);
+ clks_err:
+ 	return ret;
+ }
 -- 
 2.16.1
