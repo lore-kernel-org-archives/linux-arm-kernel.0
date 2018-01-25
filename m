@@ -1,61 +1,23 @@
-From: philippe.cornu@st.com (Philippe Cornu)
-Date: Thu, 25 Jan 2018 16:55:04 +0100
-Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
-Message-ID: <20180125155504.8611-1-philippe.cornu@st.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 25 Jan 2018 10:55:47 -0500 (EST)
+Subject: [RFC/RFT usb-next v1 3/6] usb: host: ehci-platform: remove custom
+ USB PHY handling
+In-Reply-To: <20180125001639.14681-4-martin.blumenstingl@googlemail.com>
+Message-ID: <Pine.LNX.4.44L0.1801251055020.1531-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "adjusted_mode" clock value (ie the real pixel clock) is more
-accurate than "mode" clock value (ie the panel/bridge requested
-clock value). It offers a better preciseness for timing
-computations and allows to reduce the extra dsi bandwidth in
-burst mode (from ~20% to ~10-12%, hw platform dependant).
+On Thu, 25 Jan 2018, Martin Blumenstingl wrote:
 
-Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
----
-Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel clock"
+> The new PHY wrapper is now wired up in the core HCD code. This means
+> that PHYs are now controlled (initialized, enabled, disabled, exited)
+> without requiring any host-driver specific code.
+> Remove the custom USB PHY handling from the ehci-platform driver as the
+> core HCD code now handles this.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
 
- drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+For patches 3/6 and 4/6:
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-index ed8af32f8e52..b926b62e9e33 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-@@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
- 
- 	clk_prepare_enable(dsi->pclk);
- 
--	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
-+	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode, dsi->mode_flags,
- 				     dsi->lanes, dsi->format, &dsi->lane_mbps);
- 	if (ret)
- 		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
- 
- 	pm_runtime_get_sync(dsi->dev);
- 	dw_mipi_dsi_init(dsi);
--	dw_mipi_dsi_dpi_config(dsi, mode);
-+	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
- 	dw_mipi_dsi_packet_handler_config(dsi);
- 	dw_mipi_dsi_video_mode_config(dsi);
--	dw_mipi_dsi_video_packet_config(dsi, mode);
-+	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
- 	dw_mipi_dsi_command_mode_config(dsi);
--	dw_mipi_dsi_line_timer_config(dsi, mode);
--	dw_mipi_dsi_vertical_timing_config(dsi, mode);
-+	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
-+	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
- 
- 	dw_mipi_dsi_dphy_init(dsi);
- 	dw_mipi_dsi_dphy_timing_config(dsi);
-@@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
- 
- 	dw_mipi_dsi_dphy_enable(dsi);
- 
--	dw_mipi_dsi_wait_for_two_frames(mode);
-+	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
- 
- 	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
- 	dw_mipi_dsi_set_mode(dsi, 0);
--- 
-2.15.1
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
