@@ -1,27 +1,39 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Thu, 25 Jan 2018 12:51:55 +0530
-Subject: [PATCH 0/2] mtd: fsl-quadspi: Update hwcap based on mode provided in
- dtsi file
-Message-ID: <1516864917-31969-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Date: Thu, 25 Jan 2018 12:51:56 +0530
+Subject: [PATCH 1/2] Documentation: binding: Update fsl-quadspi binding
+In-Reply-To: <1516864917-31969-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1516864917-31969-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1516864917-31969-2-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set added support to update hwcap of FSL QUADSPI controller
-by reading values from the device tree files.
+QuadSPI controller supports Single, dual, quad modes of operation.
+Mode is controlled via either RCW or the on-board connection to flash.
 
-Updated the fsl-quadspi binding by adding spi-tx-bus-width,
-spi-rx-bus-width binding needed to define mode of operation.
+spi-tx-bus-width, spi-rx-bus-width binding added to define mode
+of operation. Definition of these binding are standard as defined
+in Documentation/devicetree/bindings/spi/spi-bus.txt.
 
-Depends on
- https://patchwork.ozlabs.org/project/linux-mtd/list/?series=25286
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+---
+ Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Yogesh Gaur (2):
-  Documentation: binding: Update fsl-quadspi binding
-  mtd: fsl-quadspi: Update hwcap based on mode provided in dtsi file
-
- .../devicetree/bindings/mtd/fsl-quadspi.txt        |  4 ++
- drivers/mtd/spi-nor/fsl-quadspi.c                  | 46 ++++++++++++++++++++--
- 2 files changed, 47 insertions(+), 3 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+index c34aa6f..13a903e 100644
+--- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
++++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
+@@ -23,6 +23,10 @@ Optional properties:
+ 			      bus, you should enable this property.
+ 			      (Please check the board's schematic.)
+   - big-endian : That means the IP register is big endian
++  - spi-tx-bus-width - Definition as per
++                     Documentation/devicetree/bindings/spi/spi-bus.txt
++  - spi-rx-bus-width - Definition as per
++                     Documentation/devicetree/bindings/spi/spi-bus.txt
+ 
+ Example:
+ 
 -- 
 1.9.1
