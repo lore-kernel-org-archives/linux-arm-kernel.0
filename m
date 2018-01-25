@@ -1,108 +1,214 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Thu, 25 Jan 2018 10:19:57 +0800
-Subject: [PATCH 2/2] ARM: imx: cpuidle-imx6q: configure CCM to RUN mode
- when CPU is active
-In-Reply-To: <1516792585.6411.2.camel@pengutronix.de>
-References: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
- <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
- <1516792585.6411.2.camel@pengutronix.de>
-Message-ID: <20180125021957.GA19344@shlinux2>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 25 Jan 2018 10:33:36 +0800
+Subject: [linux-sunxi] [PATCH 2/3] ASoC: sun4i-i2s: Do not divide clocks
+ when slave
+In-Reply-To: <20180124141101.12867-3-codekipper@gmail.com>
+References: <20180124141101.12867-1-codekipper@gmail.com>
+ <20180124141101.12867-3-codekipper@gmail.com>
+Message-ID: <CAGb2v65ZGeeYewM6Y2Ss_o+-nQp=a=z9FRrOU7MkRTzqo2UpuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
-On Wed, Jan 24, 2018 at 12:16:25PM +0100, Lucas Stach wrote:
->Hi Peng,
->
->Am Samstag, den 30.12.2017, 21:53 +0800 schrieb Peng Fan:
->> There are two states in i.MX6Q cpuidle driver.
->> state[1]: ARM WFI mode
->> state[2]: i.MX6Q WAIT mode
->> 
->> Take i.MX6DL as example, think out such a case:
->> 1. CPU0/1 both run at normal mode
->> 2. On CPU0, `sleep 1` is executed. And there are no workload on CPU1.
->> 3. CPU0 first runs into state[2] and 'wfi' instruction. Switched to
->> use
->> ??????GPT broadcast.
->> 4. CPU1 runs into state[2] and configure CCM to WAIT MODE,
->> ??????then 'wfi' instruction. Now arm_clk and local timer clock are
->> ??????shutdown. Switched to use GPT broadcast
->> 5. GPT broadcast timer interrupt comes to GPC/GIC, then CPU0 wakes
->> up.
->> ??????CPU0 switched to use arm local timer. CPU1 is still sleeping.
->> 6. No workload on CPU0, CPU0 runs into state[1]. But CCM register
->> ??????is still not restored to Normal RUN mode. 'wfi' + CCM WAIT will
->> ??????cause arm_clk and arm core clk.
->> ??????Now CPU0 stops, which is not correct.
->> 
->> So, need to make sure CCM configured to RUN mode when any cpu exit
->> state[2].
->> 
->> In this patch,
->> When CPU exits state[2], it configures CCM to RUN mode.
->> When all CPUs enters state[2], the last CPU needs to check
->> whether it's ok to configure CCM to WAIT mode or not.
->
->To me this patch seems like we are adding duct tape to fix the issue.??
->
->It seems the whole master_lock thing doesn't properly work when the CPU
->that is woken up by the timer broadcast isn't the last CPU going to
->sleep. We should probably try to come up with a way to simplify this
->whole master dance, instead of adding yet more complexity.
+On Wed, Jan 24, 2018 at 10:11 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 
-The master_lock is used to protect multiple CPUS runs into State[1].
-It could not be used to protect the CPU runs into State[0].
+Subject is slightly hard to read.
 
-The patch is to make sure that before arm clk turned off, need to check
-whether all the cpus are in State[1]. And the cpu who first wake up from
-State[1], need to configure CCM to RUN mode.
+ASoC: sun4i-i2s: Do not divide clocks when acting as slave
 
-This patch has been integrated into vendor kernel and fixed customer's issue.
-I could not think out of a better solution to restructure the master lock,
-and this may introduce new issues.
-
-Thanks,
-Peng.
+would be easier to understand.
 
 >
->Regards,
->Lucas
+> There is no need to set the clock and calculate the division of
+> the audio pll for the bclk and sync signals when they are not
+> required.
 >
->> Signed-off-by: Peng Fan <peng.fan@nxp.com>
->> ---
->> 
->> V1:
->> ??This is to upstream patch:
->> ??http://git.freescale.com/git/cgit.cgi/imx/linux-imx.git/commit/?h=im
->> x_4.9.11_1.0.0_ga&id=0d980646ee068b92db71fd5e4e4efcbc33749cbd
->> 
->> ??arch/arm/mach-imx/cpuidle-imx6q.c | 3 +++
->> ??1 file changed, 3 insertions(+)
->> 
->> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-
->> imx/cpuidle-imx6q.c
->> index bfeb25aaf9a2..4d342e2fdfe6 100644
->> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
->> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
->> @@ -30,6 +30,8 @@ static int imx6q_enter_wait(struct cpuidle_device
->> *dev,
->> ??		if (!spin_trylock(&master_lock))
->> ??			goto idle;
->> ??		imx6_set_lpm(WAIT_UNCLOCKED);
->> +		if (atomic_read(&master) != num_online_cpus())
->> +			imx6_set_lpm(WAIT_CLOCKED);
->> ??		cpu_do_idle();
->> ??		imx6_set_lpm(WAIT_CLOCKED);
->> ??		spin_unlock(&master_lock);
->> @@ -41,6 +43,7 @@ static int imx6q_enter_wait(struct cpuidle_device
->> *dev,
->> ??done:
->> ??	atomic_dec(&master);
->> ??
->> +	imx6_set_lpm(WAIT_CLOCKED);
->> ??	return index;
->> ??}
->> ??
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  sound/soc/sunxi/sun4i-i2s.c | 116 ++++++++++++++++++++++++--------------------
+>  1 file changed, 64 insertions(+), 52 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> index d7a9141514cf..626679057d0f 100644
+> --- a/sound/soc/sunxi/sun4i-i2s.c
+> +++ b/sound/soc/sunxi/sun4i-i2s.c
+> @@ -195,6 +195,8 @@ struct sun4i_i2s {
+>
+>         const struct sun4i_i2s_quirks   *variant;
+>
+> +       bool bit_clk_master;
+> +
+>         unsigned int    tdm_slots;
+>         unsigned int    slot_width;
+>  };
+> @@ -282,67 +284,73 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
+>         int bclk_div, mclk_div;
+>         int ret;
+>
+> -       switch (rate) {
+> -       case 176400:
+> -       case 88200:
+> -       case 44100:
+> -       case 22050:
+> -       case 11025:
+> -               clk_rate = 22579200;
+> -               break;
+> +       if (i2s->bit_clk_master) {
+> +               switch (rate) {
+> +               case 176400:
+> +               case 88200:
+> +               case 44100:
+> +               case 22050:
+> +               case 11025:
+> +                       clk_rate = 22579200;
+> +                       break;
+>
+> -       case 192000:
+> -       case 128000:
+> -       case 96000:
+> -       case 64000:
+> -       case 48000:
+> -       case 32000:
+> -       case 24000:
+> -       case 16000:
+> -       case 12000:
+> -       case 8000:
+> -               clk_rate = 24576000;
+> -               break;
+> +               case 192000:
+> +               case 128000:
+> +               case 96000:
+> +               case 64000:
+> +               case 48000:
+> +               case 32000:
+> +               case 24000:
+> +               case 16000:
+> +               case 12000:
+> +               case 8000:
+> +                       clk_rate = 24576000;
+> +                       break;
+>
+> -       default:
+> -               dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
+> -               return -EINVAL;
+> -       }
+> +               default:
+> +                       dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
+> +                       return -EINVAL;
+> +               }
+>
+> -       ret = clk_set_rate(i2s->mod_clk, clk_rate);
+> -       if (ret)
+> -               return ret;
+> +               ret = clk_set_rate(i2s->mod_clk, clk_rate);
+> +               if (ret) {
+> +                       dev_err(dai->dev, "Unable to set clock\n");
+> +                       return ret;
+> +               }
+>
+> -       oversample_rate = i2s->mclk_freq / rate;
+> -       if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
+> -               dev_err(dai->dev, "Unsupported oversample rate: %d\n",
+> -                       oversample_rate);
+> -               return -EINVAL;
+> -       }
+> +               oversample_rate = i2s->mclk_freq / rate;
+> +               if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
+> +                       dev_err(dai->dev, "Unsupported oversample rate: %d\n",
+> +                               oversample_rate);
+> +                       return -EINVAL;
+> +               }
+>
+> -       bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
+> -                                         word_size);
+> -       if (bclk_div < 0) {
+> -               dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
+> -               return -EINVAL;
+> -       }
+> +               bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
+> +                                                 word_size);
+> +               if (bclk_div < 0) {
+> +                       dev_err(dai->dev, "Unsupported BCLK divider: %d\n",
+> +                               bclk_div);
+> +                       return -EINVAL;
+> +               }
+>
+> -       mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
+> -                                         clk_rate, rate);
+> -       if (mclk_div < 0) {
+> -               dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
+> -               return -EINVAL;
+> -       }
+> +               mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
+> +                                                 clk_rate, rate);
+> +               if (mclk_div < 0) {
+> +                       dev_err(dai->dev, "Unsupported MCLK divider: %d\n",
+> +                               mclk_div);
+> +                       return -EINVAL;
+> +               }
+>
+> -       /* Adjust the clock division values if needed */
+> -       bclk_div += i2s->variant->bclk_offset;
+> -       mclk_div += i2s->variant->mclk_offset;
+> +               /* Adjust the clock division values if needed */
+> +               bclk_div += i2s->variant->bclk_offset;
+> +               mclk_div += i2s->variant->mclk_offset;
+>
+> -       regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
+> -                    SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
+> -                    SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
+> +               regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
+> +                            SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
+> +                            SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
+>
+> -       regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
+> +               regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
+> +       }
 
--- 
+The changed block is so long that it seems better to split it out
+into a helper function that doesn't get called when the controller
+isn't the BCLK master. Or you could move the last "Set sync period"
+block up top, and do an early return if it's not the master. Either
+way I think it's better than having a large indented block.
+
+On the other hand, do the settings need to be cleared if it's the
+slave?
+
+ChenYu
+
+>
+>         /* Set sync period */
+>         if (i2s->variant->has_fmt_set_lrck_period)
+> @@ -501,10 +509,12 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+>                 case SND_SOC_DAIFMT_CBS_CFS:
+>                         /* BCLK and LRCLK master */
+>                         val = SUN4I_I2S_CTRL_MODE_MASTER;
+> +                       i2s->bit_clk_master = true;
+>                         break;
+>                 case SND_SOC_DAIFMT_CBM_CFM:
+>                         /* BCLK and LRCLK slave */
+>                         val = SUN4I_I2S_CTRL_MODE_SLAVE;
+> +                       i2s->bit_clk_master = false;
+>                         break;
+>                 default:
+>                         dev_err(dai->dev, "Unsupported slave setting: %d\n",
+> @@ -525,10 +535,12 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+>                         /* BCLK and LRCLK master */
+>                         val = SUN8I_I2S_CTRL_BCLK_OUT |
+>                                 SUN8I_I2S_CTRL_LRCK_OUT;
+> +                       i2s->bit_clk_master = true;
+>                         break;
+>                 case SND_SOC_DAIFMT_CBM_CFM:
+>                         /* BCLK and LRCLK slave */
+>                         val = 0;
+> +                       i2s->bit_clk_master = false;
+>                         break;
+>                 default:
+>                         dev_err(dai->dev, "Unsupported slave setting: %d\n",
+> --
+> 2.16.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
