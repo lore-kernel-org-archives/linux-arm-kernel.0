@@ -1,65 +1,40 @@
-From: aisheng.dong@codeaurora.org (aisheng.dong at codeaurora.org)
-Date: Thu, 25 Jan 2018 18:10:35 +0800
-Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <20180123103931.GE27764@dragon>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-3-l.stach@pengutronix.de>
- <20180123103931.GE27764@dragon>
-Message-ID: <278bb44610b8a27826550732095aba03@codeaurora.org>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Thu, 25 Jan 2018 18:24:37 +0800
+Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <c05d4794-b76d-cfaa-d7ed-c44108117ee2@rock-chips.com>
+References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
+ <20180118115251.5542-9-jeffy.chen@rock-chips.com>
+ <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
+ <5A60AE41.2050101@rock-chips.com>
+ <1f4b3c0d-1414-0012-a072-f4a11f432c21@rock-chips.com>
+ <5A654925.9020203@rock-chips.com> <5A6563FA.8080602@rock-chips.com>
+ <c05d4794-b76d-cfaa-d7ed-c44108117ee2@rock-chips.com>
+Message-ID: <5A69B065.30501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-23 18:39, Shawn Guo wrote:
-> On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
-> 
->> +	pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
->> +		fsl,pins = <
->> +			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
->> +			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
->> +			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
->> +			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
->> +			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
->> +			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
->> +			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
->> +		>;
->> +		};
-> 
-> Bad indentation.
-> 
-> Shawn
-> 
->> +
->> +	pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
->> +		fsl,pins = <
->> +			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
->> +			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
->> +			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
->> +			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
->> +			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
->> +			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
->> +			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
->> +		>;
->> +	};
+On 01/25/2018 05:42 PM, Randy Li wrote:
+>>>
+>>
+>> confirmed with Simon, there might be some iommus don't have a pd, and
+> We use the pd to control the NIU node(not on upstream), without a pd or
+> fake pd, none of the platform would work.
+after talked offline, it's possible to have iommu without pd in upstream 
+kernel(and chromeos kernel), but on our internal kernel, the drivers 
+would require pd(or fake pd) to reset modules when error happens.
 
-AFAIK we switched to generic pinconfig since MX7ULP as maintainer won't
-access old binding pinctrl drivers.
+anyway, i think that means we do need clock control here.
 
-So i wonder if you may have some special reasons to insist on old 
-binding which
-i may overlooked?
-
-(I did not receive your pinctrl patch by accidently. So i can't reply on
-it before.)
-
-Regards
-Dong Aisheng
-
->> +};
->> --
->> 2.11.0
->> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> the CONFIG_PM could be disabled.I am hard to believe a modern platform
+>> can work without that.
+>>
+>> so it might be better to control clocks in iommu driver itself.
+>I won't
+> insist how the version of the iommu patch on the upstream, I
+> just post an idea here.
+> The version for kernel 4.4 is under internal review, the implementation
+> has been modified many times.
+>
+> I would suggest the managing clocks in pd is a more easy way and don't
+> need to spare those thing in two places.
