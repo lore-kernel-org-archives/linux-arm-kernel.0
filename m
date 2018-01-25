@@ -1,27 +1,38 @@
 From: philippe.cornu@st.com (Philippe Cornu)
-Date: Thu, 25 Jan 2018 11:37:58 +0100
-Subject: [PATCH v2 0/2] drm/bridge/synopsys: dsi: Add fix & warning in
- dsi_host_transfer()
-Message-ID: <20180125103800.1999-1-philippe.cornu@st.com>
+Date: Thu, 25 Jan 2018 11:37:59 +0100
+Subject: [PATCH v2 1/2] drm/bridge/synopsys: dsi: Add a warning msg on dsi
+ read requests
+In-Reply-To: <20180125103800.1999-1-philippe.cornu@st.com>
+References: <20180125103800.1999-1-philippe.cornu@st.com>
+Message-ID: <20180125103800.1999-2-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a fix & a warning in the dsi_host_transfer().
+The dcs/generic dsi read feature is not yet implemented so it
+is important to warn the host_transfer() caller in case of
+read operation requests.
 
-Version 2:
-- Simplify the 2 patches following comments from Brian Norris.
-- Swap the 2 patches as the return value is only on tx and
-  in case of rx requests the warning is there.
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Version 1:
-- Initial commit
-
-Philippe Cornu (2):
-  drm/bridge/synopsys: dsi: Add a warning msg on dsi read requests
-  drm/bridge/synopsys: dsi: Fix dsi_host_transfer() return value
-
- drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index daec7881be6d..72ecaeb40822 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -405,6 +405,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	struct mipi_dsi_packet packet;
+ 	int ret;
+ 
++	if (msg->rx_buf || msg->rx_len) {
++		/* TODO dw drv improvements: implement read feature */
++		dev_warn(dsi->dev, "read operations not yet implemented\n");
++		return -EINVAL;
++	}
++
+ 	ret = mipi_dsi_create_packet(&packet, msg);
+ 	if (ret) {
+ 		dev_err(dsi->dev, "failed to create packet: %d\n", ret);
 -- 
 2.15.1
