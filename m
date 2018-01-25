@@ -1,9 +1,10 @@
 From: philippe.cornu@st.com (Philippe CORNU)
-Date: Thu, 25 Jan 2018 16:06:18 +0000
-Subject: [PATCH v3] drm/bridge/synopsys: dsi: add optional pixel clock
-In-Reply-To: <20180123170806.5282-1-philippe.cornu@st.com>
-References: <20180123170806.5282-1-philippe.cornu@st.com>
-Message-ID: <9a37839b-f3bc-2c69-94b8-2fe52ea14965@st.com>
+Date: Thu, 25 Jan 2018 16:08:35 +0000
+Subject: [PATCH] dt-bindings: display: stm32: add pixel clock mandatory
+ property
+In-Reply-To: <20180122153805.23720-1-philippe.cornu@st.com>
+References: <20180122153805.23720-1-philippe.cornu@st.com>
+Message-ID: <881ad794-6c4a-b753-2325-ac8522f8a70c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,100 +12,57 @@ Hi,
 
 in short: this patch is "CANCELLED" : )
 
-Thanks to comments from some of you, I managed to use adjusted_mode.
+There is no need to add the pixel clock as a mandatory property because 
+now the clock value is ajusted in adjusted_mode.
 
-Please have a look to the patch "drm/bridge/synopsys: dsi: use 
-adjusted_mode in mode_set".
+Please have a look to patches:
+- drm/stm: ltdc: use crtc_mode_fixup to update adjusted_mode clock
+- drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
 
 Hope it is better, comments are welcome
 
 Many thanks,
 Philippe :-)
 
-On 01/23/2018 06:08 PM, Philippe Cornu wrote:
-> The pixel clock is optional. When available, it offers a better
-> preciseness for timing computations and allows to reduce the extra dsi
-> bandwidth in burst mode (from ~20% to ~10-12%, hw platform dependant).
+On 01/22/2018 04:38 PM, Philippe Cornu wrote:
+> Add the DPI/RGB input pixel clock in mandatory properties
+> because it really offers a better preciseness for timing
+> computations.
 > 
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 > Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
 > ---
-> Changes in v3: Simplify px_clk probing thanks to Andrzej Hajda comments
+> Please apply "dt-bindings: display: stm32: correct clock-names
+> in dsi panel example" before this patch.
 > 
-> Changes in v2: Improve px_clk probing in case of ENOENT dt returned value
-> (thanks to Philipp Zabel & Andrzej Hajda comments)
+> Changes in v3: remove the note regarding swapped clock names
+>    (now in a separate patch).
+> Changes in v2: put new clock in last position (Rob Herring)
 > 
->   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 25 +++++++++++++++++++------
->   1 file changed, 19 insertions(+), 6 deletions(-)
+>   Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index ed8af32f8e52..9fb35385c348 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -217,6 +217,7 @@ struct dw_mipi_dsi {
->   	void __iomem *base;
+> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> index 3eb1b48b47dd..942b7237ae87 100644
+> --- a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> @@ -29,6 +29,7 @@ Mandatory properties specific to STM32 DSI:
+>   - compatible: "st,stm32-dsi".
+>   - clock-names:
+>     - phy pll reference clock string name, must be "ref".
+> +  - DPI/RGB input pixel clock string name, must be "px_clk".
+>   - resets: see [5].
+>   - reset-names: see [5].
 >   
->   	struct clk *pclk;
-> +	struct clk *px_clk;
+> @@ -97,8 +98,9 @@ Example 2: DSI panel
+>   			#size-cells = <0>;
+>   			compatible = "st,stm32-dsi";
+>   			reg = <0x40016c00 0x800>;
+> -			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
+> -			clock-names = "pclk", "ref";
+> +			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>,
+> +				 <&rcc 1 CLK_LCD>;
+> +			clock-names = "pclk", "ref", "px_clk";
+>   			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
+>   			reset-names = "apb";
 >   
->   	unsigned int lane_mbps; /* per lane */
->   	u32 channel;
-> @@ -703,24 +704,28 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
->   	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
->   	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
->   	void *priv_data = dsi->plat_data->priv_data;
-> +	struct drm_display_mode px_clk_mode = *mode;
->   	int ret;
->   
->   	clk_prepare_enable(dsi->pclk);
->   
-> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
-> +	if (dsi->px_clk)
-> +		px_clk_mode.clock = clk_get_rate(dsi->px_clk) / 1000;
-> +
-> +	ret = phy_ops->get_lane_mbps(priv_data, &px_clk_mode, dsi->mode_flags,
->   				     dsi->lanes, dsi->format, &dsi->lane_mbps);
->   	if (ret)
->   		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
->   
->   	pm_runtime_get_sync(dsi->dev);
->   	dw_mipi_dsi_init(dsi);
-> -	dw_mipi_dsi_dpi_config(dsi, mode);
-> +	dw_mipi_dsi_dpi_config(dsi, &px_clk_mode);
->   	dw_mipi_dsi_packet_handler_config(dsi);
->   	dw_mipi_dsi_video_mode_config(dsi);
-> -	dw_mipi_dsi_video_packet_config(dsi, mode);
-> +	dw_mipi_dsi_video_packet_config(dsi, &px_clk_mode);
->   	dw_mipi_dsi_command_mode_config(dsi);
-> -	dw_mipi_dsi_line_timer_config(dsi, mode);
-> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
-> +	dw_mipi_dsi_line_timer_config(dsi, &px_clk_mode);
-> +	dw_mipi_dsi_vertical_timing_config(dsi, &px_clk_mode);
->   
->   	dw_mipi_dsi_dphy_init(dsi);
->   	dw_mipi_dsi_dphy_timing_config(dsi);
-> @@ -734,7 +739,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
->   
->   	dw_mipi_dsi_dphy_enable(dsi);
->   
-> -	dw_mipi_dsi_wait_for_two_frames(mode);
-> +	dw_mipi_dsi_wait_for_two_frames(&px_clk_mode);
->   
->   	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
->   	dw_mipi_dsi_set_mode(dsi, 0);
-> @@ -828,6 +833,14 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
->   		return ERR_PTR(ret);
->   	}
->   
-> +	dsi->px_clk = devm_clk_get(dev, "px_clk");
-> +	if (IS_ERR(dsi->px_clk)) {
-> +		ret = PTR_ERR(dsi->px_clk);
-> +		if (ret != ENOENT)
-> +			dev_err(dev, "Unable to get opt. px_clk: %d\n", ret);
-> +		dsi->px_clk = NULL;
-> +	}
-> +
->   	/*
->   	 * Note that the reset was not defined in the initial device tree, so
->   	 * we have to be prepared for it not being found.
 > 
