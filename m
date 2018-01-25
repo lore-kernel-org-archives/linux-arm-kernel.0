@@ -1,174 +1,67 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 25 Jan 2018 19:06:56 +0800
-Subject: [PATCH v2] iommu/mediatek: Move attach_device after iommu-group
- is ready for M4Uv1
-In-Reply-To: <78721402-989d-d06a-18cc-dd6efd358dfd@arm.com>
-References: <1516696788-8668-1-git-send-email-yong.wu@mediatek.com>
- <78721402-989d-d06a-18cc-dd6efd358dfd@arm.com>
-Message-ID: <1516878416.22553.24.camel@mhfsdcap03>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 25 Jan 2018 12:09:42 +0100
+Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-3-l.stach@pengutronix.de>
+ <20180123103931.GE27764@dragon>
+ <278bb44610b8a27826550732095aba03@codeaurora.org>
+ <1516876300.6411.25.camel@pengutronix.de>
+ <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
+Message-ID: <1516878582.6411.27.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-01-24 at 14:55 +0000, Robin Murphy wrote:
-> On 23/01/18 08:39, Yong Wu wrote:
-> > In the commit 05f80300dc8b ("iommu: Finish making iommu_group support
-> > mandatory"), the iommu framework has supposed all the iommu drivers have
-> > their owner iommu-group, it get rid of the FIXME workarounds while the
-> > group is NULL. But the flow of Mediatek M4U gen1 looks a bit trick that
-> > it will hang at this case:
+Am Donnerstag, den 25.01.2018, 18:49 +0800 schrieb Dong Aisheng:
+> On 2018-01-25 18:31, Lucas Stach wrote:
+> > Am Donnerstag, den 25.01.2018, 18:10 +0800 schrieb?
+> > aisheng.dong at codeaurora.org:
+[...]
+> AFAIK we switched to generic pinconfig since MX7ULP as maintainer?
+> > > won't
+> > > access old binding pinctrl drivers.
 > > 
-> > ==========================================
-> > Unable to handle kernel NULL pointer dereference at virtual address 00000030
-> > PC is at mutex_lock+0x28/0x54
-> > LR is at iommu_attach_device+0xa4/0xd4
-> > pc : [<c07632e8>]    lr : [<c04736fc>]    psr: 60000013
-> > sp : df0edbb8  ip : df0edbc8  fp : df0edbc4
-> > r10: c114da14  r9 : df2a3e40  r8 : 00000003
-> > r7 : df27a210  r6 : df2a90c4  r5 : 00000030  r4 : 00000000
-> > r3 : df0f8000  r2 : fffff000  r1 : df29c610  r0 : 00000030
-> > Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> > xxx
-> > (mutex_lock) from [<c04736fc>] (iommu_attach_device+0xa4/0xd4)
-> > (iommu_attach_device) from [<c011b9dc>] (__arm_iommu_attach_device+0x28/0x90)
-> > (__arm_iommu_attach_device) from [<c011ba60>] (arm_iommu_attach_device+0x1c/0x30)
-> > (arm_iommu_attach_device) from [<c04759ac>] (mtk_iommu_add_device+0xfc/0x214)
-> > (mtk_iommu_add_device) from [<c0472aa4>] (add_iommu_group+0x3c/0x68)
-> > (add_iommu_group) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> > (bus_for_each_dev) from [<c04734a4>] (bus_set_iommu+0xb0/0xec)
-> > (bus_set_iommu) from [<c0476310>] (mtk_iommu_probe+0x328/0x368)
-> > (mtk_iommu_probe) from [<c048189c>] (platform_drv_probe+0x5c/0xc0)
-> > (platform_drv_probe) from [<c047f510>] (driver_probe_device+0x2f4/0x4d8)
-> > (driver_probe_device) from [<c047f800>] (__driver_attach+0x10c/0x128)
-> > (__driver_attach) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> > (bus_for_each_dev) from [<c047ec78>] (driver_attach+0x2c/0x30)
-> > (driver_attach) from [<c047e640>] (bus_add_driver+0x1e0/0x278)
-> > (bus_add_driver) from [<c048052c>] (driver_register+0x88/0x108)
-> > (driver_register) from [<c04817ec>] (__platform_driver_register+0x50/0x58)
-> > (__platform_driver_register) from [<c0b31380>] (m4u_init+0x24/0x28)
-> > (m4u_init) from [<c0101c38>] (do_one_initcall+0xf0/0x17c)
-> > =========================
+> > I'm not convinced that the generic pinconf is good fit. For pingroups
+> > with different configs for some of the pins, like the example above, we
+> > would need to split things into multiple DT nodes. This really hurts
+> > readability, so I'm not going to switch to the generic stuff without
+> > some really convincing arguments.
 > > 
-> > The root cause is that "arm_iommu_attach_device" is called before
-> > "iommu_group_get_for_dev" in the interface "mtk_iommu_add_device". Thus,
-> > We adjust the sequence of this two functions.
-> > 
-> > Unfortunately, there is another issue after the solution above, From the
-> > function "iommu_attach_device", Only one device in each a iommu group is
-> > allowed. In Mediatek case, there is only one m4u group, all the devices
-> > are in one group. thus it get fail at this step.
-> > 
-> > In order to satisfy this requirement, a new iommu group is allocated for
-> > each a iommu consumer device. But meanwhile, we still have to use the
-> > same domain for all the iommu group. Use a global variable "mtk_domain_v1"
-> > to save the global domain.
 > 
-> Argh, sorry for breaking it! Seems I managed to forget just how horrible 
-> and fiddly all the arm_iommu_* stuff is :(
+> Per my understanding, based on the last discussion with Linus W, we?
+> actually did this in order to increase the readability that 1) user does
+> not need?to see the 'ugly' unreadable raw data and refer to reference
+> manual 2)?unified generic binding format which already exist in kernel
+> and used by many platforms.
 > 
-> > CC: Robin Murphy <robin.murphy@arm.com>
-> > CC: Honghui Zhang <honghui.zhang@mediatek.com>
-> > Fixes: 05f80300dc8b ("iommu: Finish making iommu_group support mandatory")
-> > Reported-by: Ryder Lee <ryder.lee@mediatek.com>
-> > Tested-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> > changes since v1:
-> >     Add mtk_domain_v1=NULL in domain_free for symmetry.
-> > 
-> > v1: https://patchwork.kernel.org/patch/10176255/
-> > ---
-> >   drivers/iommu/mtk_iommu_v1.c | 42 +++++++++++++++++++-----------------------
-> >   1 file changed, 19 insertions(+), 23 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> > index 542930c..86106bf 100644
-> > --- a/drivers/iommu/mtk_iommu_v1.c
-> > +++ b/drivers/iommu/mtk_iommu_v1.c
-> > @@ -103,6 +103,9 @@ struct mtk_iommu_domain {
-> >   	struct mtk_iommu_data		*data;
-> >   };
-> >   
-> > +/* There is only a iommu domain in M4U gen1. */
-> > +static struct mtk_iommu_domain *mtk_domain_v1;
-> > +
-> >   static struct mtk_iommu_domain *to_mtk_domain(struct iommu_domain *dom)
-> >   {
-> >   	return container_of(dom, struct mtk_iommu_domain, domain);
-> > @@ -251,10 +254,15 @@ static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
-> >   	if (type != IOMMU_DOMAIN_UNMANAGED)
-> >   		return NULL;
-> >   
-> > +	/* Always return the same domain. */
-> > +	if (mtk_domain_v1)
-> > +		return &mtk_domain_v1->domain;
+> Actually MXS platform already used it for many years in a similar way.
+> So IMHO a little hurt to add another node for different pad setting in?
+> the same group won't be enough reason to stop switching to generic config.
 > 
-> This seems a bit too fragile (and I vaguely recall we may have discussed 
-> and rejected this approach for the original driver), since any code doing:
+> Does it make sense?
 
-Yes. We discussed it long before. Using a global variable is simpler
-sometimes, so I didn't dig further. sorry.
+I know that Linus W is pushing for this common pinconf thing in the
+name of readability. It's just that I don't think it's such a clear
+win.
 
-> 
-> 	unused = iommu_domain_alloc(bus);
-> 	iommu_domain_free(unused);
-> 
-> will pull the rug out from under everyone's feet in a very nasty and 
-> unexpected manner. Given that mtk_iommu_create_mapping() is already a 
-> giant workaround for the ARM DMA code not understanding groups and 
-> default domains, I'd prefer not to have to regress "correct" driver 
-> behaviour for the sake of that; how about something like the below diff, 
-> is that enough to make things work?
+After all you still need to look into the reference manual or binding
+to see which values in the common binding correspond to a specific
+drive/pull strength, etc.
 
-Thanks very much for this approach. I have tested it and it works fine.
+On the other hand it really bloats the DT description of the pin
+configuration. If you want to look at an (IMHO) bad example, go look at
+the Tegra DTs. The Tegra pincontrol implements the "separate properties
+for each pinconf option" that is pushed by Linus W. This bloated the DT
+description to the point that no-one is able/willing to write those
+descriptions anymore and the only viable way to get them is to auto-
+generate them from some spreadsheets. Not really what I would call an
+readable...
 
-I change a little:
-1. Move the diff below into mtk_iommu_add_device. This is because
-mtk_iommu_create_mapping is called in a of_for_each_xx, it may enter
-several times. so I move it out from mtk_iommu_create_mapping to make
-the flow more meet your expectation.
-2. "return NULL" in device_group. Currently the device_group callback
-looks not needed. I am not sure which one is better, delete whole this
-callback or return NULL. in next version I use "return NULL", let
-the framework report warning if it enter this device_group.
-
-Thanks again.
-
-> 
-> Robin.
-> 
-> ----->8-----
-> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> index 542930cd183d..8b90b7a72238 100644
-> --- a/drivers/iommu/mtk_iommu_v1.c
-> +++ b/drivers/iommu/mtk_iommu_v1.c
-> @@ -376,6 +376,7 @@ static int mtk_iommu_create_mapping(struct device *dev,
->   	struct platform_device *m4updev;
->   	struct dma_iommu_mapping *mtk_mapping;
->   	struct device *m4udev;
-> +	struct iommu_group *group;
->   	int ret;
-> 
->   	if (args->args_count != 1) {
-> @@ -418,6 +419,22 @@ static int mtk_iommu_create_mapping(struct device *dev,
->   		m4udev->archdata.iommu = mtk_mapping;
->   	}
-> 
-> +	/*
-> +	 * This is a short-term bodge because the ARM DMA code doesn't
-> +	 * understand multi-device groups, but we have to call into it
-> +	 * successfully (and not just rely on a normal IOMMU API attach
-> +	 * here) in order to set the correct DMA API ops on @dev.
-> +	 */
-> +	group = iommu_group_alloc();
-> +	if (IS_ERR(group)) {
-> +		ret = ERR_PTR(group);
-> +		goto err_release_mapping;
-> +	}
-> +	ret = iommu_group_add_device(group,  dev);
-> +	iommu_group_put(group);
-> +	if (ret)
-> +		goto err_release_mapping;
-> +
->   	ret = arm_iommu_attach_device(dev, mtk_mapping);
->   	if (ret)
->   		goto err_release_mapping;
+Maybe I'm a little stubborn when it comes to this topic, but at
+Pengutronix we see a lot of customer designs where we need to come up
+with the board DT. Bloating each one of those and making the work of
+the developers harder in the name of a readability win that I just
+don't see doesn't sound like something I want to support. :)
+	
+Regards,
+Lucas
