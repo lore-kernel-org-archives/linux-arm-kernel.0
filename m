@@ -1,59 +1,83 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 25 Jan 2018 23:30:25 +0800
-Subject: [PATCH] ARM: dts: imx6sx: add pu power domain support
-In-Reply-To: <1516720343-21933-1-git-send-email-Anson.Huang@nxp.com>
-References: <1516720343-21933-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180125153025.GC24622@b29396-OptiPlex-7040>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Jan 2018 16:31:42 +0100
+Subject: [linux-sunxi][PATCH 5/5] arm64: allwinner: a64: Add DAI nodes
+In-Reply-To: <CAEKpxBmbhtGxk7hZMt3h7M_ih9njrwbtR7ooP4PT2kRD6xf=rw@mail.gmail.com>
+References: <20180124103943.2062-1-codekipper@gmail.com>
+ <20180124103943.2062-6-codekipper@gmail.com>
+ <20180124110222.cdglyg5m7644xiem@flea.lan>
+ <CAEKpxBk8NXJn4KxEGXx7UddqpUMC65kdEgx1phZDWyUd3ER_3Q@mail.gmail.com>
+ <20180125082904.t4sqob626kyzw4ga@flea.lan>
+ <CAEKpxBmbhtGxk7hZMt3h7M_ih9njrwbtR7ooP4PT2kRD6xf=rw@mail.gmail.com>
+Message-ID: <20180125153142.322ce343cjzxer7g@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 11:12:23PM +0800, Anson Huang wrote:
-> Add PU power domain support, GPU is the only
-> module inside PU power domain, and PU power
-> is supplied by LDO_SOC.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6sx.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index fd78793..42ef4c6 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -188,6 +188,7 @@
->  				 <&clks IMX6SX_CLK_GPU>,
->  				 <&clks IMX6SX_CLK_GPU>;
->  			clock-names = "bus", "core", "shader";
-> +			power-domains = <&pd_pu>;
->  		};
->  
->  		dma_apbh: dma-apbh at 1804000 {
-> @@ -767,6 +768,13 @@
->  					#address-cells = <1>;
->  					#size-cells = <0>;
->  
-> +					pd_pu: power-domain at 1 {
-> +						reg = <1>;
-> +						#power-domain-cells = <0>;
-> +						power-supply = <&reg_soc>;
+On Thu, Jan 25, 2018 at 10:46:15AM +0100, Code Kipper wrote:
+> On 25 January 2018 at 09:29, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Wed, Jan 24, 2018 at 12:39:31PM +0100, Code Kipper wrote:
+> >> On 24 January 2018 at 12:02, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > Hi,
+> >> >
+> >> > On Wed, Jan 24, 2018 at 11:39:43AM +0100, codekipper at gmail.com wrote:
+> >> >> From: Marcus Cooper <codekipper@gmail.com>
+> >> >>
+> >> >> Add the DAI blocks to the device tree. I2S0 and I2S1 are for
+> >> >> connecting to an external codec.
+> >> >>
+> >> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> >> >> ---
+> >> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
+> >> >>  1 file changed, 26 insertions(+)
+> >> >>
+> >> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> >> index f060a58f374c..f3354f8c2026 100644
+> >> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> >> @@ -419,6 +419,32 @@
+> >> >>                       status = "disabled";
+> >> >>               };
+> >> >>
+> >> >> +             i2s0: i2s at 1c22000 {
+> >> >> +                     #sound-dai-cells = <0>;
+> >> >> +                     compatible = "allwinner,sun8i-h3-i2s";
+> >> >
+> >> > Same remark than for the spdif, please add a soc-specific compatible.
+> >>
+> >> Is that really necessary?..
+> >
+> > Yes.
+> >
+> >> for example on the a20 the functionality of the i2s is the same as
+> >> the a10 so it is down as "allwinner,sun4i-a10-i2s", likewise here
+> >> it's the same as the changes required for the H3. I was planning on
+> >> using the compatible "allwinner,sun50i-a64-i2s" for the audio codec
+> >> as there are some quirks that need to be addressed.
+> >
+> > And this is exactly why it is necessary. If we ever find a quirk in
+> > the future, supporting that quirk will be smooth if we already have a
+> > compatible for that SoC in the DT, and a pain if we don't.
+> Hi Maxime,
+> so just to comfirm. I'll make this change
+> compatible = "allwinner,sun50i-a64-i2s", "allwinner,sun8i-h3-i2s"; to the dtsi
+> and later will add to the i2s driver the compatible
+> "allwinner,sun50i-a64-i2s-audio-codec"(or something other than
+> allwinner,sun50i-a64-i2s) for the quirks required for the i2s block
+> used for the audio codec.
 
-I wonder we may not need this as it's a non-stop domain
-just like we did for arm domain, right?
+That looks reasonable yes.
 
-Otherwise, the patch looks fine to me.
+Maxime
 
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
-
-Regards
-Dong Aisheng
-
-> +						clocks = <&clks IMX6SX_CLK_GPU>;
-> +					};
-> +
->  					pd_pci: power-domain at 3 {
->  						reg = <3>;
->  						#power-domain-cells = <0>;
-> -- 
-> 2.7.4
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180125/c8289507/attachment-0001.sig>
