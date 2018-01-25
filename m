@@ -1,32 +1,57 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Thu, 25 Jan 2018 18:02:59 +0000
-Subject: [RFC 25/37] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN2
+Date: Thu, 25 Jan 2018 18:02:56 +0000
+Subject: [RFC 22/37] watchdog: renesas_wdt: Add restart support
 In-Reply-To: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1516903391-30467-26-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1516903391-30467-23-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
-its driver by default.
+This commit extends the driver to add restart support by implementing
+the restart callback to trigger the watchdog as quickly as possible.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 ---
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/watchdog/renesas_wdt.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 578434c..f25bd1c 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
-+CONFIG_RENESAS_WDT_GEN2=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
+diff --git a/drivers/watchdog/renesas_wdt.c b/drivers/watchdog/renesas_wdt.c
+index 831ef83..120ddac 100644
+--- a/drivers/watchdog/renesas_wdt.c
++++ b/drivers/watchdog/renesas_wdt.c
+@@ -107,6 +107,24 @@ static unsigned int rwdt_get_timeleft(struct watchdog_device *wdev)
+ 	return DIV_BY_CLKS_PER_SEC(priv, 65536 - val);
+ }
+ 
++static int rwdt_restart(struct watchdog_device *wdev, unsigned long action,
++			void *data)
++{
++	struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
++
++	pm_runtime_get_sync(wdev->parent);
++
++	rwdt_write(priv, 0x00, RWTCSRB);
++	rwdt_write(priv, 0x00, RWTCSRA);
++	rwdt_write(priv, 0xffff, RWTCNT);
++
++	while (readb_relaxed(priv->base + RWTCSRA) & RWTCSRA_WRFLG)
++		cpu_relax();
++
++	rwdt_write(priv, 0x80, RWTCSRA);
++	return 0;
++}
++
+ static const struct watchdog_info rwdt_ident = {
+ 	.options = WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
+ 	.identity = "Renesas WDT Watchdog",
+@@ -118,6 +136,7 @@ static const struct watchdog_ops rwdt_ops = {
+ 	.stop = rwdt_stop,
+ 	.ping = rwdt_init_timeout,
+ 	.get_timeleft = rwdt_get_timeleft,
++	.restart = rwdt_restart,
+ };
+ 
+ static int rwdt_probe(struct platform_device *pdev)
 -- 
 2.7.4
