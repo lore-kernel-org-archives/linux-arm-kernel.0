@@ -1,73 +1,63 @@
 From: codekipper@gmail.com (Code Kipper)
-Date: Thu, 25 Jan 2018 10:03:51 +0100
-Subject: [PATCH 3/3] ASoC: sun4i-i2s: Add regmap field to sign extend
- sample
-In-Reply-To: <20180125084145.f4otos2kavo6rg7t@flea.lan>
-References: <20180124141101.12867-1-codekipper@gmail.com>
- <20180124141101.12867-4-codekipper@gmail.com>
- <20180125084145.f4otos2kavo6rg7t@flea.lan>
-Message-ID: <CAEKpxB=5nd2fqpAJQ4L6EFqxCZ=pkCvE9v5EYUR=6BGVYbwp_g@mail.gmail.com>
+Date: Thu, 25 Jan 2018 10:07:45 +0100
+Subject: [linux-sunxi][PATCH 5/5] arm64: allwinner: a64: Add DAI nodes
+In-Reply-To: <20180125082904.t4sqob626kyzw4ga@flea.lan>
+References: <20180124103943.2062-1-codekipper@gmail.com>
+ <20180124103943.2062-6-codekipper@gmail.com>
+ <20180124110222.cdglyg5m7644xiem@flea.lan>
+ <CAEKpxBk8NXJn4KxEGXx7UddqpUMC65kdEgx1phZDWyUd3ER_3Q@mail.gmail.com>
+ <20180125082904.t4sqob626kyzw4ga@flea.lan>
+Message-ID: <CAEKpxBmbz-dwF77PDs-mREHwDfXG3juXz7zUKcaMQKjz=1b+Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2018 at 09:41, Maxime Ripard
+On 25 January 2018 at 09:29, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Hi,
+> On Wed, Jan 24, 2018 at 12:39:31PM +0100, Code Kipper wrote:
+>> On 24 January 2018 at 12:02, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Wed, Jan 24, 2018 at 11:39:43AM +0100, codekipper at gmail.com wrote:
+>> >> From: Marcus Cooper <codekipper@gmail.com>
+>> >>
+>> >> Add the DAI blocks to the device tree. I2S0 and I2S1 are for
+>> >> connecting to an external codec.
+>> >>
+>> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> >> ---
+>> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
+>> >>  1 file changed, 26 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >> index f060a58f374c..f3354f8c2026 100644
+>> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> >> @@ -419,6 +419,32 @@
+>> >>                       status = "disabled";
+>> >>               };
+>> >>
+>> >> +             i2s0: i2s at 1c22000 {
+>> >> +                     #sound-dai-cells = <0>;
+>> >> +                     compatible = "allwinner,sun8i-h3-i2s";
+>> >
+>> > Same remark than for the spdif, please add a soc-specific compatible.
+>>
+>> Is that really necessary?..
 >
-> On Wed, Jan 24, 2018 at 03:11:01PM +0100, codekipper at gmail.com wrote:
->> From: Marcus Cooper <codekipper@gmail.com>
->>
->> On the newer SoCs this is set by default to transfer a 0 after
->> each sample in each slot. Add the regmap field to configure this
->> and set it so that it pads the sample with 0s.
->>
->> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->> ---
->>  sound/soc/sunxi/sun4i-i2s.c | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
->> index 626679057d0f..9fda1240b717 100644
->> --- a/sound/soc/sunxi/sun4i-i2s.c
->> +++ b/sound/soc/sunxi/sun4i-i2s.c
->> @@ -139,6 +139,7 @@
->>   * @field_fmt_bclk: regmap field to set clk polarity.
->>   * @field_fmt_lrclk: regmap field to set frame polarity.
->>   * @field_fmt_mode: regmap field to set the operational mode.
->> + * @field_fmt_sext: regmap field to set the sign extension.
->>   * @field_txchanmap: location of the tx channel mapping register.
->>   * @field_rxchanmap: location of the rx channel mapping register.
->>   * @field_txchansel: location of the tx channel select bit fields.
->> @@ -164,6 +165,7 @@ struct sun4i_i2s_quirks {
->>       struct reg_field                field_fmt_bclk;
->>       struct reg_field                field_fmt_lrclk;
->>       struct reg_field                field_fmt_mode;
->> +     struct reg_field                field_fmt_sext;
->>       struct reg_field                field_txchanmap;
->>       struct reg_field                field_rxchanmap;
->>       struct reg_field                field_txchansel;
->> @@ -188,6 +190,7 @@ struct sun4i_i2s {
->>       struct regmap_field     *field_fmt_bclk;
->>       struct regmap_field     *field_fmt_lrclk;
->>       struct regmap_field     *field_fmt_mode;
->> +     struct regmap_field     *field_fmt_sext;
->>       struct regmap_field     *field_txchanmap;
->>       struct regmap_field     *field_rxchanmap;
->>       struct regmap_field     *field_txchansel;
->> @@ -358,6 +361,9 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
->>                                  SUN8I_I2S_FMT0_LRCK_PERIOD_MASK,
->>                                  SUN8I_I2S_FMT0_LRCK_PERIOD(word_size));
->>
->> +     /* Set sign extension to pad out LSB with 0 */
->> +     regmap_field_write(i2s->field_fmt_sext, 0);
->> +
+> Yes.
 >
-> Your commit log seems to suggest that it's only relevant for the newer
-> SoCs (which ones?), yet you enable it for all the supported
-> ones. Either the code or the commit log should be adjusted to be
-> consistent with the other.
-ACK
-Thanks,
+>> for example on the a20 the functionality of the i2s is the same as
+>> the a10 so it is down as "allwinner,sun4i-a10-i2s", likewise here
+>> it's the same as the changes required for the H3. I was planning on
+>> using the compatible "allwinner,sun50i-a64-i2s" for the audio codec
+>> as there are some quirks that need to be addressed.
+>
+> And this is exactly why it is necessary. If we ever find a quirk in
+> the future, supporting that quirk will be smooth if we already have a
+> compatible for that SoC in the DT, and a pain if we don't.
+ACK, but is there any reason why we're not doing this for i2c?
+BR,
 CK
 >
 > Maxime
