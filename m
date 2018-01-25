@@ -1,153 +1,108 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Thu, 25 Jan 2018 11:09:30 +0900
-Subject: [PATCH 2/4] usb: dwc3: add dwc3 glue layer for UniPhier SoCs
-In-Reply-To: <87a7x3l8gr.fsf@linux.intel.com>
-References: <20180124215228.ED43.4A936039@socionext.com>
- <87a7x3l8gr.fsf@linux.intel.com>
-Message-ID: <20180125110929.C609.4A936039@socionext.com>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Thu, 25 Jan 2018 10:19:57 +0800
+Subject: [PATCH 2/2] ARM: imx: cpuidle-imx6q: configure CCM to RUN mode
+ when CPU is active
+In-Reply-To: <1516792585.6411.2.camel@pengutronix.de>
+References: <1514641999-20521-1-git-send-email-peng.fan@nxp.com>
+ <1514641999-20521-2-git-send-email-peng.fan@nxp.com>
+ <1516792585.6411.2.camel@pengutronix.de>
+Message-ID: <20180125021957.GA19344@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Felipe,
+Hi Lucas,
+On Wed, Jan 24, 2018 at 12:16:25PM +0100, Lucas Stach wrote:
+>Hi Peng,
+>
+>Am Samstag, den 30.12.2017, 21:53 +0800 schrieb Peng Fan:
+>> There are two states in i.MX6Q cpuidle driver.
+>> state[1]: ARM WFI mode
+>> state[2]: i.MX6Q WAIT mode
+>> 
+>> Take i.MX6DL as example, think out such a case:
+>> 1. CPU0/1 both run at normal mode
+>> 2. On CPU0, `sleep 1` is executed. And there are no workload on CPU1.
+>> 3. CPU0 first runs into state[2] and 'wfi' instruction. Switched to
+>> use
+>> ??????GPT broadcast.
+>> 4. CPU1 runs into state[2] and configure CCM to WAIT MODE,
+>> ??????then 'wfi' instruction. Now arm_clk and local timer clock are
+>> ??????shutdown. Switched to use GPT broadcast
+>> 5. GPT broadcast timer interrupt comes to GPC/GIC, then CPU0 wakes
+>> up.
+>> ??????CPU0 switched to use arm local timer. CPU1 is still sleeping.
+>> 6. No workload on CPU0, CPU0 runs into state[1]. But CCM register
+>> ??????is still not restored to Normal RUN mode. 'wfi' + CCM WAIT will
+>> ??????cause arm_clk and arm core clk.
+>> ??????Now CPU0 stops, which is not correct.
+>> 
+>> So, need to make sure CCM configured to RUN mode when any cpu exit
+>> state[2].
+>> 
+>> In this patch,
+>> When CPU exits state[2], it configures CCM to RUN mode.
+>> When all CPUs enters state[2], the last CPU needs to check
+>> whether it's ok to configure CCM to WAIT mode or not.
+>
+>To me this patch seems like we are adding duct tape to fix the issue.??
+>
+>It seems the whole master_lock thing doesn't properly work when the CPU
+>that is woken up by the timer broadcast isn't the last CPU going to
+>sleep. We should probably try to come up with a way to simplify this
+>whole master dance, instead of adding yet more complexity.
 
-On Wed, 24 Jan 2018 14:58:12 +0200 <balbi@kernel.org> wrote:
+The master_lock is used to protect multiple CPUS runs into State[1].
+It could not be used to protect the CPU runs into State[0].
 
-> 
-> Hi,
-> 
-> Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
-> > Hello Felipe,
-> >
-> > Thank you for your comments.
-> >
-> > On Tue, 23 Jan 2018 15:12:36 +0200 <balbi@kernel.org> wrote:
-> >
-> >> 
-> >> Hi,
-> >> 
-> >> Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
-> >> > Add a specific glue layer for UniPhier SoC platform to support
-> >> > USB host mode. It manages hardware operating sequences to enable multiple
-> >> > clock gates and assert resets, and to prepare to use dwc3 controller
-> >> > on the SoC.
-> >> >
-> >> > This patch also handles the physical layer that has same register space
-> >> > as the glue layer, because it needs to integrate initialziation sequence
-> >> > between glue and phy.
-> >> >
-> >> > In case of some SoCs, since some initialization values for PHY are
-> >> > included in nvmem, this patch includes the way to get the values from nvmem.
-> >> >
-> >> > It supports PXs2 and LD20 SoCs.
-> >> >
-> >> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> >> > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> >> > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
-> >> > ---
-> >> >  drivers/usb/dwc3/Kconfig         |   9 +
-> >> >  drivers/usb/dwc3/Makefile        |   1 +
-> >> >  drivers/usb/dwc3/dwc3-uniphier.c | 554 +++++++++++++++++++++++++++++++++++++++
-> >> >  3 files changed, 564 insertions(+)
-> >> >  create mode 100644 drivers/usb/dwc3/dwc3-uniphier.c
-> >
-> > ...snip...
-> >
-> >> > +
-> >> > +static void dwc3u_ssphy_testio_write(struct dwc3u_priv *priv, int port,
-> >> > +				     u32 data)
-> >> 
-> >> anything with sshphy or hsphy in the name should probably be part of a
-> >> PHY driver using drivers/phy/ framework.
-> >
-> > I can try to separate phy control from this driver.
-> > However, phy registers belongs to "dwc3-glue" IO map area (65b00000),
-> > and this area also contains a reset bit for "dwc3-core" hardware.
-> >
-> > Although the phy driver is called from dwc3-core driver,
-> > we need to deassert the reset bit before probing dwc3-core driver.
-> >
-> > As shown later, I think that it's difficut to determine the order of
-> > initializing the registers in this area.
-> >
-> >> > +static void dwc3u_vbus_disable(struct dwc3u_priv *priv)
-> >> > +{
-> >> > +	int i;
-> >> > +
-> >> > +	for (i = 0; i < priv->nvbus; i++) {
-> >> > +		dwc3u_maskwrite(priv, VBUS_CONTROL(i),
-> >> > +				DRVVBUS_REG_EN | DRVVBUS_REG,
-> >> > +				DRVVBUS_REG_EN | 0);
-> >> > +	}
-> >> > +}
-> >> 
-> >> drivers/regulator maybe?
-> >
-> > VBUS_CONTROL register is used for determing whether "dwc3-glue" hardware
-> > enables vbus connected with "regulator" hardware.
-> >
-> > The regulator driver should manage "regulator" hardware, and
-> > I don't think that the driver should manage this register.
-> >
-> >> > +static void dwc3u_reset_init(struct dwc3u_priv *priv)
-> >> > +{
-> >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
-> >> > +	usleep_range(1000, 2000);
-> >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, LINK_RESET);
-> >> > +}
-> >> > +
-> >> > +static void dwc3u_reset_clear(struct dwc3u_priv *priv)
-> >> > +{
-> >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
-> >> > +}
-> >> 
-> >> drivers/reset ?
-> >
-> > The reset driver manages "sysctrl" IO map area in our SoC.
-> >
-> > RESET_CTL register belongs to "dwc3-glue" IO map area,
-> > and the kernel can't access this area until enabling usb clocks and
-> > deasserting usb resets in "sysctrl".
-> >
-> > I think that "dwc3-glue" register control should be separated from
-> > "sysctrl".
-> 
-> Just split your address space and treat your glue as a device with
-> several children:
-> 
-> glue at 65b00000 {
-> 	compatible = "foo"
+The patch is to make sure that before arm clk turned off, need to check
+whether all the cpus are in State[1]. And the cpu who first wake up from
+State[1], need to configure CCM to RUN mode.
 
-Just to confirm, instead of SoC-specific glue driver, dwc3-of-simple.c
-should handle compatible "foo", right?
+This patch has been integrated into vendor kernel and fixed customer's issue.
+I could not think out of a better solution to restructure the master lock,
+and this may introduce new issues.
 
-> 
-> 	phy at bar {
->         	...
-> 	};
-> 
-> 	sysctrl at baz {
->         	...
-> 	};
-> 
-> 	dwc3 at foo {
->         	compatible = "snps, dwc3";
->                 ...
-> 	};
-> };
-> 
-> Then you know that you can let dwc3/core.c handle the PHY for you. If we
-> need to teach dwc3/core.c about regulators, we can do that. But we don't
-> need SoC-specific hacks ;-)
+Thanks,
+Peng.
 
-I also don't think that dwc3/core.c should have any SoC-specific controls.
-I've thought the SoC-specific glue driver (dwc3-***.c) calls "clocks",
-"resets", and "regulators".
+>
+>Regards,
+>Lucas
+>
+>> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+>> ---
+>> 
+>> V1:
+>> ??This is to upstream patch:
+>> ??http://git.freescale.com/git/cgit.cgi/imx/linux-imx.git/commit/?h=im
+>> x_4.9.11_1.0.0_ga&id=0d980646ee068b92db71fd5e4e4efcbc33749cbd
+>> 
+>> ??arch/arm/mach-imx/cpuidle-imx6q.c | 3 +++
+>> ??1 file changed, 3 insertions(+)
+>> 
+>> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-
+>> imx/cpuidle-imx6q.c
+>> index bfeb25aaf9a2..4d342e2fdfe6 100644
+>> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
+>> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+>> @@ -30,6 +30,8 @@ static int imx6q_enter_wait(struct cpuidle_device
+>> *dev,
+>> ??		if (!spin_trylock(&master_lock))
+>> ??			goto idle;
+>> ??		imx6_set_lpm(WAIT_UNCLOCKED);
+>> +		if (atomic_read(&master) != num_online_cpus())
+>> +			imx6_set_lpm(WAIT_CLOCKED);
+>> ??		cpu_do_idle();
+>> ??		imx6_set_lpm(WAIT_CLOCKED);
+>> ??		spin_unlock(&master_lock);
+>> @@ -41,6 +43,7 @@ static int imx6q_enter_wait(struct cpuidle_device
+>> *dev,
+>> ??done:
+>> ??	atomic_dec(&master);
+>> ??
+>> +	imx6_set_lpm(WAIT_CLOCKED);
+>> ??	return index;
+>> ??}
+>> ??
 
-However, although dwc3-of-simple.c can handle "clocks", it can't handle
-"resets" and "regulators". Who should call them?
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+-- 
