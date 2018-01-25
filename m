@@ -1,27 +1,22 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 25 Jan 2018 21:11:03 +0530
-Subject: [RESEND] phy: da8xx-usb: rename clock con_ids
-In-Reply-To: <1516731283-26388-1-git-send-email-david@lechnology.com>
-References: <1516731283-26388-1-git-send-email-david@lechnology.com>
-Message-ID: <dbf02743-10ee-ccce-5f9c-2be8de075832@ti.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 25 Jan 2018 16:45:12 +0100
+Subject: [PATCH 0/2] Input: sirfsoc-onkey: Adjustments for sirfsoc_pwrc_probe()
+Message-ID: <b66f4105-57f2-adc2-ecde-cd4dacac408c@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 January 2018 11:44 PM, David Lechner wrote:
-> This renames the clock con_ids in the DA8XX USB PHY driver as well as
-> the matching names in the mach clock registration code.
-> 
-> This is in preparation for using device tree clocks where these names
-> will become part of the device tree bindings. The new names more closely
-> match the names used in the USB clock diagram in the SoC TRM.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 25 Jan 2018 16:42:24 +0100
 
-Looks good to me.
+Two update suggestions were taken into account
+from static source code analysis.
 
-Kishon, like with the other patch touching phy-da8xx-usb.c, I would like
-to queue this through my tree and provide an immutable commit to you.
-Let me know.
+Markus Elfring (2):
+  Delete an error message for a failed memory allocation
+  Improve a size determination
 
-Thanks,
-Sekhar
+ drivers/input/misc/sirfsoc-onkey.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+-- 
+2.16.1
