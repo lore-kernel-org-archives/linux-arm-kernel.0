@@ -1,174 +1,353 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 25 Jan 2018 12:02:12 +0000
-Subject: [PATCH v3] iommu/mediatek: Move attach_device after iommu-group
- is ready for M4Uv1
-In-Reply-To: <1516878844-23021-1-git-send-email-yong.wu@mediatek.com>
-References: <1516878844-23021-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <d22d221c-9609-12bf-490d-202ebfb6c38a@arm.com>
+Date: Thu, 25 Jan 2018 12:11:14 +0000
+Subject: [PATCH RFC 0/3] API for 128-bit IO access
+In-Reply-To: <20180125113843.vgv6kyp7qjd75qif@yury-thinkpad>
+References: <CAK8P3a3TEV7Uyo_oBcMz_GYEYTB+V5AhDgbOgCEW-+X1h7sXEg@mail.gmail.com>
+ <20180125113843.vgv6kyp7qjd75qif@yury-thinkpad>
+Message-ID: <8999df0f-910a-21f8-e66d-3deedecdad3d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/18 11:14, Yong Wu wrote:
-> In the commit 05f80300dc8b, the iommu framework has supposed all the
-> iommu drivers have their owner iommu-group, it get rid of the FIXME
-> workarounds while the group is NULL. But the flow of Mediatek M4U gen1
-> looks a bit trick that it will hang at this case:
+On 25/01/18 11:38, Yury Norov wrote:
+> On Wed, Jan 24, 2018 at 11:28:55AM +0100, Arnd Bergmann wrote:
+>> On Wed, Jan 24, 2018 at 10:05 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>>> This series adds API for 128-bit memory IO access and enables it for ARM64.
+>>> The original motivation for 128-bit API came from new Cavium network device
+>>> driver. The hardware requires 128-bit access to make things work. See
+>>> description in patch 3 for details.
+>>
+>> We might also want to do something similar to the
+>> include/linux/io-64-nonatomic-lo-hi.h
+>> and hi-lo.h files, to simulate 128-bit access using pairs of 64-bit access on
+>> other targets. It's apparently driver specific which half you need to do first
+>> to make it work, so we need both.
 > 
-> ==========================================
-> Unable to handle kernel NULL pointer dereference at virtual address 00000030
-> pgd = c0004000
-> [00000030] *pgd=00000000
-> PC is at mutex_lock+0x28/0x54
-> LR is at iommu_attach_device+0xa4/0xd4
-> pc : [<c07632e8>]    lr : [<c04736fc>]    psr: 60000013
-> sp : df0edbb8  ip : df0edbc8  fp : df0edbc4
-> r10: c114da14  r9 : df2a3e40  r8 : 00000003
-> r7 : df27a210  r6 : df2a90c4  r5 : 00000030  r4 : 00000000
-> r3 : df0f8000  r2 : fffff000  r1 : df29c610  r0 : 00000030
-> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> xxx
-> (mutex_lock) from [<c04736fc>] (iommu_attach_device+0xa4/0xd4)
-> (iommu_attach_device) from [<c011b9dc>] (__arm_iommu_attach_device+0x28/0x90)
-> (__arm_iommu_attach_device) from [<c011ba60>] (arm_iommu_attach_device+0x1c/0x30)
-> (arm_iommu_attach_device) from [<c04759ac>] (mtk_iommu_add_device+0xfc/0x214)
-> (mtk_iommu_add_device) from [<c0472aa4>] (add_iommu_group+0x3c/0x68)
-> (add_iommu_group) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> (bus_for_each_dev) from [<c04734a4>] (bus_set_iommu+0xb0/0xec)
-> (bus_set_iommu) from [<c0476310>] (mtk_iommu_probe+0x328/0x368)
-> (mtk_iommu_probe) from [<c048189c>] (platform_drv_probe+0x5c/0xc0)
-> (platform_drv_probe) from [<c047f510>] (driver_probe_device+0x2f4/0x4d8)
-> (driver_probe_device) from [<c047f800>] (__driver_attach+0x10c/0x128)
-> (__driver_attach) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> (bus_for_each_dev) from [<c047ec78>] (driver_attach+0x2c/0x30)
-> (driver_attach) from [<c047e640>] (bus_add_driver+0x1e0/0x278)
-> (bus_add_driver) from [<c048052c>] (driver_register+0x88/0x108)
-> (driver_register) from [<c04817ec>] (__platform_driver_register+0x50/0x58)
-> (__platform_driver_register) from [<c0b31380>] (m4u_init+0x24/0x28)
-> (m4u_init) from [<c0101c38>] (do_one_initcall+0xf0/0x17c)
-> =========================
-> 
-> The root cause is that the device's iommu-group is NULL while
-> arm_iommu_attach_device is called. This patch prepare a new iommu-group
-> for the iommu consumer devices to fix this issue.
-> 
-> CC: Robin Murphy <robin.murphy@arm.com>
-> CC: Honghui Zhang <honghui.zhang@mediatek.com>
-> Fixes: 05f80300dc8b ('iommu: Finish making iommu_group support mandatory')
-> Reported-by: Ryder Lee <ryder.lee@mediatek.com>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
-> changes notes:
-> v3: don't use the global variable and allocate a new iommu group before
->      arm_iommu_attach_device following Robin's suggestion.
-> 
-> v2: http://lists.infradead.org/pipermail/linux-mediatek/2018-January/011810.html
->     Add mtk_domain_v1=NULL in domain_free for symmetry.
-> 
-> v1: https://patchwork.kernel.org/patch/10176255/
-> ---
->   drivers/iommu/mtk_iommu_v1.c | 49 ++++++++++++++++++++++----------------------
->   1 file changed, 25 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> index 542930c..aca76d2 100644
-> --- a/drivers/iommu/mtk_iommu_v1.c
-> +++ b/drivers/iommu/mtk_iommu_v1.c
-> @@ -418,20 +418,12 @@ static int mtk_iommu_create_mapping(struct device *dev,
->   		m4udev->archdata.iommu = mtk_mapping;
->   	}
+> OK, will do.
 >   
-> -	ret = arm_iommu_attach_device(dev, mtk_mapping);
-> -	if (ret)
-> -		goto err_release_mapping;
-> -
->   	return 0;
-> -
-> -err_release_mapping:
-> -	arm_iommu_release_mapping(mtk_mapping);
-> -	m4udev->archdata.iommu = NULL;
-> -	return ret;
->   }
->   
->   static int mtk_iommu_add_device(struct device *dev)
->   {
-> +	struct dma_iommu_mapping *mtk_mapping;
->   	struct of_phandle_args iommu_spec;
->   	struct of_phandle_iterator it;
->   	struct mtk_iommu_data *data;
-> @@ -452,9 +444,30 @@ static int mtk_iommu_add_device(struct device *dev)
->   	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
->   		return -ENODEV; /* Not a iommu client device */
->   
-> +	/*
-> +	 * This is a short-term bodge because the ARM DMA code doesn't
-> +	 * understand multi-device groups, but we have to call into it
-> +	 * successfully (and not just rely on a normal IOMMU API attach
-> +	 * here) in order to set the correct DMA API ops on @dev.
-> +	 */
-> +	group = iommu_group_alloc();
-> +	if (IS_ERR(group))
-> +		return PTR_ERR(group);
-> +
-> +	err = iommu_group_add_device(group, dev);
-> +	iommu_group_put(group);
-> +	if (err)
-> +		return err;
-> +
->   	data = dev->iommu_fwspec->iommu_priv;
-> -	iommu_device_link(&data->iommu, dev);
-> +	mtk_mapping = data->dev->archdata.iommu;
-> +	err = arm_iommu_attach_device(dev, mtk_mapping);
-> +	if (err) {
-> +		iommu_group_remove_device(dev);
-> +		return err;
-> +	}
->   
-> +	iommu_device_link(&data->iommu, dev);
->   	group = iommu_group_get_for_dev(dev);
+>>> Also, starting from ARMv8.4, stp and ldp instructions become atomic, and
+>>> API for 128-bit access would be helpful in core arm64 code.
+>>>
+>>> This series is RFC. I'd like to collect opinions on idea and implementation
+>>> details.
+>>> * I didn't implement all 128-bit operations existing for 64-bit variables
+>>> and other types (__swab128p etc). Do we need them all right now, or we
+>>> can add them when actually needed?
+>>
+>> I think in this case it's better to do them all at once.
+> 
+> Ack.
+> 
+>>> * u128 name is already used in crypto code. So here I use __uint128_t that
+>>> comes from GCC for 128-bit types. Should I rename existing type in crypto
+>>> and make core code for 128-bit variables consistent with u64, u32 etc? (I
+>>> think yes, but would like to ask crypto people for it.)
+>>
+>> Hmm, that file probably predates the __uint128_t support. My guess would
+>> be that the crypto code using it can actually benefit from the new types as
+>> well, so maybe move the existing file to include/linux/int128.h and add
+>> an #if/#else logic to it so we use 'typedef __uint128_t __u128' if that
+>> is available.
+> 
+> It sounds reasonable. But I worry about testing that changes. Hope,
+> crypto community will help with it.
+> 
+>>> * Some compilers don't support __uint128_t, so I protected all generic code
+>>> with config option HAVE_128BIT_ACCESS. I think it's OK, but...
+>>
+>> That would be nicely solved by using the #if/#else definition above.
+>>
+>>> * For 128-bit read/write functions I take suffix 'o', which means read/write
+>>> the octet of bytes. Is this name OK?
+>>
+>> Can't think of anything better. It's not an octet though, but 16 bytes
+>> ('q' is for quadword, meaning four 16-bit words in Intel terminology).
+> 
+> Ah, sure. Octet of words. Will change it.
+> 
+>>> * my mips-linux-gnu-gcc v6.3.0 doesn't support __uint128_t, and I
+>>> don't have other BE setup on hand, so BE case is formally not tested.
+>>> BE code for arm64 is looking well though.
+>>
+>> I've run it through my collection of compilers, it seems that most but not
+>> all 64-bit targets support it (exceptions appear to be older versions of
+>> gcc for s390x and parisc), and none of the 32-bit targets do:
+> 
+> Thanks for doing this test. Looking at this I realize that this is
+> not the architecture feature but compiler feature. So if we add
+> 128-bit interface, it would be reasonable to add it for all targets
+> that compiled with toolchain supporting 128-bit accesses.
+> 
+> There's already the option ARCH_SUPPORTS_INT128 that is enabled for
+> x86_64 in arch/x86/Kconfig and conditionally enabled for arm64 in
+> arch/arm64/Makefile:
+> KBUILD_CFLAGS    += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+> 
+> It is used in include/linux/math64.h and in lib/ubsan.c, not so wide.
+> 
+> So I find things little messed. Crypto code ignores compilers' ability
+> to operate with 128-bit numbers. Ubsan and math64 relies on compiler
+> version (at least for arm64, and I doubt it would work correctly with clang).
+> And now I introduce HAVE_128BIT_ACCESS with the same meaning for memory
+> access.
+> 
+> I think it's time to unify 128-bit code:
+>   - enable CONFIG_ARCH_SUPPORTS_INT128 if compiler supports it, ie check
+>     it like you do below;
+>   - declare u128 as structure or typedef depending on ARCH_SUPPORTS_INT128
+>     in generic include/linux/int128.h, as you suggest here;
+>   - switch this series to ARCH_SUPPORTS_INT128.
+> 
+> Does it sound reasonable?
 
-This call now does nothing, so you may as well remove it (and the 
-subsequent iommu_group_put)...
-
->   	if (IS_ERR(group))
->   		return PTR_ERR(group);
-> @@ -479,20 +492,8 @@ static void mtk_iommu_remove_device(struct device *dev)
->   
->   static struct iommu_group *mtk_iommu_device_group(struct device *dev)
->   {
-> -	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
-> -
-> -	if (!data)
-> -		return ERR_PTR(-ENODEV);
-> -
-> -	/* All the client devices are in the same m4u iommu-group */
-> -	if (!data->m4u_group) {
-> -		data->m4u_group = iommu_group_alloc();
-> -		if (IS_ERR(data->m4u_group))
-> -			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
-> -	} else {
-> -		iommu_group_ref_get(data->m4u_group);
-> -	}
-> -	return data->m4u_group;
-> +	/* The iommu-group has always been allocated in add_device. */
-> +	return NULL;
-
-... and get rid of this and the mtk_iommu_ops.device_group callback 
-entirely.
-
-If you're moving the arm_iommu_attach_device() call anyway though, 
-another clean option would be put it after iommu_group_get_for_dev() and 
-switch .device_group to generic_device_group - I *think* that should be 
-directly equivalent to the open-coded iommu_group_alloc/add_device.
-
-I admit I was somewhat hoping we could confine the ARM-specific stuff to 
-mtk_iommu_create_mapping() and let all the "correct" IOMMU API code stay 
-in the right places even if it would strictly be unused. On reflection 
-though, that's clearly a bit silly, since we can always easily bring it 
-back via a revert in future.
+It probably is about time to formalise the current scattered fragments 
+of uint_128_t support, but to reiterate Will's comment it is almost 
+certainly not worth the effort to implement 'generic' I/O accessors 
+which only work under implementation-defined and undiscoverable hardware 
+conditions, and will be unusable on the overwhelming majority of 
+systems. Just open-code LDP/STP accessors in the one driver which needs 
+them and (by definition) only runs on SoCs where they *are* known to 
+work correctly.
 
 Robin.
 
->   }
->   
->   static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+> 
+> Yury
+> 
+>> $ for i in /home/arnd/cross-gcc/bin/*gcc-[3-8]* ; do echo -n $i" " ;
+>> echo '__uint128_t v;' | $i -xc -S - -o /dev/null && echo ok ; done
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-4.8.5 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-4.9.3 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-4.9.4 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-5.2.1 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-5.4.1 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-5.5.0 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-6.3.1 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.0.0 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.0.1 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.1.1 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/aarch64-linux-gcc-8.0.0 ok
+>> /home/arnd/cross-gcc/bin/alpha-linux-gcc-4.1.3 ok
+>> /home/arnd/cross-gcc/bin/alpha-linux-gcc-4.3.6 ok
+>> /home/arnd/cross-gcc/bin/alpha-linux-gcc-4.9.3 ok
+>> /home/arnd/cross-gcc/bin/alpha-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/am33_2.0-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/am33_2.0-linux-gcc-5.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/am33_2.0-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/arc-elf-gcc-7.2.1 <stdin>:1:1: error: unknown
+>> type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-3.4.6 ok
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.4.7 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.5.4 <stdin>:1:13:
+>> error: expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.6.4 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.7.4 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.8.5 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.0 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.2 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.3 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-4.9.4 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.0.0 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.1.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.2.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.3.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.4.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-5.5.0 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-6.0.0 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-6.1.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-6.3.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.0.0 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.0.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.1.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-7.2.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/arm-linux-gnueabi-gcc-8.0.0 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/bfin-uclinux-gcc-7.0.0
+>> bfin-uclinux-gcc-7.0.0: error trying to exec 'cc1': execvp: No such
+>> file or directory
+>> /home/arnd/cross-gcc/bin/bfin-uclinux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/c6x-elf-gcc-7.2.1 <stdin>:1:1: error: unknown
+>> type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/cris-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/cris-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/cris-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/cris-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/frv-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/frv-linux-gcc-4.3.6 <stdin>:1: internal
+>> compiler error: in default_secondary_reload, at targhooks.c:618
+>> Please submit a full bug report,
+>> with preprocessed source if appropriate.
+>> See <http://gcc.gnu.org/bugs.html> for instructions.
+>> /home/arnd/cross-gcc/bin/frv-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/frv-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/h8300-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/hppa64-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/hppa64-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/hppa-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/hppa-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/hppa-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/hppa-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/i386-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/i386-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/ia64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/m32r-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/m32r-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/m32r-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/m32r-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/m68k-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/m68k-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/m68k-linux-gcc-6.0.0 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/m68k-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/microblaze-linux-gcc-4.9.3 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/microblaze-linux-gcc-7.2.1 <stdin>:1:1:
+>> error: unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/mips64-linux-gcc-4.9.3 ok
+>> /home/arnd/cross-gcc/bin/mips64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.0.4 <stdin>:1: error: syntax
+>> error before 'v'
+>> <stdin>:1: warning: data definition has no type or storage class
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-7.0.0 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-7.0.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/mips-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/nios2-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/parisc-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-4.1.3 ok
+>> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-4.3.6 ok
+>> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-4.9.3 ok
+>> /home/arnd/cross-gcc/bin/powerpc64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/powerpc-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/powerpc-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/riscv32-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/riscv64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/s390-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/s390-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/s390-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/s390-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/sh2-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/sh3-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/sh3-linux-gcc-4.3.6 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/sh3-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/sh4-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/sh-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/sparc64-linux-gcc-4.9.3 ok
+>> /home/arnd/cross-gcc/bin/sparc64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/sparc-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/sparc-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/sparc-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/tilegx-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/tilepro-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-3.4.6 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.0.4 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.1.3 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.2.5 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.3.6 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.4.7 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.5.4 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.6.4 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.7.4 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.8.5 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.9.3 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-4.9.4 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-5.4.1 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-5.5.0 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-6.1.1 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-6.3.1 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.0.0 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.0.1 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.1.1 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-7.2.1 ok
+>> /home/arnd/cross-gcc/bin/x86_64-linux-gcc-8.0.0 ok
+>> /home/arnd/cross-gcc/bin/xtensa-linux-gcc-4.1.3 <stdin>:1: error:
+>> expected '=', ',', ';', 'asm' or '__attribute__' before 'v'
+>> /home/arnd/cross-gcc/bin/xtensa-linux-gcc-4.9.3 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'
+>> /home/arnd/cross-gcc/bin/xtensa-linux-gcc-7.2.1 <stdin>:1:1: error:
+>> unknown type name '__uint128_t'; did you mean '__int128'?
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
