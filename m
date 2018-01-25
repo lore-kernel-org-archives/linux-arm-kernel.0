@@ -1,40 +1,40 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Thu, 25 Jan 2018 18:24:37 +0800
-Subject: [PATCH v4 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <c05d4794-b76d-cfaa-d7ed-c44108117ee2@rock-chips.com>
-References: <20180118115251.5542-1-jeffy.chen@rock-chips.com>
- <20180118115251.5542-9-jeffy.chen@rock-chips.com>
- <c188e6a9-744c-d984-545c-408607f35cc9@arm.com>
- <5A60AE41.2050101@rock-chips.com>
- <1f4b3c0d-1414-0012-a072-f4a11f432c21@rock-chips.com>
- <5A654925.9020203@rock-chips.com> <5A6563FA.8080602@rock-chips.com>
- <c05d4794-b76d-cfaa-d7ed-c44108117ee2@rock-chips.com>
-Message-ID: <5A69B065.30501@rock-chips.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 25 Jan 2018 15:37:29 +0800
+Subject: [PATCH 2/2] nvmem: imx-ocotp: remove unused dead code
+In-Reply-To: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
+References: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1516865849-26191-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2018 05:42 PM, Randy Li wrote:
->>>
->>
->> confirmed with Simon, there might be some iommus don't have a pd, and
-> We use the pd to control the NIU node(not on upstream), without a pd or
-> fake pd, none of the platform would work.
-after talked offline, it's possible to have iommu without pd in upstream 
-kernel(and chromeos kernel), but on our internal kernel, the drivers 
-would require pd(or fake pd) to reset modules when error happens.
+remove unused dead code
 
-anyway, i think that means we do need clock control here.
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ drivers/nvmem/imx-ocotp.c | 2 --
+ 1 file changed, 2 deletions(-)
 
->> the CONFIG_PM could be disabled.I am hard to believe a modern platform
->> can work without that.
->>
->> so it might be better to control clocks in iommu driver itself.
->I won't
-> insist how the version of the iommu patch on the upstream, I
-> just post an idea here.
-> The version for kernel 4.4 is under internal review, the implementation
-> has been modified many times.
->
-> I would suggest the managing clocks in pd is a more easy way and don't
-> need to spare those thing in two places.
+diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
+index d7ba351..4f61fbd 100644
+--- a/drivers/nvmem/imx-ocotp.c
++++ b/drivers/nvmem/imx-ocotp.c
+@@ -439,7 +439,6 @@ MODULE_DEVICE_TABLE(of, imx_ocotp_dt_ids);
+ 
+ static int imx_ocotp_probe(struct platform_device *pdev)
+ {
+-	const struct of_device_id *of_id;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+ 	struct ocotp_priv *priv;
+@@ -460,7 +459,6 @@ static int imx_ocotp_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv->clk))
+ 		return PTR_ERR(priv->clk);
+ 
+-	of_id = of_match_device(imx_ocotp_dt_ids, dev);
+ 	priv->params = of_device_get_match_data(&pdev->dev);
+ 	imx_ocotp_nvmem_config.size = 4 * priv->params->nregs;
+ 	imx_ocotp_nvmem_config.dev = dev;
+-- 
+2.7.4
