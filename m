@@ -1,67 +1,47 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 25 Jan 2018 12:09:42 +0100
-Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-3-l.stach@pengutronix.de>
- <20180123103931.GE27764@dragon>
- <278bb44610b8a27826550732095aba03@codeaurora.org>
- <1516876300.6411.25.camel@pengutronix.de>
- <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
-Message-ID: <1516878582.6411.27.camel@pengutronix.de>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Thu, 25 Jan 2018 03:11:32 -0800
+Subject: [PATCH v3] net: ethernet: cavium: Correct Cavium Thunderx NIC
+ module and driver names
+In-Reply-To: <20180124.162737.1427515957453841771.davem@davemloft.net>
+References: <1516290789-3585-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <1516630407-23161-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <20180124.162737.1427515957453841771.davem@davemloft.net>
+Message-ID: <20180125111132.GA6458@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 25.01.2018, 18:49 +0800 schrieb Dong Aisheng:
-> On 2018-01-25 18:31, Lucas Stach wrote:
-> > Am Donnerstag, den 25.01.2018, 18:10 +0800 schrieb?
-> > aisheng.dong at codeaurora.org:
-[...]
-> AFAIK we switched to generic pinconfig since MX7ULP as maintainer?
-> > > won't
-> > > access old binding pinctrl drivers.
+On Wed, Jan 24, 2018 at 04:27:37PM -0500, David Miller wrote:
+> From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> Date: Mon, 22 Jan 2018 06:13:27 -0800
+> 
+> > From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > > 
-> > I'm not convinced that the generic pinconf is good fit. For pingroups
-> > with different configs for some of the pins, like the example above, we
-> > would need to split things into multiple DT nodes. This really hurts
-> > readability, so I'm not going to switch to the generic stuff without
-> > some really convincing arguments.
+> > It was found that ethtool provides unexisting module name while
+> > it queries the specified network device for associated driver
+> > information. Then user tries to unload that module by provided
+> > module name and fails.
 > > 
+> > This happens because ethtool reads value of DRV_NAME macro,
+> > while module name is defined at the driver's Makefile.
+> > 
+> > This patch is to correct Cavium CN88xx Thunder NIC driver modules
+> > names 'nicvf' to 'thunder_nicvf' and 'nicpf' to 'thunder_nicpf' along
+> > with updating DRV_NAME macro values accordingly.
+> > 
+> > Signed-off-by: Dean Nelson <dnelson@redhat.com>
+> > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > 
-> Per my understanding, based on the last discussion with Linus W, we?
-> actually did this in order to increase the readability that 1) user does
-> not need?to see the 'ugly' unreadable raw data and refer to reference
-> manual 2)?unified generic binding format which already exist in kernel
-> and used by many platforms.
+> Once your driver has been deployed in a real upstream release you
+> should never change the driver module name.
 > 
-> Actually MXS platform already used it for many years in a similar way.
-> So IMHO a little hurt to add another node for different pad setting in?
-> the same group won't be enough reason to stop switching to generic config.
+> So if you want to fix things, you'll have to fix them the other
+> way around, by not changing the module name but changing the
+> strings that ethtool ends up with instead.
 > 
-> Does it make sense?
+> Thank you.
 
-I know that Linus W is pushing for this common pinconf thing in the
-name of readability. It's just that I don't think it's such a clear
-win.
+Ok, understood.
+Will update patch and re-send.
 
-After all you still need to look into the reference manual or binding
-to see which values in the common binding correspond to a specific
-drive/pull strength, etc.
-
-On the other hand it really bloats the DT description of the pin
-configuration. If you want to look at an (IMHO) bad example, go look at
-the Tegra DTs. The Tegra pincontrol implements the "separate properties
-for each pinconf option" that is pushed by Linus W. This bloated the DT
-description to the point that no-one is able/willing to write those
-descriptions anymore and the only viable way to get them is to auto-
-generate them from some spreadsheets. Not really what I would call an
-readable...
-
-Maybe I'm a little stubborn when it comes to this topic, but at
-Pengutronix we see a lot of customer designs where we need to come up
-with the board DT. Bloating each one of those and making the work of
-the developers harder in the name of a readability win that I just
-don't see doesn't sound like something I want to support. :)
-	
-Regards,
-Lucas
+Thank you.
+Vadim
