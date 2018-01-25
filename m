@@ -1,58 +1,103 @@
-From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
-Date: Thu, 25 Jan 2018 22:00:23 +0000
-Subject: DRM: double free in rcar_du_vsp.c
-In-Reply-To: <f61c270f-219c-56e5-a03d-e9a3e122d4b4@epam.com>
-References: <234140a7-8538-3ec4-1c40-e6ebcc42be8f@epam.com>
- <f61c270f-219c-56e5-a03d-e9a3e122d4b4@epam.com>
-Message-ID: <8130932d-7b03-291b-df4f-3227c089fcc4@ideasonboard.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jan 2018 14:19:26 -0800
+Subject: [PATCH] clk: Properly update prepare/enable count on orphan
+ clock reparent
+In-Reply-To: <20180115115214.10303-1-m.szyprowski@samsung.com>
+References: <CGME20180115115231eucas1p1499f46ca64b65598d03a182ed5670f28@eucas1p1.samsung.com>
+ <20180115115214.10303-1-m.szyprowski@samsung.com>
+Message-ID: <20180125221926.GA28313@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Volodymyr,
-
-My apologies for the silence on this thread, but it has not been ignored.
-
-I believe Laurent has investigated this issue, and prepared a patch
-locally on his tree. However, he is currently out-of-office with travel and may
-not find time to reply to this thread this week or next.
-
-I suspect after a bit of testing and polish he will send it out for
-review/integration, or inclusion in a mainline pull-request.
---
-Regards
-
-Kieran
-
-On 24/01/18 12:04, Volodymyr Babchuk wrote:
+On 01/15, Marek Szyprowski wrote:
+> If orphaned clock has been already prepared/enabled (for example if it or
+> one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+> counters of the newly assigned parent are not updated correctly. This
+> might later cause warnings during changing clock parents.
 > 
-> Looping in DRM maintainer.
+> This patch fixes following warning on Exynos5422-based boards:
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:811 clk_core_disable_lock+0x18/0x24
+> Modules linked in:
+> CPU: 0 PID: 59 Comm: kworker/0:1 Not tainted 4.15.0-rc7-next-20180115 #106
+> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> Workqueue: pm genpd_power_off_work_fn
+> [<c0111504>] (unwind_backtrace) from [<c010dbec>] (show_stack+0x10/0x14)
+> [<c010dbec>] (show_stack) from [<c09b3f34>] (dump_stack+0x90/0xc8)
+> [<c09b3f34>] (dump_stack) from [<c0125060>] (__warn+0xe4/0x110)
+> [<c0125060>] (__warn) from [<c01250cc>] (warn_slowpath_null+0x40/0x48)
+> [<c01250cc>] (warn_slowpath_null) from [<c048d584>] (clk_core_disable_lock+0x18/0x24)
+> [<c048d584>] (clk_core_disable_lock) from [<c048e490>] (clk_core_disable_unprepare+0xc/0x20)
+> [<c048e490>] (clk_core_disable_unprepare) from [<c048ea60>] (__clk_set_parent_after+0x48/0x4c)
+> [<c048ea60>] (__clk_set_parent_after) from [<c048ec88>] (clk_core_set_parent_nolock+0x224/0x5b4)
+> [<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>] (clk_set_parent+0x38/0x6c)
+> [<c048f23c>] (clk_set_parent) from [<c049c41c>] (exynos_pd_power+0x74/0x1cc)
+> [<c049c41c>] (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+> [<c0550768>] (genpd_power_off) from [<c0550b34>] (genpd_power_off_work_fn+0x2c/0x40)
+> [<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>] (process_one_work+0x1d0/0x7bc)
+> [<c01432e4>] (process_one_work) from [<c014393c>] (worker_thread+0x34/0x4dc)
+> [<c014393c>] (worker_thread) from [<c014a0d0>] (kthread+0x128/0x164)
+> [<c014a0d0>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+> Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+> 1fa0:                                     00000000 00000000 00000000 00000000
+> 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+> ---[ end trace 503c239fb760f17a ]---
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:684 clk_core_disable_unprepare+0x18/0x20
+> Modules linked in:
+> CPU: 0 PID: 59 Comm: kworker/0:1 Tainted: G        W        4.15.0-rc7-next-20180115 #106
+> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> Workqueue: pm genpd_power_off_work_fn
+> [<c0111504>] (unwind_backtrace) from [<c010dbec>] (show_stack+0x10/0x14)
+> [<c010dbec>] (show_stack) from [<c09b3f34>] (dump_stack+0x90/0xc8)
+> [<c09b3f34>] (dump_stack) from [<c0125060>] (__warn+0xe4/0x110)
+> [<c0125060>] (__warn) from [<c01250cc>] (warn_slowpath_null+0x40/0x48)
+> [<c01250cc>] (warn_slowpath_null) from [<c048e49c>] (clk_core_disable_unprepare+0x18/0x20)
+> [<c048e49c>] (clk_core_disable_unprepare) from [<c048ea60>] (__clk_set_parent_after+0x48/0x4c)
+> [<c048ea60>] (__clk_set_parent_after) from [<c048ec88>] (clk_core_set_parent_nolock+0x224/0x5b4)
+> [<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>] (clk_set_parent+0x38/0x6c)
+> [<c048f23c>] (clk_set_parent) from [<c049c41c>] (exynos_pd_power+0x74/0x1cc)
+> [<c049c41c>] (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+> [<c0550768>] (genpd_power_off) from [<c0550b34>] (genpd_power_off_work_fn+0x2c/0x40)
+> [<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>] (process_one_work+0x1d0/0x7bc)
+> [<c01432e4>] (process_one_work) from [<c014393c>] (worker_thread+0x34/0x4dc)
+> [<c014393c>] (worker_thread) from [<c014a0d0>] (kthread+0x128/0x164)
+> [<c014a0d0>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+> Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+> 1fa0:                                     00000000 00000000 00000000 00000000
+> 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+> ---[ end trace 503c239fb760f17b ]---
+> ------------[ cut here ]------------
 > 
->> Hello,
->>
->> I have found issue with double free() in RCAR DU VSP driver. it is
->> caused by rcar_du_vsp_plane_atomic_duplicate_state(), which duplicates
->> struct rcar_du_vsp_plane_state. This struct holds sg_tables which are
->> then freed in rcar_du_vsp_plane_cleanup_fb(). This function is called
->> for every rcar_du_vsp_plane_state, so it calls sg_free_table() twice for
->> the same sg_table.
->>
->> I'm not familiar with DRM, so I can't say why this does not occur every
->> time, but this bug caused problems on our setup from time to time. Looks
->> like it occurs only under heavy system load.
->>
->> As I said, I'm not good in DRM, so I don't know the proper fix. But you
->> can find workaround at [1]. I don't know how good it is, but at least
->> it resolved issue on our setup. If drm guys think that this fix is fine
->> enough, I can push it to the? ML for a proper review.
->>
->> [1]
->> https://github.com/lorc/linux/commit/80155506d3499273155366a1d263a81baface718
->>
->> Cheers,
->> --?
->> Volodymyr Babchuk
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Fixes: f8f8f1d04494 ("clk: Don't touch hardware when reparenting during registration")
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/clk/clk.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 0f686a9dac3e..d33c087d7868 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2982,6 +2982,10 @@ static int __clk_core_init(struct clk_core *core)
+>  		if (parent) {
+>  			/* update the clk tree topology */
+>  			flags = clk_enable_lock();
+
+This is the spinlock?
+
+> +			if (orphan->prepare_count)
+> +				clk_core_prepare(parent);
+
+And this is prepare mutex? Doesn't sound like it will work.
+
+> +			if (orphan->enable_count)
+> +				clk_core_enable(parent);
+
+This would be OK, but then we might touch the hardware again?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
