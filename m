@@ -1,93 +1,31 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Thu, 25 Jan 2018 13:56:57 +0530
-Subject: [PATCH] arm64: dts: ls1088a: Add qspi device node for ls1088a-rdb
-Message-ID: <1516868817-2327-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Thu, 25 Jan 2018 16:27:45 +0800
+Subject: [PATCH v6 03/13] arm64: cpufeature: Detect CPU RAS Extentions
+In-Reply-To: <5A67877F.5090300@arm.com>
+References: <20180115193906.30053-1-james.morse@arm.com>
+ <20180115193906.30053-4-james.morse@arm.com>
+ <78d4374a-f75c-6860-38ab-6373ffae3eee@huawei.com> <5A663C59.6030205@arm.com>
+ <2fbdd6f2-3225-1993-cae5-0bc435189d36@huawei.com> <5A67877F.5090300@arm.com>
+Message-ID: <daa4f204-a089-75ed-fdf4-625d3a58f6bc@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes and properties for QSPI controller.
-Add support for spansion flash, s25fs512s, as slave device for
-QSPI controller.
+On 2018/1/24 3:05, James Morse wrote:
+>> do you mean we do not enable "CONFIG_ARM64_RAS_EXTN" in the
+>> defconfig for ARM's SOC until kernel-first RAS is supported?
+> I've no idea if or when we will do kernel-first, when I bring it up, its so we
+> don't build a hybrid model, and we consider how we going to add kernel-first
+> support if/when it comes along.
+> 
+> If you want it turned on in defconfig please submit a patch to do that. I
+sorry, it is my mistake,
+In your patch, ARM64_RAS_EXTN is already turned on by default, so no need to turn on again.
 
-Added entry of "fsl,ls1088a-qspi" in fsl-quadspi.txt binding file.
++config ARM64_RAS_EXTN
++       bool "Enable support for RAS CPU Extensions"
++       default y
++       help
++         CPUs that support the Reliability, Availability and Serviceability
 
-Signed-off-by: Suresh Gupta <suresh.gupta@nxp.com>
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Depends on
- https://patchwork.ozlabs.org/project/linux-mtd/list/?series=25292
 
- .../devicetree/bindings/mtd/fsl-quadspi.txt         |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts   | 21 +++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi      | 12 ++++++++++++
- 3 files changed, 34 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-index 13a903e..927d65c 100644
---- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-@@ -7,6 +7,7 @@ Required properties:
- 		 or
- 		 "fsl,ls2080a-qspi" followed by "fsl,ls1021a-qspi",
- 		 "fsl,ls1043a-qspi" followed by "fsl,ls1021a-qspi"
-+		 "fsl,ls2080a-qspi" followed by "fsl,ls1088a-qspi",
-   - reg : the first contains the register location and length,
-           the second contains the memory mapping address and length
-   - reg-names: Should contain the reg names "QuadSPI" and "QuadSPI-memory"
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 0f6fcda..3febb59 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -94,6 +94,27 @@
- 	};
- };
- 
-+&qspi {
-+	status = "okay";
-+	fsl,qspi-has-second-chip;
-+	spi-rx-bus-width = <4>;
-+	spi-tx-bus-width = <4>;
-+	qflash0: s25fs512s at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+
-+	qflash1: s25fs512s at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		reg = <1>;
-+	};
-+
-+};
-+
- &ifc {
- 	ranges = <0 0 0x5 0x30000000 0x00010000
- 		  2 0 0x5 0x20000000 0x00010000>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index bd80e9a..b45a522 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -394,6 +394,18 @@
- 			status = "disabled";
- 		};
- 
-+		qspi: quadspi at 20c0000 {
-+			compatible = "fsl,ls2080a-qspi", "fsl,ls1088a-qspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x20c0000 0x0 0x10000>,
-+				<0x0 0x20000000 0x0 0x10000000>;
-+			reg-names = "QuadSPI", "QuadSPI-memory";
-+			interrupts = <0 25 0x4>; /* Level high type */
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "qspi_en", "qspi";
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
--- 
-1.9.1
+> haven't because I don't know where they go!
