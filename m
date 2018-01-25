@@ -1,40 +1,62 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 25 Jan 2018 15:37:29 +0800
-Subject: [PATCH 2/2] nvmem: imx-ocotp: remove unused dead code
-In-Reply-To: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
-References: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1516865849-26191-2-git-send-email-aisheng.dong@nxp.com>
+Date: Thu, 25 Jan 2018 14:37:49 +0800
+Subject: [PATCH 1/1] dt-bindings: thermal: imx: update the binding to new
+ method
+Message-ID: <1516862269-25543-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-remove unused dead code
+Due to the old method has already been marked as deprecated in binding
+doc, so obviously it's better to update the example to new bindings
+as well.
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Leonard Crestez <leonard.crestez@nxp.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/nvmem/imx-ocotp.c | 2 --
- 1 file changed, 2 deletions(-)
+ .../devicetree/bindings/thermal/imx-thermal.txt    | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7ba351..4f61fbd 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -439,7 +439,6 @@ MODULE_DEVICE_TABLE(of, imx_ocotp_dt_ids);
+diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+index 28be51a..379eb76 100644
+--- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+@@ -22,7 +22,32 @@ Optional properties:
+ - clocks : thermal sensor's clock source.
  
- static int imx_ocotp_probe(struct platform_device *pdev)
- {
--	const struct of_device_id *of_id;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
- 	struct ocotp_priv *priv;
-@@ -460,7 +459,6 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->clk))
- 		return PTR_ERR(priv->clk);
+ Example:
++ocotp: ocotp at 21bc000 {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	compatible = "fsl,imx6sx-ocotp", "syscon";
++	reg = <0x021bc000 0x4000>;
++	clocks = <&clks IMX6SX_CLK_OCOTP>;
  
--	of_id = of_match_device(imx_ocotp_dt_ids, dev);
- 	priv->params = of_device_get_match_data(&pdev->dev);
- 	imx_ocotp_nvmem_config.size = 4 * priv->params->nregs;
- 	imx_ocotp_nvmem_config.dev = dev;
++	tempmon_calib: calib at 38 {
++		reg = <0x38 4>;
++	};
++
++	tempmon_temp_grade: temp-grade at 20 {
++		reg = <0x20 4>;
++	};
++};
++
++tempmon: tempmon {
++	compatible = "fsl,imx6sx-tempmon", "fsl,imx6q-tempmon";
++	interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,tempmon = <&anatop>;
++	nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
++	nvmem-cell-names = "calib", "temp_grade";
++	clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
++};
++
++Legacy method (Deprecated):
+ tempmon {
+ 	compatible = "fsl,imx6q-tempmon";
+ 	fsl,tempmon = <&anatop>;
 -- 
 2.7.4
