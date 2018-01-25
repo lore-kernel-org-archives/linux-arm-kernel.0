@@ -1,180 +1,110 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 25 Jan 2018 09:56:30 -0600
-Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
- topology
-In-Reply-To: <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
-References: <20180113005920.28658-1-jeremy.linton@arm.com>
- <20180113005920.28658-12-jeremy.linton@arm.com>
- <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
-Message-ID: <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Thu, 25 Jan 2018 16:06:18 +0000
+Subject: [PATCH v3] drm/bridge/synopsys: dsi: add optional pixel clock
+In-Reply-To: <20180123170806.5282-1-philippe.cornu@st.com>
+References: <20180123170806.5282-1-philippe.cornu@st.com>
+Message-ID: <9a37839b-f3bc-2c69-94b8-2fe52ea14965@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
-> Hi Jeremy,
+in short: this patch is "CANCELLED" : )
+
+Thanks to comments from some of you, I managed to use adjusted_mode.
+
+Please have a look to the patch "drm/bridge/synopsys: dsi: use 
+adjusted_mode in mode_set".
+
+Hope it is better, comments are welcome
+
+Many thanks,
+Philippe :-)
+
+On 01/23/2018 06:08 PM, Philippe Cornu wrote:
+> The pixel clock is optional. When available, it offers a better
+> preciseness for timing computations and allows to reduce the extra dsi
+> bandwidth in burst mode (from ~20% to ~10-12%, hw platform dependant).
 > 
-> I have tested the patch with the newest UEFI. It prints the below error:
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> ---
+> Changes in v3: Simplify px_clk probing thanks to Andrzej Hajda comments
 > 
-> [    4.017371] BUG: arch topology borken
-> [    4.021069] BUG: arch topology borken
-> [    4.024764] BUG: arch topology borken
-> [    4.028460] BUG: arch topology borken
-> [    4.032153] BUG: arch topology borken
-> [    4.035849] BUG: arch topology borken
-> [    4.039543] BUG: arch topology borken
-> [    4.043239] BUG: arch topology borken
-> [    4.046932] BUG: arch topology borken
-> [    4.050629] BUG: arch topology borken
-> [    4.054322] BUG: arch topology borken
+> Changes in v2: Improve px_clk probing in case of ENOENT dt returned value
+> (thanks to Philipp Zabel & Andrzej Hajda comments)
 > 
-> I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
-> the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
-
-I commented about that on the EDK2 mailing list. While the current spec 
-doesn't explicitly ban having the flag set multiple times between the 
-leaf and the root I consider it a "bug" and there is an effort to 
-clarify the spec and the use of that flag.
+>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 25 +++++++++++++++++++------
+>   1 file changed, 19 insertions(+), 6 deletions(-)
 > 
-> When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
-> and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
-> sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
-
-Right. I've mentioned this problem a couple of times.
-
-At at the moment, the spec isn't clear about how the proximity domain is 
-detected/located within the PPTT topology (a node with a 1:1 
-correspondence isn't even required). As you can see from this patch set, 
-we are making the general assumption that the proximity domains are at 
-the same level as the physical socket. This isn't ideal for NUMA 
-topologies, like the D05, that don't align with the physical socket.
-
-There are efforts underway to clarify and expand upon the specification 
-to deal with this general problem. The simple solution is another flag 
-(say PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could 
-be used to find nodes with 1:1 correspondence. At that point we could 
-add a fairly trivial patch to correct just the scheduler topology 
-without affecting the rest of the system topology code.
-
-> 
-> If we modify the UEFI to make NUMA sched_domain start from the layer of package, then all the topology information
-> within the package will be discarded. I think we need to build the multi-core sched_domain using the cores within
-> the cluster instead of the cores within the package. I think that's what 'multi-core' means. Multi cores form a cluster. I guess.
-> If we build the multi-core sched_domain using the cores within a cluster, I think we need to add fields in struct cpu_topology
-> to record which cores are in each cluster.
-
-The problem is that there isn't a generic way to identify which level of 
-cache sharing is the "correct" top layer MC domain. For one system 
-cluster might be appropriate, for another it might be the highest 
-caching level within a socket, for another is might be a something in 
-between or a group of clusters or LLCs..
-
-Hence the effort to standardize/guarantee a PPTT node that exactly 
-matches a SRAT domain. With that, each SOC/system provider has clearly 
-defined method for communicating where they want the proximity domain 
-information to begin.
-
-Thanks,
-
-> 
-> 
-> Thanks,
-> Xiongfeng
-> 
-> On 2018/1/13 8:59, Jeremy Linton wrote:
->> Propagate the topology information from the PPTT tree to the
->> cpu_topology array. We can get the thread id, core_id and
->> cluster_id by assuming certain levels of the PPTT tree correspond
->> to those concepts. The package_id is flagged in the tree and can be
->> found by calling find_acpi_cpu_topology_package() which terminates
->> its search when it finds an ACPI node flagged as the physical
->> package. If the tree doesn't contain enough levels to represent
->> all of the requested levels then the root node will be returned
->> for all subsequent levels.
->>
->> Cc: Juri Lelli <juri.lelli@arm.com>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
->>   1 file changed, 45 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->> index 7b06e263fdd1..ce8ec7fd6b32 100644
->> --- a/arch/arm64/kernel/topology.c
->> +++ b/arch/arm64/kernel/topology.c
->> @@ -11,6 +11,7 @@
->>    * for more details.
->>    */
->>   
->> +#include <linux/acpi.h>
->>   #include <linux/arch_topology.h>
->>   #include <linux/cpu.h>
->>   #include <linux/cpumask.h>
->> @@ -22,6 +23,7 @@
->>   #include <linux/sched.h>
->>   #include <linux/sched/topology.h>
->>   #include <linux/slab.h>
->> +#include <linux/smp.h>
->>   #include <linux/string.h>
->>   
->>   #include <asm/cpu.h>
->> @@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
->>   	}
->>   }
->>   
->> +#ifdef CONFIG_ACPI
->> +/*
->> + * Propagate the topology information of the processor_topology_node tree to the
->> + * cpu_topology array.
->> + */
->> +static int __init parse_acpi_topology(void)
->> +{
->> +	bool is_threaded;
->> +	int cpu, topology_id;
->> +
->> +	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		topology_id = find_acpi_cpu_topology(cpu, 0);
->> +		if (topology_id < 0)
->> +			return topology_id;
->> +
->> +		if (is_threaded) {
->> +			cpu_topology[cpu].thread_id = topology_id;
->> +			topology_id = find_acpi_cpu_topology(cpu, 1);
->> +			cpu_topology[cpu].core_id   = topology_id;
->> +			topology_id = find_acpi_cpu_topology_package(cpu);
->> +			cpu_topology[cpu].package_id = topology_id;
->> +		} else {
->> +			cpu_topology[cpu].thread_id  = -1;
->> +			cpu_topology[cpu].core_id    = topology_id;
->> +			topology_id = find_acpi_cpu_topology_package(cpu);
->> +			cpu_topology[cpu].package_id = topology_id;
->> +		}
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +#else
->> +static inline int __init parse_acpi_topology(void)
->> +{
->> +	return -EINVAL;
->> +}
->> +#endif
->>   
->>   void __init init_cpu_topology(void)
->>   {
->> @@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
->>   	 * Discard anything that was parsed if we hit an error so we
->>   	 * don't use partial information.
->>   	 */
->> -	if (of_have_populated_dt() && parse_dt_topology())
->> +	if ((!acpi_disabled) && parse_acpi_topology())
->> +		reset_cpu_topology();
->> +	else if (of_have_populated_dt() && parse_dt_topology())
->>   		reset_cpu_topology();
->>   }
->>
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> index ed8af32f8e52..9fb35385c348 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> @@ -217,6 +217,7 @@ struct dw_mipi_dsi {
+>   	void __iomem *base;
+>   
+>   	struct clk *pclk;
+> +	struct clk *px_clk;
+>   
+>   	unsigned int lane_mbps; /* per lane */
+>   	u32 channel;
+> @@ -703,24 +704,28 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+>   	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
+>   	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
+>   	void *priv_data = dsi->plat_data->priv_data;
+> +	struct drm_display_mode px_clk_mode = *mode;
+>   	int ret;
+>   
+>   	clk_prepare_enable(dsi->pclk);
+>   
+> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
+> +	if (dsi->px_clk)
+> +		px_clk_mode.clock = clk_get_rate(dsi->px_clk) / 1000;
+> +
+> +	ret = phy_ops->get_lane_mbps(priv_data, &px_clk_mode, dsi->mode_flags,
+>   				     dsi->lanes, dsi->format, &dsi->lane_mbps);
+>   	if (ret)
+>   		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+>   
+>   	pm_runtime_get_sync(dsi->dev);
+>   	dw_mipi_dsi_init(dsi);
+> -	dw_mipi_dsi_dpi_config(dsi, mode);
+> +	dw_mipi_dsi_dpi_config(dsi, &px_clk_mode);
+>   	dw_mipi_dsi_packet_handler_config(dsi);
+>   	dw_mipi_dsi_video_mode_config(dsi);
+> -	dw_mipi_dsi_video_packet_config(dsi, mode);
+> +	dw_mipi_dsi_video_packet_config(dsi, &px_clk_mode);
+>   	dw_mipi_dsi_command_mode_config(dsi);
+> -	dw_mipi_dsi_line_timer_config(dsi, mode);
+> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
+> +	dw_mipi_dsi_line_timer_config(dsi, &px_clk_mode);
+> +	dw_mipi_dsi_vertical_timing_config(dsi, &px_clk_mode);
+>   
+>   	dw_mipi_dsi_dphy_init(dsi);
+>   	dw_mipi_dsi_dphy_timing_config(dsi);
+> @@ -734,7 +739,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+>   
+>   	dw_mipi_dsi_dphy_enable(dsi);
+>   
+> -	dw_mipi_dsi_wait_for_two_frames(mode);
+> +	dw_mipi_dsi_wait_for_two_frames(&px_clk_mode);
+>   
+>   	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
+>   	dw_mipi_dsi_set_mode(dsi, 0);
+> @@ -828,6 +833,14 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
+>   		return ERR_PTR(ret);
+>   	}
+>   
+> +	dsi->px_clk = devm_clk_get(dev, "px_clk");
+> +	if (IS_ERR(dsi->px_clk)) {
+> +		ret = PTR_ERR(dsi->px_clk);
+> +		if (ret != ENOENT)
+> +			dev_err(dev, "Unable to get opt. px_clk: %d\n", ret);
+> +		dsi->px_clk = NULL;
+> +	}
+> +
+>   	/*
+>   	 * Note that the reset was not defined in the initial device tree, so
+>   	 * we have to be prepared for it not being found.
 > 
