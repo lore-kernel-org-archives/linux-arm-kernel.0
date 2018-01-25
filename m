@@ -1,51 +1,120 @@
 From: ckadabi@codeaurora.org (Channagoud Kadabi)
-Date: Thu, 25 Jan 2018 15:55:11 -0800
-Subject: [PATCH 0/2] SDM845 System Cache Driver
-Message-ID: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+Date: Thu, 25 Jan 2018 15:55:12 -0800
+Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
+In-Reply-To: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+Message-ID: <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements system cache or LLCC(Last Level Cache Controller) driver
-for SDM845 SOC. The purpose of the driver is to partition the system cache and
-program the settings such as priortiy, lines to probe while doing a look up
-in the system cache, low power related settings etc. The partitions are called
-cache slices. Each cache slice is associated with size and SCID (System Cache ID)
-The driver also provides API for clients to query the cache slice details,
-activate and deactivate them.
+Documentation for last level cache controller device tree bindings,
+client bindings usage examples.
 
-System cache has other blocks for memory error detection and
-AMON (Activity Monitor) for lock up detection.
-
-Since the hardware block has multiple functional units the driver is implemented
-to use syscon/regmap interface. The driver can be broadly classified into:
-
-- Core driver: llcc-core.c: This driver initializes the syscon, does common
-settings required to enable interrupts and error handling features.
-
-- SOC specific driver: llcc-sdm845.c: Cache partitioning and cache slice
-properties for usecases on sdm845 that need to use system cache.
-
-- API : llcc-slice.c: Exports APIs to clients to query cache slice details,
-activate and deactivate cache slices.
-
-Channagoud Kadabi (2):
-  dt-bindings: Documentation for qcom,llcc
-  drivers: soc: Add LLCC driver
-
- .../devicetree/bindings/arm/msm/qcom,llcc.txt      |  93 +++++
- drivers/soc/qcom/Kconfig                           |  16 +
- drivers/soc/qcom/Makefile                          |   2 +
- drivers/soc/qcom/llcc-core.c                       | 120 ++++++
- drivers/soc/qcom/llcc-sdm845.c                     | 102 +++++
- drivers/soc/qcom/llcc-slice.c                      | 456 +++++++++++++++++++++
- include/linux/soc/qcom/llcc-qcom.h                 | 152 +++++++
- 7 files changed, 941 insertions(+)
+Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+---
+ .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 93 ++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
- create mode 100644 drivers/soc/qcom/llcc-core.c
- create mode 100644 drivers/soc/qcom/llcc-sdm845.c
- create mode 100644 drivers/soc/qcom/llcc-slice.c
- create mode 100644 include/linux/soc/qcom/llcc-qcom.h
 
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+new file mode 100644
+index 0000000..d433b0c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+@@ -0,0 +1,93 @@
++* LLCC (Last Level Cache Controller)
++
++Properties:
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be "qcom,llcc-core"
++
++- reg:
++	Usage: required
++	Value Type: <prop-encoded-array>
++	Definition: must be addresses and sizes of the LLCC registers
++
++- llcc-bank-off:
++	Usage: required
++	Value Type: <u32 array>
++	Definition: Offsets of llcc banks from llcc base address starting from
++		    LLCC bank0.
++
++- llcc-broadcast-off:
++	Usage: required
++	Value Type: <u32>
++	Definition: Offset of broadcast register from LLCC bank0 address.
++
++- #cache-cells:
++	Usage: required
++	Value Type: <u32>
++	Definition: Number of cache cells, must be 1
++
++- max-slices:
++	usage: required
++	Value Type: <u32>
++	Definition: Number of cache slices supported by hardware
++
++- status:
++	Usage: optional
++	Value type: <string>
++	Definition: Property to enable or disable the driver
++
++== llcc amon device ==
++
++Properties:
++-qcom,fg-cnt : The value of fine grained counter of activity monitor
++	        block.
++
++compatible devices:
++		qcom,sdm845-llcc
++
++Example:
++
++	qcom,system-cache at 1300000 {
++		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
++		reg = <0x1300000 0x50000>;
++		reg-names = "llcc_base";
++
++		llcc: qcom,sdm845-llcc {
++			compatible = "qcom,sdm845-llcc";
++			#cache-cells = <1>;
++			max-slices = <32>;
++		};
++
++		qcom,llcc-ecc {
++			compatible = "qcom,llcc-ecc";
++		};
++
++		qcom,llcc-amon {
++			compatible = "qcom,llcc-amon";
++			qcom,fg-cnt = <0x7>;
++		};
++
++	};
++
++== Client ==
++
++Properties:
++- cache-slice-names:
++	Usage: required
++	Value type: <stringlist>
++	Definition: A set of names that identify the usecase names of a client that uses
++		    cache slice. These strings are used to look up the cache slice
++		    entries by name.
++
++- cache-slices:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: The tuple has phandle to llcc device as the first argument and the
++		    second argument is the usecase id of the client.
++For example:
++
++	video-decoder-encoder {
++		cache-slice-names = "vidsc0", "vidsc1";
++		cache-slices = <&llcc 2>, <&llcc 3>;
++	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
