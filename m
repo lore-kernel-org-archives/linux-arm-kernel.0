@@ -1,149 +1,117 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 25 Jan 2018 16:57:22 +0000
-Subject: [PATCH 01/16] arm64: capabilities: Update prototype for enable
- call back
-In-Reply-To: <20180125153611.GI5862@e103592.cambridge.arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-2-suzuki.poulose@arm.com>
- <20180123145204.GR22781@e103592.cambridge.arm.com>
- <5d32970c-ef6b-791b-4140-0e7de37364c8@arm.com>
- <20180125153611.GI5862@e103592.cambridge.arm.com>
-Message-ID: <51abe4ec-5c4f-aa7e-c045-59057e2fd2f6@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 25 Jan 2018 22:35:42 +0530
+Subject: =?UTF-8?Q?Re:_[PATCH_v6_00/41]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <12b97dc0-84e9-decd-16c0-9656b8aee072@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <CAMRc=McVNJqsO4+j=XkyNWuKqF-S-hQAw9XxHx6GC47UudgMYw@mail.gmail.com>
+ <e5f4af7d-971c-5694-2da5-0cba9083ee5c@lechnology.com>
+ <615bc302-e129-1501-63be-fa701f5ecaad@lechnology.com>
+ <CAHCN7xLW=RjHHBjvDto=DRrNfNsQrsaGb0zmsRrwdc+7Wbhaxg@mail.gmail.com>
+ <CAMRc=MdyGx3PFiryYybB2fCGx=AP=e7kkdd-DUL29pT+St9u1g@mail.gmail.com>
+ <5f836454-5de7-c51d-d262-2c2dbc26e438@lechnology.com>
+ <CAMRc=Mcw8wWNo7Q3KnHNv81UGuHxEqmOs0he7MKxmaxDjwao+A@mail.gmail.com>
+ <aaeb7d73-bd3b-9c85-88c5-c60da6ca3733@lechnology.com>
+ <CAMRc=Me8HefZJYTkprqL2vpq_nLym4r6p-du7hoKwVk8kSCR8w@mail.gmail.com>
+ <cafb3712-08eb-18f7-b3b6-debba2298b49@lechnology.com>
+ <f28601f6-d6f1-9a55-f3cf-62543412bd36@lechnology.com>
+ <fc54ab26-72be-1377-2ccb-72d34360c5eb@lechnology.com>
+ <CAMRc=Me1_i8qQE4GHeLiU2itHnp71Gt03UM6NhL=hA8Y6Pb0MA@mail.gmail.com>
+ <597caa1a-a790-3629-3186-5d2152f45e06@ti.com>
+ <12b97dc0-84e9-decd-16c0-9656b8aee072@lechnology.com>
+Message-ID: <58cb2650-8aa5-85f0-4ce4-0a388105c257@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/18 15:36, Dave Martin wrote:
-> On Tue, Jan 23, 2018 at 03:38:37PM +0000, Suzuki K Poulose wrote:
->> On 23/01/18 14:52, Dave Martin wrote:
->>> On Tue, Jan 23, 2018 at 12:27:54PM +0000, Suzuki K Poulose wrote:
->>>> From: Dave Martin <dave.martin@arm.com>
+On Thursday 25 January 2018 09:48 PM, David Lechner wrote:
+> On 01/25/2018 06:53 AM, Sekhar Nori wrote:
+>> On Wednesday 24 January 2018 01:33 PM, Bartosz Golaszewski wrote:
+>>> 2018-01-23 21:23 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>> On 01/23/2018 02:05 PM, David Lechner wrote:
+>>>>>
+>>>>> On 01/23/2018 02:01 PM, David Lechner wrote:
+>>>>>>
+>>>>>> On 01/23/2018 01:53 PM, Bartosz Golaszewski wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> In the mdio case - the problem is that devm_clk_get() doesn't fail,
+>>>>>>> but somehow the clock doesn't end up in the list of the device's
+>>>>>>> clocks - which is why it's not enabled by pm_runtime_get_sync().
+>>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Right. This is because devm_clk_get() now finds the clock via device
+>>>>>> tree instead of a clkdev lookup entry. However, I think that the PM
+>>>>>> notifier registered in arch/arm/mach-davinci/pm_domain.c only uses
+>>>>>> the clkdev lookup to match the con_id and does not use device tree.
+>>>>>> The same thing is happing in mdio, emac and lcdc.
+>>>>>>
+>>>>>
+>>>>> Minor correction: It looks like emac doesn't do this because it
+>>>>> doesn't
+>>>>> have a con_id of "fck". But, the same clock is shared by emac and
+>>>>> mdio, so
+>>>>> since mdio enables the clock, emac doesn't notice or care that it did
+>>>>> not enable the clock itself.
 >>>>
->>>> We issue the enable() call back for all CPU hwcaps capabilities
->>>> available on the system, on all the CPUs. So far we have ignored
->>>> the argument passed to the call back, which had a prototype to
->>>> accept a "void *" for use with on_each_cpu() and later with
->>>> stop_machine(). However, with commit 0a0d111d40fd1
->>>> ("arm64: cpufeature: Pass capability structure to ->enable callback"),
->>>> there are some users of the argument who wants the matching capability
->>>> struct pointer where there are multiple matching criteria for a single
->>>> capability. Update the prototype for enable to accept a const pointer.
 >>>>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: Robin Murphy <robin.murphy@arm.com>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Andre Przywara <andre.przywara@arm.com>
->>>> Cc: James Morse <james.morse@arm.com>
->>>> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
->>>> Signed-off-by: Dave Martin <dave.martin@arm.com>
->>>> [ Rebased to for-next/core converting more users ]
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>>>   arch/arm64/include/asm/cpufeature.h |  3 ++-
->>>>   arch/arm64/include/asm/fpsimd.h     |  4 +++-
->>>>   arch/arm64/include/asm/processor.h  |  7 ++++---
->>>>   arch/arm64/kernel/cpu_errata.c      | 14 ++++++--------
->>>>   arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++----
->>>>   arch/arm64/kernel/fpsimd.c          |  3 ++-
->>>>   arch/arm64/kernel/traps.c           |  3 ++-
->>>>   arch/arm64/mm/fault.c               |  2 +-
->>>>   8 files changed, 32 insertions(+), 20 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->>>> index ac67cfc2585a..cefbd685292c 100644
->>>> --- a/arch/arm64/include/asm/cpufeature.h
->>>> +++ b/arch/arm64/include/asm/cpufeature.h
->>>> @@ -97,7 +97,8 @@ struct arm64_cpu_capabilities {
->>>>   	u16 capability;
->>>>   	int def_scope;			/* default scope */
->>>>   	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
->>>> -	int (*enable)(void *);		/* Called on all active CPUs */
->>>> +	/* Called on all active CPUs for all  "available" capabilities */
+>>>> How about using pm_clk_add_clk() in these drivers to explicitly use the
+>>>> clocks for power management instead of relying on pm_clk_add_notifier()
+>>>> to do this implicitly?
 >>>
->>> Nit: Odd spacing?  Also, "available" doesn't really make sense for errata
->>> workarounds.
->>>
+>>> Yes, this sounds good.
 >>
->> Thanks for spotting, will fix it.
+>> Looking at how pm_clk_notify() in clock_ops.c uses con_id[] list, right
+>> now pm_runtime() will work only for clocks which have con_id (from the
+>> list above) mentioned in DT. Since clk_find() mandates con_id match when
+>> its available, NULL con_id does not match.
 >>
->>> Maybe applicable would be a better word?
->>>
+>> For simple devices like DaVinci which uses just one clock for power
+>> management per device (multiple devices might share a clock, but not
+>> other way around as far as I recall, anyway I will double check this
+>> assertion), the attached patch should make EMAC work.
 >>
->> There is a subtle difference. If there are two entries for a capability,
->> with only one of them matches, we end up calling the enable() for both
->> the entries. "Applicable" could potentially be misunderstood, leading
->> to assumption that the enable() is called only if that "entry" matches,
->> which is not true. I accept that "available" doesn't sound any better either.
+>> That still leaves why lcdc does not work. One difference is it uses
+>> PSC1. Are there other devices in PSC1 which work (just to rule out any
+>> thing wrong with PSC1 handling).
+>>
+>> Thanks,
+>> Sekhar
+>>
+>> ---8<---
+>> diff --git a/arch/arm/mach-davinci/pm_domain.c
+>> b/arch/arm/mach-davinci/pm_domain.c
+>> index 78eac2c0c146..0dce7397856d 100644
+>> --- a/arch/arm/mach-davinci/pm_domain.c
+>> +++ b/arch/arm/mach-davinci/pm_domain.c
+>> @@ -23,7 +23,6 @@ static struct dev_pm_domain davinci_pm_domain = {
+>> ? ? static struct pm_clk_notifier_block platform_bus_notifier = {
+>> ????? .pm_domain = &davinci_pm_domain,
+>> -??? .con_ids = { "fck", "master", "slave", NULL },
+>> ? };
+>> ? ? static int __init davinci_pm_runtime_init(void)
 >>
 >>
->>>> +	int (*enable)(const struct arm64_cpu_capabilities *caps);
 > 
-> This probably shouldn't be "caps" here: this argument refers a single
-> capability, not an array.  Also, this shouldn't be any random capability,
-> but the one corresponding to the enable method:
-> 
-> 	cap->enable(cap)
-> 
-> (i.e., cap1->enable(cap2) is invalid, and the cpufeature framework won't
-> do that).
-> 
+> Won't this cause *all* clocks, not just PSC clocks, to be used for power
+> management?
 
-Yes, thats correct. I will change it.
-
->>> Alternatively, if the comment is liable to be ambiguous, maybe it would
->>> be better to delete it.  The explicit argument type already makes this
->>> more self-documenting than previously.
->>
->> I think we still need to make it clear that the enable is called on
->> all active CPUs. It is not about the argument anymore.
->>
->> How about :
->>
->> /*
->>   * Called on all active CPUs if the capability associated with
->>   * this entry is set.
->>   */
-> 
-> Maybe, but now we have the new concept of "setting" a capability.
-> 
-> Really, this is enabling the capability for a CPU, not globally, so
-> maybe it could be renamed to "cpu_enable".
-> 
-> Could we describe the method in terms of what it is required to do,
-> as well as the circumstances of the call, e.g.:
-> 
-> /*
->   * Take the appropriate actions to enable this capability for this cpu.
->   * Every time a cpu is booted, this method is called under stop_machine()
->   * for each globally enabled capability.
->   */
-
-Make sense, except for the "stop_machine" part. It is called under stop_machine
-for all CPUs brought up by kernel, for capabilities which are enabled from
-setup_cpu_features(), i.e, after all the CPUs are booted. But, it is called
-directly on the CPU, if the CPU is booted after it has been enabled on CPUs
-in the system. (e.g, a CPU brought up by the user - via __verify_local_cpu_caps -,
-or a capability that is enabled early by boot CPU - will post the changes in the next
-revision).
+In case of DT, the first clock mentioned in 'clocks' property will get
+picked up since it will match with wildcard con_id. This unfortunately
+depends on how the clocks list is prepared so quite implementation
+dependent.
 
 > 
-> (I'm hoping that "globally enabled" is meaningful wording, though
-> perhaps not.)
+> Some examples of devices with more than just the PSC clock are SATA and
+> the USB PHY.
 
-Hmm.. "globally enabled" kind of sounds recursive for describing "enable" :-).
-How about "globally accepted" or "globally detected" ?
+Its not a problem to have more than one clock passed in device node as
+long as only one clock (the first clock) needs to participate in power
+management.
 
-> 
-> Also, what does the return value of this method mean?
+This may work for the moment, but longer term I do think genpd
+implementation for DaVinci will be needed. Or may be there is breakage
+even today that I am not able to think on top of my head.
 
-Thats a good point. We ignore it. I believe it is best to leave it to the method
-to decide, what to do about it if there is a failure. It was there just to make
-sure we comply with what stop_machine expected. Now that we don't pass it to
-stop_machine directly, we could change it to void.
-  
-> Previously, the return value was ignored, but other patches in this
-> series might change that.
-> 
-
-Cheers
-Suzuki
+Thanks,
+Sekhar
