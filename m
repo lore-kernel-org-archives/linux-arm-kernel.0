@@ -1,66 +1,38 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Thu, 25 Jan 2018 12:11:09 -0500
-Subject: [PATCH v4 0/4] arm64/ras: support sea error recovery
-In-Reply-To: <1506516620-20033-1-git-send-email-xiexiuqi@huawei.com>
-References: <1506516620-20033-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <d6fb667b-402c-00df-fc56-1252261fbbe1@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 25 Jan 2018 18:16:16 +0100
+Subject: [RFC 09/10] x86/enter: Create macros to restrict/unrestrict
+ Indirect Branch Speculation
+In-Reply-To: <d77abfaf-077a-0ae6-8ed7-3b5354938a52@free.fr>
+References: <CA+55aFxUEPHc7JRQG3zmxEsfmfJOiJa1QqFBKCBNb5Tt5vfiSg@mail.gmail.com>
+ <1516566497.9814.78.camel@infradead.org>
+ <CA+55aFwOkH8RH12Dzs=hT3e7eS3Ckz9Ed6x_-9a0zs1cw9zbKA@mail.gmail.com>
+ <1516572013.9814.109.camel@infradead.org>
+ <CA+55aFwoxXmY0u84iPT-RP8DoG+Qb8t-mh2r8RLhKVAH3jm6qg@mail.gmail.com>
+ <1516638426.9521.20.camel@infradead.org>
+ <20180123072930.soz25cyky3u4hpgv@gmail.com>
+ <20180123075358.nztpyxympwfkyi2a@gmail.com>
+ <1516699832.9521.123.camel@infradead.org>
+ <d77abfaf-077a-0ae6-8ed7-3b5354938a52@free.fr>
+Message-ID: <20180125171616.GA25130@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Xie,
+On Thu, Jan 25, 2018 at 05:19:04PM +0100, Mason wrote:
+> On 23/01/2018 10:30, David Woodhouse wrote:
+> 
+> > Skylake takes predictions from the generic branch target buffer when
+> > the RSB underflows.
+> 
+> Adding LAKML.
+> 
+> AFAIU, some ARM Cortex cores have the same optimization.
+> (A9 maybe, A17 probably, some recent 64-bit cores)
+> 
+> Are there software work-arounds for Spectre planned for arm32 and arm64?
 
+Yes, I think they are currently burried in one of the arm64 trees, and
+they have been posted to the mailing list a few times in the past.
 
-On 9/27/2017 8:50 AM, Xie XiuQi wrote:
-> With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
-> are consumed. According to the existing process, errors occurred in the
-> kernel, leading to direct panic, if it occurred the user-space, we should
-> just kill process.
->
-> But there is a class of error, in fact, is not necessary to kill
-> process, you can recover and continue to run the process. Such as
-> the instruction data corrupted, where the memory page might be
-> read-only, which is has not been modified, the disk might have the
-> correct data, so you can directly drop the page, ant reload it when
-> necessary.
->
-> So this patchset is just try to solve such problem: if the error is
-> consumed in user-space and the error occurs on a clean page, you can
-> directly drop the memory page without killing process.
->
-> If the corrupted page is clean, just dropped it and return to user-space
-> without side effects. And if corrupted page is dirty, memory_failure()
-> will send SIGBUS with code=BUS_MCEERR_AR. While without this patchset,
-> do_sea() will just send SIGBUS, so the process was killed in the same place.
->
-> Because memory_failure() may sleep, we can not call it directly in SEA
-> exception context. So we saved faulting physical address associated with
-> a process in the ghes handler and set __TIF_SEA_NOTIFY. When we return
-> from SEA exception context and get into do_notify_resume() before the
-> process running, we could check it and call memory_failure() to do
-> recovery. It's safe, because we are in process context.
->
-> In some platform, when SEA triggerred, physical address could be reported
-> by memory section or by processor section, so we save address at this two
-> place.
-For this series - Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+thanks,
 
-Note that this will probably need to be rebased on top of these patches:
-
-https://patchwork.codeaurora.org/patch/415877/
-https://patchwork.codeaurora.org/patch/415879/
-
-With that, the first patch should be able to be removed because the above 
-patches already define the ARM error types:
-
-+#define CPER_ARM_CACHE_ERROR??? ??? ??? 0
-+#define CPER_ARM_TLB_ERROR??? ??? ??? 1
-+#define CPER_ARM_BUS_ERROR??? ??? ??? 2
-+#define CPER_ARM_VENDOR_ERROR??? ??? ??? 3
-
-Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+greg k-h
