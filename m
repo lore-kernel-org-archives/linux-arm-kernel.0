@@ -1,54 +1,51 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 25 Jan 2018 11:52:24 +0200
-Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <20180124144751.jt6y3uayhplzbjxf@sapphire.tkos.co.il>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-3-l.stach@pengutronix.de>
- <20180124144751.jt6y3uayhplzbjxf@sapphire.tkos.co.il>
-Message-ID: <20180125095224.npweaunijmesbmhs@tarshish>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 25 Jan 2018 11:05:54 +0100
+Subject: [PATCH] mtd: nand: sunxi: Fix ECC strength choice
+In-Reply-To: <20180124235936.4b49b094@xps13>
+References: <20180124224931.14392-1-miquel.raynal@free-electrons.com>
+ <20180124235936.4b49b094@xps13>
+Message-ID: <20180125110554.699b56e3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+On Wed, 24 Jan 2018 23:59:36 +0100
+Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-On Wed, Jan 24, 2018 at 04:47:51PM +0200, Baruch Siach wrote:
-> On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
-> > This is the evaluation kit board for the i.MX8M. The current level of
-> > support yields a working console and is able to boot userspace from
-> > SD card or Network.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  arch/arm64/boot/dts/nxp/Makefile       |   3 +
-> >  arch/arm64/boot/dts/nxp/imx8mq-evk.dts | 287 +++++++++++++++++++++++++++++++++
-> >  2 files changed, 290 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/nxp/Makefile
-> >  create mode 100644 arch/arm64/boot/dts/nxp/imx8mq-evk.dts
-> > 
-> > diff --git a/arch/arm64/boot/dts/nxp/Makefile b/arch/arm64/boot/dts/nxp/Makefile
-> > new file mode 100644
-> > index 000000000000..1aebb1f16708
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/nxp/Makefile
-> > @@ -0,0 +1,3 @@
-> > +# SPDX-License-Identifier: GPL-2.0
-> > +
-> > +dtb-$(CONFIG_SOC_IMX8MQ) += imx8m-evk.dtb
+> Hello,
 > 
-> Typo, should be imx8mq-evk.dtb. Without this fix I'm getting:
+> On Wed, 24 Jan 2018 23:49:31 +0100
+> Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 > 
-> make[2]: *** No rule to make target 'arch/arm64/boot/dts/nxp/imx8m-evk.dtb', needed by '__build'.  Stop.
+> > When the requested ECC strength does not exactly match the strengths
+> > supported by the ECC engine, the driver is selecting the closest
+> > strength meeting the 'selected_strength > requested_strength'
+> > constraint. Fix the fact that, in this particular case, ecc->strength
+> > value was not updated to match the 'selected_strength'.
+> > 
+> > For instance, one can encounter this issue when no ECC requirement is
+> > filled in the device tree while the NAND chip minimum requirement is not
+> > a strength/step_size combo natively supported by the ECC engine.
+> >   
+> 
+> I forgot to add the Fixes/CC tags, but it seems that this problem
+> has always been out there...
+> 
+> Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller
+> support")
+> CC: stable at vger.kernel.org
 
-With this fix and CONFIG_CPU_IDLE disabled:
-
-Tested-by: Baruch Siach <baruch@tkos.co.il>
-
-On i.MX8MQ EVK rev B3.
+No need to send a new version. I added the Fixes+stable tags when
+applying.
 
 Thanks,
-baruch
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Boris
+
+> 
+> > Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>  
+> 
+> I will wait a review before sending a v2.
+> 
+> Thanks,
+> Miqu?l
