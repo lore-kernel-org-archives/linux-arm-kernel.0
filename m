@@ -1,195 +1,149 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Thu, 25 Jan 2018 17:50:18 +0100
-Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
- correctly
-In-Reply-To: <20180125152117.qikemrwl7f35ssjg@flea.lan>
-References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
- <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
- <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
- <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
- <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
- <20180125152117.qikemrwl7f35ssjg@flea.lan>
-Message-ID: <d79602b9-8e04-8250-fd7f-f52b8e16c575@micronovasrl.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 25 Jan 2018 16:57:22 +0000
+Subject: [PATCH 01/16] arm64: capabilities: Update prototype for enable
+ call back
+In-Reply-To: <20180125153611.GI5862@e103592.cambridge.arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-2-suzuki.poulose@arm.com>
+ <20180123145204.GR22781@e103592.cambridge.arm.com>
+ <5d32970c-ef6b-791b-4140-0e7de37364c8@arm.com>
+ <20180125153611.GI5862@e103592.cambridge.arm.com>
+Message-ID: <51abe4ec-5c4f-aa7e-c045-59057e2fd2f6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Il 25/01/2018 16:21, Maxime Ripard ha scritto:
-> Hi,
-> 
-> On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
->> Hi,
+On 25/01/18 15:36, Dave Martin wrote:
+> On Tue, Jan 23, 2018 at 03:38:37PM +0000, Suzuki K Poulose wrote:
+>> On 23/01/18 14:52, Dave Martin wrote:
+>>> On Tue, Jan 23, 2018 at 12:27:54PM +0000, Suzuki K Poulose wrote:
+>>>> From: Dave Martin <dave.martin@arm.com>
+>>>>
+>>>> We issue the enable() call back for all CPU hwcaps capabilities
+>>>> available on the system, on all the CPUs. So far we have ignored
+>>>> the argument passed to the call back, which had a prototype to
+>>>> accept a "void *" for use with on_each_cpu() and later with
+>>>> stop_machine(). However, with commit 0a0d111d40fd1
+>>>> ("arm64: cpufeature: Pass capability structure to ->enable callback"),
+>>>> there are some users of the argument who wants the matching capability
+>>>> struct pointer where there are multiple matching criteria for a single
+>>>> capability. Update the prototype for enable to accept a const pointer.
+>>>>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Robin Murphy <robin.murphy@arm.com>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Andre Przywara <andre.przywara@arm.com>
+>>>> Cc: James Morse <james.morse@arm.com>
+>>>> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+>>>> Signed-off-by: Dave Martin <dave.martin@arm.com>
+>>>> [ Rebased to for-next/core converting more users ]
+>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> ---
+>>>>   arch/arm64/include/asm/cpufeature.h |  3 ++-
+>>>>   arch/arm64/include/asm/fpsimd.h     |  4 +++-
+>>>>   arch/arm64/include/asm/processor.h  |  7 ++++---
+>>>>   arch/arm64/kernel/cpu_errata.c      | 14 ++++++--------
+>>>>   arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++----
+>>>>   arch/arm64/kernel/fpsimd.c          |  3 ++-
+>>>>   arch/arm64/kernel/traps.c           |  3 ++-
+>>>>   arch/arm64/mm/fault.c               |  2 +-
+>>>>   8 files changed, 32 insertions(+), 20 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>>>> index ac67cfc2585a..cefbd685292c 100644
+>>>> --- a/arch/arm64/include/asm/cpufeature.h
+>>>> +++ b/arch/arm64/include/asm/cpufeature.h
+>>>> @@ -97,7 +97,8 @@ struct arm64_cpu_capabilities {
+>>>>   	u16 capability;
+>>>>   	int def_scope;			/* default scope */
+>>>>   	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+>>>> -	int (*enable)(void *);		/* Called on all active CPUs */
+>>>> +	/* Called on all active CPUs for all  "available" capabilities */
+>>>
+>>> Nit: Odd spacing?  Also, "available" doesn't really make sense for errata
+>>> workarounds.
+>>>
 >>
->> Il 24/01/2018 18:38, Giulio Benetti ha scritto:
->>> Hi,
->>>
->>> Il 22/01/2018 21:27, Giulio Benetti ha scritto:
->>>> Hi,
->>>>
->>>> Il 22/01/2018 09:51, Maxime Ripard ha scritto:
->>>>> On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
->>>>>> On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
->>>>>> it was ignored,
->>>>>> because only PHSYNC and PVSYNC were taken into account.
->>>>>> DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
->>>>>>
->>>>>> If flags contains PVSYNC, it doesn't mean it is NVSYNC.
->>>>>> And it's true also the contrary.
->>>>>> Also, as I've checked with scope on A20,
->>>>>> if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
->>>>>> must be set, as name suggests.
->>>>>> It seems all display io polarities starts inverted if 0.
->>>>>>
->>>>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>>>>>
->>>>>> PVSYNC and PHSYNC only
->>>>>>
->>>>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>>>>
->>>>> Checkpatch:
->>>>> WARNING: Duplicate signature
->>>>
->>>> Sorry I didn't use ./scripts/checkpatch.pl
->>>>
->>>>>
->>>>>> ---
->>>>>>  ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
->>>>>>  ? 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>>> index 6121210..e873a37 100644
->>>>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->>>>>> @@ -224,10 +224,10 @@ static void
->>>>>> sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
->>>>>>  ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
->>>>>>  ????? /* Setup the polarity of the various signals */
->>>>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
->>>>>> +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
->>>>>>  ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
->>>>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
->>>>>> +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->>>>>>  ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
->>>>>
->>>>> I'm not sure why you were talking of the differences between NVSYNC
->>>>> and PVSYNC if you're not making use of any of it here?
->>>>
->>>> Thinking about it more now, the point is that all Lcd IOs seem to be
->>>> inverted by default(at least on A20).
->>>> With inverted, I mean that if for example PVSYNC,
->>>> I should see vsync line low and when asserted to give VSync,
->>>> it goes high.
->>>> This is what I've checked with oscilloscope on A20.
->>>> Can someone give a try on A33? Otherwise I will,
->>>> but I will take some time.
->>>> On uboot, everything is treated equal to kernel,
->>>> but to have my falling edge dclk and low h/vsync I had to specify:
->>>> CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
->>>> and
->>>> CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
->>>> but digging into code, I see "sync:3" means H/VSYNC HIGH,
->>>> but I experience both LOW during their pulse.
->>>>
->>>>>
->>>>> Also, how was it tested? This seems quite weird that we haven't caught
->>>>> that one sooner, and I'm a bit worried about the possible regressions
->>>>> here.
->>>>
->>>> It sounds really strange to me too,
->>>> because everybody under uboot use "sync:3"(HIGH).
->>>> I will retry to measure,
->>>> unfortunately at home I don't have a scope,
->>>> but I think I'm going to have one soon, because of this. :)
->>>
->>> Here I am with scope captures and tcon0 registers dump:
->>> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
->>> dclk_d0 => https://pasteboard.co/H4r8QRe.png
->>> dclk_de => https://pasteboard.co/H4r8zh4R.png
->>> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
->>>
->>> As you can see circled in reg on registers,
->>> TCON0_IO_POL_REG = 0x00000000.
->>> But on all the waveforms you can see:
->>> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
->>> the rising front overlaps dclk rising edge(not good), so to me this is
->>> falling, then I mean it Negative.
->>> - dclk_de: de pulse is clearly negative, even if register is 0 and its'
->>> polarity bit is 0.
->>> - dclk_vsnc: same as dclk_de
->>> - dclk_hsync: I didn't take scope screenshot but I can assure you it's
->>> negative.
->>>
->>> You can also check all the other registers about TCON0.
->>>
->>> Now I proceed testing it on A33, maybe the peripheral is slightly
->>> different between Axx SoCs, if I find it that way,
->>> it should be only a check about SoC or peripheral ID,
->>> and treat polarity as it should be done.
+>> Thanks for spotting, will fix it.
 >>
->> Here I am with A33 waveforms:
->> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
->> dclk_d0 => https://pasteboard.co/H4rVXwy.png
->> dclk_de => https://pasteboard.co/H4rWDt8.png
->> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
->> dclk_hsync => https://pasteboard.co/H4rWK6I.png
+>>> Maybe applicable would be a better word?
+>>>
+>>
+>> There is a subtle difference. If there are two entries for a capability,
+>> with only one of them matches, we end up calling the enable() for both
+>> the entries. "Applicable" could potentially be misunderstood, leading
+>> to assumption that the enable() is called only if that "entry" matches,
+>> which is not true. I accept that "available" doesn't sound any better either.
+>>
+>>
+>>>> +	int (*enable)(const struct arm64_cpu_capabilities *caps);
 > 
-> Thanks, that's really helpful.
+> This probably shouldn't be "caps" here: this argument refers a single
+> capability, not an array.  Also, this shouldn't be any random capability,
+> but the one corresponding to the enable method:
 > 
->> It behaves the same way as A20, so as I mean IO polarity,
->> all signals(except D0-D23), are inverted.
->> For A33 I've used A33-OLinuXino.
->> For A20 our LiNova1.
+> 	cap->enable(cap)
 > 
-> Indeed, HSYNC and VSYNC look inverted. 
-
-Yes, so they should be inverted inside the driver.
-
-> I don't really know what the
-> polarity of D0 would be just by judging at that capture, but we would
-> have noticed if the colors were inverted for quite some time now.
-
-D0-D23 are correct.
-With that capture,
-I mean to show you instead dclk is inverted,
-as dclk samples D0 on falling edge.
-So 0 is NEGEDGE and 1 is POSEDGE(1/3 of clock phase).
-1/3 clock phase seems enough to me to be considered POSEDGE,
-2/3 instead risks to go too much to the right of D0(even if it could work).
-
-> 
-> DE seems to be active high though, since it's only going to be at a
-> logical low level when data are not transmitted, so during the blank
-> periods.
-
-Yes, you're right, DE is data enable, and is asserted high as 0.
-But it must be added.
-I'm planning to send a new patchset with all these things corrected for 
-kernel.
-
-A little out of thread but:
-I'd like to send one for u-boot too,
-but this means also to modify every sunxi "sync:3" to "sync:0" and 
-vice-versa.
-
-What do you think?
-
-> 
-> Maxime
+> (i.e., cap1->enable(cap2) is invalid, and the cpufeature framework won't
+> do that).
 > 
 
+Yes, thats correct. I will change it.
 
--- 
-Giulio Benetti
-R&D Manager &
-Advanced Research
+>>> Alternatively, if the comment is liable to be ambiguous, maybe it would
+>>> be better to delete it.  The explicit argument type already makes this
+>>> more self-documenting than previously.
+>>
+>> I think we still need to make it clear that the enable is called on
+>> all active CPUs. It is not about the argument anymore.
+>>
+>> How about :
+>>
+>> /*
+>>   * Called on all active CPUs if the capability associated with
+>>   * this entry is set.
+>>   */
+> 
+> Maybe, but now we have the new concept of "setting" a capability.
+> 
+> Really, this is enabling the capability for a CPU, not globally, so
+> maybe it could be renamed to "cpu_enable".
+> 
+> Could we describe the method in terms of what it is required to do,
+> as well as the circumstances of the call, e.g.:
+> 
+> /*
+>   * Take the appropriate actions to enable this capability for this cpu.
+>   * Every time a cpu is booted, this method is called under stop_machine()
+>   * for each globally enabled capability.
+>   */
 
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+Make sense, except for the "stop_machine" part. It is called under stop_machine
+for all CPUs brought up by kernel, for capabilities which are enabled from
+setup_cpu_features(), i.e, after all the CPUs are booted. But, it is called
+directly on the CPU, if the CPU is booted after it has been enabled on CPUs
+in the system. (e.g, a CPU brought up by the user - via __verify_local_cpu_caps -,
+or a capability that is enabled early by boot CPU - will post the changes in the next
+revision).
+
+> 
+> (I'm hoping that "globally enabled" is meaningful wording, though
+> perhaps not.)
+
+Hmm.. "globally enabled" kind of sounds recursive for describing "enable" :-).
+How about "globally accepted" or "globally detected" ?
+
+> 
+> Also, what does the return value of this method mean?
+
+Thats a good point. We ignore it. I believe it is best to leave it to the method
+to decide, what to do about it if there is a failure. It was there just to make
+sure we comply with what stop_machine expected. Now that we don't pass it to
+stop_machine directly, we could change it to void.
+  
+> Previously, the return value was ignored, but other patches in this
+> series might change that.
+> 
+
+Cheers
+Suzuki
