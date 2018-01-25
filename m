@@ -1,197 +1,65 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 25 Jan 2018 01:16:35 +0100
-Subject: [RFC/RFT usb-next v1 2/6] usb: host: xhci-mtk: remove custom USB PHY
+Date: Thu, 25 Jan 2018 01:16:33 +0100
+Subject: [RFC/RFT usb-next v1 0/6] remove driver-specific "multiple PHY"
  handling
-In-Reply-To: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
-References: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180125001639.14681-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new PHY wrapper is now wired up in the core HCD code. This means
-that PHYs are now controlled (initialized, enabled, disabled, exited)
-without requiring any host-driver specific code.
-Remove the custom USB PHY handling from the xhci-mtk driver as the core
-HCD code now handles this.
+(this is the follow-up to my "initialize (multiple) PHYs for a HCD"
+series from [0])
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/usb/host/xhci-mtk.c | 98 +--------------------------------------------
- 1 file changed, 2 insertions(+), 96 deletions(-)
+Various USB controller drivers parse the "phys" device-tree property and
+grab all listed PHYs.
+There is a lot of duplicate code around this in the various drivers:
+- parse the "phys" property during .probe and save all PHYs in an array
+- call phy_init and phy_power_on on all PHYs
+- (where supported by the driver) call phy_power_off during .suspend and
+  phy_power_on during .resume
+- call phy_power_off and phy_exit during .remove
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index b0ab4d5e2751..7334da9e9779 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -14,7 +14,6 @@
- #include <linux/mfd/syscon.h>
- #include <linux/module.h>
- #include <linux/of.h>
--#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-@@ -352,62 +351,6 @@ static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
- 
- static struct hc_driver __read_mostly xhci_mtk_hc_driver;
- 
--static int xhci_mtk_phy_init(struct xhci_hcd_mtk *mtk)
--{
--	int i;
--	int ret;
--
--	for (i = 0; i < mtk->num_phys; i++) {
--		ret = phy_init(mtk->phys[i]);
--		if (ret)
--			goto exit_phy;
--	}
--	return 0;
--
--exit_phy:
--	for (; i > 0; i--)
--		phy_exit(mtk->phys[i - 1]);
--
--	return ret;
--}
--
--static int xhci_mtk_phy_exit(struct xhci_hcd_mtk *mtk)
--{
--	int i;
--
--	for (i = 0; i < mtk->num_phys; i++)
--		phy_exit(mtk->phys[i]);
--
--	return 0;
--}
--
--static int xhci_mtk_phy_power_on(struct xhci_hcd_mtk *mtk)
--{
--	int i;
--	int ret;
--
--	for (i = 0; i < mtk->num_phys; i++) {
--		ret = phy_power_on(mtk->phys[i]);
--		if (ret)
--			goto power_off_phy;
--	}
--	return 0;
--
--power_off_phy:
--	for (; i > 0; i--)
--		phy_power_off(mtk->phys[i - 1]);
--
--	return ret;
--}
--
--static void xhci_mtk_phy_power_off(struct xhci_hcd_mtk *mtk)
--{
--	unsigned int i;
--
--	for (i = 0; i < mtk->num_phys; i++)
--		phy_power_off(mtk->phys[i]);
--}
--
- static int xhci_mtk_ldos_enable(struct xhci_hcd_mtk *mtk)
- {
- 	int ret;
-@@ -488,8 +431,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 	struct xhci_hcd *xhci;
- 	struct resource *res;
- 	struct usb_hcd *hcd;
--	struct phy *phy;
--	int phy_num;
- 	int ret = -ENODEV;
- 	int irq;
- 
-@@ -529,16 +470,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	mtk->num_phys = of_count_phandle_with_args(node,
--			"phys", "#phy-cells");
--	if (mtk->num_phys > 0) {
--		mtk->phys = devm_kcalloc(dev, mtk->num_phys,
--					sizeof(*mtk->phys), GFP_KERNEL);
--		if (!mtk->phys)
--			return -ENOMEM;
--	} else {
--		mtk->num_phys = 0;
--	}
- 	pm_runtime_enable(dev);
- 	pm_runtime_get_sync(dev);
- 	device_enable_async_suspend(dev);
-@@ -596,23 +527,6 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 		mtk->has_ippc = false;
- 	}
- 
--	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
--		phy = devm_of_phy_get_by_index(dev, node, phy_num);
--		if (IS_ERR(phy)) {
--			ret = PTR_ERR(phy);
--			goto put_usb2_hcd;
--		}
--		mtk->phys[phy_num] = phy;
--	}
--
--	ret = xhci_mtk_phy_init(mtk);
--	if (ret)
--		goto put_usb2_hcd;
--
--	ret = xhci_mtk_phy_power_on(mtk);
--	if (ret)
--		goto exit_phys;
--
- 	device_init_wakeup(dev, true);
- 
- 	xhci = hcd_to_xhci(hcd);
-@@ -630,7 +544,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 			dev_name(dev), hcd);
- 	if (!xhci->shared_hcd) {
- 		ret = -ENOMEM;
--		goto power_off_phys;
-+		goto disable_device_wakeup;
- 	}
- 
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-@@ -653,13 +567,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 	xhci_mtk_sch_exit(mtk);
- 	usb_put_hcd(xhci->shared_hcd);
- 
--power_off_phys:
--	xhci_mtk_phy_power_off(mtk);
-+disable_device_wakeup:
- 	device_init_wakeup(dev, false);
- 
--exit_phys:
--	xhci_mtk_phy_exit(mtk);
--
- put_usb2_hcd:
- 	usb_put_hcd(hcd);
- 
-@@ -682,8 +592,6 @@ static int xhci_mtk_remove(struct platform_device *dev)
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
- 
- 	usb_remove_hcd(xhci->shared_hcd);
--	xhci_mtk_phy_power_off(mtk);
--	xhci_mtk_phy_exit(mtk);
- 	device_init_wakeup(&dev->dev, false);
- 
- 	usb_remove_hcd(hcd);
-@@ -718,7 +626,6 @@ static int __maybe_unused xhci_mtk_suspend(struct device *dev)
- 	del_timer_sync(&xhci->shared_hcd->rh_timer);
- 
- 	xhci_mtk_host_disable(mtk);
--	xhci_mtk_phy_power_off(mtk);
- 	xhci_mtk_clks_disable(mtk);
- 	usb_wakeup_set(mtk, true);
- 	return 0;
-@@ -732,7 +639,6 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
- 
- 	usb_wakeup_set(mtk, false);
- 	xhci_mtk_clks_enable(mtk);
--	xhci_mtk_phy_power_on(mtk);
- 	xhci_mtk_host_enable(mtk);
- 
- 	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
+With [0] this functionality was moved to the core HCD driver, meaning
+that all USB controller drivers now support this without having to
+implement custom code for it.
+
+Thus this series removes this code duplication.
+
+The last two patches are a bit special:
+- after patches #1-4 the chipidea driver is the last driver which sets
+  the "phy" field of struct usb_hcd. remove this logic as the PHY
+  wrapper (which is now part of the core HCD driver) manages the state
+  of all PHYs anyways.
+- the last patch removes the "phy" field from struct usb_hcd because
+  nothing uses it anymore after the previous patches. it also removes
+  the parsing and managing of a single PHY with the name "usb" as the
+  new PHY wrapper parses all PHYs from the device-tree "phys" property
+  anyways (so the PHY wrapper has the same functionality, except that it
+  doesn't need the phy-name "usb" and it can manage more than one PHY)
+
+preconditions for testing this series: all patches from [0] need to be
+applied.
+disclaimer: I don't have any hardware that uses any of the affected
+drivers!
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2018-January/006274.html
+
+Martin Blumenstingl (6):
+  usb: mtu3: remove custom USB PHY handling
+  usb: host: xhci-mtk: remove custom USB PHY handling
+  usb: host: ehci-platform: remove custom USB PHY handling
+  usb: host: ohci-platform: remove custom USB PHY handling
+  usb: chipidea: do not set the "phy" field in struct usb_hcd
+  usb: core: hcd: remove support for initializing a single PHY
+
+ drivers/usb/chipidea/host.c      |   4 +-
+ drivers/usb/core/hcd.c           |  37 --------------
+ drivers/usb/host/ehci-platform.c |  55 ++-------------------
+ drivers/usb/host/ohci-platform.c |  56 ++--------------------
+ drivers/usb/host/xhci-mtk.c      |  98 +------------------------------------
+ drivers/usb/mtu3/mtu3_plat.c     | 101 ---------------------------------------
+ include/linux/usb/hcd.h          |   1 -
+ 7 files changed, 12 insertions(+), 340 deletions(-)
+
 -- 
 2.16.1
