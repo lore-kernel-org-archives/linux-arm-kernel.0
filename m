@@ -1,214 +1,188 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 25 Jan 2018 10:33:36 +0800
-Subject: [linux-sunxi] [PATCH 2/3] ASoC: sun4i-i2s: Do not divide clocks
- when slave
-In-Reply-To: <20180124141101.12867-3-codekipper@gmail.com>
-References: <20180124141101.12867-1-codekipper@gmail.com>
- <20180124141101.12867-3-codekipper@gmail.com>
-Message-ID: <CAGb2v65ZGeeYewM6Y2Ss_o+-nQp=a=z9FRrOU7MkRTzqo2UpuA@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 25 Jan 2018 14:46:27 +1100
+Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
+In-Reply-To: <20180123132220.29886-1-linus.walleij@linaro.org>
+References: <20180123132220.29886-1-linus.walleij@linaro.org>
+Message-ID: <87inbqppm4.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 24, 2018 at 10:11 PM,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Subject is slightly hard to read.
-
-ASoC: sun4i-i2s: Do not divide clocks when acting as slave
-
-would be easier to understand.
-
+> We were previously selecting 1024x768 and 32BPP as the default
+> set-up for the PL111 consumers.
 >
-> There is no need to set the clock and calculate the division of
-> the audio pll for the bclk and sync signals when they are not
-> required.
+> This does not work on elder systems: the device tree bindings
+> support a property "max-memory-bandwidth" in bytes/second that
+> states that if you exceed this the memory bus will saturate.
+> The result is flickering and unstable images.
 >
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> Parse the "max-memory-bandwidth" and respect it when
+> intializing the driver. On the RealView PB11MP we get a nice
+> 1024x768 console with RGB565 as default with this code.
+>
+> If the device tree does not specify the maximum memory
+> bandwidth we keep the old assumption that we can support
+> 1024x768, 32BPP.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  sound/soc/sunxi/sun4i-i2s.c | 116 ++++++++++++++++++++++++--------------------
->  1 file changed, 64 insertions(+), 52 deletions(-)
+>  drivers/gpu/drm/pl111/pl111_drm.h |  1 +
+>  drivers/gpu/drm/pl111/pl111_drv.c | 99 +++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 97 insertions(+), 3 deletions(-)
 >
-> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-> index d7a9141514cf..626679057d0f 100644
-> --- a/sound/soc/sunxi/sun4i-i2s.c
-> +++ b/sound/soc/sunxi/sun4i-i2s.c
-> @@ -195,6 +195,8 @@ struct sun4i_i2s {
->
->         const struct sun4i_i2s_quirks   *variant;
->
-> +       bool bit_clk_master;
-> +
->         unsigned int    tdm_slots;
->         unsigned int    slot_width;
+> diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+> index 440f53ebee8c..770ef5ce3645 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drm.h
+> +++ b/drivers/gpu/drm/pl111/pl111_drm.h
+> @@ -56,6 +56,7 @@ struct pl111_drm_dev_private {
+>  	struct drm_fbdev_cma *fbdev;
+>  
+>  	void *regs;
+> +	u32 memory_bw;
+>  	u32 ienb;
+>  	u32 ctrl;
+>  	/* The pixel clock (a reference to our clock divider off of CLCDCLK). */
+> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+> index 101a9c7db6ff..1b47ee67097d 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drv.c
+> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
+> @@ -58,6 +58,7 @@
+>  #include <linux/dma-buf.h>
+>  #include <linux/module.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>  
+>  #include <drm/drmP.h>
+>  #include <drm/drm_atomic_helper.h>
+> @@ -80,21 +81,107 @@ static const struct drm_mode_config_funcs mode_config_funcs = {
+>  	.atomic_commit = drm_atomic_helper_commit,
 >  };
-> @@ -282,67 +284,73 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
->         int bclk_div, mclk_div;
->         int ret;
->
-> -       switch (rate) {
-> -       case 176400:
-> -       case 88200:
-> -       case 44100:
-> -       case 22050:
-> -       case 11025:
-> -               clk_rate = 22579200;
-> -               break;
-> +       if (i2s->bit_clk_master) {
-> +               switch (rate) {
-> +               case 176400:
-> +               case 88200:
-> +               case 44100:
-> +               case 22050:
-> +               case 11025:
-> +                       clk_rate = 22579200;
-> +                       break;
->
-> -       case 192000:
-> -       case 128000:
-> -       case 96000:
-> -       case 64000:
-> -       case 48000:
-> -       case 32000:
-> -       case 24000:
-> -       case 16000:
-> -       case 12000:
-> -       case 8000:
-> -               clk_rate = 24576000;
-> -               break;
-> +               case 192000:
-> +               case 128000:
-> +               case 96000:
-> +               case 64000:
-> +               case 48000:
-> +               case 32000:
-> +               case 24000:
-> +               case 16000:
-> +               case 12000:
-> +               case 8000:
-> +                       clk_rate = 24576000;
-> +                       break;
->
-> -       default:
-> -               dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
-> -               return -EINVAL;
-> -       }
-> +               default:
-> +                       dev_err(dai->dev, "Unsupported sample rate: %u\n", rate);
-> +                       return -EINVAL;
-> +               }
->
-> -       ret = clk_set_rate(i2s->mod_clk, clk_rate);
-> -       if (ret)
-> -               return ret;
-> +               ret = clk_set_rate(i2s->mod_clk, clk_rate);
-> +               if (ret) {
-> +                       dev_err(dai->dev, "Unable to set clock\n");
-> +                       return ret;
-> +               }
->
-> -       oversample_rate = i2s->mclk_freq / rate;
-> -       if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
-> -               dev_err(dai->dev, "Unsupported oversample rate: %d\n",
-> -                       oversample_rate);
-> -               return -EINVAL;
-> -       }
-> +               oversample_rate = i2s->mclk_freq / rate;
-> +               if (!sun4i_i2s_oversample_is_valid(oversample_rate)) {
-> +                       dev_err(dai->dev, "Unsupported oversample rate: %d\n",
-> +                               oversample_rate);
-> +                       return -EINVAL;
-> +               }
->
-> -       bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
-> -                                         word_size);
-> -       if (bclk_div < 0) {
-> -               dev_err(dai->dev, "Unsupported BCLK divider: %d\n", bclk_div);
-> -               return -EINVAL;
-> -       }
-> +               bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
-> +                                                 word_size);
-> +               if (bclk_div < 0) {
-> +                       dev_err(dai->dev, "Unsupported BCLK divider: %d\n",
-> +                               bclk_div);
-> +                       return -EINVAL;
-> +               }
->
-> -       mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
-> -                                         clk_rate, rate);
-> -       if (mclk_div < 0) {
-> -               dev_err(dai->dev, "Unsupported MCLK divider: %d\n", mclk_div);
-> -               return -EINVAL;
-> -       }
-> +               mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
-> +                                                 clk_rate, rate);
-> +               if (mclk_div < 0) {
-> +                       dev_err(dai->dev, "Unsupported MCLK divider: %d\n",
-> +                               mclk_div);
-> +                       return -EINVAL;
-> +               }
->
-> -       /* Adjust the clock division values if needed */
-> -       bclk_div += i2s->variant->bclk_offset;
-> -       mclk_div += i2s->variant->mclk_offset;
-> +               /* Adjust the clock division values if needed */
-> +               bclk_div += i2s->variant->bclk_offset;
-> +               mclk_div += i2s->variant->mclk_offset;
->
-> -       regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
-> -                    SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
-> -                    SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
-> +               regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
-> +                            SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
-> +                            SUN4I_I2S_CLK_DIV_MCLK(mclk_div));
->
-> -       regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
-> +               regmap_field_write(i2s->field_clkdiv_mclk_en, 1);
-> +       }
+>  
+> +/**
+> + * pl111_choose_max_resolution() - choose max resolution
+> + * @dev: DRM device
+> + * @memory_bw: the graphics maximum memory bandwidth in bytes/s
+> + * @max_width: returns the maximum width
+> + * @max_height: returns the maximum height
+> + * @bpp: returns the maximum bips per pixed (32 or 16)
+> + *
+> + * This function attempts to cut down the maximum supported resolution
+> + * to something the system memory bus can handle. The PL111 and pixel
+> + * clocks may be able to support higher resolutions and color depths
+> + * but as we go up the memory bus get saturated and becomes the
+> + * bottleneck for the resolution. On several systems using e.g.
+> + * 1024x768 with 32 BPP results in instable flickering images.
+> + */
+> +static void pl111_choose_max_resolution(struct drm_device *dev,
+> +					u32 memory_bw,
+> +					int *max_width,
+> +					int *max_height,
+> +					unsigned int *bpp)
+> +{
+> +	/* No limitations, this is the most aggressive */
+> +	if (!memory_bw) {
+> +		*max_width = 1024;
+> +		*max_height = 768;
+> +		*bpp = 32;
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * 1024x768 with RGBX8888 requires a memory bandwidth of
+> +	 * 65Mhz * 4 bytes = 260000000 bytes per second.
+> +	 */
+> +	if (memory_bw >= 260000000) {
+> +		*max_width = 1024;
+> +		*max_height = 768;
+> +		*bpp = 32;
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * 800x600 with RGB8888 requires a memory bandwidth of
+> +	 * 36Mhz * 4 bytes = 144000000 bytes per second. But we
+> +	 * assume the user prefer higher resolution over more
+> +	 * color depth, so we do not add this mode here.
+> +	 */
+> +
+> +	/*
+> +	 * 1024x768 with RGB565 requires a memory bandwidth of
+> +	 * 65Mhz * 2 bytes = 130000000 bytes per second.
+> +	 */
+> +	if (memory_bw >= 130000000) {
+> +		*max_width = 1024;
+> +		*max_height = 768;
+> +		*bpp = 16;
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * 800x600 with RGB565 requires a memory bandwidth of
+> +	 * 36Mhz * 2 bytes = 72000000 bytes per second.
+> +	 */
+> +	if (memory_bw >= 72000000) {
+> +		*max_width = 800;
+> +		*max_height = 600;
+> +		*bpp = 16;
+> +		return;
+> +	}
+> +
+> +	/*
+> +	 * 640x480 with RGB565 requires a memory bandwidth of
+> +	 * 25.175Mhz * 2 bytes = 50350000 bytes per second.
+> +	 */
+> +	if (memory_bw < 50350000)
+> +		dev_err(dev->dev, "can't even do 640x480 VGA RGB565, proceed anyway\n");
+> +
+> +	*max_width = 640;
+> +	*max_height = 480;
+> +	*bpp = 16;
+> +}
+> +
+>  static int pl111_modeset_init(struct drm_device *dev)
+>  {
+>  	struct drm_mode_config *mode_config;
+>  	struct pl111_drm_dev_private *priv = dev->dev_private;
+>  	struct drm_panel *panel;
+>  	struct drm_bridge *bridge;
+> +	unsigned int bpp; /* bits per pixel */
+>  	int ret = 0;
+>  
+>  	drm_mode_config_init(dev);
+>  	mode_config = &dev->mode_config;
+>  	mode_config->funcs = &mode_config_funcs;
+>  	mode_config->min_width = 1;
+> -	mode_config->max_width = 1024;
+>  	mode_config->min_height = 1;
+> -	mode_config->max_height = 768;
+> +
+> +	pl111_choose_max_resolution(dev, priv->memory_bw,
+> +				    &mode_config->max_width,
+> +				    &mode_config->max_height, &bpp);
+> +	dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
+> +		 mode_config->max_width, mode_config->max_height, bpp);
 
-The changed block is so long that it seems better to split it out
-into a helper function that doesn't get called when the controller
-isn't the BCLK master. Or you could move the last "Set sync period"
-block up top, and do an early return if it's not the master. Either
-way I think it's better than having a large indented block.
+I think this is the wrong place in the pipeline to be doing this, but I
+don't have a complete solution so I'm not necessarily saying no.  Things
+I think we should do for bandwidth limits:
 
-On the other hand, do the settings need to be cleared if it's the
-slave?
+A new pl111_mode_valid() rejects modes with width*height*2 > bandwidth
+(if we can't scan it out with our smallest format, don't advertise it).
 
-ChenYu
+pl111_display_check() rejects modes with width*height*bpp > bandwidth
+(if we can't scan out this particular configuration, let them know we
+can't set the mode).
 
->
->         /* Set sync period */
->         if (i2s->variant->has_fmt_set_lrck_period)
-> @@ -501,10 +509,12 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
->                 case SND_SOC_DAIFMT_CBS_CFS:
->                         /* BCLK and LRCLK master */
->                         val = SUN4I_I2S_CTRL_MODE_MASTER;
-> +                       i2s->bit_clk_master = true;
->                         break;
->                 case SND_SOC_DAIFMT_CBM_CFM:
->                         /* BCLK and LRCLK slave */
->                         val = SUN4I_I2S_CTRL_MODE_SLAVE;
-> +                       i2s->bit_clk_master = false;
->                         break;
->                 default:
->                         dev_err(dai->dev, "Unsupported slave setting: %d\n",
-> @@ -525,10 +535,12 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
->                         /* BCLK and LRCLK master */
->                         val = SUN8I_I2S_CTRL_BCLK_OUT |
->                                 SUN8I_I2S_CTRL_LRCK_OUT;
-> +                       i2s->bit_clk_master = true;
->                         break;
->                 case SND_SOC_DAIFMT_CBM_CFM:
->                         /* BCLK and LRCLK slave */
->                         val = 0;
-> +                       i2s->bit_clk_master = false;
->                         break;
->                 default:
->                         dev_err(dai->dev, "Unsupported slave setting: %d\n",
-> --
-> 2.16.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Ideally given those two things, fbdev and X11 would notice that the
+preferred mode fails at 24bpp and fall back to 16bpp.  I don't think
+either of those does so today, though.
+
+Interested in tackling any of these?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180125/89f34bf6/attachment.sig>
