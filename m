@@ -1,64 +1,85 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 25 Jan 2018 15:37:28 +0800
-Subject: [PATCH 1/2] dt-bindings: nvmem: imx-ocotp: update the binding to
- reflect data cells
-Message-ID: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 25 Jan 2018 11:27:06 +0100
+Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <ebc8b28d5c2948131cc187ac8177395c@codeaurora.org>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-2-l.stach@pengutronix.de>
+ <20180123103609.GD27764@dragon> <1516713799.25726.21.camel@pengutronix.de>
+ <ebc8b28d5c2948131cc187ac8177395c@codeaurora.org>
+Message-ID: <1516876026.6411.23.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx-ocotp is implemented based on nvmem which can have data cells
-as child node. Update the binding doc to reflect it to be more easily
-understood by users.
+Hi Dong,
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- .../devicetree/bindings/nvmem/imx-ocotp.txt        | 23 ++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+Am Donnerstag, den 25.01.2018, 17:48 +0800 schrieb aisheng.dong at codeaurora.org:
+> Hi Lucas,
+> 
+> First of all, good to see this patch series in community.
+> 
+> Pengutronix has always been an active friendly contributor on IMX
+> upstream activities.??You Did help us a lot!
+> 
+> On 2018-01-23 21:23, Lucas Stach wrote:
+> 
+> <snip>
+> 
+> > > > > > > > > > > > +			#address-cells = <1>;
+> > > > > > > > > > > > +			#size-cells = <1>;
+> > > > > > +			ranges = <0x30000000 0x30000000 0x400000>;
+> > > > 
+> > > > +
+> > > > > > > > +			gpio1: gpio at 30200000 {
+> > > > 
+> > > > +				compatible = "nxp,imx8mq-gpio", "fsl,imx35-gpio";
+> > > 
+> > > It looks a bit odd to have different vendor prefix for the same?
+> > > device.
+> > > But we can understand the reason.??Just curious if this is what vendor
+> > > kernel does?
+> > 
+> > No, I did it mostly to be consistent with the location of the DT files
+> > under "nxp". I'll change this to match the "freescale" location.
+> > 
+> 
+> Vendor tree mostly is still using fsl,imx8mq-xx.
+> 
+> And many binding doc format is:"compatible : Should be "fsl,<soc>-gpio".
+> So we can't use 'nxp' prefix here without changing binding doc.
+> 
+> Then if we decided to use 'fsl' prefix, probably we may want to fix the
+> rest of them in this file as well.
 
-diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-index f162c72..729f674 100644
---- a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-+++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-@@ -11,17 +11,32 @@ Required properties:
- 	"fsl,imx6ul-ocotp" (i.MX6UL),
- 	"fsl,imx7d-ocotp" (i.MX7D/S),
- 	followed by "syscon".
-+- #address-cells : Should be 1
-+- #size-cells : Should be 1
- - reg: Should contain the register base and length.
- - clocks: Should contain a phandle pointing to the gated peripheral clock.
- 
- Optional properties:
- - read-only: disable write access
- 
--Example:
-+Optional Child nodes:
-+
-+- Data cells of ocotp:
-+  Detailed bindings are described in bindings/nvmem/nvmem.txt
- 
-+Example:
- 	ocotp: ocotp at 21bc000 {
--		compatible = "fsl,imx6q-ocotp", "syscon";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "fsl,imx6sx-ocotp", "syscon";
- 		reg = <0x021bc000 0x4000>;
--		clocks = <&clks IMX6QDL_CLK_IIM>;
--		read-only;
-+		clocks = <&clks IMX6SX_CLK_OCOTP>;
-+
-+		tempmon_calib: calib at 38 {
-+			reg = <0x38 4>;
-+		};
-+
-+		tempmon_temp_grade: temp-grade at 20 {
-+			reg = <0x20 4>;
-+		};
- 	};
--- 
-2.7.4
+Yes, this is changed consistently to "fsl," for the next revision of
+the patchset.
+
+> And i see the dtsi file does not include Freescale/NXP copyright,
+> is there a reason?
+
+The dtsi is quite different from the downstream version. But you are
+right, I looked extensively at the downstream version, so I'll add the
+NXP copyright.
+
+BTW: Could you check internally to see if Freescale/NXP would be okay
+with relicensing the DT bits I pulled from downstream as dual GPL-2.0
+and MIT, to align with other DTs in the kernel?
+
+> BTW it's quite strange that my gmail did not receive your MX8MQ patch
+> series except clk part.
+> Lucas, Could you help have me CCed next time?
+> I'd like to help review and test the patch series.
+> 
+> For this time, can you help send them all to me as attachment?
+
+I'm about to send v2 of the series. I'll CC you on the submission.
+
+> (You can also send all IMX related patches to linux-imx at nxp.com maillist
+> i created recently for tracking all IMX related upstream activities.
+> Most Freescale/NXP driver owners are in this list that could help on
+> the review. Shawn, do you think if i can put it in MAINTAINER file?)
+
+That's great news that there is now a common address for this. I think
+it would be a good idea to have it added to MAINTAINERS as a reviewer.
+
+Regards,
+Lucas
