@@ -1,40 +1,61 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 25 Jan 2018 16:48:16 +0100
-Subject: [PATCH 2/2] Input: sirfsoc-onkey: Improve a size determination in
- sirfsoc_pwrc_probe()
-In-Reply-To: <b66f4105-57f2-adc2-ecde-cd4dacac408c@users.sourceforge.net>
-References: <b66f4105-57f2-adc2-ecde-cd4dacac408c@users.sourceforge.net>
-Message-ID: <07e55fcd-8ba5-bae4-0d05-34ada8453a47@users.sourceforge.net>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Thu, 25 Jan 2018 16:55:04 +0100
+Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
+Message-ID: <20180125155504.8611-1-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 25 Jan 2018 16:35:13 +0100
+The "adjusted_mode" clock value (ie the real pixel clock) is more
+accurate than "mode" clock value (ie the panel/bridge requested
+clock value). It offers a better preciseness for timing
+computations and allows to reduce the extra dsi bandwidth in
+burst mode (from ~20% to ~10-12%, hw platform dependant).
 
-Replace the specification of a data structure by a pointer dereference
-as the parameter for the operator "sizeof" to make the corresponding size
-determination a bit safer according to the Linux coding style convention.
-
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
 ---
- drivers/input/misc/sirfsoc-onkey.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel clock"
 
-diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
-index 9d8b4e2d7063..cdad20811d35 100644
---- a/drivers/input/misc/sirfsoc-onkey.c
-+++ b/drivers/input/misc/sirfsoc-onkey.c
-@@ -111,8 +111,7 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
- 	int irq;
- 	int error;
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index ed8af32f8e52..b926b62e9e33 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
  
--	pwrcdrv = devm_kzalloc(&pdev->dev, sizeof(struct sirfsoc_pwrc_drvdata),
--			       GFP_KERNEL);
-+	pwrcdrv = devm_kzalloc(&pdev->dev, sizeof(*pwrcdrv), GFP_KERNEL);
- 	if (!pwrcdrv)
- 		return -ENOMEM;
+ 	clk_prepare_enable(dsi->pclk);
  
+-	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
++	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode, dsi->mode_flags,
+ 				     dsi->lanes, dsi->format, &dsi->lane_mbps);
+ 	if (ret)
+ 		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+ 
+ 	pm_runtime_get_sync(dsi->dev);
+ 	dw_mipi_dsi_init(dsi);
+-	dw_mipi_dsi_dpi_config(dsi, mode);
++	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
+ 	dw_mipi_dsi_packet_handler_config(dsi);
+ 	dw_mipi_dsi_video_mode_config(dsi);
+-	dw_mipi_dsi_video_packet_config(dsi, mode);
++	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
+ 	dw_mipi_dsi_command_mode_config(dsi);
+-	dw_mipi_dsi_line_timer_config(dsi, mode);
+-	dw_mipi_dsi_vertical_timing_config(dsi, mode);
++	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
++	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
+ 
+ 	dw_mipi_dsi_dphy_init(dsi);
+ 	dw_mipi_dsi_dphy_timing_config(dsi);
+@@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+ 
+ 	dw_mipi_dsi_dphy_enable(dsi);
+ 
+-	dw_mipi_dsi_wait_for_two_frames(mode);
++	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
+ 
+ 	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
+ 	dw_mipi_dsi_set_mode(dsi, 0);
 -- 
-2.16.1
+2.15.1
