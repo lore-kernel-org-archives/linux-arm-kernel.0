@@ -1,51 +1,44 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 25 Jan 2018 18:33:16 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6sx: add ARM power domain support
-In-Reply-To: <1516725734-32745-2-git-send-email-Anson.Huang@nxp.com>
-References: <1516725734-32745-1-git-send-email-Anson.Huang@nxp.com>
- <1516725734-32745-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180125103316.GB24622@b29396-OptiPlex-7040>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Thu, 25 Jan 2018 11:38:00 +0100
+Subject: [PATCH v2 2/2] drm/bridge/synopsys: dsi: Fix dsi_host_transfer()
+ return value
+In-Reply-To: <20180125103800.1999-1-philippe.cornu@st.com>
+References: <20180125103800.1999-1-philippe.cornu@st.com>
+Message-ID: <20180125103800.1999-3-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 24, 2018 at 12:42:14AM +0800, Anson Huang wrote:
-> Add ARM power domain in PGC.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
-> this patch should be based on 0001-ARM-dts-imx6sx-add-pu-power-domain-support.patch
->  arch/arm/boot/dts/imx6sx.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index 42ef4c6..aa29ca6 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -768,6 +768,11 @@
->  					#address-cells = <1>;
->  					#size-cells = <0>;
->  
-> +					power-domain at 0 {
+The dw_mipi_dsi_host_transfer() must return the number of
+bytes transmitted/received on success instead of 0.
+Note: As the read feature is not implemented, only the
+transmitted number of bytes is returned for the moment.
 
-Nitpick: probably an 'arm' prefix is better:
-arm: power-domain at 0
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-Anyway, it's minor depends on maintainer's perference.
-
-Otherwise, looks fine
-
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
-
-Regards
-Dong Aisheng
-
-> +						reg = <0>;
-> +						#power-domain-cells = <0>;
-> +					};
-> +
->  					pd_pu: power-domain at 1 {
->  						reg = <1>;
->  						#power-domain-cells = <0>;
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index 72ecaeb40822..090bf62d1ea8 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -419,7 +419,16 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 
+ 	dw_mipi_message_config(dsi, msg);
+ 
+-	return dw_mipi_dsi_write(dsi, &packet);
++	ret = dw_mipi_dsi_write(dsi, &packet);
++	if (ret)
++		return ret;
++
++	/*
++	 * TODO Only transmitted size is returned as actual driver does
++	 * not support dcs/generic reads. Please update return value when
++	 * delivering the read feature.
++	 */
++	return packet.size;
+ }
+ 
+ static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
+-- 
+2.15.1
