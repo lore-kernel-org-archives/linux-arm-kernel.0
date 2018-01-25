@@ -1,31 +1,69 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Thu, 25 Jan 2018 16:27:45 +0800
-Subject: [PATCH v6 03/13] arm64: cpufeature: Detect CPU RAS Extentions
-In-Reply-To: <5A67877F.5090300@arm.com>
-References: <20180115193906.30053-1-james.morse@arm.com>
- <20180115193906.30053-4-james.morse@arm.com>
- <78d4374a-f75c-6860-38ab-6373ffae3eee@huawei.com> <5A663C59.6030205@arm.com>
- <2fbdd6f2-3225-1993-cae5-0bc435189d36@huawei.com> <5A67877F.5090300@arm.com>
-Message-ID: <daa4f204-a089-75ed-fdf4-625d3a58f6bc@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Jan 2018 09:29:04 +0100
+Subject: [linux-sunxi][PATCH 5/5] arm64: allwinner: a64: Add DAI nodes
+In-Reply-To: <CAEKpxBk8NXJn4KxEGXx7UddqpUMC65kdEgx1phZDWyUd3ER_3Q@mail.gmail.com>
+References: <20180124103943.2062-1-codekipper@gmail.com>
+ <20180124103943.2062-6-codekipper@gmail.com>
+ <20180124110222.cdglyg5m7644xiem@flea.lan>
+ <CAEKpxBk8NXJn4KxEGXx7UddqpUMC65kdEgx1phZDWyUd3ER_3Q@mail.gmail.com>
+Message-ID: <20180125082904.t4sqob626kyzw4ga@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/1/24 3:05, James Morse wrote:
->> do you mean we do not enable "CONFIG_ARM64_RAS_EXTN" in the
->> defconfig for ARM's SOC until kernel-first RAS is supported?
-> I've no idea if or when we will do kernel-first, when I bring it up, its so we
-> don't build a hybrid model, and we consider how we going to add kernel-first
-> support if/when it comes along.
+On Wed, Jan 24, 2018 at 12:39:31PM +0100, Code Kipper wrote:
+> On 24 January 2018 at 12:02, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Wed, Jan 24, 2018 at 11:39:43AM +0100, codekipper at gmail.com wrote:
+> >> From: Marcus Cooper <codekipper@gmail.com>
+> >>
+> >> Add the DAI blocks to the device tree. I2S0 and I2S1 are for
+> >> connecting to an external codec.
+> >>
+> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> >> ---
+> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
+> >>  1 file changed, 26 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> index f060a58f374c..f3354f8c2026 100644
+> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> @@ -419,6 +419,32 @@
+> >>                       status = "disabled";
+> >>               };
+> >>
+> >> +             i2s0: i2s at 1c22000 {
+> >> +                     #sound-dai-cells = <0>;
+> >> +                     compatible = "allwinner,sun8i-h3-i2s";
+> >
+> > Same remark than for the spdif, please add a soc-specific compatible.
 > 
-> If you want it turned on in defconfig please submit a patch to do that. I
-sorry, it is my mistake,
-In your patch, ARM64_RAS_EXTN is already turned on by default, so no need to turn on again.
+> Is that really necessary?..
 
-+config ARM64_RAS_EXTN
-+       bool "Enable support for RAS CPU Extensions"
-+       default y
-+       help
-+         CPUs that support the Reliability, Availability and Serviceability
+Yes.
 
+> for example on the a20 the functionality of the i2s is the same as
+> the a10 so it is down as "allwinner,sun4i-a10-i2s", likewise here
+> it's the same as the changes required for the H3. I was planning on
+> using the compatible "allwinner,sun50i-a64-i2s" for the audio codec
+> as there are some quirks that need to be addressed.
 
-> haven't because I don't know where they go!
+And this is exactly why it is necessary. If we ever find a quirk in
+the future, supporting that quirk will be smooth if we already have a
+compatible for that SoC in the DT, and a pain if we don't.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180125/5a086062/attachment.sig>
