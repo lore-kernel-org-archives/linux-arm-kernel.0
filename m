@@ -1,47 +1,136 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 26 Jan 2018 09:06:33 +0000
-Subject: [RFC/RFT usb-next v1 5/6] usb: chipidea: do not set the "phy"
- field in struct usb_hcd
-In-Reply-To: <20180125001639.14681-6-martin.blumenstingl@googlemail.com>
-References: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
- <20180125001639.14681-6-martin.blumenstingl@googlemail.com>
-Message-ID: <HE1PR04MB145071FCFAF041E0A9252FF08BE00@HE1PR04MB1450.eurprd04.prod.outlook.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 26 Jan 2018 10:14:25 +0100
+Subject: [PATCH v3 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <20180125152139.32431-5-marc.zyngier@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-5-marc.zyngier@arm.com>
+Message-ID: <20180126091425.GU21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Thu, Jan 25, 2018 at 03:21:37PM +0000, Marc Zyngier wrote:
+> In order to avoid aliasing attacks against the branch predictor,
+> Cortex-A15 require to invalidate the BTB when switching
+> from one user context to another. The only way to do so on this
+> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+> mode.
 > 
-> Now that usb_add_hcd parses all generic PHYs anyways the code which skips
-> initialization of a single PHY will go away.
-> Remove the code which sets struct usb_hcd's phy field from the chipidea driver as
-> this field will go away soon.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/usb/chipidea/host.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>  arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
+>  arch/arm/mm/proc-v7-3level.S | 16 ++++++++++++++++
+>  arch/arm/mm/proc-v7.S        | 18 +++++++++++++++++-
+>  3 files changed, 43 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c index
-> 19d60ed7e41f..fc324767cb0f 100644
-> --- a/drivers/usb/chipidea/host.c
-> +++ b/drivers/usb/chipidea/host.c
-> @@ -124,9 +124,7 @@ static int host_start(struct ci_hdrc *ci)
-> 
->  	hcd->power_budget = ci->platdata->power_budget;
->  	hcd->tpl_support = ci->platdata->tpl_support;
-> -	if (ci->phy)
-> -		hcd->phy = ci->phy;
-> -	else
-> +	if (!ci->phy)
->  		hcd->usb_phy = ci->usb_phy;
+> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+> index 0422e58b74e8..7dc9e1c69039 100644
+> --- a/arch/arm/mm/proc-v7-2level.S
+> +++ b/arch/arm/mm/proc-v7-2level.S
+> @@ -40,7 +40,17 @@
+>   *	Note that we always need to flush BTAC/BTB if IBE is set
+>   *	even on Cortex-A8 revisions not affected by 430973.
+>   *	If IBE is not set, the flush BTAC/BTB won't do anything.
+> + *
+> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+> + *	for the icache invalidation to also invalidate the BTB.
+>   */
+
+Seems like we can read (but not write) this bit from non-secure.  Should
+we test if it's set somewhere during boot and warn the user if not?
+
+> +ENTRY(cpu_ca15_switch_mm)
+> +#ifdef CONFIG_MMU
+> +	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
+> +	isb
+> +	b	cpu_v7_switch_mm
+> +#endif
+> +ENDPROC(cpu_ca15_switch_mm)
+>  ENTRY(cpu_v7_btbinv_switch_mm)
+>  #ifdef CONFIG_MMU
+>  	mov	r2, #0
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 934272e1fa08..cae6bb4da956 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
+>  ENDPROC(cpu_v7_switch_mm)
+>  ENDPROC(cpu_v7_btbinv_switch_mm)
+>  
+> +/*
+> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+> + *	for the icache invalidation to also invalidate the BTB.
+> + */
+> +ENTRY(cpu_ca15_switch_mm)
+> +#ifdef CONFIG_MMU
+> +	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
+> +	mmid	r2, r2
+> +	asid	r2, r2
+> +	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
+> +	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
+> +	isb
+> +#endif
+> +	ret	lr
+> +ENDPROC(cpu_ca15_switch_mm)
+> +
+
+There's some potential for code shaing with cpu_v7_switch_mm here,
+either via a macro or by simply calling cpu_v7_switch_mm from
+cpu_ca15_switch_mm, but I'm not sure if we care?
+
+>  #ifdef __ARMEB__
+>  #define rl r3
+>  #define rh r2
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 0a14967fd400..9310fd9aa1cf 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -173,6 +173,21 @@ ENDPROC(cpu_v7_do_resume)
+>  	globl_equ	cpu_v7_btbinv_do_resume,	cpu_v7_do_resume
+>  #endif
+>  
+> +/*
+> + * Cortex-A15 that require an icache invalidation on switch_mm
+
+uber nit: The wording is weird here, how about "Cortex-A15 requires
+an..." ?
+
+> + */
+> +	globl_equ	cpu_ca15_proc_init,		cpu_v7_proc_init
+> +	globl_equ	cpu_ca15_proc_fin,		cpu_v7_proc_fin
+> +	globl_equ	cpu_ca15_reset,			cpu_v7_reset
+> +	globl_equ	cpu_ca15_do_idle,		cpu_v7_do_idle
+> +	globl_equ	cpu_ca15_dcache_clean_area, 	cpu_v7_dcache_clean_area
+> +	globl_equ	cpu_ca15_set_pte_ext,		cpu_v7_set_pte_ext
+> +	globl_equ	cpu_ca15_suspend_size,		cpu_v7_suspend_size
+> +#ifdef CONFIG_ARM_CPU_SUSPEND
+> +	globl_equ	cpu_ca15_do_suspend,		cpu_v7_do_suspend
+> +	globl_equ	cpu_ca15_do_resume,		cpu_v7_do_resume
+> +#endif
+> +
+>  /*
+>   * Cortex-A9 processor functions
+>   */
+> @@ -549,6 +564,7 @@ __v7_setup_stack:
+>  	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+>  	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+>  	define_processor_functions v7_btbinv, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+> +	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+>  #ifndef CONFIG_ARM_LPAE
+>  	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+>  #endif
+> @@ -668,7 +684,7 @@ __v7_ca12mp_proc_info:
+>  __v7_ca15mp_proc_info:
+>  	.long	0x410fc0f0
+>  	.long	0xff0ffff0
+> -	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup
+> +	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup, proc_fns = ca15_processor_functions
+>  	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+>  
+>  	/*
+> -- 
+> 2.14.2
 > 
 
-The reason hcd->phy is initialized by chipidea core is we do not need HCD core to
-touch PHY, and PHY operation is shared for both device and host mode for chipidea.
-
-If I understand correct, your HCD core PHY wrapper patch set will do PHY operation if
-there is a "phy" node under controller's? If it is correct, you may supply one way to let
-the HCD core bypass phy operations for some USB controllers, eg dual-role controllers.
-Thanks.
-
-Peter
+Thanks,
+-Christoffer
