@@ -1,59 +1,39 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 26 Jan 2018 16:11:34 +0100
-Subject: [PATCH v2 3/8] dt-bindings: mfd: stm32-timers: add support for dmas
-In-Reply-To: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
-References: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1516979499-3665-4-git-send-email-fabrice.gasnier@st.com>
+Date: Fri, 26 Jan 2018 16:11:31 +0100
+Subject: [PATCH v2 0/8] Add support for PWM input capture on STM32
+Message-ID: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DMAs to STM32 timers. STM32 Timers can support up to 7
-dma requests: up to 4 channels, update, compare and trigger.
-DMAs may be used to transfer data from pwm capture for instance.
-DMA support is made optional, PWM capture support is also an option.
-This is much more wise system-wide to avoid shortage on DMA request
-lines as there's significant amount of timer instances that can
-request up to 7 channels.
+This series adds support for capture to stm32-pwm driver.
+Capture is based on DMAs.
+- First two patches are precursor patches
+- Subsequent two patches add support for requesting DMAs to MFD core
+- Next three patches add support for capture to stm32-pwm driver
+- This has been tested on stm32429i-eval board.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- .../devicetree/bindings/mfd/stm32-timers.txt         | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Changes in v2:
+- Abstract DMA handling from child driver: move it to MFD core
+- Rework pwm capture routines to adopt this change
+- Comment on optional dma support, beautify DMAs probe
 
-diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-index 1db6e00..0e900b5 100644
---- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-+++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-@@ -19,6 +19,11 @@ Required parameters:
- Optional parameters:
- - resets:		Phandle to the parent reset controller.
- 			See ../reset/st,stm32-rcc.txt
-+- dmas:			List of phandle to dma channels that can be used for
-+			this timer instance. There may be up to 7 dma channels.
-+- dma-names:		List of dma names. Must match 'dmas' property. Valid
-+			names are: "ch1", "ch2", "ch3", "ch4", "up", "trig",
-+			"com".
- 
- Optional subnodes:
- - pwm:			See ../pwm/pwm-stm32.txt
-@@ -44,3 +49,18 @@ Example:
- 			reg = <0>;
- 		};
- 	};
-+
-+Example with all dmas:
-+	timer at 40010000 {
-+		...
-+		dmas = <&dmamux1 11 0x400 0x0>,
-+		       <&dmamux1 12 0x400 0x0>,
-+		       <&dmamux1 13 0x400 0x0>,
-+		       <&dmamux1 14 0x400 0x0>,
-+		       <&dmamux1 15 0x400 0x0>,
-+		       <&dmamux1 16 0x400 0x0>,
-+		       <&dmamux1 17 0x400 0x0>;
-+		dma-names = "ch1", "ch2", "ch3", "ch4", "up", "trig", "com";
-+		...
-+		child nodes...
-+	};
+Fabrice Gasnier (8):
+  pwm: stm32: fix, remove unused struct device
+  pwm: stm32: protect common prescaler for all channels
+  dt-bindings: mfd: stm32-timers: add support for dmas
+  mfd: stm32-timers: add support for dmas
+  pwm: stm32: add capture support
+  pwm: stm32: improve capture by tuning counter prescaler
+  pwm: stm32: use input prescaler to improve period capture
+  ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+
+ .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+ arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+ drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
+ drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
+ include/linux/mfd/stm32-timers.h                   |  39 +++
+ 5 files changed, 547 insertions(+), 6 deletions(-)
+
 -- 
 1.9.1
