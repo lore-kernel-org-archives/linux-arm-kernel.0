@@ -1,32 +1,59 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 26 Jan 2018 17:23:39 +0100
-Subject: [PATCH] ARM: dts: stm32: Fix HSE clock frequency for stm32h743i-disco
- board
-Message-ID: <1516983819-6567-1-git-send-email-patrice.chotard@st.com>
+From: samuel@sholland.org (Samuel Holland)
+Date: Fri, 26 Jan 2018 10:25:12 -0600
+Subject: [linux-sunxi] [PATCH 16/16] arm: dts: sun8i: a83t: add thermal
+ zone to A83T
+In-Reply-To: <20180126151941.12183-17-embed3d@gmail.com>
+References: <20180126151941.12183-1-embed3d@gmail.com>
+ <20180126151941.12183-17-embed3d@gmail.com>
+Message-ID: <6ee10c04-6602-b927-5f47-64d6beb10625@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On 01/26/18 09:19, Philipp Rossak wrote:
+> This patch adds the thermal zones to the A83T. Sensor 0 is located in the
+> cpu cluster 0. Sensor 1 is located in cluster 1 and Sensor 3 is located
+> in the gpu.
 
-The HSE oscillator frequency was wrongly set to 125MHz instead of 25MHz.
+You mention sensor 3 here, but have sensor 2 in the device tree.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
----
- arch/arm/boot/dts/stm32h743i-disco.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> index 9e53ff5ac4ed..4259a8726031 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> @@ -747,4 +747,24 @@
+>  			#size-cells = <0>;
+>  		};
+>  	};
+> +
+> +	thermal-zones {
+> +		cpu0_thermal: cpu0-thermal {
+> +			polling-delay-passive = <1000>;
+> +			polling-delay = <5000>;
+> +			thermal-sensors = <&ths 0>;
+> +		};
+> +
+> +		cpu1_thermal: cpu1-thermal {
+> +			polling-delay-passive = <1000>;
+> +			polling-delay = <5000>;
+> +			thermal-sensors = <&ths 1>;
+> +		};
+> +
+> +		gpu_thermal: gpu-thermal {
+> +			polling-delay-passive = <1000>;
+> +			polling-delay = <5000>;
+> +			thermal-sensors = <&ths 2>;
 
-diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts b/arch/arm/boot/dts/stm32h743i-disco.dts
-index 79e841d94079..45e088c55741 100644
---- a/arch/arm/boot/dts/stm32h743i-disco.dts
-+++ b/arch/arm/boot/dts/stm32h743i-disco.dts
-@@ -63,7 +63,7 @@
- };
- 
- &clk_hse {
--	clock-frequency = <125000000>;
-+	clock-frequency = <25000000>;
- };
- 
- &usart2 {
--- 
-1.9.1
+                                           ^^^^ here
+
+> +		};
+> +	};
+>  };
+> 
+
+Thanks,
+Samuel
