@@ -1,40 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Jan 2018 18:02:43 +0000
-Subject: [RFC 2/2] arm64: compat: cacheflush syscall: process only pages
- that are in the memory
-In-Reply-To: <20180126174145.6gtfjjoxb57d7qwt@armageddon.cambridge.arm.com>
-References: <20180126111441.29353-1-m.szyprowski@samsung.com>
- <CGME20180126111453eucas1p178663ac7b17d0c92cc889a42b3f5bcec@eucas1p1.samsung.com>
- <20180126111441.29353-2-m.szyprowski@samsung.com>
- <20180126174145.6gtfjjoxb57d7qwt@armageddon.cambridge.arm.com>
-Message-ID: <20180126180242.ziek4kxdkimlawnw@armageddon.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Jan 2018 18:10:23 +0000
+Subject: [PATCH 03/14] arm/arm64: KVM: Consolidate the PSCI include files
+In-Reply-To: <20180126142847.31240-4-marc.zyngier@arm.com>
+References: <20180126142847.31240-1-marc.zyngier@arm.com>
+ <20180126142847.31240-4-marc.zyngier@arm.com>
+Message-ID: <94c9a057-cb41-a92a-aaca-8b8e95676a32@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 05:41:45PM +0000, Catalin Marinas wrote:
-> On Fri, Jan 26, 2018 at 12:14:41PM +0100, Marek Szyprowski wrote:
-> > @@ -32,23 +33,36 @@
-> >  static long
-> >  __do_compat_cache_op(unsigned long start, unsigned long end)
-> [...]
-> > +		if (follow_page(vma, start, 0)) {
-> > +			ret = __flush_cache_user_range(start, start + chunk);
-> > +			if (ret)
-> > +				goto done;
-> > +		}
+On 26/01/18 14:28, Marc Zyngier wrote:
+> As we're about to update the PSCI support, and because I'm lazy,
+> let's move the PSCI include file to include/kvm so that both
+> ARM architectures can find it.
 > 
-> This looks pretty expensive for pages already in memory. Could we do
-> some tricks with the AT instruction in __flush_cache_user_range() so
-> that we skip the flushing if the page isn't there? We know that when a
-> page is mapped, the cache will get cleaned/invalidated via set_pte_at()
-> + sync_icache_dcache(), so the only problem of a race is flushing the
-> caches twice for a page. If a page gets unmapped after AT, we may bring
-> it back through the cache ops.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/psci.h                        | 25 ----------------------
+>  arch/arm/kvm/handle_exit.c                         |  2 +-
+>  arch/arm64/kvm/handle_exit.c                       |  3 ++-
+>  .../asm/kvm_psci.h => include/kvm/arm_psci.h       |  6 +++---
+>  virt/kvm/arm/arm.c                                 |  2 +-
+>  virt/kvm/arm/psci.c                                |  3 ++-
+>  6 files changed, 9 insertions(+), 32 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/psci.h
+>  rename arch/arm64/include/asm/kvm_psci.h => include/kvm/arm_psci.h (89%)
+> 
+> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> deleted file mode 100644
+> index e1b825dfab23..000000000000
+> --- a/arch/arm/include/asm/psci.h
+> +++ /dev/null
+> @@ -1,25 +0,0 @@
+> -/*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - * Copyright (C) 2012 ARM Limited
+> - */
+> -
+> -#ifndef __ASM_ARM_PSCI_H
+> -#define __ASM_ARM_PSCI_H
+> -
+> -extern const struct smp_operations psci_smp_ops;
+> -
+> -#if defined(CONFIG_SMP) && defined(CONFIG_ARM_PSCI)
+> -bool psci_smp_available(void);
+> -#else
+> -static inline bool psci_smp_available(void) { return false; }
+> -#endif
+> -
+> -#endif /* __ASM_ARM_PSCI_H */
 
-Alternatively, we could try to use pagefault_disable()/enable() around
-this but we need to make sure we cover all the cases where a page may
-not be flushed even when it is actually present (i.e. old pte). For
-example, ptep_set_access_flags() skips __sync_icache_dcache().
+Doh. I deleted the wrong file. That was supposed to be kvm_psci.h, and
+not psci.h. Not sure how I managed that one...
 
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
