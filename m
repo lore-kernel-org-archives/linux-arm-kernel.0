@@ -1,115 +1,58 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Jan 2018 12:03:16 +0000
-Subject: [PATCH 6/7] arm64: assembler: Change order of macro arguments in
- phys_to_ttbr
+Date: Fri, 26 Jan 2018 12:03:15 +0000
+Subject: [PATCH 5/7] arm64: Force KPTI to be disabled on Cavium ThunderX
 In-Reply-To: <1516968197-23206-1-git-send-email-will.deacon@arm.com>
 References: <1516968197-23206-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1516968197-23206-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1516968197-23206-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since AArch64 assembly instructions take the destination register as
-their first operand, do the same thing for the phys_to_ttbr macro.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
+Cavium ThunderX's erratum 27456 results in a corruption of icache
+entries that are loaded from memory that is mapped as non-global
+(i.e. ASID-tagged).
+
+As KPTI is based on memory being mapped non-global, let's prevent
+it from kicking in if this erratum is detected.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+[will: Update comment]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 2 +-
- arch/arm64/kernel/head.S           | 4 ++--
- arch/arm64/kernel/hibernate-asm.S  | 4 ++--
- arch/arm64/kvm/hyp-init.S          | 2 +-
- arch/arm64/mm/proc.S               | 6 +++---
- 5 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 23251eae6e8a..e4495ef96058 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -514,7 +514,7 @@ alternative_endif
-  * 	phys:	physical address, preserved
-  * 	ttbr:	returns the TTBR value
-  */
--	.macro	phys_to_ttbr, phys, ttbr
-+	.macro	phys_to_ttbr, ttbr, phys
- #ifdef CONFIG_ARM64_PA_BITS_52
- 	orr	\ttbr, \phys, \phys, lsr #46
- 	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index ba3ab04788dc..341649c08337 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -776,8 +776,8 @@ ENTRY(__enable_mmu)
- 	update_early_cpu_boot_status 0, x1, x2
- 	adrp	x1, idmap_pg_dir
- 	adrp	x2, swapper_pg_dir
--	phys_to_ttbr x1, x3
--	phys_to_ttbr x2, x4
-+	phys_to_ttbr x3, x1
-+	phys_to_ttbr x4, x2
- 	msr	ttbr0_el1, x3			// load TTBR0
- 	msr	ttbr1_el1, x4			// load TTBR1
- 	isb
-diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
-index 84f5d52fddda..dd14ab8c9f72 100644
---- a/arch/arm64/kernel/hibernate-asm.S
-+++ b/arch/arm64/kernel/hibernate-asm.S
-@@ -34,12 +34,12 @@
-  * each stage of the walk.
-  */
- .macro break_before_make_ttbr_switch zero_page, page_table, tmp
--	phys_to_ttbr \zero_page, \tmp
-+	phys_to_ttbr \tmp, \zero_page
- 	msr	ttbr1_el1, \tmp
- 	isb
- 	tlbi	vmalle1
- 	dsb	nsh
--	phys_to_ttbr \page_table, \tmp
-+	phys_to_ttbr \tmp, \page_table
- 	msr	ttbr1_el1, \tmp
- 	isb
- .endm
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index e086c6eff8c6..5aa9ccf6db99 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -63,7 +63,7 @@ __do_hyp_init:
- 	cmp	x0, #HVC_STUB_HCALL_NR
- 	b.lo	__kvm_handle_stub_hvc
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index cd9f46952db3..0ff8ab79352c 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -855,12 +855,23 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 				int __unused)
+ {
++	char const *str = "command line option";
+ 	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
  
--	phys_to_ttbr x0, x4
-+	phys_to_ttbr x4, x0
- 	msr	ttbr0_el2, x4
- 
- 	mrs	x4, tcr_el1
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index cc7d2389edc8..42204b2525ea 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -153,7 +153,7 @@ ENDPROC(cpu_do_resume)
- ENTRY(cpu_do_switch_mm)
- 	mrs	x2, ttbr1_el1
- 	mmid	x1, x1				// get mm->context.id
--	phys_to_ttbr x0, x3
-+	phys_to_ttbr x3, x0
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	bfi	x3, x1, #48, #16		// set the ASID field in TTBR0
- #endif
-@@ -169,7 +169,7 @@ ENDPROC(cpu_do_switch_mm)
- 
- .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
- 	adrp	\tmp1, empty_zero_page
--	phys_to_ttbr \tmp1, \tmp2
-+	phys_to_ttbr \tmp2, \tmp1
- 	msr	ttbr1_el1, \tmp2
- 	isb
- 	tlbi	vmalle1
-@@ -188,7 +188,7 @@ ENTRY(idmap_cpu_replace_ttbr1)
- 
- 	__idmap_cpu_set_reserved_ttbr1 x1, x3
- 
--	phys_to_ttbr x0, x3
-+	phys_to_ttbr x3, x0
- 	msr	ttbr1_el1, x3
- 	isb
+-	/* Forced on command line? */
++	/*
++	 * For reasons that aren't entirely clear, enabling KPTI on Cavium
++	 * ThunderX leads to apparent I-cache corruption of kernel text, which
++	 * ends as well as you might imagine. Don't even try.
++	 */
++	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_27456)) {
++		str = "ARM64_WORKAROUND_CAVIUM_27456";
++		__kpti_forced = -1;
++	}
++
++	/* Forced? */
+ 	if (__kpti_forced) {
+-		pr_info_once("kernel page table isolation forced %s by command line option\n",
+-			     __kpti_forced > 0 ? "ON" : "OFF");
++		pr_info_once("kernel page table isolation forced %s by %s\n",
++			     __kpti_forced > 0 ? "ON" : "OFF", str);
+ 		return __kpti_forced > 0;
+ 	}
  
 -- 
 2.1.4
