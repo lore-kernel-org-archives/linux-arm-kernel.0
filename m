@@ -1,192 +1,159 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 26 Jan 2018 16:34:02 +0800
-Subject: [PATCH v3] iommu/mediatek: Move attach_device after iommu-group
- is ready for M4Uv1
-In-Reply-To: <d22d221c-9609-12bf-490d-202ebfb6c38a@arm.com>
-References: <1516878844-23021-1-git-send-email-yong.wu@mediatek.com>
- <d22d221c-9609-12bf-490d-202ebfb6c38a@arm.com>
-Message-ID: <1516955642.22553.50.camel@mhfsdcap03>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 26 Jan 2018 08:36:21 +0000
+Subject: [PATCH] clk: Properly update prepare/enable count on orphan clock
+ reparent
+In-Reply-To: <870d88cb-aa16-aced-8e40-cdfa3eddac16@samsung.com>
+References: <CGME20180115115231eucas1p1499f46ca64b65598d03a182ed5670f28@eucas1p1.samsung.com>
+ <20180115115214.10303-1-m.szyprowski@samsung.com>
+ <20180125221926.GA28313@codeaurora.org>
+ <870d88cb-aa16-aced-8e40-cdfa3eddac16@samsung.com>
+Message-ID: <AM3PR04MB3061EA2F3DEE180DC32C5F380E00@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-01-25 at 12:02 +0000, Robin Murphy wrote:
-> On 25/01/18 11:14, Yong Wu wrote:
-> > In the commit 05f80300dc8b, the iommu framework has supposed all the
-> > iommu drivers have their owner iommu-group, it get rid of the FIXME
-> > workarounds while the group is NULL. But the flow of Mediatek M4U gen1
-> > looks a bit trick that it will hang at this case:
-> > 
-> > ==========================================
-> > Unable to handle kernel NULL pointer dereference at virtual address 00000030
-> > pgd = c0004000
-> > [00000030] *pgd=00000000
-> > PC is at mutex_lock+0x28/0x54
-> > LR is at iommu_attach_device+0xa4/0xd4
-> > pc : [<c07632e8>]    lr : [<c04736fc>]    psr: 60000013
-> > sp : df0edbb8  ip : df0edbc8  fp : df0edbc4
-> > r10: c114da14  r9 : df2a3e40  r8 : 00000003
-> > r7 : df27a210  r6 : df2a90c4  r5 : 00000030  r4 : 00000000
-> > r3 : df0f8000  r2 : fffff000  r1 : df29c610  r0 : 00000030
-> > Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> > xxx
-> > (mutex_lock) from [<c04736fc>] (iommu_attach_device+0xa4/0xd4)
-> > (iommu_attach_device) from [<c011b9dc>] (__arm_iommu_attach_device+0x28/0x90)
-> > (__arm_iommu_attach_device) from [<c011ba60>] (arm_iommu_attach_device+0x1c/0x30)
-> > (arm_iommu_attach_device) from [<c04759ac>] (mtk_iommu_add_device+0xfc/0x214)
-> > (mtk_iommu_add_device) from [<c0472aa4>] (add_iommu_group+0x3c/0x68)
-> > (add_iommu_group) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> > (bus_for_each_dev) from [<c04734a4>] (bus_set_iommu+0xb0/0xec)
-> > (bus_set_iommu) from [<c0476310>] (mtk_iommu_probe+0x328/0x368)
-> > (mtk_iommu_probe) from [<c048189c>] (platform_drv_probe+0x5c/0xc0)
-> > (platform_drv_probe) from [<c047f510>] (driver_probe_device+0x2f4/0x4d8)
-> > (driver_probe_device) from [<c047f800>] (__driver_attach+0x10c/0x128)
-> > (__driver_attach) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-> > (bus_for_each_dev) from [<c047ec78>] (driver_attach+0x2c/0x30)
-> > (driver_attach) from [<c047e640>] (bus_add_driver+0x1e0/0x278)
-> > (bus_add_driver) from [<c048052c>] (driver_register+0x88/0x108)
-> > (driver_register) from [<c04817ec>] (__platform_driver_register+0x50/0x58)
-> > (__platform_driver_register) from [<c0b31380>] (m4u_init+0x24/0x28)
-> > (m4u_init) from [<c0101c38>] (do_one_initcall+0xf0/0x17c)
-> > =========================
-> > 
-> > The root cause is that the device's iommu-group is NULL while
-> > arm_iommu_attach_device is called. This patch prepare a new iommu-group
-> > for the iommu consumer devices to fix this issue.
-> > 
-> > CC: Robin Murphy <robin.murphy@arm.com>
-> > CC: Honghui Zhang <honghui.zhang@mediatek.com>
-> > Fixes: 05f80300dc8b ('iommu: Finish making iommu_group support mandatory')
-> > Reported-by: Ryder Lee <ryder.lee@mediatek.com>
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> > changes notes:
-> > v3: don't use the global variable and allocate a new iommu group before
-> >      arm_iommu_attach_device following Robin's suggestion.
-> > 
-> > v2: http://lists.infradead.org/pipermail/linux-mediatek/2018-January/011810.html
-> >     Add mtk_domain_v1=NULL in domain_free for symmetry.
-> > 
-> > v1: https://patchwork.kernel.org/patch/10176255/
-> > ---
-> >   drivers/iommu/mtk_iommu_v1.c | 49 ++++++++++++++++++++++----------------------
-> >   1 file changed, 25 insertions(+), 24 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> > index 542930c..aca76d2 100644
-> > --- a/drivers/iommu/mtk_iommu_v1.c
-> > +++ b/drivers/iommu/mtk_iommu_v1.c
-> > @@ -418,20 +418,12 @@ static int mtk_iommu_create_mapping(struct device *dev,
-> >   		m4udev->archdata.iommu = mtk_mapping;
-> >   	}
-> >   
-> > -	ret = arm_iommu_attach_device(dev, mtk_mapping);
-> > -	if (ret)
-> > -		goto err_release_mapping;
-> > -
-> >   	return 0;
-> > -
-> > -err_release_mapping:
-> > -	arm_iommu_release_mapping(mtk_mapping);
-> > -	m4udev->archdata.iommu = NULL;
-> > -	return ret;
-> >   }
-> >   
-> >   static int mtk_iommu_add_device(struct device *dev)
-> >   {
-> > +	struct dma_iommu_mapping *mtk_mapping;
-> >   	struct of_phandle_args iommu_spec;
-> >   	struct of_phandle_iterator it;
-> >   	struct mtk_iommu_data *data;
-> > @@ -452,9 +444,30 @@ static int mtk_iommu_add_device(struct device *dev)
-> >   	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
-> >   		return -ENODEV; /* Not a iommu client device */
-> >   
-> > +	/*
-> > +	 * This is a short-term bodge because the ARM DMA code doesn't
-> > +	 * understand multi-device groups, but we have to call into it
-> > +	 * successfully (and not just rely on a normal IOMMU API attach
-> > +	 * here) in order to set the correct DMA API ops on @dev.
-> > +	 */
-> > +	group = iommu_group_alloc();
-> > +	if (IS_ERR(group))
-> > +		return PTR_ERR(group);
-> > +
-> > +	err = iommu_group_add_device(group, dev);
-> > +	iommu_group_put(group);
-> > +	if (err)
-> > +		return err;
-> > +
-> >   	data = dev->iommu_fwspec->iommu_priv;
-> > -	iommu_device_link(&data->iommu, dev);
-> > +	mtk_mapping = data->dev->archdata.iommu;
-> > +	err = arm_iommu_attach_device(dev, mtk_mapping);
-> > +	if (err) {
-> > +		iommu_group_remove_device(dev);
-> > +		return err;
-> > +	}
-> >   
-> > +	iommu_device_link(&data->iommu, dev);
-> >   	group = iommu_group_get_for_dev(dev);
+> -----Original Message-----
+> From: Marek Szyprowski [mailto:m.szyprowski at samsung.com]
+> Sent: Friday, January 26, 2018 3:31 PM
+> To: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: linux-clk at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Michael
+> Turquette <mturquette@baylibre.com>; Shawn Guo <shawnguo@kernel.org>;
+> A.s. Dong <aisheng.dong@nxp.com>; Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com>
+> Subject: Re: [PATCH] clk: Properly update prepare/enable count on orphan
+> clock reparent
 > 
-> This call now does nothing, so you may as well remove it (and the 
-> subsequent iommu_group_put)...
+> Hi Stephen,
 > 
-> >   	if (IS_ERR(group))
-> >   		return PTR_ERR(group);
-> > @@ -479,20 +492,8 @@ static void mtk_iommu_remove_device(struct device *dev)
-> >   
-> >   static struct iommu_group *mtk_iommu_device_group(struct device *dev)
-> >   {
-> > -	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
-> > -
-> > -	if (!data)
-> > -		return ERR_PTR(-ENODEV);
-> > -
-> > -	/* All the client devices are in the same m4u iommu-group */
-> > -	if (!data->m4u_group) {
-> > -		data->m4u_group = iommu_group_alloc();
-> > -		if (IS_ERR(data->m4u_group))
-> > -			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
-> > -	} else {
-> > -		iommu_group_ref_get(data->m4u_group);
-> > -	}
-> > -	return data->m4u_group;
-> > +	/* The iommu-group has always been allocated in add_device. */
-> > +	return NULL;
+> On 2018-01-25 23:19, Stephen Boyd wrote:
+> > On 01/15, Marek Szyprowski wrote:
+> >> If orphaned clock has been already prepared/enabled (for example if
+> >> it or one of its children has CLK_IS_CRITICAL flag), then the
+> >> prepare/enable counters of the newly assigned parent are not updated
+> >> correctly. This might later cause warnings during changing clock parents.
+> >>
+> >> This patch fixes following warning on Exynos5422-based boards:
+> >> ------------[ cut here ]------------
+> >> WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:811
+> >> clk_core_disable_lock+0x18/0x24 Modules linked in:
+> >> CPU: 0 PID: 59 Comm: kworker/0:1 Not tainted 4.15.0-rc7-next-20180115
+> >> #106 Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> >> Workqueue: pm genpd_power_off_work_fn [<c0111504>]
+> (unwind_backtrace)
+> >> from [<c010dbec>] (show_stack+0x10/0x14) [<c010dbec>] (show_stack)
+> >> from [<c09b3f34>] (dump_stack+0x90/0xc8) [<c09b3f34>] (dump_stack)
+> >> from [<c0125060>] (__warn+0xe4/0x110) [<c0125060>] (__warn) from
+> >> [<c01250cc>] (warn_slowpath_null+0x40/0x48) [<c01250cc>]
+> >> (warn_slowpath_null) from [<c048d584>]
+> >> (clk_core_disable_lock+0x18/0x24) [<c048d584>]
+> >> (clk_core_disable_lock) from [<c048e490>]
+> >> (clk_core_disable_unprepare+0xc/0x20)
+> >> [<c048e490>] (clk_core_disable_unprepare) from [<c048ea60>]
+> >> (__clk_set_parent_after+0x48/0x4c)
+> >> [<c048ea60>] (__clk_set_parent_after) from [<c048ec88>]
+> >> (clk_core_set_parent_nolock+0x224/0x5b4)
+> >> [<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>]
+> >> (clk_set_parent+0x38/0x6c) [<c048f23c>] (clk_set_parent) from
+> >> [<c049c41c>] (exynos_pd_power+0x74/0x1cc) [<c049c41c>]
+> >> (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+> >> [<c0550768>] (genpd_power_off) from [<c0550b34>]
+> >> (genpd_power_off_work_fn+0x2c/0x40)
+> >> [<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>]
+> >> (process_one_work+0x1d0/0x7bc) [<c01432e4>] (process_one_work) from
+> >> [<c014393c>] (worker_thread+0x34/0x4dc) [<c014393c>] (worker_thread)
+> >> from [<c014a0d0>] (kthread+0x128/0x164) [<c014a0d0>] (kthread) from
+> >> [<c01010b4>] (ret_from_fork+0x14/0x20) Exception stack(0xeeb01fb0 to
+> 0xeeb01ff8)
+> >> 1fa0:                                     00000000 00000000 00000000 00000000
+> >> 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> >> 00000000
+> >> 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000 ---[ end
+> >> trace 503c239fb760f17a ]--- ------------[ cut here ]------------
+> >> WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:684
+> >> clk_core_disable_unprepare+0x18/0x20
+> >> Modules linked in:
+> >> CPU: 0 PID: 59 Comm: kworker/0:1 Tainted: G        W        4.15.0-rc7-next-
+> 20180115 #106
+> >> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> >> Workqueue: pm genpd_power_off_work_fn [<c0111504>]
+> (unwind_backtrace)
+> >> from [<c010dbec>] (show_stack+0x10/0x14) [<c010dbec>] (show_stack)
+> >> from [<c09b3f34>] (dump_stack+0x90/0xc8) [<c09b3f34>] (dump_stack)
+> >> from [<c0125060>] (__warn+0xe4/0x110) [<c0125060>] (__warn) from
+> >> [<c01250cc>] (warn_slowpath_null+0x40/0x48) [<c01250cc>]
+> >> (warn_slowpath_null) from [<c048e49c>]
+> >> (clk_core_disable_unprepare+0x18/0x20)
+> >> [<c048e49c>] (clk_core_disable_unprepare) from [<c048ea60>]
+> >> (__clk_set_parent_after+0x48/0x4c)
+> >> [<c048ea60>] (__clk_set_parent_after) from [<c048ec88>]
+> >> (clk_core_set_parent_nolock+0x224/0x5b4)
+> >> [<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>]
+> >> (clk_set_parent+0x38/0x6c) [<c048f23c>] (clk_set_parent) from
+> >> [<c049c41c>] (exynos_pd_power+0x74/0x1cc) [<c049c41c>]
+> >> (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+> >> [<c0550768>] (genpd_power_off) from [<c0550b34>]
+> >> (genpd_power_off_work_fn+0x2c/0x40)
+> >> [<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>]
+> >> (process_one_work+0x1d0/0x7bc) [<c01432e4>] (process_one_work) from
+> >> [<c014393c>] (worker_thread+0x34/0x4dc) [<c014393c>] (worker_thread)
+> >> from [<c014a0d0>] (kthread+0x128/0x164) [<c014a0d0>] (kthread) from
+> >> [<c01010b4>] (ret_from_fork+0x14/0x20) Exception stack(0xeeb01fb0 to
+> 0xeeb01ff8)
+> >> 1fa0:                                     00000000 00000000 00000000 00000000
+> >> 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> >> 00000000
+> >> 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000 ---[ end
+> >> trace 503c239fb760f17b ]--- ------------[ cut here ]------------
+> >>
+> >> Fixes: f8f8f1d04494 ("clk: Don't touch hardware when reparenting
+> >> during registration")
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >>   drivers/clk/clk.c | 4 ++++
+> >>   1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c index
+> >> 0f686a9dac3e..d33c087d7868 100644
+> >> --- a/drivers/clk/clk.c
+> >> +++ b/drivers/clk/clk.c
+> >> @@ -2982,6 +2982,10 @@ static int __clk_core_init(struct clk_core *core)
+> >>   		if (parent) {
+> >>   			/* update the clk tree topology */
+> >>   			flags = clk_enable_lock();
+> > This is the spinlock?
 > 
-> ... and get rid of this and the mtk_iommu_ops.device_group callback 
-> entirely.
-
-OK. Thanks.
-
+> yes
 > 
-> If you're moving the arm_iommu_attach_device() call anyway though, 
-> another clean option would be put it after iommu_group_get_for_dev() and 
-> switch .device_group to generic_device_group - I *think* that should be 
-> directly equivalent to the open-coded iommu_group_alloc/add_device.
-
-In the v1 and v2, I followed this method. then I got a problem in [1]
-which always create a new domain, that is not our expectation.Thus, I
-have to use a global variable to restore our special M4U domain.
-
+> >
+> >> +			if (orphan->prepare_count)
+> >> +				clk_core_prepare(parent);
+> > And this is prepare mutex? Doesn't sound like it will work.
 > 
-> I admit I was somewhat hoping we could confine the ARM-specific stuff to 
-> mtk_iommu_create_mapping() and let all the "correct" IOMMU API code stay 
-> in the right places even if it would strictly be unused. On reflection 
-> though, that's clearly a bit silly, since we can always easily bring it 
-> back via a revert in future.
+> Prepare mutex is taken at the beginning of __clk_core_init() function, so
+> everything is fine here.
 > 
 
-I remember a patch[2], It looks try to synchronize the flow of ARM/DMA
-and ARM64/DMA. Maybe this will help?.
+Theoretically no issue may happen, just looks strange to claim mutex within
+spinlock.
 
-[1]
-http://elixir.free-electrons.com/linux/latest/source/drivers/iommu/iommu.c#L1027
-[2] https://patchwork.kernel.org/patch/8357801/
-
-> Robin.
+> >> +			if (orphan->enable_count)
+> >> +				clk_core_enable(parent);
+> > This would be OK, but then we might touch the hardware again?
 > 
-> >   }
-> >   
-> >   static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
-> > 
+> Well, it will touch hardware in one case: if orphaned clock is already prepared
+> and enabled (for example due to having CLK_IS_CRITICAL flag) and the newly
+> registered parent is not (yet?) enabled. Then it will prepare and enable this
+> new parent clock, what is a desired behavior.
+> 
+> This code will not temporarily disable any clocks, what I assume was the main
+> reason for the patch mentioned in the commit message.
+> 
+
+Then this code seems bypass the CLK_OPS_PARENT_ENABLE feature.
+
+Regards
+Dong Aisheng
+
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
