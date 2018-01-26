@@ -1,46 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jan 2018 11:06:53 +0100
-Subject: [RFC 11/37] soc: renesas: rcar-rst: Document generic compatible
- strings
-In-Reply-To: <1516903391-30467-12-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1516903391-30467-12-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdUGq-k55RoGLvtG_fbG_aXtENovjKzpkHF5WD0nTon+zA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jan 2018 10:10:21 +0000
+Subject: [PATCH 05/16] arm64: Add flags to check the safety of a
+ capability for late CPU
+In-Reply-To: <20180123122809.16269-6-suzuki.poulose@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-6-suzuki.poulose@arm.com>
+Message-ID: <20180126101020.GM5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 7:02 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> From now on, devices compatible with the generic compatible strings
-> documented by this commit don't need to modify the corresponding driver
-> anymore.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+On Tue, Jan 23, 2018 at 12:27:58PM +0000, Suzuki K Poulose wrote:
+> Add two different flags to indicate if the conflict of a capability
+> on a late CPU with the current system state
+> 
+>  1) Can a CPU have a capability when the system doesn't have it ?
+> 
+>     Most arm64 features could have this set. While erratum work arounds
+>     cannot have this, as we may miss work arounds.
+> 
+>  2) Can a CPU miss a capability when the system has it ?
+>     This could be set for arm64 erratum work arounds as we don't
+>     care if a CPU doesn't need the work around. However it should
+>     be clear for features.
+> 
+> These flags could be added to certain entries based on their nature.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 35 +++++++++++++++++++++++++++++++----
+>  1 file changed, 31 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 4fd5de8ef33e..27d037bb0451 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -94,10 +94,25 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>  #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
+>  #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
+>  
+> -/* CPU errata detected at boot time based on feature of one or more CPUs */
+> -#define ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM	(ARM64_CPUCAP_SCOPE_LOCAL_CPU)
+> -/* CPU feature detected at boot time based on system-wide value of a feature */
+> -#define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	(ARM64_CPUCAP_SCOPE_SYSTEM)
+> +/* Is it safe for a late CPU to have this capability when system doesn't already have */
+> +#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE	BIT(2)
+> +/* Is it safe for a late CPU to miss this capability when system has it */
+> +#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	BIT(3)
 
-Thanks for your patch!
+Maybe _OPTIONAL and _PERMITTED would be a bit less verbose?
 
->From commit 362922a1a5345d17 ("reset: Add renesas,rst DT bindings")
+Alternatively,
+	ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU
+	ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU
 
-    As the features provided by the hardware module differ a lot across the
-    various SoC families and members, only SoC-specific compatible values
-    are defined.
+might be easier to understand.
 
-In fact the only commonalities are the presence of the MODEMR register
-(the mode bits differ), and the Watchdog Timer Reset Control Register.
-All other registers and bits depend on the SoC's CPU core configuration.
+[...]
 
-Hence that's why I did not add generic compatible values.
-So unless you really need them (from this series, it looks like you
-don't?), I wouldn't add them.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers
+---Dave
