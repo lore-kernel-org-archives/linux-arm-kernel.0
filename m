@@ -1,36 +1,144 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jan 2018 11:40:22 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7745: sort subnodes of soc node
-In-Reply-To: <20180126094052.17119-3-horms+renesas@verge.net.au>
-References: <20180126094052.17119-1-horms+renesas@verge.net.au>
- <20180126094052.17119-3-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdU_ttQ7KVpVHMd2+uZfubZCjvu1ioqH4ZAYtJDCi4H_Kg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jan 2018 11:08:00 +0000
+Subject: [PATCH 06/16] arm64: capabilities: Unify the verification
+In-Reply-To: <20180123122809.16269-7-suzuki.poulose@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-7-suzuki.poulose@arm.com>
+Message-ID: <20180126110759.GN5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 10:40 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Sort the subnodes of the soc node to improve maintainability.
-> The sort key is the address on the bus with instances of the same
-> IP block grouped together and sorted alphabetically.
->
-> Minor whitespace and line-wrapping changes are also made
-> to match the formatting of R-Car Gen2 SoCs.
->
-> This patch should not introduce any functional change.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Tue, Jan 23, 2018 at 12:27:59PM +0000, Suzuki K Poulose wrote:
+> Now that each capability describes how to treat the conflicts
+> of CPU cap state vs System wide cap state, we can unify the
+> verification logic to a single place.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 87 ++++++++++++++++++++++++++----------------
+>  1 file changed, 54 insertions(+), 33 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 43c7e992d784..79737034a628 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1228,6 +1228,54 @@ static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *
+>  }
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-using dtx_diff
+>  
+>  /*
+> + * Run through the list of capabilities to check for conflicts.
+> + * Returns "false" on conflicts.
+> + */
+> +static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
+> +{
+> +	bool cpu_has_cap, system_has_cap;
+> +	const struct arm64_cpu_capabilities *caps = caps_list;
+> +
+> +	for (; caps->matches; caps++) {
+> +		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
 
-Gr{oetje,eeting}s,
+What's the point of scanning the whole of caps_list?  Don't we already
+have the pointer to the right cap struct?
 
-                        Geert
+We already know caps->matches is true.  Can't we just call
+caps->matches(caps)?  That seemed pretty intuitive to me in the old
+code.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +		system_has_cap =  cpus_have_cap(caps->capability);
+> +
+> +		if (system_has_cap) {
+> +			/*
+> +			 * Check if the new CPU misses an advertised feature, which is not
+> +			 * safe to miss.
+> +			 */
+> +			if (!cpu_has_cap && !cpucap_late_cpu_missing_cap_safe(caps))
+> +				break;
+> +			/*
+> +			 * We have to issue enable() irrespective of whether the CPU
+> +			 * has it or not, as it is enabeld system wide. It is upto
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+enabled
+
+> +			 * the call back to take appropriate action on this CPU.
+> +			 */
+> +			if (caps->enable)
+> +				caps->enable(caps);
+> +		} else {
+> +			/*
+> +			 * Check if the CPU has this capability if it isn't safe to
+> +			 * have when the system doesn't.
+> +			 */
+
+Possibly most of the commenting here is not needed.  The code is pretty
+self-explanatory, so the comments may just be adding clutter.
+
+The role of the ->enable() call is the only real subtlety here.
+
+> +			if (cpu_has_cap && !cpucap_late_cpu_have_cap_safe(caps))
+> +				break;
+> +		}
+> +	}
+> +
+> +	if (caps->matches) {
+> +		pr_crit("CPU%d: Detected conflict for capability %d (%s), System: %d, CPU: %d\n",
+> +			smp_processor_id(), caps->capability,
+> +			caps->desc ? : "no description",
+
+Wouldn't it be a bug for a conflict to occur on a cap with no .desc?
+
+Why can't we just let printk print its default "(null)" for %s
+in this case?
+
+Alternatively, is there a reason for any cap not to have a description?
+
+> +			system_has_cap, cpu_has_cap);
+> +		return false;
+> +	}
+> +
+> +	return true;
+> +}
+
+Perhaps the capability verification procedure could be made a little
+clearer by splitting this into two functions:
+
+static bool __verify_local_cpu_cap(const struct arm64_cpu_capabilities *cap)
+{
+	bool cpu_has_cap = cap->matches(cap, SCOPE_LOCAL_CPU);
+	bool system_has_cap =  cpus_have_cap(cap->capability);
+
+	if (system_has_cap) {
+		if (!cpu_has_cap && !cpucap_late_cpu_missing_cap_safe(cap))
+			goto bad;
+
+		if (cap->enable)
+			/* Enable for this cpu if appropriate: */
+			cap->enable(cap);
+	} else {
+		if (cpu_has_cap && !cpucap_late_cpu_have_cap_safe(cap))
+			goto bad;
+	}
+
+	return true;
+
+bad:
+	pr_crit([...]);
+	return false;
+}
+
+static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps)
+{
+	while (caps->matches) {
+		if (!__verify_local_cpu_cap(caps))
+			return false;
+
+		++caps;
+	}
+
+	return true;
+}
+
+[...]
+
+Cheers
+---Dave
