@@ -1,16 +1,16 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jan 2018 11:27:53 +0100
-Subject: [RFC 31/37] ARM: dts: r8a7743: Add watchdog support to SoC dtsi
-In-Reply-To: <1516903391-30467-32-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Fri, 26 Jan 2018 11:28:34 +0100
+Subject: [RFC 32/37] ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+In-Reply-To: <1516903391-30467-33-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1516903391-30467-32-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdXM-xVhG0FiZ9vtHKy4=rVo8P+J1S0U3gst5e9s2163sw@mail.gmail.com>
+ <1516903391-30467-33-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdX592Z366ptHmd9Gv9rgXkbdbcS66XCzz4N6Q_XcY7Q-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jan 25, 2018 at 7:03 PM, Fabrizio Castro
 <fabrizio.castro@bp.renesas.com> wrote:
-> This patch adds watchdog support to the r8a7743 SoC dtsi.
+> This patch adds watchdog support to the r8a7745 SoC dtsi.
 >
 > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
