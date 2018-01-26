@@ -1,625 +1,125 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Fri, 26 Jan 2018 09:19:40 -0800
-Subject: [PATCH v2 4/6] arm64: compat: Add a 32-bit vDSO
-Message-ID: <20180126172004.87657-1-salyzyn@android.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 26 Jan 2018 17:20:29 +0000
+Subject: [PATCH v3 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <38746bda-6773-41e7-3b2f-7f9476ef9fb2@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-5-marc.zyngier@arm.com> <20180126091425.GU21802@cbox>
+ <38746bda-6773-41e7-3b2f-7f9476ef9fb2@arm.com>
+Message-ID: <2ee637c7-72fb-17f4-b43e-eb547aa04924@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Brodsky <kevin.brodsky@arm.com>
+On 26/01/18 09:30, Marc Zyngier wrote:
+> On 26/01/18 09:14, Christoffer Dall wrote:
+>> On Thu, Jan 25, 2018 at 03:21:37PM +0000, Marc Zyngier wrote:
+>>> In order to avoid aliasing attacks against the branch predictor,
+>>> Cortex-A15 require to invalidate the BTB when switching
+>>> from one user context to another. The only way to do so on this
+>>> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+>>> mode.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>   arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
+>>>   arch/arm/mm/proc-v7-3level.S | 16 ++++++++++++++++
+>>>   arch/arm/mm/proc-v7.S        | 18 +++++++++++++++++-
+>>>   3 files changed, 43 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+>>> index 0422e58b74e8..7dc9e1c69039 100644
+>>> --- a/arch/arm/mm/proc-v7-2level.S
+>>> +++ b/arch/arm/mm/proc-v7-2level.S
+>>> @@ -40,7 +40,17 @@
+>>>    *	Note that we always need to flush BTAC/BTB if IBE is set
+>>>    *	even on Cortex-A8 revisions not affected by 430973.
+>>>    *	If IBE is not set, the flush BTAC/BTB won't do anything.
+>>> + *
+>>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+>>> + *	for the icache invalidation to also invalidate the BTB.
+>>>    */
+>>
+>> Seems like we can read (but not write) this bit from non-secure.  Should
+>> we test if it's set somewhere during boot and warn the user if not?
+> 
+> That would have to be something that happens much later in the boot
+> process, as the proc structure is picked up very early, before we run
+> any C code.
+> 
+> I could add some detection code later, but we'll be stuck with a icache
+> invalidation for nothing. Not a pretty situation.
+> 
+>>
+>>> +ENTRY(cpu_ca15_switch_mm)
+>>> +#ifdef CONFIG_MMU
+>>> +	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
+>>> +	isb
+>>> +	b	cpu_v7_switch_mm
+>>> +#endif
+>>> +ENDPROC(cpu_ca15_switch_mm)
+>>>   ENTRY(cpu_v7_btbinv_switch_mm)
+>>>   #ifdef CONFIG_MMU
+>>>   	mov	r2, #0
+>>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>>> index 934272e1fa08..cae6bb4da956 100644
+>>> --- a/arch/arm/mm/proc-v7-3level.S
+>>> +++ b/arch/arm/mm/proc-v7-3level.S
+>>> @@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
+>>>   ENDPROC(cpu_v7_switch_mm)
+>>>   ENDPROC(cpu_v7_btbinv_switch_mm)
+>>>   
+>>> +/*
+>>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+>>> + *	for the icache invalidation to also invalidate the BTB.
+>>> + */
+>>> +ENTRY(cpu_ca15_switch_mm)
+>>> +#ifdef CONFIG_MMU
+>>> +	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
+>>> +	mmid	r2, r2
+>>> +	asid	r2, r2
+>>> +	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
+>>> +	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
+>>> +	isb
+>>> +#endif
+>>> +	ret	lr
+>>> +ENDPROC(cpu_ca15_switch_mm)
+>>> +
+>>
+>> There's some potential for code shaing with cpu_v7_switch_mm here,
+>> either via a macro or by simply calling cpu_v7_switch_mm from
+>> cpu_ca15_switch_mm, but I'm not sure if we care?
+> 
+> We could, but most things seems to been duplicated between the two
+> page-table implementations. I can look in to it if this is going anywhere.
 
-Provide the files necessary for building a compat (AArch32) vDSO in
-kernel/vdso32.
+Could this not just do the equivalent of the cpu_ca8 version for 2-level 
+paging, i.e. execute the ICIALLU then fall through - everything else is 
+the same, right?
 
-This is mostly an adaptation of the arm vDSO. The most significant
-change in vgettimeofday.c is the use of the arm64 vdso_data struct,
-allowing the vDSO data page to be shared between the 32 and 64-bit
-vDSOs. Additionally, a different set of barrier macros is used (see
-aarch32-barrier.h), as we want to support old 32-bit compilers that
-may not support ARMv8 and its new barrier arguments (*ld).
+Robin.
 
-In addition to the time functions, sigreturn trampolines are also
-provided, aiming at replacing those in the sigreturn page as the
-latter don't provide any unwinding information (and it's easier to
-have just one "user code" page). arm-specific unwinding directives are
-used, based on glibc's implementation. Symbol offsets are made
-available to the kernel using the same method as the 64-bit vDSO.
-
-There is unfortunately an important caveat: we cannot get away with
-hand-coding 32-bit instructions like in kernel/kuser32.S, this time we
-really need a 32-bit compiler. The compat vDSO Makefile relies on
-CROSS_COMPILE_ARM32 to provide a 32-bit compiler, appropriate logic
-will be added to the arm64 Makefile later on to ensure that an attempt
-to build the compat vDSO is made only if this variable has been set
-properly.
-
-Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture.
-
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Dave Martin <Dave.Martin@arm.com>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-
-v2:
-- Ensured CONFIG_64BIT is not defined, side effect is
-  BITS_PER_LONG is correct adding confidence.
-
----
- arch/arm64/kernel/vdso32/.gitignore      |   2 +
- arch/arm64/kernel/vdso32/Makefile        | 172 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/vdso32/compiler.h      | 122 ++++++++++++++++++++++
- arch/arm64/kernel/vdso32/datapage.h      |   1 +
- arch/arm64/kernel/vdso32/sigreturn.S     |  76 ++++++++++++++
- arch/arm64/kernel/vdso32/vdso.S          |  32 ++++++
- arch/arm64/kernel/vdso32/vdso.lds.S      |  95 +++++++++++++++++
- arch/arm64/kernel/vdso32/vgettimeofday.c |   3 +
- 8 files changed, 503 insertions(+)
- create mode 100644 arch/arm64/kernel/vdso32/.gitignore
- create mode 100644 arch/arm64/kernel/vdso32/Makefile
- create mode 100644 arch/arm64/kernel/vdso32/compiler.h
- create mode 100644 arch/arm64/kernel/vdso32/datapage.h
- create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
- create mode 100644 arch/arm64/kernel/vdso32/vdso.S
- create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
- create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
-
-diff --git a/arch/arm64/kernel/vdso32/.gitignore b/arch/arm64/kernel/vdso32/.gitignore
-new file mode 100644
-index 000000000000..4fea950fa5ed
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/.gitignore
-@@ -0,0 +1,2 @@
-+vdso.lds
-+vdso.so.raw
-diff --git a/arch/arm64/kernel/vdso32/Makefile b/arch/arm64/kernel/vdso32/Makefile
-new file mode 100644
-index 000000000000..6d44d972e89d
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/Makefile
-@@ -0,0 +1,172 @@
-+#
-+# Building a vDSO image for AArch32.
-+#
-+# Author: Kevin Brodsky <kevin.brodsky@arm.com>
-+# A mix between the arm64 and arm vDSO Makefiles.
-+
-+ifeq ($(cc-name),clang)
-+  CC_ARM32 := $(cc-name) $(CLANG_TARGET_ARM32) -no-integrated-as
-+else
-+  CC_ARM32 := $(CROSS_COMPILE_ARM32)$(cc-name)
-+endif
-+
-+# Same as cc-*option, but using CC_ARM32 instead of CC
-+cc32-option = $(call try-run,\
-+        $(CC_ARM32) $(1) -c -x c /dev/null -o "$$TMP",$(1),$(2))
-+cc32-disable-warning = $(call try-run,\
-+	$(CC_ARM32) -W$(strip $(1)) -c -x c /dev/null -o "$$TMP",-Wno-$(strip $(1)))
-+cc32-ldoption = $(call try-run,\
-+        $(CC_ARM32) $(1) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
-+
-+# We cannot use the global flags to compile the vDSO files, the main reason
-+# being that the 32-bit compiler may be older than the main (64-bit) compiler
-+# and therefore may not understand flags set using $(cc-option ...). Besides,
-+# arch-specific options should be taken from the arm Makefile instead of the
-+# arm64 one.
-+# As a result we set our own flags here.
-+
-+# From top-level Makefile
-+# NOSTDINC_FLAGS
-+VDSO_CPPFLAGS := -nostdinc -isystem $(shell $(CC_ARM32) -print-file-name=include)
-+VDSO_CPPFLAGS += $(LINUXINCLUDE)
-+VDSO_CPPFLAGS += $(KBUILD_CPPFLAGS)
-+
-+# Common C and assembly flags
-+# From top-level Makefile
-+VDSO_CAFLAGS := $(VDSO_CPPFLAGS)
-+VDSO_CAFLAGS += $(call cc32-option,-fno-PIE)
-+ifdef CONFIG_DEBUG_INFO
-+VDSO_CAFLAGS += -g
-+endif
-+ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC_ARM32)), y)
-+VDSO_CAFLAGS += -DCC_HAVE_ASM_GOTO
-+endif
-+
-+# From arm Makefile
-+VDSO_CAFLAGS += $(call cc32-option,-fno-dwarf2-cfi-asm)
-+VDSO_CAFLAGS += -mabi=aapcs-linux -mfloat-abi=soft
-+ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
-+VDSO_CAFLAGS += -mbig-endian
-+else
-+VDSO_CAFLAGS += -mlittle-endian
-+endif
-+
-+# From arm vDSO Makefile
-+VDSO_CAFLAGS += -fPIC -fno-builtin -fno-stack-protector
-+VDSO_CAFLAGS += -DDISABLE_BRANCH_PROFILING
-+
-+# Try to compile for ARMv8. If the compiler is too old and doesn't support it,
-+# fall back to v7. There is no easy way to check for what architecture the code
-+# is being compiled, so define a macro specifying that (see arch/arm/Makefile).
-+VDSO_CAFLAGS += $(call cc32-option,-march=armv8-a -D__LINUX_ARM_ARCH__=8,\
-+                                   -march=armv7-a -D__LINUX_ARM_ARCH__=7)
-+
-+VDSO_CFLAGS := $(VDSO_CAFLAGS)
-+# KBUILD_CFLAGS from top-level Makefile
-+VDSO_CFLAGS += -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-+               -fno-strict-aliasing -fno-common \
-+               -Werror-implicit-function-declaration \
-+               -Wno-format-security \
-+               -std=gnu89
-+VDSO_CFLAGS  += -O2
-+# Some useful compiler-dependent flags from top-level Makefile
-+VDSO_CFLAGS += $(call cc32-option,-Wdeclaration-after-statement,)
-+VDSO_CFLAGS += $(call cc32-option,-Wno-pointer-sign)
-+VDSO_CFLAGS += $(call cc32-option,-fno-strict-overflow)
-+VDSO_CFLAGS += $(call cc32-option,-Werror=strict-prototypes)
-+VDSO_CFLAGS += $(call cc32-option,-Werror=date-time)
-+VDSO_CFLAGS += $(call cc32-option,-Werror=incompatible-pointer-types)
-+
-+# The 32-bit compiler does not provide 128-bit integers, which are used in
-+# some headers that are indirectly included from the vDSO code.
-+# This hack makes the compiler happy and should trigger a warning/error if
-+# variables of such type are referenced.
-+VDSO_CFLAGS += -D__uint128_t='void*'
-+# Silence some warnings coming from headers that operate on long's
-+# (on GCC 4.8 or older, there is unfortunately no way to silence this warning)
-+VDSO_CFLAGS += $(call cc32-disable-warning,shift-count-overflow)
-+VDSO_CFLAGS += -Wno-int-to-pointer-cast
-+
-+VDSO_AFLAGS := $(VDSO_CAFLAGS)
-+VDSO_AFLAGS += -D__ASSEMBLY__
-+
-+VDSO_LDFLAGS := $(VDSO_CPPFLAGS)
-+# From arm vDSO Makefile
-+VDSO_LDFLAGS += -Wl,-Bsymbolic -Wl,--no-undefined -Wl,-soname=linux-vdso.so.1
-+VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
-+VDSO_LDFLAGS += -nostdlib -shared -mfloat-abi=soft
-+VDSO_LDFLAGS += $(call cc32-ldoption,-Wl$(comma)--hash-style=sysv)
-+VDSO_LDFLAGS += $(call cc32-ldoption,-Wl$(comma)--build-id)
-+VDSO_LDFLAGS += $(call cc32-ldoption,-fuse-ld=bfd)
-+
-+
-+# Borrow vdsomunge.c from the arm vDSO
-+# We have to use a relative path because scripts/Makefile.host prefixes
-+# $(hostprogs-y) with $(obj)
-+munge := ../../../arm/vdso/vdsomunge
-+hostprogs-y := $(munge)
-+
-+c-obj-vdso := vgettimeofday.o
-+asm-obj-vdso := sigreturn.o
-+
-+# Build rules
-+targets := $(c-obj-vdso) $(asm-obj-vdso) vdso.so vdso.so.dbg vdso.so.raw
-+c-obj-vdso := $(addprefix $(obj)/, $(c-obj-vdso))
-+asm-obj-vdso := $(addprefix $(obj)/, $(asm-obj-vdso))
-+obj-vdso := $(c-obj-vdso) $(asm-obj-vdso)
-+
-+obj-y += vdso.o
-+extra-y += vdso.lds
-+CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
-+
-+# Force dependency (vdso.s includes vdso.so through incbin)
-+$(obj)/vdso.o: $(obj)/vdso.so
-+
-+include/generated/vdso32-offsets.h: $(obj)/vdso.so.dbg FORCE
-+	$(call if_changed,vdsosym)
-+
-+# Strip rule for vdso.so
-+$(obj)/vdso.so: OBJCOPYFLAGS := -S
-+$(obj)/vdso.so: $(obj)/vdso.so.dbg FORCE
-+	$(call if_changed,objcopy)
-+
-+$(obj)/vdso.so.dbg: $(obj)/vdso.so.raw $(obj)/$(munge) FORCE
-+	$(call if_changed,vdsomunge)
-+
-+# Link rule for the .so file, .lds has to be first
-+$(obj)/vdso.so.raw: $(src)/vdso.lds $(obj-vdso) FORCE
-+	$(call if_changed,vdsold)
-+
-+# Compilation rules for the vDSO sources
-+$(filter-out vgettimeofday.o, $(c-obj-vdso)): %.o: %.c FORCE
-+	$(call if_changed_dep,vdsocc)
-+$(asm-obj-vdso): %.o: %.S FORCE
-+	$(call if_changed_dep,vdsoas)
-+
-+# Actual build commands
-+quiet_cmd_vdsold = VDSOL32   $@
-+      cmd_vdsold = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_LDFLAGS) \
-+                   -Wl,-T $(filter %.lds,$^) $(filter %.o,$^) -o $@
-+quiet_cmd_vdsocc = VDSOC32   $@
-+      cmd_vdsocc = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_CFLAGS) -c -o $@ $<
-+quiet_cmd_vdsoas = VDSOA32   $@
-+      cmd_vdsoas = $(CC_ARM32) -Wp,-MD,$(depfile) $(VDSO_AFLAGS) -c -o $@ $<
-+
-+quiet_cmd_vdsomunge = MUNGE   $@
-+      cmd_vdsomunge = $(obj)/$(munge) $< $@
-+
-+# Generate vDSO offsets using helper script (borrowed from the 64-bit vDSO)
-+gen-vdsosym := $(srctree)/$(src)/../vdso/gen_vdso_offsets.sh
-+quiet_cmd_vdsosym = VDSOSYM $@
-+# The AArch64 nm should be able to read an AArch32 binary
-+      cmd_vdsosym = $(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@
-+
-+# Install commands for the unstripped file
-+quiet_cmd_vdso_install = INSTALL $@
-+      cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/vdso32.so
-+
-+vdso.so: $(obj)/vdso.so.dbg
-+	@mkdir -p $(MODLIB)/vdso
-+	$(call cmd,vdso_install)
-+
-+vdso_install: vdso.so
-diff --git a/arch/arm64/kernel/vdso32/compiler.h b/arch/arm64/kernel/vdso32/compiler.h
-new file mode 100644
-index 000000000000..19a43fc37bb9
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/compiler.h
-@@ -0,0 +1,122 @@
-+/*
-+ * Userspace implementations of fallback calls
-+ *
-+ * Copyright (C) 2017 Cavium, Inc.
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Rewriten into C by: Andrew Pinski <apinski@cavium.com>
-+ */
-+
-+#ifndef __VDSO_COMPILER_H
-+#define __VDSO_COMPILER_H
-+
-+#include <generated/autoconf.h>
-+#undef CONFIG_64BIT
-+#include <asm/barrier.h>	/* for isb() & dmb()	*/
-+#include <asm/param.h>		/* for HZ		*/
-+#include <asm/unistd32.h>
-+#include <linux/compiler.h>
-+
-+#ifdef CONFIG_ARM_ARCH_TIMER
-+#define ARCH_PROVIDES_TIMER
-+#endif
-+
-+/* can not include linux/time.h because of too much architectural cruft */
-+#ifndef NSEC_PER_SEC
-+#define NSEC_PER_SEC    1000000000L
-+#endif
-+
-+/* can not include linux/jiffies.h because of too much architectural cruft */
-+#ifndef TICK_NSEC
-+#define TICK_NSEC ((NSEC_PER_SEC+HZ/2)/HZ)
-+#endif
-+
-+/* can not include linux/hrtimer.h because of too much architectural cruft */
-+#ifndef LOW_RES_NSEC
-+#define LOW_RES_NSEC        TICK_NSEC
-+#ifdef ARCH_PROVIDES_TIMER
-+#ifdef CONFIG_HIGH_RES_TIMERS
-+# define HIGH_RES_NSEC        1
-+# define MONOTONIC_RES_NSEC    HIGH_RES_NSEC
-+#else
-+# define MONOTONIC_RES_NSEC    LOW_RES_NSEC
-+#endif
-+#endif
-+#endif
-+
-+#define DEFINE_FALLBACK(name, type_arg1, name_arg1, type_arg2, name_arg2) \
-+static notrace long name##_fallback(type_arg1 _##name_arg1,		  \
-+				    type_arg2 _##name_arg2)		  \
-+{									  \
-+	register type_arg1 name_arg1 asm("r0") = _##name_arg1;		  \
-+	register type_arg2 name_arg2 asm("r1") = _##name_arg2;		  \
-+	register long ret asm ("r0");					  \
-+	register long nr asm("r7") = __NR_##name;			  \
-+									  \
-+	asm volatile(							  \
-+	"	swi #0\n"						  \
-+	: "=r" (ret)							  \
-+	: "r" (name_arg1), "r" (name_arg2), "r" (nr)			  \
-+	: "memory");							  \
-+									  \
-+	return ret;							  \
-+}
-+
-+/*
-+ * AArch32 implementation of arch_counter_get_cntvct() suitable for vdso
-+ */
-+static __always_inline notrace u64 arch_vdso_read_counter(void)
-+{
-+	u64 res;
-+
-+	/* Read the virtual counter. */
-+	isb();
-+	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (res));
-+
-+	return res;
-+}
-+
-+/*
-+ * Can not include asm/processor.h to pick this up because of all the
-+ * architectural components also included, so we open code a copy.
-+ */
-+static inline void cpu_relax(void)
-+{
-+	asm volatile("yield" ::: "memory");
-+}
-+
-+#undef smp_rmb
-+#if __LINUX_ARM_ARCH__ >= 8
-+#define	smp_rmb()	dmb(ishld) /* ok on ARMv8 */
-+#else
-+#define	smp_rmb()	dmb(ish) /* ishld does not exist on ARMv7 */
-+#endif
-+
-+/* Avoid unresolved references emitted by GCC */
-+
-+void __aeabi_unwind_cpp_pr0(void)
-+{
-+}
-+
-+void __aeabi_unwind_cpp_pr1(void)
-+{
-+}
-+
-+void __aeabi_unwind_cpp_pr2(void)
-+{
-+}
-+
-+#endif /* __VDSO_COMPILER_H */
-diff --git a/arch/arm64/kernel/vdso32/datapage.h b/arch/arm64/kernel/vdso32/datapage.h
-new file mode 100644
-index 000000000000..fe3e216d94d1
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/datapage.h
-@@ -0,0 +1 @@
-+#include "../vdso/datapage.h"
-diff --git a/arch/arm64/kernel/vdso32/sigreturn.S b/arch/arm64/kernel/vdso32/sigreturn.S
-new file mode 100644
-index 000000000000..14e5f9ca34f9
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/sigreturn.S
-@@ -0,0 +1,76 @@
-+/*
-+ * Sigreturn trampolines for returning from a signal when the SA_RESTORER
-+ * flag is not set.
-+ *
-+ * Copyright (C) 2016 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Based on glibc's arm sa_restorer. While this is not strictly necessary, we
-+ * provide both A32 and T32 versions, in accordance with the arm sigreturn
-+ * code.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/unistd32.h>
-+
-+.macro sigreturn_trampoline name, syscall, regs_offset
-+	/*
-+	 * We provide directives for enabling stack unwinding through the
-+	 * trampoline. On arm, CFI directives are only used for debugging (and
-+	 * the vDSO is stripped of debug information), so only the arm-specific
-+	 * unwinding directives are useful here.
-+	 */
-+	.fnstart
-+	.save {r0-r15}
-+	.pad #\regs_offset
-+	/*
-+	 * It is necessary to start the unwind tables at least one instruction
-+	 * before the trampoline, as the unwinder will assume that the signal
-+	 * handler has been called from the trampoline, that is just before
-+	 * where the signal handler returns (mov r7, ...).
-+	 */
-+	nop
-+ENTRY(\name)
-+	mov	r7, #\syscall
-+	svc	#0
-+	.fnend
-+	/*
-+	 * We would like to use ENDPROC, but the macro uses @ which is a
-+	 * comment symbol for arm assemblers, so directly use .type with %
-+	 * instead.
-+	 */
-+	.type \name, %function
-+END(\name)
-+.endm
-+
-+	.text
-+
-+	.arm
-+	sigreturn_trampoline __kernel_sigreturn_arm, \
-+			     __NR_sigreturn, \
-+			     COMPAT_SIGFRAME_REGS_OFFSET
-+
-+	sigreturn_trampoline __kernel_rt_sigreturn_arm, \
-+			     __NR_rt_sigreturn, \
-+			     COMPAT_RT_SIGFRAME_REGS_OFFSET
-+
-+	.thumb
-+	sigreturn_trampoline __kernel_sigreturn_thumb, \
-+			     __NR_sigreturn, \
-+			     COMPAT_SIGFRAME_REGS_OFFSET
-+
-+	sigreturn_trampoline __kernel_rt_sigreturn_thumb, \
-+			     __NR_rt_sigreturn, \
-+			     COMPAT_RT_SIGFRAME_REGS_OFFSET
-diff --git a/arch/arm64/kernel/vdso32/vdso.S b/arch/arm64/kernel/vdso32/vdso.S
-new file mode 100644
-index 000000000000..fe19ff70eb76
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/vdso.S
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/page.h>
-+
-+	.globl vdso32_start, vdso32_end
-+	.section .rodata
-+	.balign PAGE_SIZE
-+vdso32_start:
-+	.incbin "arch/arm64/kernel/vdso32/vdso.so"
-+	.balign PAGE_SIZE
-+vdso32_end:
-+
-+	.previous
-diff --git a/arch/arm64/kernel/vdso32/vdso.lds.S b/arch/arm64/kernel/vdso32/vdso.lds.S
-new file mode 100644
-index 000000000000..f95cb1c431fb
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/vdso.lds.S
-@@ -0,0 +1,95 @@
-+/*
-+ * Adapted from arm64 version.
-+ *
-+ * GNU linker script for the VDSO library.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Heavily based on the vDSO linker scripts for other archs.
-+ */
-+
-+#include <linux/const.h>
-+#include <asm/page.h>
-+#include <asm/vdso.h>
-+
-+OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
-+OUTPUT_ARCH(arm)
-+
-+SECTIONS
-+{
-+	PROVIDE_HIDDEN(_vdso_data = . - PAGE_SIZE);
-+	. = VDSO_LBASE + SIZEOF_HEADERS;
-+
-+	.hash		: { *(.hash) }			:text
-+	.gnu.hash	: { *(.gnu.hash) }
-+	.dynsym		: { *(.dynsym) }
-+	.dynstr		: { *(.dynstr) }
-+	.gnu.version	: { *(.gnu.version) }
-+	.gnu.version_d	: { *(.gnu.version_d) }
-+	.gnu.version_r	: { *(.gnu.version_r) }
-+
-+	.note		: { *(.note.*) }		:text	:note
-+
-+	.dynamic	: { *(.dynamic) }		:text	:dynamic
-+
-+	.rodata		: { *(.rodata*) }		:text
-+
-+	.text		: { *(.text*) }			:text	=0xe7f001f2
-+
-+	.got		: { *(.got) }
-+	.rel.plt	: { *(.rel.plt) }
-+
-+	/DISCARD/	: {
-+		*(.note.GNU-stack)
-+		*(.data .data.* .gnu.linkonce.d.* .sdata*)
-+		*(.bss .sbss .dynbss .dynsbss)
-+	}
-+}
-+
-+/*
-+ * We must supply the ELF program headers explicitly to get just one
-+ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
-+ */
-+PHDRS
-+{
-+	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
-+	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
-+	note		PT_NOTE		FLAGS(4);		/* PF_R */
-+}
-+
-+VERSION
-+{
-+	LINUX_2.6 {
-+	global:
-+		__vdso_clock_gettime;
-+		__vdso_gettimeofday;
-+		__vdso_clock_getres;
-+		__vdso_time;
-+		__kernel_sigreturn_arm;
-+		__kernel_sigreturn_thumb;
-+		__kernel_rt_sigreturn_arm;
-+		__kernel_rt_sigreturn_thumb;
-+	local: *;
-+	};
-+}
-+
-+/*
-+ * Make the sigreturn code visible to the kernel.
-+ */
-+VDSO_compat_sigreturn_arm	= __kernel_sigreturn_arm;
-+VDSO_compat_sigreturn_thumb	= __kernel_sigreturn_thumb;
-+VDSO_compat_rt_sigreturn_arm	= __kernel_rt_sigreturn_arm;
-+VDSO_compat_rt_sigreturn_thumb	= __kernel_rt_sigreturn_thumb;
-diff --git a/arch/arm64/kernel/vdso32/vgettimeofday.c b/arch/arm64/kernel/vdso32/vgettimeofday.c
-new file mode 100644
-index 000000000000..b73d4011993d
---- /dev/null
-+++ b/arch/arm64/kernel/vdso32/vgettimeofday.c
-@@ -0,0 +1,3 @@
-+#include "compiler.h"
-+#include "datapage.h"
-+#include "../../../../lib/vdso/vgettimeofday.c"
--- 
-2.16.0.rc1.238.g530d649a79-goog
+> 
+>>
+>>>   #ifdef __ARMEB__
+>>>   #define rl r3
+>>>   #define rh r2
+>>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>>> index 0a14967fd400..9310fd9aa1cf 100644
+>>> --- a/arch/arm/mm/proc-v7.S
+>>> +++ b/arch/arm/mm/proc-v7.S
+>>> @@ -173,6 +173,21 @@ ENDPROC(cpu_v7_do_resume)
+>>>   	globl_equ	cpu_v7_btbinv_do_resume,	cpu_v7_do_resume
+>>>   #endif
+>>>   
+>>> +/*
+>>> + * Cortex-A15 that require an icache invalidation on switch_mm
+>>
+>> uber nit: The wording is weird here, how about "Cortex-A15 requires
+>> an..." ?
+> 
+> Sure.
+> 
+> Thanks,
+> 
+> 	M.
+> 
