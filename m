@@ -1,51 +1,66 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Jan 2018 21:39:12 +0000
-Subject: [RFC 1/2] arm: cacheflush syscall: process only pages that are
- in the memory
-In-Reply-To: <589aa8ab-5bfc-e065-51f9-3a403c346d92@samsung.com>
-References: <CGME20180126111453eucas1p1330d8561386c3cf2bb457bc22c0d99a8@eucas1p1.samsung.com>
- <20180126111441.29353-1-m.szyprowski@samsung.com>
- <20180126113226.GX17719@n2100.armlinux.org.uk>
- <589aa8ab-5bfc-e065-51f9-3a403c346d92@samsung.com>
-Message-ID: <20180126213911.GY17719@n2100.armlinux.org.uk>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 26 Jan 2018 23:13:53 +0100
+Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
+In-Reply-To: <5bcf9545-37ee-18b5-33d9-7ce3da9b0048@codeaurora.org>
+References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
+ <CACRpkda6FLfUhqOPqJfCHm1PHOWg=CY=wOCDyrd78eMx+-zrZw@mail.gmail.com>
+ <5bcf9545-37ee-18b5-33d9-7ce3da9b0048@codeaurora.org>
+Message-ID: <CAMRc=McDzELTddEXnKtsE7jG4r5ROodhbjh=QSjVDtLHE0KSPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 02:30:47PM +0100, Marek Szyprowski wrote:
-> Hi Russell,
-> 
-> On 2018-01-26 12:32, Russell King - ARM Linux wrote:
-> >On Fri, Jan 26, 2018 at 12:14:40PM +0100, Marek Szyprowski wrote:
-> >>glibc in calls cacheflush syscall on the whole textrels section of the
-> >>relocated binaries. However, relocation usually doesn't touch all pages
-> >>of that section, so not all of them are read to memory when calling this
-> >>syscall. However flush_cache_user_range() function will unconditionally
-> >>touch all pages from the provided range, resulting additional overhead
-> >>related to reading all clean pages. Optimize this by calling
-> >>flush_cache_user_range() only on the pages that are already in the
-> >>memory.
-> >What ensures that another CPU doesn't remove a page while we're
-> >flushing it?  That will trigger a data abort, which will want to
-> >take the mmap_sem, causing a deadlock.
-> 
-> I thought that taking mmap_sem will prevent pages from being removed.
-> mmap_sem has been already taken in the previous implementation of that
-> syscall, until code simplification done by commit 97c72d89ce0e ("ARM:
-> cacheflush: don't bother rounding to nearest vma").
+2018-01-26 14:16 GMT+01:00 Timur Tabi <timur@codeaurora.org>:
+> On 1/26/18 7:01 AM, Linus Walleij wrote:
+>>
+>> This is a feature not a bug. It encourages people not to
+>> depend on the global GPIO numberspace.
+>>
+>> Just set it to -1.
+>
+>
+> If I change it to -1, then I think I'm going to break every existing MSM
+> platform that depends on the base address being 0, because then every MSM
+> driver will have a non-zero base, and none of the existing drivers register
+> more than one GPIO device.
+>
+> So how about this:
+>
+>         static int base = 0;
+>
+>         chip->base = base;
+>         base = -1;
+>
+> This way, existing code works as before.  If any driver registers two GPIO
+> devices, the first one will get a base of 0, and the second one will get
+> some other base.
+>
+>>> gpiochip_find_base: found new base at 437
+>>
+>> (...)
+>>>
+>>> gpiochip_find_base: found new base at 362
+>>
+>> These are awesome bases, just beautiful. Use this.
+>>
+>> If you don't like seeing GPIO base numbers like this: use things
+>> like the chardev and the tools in tools/gpio or libgpiod when
+>> developing, and you will never see them. They should not make
+>> a difference anyway.
+>
+>
+> Can you tell me more about the chardev?  I've always been using "echo X >
+> /sys/class/gpio/export", so I guess that's not the right way to do things.
+>
 
-No, you're not reading the previous code state correctly.  Take a closer
-look at that commit.
+Hi Timur,
 
-find_vma() requires that mmap_sem is held across the call as the VMA
-list is not stable without that semaphore held.  However, more
-importantly, notice that it drops the semaphore _before_ calling the
-cache flushing function (__do_cache_op()).
+take a look at the in-project documentation[1] and read the article[2]
+about libgpiod. That should get you started.
 
-The point is that if __do_cache_op() faults, it will enter
-do_page_fault(), which will try to take the mmap_sem again, causing
-a deadlock.
+Let me know if anything's not clear.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Bartosz
+
+[1] https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git/
+[2] https://www.cnx-software.com/2017/11/03/learn-more-about-linuxs-new-gpio-user-space-subsystem-libgpiod/
