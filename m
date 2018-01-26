@@ -1,112 +1,276 @@
 From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
-Date: Fri, 26 Jan 2018 06:51:25 -0600
-Subject: [PATCH v5 0/2] staging: fsl-mc: Move bus driver out of staging
-Message-ID: <20180126125127.26439-1-bogdan.purcareata@nxp.com>
+Date: Fri, 26 Jan 2018 06:51:27 -0600
+Subject: [PATCH v5 2/2] staging: fsl-mc: Move irqchip code out of staging
+In-Reply-To: <20180126125127.26439-1-bogdan.purcareata@nxp.com>
+References: <20180126125127.26439-1-bogdan.purcareata@nxp.com>
+Message-ID: <20180126125127.26439-3-bogdan.purcareata@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous submission: https://patchwork.kernel.org/patch/10081731/
+Now that the fsl-mc bus core infrastructure is out of staging, the
+remaining irqchip glue code used (irq-gic-v3-its-fsl-mc-msi.c) goes
+to drivers/irqchip.
 
-Most of the feedback was addressed by a separate series of cleanup
-/ refactoring patches [1] which were applied.
-
-The thing left to do is to split the original patch into moving out the
-core bus infrastructure separate from the irqchip glue code, and
-integrate the documentation with the kernel build system.
-
-This patchset only handles moving the fsl-mc bus core out of staging.
-The remaining objects (DPBP, DPCON) and drivers (dpio, dpaa2-eth) will
-be moved out in subsequent patches.
-
-[1] https://lkml.org/lkml/2018/1/16/386
-
+Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+[rebased, add dpaa2_eth and dpio #include updates]
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+[rebased, split irqchip to separate patch]
+Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
 Notes:
     -v5:
       - split irqchip glue code to separate patch (GregKH)
-      - integrate doc with the kernel build system
-    -v4:
-      - regenerated patch with renames detection disabled (Andrew Lunn)
-    -v3:
-      - rebased
-    -v2:
-      - group irqchip gic its glue code together with the rest (Marc Zyngier)
+    -v4 - v1:
+      - no change
 
-Bogdan Purcareata (2):
-  staging: fsl-mc: Move core bus out of staging
-  staging: fsl-mc: Move irqchip code out of staging
-
- Documentation/networking/dpaa2/index.rst           |   8 +
- Documentation/networking/dpaa2/overview.rst        | 404 +++++++++
- Documentation/networking/index.rst                 |   1 +
- MAINTAINERS                                        |   3 +-
- drivers/bus/Kconfig                                |   2 +
- drivers/bus/Makefile                               |   4 +
- drivers/bus/fsl-mc/Kconfig                         |  16 +
- drivers/bus/fsl-mc/Makefile                        |  16 +
- drivers/bus/fsl-mc/dpmcp.c                         |  99 +++
- drivers/bus/fsl-mc/dprc-driver.c                   | 809 ++++++++++++++++++
- drivers/bus/fsl-mc/dprc.c                          | 532 ++++++++++++
- drivers/bus/fsl-mc/fsl-mc-allocator.c              | 648 ++++++++++++++
- drivers/bus/fsl-mc/fsl-mc-bus.c                    | 948 +++++++++++++++++++++
- drivers/bus/fsl-mc/fsl-mc-msi.c                    | 285 +++++++
- drivers/bus/fsl-mc/fsl-mc-private.h                | 475 +++++++++++
- drivers/bus/fsl-mc/mc-io.c                         | 268 ++++++
- drivers/bus/fsl-mc/mc-sys.c                        | 296 +++++++
  drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c        | 100 +++
- drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
- drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
- drivers/staging/fsl-mc/TODO                        |  18 -
- drivers/staging/fsl-mc/bus/Kconfig                 |  10 -
- drivers/staging/fsl-mc/bus/Makefile                |  15 +-
- drivers/staging/fsl-mc/bus/dpbp.c                  |   2 +-
- drivers/staging/fsl-mc/bus/dpcon.c                 |   2 +-
- drivers/staging/fsl-mc/bus/dpio/dpio-driver.c      |   2 +-
- drivers/staging/fsl-mc/bus/dpio/dpio-service.c     |   2 +-
- drivers/staging/fsl-mc/bus/dpio/dpio.c             |   2 +-
- drivers/staging/fsl-mc/bus/dpmcp.c                 |  99 ---
- drivers/staging/fsl-mc/bus/dprc-driver.c           | 809 ------------------
- drivers/staging/fsl-mc/bus/dprc.c                  | 531 ------------
- drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      | 648 --------------
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c            | 948 ---------------------
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c            | 284 ------
- drivers/staging/fsl-mc/bus/fsl-mc-private.h        | 475 -----------
- .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 100 ---
- drivers/staging/fsl-mc/bus/mc-io.c                 | 268 ------
- drivers/staging/fsl-mc/bus/mc-sys.c                | 296 -------
- drivers/staging/fsl-mc/include/mc.h                | 454 ----------
- drivers/staging/fsl-mc/overview.rst                | 404 ---------
- include/linux/fsl/mc.h                             | 454 ++++++++++
- 43 files changed, 5378 insertions(+), 5366 deletions(-)
- create mode 100644 Documentation/networking/dpaa2/index.rst
- create mode 100644 Documentation/networking/dpaa2/overview.rst
- create mode 100644 drivers/bus/fsl-mc/Kconfig
- create mode 100644 drivers/bus/fsl-mc/Makefile
- create mode 100644 drivers/bus/fsl-mc/dpmcp.c
- create mode 100644 drivers/bus/fsl-mc/dprc-driver.c
- create mode 100644 drivers/bus/fsl-mc/dprc.c
- create mode 100644 drivers/bus/fsl-mc/fsl-mc-allocator.c
- create mode 100644 drivers/bus/fsl-mc/fsl-mc-bus.c
- create mode 100644 drivers/bus/fsl-mc/fsl-mc-msi.c
- create mode 100644 drivers/bus/fsl-mc/fsl-mc-private.h
- create mode 100644 drivers/bus/fsl-mc/mc-io.c
- create mode 100644 drivers/bus/fsl-mc/mc-sys.c
+ drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c        | 100 +++++++++++++++++++++
+ drivers/staging/fsl-mc/bus/Makefile                |   3 +-
+ .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 100 ---------------------
+ 4 files changed, 102 insertions(+), 102 deletions(-)
  create mode 100644 drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
- delete mode 100644 drivers/staging/fsl-mc/TODO
- delete mode 100644 drivers/staging/fsl-mc/bus/dpmcp.c
- delete mode 100644 drivers/staging/fsl-mc/bus/dprc-driver.c
- delete mode 100644 drivers/staging/fsl-mc/bus/dprc.c
- delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
- delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-bus.c
- delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-msi.c
- delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-private.h
  delete mode 100644 drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
- delete mode 100644 drivers/staging/fsl-mc/bus/mc-io.c
- delete mode 100644 drivers/staging/fsl-mc/bus/mc-sys.c
- delete mode 100644 drivers/staging/fsl-mc/include/mc.h
- delete mode 100644 drivers/staging/fsl-mc/overview.rst
- create mode 100644 include/linux/fsl/mc.h
 
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index d2df34a..641d8a4 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-platform-msi.o irq-gic-v4.o
+ obj-$(CONFIG_ARM_GIC_V3_ITS_PCI)	+= irq-gic-v3-its-pci-msi.o
++obj-$(CONFIG_FSL_MC_BUS)		+= irq-gic-v3-its-fsl-mc-msi.o
+ obj-$(CONFIG_PARTITION_PERCPU)		+= irq-partition-percpu.o
+ obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+diff --git a/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c b/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
+new file mode 100644
+index 0000000..b365fbb
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
+@@ -0,0 +1,100 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Freescale Management Complex (MC) bus driver MSI support
++ *
++ * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
++ * Author: German Rivera <German.Rivera@freescale.com>
++ *
++ */
++
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/irq.h>
++#include <linux/msi.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/fsl/mc.h>
++
++static struct irq_chip its_msi_irq_chip = {
++	.name = "ITS-fMSI",
++	.irq_mask = irq_chip_mask_parent,
++	.irq_unmask = irq_chip_unmask_parent,
++	.irq_eoi = irq_chip_eoi_parent,
++	.irq_set_affinity = msi_domain_set_affinity
++};
++
++static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
++				  struct device *dev,
++				  int nvec, msi_alloc_info_t *info)
++{
++	struct fsl_mc_device *mc_bus_dev;
++	struct msi_domain_info *msi_info;
++
++	if (!dev_is_fsl_mc(dev))
++		return -EINVAL;
++
++	mc_bus_dev = to_fsl_mc_device(dev);
++	if (!(mc_bus_dev->flags & FSL_MC_IS_DPRC))
++		return -EINVAL;
++
++	/*
++	 * Set the device Id to be passed to the GIC-ITS:
++	 *
++	 * NOTE: This device id corresponds to the IOMMU stream ID
++	 * associated with the DPRC object (ICID).
++	 */
++#ifdef GENERIC_MSI_DOMAIN_OPS
++	info->scratchpad[0].ul = mc_bus_dev->icid;
++#endif
++	msi_info = msi_get_domain_info(msi_domain->parent);
++	return msi_info->ops->msi_prepare(msi_domain->parent, dev, nvec, info);
++}
++
++static struct msi_domain_ops its_fsl_mc_msi_ops __ro_after_init = {
++	.msi_prepare = its_fsl_mc_msi_prepare,
++};
++
++static struct msi_domain_info its_fsl_mc_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.ops	= &its_fsl_mc_msi_ops,
++	.chip	= &its_msi_irq_chip,
++};
++
++static const struct of_device_id its_device_id[] = {
++	{	.compatible	= "arm,gic-v3-its",	},
++	{},
++};
++
++static int __init its_fsl_mc_msi_init(void)
++{
++	struct device_node *np;
++	struct irq_domain *parent;
++	struct irq_domain *mc_msi_domain;
++
++	for (np = of_find_matching_node(NULL, its_device_id); np;
++	     np = of_find_matching_node(np, its_device_id)) {
++		if (!of_property_read_bool(np, "msi-controller"))
++			continue;
++
++		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
++		if (!parent || !msi_get_domain_info(parent)) {
++			pr_err("%pOF: unable to locate ITS domain\n", np);
++			continue;
++		}
++
++		mc_msi_domain = fsl_mc_msi_create_irq_domain(
++						 of_node_to_fwnode(np),
++						 &its_fsl_mc_msi_domain_info,
++						 parent);
++		if (!mc_msi_domain) {
++			pr_err("%pOF: unable to create fsl-mc domain\n", np);
++			continue;
++		}
++
++		pr_info("fsl-mc MSI: %pOF domain created\n", np);
++	}
++
++	return 0;
++}
++
++early_initcall(its_fsl_mc_msi_init);
+diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
+index 18b1b5f..b67889e 100644
+--- a/drivers/staging/fsl-mc/bus/Makefile
++++ b/drivers/staging/fsl-mc/bus/Makefile
+@@ -4,8 +4,7 @@
+ #
+ # Copyright (C) 2014 Freescale Semiconductor, Inc.
+ #
+-obj-$(CONFIG_FSL_MC_BUS) += irq-gic-v3-its-fsl-mc-msi.o \
+-			    dpbp.o \
++obj-$(CONFIG_FSL_MC_BUS) += dpbp.o \
+ 			    dpcon.o
+ 
+ # MC DPIO driver
+diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+deleted file mode 100644
+index b365fbb..0000000
+--- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
++++ /dev/null
+@@ -1,100 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-/*
+- * Freescale Management Complex (MC) bus driver MSI support
+- *
+- * Copyright (C) 2015-2016 Freescale Semiconductor, Inc.
+- * Author: German Rivera <German.Rivera@freescale.com>
+- *
+- */
+-
+-#include <linux/of_device.h>
+-#include <linux/of_address.h>
+-#include <linux/irq.h>
+-#include <linux/msi.h>
+-#include <linux/of.h>
+-#include <linux/of_irq.h>
+-#include <linux/fsl/mc.h>
+-
+-static struct irq_chip its_msi_irq_chip = {
+-	.name = "ITS-fMSI",
+-	.irq_mask = irq_chip_mask_parent,
+-	.irq_unmask = irq_chip_unmask_parent,
+-	.irq_eoi = irq_chip_eoi_parent,
+-	.irq_set_affinity = msi_domain_set_affinity
+-};
+-
+-static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
+-				  struct device *dev,
+-				  int nvec, msi_alloc_info_t *info)
+-{
+-	struct fsl_mc_device *mc_bus_dev;
+-	struct msi_domain_info *msi_info;
+-
+-	if (!dev_is_fsl_mc(dev))
+-		return -EINVAL;
+-
+-	mc_bus_dev = to_fsl_mc_device(dev);
+-	if (!(mc_bus_dev->flags & FSL_MC_IS_DPRC))
+-		return -EINVAL;
+-
+-	/*
+-	 * Set the device Id to be passed to the GIC-ITS:
+-	 *
+-	 * NOTE: This device id corresponds to the IOMMU stream ID
+-	 * associated with the DPRC object (ICID).
+-	 */
+-#ifdef GENERIC_MSI_DOMAIN_OPS
+-	info->scratchpad[0].ul = mc_bus_dev->icid;
+-#endif
+-	msi_info = msi_get_domain_info(msi_domain->parent);
+-	return msi_info->ops->msi_prepare(msi_domain->parent, dev, nvec, info);
+-}
+-
+-static struct msi_domain_ops its_fsl_mc_msi_ops __ro_after_init = {
+-	.msi_prepare = its_fsl_mc_msi_prepare,
+-};
+-
+-static struct msi_domain_info its_fsl_mc_msi_domain_info = {
+-	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
+-	.ops	= &its_fsl_mc_msi_ops,
+-	.chip	= &its_msi_irq_chip,
+-};
+-
+-static const struct of_device_id its_device_id[] = {
+-	{	.compatible	= "arm,gic-v3-its",	},
+-	{},
+-};
+-
+-static int __init its_fsl_mc_msi_init(void)
+-{
+-	struct device_node *np;
+-	struct irq_domain *parent;
+-	struct irq_domain *mc_msi_domain;
+-
+-	for (np = of_find_matching_node(NULL, its_device_id); np;
+-	     np = of_find_matching_node(np, its_device_id)) {
+-		if (!of_property_read_bool(np, "msi-controller"))
+-			continue;
+-
+-		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+-		if (!parent || !msi_get_domain_info(parent)) {
+-			pr_err("%pOF: unable to locate ITS domain\n", np);
+-			continue;
+-		}
+-
+-		mc_msi_domain = fsl_mc_msi_create_irq_domain(
+-						 of_node_to_fwnode(np),
+-						 &its_fsl_mc_msi_domain_info,
+-						 parent);
+-		if (!mc_msi_domain) {
+-			pr_err("%pOF: unable to create fsl-mc domain\n", np);
+-			continue;
+-		}
+-
+-		pr_info("fsl-mc MSI: %pOF domain created\n", np);
+-	}
+-
+-	return 0;
+-}
+-
+-early_initcall(its_fsl_mc_msi_init);
 -- 
 2.7.4
