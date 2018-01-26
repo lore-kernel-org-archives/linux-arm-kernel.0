@@ -1,140 +1,53 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 26 Jan 2018 07:59:46 +0000
-Subject: [PATCH] ARM: imx: Improve the soc revision calculation flow
-In-Reply-To: <1515486632-18488-1-git-send-email-ping.bai@nxp.com>
-References: <1515486632-18488-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <AM3PR04MB306176538988C3363E4EE5380E00@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 26 Jan 2018 09:07:23 +0100
+Subject: sun4i drm device tree
+In-Reply-To: <1844c194-1a4b-2a39-8798-adc4dc83a6c1@orpaltech.com>
+References: <70275161-0167-fa2e-3557-d15b8244c04d@orpaltech.com>
+ <20180122085537.2cenqvvpjrbrzf7g@flea.lan>
+ <1844c194-1a4b-2a39-8798-adc4dc83a6c1@orpaltech.com>
+Message-ID: <20180126080723.cdortgeqgbxqfkwh@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jacky Bai
-> Sent: Tuesday, January 09, 2018 4:31 PM
-> To: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>;
-> A.s. Dong <aisheng.dong@nxp.com>; jacky.baip at gmail.com
-> Subject: [PATCH] ARM: imx: Improve the soc revision calculation flow
-> 
-> On our i.MX6 SOC, the DIGPROG register is used for representing the SOC ID
-> and silicon revision. The revision has two part: MAJOR and MINOR. each is
-> represented in 8 bits in the register.
-> 
-> bits [15:8]: reflect the MAJOR part of the revision; bits [7:0]: reflect the MINOR
-> part of the revision;
-> 
-> In our linux kernel, the soc revision is represented in 8 bits.
-> MAJOR part and MINOR each occupy 4 bits.
-> 
-> previous method does NOT take care about the MAJOR part in DIGPROG
-> register. So reformat the revision read from the HW to be compatible with the
-> revision format used in kernel.
-> 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> ---
->  arch/arm/mach-imx/anatop.c | 58 +++++++++++++++++--------------------------
-> ---
->  1 file changed, 21 insertions(+), 37 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c index
-> 649a84c..170cb30 100644
-> --- a/arch/arm/mach-imx/anatop.c
-> +++ b/arch/arm/mach-imx/anatop.c
-> @@ -1,5 +1,6 @@
->  /*
->   * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
-> + * Copyright NXP 2017.
+On Fri, Jan 26, 2018 at 10:05:08AM +0300, Sergey Suloev wrote:
+> On 01/22/2018 11:55 AM, Maxime Ripard wrote:
+> > On Mon, Jan 22, 2018 at 11:15:58AM +0300, Sergey Suloev wrote:
+> > > But it seems that there should be changes to device tree files
+> > > (arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi,
+> > > arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi) too.
+> > > 
+> > > Can you PLEASE give a ref to a patch or explain device tree changes
+> > > needed?
+> > And even if it was supported, we'd need a lot more informations to
+> > help you. For example, which boards, with which video outputs
+>
+> Maxime, it is still unclear about sun4i-drm on aarch64: should it work on
+> NanoPi A64 ?
 
-Copyright 2017-2018  NXP ?
+No
 
->   *
->   * The code contained herein is licensed under the GNU General Public
->   * License. You may obtain a copy of the GNU General Public License @@ -
-> 116,6 +117,8 @@ void __init imx_init_revision_from_anatop(void)
->  	unsigned int revision;
->  	u32 digprog;
->  	u16 offset = ANADIG_DIGPROG;
-> +	u16 major_part, minor_part;
+> Are there device tree patches for it ?
 
-U8?
+No
 
-> +
-> 
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
->  	anatop_base = of_iomap(np, 0);
-> @@ -127,45 +130,26 @@ void __init imx_init_revision_from_anatop(void)
->  	digprog = readl_relaxed(anatop_base + offset);
->  	iounmap(anatop_base);
-> 
-> -	switch (digprog & 0xff) {
-> -	case 0:
-> -		/*
-> -		 * For i.MX6QP, most of the code for i.MX6Q can be resued,
-> -		 * so internally, we identify it as i.MX6Q Rev 2.0
-> -		 */
-> -		if (digprog >> 8 & 0x01)
-> -			revision = IMX_CHIP_REVISION_2_0;
-> -		else
-> -			revision = IMX_CHIP_REVISION_1_0;
-> -		break;
-> -	case 1:
-> -		revision = IMX_CHIP_REVISION_1_1;
-> -		break;
-> -	case 2:
-> -		revision = IMX_CHIP_REVISION_1_2;
-> -		break;
-> -	case 3:
-> -		revision = IMX_CHIP_REVISION_1_3;
-> -		break;
-> -	case 4:
-> -		revision = IMX_CHIP_REVISION_1_4;
-> -		break;
-> -	case 5:
-> -		/*
-> -		 * i.MX6DQ TO1.5 is defined as Rev 1.3 in Data Sheet, marked
-> -		 * as 'D' in Part Number last character.
-> -		 */
-> -		revision = IMX_CHIP_REVISION_1_5;
-> -		break;
-> -	default:
-> -		/*
-> -		 * Fail back to return raw register value instead of 0xff.
-> -		 * It will be easy to know version information in SOC if it
-> -		 * can't be recognized by known version. And some chip's
-> (i.MX7D)
-> -		 * digprog value match linux version format, so it needn't map
-> -		 * again and we can use register value directly.
-> +	/*
-> +	 * On i.MX7D digprog value match linux version format, so
-> +	 * it needn't map again and we can use register value directly.
-> +	 */
-> +	if (of_device_is_compatible(np, "fsl,imx7d-anatop")) {
-> +		revision = digprog & 0xff;
-> +	} else {
-> +
-> +		/* MAJOR: [15:8], the major silicon revison;
-> +		 * MINOR: [7: 0], the minor silicon revison;
-> +		 *
-> +		 * please refer to the i.MX RM for the detailed
-> +		 * silicon revison bit define.
-> +		 * format the major part and minor part to match the
-> +		 * linux kernel soc version format.
->  		 */
->  		revision = digprog & 0xff;
+> Can you (or someone else) share any info about the status, PLEASE. That may
+> be helpful for many people, I guess.
 
-Unneeded line?
+It's documented here:
+https://linux-sunxi.org/Mainlining_Effort#Status_Matrix
 
-Otherwise:
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+With a status of either WiP or not supported depending on the outputs.
 
-Regards
-Dong Aisheng
+Maxime
 
-> +		major_part = (digprog >> 8) & 0xf;
-> +		minor_part = digprog & 0xf;
-> +		revision = ((major_part + 1) << 4) | minor_part;
->  	}
-> 
->  	mxc_set_cpu_type(digprog >> 16 & 0xff);
-> --
-> 1.9.1
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180126/b3a09012/attachment.sig>
