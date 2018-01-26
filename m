@@ -1,41 +1,39 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 26 Jan 2018 16:19:40 +0100
-Subject: [PATCH 15/16] arm: dts: sun8i: a83t: add support for the thermal
- sensor in A83T
+Date: Fri, 26 Jan 2018 16:19:38 +0100
+Subject: [PATCH 13/16] arm: dts: sun8i: h3: add thermal zone to H3
 In-Reply-To: <20180126151941.12183-1-embed3d@gmail.com>
 References: <20180126151941.12183-1-embed3d@gmail.com>
-Message-ID: <20180126151941.12183-16-embed3d@gmail.com>
+Message-ID: <20180126151941.12183-14-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have gained the support for the thermal sensor in A83T,
-we can now add its device nodes to the device tree.
-
-The A83T seems to have a broken IRQ 31, thus we use here IRQ 41.
+This patch adds the thermal zones to the H3. We have only one sensor and
+that is placed in the cpu.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 7f4955a5fab7..9e53ff5ac4ed 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -518,6 +518,14 @@
- 			clocks = <&osc24M>;
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index fbb007e5798e..3f83f6a27c74 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -72,6 +72,15 @@
  		};
+ 	};
  
-+		ths: thermal-sensor at 1f04000 {
-+			compatible = "allwinner,sun8i-a83t-ths";
-+			reg = <0x01f04000 0x100>;
-+			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+			#thermal-sensor-cells = <1>;
-+			#io-channel-cells = <0>;
++	thermal-zones {
++		cpu-thermal {
++			/* milliseconds */
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++			thermal-sensors = <&ths 0>;
 +		};
++	};
 +
- 		watchdog at 1c20ca0 {
- 			compatible = "allwinner,sun6i-a31-wdt";
- 			reg = <0x01c20ca0 0x20>;
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 -- 
 2.11.0
