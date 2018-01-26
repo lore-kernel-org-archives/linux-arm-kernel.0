@@ -1,144 +1,72 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 11:08:00 +0000
-Subject: [PATCH 06/16] arm64: capabilities: Unify the verification
-In-Reply-To: <20180123122809.16269-7-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-7-suzuki.poulose@arm.com>
-Message-ID: <20180126110759.GN5862@e103592.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 26 Jan 2018 12:14:40 +0100
+Subject: [RFC 1/2] arm: cacheflush syscall: process only pages that are in
+ the memory
+References: <CGME20180126111453eucas1p1330d8561386c3cf2bb457bc22c0d99a8@eucas1p1.samsung.com>
+Message-ID: <20180126111441.29353-1-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:27:59PM +0000, Suzuki K Poulose wrote:
-> Now that each capability describes how to treat the conflicts
-> of CPU cap state vs System wide cap state, we can unify the
-> verification logic to a single place.
-> 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/cpufeature.c | 87 ++++++++++++++++++++++++++----------------
->  1 file changed, 54 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 43c7e992d784..79737034a628 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1228,6 +1228,54 @@ static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *
->  }
+glibc in calls cacheflush syscall on the whole textrels section of the
+relocated binaries. However, relocation usually doesn't touch all pages
+of that section, so not all of them are read to memory when calling this
+syscall. However flush_cache_user_range() function will unconditionally
+touch all pages from the provided range, resulting additional overhead
+related to reading all clean pages. Optimize this by calling
+flush_cache_user_range() only on the pages that are already in the
+memory.
 
->  
->  /*
-> + * Run through the list of capabilities to check for conflicts.
-> + * Returns "false" on conflicts.
-> + */
-> +static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
-> +{
-> +	bool cpu_has_cap, system_has_cap;
-> +	const struct arm64_cpu_capabilities *caps = caps_list;
-> +
-> +	for (; caps->matches; caps++) {
-> +		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/kernel/traps.c | 25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
 
-What's the point of scanning the whole of caps_list?  Don't we already
-have the pointer to the right cap struct?
-
-We already know caps->matches is true.  Can't we just call
-caps->matches(caps)?  That seemed pretty intuitive to me in the old
-code.
-
-> +		system_has_cap =  cpus_have_cap(caps->capability);
-> +
-> +		if (system_has_cap) {
-> +			/*
-> +			 * Check if the new CPU misses an advertised feature, which is not
-> +			 * safe to miss.
-> +			 */
-> +			if (!cpu_has_cap && !cpucap_late_cpu_missing_cap_safe(caps))
-> +				break;
-> +			/*
-> +			 * We have to issue enable() irrespective of whether the CPU
-> +			 * has it or not, as it is enabeld system wide. It is upto
-
-enabled
-
-> +			 * the call back to take appropriate action on this CPU.
-> +			 */
-> +			if (caps->enable)
-> +				caps->enable(caps);
-> +		} else {
-> +			/*
-> +			 * Check if the CPU has this capability if it isn't safe to
-> +			 * have when the system doesn't.
-> +			 */
-
-Possibly most of the commenting here is not needed.  The code is pretty
-self-explanatory, so the comments may just be adding clutter.
-
-The role of the ->enable() call is the only real subtlety here.
-
-> +			if (cpu_has_cap && !cpucap_late_cpu_have_cap_safe(caps))
-> +				break;
-> +		}
-> +	}
-> +
-> +	if (caps->matches) {
-> +		pr_crit("CPU%d: Detected conflict for capability %d (%s), System: %d, CPU: %d\n",
-> +			smp_processor_id(), caps->capability,
-> +			caps->desc ? : "no description",
-
-Wouldn't it be a bug for a conflict to occur on a cap with no .desc?
-
-Why can't we just let printk print its default "(null)" for %s
-in this case?
-
-Alternatively, is there a reason for any cap not to have a description?
-
-> +			system_has_cap, cpu_has_cap);
-> +		return false;
-> +	}
-> +
-> +	return true;
-> +}
-
-Perhaps the capability verification procedure could be made a little
-clearer by splitting this into two functions:
-
-static bool __verify_local_cpu_cap(const struct arm64_cpu_capabilities *cap)
-{
-	bool cpu_has_cap = cap->matches(cap, SCOPE_LOCAL_CPU);
-	bool system_has_cap =  cpus_have_cap(cap->capability);
-
-	if (system_has_cap) {
-		if (!cpu_has_cap && !cpucap_late_cpu_missing_cap_safe(cap))
-			goto bad;
-
-		if (cap->enable)
-			/* Enable for this cpu if appropriate: */
-			cap->enable(cap);
-	} else {
-		if (cpu_has_cap && !cpucap_late_cpu_have_cap_safe(cap))
-			goto bad;
-	}
-
-	return true;
-
-bad:
-	pr_crit([...]);
-	return false;
-}
-
-static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps)
-{
-	while (caps->matches) {
-		if (!__verify_local_cpu_cap(caps))
-			return false;
-
-		++caps;
-	}
-
-	return true;
-}
-
-[...]
-
-Cheers
----Dave
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 5e3633c24e63..a5ec262ab30e 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -564,23 +564,36 @@ static int bad_syscall(int n, struct pt_regs *regs)
+ static inline int
+ __do_cache_op(unsigned long start, unsigned long end)
+ {
+-	int ret;
++	struct vm_area_struct *vma = NULL;
++	int ret = 0;
+ 
++	down_read(&current->mm->mmap_sem);
+ 	do {
+ 		unsigned long chunk = min(PAGE_SIZE, end - start);
+ 
++		if (!vma || vma->vm_end <= start) {
++			vma = find_vma(current->mm, start);
++			if (!vma) {
++				ret = -EFAULT;
++				goto done;
++			}
++		}
++
+ 		if (fatal_signal_pending(current))
+ 			return 0;
+ 
+-		ret = flush_cache_user_range(start, start + chunk);
+-		if (ret)
+-			return ret;
++		if (follow_page(vma, start, 0)) {
++			ret = flush_cache_user_range(start, start + chunk);
++			if (ret)
++				goto done;
++		}
+ 
+ 		cond_resched();
+ 		start += chunk;
+ 	} while (start < end);
+-
+-	return 0;
++done:
++	up_read(&current->mm->mmap_sem);
++	return ret;
+ }
+ 
+ static inline int
+-- 
+2.15.0
