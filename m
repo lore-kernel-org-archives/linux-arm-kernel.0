@@ -1,84 +1,128 @@
-From: yong.deng@magewell.com (Yong)
-Date: Fri, 26 Jan 2018 11:00:41 +0800
-Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
-References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <201801260759.RyNhDZz4%fengguang.wu@intel.com>
- <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
-Message-ID: <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 26 Jan 2018 03:06:05 +0000
+Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <1516903397.6411.42.camel@pengutronix.de>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-3-l.stach@pengutronix.de>
+ <20180123103931.GE27764@dragon>
+ <278bb44610b8a27826550732095aba03@codeaurora.org>
+ <1516876300.6411.25.camel@pengutronix.de>
+ <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
+ <1516878582.6411.27.camel@pengutronix.de>
+ <2e5f5ec08b3165cb84115c12f9ddbd9e@codeaurora.org>
+ <1516903397.6411.42.camel@pengutronix.de>
+Message-ID: <AM3PR04MB306AA4937045277CBD6DE0880E00@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Fri, 26 Jan 2018 09:46:58 +0800
-Yong <yong.deng@magewell.com> wrote:
-
-> Hi Maxime,
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: Friday, January 26, 2018 2:03 AM
+> To: Dong Aisheng <aisheng.dong@codeaurora.org>; Linus Walleij
+> <linus.walleij@linaro.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; devicetree at vger.kernel.org; Catalin Marinas
+> <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>;
+> patchwork-lst at pengutronix.de; Rob Herring <robh+dt@kernel.org>;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; linux-
+> arm-kernel at lists.infradead.org; A.s. Dong <aisheng.dong@nxp.com>; dl-linux-
+> imx <linux-imx@nxp.com>
+> Subject: Re: [PATCH 3/4] arm64: add support for i.MX8M EVK board
 > 
-> Do you have any experience in solving this problem?
-> It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
-
-Got it.
-Should I add 'depends on ARM' in Kconfig?
-
+> Am Donnerstag, den 25.01.2018, 21:03 +0800 schrieb Dong Aisheng:
+> > On 2018-01-25 19:09, Lucas Stach wrote:
+> > > Am Donnerstag, den 25.01.2018, 18:49 +0800 schrieb Dong Aisheng:
+> > > > On 2018-01-25 18:31, Lucas Stach wrote:
+> > > > > Am Donnerstag, den 25.01.2018, 18:10 +0800 schrieb
+> > > > > aisheng.dong at codeaurora.org:
+> > >
+> > > [...]
+> > > > AFAIK we switched to generic pinconfig since MX7ULP as maintainer
+> > > > > > won't
+> > > > > > access old binding pinctrl drivers.
+> > > > >
+> > > > > I'm not convinced that the generic pinconf is good fit. For
+> > > > > pingroups with different configs for some of the pins, like the
+> > > > > example above, we would need to split things into multiple DT
+> > > > > nodes. This really hurts readability, so I'm not going to switch
+> > > > > to the generic stuff without some really convincing arguments.
+> > > > >
+> > > >
+> > > > Per my understanding, based on the last discussion with Linus W,
+> > > > we actually did this in order to increase the readability that 1)
+> > > > user does not need?to see the 'ugly' unreadable raw data and refer
+> > > > to reference manual 2)?unified generic binding format which
+> > > > already exist in kernel and used by many platforms.
+> > > >
+> > > > Actually MXS platform already used it for many years in a similar
+> > > > way.
+> > > > So IMHO a little hurt to add another node for different pad
+> > > > setting in the same group won't be enough reason to stop switching
+> > > > to generic config.
+> > > >
+> > > > Does it make sense?
+> > >
+> > > I know that Linus W is pushing for this common pinconf thing in the
+> > > name of readability. It's just that I don't think it's such a clear
+> > > win.
+> > >
+> > > After all you still need to look into the reference manual or
+> > > binding to see which values in the common binding correspond to a
+> > > specific drive/pull strength, etc.
+> > >
+> >
+> > User don't need to look into reference manual and they don't need to
+> > compose the 'ulgy' raw data which is the most tough thing.
+> >
+> > With generic binding, it probably can saving ~80% pad setting effort
+> > by refer to the defined generic config properties.
+> > And things can be even better when the reference code is already there
+> > as user becomes know which property supported.
+> >
+> > > On the other hand it really bloats the DT description of the pin
+> > > configuration. If you want to look at an (IMHO) bad example, go look
+> > > at the Tegra DTs. The Tegra pincontrol implements the "separate
+> > > properties for each pinconf option" that is pushed by Linus W. This
+> > > bloated the DT description to the point that no-one is able/willing
+> > > to write those descriptions anymore and the only viable way to get
+> > > them is to
+> > > auto-
+> > > generate them from some spreadsheets. Not really what I would call
+> > > an readable...
+> > >
+> >
+> > I wonder the worst case you're worrying whether exist in reality.
+> > Take imx6qdl-sabresd as an example, about half of pingroups having the
+> > same pad setting while others have two different settings at most.
+> > That means it may not bloat the device tree too much.
+> >
+> > > Maybe I'm a little stubborn when it comes to this topic, but at
+> > > Pengutronix we see a lot of customer designs where we need to come
+> > > up with the board DT. Bloating each one of those and making the work
+> > > of the developers harder in the name of a readability win that I
+> > > just don't see doesn't sound like something I want to support. :)
+> > >
+> >
+> > Hmm.. In contrast, what i feel currently is that it may ease the using
+> > of pad setting, not make it harder. Not sure if i overlooked
+> > something.
+> >
+> > Let's listen to Shawn and Linus W if they have some comments.
 > 
-> On Fri, 26 Jan 2018 08:04:18 +0800
-> kbuild test robot <lkp@intel.com> wrote:
+> While I'm still unconvinced that the generic binding actually adds any value, I'll
+> go and see how converting the MX8M pinctrl will look on a real board.
 > 
-> > Hi Yong,
-> > 
-> > I love your patch! Yet something to improve:
-> > 
-> > [auto build test ERROR on linuxtv-media/master]
-> > [also build test ERROR on v4.15-rc9 next-20180119]
-> > [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> > 
-> > url:    https://github.com/0day-ci/linux/commits/Yong-Deng/dt-bindings-media-Add-Allwinner-V3s-Camera-Sensor-Interface-CSI/20180126-054511
-> > base:   git://linuxtv.org/media_tree.git master
-> > config: i386-allmodconfig (attached as .config)
-> > compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-> > reproduce:
-> >         # save the attached .config to linux build tree
-> >         make ARCH=i386 
-> > 
-> > All errors (new ones prefixed by >>):
-> > 
-> >    drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c: In function 'sun6i_csi_update_buf_addr':
-> > >> drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c:567:31: error: 'PHYS_OFFSET' undeclared (first use in this function); did you mean 'PAGE_OFFSET'?
-> >      dma_addr_t bus_addr = addr - PHYS_OFFSET;
-> >                                   ^~~~~~~~~~~
-> >                                   PAGE_OFFSET
-> >    drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c:567:31: note: each undeclared identifier is reported only once for each function it appears in
-> > 
-> > vim +567 drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
-> > 
-> >    562	
-> >    563	void sun6i_csi_update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
-> >    564	{
-> >    565		struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
-> >    566		/* transform physical address to bus address */
-> >  > 567		dma_addr_t bus_addr = addr - PHYS_OFFSET;
-> >    568	
-> >    569		regmap_write(sdev->regmap, CSI_CH_F0_BUFA_REG,
-> >    570			     (bus_addr + sdev->planar_offset[0]) >> 2);
-> >    571		if (sdev->planar_offset[1] != -1)
-> >    572			regmap_write(sdev->regmap, CSI_CH_F1_BUFA_REG,
-> >    573				     (bus_addr + sdev->planar_offset[1]) >> 2);
-> >    574		if (sdev->planar_offset[2] != -1)
-> >    575			regmap_write(sdev->regmap, CSI_CH_F2_BUFA_REG,
-> >    576				     (bus_addr + sdev->planar_offset[2]) >> 2);
-> >    577	}
-> >    578	
-> > 
-> > ---
-> > 0-DAY kernel test infrastructure                Open Source Technology Center
-> > https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
-> 
-> Thanks,
-> Yong
 
+You can refer to what we've done for MX7ULP.
 
-Thanks,
-Yong
+> This will delay rev 2 of this series a bit, but I hope to have something to send
+> out tomorrow.
+> 
+
+Sorry for making the trouble. 
+
+Regards
+Dong Aisheng
+
+> Regards,
+> Lucas
