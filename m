@@ -1,47 +1,67 @@
-From: samuel@sholland.org (Samuel Holland)
-Date: Fri, 26 Jan 2018 10:26:19 -0600
-Subject: [linux-sunxi] [PATCH 13/16] arm: dts: sun8i: h3: add thermal zone
- to H3
-In-Reply-To: <20180126151941.12183-14-embed3d@gmail.com>
-References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-14-embed3d@gmail.com>
-Message-ID: <4cfb1faf-a712-c882-1ef1-55845c1bb00e@sholland.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 26 Jan 2018 16:29:53 +0000
+Subject: [PATCH 16/16] arm64: Add work around for Arm Cortex-A55 Erratum
+ 1024718
+In-Reply-To: <20180126153314.GW5862@e103592.cambridge.arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-17-suzuki.poulose@arm.com>
+ <20180126153314.GW5862@e103592.cambridge.arm.com>
+Message-ID: <58d36133-4f83-99f3-0423-7a80f3dd82f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/18 09:19, Philipp Rossak wrote:
-> This patch adds the thermal zones to the H3. We have only one sensor and
-> that is placed in the cpu.
+On 26/01/18 15:33, Dave Martin wrote:
+> On Tue, Jan 23, 2018 at 12:28:09PM +0000, Suzuki K Poulose wrote:
+>> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+>> from an erratum 1024718, which causes incorrect updates when DBM/AP
+>> bits in a page table entry is modified without a break-before-make
+>> sequence. The work around is to skip enabling the hardware DBM feature
+>> on the affected cores. The hardware Access Flag management features
+>> is not affected.
+>>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   Documentation/arm64/silicon-errata.txt |  1 +
+>>   arch/arm64/Kconfig                     | 14 ++++++++++++++
+>>   arch/arm64/kernel/cpufeature.c         | 14 +++++++++++++-
+>>   3 files changed, 28 insertions(+), 1 deletion(-)
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> [...]
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index fbb007e5798e..3f83f6a27c74 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -72,6 +72,15 @@
->  		};
->  	};
->  
-> +	thermal-zones {
-> +		cpu-thermal {
-> +			/* milliseconds */
-> +			polling-delay-passive = <250>;
-> +			polling-delay = <1000>;
-> +			thermal-sensors = <&ths 0>;
-
-If #thermal-sensor-cells = <0>, shouldn't this just be <&ths> ?
-
-> +		};
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv7-timer";
->  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 8af755b8219d..64f1e911c6af 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -914,9 +914,21 @@ static inline void __cpu_enable_hw_dbm(void)
+>>   	isb();
+>>   }
+>>   
+>> +static bool cpu_has_erratum_1024718(void)
+>> +{
+>> +	static const struct midr_range __maybe_unused cpus[] = {
 > 
+> Do you need __maybe_unused?  If #ifdef were used here then
+> __maybe_unused would be needed, but I thought that if code is optimised
+> out instead of conditionally copiled, this didn't apply.
 
-Thanks,
-Samuel
+Yep. I don't know if the compiler could optimise the array itself with
+the tag as a hint. I will double check.
+
+> 
+>> +		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),	// A55 r0p0 -r1p0
+>> +		{},
+>> +	};
+>> +
+>> +	return IS_ENABLED(CONFIG_ARM64_ERRATUM_1024718) &&
+>> +	       is_midr_in_range_list(read_cpuid_id(), cpus);
+> 
+> Why have a list with just one entry?  Do you expect more entries over
+> time?
+
+Yes. I should have mentioned it here. See [1]
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/554516.html
+
+
+Cheers
+Suzuki
