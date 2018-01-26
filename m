@@ -1,128 +1,171 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 26 Jan 2018 03:06:05 +0000
-Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <1516903397.6411.42.camel@pengutronix.de>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-3-l.stach@pengutronix.de>
- <20180123103931.GE27764@dragon>
- <278bb44610b8a27826550732095aba03@codeaurora.org>
- <1516876300.6411.25.camel@pengutronix.de>
- <2cac219f031a08ae2ac02a0624fe302f@codeaurora.org>
- <1516878582.6411.27.camel@pengutronix.de>
- <2e5f5ec08b3165cb84115c12f9ddbd9e@codeaurora.org>
- <1516903397.6411.42.camel@pengutronix.de>
-Message-ID: <AM3PR04MB306AA4937045277CBD6DE0880E00@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Fri, 26 Jan 2018 12:21:59 +0800
+Subject: [PATCH v6 11/12] arm64: topology: enable ACPI/PPTT based CPU
+ topology
+In-Reply-To: <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
+References: <20180113005920.28658-1-jeremy.linton@arm.com>
+ <20180113005920.28658-12-jeremy.linton@arm.com>
+ <928cb0c9-1d7a-3d0c-0538-a8bb0e2a86b1@huawei.com>
+ <b4060cb0-6eed-f34a-00d5-4c2f55f20220@arm.com>
+Message-ID: <4ab10a2d-c73a-6249-ea59-adc70f5ae5b9@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Friday, January 26, 2018 2:03 AM
-> To: Dong Aisheng <aisheng.dong@codeaurora.org>; Linus Walleij
-> <linus.walleij@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; devicetree at vger.kernel.org; Catalin Marinas
-> <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>;
-> patchwork-lst at pengutronix.de; Rob Herring <robh+dt@kernel.org>;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>; linux-
-> arm-kernel at lists.infradead.org; A.s. Dong <aisheng.dong@nxp.com>; dl-linux-
-> imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH 3/4] arm64: add support for i.MX8M EVK board
+
+Hi Jeremy,
+On 2018/1/25 23:56, Jeremy Linton wrote:
+> Hi,
 > 
-> Am Donnerstag, den 25.01.2018, 21:03 +0800 schrieb Dong Aisheng:
-> > On 2018-01-25 19:09, Lucas Stach wrote:
-> > > Am Donnerstag, den 25.01.2018, 18:49 +0800 schrieb Dong Aisheng:
-> > > > On 2018-01-25 18:31, Lucas Stach wrote:
-> > > > > Am Donnerstag, den 25.01.2018, 18:10 +0800 schrieb
-> > > > > aisheng.dong at codeaurora.org:
-> > >
-> > > [...]
-> > > > AFAIK we switched to generic pinconfig since MX7ULP as maintainer
-> > > > > > won't
-> > > > > > access old binding pinctrl drivers.
-> > > > >
-> > > > > I'm not convinced that the generic pinconf is good fit. For
-> > > > > pingroups with different configs for some of the pins, like the
-> > > > > example above, we would need to split things into multiple DT
-> > > > > nodes. This really hurts readability, so I'm not going to switch
-> > > > > to the generic stuff without some really convincing arguments.
-> > > > >
-> > > >
-> > > > Per my understanding, based on the last discussion with Linus W,
-> > > > we actually did this in order to increase the readability that 1)
-> > > > user does not need?to see the 'ugly' unreadable raw data and refer
-> > > > to reference manual 2)?unified generic binding format which
-> > > > already exist in kernel and used by many platforms.
-> > > >
-> > > > Actually MXS platform already used it for many years in a similar
-> > > > way.
-> > > > So IMHO a little hurt to add another node for different pad
-> > > > setting in the same group won't be enough reason to stop switching
-> > > > to generic config.
-> > > >
-> > > > Does it make sense?
-> > >
-> > > I know that Linus W is pushing for this common pinconf thing in the
-> > > name of readability. It's just that I don't think it's such a clear
-> > > win.
-> > >
-> > > After all you still need to look into the reference manual or
-> > > binding to see which values in the common binding correspond to a
-> > > specific drive/pull strength, etc.
-> > >
-> >
-> > User don't need to look into reference manual and they don't need to
-> > compose the 'ulgy' raw data which is the most tough thing.
-> >
-> > With generic binding, it probably can saving ~80% pad setting effort
-> > by refer to the defined generic config properties.
-> > And things can be even better when the reference code is already there
-> > as user becomes know which property supported.
-> >
-> > > On the other hand it really bloats the DT description of the pin
-> > > configuration. If you want to look at an (IMHO) bad example, go look
-> > > at the Tegra DTs. The Tegra pincontrol implements the "separate
-> > > properties for each pinconf option" that is pushed by Linus W. This
-> > > bloated the DT description to the point that no-one is able/willing
-> > > to write those descriptions anymore and the only viable way to get
-> > > them is to
-> > > auto-
-> > > generate them from some spreadsheets. Not really what I would call
-> > > an readable...
-> > >
-> >
-> > I wonder the worst case you're worrying whether exist in reality.
-> > Take imx6qdl-sabresd as an example, about half of pingroups having the
-> > same pad setting while others have two different settings at most.
-> > That means it may not bloat the device tree too much.
-> >
-> > > Maybe I'm a little stubborn when it comes to this topic, but at
-> > > Pengutronix we see a lot of customer designs where we need to come
-> > > up with the board DT. Bloating each one of those and making the work
-> > > of the developers harder in the name of a readability win that I
-> > > just don't see doesn't sound like something I want to support. :)
-> > >
-> >
-> > Hmm.. In contrast, what i feel currently is that it may ease the using
-> > of pad setting, not make it harder. Not sure if i overlooked
-> > something.
-> >
-> > Let's listen to Shawn and Linus W if they have some comments.
+> On 01/25/2018 06:15 AM, Xiongfeng Wang wrote:
+>> Hi Jeremy,
+>>
+>> I have tested the patch with the newest UEFI. It prints the below error:
+>>
+>> [    4.017371] BUG: arch topology borken
+>> [    4.021069] BUG: arch topology borken
+>> [    4.024764] BUG: arch topology borken
+>> [    4.028460] BUG: arch topology borken
+>> [    4.032153] BUG: arch topology borken
+>> [    4.035849] BUG: arch topology borken
+>> [    4.039543] BUG: arch topology borken
+>> [    4.043239] BUG: arch topology borken
+>> [    4.046932] BUG: arch topology borken
+>> [    4.050629] BUG: arch topology borken
+>> [    4.054322] BUG: arch topology borken
+>>
+>> I checked the code and found that the newest UEFI set PPTT physical_package_flag on a physical package node and
+>> the NUMA domain (SRAT domains) starts from the layer of DIE. (The topology of our board is core->cluster->die->package).
 > 
-> While I'm still unconvinced that the generic binding actually adds any value, I'll
-> go and see how converting the MX8M pinctrl will look on a real board.
+> I commented about that on the EDK2 mailing list. While the current spec doesn't explicitly ban having the flag set multiple times between the leaf and the root I consider it a "bug" and there is an effort to clarify the spec and the use of that flag.
+>>
+>> When the kernel starts to build sched_domain, the multi-core sched_domain contains all the cores within a package,
+>> and the lowest NUMA sched_domain contains all the cores within a die. But the kernel requires that the multi-core
+>> sched_domain should be a subset of the lowest NUMA sched_domain, so the BUG info is printed.
 > 
-
-You can refer to what we've done for MX7ULP.
-
-> This will delay rev 2 of this series a bit, but I hope to have something to send
-> out tomorrow.
+> Right. I've mentioned this problem a couple of times.
 > 
+> At at the moment, the spec isn't clear about how the proximity domain is detected/located within the PPTT topology (a node with a 1:1 correspondence isn't even required). As you can see from this patch set, we are making the general assumption that the proximity domains are at the same level as the physical socket. This isn't ideal for NUMA topologies, like the D05, that don't align with the physical socket.
+> 
+> There are efforts underway to clarify and expand upon the specification to deal with this general problem. The simple solution is another flag (say PPTT_PROXIMITY_DOMAIN which would map to the D05 die) which could be used to find nodes with 1:1 correspondence. At that point we could add a fairly trivial patch to correct just the scheduler topology without affecting the rest of the system topology code.
+> 
+>>
+>> If we modify the UEFI to make NUMA sched_domain start from the layer of package, then all the topology information
+>> within the package will be discarded. I think we need to build the multi-core sched_domain using the cores within
+>> the cluster instead of the cores within the package. I think that's what 'multi-core' means. Multi cores form a cluster. I guess.
+>> If we build the multi-core sched_domain using the cores within a cluster, I think we need to add fields in struct cpu_topology
+>> to record which cores are in each cluster.
+> 
+> The problem is that there isn't a generic way to identify which level of cache sharing is the "correct" top layer MC domain. For one system cluster might be appropriate, for another it might be the highest caching level within a socket, for another is might be a something in between or a group of clusters or LLCs..
+> 
+> Hence the effort to standardize/guarantee a PPTT node that exactly matches a SRAT domain. With that, each SOC/system provider has clearly defined method for communicating where they want the proximity domain information to begin.
+> 
+Or maybe we can add a multi-core flag in PPTT to indicate in which layer of the topology tree each node represent a multi-core.
+And also require that the layer of multi-core be below the layer of NUMA. So we don't need the  PPTT_PROXIMITY_DOMAIN flag either.
+I think it's reasonable for PPTT to report muli-core topology information.
 
-Sorry for making the trouble. 
+Thanks,
+Xiongfeng
 
-Regards
-Dong Aisheng
-
-> Regards,
-> Lucas
+> Thanks,
+> 
+>>
+>>
+>> Thanks,
+>> Xiongfeng
+>>
+>> On 2018/1/13 8:59, Jeremy Linton wrote:
+>>> Propagate the topology information from the PPTT tree to the
+>>> cpu_topology array. We can get the thread id, core_id and
+>>> cluster_id by assuming certain levels of the PPTT tree correspond
+>>> to those concepts. The package_id is flagged in the tree and can be
+>>> found by calling find_acpi_cpu_topology_package() which terminates
+>>> its search when it finds an ACPI node flagged as the physical
+>>> package. If the tree doesn't contain enough levels to represent
+>>> all of the requested levels then the root node will be returned
+>>> for all subsequent levels.
+>>>
+>>> Cc: Juri Lelli <juri.lelli@arm.com>
+>>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>>> ---
+>>>   arch/arm64/kernel/topology.c | 46 +++++++++++++++++++++++++++++++++++++++++++-
+>>>   1 file changed, 45 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>>> index 7b06e263fdd1..ce8ec7fd6b32 100644
+>>> --- a/arch/arm64/kernel/topology.c
+>>> +++ b/arch/arm64/kernel/topology.c
+>>> @@ -11,6 +11,7 @@
+>>>    * for more details.
+>>>    */
+>>>   +#include <linux/acpi.h>
+>>>   #include <linux/arch_topology.h>
+>>>   #include <linux/cpu.h>
+>>>   #include <linux/cpumask.h>
+>>> @@ -22,6 +23,7 @@
+>>>   #include <linux/sched.h>
+>>>   #include <linux/sched/topology.h>
+>>>   #include <linux/slab.h>
+>>> +#include <linux/smp.h>
+>>>   #include <linux/string.h>
+>>>     #include <asm/cpu.h>
+>>> @@ -300,6 +302,46 @@ static void __init reset_cpu_topology(void)
+>>>       }
+>>>   }
+>>>   +#ifdef CONFIG_ACPI
+>>> +/*
+>>> + * Propagate the topology information of the processor_topology_node tree to the
+>>> + * cpu_topology array.
+>>> + */
+>>> +static int __init parse_acpi_topology(void)
+>>> +{
+>>> +    bool is_threaded;
+>>> +    int cpu, topology_id;
+>>> +
+>>> +    is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+>>> +
+>>> +    for_each_possible_cpu(cpu) {
+>>> +        topology_id = find_acpi_cpu_topology(cpu, 0);
+>>> +        if (topology_id < 0)
+>>> +            return topology_id;
+>>> +
+>>> +        if (is_threaded) {
+>>> +            cpu_topology[cpu].thread_id = topology_id;
+>>> +            topology_id = find_acpi_cpu_topology(cpu, 1);
+>>> +            cpu_topology[cpu].core_id   = topology_id;
+>>> +            topology_id = find_acpi_cpu_topology_package(cpu);
+>>> +            cpu_topology[cpu].package_id = topology_id;
+>>> +        } else {
+>>> +            cpu_topology[cpu].thread_id  = -1;
+>>> +            cpu_topology[cpu].core_id    = topology_id;
+>>> +            topology_id = find_acpi_cpu_topology_package(cpu);
+>>> +            cpu_topology[cpu].package_id = topology_id;
+>>> +        }
+>>> +    }
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +#else
+>>> +static inline int __init parse_acpi_topology(void)
+>>> +{
+>>> +    return -EINVAL;
+>>> +}
+>>> +#endif
+>>>     void __init init_cpu_topology(void)
+>>>   {
+>>> @@ -309,6 +351,8 @@ void __init init_cpu_topology(void)
+>>>        * Discard anything that was parsed if we hit an error so we
+>>>        * don't use partial information.
+>>>        */
+>>> -    if (of_have_populated_dt() && parse_dt_topology())
+>>> +    if ((!acpi_disabled) && parse_acpi_topology())
+>>> +        reset_cpu_topology();
+>>> +    else if (of_have_populated_dt() && parse_dt_topology())
+>>>           reset_cpu_topology();
+>>>   }
+>>>
+>>
+> 
+> 
+> .
+> 
