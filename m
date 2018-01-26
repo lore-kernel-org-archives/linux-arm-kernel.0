@@ -1,67 +1,87 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Fri, 26 Jan 2018 20:31:24 +0800
-Subject: [PATCH v5 2/3] GHES: add a notify chain for process memory section
-In-Reply-To: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
-References: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1516969885-150532-3-git-send-email-xiexiuqi@huawei.com>
+Date: Fri, 26 Jan 2018 20:31:22 +0800
+Subject: [PATCH v5 0/3] arm64/ras: support sea error recovery
+Message-ID: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a notify chain for process memory section, with
-which other modules might do error recovery.
+With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
+are consumed. According to the existing process, errors occurred in the
+kernel, leading to direct panic, if it occurred the user-space, we should
+just kill process.
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Tested-by: Wang Xiongfeng <wangxiongfeng2@huawei.com>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+But there is a class of error, in fact, is not necessary to kill
+process, you can recover and continue to run the process. Such as
+the instruction data corrupted, where the memory page might be
+read-only, which is has not been modified, the disk might have the
+correct data, so you can directly drop the page, ant reload it when
+necessary.
+
+So this patchset is just try to solve such problem: if the error is
+consumed in user-space and the error occurs on a clean page, you can
+directly drop the memory page without killing process.
+
+If the corrupted page is clean, just dropped it and return to user-space
+without side effects. And if corrupted page is dirty, memory_failure()
+will send SIGBUS with code=BUS_MCEERR_AR. While without this patchset,
+do_sea() will just send SIGBUS, so the process was killed in the same place.
+
+Because memory_failure() may sleep, we can not call it directly in SEA
+exception context. So we saved faulting physical address associated with
+a process in the ghes handler and set __TIF_SEA_NOTIFY. When we return
+from SEA exception context and get into do_notify_resume() before the
+process running, we could check it and call memory_failure() to do
+recovery. It's safe, because we are in process context.
+
+In some platform, when SEA triggerred, physical address could be reported
+by memory section or by processor section, so we save address at this two
+place.
+
 ---
- drivers/acpi/apei/ghes.c | 10 ++++++++++
- include/acpi/ghes.h      |  8 ++++++++
- 2 files changed, 18 insertions(+)
+v5 - v4:
+  - rebased on top of 4.15-rc9 + efi patches
+    efi patches:
+    https://patchwork.codeaurora.org/patch/415877/
+    https://patchwork.codeaurora.org/patch/415879/
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index cff671d..1f0ebfb 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -109,6 +109,9 @@ static inline bool is_hest_type_generic_v2(struct ghes *ghes)
- static LIST_HEAD(ghes_hed);
- static DEFINE_MUTEX(ghes_list_mutex);
- 
-+ATOMIC_NOTIFIER_HEAD(ghes_mem_err_chain);
-+EXPORT_SYMBOL(ghes_mem_err_chain);
-+
- /*
-  * Because the memory area used to transfer hardware error information
-  * from BIOS to Linux can be determined only in NMI, IRQ or timer
-@@ -441,6 +444,13 @@ static void ghes_do_proc(struct ghes *ghes,
- 
- 		if (guid_equal(sec_type, &CPER_SEC_PLATFORM_MEM)) {
- 			struct cper_sec_mem_err *mem_err = acpi_hest_get_payload(gdata);
-+			struct ghes_mem_err mem;
-+
-+			mem.notify_type = ghes->generic->notify.type;
-+			mem.severity = gdata->error_severity;
-+			mem.mem_err = mem_err;
-+
-+			atomic_notifier_call_chain(&ghes_mem_err_chain, 0, &mem);
- 
- 			ghes_edac_report_mem_error(ghes, sev, mem_err);
- 
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index d626367..921ebf1 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -124,4 +124,12 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
- extern void ghes_arm_process_error(struct ghes *ghes,
- 				   struct cper_sec_proc_arm *err);
- 
-+struct ghes_mem_err {
-+	int notify_type;
-+	int severity;
-+	struct cper_sec_mem_err *mem_err;
-+};
-+
-+extern struct atomic_notifier_head ghes_mem_err_chain;
-+
- #endif /* GHES_H */
+  - add Tyler & Xiongfeng's Tested-by.
+
+v4 - v3:
+  - rebase on top of the latest mainline
+  - make ghes_arm_process_error as a weak function
+  - only pick cache error from arm processor section for error recovery
+  - fix s-o-b issue
+
+  https://lkml.org/lkml/2017/9/7/98
+
+v3 - v2:
+  - fix patch style issue
+
+v2 - v1:
+  - wrap arm_proc_error_check and log_arm_hw_error in a single arm_process_error()
+  - fix sea_save_info return value issue
+  - fix link error if this CONFIG_ARM64_ERR_RECOV is not selected
+  - use a notify chain instead of call arch_apei_report_mem_error directly
+
+  https://lkml.org/lkml/2017/9/1/189
+
+Xie XiuQi (3):
+  arm64/ras: support sea error recovery
+  GHES: add a notify chain for process memory section
+  arm64/ras: save error address from memory section for recovery
+
+ arch/arm64/Kconfig                   |  11 +++
+ arch/arm64/include/asm/ras.h         |  23 +++++
+ arch/arm64/include/asm/thread_info.h |   4 +-
+ arch/arm64/kernel/Makefile           |   1 +
+ arch/arm64/kernel/ras.c              | 173 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal.c           |   7 ++
+ arch/arm64/mm/fault.c                |  27 ++++--
+ drivers/acpi/apei/ghes.c             |  18 +++-
+ include/acpi/ghes.h                  |  11 +++
+ 9 files changed, 265 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ras.h
+ create mode 100644 arch/arm64/kernel/ras.c
+
 -- 
 1.8.3.1
