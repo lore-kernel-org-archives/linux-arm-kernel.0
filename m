@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jan 2018 11:39:57 +0100
-Subject: [PATCH 1/2] ARM: dts: r8a7743: sort subnodes of soc node
-In-Reply-To: <20180126094052.17119-2-horms+renesas@verge.net.au>
+Date: Fri, 26 Jan 2018 11:40:22 +0100
+Subject: [PATCH 2/2] ARM: dts: r8a7745: sort subnodes of soc node
+In-Reply-To: <20180126094052.17119-3-horms+renesas@verge.net.au>
 References: <20180126094052.17119-1-horms+renesas@verge.net.au>
- <20180126094052.17119-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXyNDKoq1feunubxG93Qbb0DBYzTU+Xya1O+1b2oBiKig@mail.gmail.com>
+ <20180126094052.17119-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU_ttQ7KVpVHMd2+uZfubZCjvu1ioqH4ZAYtJDCi4H_Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
