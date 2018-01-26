@@ -1,125 +1,414 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 26 Jan 2018 17:20:29 +0000
-Subject: [PATCH v3 4/6] arm: Add icache invalidation on switch_mm for
- Cortex-A15
-In-Reply-To: <38746bda-6773-41e7-3b2f-7f9476ef9fb2@arm.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-5-marc.zyngier@arm.com> <20180126091425.GU21802@cbox>
- <38746bda-6773-41e7-3b2f-7f9476ef9fb2@arm.com>
-Message-ID: <2ee637c7-72fb-17f4-b43e-eb547aa04924@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 26 Jan 2018 09:28:35 -0800
+Subject: [RFC 24/37] watchdog: renesas_wdt_gen2: Add Gen2 specific driver
+In-Reply-To: <1516903391-30467-25-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1516903391-30467-25-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180126172835.GB16194@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 09:30, Marc Zyngier wrote:
-> On 26/01/18 09:14, Christoffer Dall wrote:
->> On Thu, Jan 25, 2018 at 03:21:37PM +0000, Marc Zyngier wrote:
->>> In order to avoid aliasing attacks against the branch predictor,
->>> Cortex-A15 require to invalidate the BTB when switching
->>> from one user context to another. The only way to do so on this
->>> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
->>> mode.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>   arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
->>>   arch/arm/mm/proc-v7-3level.S | 16 ++++++++++++++++
->>>   arch/arm/mm/proc-v7.S        | 18 +++++++++++++++++-
->>>   3 files changed, 43 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
->>> index 0422e58b74e8..7dc9e1c69039 100644
->>> --- a/arch/arm/mm/proc-v7-2level.S
->>> +++ b/arch/arm/mm/proc-v7-2level.S
->>> @@ -40,7 +40,17 @@
->>>    *	Note that we always need to flush BTAC/BTB if IBE is set
->>>    *	even on Cortex-A8 revisions not affected by 430973.
->>>    *	If IBE is not set, the flush BTAC/BTB won't do anything.
->>> + *
->>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
->>> + *	for the icache invalidation to also invalidate the BTB.
->>>    */
->>
->> Seems like we can read (but not write) this bit from non-secure.  Should
->> we test if it's set somewhere during boot and warn the user if not?
+On Thu, Jan 25, 2018 at 06:02:58PM +0000, Fabrizio Castro wrote:
+> R-Car Gen2 (and RZ/G1) platforms need some tweaking for SMP and watchdog
+> to coexist nicely.
+> This new driver is based on top of Wolfram Sang's driver
+> (drivers/watchdog/renesas_wdt.c), and it contains the quirks necessary
+> for R-Car Gen2 and RZ/G1 to work properly and in harmony with the rest of
+> the system. In particular, the driver:
+> * expects the device clock to be ON all the time,
+> * "pauses" the watchdog operation during suspend, and
+> * "reassures" the SMP bringup function about the availability of the
+>   watchdog registers.
 > 
-> That would have to be something that happens much later in the boot
-> process, as the proc structure is picked up very early, before we run
-> any C code.
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+>  drivers/watchdog/Kconfig            |  15 +-
+>  drivers/watchdog/Makefile           |   1 +
+>  drivers/watchdog/renesas_wdt_gen2.c | 270 ++++++++++++++++++++++++++++++++++++
+>  drivers/watchdog/renesas_wdt_gen2.h |  22 +++
+>  4 files changed, 306 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/watchdog/renesas_wdt_gen2.c
+>  create mode 100644 drivers/watchdog/renesas_wdt_gen2.h
 > 
-> I could add some detection code later, but we'll be stuck with a icache
-> invalidation for nothing. Not a pretty situation.
-> 
->>
->>> +ENTRY(cpu_ca15_switch_mm)
->>> +#ifdef CONFIG_MMU
->>> +	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
->>> +	isb
->>> +	b	cpu_v7_switch_mm
->>> +#endif
->>> +ENDPROC(cpu_ca15_switch_mm)
->>>   ENTRY(cpu_v7_btbinv_switch_mm)
->>>   #ifdef CONFIG_MMU
->>>   	mov	r2, #0
->>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->>> index 934272e1fa08..cae6bb4da956 100644
->>> --- a/arch/arm/mm/proc-v7-3level.S
->>> +++ b/arch/arm/mm/proc-v7-3level.S
->>> @@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
->>>   ENDPROC(cpu_v7_switch_mm)
->>>   ENDPROC(cpu_v7_btbinv_switch_mm)
->>>   
->>> +/*
->>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
->>> + *	for the icache invalidation to also invalidate the BTB.
->>> + */
->>> +ENTRY(cpu_ca15_switch_mm)
->>> +#ifdef CONFIG_MMU
->>> +	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
->>> +	mmid	r2, r2
->>> +	asid	r2, r2
->>> +	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
->>> +	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
->>> +	isb
->>> +#endif
->>> +	ret	lr
->>> +ENDPROC(cpu_ca15_switch_mm)
->>> +
->>
->> There's some potential for code shaing with cpu_v7_switch_mm here,
->> either via a macro or by simply calling cpu_v7_switch_mm from
->> cpu_ca15_switch_mm, but I'm not sure if we care?
-> 
-> We could, but most things seems to been duplicated between the two
-> page-table implementations. I can look in to it if this is going anywhere.
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index ca200d1..e580c72 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -725,12 +725,23 @@ config ATLAS7_WATCHDOG
+>  	  module will be called atlas7_wdt.
+>  
+>  config RENESAS_WDT
+> -	tristate "Renesas WDT Watchdog"
+> +	tristate "Renesas R-Car Gen3 WDT Watchdog"
+>  	depends on ARCH_RENESAS || COMPILE_TEST
+>  	select WATCHDOG_CORE
+>  	help
+>  	  This driver adds watchdog support for the integrated watchdogs in the
+> -	  Renesas R-Car and other SH-Mobile SoCs (usually named RWDT or SWDT).
+> +	  Renesas R-Car Gen3 devices.
+> +
+> +config RENESAS_WDT_GEN2
+> +	tristate "Renesas R-Car Gen2 and RZ/G1 WDT Watchdog"
+> +	depends on ARCH_RENESAS || COMPILE_TEST
+> +	select WATCHDOG_CORE
+> +	help
+> +	  This driver adds watchdog support for the integrated watchdogs in the
+> +	  Renesas R-Car Gen2 and RZ/G1 devices.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called renesas_wdt_gen2.
+>  
+>  config RENESAS_RZAWDT
+>  	tristate "Renesas RZ/A WDT Watchdog"
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 715a210..57ab810 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -83,6 +83,7 @@ obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
+>  obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
+>  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+> +obj-$(CONFIG_RENESAS_WDT_GEN2) += renesas_wdt_gen2.o
+>  obj-$(CONFIG_RENESAS_RZAWDT) += rza_wdt.o
+>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
+>  obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+> diff --git a/drivers/watchdog/renesas_wdt_gen2.c b/drivers/watchdog/renesas_wdt_gen2.c
+> new file mode 100644
+> index 0000000..c841636
+> --- /dev/null
+> +++ b/drivers/watchdog/renesas_wdt_gen2.c
+> @@ -0,0 +1,270 @@
+> +/*
+> + * Watchdog driver for Renesas WDT watchdog
+> + *
+> + * Copyright (C) 2015-17 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+> + * Copyright (C) 2018    Renesas Electronics Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
 
-Could this not just do the equivalent of the cpu_ca8 version for 2-level 
-paging, i.e. execute the ICIALLU then fall through - everything else is 
-the same, right?
+Please use the SPDX identifier.
 
-Robin.
+> + */
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/watchdog.h>
+> +#include "renesas_wdt_gen2.h"
+> +
+> +#define RWTCNT			0
+> +#define RWTCSRA			4
+> +#define RWTCSRA_WOVF		BIT(4)
+> +#define RWTCSRA_WRFLG		BIT(5)
+> +#define RWTCSRA_TME		BIT(7)
+> +#define RWTCSRB			8
+> +
+> +#define RWDT_DEFAULT_TIMEOUT	60U
+> +
+> +/*
+> + * In probe, clk_rate is checked to be not more than 16 bit * biggest clock
+> + * divider (12 bits). d is only a factor to fully utilize the WDT counter and
+> + * will not exceed its 16 bits. Thus, no overflow, we stay below 32 bits.
+> + */
+> +#define MUL_BY_CLKS_PER_SEC(p, d) \
+> +	DIV_ROUND_UP((d) * (p)->clk_rate, clk_divs[(p)->cks])
+> +
+> +/* d is 16 bit, clk_divs 12 bit -> no 32 bit overflow */
+> +#define DIV_BY_CLKS_PER_SEC(p, d) ((d) * clk_divs[(p)->cks] / (p)->clk_rate)
+> +
+> +static const unsigned int clk_divs[] = { 1, 4, 16, 32, 64, 128, 1024, 4096 };
+> +
+> +static bool nowayout = WATCHDOG_NOWAYOUT;
+> +module_param(nowayout, bool, 0);
+> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+> +				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> +
+> +struct rwdt_priv {
+> +	void __iomem *base;
+> +	struct watchdog_device wdev;
+> +	unsigned long clk_rate;
+> +	bool enabled;
+> +	u8 cks;
+> +};
+> +
+> +static void rwdt_write(struct rwdt_priv *priv, u32 val, unsigned int reg)
+> +{
+> +	if (reg == RWTCNT)
+> +		val |= 0x5a5a0000;
+> +	else
+> +		val |= 0xa5a5a500;
+> +
+> +	writel_relaxed(val, priv->base + reg);
+> +}
+> +
+> +static int rwdt_init_timeout(struct watchdog_device *wdev)
+> +{
+> +	struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> +
+> +	rwdt_write(priv, 65536 - MUL_BY_CLKS_PER_SEC(priv, wdev->timeout),
+> +		   RWTCNT);
+> +
+> +	return 0;
+> +}
+> +
+> +static int rwdt_start(struct watchdog_device *wdev)
+> +{
+> +	struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> +
+> +	rwdt_write(priv, 0, RWTCSRB);
+> +	rwdt_write(priv, priv->cks, RWTCSRA);
+> +	rwdt_init_timeout(wdev);
+> +
+> +	while (readb_relaxed(priv->base + RWTCSRA) & RWTCSRA_WRFLG)
+> +		cpu_relax();
+> +
+Can this get stuck ?
 
+> +	rwdt_write(priv, priv->cks | RWTCSRA_TME, RWTCSRA);
+> +
+> +	return 0;
+> +}
+> +
+> +static int rwdt_stop(struct watchdog_device *wdev)
+> +{
+> +	struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> +
+> +	rwdt_write(priv, priv->cks, RWTCSRA);
+> +
+> +	return 0;
+> +}
+> +
+> +static unsigned int rwdt_get_timeleft(struct watchdog_device *wdev)
+> +{
+> +	struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> +	u16 val = readw_relaxed(priv->base + RWTCNT);
+> +
+> +	return DIV_BY_CLKS_PER_SEC(priv, 65536 - val);
+> +}
+> +
+> +static int rwdt_restart(struct watchdog_device *wdev, unsigned long action,
+> +			void *data)
+> +{
+> +	struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> +
+> +	rwdt_write(priv, 0x00, RWTCSRB);
+> +	rwdt_write(priv, 0x00, RWTCSRA);
+> +	rwdt_write(priv, 0xffff, RWTCNT);
+> +
+> +	while (readb_relaxed(priv->base + RWTCSRA) & RWTCSRA_WRFLG)
+> +		cpu_relax();
+> +
+> +	rwdt_write(priv, 0x80, RWTCSRA);
+> +	return 0;
+> +}
+> +
+> +static const struct watchdog_info rwdt_ident = {
+> +	.options = WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
+> +	.identity = "Renesas WDT Watchdog",
+> +};
+> +
+> +static const struct watchdog_ops rwdt_ops = {
+> +	.owner = THIS_MODULE,
+> +	.start = rwdt_start,
+> +	.stop = rwdt_stop,
+> +	.ping = rwdt_init_timeout,
+> +	.get_timeleft = rwdt_get_timeleft,
+> +	.restart = rwdt_restart,
+> +};
+> +
+> +static int rwdt_probe(struct platform_device *pdev)
+> +{
+> +	struct rwdt_priv *priv;
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	unsigned long clks_per_sec;
+> +	int ret, i;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +
+> +	priv->clk_rate = clk_get_rate(clk);
+> +
+> +	if (!priv->clk_rate)
+> +		return -ENOENT;
+> +
+Odd line spacing. Please no double empty lines, and please no
+empty line after a function and before checking the return value.
+
+ENOENT is an odd return value. No such file or directory ?
+
+> +	for (i = ARRAY_SIZE(clk_divs) - 1; i >= 0; i--) {
+> +		clks_per_sec = priv->clk_rate / clk_divs[i];
+> +		if (clks_per_sec && clks_per_sec < 65536) {
+> +			priv->cks = i;
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (i < 0) {
+> +		dev_err(&pdev->dev, "Can't find suitable clock divider\n");
+> +		return -ERANGE;
+
+Another odd return value. Math result not presentable ?
+
+> +	}
+> +
+> +	priv->wdev.info = &rwdt_ident,
+> +	priv->wdev.ops = &rwdt_ops,
+> +	priv->wdev.parent = &pdev->dev;
+> +	priv->wdev.min_timeout = 1;
+> +	priv->wdev.max_timeout = DIV_BY_CLKS_PER_SEC(priv, 65536);
+> +	priv->wdev.timeout = min(priv->wdev.max_timeout, RWDT_DEFAULT_TIMEOUT);
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +	watchdog_set_drvdata(&priv->wdev, priv);
+> +	watchdog_set_nowayout(&priv->wdev, nowayout);
+> +
+> +	ret = watchdog_init_timeout(&priv->wdev, 0, &pdev->dev);
+> +	if (ret)
+> +		dev_warn(&pdev->dev,
+> +			 "Specified timeout value invalid, using default\n");
+> +	shmobile_set_wdt_clock_status(RWDT_CLOCK_ON);
+> +
+> +	ret = watchdog_register_device(&priv->wdev);
+
+Please consider using devm_watchdog_register_device().
+
+> +	return ret;
+> +}
+> +
+> +static int rwdt_remove(struct platform_device *pdev)
+> +{
+> +	struct rwdt_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&priv->wdev);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int rwdt_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev;
+> +	struct rwdt_priv *priv;
+> +	u8 val;
+> +
+> +	pdev = to_platform_device(dev);
+> +	priv = platform_get_drvdata(pdev);
+> +	val = readb_relaxed(priv->base + RWTCSRA);
+> +	if (val & RWTCSRA_TME) {
+> +		priv->enabled = true;
+> +		rwdt_write(priv, val & ~RWTCSRA_TME, RWTCSRA);
+> +	} else {
+> +		priv->enabled = false;
+> +	}
+
+This will require an explanation why you can't use watchdog_active()
+here and in the resume function.
+
+> +	return 0;
+> +}
+> +
+> +static int rwdt_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev;
+> +	struct rwdt_priv *priv;
+> +	u8 val;
+> +
+> +	pdev = to_platform_device(dev);
+> +	priv = platform_get_drvdata(pdev);
+> +	if (priv->enabled) {
+> +		val = readb_relaxed(priv->base + RWTCSRA);
+> +		rwdt_write(priv, val | RWTCSRA_TME, RWTCSRA);
+> +	}
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops rwdt_pm = {
+> +	.suspend = rwdt_suspend,
+> +	.resume = rwdt_resume,
+
+Any reason for not using helper functions such as SET_SYSTEM_SLEEP_PM_OPS()
+or SIMPLE_DEV_PM_OPS() ?
+
+> +};
+> +#endif
+> +
+> +static const struct of_device_id rwdt_ids[] = {
+> +	{ .compatible = "renesas,rcar-gen2-wdt", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, rwdt_ids);
+> +
+> +static struct platform_driver rwdt_driver = {
+> +	.driver = {
+> +		.name = "renesas_wdt_gen2",
+> +		.of_match_table = rwdt_ids,
+> +#ifdef CONFIG_PM
+> +		.pm = &rwdt_pm,
+> +#endif
+> +	},
+> +	.probe = rwdt_probe,
+> +	.remove = rwdt_remove,
+> +};
+> +module_platform_driver(rwdt_driver);
+> +
+> +MODULE_DESCRIPTION("Renesas R-Car Gen2 Watchdog Driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Fabrizio Castro <fabrizio.castro@bp.renesas.com>");
+> diff --git a/drivers/watchdog/renesas_wdt_gen2.h b/drivers/watchdog/renesas_wdt_gen2.h
+> new file mode 100644
+> index 0000000..41b9e9c
+> --- /dev/null
+> +++ b/drivers/watchdog/renesas_wdt_gen2.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * drivers/watchdog/renesas_wdt_gen2.h
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Corporation
+> + *
+> + * R-Car Gen2 and RZ/G specific symbols
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#ifndef RENESAS_WDT_GEN2_H
+> +#define RENESAS_WDT_GEN2_H
+> +
+> +#define RWDT_CLOCK_ON		0xdeadbeef
+> +#define RWDT_CLOCK_OFF		0x00000000
+> +
+> +extern void shmobile_set_wdt_clock_status(unsigned long value);
+
+Wrong file to declare this function. It is not defined in the watchdog driver.
+Same for the defines.
+
+> +
+> +#endif /* RENESAS_WDT_GEN2_H */
+> -- 
+> 2.7.4
 > 
->>
->>>   #ifdef __ARMEB__
->>>   #define rl r3
->>>   #define rh r2
->>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->>> index 0a14967fd400..9310fd9aa1cf 100644
->>> --- a/arch/arm/mm/proc-v7.S
->>> +++ b/arch/arm/mm/proc-v7.S
->>> @@ -173,6 +173,21 @@ ENDPROC(cpu_v7_do_resume)
->>>   	globl_equ	cpu_v7_btbinv_do_resume,	cpu_v7_do_resume
->>>   #endif
->>>   
->>> +/*
->>> + * Cortex-A15 that require an icache invalidation on switch_mm
->>
->> uber nit: The wording is weird here, how about "Cortex-A15 requires
->> an..." ?
-> 
-> Sure.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
