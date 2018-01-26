@@ -1,57 +1,86 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 26 Jan 2018 18:48:39 +0100
-Subject: [linux-sunxi] [PATCH 13/16] arm: dts: sun8i: h3: add thermal zone
- to H3
-In-Reply-To: <4cfb1faf-a712-c882-1ef1-55845c1bb00e@sholland.org>
-References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-14-embed3d@gmail.com>
- <4cfb1faf-a712-c882-1ef1-55845c1bb00e@sholland.org>
-Message-ID: <18116ff5-e919-a224-8d7d-2add836c1047@gmail.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 26 Jan 2018 17:50:16 +0000
+Subject: [RFC 22/37] watchdog: renesas_wdt: Add restart support
+In-Reply-To: <20180126171418.GA16194@roeck-us.net>
+References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1516903391-30467-23-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20180126171418.GA16194@roeck-us.net>
+Message-ID: <TY1PR06MB0895CE80DD4121A7EB6B3B05C0E00@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Guenter,
+
+thank you for your feedback.
+
+> Subject: Re: [RFC 22/37] watchdog: renesas_wdt: Add restart support
+>
+> On Thu, Jan 25, 2018 at 06:02:56PM +0000, Fabrizio Castro wrote:
+> > This commit extends the driver to add restart support by implementing
+> > the restart callback to trigger the watchdog as quickly as possible.
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> > ---
+> >  drivers/watchdog/renesas_wdt.c | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >
+> > diff --git a/drivers/watchdog/renesas_wdt.c b/drivers/watchdog/renesas_wdt.c
+> > index 831ef83..120ddac 100644
+> > --- a/drivers/watchdog/renesas_wdt.c
+> > +++ b/drivers/watchdog/renesas_wdt.c
+> > @@ -107,6 +107,24 @@ static unsigned int rwdt_get_timeleft(struct watchdog_device *wdev)
+> >  return DIV_BY_CLKS_PER_SEC(priv, 65536 - val);
+> >  }
+> >
+> > +static int rwdt_restart(struct watchdog_device *wdev, unsigned long action,
+> > +void *data)
+> > +{
+> > +struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> > +
+> > +pm_runtime_get_sync(wdev->parent);
+> > +
+> > +rwdt_write(priv, 0x00, RWTCSRB);
+> > +rwdt_write(priv, 0x00, RWTCSRA);
+> > +rwdt_write(priv, 0xffff, RWTCNT);
+> > +
+> > +while (readb_relaxed(priv->base + RWTCSRA) & RWTCSRA_WRFLG)
+> > +cpu_relax();
+>
+> Can this get stuck forever or should there be a timeout ?
+
+This won't get stuck forever, the particular bit we are checking marks the period of time writing to register RWTCNT is prohibited due to synchronization from the previous write. It gets cleared eventually (quite quickly). Also, we use exactly the same logic for the "start" callback.
+
+Best regards,
+Fabrizio
+
+>
+> Guenter
+>
+> > +
+> > +rwdt_write(priv, 0x80, RWTCSRA);
+> > +return 0;
+> > +}
+> > +
+> >  static const struct watchdog_info rwdt_ident = {
+> >  .options = WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
+> >  .identity = "Renesas WDT Watchdog",
+> > @@ -118,6 +136,7 @@ static const struct watchdog_ops rwdt_ops = {
+> >  .stop = rwdt_stop,
+> >  .ping = rwdt_init_timeout,
+> >  .get_timeleft = rwdt_get_timeleft,
+> > +.restart = rwdt_restart,
+> >  };
+> >
+> >  static int rwdt_probe(struct platform_device *pdev)
+> > --
+> > 2.7.4
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
-On 26.01.2018 17:26, Samuel Holland wrote:
-> On 01/26/18 09:19, Philipp Rossak wrote:
->> This patch adds the thermal zones to the H3. We have only one sensor and
->> that is placed in the cpu.
->>
->> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> ---
->>   arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> index fbb007e5798e..3f83f6a27c74 100644
->> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> @@ -72,6 +72,15 @@
->>   		};
->>   	};
->>   
->> +	thermal-zones {
->> +		cpu-thermal {
->> +			/* milliseconds */
->> +			polling-delay-passive = <250>;
->> +			polling-delay = <1000>;
->> +			thermal-sensors = <&ths 0>;
-> 
-> If #thermal-sensor-cells = <0>, shouldn't this just be <&ths> ?
-I think both works, but I my intention was to have an accurate 
-description in DT.
-I thought that that is important in DT.
 
->> +		};
->> +	};
->> +
->>   	timer {
->>   		compatible = "arm,armv7-timer";
->>   		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->>
-> 
-> Thanks,
-> Samuel
-> 
-Regards,
-Philipp
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
