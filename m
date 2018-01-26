@@ -1,68 +1,121 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 14:16:11 +0000
-Subject: [PATCH 13/16] arm64: Add support for checking errata based on a
- list of MIDRS
-In-Reply-To: <20180123122809.16269-14-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-14-suzuki.poulose@arm.com>
-Message-ID: <20180126141610.GU5862@e103592.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 26 Jan 2018 14:17:58 +0000
+Subject: [PATCH 6/7] arm64: assembler: Change order of macro arguments in
+ phys_to_ttbr
+In-Reply-To: <1516968197-23206-7-git-send-email-will.deacon@arm.com>
+References: <1516968197-23206-1-git-send-email-will.deacon@arm.com>
+ <1516968197-23206-7-git-send-email-will.deacon@arm.com>
+Message-ID: <496884f2-6548-6c25-9df7-419e2f08f61e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:28:06PM +0000, Suzuki K Poulose wrote:
-> Add helpers for detecting an errata on list of midr ranges
-> of affected CPUs.
+On 26/01/18 12:03, Will Deacon wrote:
+> Since AArch64 assembly instructions take the destination register as
+> their first operand, do the same thing for the phys_to_ttbr macro.
 
-This doesn't describe what the patch does: instead, helpers are being
-added for checking whether an MIDR falls in one of multiple affected
-model(s) and or revision(s).
+Anything which makes the macro soup of our assembly files slightly more 
+intuitive is good by me!
 
-Doing this makes sense, but is it really worth it?
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-We might save 100-200 bytes in the kernel image for now, but a common
-workaround for errata on multiple unrelated cpus is surely a rare case.
-
-Only if there are many such lists, or if the lists become large does
-this start to seem a clear win.
-
-> 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm64/include/asm/cpufeature.h |  1 +
->  arch/arm64/kernel/cpu_errata.c      | 40 ++++++++++++++++++++++---------------
->  2 files changed, 25 insertions(+), 16 deletions(-)
+>   arch/arm64/include/asm/assembler.h | 2 +-
+>   arch/arm64/kernel/head.S           | 4 ++--
+>   arch/arm64/kernel/hibernate-asm.S  | 4 ++--
+>   arch/arm64/kvm/hyp-init.S          | 2 +-
+>   arch/arm64/mm/proc.S               | 6 +++---
+>   5 files changed, 9 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index a3d54c2c411f..70712de687c7 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-
-[...]
-
-> @@ -330,22 +353,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
->  	{
->  		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-> -		.enable = enable_psci_bp_hardening,
-> -	},
-> -	{
-> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-> -		.enable = enable_psci_bp_hardening,
-> -	},
-> -	{
-> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-> -		.enable = enable_psci_bp_hardening,
-> -	},
-> -	{
-> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-> +		ERRATA_MIDR_RANGE_LIST(cortex_bp_harden_cpus),
-
-Could we just use a macro to generate multiple structs, instead of
-inventing a new type of struct?
-
-Cheers
----Dave
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 23251eae6e8a..e4495ef96058 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -514,7 +514,7 @@ alternative_endif
+>    * 	phys:	physical address, preserved
+>    * 	ttbr:	returns the TTBR value
+>    */
+> -	.macro	phys_to_ttbr, phys, ttbr
+> +	.macro	phys_to_ttbr, ttbr, phys
+>   #ifdef CONFIG_ARM64_PA_BITS_52
+>   	orr	\ttbr, \phys, \phys, lsr #46
+>   	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index ba3ab04788dc..341649c08337 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -776,8 +776,8 @@ ENTRY(__enable_mmu)
+>   	update_early_cpu_boot_status 0, x1, x2
+>   	adrp	x1, idmap_pg_dir
+>   	adrp	x2, swapper_pg_dir
+> -	phys_to_ttbr x1, x3
+> -	phys_to_ttbr x2, x4
+> +	phys_to_ttbr x3, x1
+> +	phys_to_ttbr x4, x2
+>   	msr	ttbr0_el1, x3			// load TTBR0
+>   	msr	ttbr1_el1, x4			// load TTBR1
+>   	isb
+> diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+> index 84f5d52fddda..dd14ab8c9f72 100644
+> --- a/arch/arm64/kernel/hibernate-asm.S
+> +++ b/arch/arm64/kernel/hibernate-asm.S
+> @@ -34,12 +34,12 @@
+>    * each stage of the walk.
+>    */
+>   .macro break_before_make_ttbr_switch zero_page, page_table, tmp
+> -	phys_to_ttbr \zero_page, \tmp
+> +	phys_to_ttbr \tmp, \zero_page
+>   	msr	ttbr1_el1, \tmp
+>   	isb
+>   	tlbi	vmalle1
+>   	dsb	nsh
+> -	phys_to_ttbr \page_table, \tmp
+> +	phys_to_ttbr \tmp, \page_table
+>   	msr	ttbr1_el1, \tmp
+>   	isb
+>   .endm
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index e086c6eff8c6..5aa9ccf6db99 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -63,7 +63,7 @@ __do_hyp_init:
+>   	cmp	x0, #HVC_STUB_HCALL_NR
+>   	b.lo	__kvm_handle_stub_hvc
+>   
+> -	phys_to_ttbr x0, x4
+> +	phys_to_ttbr x4, x0
+>   	msr	ttbr0_el2, x4
+>   
+>   	mrs	x4, tcr_el1
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index cc7d2389edc8..42204b2525ea 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -153,7 +153,7 @@ ENDPROC(cpu_do_resume)
+>   ENTRY(cpu_do_switch_mm)
+>   	mrs	x2, ttbr1_el1
+>   	mmid	x1, x1				// get mm->context.id
+> -	phys_to_ttbr x0, x3
+> +	phys_to_ttbr x3, x0
+>   #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+>   	bfi	x3, x1, #48, #16		// set the ASID field in TTBR0
+>   #endif
+> @@ -169,7 +169,7 @@ ENDPROC(cpu_do_switch_mm)
+>   
+>   .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+>   	adrp	\tmp1, empty_zero_page
+> -	phys_to_ttbr \tmp1, \tmp2
+> +	phys_to_ttbr \tmp2, \tmp1
+>   	msr	ttbr1_el1, \tmp2
+>   	isb
+>   	tlbi	vmalle1
+> @@ -188,7 +188,7 @@ ENTRY(idmap_cpu_replace_ttbr1)
+>   
+>   	__idmap_cpu_set_reserved_ttbr1 x1, x3
+>   
+> -	phys_to_ttbr x0, x3
+> +	phys_to_ttbr x3, x0
+>   	msr	ttbr1_el1, x3
+>   	isb
+>   
+> 
