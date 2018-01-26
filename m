@@ -1,93 +1,349 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 26 Jan 2018 14:30:47 +0100
-Subject: [RFC 1/2] arm: cacheflush syscall: process only pages that are
- in the memory
-In-Reply-To: <20180126113226.GX17719@n2100.armlinux.org.uk>
-References: <CGME20180126111453eucas1p1330d8561386c3cf2bb457bc22c0d99a8@eucas1p1.samsung.com>
- <20180126111441.29353-1-m.szyprowski@samsung.com>
- <20180126113226.GX17719@n2100.armlinux.org.uk>
-Message-ID: <589aa8ab-5bfc-e065-51f9-3a403c346d92@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Jan 2018 13:40:50 +0000
+Subject: [PATCH 4/7] arm64: kpti: Add ->enable callback to remap swapper
+ using nG mappings
+In-Reply-To: <1516968197-23206-5-git-send-email-will.deacon@arm.com>
+References: <1516968197-23206-1-git-send-email-will.deacon@arm.com>
+ <1516968197-23206-5-git-send-email-will.deacon@arm.com>
+Message-ID: <2d89624a-ccc2-78a0-deaf-e0494636659a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hey Will,
 
-On 2018-01-26 12:32, Russell King - ARM Linux wrote:
-> On Fri, Jan 26, 2018 at 12:14:40PM +0100, Marek Szyprowski wrote:
->> glibc in calls cacheflush syscall on the whole textrels section of the
->> relocated binaries. However, relocation usually doesn't touch all pages
->> of that section, so not all of them are read to memory when calling this
->> syscall. However flush_cache_user_range() function will unconditionally
->> touch all pages from the provided range, resulting additional overhead
->> related to reading all clean pages. Optimize this by calling
->> flush_cache_user_range() only on the pages that are already in the
->> memory.
-> What ensures that another CPU doesn't remove a page while we're
-> flushing it?  That will trigger a data abort, which will want to
-> take the mmap_sem, causing a deadlock.
+On 26/01/18 12:03, Will Deacon wrote:
+> Defaulting to global mappings for kernel space is generally good for
+> performance and appears to be necessary for Cavium ThunderX. If we
+> subsequently decide that we need to enable kpti, then we need to rewrite
+> our existing page table entries to be non-global. This is fiddly, and
+> made worse by the possible use of contiguous mappings, which require
+> a strict break-before-make sequence.
+> 
+> Since the enable callback runs on each online CPU from stop_machine
+> context, we can have all CPUs enter the idmap, where secondaries can
+> wait for the primary CPU to rewrite swapper with its MMU off. It's all
+> fairly horrible, but at least it only runs once.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/assembler.h |  10 ++
+>  arch/arm64/kernel/cpufeature.c     |  25 +++++
+>  arch/arm64/mm/proc.S               | 204 +++++++++++++++++++++++++++++++++++--
+>  3 files changed, 231 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 3873dd7b5a32..23251eae6e8a 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -523,6 +523,16 @@ alternative_endif
+>  #endif
+>  	.endm
+>  
+> +	.macro	pte_to_phys, phys, pte
+> +#ifdef CONFIG_ARM64_PA_BITS_52
+> +	ror	\phys, \pte, #16
+> +	bfi	\phys, \phys, #(16 + 12), #32
+> +	lsr	\phys, \phys, #12
+> +#else
+> +	and	\phys, \pte, #PTE_ADDR_MASK
+> +#endif
+> +	.endm
+> +
+>  /**
+>   * Errata workaround prior to disable MMU. Insert an ISB immediately prior
+>   * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 4b6f9051cf0c..cd9f46952db3 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -880,6 +880,30 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>  						     ID_AA64PFR0_CSV3_SHIFT);
+>  }
+>  
+> +static int kpti_install_ng_mappings(void *__unused)
+> +{
+> +	typedef void (kpti_remap_fn)(int, int, phys_addr_t);
+> +	extern kpti_remap_fn idmap_kpti_install_ng_mappings;
+> +	kpti_remap_fn *remap_fn;
+> +
+> +	static bool kpti_applied = false;
+> +	int cpu = smp_processor_id();
+> +
+> +	if (kpti_applied)
+> +		return 0;
+> +
+> +	remap_fn = (void *)__pa_symbol(idmap_kpti_install_ng_mappings);
+> +
+> +	cpu_install_idmap();
+> +	remap_fn(cpu, num_online_cpus(), __pa_symbol(swapper_pg_dir));
+> +	cpu_uninstall_idmap();
+> +
+> +	if (!cpu)
+> +		kpti_applied = true;
+> +
+> +	return 0;
+> +}
+> +
+>  static int __init parse_kpti(char *str)
+>  {
+>  	bool enabled;
+> @@ -1003,6 +1027,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>  		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+>  		.def_scope = SCOPE_SYSTEM,
+>  		.matches = unmap_kernel_at_el0,
+> +		.enable = kpti_install_ng_mappings,
+>  	},
+>  #endif
+>  	{
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 9f177aac6390..cc7d2389edc8 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -166,6 +166,17 @@ ENTRY(cpu_do_switch_mm)
+>  ENDPROC(cpu_do_switch_mm)
+>  
+>  	.pushsection ".idmap.text", "ax"
+> +
+> +.macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+> +	adrp	\tmp1, empty_zero_page
+> +	phys_to_ttbr \tmp1, \tmp2
+> +	msr	ttbr1_el1, \tmp2
+> +	isb
+> +	tlbi	vmalle1
+> +	dsb	nsh
+> +	isb
+> +.endm
+> +
+>  /*
+>   * void idmap_cpu_replace_ttbr1(phys_addr_t new_pgd)
+>   *
+> @@ -175,14 +186,7 @@ ENDPROC(cpu_do_switch_mm)
+>  ENTRY(idmap_cpu_replace_ttbr1)
+>  	save_and_disable_daif flags=x2
+>  
+> -	adrp	x1, empty_zero_page
+> -	phys_to_ttbr x1, x3
+> -	msr	ttbr1_el1, x3
+> -	isb
+> -
+> -	tlbi	vmalle1
+> -	dsb	nsh
+> -	isb
+> +	__idmap_cpu_set_reserved_ttbr1 x1, x3
+>  
+>  	phys_to_ttbr x0, x3
+>  	msr	ttbr1_el1, x3
+> @@ -194,6 +198,190 @@ ENTRY(idmap_cpu_replace_ttbr1)
+>  ENDPROC(idmap_cpu_replace_ttbr1)
+>  	.popsection
+>  
+> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> +	.pushsection ".idmap.text", "ax"
+> +
+> +	.macro	__idmap_kpti_get_pgtable_ent, type
+> +	dc	cvac, cur_\()\type\()p		// Ensure any existing dirty
+> +	dmb	sy				// lines are written back before
+> +	ldr	\type, [cur_\()\type\()p]	// loading the entry
+> +	tbz	\type, #0, next_\()\type	// Skip invalid entries
+> +	.endm
+> +
+> +	.macro __idmap_kpti_put_pgtable_ent_ng, type
+> +	orr	\type, \type, #PTE_NG		// Same bit for blocks and pages
+> +	str	\type, [cur_\()\type\()p]	// Update the entry and ensure it
+> +	dc	civac, cur_\()\type\()p		// is visible to all CPUs.
+> +	.endm
+> +
+> +/*
+> + * void __kpti_install_ng_mappings(int cpu, int num_cpus, phys_addr_t swapper)
+> + *
+> + * Called exactly once from stop_machine context by each CPU found during boot.
+> + */
+> +__idmap_kpti_flag:
+> +	.long	1
 
-I thought that taking mmap_sem will prevent pages from being removed.
-mmap_sem has been already taken in the previous implementation of that
-syscall, until code simplification done by commit 97c72d89ce0e ("ARM:
-cacheflush: don't bother rounding to nearest vma").
+I'm a bit concerned that we're placing the counter in a section that is
+not writeable (at least in theory). We can either have the idmap
+writeable entirely, or have a idmap data section (which means extending
+it to be more than a single page).
 
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   arch/arm/kernel/traps.c | 25 +++++++++++++++++++------
->>   1 file changed, 19 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index 5e3633c24e63..a5ec262ab30e 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -564,23 +564,36 @@ static int bad_syscall(int n, struct pt_regs *regs)
->>   static inline int
->>   __do_cache_op(unsigned long start, unsigned long end)
->>   {
->> -	int ret;
->> +	struct vm_area_struct *vma = NULL;
->> +	int ret = 0;
->>   
->> +	down_read(&current->mm->mmap_sem);
->>   	do {
->>   		unsigned long chunk = min(PAGE_SIZE, end - start);
->>   
->> +		if (!vma || vma->vm_end <= start) {
->> +			vma = find_vma(current->mm, start);
->> +			if (!vma) {
->> +				ret = -EFAULT;
->> +				goto done;
->> +			}
->> +		}
->> +
->>   		if (fatal_signal_pending(current))
->>   			return 0;
->>   
->> -		ret = flush_cache_user_range(start, start + chunk);
->> -		if (ret)
->> -			return ret;
->> +		if (follow_page(vma, start, 0)) {
->> +			ret = flush_cache_user_range(start, start + chunk);
->> +			if (ret)
->> +				goto done;
->> +		}
->>   
->>   		cond_resched();
->>   		start += chunk;
->>   	} while (start < end);
->> -
->> -	return 0;
->> +done:
->> +	up_read(&current->mm->mmap_sem);
->> +	return ret;
->>   }
->>   
->>   static inline int
->> -- 
->> 2.15.0
->>
+Not sure if that's a concern, but I thought I'd raise it. The core works
+pretty well as is, so  it cannot be completely wrong... ;-)
 
-Best regards
+> +ENTRY(idmap_kpti_install_ng_mappings)
+> +	cpu		.req	w0
+> +	num_cpus	.req	w1
+> +	swapper_pa	.req	x2
+> +	swapper_ttb	.req	x3
+> +	flag_ptr	.req	x4
+> +	cur_pgdp	.req	x5
+> +	end_pgdp	.req	x6
+> +	pgd		.req	x7
+> +	cur_pudp	.req	x8
+> +	end_pudp	.req	x9
+> +	pud		.req	x10
+> +	cur_pmdp	.req	x11
+> +	end_pmdp	.req	x12
+> +	pmd		.req	x13
+> +	cur_ptep	.req	x14
+> +	end_ptep	.req	x15
+> +	pte		.req	x16
+> +
+> +	mrs	swapper_ttb, ttbr1_el1
+> +	adr	flag_ptr, __idmap_kpti_flag
+> +
+> +	cbnz	cpu, __idmap_kpti_secondary
+> +
+> +	/* We're the boot CPU. Wait for the others to catch up */
+> +	sevl
+> +1:	wfe
+> +	ldaxr	w18, [flag_ptr]
+> +	eor	w18, w18, num_cpus
+> +	cbnz	w18, 1b
+> +
+> +	/* We need to walk swapper, so turn off the MMU. */
+> +	pre_disable_mmu_workaround
+> +	mrs	x18, sctlr_el1
+> +	bic	x18, x18, #1
+
+nit: You should be able to use SCTLR_ELx_M, as we already include
+sysreg.h (indirectly).
+
+> +	msr	sctlr_el1, x18
+> +	isb
+> +
+> +	/* Everybody is enjoying the idmap, so we can rewrite swapper. */
+> +	/* PGD */
+> +	mov	cur_pgdp, swapper_pa
+> +	add	end_pgdp, cur_pgdp, #(PTRS_PER_PGD * 8)
+> +do_pgd:	__idmap_kpti_get_pgtable_ent	pgd
+> +	tbnz	pgd, #1, walk_puds
+> +	__idmap_kpti_put_pgtable_ent_ng	pgd
+> +next_pgd:
+> +	add	cur_pgdp, cur_pgdp, #8
+> +	cmp	cur_pgdp, end_pgdp
+> +	b.ne	do_pgd
+> +
+> +	/* Publish the updated tables and nuke all the TLBs */
+> +	dsb	sy
+> +	tlbi	vmalle1is
+> +	dsb	ish
+> +	isb
+> +
+> +	/* We're done: fire up the MMU again */
+> +	mrs	x18, sctlr_el1
+> +	orr	x18, x18, #1
+
+Same here.
+
+> +	msr	sctlr_el1, x18
+> +	isb
+> +
+> +	/* Set the flag to zero to indicate that we're all done */
+> +	str	wzr, [flag_ptr]
+> +	ret
+> +
+> +	/* PUD */
+> +walk_puds:
+> +	.if CONFIG_PGTABLE_LEVELS > 3
+> +	pte_to_phys	cur_pudp, pgd
+> +	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
+> +do_pud:	__idmap_kpti_get_pgtable_ent	pud
+> +	tbnz	pud, #1, walk_pmds
+> +	__idmap_kpti_put_pgtable_ent_ng	pud
+> +next_pud:
+> +	add	cur_pudp, cur_pudp, 8
+> +	cmp	cur_pudp, end_pudp
+> +	b.ne	do_pud
+> +	b	next_pgd
+> +	.else /* CONFIG_PGTABLE_LEVELS <= 3 */
+> +	mov	pud, pgd
+> +	b	walk_pmds
+> +next_pud:
+> +	b	next_pgd
+> +	.endif
+> +
+> +	/* PMD */
+> +walk_pmds:
+> +	.if CONFIG_PGTABLE_LEVELS > 2
+> +	pte_to_phys	cur_pmdp, pud
+> +	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
+> +do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
+> +	tbnz	pmd, #1, walk_ptes
+> +	__idmap_kpti_put_pgtable_ent_ng	pmd
+> +next_pmd:
+> +	add	cur_pmdp, cur_pmdp, #8
+> +	cmp	cur_pmdp, end_pmdp
+> +	b.ne	do_pmd
+> +	b	next_pud
+> +	.else /* CONFIG_PGTABLE_LEVELS <= 2 */
+> +	mov	pmd, pud
+> +	b	walk_ptes
+> +next_pmd:
+> +	b	next_pud
+> +	.endif
+> +
+> +	/* PTE */
+> +walk_ptes:
+> +	pte_to_phys	cur_ptep, pmd
+> +	add	end_ptep, cur_ptep, #(PTRS_PER_PTE * 8)
+> +do_pte:	__idmap_kpti_get_pgtable_ent	pte
+> +	__idmap_kpti_put_pgtable_ent_ng	pte
+> +next_pte:
+> +	add	cur_ptep, cur_ptep, #8
+> +	cmp	cur_ptep, end_ptep
+> +	b.ne	do_pte
+> +	b	next_pmd
+> +
+> +	/* Secondary CPUs end up here */
+> +__idmap_kpti_secondary:
+> +	/* Uninstall swapper before surgery begins */
+> +	__idmap_cpu_set_reserved_ttbr1 x18, x17
+> +
+> +	/* Increment the flag to let the boot CPU we're ready */
+> +1:	ldxr	w18, [flag_ptr]
+> +	add	w18, w18, #1
+> +	stxr	w17, w18, [flag_ptr]
+> +	cbnz	w17, 1b
+> +
+> +	/* Wait for the boot CPU to finish messing around with swapper */
+> +	sevl
+> +1:	wfe
+> +	ldxr	w18, [flag_ptr]
+> +	cbnz	w18, 1b
+> +
+> +	/* All done, act like nothing happened */
+> +	msr	ttbr1_el1, swapper_ttb
+> +	isb
+> +	ret
+> +
+> +	.unreq	cpu
+> +	.unreq	num_cpus
+> +	.unreq	swapper_pa
+> +	.unreq	swapper_ttb
+> +	.unreq	flag_ptr
+> +	.unreq	cur_pgdp
+> +	.unreq	end_pgdp
+> +	.unreq	pgd
+> +	.unreq	cur_pudp
+> +	.unreq	end_pudp
+> +	.unreq	pud
+> +	.unreq	cur_pmdp
+> +	.unreq	end_pmdp
+> +	.unreq	pmd
+> +	.unreq	cur_ptep
+> +	.unreq	end_ptep
+> +	.unreq	pte
+> +ENDPROC(idmap_kpti_install_ng_mappings)
+> +	.popsection
+> +#endif
+> +
+>  /*
+>   *	__cpu_setup
+>   *
+> 
+
+Thanks,
+
+	M.
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Jazz is not dead. It just smells funny...
