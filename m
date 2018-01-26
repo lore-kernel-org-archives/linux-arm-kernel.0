@@ -1,30 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Jan 2018 10:36:32 +0100
-Subject: [PATCH 0/3] ARM: dts: renesas: consistently use single space before =
-Message-ID: <20180126093635.16945-1-horms+renesas@verge.net.au>
+Date: Fri, 26 Jan 2018 10:36:35 +0100
+Subject: [PATCH 3/3] ARM: dts: r8a7793: consistently use single space before =
+In-Reply-To: <20180126093635.16945-1-horms+renesas@verge.net.au>
+References: <20180126093635.16945-1-horms+renesas@verge.net.au>
+Message-ID: <20180126093635.16945-4-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Consistently use a single space before a =.
 
-This series fixes instances where a tab is used instead.
+This patch fixes instances where a tab is used instead.
 
-This is part of an ongoing effort to improve consistency within and between
-the DT of Renesas SoCs to allow for easier comparison and maintenance.
+This patch should not introduce any functional change.
 
-This series should not introduce any functional change.
-
-Based on renesas-devel-20180123-v4.15-rc9
-
-Simon Horman (3):
-  ARM: dts: r8a7790: consistently use single space before =
-  ARM: dts: r8a7791: consistently use single space before =
-  ARM: dts: r8a7793: consistently use single space before =
-
- arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
- arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/r8a7793.dtsi | 10 +++++-----
- 3 files changed, 15 insertions(+), 15 deletions(-)
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index aa7d7792fb13..f9c5a557107d 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1362,16 +1362,16 @@
+ 
+ 	thermal-zones {
+ 		cpu_thermal: cpu-thermal {
+-			polling-delay-passive	= <0>;
+-			polling-delay		= <0>;
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
+ 
+ 			thermal-sensors = <&thermal>;
+ 
+ 			trips {
+ 				cpu-crit {
+-					temperature	= <95000>;
+-					hysteresis	= <0>;
+-					type		= "critical";
++					temperature = <95000>;
++					hysteresis = <0>;
++					type = "critical";
+ 				};
+ 			};
+ 			cooling-maps {
 -- 
 2.11.0
