@@ -1,170 +1,168 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 26 Jan 2018 15:11:28 +0800
-Subject: [PATCH v4] iommu/mediatek: Move attach_device after iommu-group is
- ready for M4Uv1
-Message-ID: <1516950688-28405-1-git-send-email-yong.wu@mediatek.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Fri, 26 Jan 2018 16:28:46 +0900
+Subject: [PATCH 2/4] usb: dwc3: add dwc3 glue layer for UniPhier SoCs
+In-Reply-To: <20180125110929.C609.4A936039@socionext.com>
+References: <87a7x3l8gr.fsf@linux.intel.com>
+ <20180125110929.C609.4A936039@socionext.com>
+Message-ID: <20180126162846.BFA9.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the commit 05f80300dc8b ("iommu: Finish making iommu_group support
-mandatory"), the iommu framework has supposed all the iommu drivers have
-their owner iommu-group, it get rid of the FIXME workarounds while the
-group is NULL. But the flow of Mediatek M4U gen1 looks a bit trick that
-it will hang at this case:
+Hi,
 
-==========================================
-Unable to handle kernel NULL pointer dereference at virtual address 00000030
-pgd = c0004000
-[00000030] *pgd=00000000
-PC is at mutex_lock+0x28/0x54
-LR is at iommu_attach_device+0xa4/0xd4
-pc : [<c07632e8>]    lr : [<c04736fc>]    psr: 60000013
-sp : df0edbb8  ip : df0edbc8  fp : df0edbc4
-r10: c114da14  r9 : df2a3e40  r8 : 00000003
-r7 : df27a210  r6 : df2a90c4  r5 : 00000030  r4 : 00000000
-r3 : df0f8000  r2 : fffff000  r1 : df29c610  r0 : 00000030
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-xxx
-(mutex_lock) from [<c04736fc>] (iommu_attach_device+0xa4/0xd4)
-(iommu_attach_device) from [<c011b9dc>] (__arm_iommu_attach_device+0x28/0x90)
-(__arm_iommu_attach_device) from [<c011ba60>] (arm_iommu_attach_device+0x1c/0x30)
-(arm_iommu_attach_device) from [<c04759ac>] (mtk_iommu_add_device+0xfc/0x214)
-(mtk_iommu_add_device) from [<c0472aa4>] (add_iommu_group+0x3c/0x68)
-(add_iommu_group) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-(bus_for_each_dev) from [<c04734a4>] (bus_set_iommu+0xb0/0xec)
-(bus_set_iommu) from [<c0476310>] (mtk_iommu_probe+0x328/0x368)
-(mtk_iommu_probe) from [<c048189c>] (platform_drv_probe+0x5c/0xc0)
-(platform_drv_probe) from [<c047f510>] (driver_probe_device+0x2f4/0x4d8)
-(driver_probe_device) from [<c047f800>] (__driver_attach+0x10c/0x128)
-(__driver_attach) from [<c047d044>] (bus_for_each_dev+0x78/0xac)
-(bus_for_each_dev) from [<c047ec78>] (driver_attach+0x2c/0x30)
-(driver_attach) from [<c047e640>] (bus_add_driver+0x1e0/0x278)
-(bus_add_driver) from [<c048052c>] (driver_register+0x88/0x108)
-(driver_register) from [<c04817ec>] (__platform_driver_register+0x50/0x58)
-(__platform_driver_register) from [<c0b31380>] (m4u_init+0x24/0x28)
-(m4u_init) from [<c0101c38>] (do_one_initcall+0xf0/0x17c)
-=========================
+On Thu, 25 Jan 2018 11:09:30 +0900 <hayashi.kunihiko@socionext.com> wrote:
 
-The root cause is that the device's iommu-group is NULL while
-arm_iommu_attach_device is called. This patch prepare a new iommu-group
-for the iommu consumer devices to fix this issue.
+> Hello Felipe,
+> 
+> On Wed, 24 Jan 2018 14:58:12 +0200 <balbi@kernel.org> wrote:
+> 
+> > 
+> > Hi,
+> > 
+> > Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
+> > > Hello Felipe,
+> > >
+> > > Thank you for your comments.
+> > >
+> > > On Tue, 23 Jan 2018 15:12:36 +0200 <balbi@kernel.org> wrote:
+> > >
+> > >> 
+> > >> Hi,
+> > >> 
+> > >> Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
+> > >> > Add a specific glue layer for UniPhier SoC platform to support
+> > >> > USB host mode. It manages hardware operating sequences to enable multiple
+> > >> > clock gates and assert resets, and to prepare to use dwc3 controller
+> > >> > on the SoC.
+> > >> >
+> > >> > This patch also handles the physical layer that has same register space
+> > >> > as the glue layer, because it needs to integrate initialziation sequence
+> > >> > between glue and phy.
+> > >> >
+> > >> > In case of some SoCs, since some initialization values for PHY are
+> > >> > included in nvmem, this patch includes the way to get the values from nvmem.
+> > >> >
+> > >> > It supports PXs2 and LD20 SoCs.
+> > >> >
+> > >> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > >> > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> > >> > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> > >> > ---
+> > >> >  drivers/usb/dwc3/Kconfig         |   9 +
+> > >> >  drivers/usb/dwc3/Makefile        |   1 +
+> > >> >  drivers/usb/dwc3/dwc3-uniphier.c | 554 +++++++++++++++++++++++++++++++++++++++
+> > >> >  3 files changed, 564 insertions(+)
+> > >> >  create mode 100644 drivers/usb/dwc3/dwc3-uniphier.c
+> > >
+> > > ...snip...
+> > >
+> > >> > +
+> > >> > +static void dwc3u_ssphy_testio_write(struct dwc3u_priv *priv, int port,
+> > >> > +				     u32 data)
+> > >> 
+> > >> anything with sshphy or hsphy in the name should probably be part of a
+> > >> PHY driver using drivers/phy/ framework.
+> > >
+> > > I can try to separate phy control from this driver.
+> > > However, phy registers belongs to "dwc3-glue" IO map area (65b00000),
+> > > and this area also contains a reset bit for "dwc3-core" hardware.
+> > >
+> > > Although the phy driver is called from dwc3-core driver,
+> > > we need to deassert the reset bit before probing dwc3-core driver.
+> > >
+> > > As shown later, I think that it's difficut to determine the order of
+> > > initializing the registers in this area.
+> > >
+> > >> > +static void dwc3u_vbus_disable(struct dwc3u_priv *priv)
+> > >> > +{
+> > >> > +	int i;
+> > >> > +
+> > >> > +	for (i = 0; i < priv->nvbus; i++) {
+> > >> > +		dwc3u_maskwrite(priv, VBUS_CONTROL(i),
+> > >> > +				DRVVBUS_REG_EN | DRVVBUS_REG,
+> > >> > +				DRVVBUS_REG_EN | 0);
+> > >> > +	}
+> > >> > +}
+> > >> 
+> > >> drivers/regulator maybe?
+> > >
+> > > VBUS_CONTROL register is used for determing whether "dwc3-glue" hardware
+> > > enables vbus connected with "regulator" hardware.
+> > >
+> > > The regulator driver should manage "regulator" hardware, and
+> > > I don't think that the driver should manage this register.
+> > >
+> > >> > +static void dwc3u_reset_init(struct dwc3u_priv *priv)
+> > >> > +{
+> > >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
+> > >> > +	usleep_range(1000, 2000);
+> > >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, LINK_RESET);
+> > >> > +}
+> > >> > +
+> > >> > +static void dwc3u_reset_clear(struct dwc3u_priv *priv)
+> > >> > +{
+> > >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
+> > >> > +}
+> > >> 
+> > >> drivers/reset ?
+> > >
+> > > The reset driver manages "sysctrl" IO map area in our SoC.
+> > >
+> > > RESET_CTL register belongs to "dwc3-glue" IO map area,
+> > > and the kernel can't access this area until enabling usb clocks and
+> > > deasserting usb resets in "sysctrl".
+> > >
+> > > I think that "dwc3-glue" register control should be separated from
+> > > "sysctrl".
+> > 
+> > Just split your address space and treat your glue as a device with
+> > several children:
+> > 
+> > glue at 65b00000 {
+> > 	compatible = "foo"
+> 
+> Just to confirm, instead of SoC-specific glue driver, dwc3-of-simple.c
+> should handle compatible "foo", right?
 
-CC: Robin Murphy <robin.murphy@arm.com>
-CC: Honghui Zhang <honghui.zhang@mediatek.com>
-Fixes: 05f80300dc8b ("iommu: Finish making iommu_group support mandatory")
-Reported-by: Ryder Lee <ryder.lee@mediatek.com>
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+I understood this the answer was no.
+We can define glue node as "simple-mfd" and/or "syscon", and the node
+can include another function nodes like phy, sysctrl, and even dwc3-of-simple.
+
+> > 
+> > 	phy at bar {
+> >         	...
+> > 	};
+> > 
+> > 	sysctrl at baz {
+> >         	...
+> > 	};
+> > 
+> > 	dwc3 at foo {
+> >         	compatible = "snps, dwc3";
+> >                 ...
+> > 	};
+> > };
+> > 
+> > Then you know that you can let dwc3/core.c handle the PHY for you. If we
+> > need to teach dwc3/core.c about regulators, we can do that. But we don't
+> > need SoC-specific hacks ;-)
+> 
+> I also don't think that dwc3/core.c should have any SoC-specific controls.
+> I've thought the SoC-specific glue driver (dwc3-***.c) calls "clocks",
+> "resets", and "regulators".
+> 
+> However, although dwc3-of-simple.c can handle "clocks", it can't handle
+> "resets" and "regulators". Who should call them?
+
+Since The dwc3/core.c calls phy APIs, phy_power_on(), then we can handle
+regulators in phy driver.
+
+On the other hand, I think it's necessary to deassert "resets"
+before probing dwc3/core.c, same as "clocks".  I'll suggest a patch to solve
+the issue next.
+
+Thank you,
+
 ---
-Change notes:
-
-v4: Get rid of device_group callback.
-
-v3: https://lists.linuxfoundation.org/pipermail/iommu/2018-January/025872.html
-    don't use the global variable and allocate a new iommu group before
-    arm_iommu_attach_device following Robin's suggestion.
-
-v2: http://lists.infradead.org/pipermail/linux-mediatek/2018-January/011810.html
-   Add mtk_domain_v1=NULL in domain_free for symmetry.
-
-v1: https://patchwork.kernel.org/patch/10176255/
----
- drivers/iommu/mtk_iommu_v1.c | 54 +++++++++++++++++---------------------------
- 1 file changed, 21 insertions(+), 33 deletions(-)
-
-diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-index 542930c..1b1b7759 100644
---- a/drivers/iommu/mtk_iommu_v1.c
-+++ b/drivers/iommu/mtk_iommu_v1.c
-@@ -418,20 +418,12 @@ static int mtk_iommu_create_mapping(struct device *dev,
- 		m4udev->archdata.iommu = mtk_mapping;
- 	}
- 
--	ret = arm_iommu_attach_device(dev, mtk_mapping);
--	if (ret)
--		goto err_release_mapping;
--
- 	return 0;
--
--err_release_mapping:
--	arm_iommu_release_mapping(mtk_mapping);
--	m4udev->archdata.iommu = NULL;
--	return ret;
- }
- 
- static int mtk_iommu_add_device(struct device *dev)
- {
-+	struct dma_iommu_mapping *mtk_mapping;
- 	struct of_phandle_args iommu_spec;
- 	struct of_phandle_iterator it;
- 	struct mtk_iommu_data *data;
-@@ -452,15 +444,30 @@ static int mtk_iommu_add_device(struct device *dev)
- 	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
- 		return -ENODEV; /* Not a iommu client device */
- 
--	data = dev->iommu_fwspec->iommu_priv;
--	iommu_device_link(&data->iommu, dev);
--
--	group = iommu_group_get_for_dev(dev);
-+	/*
-+	 * This is a short-term bodge because the ARM DMA code doesn't
-+	 * understand multi-device groups, but we have to call into it
-+	 * successfully (and not just rely on a normal IOMMU API attach
-+	 * here) in order to set the correct DMA API ops on @dev.
-+	 */
-+	group = iommu_group_alloc();
- 	if (IS_ERR(group))
- 		return PTR_ERR(group);
- 
-+	err = iommu_group_add_device(group, dev);
- 	iommu_group_put(group);
--	return 0;
-+	if (err)
-+		return err;
-+
-+	data = dev->iommu_fwspec->iommu_priv;
-+	mtk_mapping = data->dev->archdata.iommu;
-+	err = arm_iommu_attach_device(dev, mtk_mapping);
-+	if (err) {
-+		iommu_group_remove_device(dev);
-+		return err;
-+	}
-+
-+	return iommu_device_link(&data->iommu, dev);;
- }
- 
- static void mtk_iommu_remove_device(struct device *dev)
-@@ -477,24 +484,6 @@ static void mtk_iommu_remove_device(struct device *dev)
- 	iommu_fwspec_free(dev);
- }
- 
--static struct iommu_group *mtk_iommu_device_group(struct device *dev)
--{
--	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
--
--	if (!data)
--		return ERR_PTR(-ENODEV);
--
--	/* All the client devices are in the same m4u iommu-group */
--	if (!data->m4u_group) {
--		data->m4u_group = iommu_group_alloc();
--		if (IS_ERR(data->m4u_group))
--			dev_err(dev, "Failed to allocate M4U IOMMU group\n");
--	} else {
--		iommu_group_ref_get(data->m4u_group);
--	}
--	return data->m4u_group;
--}
--
- static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
- {
- 	u32 regval;
-@@ -547,7 +536,6 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
- 	.iova_to_phys	= mtk_iommu_iova_to_phys,
- 	.add_device	= mtk_iommu_add_device,
- 	.remove_device	= mtk_iommu_remove_device,
--	.device_group	= mtk_iommu_device_group,
- 	.pgsize_bitmap	= ~0UL << MT2701_IOMMU_PAGE_SHIFT,
- };
- 
--- 
-1.8.1.1.dirty
+Best Regards,
+Kunihiko Hayashi
