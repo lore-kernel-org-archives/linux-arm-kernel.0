@@ -1,41 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Jan 2018 09:10:00 +0100
-Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
-References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <201801260759.RyNhDZz4%fengguang.wu@intel.com>
- <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
- <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
-Message-ID: <20180126081000.hy7g57zp5dv6ug2g@flea.lan>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Fri, 26 Jan 2018 09:23:52 +0100
+Subject: [PATCH 3/3] ARM: dts: imx6ull: address some more incompatibilites
+ between i.MX6UL and i.MX6ULL
+In-Reply-To: <1516955032-21167-1-git-send-email-LW@KARO-electronics.de>
+References: <1516955032-21167-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1516955032-21167-4-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
-> Hi Maxime,
-> 
-> On Fri, 26 Jan 2018 09:46:58 +0800
-> Yong <yong.deng@magewell.com> wrote:
-> 
-> > Hi Maxime,
-> > 
-> > Do you have any experience in solving this problem?
-> > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
-> 
-> Got it.
-> Should I add 'depends on ARM' in Kconfig?
+The i.MX6ULL doesn't have the CAAM engine nor any SIM interface.
+These are currently not implemented for i.MX6UL but it cannot hurt to
+delete the corresponding nodes from the i.MX6ULL DTB anyway.
 
-Yes, or even better a depends on MACH_SUNXI :)
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ arch/arm/boot/dts/imx6ull.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+index 8724fdb2..da325cd 100644
+--- a/arch/arm/boot/dts/imx6ull.dtsi
++++ b/arch/arm/boot/dts/imx6ull.dtsi
+@@ -67,6 +67,12 @@
+ 			};
+ 		};
+ 
++		aips-bus at 2100000 {
++			/delete-node/ caam at 21400000;
++			/delete-node/ sim at 218c0000;
++			/delete-node/ sim at 21b40000;
++		};
++
+ 		aips3: aips-bus at 2200000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180126/53e9dc57/attachment.sig>
+2.1.4
