@@ -1,47 +1,34 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 26 Jan 2018 17:05:45 +0800
-Subject: [PATCH 3/3] ARM: dts: imx6ull: address some more
- incompatibilites between i.MX6UL and i.MX6ULL
-In-Reply-To: <1516955032-21167-4-git-send-email-LW@KARO-electronics.de>
-References: <1516955032-21167-1-git-send-email-LW@KARO-electronics.de>
- <1516955032-21167-4-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20180126090545.GD14058@b29396-OptiPlex-7040>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 26 Jan 2018 12:05:42 +0300
+Subject: [PATCH RFC 0/3] API for 128-bit IO access
+In-Reply-To: <20180124102212.GC20586@arm.com>
+References: <20180124090519.6680-1-ynorov@caviumnetworks.com>
+ <20180124102212.GC20586@arm.com>
+Message-ID: <20180126090542.bsza7hqqinqwllcr@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 09:23:52AM +0100, Lothar Wa?mann wrote:
-> The i.MX6ULL doesn't have the CAAM engine nor any SIM interface.
-> These are currently not implemented for i.MX6UL but it cannot hurt to
-> delete the corresponding nodes from the i.MX6ULL DTB anyway.
+On Wed, Jan 24, 2018 at 10:22:13AM +0000, Will Deacon wrote:
+> On Wed, Jan 24, 2018 at 12:05:16PM +0300, Yury Norov wrote:
+> > This series adds API for 128-bit memory IO access and enables it for ARM64.
+> > The original motivation for 128-bit API came from new Cavium network device
+> > driver. The hardware requires 128-bit access to make things work. See
+> > description in patch 3 for details.
+> > 
+> > Also, starting from ARMv8.4, stp and ldp instructions become atomic, and
+> > API for 128-bit access would be helpful in core arm64 code.
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Only for normal, cacheable memory, so they're not suitable for IO accesses
+> as you're proposing here.
 
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Hi Will,
 
-Regards
-Dong Aisheng
+Thanks for clarification.
 
-> ---
->  arch/arm/boot/dts/imx6ull.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-> index 8724fdb2..da325cd 100644
-> --- a/arch/arm/boot/dts/imx6ull.dtsi
-> +++ b/arch/arm/boot/dts/imx6ull.dtsi
-> @@ -67,6 +67,12 @@
->  			};
->  		};
->  
-> +		aips-bus at 2100000 {
-> +			/delete-node/ caam at 21400000;
-> +			/delete-node/ sim at 218c0000;
-> +			/delete-node/ sim at 21b40000;
-> +		};
-> +
->  		aips3: aips-bus at 2200000 {
->  			compatible = "fsl,aips-bus", "simple-bus";
->  			#address-cells = <1>;
-> -- 
-> 2.1.4
-> 
+Could you elaborate, do you find 128-bit read/write API useless, or
+you just correct my comment?
+
+I think that ordered uniform 128-bit access API would be helpful, even
+if not atomic.
+
+Yury.
