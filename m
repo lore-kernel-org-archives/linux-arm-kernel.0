@@ -1,71 +1,51 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 26 Jan 2018 22:05:42 +0100
-Subject: [RFC/RFT usb-next v1 5/6] usb: chipidea: do not set the "phy"
- field in struct usb_hcd
-In-Reply-To: <HE1PR04MB145071FCFAF041E0A9252FF08BE00@HE1PR04MB1450.eurprd04.prod.outlook.com>
-References: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
- <20180125001639.14681-6-martin.blumenstingl@googlemail.com>
- <HE1PR04MB145071FCFAF041E0A9252FF08BE00@HE1PR04MB1450.eurprd04.prod.outlook.com>
-Message-ID: <CAFBinCCzghJxHe-1Jzwa1ohHYYytn53QAsXYue229dVu7tB7UQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Jan 2018 21:39:12 +0000
+Subject: [RFC 1/2] arm: cacheflush syscall: process only pages that are
+ in the memory
+In-Reply-To: <589aa8ab-5bfc-e065-51f9-3a403c346d92@samsung.com>
+References: <CGME20180126111453eucas1p1330d8561386c3cf2bb457bc22c0d99a8@eucas1p1.samsung.com>
+ <20180126111441.29353-1-m.szyprowski@samsung.com>
+ <20180126113226.GX17719@n2100.armlinux.org.uk>
+ <589aa8ab-5bfc-e065-51f9-3a403c346d92@samsung.com>
+Message-ID: <20180126213911.GY17719@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Fri, Jan 26, 2018 at 02:30:47PM +0100, Marek Szyprowski wrote:
+> Hi Russell,
+> 
+> On 2018-01-26 12:32, Russell King - ARM Linux wrote:
+> >On Fri, Jan 26, 2018 at 12:14:40PM +0100, Marek Szyprowski wrote:
+> >>glibc in calls cacheflush syscall on the whole textrels section of the
+> >>relocated binaries. However, relocation usually doesn't touch all pages
+> >>of that section, so not all of them are read to memory when calling this
+> >>syscall. However flush_cache_user_range() function will unconditionally
+> >>touch all pages from the provided range, resulting additional overhead
+> >>related to reading all clean pages. Optimize this by calling
+> >>flush_cache_user_range() only on the pages that are already in the
+> >>memory.
+> >What ensures that another CPU doesn't remove a page while we're
+> >flushing it?  That will trigger a data abort, which will want to
+> >take the mmap_sem, causing a deadlock.
+> 
+> I thought that taking mmap_sem will prevent pages from being removed.
+> mmap_sem has been already taken in the previous implementation of that
+> syscall, until code simplification done by commit 97c72d89ce0e ("ARM:
+> cacheflush: don't bother rounding to nearest vma").
 
-On Fri, Jan 26, 2018 at 10:06 AM, Peter Chen <peter.chen@nxp.com> wrote:
->
->>
->> Now that usb_add_hcd parses all generic PHYs anyways the code which skips
->> initialization of a single PHY will go away.
->> Remove the code which sets struct usb_hcd's phy field from the chipidea driver as
->> this field will go away soon.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  drivers/usb/chipidea/host.c | 4 +---
->>  1 file changed, 1 insertion(+), 3 deletions(-)
->>
->> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c index
->> 19d60ed7e41f..fc324767cb0f 100644
->> --- a/drivers/usb/chipidea/host.c
->> +++ b/drivers/usb/chipidea/host.c
->> @@ -124,9 +124,7 @@ static int host_start(struct ci_hdrc *ci)
->>
->>       hcd->power_budget = ci->platdata->power_budget;
->>       hcd->tpl_support = ci->platdata->tpl_support;
->> -     if (ci->phy)
->> -             hcd->phy = ci->phy;
->> -     else
->> +     if (!ci->phy)
->>               hcd->usb_phy = ci->usb_phy;
->>
->
-> The reason hcd->phy is initialized by chipidea core is we do not need HCD core to
-> touch PHY, and PHY operation is shared for both device and host mode for chipidea.
-Chunfeng wanted me to drop the mtu3 patch because I forgot about
-device mode in the mtu3 driver.
-however, the chipidea driver seems to be different because I'm not
-dropping the whole phy_{init,power_on,power_off,exit} code from it,
-but only a "flag" that tells the HCD core to skip managing the USB PHY
+No, you're not reading the previous code state correctly.  Take a closer
+look at that commit.
 
-> If I understand correct, your HCD core PHY wrapper patch set will do PHY operation if
-> there is a "phy" node under controller's? If it is correct, you may supply one way to let
-> the HCD core bypass phy operations for some USB controllers, eg dual-role controllers.
-> Thanks.
-could you please explain why the HCD core should not manage the the
-PHYs when the chipidea driver is used?
+find_vma() requires that mmap_sem is held across the call as the VMA
+list is not stable without that semaphore held.  However, more
+importantly, notice that it drops the semaphore _before_ calling the
+cache flushing function (__do_cache_op()).
 
-my understanding is that all phy_{init,power_on,power_off,exit}
-operations are ref-counted internally in the PHY framework
-this means that if the chipidea driver calls phy_{init,power_on} first
-then the same functions called from within the HCD core are no-ops
-(except for the ref-counting)
-so I think it should not change anything - however, I have no hardware
-to actually prove that.
-it would be great if you could explain the issue behind this (and
-thereby answer the question: why we would not want the HCD core to
-manage the PHY states)!
+The point is that if __do_cache_op() faults, it will enter
+do_page_fault(), which will try to take the mmap_sem again, causing
+a deadlock.
 
-
-Regards
-Martin
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
