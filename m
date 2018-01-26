@@ -1,240 +1,180 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 11:47:08 +0000
-Subject: [PATCH 08/16] arm64: capabilities: Group handling of features
- and errata
-In-Reply-To: <20180123122809.16269-9-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-9-suzuki.poulose@arm.com>
-Message-ID: <20180126114708.GP5862@e103592.cambridge.arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 26 Jan 2018 11:52:15 +0000
+Subject: [RFC 01/37] ARM: shmobile: Add watchdog support
+In-Reply-To: <CAMuHMdWVvMJR5NHMFn6zx39jw2XdP5nteU3actUcen0dmoT-LQ@mail.gmail.com>
+References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1516903391-30467-2-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdWVvMJR5NHMFn6zx39jw2XdP5nteU3actUcen0dmoT-LQ@mail.gmail.com>
+Message-ID: <TY1PR06MB08950BD28BEC28D55C6D80EDC0E00@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:28:01PM +0000, Suzuki K Poulose wrote:
-> So far we have had separate routes for triggering errata and feature
+Hello Geert,
 
-"triggering errata" ? ;)
+> Subject: Re: [RFC 01/37] ARM: shmobile: Add watchdog support
+>
+> Hi Fabrizio,
+>
+> On Thu, Jan 25, 2018 at 7:02 PM, Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> > On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
+> > boot CPUs run a routine designed to bring up SMP and deal with hot plug.
+> > The value contained in the SBAR registers is not initialized by a WDT
+> > triggered reset, which means that after a WDT triggered reset we jump
+> > to the SMP bring up routine, preventing the system from executing the
+> > bootrom code.
+>
+> Thanks for your patch!
 
-Maybe "[...] for determining whether to activate errata workarounds and
-whether to enable feature capabilities."
+Thank you for looking into this!
 
-> capabilities. Also, we never allowed "features" based on local CPU
-> and "errata" based on System wide safe registers. This patch
-> groups the handling of errata and features and also allows them
-> to have all the possible scopes.
-> 
-> So, we now run through the arm64_features and arm64_errata:
+I am not going to reply to your comments on the other patches for now, as we need to find a solution for this particular patch we are all happy with first.
+A change to this patch may impact the other patches as well.
 
-when?
+>
+> > The purpose of this patch is to jump to the bootrom code in case of a
+> > WDT triggered reset, and keep the SMP functionality untouched.
+> > In order to tell if the code had been called due to the WDT overflowing
+> > we need to inspect flag WOVF from register RWTCSRA, however for this
+> > to work smoothly we need to make sure that RWDT clock is ON.
+> > Since it's not wise to interfere with the clock configuration from
+> > within this routine, a flag has been put in place
+> > (shmobile_wdt_clock_status) so that the watchdog driver can tell
+> > shmobile_boot_vector when the clock is ON, and therefore there is no
+> > need for shmobile_boot_vector to mess up with the clock registers.
+> >
+> > Bit WOVF survives a watchdog triggered reset, and it is usually cleared
+> > by the bootloader. Checking the MMU enable bit from register SCTLR
+> > allows us to make the code a little bit more robust (just in case the
+> > bit wasn't cleared up), as right after a reset the MMU is disabled,
+> > and when Linux is running the MMU is enabled. Also, accessing RWTCSRA
+> > physical address is safe when the MMU is down.
+>
+> Checking a hardware register is indeed a better solution than my original
+> idea to let SMP bringup set a flag in RAM, as the former is less racy.
 
-What about late cpus?
+Also, such a flag would not be accessible after the reset gets triggered.
 
->  1) with SCOPE_LOCAL_CPU filter on each boot time enabeld CPUs,
->     via update_cpu_local_capabilities().
+> However, as you can probably imagine, I don't like the
+> shmobile_wdt_clock_status part ;-)
 
-"each [...] enabeld CPUs" -> "each [...] enabled CPU".
+Neither do I!      :-D
 
-Also, changing "boot time" -> "boot-time" helps avoid this being misread
-as "on each boot", which could be taken to mean "each time a CPU comes
-online".  I'm guessing that's not the intended meaning here.
+>
+> Isn't is sufficient to check the MMU enable bit?
 
->  2) with SCOPE_SYSTEM filter only once after all boot time enabled
->     CPUs are active.
-> 
-> We could ideally merge the two tables into one. But leave it as
-> it is for easy access to the list of particular type.
-> 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/cpufeature.c | 77 ++++++++++++++++++++++++------------------
->  1 file changed, 44 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 198c5daddd65..7ae5cf9092d0 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -504,7 +504,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
->  }
->  
->  extern const struct arm64_cpu_capabilities arm64_errata[];
-> -static void update_cpu_errata_workarounds(void);
-> +static void update_cpu_local_capabilities(void);
->  
->  void __init init_cpu_features(struct cpuinfo_arm64 *info)
->  {
-> @@ -553,7 +553,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
->  	 * Run the errata work around checks on the boot CPU, once we have
->  	 * initialised the cpu feature infrastructure.
->  	 */
-> -	update_cpu_errata_workarounds();
-> +	update_cpu_local_capabilities();
->  }
->  
->  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-> @@ -1179,8 +1179,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
->  	return false;
->  }
->  
-> -static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> -				    u16 cap_type, const char *info)
-> +static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> +				      u16 cap_type, const char *info)
->  {
->  	for (; caps->matches; caps++) {
->  		if (!(caps->type & cap_type))
-> @@ -1194,6 +1194,13 @@ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->  	}
->  }
->  
-> +static void update_cpu_capabilities(u16 type)
-> +{
-> +	__update_cpu_capabilities(arm64_features, type,
-> +				"detected feature:");
-> +	__update_cpu_capabilities(arm64_errata, type,
-> +				"enabling work around for");
-> +}
->  
->  static int __enable_cpu_capability(void *arg)
->  {
-> @@ -1207,7 +1214,7 @@ static int __enable_cpu_capability(void *arg)
->   * CPUs
->   */
->  static void __init
-> -enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 caps_type)
-> +__enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 caps_type)
->  {
->  	for (; caps->matches; caps++) {
->  		unsigned int num = caps->capability;
-> @@ -1282,6 +1289,12 @@ static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_li
->  	return true;
->  }
->  
-> +static bool verify_local_cpu_caps(u16 type)
-> +{
-> +	return __verify_local_cpu_caps(arm64_features, type) &&
-> +	       __verify_local_cpu_caps(arm64_errata, type);
-> +}
-> +
->  /*
->   * Check for CPU features that are used in early boot
->   * based on the Boot CPU value.
-> @@ -1304,12 +1317,6 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
->  		}
->  }
->  
-> -static void verify_local_cpu_features(void)
-> -{
-> -	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_TYPE_ALL))
-> -		cpu_die_early();
-> -}
-> -
->  static void verify_sve_features(void)
->  {
->  	u64 safe_zcr = read_sanitised_ftr_reg(SYS_ZCR_EL1);
-> @@ -1328,26 +1335,28 @@ static void verify_sve_features(void)
->  }
->  
->  /*
-> - * The CPU Errata work arounds are detected and applied at boot time
-> - * and the related information is freed soon after. If the new CPU requires
-> - * an errata not detected at boot, fail this CPU.
-> + * Check for all capablities within the scope of local CPU.
-> + * This is run on all boot time activated CPUs.
->   */
-> -static void verify_local_cpu_errata_workarounds(void)
-> +static void update_cpu_local_capabilities(void)
+I am afraid it isn't, when bringing up SMP the cores will read the MMU flag as disabled, to make things worse at that precise point in time the rwdt clock is disabled.
+If the system just restarted due to the watchdog, then when you read WOVF chances are you are going to read '1', hence the system will fail to bring up SMP.
 
-[Gaah, stupid git diff making function insertion look like function
-modification.  Sometimes --patience does a better job, but there seems
-no foolproof solution...  If you do a respin, it might be worth trying
-it.]
+> However, that would precludes uClinux (do we care?).
 
->  {
-> -	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_TYPE_ALL))
-> -		cpu_die_early();
-> +	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_LOCAL_CPU);
->  }
->  
-> -static void update_cpu_errata_workarounds(void)
-> +/*
-> + * Check for all capablities with a system wide scope.
-> + * This is run only once after all the boot CPUs are
-> + * brought online.
-> + */
-> +static void update_system_capabilities(void)
->  {
-> -	update_cpu_capabilities(arm64_errata,
-> -				ARM64_CPUCAP_TYPE_ALL,
-> -				"enabling workaround for");
-> +	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_SYSTEM);
->  }
->  
-> -static void __init enable_errata_workarounds(void)
-> +static void enable_cpu_capabilities(u16 type)
->  {
-> -	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_TYPE_ALL);
-> +	__enable_cpu_capabilities(arm64_errata, type);
-> +	__enable_cpu_capabilities(arm64_features, type);
->  }
->  
->  /*
-> @@ -1360,8 +1369,8 @@ static void __init enable_errata_workarounds(void)
->   */
->  static void verify_local_cpu_capabilities(void)
->  {
-> -	verify_local_cpu_errata_workarounds();
-> -	verify_local_cpu_features();
-> +	if (!verify_local_cpu_caps(ARM64_CPUCAP_TYPE_ALL))
-> +		cpu_die_early();
->  	verify_local_elf_hwcaps(arm64_elf_hwcaps);
->  
->  	if (system_supports_32bit_el0())
-> @@ -1389,16 +1398,20 @@ void check_local_cpu_capabilities(void)
->  	 * advertised capabilities.
->  	 */
->  	if (!sys_caps_initialised)
-> -		update_cpu_errata_workarounds();
-> +		update_cpu_local_capabilities();
->  	else
->  		verify_local_cpu_capabilities();
->  }
->  
-> -static void __init setup_feature_capabilities(void)
-> +static void __init setup_system_capabilities(void)
->  {
-> -	update_cpu_capabilities(arm64_features,
-> -				ARM64_CPUCAP_TYPE_ALL, "detected feature:");
-> -	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_TYPE_ALL);
-> +	/*
-> +	 * We have finalised the system wide safe feature registers,
-> +	 * finalise the capabilities that depend on it.
-> +	 */
-> +	update_system_capabilities();
-> +	/* Enable all the available capabilities */
-> +	enable_cpu_capabilities(ARM64_CPUCAP_TYPE_ALL);
+The MMU will be constantly disabled in this case, wouldn't it? Therefore the reset vector will always proceed with the testing of variable "shmobile_wdt_clock_status", and it'll finally test WOVF only when it's safe to do so. If WOVF is set, then we still jump to the bootrom code. if WOVF is not set, then we jump to shmobile_boot_fn. Could you please elaborate your thoughts a little bit more?
 
-So setup_system_capabilities() enables _non_ system-wide capabilities/
-errata workarounds too?
+> Is there any other register/bit that's reset when the watchdog is
+> triggered, and always set by Linux?
 
-Maybe this function should just have a different name, like
-"setup_boot_capabilities" or similar?
+Not that I know of, but you may know better ;-P
+Any suggestion?
 
-  }
->  
->  DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
-> @@ -1422,9 +1435,7 @@ void __init setup_cpu_features(void)
->  	u32 cwg;
->  	int cls;
->  
-> -	/* Set the CPU feature capabilies */
-> -	setup_feature_capabilities();
-> -	enable_errata_workarounds();
-> +	setup_system_capabilities();
->  	mark_const_caps_ready();
->  	setup_elf_hwcaps(arm64_elf_hwcaps);
+>
+> > SMP bringup, CPU hot plug, and suspend to RAM work as normal.
+>
+> shmobile_boot_vector is not only used for R-Car Gen2 and RZ/G1 SoCs, but
+> also for EMMA Mobile, SH/R-Mobile, and R-Car H1.  Hence this breaks SMP
+> for the latter (and their build if ARCH_RENESAS=n, due to missing
+> shmobile_wdt_clock_status).
 
-I wonder whether we could unify the elf hwcaps handling too.
+As per your suggestion, I am ignoring this.
 
-That's not necessary for this series though.
+>
+> > Since shmobile_boot_vector has become bigger, "reg" property of nodes
+> > compatible with "renesas,smp-sram" now need to be set to "<0 0x64>".
+>
+> This breaks backwards compatibility with old DTs declaring a too small
+> smp-sram area. If the area is too small, you should fallback to the old and
+> smaller code.
 
-Cheers
----Dave
+Good point. I'll look into this.
+
+
+Thanks,
+Fab
+
+>
+> > --- a/arch/arm/mach-shmobile/headsmp.S
+> > +++ b/arch/arm/mach-shmobile/headsmp.S
+> > @@ -16,6 +16,13 @@
+> >  #include <asm/assembler.h>
+> >  #include <asm/memory.h>
+> >
+> > +#define RWDT_CLOCK_ON  0xdeadbeef
+> > +#define RWDT_CLOCK_OFF 0x00000000
+> > +#define SCTLR_MMU      0x01
+> > +#define BOOTROM_ADDRESS        0xE6340000
+> > +#define RWTCSRA_ADDRESS 0xE6020004
+> > +#define RWTCSRA_WOVF   0x10
+> > +
+> >  /*
+> >   * Reset vector for secondary CPUs.
+> >   * This will be mapped at address 0 by SBAR register.
+> > @@ -24,11 +31,57 @@
+> >         .arm
+> >         .align  12
+> >  ENTRY(shmobile_boot_vector)
+>
+> This should become e.g. rcar_gen2_boot_vector_wdt
+>
+> > +/*
+> > +       if (SCTLR_MMU == 1)
+> > +               goto shmobile_smp_continue;
+> > +*/
+> > +       mrc     p15, 0, r1, c1, c0, 0           @ r1 = SCTLR
+> > +       and     r0, r1, #SCTLR_MMU
+> > +       cmp     r0, #SCTLR_MMU
+> > +       beq     shmobile_smp_continue
+> > +/*
+> > +       if (shmobile_wdt_clock_status != RWDT_CLOCK_ON)
+> > +               goto shmobile_smp_continue;
+> > +*/
+> > +       ldr     r0, #shmobile_wdt_clock_status
+> > +       ldr     r1, #clock_on
+> > +       cmp     r0, r1
+> > +       bne     shmobile_smp_continue
+> > +
+> > +/*
+> > +       if (RWTCSRA_WOVF == 0)
+> > +               goto shmobile_smp_continue;
+> > +*/
+> > +       ldr     r0, rwtcsra
+> > +       mov     r1, #0
+> > +       ldrb    r1, [r0]
+> > +       and     r0, r1, #RWTCSRA_WOVF
+> > +       cmp     r0, #RWTCSRA_WOVF
+> > +       bne     shmobile_smp_continue
+> > +
+> > +/*
+> > +       goto bootrom;
+> > +*/
+> > +       ldr     r0, bootrom
+> > +       bx      r0
+> > +
+> > +shmobile_smp_continue:
+>
+> This should become
+>
+>     ENTRY(shmobile_boot_vector)
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
