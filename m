@@ -1,85 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Jan 2018 14:05:46 +0000
-Subject: [PATCH 4/7] arm64: kpti: Add ->enable callback to remap swapper
- using nG mappings
-In-Reply-To: <2d89624a-ccc2-78a0-deaf-e0494636659a@arm.com>
-References: <1516968197-23206-1-git-send-email-will.deacon@arm.com>
- <1516968197-23206-5-git-send-email-will.deacon@arm.com>
- <2d89624a-ccc2-78a0-deaf-e0494636659a@arm.com>
-Message-ID: <20180126140546.GA25364@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 26 Jan 2018 15:06:25 +0100
+Subject: [PATCH v5 1/2] staging: fsl-mc: Move core bus out of staging
+In-Reply-To: <20180126125127.26439-2-bogdan.purcareata@nxp.com>
+References: <20180126125127.26439-1-bogdan.purcareata@nxp.com>
+ <20180126125127.26439-2-bogdan.purcareata@nxp.com>
+Message-ID: <20180126140625.GA14509@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Fri, Jan 26, 2018 at 01:40:50PM +0000, Marc Zyngier wrote:
-> On 26/01/18 12:03, Will Deacon wrote:
-> > +/*
-> > + * void __kpti_install_ng_mappings(int cpu, int num_cpus, phys_addr_t swapper)
-> > + *
-> > + * Called exactly once from stop_machine context by each CPU found during boot.
-> > + */
-> > +__idmap_kpti_flag:
-> > +	.long	1
+On Fri, Jan 26, 2018 at 06:51:26AM -0600, Bogdan Purcareata wrote:
+> Move the source files out of staging into their final locations:
+>   -mc.h include file in drivers/staging/fsl-mc/include go to include/linux/fsl
+>   -source files in drivers/staging/fsl-mc/bus go to drivers/bus/fsl-mc
+>   -overview.rst, providing an overview of DPAA2, goes to
+>    Documentation/networking/dpaa2/overview.rst
 > 
-> I'm a bit concerned that we're placing the counter in a section that is
-> not writeable (at least in theory). We can either have the idmap
-> writeable entirely, or have a idmap data section (which means extending
-> it to be more than a single page).
-
-The idmap is mapped using the same attributes as the initial swapper
-mappings (SWAPPER_MM_MMUFLAGS) but, unlike swapper, it is not subsequently
-remapped and therefore remains writeable.
-
-I could update the .pushsection flags to reflect this with "awx"?
-
-Also, whilst looking around in head.S, I noticed phys_to_pte. I'll move
-that into assembler.h and switch the argument order as a separate patch.
-
-> Not sure if that's a concern, but I thought I'd raise it. The core works
-> pretty well as is, so  it cannot be completely wrong... ;-)
-
-Is that a Tested-by? ;)
-
-> > +ENTRY(idmap_kpti_install_ng_mappings)
-> > +	cpu		.req	w0
-> > +	num_cpus	.req	w1
-> > +	swapper_pa	.req	x2
-> > +	swapper_ttb	.req	x3
-> > +	flag_ptr	.req	x4
-> > +	cur_pgdp	.req	x5
-> > +	end_pgdp	.req	x6
-> > +	pgd		.req	x7
-> > +	cur_pudp	.req	x8
-> > +	end_pudp	.req	x9
-> > +	pud		.req	x10
-> > +	cur_pmdp	.req	x11
-> > +	end_pmdp	.req	x12
-> > +	pmd		.req	x13
-> > +	cur_ptep	.req	x14
-> > +	end_ptep	.req	x15
-> > +	pte		.req	x16
-> > +
-> > +	mrs	swapper_ttb, ttbr1_el1
-> > +	adr	flag_ptr, __idmap_kpti_flag
-> > +
-> > +	cbnz	cpu, __idmap_kpti_secondary
-> > +
-> > +	/* We're the boot CPU. Wait for the others to catch up */
-> > +	sevl
-> > +1:	wfe
-> > +	ldaxr	w18, [flag_ptr]
-> > +	eor	w18, w18, num_cpus
-> > +	cbnz	w18, 1b
-> > +
-> > +	/* We need to walk swapper, so turn off the MMU. */
-> > +	pre_disable_mmu_workaround
-> > +	mrs	x18, sctlr_el1
-> > +	bic	x18, x18, #1
+> Update or delete other remaining staging files -- Makefile, Kconfig, TODO.
+> Update dpaa2_eth and dpio staging drivers.
+> Add integration bits for the documentation build system.
 > 
-> nit: You should be able to use SCTLR_ELx_M, as we already include
-> sysreg.h (indirectly).
+> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> [rebased, add dpaa2_eth and dpio #include updates]
+> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> [rebased, split irqchip to separate patch]
+> Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Notes:
+>     -v5:
+>       - split irqchip glue code to separate patch (GregKH)
+>       - integrate doc with the kernel build system
+>     -v4:
+>       - regenerated patch with renames detection disabled (Andrew Lunn)
+>     -v3:
+>       - rebased
+>     -v2:
+>       - group irqchip gic its glue code together with the rest (Marc Zyngier)
+> 
+>  Documentation/networking/dpaa2/index.rst           |   8 +
+>  Documentation/networking/dpaa2/overview.rst        | 404 +++++++++
+>  Documentation/networking/index.rst                 |   1 +
+>  MAINTAINERS                                        |   3 +-
+>  drivers/bus/Kconfig                                |   2 +
+>  drivers/bus/Makefile                               |   4 +
+>  drivers/bus/fsl-mc/Kconfig                         |  16 +
+>  drivers/bus/fsl-mc/Makefile                        |  16 +
+>  drivers/bus/fsl-mc/dpmcp.c                         |  99 +++
+>  drivers/bus/fsl-mc/dprc-driver.c                   | 809 ++++++++++++++++++
+>  drivers/bus/fsl-mc/dprc.c                          | 532 ++++++++++++
+>  drivers/bus/fsl-mc/fsl-mc-allocator.c              | 648 ++++++++++++++
+>  drivers/bus/fsl-mc/fsl-mc-bus.c                    | 948 +++++++++++++++++++++
+>  drivers/bus/fsl-mc/fsl-mc-msi.c                    | 285 +++++++
+>  drivers/bus/fsl-mc/fsl-mc-private.h                | 475 +++++++++++
+>  drivers/bus/fsl-mc/mc-io.c                         | 268 ++++++
+>  drivers/bus/fsl-mc/mc-sys.c                        | 296 +++++++
+>  drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
+>  drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
+>  drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
+>  drivers/staging/fsl-mc/TODO                        |  18 -
+>  drivers/staging/fsl-mc/bus/Kconfig                 |  10 -
+>  drivers/staging/fsl-mc/bus/Makefile                |  16 +-
+>  drivers/staging/fsl-mc/bus/dpbp.c                  |   2 +-
+>  drivers/staging/fsl-mc/bus/dpcon.c                 |   2 +-
+>  drivers/staging/fsl-mc/bus/dpio/dpio-driver.c      |   2 +-
+>  drivers/staging/fsl-mc/bus/dpio/dpio-service.c     |   2 +-
+>  drivers/staging/fsl-mc/bus/dpio/dpio.c             |   2 +-
+>  drivers/staging/fsl-mc/bus/dpmcp.c                 |  99 ---
+>  drivers/staging/fsl-mc/bus/dprc-driver.c           | 809 ------------------
+>  drivers/staging/fsl-mc/bus/dprc.c                  | 531 ------------
+>  drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      | 648 --------------
+>  drivers/staging/fsl-mc/bus/fsl-mc-bus.c            | 948 ---------------------
+>  drivers/staging/fsl-mc/bus/fsl-mc-msi.c            | 284 ------
+>  drivers/staging/fsl-mc/bus/fsl-mc-private.h        | 475 -----------
+>  .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   2 +-
+>  drivers/staging/fsl-mc/bus/mc-io.c                 | 268 ------
+>  drivers/staging/fsl-mc/bus/mc-sys.c                | 296 -------
+>  drivers/staging/fsl-mc/include/mc.h                | 454 ----------
+>  drivers/staging/fsl-mc/overview.rst                | 404 ---------
+>  include/linux/fsl/mc.h                             | 454 ++++++++++
+>  41 files changed, 5279 insertions(+), 5267 deletions(-)
+>  create mode 100644 Documentation/networking/dpaa2/index.rst
+>  create mode 100644 Documentation/networking/dpaa2/overview.rst
+>  create mode 100644 drivers/bus/fsl-mc/Kconfig
+>  create mode 100644 drivers/bus/fsl-mc/Makefile
+>  create mode 100644 drivers/bus/fsl-mc/dpmcp.c
+>  create mode 100644 drivers/bus/fsl-mc/dprc-driver.c
+>  create mode 100644 drivers/bus/fsl-mc/dprc.c
+>  create mode 100644 drivers/bus/fsl-mc/fsl-mc-allocator.c
+>  create mode 100644 drivers/bus/fsl-mc/fsl-mc-bus.c
+>  create mode 100644 drivers/bus/fsl-mc/fsl-mc-msi.c
+>  create mode 100644 drivers/bus/fsl-mc/fsl-mc-private.h
+>  create mode 100644 drivers/bus/fsl-mc/mc-io.c
+>  create mode 100644 drivers/bus/fsl-mc/mc-sys.c
+>  delete mode 100644 drivers/staging/fsl-mc/TODO
+>  delete mode 100644 drivers/staging/fsl-mc/bus/dpmcp.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/dprc-driver.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/dprc.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-private.h
+>  delete mode 100644 drivers/staging/fsl-mc/bus/mc-io.c
+>  delete mode 100644 drivers/staging/fsl-mc/bus/mc-sys.c
+>  delete mode 100644 drivers/staging/fsl-mc/include/mc.h
+>  delete mode 100644 drivers/staging/fsl-mc/overview.rst
+>  create mode 100644 include/linux/fsl/mc.h
 
-Aha, I looked for that and failed to find it. Thanks.
+I thought you were creating this with -M to git format-patch, what
+happened?  That will show the files being renamed, not just deleted and
+added.
 
-Will
+thanks,
+
+greg k-h
