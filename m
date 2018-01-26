@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jan 2018 11:32:10 +0100
-Subject: [RFC 36/37] ARM: dts: iwg20m: Add watchdog support to SoM dtsi
-In-Reply-To: <1516903391-30467-37-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Fri, 26 Jan 2018 11:32:35 +0100
+Subject: [RFC 37/37] ARM: dts: iwg22m: Add watchdog support to SoM dtsi
+In-Reply-To: <1516903391-30467-38-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1516903391-30467-37-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdWMtOV2wWVzbuk7zzPOonV0_uo5EdPDCv2KKjz90P9ZRQ@mail.gmail.com>
+ <1516903391-30467-38-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdU+_b6503dea70GuZsrpeQM8WQF1i+Z-RTBo6nYVmhCOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
