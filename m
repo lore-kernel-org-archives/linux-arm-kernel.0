@@ -1,144 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 14:41:20 +0000
-Subject: [PATCH 15/16] arm64: Delay enabling hardware DBM feature
-In-Reply-To: <20180123122809.16269-16-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-16-suzuki.poulose@arm.com>
-Message-ID: <20180126144119.GV5862@e103592.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 26 Jan 2018 15:43:34 +0100
+Subject: [RFC PATCH 0/9] initial support for "suniv" Allwinner new ARM9 SoC
+In-Reply-To: <2A78FC75-61C0-4317-A7A1-6E1E42098C07@aosc.io>
+References: <20180119231735.61504-1-icenowy@aosc.io>
+ <20180122121435.bpayxk4uzfqbhqse@flea.lan>
+ <14593819.uISRktVE4V@ice-x220i>
+ <20180125153520.lxcfvh3yvi36uiux@flea.lan>
+ <2A78FC75-61C0-4317-A7A1-6E1E42098C07@aosc.io>
+Message-ID: <20180126144334.27hengoucfipdsdj@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:28:08PM +0000, Suzuki K Poulose wrote:
-> We enable hardware DBM bit in a capable CPU, very early in the
-> boot via __cpu_setup. This doesn't give us a flexibility of
-> optionally disable the feature, as the clearing the bit
-> is a bit costly as the TLB can cache the settings. Instead,
-> we delay enabling the feature until the CPU is brought up
-> into the kernel. We use the feature capability mechanism
-> to handle it.
+On Thu, Jan 25, 2018 at 11:38:04PM +0800, Icenowy Zheng wrote:
+> >On Wed, Jan 24, 2018 at 09:10:34PM +0800, Icenowy Zheng wrote:
+> >> ? 2018?1?22???? CST ??8:14:35?Maxime Ripard ???
+> >> > On Sat, Jan 20, 2018 at 07:17:26AM +0800, Icenowy Zheng wrote:
+> >> > > This is the RFC initial patchset for the "new" Allwinner SUNIV
+> >ARM9 SoC.
+> >> > > 
+> >> > > The same die is packaged differently, come with different
+> >co-packaged
+> >> > > DRAM or shipped with different SDK; and then made many model
+> >names: F23,
+> >> > > F25, F1C100A, F1C100S, F1C200S, F1C500, F1C600, R6, etc. These
+> >SoCs all
+> >> > > share a common feature set and are packaged similarly (eLQFP128
+> >for SoCs
+> >> > > without co-packaged DRAM, QFN88 for with DRAM). As their's no
+> >> > > functionality hidden on the QFN88 models (except DRAM interface
+> >not
+> >> > > exported), it's not clever to differentiate them. So I will use
+> >suniv as
+> >> > > common name of all these SoCs.
+> >> > 
+> >> > Where is that suniv prefix coming from?
+> >> 
+> >> The BSP (Melis and Linux). (e.g. "libs/suniv" directory of the Melis
+> >SDK and 
+> >> "arch/arm/boot/dts/sunivw1p1.dtsi" in the Linux SDK)
+> >
+> >Do you have a link to that BSP?
 > 
-> The hardware DBM is a non-conflicting feature. i.e, the kernel
-> can safely run with a mix of CPUs with some using the feature
-> and the others don't. So, it is safe for a late CPU to have
-> this capability and enable it, even if the active CPUs don't.
-> 
-> To get this handled properly by the infrastructure, we
-> unconditionally set the capability and only enable it
-> on CPUs which really have the feature. Adds a new type
-> of feature to the capability infrastructure which
-> ignores the conflict in a late CPU.
-> 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/cpucaps.h    |  3 ++-
->  arch/arm64/include/asm/cpufeature.h |  8 +++++++
->  arch/arm64/kernel/cpufeature.c      | 42 +++++++++++++++++++++++++++++++++++++
->  arch/arm64/mm/proc.S                |  5 +----
->  4 files changed, 53 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index bb263820de13..8df80cc828ac 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -45,7 +45,8 @@
->  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
->  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
->  #define ARM64_HAS_RAS_EXTN			26
-> +#define ARM64_HW_DBM				27
->  
-> -#define ARM64_NCAPS				27
-> +#define ARM64_NCAPS				28
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 70712de687c7..243ec7c77c79 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -126,6 +126,14 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->   */
->  #define ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE	\
->  	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
-> +/*
-> + * CPU feature detected on each local CPU. It is safe for a late CPU to
-> + * either have it or not.
-> + */
-> +#define ARM64_CPUCAP_WEAK_CPU_LOCAL_FEATURE	 \
-> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|\
-> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	|\
-> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE)
+> I have it on the Baidu Pan. Is it acceptable?
 
-OK, so this is similar to my suggestion for HAS_NO_HW_PREFETCH (though
-that need not have the same answer -- I was speculating there).
+Yep, it's not crazy fast but it works :)
 
-Nit: tab between | and \?
+Thanks!
+Maxime
 
->  struct arm64_cpu_capabilities {
->  	const char *desc;
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 2627a836e99d..8af755b8219d 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -894,6 +894,35 @@ static int __init parse_kpti(char *str)
->  __setup("kpti=", parse_kpti);
->  #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
->  
-> +#ifdef CONFIG_ARM64_HW_AFDBM
-> +static bool has_hw_dbm(const struct arm64_cpu_capabilities *entry, int scope)
-> +{
-> +	/*
-> +	 * DBM is a non-conflicting feature. i.e, the kernel can safely run
-> +	 * a mix of CPUs with and without the feature. So, we unconditionally
-> +	 * enable the capability to allow any late CPU to use the feature.
-> +	 * We only enable the control bits on the CPU, if it actually supports.
-> +	 */
-> +	return true;
-> +}
-> +
-> +static inline void __cpu_enable_hw_dbm(void)
-> +{
-> +	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
-> +
-> +	write_sysreg(tcr, tcr_el1);
-> +	isb();
-
-Do we need this isb?  Do we care exactly when setting TCR_HD appears
-to take effect?
-
-> +}
-> +
-> +static int cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
-> +{
-> +	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU))
-> +		__cpu_enable_hw_dbm();
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
->  static int cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->  {
->  	/*
-> @@ -1052,6 +1081,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  		.enable = cpu_clear_disr,
->  	},
->  #endif /* CONFIG_ARM64_RAS_EXTN */
-> +#ifdef CONFIG_ARM64_HW_AFDBM
-> +	{
-> +		.desc = "Hardware pagetable Dirty Bit Management",
-> +		.type = ARM64_CPUCAP_WEAK_CPU_LOCAL_FEATURE,
-> +		.capability = ARM64_HW_DBM,
-> +		.sys_reg = SYS_ID_AA64MMFR1_EL1,
-> +		.sign = FTR_UNSIGNED,
-> +		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
-> +		.min_field_value = 2,
-> +		.matches = has_hw_dbm,
-
-Can't we use has_cpuid_feature here?  Why do we need a fake .matches and
-then code the check manually in the enable mathod?
-
-I may be missing something here.
-
-[...]
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180126/18006b5f/attachment.sig>
