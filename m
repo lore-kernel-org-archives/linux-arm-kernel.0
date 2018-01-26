@@ -1,89 +1,69 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 26 Jan 2018 12:44:16 -0800
-Subject: [PATCH v3 1/6] arm: Add BTB invalidation on switch_mm for
- Cortex-A9, A12 and A17
-In-Reply-To: <20180125152139.32431-2-marc.zyngier@arm.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-2-marc.zyngier@arm.com>
-Message-ID: <1e81134a-c88f-1764-a193-24e55eb43819@gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 27 Jan 2018 04:57:33 +0800
+Subject: [RFC PATCH 0/9] initial support for "suniv" Allwinner new ARM9 SoC
+In-Reply-To: <20180125153520.lxcfvh3yvi36uiux@flea.lan>
+References: <20180119231735.61504-1-icenowy@aosc.io>
+ <14593819.uISRktVE4V@ice-x220i> <20180125153520.lxcfvh3yvi36uiux@flea.lan>
+Message-ID: <3527360.oZpfb5Pa1p@ice-x220i>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2018 07:21 AM, Marc Zyngier wrote:
-> In order to avoid aliasing attacks against the branch predictor,
-> some implementations require to invalidate the BTB when switching
-> from one user context to another.
+? 2018?1?25???? CST ??11:35:20?Maxime Ripard ???
+> Hi,
 > 
-> For this, we reuse the existing implementation for Cortex-A8, and
-> apply it to A9, A12 and A17.
+> On Wed, Jan 24, 2018 at 09:10:34PM +0800, Icenowy Zheng wrote:
+> > ? 2018?1?22???? CST ??8:14:35?Maxime Ripard ???
+> > 
+> > > On Sat, Jan 20, 2018 at 07:17:26AM +0800, Icenowy Zheng wrote:
+> > > > This is the RFC initial patchset for the "new" Allwinner SUNIV ARM9
+> > > > SoC.
+> > > > 
+> > > > The same die is packaged differently, come with different co-packaged
+> > > > DRAM or shipped with different SDK; and then made many model names:
+> > > > F23,
+> > > > F25, F1C100A, F1C100S, F1C200S, F1C500, F1C600, R6, etc. These SoCs
+> > > > all
+> > > > share a common feature set and are packaged similarly (eLQFP128 for
+> > > > SoCs
+> > > > without co-packaged DRAM, QFN88 for with DRAM). As their's no
+> > > > functionality hidden on the QFN88 models (except DRAM interface not
+> > > > exported), it's not clever to differentiate them. So I will use suniv
+> > > > as
+> > > > common name of all these SoCs.
+> > > 
+> > > Where is that suniv prefix coming from?
+> > 
+> > The BSP (Melis and Linux). (e.g. "libs/suniv" directory of the Melis SDK
+> > and "arch/arm/boot/dts/sunivw1p1.dtsi" in the Linux SDK)
+> 
+> Do you have a link to that BSP?
 
-Should this read: and apply it to A8, A9, A12 and A17
+https://pan.baidu.com/s/1rar5YtI
+
+There's Melis (F1C100s) and Linux (F1C600) BSP.
 
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mm/proc-v7-2level.S |  4 ++--
->  arch/arm/mm/proc-v7-3level.S |  6 ++++++
->  arch/arm/mm/proc-v7.S        | 30 +++++++++++++++---------------
->  3 files changed, 23 insertions(+), 17 deletions(-)
+> > > You should really answer two questions here:
+> > >   - Are you able to predict whether you'll find an SoC part of that
+> > >   
+> > >     family in the future that derives a bit and will need a compatible
+> > >     of its own?
+> > >   
+> > >   - Are you able to predict which quirks we'll need along the way to
+> > >   
+> > >     support all the SoCs you've listed there?
+> > > 
+> > > If you can't answer yes to both these questions, with a 100%
+> > > certainty, then you'll need a SoC name in the compatible.
+> > > 
+> > > Which doesn't prevent you from sharing as much as possible the DT like
+> > > we did between the A10s and the A13 for example.
+> > 
+> > So the suniv-f1c100s.dtsi will still be kept empty and all peripherals
+> > known should go through suniv.dtsi.
 > 
-> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-> index c6141a5435c3..0422e58b74e8 100644
-> --- a/arch/arm/mm/proc-v7-2level.S
-> +++ b/arch/arm/mm/proc-v7-2level.S
-> @@ -41,7 +41,7 @@
->   *	even on Cortex-A8 revisions not affected by 430973.
->   *	If IBE is not set, the flush BTAC/BTB won't do anything.
->   */
-> -ENTRY(cpu_ca8_switch_mm)
-> +ENTRY(cpu_v7_btbinv_switch_mm)
->  #ifdef CONFIG_MMU
->  	mov	r2, #0
->  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
-> @@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
->  #endif
->  	bx	lr
->  ENDPROC(cpu_v7_switch_mm)
-> -ENDPROC(cpu_ca8_switch_mm)
-> +ENDPROC(cpu_v7_btbinv_switch_mm)
->  
->  /*
->   *	cpu_v7_set_pte_ext(ptep, pte)
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 7d16bbc4102b..934272e1fa08 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -54,6 +54,11 @@
->   * Set the translation table base pointer to be pgd_phys (physical address of
->   * the new TTB).
->   */
-> +ENTRY(cpu_v7_btbinv_switch_mm)
-> +#ifdef CONFIG_MMU
-> +	mov	r2, #0
-> +	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
-> +#endif
->  ENTRY(cpu_v7_switch_mm)
->  #ifdef CONFIG_MMU
->  	mmid	r2, r2
-> @@ -64,6 +69,7 @@ ENTRY(cpu_v7_switch_mm)
->  #endif
->  	ret	lr
->  ENDPROC(cpu_v7_switch_mm)
-> +ENDPROC(cpu_v7_btbinv_switch_mm)
->  
->  #ifdef __ARMEB__
->  #define rl r3
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 01d64c0b2563..0a14967fd400 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -159,18 +159,18 @@ ENDPROC(cpu_v7_do_resume)
->  #endif
->  
->  /*
-> - * Cortex-A8
-> + * Cortex-A8/A12/A17 that require a BTB invalidation on switch_mm
-
-Should this read Cortex-A8/A9/A12/A17?
--- 
-Florian
+> Sorry if I wasn't really clear. You can totally keep the current DT
+> structure if that makes sense (and judging by what you're saying, it
+> does.), but the compatibles should have the SoC name in it.
+> 
+> Maxime
