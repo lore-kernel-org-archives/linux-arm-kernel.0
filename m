@@ -1,162 +1,144 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 26 Jan 2018 14:28:47 +0000
-Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <20180126142847.31240-1-marc.zyngier@arm.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
-Message-ID: <20180126142847.31240-15-marc.zyngier@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jan 2018 14:41:20 +0000
+Subject: [PATCH 15/16] arm64: Delay enabling hardware DBM feature
+In-Reply-To: <20180123122809.16269-16-suzuki.poulose@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-16-suzuki.poulose@arm.com>
+Message-ID: <20180126144119.GV5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
-It is lovely. Really.
+On Tue, Jan 23, 2018 at 12:28:08PM +0000, Suzuki K Poulose wrote:
+> We enable hardware DBM bit in a capable CPU, very early in the
+> boot via __cpu_setup. This doesn't give us a flexibility of
+> optionally disable the feature, as the clearing the bit
+> is a bit costly as the TLB can cache the settings. Instead,
+> we delay enabling the feature until the CPU is brought up
+> into the kernel. We use the feature capability mechanism
+> to handle it.
+> 
+> The hardware DBM is a non-conflicting feature. i.e, the kernel
+> can safely run with a mix of CPUs with some using the feature
+> and the others don't. So, it is safe for a late CPU to have
+> this capability and enable it, even if the active CPUs don't.
+> 
+> To get this handled properly by the infrastructure, we
+> unconditionally set the capability and only enable it
+> on CPUs which really have the feature. Adds a new type
+> of feature to the capability infrastructure which
+> ignores the conflict in a late CPU.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/cpucaps.h    |  3 ++-
+>  arch/arm64/include/asm/cpufeature.h |  8 +++++++
+>  arch/arm64/kernel/cpufeature.c      | 42 +++++++++++++++++++++++++++++++++++++
+>  arch/arm64/mm/proc.S                |  5 +----
+>  4 files changed, 53 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index bb263820de13..8df80cc828ac 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -45,7 +45,8 @@
+>  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+>  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+>  #define ARM64_HAS_RAS_EXTN			26
+> +#define ARM64_HW_DBM				27
+>  
+> -#define ARM64_NCAPS				27
+> +#define ARM64_NCAPS				28
+>  
+>  #endif /* __ASM_CPUCAPS_H */
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 70712de687c7..243ec7c77c79 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -126,6 +126,14 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>   */
+>  #define ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE	\
+>  	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
+> +/*
+> + * CPU feature detected on each local CPU. It is safe for a late CPU to
+> + * either have it or not.
+> + */
+> +#define ARM64_CPUCAP_WEAK_CPU_LOCAL_FEATURE	 \
+> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|\
+> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	|\
+> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE)
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/bpi.S        | 20 ++++++++++++
- arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 90 insertions(+), 1 deletion(-)
+OK, so this is similar to my suggestion for HAS_NO_HW_PREFETCH (though
+that need not have the same answer -- I was speculating there).
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index 76225c2611ea..add7e08a018d 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <linux/arm-smccc.h>
- 
- .macro ventry target
- 	.rept 31
-@@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
- 	.endr
- 	ldp	x29, x30, [sp], #16
- ENTRY(__qcom_hyp_sanitize_link_stack_end)
-+
-+.macro smccc_workaround_1 inst
-+	sub	sp, sp, #(8 * 4)
-+	stp	x2, x3, [sp, #(16 * 0)]
-+	stp	x0, x1, [sp, #(16 * 1)]
-+	orr	w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	\inst	#0
-+	ldp	x2, x3, [sp, #(16 * 0)]
-+	ldp	x0, x1, [sp, #(16 * 1)]
-+	add	sp, sp, #(8 * 4)
-+.endm
-+
-+ENTRY(__smccc_workaround_1_smc_start)
-+	smccc_workaround_1	smc
-+ENTRY(__smccc_workaround_1_smc_end)
-+
-+ENTRY(__smccc_workaround_1_hvc_start)
-+	smccc_workaround_1	hvc
-+ENTRY(__smccc_workaround_1_hvc_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index ed6881882231..f1501873f2e4 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
- extern char __qcom_hyp_sanitize_link_stack_start[];
- extern char __qcom_hyp_sanitize_link_stack_end[];
-+extern char __smccc_workaround_1_smc_start[];
-+extern char __smccc_workaround_1_smc_end[];
-+extern char __smccc_workaround_1_hvc_start[];
-+extern char __smccc_workaround_1_hvc_end[];
- 
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
-@@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- #define __psci_hyp_bp_inval_end			NULL
- #define __qcom_hyp_sanitize_link_stack_start	NULL
- #define __qcom_hyp_sanitize_link_stack_end	NULL
-+#define __smccc_workaround_1_smc_start		NULL
-+#define __smccc_workaround_1_smc_end		NULL
-+#define __smccc_workaround_1_hvc_start		NULL
-+#define __smccc_workaround_1_hvc_end		NULL
- 
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
-@@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
- 
-+#include <uapi/linux/psci.h>
-+#include <linux/arm-smccc.h>
- #include <linux/psci.h>
- 
-+static void call_smc_arch_workaround_1(void)
-+{
-+	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
-+	asm volatile("smc	#0\n"
-+		     : "+r" (w0));
-+}
-+
-+static void call_hvc_arch_workaround_1(void)
-+{
-+	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
-+	asm volatile("hvc	#0\n"
-+		     : "+r" (w0));
-+}
-+
-+static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-+{
-+	bp_hardening_cb_t cb;
-+	void *smccc_start, *smccc_end;
-+	struct arm_smccc_res res;
-+
-+	if (psci_ops.variant == SMCCC_VARIANT_1_0)
-+		return false;
-+
-+	switch (psci_ops.conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+			      ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
-+			      &res);
-+		if (res.a0)
-+			return false;
-+		cb = call_hvc_arch_workaround_1;
-+		smccc_start = __smccc_workaround_1_hvc_start;
-+		smccc_end = __smccc_workaround_1_hvc_end;
-+		break;
-+
-+	case PSCI_CONDUIT_SMC:
-+		arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+			      ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
-+			      &res);
-+		if (res.a0)
-+			return false;
-+		cb = call_smc_arch_workaround_1;
-+		smccc_start = __smccc_workaround_1_smc_start;
-+		smccc_end = __smccc_workaround_1_smc_end;
-+		break;
-+
-+	default:
-+		return false;
-+	}
-+
-+	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
-+
-+	return true;
-+}
-+
- static int enable_psci_bp_hardening(void *data)
- {
- 	const struct arm64_cpu_capabilities *entry = data;
- 
--	if (psci_ops.get_version)
-+	if (psci_ops.get_version) {
-+		if (check_smccc_arch_workaround_1(entry))
-+			return 0;
-+
- 		install_bp_hardening_cb(entry,
- 				       (bp_hardening_cb_t)psci_ops.get_version,
- 				       __psci_hyp_bp_inval_start,
- 				       __psci_hyp_bp_inval_end);
-+	}
- 
- 	return 0;
- }
--- 
-2.14.2
+Nit: tab between | and \?
+
+>  struct arm64_cpu_capabilities {
+>  	const char *desc;
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 2627a836e99d..8af755b8219d 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -894,6 +894,35 @@ static int __init parse_kpti(char *str)
+>  __setup("kpti=", parse_kpti);
+>  #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>  
+> +#ifdef CONFIG_ARM64_HW_AFDBM
+> +static bool has_hw_dbm(const struct arm64_cpu_capabilities *entry, int scope)
+> +{
+> +	/*
+> +	 * DBM is a non-conflicting feature. i.e, the kernel can safely run
+> +	 * a mix of CPUs with and without the feature. So, we unconditionally
+> +	 * enable the capability to allow any late CPU to use the feature.
+> +	 * We only enable the control bits on the CPU, if it actually supports.
+> +	 */
+> +	return true;
+> +}
+> +
+> +static inline void __cpu_enable_hw_dbm(void)
+> +{
+> +	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
+> +
+> +	write_sysreg(tcr, tcr_el1);
+> +	isb();
+
+Do we need this isb?  Do we care exactly when setting TCR_HD appears
+to take effect?
+
+> +}
+> +
+> +static int cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
+> +{
+> +	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU))
+> +		__cpu_enable_hw_dbm();
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+>  static int cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+>  {
+>  	/*
+> @@ -1052,6 +1081,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>  		.enable = cpu_clear_disr,
+>  	},
+>  #endif /* CONFIG_ARM64_RAS_EXTN */
+> +#ifdef CONFIG_ARM64_HW_AFDBM
+> +	{
+> +		.desc = "Hardware pagetable Dirty Bit Management",
+> +		.type = ARM64_CPUCAP_WEAK_CPU_LOCAL_FEATURE,
+> +		.capability = ARM64_HW_DBM,
+> +		.sys_reg = SYS_ID_AA64MMFR1_EL1,
+> +		.sign = FTR_UNSIGNED,
+> +		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
+> +		.min_field_value = 2,
+> +		.matches = has_hw_dbm,
+
+Can't we use has_cpuid_feature here?  Why do we need a fake .matches and
+then code the check manually in the enable mathod?
+
+I may be missing something here.
+
+[...]
+
+Cheers
+---Dave
