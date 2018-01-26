@@ -1,164 +1,153 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Jan 2018 16:05:24 +0000
-Subject: [PATCH 15/16] arm64: Delay enabling hardware DBM feature
-In-Reply-To: <20180126144119.GV5862@e103592.cambridge.arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-16-suzuki.poulose@arm.com>
- <20180126144119.GV5862@e103592.cambridge.arm.com>
-Message-ID: <447fb2b7-1924-94b2-ff78-c97cd8bcea8d@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Jan 2018 16:07:48 +0000
+Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+ support
+In-Reply-To: <6d2eae60-44b7-e5c2-0e71-f27ce2322237@arm.com>
+References: <20180126142847.31240-1-marc.zyngier@arm.com>
+ <20180126142847.31240-15-marc.zyngier@arm.com>
+ <6d2eae60-44b7-e5c2-0e71-f27ce2322237@arm.com>
+Message-ID: <fc96e301-9638-fd67-13a2-e99afc8c1ef9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 14:41, Dave Martin wrote:
-> On Tue, Jan 23, 2018 at 12:28:08PM +0000, Suzuki K Poulose wrote:
->> We enable hardware DBM bit in a capable CPU, very early in the
->> boot via __cpu_setup. This doesn't give us a flexibility of
->> optionally disable the feature, as the clearing the bit
->> is a bit costly as the TLB can cache the settings. Instead,
->> we delay enabling the feature until the CPU is brought up
->> into the kernel. We use the feature capability mechanism
->> to handle it.
+Hi Robin,
+
+On 26/01/18 15:50, Robin Murphy wrote:
+> On 26/01/18 14:28, Marc Zyngier wrote:
+>> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
+>> It is lovely. Really.
 >>
->> The hardware DBM is a non-conflicting feature. i.e, the kernel
->> can safely run with a mix of CPUs with some using the feature
->> and the others don't. So, it is safe for a late CPU to have
->> this capability and enable it, even if the active CPUs don't.
->>
->> To get this handled properly by the infrastructure, we
->> unconditionally set the capability and only enable it
->> on CPUs which really have the feature. Adds a new type
->> of feature to the capability infrastructure which
->> ignores the conflict in a late CPU.
->>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>   arch/arm64/include/asm/cpucaps.h    |  3 ++-
->>   arch/arm64/include/asm/cpufeature.h |  8 +++++++
->>   arch/arm64/kernel/cpufeature.c      | 42 +++++++++++++++++++++++++++++++++++++
->>   arch/arm64/mm/proc.S                |  5 +----
->>   4 files changed, 53 insertions(+), 5 deletions(-)
+>>   arch/arm64/kernel/bpi.S        | 20 ++++++++++++
+>>   arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
+>>   2 files changed, 90 insertions(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
->> index bb263820de13..8df80cc828ac 100644
->> --- a/arch/arm64/include/asm/cpucaps.h
->> +++ b/arch/arm64/include/asm/cpucaps.h
->> @@ -45,7 +45,8 @@
->>   #define ARM64_HARDEN_BRANCH_PREDICTOR		24
->>   #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
->>   #define ARM64_HAS_RAS_EXTN			26
->> +#define ARM64_HW_DBM				27
->>   
->> -#define ARM64_NCAPS				27
->> +#define ARM64_NCAPS				28
->>   
->>   #endif /* __ASM_CPUCAPS_H */
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index 70712de687c7..243ec7c77c79 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -126,6 +126,14 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>> index 76225c2611ea..add7e08a018d 100644
+>> --- a/arch/arm64/kernel/bpi.S
+>> +++ b/arch/arm64/kernel/bpi.S
+>> @@ -17,6 +17,7 @@
 >>    */
->>   #define ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE	\
->>   	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
->> +/*
->> + * CPU feature detected on each local CPU. It is safe for a late CPU to
->> + * either have it or not.
->> + */
->> +#define ARM64_CPUCAP_WEAK_CPU_LOCAL_FEATURE	 \
->> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|\
->> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	|\
->> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE)
-> 
-> OK, so this is similar to my suggestion for HAS_NO_HW_PREFETCH (though
-> that need not have the same answer -- I was speculating there).
-
-Yes, I was under the assumption that HAS_NO_HW_PREFETCH is treated as
-a "Late CPU can't have the capability" type, hence the "STRICT_CPU_LOCAL",
-as we can't apply work-arounds anymore for this CPU. However, since
-we only suffer a performance impact, we could as well convert it to
-a WEAK one.
-
-> 
-> Nit: tab between | and \?
-
-Sure.
-
-> 
->>   struct arm64_cpu_capabilities {
->>   	const char *desc;
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 2627a836e99d..8af755b8219d 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -894,6 +894,35 @@ static int __init parse_kpti(char *str)
->>   __setup("kpti=", parse_kpti);
->>   #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
 >>   
->> +#ifdef CONFIG_ARM64_HW_AFDBM
->> +static bool has_hw_dbm(const struct arm64_cpu_capabilities *entry, int scope)
->> +{
->> +	/*
->> +	 * DBM is a non-conflicting feature. i.e, the kernel can safely run
->> +	 * a mix of CPUs with and without the feature. So, we unconditionally
->> +	 * enable the capability to allow any late CPU to use the feature.
->> +	 * We only enable the control bits on the CPU, if it actually supports.
->> +	 */
->> +	return true;
->> +}
+>>   #include <linux/linkage.h>
+>> +#include <linux/arm-smccc.h>
+>>   
+>>   .macro ventry target
+>>   	.rept 31
+>> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+>>   	.endr
+>>   	ldp	x29, x30, [sp], #16
+>>   ENTRY(__qcom_hyp_sanitize_link_stack_end)
 >> +
->> +static inline void __cpu_enable_hw_dbm(void)
->> +{
->> +	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
->> +
->> +	write_sysreg(tcr, tcr_el1);
->> +	isb();
+>> +.macro smccc_workaround_1 inst
+>> +	sub	sp, sp, #(8 * 4)
+>> +	stp	x2, x3, [sp, #(16 * 0)]
 > 
-> Do we need this isb?  Do we care exactly when setting TCR_HD appears
-> to take effect?
+> This seems unnecessarily confusing - using either units of registers, or 
+> of register pairs, is fine, but mixing both in the same sequence just 
+> hurts more than it needs to.
 
-Practically no, as it doesn't matter if we use it or not. But, since the
-CPU is anyway booting, there is no harm in enforcing it to take effect.
+Point taken.
 
 > 
->> +}
->> +
->> +static int cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
->> +{
->> +	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU))
->> +		__cpu_enable_hw_dbm();
->> +
->> +	return 0;
->> +}
->> +#endif
->> +
->>   static int cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->>   {
->>   	/*
->> @@ -1052,6 +1081,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->>   		.enable = cpu_clear_disr,
->>   	},
->>   #endif /* CONFIG_ARM64_RAS_EXTN */
->> +#ifdef CONFIG_ARM64_HW_AFDBM
->> +	{
->> +		.desc = "Hardware pagetable Dirty Bit Management",
->> +		.type = ARM64_CPUCAP_WEAK_CPU_LOCAL_FEATURE,
->> +		.capability = ARM64_HW_DBM,
->> +		.sys_reg = SYS_ID_AA64MMFR1_EL1,
->> +		.sign = FTR_UNSIGNED,
->> +		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
->> +		.min_field_value = 2,
->> +		.matches = has_hw_dbm,
+>> +	stp	x0, x1, [sp, #(16 * 1)]
+>> +	orr	w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
 > 
-> Can't we use has_cpuid_feature here?  Why do we need a fake .matches and
-> then code the check manually in the enable mathod?
+> Writing this as a MOV like a sane person would make things 0.37% more 
+> lovely, I promise ;)
 
-We could, but then we need to add another *type*, where capabilities could
-be enabled by a late CPU, where something is not already enabled by the boot-time
-CPUs. i.e, if we boot a DBM capable CPU late, we won't be able to use the feature
-on it, with the current setup. I didn't want to complicate the infrastructure
-further just for this.
+But I swear that's what the assembler actually generates! Do I still get
+the additional loveliness? ;-) I'll MOV it up.
 
-> I may be missing something here.
+> 
+>> +	\inst	#0
+>> +	ldp	x2, x3, [sp, #(16 * 0)]
+>> +	ldp	x0, x1, [sp, #(16 * 1)]
+>> +	add	sp, sp, #(8 * 4)
+>> +.endm
+>> +
+>> +ENTRY(__smccc_workaround_1_smc_start)
+>> +	smccc_workaround_1	smc
+>> +ENTRY(__smccc_workaround_1_smc_end)
+>> +
+>> +ENTRY(__smccc_workaround_1_hvc_start)
+>> +	smccc_workaround_1	hvc
+>> +ENTRY(__smccc_workaround_1_hvc_end)
+> 
+> That said, should we not be implementing this lot in smccc-call.S...
 
-Cheers
-Suzuki
+Wouldn't work. We *copy* that code in the KVM vectors, see
+__install_bp_hardening_cb and __copy_hyp_vect_bpi...
+
+Yes, I know.
+
+> 
+>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>> index ed6881882231..f1501873f2e4 100644
+>> --- a/arch/arm64/kernel/cpu_errata.c
+>> +++ b/arch/arm64/kernel/cpu_errata.c
+>> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>>   extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+>>   extern char __qcom_hyp_sanitize_link_stack_start[];
+>>   extern char __qcom_hyp_sanitize_link_stack_end[];
+>> +extern char __smccc_workaround_1_smc_start[];
+>> +extern char __smccc_workaround_1_smc_end[];
+>> +extern char __smccc_workaround_1_hvc_start[];
+>> +extern char __smccc_workaround_1_hvc_end[];
+>>   
+>>   static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>>   				const char *hyp_vecs_end)
+>> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>   #define __psci_hyp_bp_inval_end			NULL
+>>   #define __qcom_hyp_sanitize_link_stack_start	NULL
+>>   #define __qcom_hyp_sanitize_link_stack_end	NULL
+>> +#define __smccc_workaround_1_smc_start		NULL
+>> +#define __smccc_workaround_1_smc_end		NULL
+>> +#define __smccc_workaround_1_hvc_start		NULL
+>> +#define __smccc_workaround_1_hvc_end		NULL
+>>   
+>>   static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>   				      const char *hyp_vecs_start,
+>> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+>>   	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+>>   }
+>>   
+>> +#include <uapi/linux/psci.h>
+>> +#include <linux/arm-smccc.h>
+>>   #include <linux/psci.h>
+>>   
+>> +static void call_smc_arch_workaround_1(void)
+>> +{
+>> +	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+>> +	asm volatile("smc	#0\n"
+>> +		     : "+r" (w0));
+>> +}
+>> +
+>> +static void call_hvc_arch_workaround_1(void)
+>> +{
+>> +	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+>> +	asm volatile("hvc	#0\n"
+>> +		     : "+r" (w0));
+>> +}
+> 
+> ...such that these could simply be something like:
+> 
+> static void call_{smc,hvc}_arch_workaround_1(void)
+> {
+> 	arm_smccc_v1_1_{smc,hvc}(ARM_SMCCC_ARCH_WORKAROUND_1);
+> }
+> 
+> ?
+
+That we could do. And maybe define them inline in arm-smccc.h so that we
+don't get any extra call (we'd just need a way to declare x0-x3 as being
+clobbered).
+
+I'll have a go at it.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
