@@ -1,38 +1,51 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Fri, 26 Jan 2018 16:22:15 +0800
-Subject: [PATCH v2] arm: dts: ls1021a: Add configure-gfladj property to USB3
- node
-Message-ID: <20180126082215.3191-1-yinbo.zhu@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Jan 2018 11:25:15 +0100
+Subject: [RFC 28/37] clk: renesas: r8a7790: Add rwdt clock
+In-Reply-To: <1516903391-30467-29-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1516903391-30467-29-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdVxgyo3FWWxHnXyoHHueq4pibUYLAd=nZJDpG2++e-8Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: yinbo.zhu <yinbo.zhu@nxp.com>
+On Thu, Jan 25, 2018 at 7:03 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> Add "rwdt" clock to r8a7790_mod_clks. Also, since we may need to access
+> the watchdog registers at any time, declare the clock as critical.
+>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 
-Add "configure-gfladj" boolean property to USB3 node. This property
-is used to determine whether frame length adjustent is required
-or not
+With the critical clock handling removed (that can be done by the driver,
+if really needed)
 
-Signed-off-by: Ramneek Mehresh <ramneek.mehresh@freescale.com>
-Signed-off-by: Honghua Yin <Hong-Hua.Yin@freescale.com>
-Signed-off-by: yinbo zhu <yinbo.zhu@nxp.com>
----
-Change in v2:
-		Remove the automatic generated tag from Gerrit.
-		Change "yinbo.zhu" to "yinbo zhu".
- arch/arm/boot/dts/ls1021a.dtsi |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9319e1f..ae8fc40 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -681,6 +681,7 @@
- 			reg = <0x0 0x3100000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 			dr_mode = "host";
-+			configure-gfladj;
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
- 		};
--- 
-1.7.1
+> --- a/drivers/clk/renesas/r8a7790-cpg-mssr.c
+> +++ b/drivers/clk/renesas/r8a7790-cpg-mssr.c
+> @@ -140,6 +140,7 @@ static const struct mssr_mod_clk r8a7790_mod_clks[] __initconst = {
+>         DEF_MOD("cmt1",                  329,   R8A7790_CLK_R),
+>         DEF_MOD("usbhs-dmac0",           330,   R8A7790_CLK_HP),
+>         DEF_MOD("usbhs-dmac1",           331,   R8A7790_CLK_HP),
+> +       DEF_MOD("rwdt",                  402,   R8A7790_CLK_R),
+>         DEF_MOD("irqc",                  407,   R8A7790_CLK_CP),
+>         DEF_MOD("intc-sys",              408,   R8A7790_CLK_ZS),
+>         DEF_MOD("audio-dmac1",           501,   R8A7790_CLK_HP),
+> @@ -211,6 +212,7 @@ static const struct mssr_mod_clk r8a7790_mod_clks[] __initconst = {
+>  };
+>
+>  static const unsigned int r8a7790_crit_mod_clks[] __initconst = {
+> +       MOD_CLK_ID(402),        /* RWDT */
+>         MOD_CLK_ID(408),        /* INTC-SYS (GIC) */
+>  };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
