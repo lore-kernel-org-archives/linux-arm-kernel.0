@@ -1,61 +1,73 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 10:10:21 +0000
-Subject: [PATCH 05/16] arm64: Add flags to check the safety of a
- capability for late CPU
-In-Reply-To: <20180123122809.16269-6-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-6-suzuki.poulose@arm.com>
-Message-ID: <20180126101020.GM5862@e103592.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Jan 2018 11:10:28 +0100
+Subject: [RFC 21/37] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2
+ support
+In-Reply-To: <1516903391-30467-22-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1516903391-30467-22-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdVn-XbsT1PQpcxKNHJ3ErecZtHy9=oJAGKd+heGLpLgcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:27:58PM +0000, Suzuki K Poulose wrote:
-> Add two different flags to indicate if the conflict of a capability
-> on a late CPU with the current system state
-> 
->  1) Can a CPU have a capability when the system doesn't have it ?
-> 
->     Most arm64 features could have this set. While erratum work arounds
->     cannot have this, as we may miss work arounds.
-> 
->  2) Can a CPU miss a capability when the system has it ?
->     This could be set for arm64 erratum work arounds as we don't
->     care if a CPU doesn't need the work around. However it should
->     be clear for features.
-> 
-> These flags could be added to certain entries based on their nature.
-> 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Hi Fabrizio,
+
+On Thu, Jan 25, 2018 at 7:02 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> This commit documents the compatibility with R-Car Gen2 and RZ/G
+> devices by defining the generifc compatible string "renesas,rcar-gen2-wdt".
+
+generic
+
++ SoC-specific compatible values.
+
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 > ---
->  arch/arm64/include/asm/cpufeature.h | 35 +++++++++++++++++++++++++++++++----
->  1 file changed, 31 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 4fd5de8ef33e..27d037bb0451 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -94,10 +94,25 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->  #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
->  #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
->  
-> -/* CPU errata detected at boot time based on feature of one or more CPUs */
-> -#define ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM	(ARM64_CPUCAP_SCOPE_LOCAL_CPU)
-> -/* CPU feature detected at boot time based on system-wide value of a feature */
-> -#define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	(ARM64_CPUCAP_SCOPE_SYSTEM)
-> +/* Is it safe for a late CPU to have this capability when system doesn't already have */
-> +#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE	BIT(2)
-> +/* Is it safe for a late CPU to miss this capability when system has it */
-> +#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	BIT(3)
+>  Documentation/devicetree/bindings/watchdog/renesas-wdt.txt | 13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
+> index bf6d1ca..436dca5 100644
+> --- a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
+> @@ -1,17 +1,20 @@
+>  Renesas Watchdog Timer (WDT) Controller
+>
+>  Required properties:
+> -- compatible : Should be "renesas,<soctype>-wdt", and
+> -              "renesas,rcar-gen3-wdt" or "renesas,rza-wdt" as fallback.
+> + - compatible : Must be "renesas,<soctype>-wdt", followed by a generic
+> +               fallback compatible string when compatible with the generic
+> +               version.
+>                Examples with soctypes are:
+> +                - "renesas,r8a7743-wdt" (RZ/G1M)
+> +                - "renesas,r8a7745-wdt" (RZ/G1E)
 
-Maybe _OPTIONAL and _PERMITTED would be a bit less verbose?
+I guess you wanted to add r8a779[0-4], too, as you use (some of) them in
+later patches in this series?
 
-Alternatively,
-	ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU
-	ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU
+>                  - "renesas,r8a7795-wdt" (R-Car H3)
+>                  - "renesas,r8a7796-wdt" (R-Car M3-W)
+>                  - "renesas,r8a77995-wdt" (R-Car D3)
+>                  - "renesas,r7s72100-wdt" (RZ/A1)
+> +               The generic compatible string must be:
+> +                - "renesas,rcar-gen2-wdt" for R-Car Gen2 and RZ/G
+> +                - "renesas,rcar-gen3-wdt" for R-Car Gen3
+>
+> -  When compatible with the generic version, nodes must list the SoC-specific
+> -  version corresponding to the platform first, followed by the generic
+> -  version.
+>
+>  - reg : Should contain WDT registers location and length
+>  - clocks : the clock feeding the watchdog timer.
 
-might be easier to understand.
+Gr{oetje,eeting}s,
 
-[...]
+                        Geert
 
-Cheers
----Dave
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
