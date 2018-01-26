@@ -1,168 +1,119 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 26 Jan 2018 16:28:46 +0900
-Subject: [PATCH 2/4] usb: dwc3: add dwc3 glue layer for UniPhier SoCs
-In-Reply-To: <20180125110929.C609.4A936039@socionext.com>
-References: <87a7x3l8gr.fsf@linux.intel.com>
- <20180125110929.C609.4A936039@socionext.com>
-Message-ID: <20180126162846.BFA9.4A936039@socionext.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 26 Jan 2018 08:31:05 +0100
+Subject: [PATCH] clk: Properly update prepare/enable count on orphan
+ clock reparent
+In-Reply-To: <20180125221926.GA28313@codeaurora.org>
+References: <CGME20180115115231eucas1p1499f46ca64b65598d03a182ed5670f28@eucas1p1.samsung.com>
+ <20180115115214.10303-1-m.szyprowski@samsung.com>
+ <20180125221926.GA28313@codeaurora.org>
+Message-ID: <870d88cb-aa16-aced-8e40-cdfa3eddac16@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
 
-On Thu, 25 Jan 2018 11:09:30 +0900 <hayashi.kunihiko@socionext.com> wrote:
+On 2018-01-25 23:19, Stephen Boyd wrote:
+> On 01/15, Marek Szyprowski wrote:
+>> If orphaned clock has been already prepared/enabled (for example if it or
+>> one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+>> counters of the newly assigned parent are not updated correctly. This
+>> might later cause warnings during changing clock parents.
+>>
+>> This patch fixes following warning on Exynos5422-based boards:
+>> ------------[ cut here ]------------
+>> WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:811 clk_core_disable_lock+0x18/0x24
+>> Modules linked in:
+>> CPU: 0 PID: 59 Comm: kworker/0:1 Not tainted 4.15.0-rc7-next-20180115 #106
+>> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+>> Workqueue: pm genpd_power_off_work_fn
+>> [<c0111504>] (unwind_backtrace) from [<c010dbec>] (show_stack+0x10/0x14)
+>> [<c010dbec>] (show_stack) from [<c09b3f34>] (dump_stack+0x90/0xc8)
+>> [<c09b3f34>] (dump_stack) from [<c0125060>] (__warn+0xe4/0x110)
+>> [<c0125060>] (__warn) from [<c01250cc>] (warn_slowpath_null+0x40/0x48)
+>> [<c01250cc>] (warn_slowpath_null) from [<c048d584>] (clk_core_disable_lock+0x18/0x24)
+>> [<c048d584>] (clk_core_disable_lock) from [<c048e490>] (clk_core_disable_unprepare+0xc/0x20)
+>> [<c048e490>] (clk_core_disable_unprepare) from [<c048ea60>] (__clk_set_parent_after+0x48/0x4c)
+>> [<c048ea60>] (__clk_set_parent_after) from [<c048ec88>] (clk_core_set_parent_nolock+0x224/0x5b4)
+>> [<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>] (clk_set_parent+0x38/0x6c)
+>> [<c048f23c>] (clk_set_parent) from [<c049c41c>] (exynos_pd_power+0x74/0x1cc)
+>> [<c049c41c>] (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+>> [<c0550768>] (genpd_power_off) from [<c0550b34>] (genpd_power_off_work_fn+0x2c/0x40)
+>> [<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>] (process_one_work+0x1d0/0x7bc)
+>> [<c01432e4>] (process_one_work) from [<c014393c>] (worker_thread+0x34/0x4dc)
+>> [<c014393c>] (worker_thread) from [<c014a0d0>] (kthread+0x128/0x164)
+>> [<c014a0d0>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+>> Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+>> 1fa0:                                     00000000 00000000 00000000 00000000
+>> 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+>> 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+>> ---[ end trace 503c239fb760f17a ]---
+>> ------------[ cut here ]------------
+>> WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:684 clk_core_disable_unprepare+0x18/0x20
+>> Modules linked in:
+>> CPU: 0 PID: 59 Comm: kworker/0:1 Tainted: G        W        4.15.0-rc7-next-20180115 #106
+>> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+>> Workqueue: pm genpd_power_off_work_fn
+>> [<c0111504>] (unwind_backtrace) from [<c010dbec>] (show_stack+0x10/0x14)
+>> [<c010dbec>] (show_stack) from [<c09b3f34>] (dump_stack+0x90/0xc8)
+>> [<c09b3f34>] (dump_stack) from [<c0125060>] (__warn+0xe4/0x110)
+>> [<c0125060>] (__warn) from [<c01250cc>] (warn_slowpath_null+0x40/0x48)
+>> [<c01250cc>] (warn_slowpath_null) from [<c048e49c>] (clk_core_disable_unprepare+0x18/0x20)
+>> [<c048e49c>] (clk_core_disable_unprepare) from [<c048ea60>] (__clk_set_parent_after+0x48/0x4c)
+>> [<c048ea60>] (__clk_set_parent_after) from [<c048ec88>] (clk_core_set_parent_nolock+0x224/0x5b4)
+>> [<c048ec88>] (clk_core_set_parent_nolock) from [<c048f23c>] (clk_set_parent+0x38/0x6c)
+>> [<c048f23c>] (clk_set_parent) from [<c049c41c>] (exynos_pd_power+0x74/0x1cc)
+>> [<c049c41c>] (exynos_pd_power) from [<c0550768>] (genpd_power_off+0x164/0x264)
+>> [<c0550768>] (genpd_power_off) from [<c0550b34>] (genpd_power_off_work_fn+0x2c/0x40)
+>> [<c0550b34>] (genpd_power_off_work_fn) from [<c01432e4>] (process_one_work+0x1d0/0x7bc)
+>> [<c01432e4>] (process_one_work) from [<c014393c>] (worker_thread+0x34/0x4dc)
+>> [<c014393c>] (worker_thread) from [<c014a0d0>] (kthread+0x128/0x164)
+>> [<c014a0d0>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+>> Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+>> 1fa0:                                     00000000 00000000 00000000 00000000
+>> 1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+>> 1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+>> ---[ end trace 503c239fb760f17b ]---
+>> ------------[ cut here ]------------
+>>
+>> Fixes: f8f8f1d04494 ("clk: Don't touch hardware when reparenting during registration")
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/clk/clk.c | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 0f686a9dac3e..d33c087d7868 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -2982,6 +2982,10 @@ static int __clk_core_init(struct clk_core *core)
+>>   		if (parent) {
+>>   			/* update the clk tree topology */
+>>   			flags = clk_enable_lock();
+> This is the spinlock?
 
-> Hello Felipe,
-> 
-> On Wed, 24 Jan 2018 14:58:12 +0200 <balbi@kernel.org> wrote:
-> 
-> > 
-> > Hi,
-> > 
-> > Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
-> > > Hello Felipe,
-> > >
-> > > Thank you for your comments.
-> > >
-> > > On Tue, 23 Jan 2018 15:12:36 +0200 <balbi@kernel.org> wrote:
-> > >
-> > >> 
-> > >> Hi,
-> > >> 
-> > >> Kunihiko Hayashi <hayashi.kunihiko@socionext.com> writes:
-> > >> > Add a specific glue layer for UniPhier SoC platform to support
-> > >> > USB host mode. It manages hardware operating sequences to enable multiple
-> > >> > clock gates and assert resets, and to prepare to use dwc3 controller
-> > >> > on the SoC.
-> > >> >
-> > >> > This patch also handles the physical layer that has same register space
-> > >> > as the glue layer, because it needs to integrate initialziation sequence
-> > >> > between glue and phy.
-> > >> >
-> > >> > In case of some SoCs, since some initialization values for PHY are
-> > >> > included in nvmem, this patch includes the way to get the values from nvmem.
-> > >> >
-> > >> > It supports PXs2 and LD20 SoCs.
-> > >> >
-> > >> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > >> > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> > >> > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
-> > >> > ---
-> > >> >  drivers/usb/dwc3/Kconfig         |   9 +
-> > >> >  drivers/usb/dwc3/Makefile        |   1 +
-> > >> >  drivers/usb/dwc3/dwc3-uniphier.c | 554 +++++++++++++++++++++++++++++++++++++++
-> > >> >  3 files changed, 564 insertions(+)
-> > >> >  create mode 100644 drivers/usb/dwc3/dwc3-uniphier.c
-> > >
-> > > ...snip...
-> > >
-> > >> > +
-> > >> > +static void dwc3u_ssphy_testio_write(struct dwc3u_priv *priv, int port,
-> > >> > +				     u32 data)
-> > >> 
-> > >> anything with sshphy or hsphy in the name should probably be part of a
-> > >> PHY driver using drivers/phy/ framework.
-> > >
-> > > I can try to separate phy control from this driver.
-> > > However, phy registers belongs to "dwc3-glue" IO map area (65b00000),
-> > > and this area also contains a reset bit for "dwc3-core" hardware.
-> > >
-> > > Although the phy driver is called from dwc3-core driver,
-> > > we need to deassert the reset bit before probing dwc3-core driver.
-> > >
-> > > As shown later, I think that it's difficut to determine the order of
-> > > initializing the registers in this area.
-> > >
-> > >> > +static void dwc3u_vbus_disable(struct dwc3u_priv *priv)
-> > >> > +{
-> > >> > +	int i;
-> > >> > +
-> > >> > +	for (i = 0; i < priv->nvbus; i++) {
-> > >> > +		dwc3u_maskwrite(priv, VBUS_CONTROL(i),
-> > >> > +				DRVVBUS_REG_EN | DRVVBUS_REG,
-> > >> > +				DRVVBUS_REG_EN | 0);
-> > >> > +	}
-> > >> > +}
-> > >> 
-> > >> drivers/regulator maybe?
-> > >
-> > > VBUS_CONTROL register is used for determing whether "dwc3-glue" hardware
-> > > enables vbus connected with "regulator" hardware.
-> > >
-> > > The regulator driver should manage "regulator" hardware, and
-> > > I don't think that the driver should manage this register.
-> > >
-> > >> > +static void dwc3u_reset_init(struct dwc3u_priv *priv)
-> > >> > +{
-> > >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
-> > >> > +	usleep_range(1000, 2000);
-> > >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, LINK_RESET);
-> > >> > +}
-> > >> > +
-> > >> > +static void dwc3u_reset_clear(struct dwc3u_priv *priv)
-> > >> > +{
-> > >> > +	dwc3u_maskwrite(priv, RESET_CTL, LINK_RESET, 0);
-> > >> > +}
-> > >> 
-> > >> drivers/reset ?
-> > >
-> > > The reset driver manages "sysctrl" IO map area in our SoC.
-> > >
-> > > RESET_CTL register belongs to "dwc3-glue" IO map area,
-> > > and the kernel can't access this area until enabling usb clocks and
-> > > deasserting usb resets in "sysctrl".
-> > >
-> > > I think that "dwc3-glue" register control should be separated from
-> > > "sysctrl".
-> > 
-> > Just split your address space and treat your glue as a device with
-> > several children:
-> > 
-> > glue at 65b00000 {
-> > 	compatible = "foo"
-> 
-> Just to confirm, instead of SoC-specific glue driver, dwc3-of-simple.c
-> should handle compatible "foo", right?
+yes
 
-I understood this the answer was no.
-We can define glue node as "simple-mfd" and/or "syscon", and the node
-can include another function nodes like phy, sysctrl, and even dwc3-of-simple.
+>
+>> +			if (orphan->prepare_count)
+>> +				clk_core_prepare(parent);
+> And this is prepare mutex? Doesn't sound like it will work.
 
-> > 
-> > 	phy at bar {
-> >         	...
-> > 	};
-> > 
-> > 	sysctrl at baz {
-> >         	...
-> > 	};
-> > 
-> > 	dwc3 at foo {
-> >         	compatible = "snps, dwc3";
-> >                 ...
-> > 	};
-> > };
-> > 
-> > Then you know that you can let dwc3/core.c handle the PHY for you. If we
-> > need to teach dwc3/core.c about regulators, we can do that. But we don't
-> > need SoC-specific hacks ;-)
-> 
-> I also don't think that dwc3/core.c should have any SoC-specific controls.
-> I've thought the SoC-specific glue driver (dwc3-***.c) calls "clocks",
-> "resets", and "regulators".
-> 
-> However, although dwc3-of-simple.c can handle "clocks", it can't handle
-> "resets" and "regulators". Who should call them?
+Prepare mutex is taken at the beginning of __clk_core_init() function, so
+everything is fine here.
 
-Since The dwc3/core.c calls phy APIs, phy_power_on(), then we can handle
-regulators in phy driver.
+>> +			if (orphan->enable_count)
+>> +				clk_core_enable(parent);
+> This would be OK, but then we might touch the hardware again?
 
-On the other hand, I think it's necessary to deassert "resets"
-before probing dwc3/core.c, same as "clocks".  I'll suggest a patch to solve
-the issue next.
+Well, it will touch hardware in one case: if orphaned clock is already
+prepared and enabled (for example due to having CLK_IS_CRITICAL flag)
+and the newly registered parent is not (yet?) enabled. Then it will
+prepare and enable this new parent clock, what is a desired behavior.
 
-Thank you,
+This code will not temporarily disable any clocks, what I assume was the
+main reason for the patch mentioned in the commit message.
 
----
-Best Regards,
-Kunihiko Hayashi
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
