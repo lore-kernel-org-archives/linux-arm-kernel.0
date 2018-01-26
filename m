@@ -1,45 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Jan 2018 14:01:39 +0100
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 26 Jan 2018 07:16:51 -0600
 Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
-In-Reply-To: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
+In-Reply-To: <CACRpkda6FLfUhqOPqJfCHm1PHOWg=CY=wOCDyrd78eMx+-zrZw@mail.gmail.com>
 References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkda6FLfUhqOPqJfCHm1PHOWg=CY=wOCDyrd78eMx+-zrZw@mail.gmail.com>
+ <CACRpkda6FLfUhqOPqJfCHm1PHOWg=CY=wOCDyrd78eMx+-zrZw@mail.gmail.com>
+Message-ID: <5bcf9545-37ee-18b5-33d9-7ce3da9b0048@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+On 1/26/18 7:01 AM, Linus Walleij wrote:
+> This is a feature not a bug. It encourages people not to
+> depend on the global GPIO numberspace.
+> 
+> Just set it to -1.
 
-thanks for the patch!
+If I change it to -1, then I think I'm going to break every existing MSM 
+platform that depends on the base address being 0, because then every 
+MSM driver will have a non-zero base, and none of the existing drivers 
+register more than one GPIO device.
 
-On Thu, Jan 25, 2018 at 10:20 PM, Timur Tabi <timur@codeaurora.org> wrote:
+So how about this:
 
-> Add an integer to the msm_pinctrl_soc_data struct that pinctrl-msm
-> client drivers can use to specify the gpio base.  This is useful
-> if the client driver wants to register multiple TLMM devices, because
-> each one needs a distinct base.
+	static int base = 0;
 
-Sorry, but NACK.
+	chip->base = base;
+	base = -1;
 
-> pinctrl-msm currently sets the base to 0, which ensures that GPIOs
-> of the first TLMM are numbered 0..n-1.  It could specify -1 as the
-> base, which would tell gpiolib to choose a unique base, but this
-> has the side-effect of choosing a non-zero base for all TLMMs:
+This way, existing code works as before.  If any driver registers two 
+GPIO devices, the first one will get a base of 0, and the second one 
+will get some other base.
 
-This is a feature not a bug. It encourages people not to
-depend on the global GPIO numberspace.
+>> gpiochip_find_base: found new base at 437
+> (...)
+>> gpiochip_find_base: found new base at 362
+> These are awesome bases, just beautiful. Use this.
+> 
+> If you don't like seeing GPIO base numbers like this: use things
+> like the chardev and the tools in tools/gpio or libgpiod when
+> developing, and you will never see them. They should not make
+> a difference anyway.
 
-Just set it to -1.
+Can you tell me more about the chardev?  I've always been using "echo X 
+ > /sys/class/gpio/export", so I guess that's not the right way to do 
+things.
 
-> gpiochip_find_base: found new base at 437
-(...)
-> gpiochip_find_base: found new base at 362
-
-These are awesome bases, just beautiful. Use this.
-
-If you don't like seeing GPIO base numbers like this: use things
-like the chardev and the tools in tools/gpio or libgpiod when
-developing, and you will never see them. They should not make
-a difference anyway.
-
-Yours,
-Linus Walleij
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
