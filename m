@@ -1,134 +1,138 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Fri, 26 Jan 2018 17:45:31 +0800
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <f06d2d9f-3869-ed02-43f4-f4ea4a104a57@arm.com>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <f06d2d9f-3869-ed02-43f4-f4ea4a104a57@arm.com>
-Message-ID: <5A6AF8BB.4040601@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Jan 2018 10:46:23 +0100
+Subject: [RFC 01/37] ARM: shmobile: Add watchdog support
+In-Reply-To: <1516903391-30467-2-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1516903391-30467-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1516903391-30467-2-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdWVvMJR5NHMFn6zx39jw2XdP5nteU3actUcen0dmoT-LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Fabrizio,
 
-Thanks for your reply.
+On Thu, Jan 25, 2018 at 7:02 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
+> boot CPUs run a routine designed to bring up SMP and deal with hot plug.
+> The value contained in the SBAR registers is not initialized by a WDT
+> triggered reset, which means that after a WDT triggered reset we jump
+> to the SMP bring up routine, preventing the system from executing the
+> bootrom code.
 
-On 01/24/2018 09:49 PM, Robin Murphy wrote:
->>
->> +Optional properties:
->> +- clocks : A list of master clocks requires for the IOMMU to be
->> accessible
->
-> s/requires/required/
-ok
->
->> +           by the host CPU. The number of clocks depends on the master
->> +           block and might as well be zero. See [1] for generic clock
->
-> Oops, some subtleties of English here :)
->
-> To say "the number of clocks ... might as well be zero" effectively
-> implies "there's no point ever specifying any clocks". I guess what you
-> really mean here is "...might well be...", i.e. it is both valid and
-> reasonably likely to require zero clocks.
-ok
->
->> +           bindings description.
->> +
->> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>   Optional properties:
->>   - rockchip,disable-mmu-reset : Don't use the mmu reset operation.
->> @@ -27,5 +34,6 @@ Example:
->>           reg = <0xff940300 0x100>;
->>           interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
->>           interrupt-names = "vopl_mmu";
->> +        clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
->>           #iommu-cells = <0>;
->>       };
->> diff --git a/drivers/iommu/rockchip-iommu.c
->> b/drivers/iommu/rockchip-iommu.c
->> index c4131ca792e0..8a5e2a659b67 100644
->> --- a/drivers/iommu/rockchip-iommu.c
->> +++ b/drivers/iommu/rockchip-iommu.c
->> @@ -4,6 +4,7 @@
->>    * published by the Free Software Foundation.
->>    */
->> +#include <linux/clk.h>
->>   #include <linux/compiler.h>
->>   #include <linux/delay.h>
->>   #include <linux/device.h>
->> @@ -91,6 +92,8 @@ struct rk_iommu {
->>       struct device *dev;
->>       void __iomem **bases;
->>       int num_mmu;
->> +    struct clk_bulk_data *clocks;
->> +    int num_clocks;
->>       bool reset_disabled;
->>       struct iommu_device iommu;
->>       struct list_head node; /* entry in rk_iommu_domain.iommus */
->> @@ -450,6 +453,38 @@ static int rk_iommu_force_reset(struct rk_iommu
->> *iommu)
->>       return 0;
->>   }
->> +static int rk_iommu_of_get_clocks(struct rk_iommu *iommu)
->> +{
->> +    struct device_node *np = iommu->dev->of_node;
->> +    int ret;
->> +    int i;
->> +
->> +    ret = of_count_phandle_with_args(np, "clocks", "#clock-cells");
->> +    if (ret == -ENOENT)
->> +        return 0;
->> +    else if (ret < 0)
->> +        return ret;
->> +
->> +    iommu->num_clocks = ret;
->> +    iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
->> +                     sizeof(*iommu->clocks), GFP_KERNEL);
->> +    if (!iommu->clocks)
->> +        return -ENOMEM;
->> +
->> +    for (i = 0; i < iommu->num_clocks; ++i) {
->> +        iommu->clocks[i].clk = of_clk_get(np, i);
->> +        if (IS_ERR(iommu->clocks[i].clk)) {
->> +            ret = PTR_ERR(iommu->clocks[i].clk);
->> +            goto err_clk_put;
->> +        }
->> +    }
->
-> Just to confirm my understanding from a quick scan through the code, the
-> reason we can't use clk_bulk_get() here is that currently, clocks[i].id
-> being NULL means we'd end up just getting the first clock multiple
-> times, right?
-right, without a valid name, it would return the first clock.
+Thanks for your patch!
 
-     /* Walk up the tree of devices looking for a clock that matches */
-     while (np) {
-         int index = 0;
+> The purpose of this patch is to jump to the bootrom code in case of a
+> WDT triggered reset, and keep the SMP functionality untouched.
+> In order to tell if the code had been called due to the WDT overflowing
+> we need to inspect flag WOVF from register RWTCSRA, however for this
+> to work smoothly we need to make sure that RWDT clock is ON.
+> Since it's not wise to interfere with the clock configuration from
+> within this routine, a flag has been put in place
+> (shmobile_wdt_clock_status) so that the watchdog driver can tell
+> shmobile_boot_vector when the clock is ON, and therefore there is no
+> need for shmobile_boot_vector to mess up with the clock registers.
+>
+> Bit WOVF survives a watchdog triggered reset, and it is usually cleared
+> by the bootloader. Checking the MMU enable bit from register SCTLR
+> allows us to make the code a little bit more robust (just in case the
+> bit wasn't cleared up), as right after a reset the MMU is disabled,
+> and when Linux is running the MMU is enabled. Also, accessing RWTCSRA
+> physical address is safe when the MMU is down.
 
-         /*
-          * For named clocks, first look up the name in the
-          * "clock-names" property.  If it cannot be found, then
-          * index will be an error code, and of_clk_get() will fail.
-          */
-         if (name)
-             index = of_property_match_string(np, "clock-names", name);
-         clk = __of_clk_get(np, index, dev_id, name);
+Checking a hardware register is indeed a better solution than my original
+idea to let SMP bringup set a flag in RAM, as the former is less racy.
+However, as you can probably imagine, I don't like the
+shmobile_wdt_clock_status part ;-)
 
+Isn't is sufficient to check the MMU enable bit?
+However, that would precludes uClinux (do we care?).
+Is there any other register/bit that's reset when the watchdog is
+triggered, and always set by Linux?
 
+> SMP bringup, CPU hot plug, and suspend to RAM work as normal.
+
+shmobile_boot_vector is not only used for R-Car Gen2 and RZ/G1 SoCs, but
+also for EMMA Mobile, SH/R-Mobile, and R-Car H1.  Hence this breaks SMP
+for the latter (and their build if ARCH_RENESAS=n, due to missing
+shmobile_wdt_clock_status).
+
+> Since shmobile_boot_vector has become bigger, "reg" property of nodes
+> compatible with "renesas,smp-sram" now need to be set to "<0 0x64>".
+
+This breaks backwards compatibility with old DTs declaring a too small
+smp-sram area. If the area is too small, you should fallback to the old and
+smaller code.
+
+> --- a/arch/arm/mach-shmobile/headsmp.S
+> +++ b/arch/arm/mach-shmobile/headsmp.S
+> @@ -16,6 +16,13 @@
+>  #include <asm/assembler.h>
+>  #include <asm/memory.h>
 >
-> I guess there could be other users who also want "just get whatever
-> clocks I have" functionality, so it might be worth proposing that for
-> the core API as a separate/follow-up patch, but it definitely doesn't
-> need to be part of this series.
-right, i can try to do it later :)
->
-> I really don't know enough about correct clk API usage, but modulo the
-> binding comments it certainly looks nice and tidy now;
->
-> Acked-by: Robin Murphy <robin.murphy@arm.com>
-thanks.
->
-> Thanks,
-> Robin.
+> +#define RWDT_CLOCK_ON  0xdeadbeef
+> +#define RWDT_CLOCK_OFF 0x00000000
+> +#define SCTLR_MMU      0x01
+> +#define BOOTROM_ADDRESS        0xE6340000
+> +#define RWTCSRA_ADDRESS 0xE6020004
+> +#define RWTCSRA_WOVF   0x10
+> +
+>  /*
+>   * Reset vector for secondary CPUs.
+>   * This will be mapped at address 0 by SBAR register.
+> @@ -24,11 +31,57 @@
+>         .arm
+>         .align  12
+>  ENTRY(shmobile_boot_vector)
+
+This should become e.g. rcar_gen2_boot_vector_wdt
+
+> +/*
+> +       if (SCTLR_MMU == 1)
+> +               goto shmobile_smp_continue;
+> +*/
+> +       mrc     p15, 0, r1, c1, c0, 0           @ r1 = SCTLR
+> +       and     r0, r1, #SCTLR_MMU
+> +       cmp     r0, #SCTLR_MMU
+> +       beq     shmobile_smp_continue
+> +/*
+> +       if (shmobile_wdt_clock_status != RWDT_CLOCK_ON)
+> +               goto shmobile_smp_continue;
+> +*/
+> +       ldr     r0, #shmobile_wdt_clock_status
+> +       ldr     r1, #clock_on
+> +       cmp     r0, r1
+> +       bne     shmobile_smp_continue
+> +
+> +/*
+> +       if (RWTCSRA_WOVF == 0)
+> +               goto shmobile_smp_continue;
+> +*/
+> +       ldr     r0, rwtcsra
+> +       mov     r1, #0
+> +       ldrb    r1, [r0]
+> +       and     r0, r1, #RWTCSRA_WOVF
+> +       cmp     r0, #RWTCSRA_WOVF
+> +       bne     shmobile_smp_continue
+> +
+> +/*
+> +       goto bootrom;
+> +*/
+> +       ldr     r0, bootrom
+> +       bx      r0
+> +
+> +shmobile_smp_continue:
+
+This should become
+
+    ENTRY(shmobile_boot_vector)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
