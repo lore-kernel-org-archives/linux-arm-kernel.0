@@ -1,78 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Jan 2018 18:19:08 +0000
-Subject: [PATCH] arm64: Fix TTBR + PAN + 52-bit PA logic in
- cpu_do_switch_mm
-In-Reply-To: <611f40d5-ee64-ccab-065d-eaf3da03c5ee@arm.com>
-References: <20180124082708.29038-1-steve.capper@arm.com>
- <20180124094548.daey56d2d54ij6f2@armageddon.cambridge.arm.com>
- <611f40d5-ee64-ccab-065d-eaf3da03c5ee@arm.com>
-Message-ID: <20180126181908.6bhdagfsvgkqyqva@armageddon.cambridge.arm.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 26 Jan 2018 20:15:28 +0100
+Subject: [PATCH v2 0/6] crypto: engine - Permit to enqueue all async requests
+Message-ID: <20180126191534.17569-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 12:01:49PM +0000, Kristina Martsenko wrote:
-> On 24/01/18 09:45, Catalin Marinas wrote:
-> > On Wed, Jan 24, 2018 at 08:27:08AM +0000, Steve Capper wrote:
-> >> In cpu_do_switch_mm(.) with ARM64_SW_TTBR0_PAN=y we apply phys_to_ttbr
-> >> to a value that already has an ASID inserted into the upper bits. For
-> >> 52-bit PA configurations this then can give us TTBR0_EL1 registers that
-> >> cause translation table walks to attempt to access non-zero PA[51:48]
-> >> spuriously. Ultimately leading to a Synchronous External Abort on level
-> >> 1 translation.
-> >>
-> >> This patch re-arranges the logic in cpu_do_switch_mm(.) such that
-> >> phys_to_ttbr is called before the ASID is inserted into the TTBR0 value.
-> >>
-> >> Signed-off-by: Steve Capper <steve.capper@arm.com>
-> >>
-> >> ---
-> >>
-> >> This applies to the arm64 for-next/core branch.
-> >> ---
-> >>  arch/arm64/mm/proc.S | 6 +++---
-> >>  1 file changed, 3 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> >> index c6a12073ef46..9f177aac6390 100644
-> >> --- a/arch/arm64/mm/proc.S
-> >> +++ b/arch/arm64/mm/proc.S
-> >> @@ -153,14 +153,14 @@ ENDPROC(cpu_do_resume)
-> >>  ENTRY(cpu_do_switch_mm)
-> >>  	mrs	x2, ttbr1_el1
-> >>  	mmid	x1, x1				// get mm->context.id
-> >> +	phys_to_ttbr x0, x3
-> >>  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
-> >> -	bfi	x0, x1, #48, #16		// set the ASID field in TTBR0
-> >> +	bfi	x3, x1, #48, #16		// set the ASID field in TTBR0
-> >>  #endif
-> >>  	bfi	x2, x1, #48, #16		// set the ASID
-> >>  	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
-> >>  	isb
-> >> -	phys_to_ttbr x0, x2
-> >> -	msr	ttbr0_el1, x2			// now update TTBR0
-> >> +	msr	ttbr0_el1, x3			// now update TTBR0
-> >>  	isb
-> >>  	b	post_ttbr_update_workaround	// Back to C code...
-> >>  ENDPROC(cpu_do_switch_mm)
-> 
-> Thanks for finding and fixing this Steve, the patch looks good to me and
-> I can reproduce the issue as well as confirm that this patch fixes it:
-> 
-> Tested-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> Reviewed-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> 
-> > Thanks Steve. It looks like I messed up the merge: 1f911c3a1140 ("Merge
-> > branch 'for-next/52-bit-pa' into for-next/core").
-> 
-> The merge commit is fine, the bug was introduced in commit 6b88a32c7af6
-> ("arm64: kpti: Fix the interaction between ASID switching and software
-> PAN").
+Hello
 
-Good point. I was bouncing between two versions of this patch, one for
-the kpti branch and the other for for-next/core (the former doesn't have
-the 52-bit PA).
+The current crypto_engine support only ahash and ablkcipher request.
+My first patch which try to add skcipher was Nacked, it will add too many functions
+and adding other algs(aead, asymetric_key) will make the situation worst.
 
-I'll amend the commit.
+This patchset remove all algs specific stuff and now only process generic crypto_async_request.
+
+The requests handler function pointer are now moved out of struct engine and
+are now stored directly in a crypto_engine_reqctx.
+
+The original proposal of Herbert [1] cannot be done completly since the crypto_engine
+could only dequeue crypto_async_request and it is impossible to access any request_ctx
+without knowing the underlying request type.
+
+So I do something near that was requested: adding crypto_engine_reqctx in TFM context.
+Note that the current implementation expect that crypto_engine_reqctx
+is the first member of the context.
+
+The first patch is a try to document the crypto engine API.
+The second patch convert the crypto engine with the new way,
+while the following patchs convert the 4 existing users of crypto_engine.
+Note that this split break bisection, so probably the final commit will be all merged.
+
+Appart from virtio, all 4 latest patch were compile tested only.
+But the crypto engine is tested with my new sun8i-ce driver.
+
+Regards
+
+[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
+
+Changes since V1:
+- renamed crypto_engine_reqctx to crypto_engine_ctx
+- indentation fix in function parameter
+- do not export crypto_transfer_request
+- Add aead support
+- crypto_finalize_request is now static
+
+Changes since RFC:
+- Added a documentation patch
+- Added patch for stm32-cryp
+- Changed parameter of all crypto_engine_op functions from
+	crypto_async_request to void*
+- Reintroduced crypto_transfer_xxx_request_to_engine functions
+
+Corentin Labbe (6):
+  Documentation: crypto: document crypto engine API
+  crypto: engine - Permit to enqueue all async requests
+  crypto: omap: convert to new crypto engine API
+  crypto: virtio: convert to new crypto engine API
+  crypto: stm32-hash: convert to the new crypto engine API
+  crypto: stm32-cryp: convert to the new crypto engine API
+
+ Documentation/crypto/crypto_engine.rst       |  48 +++++
+ crypto/crypto_engine.c                       | 301 +++++++++++++++------------
+ drivers/crypto/omap-aes.c                    |  21 +-
+ drivers/crypto/omap-aes.h                    |   3 +
+ drivers/crypto/omap-des.c                    |  24 ++-
+ drivers/crypto/stm32/stm32-cryp.c            |  29 ++-
+ drivers/crypto/stm32/stm32-hash.c            |  20 +-
+ drivers/crypto/virtio/virtio_crypto_algs.c   |  16 +-
+ drivers/crypto/virtio/virtio_crypto_common.h |   3 +-
+ drivers/crypto/virtio/virtio_crypto_core.c   |   3 -
+ include/crypto/engine.h                      |  68 +++---
+ 11 files changed, 332 insertions(+), 204 deletions(-)
+ create mode 100644 Documentation/crypto/crypto_engine.rst
 
 -- 
-Catalin
+2.13.6
