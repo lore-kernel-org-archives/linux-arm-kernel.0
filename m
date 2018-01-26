@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 26 Jan 2018 10:36:34 +0100
-Subject: [PATCH 2/3] ARM: dts: r8a7791: consistently use single space before =
+Date: Fri, 26 Jan 2018 10:36:33 +0100
+Subject: [PATCH 1/3] ARM: dts: r8a7790: consistently use single space before =
 In-Reply-To: <20180126093635.16945-1-horms+renesas@verge.net.au>
 References: <20180126093635.16945-1-horms+renesas@verge.net.au>
-Message-ID: <20180126093635.16945-3-horms+renesas@verge.net.au>
+Message-ID: <20180126093635.16945-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,14 +15,14 @@ This patch should not introduce any functional change.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
+ arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index dc659351472f..f11dab71b03a 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1703,16 +1703,16 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 3bbcc0b93f1c..e4367cecad18 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1705,16 +1705,16 @@
  
  	thermal-zones {
  		cpu_thermal: cpu-thermal {
