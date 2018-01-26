@@ -1,58 +1,22 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 15:33:15 +0000
-Subject: [PATCH 16/16] arm64: Add work around for Arm Cortex-A55 Erratum
- 1024718
-In-Reply-To: <20180123122809.16269-17-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-17-suzuki.poulose@arm.com>
-Message-ID: <20180126153314.GW5862@e103592.cambridge.arm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 26 Jan 2018 23:45:24 +0800
+Subject: [PATCH -next] hwrng: bcm2835 - Remove redundant dev_err call in
+ bcm2835_rng_probe()
+In-Reply-To: <1516189234-11957-1-git-send-email-weiyongjun1@huawei.com>
+References: <1516189234-11957-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20180126154524.GF4002@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:28:09PM +0000, Suzuki K Poulose wrote:
-> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-> from an erratum 1024718, which causes incorrect updates when DBM/AP
-> bits in a page table entry is modified without a break-before-make
-> sequence. The work around is to skip enabling the hardware DBM feature
-> on the affected cores. The hardware Access Flag management features
-> is not affected.
+On Wed, Jan 17, 2018 at 11:40:34AM +0000, Wei Yongjun wrote:
+> There is a error message within devm_ioremap_resource
+> already, so remove the dev_err call to avoid redundant
+> error message.
 > 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 14 ++++++++++++++
->  arch/arm64/kernel/cpufeature.c         | 14 +++++++++++++-
->  3 files changed, 28 insertions(+), 1 deletion(-)
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-[...]
-
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 8af755b8219d..64f1e911c6af 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -914,9 +914,21 @@ static inline void __cpu_enable_hw_dbm(void)
->  	isb();
->  }
->  
-> +static bool cpu_has_erratum_1024718(void)
-> +{
-> +	static const struct midr_range __maybe_unused cpus[] = {
-
-Do you need __maybe_unused?  If #ifdef were used here then
-__maybe_unused would be needed, but I thought that if code is optimised
-out instead of conditionally copiled, this didn't apply.
-
-> +		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),	// A55 r0p0 -r1p0
-> +		{},
-> +	};
-> +
-> +	return IS_ENABLED(CONFIG_ARM64_ERRATUM_1024718) &&
-> +	       is_midr_in_range_list(read_cpuid_id(), cpus);
-
-Why have a list with just one entry?  Do you expect more entries over
-time?
-
-[...]
-
-Cheers
----Dave
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
