@@ -1,56 +1,85 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 26 Jan 2018 13:50:13 +0000
-Subject: [PATCH 11/16] arm64: errata: Clean up midr range helpers
-In-Reply-To: <20180123122809.16269-12-suzuki.poulose@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-12-suzuki.poulose@arm.com>
-Message-ID: <20180126135013.GS5862@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Jan 2018 14:05:46 +0000
+Subject: [PATCH 4/7] arm64: kpti: Add ->enable callback to remap swapper
+ using nG mappings
+In-Reply-To: <2d89624a-ccc2-78a0-deaf-e0494636659a@arm.com>
+References: <1516968197-23206-1-git-send-email-will.deacon@arm.com>
+ <1516968197-23206-5-git-send-email-will.deacon@arm.com>
+ <2d89624a-ccc2-78a0-deaf-e0494636659a@arm.com>
+Message-ID: <20180126140546.GA25364@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 12:28:04PM +0000, Suzuki K Poulose wrote:
-> We are about to introduce generic MIDR range helpers. Clean
-> up the existing helpers in errat handling, preparing them
+Hi Marc,
 
-errata/erratum
-
-> to use generic version.
+On Fri, Jan 26, 2018 at 01:40:50PM +0000, Marc Zyngier wrote:
+> On 26/01/18 12:03, Will Deacon wrote:
+> > +/*
+> > + * void __kpti_install_ng_mappings(int cpu, int num_cpus, phys_addr_t swapper)
+> > + *
+> > + * Called exactly once from stop_machine context by each CPU found during boot.
+> > + */
+> > +__idmap_kpti_flag:
+> > +	.long	1
 > 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/cpu_errata.c | 76 +++++++++++++++++++++++-------------------
->  1 file changed, 41 insertions(+), 35 deletions(-)
+> I'm a bit concerned that we're placing the counter in a section that is
+> not writeable (at least in theory). We can either have the idmap
+> writeable entirely, or have a idmap data section (which means extending
+> it to be more than a single page).
+
+The idmap is mapped using the same attributes as the initial swapper
+mappings (SWAPPER_MM_MMUFLAGS) but, unlike swapper, it is not subsequently
+remapped and therefore remains writeable.
+
+I could update the .pushsection flags to reflect this with "awx"?
+
+Also, whilst looking around in head.S, I noticed phys_to_pte. I'll move
+that into assembler.h and switch the argument order as a separate patch.
+
+> Not sure if that's a concern, but I thought I'd raise it. The core works
+> pretty well as is, so  it cannot be completely wrong... ;-)
+
+Is that a Tested-by? ;)
+
+> > +ENTRY(idmap_kpti_install_ng_mappings)
+> > +	cpu		.req	w0
+> > +	num_cpus	.req	w1
+> > +	swapper_pa	.req	x2
+> > +	swapper_ttb	.req	x3
+> > +	flag_ptr	.req	x4
+> > +	cur_pgdp	.req	x5
+> > +	end_pgdp	.req	x6
+> > +	pgd		.req	x7
+> > +	cur_pudp	.req	x8
+> > +	end_pudp	.req	x9
+> > +	pud		.req	x10
+> > +	cur_pmdp	.req	x11
+> > +	end_pmdp	.req	x12
+> > +	pmd		.req	x13
+> > +	cur_ptep	.req	x14
+> > +	end_ptep	.req	x15
+> > +	pte		.req	x16
+> > +
+> > +	mrs	swapper_ttb, ttbr1_el1
+> > +	adr	flag_ptr, __idmap_kpti_flag
+> > +
+> > +	cbnz	cpu, __idmap_kpti_secondary
+> > +
+> > +	/* We're the boot CPU. Wait for the others to catch up */
+> > +	sevl
+> > +1:	wfe
+> > +	ldaxr	w18, [flag_ptr]
+> > +	eor	w18, w18, num_cpus
+> > +	cbnz	w18, 1b
+> > +
+> > +	/* We need to walk swapper, so turn off the MMU. */
+> > +	pre_disable_mmu_workaround
+> > +	mrs	x18, sctlr_el1
+> > +	bic	x18, x18, #1
 > 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 550ac8a0854b..054b17009f41 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -179,14 +179,23 @@ static int qcom_enable_link_stack_sanitization(
->  }
->  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
->  
-> -#define MIDR_RANGE(model, min, max) \
-> +#define ERRATA_MIDR_RANGE(model, v_min, r_min, v_max, r_max) \
->  	.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM, \
->  	.matches = is_affected_midr_range, \
->  	.midr_model = model, \
-> -	.midr_range_min = min, \
-> -	.midr_range_max = max
-> +	.midr_range_min = MIDR_CPU_VAR_REV(v_min, r_min), \
-> +	.midr_range_max = MIDR_CPU_VAR_REV(v_max, r_max)
->  
-> -#define MIDR_ALL_VERSIONS(model) \
-> +/* Errata affecting a range of revisions of  given model variant */
-> +#define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max) \
-> +	ERRATA_MIDR_RANGE(m, var, r_min, var, r_max)
-> +
-> +/* Errata affecting a single variant/revision of a model */
-> +#define ERRATA_MIDR(model, var, rev)	\
+> nit: You should be able to use SCTLR_ELx_M, as we already include
+> sysreg.h (indirectly).
 
-Maybe call this ERRATA_MIDR_REV() since it's similar to
-ERRATA_MIDR_REV_RANGE() but describes a single revision?
+Aha, I looked for that and failed to find it. Thanks.
 
-[...]
-
-Cheers
----Dave
+Will
