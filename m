@@ -1,65 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 26 Jan 2018 18:10:23 +0000
-Subject: [PATCH 03/14] arm/arm64: KVM: Consolidate the PSCI include files
-In-Reply-To: <20180126142847.31240-4-marc.zyngier@arm.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
- <20180126142847.31240-4-marc.zyngier@arm.com>
-Message-ID: <94c9a057-cb41-a92a-aaca-8b8e95676a32@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Jan 2018 18:11:49 +0000
+Subject: [PATCH RFC 0/3] API for 128-bit IO access
+In-Reply-To: <20180126090542.bsza7hqqinqwllcr@yury-thinkpad>
+References: <20180124090519.6680-1-ynorov@caviumnetworks.com>
+ <20180124102212.GC20586@arm.com>
+ <20180126090542.bsza7hqqinqwllcr@yury-thinkpad>
+Message-ID: <20180126181149.GA17922@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 14:28, Marc Zyngier wrote:
-> As we're about to update the PSCI support, and because I'm lazy,
-> let's move the PSCI include file to include/kvm so that both
-> ARM architectures can find it.
+On Fri, Jan 26, 2018 at 12:05:42PM +0300, Yury Norov wrote:
+> On Wed, Jan 24, 2018 at 10:22:13AM +0000, Will Deacon wrote:
+> > On Wed, Jan 24, 2018 at 12:05:16PM +0300, Yury Norov wrote:
+> > > This series adds API for 128-bit memory IO access and enables it for ARM64.
+> > > The original motivation for 128-bit API came from new Cavium network device
+> > > driver. The hardware requires 128-bit access to make things work. See
+> > > description in patch 3 for details.
+> > > 
+> > > Also, starting from ARMv8.4, stp and ldp instructions become atomic, and
+> > > API for 128-bit access would be helpful in core arm64 code.
+> > 
+> > Only for normal, cacheable memory, so they're not suitable for IO accesses
+> > as you're proposing here.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/psci.h                        | 25 ----------------------
->  arch/arm/kvm/handle_exit.c                         |  2 +-
->  arch/arm64/kvm/handle_exit.c                       |  3 ++-
->  .../asm/kvm_psci.h => include/kvm/arm_psci.h       |  6 +++---
->  virt/kvm/arm/arm.c                                 |  2 +-
->  virt/kvm/arm/psci.c                                |  3 ++-
->  6 files changed, 9 insertions(+), 32 deletions(-)
->  delete mode 100644 arch/arm/include/asm/psci.h
->  rename arch/arm64/include/asm/kvm_psci.h => include/kvm/arm_psci.h (89%)
+> Hi Will,
 > 
-> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-> deleted file mode 100644
-> index e1b825dfab23..000000000000
-> --- a/arch/arm/include/asm/psci.h
-> +++ /dev/null
-> @@ -1,25 +0,0 @@
-> -/*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - *
-> - * Copyright (C) 2012 ARM Limited
-> - */
-> -
-> -#ifndef __ASM_ARM_PSCI_H
-> -#define __ASM_ARM_PSCI_H
-> -
-> -extern const struct smp_operations psci_smp_ops;
-> -
-> -#if defined(CONFIG_SMP) && defined(CONFIG_ARM_PSCI)
-> -bool psci_smp_available(void);
-> -#else
-> -static inline bool psci_smp_available(void) { return false; }
-> -#endif
-> -
-> -#endif /* __ASM_ARM_PSCI_H */
+> Thanks for clarification.
+> 
+> Could you elaborate, do you find 128-bit read/write API useless, or
+> you just correct my comment?
+> 
+> I think that ordered uniform 128-bit access API would be helpful, even
+> if not atomic.
 
-Doh. I deleted the wrong file. That was supposed to be kvm_psci.h, and
-not psci.h. Not sure how I managed that one...
+Sorry, but I strongly disagree here. Having an IO accessor that isn't
+guaranteed to be atomic is a recipe for disaster if it's not called out
+explicitly. You're much better off implementing something along the lines
+of <linux/io-128-nonatomic-hi-lo.h> using 2x64-bit accessors like we already
+have for the 2x32-bit case.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+However, that doesn't solve your problem and is somewhat of a distraction.
+I'd suggest that in your case, where you have a device that relies on
+128-bit atomic access that is assumedly tightly integrated into your SoC,
+then the driver just codes it's own local implementation of the accessor,
+given that there isn't a way to guarantee the atomicity architecturally
+(and even within your SoC it might not be atomic to all endpoints).
+
+Will
