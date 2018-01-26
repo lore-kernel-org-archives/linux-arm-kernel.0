@@ -1,87 +1,77 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Fri, 26 Jan 2018 20:31:22 +0800
-Subject: [PATCH v5 0/3] arm64/ras: support sea error recovery
-Message-ID: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jan 2018 12:25:19 +0000
+Subject: [PATCH 10/16] arm64: Make KPTI strict CPU local feature
+In-Reply-To: <20180123122809.16269-11-suzuki.poulose@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-11-suzuki.poulose@arm.com>
+Message-ID: <20180126122519.GR5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
-are consumed. According to the existing process, errors occurred in the
-kernel, leading to direct panic, if it occurred the user-space, we should
-just kill process.
+On Tue, Jan 23, 2018 at 12:28:03PM +0000, Suzuki K Poulose wrote:
+> KPTI capability is a security feature which should be enabled
+> when at least one CPU on the system needs it. Any late CPU
+> which needs the kernel support, should be prevented from
+> booting (and thus making the system unsecure) if the feature
+> was not already enabled.
 
-But there is a class of error, in fact, is not necessary to kill
-process, you can recover and continue to run the process. Such as
-the instruction data corrupted, where the memory page might be
-read-only, which is has not been modified, the disk might have the
-correct data, so you can directly drop the page, ant reload it when
-necessary.
+Is there an actual change to behaviour here?
 
-So this patchset is just try to solve such problem: if the error is
-consumed in user-space and the error occurs on a clean page, you can
-directly drop the memory page without killing process.
+It's not very obvious from the commit message, or the patch when read in
+isolation.
 
-If the corrupted page is clean, just dropped it and return to user-space
-without side effects. And if corrupted page is dirty, memory_failure()
-will send SIGBUS with code=BUS_MCEERR_AR. While without this patchset,
-do_sea() will just send SIGBUS, so the process was killed in the same place.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 111f6c4b4cd7..2627a836e99d 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -862,9 +862,8 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+>  static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>  
+>  static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 
-Because memory_failure() may sleep, we can not call it directly in SEA
-exception context. So we saved faulting physical address associated with
-a process in the ghes handler and set __TIF_SEA_NOTIFY. When we return
-from SEA exception context and get into do_notify_resume() before the
-process running, we could check it and call memory_failure() to do
-recovery. It's safe, because we are in process context.
+[Nit: All the other .matches functions have a predicate-style name, so
+"should_unmap_kernel_at_el0" or "must_unmap_kernel_at_el0" might be
+better names...  However, the name wasn't introduced by this series and
+it's not a huge deal.] 
 
-In some platform, when SEA triggerred, physical address could be reported
-by memory section or by processor section, so we save address at this two
-place.
+> -				int __unused)
+> +				int scope)
+>  {
+> -	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+>  
+>  	/* Forced on command line? */
+>  	if (__kpti_forced) {
+> @@ -878,8 +877,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>  		return true;
+>  
+>  	/* Defer to CPU feature registers */
+> -	return !cpuid_feature_extract_unsigned_field(pfr0,
+> -						     ID_AA64PFR0_CSV3_SHIFT);
+> +	return !has_cpuid_feature(entry, scope);
+>  }
+>  
+>  static int __init parse_kpti(char *str)
+> @@ -1003,7 +1001,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>  	{
+>  		.desc = "Kernel page table isolation (KPTI)",
+>  		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+> -		.type = ARM64_CPUCAP_BOOT_SYSTEM_FEATURE,
+> +		.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE,
+> +		.sys_reg = SYS_ID_AA64PFR0_EL1,
+> +		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
+> +		.min_field_value = 1,
+>  		.matches = unmap_kernel_at_el0,
+>  	},
+>  #endif
 
----
-v5 - v4:
-  - rebased on top of 4.15-rc9 + efi patches
-    efi patches:
-    https://patchwork.codeaurora.org/patch/415877/
-    https://patchwork.codeaurora.org/patch/415879/
+[...]
 
-  - add Tyler & Xiongfeng's Tested-by.
-
-v4 - v3:
-  - rebase on top of the latest mainline
-  - make ghes_arm_process_error as a weak function
-  - only pick cache error from arm processor section for error recovery
-  - fix s-o-b issue
-
-  https://lkml.org/lkml/2017/9/7/98
-
-v3 - v2:
-  - fix patch style issue
-
-v2 - v1:
-  - wrap arm_proc_error_check and log_arm_hw_error in a single arm_process_error()
-  - fix sea_save_info return value issue
-  - fix link error if this CONFIG_ARM64_ERR_RECOV is not selected
-  - use a notify chain instead of call arch_apei_report_mem_error directly
-
-  https://lkml.org/lkml/2017/9/1/189
-
-Xie XiuQi (3):
-  arm64/ras: support sea error recovery
-  GHES: add a notify chain for process memory section
-  arm64/ras: save error address from memory section for recovery
-
- arch/arm64/Kconfig                   |  11 +++
- arch/arm64/include/asm/ras.h         |  23 +++++
- arch/arm64/include/asm/thread_info.h |   4 +-
- arch/arm64/kernel/Makefile           |   1 +
- arch/arm64/kernel/ras.c              | 173 +++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal.c           |   7 ++
- arch/arm64/mm/fault.c                |  27 ++++--
- drivers/acpi/apei/ghes.c             |  18 +++-
- include/acpi/ghes.h                  |  11 +++
- 9 files changed, 265 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/include/asm/ras.h
- create mode 100644 arch/arm64/kernel/ras.c
-
--- 
-1.8.3.1
+Cheers
+---Dave
