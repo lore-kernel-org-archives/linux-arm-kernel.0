@@ -1,175 +1,72 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 26 Jan 2018 17:12:38 +0000
-Subject: [PATCH v3 3/6] arm: KVM: Invalidate BTB on guest exit for
- Cortex-A12/A17
-In-Reply-To: <20180125152139.32431-4-marc.zyngier@arm.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-4-marc.zyngier@arm.com>
-Message-ID: <361ff814-cf1e-ad1f-329a-0fe416c2b6f7@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 26 Jan 2018 19:13:32 +0200
+Subject: [RFC PATCH 2/2] gpio: provide a consumer when requesting a gpio
+In-Reply-To: <20180126073213.GW3055@rfolt0960.corp.atmel.com>
+References: <20180115162407.6314-1-ludovic.desroches@microchip.com>
+ <20180115162407.6314-3-ludovic.desroches@microchip.com>
+ <CACRpkdbsYyHRz826K0QA=Y7Dvf_sm714o5601KBD7Zo4+1hrQA@mail.gmail.com>
+ <20180118152228.GX2989@rfolt0960.corp.atmel.com>
+ <20180124130705.GN3055@rfolt0960.corp.atmel.com>
+ <CAHp75VeuX8kGumtiu6iBhJ+AL+Ug3dm5Pb_tQ8YYYU9SH+QSZA@mail.gmail.com>
+ <20180126073213.GW3055@rfolt0960.corp.atmel.com>
+Message-ID: <CAHp75Vfe_Zf1bqOEmTprxiy=o0ROUnj4F5aZKP7=q3CjiXT5oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/18 15:21, Marc Zyngier wrote:
-> In order to avoid aliasing attacks against the branch predictor,
-> let's invalidate the BTB on guest exit. This is made complicated
-> by the fact that we cannot take a branch before invalidating the
-> BTB.
-> 
-> We only apply this to A12 and A17, which are the only two ARM
-> cores on which this useful.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/include/asm/kvm_asm.h |  2 --
->   arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
->   arch/arm/kvm/hyp/hyp-entry.S   | 62 ++++++++++++++++++++++++++++++++++++++++--
->   3 files changed, 72 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 36dd2962a42d..df24ed48977d 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -61,8 +61,6 @@ struct kvm_vcpu;
->   extern char __kvm_hyp_init[];
->   extern char __kvm_hyp_init_end[];
->   
-> -extern char __kvm_hyp_vector[];
-> -
->   extern void __kvm_flush_vm_context(void);
->   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->   extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index eb46fc81a440..b47db5b9e407 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -37,6 +37,7 @@
->   
->   #include <linux/highmem.h>
->   #include <asm/cacheflush.h>
-> +#include <asm/cputype.h>
->   #include <asm/pgalloc.h>
->   #include <asm/stage2_pgtable.h>
->   
-> @@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
->   
->   static inline void *kvm_get_hyp_vector(void)
->   {
-> -	return kvm_ksym_ref(__kvm_hyp_vector);
-> +	extern char __kvm_hyp_vector[];
-> +	extern char __kvm_hyp_vector_bp_inv[];
-> +
-> +	switch(read_cpuid_part()) {
-> +	case ARM_CPU_PART_CORTEX_A12:
-> +	case ARM_CPU_PART_CORTEX_A17:
-> +		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
-> +
-> +	default:
-> +		return kvm_ksym_ref(__kvm_hyp_vector);
-> +	}
->   }
->   
->   static inline int kvm_map_vectors(void)
-> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-> index 95a2faefc070..aab6b0c06a19 100644
-> --- a/arch/arm/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm/kvm/hyp/hyp-entry.S
-> @@ -70,6 +70,57 @@ __kvm_hyp_vector:
->   	W(b)	hyp_hvc
->   	W(b)	hyp_irq
->   	W(b)	hyp_fiq
-> +	
-> +	.align 5
-> +__kvm_hyp_vector_bp_inv:
-> +	.global __kvm_hyp_vector_bp_inv
-> +
-> +	/*
-> +	 * We encode the exception entry in the bottom 3 bits of
-> +	 * SP, and we have to guarantee to be 8 bytes aligned.
-> +	 */
-> +	W(add)	sp, sp, #1	/* Reset 	  7 */
-> +	W(add)	sp, sp, #1	/* Undef	  6 */
-> +	W(add)	sp, sp, #1	/* Syscall	  5 */
-> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-> +	W(add)	sp, sp, #1	/* Data abort	  3 */
-> +	W(add)	sp, sp, #1	/* HVC		  2 */
-> +	W(add)	sp, sp, #1	/* IRQ		  1 */
-> +	W(nop)			/* FIQ		  0 */
-> +
-> +	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
-> +	isb
-> +
+On Fri, Jan 26, 2018 at 9:32 AM, Ludovic Desroches
+<ludovic.desroches@microchip.com> wrote:
+> On Wed, Jan 24, 2018 at 05:42:15PM +0200, Andy Shevchenko wrote:
+>> On Wed, Jan 24, 2018 at 3:07 PM, Ludovic Desroches
+>> <ludovic.desroches@microchip.com> wrote:
+>> > On Thu, Jan 18, 2018 at 04:22:28PM +0100, Ludovic Desroches wrote:
+>> >> On Thu, Jan 18, 2018 at 11:30:00AM +0100, Linus Walleij wrote:
 
-The below is quite a bit of faff; might it be worth an
+>> >> > Can't we just look up the associated gpio_chip from the GPIO range,
+>> >> > and in case the pin is connected between the pin controller and
+>> >> > the GPIO chip, then we allow the gpiochip to also take a
+>> >> > reference?
+>>
+>> How do you find my proposal about introducing ownership level (not
+>> requested yet; exclusive; shared)?
 
-#ifdef CONFIG_THUMB2_KERNEL
+> Yes but I don't see how I can fix my issue with these levels. In my
+> case, I need an exclusive ownership at device level not at pin level. In
+> reality, it is at pin level but I am in this situation because my pin
+> controler was introduced as non strict and also because I need to set
+> the configuration of the pin which is going to be used as a GPIO.
+>
+> If the ownership is exclusive, pinmuxing coming from pinctrl-default
+> will be accepted but the GPIO request will fail even if it comes from the
+> same device.
 
-> +	/*
-> +	 * Yet another silly hack: Use VPIDR as a temp register.
-> +	 * Thumb2 is really a pain, as SP cannot be used with most
-> +	 * of the bitwise instructions. The vect_br macro ensures
-> +	 * things gets cleaned-up.
-> +	 */
-> +	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
-> +	mov	r0, sp
-> +	and	r0, r0, #7
-> +	sub	sp, sp, r0
-> +	push	{r1, r2}
-> +	mov	r1, r0
-> +	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
-> +	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
-> +	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+The problem here is to declare a right consumer of the resource.
 
-#endif
+My understanding that consumer at the end is device or device(s):
 
-> +
-> +.macro vect_br val, targ
+none: resource is free to acquire
+exclusive: certain device has access to the resource (pin)
+shared: several devices may access to the resource
 
-ARM(cmp		sp, #val)
-THUMB(cmp	r1, #\val)
-THUMB(popeq	{r1, r2}
+In both cases couple of caveats:
+- power management has a special access level to the resource on
+behalf of the owner(s)
+- it can have some flags, like 'locked', which means no more owners
+can be changed / added, but still possible to free resource by all
+owners to go to state 'none'
 
-> +	beq	\targ
-> +.endm
+> If the ownership is shared then, pinmuxing coming from pinctrl-default
+> will be accepted but a GPIO request from another device will be accepted
+> too.
+>
+> Both situations are incorrect in my case.
 
-...to keep the "normal" path relatively streamlined?
+Yes, since the ownership design is based on subsystem rather consumer device.
 
-Robin.
+> Let me know if I have not well understood your proposal. My concern is
+> to get out of this situation without breaking current DTs.
 
-> +
-> +	vect_br	0, hyp_fiq
-> +	vect_br	1, hyp_irq
-> +	vect_br	2, hyp_hvc
-> +	vect_br	3, hyp_dabt
-> +	vect_br	4, hyp_pabt
-> +	vect_br	5, hyp_svc
-> +	vect_br	6, hyp_undef
-> +	vect_br	7, hyp_reset
->   
->   .macro invalid_vector label, cause
->   	.align
-> @@ -149,7 +200,14 @@ hyp_hvc:
->   	bx	ip
->   
->   1:
-> -	push	{lr}
-> +	/*
-> +	 * Pushing r2 here is just a way of keeping the stack aligned to
-> +	 * 8 bytes on any path that can trigger a HYP exception. Here,
-> +	 * we may well be about to jump into the guest, and the guest
-> +	 * exit would otherwise be badly decoded by our fancy
-> +	 * "decode-exception-without-a-branch" code...
-> +	 */
-> +	push	{r2, lr}
->   
->   	mov	lr, r0
->   	mov	r0, r1
-> @@ -159,7 +217,7 @@ hyp_hvc:
->   THUMB(	orr	lr, #1)
->   	blx	lr			@ Call the HYP function
->   
-> -	pop	{lr}
-> +	pop	{r2, lr}
->   	eret
->   
->   guest_trap:
-> 
+See above, hope it clarifies a bit.
+
+-- 
+With Best Regards,
+Andy Shevchenko
