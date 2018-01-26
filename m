@@ -1,63 +1,57 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 26 Jan 2018 18:48:27 +0100
-Subject: [PATCH v4 1/3] i2c: mv64xxx: Remove useless test before
- clk_disable_unprepare
-In-Reply-To: <20180116163540.1092-2-gregory.clement@free-electrons.com>
-References: <20180116163540.1092-1-gregory.clement@free-electrons.com>
- <20180116163540.1092-2-gregory.clement@free-electrons.com>
-Message-ID: <20180126174827.kutntrg74avpigfr@ninjato>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Fri, 26 Jan 2018 18:48:39 +0100
+Subject: [linux-sunxi] [PATCH 13/16] arm: dts: sun8i: h3: add thermal zone
+ to H3
+In-Reply-To: <4cfb1faf-a712-c882-1ef1-55845c1bb00e@sholland.org>
+References: <20180126151941.12183-1-embed3d@gmail.com>
+ <20180126151941.12183-14-embed3d@gmail.com>
+ <4cfb1faf-a712-c882-1ef1-55845c1bb00e@sholland.org>
+Message-ID: <18116ff5-e919-a224-8d7d-2add836c1047@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 05:35:38PM +0100, Gregory CLEMENT wrote:
-> The 2 functions called from clk_disable_unprepare() already check that
-> the clock pointer is valid: no need to test it before calling it.
 
-Now I get it. 'called from' != 'calling' (what I understood). But also
-!= 'called by' (what I would have ecpected, but I am neither a native
-speaker).
 
-You mean "clk_disable_unprepare() is NULL pointer safe."
+On 26.01.2018 17:26, Samuel Holland wrote:
+> On 01/26/18 09:19, Philipp Rossak wrote:
+>> This patch adds the thermal zones to the H3. We have only one sensor and
+>> that is placed in the cpu.
+>>
+>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>> ---
+>>   arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index fbb007e5798e..3f83f6a27c74 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -72,6 +72,15 @@
+>>   		};
+>>   	};
+>>   
+>> +	thermal-zones {
+>> +		cpu-thermal {
+>> +			/* milliseconds */
+>> +			polling-delay-passive = <250>;
+>> +			polling-delay = <1000>;
+>> +			thermal-sensors = <&ths 0>;
+> 
+> If #thermal-sensor-cells = <0>, shouldn't this just be <&ths> ?
+I think both works, but I my intention was to have an accurate 
+description in DT.
+I thought that that is important in DT.
 
+>> +		};
+>> +	};
+>> +
+>>   	timer {
+>>   		compatible = "arm,armv7-timer";
+>>   		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>>
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
+> Thanks,
+> Samuel
 > 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index a832c45276a4..f69066266faa 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -950,9 +950,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  exit_reset:
->  	reset_control_assert(drv_data->rstc);
->  exit_clk:
-> -	/* Not all platforms have a clk */
-> -	if (!IS_ERR(drv_data->clk))
-> -		clk_disable_unprepare(drv_data->clk);
-> +	clk_disable_unprepare(drv_data->clk);
->  
->  	return rc;
->  }
-> @@ -965,9 +963,7 @@ mv64xxx_i2c_remove(struct platform_device *dev)
->  	i2c_del_adapter(&drv_data->adapter);
->  	free_irq(drv_data->irq, drv_data);
->  	reset_control_assert(drv_data->rstc);
-> -	/* Not all platforms have a clk */
-> -	if (!IS_ERR(drv_data->clk))
-> -		clk_disable_unprepare(drv_data->clk);
-> +	clk_disable_unprepare(drv_data->clk);
->  
->  	return 0;
->  }
-> -- 
-> 2.15.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180126/18797b1c/attachment-0001.sig>
+Regards,
+Philipp
