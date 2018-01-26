@@ -1,72 +1,60 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Jan 2018 14:20:32 +0100
-Subject: [PATCH 3/4] drm/pl111: Handle the Versatile RGB/BGR565 mode
-In-Reply-To: <20180126132033.19744-1-linus.walleij@linaro.org>
-References: <20180126132033.19744-1-linus.walleij@linaro.org>
-Message-ID: <20180126132033.19744-3-linus.walleij@linaro.org>
+Date: Fri, 26 Jan 2018 14:27:44 +0100
+Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
+In-Reply-To: <87inbqppm4.fsf@anholt.net>
+References: <20180123132220.29886-1-linus.walleij@linaro.org>
+ <87inbqppm4.fsf@anholt.net>
+Message-ID: <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Versatile series can do RGB/BGR565 with an external
-"PLD" (Programmable Logical Device). However the CLCD does not
-have control bits for this, so it needs to be set into the
-ordinary 16BPP mode, then the RGB/BGR565 handling of the pixel
-data is handled by configuring the PLD through the external
-register.
+On Thu, Jan 25, 2018 at 4:46 AM, Eric Anholt <eric@anholt.net> wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpu/drm/pl111/pl111_display.c | 15 +++++++++++++--
- drivers/gpu/drm/pl111/pl111_drv.c     |  2 ++
- 2 files changed, 15 insertions(+), 2 deletions(-)
+>> +     pl111_choose_max_resolution(dev, priv->memory_bw,
+>> +                                 &mode_config->max_width,
+>> +                                 &mode_config->max_height, &bpp);
+>> +     dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
+>> +              mode_config->max_width, mode_config->max_height, bpp);
+>
+> I think this is the wrong place in the pipeline to be doing this, but I
+> don't have a complete solution so I'm not necessarily saying no.
 
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 7fe4040aea46..90946fcd65ef 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -199,10 +199,17 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 		cntl |= CNTL_LCDBPP24 | CNTL_BGR;
- 		break;
- 	case DRM_FORMAT_BGR565:
--		cntl |= CNTL_LCDBPP16_565;
-+		if (priv->variant->is_pl110)
-+			cntl |= CNTL_LCDBPP16;
-+		else
-+			cntl |= CNTL_LCDBPP16_565;
- 		break;
- 	case DRM_FORMAT_RGB565:
--		cntl |= CNTL_LCDBPP16_565 | CNTL_BGR;
-+		if (priv->variant->is_pl110)
-+			cntl |= CNTL_LCDBPP16;
-+		else
-+			cntl |= CNTL_LCDBPP16_565;
-+		cntl |= CNTL_BGR;
- 		break;
- 	case DRM_FORMAT_ABGR1555:
- 	case DRM_FORMAT_XBGR1555:
-@@ -226,6 +233,10 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 		break;
- 	}
- 
-+	/* The PL110+ does the BGR routing externally */
-+	if (priv->variant->is_pl110_plus)
-+		cntl &= ~CNTL_BGR;
-+
- 	/* Power sequence: first enable and chill */
- 	writel(cntl, priv->regs + priv->ctrl);
- 
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 8da75089dc59..f1f1b87b0e44 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -209,6 +209,8 @@ static const u32 pl110_pixel_formats[] = {
- 	DRM_FORMAT_XBGR8888,
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_BGR565,
-+	DRM_FORMAT_RGB565,
- 	DRM_FORMAT_ABGR1555,
- 	DRM_FORMAT_XBGR1555,
- 	DRM_FORMAT_ARGB1555,
--- 
-2.14.3
+So currently the driver does this:
+
+mode_config->max_width = 1024;
+mode_config->max_height = 768;
+
+And that is because it cannot really handle anything. I guess ideally
+the DRM driver should set these to -1 or something so that any widths
+and heights negotiated will work.
+
+>  Things I think we should do for bandwidth limits:
+>
+> A new pl111_mode_valid() rejects modes with width*height*2 > bandwidth
+> (if we can't scan it out with our smallest format, don't advertise it).
+>
+> pl111_display_check() rejects modes with width*height*bpp > bandwidth
+> (if we can't scan out this particular configuration, let them know we
+> can't set the mode).
+>
+> Ideally given those two things, fbdev and X11 would notice that the
+> preferred mode fails at 24bpp and fall back to 16bpp.  I don't think
+> either of those does so today, though.
+>
+> Interested in tackling any of these?
+
+I tried the pl111_display_check() version. It just made the driver
+fail to initialize anything, at least when using the dumb VGA
+bridge.
+
+There are .mode_valid() callbacks on the bridges we use
+(panel and dumb VGA) but neither uses it at the moment, hm.
+I could just assign my own .mode_valid() callback to the bridge,
+but it seems a bit fragile. But it's worth a hack, I'll try it.
+
+I sent a sent of lesser controversial patches in the meantime,
+and rebased this on top of those so we can deal with the
+memory BW issue separately.
+
+Yours,
+Linus Walleij
