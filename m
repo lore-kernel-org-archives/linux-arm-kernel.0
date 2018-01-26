@@ -1,32 +1,140 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 26 Jan 2018 08:53:43 +0100
-Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for inbound
- traffic
-In-Reply-To: <f746f9d5-b12d-9ffc-83e3-3851b4de6e52@gmail.com>
-References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
- <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
- <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
- <20180118073123.GA15766@lst.de>
- <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
- <20180118152331.GA24461@lst.de>
- <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
- <20180123132033.GA21438@lst.de>
- <f746f9d5-b12d-9ffc-83e3-3851b4de6e52@gmail.com>
-Message-ID: <20180126075343.GB2356@lst.de>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 26 Jan 2018 07:59:46 +0000
+Subject: [PATCH] ARM: imx: Improve the soc revision calculation flow
+In-Reply-To: <1515486632-18488-1-git-send-email-ping.bai@nxp.com>
+References: <1515486632-18488-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <AM3PR04MB306176538988C3363E4EE5380E00@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 24, 2018 at 12:04:58PM -0800, Florian Fainelli wrote:
-> This looks nicer than the current shape, but this still requires to
-> register a PCI fixup to override phys_to_dma() and dma_to_phys(), and it
-> would appear that you have dodged my question about how this is supposed
-> to fit with an entirely modular PCIe root complex driver? Are you
-> suggesting that we split the module into a built-in part and a modular part?
+> -----Original Message-----
+> From: Jacky Bai
+> Sent: Tuesday, January 09, 2018 4:31 PM
+> To: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>;
+> A.s. Dong <aisheng.dong@nxp.com>; jacky.baip at gmail.com
+> Subject: [PATCH] ARM: imx: Improve the soc revision calculation flow
+> 
+> On our i.MX6 SOC, the DIGPROG register is used for representing the SOC ID
+> and silicon revision. The revision has two part: MAJOR and MINOR. each is
+> represented in 8 bits in the register.
+> 
+> bits [15:8]: reflect the MAJOR part of the revision; bits [7:0]: reflect the MINOR
+> part of the revision;
+> 
+> In our linux kernel, the soc revision is represented in 8 bits.
+> MAJOR part and MINOR each occupy 4 bits.
+> 
+> previous method does NOT take care about the MAJOR part in DIGPROG
+> register. So reformat the revision read from the HW to be compatible with the
+> revision format used in kernel.
+> 
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> ---
+>  arch/arm/mach-imx/anatop.c | 58 +++++++++++++++++--------------------------
+> ---
+>  1 file changed, 21 insertions(+), 37 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c index
+> 649a84c..170cb30 100644
+> --- a/arch/arm/mach-imx/anatop.c
+> +++ b/arch/arm/mach-imx/anatop.c
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
+> + * Copyright NXP 2017.
 
-I don't think entirely modular PCI root bridges should be a focal point
-for the design.  If we happen to support them by other design choices:
-fine, but they should not be a priority.
+Copyright 2017-2018  NXP ?
 
-That being said if we have core dma mapping or PCIe code that has
-a list of offsets and the root complex only populates them it should
-work just fine.
+>   *
+>   * The code contained herein is licensed under the GNU General Public
+>   * License. You may obtain a copy of the GNU General Public License @@ -
+> 116,6 +117,8 @@ void __init imx_init_revision_from_anatop(void)
+>  	unsigned int revision;
+>  	u32 digprog;
+>  	u16 offset = ANADIG_DIGPROG;
+> +	u16 major_part, minor_part;
+
+U8?
+
+> +
+> 
+>  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+>  	anatop_base = of_iomap(np, 0);
+> @@ -127,45 +130,26 @@ void __init imx_init_revision_from_anatop(void)
+>  	digprog = readl_relaxed(anatop_base + offset);
+>  	iounmap(anatop_base);
+> 
+> -	switch (digprog & 0xff) {
+> -	case 0:
+> -		/*
+> -		 * For i.MX6QP, most of the code for i.MX6Q can be resued,
+> -		 * so internally, we identify it as i.MX6Q Rev 2.0
+> -		 */
+> -		if (digprog >> 8 & 0x01)
+> -			revision = IMX_CHIP_REVISION_2_0;
+> -		else
+> -			revision = IMX_CHIP_REVISION_1_0;
+> -		break;
+> -	case 1:
+> -		revision = IMX_CHIP_REVISION_1_1;
+> -		break;
+> -	case 2:
+> -		revision = IMX_CHIP_REVISION_1_2;
+> -		break;
+> -	case 3:
+> -		revision = IMX_CHIP_REVISION_1_3;
+> -		break;
+> -	case 4:
+> -		revision = IMX_CHIP_REVISION_1_4;
+> -		break;
+> -	case 5:
+> -		/*
+> -		 * i.MX6DQ TO1.5 is defined as Rev 1.3 in Data Sheet, marked
+> -		 * as 'D' in Part Number last character.
+> -		 */
+> -		revision = IMX_CHIP_REVISION_1_5;
+> -		break;
+> -	default:
+> -		/*
+> -		 * Fail back to return raw register value instead of 0xff.
+> -		 * It will be easy to know version information in SOC if it
+> -		 * can't be recognized by known version. And some chip's
+> (i.MX7D)
+> -		 * digprog value match linux version format, so it needn't map
+> -		 * again and we can use register value directly.
+> +	/*
+> +	 * On i.MX7D digprog value match linux version format, so
+> +	 * it needn't map again and we can use register value directly.
+> +	 */
+> +	if (of_device_is_compatible(np, "fsl,imx7d-anatop")) {
+> +		revision = digprog & 0xff;
+> +	} else {
+> +
+> +		/* MAJOR: [15:8], the major silicon revison;
+> +		 * MINOR: [7: 0], the minor silicon revison;
+> +		 *
+> +		 * please refer to the i.MX RM for the detailed
+> +		 * silicon revison bit define.
+> +		 * format the major part and minor part to match the
+> +		 * linux kernel soc version format.
+>  		 */
+>  		revision = digprog & 0xff;
+
+Unneeded line?
+
+Otherwise:
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Regards
+Dong Aisheng
+
+> +		major_part = (digprog >> 8) & 0xf;
+> +		minor_part = digprog & 0xf;
+> +		revision = ((major_part + 1) << 4) | minor_part;
+>  	}
+> 
+>  	mxc_set_cpu_type(digprog >> 16 & 0xff);
+> --
+> 1.9.1
