@@ -1,136 +1,86 @@
-From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
-Date: Fri, 26 Jan 2018 14:25:52 +0000
-Subject: [PATCH v5 1/2] staging: fsl-mc: Move core bus out of staging
-In-Reply-To: <20180126140625.GA14509@kroah.com>
-References: <20180126125127.26439-1-bogdan.purcareata@nxp.com>
- <20180126125127.26439-2-bogdan.purcareata@nxp.com>
- <20180126140625.GA14509@kroah.com>
-Message-ID: <AM0PR0402MB364966EA575C57E36DD5D0C8EAE00@AM0PR0402MB3649.eurprd04.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Jan 2018 15:26:10 +0100
+Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
+In-Reply-To: <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
+References: <20180123132220.29886-1-linus.walleij@linaro.org>
+ <87inbqppm4.fsf@anholt.net>
+ <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
+Message-ID: <CACRpkdZeH8BR3Hs8Pa5=mELn4Swo7whxPAj1vpfvo7yQ2zrscQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: Friday, January 26, 2018 4:06 PM
-> To: Bogdan Purcareata <bogdan.purcareata@nxp.com>
-> Cc: Laurentiu Tudor <laurentiu.tudor@nxp.com>; Ruxandra Ioana Ciocoi Radulescu
-> <ruxandra.radulescu@nxp.com>; stuyoder at gmail.com; arnd at arndb.de;
-> robh at kernel.org; Ioana Ciornei <ioana.ciornei@nxp.com>; Nipun Gupta
-> <nipun.gupta@nxp.com>; Roy Pledge <roy.pledge@nxp.com>; Horia Geant?
-> <horia.geanta@nxp.com>; marc.zyngier at arm.com; tglx at linutronix.de;
-> jason at lakedaemon.net; devel at driverdev.osuosl.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v5 1/2] staging: fsl-mc: Move core bus out of staging
-> 
-> On Fri, Jan 26, 2018 at 06:51:26AM -0600, Bogdan Purcareata wrote:
-> > Move the source files out of staging into their final locations:
-> >   -mc.h include file in drivers/staging/fsl-mc/include go to
-> include/linux/fsl
-> >   -source files in drivers/staging/fsl-mc/bus go to drivers/bus/fsl-mc
-> >   -overview.rst, providing an overview of DPAA2, goes to
-> >    Documentation/networking/dpaa2/overview.rst
-> >
-> > Update or delete other remaining staging files -- Makefile, Kconfig, TODO.
-> > Update dpaa2_eth and dpio staging drivers.
-> > Add integration bits for the documentation build system.
-> >
-> > Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
-> > [rebased, add dpaa2_eth and dpio #include updates]
-> > Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> > [rebased, split irqchip to separate patch]
-> > Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> > Notes:
-> >     -v5:
-> >       - split irqchip glue code to separate patch (GregKH)
-> >       - integrate doc with the kernel build system
-> >     -v4:
-> >       - regenerated patch with renames detection disabled (Andrew Lunn)
-> >     -v3:
-> >       - rebased
-> >     -v2:
-> >       - group irqchip gic its glue code together with the rest (Marc Zyngier)
-> >
-> >  Documentation/networking/dpaa2/index.rst           |   8 +
-> >  Documentation/networking/dpaa2/overview.rst        | 404 +++++++++
-> >  Documentation/networking/index.rst                 |   1 +
-> >  MAINTAINERS                                        |   3 +-
-> >  drivers/bus/Kconfig                                |   2 +
-> >  drivers/bus/Makefile                               |   4 +
-> >  drivers/bus/fsl-mc/Kconfig                         |  16 +
-> >  drivers/bus/fsl-mc/Makefile                        |  16 +
-> >  drivers/bus/fsl-mc/dpmcp.c                         |  99 +++
-> >  drivers/bus/fsl-mc/dprc-driver.c                   | 809 ++++++++++++++++++
-> >  drivers/bus/fsl-mc/dprc.c                          | 532 ++++++++++++
-> >  drivers/bus/fsl-mc/fsl-mc-allocator.c              | 648 ++++++++++++++
-> >  drivers/bus/fsl-mc/fsl-mc-bus.c                    | 948
-> +++++++++++++++++++++
-> >  drivers/bus/fsl-mc/fsl-mc-msi.c                    | 285 +++++++
-> >  drivers/bus/fsl-mc/fsl-mc-private.h                | 475 +++++++++++
-> >  drivers/bus/fsl-mc/mc-io.c                         | 268 ++++++
-> >  drivers/bus/fsl-mc/mc-sys.c                        | 296 +++++++
-> >  drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
-> >  drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
-> >  drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
-> >  drivers/staging/fsl-mc/TODO                        |  18 -
-> >  drivers/staging/fsl-mc/bus/Kconfig                 |  10 -
-> >  drivers/staging/fsl-mc/bus/Makefile                |  16 +-
-> >  drivers/staging/fsl-mc/bus/dpbp.c                  |   2 +-
-> >  drivers/staging/fsl-mc/bus/dpcon.c                 |   2 +-
-> >  drivers/staging/fsl-mc/bus/dpio/dpio-driver.c      |   2 +-
-> >  drivers/staging/fsl-mc/bus/dpio/dpio-service.c     |   2 +-
-> >  drivers/staging/fsl-mc/bus/dpio/dpio.c             |   2 +-
-> >  drivers/staging/fsl-mc/bus/dpmcp.c                 |  99 ---
-> >  drivers/staging/fsl-mc/bus/dprc-driver.c           | 809 ------------------
-> >  drivers/staging/fsl-mc/bus/dprc.c                  | 531 ------------
-> >  drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      | 648 --------------
-> >  drivers/staging/fsl-mc/bus/fsl-mc-bus.c            | 948 -------------------
-> --
-> >  drivers/staging/fsl-mc/bus/fsl-mc-msi.c            | 284 ------
-> >  drivers/staging/fsl-mc/bus/fsl-mc-private.h        | 475 -----------
-> >  .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   2 +-
-> >  drivers/staging/fsl-mc/bus/mc-io.c                 | 268 ------
-> >  drivers/staging/fsl-mc/bus/mc-sys.c                | 296 -------
-> >  drivers/staging/fsl-mc/include/mc.h                | 454 ----------
-> >  drivers/staging/fsl-mc/overview.rst                | 404 ---------
-> >  include/linux/fsl/mc.h                             | 454 ++++++++++
-> >  41 files changed, 5279 insertions(+), 5267 deletions(-)
-> >  create mode 100644 Documentation/networking/dpaa2/index.rst
-> >  create mode 100644 Documentation/networking/dpaa2/overview.rst
-> >  create mode 100644 drivers/bus/fsl-mc/Kconfig
-> >  create mode 100644 drivers/bus/fsl-mc/Makefile
-> >  create mode 100644 drivers/bus/fsl-mc/dpmcp.c
-> >  create mode 100644 drivers/bus/fsl-mc/dprc-driver.c
-> >  create mode 100644 drivers/bus/fsl-mc/dprc.c
-> >  create mode 100644 drivers/bus/fsl-mc/fsl-mc-allocator.c
-> >  create mode 100644 drivers/bus/fsl-mc/fsl-mc-bus.c
-> >  create mode 100644 drivers/bus/fsl-mc/fsl-mc-msi.c
-> >  create mode 100644 drivers/bus/fsl-mc/fsl-mc-private.h
-> >  create mode 100644 drivers/bus/fsl-mc/mc-io.c
-> >  create mode 100644 drivers/bus/fsl-mc/mc-sys.c
-> >  delete mode 100644 drivers/staging/fsl-mc/TODO
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/dpmcp.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/dprc-driver.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/dprc.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-private.h
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/mc-io.c
-> >  delete mode 100644 drivers/staging/fsl-mc/bus/mc-sys.c
-> >  delete mode 100644 drivers/staging/fsl-mc/include/mc.h
-> >  delete mode 100644 drivers/staging/fsl-mc/overview.rst
-> >  create mode 100644 include/linux/fsl/mc.h
-> 
-> I thought you were creating this with -M to git format-patch, what
-> happened?  That will show the files being renamed, not just deleted and
-> added.
+On Fri, Jan 26, 2018 at 2:27 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Jan 25, 2018 at 4:46 AM, Eric Anholt <eric@anholt.net> wrote:
+>
+>>> +     pl111_choose_max_resolution(dev, priv->memory_bw,
+>>> +                                 &mode_config->max_width,
+>>> +                                 &mode_config->max_height, &bpp);
+>>> +     dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
+>>> +              mode_config->max_width, mode_config->max_height, bpp);
+>>
+>> I think this is the wrong place in the pipeline to be doing this, but I
+>> don't have a complete solution so I'm not necessarily saying no.
+>
+> So currently the driver does this:
+>
+> mode_config->max_width = 1024;
+> mode_config->max_height = 768;
+>
+> And that is because it cannot really handle anything. I guess ideally
+> the DRM driver should set these to -1 or something so that any widths
+> and heights negotiated will work.
+>
+>>  Things I think we should do for bandwidth limits:
+>>
+>> A new pl111_mode_valid() rejects modes with width*height*2 > bandwidth
+>> (if we can't scan it out with our smallest format, don't advertise it).
+>>
+>> pl111_display_check() rejects modes with width*height*bpp > bandwidth
+>> (if we can't scan out this particular configuration, let them know we
+>> can't set the mode).
+>>
+>> Ideally given those two things, fbdev and X11 would notice that the
+>> preferred mode fails at 24bpp and fall back to 16bpp.  I don't think
+>> either of those does so today, though.
+>>
+>> Interested in tackling any of these?
+>
+> I tried the pl111_display_check() version. It just made the driver
+> fail to initialize anything, at least when using the dumb VGA
+> bridge.
 
-We previously received feedback suggesting to create the
-patchset with file renaming detection disabled (comment added
-in the notes).
+I guess this is because it gets called from
+drm_simple_display_pipe_funcs
+at which point the driver framework has already decided to go with
+this format. And that is backed by crtc.
 
-Bogdan P.
+We would need to extend this with a new function such as
+.crtc_valid() that can check both mode (for resolution)
+and format (for BPP).
+
+But then I start to wonde how "simple" drm_simple_display_pipe
+is becoming :/
+
+I can't figure out if the crtc is even the right place to address this...
+
+> There are .mode_valid() callbacks on the bridges we use
+> (panel and dumb VGA) but neither uses it at the moment, hm.
+> I could just assign my own .mode_valid() callback to the bridge,
+> but it seems a bit fragile. But it's worth a hack, I'll try it.
+
+It turns out that this passes only an struct drm_display_mode
+which does not concern itself with display engine details
+like BPP.
+
+So the bridges just put limitations on modes, not on BPP,
+which makes a lot of sense, it corresponds to what the
+hardware does.
+
+It's evident when I think about it...
+
+The check needs to be done in the
+drm_simple_display_pipe_funcs  or setting that up as
+per above. I just don't really see exactly where?
+
+Yours,
+Linus Walleij
