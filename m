@@ -1,58 +1,46 @@
 From: samuel@sholland.org (Samuel Holland)
-Date: Fri, 26 Jan 2018 10:25:12 -0600
-Subject: [linux-sunxi] [PATCH 16/16] arm: dts: sun8i: a83t: add thermal
- zone to A83T
-In-Reply-To: <20180126151941.12183-17-embed3d@gmail.com>
+Date: Fri, 26 Jan 2018 10:26:19 -0600
+Subject: [linux-sunxi] [PATCH 13/16] arm: dts: sun8i: h3: add thermal zone
+ to H3
+In-Reply-To: <20180126151941.12183-14-embed3d@gmail.com>
 References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-17-embed3d@gmail.com>
-Message-ID: <6ee10c04-6602-b927-5f47-64d6beb10625@sholland.org>
+ <20180126151941.12183-14-embed3d@gmail.com>
+Message-ID: <4cfb1faf-a712-c882-1ef1-55845c1bb00e@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01/26/18 09:19, Philipp Rossak wrote:
-> This patch adds the thermal zones to the A83T. Sensor 0 is located in the
-> cpu cluster 0. Sensor 1 is located in cluster 1 and Sensor 3 is located
-> in the gpu.
-
-You mention sensor 3 here, but have sensor 2 in the device tree.
-
+> This patch adds the thermal zones to the H3. We have only one sensor and
+> that is placed in the cpu.
+> 
 > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index 9e53ff5ac4ed..4259a8726031 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -747,4 +747,24 @@
->  			#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index fbb007e5798e..3f83f6a27c74 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -72,6 +72,15 @@
 >  		};
 >  	};
-> +
+>  
 > +	thermal-zones {
-> +		cpu0_thermal: cpu0-thermal {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <5000>;
+> +		cpu-thermal {
+> +			/* milliseconds */
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
 > +			thermal-sensors = <&ths 0>;
-> +		};
-> +
-> +		cpu1_thermal: cpu1-thermal {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <5000>;
-> +			thermal-sensors = <&ths 1>;
-> +		};
-> +
-> +		gpu_thermal: gpu-thermal {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <5000>;
-> +			thermal-sensors = <&ths 2>;
 
-                                           ^^^^ here
+If #thermal-sensor-cells = <0>, shouldn't this just be <&ths> ?
 
 > +		};
 > +	};
->  };
+> +
+>  	timer {
+>  		compatible = "arm,armv7-timer";
+>  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 > 
 
 Thanks,
