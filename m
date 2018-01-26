@@ -1,60 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Jan 2018 14:27:44 +0100
-Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
-In-Reply-To: <87inbqppm4.fsf@anholt.net>
-References: <20180123132220.29886-1-linus.walleij@linaro.org>
- <87inbqppm4.fsf@anholt.net>
-Message-ID: <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 26 Jan 2018 14:30:47 +0100
+Subject: [RFC 1/2] arm: cacheflush syscall: process only pages that are
+ in the memory
+In-Reply-To: <20180126113226.GX17719@n2100.armlinux.org.uk>
+References: <CGME20180126111453eucas1p1330d8561386c3cf2bb457bc22c0d99a8@eucas1p1.samsung.com>
+ <20180126111441.29353-1-m.szyprowski@samsung.com>
+ <20180126113226.GX17719@n2100.armlinux.org.uk>
+Message-ID: <589aa8ab-5bfc-e065-51f9-3a403c346d92@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 4:46 AM, Eric Anholt <eric@anholt.net> wrote:
+Hi Russell,
 
->> +     pl111_choose_max_resolution(dev, priv->memory_bw,
->> +                                 &mode_config->max_width,
->> +                                 &mode_config->max_height, &bpp);
->> +     dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
->> +              mode_config->max_width, mode_config->max_height, bpp);
->
-> I think this is the wrong place in the pipeline to be doing this, but I
-> don't have a complete solution so I'm not necessarily saying no.
+On 2018-01-26 12:32, Russell King - ARM Linux wrote:
+> On Fri, Jan 26, 2018 at 12:14:40PM +0100, Marek Szyprowski wrote:
+>> glibc in calls cacheflush syscall on the whole textrels section of the
+>> relocated binaries. However, relocation usually doesn't touch all pages
+>> of that section, so not all of them are read to memory when calling this
+>> syscall. However flush_cache_user_range() function will unconditionally
+>> touch all pages from the provided range, resulting additional overhead
+>> related to reading all clean pages. Optimize this by calling
+>> flush_cache_user_range() only on the pages that are already in the
+>> memory.
+> What ensures that another CPU doesn't remove a page while we're
+> flushing it?  That will trigger a data abort, which will want to
+> take the mmap_sem, causing a deadlock.
 
-So currently the driver does this:
+I thought that taking mmap_sem will prevent pages from being removed.
+mmap_sem has been already taken in the previous implementation of that
+syscall, until code simplification done by commit 97c72d89ce0e ("ARM:
+cacheflush: don't bother rounding to nearest vma").
 
-mode_config->max_width = 1024;
-mode_config->max_height = 768;
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   arch/arm/kernel/traps.c | 25 +++++++++++++++++++------
+>>   1 file changed, 19 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index 5e3633c24e63..a5ec262ab30e 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -564,23 +564,36 @@ static int bad_syscall(int n, struct pt_regs *regs)
+>>   static inline int
+>>   __do_cache_op(unsigned long start, unsigned long end)
+>>   {
+>> -	int ret;
+>> +	struct vm_area_struct *vma = NULL;
+>> +	int ret = 0;
+>>   
+>> +	down_read(&current->mm->mmap_sem);
+>>   	do {
+>>   		unsigned long chunk = min(PAGE_SIZE, end - start);
+>>   
+>> +		if (!vma || vma->vm_end <= start) {
+>> +			vma = find_vma(current->mm, start);
+>> +			if (!vma) {
+>> +				ret = -EFAULT;
+>> +				goto done;
+>> +			}
+>> +		}
+>> +
+>>   		if (fatal_signal_pending(current))
+>>   			return 0;
+>>   
+>> -		ret = flush_cache_user_range(start, start + chunk);
+>> -		if (ret)
+>> -			return ret;
+>> +		if (follow_page(vma, start, 0)) {
+>> +			ret = flush_cache_user_range(start, start + chunk);
+>> +			if (ret)
+>> +				goto done;
+>> +		}
+>>   
+>>   		cond_resched();
+>>   		start += chunk;
+>>   	} while (start < end);
+>> -
+>> -	return 0;
+>> +done:
+>> +	up_read(&current->mm->mmap_sem);
+>> +	return ret;
+>>   }
+>>   
+>>   static inline int
+>> -- 
+>> 2.15.0
+>>
 
-And that is because it cannot really handle anything. I guess ideally
-the DRM driver should set these to -1 or something so that any widths
-and heights negotiated will work.
-
->  Things I think we should do for bandwidth limits:
->
-> A new pl111_mode_valid() rejects modes with width*height*2 > bandwidth
-> (if we can't scan it out with our smallest format, don't advertise it).
->
-> pl111_display_check() rejects modes with width*height*bpp > bandwidth
-> (if we can't scan out this particular configuration, let them know we
-> can't set the mode).
->
-> Ideally given those two things, fbdev and X11 would notice that the
-> preferred mode fails at 24bpp and fall back to 16bpp.  I don't think
-> either of those does so today, though.
->
-> Interested in tackling any of these?
-
-I tried the pl111_display_check() version. It just made the driver
-fail to initialize anything, at least when using the dumb VGA
-bridge.
-
-There are .mode_valid() callbacks on the bridges we use
-(panel and dumb VGA) but neither uses it at the moment, hm.
-I could just assign my own .mode_valid() callback to the bridge,
-but it seems a bit fragile. But it's worth a hack, I'll try it.
-
-I sent a sent of lesser controversial patches in the meantime,
-and rebased this on top of those so we can deal with the
-memory BW issue separately.
-
-Yours,
-Linus Walleij
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
