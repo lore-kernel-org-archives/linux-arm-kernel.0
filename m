@@ -1,187 +1,235 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 26 Jan 2018 15:50:55 +0000
-Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <20180126142847.31240-15-marc.zyngier@arm.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
- <20180126142847.31240-15-marc.zyngier@arm.com>
-Message-ID: <6d2eae60-44b7-e5c2-0e71-f27ce2322237@arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Fri, 26 Jan 2018 16:55:54 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <20180126145608.5s6c6ltpvrko7iyv@flea.lan>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180125152117.qikemrwl7f35ssjg@flea.lan>
+ <d79602b9-8e04-8250-fd7f-f52b8e16c575@micronovasrl.com>
+ <20180126145608.5s6c6ltpvrko7iyv@flea.lan>
+Message-ID: <18ec71dc-a785-a771-76d4-176d95032c97@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 14:28, Marc Zyngier wrote:
-> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
-> It is lovely. Really.
+Hi,
+
+Il 26/01/2018 15:56, Maxime Ripard ha scritto:
+> On Thu, Jan 25, 2018 at 05:50:18PM +0100, Giulio Benetti wrote:
+>>>>>>> On Sat, Jan 20, 2018 at 07:50:21PM +0100, Giulio Benetti wrote:
+>>>>>>>> On previous handling, if specified DRM_MODE_FLAG_N*SYNC,
+>>>>>>>> it was ignored,
+>>>>>>>> because only PHSYNC and PVSYNC were taken into account.
+>>>>>>>> DRM_MODE_FLAG_P*SYNC and DRM_MODE_FLAG_N*SYNC are not exclusive.
+>>>>>>>>
+>>>>>>>> If flags contains PVSYNC, it doesn't mean it is NVSYNC.
+>>>>>>>> And it's true also the contrary.
+>>>>>>>> Also, as I've checked with scope on A20,
+>>>>>>>> if (flags & PVSYNC) then SUN4I_TCON0_IO_POL_VSYNC_POSITIVE
+>>>>>>>> must be set, as name suggests.
+>>>>>>>> It seems all display io polarities starts inverted if 0.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>>>>>>>
+>>>>>>>> PVSYNC and PHSYNC only
+>>>>>>>>
+>>>>>>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>>>>>>
+>>>>>>> Checkpatch:
+>>>>>>> WARNING: Duplicate signature
+>>>>>>
+>>>>>> Sorry I didn't use ./scripts/checkpatch.pl
+>>>>>>
+>>>>>>>
+>>>>>>>> ---
+>>>>>>>>   ? drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+>>>>>>>>   ? 1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>>>>>> b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>>>>>> index 6121210..e873a37 100644
+>>>>>>>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>>>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>>>>>>>> @@ -224,10 +224,10 @@ static void
+>>>>>>>> sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>>>>>>>>   ?????????????? SUN4I_TCON0_BASIC3_H_SYNC(hsync));
+>>>>>>>>   ????? /* Setup the polarity of the various signals */
+>>>>>>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
+>>>>>>>> +??? if (mode->flags & DRM_MODE_FLAG_PHSYNC)
+>>>>>>>>   ????????? val |= SUN4I_TCON0_IO_POL_HSYNC_POSITIVE;
+>>>>>>>> -??? if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
+>>>>>>>> +??? if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>>>>>>>>   ????????? val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>>>>>>>
+>>>>>>> I'm not sure why you were talking of the differences between NVSYNC
+>>>>>>> and PVSYNC if you're not making use of any of it here?
+>>>>>>
+>>>>>> Thinking about it more now, the point is that all Lcd IOs seem to be
+>>>>>> inverted by default(at least on A20).
+>>>>>> With inverted, I mean that if for example PVSYNC,
+>>>>>> I should see vsync line low and when asserted to give VSync,
+>>>>>> it goes high.
+>>>>>> This is what I've checked with oscilloscope on A20.
+>>>>>> Can someone give a try on A33? Otherwise I will,
+>>>>>> but I will take some time.
+>>>>>> On uboot, everything is treated equal to kernel,
+>>>>>> but to have my falling edge dclk and low h/vsync I had to specify:
+>>>>>> CONFIG_VIDEO_LCD_DCLK_PHASE=0 (giving me falling edge on dclk)
+>>>>>> and
+>>>>>> CONFIG_VIDEO_LCD_MODE="....,sync:3,..."
+>>>>>> but digging into code, I see "sync:3" means H/VSYNC HIGH,
+>>>>>> but I experience both LOW during their pulse.
+>>>>>>
+>>>>>>>
+>>>>>>> Also, how was it tested? This seems quite weird that we haven't caught
+>>>>>>> that one sooner, and I'm a bit worried about the possible regressions
+>>>>>>> here.
+>>>>>>
+>>>>>> It sounds really strange to me too,
+>>>>>> because everybody under uboot use "sync:3"(HIGH).
+>>>>>> I will retry to measure,
+>>>>>> unfortunately at home I don't have a scope,
+>>>>>> but I think I'm going to have one soon, because of this. :)
+>>>>>
+>>>>> Here I am with scope captures and tcon0 registers dump:
+>>>>> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+>>>>> dclk_d0 => https://pasteboard.co/H4r8QRe.png
+>>>>> dclk_de => https://pasteboard.co/H4r8zh4R.png
+>>>>> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
+>>>>>
+>>>>> As you can see circled in reg on registers,
+>>>>> TCON0_IO_POL_REG = 0x00000000.
+>>>>> But on all the waveforms you can see:
+>>>>> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
+>>>>> the rising front overlaps dclk rising edge(not good), so to me this is
+>>>>> falling, then I mean it Negative.
+>>>>> - dclk_de: de pulse is clearly negative, even if register is 0 and its'
+>>>>> polarity bit is 0.
+>>>>> - dclk_vsnc: same as dclk_de
+>>>>> - dclk_hsync: I didn't take scope screenshot but I can assure you it's
+>>>>> negative.
+>>>>>
+>>>>> You can also check all the other registers about TCON0.
+>>>>>
+>>>>> Now I proceed testing it on A33, maybe the peripheral is slightly
+>>>>> different between Axx SoCs, if I find it that way,
+>>>>> it should be only a check about SoC or peripheral ID,
+>>>>> and treat polarity as it should be done.
+>>>>
+>>>> Here I am with A33 waveforms:
+>>>> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
+>>>> dclk_d0 => https://pasteboard.co/H4rVXwy.png
+>>>> dclk_de => https://pasteboard.co/H4rWDt8.png
+>>>> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
+>>>> dclk_hsync => https://pasteboard.co/H4rWK6I.png
+>>>
+>>> Thanks, that's really helpful.
+>>>
+>>>> It behaves the same way as A20, so as I mean IO polarity,
+>>>> all signals(except D0-D23), are inverted.
+>>>> For A33 I've used A33-OLinuXino.
+>>>> For A20 our LiNova1.
+>>>
+>>> Indeed, HSYNC and VSYNC look inverted.
+>>
+>> Yes, so they should be inverted inside the driver.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm64/kernel/bpi.S        | 20 ++++++++++++
->   arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
->   2 files changed, 90 insertions(+), 1 deletion(-)
+> Yep. And the LCD panels used on our boards as well in order to avoid
+> any breakages.
+
+Can you provide a list?
+Or is there a way I can find it on my own?
+I can create a whole patch-set providing this too on panel-simple.c
+Ok?
+
 > 
-> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-> index 76225c2611ea..add7e08a018d 100644
-> --- a/arch/arm64/kernel/bpi.S
-> +++ b/arch/arm64/kernel/bpi.S
-> @@ -17,6 +17,7 @@
->    */
->   
->   #include <linux/linkage.h>
-> +#include <linux/arm-smccc.h>
->   
->   .macro ventry target
->   	.rept 31
-> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
->   	.endr
->   	ldp	x29, x30, [sp], #16
->   ENTRY(__qcom_hyp_sanitize_link_stack_end)
-> +
-> +.macro smccc_workaround_1 inst
-> +	sub	sp, sp, #(8 * 4)
-> +	stp	x2, x3, [sp, #(16 * 0)]
-
-This seems unnecessarily confusing - using either units of registers, or 
-of register pairs, is fine, but mixing both in the same sequence just 
-hurts more than it needs to.
-
-> +	stp	x0, x1, [sp, #(16 * 1)]
-> +	orr	w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
-
-Writing this as a MOV like a sane person would make things 0.37% more 
-lovely, I promise ;)
-
-> +	\inst	#0
-> +	ldp	x2, x3, [sp, #(16 * 0)]
-> +	ldp	x0, x1, [sp, #(16 * 1)]
-> +	add	sp, sp, #(8 * 4)
-> +.endm
-> +
-> +ENTRY(__smccc_workaround_1_smc_start)
-> +	smccc_workaround_1	smc
-> +ENTRY(__smccc_workaround_1_smc_end)
-> +
-> +ENTRY(__smccc_workaround_1_hvc_start)
-> +	smccc_workaround_1	hvc
-> +ENTRY(__smccc_workaround_1_hvc_end)
-
-That said, should we not be implementing this lot in smccc-call.S...
-
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index ed6881882231..f1501873f2e4 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
->   extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
->   extern char __qcom_hyp_sanitize_link_stack_start[];
->   extern char __qcom_hyp_sanitize_link_stack_end[];
-> +extern char __smccc_workaround_1_smc_start[];
-> +extern char __smccc_workaround_1_smc_end[];
-> +extern char __smccc_workaround_1_hvc_start[];
-> +extern char __smccc_workaround_1_hvc_end[];
->   
->   static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
->   				const char *hyp_vecs_end)
-> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->   #define __psci_hyp_bp_inval_end			NULL
->   #define __qcom_hyp_sanitize_link_stack_start	NULL
->   #define __qcom_hyp_sanitize_link_stack_end	NULL
-> +#define __smccc_workaround_1_smc_start		NULL
-> +#define __smccc_workaround_1_smc_end		NULL
-> +#define __smccc_workaround_1_hvc_start		NULL
-> +#define __smccc_workaround_1_hvc_end		NULL
->   
->   static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->   				      const char *hyp_vecs_start,
-> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
->   	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
->   }
->   
-> +#include <uapi/linux/psci.h>
-> +#include <linux/arm-smccc.h>
->   #include <linux/psci.h>
->   
-> +static void call_smc_arch_workaround_1(void)
-> +{
-> +	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
-> +	asm volatile("smc	#0\n"
-> +		     : "+r" (w0));
-> +}
-> +
-> +static void call_hvc_arch_workaround_1(void)
-> +{
-> +	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
-> +	asm volatile("hvc	#0\n"
-> +		     : "+r" (w0));
-> +}
-
-...such that these could simply be something like:
-
-static void call_{smc,hvc}_arch_workaround_1(void)
-{
-	arm_smccc_v1_1_{smc,hvc}(ARM_SMCCC_ARCH_WORKAROUND_1);
-}
-
-?
-
-Robin.
-
-> +
-> +static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-> +{
-> +	bp_hardening_cb_t cb;
-> +	void *smccc_start, *smccc_end;
-> +	struct arm_smccc_res res;
-> +
-> +	if (psci_ops.variant == SMCCC_VARIANT_1_0)
-> +		return false;
-> +
-> +	switch (psci_ops.conduit) {
-> +	case PSCI_CONDUIT_HVC:
-> +		arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> +			      ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
-> +			      &res);
-> +		if (res.a0)
-> +			return false;
-> +		cb = call_hvc_arch_workaround_1;
-> +		smccc_start = __smccc_workaround_1_hvc_start;
-> +		smccc_end = __smccc_workaround_1_hvc_end;
-> +		break;
-> +
-> +	case PSCI_CONDUIT_SMC:
-> +		arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> +			      ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
-> +			      &res);
-> +		if (res.a0)
-> +			return false;
-> +		cb = call_smc_arch_workaround_1;
-> +		smccc_start = __smccc_workaround_1_smc_start;
-> +		smccc_end = __smccc_workaround_1_smc_end;
-> +		break;
-> +
-> +	default:
-> +		return false;
-> +	}
-> +
-> +	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
-> +
-> +	return true;
-> +}
-> +
->   static int enable_psci_bp_hardening(void *data)
->   {
->   	const struct arm64_cpu_capabilities *entry = data;
->   
-> -	if (psci_ops.get_version)
-> +	if (psci_ops.get_version) {
-> +		if (check_smccc_arch_workaround_1(entry))
-> +			return 0;
-> +
->   		install_bp_hardening_cb(entry,
->   				       (bp_hardening_cb_t)psci_ops.get_version,
->   				       __psci_hyp_bp_inval_start,
->   				       __psci_hyp_bp_inval_end);
-> +	}
->   
->   	return 0;
->   }
+>>> I don't really know what the polarity of D0 would be just by
+>>> judging at that capture, but we would have noticed if the colors
+>>> were inverted for quite some time now.
+>>
+>> D0-D23 are correct.
+>>
+>> With that capture, I mean to show you instead dclk is inverted, as
+>> dclk samples D0 on falling edge.
 > 
+> Ah right, DCLK being the first channel?
+
+Yes, sorry I didn't place a label on channels
+
+> 
+>> So 0 is NEGEDGE and 1 is POSEDGE(1/3 of clock phase).
+>> 1/3 clock phase seems enough to me to be considered POSEDGE,
+>> 2/3 instead risks to go too much to the right of D0(even if it could work).
+> 
+> Do you have captures with both settings?
+
+Not now, but asap I'm going to take.
+
+> 
+>>> DE seems to be active high though, since it's only going to be at
+>>> a logical low level when data are not transmitted, so during the
+>>> blank periods.
+>>
+>> Yes, you're right, DE is data enable, and is asserted high as 0.
+> 
+> No, it is asserted high as 1
+
+Sorry, I wanted to tell it is asserted high with IO_POL register bit 
+cleared to 0. So we're saying same thing now.
+
+> 
+>> But it must be added.
+>> I'm planning to send a new patchset with all these things corrected for
+>> kernel.
+> 
+> Ok.
+> 
+>> A little out of thread but:
+>> I'd like to send one for u-boot too,
+>> but this means also to modify every sunxi "sync:3" to "sync:0" and
+>> vice-versa.
+>>
+>> What do you think?
+> 
+> That it's going to be a nightmare... We've advertised since the very
+> beginning something, and we're about to break it. I'm not sure we want
+> to do that.
+
+I can take care about that.
+But I also think that a lot of displays work because they use only 
+DE-mode, almost ignoring HSync and VSync signals(HV-mode).
+
+In any case I have to produce these patches because of my company's 
+board based on A20 and A33, and modify defconfig according to it.
+The only technical nightmare I see is to produce a commit for every 
+defconfig to be modified and copy-paste che commit-log substituing board 
+name(1-2 days of work).
+Problem is testing, but we're speaking about something that probably was 
+badly working, but you couldn't see it on display.
+So I think this is only an improvement at the end.
+
+I'm sorry I've taken bad news.
+Drink 1 glass of Spritz to go over! :)
+
+> 
+> Thanks!
+> Maxime
+> 
+
+
+-- 
+Giulio Benetti
+R&D Manager &
+Advanced Research
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
