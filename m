@@ -1,153 +1,144 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 26 Jan 2018 16:07:48 +0000
-Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <6d2eae60-44b7-e5c2-0e71-f27ce2322237@arm.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
- <20180126142847.31240-15-marc.zyngier@arm.com>
- <6d2eae60-44b7-e5c2-0e71-f27ce2322237@arm.com>
-Message-ID: <fc96e301-9638-fd67-13a2-e99afc8c1ef9@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 26 Jan 2018 16:08:56 +0000
+Subject: [RFC v2 01/37] ARM: shmobile: Add watchdog support
+In-Reply-To: <TY1PR06MB08950BD28BEC28D55C6D80EDC0E00@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <TY1PR06MB08950BD28BEC28D55C6D80EDC0E00@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <1516982937-29245-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
+boot CPUs run a routine designed to bring up SMP and deal with hot plug.
+The value contained in the SBAR registers is not initialized by a WDT
+triggered reset, which means that after a WDT triggered reset we jump
+to the SMP bring up routine, preventing the system from executing the
+bootrom code.
 
-On 26/01/18 15:50, Robin Murphy wrote:
-> On 26/01/18 14:28, Marc Zyngier wrote:
->> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
->> It is lovely. Really.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   arch/arm64/kernel/bpi.S        | 20 ++++++++++++
->>   arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
->>   2 files changed, 90 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
->> index 76225c2611ea..add7e08a018d 100644
->> --- a/arch/arm64/kernel/bpi.S
->> +++ b/arch/arm64/kernel/bpi.S
->> @@ -17,6 +17,7 @@
->>    */
->>   
->>   #include <linux/linkage.h>
->> +#include <linux/arm-smccc.h>
->>   
->>   .macro ventry target
->>   	.rept 31
->> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
->>   	.endr
->>   	ldp	x29, x30, [sp], #16
->>   ENTRY(__qcom_hyp_sanitize_link_stack_end)
->> +
->> +.macro smccc_workaround_1 inst
->> +	sub	sp, sp, #(8 * 4)
->> +	stp	x2, x3, [sp, #(16 * 0)]
-> 
-> This seems unnecessarily confusing - using either units of registers, or 
-> of register pairs, is fine, but mixing both in the same sequence just 
-> hurts more than it needs to.
+The purpose of this patch is to jump to the bootrom code in case of a
+WDT triggered reset, and keep the SMP functionality untouched.
+In order to tell if the code had been called due to the WDT overflowing
+we need to inspect flag WOVF from register RWTCSRA, however for this
+to work smoothly we need to make sure that RWDT clock is ON.
+Since it's not wise to interfere with the clock configuration from
+within this routine, a flag has been put in place
+(shmobile_wdt_clock_status) so that the watchdog driver can tell
+shmobile_boot_vector_gen2 when the clock is ON, and therefore there is
+no need for shmobile_boot_vector to mess up with the clock registers.
 
-Point taken.
+Bit WOVF survives a watchdog triggered reset, and it is usually cleared
+by the bootloader. Checking the MMU enable bit from register SCTLR
+allows us to make the code a little bit more robust (just in case the
+bit wasn't cleared up), as right after a reset the MMU is disabled,
+and when Linux is running the MMU is enabled. Also, accessing RWTCSRA
+physical address is safe when the MMU is down.
 
-> 
->> +	stp	x0, x1, [sp, #(16 * 1)]
->> +	orr	w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
-> 
-> Writing this as a MOV like a sane person would make things 0.37% more 
-> lovely, I promise ;)
+New function shmobile_boot_vector_gen2 isn't replacing
+shmobile_boot_vector for backward compatibility reasons. The kernel
+will install the best option (either shmobile_boot_vector or
+shmobile_boot_vector_gen2) to ICRAM1 after parsing the device tree.
 
-But I swear that's what the assembler actually generates! Do I still get
-the additional loveliness? ;-) I'll MOV it up.
+SMP bringup, CPU hot plug, and suspend to RAM work as normal.
 
-> 
->> +	\inst	#0
->> +	ldp	x2, x3, [sp, #(16 * 0)]
->> +	ldp	x0, x1, [sp, #(16 * 1)]
->> +	add	sp, sp, #(8 * 4)
->> +.endm
->> +
->> +ENTRY(__smccc_workaround_1_smc_start)
->> +	smccc_workaround_1	smc
->> +ENTRY(__smccc_workaround_1_smc_end)
->> +
->> +ENTRY(__smccc_workaround_1_hvc_start)
->> +	smccc_workaround_1	hvc
->> +ENTRY(__smccc_workaround_1_hvc_end)
-> 
-> That said, should we not be implementing this lot in smccc-call.S...
+Since shmobile_boot_vector has become bigger, "reg" property of nodes
+compatible with "renesas,smp-sram" now need to be set to "<0 0x64>".
 
-Wouldn't work. We *copy* that code in the KVM vectors, see
-__install_bp_hardening_cb and __copy_hyp_vect_bpi...
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+---
+ arch/arm/mach-shmobile/headsmp.S | 74 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
-Yes, I know.
-
-> 
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index ed6881882231..f1501873f2e4 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
->>   extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
->>   extern char __qcom_hyp_sanitize_link_stack_start[];
->>   extern char __qcom_hyp_sanitize_link_stack_end[];
->> +extern char __smccc_workaround_1_smc_start[];
->> +extern char __smccc_workaround_1_smc_end[];
->> +extern char __smccc_workaround_1_hvc_start[];
->> +extern char __smccc_workaround_1_hvc_end[];
->>   
->>   static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
->>   				const char *hyp_vecs_end)
->> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->>   #define __psci_hyp_bp_inval_end			NULL
->>   #define __qcom_hyp_sanitize_link_stack_start	NULL
->>   #define __qcom_hyp_sanitize_link_stack_end	NULL
->> +#define __smccc_workaround_1_smc_start		NULL
->> +#define __smccc_workaround_1_smc_end		NULL
->> +#define __smccc_workaround_1_hvc_start		NULL
->> +#define __smccc_workaround_1_hvc_end		NULL
->>   
->>   static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->>   				      const char *hyp_vecs_start,
->> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
->>   	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
->>   }
->>   
->> +#include <uapi/linux/psci.h>
->> +#include <linux/arm-smccc.h>
->>   #include <linux/psci.h>
->>   
->> +static void call_smc_arch_workaround_1(void)
->> +{
->> +	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
->> +	asm volatile("smc	#0\n"
->> +		     : "+r" (w0));
->> +}
->> +
->> +static void call_hvc_arch_workaround_1(void)
->> +{
->> +	register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
->> +	asm volatile("hvc	#0\n"
->> +		     : "+r" (w0));
->> +}
-> 
-> ...such that these could simply be something like:
-> 
-> static void call_{smc,hvc}_arch_workaround_1(void)
-> {
-> 	arm_smccc_v1_1_{smc,hvc}(ARM_SMCCC_ARCH_WORKAROUND_1);
-> }
-> 
-> ?
-
-That we could do. And maybe define them inline in arm-smccc.h so that we
-don't get any extra call (we'd just need a way to declare x0-x3 as being
-clobbered).
-
-I'll have a go at it.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 32e0bf6..4b14d4c 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -16,6 +16,13 @@
+ #include <asm/assembler.h>
+ #include <asm/memory.h>
+ 
++#define RWDT_CLOCK_ON	0xdeadbeef
++#define RWDT_CLOCK_OFF	0x00000000
++#define SCTLR_MMU	0x01
++#define BOOTROM_ADDRESS	0xE6340000
++#define RWTCSRA_ADDRESS 0xE6020004
++#define RWTCSRA_WOVF	0x10
++
+ /*
+  * Reset vector for secondary CPUs.
+  * This will be mapped at address 0 by SBAR register.
+@@ -37,6 +44,73 @@ shmobile_boot_fn:
+ shmobile_boot_size:
+ 	.long	. - shmobile_boot_vector
+ 
++#ifdef CONFIG_ARCH_RCAR_GEN2
++/*
++ * Reset vector for R-Car Gen2 and RZ/G1 secondary CPUs.
++ * This will be mapped at address 0 by SBAR register.
++ */
++ENTRY(shmobile_boot_vector_gen2)
++/*
++	if (SCTLR_MMU == 1)
++		goto shmobile_smp_continue_gen2;
++*/
++	mrc	p15, 0, r1, c1, c0, 0		@ r1 = SCTLR
++	and	r0, r1, #SCTLR_MMU
++	cmp	r0, #SCTLR_MMU
++	beq	shmobile_smp_continue_gen2
++
++/*
++	if (shmobile_wdt_clock_status != RWDT_CLOCK_ON)
++		goto shmobile_smp_continue_gen2;
++*/
++	ldr	r0, #shmobile_wdt_clock_status
++	ldr	r1, #clock_on
++	cmp	r0, r1
++	bne	shmobile_smp_continue_gen2
++
++/*
++	if (RWTCSRA_WOVF == 0)
++		goto shmobile_smp_continue_gen2;
++*/
++	ldr	r0, rwtcsra
++	mov	r1, #0
++	ldrb	r1, [r0]
++	and	r0, r1, #RWTCSRA_WOVF
++	cmp	r0, #RWTCSRA_WOVF
++	bne	shmobile_smp_continue_gen2
++
++/*
++	goto bootrom;
++*/
++	ldr	r0, bootrom
++	bx	r0
++
++shmobile_smp_continue_gen2:
++	ldr     r1, shmobile_boot_fn_gen2
++	bx	r1
++
++ENDPROC(shmobile_boot_vector_gen2)
++
++	.align	4
++rwtcsra:
++	.word	RWTCSRA_ADDRESS
++bootrom:
++	.word	BOOTROM_ADDRESS
++clock_on:
++	.word	RWDT_CLOCK_ON
++	.globl	shmobile_wdt_clock_status
++shmobile_wdt_clock_status:
++	.word	RWDT_CLOCK_OFF
++
++	.align	2
++	.globl	shmobile_boot_fn_gen2
++shmobile_boot_fn_gen2:
++	.space	4
++	.globl	shmobile_boot_size_gen2
++shmobile_boot_size_gen2:
++	.long	. - shmobile_boot_vector_gen2
++#endif /* CONFIG_ARCH_RCAR_GEN2 */
++
+ /*
+  * Per-CPU SMP boot function/argument selection code based on MPIDR
+  */
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
