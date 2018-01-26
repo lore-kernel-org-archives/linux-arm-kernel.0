@@ -1,49 +1,58 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 26 Jan 2018 16:19:41 +0100
-Subject: [PATCH 16/16] arm: dts: sun8i: a83t: add thermal zone to A83T
-In-Reply-To: <20180126151941.12183-1-embed3d@gmail.com>
-References: <20180126151941.12183-1-embed3d@gmail.com>
-Message-ID: <20180126151941.12183-17-embed3d@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 26 Jan 2018 15:33:15 +0000
+Subject: [PATCH 16/16] arm64: Add work around for Arm Cortex-A55 Erratum
+ 1024718
+In-Reply-To: <20180123122809.16269-17-suzuki.poulose@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-17-suzuki.poulose@arm.com>
+Message-ID: <20180126153314.GW5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the thermal zones to the A83T. Sensor 0 is located in the
-cpu cluster 0. Sensor 1 is located in cluster 1 and Sensor 3 is located
-in the gpu.
+On Tue, Jan 23, 2018 at 12:28:09PM +0000, Suzuki K Poulose wrote:
+> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+> from an erratum 1024718, which causes incorrect updates when DBM/AP
+> bits in a page table entry is modified without a break-before-make
+> sequence. The work around is to skip enabling the hardware DBM feature
+> on the affected cores. The hardware Access Flag management features
+> is not affected.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  Documentation/arm64/silicon-errata.txt |  1 +
+>  arch/arm64/Kconfig                     | 14 ++++++++++++++
+>  arch/arm64/kernel/cpufeature.c         | 14 +++++++++++++-
+>  3 files changed, 28 insertions(+), 1 deletion(-)
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+[...]
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 9e53ff5ac4ed..4259a8726031 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -747,4 +747,24 @@
- 			#size-cells = <0>;
- 		};
- 	};
-+
-+	thermal-zones {
-+		cpu0_thermal: cpu0-thermal {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+			thermal-sensors = <&ths 0>;
-+		};
-+
-+		cpu1_thermal: cpu1-thermal {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+			thermal-sensors = <&ths 1>;
-+		};
-+
-+		gpu_thermal: gpu-thermal {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+			thermal-sensors = <&ths 2>;
-+		};
-+	};
- };
--- 
-2.11.0
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 8af755b8219d..64f1e911c6af 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -914,9 +914,21 @@ static inline void __cpu_enable_hw_dbm(void)
+>  	isb();
+>  }
+>  
+> +static bool cpu_has_erratum_1024718(void)
+> +{
+> +	static const struct midr_range __maybe_unused cpus[] = {
+
+Do you need __maybe_unused?  If #ifdef were used here then
+__maybe_unused would be needed, but I thought that if code is optimised
+out instead of conditionally copiled, this didn't apply.
+
+> +		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),	// A55 r0p0 -r1p0
+> +		{},
+> +	};
+> +
+> +	return IS_ENABLED(CONFIG_ARM64_ERRATUM_1024718) &&
+> +	       is_midr_in_range_list(read_cpuid_id(), cpus);
+
+Why have a list with just one entry?  Do you expect more entries over
+time?
+
+[...]
+
+Cheers
+---Dave
