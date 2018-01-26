@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jan 2018 11:35:07 +0100
-Subject: [PATCH 1/3] ARM: dts: r8a7790: consistently use single space
+Date: Fri, 26 Jan 2018 11:36:23 +0100
+Subject: [PATCH 2/3] ARM: dts: r8a7791: consistently use single space
  before =
-In-Reply-To: <20180126093635.16945-2-horms+renesas@verge.net.au>
+In-Reply-To: <20180126093635.16945-3-horms+renesas@verge.net.au>
 References: <20180126093635.16945-1-horms+renesas@verge.net.au>
- <20180126093635.16945-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWCLA_rx0ejivkme9xxbb=ttuM2G7u5-W9ng-m=b-Wgow@mail.gmail.com>
+ <20180126093635.16945-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX=UBau32kA=injSSHNJh=MWgXxWvA3-RpnpeeaYq1B3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
