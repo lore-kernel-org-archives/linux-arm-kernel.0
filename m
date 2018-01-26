@@ -1,120 +1,112 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Jan 2018 12:31:18 +0000
-Subject: [PATCH 08/16] arm64: capabilities: Group handling of features and
- errata
-In-Reply-To: <20180126114708.GP5862@e103592.cambridge.arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-9-suzuki.poulose@arm.com>
- <20180126114708.GP5862@e103592.cambridge.arm.com>
-Message-ID: <cdd7ab66-9d9e-286d-cb39-c1684bde9c19@arm.com>
+From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
+Date: Fri, 26 Jan 2018 06:51:25 -0600
+Subject: [PATCH v5 0/2] staging: fsl-mc: Move bus driver out of staging
+Message-ID: <20180126125127.26439-1-bogdan.purcareata@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 11:47, Dave Martin wrote:
-> On Tue, Jan 23, 2018 at 12:28:01PM +0000, Suzuki K Poulose wrote:
->> So far we have had separate routes for triggering errata and feature
-> 
-> "triggering errata" ? ;)
-> 
+Previous submission: https://patchwork.kernel.org/patch/10081731/
 
-:-). Should have been "triggering errata and feature capability *checks*.
+Most of the feedback was addressed by a separate series of cleanup
+/ refactoring patches [1] which were applied.
 
-> Maybe "[...] for determining whether to activate errata workarounds and
-> whether to enable feature capabilities."
-> 
+The thing left to do is to split the original patch into moving out the
+core bus infrastructure separate from the irqchip glue code, and
+integrate the documentation with the kernel build system.
 
+This patchset only handles moving the fsl-mc bus core out of staging.
+The remaining objects (DPBP, DPCON) and drivers (dpio, dpaa2-eth) will
+be moved out in subsequent patches.
 
->> capabilities. Also, we never allowed "features" based on local CPU
->> and "errata" based on System wide safe registers. This patch
->> groups the handling of errata and features and also allows them
->> to have all the possible scopes.
->>
->> So, we now run through the arm64_features and arm64_errata:
-> 
-> when?
+[1] https://lkml.org/lkml/2018/1/16/386
 
-with this patch.
+Notes:
+    -v5:
+      - split irqchip glue code to separate patch (GregKH)
+      - integrate doc with the kernel build system
+    -v4:
+      - regenerated patch with renames detection disabled (Andrew Lunn)
+    -v3:
+      - rebased
+    -v2:
+      - group irqchip gic its glue code together with the rest (Marc Zyngier)
 
-> What about late cpus?
-> 
+Bogdan Purcareata (2):
+  staging: fsl-mc: Move core bus out of staging
+  staging: fsl-mc: Move irqchip code out of staging
 
-We don't detect any new capabilities on them. They continue to get
-verified against the enabled capabilities.
+ Documentation/networking/dpaa2/index.rst           |   8 +
+ Documentation/networking/dpaa2/overview.rst        | 404 +++++++++
+ Documentation/networking/index.rst                 |   1 +
+ MAINTAINERS                                        |   3 +-
+ drivers/bus/Kconfig                                |   2 +
+ drivers/bus/Makefile                               |   4 +
+ drivers/bus/fsl-mc/Kconfig                         |  16 +
+ drivers/bus/fsl-mc/Makefile                        |  16 +
+ drivers/bus/fsl-mc/dpmcp.c                         |  99 +++
+ drivers/bus/fsl-mc/dprc-driver.c                   | 809 ++++++++++++++++++
+ drivers/bus/fsl-mc/dprc.c                          | 532 ++++++++++++
+ drivers/bus/fsl-mc/fsl-mc-allocator.c              | 648 ++++++++++++++
+ drivers/bus/fsl-mc/fsl-mc-bus.c                    | 948 +++++++++++++++++++++
+ drivers/bus/fsl-mc/fsl-mc-msi.c                    | 285 +++++++
+ drivers/bus/fsl-mc/fsl-mc-private.h                | 475 +++++++++++
+ drivers/bus/fsl-mc/mc-io.c                         | 268 ++++++
+ drivers/bus/fsl-mc/mc-sys.c                        | 296 +++++++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c        | 100 +++
+ drivers/staging/fsl-dpaa2/ethernet/README          |   2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpni.c          |   2 +-
+ drivers/staging/fsl-mc/TODO                        |  18 -
+ drivers/staging/fsl-mc/bus/Kconfig                 |  10 -
+ drivers/staging/fsl-mc/bus/Makefile                |  15 +-
+ drivers/staging/fsl-mc/bus/dpbp.c                  |   2 +-
+ drivers/staging/fsl-mc/bus/dpcon.c                 |   2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio-driver.c      |   2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c     |   2 +-
+ drivers/staging/fsl-mc/bus/dpio/dpio.c             |   2 +-
+ drivers/staging/fsl-mc/bus/dpmcp.c                 |  99 ---
+ drivers/staging/fsl-mc/bus/dprc-driver.c           | 809 ------------------
+ drivers/staging/fsl-mc/bus/dprc.c                  | 531 ------------
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      | 648 --------------
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c            | 948 ---------------------
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c            | 284 ------
+ drivers/staging/fsl-mc/bus/fsl-mc-private.h        | 475 -----------
+ .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 100 ---
+ drivers/staging/fsl-mc/bus/mc-io.c                 | 268 ------
+ drivers/staging/fsl-mc/bus/mc-sys.c                | 296 -------
+ drivers/staging/fsl-mc/include/mc.h                | 454 ----------
+ drivers/staging/fsl-mc/overview.rst                | 404 ---------
+ include/linux/fsl/mc.h                             | 454 ++++++++++
+ 43 files changed, 5378 insertions(+), 5366 deletions(-)
+ create mode 100644 Documentation/networking/dpaa2/index.rst
+ create mode 100644 Documentation/networking/dpaa2/overview.rst
+ create mode 100644 drivers/bus/fsl-mc/Kconfig
+ create mode 100644 drivers/bus/fsl-mc/Makefile
+ create mode 100644 drivers/bus/fsl-mc/dpmcp.c
+ create mode 100644 drivers/bus/fsl-mc/dprc-driver.c
+ create mode 100644 drivers/bus/fsl-mc/dprc.c
+ create mode 100644 drivers/bus/fsl-mc/fsl-mc-allocator.c
+ create mode 100644 drivers/bus/fsl-mc/fsl-mc-bus.c
+ create mode 100644 drivers/bus/fsl-mc/fsl-mc-msi.c
+ create mode 100644 drivers/bus/fsl-mc/fsl-mc-private.h
+ create mode 100644 drivers/bus/fsl-mc/mc-io.c
+ create mode 100644 drivers/bus/fsl-mc/mc-sys.c
+ create mode 100644 drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
+ delete mode 100644 drivers/staging/fsl-mc/TODO
+ delete mode 100644 drivers/staging/fsl-mc/bus/dpmcp.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/dprc-driver.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/dprc.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/fsl-mc-private.h
+ delete mode 100644 drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/mc-io.c
+ delete mode 100644 drivers/staging/fsl-mc/bus/mc-sys.c
+ delete mode 100644 drivers/staging/fsl-mc/include/mc.h
+ delete mode 100644 drivers/staging/fsl-mc/overview.rst
+ create mode 100644 include/linux/fsl/mc.h
 
->>   1) with SCOPE_LOCAL_CPU filter on each boot time enabeld CPUs,
->>      via update_cpu_local_capabilities().
-> 
-> "each [...] enabeld CPUs" -> "each [...] enabled CPU"
-> 
-> Also, changing "boot time" -> "boot-time" helps avoid this being misread
-> as "on each boot", which could be taken to mean "each time a CPU comes
-> online".  I'm guessing that's not the intended meaning here.
-
-OK
-
-
->>   /*
->> - * The CPU Errata work arounds are detected and applied at boot time
->> - * and the related information is freed soon after. If the new CPU requires
->> - * an errata not detected at boot, fail this CPU.
->> + * Check for all capablities within the scope of local CPU.
->> + * This is run on all boot time activated CPUs.
->>    */
->> -static void verify_local_cpu_errata_workarounds(void)
->> +static void update_cpu_local_capabilities(void)
-> 
-> [Gaah, stupid git diff making function insertion look like function
-> modification.  Sometimes --patience does a better job, but there seems
-> no foolproof solution...  If you do a respin, it might be worth trying
-> it.]
-
-Will try, thanks for the suggestion. I didn't know about that :-)
-
->> -static void __init setup_feature_capabilities(void)
->> +static void __init setup_system_capabilities(void)
->>   {
->> -	update_cpu_capabilities(arm64_features,
->> -				ARM64_CPUCAP_TYPE_ALL, "detected feature:");
->> -	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_TYPE_ALL);
->> +	/*
->> +	 * We have finalised the system wide safe feature registers,
->> +	 * finalise the capabilities that depend on it.
->> +	 */
->> +	update_system_capabilities();
->> +	/* Enable all the available capabilities */
->> +	enable_cpu_capabilities(ARM64_CPUCAP_TYPE_ALL);
-> 
-> So setup_system_capabilities() enables _non_ system-wide capabilities/
-> errata workarounds too?
-
-> Maybe this function should just have a different name, like
-> "setup_boot_capabilities" or similar?
-
-The problem with setup_boot_capabilities() is that it could conflict with
-"coming soon" setup_boot_cpu_capabilities(). May be,
-
-setup_boot_time_system_capabilities().
-
-
-> 
->    }
->>   
->>   DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
->> @@ -1422,9 +1435,7 @@ void __init setup_cpu_features(void)
->>   	u32 cwg;
->>   	int cls;
->>   
->> -	/* Set the CPU feature capabilies */
->> -	setup_feature_capabilities();
->> -	enable_errata_workarounds();
->> +	setup_system_capabilities();
->>   	mark_const_caps_ready();
->>   	setup_elf_hwcaps(arm64_elf_hwcaps);
-> 
-> I wonder whether we could unify the elf hwcaps handling too.
-
-I was thinking about it today. The only catch is how do we know
-if we have "the capability", as it is spread across multiple bitmasks.
-(HWCAP, COMPAT_HWCAP, COMPAT_HWCAP2).
-
-Suzuki
+-- 
+2.7.4
