@@ -1,42 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Jan 2018 09:07:23 +0100
-Subject: sun4i drm device tree
-In-Reply-To: <1844c194-1a4b-2a39-8798-adc4dc83a6c1@orpaltech.com>
-References: <70275161-0167-fa2e-3557-d15b8244c04d@orpaltech.com>
- <20180122085537.2cenqvvpjrbrzf7g@flea.lan>
- <1844c194-1a4b-2a39-8798-adc4dc83a6c1@orpaltech.com>
-Message-ID: <20180126080723.cdortgeqgbxqfkwh@flea.lan>
+Date: Fri, 26 Jan 2018 09:10:00 +0100
+Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
+References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+ <201801260759.RyNhDZz4%fengguang.wu@intel.com>
+ <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
+ <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
+Message-ID: <20180126081000.hy7g57zp5dv6ug2g@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 10:05:08AM +0300, Sergey Suloev wrote:
-> On 01/22/2018 11:55 AM, Maxime Ripard wrote:
-> > On Mon, Jan 22, 2018 at 11:15:58AM +0300, Sergey Suloev wrote:
-> > > But it seems that there should be changes to device tree files
-> > > (arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi,
-> > > arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi) too.
-> > > 
-> > > Can you PLEASE give a ref to a patch or explain device tree changes
-> > > needed?
-> > And even if it was supported, we'd need a lot more informations to
-> > help you. For example, which boards, with which video outputs
->
-> Maxime, it is still unclear about sun4i-drm on aarch64: should it work on
-> NanoPi A64 ?
+On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
+> Hi Maxime,
+> 
+> On Fri, 26 Jan 2018 09:46:58 +0800
+> Yong <yong.deng@magewell.com> wrote:
+> 
+> > Hi Maxime,
+> > 
+> > Do you have any experience in solving this problem?
+> > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
+> 
+> Got it.
+> Should I add 'depends on ARM' in Kconfig?
 
-No
-
-> Are there device tree patches for it ?
-
-No
-
-> Can you (or someone else) share any info about the status, PLEASE. That may
-> be helpful for many people, I guess.
-
-It's documented here:
-https://linux-sunxi.org/Mainlining_Effort#Status_Matrix
-
-With a status of either WiP or not supported depending on the outputs.
+Yes, or even better a depends on MACH_SUNXI :)
 
 Maxime
 
@@ -50,4 +38,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180126/b3a09012/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180126/53e9dc57/attachment.sig>
