@@ -1,203 +1,157 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Jan 2018 12:13:55 +0000
-Subject: [PATCH 04/16] arm64: capabilities: Prepare for fine grained
- capabilities
-In-Reply-To: <20180126100053.GL5862@e103592.cambridge.arm.com>
+Date: Fri, 26 Jan 2018 12:21:43 +0000
+Subject: [PATCH 07/16] arm64: capabilities: Filter the entries based on a
+ given type
+In-Reply-To: <20180126112217.GO5862@e103592.cambridge.arm.com>
 References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-5-suzuki.poulose@arm.com>
- <20180125173307.GJ5862@e103592.cambridge.arm.com>
- <1c8b0c18-1b18-30b3-6df0-ff4bd876cbbc@arm.com>
- <20180126100053.GL5862@e103592.cambridge.arm.com>
-Message-ID: <e049d937-b4c4-8472-8995-3fe51fa52805@arm.com>
+ <20180123122809.16269-8-suzuki.poulose@arm.com>
+ <20180126112217.GO5862@e103592.cambridge.arm.com>
+Message-ID: <bea651c0-9184-79ea-5613-c59fa6c64a79@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 10:00, Dave Martin wrote:
-> On Thu, Jan 25, 2018 at 05:56:02PM +0000, Suzuki K Poulose wrote:
->> On 25/01/18 17:33, Dave Martin wrote:
->>> On Tue, Jan 23, 2018 at 12:27:57PM +0000, Suzuki K Poulose wrote:
->>>> We use arm64_cpu_capabilities to represent CPU ELF HWCAPs exposed
->>>> to the userspace and the CPU hwcaps used by the kernel, which
->>>> include cpu features and CPU errata work arounds.
->>>>
->>>> At the moment we have the following restricions:
->>>>
->>>>   a) CPU feature hwcaps (arm64_features) and ELF HWCAPs (arm64_elf_hwcap)
->>>>     - Detected mostly on system wide CPU feature register. But
->>>>       there are some which really uses a local CPU's value to
->>>>       decide the availability (e.g, availability of hardware
->>>>       prefetch). So, we run the check only once, after all the
->>>>       boot-time active CPUs are turned on.
->>>
->>> [ARM64_HAS_NO_HW_PREFETCH is kinda broken, but we also get away with it
->>> presumably because the only systems to which it applies are homogeneous,
->>> and anyway it's only an optimisation IIUC.
->>>
->>> This could be a separate category, but as a one-off that may be a bit
->>> pointless.
->> I understand and was planning to fix this back when it was introduced.
->> But then it was pointless at that time, given that it was always
->> guaranteed to be a homogeneous system. We do something about it in
->> Patch 9.
+On 26/01/18 11:22, Dave Martin wrote:
+> On Tue, Jan 23, 2018 at 12:28:00PM +0000, Suzuki K Poulose wrote:
+>> While processing the list of capabilities, it is useful to
+>> filter out some of the entries based on the given type to
+>> allow better control. This can be used later for handling
+>> LOCAL vs SYSTEM wide capabilities and more.
+>>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/include/asm/cpufeature.h |  5 +++++
+>>   arch/arm64/kernel/cpufeature.c      | 30 ++++++++++++++++++++----------
+>>   2 files changed, 25 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index 27d037bb0451..a621d2184227 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -99,6 +99,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>   /* Is it safe for a late CPU to miss this capability when system has it */
+>>   #define ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	BIT(3)
+>>   
+>> +#define ARM64_CPUCAP_TYPE_ALL			 \
+>> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|\
+>> +	 ARM64_CPUCAP_SCOPE_SYSTEM		|\
+>> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE	|\
+>> +	 ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
 > 
-> This was just on observation than something that needs to be fixed,
-> but it it's been cleaned up then so much the better :)
+> Nit: can we have another tab between | and \?
 > 
-> I'll take a look.
-> 
->>> .def_scope == SCOPE_SYSTEM appears anomalous there, but it's also
->>> unused in that case.]
->>>
->>>>     - Any late CPU which doesn't posses all the established features
->>>>       is killed.
->>>
->>> Does "established feature" above ...
->>>
->>>>     - Any late CPU which possess a feature *not* already available
->>>>       is allowed to boot.
->>>
->>> mean the same as "feature already available" here?
->>
->> Yes, its the same. I should have been more consistent.
->>
->>>
->>>>
->>>>   b) CPU Errata work arounds (arm64_errata)
->>>>     - Detected mostly based on a local CPU's feature register.
->>>>       The checks are run on each boot time activated CPUs.
->>>>     - Any late CPU which doesn't have any of the established errata
->>>>       work around capabilities is ignored and is allowed to boot.
->>>>     - Any late CPU which has an errata work around not already available
->>>>       is killed.
->>>>
->>>> However there are some exceptions to the cases above.
->>>>
->>>> 1) KPTI is a feature that we need to enable when at least one CPU needs it.
->>>>     And any late CPU that has this "feature" should be killed.
->>>
->>> Should that be "If KPTI is not enabled during system boot, then any late
->>> CPU that has this "feature" should be killed."
->>
->> Yes.
->>
->>>
->>>> 2) Hardware DBM feature is a non-conflicting capability which could be
->>>>     enabled on CPUs which has it without any issues, even if the CPU is
->>>
->>> have
->>>
->>
->>>>     brought up late.
->>>>
->>>> So this calls for a lot more fine grained behavior for each capability.
->>>> And if we define all the attributes to control their behavior properly,
->>>> we may be able to use a single table for the CPU hwcaps (not the
->>>> ELF HWCAPs, which cover errata and features). This is a prepartory step
->>>> to get there. We define type for a capability, which for now encodes the
->>>> scope of the check. i.e, whether it should be checked system wide or on
->>>> each local CPU. We define two types :
->>>>
->>>>    1) ARM64_CPUCAP_BOOT_SYSTEM_FEATURE - Implies (a) as described above.
->>>>    1) ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM - Implies (b) as described above.
->>>
->>> 2)
-> 
-> Meaning you've got 1) twice above (in case you didn't spot it).
+> This will help to make missing |s stand out more if/when more entries
+> are added to this list in future.
 > 
 
-Yes, you're right.
+Sure, will do.
 
->>>
->>>> As such there is no change in how the capabilities are treated.
->>>
->>> OK, I think I finally have my head around this, more or less.
->>>
->>> Mechanism (operations on architectural feature regs) and policy (kernel
->>> runtime configuration) seem to be rather mixed together.  This works
->>> fairly naturally for things like deriving the sanitised feature regs
->>> seen by userspace and determining the ELF hwcaps; but not so naturally
->>> for errata workarounds and other anomalous things like
->>> ARM64_HAS_NO_HW_PREFETCH.
->>
->> Right. We are stuck with "cpu_hwcaps" for both erratum and features,
->> based on which we make some decisions to change the kernel behavior,
->> as it is tied to alternative patching.
->>
->>>
->>> I'm not sure that there is a better approach though -- anyway, that
->>> would be out of scope for this series.
->>>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>>>   arch/arm64/include/asm/cpufeature.h | 24 +++++++++++++++++------
->>>>   arch/arm64/kernel/cpu_errata.c      |  8 ++++----
->>>>   arch/arm64/kernel/cpufeature.c      | 38 ++++++++++++++++++-------------------
->>>>   3 files changed, 41 insertions(+), 29 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->>>> index a23c0d4f27e9..4fd5de8ef33e 100644
->>>> --- a/arch/arm64/include/asm/cpufeature.h
->>>> +++ b/arch/arm64/include/asm/cpufeature.h
->>>> @@ -86,16 +86,23 @@ struct arm64_ftr_reg {
->>>>   extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->>>> -/* scope of capability check */
->>>> -enum {
->>>> -	SCOPE_SYSTEM,
->>>> -	SCOPE_LOCAL_CPU,
->>>> -};
->>>> +
->>>> +/* Decide how the capability is detected. On a local CPU vs System wide */
->>>> +#define ARM64_CPUCAP_SCOPE_MASK			0x3
->>>> +#define ARM64_CPUCAP_SCOPE_LOCAL_CPU		BIT(0)
->>>> +#define ARM64_CPUCAP_SCOPE_SYSTEM		BIT(1)
->>>> +#define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
->>>> +#define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
->>>
->>> Are these really orthogonal?  What would be meant by (LOCAL_CPU | SYSTEM)?
->>
->> It is an unsupported configuration.
+>>   /*
+>>    * CPU errata detected at boot time based on feature of one or more CPUs.
+>>    * It is not safe for a late CPU to have this feature when the system doesn't
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 79737034a628..198c5daddd65 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -1180,9 +1180,11 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+>>   }
+>>   
+>>   static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>> -			    const char *info)
+>> +				    u16 cap_type, const char *info)
 > 
-> Surely meaningless, not just unsupported?
-
-Yep.
-
+> Semantically "cap_type" represents a set of accepted types, not a single
+> type here.
 > 
->>>
->>> Otherwise, perhaps they should be 0 and 1, not BIT(0), BIT(1).
->>>
->>
->> It is a bit tricky. I chose separate bits to allow filter an entry in a table
->> of capabilities based on the bits. e.g, we want to
->>
->> 1) Process only the local scope (e.g detecting CPU local capabilities, where
->> we are not yet ready to run the system wide checks)
->>
->> 2) Process all the entries including local/system. (e.g, verifying all the
->> capabilities for a late CPU).
+> Can we rename it to "cap_types", "cap_type_mask" or similar?
 > 
-> OK, so LOCAL_CPU and SYSTEM are mutually exclusive for the cap type, but
-> by making them separate bits in a bitmask then (LOCAL_CPU | SYSTEM) as a
-> match value will match on either.
+>>   {
+>>   	for (; caps->matches; caps++) {
+>> +		if (!(caps->type & cap_type))
+>> +			continue;
 > 
->> Things get further complicated by the addition of "EARLY", where we want to
->> filter entries based on "EARLY" bit. So, we need to pass on a mask of bits
->> to the helpers, which are not just the binary scope. See Patch 7 for more
->> info.
->>
->>>> +
->>>> +/* CPU errata detected at boot time based on feature of one or more CPUs */
->>>> +#define ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM	(ARM64_CPUCAP_SCOPE_LOCAL_CPU)
->>>
->>>> +/* CPU feature detected at boot time based on system-wide value of a feature */
->>>
->>> I'm still not overly keen on these names, but I do at least see where
->>> they come from now.
+> Minor nit: insert a blank line here?
+> 
+> To me, lack of a blank line suggests that the code will always fall
+> through to the next line, which is not the case after
+> return/continue/break/goto.
+> 
+> Alternatively:
+> 
+> 		if (!(caps->type & cap_type) ||
+> 		    !caps->matches(caps, caps->def_scope))
+> 			continue;
+> 
+> still seems fairly intelligible ...[1]
+> 
+>>   		if (!caps->matches(caps, cpucap_default_scope(caps)))
+>>   			continue;
+>>   
 
-I will try to make this patch a bit more simpler, by not doing a forward reference
-of the conflict "behavior" we introduce in the next patch and, keeping it just to
-changing the field name.
+Yep, will do.
 
-Thanks a lot for the feedback.
+>> @@ -1204,12 +1206,13 @@ static int __enable_cpu_capability(void *arg)
+>>    * Run through the enabled capabilities and enable() it on all active
+>>    * CPUs
+>>    */
+>> -static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+>> +static void __init
+>> +enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 caps_type)
+> 
+> The "caps_type" argument should be named consistently with the
+> corresponding argument to update_cpu_capabilities().
+> 
+>>   {
+>>   	for (; caps->matches; caps++) {
+>>   		unsigned int num = caps->capability;
+>>   
+>> -		if (!cpus_have_cap(num))
+>> +		if (!(caps->type & caps_type) || !cpus_have_cap(num))
+> 
+> [1]... and would match the approach taken here.
+> 
+>>   			continue;
+>>   
+>>   		/* Ensure cpus_have_const_cap(num) works */
+>> @@ -1231,12 +1234,16 @@ static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *
+>>    * Run through the list of capabilities to check for conflicts.
+>>    * Returns "false" on conflicts.
+>>    */
+>> -static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
+>> +static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list,
+>> +				    u16 caps_type)
+>>   {
+>>   	bool cpu_has_cap, system_has_cap;
+>>   	const struct arm64_cpu_capabilities *caps = caps_list;
+>>   
+>>   	for (; caps->matches; caps++) {
+>> +		if (!(caps->type & caps_type))
+>> +			continue;
+>> +
+>>   		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
+>>   		system_has_cap =  cpus_have_cap(caps->capability);
+>>   
+>> @@ -1299,7 +1306,7 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+>>   
+>>   static void verify_local_cpu_features(void)
+>>   {
+>> -	if (!__verify_local_cpu_caps(arm64_features))
+>> +	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_TYPE_ALL))
+>>   		cpu_die_early();
+>>   }
+>>   
+>> @@ -1327,18 +1334,20 @@ static void verify_sve_features(void)
+>>    */
+>>   static void verify_local_cpu_errata_workarounds(void)
+>>   {
+>> -	if (__verify_local_cpu_caps(arm64_errata))
+>> +	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_TYPE_ALL))
+>>   		cpu_die_early();
+> 
+> Did you mean to insert the ! here?
+
+Thanks for spotting. I think it should have been there in the first place,
+as we get "false" when there is a conflict. I will fix the previous patch which
+adds the call.
 
 Cheers
 Suzuki
