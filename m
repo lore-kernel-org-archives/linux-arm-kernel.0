@@ -1,45 +1,57 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 26 Jan 2018 15:46:59 +0000
-Subject: [PATCH 10/16] arm64: Make KPTI strict CPU local feature
-In-Reply-To: <20180126122519.GR5862@e103592.cambridge.arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-11-suzuki.poulose@arm.com>
- <20180126122519.GR5862@e103592.cambridge.arm.com>
-Message-ID: <4bf35de5-ae61-93b8-f202-52d734997cc5@arm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 26 Jan 2018 23:46:23 +0800
+Subject: [PATCH 0/8] crypto: arm64+generic - SHA3/SHA-512/SM-3 roundup
+In-Reply-To: <20180119120440.31556-1-ard.biesheuvel@linaro.org>
+References: <20180119120440.31556-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180126154622.GI4002@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 12:25, Dave Martin wrote:
-> On Tue, Jan 23, 2018 at 12:28:03PM +0000, Suzuki K Poulose wrote:
->> KPTI capability is a security feature which should be enabled
->> when at least one CPU on the system needs it. Any late CPU
->> which needs the kernel support, should be prevented from
->> booting (and thus making the system unsecure) if the feature
->> was not already enabled.
+On Fri, Jan 19, 2018 at 12:04:32PM +0000, Ard Biesheuvel wrote:
+> This supersedes all outstanding patches from me related to SHA-3, SHA-512
+> or SM-3.
 > 
-> Is there an actual change to behaviour here?
-
-Yes, we now prevent any new CPU from booting if it *matches* the capability,
-which we didn't do earlier.
-
+> - fix a correctness issue in the SHA-3 code (#1) and a performance issue (#2),
+>   the first one is definitely a -stable candidate, the second one potentially
+>   as well
+> - patches #3 and #4 make the generic SHA-3 code reusable as a fallback for the
+>   accelerated code introduced in #6
+> - patch #5 adds some SHA-3 test cases
+> - patch #6 implements SHA-3 using special arm64 instructions
+> - patch #7 implements the Chinese SM3 secure hash algorithm using special
+>   arm64 instructions
+> - patch #8 contains some fixes for the recently queued SHA-512 arm64 code.
 > 
-> It's not very obvious from the commit message, or the patch when read in
-> isolation.
+> Ard Biesheuvel (8):
+>   crypto/generic: sha3 - fixes for alignment and big endian operation
+>   crypto/generic: sha3: rewrite KECCAK transform to help the compiler
+>     optimize
+>   crypto/generic: sha3 - simplify code
+>   crypto/generic: sha3 - export init/update/final routines
+>   crypto/testmgr: sha3 - add new testcases
+>   crypto/arm64: sha3 - new v8.2 Crypto Extensions implementation
+>   crypto/arm64: sm3 - new v8.2 Crypto Extensions implementation
+>   crypto/arm64: sha512 - fix/improve new v8.2 Crypto Extensions code
 > 
+>  arch/arm64/crypto/Kconfig          |  12 +
+>  arch/arm64/crypto/Makefile         |   6 +
+>  arch/arm64/crypto/sha3-ce-core.S   | 210 ++++++++
+>  arch/arm64/crypto/sha3-ce-glue.c   | 161 ++++++
+>  arch/arm64/crypto/sha512-ce-core.S | 145 +++---
+>  arch/arm64/crypto/sha512-glue.c    |   1 +
+>  arch/arm64/crypto/sm3-ce-core.S    | 141 +++++
+>  arch/arm64/crypto/sm3-ce-glue.c    |  92 ++++
+>  crypto/sha3_generic.c              | 332 ++++++------
+>  crypto/testmgr.h                   | 550 ++++++++++++++++++++
+>  include/crypto/sha3.h              |   6 +-
+>  11 files changed, 1413 insertions(+), 243 deletions(-)
+>  create mode 100644 arch/arm64/crypto/sha3-ce-core.S
+>  create mode 100644 arch/arm64/crypto/sha3-ce-glue.c
+>  create mode 100644 arch/arm64/crypto/sm3-ce-core.S
+>  create mode 100644 arch/arm64/crypto/sm3-ce-glue.c
 
-I will fix the commit message to indicate the current behavior. How about :
-
-"KPTI is treated as a system wide feature, where we enable the feature
-when all the CPUs on the system suffers from the security vulnerability,
-unless it is enabled via kernel command line. Also, we ignore a late CPU
-which might need the defense if the KPTI is not enabled, making the system
-insecure. This is not sufficient, as
-we should enable the defense when at least one CPU needs it. Also, if
-it is not enabled at boot-time, we can no longer enable it when a late
-CPU turns up. This patch makes sure that the KPTI is checked on all CPUs
-and use it when at least one needs it. Also reject any CPU that needs it,
-which turns up late if the KPTI is not already enabled."
-
-
-Cheers
-Suzuki
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
