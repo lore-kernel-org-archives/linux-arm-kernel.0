@@ -1,86 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 27 Jan 2018 16:37:33 +0100
-Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
-In-Reply-To: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
-References: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <20180127153733.7ziaq6frli3jemc7@pengutronix.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 27 Jan 2018 23:51:11 +0800
+Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <201801272310.MCYSXdwL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 27, 2018 at 01:07:52AM +0100, Beno?t Th?baudeau wrote:
-> The eSDHC does not work properly if the SION bit is not set for the
-> bidirectional CMD signal, whatever the eSDHC instance and the selected
-> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
-> this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
-> behavior for all boards.
-> 
-> This had already been done for eSDHC1, but not for eSDHC2. Also, define
-> MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
-> from now on.
+Hi Yong,
 
-There is an inconsistency in the naming. The eSDHC1 CMD constants are
-named:
+I love your patch! Yet something to improve:
 
-	MX25_PAD_SD1_CMD__SD1_CMD
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.15-rc9 next-20180126]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-The reference calls this:
+url:    https://github.com/0day-ci/linux/commits/Yong-Deng/dt-bindings-media-Add-Allwinner-V3s-Camera-Sensor-Interface-CSI/20180126-054511
+base:   git://linuxtv.org/media_tree.git master
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-	CMD of instance: esdhc1.
+All errors (new ones prefixed by >>):
 
-The register name is correct though. Not sure it's worth to fix this to
-use consistent naming (which would result in:
+   drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c: In function 'sun6i_csi_update_buf_addr':
+>> drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c:567:31: error: 'PHYS_OFFSET' undeclared (first use in this function)
+     dma_addr_t bus_addr = addr - PHYS_OFFSET;
+                                  ^~~~~~~~~~~
+   drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c:567:31: note: each undeclared identifier is reported only once for each function it appears in
 
-	MX25_PAD_SD1_CMD__ESDHC1_CMD
+vim +/PHYS_OFFSET +567 drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
 
-which looks ugly, too).
+   562	
+   563	void sun6i_csi_update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
+   564	{
+   565		struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
+   566		/* transform physical address to bus address */
+ > 567		dma_addr_t bus_addr = addr - PHYS_OFFSET;
+   568	
+   569		regmap_write(sdev->regmap, CSI_CH_F0_BUFA_REG,
+   570			     (bus_addr + sdev->planar_offset[0]) >> 2);
+   571		if (sdev->planar_offset[1] != -1)
+   572			regmap_write(sdev->regmap, CSI_CH_F1_BUFA_REG,
+   573				     (bus_addr + sdev->planar_offset[1]) >> 2);
+   574		if (sdev->planar_offset[2] != -1)
+   575			regmap_write(sdev->regmap, CSI_CH_F2_BUFA_REG,
+   576				     (bus_addr + sdev->planar_offset[2]) >> 2);
+   577	}
+   578	
 
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
-> ---
->  arch/arm/boot/dts/imx25-pinfunc.h | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-> index 6c63dca1b9b8..6cc71f7e1baa 100644
-> --- a/arch/arm/boot/dts/imx25-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx25-pinfunc.h
-> @@ -236,7 +236,8 @@
->  #define MX25_PAD_LD8__LD8			0x0e8 0x2e0 0x000 0x00 0x000
->  #define MX25_PAD_LD8__UART4_RXD			0x0e8 0x2e0 0x570 0x02 0x000
->  #define MX25_PAD_LD8__FEC_TX_ERR		0x0e8 0x2e0 0x000 0x05 0x000
-> -#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x06 0x000
-> +/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
-
-Maybe reference the more verbose comment for MX25_PAD_SD1_CMD__SD1_CMD
-here?
-
-> +#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x16 0x000
->  
->  #define MX25_PAD_LD9__LD9			0x0ec 0x2e4 0x000 0x00 0x000
->  #define MX25_PAD_LD9__UART4_TXD			0x0ec 0x2e4 0x000 0x02 0x000
-> @@ -316,7 +317,8 @@
->  #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x07 0x000
->  
->  #define MX25_PAD_CSI_D6__CSI_D6			0x130 0x328 0x000 0x00 0x000
-> -#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x02 0x001
-> +/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
-> +#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x12 0x001
->  #define MX25_PAD_CSI_D6__SIM1_PD0		0x130 0x328 0x000 0x04 0x000
->  #define MX25_PAD_CSI_D6__GPIO_1_31		0x130 0x328 0x000 0x05 0x000
->  
-> @@ -496,6 +498,8 @@
->  #define MX25_PAD_KPP_COL3__GPIO_3_4		0x1c4 0x3bc 0x000 0x05 0x000
->  
->  #define MX25_PAD_FEC_MDC__FEC_MDC		0x1c8 0x3c0 0x000 0x00 0x000
-> +/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
-> +#define MX25_PAD_FEC_MDC__SDHC2_CMD		0x1c8 0x3c0 0x4e0 0x11 0x002
->  #define MX25_PAD_FEC_MDC__AUD4_TXD		0x1c8 0x3c0 0x464 0x02 0x001
->  #define MX25_PAD_FEC_MDC__GPIO_3_5		0x1c8 0x3c0 0x000 0x05 0x000
-
-I double checked the numbers, and these seem all to be correct.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61774 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180127/6a69dae2/attachment-0001.gz>
