@@ -1,33 +1,105 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 26 Jan 2018 16:49:17 -0800
-Subject: [PATCH v2] clk: Properly update prepare/enable count on orphan
- clock reparent
-In-Reply-To: <20180126091845.11902-1-m.szyprowski@samsung.com>
-References: <CGME20180126091902eucas1p2b3ad9978e3ab09bd7a2bd9123c9eecaa@eucas1p2.samsung.com>
- <20180126091845.11902-1-m.szyprowski@samsung.com>
-Message-ID: <20180127004917.GI28313@codeaurora.org>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Sat, 27 Jan 2018 05:30:36 +0100
+Subject: [linux-sunxi] [PATCH 10/16] iio: adc: sun4i-gpadc-iio: add
+ support for A83T thermal sensor
+In-Reply-To: <20180126174602.qolcswhqblgmlad7@core.my.home>
+References: <20180126151941.12183-1-embed3d@gmail.com>
+ <20180126151941.12183-11-embed3d@gmail.com>
+ <20180126174602.qolcswhqblgmlad7@core.my.home>
+Message-ID: <d00581c9-9e4f-8f01-cb8e-95e7ef17811e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26, Marek Szyprowski wrote:
-> If orphaned clock has been already prepared/enabled (for example if it or
-> one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
-> counters of the newly assigned parent are not updated correctly. This
-> might later cause warnings during changing clock parents.
 
-This doesn't feel right. Perhaps we should delay enabling a clk
-if it's CRITICAL until we adopt an orphaned clk. Good news is we
-have orphan status tracking now so this should be pretty simple.
-Otherwise migrating the count up is complicated and requires us
-to call the prepare/enable ops on a critical clk and then keep
-doing that each time it gets re-parented. Do you have this case,
-where some clk is marked as CRITICAL, and then we need to migrate
-that enable/prepare count to the parent?
 
-Hopefully it isn't the worser case, where the clk is handed out
-to some consumer but it's still orphaned at that point, and then
-we have little control over the migration of state to the parent.
+On 26.01.2018 18:46, Ond?ej Jirman wrote:
+> Hi,
+> 
+> On Fri, Jan 26, 2018 at 04:19:35PM +0100, Philipp Rossak wrote:
+>> This patch adds support for the A83T ths sensor.
+>>
+>> The A83T does not support interrupts. This seems to be broken.
+> 
+> Though, you use support_irq = true below. And in my tests, IRQ for THS works on
+> A83T.
+> 
+> regards,
+>    o.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Oh I totally forgot to update this commit message, after I fixed the 
+devicetree and got it running.
+I will fix that in the next version of this patch series.
+
+>> The calibration data is writen at the begin of the init process.
+>>
+>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>> ---
+>>   drivers/iio/adc/sun4i-gpadc-iio.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 38 insertions(+)
+>>
+>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> index f2e0ec65c53e..b8693afcdbea 100644
+>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> @@ -170,6 +170,40 @@ static const struct gpadc_data sun8i_h3_ths_data = {
+>>   		SUNXI_THS_TEMP_PERIOD(0x7),
+>>   };
+>>   
+>> +static const struct gpadc_data sun8i_a83t_ths_data = {
+>> +	.temp_offset = -2724,
+>> +	.temp_scale = -70,
+>> +	.temp_data = {SUNXI_THS_TDATA0,
+>> +		SUNXI_THS_TDATA1,
+>> +		SUNXI_THS_TDATA2,
+>> +		0},
+>> +	.sample_start = sunxi_ths_sample_start,
+>> +	.sample_end = sunxi_ths_sample_end,
+>> +	.sensor_count = 3,
+>> +	.supports_nvmem = false,
+>> +	.support_irq = true,
+>> +	.ctrl0_map = SUNXI_THS_ACQ0(0x1f3),
+>> +	.ctrl2_map = SUNXI_THS_ACQ1(0x1f3),
+>> +	.sensor_en_map = SUNXI_THS_TEMP_SENSE_EN0 |
+>> +		SUNXI_THS_TEMP_SENSE_EN1 |
+>> +		SUNXI_THS_TEMP_SENSE_EN2,
+>> +	.filter_map = SUNXI_THS_FILTER_EN |
+>> +		SUNXI_THS_FILTER_TYPE(0x2),
+>> +	.irq_clear_map = SUNXI_THS_INTS_ALARM_INT_0 |
+>> +		SUNXI_THS_INTS_ALARM_INT_1 |
+>> +		SUNXI_THS_INTS_ALARM_INT_2 |
+>> +		SUNXI_THS_INTS_SHUT_INT_0  |
+>> +		SUNXI_THS_INTS_SHUT_INT_1  |
+>> +		SUNXI_THS_INTS_SHUT_INT_2  |
+>> +		SUNXI_THS_INTS_TDATA_IRQ_0 |
+>> +		SUNXI_THS_INTS_TDATA_IRQ_1 |
+>> +		SUNXI_THS_INTS_TDATA_IRQ_2,
+>> +	.irq_control_map = SUNXI_THS_INTC_TDATA_IRQ_EN0 |
+>> +		SUNXI_THS_INTC_TDATA_IRQ_EN1 |
+>> +		SUNXI_THS_INTC_TDATA_IRQ_EN2 |
+>> +		SUNXI_THS_TEMP_PERIOD(0x257),
+>> +};
+>> +
+>>   struct sun4i_gpadc_iio {
+>>   	struct iio_dev			*indio_dev;
+>>   	struct completion		completion;
+>> @@ -672,6 +706,10 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
+>>   		.compatible = "allwinner,sun8i-h3-ths",
+>>   		.data = &sun8i_h3_ths_data,
+>>   	},
+>> +	{
+>> +		.compatible = "allwinner,sun8i-a83t-ths",
+>> +		.data = &sun8i_a83t_ths_data,
+>> +	},
+>>   	{ /* sentinel */ }
+>>   };
+>>   
+>> -- 
+>> 2.11.0
+>>
+>> -- 
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+
+Thanks,
+Philipp
