@@ -1,26 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 26 Jan 2018 22:28:30 -0200
-Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
-In-Reply-To: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
-References: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <CAOMZO5Dfrj9H4t6T2NJH3BQ49yAx3k3a=5HRFcR+Ce5dneBfKg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 26 Jan 2018 16:49:17 -0800
+Subject: [PATCH v2] clk: Properly update prepare/enable count on orphan
+ clock reparent
+In-Reply-To: <20180126091845.11902-1-m.szyprowski@samsung.com>
+References: <CGME20180126091902eucas1p2b3ad9978e3ab09bd7a2bd9123c9eecaa@eucas1p2.samsung.com>
+ <20180126091845.11902-1-m.szyprowski@samsung.com>
+Message-ID: <20180127004917.GI28313@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 10:07 PM, Beno?t Th?baudeau
-<benoit.thebaudeau.dev@gmail.com> wrote:
-> The eSDHC does not work properly if the SION bit is not set for the
-> bidirectional CMD signal, whatever the eSDHC instance and the selected
-> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
-> this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
-> behavior for all boards.
->
-> This had already been done for eSDHC1, but not for eSDHC2. Also, define
-> MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
-> from now on.
->
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
+On 01/26, Marek Szyprowski wrote:
+> If orphaned clock has been already prepared/enabled (for example if it or
+> one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+> counters of the newly assigned parent are not updated correctly. This
+> might later cause warnings during changing clock parents.
 
-Thanks for the fix:
+This doesn't feel right. Perhaps we should delay enabling a clk
+if it's CRITICAL until we adopt an orphaned clk. Good news is we
+have orphan status tracking now so this should be pretty simple.
+Otherwise migrating the count up is complicated and requires us
+to call the prepare/enable ops on a critical clk and then keep
+doing that each time it gets re-parented. Do you have this case,
+where some clk is marked as CRITICAL, and then we need to migrate
+that enable/prepare count to the parent?
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Hopefully it isn't the worser case, where the clk is handed out
+to some consumer but it's still orphaned at that point, and then
+we have little control over the migration of state to the parent.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
