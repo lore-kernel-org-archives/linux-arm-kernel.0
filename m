@@ -1,105 +1,86 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sat, 27 Jan 2018 05:30:36 +0100
-Subject: [linux-sunxi] [PATCH 10/16] iio: adc: sun4i-gpadc-iio: add
- support for A83T thermal sensor
-In-Reply-To: <20180126174602.qolcswhqblgmlad7@core.my.home>
-References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-11-embed3d@gmail.com>
- <20180126174602.qolcswhqblgmlad7@core.my.home>
-Message-ID: <d00581c9-9e4f-8f01-cb8e-95e7ef17811e@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 27 Jan 2018 16:37:33 +0100
+Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
+In-Reply-To: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
+References: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
+Message-ID: <20180127153733.7ziaq6frli3jemc7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 26.01.2018 18:46, Ond?ej Jirman wrote:
-> Hi,
+On Sat, Jan 27, 2018 at 01:07:52AM +0100, Beno?t Th?baudeau wrote:
+> The eSDHC does not work properly if the SION bit is not set for the
+> bidirectional CMD signal, whatever the eSDHC instance and the selected
+> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
+> this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
+> behavior for all boards.
 > 
-> On Fri, Jan 26, 2018 at 04:19:35PM +0100, Philipp Rossak wrote:
->> This patch adds support for the A83T ths sensor.
->>
->> The A83T does not support interrupts. This seems to be broken.
+> This had already been done for eSDHC1, but not for eSDHC2. Also, define
+> MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
+> from now on.
+
+There is an inconsistency in the naming. The eSDHC1 CMD constants are
+named:
+
+	MX25_PAD_SD1_CMD__SD1_CMD
+
+The reference calls this:
+
+	CMD of instance: esdhc1.
+
+The register name is correct though. Not sure it's worth to fix this to
+use consistent naming (which would result in:
+
+	MX25_PAD_SD1_CMD__ESDHC1_CMD
+
+which looks ugly, too).
+
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx25-pinfunc.h | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 > 
-> Though, you use support_irq = true below. And in my tests, IRQ for THS works on
-> A83T.
-> 
-> regards,
->    o.
+> diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
+> index 6c63dca1b9b8..6cc71f7e1baa 100644
+> --- a/arch/arm/boot/dts/imx25-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx25-pinfunc.h
+> @@ -236,7 +236,8 @@
+>  #define MX25_PAD_LD8__LD8			0x0e8 0x2e0 0x000 0x00 0x000
+>  #define MX25_PAD_LD8__UART4_RXD			0x0e8 0x2e0 0x570 0x02 0x000
+>  #define MX25_PAD_LD8__FEC_TX_ERR		0x0e8 0x2e0 0x000 0x05 0x000
+> -#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x06 0x000
+> +/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
 
-Oh I totally forgot to update this commit message, after I fixed the 
-devicetree and got it running.
-I will fix that in the next version of this patch series.
+Maybe reference the more verbose comment for MX25_PAD_SD1_CMD__SD1_CMD
+here?
 
->> The calibration data is writen at the begin of the init process.
->>
->> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> ---
->>   drivers/iio/adc/sun4i-gpadc-iio.c | 38 ++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 38 insertions(+)
->>
->> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
->> index f2e0ec65c53e..b8693afcdbea 100644
->> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
->> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
->> @@ -170,6 +170,40 @@ static const struct gpadc_data sun8i_h3_ths_data = {
->>   		SUNXI_THS_TEMP_PERIOD(0x7),
->>   };
->>   
->> +static const struct gpadc_data sun8i_a83t_ths_data = {
->> +	.temp_offset = -2724,
->> +	.temp_scale = -70,
->> +	.temp_data = {SUNXI_THS_TDATA0,
->> +		SUNXI_THS_TDATA1,
->> +		SUNXI_THS_TDATA2,
->> +		0},
->> +	.sample_start = sunxi_ths_sample_start,
->> +	.sample_end = sunxi_ths_sample_end,
->> +	.sensor_count = 3,
->> +	.supports_nvmem = false,
->> +	.support_irq = true,
->> +	.ctrl0_map = SUNXI_THS_ACQ0(0x1f3),
->> +	.ctrl2_map = SUNXI_THS_ACQ1(0x1f3),
->> +	.sensor_en_map = SUNXI_THS_TEMP_SENSE_EN0 |
->> +		SUNXI_THS_TEMP_SENSE_EN1 |
->> +		SUNXI_THS_TEMP_SENSE_EN2,
->> +	.filter_map = SUNXI_THS_FILTER_EN |
->> +		SUNXI_THS_FILTER_TYPE(0x2),
->> +	.irq_clear_map = SUNXI_THS_INTS_ALARM_INT_0 |
->> +		SUNXI_THS_INTS_ALARM_INT_1 |
->> +		SUNXI_THS_INTS_ALARM_INT_2 |
->> +		SUNXI_THS_INTS_SHUT_INT_0  |
->> +		SUNXI_THS_INTS_SHUT_INT_1  |
->> +		SUNXI_THS_INTS_SHUT_INT_2  |
->> +		SUNXI_THS_INTS_TDATA_IRQ_0 |
->> +		SUNXI_THS_INTS_TDATA_IRQ_1 |
->> +		SUNXI_THS_INTS_TDATA_IRQ_2,
->> +	.irq_control_map = SUNXI_THS_INTC_TDATA_IRQ_EN0 |
->> +		SUNXI_THS_INTC_TDATA_IRQ_EN1 |
->> +		SUNXI_THS_INTC_TDATA_IRQ_EN2 |
->> +		SUNXI_THS_TEMP_PERIOD(0x257),
->> +};
->> +
->>   struct sun4i_gpadc_iio {
->>   	struct iio_dev			*indio_dev;
->>   	struct completion		completion;
->> @@ -672,6 +706,10 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
->>   		.compatible = "allwinner,sun8i-h3-ths",
->>   		.data = &sun8i_h3_ths_data,
->>   	},
->> +	{
->> +		.compatible = "allwinner,sun8i-a83t-ths",
->> +		.data = &sun8i_a83t_ths_data,
->> +	},
->>   	{ /* sentinel */ }
->>   };
->>   
->> -- 
->> 2.11.0
->>
->> -- 
->> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+> +#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x16 0x000
+>  
+>  #define MX25_PAD_LD9__LD9			0x0ec 0x2e4 0x000 0x00 0x000
+>  #define MX25_PAD_LD9__UART4_TXD			0x0ec 0x2e4 0x000 0x02 0x000
+> @@ -316,7 +317,8 @@
+>  #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x07 0x000
+>  
+>  #define MX25_PAD_CSI_D6__CSI_D6			0x130 0x328 0x000 0x00 0x000
+> -#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x02 0x001
+> +/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
+> +#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x12 0x001
+>  #define MX25_PAD_CSI_D6__SIM1_PD0		0x130 0x328 0x000 0x04 0x000
+>  #define MX25_PAD_CSI_D6__GPIO_1_31		0x130 0x328 0x000 0x05 0x000
+>  
+> @@ -496,6 +498,8 @@
+>  #define MX25_PAD_KPP_COL3__GPIO_3_4		0x1c4 0x3bc 0x000 0x05 0x000
+>  
+>  #define MX25_PAD_FEC_MDC__FEC_MDC		0x1c8 0x3c0 0x000 0x00 0x000
+> +/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
+> +#define MX25_PAD_FEC_MDC__SDHC2_CMD		0x1c8 0x3c0 0x4e0 0x11 0x002
+>  #define MX25_PAD_FEC_MDC__AUD4_TXD		0x1c8 0x3c0 0x464 0x02 0x001
+>  #define MX25_PAD_FEC_MDC__GPIO_3_5		0x1c8 0x3c0 0x000 0x05 0x000
 
-Thanks,
-Philipp
+I double checked the numbers, and these seem all to be correct.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
