@@ -1,107 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 26 Jan 2018 14:18:08 -0800
-Subject: [PATCH 2/2] arm64: dts: sdm845: Add serial console support
-In-Reply-To: <20180125163216.29018-3-rnayak@codeaurora.org>
-References: <20180125163216.29018-1-rnayak@codeaurora.org>
- <20180125163216.29018-3-rnayak@codeaurora.org>
-Message-ID: <20180126221808.GE28313@codeaurora.org>
+From: benoit.thebaudeau.dev@gmail.com (=?UTF-8?q?Beno=C3=AEt=20Th=C3=A9baudeau?=)
+Date: Sat, 27 Jan 2018 01:07:52 +0100
+Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
+Message-ID: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25, Rajendra Nayak wrote:
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
-> new file mode 100644
-> index 000000000000..b97f99e6f4b4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
-> @@ -0,0 +1,32 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> + */
-> +
-> +&tlmm {
+The eSDHC does not work properly if the SION bit is not set for the
+bidirectional CMD signal, whatever the eSDHC instance and the selected
+pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
+this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
+behavior for all boards.
 
-I'm not the maintainer, but I find this approach to the pins
-really annoying. I have to flip to another file to figure out how
-a board has configured the pins. And we may bring in a bunch of
-settings that we don't ever use on some board too. Why can't we
-put the settings in the board file directly?
+This had already been done for eSDHC1, but not for eSDHC2. Also, define
+MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
+from now on.
 
-> +	qup_uart2_default: qup_uart2_default {
-> +		pinmux {
-> +			function = "qup9";
-> +			pins = "gpio4", "gpio5";
-> +		};
-> +
-> +		pinconf {
-> +			pins = "gpio4", "gpio5";
-> +			drive-strength = <2>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	qup_uart2_sleep: qup_uart2_sleep {
-> +		pinmux {
-> +			function = "gpio";
-> +			pins = "gpio4", "gpio5";
-> +		};
-> +
-> +		pinconf {
-> +			pins = "gpio4", "gpio5";
-> +			drive-strength = <2>;
-> +			bias-disable;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index a21f4912b3e2..529f4ba3a1db 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -4,6 +4,7 @@
->   */
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/clock/qcom,gcc-sdm845.h>
->  
->  / {
->  	model = "Qualcomm Technologies, Inc. SDM845";
+Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
+---
+ arch/arm/boot/dts/imx25-pinfunc.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-I'd expect some sort of serial alias node stuff here too.
-
-> @@ -304,5 +305,26 @@
->  			cell-index = <0>;
->  		};
->  
-> +		qup_1: qcom,geni_se at ac0000 {
-> +			compatible = "qcom,geni-se-qup";
-> +			reg = <0xac0000 0x6000>;
-> +		};
-> +
-> +		qup_uart2: serial at a84000 {
-> +			compatible = "qcom,geni-console", "qcom,geni-uart";
-> +			reg = <0xa84000 0x4000>;
-> +			reg-names = "se_phys";
-> +			clock-names = "se-clk", "m-ahb", "s-ahb";
-> +			clocks = <&gcc GCC_QUPV3_WRAP1_S1_CLK>,
-> +				 <&gcc GCC_QUPV3_WRAP_1_M_AHB_CLK>,
-> +				 <&gcc GCC_QUPV3_WRAP_1_S_AHB_CLK>;
-> +			pinctrl-names = "default", "sleep";
-> +			pinctrl-0 = <&qup_uart2_default>;
-> +			pinctrl-1 = <&qup_uart2_sleep>;
-> +			interrupts = <GIC_SPI 354 IRQ_TYPE_NONE>;
-> +			qcom,wrapper-core = <&qup_1>;
-
-Is this binding still being reviewed? Ugly.
-
-> +			status = "disabled";
-> +		};
->  	};
->  };
-> +#include "sdm845-pins.dtsi"
-
-Why at the bottom?
-
+diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
+index 6c63dca1b9b8..6cc71f7e1baa 100644
+--- a/arch/arm/boot/dts/imx25-pinfunc.h
++++ b/arch/arm/boot/dts/imx25-pinfunc.h
+@@ -236,7 +236,8 @@
+ #define MX25_PAD_LD8__LD8			0x0e8 0x2e0 0x000 0x00 0x000
+ #define MX25_PAD_LD8__UART4_RXD			0x0e8 0x2e0 0x570 0x02 0x000
+ #define MX25_PAD_LD8__FEC_TX_ERR		0x0e8 0x2e0 0x000 0x05 0x000
+-#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x06 0x000
++/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
++#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x16 0x000
+ 
+ #define MX25_PAD_LD9__LD9			0x0ec 0x2e4 0x000 0x00 0x000
+ #define MX25_PAD_LD9__UART4_TXD			0x0ec 0x2e4 0x000 0x02 0x000
+@@ -316,7 +317,8 @@
+ #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x07 0x000
+ 
+ #define MX25_PAD_CSI_D6__CSI_D6			0x130 0x328 0x000 0x00 0x000
+-#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x02 0x001
++/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
++#define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x12 0x001
+ #define MX25_PAD_CSI_D6__SIM1_PD0		0x130 0x328 0x000 0x04 0x000
+ #define MX25_PAD_CSI_D6__GPIO_1_31		0x130 0x328 0x000 0x05 0x000
+ 
+@@ -496,6 +498,8 @@
+ #define MX25_PAD_KPP_COL3__GPIO_3_4		0x1c4 0x3bc 0x000 0x05 0x000
+ 
+ #define MX25_PAD_FEC_MDC__FEC_MDC		0x1c8 0x3c0 0x000 0x00 0x000
++/* The eSDHC cannot work if SION is not set for the bidirectional CMD signal. */
++#define MX25_PAD_FEC_MDC__SDHC2_CMD		0x1c8 0x3c0 0x4e0 0x11 0x002
+ #define MX25_PAD_FEC_MDC__AUD4_TXD		0x1c8 0x3c0 0x464 0x02 0x001
+ #define MX25_PAD_FEC_MDC__GPIO_3_5		0x1c8 0x3c0 0x000 0x05 0x000
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.14.1
