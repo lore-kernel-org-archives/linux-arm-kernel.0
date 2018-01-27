@@ -1,63 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 27 Jan 2018 23:51:11 +0800
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 27 Jan 2018 17:14:26 +0100
 Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
 In-Reply-To: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
 References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <201801272310.MCYSXdwL%fengguang.wu@intel.com>
+Message-ID: <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+On Tue, Jan 23, 2018 at 9:18 AM, Yong Deng <yong.deng@magewell.com> wrote:
 
-I love your patch! Yet something to improve:
+> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> interface and CSI1 is used for parallel interface. This is not
+> documented in datasheet but by test and guess.
+>
+> This patch implement a v4l2 framework driver for it.
+>
+> Currently, the driver only support the parallel interface. MIPI-CSI2,
+> ISP's support are not included in this patch.
+>
+> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.15-rc9 next-20180126]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This is cool stuff :)
 
-url:    https://github.com/0day-ci/linux/commits/Yong-Deng/dt-bindings-media-Add-Allwinner-V3s-Camera-Sensor-Interface-CSI/20180126-054511
-base:   git://linuxtv.org/media_tree.git master
-config: i386-allyesconfig (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+> +void sun6i_csi_update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
+> +{
+> +       struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
+> +       /* transform physical address to bus address */
+> +       dma_addr_t bus_addr = addr - PHYS_OFFSET;
 
-All errors (new ones prefixed by >>):
+I am sorry if this is an unjustified drive-by comment. Maybe you
+have already investigate other ways to do this.
 
-   drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c: In function 'sun6i_csi_update_buf_addr':
->> drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c:567:31: error: 'PHYS_OFFSET' undeclared (first use in this function)
-     dma_addr_t bus_addr = addr - PHYS_OFFSET;
-                                  ^~~~~~~~~~~
-   drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c:567:31: note: each undeclared identifier is reported only once for each function it appears in
+Accessing PHYS_OFFSET directly seems unintuitive
+and not good practice.
 
-vim +/PHYS_OFFSET +567 drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+But normally an dma_addr_t only comes from some
+function inside <linux/dma-mapping.h> such as:
+dma_alloc_coherent() for a contigous buffer which is coherent
+in physical memory, or from some buffer <= 64KB that
+is switching ownership between device and CPU explicitly
+with dma_map* or so. Did you check with
+Documentation/DMA-API.txt?
 
-   562	
-   563	void sun6i_csi_update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
-   564	{
-   565		struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
-   566		/* transform physical address to bus address */
- > 567		dma_addr_t bus_addr = addr - PHYS_OFFSET;
-   568	
-   569		regmap_write(sdev->regmap, CSI_CH_F0_BUFA_REG,
-   570			     (bus_addr + sdev->planar_offset[0]) >> 2);
-   571		if (sdev->planar_offset[1] != -1)
-   572			regmap_write(sdev->regmap, CSI_CH_F1_BUFA_REG,
-   573				     (bus_addr + sdev->planar_offset[1]) >> 2);
-   574		if (sdev->planar_offset[2] != -1)
-   575			regmap_write(sdev->regmap, CSI_CH_F2_BUFA_REG,
-   576				     (bus_addr + sdev->planar_offset[2]) >> 2);
-   577	}
-   578	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61774 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180127/6a69dae2/attachment-0001.gz>
+Yours,
+Linus Walleij
