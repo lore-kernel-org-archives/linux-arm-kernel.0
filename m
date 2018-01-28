@@ -1,202 +1,50 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sun, 28 Jan 2018 12:34:14 +0100
-Subject: [PATCH 05/16] iio: adc: sun4i-gpadc-iio: rework: support clocks
- and reset
-In-Reply-To: <20180128085036.389c2dfb@archlinux>
-References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-6-embed3d@gmail.com>
- <20180128085036.389c2dfb@archlinux>
-Message-ID: <489c4e33-13ca-e6fe-bb49-8795fb793fd0@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 28 Jan 2018 11:55:54 +0000
+Subject: [PATCH v3 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <f3af9f2b-ddc2-f0e2-3c80-6e93f9839861@gmail.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-5-marc.zyngier@arm.com>
+ <f3af9f2b-ddc2-f0e2-3c80-6e93f9839861@gmail.com>
+Message-ID: <20180128115554.7a52a735@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 27 Jan 2018 14:23:57 -0800
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
+> On 01/25/2018 07:21 AM, Marc Zyngier wrote:
+> > In order to avoid aliasing attacks against the branch predictor,
+> > Cortex-A15 require to invalidate the BTB when switching
+> > from one user context to another. The only way to do so on this
+> > CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+> > mode.  
+> 
+> Even though this is a platform design mistake, let's say your Linux
+> kernel boots in secure supervisor mode, we could have code
+> that tries to set ACTLR[0] as early as possible, since the writes are
+> ignored if executing from non-secure mode. If Linux is booted normally
+> either PL1 or PL2 non-secure we could still check ACTLR[0].
+> 
+> My concern is that without doing this, we may have a hard time catching
+> improper firmware as well as having bogus bug reports. This is
+> completely RFC though since:
+> 
+> - I could not quite figure out yet why update ca15_actlr_status from
+> assembly is not reflected in the C code despite using PC relative loads
 
-On 28.01.2018 09:50, Jonathan Cameron wrote:
-> On Fri, 26 Jan 2018 16:19:30 +0100
-> Philipp Rossak <embed3d@gmail.com> wrote:
-> 
->> For adding newer sensor some basic rework of the code is necessary.
->>
->> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
->> inputs (bus clock and sampling clock) and a reset. The registers are
->> also re-arranged.
->>
->> This commit reworks the code, adds the process of the clocks and
->> resets.
->>
->> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> 
-> Both clock and reset code is safe against null parameters, so you can
-> drop a lot of 'is it here' checks in this.  They could be argued to
-> act as documentation of the fact we really don't expect them in some cases
-> I suppose...
-> 
-Ok, this sounds good for me!
-I will fix that in the next version of this patch series.
+One potential problem is that you're writing this with the MMU off, and
+reading it with the MMU on. Unless you've added CMOs to make this
+visible, it will not be reliable.
 
->> ---
->>   drivers/iio/adc/sun4i-gpadc-iio.c | 80 +++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 80 insertions(+)
->>
->> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
->> index 363936b37c5a..1a80744bd472 100644
->> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
->> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
->> @@ -22,6 +22,7 @@
->>    * shutdown for not being used.
->>    */
->>   
->> +#include <linux/clk.h>
->>   #include <linux/completion.h>
->>   #include <linux/interrupt.h>
->>   #include <linux/io.h>
->> @@ -31,6 +32,7 @@
->>   #include <linux/platform_device.h>
->>   #include <linux/pm_runtime.h>
->>   #include <linux/regmap.h>
->> +#include <linux/reset.h>
->>   #include <linux/thermal.h>
->>   #include <linux/delay.h>
->>   
->> @@ -75,6 +77,9 @@ struct gpadc_data {
->>   	u32		ctrl2_map;
->>   	u32		sensor_en_map;
->>   	u32		filter_map;
->> +	bool		has_bus_clk;
->> +	bool		has_bus_rst;
->> +	bool		has_mod_clk;
->>   };
->>   
->>   static const struct gpadc_data sun4i_gpadc_data = {
->> @@ -134,6 +139,9 @@ struct sun4i_gpadc_iio {
->>   	atomic_t			ignore_temp_data_irq;
->>   	const struct gpadc_data		*data;
->>   	bool				no_irq;
->> +	struct clk			*bus_clk;
->> +	struct clk			*mod_clk;
->> +	struct reset_control		*reset;
->>   	/* prevents concurrent reads of temperature and ADC */
->>   	struct mutex			mutex;
->>   	struct thermal_zone_device	*tzd;
->> @@ -435,6 +443,12 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
->>   {
->>   	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
->>   
->> +	if (info->data->has_mod_clk)
->> +		clk_disable(info->mod_clk);
-> 
-> Safe against null parameter... (see below)
-> 
->> +
->> +	if (info->data->has_bus_clk)
->> +		clk_disable(info->bus_clk);
->> +
->>   	return info->data->sample_end(info);
->>   }
->>   
->> @@ -483,6 +497,12 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
->>   {
->>   	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
->>   
->> +	if (info->data->has_mod_clk)
->> +		clk_enable(info->mod_clk);
-> 
-> clk_enable is safe against null parameter so could do without the checks.
-> 
->> +
->> +	if (info->data->has_bus_clk)
->> +		clk_enable(info->bus_clk);
->> +
->>   	return info->data->sample_start(info);
->>   }
->>   
->> @@ -597,10 +617,61 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->>   		return ret;
->>   	}
->>   
->> +	if (info->data->has_bus_rst) {
->> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
->> +		if (IS_ERR(info->reset)) {
->> +			ret = PTR_ERR(info->reset);
->> +			return ret;
->> +		}
->> +
->> +		ret = reset_control_deassert(info->reset);
->> +		if (ret)
->> +			return ret;
->> +	}
->> +
->> +	if (info->data->has_bus_clk) {
->> +		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
->> +		if (IS_ERR(info->bus_clk)) {
->> +			ret = PTR_ERR(info->bus_clk);
->> +			goto assert_reset;
->> +		}
->> +
->> +		ret = clk_prepare_enable(info->bus_clk);
->> +		if (ret)
->> +			goto assert_reset;
->> +	}
->> +
->> +	if (info->data->has_mod_clk) {
->> +		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
->> +		if (IS_ERR(info->mod_clk)) {
->> +			ret = PTR_ERR(info->mod_clk);
->> +			goto disable_bus_clk;
->> +		}
->> +
->> +		/* Running at 6MHz */
->> +		ret = clk_set_rate(info->mod_clk, 4000000);
->> +		if (ret)
->> +			goto disable_bus_clk;
->> +
->> +		ret = clk_prepare_enable(info->mod_clk);
->> +		if (ret)
->> +			goto disable_bus_clk;
->> +	}
->> +
->>   	if (IS_ENABLED(CONFIG_THERMAL_OF))
->>   		info->sensor_device = &pdev->dev;
->>   
->>   	return 0;
->> +
->> +disable_bus_clk:
->> +	if (info->data->has_bus_clk)
->> +		clk_disable_unprepare(info->bus_clk);
->> +
->> +assert_reset:
->> +	if (info->data->has_bus_rst)
->> +		reset_control_assert(info->reset);
->> +
->> +	return ret;
->>   }
->>   
->>   static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
->> @@ -766,6 +837,15 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
->>   	if (!info->no_irq)
->>   		iio_map_array_unregister(indio_dev);
->>   
->> +	if (info->data->has_mod_clk)
->> +		clk_disable_unprepare(info->mod_clk);
-> 
-> clk_disable_unprepare is safe against a null parameter
-> so I don't think the checks are needed.
-> 
->> +
->> +	if (info->data->has_bus_clk)
->> +		clk_disable_unprepare(info->bus_clk);
->> +
->> +	if (info->data->has_bus_rst)
->> +		reset_control_assert(info->reset);
-> 
-> Safe against null parameter...
-> 
->> +
->>   	return 0;
->>   }
->>   
-> 
+Also, I'm not sure how this works with MCPM.
+
+> - this is done in __ca15mp_setup and __b15mp_setup because we know by
+> then that we have either of these two CPUs but we could presumably move
+> this check under a Kconfig option and earlier where all erratas are checked
+
 Thanks,
-Philipp
+
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
