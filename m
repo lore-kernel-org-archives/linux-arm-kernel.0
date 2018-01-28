@@ -1,50 +1,61 @@
 From: yong.deng@magewell.com (Yong)
-Date: Sun, 28 Jan 2018 10:19:03 +0800
-Subject: [linux-sunxi] Re: [PATCH v6 2/2] media: V3s: Add support for
- Allwinner CSI.
-In-Reply-To: <20180126081000.hy7g57zp5dv6ug2g@flea.lan>
+Date: Sun, 28 Jan 2018 10:39:29 +0800
+Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
 References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <201801260759.RyNhDZz4%fengguang.wu@intel.com>
- <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
- <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
- <20180126081000.hy7g57zp5dv6ug2g@flea.lan>
-Message-ID: <20180128101903.fbaec083c787bda30aeb05ef@magewell.com>
+ <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
+Message-ID: <20180128103929.421eb809821f101ee1c6cb60@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On Fri, 26 Jan 2018 09:10:00 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Sat, 27 Jan 2018 17:14:26 +0100
+Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
-> > Hi Maxime,
-> > 
-> > On Fri, 26 Jan 2018 09:46:58 +0800
-> > Yong <yong.deng@magewell.com> wrote:
-> > 
-> > > Hi Maxime,
-> > > 
-> > > Do you have any experience in solving this problem?
-> > > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
-> > 
-> > Got it.
-> > Should I add 'depends on ARM' in Kconfig?
+> On Tue, Jan 23, 2018 at 9:18 AM, Yong Deng <yong.deng@magewell.com> wrote:
 > 
-> Yes, or even better a depends on MACH_SUNXI :)
+> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > interface and CSI1 is used for parallel interface. This is not
+> > documented in datasheet but by test and guess.
+> >
+> > This patch implement a v4l2 framework driver for it.
+> >
+> > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > ISP's support are not included in this patch.
+> >
+> > Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> 
+> This is cool stuff :)
+> 
+> > +void sun6i_csi_update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
+> > +{
+> > +       struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
+> > +       /* transform physical address to bus address */
+> > +       dma_addr_t bus_addr = addr - PHYS_OFFSET;
+> 
+> I am sorry if this is an unjustified drive-by comment. Maybe you
+> have already investigate other ways to do this.
+> 
+> Accessing PHYS_OFFSET directly seems unintuitive
+> and not good practice.
+> 
+> But normally an dma_addr_t only comes from some
+> function inside <linux/dma-mapping.h> such as:
+> dma_alloc_coherent() for a contigous buffer which is coherent
+> in physical memory, or from some buffer <= 64KB that
+> is switching ownership between device and CPU explicitly
+> with dma_map* or so. Did you check with
+> Documentation/DMA-API.txt?
 
-Do you mean ARCH_SUNXI?
+The dma_addr_t here comes from v4l2 vb2 and it's already 'mapped'.
 
-ARCH_SUNXI is alreay there. In the early version, my Kconfig is like this:
+Maybe the dma-mapping code of sunXi does not do conversion between 
+device and CPU. I'm not familiar with this. 
 
-	depends on ARCH_SUNXI
-
-But Hans suggest me to change this to:
-
-	depends on ARCH_SUNXI || COMPILE_TEST
-
-to allow this driver to be compiled on e.g. Intel for compile testing.
-
-Should we get rid of COMPILE_TEST?
+Maxime, do you have any idea about this?
+Can we get bus address directly from dma_alloc_coherent or dma_map*
+at the system layer but not doing the conversion per driver?
 
 Yong
