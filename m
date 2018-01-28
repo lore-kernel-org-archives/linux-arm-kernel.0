@@ -1,123 +1,42 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 00:29:13 +0100
-Subject: [PATCH v2 10/16] iio: adc: sun4i-gpadc-iio: add support for A83T
- thermal sensor
+Date: Mon, 29 Jan 2018 00:29:14 +0100
+Subject: [PATCH v2 11/16] arm: dts: sunxi-h3-h5: add support for the thermal
+ sensor in H3 and H5
 In-Reply-To: <20180128232919.12639-1-embed3d@gmail.com>
 References: <20180128232919.12639-1-embed3d@gmail.com>
-Message-ID: <20180128232919.12639-11-embed3d@gmail.com>
+Message-ID: <20180128232919.12639-12-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the A83T ths sensor.
-
-The A83T supports interrupts. The interrupt is configured to update the
-the sensor values every second.
+As we have gained the support for the thermal sensor in H3 and H5,
+we can now add its device nodes to the device tree. The H3 and H5 share
+most of its compatible. The compatible and the thermal sensor cells
+will be added in an additional patch per device.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/sun4i-gpadc.h   | 18 ++++++++++++++++++
- 2 files changed, 56 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 8196203d65fe..9f7895ba1966 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -170,6 +170,40 @@ static const struct gpadc_data sun8i_h3_ths_data = {
- 		SUN8I_H3_THS_TEMP_PERIOD(0x7),
- };
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 7a83b15225c7..413c789b588d 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -426,6 +426,15 @@
+ 			};
+ 		};
  
-+static const struct gpadc_data sun8i_a83t_ths_data = {
-+	.temp_offset = -2724,
-+	.temp_scale = -70,
-+	.temp_data = {SUN8I_H3_THS_TDATA0,
-+		SUN8I_A83T_THS_TDATA1,
-+		SUN8I_A83T_THS_TDATA2,
-+		0},
-+	.sample_start = sunxi_ths_sample_start,
-+	.sample_end = sunxi_ths_sample_end,
-+	.sensor_count = 3,
-+	.supports_nvmem = false,
-+	.support_irq = true,
-+	.ctrl0_map = SUN4I_GPADC_CTRL0_T_ACQ(0x1f3),
-+	.ctrl2_map = SUN8I_H3_THS_ACQ1(0x1f3),
-+	.sensor_en_map = SUN8I_H3_THS_TEMP_SENSE_EN0 |
-+		SUN8I_A83T_THS_TEMP_SENSE_EN1 |
-+		SUN8I_A83T_THS_TEMP_SENSE_EN2,
-+	.filter_map = SUN4I_GPADC_CTRL3_FILTER_EN |
-+		SUN4I_GPADC_CTRL3_FILTER_TYPE(0x2),
-+	.irq_clear_map = SUN8I_H3_THS_INTS_ALARM_INT_0 |
-+		SUN8I_A83T_THS_INTS_ALARM_INT_1 |
-+		SUN8I_A83T_THS_INTS_ALARM_INT_2 |
-+		SUN8I_H3_THS_INTS_SHUT_INT_0  |
-+		SUN8I_A83T_THS_INTS_SHUT_INT_1  |
-+		SUN8I_A83T_THS_INTS_SHUT_INT_2  |
-+		SUN8I_H3_THS_INTS_TDATA_IRQ_0 |
-+		SUN8I_A83T_THS_INTS_TDATA_IRQ_1 |
-+		SUN8I_A83T_THS_INTS_TDATA_IRQ_2,
-+	.irq_control_map = SUN8I_H3_THS_INTC_TDATA_IRQ_EN0 |
-+		SUN8I_A83T_THS_INTC_TDATA_IRQ_EN1 |
-+		SUN8I_A83T_THS_INTC_TDATA_IRQ_EN2 |
-+		SUN8I_H3_THS_TEMP_PERIOD(0x257),
-+};
++		ths: thermal-sensor at 1c25000 {
++			reg = <0x01c25000 0x100>;
++			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
++			clock-names = "bus", "mod";
++			resets = <&ccu RST_BUS_THS>;
++			#io-channel-cells = <0>;
++		};
 +
- struct sun4i_gpadc_iio {
- 	struct iio_dev			*indio_dev;
- 	struct completion		completion;
-@@ -668,6 +702,10 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
- 		.compatible = "allwinner,sun8i-h3-ths",
- 		.data = &sun8i_h3_ths_data,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-a83t-ths",
-+		.data = &sun8i_a83t_ths_data,
-+	},
- 	{ /* sentinel */ }
- };
- 
-diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-index 80b79c31cea3..32f15cc03363 100644
---- a/include/linux/mfd/sun4i-gpadc.h
-+++ b/include/linux/mfd/sun4i-gpadc.h
-@@ -99,21 +99,39 @@
- #define SUNXI_THS_CDATA_0_1				0x74
- #define SUNXI_THS_CDATA_2_3				0x78
- #define SUN8I_H3_THS_TDATA0				0x80
-+#define SUN8I_A83T_THS_TDATA1				0x84
-+#define SUN8I_A83T_THS_TDATA2				0x88
- 
- #define SUN8I_H3_THS_ACQ1(x)				(GENMASK(31, 16) & ((x) << 16))
- 
- #define SUN8I_H3_THS_TEMP_SENSE_EN0			BIT(0)
-+#define SUN8I_A83T_THS_TEMP_SENSE_EN1			BIT(1)
-+#define SUN8I_A83T_THS_TEMP_SENSE_EN2			BIT(2)
- 
- #define SUN8I_H3_THS_TEMP_PERIOD(x)			(GENMASK(31, 12) & ((x) << 12))
- 
- #define SUN8I_H3_THS_INTS_ALARM_INT_0			BIT(0)
-+#define SUN8I_A83T_THS_INTS_ALARM_INT_1			BIT(1)
-+#define SUN8I_A83T_THS_INTS_ALARM_INT_2			BIT(2)
- #define SUN8I_H3_THS_INTS_SHUT_INT_0			BIT(4)
-+#define SUN8I_A83T_THS_INTS_SHUT_INT_1			BIT(5)
-+#define SUN8I_A83T_THS_INTS_SHUT_INT_2			BIT(6)
- #define SUN8I_H3_THS_INTS_TDATA_IRQ_0			BIT(8)
-+#define SUN8I_A83T_THS_INTS_TDATA_IRQ_1			BIT(9)
-+#define SUN8I_A83T_THS_INTS_TDATA_IRQ_2			BIT(10)
- #define SUN8I_H3_THS_INTS_ALARM_OFF_0			BIT(12)
-+#define SUN8I_A83T_THS_INTS_ALARM_OFF_1			BIT(13)
-+#define SUN8I_A83T_THS_INTS_ALARM_OFF_2			BIT(14)
- 
- #define SUN8I_H3_THS_INTC_ALARM_INT_EN0			BIT(0)
-+#define SUN8I_A83T_THS_INTC_ALARM_INT_EN1		BIT(1)
-+#define SUN8I_A83T_THS_INTC_ALARM_INT_EN2		BIT(2)
- #define SUN8I_H3_THS_INTC_SHUT_INT_EN0			BIT(4)
-+#define SUN8I_A83T_THS_INTC_SHUT_INT_EN1		BIT(5)
-+#define SUN8I_A83T_THS_INTC_SHUT_INT_EN2		BIT(6)
- #define SUN8I_H3_THS_INTC_TDATA_IRQ_EN0			BIT(8)
-+#define SUN8I_A83T_THS_INTC_TDATA_IRQ_EN1		BIT(9)
-+#define SUN8I_A83T_THS_INTC_TDATA_IRQ_EN2		BIT(10)
- 
- #define MAX_SENSOR_COUNT				4
- 
+ 		timer at 1c20c00 {
+ 			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0xa0>;
 -- 
 2.11.0
