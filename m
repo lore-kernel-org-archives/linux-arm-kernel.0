@@ -1,192 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 28 Jan 2018 23:08:44 +0000
-Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <20180126142847.31240-15-marc.zyngier@arm.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
- <20180126142847.31240-15-marc.zyngier@arm.com>
-Message-ID: <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Sun, 28 Jan 2018 15:23:10 -0800
+Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
+In-Reply-To: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
+References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20180128232310.GA12728@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2018 at 14:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
-> It is lovely. Really.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/bpi.S        | 20 ++++++++++++
->  arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 90 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-> index 76225c2611ea..add7e08a018d 100644
-> --- a/arch/arm64/kernel/bpi.S
-> +++ b/arch/arm64/kernel/bpi.S
-> @@ -17,6 +17,7 @@
->   */
->
->  #include <linux/linkage.h>
-> +#include <linux/arm-smccc.h>
->
->  .macro ventry target
->         .rept 31
-> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
->         .endr
->         ldp     x29, x30, [sp], #16
->  ENTRY(__qcom_hyp_sanitize_link_stack_end)
-> +
-> +.macro smccc_workaround_1 inst
-> +       sub     sp, sp, #(8 * 4)
-> +       stp     x2, x3, [sp, #(16 * 0)]
-> +       stp     x0, x1, [sp, #(16 * 1)]
-> +       orr     w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
-> +       \inst   #0
-> +       ldp     x2, x3, [sp, #(16 * 0)]
-> +       ldp     x0, x1, [sp, #(16 * 1)]
-> +       add     sp, sp, #(8 * 4)
-> +.endm
-> +
-> +ENTRY(__smccc_workaround_1_smc_start)
-> +       smccc_workaround_1      smc
-> +ENTRY(__smccc_workaround_1_smc_end)
-> +
-> +ENTRY(__smccc_workaround_1_hvc_start)
-> +       smccc_workaround_1      hvc
-> +ENTRY(__smccc_workaround_1_hvc_end)
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index ed6881882231..f1501873f2e4 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
->  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
->  extern char __qcom_hyp_sanitize_link_stack_start[];
->  extern char __qcom_hyp_sanitize_link_stack_end[];
-> +extern char __smccc_workaround_1_smc_start[];
-> +extern char __smccc_workaround_1_smc_end[];
-> +extern char __smccc_workaround_1_hvc_start[];
-> +extern char __smccc_workaround_1_hvc_end[];
->
->  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
->                                 const char *hyp_vecs_end)
-> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->  #define __psci_hyp_bp_inval_end                        NULL
->  #define __qcom_hyp_sanitize_link_stack_start   NULL
->  #define __qcom_hyp_sanitize_link_stack_end     NULL
-> +#define __smccc_workaround_1_smc_start         NULL
-> +#define __smccc_workaround_1_smc_end           NULL
-> +#define __smccc_workaround_1_hvc_start         NULL
-> +#define __smccc_workaround_1_hvc_end           NULL
->
->  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->                                       const char *hyp_vecs_start,
-> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
->         __install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
->  }
->
-> +#include <uapi/linux/psci.h>
-> +#include <linux/arm-smccc.h>
->  #include <linux/psci.h>
->
-> +static void call_smc_arch_workaround_1(void)
-> +{
-> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
-> +       asm volatile("smc       #0\n"
-> +                    : "+r" (w0));
-> +}
-> +
-> +static void call_hvc_arch_workaround_1(void)
-> +{
-> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
-> +       asm volatile("hvc       #0\n"
-> +                    : "+r" (w0));
-> +}
-> +
-> +static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-> +{
-> +       bp_hardening_cb_t cb;
-> +       void *smccc_start, *smccc_end;
-> +       struct arm_smccc_res res;
-> +
-> +       if (psci_ops.variant == SMCCC_VARIANT_1_0)
-> +               return false;
-> +
-> +       switch (psci_ops.conduit) {
-> +       case PSCI_CONDUIT_HVC:
-> +               arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
-> +                             &res);
-> +               if (res.a0)
-> +                       return false;
-> +               cb = call_hvc_arch_workaround_1;
-> +               smccc_start = __smccc_workaround_1_hvc_start;
-> +               smccc_end = __smccc_workaround_1_hvc_end;
-> +               break;
-> +
-> +       case PSCI_CONDUIT_SMC:
-> +               arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
-> +                             &res);
+On Thu 25 Jan 13:20 PST 2018, Timur Tabi wrote:
 
-This compiles to
+> Add an integer to the msm_pinctrl_soc_data struct that pinctrl-msm
+> client drivers can use to specify the gpio base.  This is useful
+> if the client driver wants to register multiple TLMM devices, because
+> each one needs a distinct base.
+> 
+> pinctrl-msm currently sets the base to 0, which ensures that GPIOs
+> of the first TLMM are numbered 0..n-1.  It could specify -1 as the
+> base, which would tell gpiolib to choose a unique base, but this
+> has the side-effect of choosing a non-zero base for all TLMMs:
 
- 4a8:   928fffe1        mov     x1, #0xffffffffffff8000         // #-32768
- 4ac:   b26187e0        mov     x0, #0xffffffff80000001         // #-2147483647
- 4b0:   d2800007        mov     x7, #0x0                        // #0
- 4b4:   d2800006        mov     x6, #0x0                        // #0
- 4b8:   d2800005        mov     x5, #0x0                        // #0
- 4bc:   d2800004        mov     x4, #0x0                        // #0
- 4c0:   d2800003        mov     x3, #0x0                        // #0
- 4c4:   d2800002        mov     x2, #0x0                        // #0
- 4c8:   f2b00001        movk    x1, #0x8000, lsl #16
- 4cc:   94000000        bl      0 <__arm_smccc_smc>
+What platform has multiple TLMMs?
 
-so it seems we're missing a UL suffix somewhere.
+[..]
 
-Also, adding some printks here reveals that this function is called 32
-times in total, i.e., 4 times per CPU on my Overdrive. This is with
-the patches applied onto v4.15-rc9, so perhaps the rework takes care
-of this?
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+> index b7b6849625ec..4dc76e15bd14 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+> @@ -901,7 +901,7 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>  		return -EINVAL;
+>  
+>  	chip = &pctrl->chip;
+> -	chip->base = 0;
 
+My bad, this should have been -1.
 
-> +               if (res.a0)
-> +                       return false;
-> +               cb = call_smc_arch_workaround_1;
-> +               smccc_start = __smccc_workaround_1_smc_start;
-> +               smccc_end = __smccc_workaround_1_smc_end;
-> +               break;
-> +
-> +       default:
-> +               return false;
-> +       }
-> +
-> +       install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
-> +
-> +       return true;
-> +}
-> +
->  static int enable_psci_bp_hardening(void *data)
->  {
->         const struct arm64_cpu_capabilities *entry = data;
->
-> -       if (psci_ops.get_version)
-> +       if (psci_ops.get_version) {
-> +               if (check_smccc_arch_workaround_1(entry))
-> +                       return 0;
-> +
->                 install_bp_hardening_cb(entry,
->                                        (bp_hardening_cb_t)psci_ops.get_version,
->                                        __psci_hyp_bp_inval_start,
->                                        __psci_hyp_bp_inval_end);
-> +       }
->
->         return 0;
->  }
-> --
-> 2.14.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Bjorn
