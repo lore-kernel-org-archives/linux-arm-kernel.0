@@ -1,260 +1,192 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 28 Jan 2018 08:43:59 +0000
-Subject: [PATCH 04/16] iio: adc: sun4i-gpadc-iio: rework: sampling
- start/end code readout reg
-In-Reply-To: <20180126151941.12183-5-embed3d@gmail.com>
+Date: Sun, 28 Jan 2018 08:50:36 +0000
+Subject: [PATCH 05/16] iio: adc: sun4i-gpadc-iio: rework: support clocks
+ and reset
+In-Reply-To: <20180126151941.12183-6-embed3d@gmail.com>
 References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-5-embed3d@gmail.com>
-Message-ID: <20180128084359.3f3e523c@archlinux>
+ <20180126151941.12183-6-embed3d@gmail.com>
+Message-ID: <20180128085036.389c2dfb@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Jan 2018 16:19:29 +0100
+On Fri, 26 Jan 2018 16:19:30 +0100
 Philipp Rossak <embed3d@gmail.com> wrote:
 
 > For adding newer sensor some basic rework of the code is necessary.
 > 
-> This commit reworks the code and allows the sampling start/end code and
-> the position of value readout register to be altered. Later the start/end
-> functions will be used to configure the ths and start/stop the
-> sampling.
+> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
+> inputs (bus clock and sampling clock) and a reset. The registers are
+> also re-arranged.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> This commit reworks the code, adds the process of the clocks and
+> resets.
+> 
 > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Hmm. It almost always turns out to be a bad idea to assume a particular
-set of registers will be consistent across a hardware family.  Usual convention
-is just to prefix them with the first supported device and use them across
-the variants where they are correct.  I.e. don't use wild cards or generic
-names as they often end up implying a wider range of applicability than
-we want.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-A few other comments inline.  Reworking code to make it ready for later
-patches is fine, but this also adds a lot of new code which isn't used until
-much later in the series.  Move it there...
+Both clock and reset code is safe against null parameters, so you can
+drop a lot of 'is it here' checks in this.  They could be argued to
+act as documentation of the fact we really don't expect them in some cases
+I suppose... 
+
 > ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 87 +++++++++++++++++++++++++++++++++++----
->  include/linux/mfd/sun4i-gpadc.h   | 19 +++++++--
->  2 files changed, 94 insertions(+), 12 deletions(-)
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 80 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 80 insertions(+)
 > 
 > diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 03804ff9c006..363936b37c5a 100644
+> index 363936b37c5a..1a80744bd472 100644
 > --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 > +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -49,6 +49,18 @@ static unsigned int sun6i_gpadc_chan_select(unsigned int chan)
->  	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
->  }
+> @@ -22,6 +22,7 @@
+>   * shutdown for not being used.
+>   */
 >  
-> +struct sun4i_gpadc_iio;
-> +
-> +/*
-> + * Prototypes for these functions, which enable these functions to be
-> + * referenced in gpadc_data structures.
-> + */
-> +static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info);
-> +static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info);
-> +
-> +static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info);
-
-Superficially this appears to be introduced but not used... Patch 9
-is first to use it I think?  Introduce it then rather than here.
-
-> +static int sunxi_ths_sample_end(struct sun4i_gpadc_iio *info);
-> +
->  struct gpadc_data {
->  	int		temp_offset;
->  	int		temp_scale;
-> @@ -56,6 +68,13 @@ struct gpadc_data {
->  	unsigned int	tp_adc_select;
->  	unsigned int	(*adc_chan_select)(unsigned int chan);
->  	unsigned int	adc_chan_mask;
-> +	unsigned int	temp_data;
-> +	int		(*sample_start)(struct sun4i_gpadc_iio *info);
-> +	int		(*sample_end)(struct sun4i_gpadc_iio *info);
-> +	u32		ctrl0_map;
-> +	u32		ctrl2_map;
-> +	u32		sensor_en_map;
-> +	u32		filter_map;
+> +#include <linux/clk.h>
+>  #include <linux/completion.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> @@ -31,6 +32,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> +#include <linux/reset.h>
+>  #include <linux/thermal.h>
+>  #include <linux/delay.h>
+>  
+> @@ -75,6 +77,9 @@ struct gpadc_data {
+>  	u32		ctrl2_map;
+>  	u32		sensor_en_map;
+>  	u32		filter_map;
+> +	bool		has_bus_clk;
+> +	bool		has_bus_rst;
+> +	bool		has_mod_clk;
 >  };
 >  
 >  static const struct gpadc_data sun4i_gpadc_data = {
-> @@ -65,6 +84,9 @@ static const struct gpadc_data sun4i_gpadc_data = {
->  	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
->  	.adc_chan_select = &sun4i_gpadc_chan_select,
->  	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
-> +	.temp_data = SUN4I_GPADC_TEMP_DATA,
-> +	.sample_start = sun4i_gpadc_sample_start,
-> +	.sample_end = sun4i_gpadc_sample_end,
->  };
->  
->  static const struct gpadc_data sun5i_gpadc_data = {
-> @@ -74,6 +96,9 @@ static const struct gpadc_data sun5i_gpadc_data = {
->  	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
->  	.adc_chan_select = &sun4i_gpadc_chan_select,
->  	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
-> +	.temp_data = SUN4I_GPADC_TEMP_DATA,
-> +	.sample_start = sun4i_gpadc_sample_start,
-> +	.sample_end = sun4i_gpadc_sample_end,
->  };
->  
->  static const struct gpadc_data sun6i_gpadc_data = {
-> @@ -83,12 +108,18 @@ static const struct gpadc_data sun6i_gpadc_data = {
->  	.tp_adc_select = SUN6I_GPADC_CTRL1_TP_ADC_SELECT,
->  	.adc_chan_select = &sun6i_gpadc_chan_select,
->  	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
-> +	.temp_data = SUN4I_GPADC_TEMP_DATA,
-> +	.sample_start = sun4i_gpadc_sample_start,
-> +	.sample_end = sun4i_gpadc_sample_end,
->  };
->  
->  static const struct gpadc_data sun8i_a33_gpadc_data = {
->  	.temp_offset = -1662,
->  	.temp_scale = 162,
->  	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
-> +	.temp_data = SUN4I_GPADC_TEMP_DATA,
-> +	.sample_start = sun4i_gpadc_sample_start,
-> +	.sample_end = sun4i_gpadc_sample_end,
->  };
->  
->  struct sun4i_gpadc_iio {
-> @@ -277,7 +308,7 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
->  	if (info->no_irq) {
->  		pm_runtime_get_sync(indio_dev->dev.parent);
->  
-> -		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
-> +		regmap_read(info->regmap, info->data->temp_data, val);
->  
->  		pm_runtime_mark_last_busy(indio_dev->dev.parent);
->  		pm_runtime_put_autosuspend(indio_dev->dev.parent);
-> @@ -382,10 +413,8 @@ static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> -static int sun4i_gpadc_runtime_suspend(struct device *dev)
-> +static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info)
->  {
-> -	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
-> -
->  	/* Disable the ADC on IP */
->  	regmap_write(info->regmap, SUN4I_GPADC_CTRL1, 0);
->  	/* Disable temperature sensor on IP */
-> @@ -394,19 +423,32 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int sun4i_gpadc_runtime_resume(struct device *dev)
-> +static int sunxi_ths_sample_end(struct sun4i_gpadc_iio *info)
-> +{
-> +	/* Disable temperature sensor */
-> +	regmap_write(info->regmap, SUNXI_THS_CTRL2, 0x0);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sun4i_gpadc_runtime_suspend(struct device *dev)
+> @@ -134,6 +139,9 @@ struct sun4i_gpadc_iio {
+>  	atomic_t			ignore_temp_data_irq;
+>  	const struct gpadc_data		*data;
+>  	bool				no_irq;
+> +	struct clk			*bus_clk;
+> +	struct clk			*mod_clk;
+> +	struct reset_control		*reset;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+>  	struct thermal_zone_device	*tzd;
+> @@ -435,6 +443,12 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
 >  {
 >  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
 >  
-> +	return info->data->sample_end(info);
-> +}
+> +	if (info->data->has_mod_clk)
+> +		clk_disable(info->mod_clk);
+
+Safe against null parameter... (see below)
+
 > +
-> +static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
-> +{
->  	/* clkin = 6MHz */
->  	regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
->  		     SUN4I_GPADC_CTRL0_ADC_CLK_DIVIDER(2) |
->  		     SUN4I_GPADC_CTRL0_FS_DIV(7) |
-> -		     SUN4I_GPADC_CTRL0_T_ACQ(63));
-> +		     SUNXI_THS_ACQ0(63));
->  	regmap_write(info->regmap, SUN4I_GPADC_CTRL1, info->data->tp_mode_en);
->  	regmap_write(info->regmap, SUN4I_GPADC_CTRL3,
-> -		     SUN4I_GPADC_CTRL3_FILTER_EN |
-> -		     SUN4I_GPADC_CTRL3_FILTER_TYPE(1));
-> +		     SUNXI_THS_FILTER_EN |
-> +		     SUNXI_THS_FILTER_TYPE(1));
+> +	if (info->data->has_bus_clk)
+> +		clk_disable(info->bus_clk);
+> +
+>  	return info->data->sample_end(info);
+>  }
+>  
+> @@ -483,6 +497,12 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>  
+> +	if (info->data->has_mod_clk)
+> +		clk_enable(info->mod_clk);
 
-Why if these are temperature sensor features are we setting them in the
-general purpose ADC start function?
+clk_enable is safe against null parameter so could do without the checks.
 
->  	/* period = SUN4I_GPADC_TPR_TEMP_PERIOD * 256 * 16 / clkin; ~0.6s */
->  	regmap_write(info->regmap, SUN4I_GPADC_TPR,
->  		     SUN4I_GPADC_TPR_TEMP_ENABLE |
-> @@ -415,6 +457,35 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+> +
+> +	if (info->data->has_bus_clk)
+> +		clk_enable(info->bus_clk);
+> +
+>  	return info->data->sample_start(info);
+>  }
+>  
+> @@ -597,10 +617,61 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  		return ret;
+>  	}
+>  
+> +	if (info->data->has_bus_rst) {
+> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
+> +		if (IS_ERR(info->reset)) {
+> +			ret = PTR_ERR(info->reset);
+> +			return ret;
+> +		}
+> +
+> +		ret = reset_control_deassert(info->reset);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	if (info->data->has_bus_clk) {
+> +		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
+> +		if (IS_ERR(info->bus_clk)) {
+> +			ret = PTR_ERR(info->bus_clk);
+> +			goto assert_reset;
+> +		}
+> +
+> +		ret = clk_prepare_enable(info->bus_clk);
+> +		if (ret)
+> +			goto assert_reset;
+> +	}
+> +
+> +	if (info->data->has_mod_clk) {
+> +		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
+> +		if (IS_ERR(info->mod_clk)) {
+> +			ret = PTR_ERR(info->mod_clk);
+> +			goto disable_bus_clk;
+> +		}
+> +
+> +		/* Running at 6MHz */
+> +		ret = clk_set_rate(info->mod_clk, 4000000);
+> +		if (ret)
+> +			goto disable_bus_clk;
+> +
+> +		ret = clk_prepare_enable(info->mod_clk);
+> +		if (ret)
+> +			goto disable_bus_clk;
+> +	}
+> +
+>  	if (IS_ENABLED(CONFIG_THERMAL_OF))
+>  		info->sensor_device = &pdev->dev;
+>  
+>  	return 0;
+> +
+> +disable_bus_clk:
+> +	if (info->data->has_bus_clk)
+> +		clk_disable_unprepare(info->bus_clk);
+> +
+> +assert_reset:
+> +	if (info->data->has_bus_rst)
+> +		reset_control_assert(info->reset);
+> +
+> +	return ret;
+>  }
+>  
+>  static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+> @@ -766,6 +837,15 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
+>  	if (!info->no_irq)
+>  		iio_map_array_unregister(indio_dev);
+>  
+> +	if (info->data->has_mod_clk)
+> +		clk_disable_unprepare(info->mod_clk);
+
+clk_disable_unprepare is safe against a null parameter
+so I don't think the checks are needed.
+
+> +
+> +	if (info->data->has_bus_clk)
+> +		clk_disable_unprepare(info->bus_clk);
+> +
+> +	if (info->data->has_bus_rst)
+> +		reset_control_assert(info->reset);
+
+Safe against null parameter...
+
+> +
 >  	return 0;
 >  }
 >  
-> +static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info)
-> +{
-> +	u32 value;
-> +
-> +	if (info->data->ctrl0_map)
-> +		regmap_write(info->regmap, SUNXI_THS_CTRL0,
-> +			info->data->ctrl0_map);
-> +
-> +	regmap_write(info->regmap, SUNXI_THS_CTRL2,
-> +		info->data->ctrl2_map);
-> +
-> +	regmap_write(info->regmap, SUNXI_THS_FILTER,
-> +		info->data->filter_map);
-> +
-> +	regmap_read(info->regmap, SUNXI_THS_CTRL2, &value);
-> +
-> +	regmap_write(info->regmap, SUNXI_THS_CTRL2,
-> +		info->data->sensor_en_map | value);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sun4i_gpadc_runtime_resume(struct device *dev)
-> +{
-> +	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
-> +
-> +	return info->data->sample_start(info);
-> +}
-> +
->  static int sun4i_gpadc_get_temp(void *data, int *temp)
->  {
->  	struct sun4i_gpadc_iio *info = data;
-> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-> index 78d31984a222..39e096c3ddac 100644
-> --- a/include/linux/mfd/sun4i-gpadc.h
-> +++ b/include/linux/mfd/sun4i-gpadc.h
-> @@ -17,7 +17,6 @@
->  #define SUN4I_GPADC_CTRL0_ADC_CLK_SELECT		BIT(22)
->  #define SUN4I_GPADC_CTRL0_ADC_CLK_DIVIDER(x)		((GENMASK(1, 0) & (x)) << 20)
->  #define SUN4I_GPADC_CTRL0_FS_DIV(x)			((GENMASK(3, 0) & (x)) << 16)
-> -#define SUN4I_GPADC_CTRL0_T_ACQ(x)			(GENMASK(15, 0) & (x))
->  
->  #define SUN4I_GPADC_CTRL1				0x04
->  
-> @@ -51,9 +50,6 @@
->  
->  #define SUN4I_GPADC_CTRL3				0x0c
->  
-> -#define SUN4I_GPADC_CTRL3_FILTER_EN			BIT(2)
-> -#define SUN4I_GPADC_CTRL3_FILTER_TYPE(x)		(GENMASK(1, 0) & (x))
-> -
->  #define SUN4I_GPADC_TPR					0x18
->  
->  #define SUN4I_GPADC_TPR_TEMP_ENABLE			BIT(16)
-> @@ -90,6 +86,21 @@
->  /* 10s delay before suspending the IP */
->  #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
->  
-> +/* SUNXI_THS COMMON REGISTERS + DEFINES */
-> +#define SUNXI_THS_CTRL0					0x00
-> +#define SUNXI_THS_CTRL2					0x40
-> +#define SUNXI_THS_FILTER				0x70
-> +
-> +#define SUNXI_THS_FILTER_EN				BIT(2)
-> +#define SUNXI_THS_FILTER_TYPE(x)			(GENMASK(1, 0) & (x))
-> +#define SUNXI_THS_ACQ0(x)				(GENMASK(15, 0) & (x))
-> +#define SUNXI_THS_ACQ1(x)				(GENMASK(31, 16) & ((x) << 16))
-> +
-> +#define SUNXI_THS_TEMP_SENSE_EN0			BIT(0)
-> +#define SUNXI_THS_TEMP_SENSE_EN1			BIT(1)
-> +#define SUNXI_THS_TEMP_SENSE_EN2			BIT(2)
-> +#define SUNXI_THS_TEMP_SENSE_EN3			BIT(3)
-> +
->  struct sun4i_gpadc_dev {
->  	struct device			*dev;
->  	struct regmap			*regmap;
