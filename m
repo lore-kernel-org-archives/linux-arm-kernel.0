@@ -1,57 +1,66 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 28 Jan 2018 08:19:25 +0000
-Subject: [PATCH] iio: adc: stm32: fix stm32h7_adc_enable error handling
-In-Reply-To: <1516723497-9018-1-git-send-email-fabrice.gasnier@st.com>
-References: <1516723497-9018-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180128081925.524a3e08@archlinux>
+Date: Sun, 28 Jan 2018 08:34:53 +0000
+Subject: [PATCH 03/16] iio: adc: sun4i-gpadc-iio: rename A33-specified
+ registers to contain A33
+In-Reply-To: <20180126151941.12183-4-embed3d@gmail.com>
+References: <20180126151941.12183-1-embed3d@gmail.com>
+ <20180126151941.12183-4-embed3d@gmail.com>
+Message-ID: <20180128083453.5d384742@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jan 2018 17:04:56 +0100
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On Fri, 26 Jan 2018 16:19:28 +0100
+Philipp Rossak <embed3d@gmail.com> wrote:
 
-> Error handling in stm32h7_adc_enable routine doesn't unwind enable
-> sequence correctly. ADEN can only be cleared by hardware (e.g. by
-> writing one to ADDIS).
-> It's also better to clear ADRDY just after it's been set by hardware.
+> From: Icenowy Zheng <icenowy@aosc.io>
 > 
-> Fixes: 95e339b6e85d ("iio: adc: stm32: add support for STM32H7")
+> As the H3 SoC, which is also in sun8i line, has totally different
+> register map for the thermal sensor (a cut down version of GPADC), we
+> should rename A23/A33-specified registers to contain A33, in order to
+> prevent obfuscation with H3 registers. Currently these registers are
+> only prefixed "SUN8I", not "SUN8I_A33".
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Applied to fixes-togreg-post-rc1 branch of iio.git and marked for
-stable.
-
-Thanks,
-
-Jonathan
+> Add "_A33" after "SUN8I" on the register names.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Jonathan Cameron <jonathan.cameron@huawei.com>
+(for the trivial change in the IIO driver)
 
 > ---
->  drivers/iio/adc/stm32-adc.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 2 +-
+>  include/linux/mfd/sun4i-gpadc.h   | 6 +++---
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-> index ca3b865..8177a92 100644
-> --- a/drivers/iio/adc/stm32-adc.c
-> +++ b/drivers/iio/adc/stm32-adc.c
-> @@ -735,8 +735,6 @@ static int stm32h7_adc_enable(struct stm32_adc *adc)
->  	int ret;
->  	u32 val;
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 04d7147e0110..03804ff9c006 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -88,7 +88,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.temp_offset = -1662,
+>  	.temp_scale = 162,
+> -	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
+> +	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
+>  };
 >  
-> -	/* Clear ADRDY by writing one, then enable ADC */
-> -	stm32_adc_set_bits(adc, STM32H7_ADC_ISR, STM32H7_ADRDY);
->  	stm32_adc_set_bits(adc, STM32H7_ADC_CR, STM32H7_ADEN);
+>  struct sun4i_gpadc_iio {
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 139872c2e0fe..78d31984a222 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -38,9 +38,9 @@
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
 >  
->  	/* Poll for ADRDY to be set (after adc startup time) */
-> @@ -744,8 +742,11 @@ static int stm32h7_adc_enable(struct stm32_adc *adc)
->  					   val & STM32H7_ADRDY,
->  					   100, STM32_ADC_TIMEOUT_US);
->  	if (ret) {
-> -		stm32_adc_clr_bits(adc, STM32H7_ADC_CR, STM32H7_ADEN);
-> +		stm32_adc_set_bits(adc, STM32H7_ADC_CR, STM32H7_ADDIS);
->  		dev_err(&indio_dev->dev, "Failed to enable ADC\n");
-> +	} else {
-> +		/* Clear ADRDY by writing one */
-> +		stm32_adc_set_bits(adc, STM32H7_ADC_ISR, STM32H7_ADRDY);
->  	}
+> -/* TP_CTRL1 bits for sun8i SoCs */
+> -#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
+> -#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
+> +/* TP_CTRL1 bits for A33 */
+> +#define SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN		BIT(8)
+> +#define SUN8I_A33_GPADC_CTRL1_GPADC_CALI_EN		BIT(7)
 >  
->  	return ret;
+>  #define SUN4I_GPADC_CTRL2				0x08
+>  
