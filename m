@@ -1,246 +1,229 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 28 Jan 2018 21:52:36 +0800
-Subject: [PATCH 07/16] iio: adc: sun4i-gpadc-iio: rework: support nvmem
- calibration data
-In-Reply-To: <6ebbb5e0-eb5f-afe4-50e8-eb3cee8ec7fa@gmail.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Sun, 28 Jan 2018 15:10:36 +0100
+Subject: [PATCH 06/16] iio: adc: sun4i-gpadc-iio: rework: support multible
+ sensors
+In-Reply-To: <20180128090839.42295eea@archlinux>
 References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-8-embed3d@gmail.com>
- <20180128090258.56e8ac93@archlinux>
- <6ebbb5e0-eb5f-afe4-50e8-eb3cee8ec7fa@gmail.com>
-Message-ID: <1927F24D-D3ED-49CF-9B7C-A7C8C873F0CF@aosc.io>
+ <20180126151941.12183-7-embed3d@gmail.com>
+ <20180128090839.42295eea@archlinux>
+Message-ID: <dbf902f4-3ae3-b6fd-04e7-6e461c363515@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2018?1?28? GMT+08:00 ??9:46:18, Philipp Rossak <embed3d@gmail.com> ??:
->
->
->On 28.01.2018 10:02, Jonathan Cameron wrote:
->> On Fri, 26 Jan 2018 16:19:32 +0100
->> Philipp Rossak <embed3d@gmail.com> wrote:
->> 
->>> This patch reworks the driver to support nvmem calibration cells.
->>> The driver checks if the nvmem calibration is supported and reads
->out
->>> the nvmem. At the beginning of the startup process the calibration
->data
->>> is written to the related registers.
->>>
->>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> 
->> A few minor suggestions inline.
->> 
->> Jonathan
->> 
->>> ---
->>>   drivers/iio/adc/sun4i-gpadc-iio.c | 52
->+++++++++++++++++++++++++++++++++++++++
->>>   include/linux/mfd/sun4i-gpadc.h   |  2 ++
->>>   2 files changed, 54 insertions(+)
->>>
->>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c
->b/drivers/iio/adc/sun4i-gpadc-iio.c
->>> index bff06f2798e8..7b12666cdd9e 100644
->>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
->>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
->>> @@ -27,6 +27,7 @@
->>>   #include <linux/interrupt.h>
->>>   #include <linux/io.h>
->>>   #include <linux/module.h>
->>> +#include <linux/nvmem-consumer.h>
->>>   #include <linux/of.h>
->>>   #include <linux/of_device.h>
->>>   #include <linux/platform_device.h>
->>> @@ -81,6 +82,7 @@ struct gpadc_data {
->>>   	bool		has_bus_rst;
->>>   	bool		has_mod_clk;
->>>   	int		sensor_count;
->>> +	bool		supports_nvmem;
->>>   };
->>>   
->>>   static const struct gpadc_data sun4i_gpadc_data = {
->>> @@ -94,6 +96,7 @@ static const struct gpadc_data sun4i_gpadc_data =
->{
->>>   	.sample_start = sun4i_gpadc_sample_start,
->>>   	.sample_end = sun4i_gpadc_sample_end,
->>>   	.sensor_count = 1,
->>> +	.supports_nvmem = false,
->>>   };
->>>   
->>>   static const struct gpadc_data sun5i_gpadc_data = {
->>> @@ -107,6 +110,7 @@ static const struct gpadc_data sun5i_gpadc_data
->= {
->>>   	.sample_start = sun4i_gpadc_sample_start,
->>>   	.sample_end = sun4i_gpadc_sample_end,
->>>   	.sensor_count = 1,
->>> +	.supports_nvmem = false,
->>>   };
->>>   
->>>   static const struct gpadc_data sun6i_gpadc_data = {
->>> @@ -120,6 +124,7 @@ static const struct gpadc_data sun6i_gpadc_data
->= {
->>>   	.sample_start = sun4i_gpadc_sample_start,
->>>   	.sample_end = sun4i_gpadc_sample_end,
->>>   	.sensor_count = 1,
->>> +	.supports_nvmem = false,
->>>   };
->>>   
->>>   static const struct gpadc_data sun8i_a33_gpadc_data = {
->>> @@ -130,6 +135,7 @@ static const struct gpadc_data
->sun8i_a33_gpadc_data = {
->>>   	.sample_start = sun4i_gpadc_sample_start,
->>>   	.sample_end = sun4i_gpadc_sample_end,
->>>   	.sensor_count = 1,
->>> +	.supports_nvmem = false,
+On 28.01.2018 10:08, Jonathan Cameron wrote:
+> On Fri, 26 Jan 2018 16:19:31 +0100
+> Philipp Rossak <embed3d@gmail.com> wrote:
+> 
+> multible -> multiple
+> 
+^^ Ok, I will fix that.
 
-BTW A33 claims to support calibration data according to the manual.
+>> For adding newer sensor some basic rework of the code is necessary.
+>>
+>> This patch reworks the driver to be able to handle more than one
+>> thermal sensor. Newer SoC like the A80 have 4 thermal sensors.
+>> Because of this the maximal sensor count value was set to 4.
+>>
+>> The sensor_id value is set during sensor registration and is for each
+>> registered sensor indiviual. This makes it able to differntiate the
+>> sensors when the value is read from the register.
+>>
+>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> Question inline about why you aren't exposing the additional temperature
+> sensors as IIO channels?
+> 
+> Fine to not do so I suppose, but needs justifying.
+> 
 
->>>   };
->>>   
->>>   struct sun4i_gpadc_iio {
->>> @@ -148,6 +154,8 @@ struct sun4i_gpadc_iio {
->>>   	struct clk			*mod_clk;
->>>   	struct reset_control		*reset;
->>>   	int				sensor_id;
->>> +	u32				calibration_data[2];
->>> +	bool				has_calibration_data[2];
->>>   	/* prevents concurrent reads of temperature and ADC */
->>>   	struct mutex			mutex;
->>>   	struct thermal_zone_device	*tzd;
->>> @@ -459,6 +467,17 @@ static int sun4i_gpadc_runtime_suspend(struct
->device *dev)
->>>   	return info->data->sample_end(info);
->>>   }
->>>   
->>> +static void sunxi_calibrate(struct sun4i_gpadc_iio *info)
->>> +{
->>> +	if (info->has_calibration_data[0])
->>> +		regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
->>> +			info->calibration_data[0]);
->>> +
->>> +	if (info->has_calibration_data[1])
->>> +		regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
->>> +			info->calibration_data[1]);
->>> +}
->>> +
->>>   static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
->>>   {
->>>   	/* clkin = 6MHz */
->>> @@ -481,6 +500,7 @@ static int sun4i_gpadc_sample_start(struct
->sun4i_gpadc_iio *info)
->>>   static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info)
->>>   {
->>>   	u32 value;
->>> +	sunxi_calibrate(info);
->>>   
->>>   	if (info->data->ctrl0_map)
->>>   		regmap_write(info->regmap, SUNXI_THS_CTRL0,
->>> @@ -602,6 +622,9 @@ static int sun4i_gpadc_probe_dt(struct
->platform_device *pdev,
->>>   	struct resource *mem;
->>>   	void __iomem *base;
->>>   	int ret;
->>> +	struct nvmem_cell *cell;
->>> +	ssize_t cell_size;
->>> +	u64 *cell_data;
->>>   
->>>   	info->data = of_device_get_match_data(&pdev->dev);
->>>   	if (!info->data)
->>> @@ -616,6 +639,35 @@ static int sun4i_gpadc_probe_dt(struct
->platform_device *pdev,
->>>   	if (IS_ERR(base))
->>>   		return PTR_ERR(base);
->>>   
->>> +	info->has_calibration_data[0] = false;
->>> +	info->has_calibration_data[1] = false;
->>> +
->>> +	if (!info->data->supports_nvmem)
->>> +		goto no_nvmem;
->>> +
->>> +	cell = devm_nvmem_cell_get(&pdev->dev, "calibration");
->>> +	if (IS_ERR(cell)) {
->>> +		if (PTR_ERR(cell) == -EPROBE_DEFER)
->>> +			return PTR_ERR(cell);
->> Use a goto here to no_nvmem.
->> 
->> Then you can drop the below else to make things more readable.
->>> +	} else {
->>> +		cell_data = (u64 *)nvmem_cell_read(cell, &cell_size);
->>> +		devm_nvmem_cell_put(&pdev->dev, cell);
->> 
->> I'm really not keen on use of devm for things we are intending
->> to drop almost immediately.  Just use the non managed versions
->> and clean up properly in the error paths (if there are any
->> where it is needed - which there aren't that I can see)
->> 
->
->^^ Ok, I will rework that.
->
->>> +		if (cell_size <= 4) {
->> Is it valid if it is anything other than 4?
->
->For sensors with only one sensor would be also a 2 valid, for those
->with 
->2 sensors ==> 4, with 3 sensors ==> 6 and with and with 4 sensors ==>
->8.
->
->In hardware we have in total to 32bit registers for calibration, thus I
->
->thought it would be a good idea to use always four bytes per register. 
->If two bytes are used, they should be the default value.
->
->But I agree, this needs a rework.
->
->>> +			info->has_calibration_data[0] = true;
->>> +			info->calibration_data[0] = be32_to_cpu(cell_data[0] &
->>> +					GENMASK(31, 0));
->> 
->> Masking isn't needed,  If you want to be paranoid there is the
->lower_32_bits
->> function..
->> 
->^^ Ok, I will rework that.
->>> +		} else if (cell_size <= 8) {
->>> +			info->has_calibration_data[0] = true;
->>> +			info->calibration_data[0] = be32_to_cpu(cell_data[0] &
->>> +					GENMASK(31, 0));
->> 
->> This first block is repeated.  Easy enough to avoid I think...
->> 
->
->^^ Ok, I will rework that.
->
->>> +			info->has_calibration_data[1] = true;
->>> +			info->calibration_data[1] = be32_to_cpu(
->>> +					(cell_data[0] >> 32) & GENMASK(31, 0));
->>> +		}
->>> +	}
->>> +
->>> +no_nvmem:
->>> +
->>>   	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
->>>   					     &sun4i_gpadc_regmap_config);
->>>   	if (IS_ERR(info->regmap)) {
->>> diff --git a/include/linux/mfd/sun4i-gpadc.h
->b/include/linux/mfd/sun4i-gpadc.h
->>> index 40b4dd9d2405..c251002431bd 100644
->>> --- a/include/linux/mfd/sun4i-gpadc.h
->>> +++ b/include/linux/mfd/sun4i-gpadc.h
->>> @@ -90,6 +90,8 @@
->>>   #define SUNXI_THS_CTRL0					0x00
->>>   #define SUNXI_THS_CTRL2					0x40
->>>   #define SUNXI_THS_FILTER				0x70
->>> +#define SUNXI_THS_CDATA_0_1				0x74
->>> +#define SUNXI_THS_CDATA_2_3				0x78
->>>   #define SUNXI_THS_TDATA0				0x80
->>>   #define SUNXI_THS_TDATA1				0x84
->>>   #define SUNXI_THS_TDATA2				0x88
->> 
->Thanks,
->Philipp
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+^^ Ok, I will rework the commit mesage. Detailed explanation see below.
+> Jonathan
+> 
+>> ---
+>>   drivers/iio/adc/sun4i-gpadc-iio.c | 36 +++++++++++++++++++++++-------------
+>>   include/linux/mfd/sun4i-gpadc.h   |  6 ++++++
+>>   2 files changed, 29 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> index 1a80744bd472..bff06f2798e8 100644
+>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> @@ -70,7 +70,7 @@ struct gpadc_data {
+>>   	unsigned int	tp_adc_select;
+>>   	unsigned int	(*adc_chan_select)(unsigned int chan);
+>>   	unsigned int	adc_chan_mask;
+>> -	unsigned int	temp_data;
+>> +	unsigned int	temp_data[MAX_SENSOR_COUNT];
+>>   	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>>   	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+>>   	u32		ctrl0_map;
+>> @@ -80,6 +80,7 @@ struct gpadc_data {
+>>   	bool		has_bus_clk;
+>>   	bool		has_bus_rst;
+>>   	bool		has_mod_clk;
+>> +	int		sensor_count;
+>>   };
+>>   
+>>   static const struct gpadc_data sun4i_gpadc_data = {
+>> @@ -89,9 +90,10 @@ static const struct gpadc_data sun4i_gpadc_data = {
+>>   	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>>   	.adc_chan_select = &sun4i_gpadc_chan_select,
+>>   	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+>> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+>> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>>   	.sample_start = sun4i_gpadc_sample_start,
+>>   	.sample_end = sun4i_gpadc_sample_end,
+>> +	.sensor_count = 1,
+>>   };
+>>   
+>>   static const struct gpadc_data sun5i_gpadc_data = {
+>> @@ -101,9 +103,10 @@ static const struct gpadc_data sun5i_gpadc_data = {
+>>   	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>>   	.adc_chan_select = &sun4i_gpadc_chan_select,
+>>   	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+>> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+>> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>>   	.sample_start = sun4i_gpadc_sample_start,
+>>   	.sample_end = sun4i_gpadc_sample_end,
+>> +	.sensor_count = 1,
+>>   };
+>>   
+>>   static const struct gpadc_data sun6i_gpadc_data = {
+>> @@ -113,18 +116,20 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>>   	.tp_adc_select = SUN6I_GPADC_CTRL1_TP_ADC_SELECT,
+>>   	.adc_chan_select = &sun6i_gpadc_chan_select,
+>>   	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
+>> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+>> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>>   	.sample_start = sun4i_gpadc_sample_start,
+>>   	.sample_end = sun4i_gpadc_sample_end,
+>> +	.sensor_count = 1,
+>>   };
+>>   
+>>   static const struct gpadc_data sun8i_a33_gpadc_data = {
+>>   	.temp_offset = -1662,
+>>   	.temp_scale = 162,
+>>   	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
+>> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+>> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+
+			[*] ^^
+>>   	.sample_start = sun4i_gpadc_sample_start,
+>>   	.sample_end = sun4i_gpadc_sample_end,
+>> +	.sensor_count = 1,
+>>   };
+>>   
+>>   struct sun4i_gpadc_iio {
+>> @@ -142,6 +147,7 @@ struct sun4i_gpadc_iio {
+>>   	struct clk			*bus_clk;
+>>   	struct clk			*mod_clk;
+>>   	struct reset_control		*reset;
+>> +	int				sensor_id;
+>>   	/* prevents concurrent reads of temperature and ADC */
+>>   	struct mutex			mutex;
+>>   	struct thermal_zone_device	*tzd;
+>> @@ -309,14 +315,15 @@ static int sun4i_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
+>>   	return sun4i_gpadc_read(indio_dev, channel, val, info->fifo_data_irq);
+>>   }
+>>   
+>> -static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+>> +static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
+>> +				int sensor)
+>>   {
+>>   	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>   
+>>   	if (info->no_irq) {
+>>   		pm_runtime_get_sync(indio_dev->dev.parent);
+>>   
+>> -		regmap_read(info->regmap, info->data->temp_data, val);
+>> +		regmap_read(info->regmap, info->data->temp_data[sensor], val);
+>>   
+>>   		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>>   		pm_runtime_put_autosuspend(indio_dev->dev.parent);
+>> @@ -363,7 +370,7 @@ static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
+>>   			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
+>>   						   val);
+>>   		else
+>> -			ret = sun4i_gpadc_temp_read(indio_dev, val);
+>> +			ret = sun4i_gpadc_temp_read(indio_dev, val, 0);
+> 
+> Wouldn't it make more sense to pass the channel number in here?
+> 
+> Looking at it, seems you only expose the first temperature sensor
+> as an IIO channel?   Perhaps fair enough, but please justify that
+> decision in the patch description.
+> 
+
+The "old" thermal sensors only have one ths sensor. This function is 
+only used with the older sensors when the adc and the ths is used. The 
+channel number is not related to that. This here is related to the 
+temp_data. register selection above (marked with [*]).
+
+
+> 
+>>   
+>>   		if (ret)
+>>   			return ret;
+>> @@ -511,7 +518,7 @@ static int sun4i_gpadc_get_temp(void *data, int *temp)
+>>   	struct sun4i_gpadc_iio *info = data;
+>>   	int val, scale, offset;
+>>   
+>> -	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
+>> +	if (sun4i_gpadc_temp_read(info->indio_dev, &val, info->sensor_id))
+>>   		return -ETIMEDOUT;
+>>   
+>>   	sun4i_gpadc_temp_scale(info->indio_dev, &scale);
+>> @@ -755,7 +762,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>>   {
+>>   	struct sun4i_gpadc_iio *info;
+>>   	struct iio_dev *indio_dev;
+>> -	int ret;
+>> +	int ret, i;
+>>   
+>>   	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>>   	if (!indio_dev)
+>> @@ -788,9 +795,12 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>>   	pm_runtime_enable(&pdev->dev);
+>>   
+>>   	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>> -		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+>> -							    0, info,
+>> -							    &sun4i_ts_tz_ops);
+>> +		for (i = 0; i < info->data->sensor_count; i++) {
+>> +			info->sensor_id = i;
+>> +			info->tzd = thermal_zone_of_sensor_register(
+>> +					info->sensor_device,
+>> +					i, info, &sun4i_ts_tz_ops);
+>> +		}
+>>   		/*
+>>   		 * Do not fail driver probing when failing to register in
+>>   		 * thermal because no thermal DT node is found.
+>> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+>> index 39e096c3ddac..40b4dd9d2405 100644
+>> --- a/include/linux/mfd/sun4i-gpadc.h
+>> +++ b/include/linux/mfd/sun4i-gpadc.h
+>> @@ -90,6 +90,10 @@
+>>   #define SUNXI_THS_CTRL0					0x00
+>>   #define SUNXI_THS_CTRL2					0x40
+>>   #define SUNXI_THS_FILTER				0x70
+>> +#define SUNXI_THS_TDATA0				0x80
+>> +#define SUNXI_THS_TDATA1				0x84
+>> +#define SUNXI_THS_TDATA2				0x88
+>> +#define SUNXI_THS_TDATA3				0x8c
+>>   
+>>   #define SUNXI_THS_FILTER_EN				BIT(2)
+>>   #define SUNXI_THS_FILTER_TYPE(x)			(GENMASK(1, 0) & (x))
+>> @@ -101,6 +105,8 @@
+>>   #define SUNXI_THS_TEMP_SENSE_EN2			BIT(2)
+>>   #define SUNXI_THS_TEMP_SENSE_EN3			BIT(3)
+>>   
+>> +#define MAX_SENSOR_COUNT				4
+>> +
+>>   struct sun4i_gpadc_dev {
+>>   	struct device			*dev;
+>>   	struct regmap			*regmap;
+> 
+
+Thanks,
+Philipp
