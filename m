@@ -1,194 +1,162 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 00:29:11 +0100
-Subject: [PATCH v2 08/16] iio: adc: sun4i-gpadc-iio: rework: add interrupt
- support
+Date: Mon, 29 Jan 2018 00:29:08 +0100
+Subject: [PATCH v2 05/16] iio: adc: sun4i-gpadc-iio: rework: support clocks
+ and reset
 In-Reply-To: <20180128232919.12639-1-embed3d@gmail.com>
 References: <20180128232919.12639-1-embed3d@gmail.com>
-Message-ID: <20180128232919.12639-9-embed3d@gmail.com>
+Message-ID: <20180128232919.12639-6-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rewors the driver to support interrupts for the thermal part
-of the sensor.
+For adding newer sensor some basic rework of the code is necessary.
 
-This is only available for the newer sensor (currently H3 and A83T).
-The interrupt will be trigerd on data available and triggers the update
-for the thermal sensors. All newer sensors have different amount of
-sensors and different interrupts for each device the reset of the
-interrupts need to be done different
+The SoCs after H3 has newer thermal sensor ADCs, which have two clock
+inputs (bus clock and sampling clock) and a reset. The registers are
+also re-arranged.
 
-For the newer sensors is the autosuspend disabled.
+This commit reworks the code, adds the process of the clocks and
+resets.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Jonathan  Cameron <jonathan.cameron@huawei.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 60 +++++++++++++++++++++++++++++++++++----
- include/linux/mfd/sun4i-gpadc.h   |  2 ++
- 2 files changed, 56 insertions(+), 6 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c | 71 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
 diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 74eeb5cd5218..b7b5451226b0 100644
+index db57d9fffe48..51ec0104d678 100644
 --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -71,11 +71,14 @@ struct gpadc_data {
- 	unsigned int	temp_data[MAX_SENSOR_COUNT];
+@@ -22,6 +22,7 @@
+  * shutdown for not being used.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/completion.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -31,6 +32,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
++#include <linux/reset.h>
+ #include <linux/thermal.h>
+ #include <linux/delay.h>
+ 
+@@ -68,6 +70,9 @@ struct gpadc_data {
+ 	unsigned int	temp_data;
  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
-+	u32		irq_clear_map;
-+	u32		irq_control_map;
- 	bool		has_bus_clk;
- 	bool		has_bus_rst;
- 	bool		has_mod_clk;
- 	int		sensor_count;
- 	bool		supports_nvmem;
-+	bool		support_irq;
++	bool		has_bus_clk;
++	bool		has_bus_rst;
++	bool		has_mod_clk;
  };
  
  static const struct gpadc_data sun4i_gpadc_data = {
-@@ -90,6 +93,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
- 	.sample_end = sun4i_gpadc_sample_end,
- 	.sensor_count = 1,
- 	.supports_nvmem = false,
-+	.support_irq = false,
- };
+@@ -127,6 +132,9 @@ struct sun4i_gpadc_iio {
+ 	atomic_t			ignore_temp_data_irq;
+ 	const struct gpadc_data		*data;
+ 	bool				no_irq;
++	struct clk			*bus_clk;
++	struct clk			*mod_clk;
++	struct reset_control		*reset;
+ 	/* prevents concurrent reads of temperature and ADC */
+ 	struct mutex			mutex;
+ 	struct thermal_zone_device	*tzd;
+@@ -420,6 +428,10 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+ {
+ 	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
  
- static const struct gpadc_data sun5i_gpadc_data = {
-@@ -104,6 +108,7 @@ static const struct gpadc_data sun5i_gpadc_data = {
- 	.sample_end = sun4i_gpadc_sample_end,
- 	.sensor_count = 1,
- 	.supports_nvmem = false,
-+	.support_irq = false,
- };
++	clk_disable(info->mod_clk);
++
++	clk_disable(info->bus_clk);
++
+ 	return info->data->sample_end(info);
+ }
  
- static const struct gpadc_data sun6i_gpadc_data = {
-@@ -118,6 +123,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
- 	.sample_end = sun4i_gpadc_sample_end,
- 	.sensor_count = 1,
- 	.supports_nvmem = false,
-+	.support_irq = false,
- };
+@@ -446,6 +458,10 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+ {
+ 	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
  
- static const struct gpadc_data sun8i_a33_gpadc_data = {
-@@ -129,6 +135,7 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
- 	.sample_end = sun4i_gpadc_sample_end,
- 	.sensor_count = 1,
- 	.supports_nvmem = false,
-+	.support_irq = false,
- };
++	clk_enable(info->mod_clk);
++
++	clk_enable(info->bus_clk);
++
+ 	return info->data->sample_start(info);
+ }
  
- struct sun4i_gpadc_iio {
-@@ -332,6 +339,11 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
- 		return 0;
+@@ -560,10 +576,59 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+ 		return ret;
  	}
  
-+	if (info->data->support_irq) {
-+		regmap_read(info->regmap, info->data->temp_data[sensor], val);
-+		return 0;
-+	}
-+
- 	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
- }
- 
-@@ -429,6 +441,17 @@ static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static irqreturn_t sunxi_irq_thread(int irq, void *data)
-+{
-+	struct sun4i_gpadc_iio *info = data;
-+
-+	regmap_write(info->regmap, SUN8I_H3_THS_STAT, info->data->irq_clear_map);
-+
-+	thermal_zone_device_update(info->tzd, THERMAL_EVENT_TEMP_SAMPLE);
-+
-+	return IRQ_HANDLED;
-+}
-+
- static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info)
- {
- 	/* Disable the ADC on IP */
-@@ -572,12 +595,29 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
- 	struct nvmem_cell *cell;
- 	ssize_t cell_size;
- 	u64 *cell_data;
-+	int irq;
- 
- 	info->data = of_device_get_match_data(&pdev->dev);
- 	if (!info->data)
- 		return -ENODEV;
- 
--	info->no_irq = true;
-+	if (info->data->support_irq) {
-+		/* only the new versions of ths support right now irqs */
-+		irq = platform_get_irq(pdev, 0);
-+		if (irq < 0) {
-+			dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
-+			return irq;
++	if (info->data->has_bus_rst) {
++		info->reset = devm_reset_control_get(&pdev->dev, NULL);
++		if (IS_ERR(info->reset)) {
++			ret = PTR_ERR(info->reset);
++			return ret;
 +		}
 +
-+		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-+				sunxi_irq_thread, IRQF_ONESHOT,
-+				dev_name(&pdev->dev), info);
++		ret = reset_control_deassert(info->reset);
 +		if (ret)
 +			return ret;
-+
-+	} else
-+		info->no_irq = true;
-+
- 	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
- 	indio_dev->channels = sun8i_a33_gpadc_channels;
- 
-@@ -789,11 +829,13 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	pm_runtime_set_autosuspend_delay(&pdev->dev,
--					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
--	pm_runtime_use_autosuspend(&pdev->dev);
--	pm_runtime_set_suspended(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
-+	if (!info->data->support_irq) {
-+		pm_runtime_set_autosuspend_delay(&pdev->dev,
-+						 SUN4I_GPADC_AUTOSUSPEND_DELAY);
-+		pm_runtime_use_autosuspend(&pdev->dev);
-+		pm_runtime_set_suspended(&pdev->dev);
-+		pm_runtime_enable(&pdev->dev);
 +	}
- 
- 	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
- 		for (i = 0; i < info->data->sensor_count; i++) {
-@@ -814,6 +856,9 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	if (info->data->support_irq)
-+		info->data->sample_start(info);
 +
- 	ret = devm_iio_device_register(&pdev->dev, indio_dev);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "could not register the device\n");
-@@ -843,6 +888,9 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
- 	if (!IS_ENABLED(CONFIG_THERMAL_OF))
- 		return 0;
- 
-+	if (info->data->support_irq)
-+		info->data->sample_end(info);
++	if (info->data->has_bus_clk) {
++		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
++		if (IS_ERR(info->bus_clk)) {
++			ret = PTR_ERR(info->bus_clk);
++			goto assert_reset;
++		}
 +
- 	thermal_zone_of_sensor_unregister(info->sensor_device, info->tzd);
++		ret = clk_prepare_enable(info->bus_clk);
++		if (ret)
++			goto assert_reset;
++	}
++
++	if (info->data->has_mod_clk) {
++		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
++		if (IS_ERR(info->mod_clk)) {
++			ret = PTR_ERR(info->mod_clk);
++			goto disable_bus_clk;
++		}
++
++		/* Running at 6MHz */
++		ret = clk_set_rate(info->mod_clk, 4000000);
++		if (ret)
++			goto disable_bus_clk;
++
++		ret = clk_prepare_enable(info->mod_clk);
++		if (ret)
++			goto disable_bus_clk;
++	}
++
+ 	if (IS_ENABLED(CONFIG_THERMAL_OF))
+ 		info->sensor_device = &pdev->dev;
  
+ 	return 0;
++
++disable_bus_clk:
++	clk_disable_unprepare(info->bus_clk);
++
++assert_reset:
++	reset_control_assert(info->reset);
++
++	return ret;
+ }
+ 
+ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+@@ -729,6 +794,12 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
  	if (!info->no_irq)
-diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-index 20fa02040007..458f2159a95a 100644
---- a/include/linux/mfd/sun4i-gpadc.h
-+++ b/include/linux/mfd/sun4i-gpadc.h
-@@ -91,6 +91,8 @@
- #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
+ 		iio_map_array_unregister(indio_dev);
  
- /* SUNXI_THS COMMON REGISTERS + DEFINES */
-+#define SUN8I_H3_THS_INTC				0x44
++	clk_disable_unprepare(info->mod_clk);
 +
- #define MAX_SENSOR_COUNT				4
++	clk_disable_unprepare(info->bus_clk);
++
++	reset_control_assert(info->reset);
++
+ 	return 0;
+ }
  
- struct sun4i_gpadc_dev {
 -- 
 2.11.0
