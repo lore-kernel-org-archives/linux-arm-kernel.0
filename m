@@ -1,254 +1,192 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sun, 28 Jan 2018 15:39:15 +0100
-Subject: [PATCH 07/16] iio: adc: sun4i-gpadc-iio: rework: support nvmem
- calibration data
-In-Reply-To: <1927F24D-D3ED-49CF-9B7C-A7C8C873F0CF@aosc.io>
-References: <20180126151941.12183-1-embed3d@gmail.com>
- <20180126151941.12183-8-embed3d@gmail.com>
- <20180128090258.56e8ac93@archlinux>
- <6ebbb5e0-eb5f-afe4-50e8-eb3cee8ec7fa@gmail.com>
- <1927F24D-D3ED-49CF-9B7C-A7C8C873F0CF@aosc.io>
-Message-ID: <c6f8c2ac-e1c5-461a-b55d-364e1239beb0@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 28 Jan 2018 23:08:44 +0000
+Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+ support
+In-Reply-To: <20180126142847.31240-15-marc.zyngier@arm.com>
+References: <20180126142847.31240-1-marc.zyngier@arm.com>
+ <20180126142847.31240-15-marc.zyngier@arm.com>
+Message-ID: <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26 January 2018 at 14:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
+> It is lovely. Really.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kernel/bpi.S        | 20 ++++++++++++
+>  arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 90 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+> index 76225c2611ea..add7e08a018d 100644
+> --- a/arch/arm64/kernel/bpi.S
+> +++ b/arch/arm64/kernel/bpi.S
+> @@ -17,6 +17,7 @@
+>   */
+>
+>  #include <linux/linkage.h>
+> +#include <linux/arm-smccc.h>
+>
+>  .macro ventry target
+>         .rept 31
+> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+>         .endr
+>         ldp     x29, x30, [sp], #16
+>  ENTRY(__qcom_hyp_sanitize_link_stack_end)
+> +
+> +.macro smccc_workaround_1 inst
+> +       sub     sp, sp, #(8 * 4)
+> +       stp     x2, x3, [sp, #(16 * 0)]
+> +       stp     x0, x1, [sp, #(16 * 1)]
+> +       orr     w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
+> +       \inst   #0
+> +       ldp     x2, x3, [sp, #(16 * 0)]
+> +       ldp     x0, x1, [sp, #(16 * 1)]
+> +       add     sp, sp, #(8 * 4)
+> +.endm
+> +
+> +ENTRY(__smccc_workaround_1_smc_start)
+> +       smccc_workaround_1      smc
+> +ENTRY(__smccc_workaround_1_smc_end)
+> +
+> +ENTRY(__smccc_workaround_1_hvc_start)
+> +       smccc_workaround_1      hvc
+> +ENTRY(__smccc_workaround_1_hvc_end)
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index ed6881882231..f1501873f2e4 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+>  extern char __qcom_hyp_sanitize_link_stack_start[];
+>  extern char __qcom_hyp_sanitize_link_stack_end[];
+> +extern char __smccc_workaround_1_smc_start[];
+> +extern char __smccc_workaround_1_smc_end[];
+> +extern char __smccc_workaround_1_hvc_start[];
+> +extern char __smccc_workaround_1_hvc_end[];
+>
+>  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>                                 const char *hyp_vecs_end)
+> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>  #define __psci_hyp_bp_inval_end                        NULL
+>  #define __qcom_hyp_sanitize_link_stack_start   NULL
+>  #define __qcom_hyp_sanitize_link_stack_end     NULL
+> +#define __smccc_workaround_1_smc_start         NULL
+> +#define __smccc_workaround_1_smc_end           NULL
+> +#define __smccc_workaround_1_hvc_start         NULL
+> +#define __smccc_workaround_1_hvc_end           NULL
+>
+>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>                                       const char *hyp_vecs_start,
+> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+>         __install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+>  }
+>
+> +#include <uapi/linux/psci.h>
+> +#include <linux/arm-smccc.h>
+>  #include <linux/psci.h>
+>
+> +static void call_smc_arch_workaround_1(void)
+> +{
+> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+> +       asm volatile("smc       #0\n"
+> +                    : "+r" (w0));
+> +}
+> +
+> +static void call_hvc_arch_workaround_1(void)
+> +{
+> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+> +       asm volatile("hvc       #0\n"
+> +                    : "+r" (w0));
+> +}
+> +
+> +static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+> +{
+> +       bp_hardening_cb_t cb;
+> +       void *smccc_start, *smccc_end;
+> +       struct arm_smccc_res res;
+> +
+> +       if (psci_ops.variant == SMCCC_VARIANT_1_0)
+> +               return false;
+> +
+> +       switch (psci_ops.conduit) {
+> +       case PSCI_CONDUIT_HVC:
+> +               arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
+> +                             &res);
+> +               if (res.a0)
+> +                       return false;
+> +               cb = call_hvc_arch_workaround_1;
+> +               smccc_start = __smccc_workaround_1_hvc_start;
+> +               smccc_end = __smccc_workaround_1_hvc_end;
+> +               break;
+> +
+> +       case PSCI_CONDUIT_SMC:
+> +               arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
+> +                             &res);
+
+This compiles to
+
+ 4a8:   928fffe1        mov     x1, #0xffffffffffff8000         // #-32768
+ 4ac:   b26187e0        mov     x0, #0xffffffff80000001         // #-2147483647
+ 4b0:   d2800007        mov     x7, #0x0                        // #0
+ 4b4:   d2800006        mov     x6, #0x0                        // #0
+ 4b8:   d2800005        mov     x5, #0x0                        // #0
+ 4bc:   d2800004        mov     x4, #0x0                        // #0
+ 4c0:   d2800003        mov     x3, #0x0                        // #0
+ 4c4:   d2800002        mov     x2, #0x0                        // #0
+ 4c8:   f2b00001        movk    x1, #0x8000, lsl #16
+ 4cc:   94000000        bl      0 <__arm_smccc_smc>
+
+so it seems we're missing a UL suffix somewhere.
+
+Also, adding some printks here reveals that this function is called 32
+times in total, i.e., 4 times per CPU on my Overdrive. This is with
+the patches applied onto v4.15-rc9, so perhaps the rework takes care
+of this?
 
 
-On 28.01.2018 14:52, Icenowy Zheng wrote:
-> 
-> 
-> ? 2018?1?28? GMT+08:00 ??9:46:18, Philipp Rossak <embed3d@gmail.com> ??:
->>
->>
->> On 28.01.2018 10:02, Jonathan Cameron wrote:
->>> On Fri, 26 Jan 2018 16:19:32 +0100
->>> Philipp Rossak <embed3d@gmail.com> wrote:
->>>
->>>> This patch reworks the driver to support nvmem calibration cells.
->>>> The driver checks if the nvmem calibration is supported and reads
->> out
->>>> the nvmem. At the beginning of the startup process the calibration
->> data
->>>> is written to the related registers.
->>>>
->>>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->>>
->>> A few minor suggestions inline.
->>>
->>> Jonathan
->>>
->>>> ---
->>>>    drivers/iio/adc/sun4i-gpadc-iio.c | 52
->> +++++++++++++++++++++++++++++++++++++++
->>>>    include/linux/mfd/sun4i-gpadc.h   |  2 ++
->>>>    2 files changed, 54 insertions(+)
->>>>
->>>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c
->> b/drivers/iio/adc/sun4i-gpadc-iio.c
->>>> index bff06f2798e8..7b12666cdd9e 100644
->>>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
->>>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
->>>> @@ -27,6 +27,7 @@
->>>>    #include <linux/interrupt.h>
->>>>    #include <linux/io.h>
->>>>    #include <linux/module.h>
->>>> +#include <linux/nvmem-consumer.h>
->>>>    #include <linux/of.h>
->>>>    #include <linux/of_device.h>
->>>>    #include <linux/platform_device.h>
->>>> @@ -81,6 +82,7 @@ struct gpadc_data {
->>>>    	bool		has_bus_rst;
->>>>    	bool		has_mod_clk;
->>>>    	int		sensor_count;
->>>> +	bool		supports_nvmem;
->>>>    };
->>>>    
->>>>    static const struct gpadc_data sun4i_gpadc_data = {
->>>> @@ -94,6 +96,7 @@ static const struct gpadc_data sun4i_gpadc_data =
->> {
->>>>    	.sample_start = sun4i_gpadc_sample_start,
->>>>    	.sample_end = sun4i_gpadc_sample_end,
->>>>    	.sensor_count = 1,
->>>> +	.supports_nvmem = false,
->>>>    };
->>>>    
->>>>    static const struct gpadc_data sun5i_gpadc_data = {
->>>> @@ -107,6 +110,7 @@ static const struct gpadc_data sun5i_gpadc_data
->> = {
->>>>    	.sample_start = sun4i_gpadc_sample_start,
->>>>    	.sample_end = sun4i_gpadc_sample_end,
->>>>    	.sensor_count = 1,
->>>> +	.supports_nvmem = false,
->>>>    };
->>>>    
->>>>    static const struct gpadc_data sun6i_gpadc_data = {
->>>> @@ -120,6 +124,7 @@ static const struct gpadc_data sun6i_gpadc_data
->> = {
->>>>    	.sample_start = sun4i_gpadc_sample_start,
->>>>    	.sample_end = sun4i_gpadc_sample_end,
->>>>    	.sensor_count = 1,
->>>> +	.supports_nvmem = false,
->>>>    };
->>>>    
->>>>    static const struct gpadc_data sun8i_a33_gpadc_data = {
->>>> @@ -130,6 +135,7 @@ static const struct gpadc_data
->> sun8i_a33_gpadc_data = {
->>>>    	.sample_start = sun4i_gpadc_sample_start,
->>>>    	.sample_end = sun4i_gpadc_sample_end,
->>>>    	.sensor_count = 1,
->>>> +	.supports_nvmem = false,
-> 
-> BTW A33 claims to support calibration data according to the manual.
-> 
-
-Yes that's true, but I haven't seen a sid/nvmem driver for the a33. If 
-that is available, we can change this for true (same on a83t).
-
->>>>    };
->>>>    
->>>>    struct sun4i_gpadc_iio {
->>>> @@ -148,6 +154,8 @@ struct sun4i_gpadc_iio {
->>>>    	struct clk			*mod_clk;
->>>>    	struct reset_control		*reset;
->>>>    	int				sensor_id;
->>>> +	u32				calibration_data[2];
->>>> +	bool				has_calibration_data[2];
->>>>    	/* prevents concurrent reads of temperature and ADC */
->>>>    	struct mutex			mutex;
->>>>    	struct thermal_zone_device	*tzd;
->>>> @@ -459,6 +467,17 @@ static int sun4i_gpadc_runtime_suspend(struct
->> device *dev)
->>>>    	return info->data->sample_end(info);
->>>>    }
->>>>    
->>>> +static void sunxi_calibrate(struct sun4i_gpadc_iio *info)
->>>> +{
->>>> +	if (info->has_calibration_data[0])
->>>> +		regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
->>>> +			info->calibration_data[0]);
->>>> +
->>>> +	if (info->has_calibration_data[1])
->>>> +		regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
->>>> +			info->calibration_data[1]);
->>>> +}
->>>> +
->>>>    static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
->>>>    {
->>>>    	/* clkin = 6MHz */
->>>> @@ -481,6 +500,7 @@ static int sun4i_gpadc_sample_start(struct
->> sun4i_gpadc_iio *info)
->>>>    static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info)
->>>>    {
->>>>    	u32 value;
->>>> +	sunxi_calibrate(info);
->>>>    
->>>>    	if (info->data->ctrl0_map)
->>>>    		regmap_write(info->regmap, SUNXI_THS_CTRL0,
->>>> @@ -602,6 +622,9 @@ static int sun4i_gpadc_probe_dt(struct
->> platform_device *pdev,
->>>>    	struct resource *mem;
->>>>    	void __iomem *base;
->>>>    	int ret;
->>>> +	struct nvmem_cell *cell;
->>>> +	ssize_t cell_size;
->>>> +	u64 *cell_data;
->>>>    
->>>>    	info->data = of_device_get_match_data(&pdev->dev);
->>>>    	if (!info->data)
->>>> @@ -616,6 +639,35 @@ static int sun4i_gpadc_probe_dt(struct
->> platform_device *pdev,
->>>>    	if (IS_ERR(base))
->>>>    		return PTR_ERR(base);
->>>>    
->>>> +	info->has_calibration_data[0] = false;
->>>> +	info->has_calibration_data[1] = false;
->>>> +
->>>> +	if (!info->data->supports_nvmem)
->>>> +		goto no_nvmem;
->>>> +
->>>> +	cell = devm_nvmem_cell_get(&pdev->dev, "calibration");
->>>> +	if (IS_ERR(cell)) {
->>>> +		if (PTR_ERR(cell) == -EPROBE_DEFER)
->>>> +			return PTR_ERR(cell);
->>> Use a goto here to no_nvmem.
->>>
->>> Then you can drop the below else to make things more readable.
->>>> +	} else {
->>>> +		cell_data = (u64 *)nvmem_cell_read(cell, &cell_size);
->>>> +		devm_nvmem_cell_put(&pdev->dev, cell);
->>>
->>> I'm really not keen on use of devm for things we are intending
->>> to drop almost immediately.  Just use the non managed versions
->>> and clean up properly in the error paths (if there are any
->>> where it is needed - which there aren't that I can see)
->>>
->>
->> ^^ Ok, I will rework that.
->>
->>>> +		if (cell_size <= 4) {
->>> Is it valid if it is anything other than 4?
->>
->> For sensors with only one sensor would be also a 2 valid, for those
->> with
->> 2 sensors ==> 4, with 3 sensors ==> 6 and with and with 4 sensors ==>
->> 8.
->>
->> In hardware we have in total to 32bit registers for calibration, thus I
->>
->> thought it would be a good idea to use always four bytes per register.
->> If two bytes are used, they should be the default value.
->>
->> But I agree, this needs a rework.
->>
->>>> +			info->has_calibration_data[0] = true;
->>>> +			info->calibration_data[0] = be32_to_cpu(cell_data[0] &
->>>> +					GENMASK(31, 0));
->>>
->>> Masking isn't needed,  If you want to be paranoid there is the
->> lower_32_bits
->>> function..
->>>
->> ^^ Ok, I will rework that.
->>>> +		} else if (cell_size <= 8) {
->>>> +			info->has_calibration_data[0] = true;
->>>> +			info->calibration_data[0] = be32_to_cpu(cell_data[0] &
->>>> +					GENMASK(31, 0));
->>>
->>> This first block is repeated.  Easy enough to avoid I think...
->>>
->>
->> ^^ Ok, I will rework that.
->>
->>>> +			info->has_calibration_data[1] = true;
->>>> +			info->calibration_data[1] = be32_to_cpu(
->>>> +					(cell_data[0] >> 32) & GENMASK(31, 0));
->>>> +		}
->>>> +	}
->>>> +
->>>> +no_nvmem:
->>>> +
->>>>    	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
->>>>    					     &sun4i_gpadc_regmap_config);
->>>>    	if (IS_ERR(info->regmap)) {
->>>> diff --git a/include/linux/mfd/sun4i-gpadc.h
->> b/include/linux/mfd/sun4i-gpadc.h
->>>> index 40b4dd9d2405..c251002431bd 100644
->>>> --- a/include/linux/mfd/sun4i-gpadc.h
->>>> +++ b/include/linux/mfd/sun4i-gpadc.h
->>>> @@ -90,6 +90,8 @@
->>>>    #define SUNXI_THS_CTRL0					0x00
->>>>    #define SUNXI_THS_CTRL2					0x40
->>>>    #define SUNXI_THS_FILTER				0x70
->>>> +#define SUNXI_THS_CDATA_0_1				0x74
->>>> +#define SUNXI_THS_CDATA_2_3				0x78
->>>>    #define SUNXI_THS_TDATA0				0x80
->>>>    #define SUNXI_THS_TDATA1				0x84
->>>>    #define SUNXI_THS_TDATA2				0x88
->>>
->> Thanks,
->> Philipp
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +               if (res.a0)
+> +                       return false;
+> +               cb = call_smc_arch_workaround_1;
+> +               smccc_start = __smccc_workaround_1_smc_start;
+> +               smccc_end = __smccc_workaround_1_smc_end;
+> +               break;
+> +
+> +       default:
+> +               return false;
+> +       }
+> +
+> +       install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
+> +
+> +       return true;
+> +}
+> +
+>  static int enable_psci_bp_hardening(void *data)
+>  {
+>         const struct arm64_cpu_capabilities *entry = data;
+>
+> -       if (psci_ops.get_version)
+> +       if (psci_ops.get_version) {
+> +               if (check_smccc_arch_workaround_1(entry))
+> +                       return 0;
+> +
+>                 install_bp_hardening_cb(entry,
+>                                        (bp_hardening_cb_t)psci_ops.get_version,
+>                                        __psci_hyp_bp_inval_start,
+>                                        __psci_hyp_bp_inval_end);
+> +       }
+>
+>         return 0;
+>  }
+> --
+> 2.14.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
