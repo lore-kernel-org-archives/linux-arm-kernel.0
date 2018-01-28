@@ -1,48 +1,202 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 28 Jan 2018 10:16:12 +0100
-Subject: [PATCH] Nokia N9: add support for up/down keys in the dts
-In-Reply-To: <20180119154325.GF4042@atomide.com>
-References: <20180102125948.GA20051@amd>
- <20180102194236.ahrhkvnefre2l6gf@earth.universe>
- <20180118220348.GD17196@amd> <20180119154325.GF4042@atomide.com>
-Message-ID: <20180128091612.GB23818@amd>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Sun, 28 Jan 2018 12:34:14 +0100
+Subject: [PATCH 05/16] iio: adc: sun4i-gpadc-iio: rework: support clocks
+ and reset
+In-Reply-To: <20180128085036.389c2dfb@archlinux>
+References: <20180126151941.12183-1-embed3d@gmail.com>
+ <20180126151941.12183-6-embed3d@gmail.com>
+ <20180128085036.389c2dfb@archlinux>
+Message-ID: <489c4e33-13ca-e6fe-bb49-8795fb793fd0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-> > > > This adds support for volume up/down keys in the dts.
-> > > > 
-> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > 
-> > > Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> > 
-> > Tony, ping? Can I get you to apply this one?
+
+On 28.01.2018 09:50, Jonathan Cameron wrote:
+> On Fri, 26 Jan 2018 16:19:30 +0100
+> Philipp Rossak <embed3d@gmail.com> wrote:
 > 
-> OK applying that for v4.16 so we have some kind of control of the
-> device without having to rely on the touch screen :)
-
-Thanks :-).
-
-> > [PATCHv2] nokia N9: Add support for magnetometer
-> > 
-> > should be good to go, too...
+>> For adding newer sensor some basic rework of the code is necessary.
+>>
+>> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
+>> inputs (bus clock and sampling clock) and a reset. The registers are
+>> also re-arranged.
+>>
+>> This commit reworks the code, adds the process of the clocks and
+>> resets.
+>>
+>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > 
-> I have that tagged for next after -rc1 thanks.
+> Both clock and reset code is safe against null parameters, so you can
+> drop a lot of 'is it here' checks in this.  They could be argued to
+> act as documentation of the fact we really don't expect them in some cases
+> I suppose...
+> 
+Ok, this sounds good for me!
+I will fix that in the next version of this patch series.
 
-Actually, if you could get that one to v4.16, too. There's still lot
-of work to be done to get N9 into usable state, and delaying here does
-not do any good.
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180128/8c14a83b/attachment.sig>
+>> ---
+>>   drivers/iio/adc/sun4i-gpadc-iio.c | 80 +++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 80 insertions(+)
+>>
+>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> index 363936b37c5a..1a80744bd472 100644
+>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> @@ -22,6 +22,7 @@
+>>    * shutdown for not being used.
+>>    */
+>>   
+>> +#include <linux/clk.h>
+>>   #include <linux/completion.h>
+>>   #include <linux/interrupt.h>
+>>   #include <linux/io.h>
+>> @@ -31,6 +32,7 @@
+>>   #include <linux/platform_device.h>
+>>   #include <linux/pm_runtime.h>
+>>   #include <linux/regmap.h>
+>> +#include <linux/reset.h>
+>>   #include <linux/thermal.h>
+>>   #include <linux/delay.h>
+>>   
+>> @@ -75,6 +77,9 @@ struct gpadc_data {
+>>   	u32		ctrl2_map;
+>>   	u32		sensor_en_map;
+>>   	u32		filter_map;
+>> +	bool		has_bus_clk;
+>> +	bool		has_bus_rst;
+>> +	bool		has_mod_clk;
+>>   };
+>>   
+>>   static const struct gpadc_data sun4i_gpadc_data = {
+>> @@ -134,6 +139,9 @@ struct sun4i_gpadc_iio {
+>>   	atomic_t			ignore_temp_data_irq;
+>>   	const struct gpadc_data		*data;
+>>   	bool				no_irq;
+>> +	struct clk			*bus_clk;
+>> +	struct clk			*mod_clk;
+>> +	struct reset_control		*reset;
+>>   	/* prevents concurrent reads of temperature and ADC */
+>>   	struct mutex			mutex;
+>>   	struct thermal_zone_device	*tzd;
+>> @@ -435,6 +443,12 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>>   {
+>>   	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>>   
+>> +	if (info->data->has_mod_clk)
+>> +		clk_disable(info->mod_clk);
+> 
+> Safe against null parameter... (see below)
+> 
+>> +
+>> +	if (info->data->has_bus_clk)
+>> +		clk_disable(info->bus_clk);
+>> +
+>>   	return info->data->sample_end(info);
+>>   }
+>>   
+>> @@ -483,6 +497,12 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+>>   {
+>>   	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>>   
+>> +	if (info->data->has_mod_clk)
+>> +		clk_enable(info->mod_clk);
+> 
+> clk_enable is safe against null parameter so could do without the checks.
+> 
+>> +
+>> +	if (info->data->has_bus_clk)
+>> +		clk_enable(info->bus_clk);
+>> +
+>>   	return info->data->sample_start(info);
+>>   }
+>>   
+>> @@ -597,10 +617,61 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>>   		return ret;
+>>   	}
+>>   
+>> +	if (info->data->has_bus_rst) {
+>> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
+>> +		if (IS_ERR(info->reset)) {
+>> +			ret = PTR_ERR(info->reset);
+>> +			return ret;
+>> +		}
+>> +
+>> +		ret = reset_control_deassert(info->reset);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	if (info->data->has_bus_clk) {
+>> +		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
+>> +		if (IS_ERR(info->bus_clk)) {
+>> +			ret = PTR_ERR(info->bus_clk);
+>> +			goto assert_reset;
+>> +		}
+>> +
+>> +		ret = clk_prepare_enable(info->bus_clk);
+>> +		if (ret)
+>> +			goto assert_reset;
+>> +	}
+>> +
+>> +	if (info->data->has_mod_clk) {
+>> +		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
+>> +		if (IS_ERR(info->mod_clk)) {
+>> +			ret = PTR_ERR(info->mod_clk);
+>> +			goto disable_bus_clk;
+>> +		}
+>> +
+>> +		/* Running at 6MHz */
+>> +		ret = clk_set_rate(info->mod_clk, 4000000);
+>> +		if (ret)
+>> +			goto disable_bus_clk;
+>> +
+>> +		ret = clk_prepare_enable(info->mod_clk);
+>> +		if (ret)
+>> +			goto disable_bus_clk;
+>> +	}
+>> +
+>>   	if (IS_ENABLED(CONFIG_THERMAL_OF))
+>>   		info->sensor_device = &pdev->dev;
+>>   
+>>   	return 0;
+>> +
+>> +disable_bus_clk:
+>> +	if (info->data->has_bus_clk)
+>> +		clk_disable_unprepare(info->bus_clk);
+>> +
+>> +assert_reset:
+>> +	if (info->data->has_bus_rst)
+>> +		reset_control_assert(info->reset);
+>> +
+>> +	return ret;
+>>   }
+>>   
+>>   static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>> @@ -766,6 +837,15 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
+>>   	if (!info->no_irq)
+>>   		iio_map_array_unregister(indio_dev);
+>>   
+>> +	if (info->data->has_mod_clk)
+>> +		clk_disable_unprepare(info->mod_clk);
+> 
+> clk_disable_unprepare is safe against a null parameter
+> so I don't think the checks are needed.
+> 
+>> +
+>> +	if (info->data->has_bus_clk)
+>> +		clk_disable_unprepare(info->bus_clk);
+>> +
+>> +	if (info->data->has_bus_rst)
+>> +		reset_control_assert(info->reset);
+> 
+> Safe against null parameter...
+> 
+>> +
+>>   	return 0;
+>>   }
+>>   
+> 
+Thanks,
+Philipp
