@@ -1,36 +1,50 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 28 Jan 2018 10:41:42 +0900
-Subject: [PATCH] kbuild: fix W= option checks for extra DTC warnings
-In-Reply-To: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNASbdy99XO712fpEW0j-wTPyMZCEuCrAOjJae2iuORut2w@mail.gmail.com>
+From: yong.deng@magewell.com (Yong)
+Date: Sun, 28 Jan 2018 10:19:03 +0800
+Subject: [linux-sunxi] Re: [PATCH v6 2/2] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <20180126081000.hy7g57zp5dv6ug2g@flea.lan>
+References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+ <201801260759.RyNhDZz4%fengguang.wu@intel.com>
+ <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
+ <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
+ <20180126081000.hy7g57zp5dv6ug2g@flea.lan>
+Message-ID: <20180128101903.fbaec083c787bda30aeb05ef@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-18 12:31 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Kbuild supports 3 levels of extra warnings, and multiple levels can
-> be combined, like W=12, W=123.  It was added by commit a6de553da01c
-> ("kbuild: Allow to combine multiple W= levels").
->
-> From the log of commit 8654cb8d0371 ("dtc: update warning settings
-> for new bus and node/property name checks"), I assume:
->
->  - unit_address_vs_reg, simple_bus_reg, etc. belong to level 1
->  - node_name_chars_strict, property_name_chars_strict belong to level 2
->
-> However, the level 1 warnings are displayed by any argument to W=.
-> On the other hand, the level 2 warnings are displayed by W=2, but
-> not by W=12, or W=123.
->
-> Use $(findstring ...) like scripts/Makefile.extrawarn.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
+Hi Maxime,
 
-Applied to linux-kbuild/kbuild.
+On Fri, 26 Jan 2018 09:10:00 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
+> On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
+> > Hi Maxime,
+> > 
+> > On Fri, 26 Jan 2018 09:46:58 +0800
+> > Yong <yong.deng@magewell.com> wrote:
+> > 
+> > > Hi Maxime,
+> > > 
+> > > Do you have any experience in solving this problem?
+> > > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
+> > 
+> > Got it.
+> > Should I add 'depends on ARM' in Kconfig?
+> 
+> Yes, or even better a depends on MACH_SUNXI :)
 
--- 
-Best Regards
-Masahiro Yamada
+Do you mean ARCH_SUNXI?
+
+ARCH_SUNXI is alreay there. In the early version, my Kconfig is like this:
+
+	depends on ARCH_SUNXI
+
+But Hans suggest me to change this to:
+
+	depends on ARCH_SUNXI || COMPILE_TEST
+
+to allow this driver to be compiled on e.g. Intel for compile testing.
+
+Should we get rid of COMPILE_TEST?
+
+Yong
