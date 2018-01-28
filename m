@@ -1,98 +1,185 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 00:29:04 +0100
-Subject: [PATCH v2 01/16] dt-bindings: update the Allwinner GPADC device tree
- binding for H3 & A83T
+Date: Mon, 29 Jan 2018 00:29:09 +0100
+Subject: [PATCH v2 06/16] iio: adc: sun4i-gpadc-iio: rework: support multiple
+ sensors
 In-Reply-To: <20180128232919.12639-1-embed3d@gmail.com>
 References: <20180128232919.12639-1-embed3d@gmail.com>
-Message-ID: <20180128232919.12639-2-embed3d@gmail.com>
+Message-ID: <20180128232919.12639-7-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 features a thermal sensor like the one in A33, but has its
-register re-arranged, the clock divider moved to CCU (originally the
-clock divider is in ADC) and added a pair of bus clock and reset.
+For adding newer sensor some basic rework of the code is necessary.
 
-Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
-the bus clock and the reset was removed from the CCU. The THS in A83T
-has a clock that is directly connected and runs with 24 MHz.
+This patch reworks the driver to be able to handle more than one
+thermal sensor. Newer SoC like the A80 have 4 thermal sensors.
+Because of this the maximal sensor count value was set to 4.
 
-Update the binding document to cover H3 and A83T.
+The sensor_id value is set during sensor registration and is for each
+registered sensor indiviual. This makes it able to differntiate the
+sensors when the value is read from the register.
+
+In function sun4i_gpadc_read_raw(), the sensor number of the ths sensor
+was directly set to 0 (sun4i_gpadc_temp_read(x,x,0)). This selects
+in the temp_read function automatically sensor 0. A check for the
+sensor_id is here not required since the old sensors only have one
+thermal sensor. In addition to that is the sun4i_gpadc_read_raw()
+function only used by the "older" sensors (before A33) where the
+thermal sensor was a cobination of an adc and a thermal sensor.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 50 ++++++++++++++++++++--
- 1 file changed, 47 insertions(+), 3 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c | 36 +++++++++++++++++++++++-------------
+ include/linux/mfd/sun4i-gpadc.h   |  3 +++
+ 2 files changed, 26 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-index 86dd8191b04c..22df0c5c23d4 100644
---- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-+++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-@@ -4,12 +4,35 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
- and sometimes as a touchscreen controller.
+diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+index 51ec0104d678..ac9ad2f8232f 100644
+--- a/drivers/iio/adc/sun4i-gpadc-iio.c
++++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+@@ -67,12 +67,13 @@ struct gpadc_data {
+ 	unsigned int	tp_adc_select;
+ 	unsigned int	(*adc_chan_select)(unsigned int chan);
+ 	unsigned int	adc_chan_mask;
+-	unsigned int	temp_data;
++	unsigned int	temp_data[MAX_SENSOR_COUNT];
+ 	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+ 	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+ 	bool		has_bus_clk;
+ 	bool		has_bus_rst;
+ 	bool		has_mod_clk;
++	int		sensor_count;
+ };
  
- Required properties:
--  - compatible: "allwinner,sun8i-a33-ths",
-+  - compatible: must contain one of the following compatibles:
-+		- "allwinner,sun8i-a33-ths"
-+		- "allwinner,sun8i-h3-ths"
-+		- "allwinner,sun8i-a83t-ths"
-   - reg: mmio address range of the chip,
--  - #thermal-sensor-cells: shall be 0,
-+  - #thermal-sensor-cells: shall be 0 or 1,
-   - #io-channel-cells: shall be 0,
+ static const struct gpadc_data sun4i_gpadc_data = {
+@@ -82,9 +83,10 @@ static const struct gpadc_data sun4i_gpadc_data = {
+ 	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+ 	.adc_chan_select = &sun4i_gpadc_chan_select,
+ 	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+-	.temp_data = SUN4I_GPADC_TEMP_DATA,
++	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+ 	.sample_start = sun4i_gpadc_sample_start,
+ 	.sample_end = sun4i_gpadc_sample_end,
++	.sensor_count = 1,
+ };
  
--Example:
-+Required properties for the following compatibles:
-+		- "allwinner,sun8i-h3-ths"
-+		- "allwinner,sun8i-a83t-ths"
-+  - interrupts: the sampling interrupt of the ADC,
-+
-+Required properties for the following compatibles:
-+		- "allwinner,sun8i-h3-ths"
-+  - clocks: the bus clock and the input clock of the ADC,
-+  - clock-names: should be "bus" and "mod",
-+  - resets: the bus reset of the ADC,
-+
-+Optional properties for the following compatibles:
-+		- "allwinner,sun8i-h3-ths"
-+  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
-+		If unspecified default values shall be used. The size should
-+		be 0x2 * sensorcount.
-+  - nvmem-cell-names: Should be "calibration".
-+
-+Details see: bindings/nvmem/nvmem.txt
-+
-+Example for A33:
- 	ths: ths at 1c25000 {
- 		compatible = "allwinner,sun8i-a33-ths";
- 		reg = <0x01c25000 0x100>;
-@@ -17,6 +40,27 @@ Example:
- 		#io-channel-cells = <0>;
- 	};
+ static const struct gpadc_data sun5i_gpadc_data = {
+@@ -94,9 +96,10 @@ static const struct gpadc_data sun5i_gpadc_data = {
+ 	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+ 	.adc_chan_select = &sun4i_gpadc_chan_select,
+ 	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+-	.temp_data = SUN4I_GPADC_TEMP_DATA,
++	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+ 	.sample_start = sun4i_gpadc_sample_start,
+ 	.sample_end = sun4i_gpadc_sample_end,
++	.sensor_count = 1,
+ };
  
-+Example for H3:
-+	ths: thermal-sensor at 1c25000 {
-+		compatible = "allwinner,sun8i-h3-ths";
-+		reg = <0x01c25000 0x400>;
-+		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-+		clock-names = "bus", "mod";
-+		resets = <&ccu RST_BUS_THS>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+		#thermal-sensor-cells = <0>;
-+		#io-channel-cells = <0>;
-+	};
-+
-+Example for A83T:
-+	ths: thermal-sensor at 1f04000 {
-+		compatible = "allwinner,sun8i-a83t-ths";
-+		reg = <0x01f04000 0x100>;
-+		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+		#thermal-sensor-cells = <1>;
-+		#io-channel-cells = <0>;
-+	};
-+
- sun4i, sun5i and sun6i SoCs are also supported via the older binding:
+ static const struct gpadc_data sun6i_gpadc_data = {
+@@ -106,18 +109,20 @@ static const struct gpadc_data sun6i_gpadc_data = {
+ 	.tp_adc_select = SUN6I_GPADC_CTRL1_TP_ADC_SELECT,
+ 	.adc_chan_select = &sun6i_gpadc_chan_select,
+ 	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
+-	.temp_data = SUN4I_GPADC_TEMP_DATA,
++	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+ 	.sample_start = sun4i_gpadc_sample_start,
+ 	.sample_end = sun4i_gpadc_sample_end,
++	.sensor_count = 1,
+ };
  
- sun4i resistive touchscreen controller
+ static const struct gpadc_data sun8i_a33_gpadc_data = {
+ 	.temp_offset = -1662,
+ 	.temp_scale = 162,
+ 	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
+-	.temp_data = SUN4I_GPADC_TEMP_DATA,
++	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+ 	.sample_start = sun4i_gpadc_sample_start,
+ 	.sample_end = sun4i_gpadc_sample_end,
++	.sensor_count = 1,
+ };
+ 
+ struct sun4i_gpadc_iio {
+@@ -135,6 +140,7 @@ struct sun4i_gpadc_iio {
+ 	struct clk			*bus_clk;
+ 	struct clk			*mod_clk;
+ 	struct reset_control		*reset;
++	int				sensor_id;
+ 	/* prevents concurrent reads of temperature and ADC */
+ 	struct mutex			mutex;
+ 	struct thermal_zone_device	*tzd;
+@@ -302,14 +308,15 @@ static int sun4i_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
+ 	return sun4i_gpadc_read(indio_dev, channel, val, info->fifo_data_irq);
+ }
+ 
+-static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
++static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
++				int sensor)
+ {
+ 	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+ 
+ 	if (info->no_irq) {
+ 		pm_runtime_get_sync(indio_dev->dev.parent);
+ 
+-		regmap_read(info->regmap, info->data->temp_data, val);
++		regmap_read(info->regmap, info->data->temp_data[sensor], val);
+ 
+ 		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+ 		pm_runtime_put_autosuspend(indio_dev->dev.parent);
+@@ -356,7 +363,7 @@ static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
+ 			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
+ 						   val);
+ 		else
+-			ret = sun4i_gpadc_temp_read(indio_dev, val);
++			ret = sun4i_gpadc_temp_read(indio_dev, val, 0);
+ 
+ 		if (ret)
+ 			return ret;
+@@ -470,7 +477,7 @@ static int sun4i_gpadc_get_temp(void *data, int *temp)
+ 	struct sun4i_gpadc_iio *info = data;
+ 	int val, scale, offset;
+ 
+-	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
++	if (sun4i_gpadc_temp_read(info->indio_dev, &val, info->sensor_id))
+ 		return -ETIMEDOUT;
+ 
+ 	sun4i_gpadc_temp_scale(info->indio_dev, &scale);
+@@ -712,7 +719,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+ {
+ 	struct sun4i_gpadc_iio *info;
+ 	struct iio_dev *indio_dev;
+-	int ret;
++	int ret, i;
+ 
+ 	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+ 	if (!indio_dev)
+@@ -745,9 +752,12 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(&pdev->dev);
+ 
+ 	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+-		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+-							    0, info,
+-							    &sun4i_ts_tz_ops);
++		for (i = 0; i < info->data->sensor_count; i++) {
++			info->sensor_id = i;
++			info->tzd = thermal_zone_of_sensor_register(
++					info->sensor_device,
++					i, info, &sun4i_ts_tz_ops);
++		}
+ 		/*
+ 		 * Do not fail driver probing when failing to register in
+ 		 * thermal because no thermal DT node is found.
+diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+index 78d31984a222..20fa02040007 100644
+--- a/include/linux/mfd/sun4i-gpadc.h
++++ b/include/linux/mfd/sun4i-gpadc.h
+@@ -90,6 +90,9 @@
+ /* 10s delay before suspending the IP */
+ #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
+ 
++/* SUNXI_THS COMMON REGISTERS + DEFINES */
++#define MAX_SENSOR_COUNT				4
++
+ struct sun4i_gpadc_dev {
+ 	struct device			*dev;
+ 	struct regmap			*regmap;
 -- 
 2.11.0
