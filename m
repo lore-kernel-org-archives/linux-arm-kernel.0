@@ -1,45 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 27 Jan 2018 14:23:57 -0800
-Subject: [PATCH v3 4/6] arm: Add icache invalidation on switch_mm for
- Cortex-A15
-In-Reply-To: <20180125152139.32431-5-marc.zyngier@arm.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-5-marc.zyngier@arm.com>
-Message-ID: <f3af9f2b-ddc2-f0e2-3c80-6e93f9839861@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 28 Jan 2018 10:41:42 +0900
+Subject: [PATCH] kbuild: fix W= option checks for extra DTC warnings
+In-Reply-To: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1516246306-12851-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNASbdy99XO712fpEW0j-wTPyMZCEuCrAOjJae2iuORut2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2018 07:21 AM, Marc Zyngier wrote:
-> In order to avoid aliasing attacks against the branch predictor,
-> Cortex-A15 require to invalidate the BTB when switching
-> from one user context to another. The only way to do so on this
-> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
-> mode.
+2018-01-18 12:31 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Kbuild supports 3 levels of extra warnings, and multiple levels can
+> be combined, like W=12, W=123.  It was added by commit a6de553da01c
+> ("kbuild: Allow to combine multiple W= levels").
+>
+> From the log of commit 8654cb8d0371 ("dtc: update warning settings
+> for new bus and node/property name checks"), I assume:
+>
+>  - unit_address_vs_reg, simple_bus_reg, etc. belong to level 1
+>  - node_name_chars_strict, property_name_chars_strict belong to level 2
+>
+> However, the level 1 warnings are displayed by any argument to W=.
+> On the other hand, the level 2 warnings are displayed by W=2, but
+> not by W=12, or W=123.
+>
+> Use $(findstring ...) like scripts/Makefile.extrawarn.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
 
-Even though this is a platform design mistake, let's say your Linux
-kernel boots in secure supervisor mode, we could have code
-that tries to set ACTLR[0] as early as possible, since the writes are
-ignored if executing from non-secure mode. If Linux is booted normally
-either PL1 or PL2 non-secure we could still check ACTLR[0].
+Applied to linux-kbuild/kbuild.
 
-My concern is that without doing this, we may have a hard time catching
-improper firmware as well as having bogus bug reports. This is
-completely RFC though since:
-
-- I could not quite figure out yet why update ca15_actlr_status from
-assembly is not reflected in the C code despite using PC relative loads
-
-- this is done in __ca15mp_setup and __b15mp_setup because we know by
-then that we have either of these two CPUs but we could presumably move
-this check under a Kconfig option and earlier where all erratas are checked
 
 -- 
-Florian
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: actlr-kernel-check.patch
-Type: text/x-patch
-Size: 4133 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180127/da1e1735/attachment-0001.bin>
+Best Regards
+Masahiro Yamada
