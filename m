@@ -1,103 +1,32 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 29 Jan 2018 17:22:26 +0000
-Subject: [PATCH 08/16] arm64: capabilities: Group handling of features and
- errata
-In-Reply-To: <20180129171410.GB5862@e103592.cambridge.arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-9-suzuki.poulose@arm.com>
- <20180126114708.GP5862@e103592.cambridge.arm.com>
- <cdd7ab66-9d9e-286d-cb39-c1684bde9c19@arm.com>
- <20180129171410.GB5862@e103592.cambridge.arm.com>
-Message-ID: <b52a705d-67b3-5d46-007e-3eb48d824ec0@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 29 Jan 2018 12:22:32 -0500 (EST)
+Subject: [PATCH v4] net: ethernet: cavium: Correct Cavium Thunderx NIC
+ driver names accordingly to module name
+In-Reply-To: <1516880297-6636-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1516630407-23161-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <1516880297-6636-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180129.122232.1135976323173289174.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 17:14, Dave Martin wrote:
-> On Fri, Jan 26, 2018 at 12:31:18PM +0000, Suzuki K Poulose wrote:
->> On 26/01/18 11:47, Dave Martin wrote:
->>> On Tue, Jan 23, 2018 at 12:28:01PM +0000, Suzuki K Poulose wrote:
->>>> So far we have had separate routes for triggering errata and feature
->>>
->>> "triggering errata" ? ;)
->>>
->>
->> :-). Should have been "triggering errata and feature capability *checks*.
->>
->>> Maybe "[...] for determining whether to activate errata workarounds and
->>> whether to enable feature capabilities."
->>>
->>
->>
->>>> capabilities. Also, we never allowed "features" based on local CPU
->>>> and "errata" based on System wide safe registers. This patch
->>>> groups the handling of errata and features and also allows them
->>>> to have all the possible scopes.
->>>>
->>>> So, we now run through the arm64_features and arm64_errata:
->>>
->>> when?
->>
->> with this patch.
+From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+Date: Thu, 25 Jan 2018 03:38:17 -0800
+
+> From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > 
-> I mean, when at runtime?
-
-Sorry, I thought that was evident from the comment below :
-
+> It was found that ethtool provides unexisting module name while
+> it queries the specified network device for associated driver
+> information. Then user tries to unload that module by provided
+> module name and fails.
 > 
->>> What about late cpus?
->>>
->>
->> We don't detect any new capabilities on them. They continue to get
->> verified against the enabled capabilities.
->>
->>>>   1) with SCOPE_LOCAL_CPU filter on each boot time enabeld CPUs,
->>>>      via update_cpu_local_capabilities().
-
-Here ^^.  Earlier we ran only through the errata list. But now, we
-run through errata and the features, using a type filter of SCOPE_LOCAL_CPU.
-
-It also said :
-
-   2) with SCOPE_SYSTEM filter only once after all boot time enabled
-     CPUs are active.
-
-(2) happens from setup_cpu_features(), just like it was done earlier, but
-with a filter of SCOPE_SYSTEM.
-
->>>
->>> "each [...] enabeld CPUs" -> "each [...] enabled CPU"
->>>
->>> Also, changing "boot time" -> "boot-time" helps avoid this being misread
->>> as "on each boot", which could be taken to mean "each time a CPU comes
->>> online".  I'm guessing that's not the intended meaning here.
->>
-
->>>
->>>    }
->>>>   DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
->>>> @@ -1422,9 +1435,7 @@ void __init setup_cpu_features(void)
->>>>   	u32 cwg;
->>>>   	int cls;
->>>> -	/* Set the CPU feature capabilies */
->>>> -	setup_feature_capabilities();
->>>> -	enable_errata_workarounds();
->>>> +	setup_system_capabilities();
->>>>   	mark_const_caps_ready();
->>>>   	setup_elf_hwcaps(arm64_elf_hwcaps);
->>>
->>> I wonder whether we could unify the elf hwcaps handling too.
->>
->> I was thinking about it today. The only catch is how do we know
->> if we have "the capability", as it is spread across multiple bitmasks.
->> (HWCAP, COMPAT_HWCAP, COMPAT_HWCAP2).
+> This happens because ethtool reads value of DRV_NAME macro,
+> while module name is defined at the driver's Makefile.
 > 
-> An easy-ish solution might be to maintain our own bitmap in the style
-> of cpu_hwcaps, and set bits in parallel with the elf_hwcap etc. bits.
-> Or, add a method that knows how to set/query the appropriate bit.
+> This patch is to correct Cavium CN88xx Thunder NIC driver names
+> (DRV_NAME macro) 'thunder-nicvf' to 'nicvf' and 'thunder-nic'
+> to 'nicpf', sync bgx and xcv driver names accordingly to their
+> module names.
 > 
-> I guess we could do this later.  It's certainly not urgent.
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-Yes, I understand.
-
-Cheers
-Suzuki
+Applied to net-next, thank you.
