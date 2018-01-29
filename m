@@ -1,50 +1,39 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 29 Jan 2018 10:19:00 +0100
-Subject: [linux-sunxi][PATCH v2 2/5] arm64: allwinner: a64: Add SPDIF to the
- A64
+Date: Mon, 29 Jan 2018 10:19:01 +0100
+Subject: [linux-sunxi][PATCH v2 3/5] arm64: allwinner: a64: Add SPDIF to the
+ Pine64
 In-Reply-To: <20180129091903.12319-1-codekipper@gmail.com>
 References: <20180129091903.12319-1-codekipper@gmail.com>
-Message-ID: <20180129091903.12319-3-codekipper@gmail.com>
+Message-ID: <20180129091903.12319-4-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the device tree sound bindings for the S/PDIF block.
+The S/PDIF transmitter can be reached on the Euler connector.
+But as this is a GPIO then leave it disabled so that an overlay
+can override the status property.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 43c54a2133f0..b9e69657a2e8 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -112,6 +112,24 @@
- 		method = "smc";
- 	};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 604cdaedac38..d1161069af9e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -230,6 +230,11 @@
+ 	regulator-name = "vcc-rtc";
+ };
  
-+	sound_spdif {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board SPDIF";
++/* On Euler connector */
++&spdif {
++	status = "disabled";
++};
 +
-+		simple-audio-card,cpu {
-+			sound-dai = <&spdif>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&spdif_out>;
-+		};
-+	};
-+
-+	spdif_out: spdif-out {
-+		#sound-dai-cells = <0>;
-+		compatible = "linux,spdif-dit";
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
+ /* On Exp and Euler connectors */
+ &uart0 {
+ 	pinctrl-names = "default";
 -- 
 2.16.1
