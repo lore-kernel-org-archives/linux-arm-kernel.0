@@ -1,5 +1,5 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 29 Jan 2018 18:43:37 +0530
+Date: Mon, 29 Jan 2018 18:45:02 +0530
 Subject: [Patch v7 12/12] Documention: v4l: Documentation for HEVC CIDs
 In-Reply-To: <f1ea8bcc-30b9-06b5-b815-e76fecc22a8a@xs4all.nl>
 References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
@@ -8,7 +8,7 @@ References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
  <127cfd7f-113f-6724-297c-6f3c3746a8ff@xs4all.nl>
  <1517229778.29374.9.camel@smitha-fedora>
  <f1ea8bcc-30b9-06b5-b815-e76fecc22a8a@xs4all.nl>
-Message-ID: <1517231617.29374.12.camel@smitha-fedora>
+Message-ID: <1517231702.29374.13.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -179,3 +179,9 @@ On Mon, 2018-01-29 at 14:27 +0100, Hans Verkuil wrote:
 > 	Hans
 > 
 > 
+I can mention for all these controls range as
+[V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP, V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP].
+Will this be ok?
+
+Regards,
+Smitha
