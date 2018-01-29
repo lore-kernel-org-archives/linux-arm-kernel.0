@@ -1,53 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 11:29:16 -0600
-Subject: [PATCH 3/4] dt-bindings: add binding for i.MX8MQ CCM
-In-Reply-To: <20180117182950.26460-3-l.stach@pengutronix.de>
-References: <20180117182950.26460-1-l.stach@pengutronix.de>
- <20180117182950.26460-3-l.stach@pengutronix.de>
-Message-ID: <20180129172916.ek5l5jscsn4qipx5@rob-hp-laptop>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Mon, 29 Jan 2018 18:30:54 +0100
+Subject: [BUG] perf, arm64, acpi: sleeping function called from invalid context
+Message-ID: <20180129173054.GD794@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 07:29:49PM +0100, Lucas Stach wrote:
-> This adds the binding for the i.MX8MQ Clock Controller Module.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  .../devicetree/bindings/clock/imx8mq-clock.txt       | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/imx8mq-clock.txt b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
-> new file mode 100644
-> index 000000000000..c9b0123b80d0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
-> @@ -0,0 +1,20 @@
-> +* Clock bindings for NXP i.MX8M Quad
-> +
-> +Required properties:
-> +- compatible: Should be "nxp,imx8mq-ccm"
-> +- reg: Address and length of the register set
-> +- #clock-cells: Should be <1>
-> +- clocks: list of clock specifiers, must contain an entry for each required
-> +          entry in clock-names
-> +- clock-names: should include the following entries:
-> +    - "ckil"
-> +    - "osc_25m"
-> +    - "osc_27m"
-> +    - "clk_ext1"
-> +    - "clk_ext2"
-> +    - "clk_ext3"
-> +    - "clk_ext4"
-> +
-> +The clock consumer should specify the desired clock by having the clock
-> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx8mq-clock.h
+Hi Will & Mark,
 
-This header belongs in this patch. With that,
+I'm seeing the following warning with 4.15 (and earlier) using ACPI & perf:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+[   34.823577] BUG: sleeping function called from invalid context at mm/slab.h:419
+[   34.830881] in_atomic(): 0, irqs_disabled(): 128, pid: 14, name: cpuhp/0
+[   34.837574] 1 lock held by cpuhp/0/14:
+[   34.841314]  #0:  (cpuhp_state-up){....}, at: [<00000000f44ba116>] cpuhp_thread_fun+0x148/0x290
+[   34.850032] CPU: 0 PID: 14 Comm: cpuhp/0 Not tainted 4.15.0-rc9-jang+ #13
+[   34.856810] Hardware name: Default string Cavium ThunderX2/Default string, BIOS 5.13 12/18/2017
+[   34.865499] Call trace:
+[   34.867941]  dump_backtrace+0x0/0x160
+[   34.871595]  show_stack+0x24/0x30
+[   34.874905]  dump_stack+0x9c/0xd0
+[   34.878214]  ___might_sleep+0x140/0x1a0
+[   34.882042]  __might_sleep+0x58/0x90
+[   34.885610]  kmem_cache_alloc_trace+0x2c4/0x320
+[   34.890134]  armpmu_alloc+0x38/0x1b0
+[   34.893701]  arm_pmu_acpi_cpu_starting+0x10c/0x138
+[   34.898484]  cpuhp_invoke_callback+0x120/0xaa8
+[   34.902920]  cpuhp_thread_fun+0xec/0x290
+[   34.906834]  smpboot_thread_fn+0x21c/0x2b8
+[   34.910923]  kthread+0x10c/0x138
+[   34.914143]  ret_from_fork+0x10/0x18
 
-> +for the full list of i.MX8M Quad clock IDs.
-> -- 
-> 2.11.0
-> 
+Changing the allocations in arm_pmu_alloc() to GFP_ATOMIC didn't help,
+as the interrupt request is also not happy in this context.
+
+Would it be possible to init the PMUs later?
+
+--Jan
