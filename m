@@ -1,46 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 17:21:27 -0600
-Subject: [PATCH v3] arm64: dts: rockchip: add roc-rk3328-cc board
-In-Reply-To: <20180123021017.24110-1-djw@t-chip.com.cn>
-References: <20180106094538.15568-1-djw@t-chip.com.cn>
- <20180123021017.24110-1-djw@t-chip.com.cn>
-Message-ID: <20180129232127.unanaujy44q42bul@rob-hp-laptop>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Jan 2018 00:33:01 +0100
+Subject: [PATCH] sound/tlv320dac33: Add device tree support
+In-Reply-To: <20180129232031.GA7695@lenoch>
+References: <20180129230539.GA18280@amd>
+ <20180129232031.GA7695@lenoch>
+Message-ID: <20180129233301.GA18104@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 10:10:17AM +0800, djw at t-chip.com.cn wrote:
-> From: Levin Du <djw@t-chip.com.cn>
+On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
+> On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
+> > 
+> > This adds device tree support to tlv320dac33.c.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> > new file mode 100644
+> > index 0000000..6cbd311
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> > @@ -0,0 +1,32 @@
+> > +Texas Instruments - tlv320dac33 Codec module
+> > +
+> > +The tlv320dac33 serial control bus communicates through I2C protocols.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible - "ti,tlv320dac33"
+> > +- reg - I2C slave address
+> > +
+> > +Optional properties:
+> > +
+> > +- power-gpios - gpio pin to power the device, active high
 > 
-> Hi all,
-> 
-> v3:
-> Use pmic at 18 instead of rk805 at 18
-> Use macro definition RK_Pxx in gpio number
-> 
-> v2:
-> Use SPDX license tag
-> 
-> Thanks.
+> While driver used gpio in platform data, isn't it more likely
+> regulator which powers device?
 
-All of this above belongs below the '---' so it is not in the commit 
-msg.
+                power-gpios = <&gpio2 28 0>; /* gpio_60 */
 
-Otherwise,
+Looks like GPIO to me -- example is from Nokia N9. So this appears to
+be correct.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-
-> The roc-rk3328-cc is a credit card size single board computer using the
-> Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
-> up to 2GB 2133MHz LPDDR4 memory. It provides eMMC module socket, MicroSD
-> Card slot, USB 2.0/3.0, Gigabit Ethernet, HDMI/CVBS, Infrared Receiver,
-> SPDIF/I2S, and SPI/I2C/UART/PWM interfaces.
-> 
-> The devicetree currently supports basic peripherals.
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
-> ---
->  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
->  arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     | 276 +++++++++++++++++++++
->  3 files changed, 281 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/a8d14f82/attachment.sig>
