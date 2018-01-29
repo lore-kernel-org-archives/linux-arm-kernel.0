@@ -1,168 +1,55 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 29 Jan 2018 18:12:58 +0530
-Subject: [Patch v7 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <127cfd7f-113f-6724-297c-6f3c3746a8ff@xs4all.nl>
-References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
- <CGME20180124112406epcas2p3820cea581731825c7ad72ebbb1ca060c@epcas2p3.samsung.com>
- <1516791584-7980-13-git-send-email-smitha.t@samsung.com>
- <127cfd7f-113f-6724-297c-6f3c3746a8ff@xs4all.nl>
-Message-ID: <1517229778.29374.9.camel@smitha-fedora>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jan 2018 14:08:13 +0100
+Subject: [PATCH v2 16/19] drm/sun4i: backend: Assign the pipes
+ automatically
+In-Reply-To: <CAGb2v662Qx6nY3Tgvnh=CRMoSDsFwNEiZwW+X8YuN8zMaNwLgw@mail.gmail.com>
+References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
+ <d4ae26685ad75bd2dde3c3c3b7d086fb544347cc.1516617243.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v662Qx6nY3Tgvnh=CRMoSDsFwNEiZwW+X8YuN8zMaNwLgw@mail.gmail.com>
+Message-ID: <20180129130813.rrnjzmskgjrbzxg2@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-01-24 at 15:16 +0100, Hans Verkuil wrote:
-> On 24/01/18 11:59, Smitha T Murthy wrote:
-> > Added V4l2 controls for HEVC encoder
-> > 
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > ---
-> >  Documentation/media/uapi/v4l/extended-controls.rst | 400 +++++++++++++++++++++
-> >  1 file changed, 400 insertions(+)
-> > 
-> > diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> > index dfe49ae..46ee2bf 100644
-> > --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> > +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> > @@ -1960,6 +1960,406 @@ enum v4l2_vp8_golden_frame_sel -
-> >      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
-> >  
-> >  
-> > +High Efficiency Video Coding (HEVC/H.265) Control Reference
-> > +-----------------------------------------------------------
-> > +
-> > +The HEVC/H.265 controls include controls for encoding parameters of HEVC/H.265
-> > +video codec.
-> > +
-> > +
-> > +.. _hevc-control-id:
-> > +
-> > +HEVC/H.265 Control IDs
-> > +^^^^^^^^^^^^^^^^^^^^^^
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP (integer)``
-> > +    Minimum quantization parameter for HEVC.
-> > +    Valid range: from 0 to 51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP (integer)``
-> > +    Maximum quantization parameter for HEVC.
-> > +    Valid range: from 0 to 51.
+On Mon, Jan 29, 2018 at 10:22:54AM +0800, Chen-Yu Tsai wrote:
+> On Mon, Jan 22, 2018 at 6:35 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Since we now have a way to enforce the zpos, check for the number of alpha
+> > planes, the only missing part is to assign our pipe automatically instead
+> > of hardcoding it.
+> >
+> > The algorithm is quite simple, but requires two iterations over the list of
+> > planes.
+> >
+> > In the first one (which is the same one that we've had to check for alpha,
+> > the frontend usage, and so on), we order the planes by their zpos.
+> >
+> > We can then do a second iteration over that array by ascending zpos
+> > starting with the pipe 0. When and if we encounter our alpha plane, we put
+> > it and all the other subsequent planes in the second pipe.
+> >
+> > And since we have runtime checks and pipe assignments now, we can just
+> > remove the static declaration of the planes we used to have.
 > 
-> You probably should mention the default values for MIN_QP and MAX_QP
-> (I assume those are 0 and 51 and are not driver specific).
-> 
-Yes these values are not driver specific.
-I followed the way MAX_QP and MIN_QP are defined for other codecs like
-H264, H263, MPEG4 where only valid range is mentioned.
+> It would be slightly better if you could split this out into a separate
+> patch. It's not immediately obvious to others that the changes to
+> sun4i_layer.c are self-contained, while the change to sun4i_layer.h
+> is part of the new pipeline tracking thing. Plus I think the way you
+> structured everything means it won't break if you split it out.
 
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP (integer)``
-> > +    Quantization parameter for an I frame for HEVC.
-> > +    Valid range: from 0 to 51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP (integer)``
-> > +    Quantization parameter for a P frame for HEVC.
-> > +    Valid range: from 0 to 51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP (integer)``
-> > +    Quantization parameter for a B frame for HEVC.
-> > +    Valid range: from 0 to 51.
-> 
-> Sorry, this still isn't clear to me.
-> 
-> If I set V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP to 50, can I then still set
-> V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP to 51? Or is 50 then the maximum?
-> 
-> In other words, what is the relationship between these three controls
-> and the MIN_QP/MAX_QP controls.
-> 
-If we set V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP as 50 then
-V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP or
-4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP or
-V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP will have maximum as 50.
-Similarly for minimum as well, the above three controls will adhere to
-the V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP set.
-These controls have similar in relation as seen with
-V4L2_CID_MPEG_VIDEO_H264_P_FRAME_QP and V4L2_CID_MPEG_VIDEO_H264_MAX_QP 
+You're right, I'll split this patch and resend it. I've pushed the
+patches 9-15 to drm-misc, with your suggestions when you had some.
 
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_QP (boolean)``
-> > +    HIERARCHICAL_QP allows the host to specify the quantization parameter
-> > +    values for each temporal layer through HIERARCHICAL_QP_LAYER. This is
-> > +    valid only if HIERARCHICAL_CODING_LAYER is greater than 1. Setting the
-> > +    control value to 1 enables setting of the QP values for the layers.
-> > +
-> > +.. _v4l2-hevc-hier-coding-type:
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE``
-> > +    (enum)
-> > +
-> > +enum v4l2_mpeg_video_hevc_hier_coding_type -
-> > +    Selects the hierarchical coding type for encoding. Possible values are:
-> > +
-> > +.. raw:: latex
-> > +
-> > +    \begin{adjustbox}{width=\columnwidth}
-> > +
-> > +.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-> > +
-> > +.. flat-table::
-> > +    :header-rows:  0
-> > +    :stub-columns: 0
-> > +
-> > +    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B``
-> > +      - Use the B frame for hierarchical coding.
-> > +    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P``
-> > +      - Use the P frame for hierarchical coding.
-> > +
-> > +.. raw:: latex
-> > +
-> > +    \end{adjustbox}
-> > +
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER (integer)``
-> > +    Selects the hierarchical coding layer. In normal encoding
-> > +    (non-hierarchial coding), it should be zero. Possible values are [0, 6].
-> > +    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
-> > +    LAYER 1 and so on.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 0.
-> > +    For HEVC it can have a value of 0-51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 1.
-> > +    For HEVC it can have a value of 0-51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 2.
-> > +    For HEVC it can have a value of 0-51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 3.
-> > +    For HEVC it can have a value of 0-51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 4.
-> > +    For HEVC it can have a value of 0-51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 5.
-> > +    For HEVC it can have a value of 0-51.
-> > +
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP (integer)``
-> > +    Indicates quantization parameter for hierarchical coding layer 6.
-> > +    For HEVC it can have a value of 0-51.
-> 
-> Same here: how does MIN_QP/MAX_QP influence these controls, if at all.
-> 
-> Regards,
-> 
-> 	Hans
-> 
-> 
-The values set in V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP and
-V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP will give the limits for the L0-L6 QP
-values that can be set.
+Thanks!
+Maxime
 
-Regards,
-Smitha
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/f5b13d81/attachment.sig>
