@@ -1,39 +1,50 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 29 Jan 2018 10:19:01 +0100
-Subject: [linux-sunxi][PATCH v2 3/5] arm64: allwinner: a64: Add SPDIF to the
- Pine64
-In-Reply-To: <20180129091903.12319-1-codekipper@gmail.com>
-References: <20180129091903.12319-1-codekipper@gmail.com>
-Message-ID: <20180129091903.12319-4-codekipper@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jan 2018 10:21:45 +0100
+Subject: [PATCH v2 02/16] arm: config: sunxi_defconfig: enable SUN4I_GPADC
+In-Reply-To: <20180128232919.12639-3-embed3d@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-3-embed3d@gmail.com>
+Message-ID: <20180129092145.4pagdnfmhilwaj2r@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+Hi,
 
-The S/PDIF transmitter can be reached on the Euler connector.
-But as this is a GPIO then leave it disabled so that an overlay
-can override the status property.
+On Mon, Jan 29, 2018 at 12:29:05AM +0100, Philipp Rossak wrote:
+> This commit enables the SUN4I_GPADC config option and
+> sets the value to yes. This is needed to enable the ths sensors.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  arch/arm/configs/sunxi_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+> index 5caaf971fb50..52c3990b9d91 100644
+> --- a/arch/arm/configs/sunxi_defconfig
+> +++ b/arch/arm/configs/sunxi_defconfig
+> @@ -131,6 +131,7 @@ CONFIG_DMA_SUN6I=y
+>  CONFIG_EXTCON=y
+>  CONFIG_IIO=y
+>  CONFIG_AXP20X_ADC=y
+> +CONFIG_SUN4I_GPADC=y
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Unfortunately, we can't do that since TOUCHSCREEN_SUN4I is already
+enabled and we have a depends on !TOUCHSCREEN_SUN4I.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 604cdaedac38..d1161069af9e 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -230,6 +230,11 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+/* On Euler connector */
-+&spdif {
-+	status = "disabled";
-+};
-+
- /* On Exp and Euler connectors */
- &uart0 {
- 	pinctrl-names = "default";
+One more reason to stop worrying about replacing that driver DT
+binding.
+
+Maxime
+
 -- 
-2.16.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/5e8fd0c5/attachment.sig>
