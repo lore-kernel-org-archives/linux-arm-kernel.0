@@ -1,38 +1,41 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 29 Jan 2018 18:31:41 +0100
-Subject: [PATCH v1] ARM: pxa/raumfeld: use PROPERTY_ENTRY_U32() directly
-In-Reply-To: <1517238114.7000.1299.camel@linux.intel.com> (Andy Shevchenko's
- message of "Mon, 29 Jan 2018 17:01:54 +0200")
-References: <20180122125529.6291-1-andriy.shevchenko@linux.intel.com>
- <1517238114.7000.1299.camel@linux.intel.com>
-Message-ID: <87tvv48tc2.fsf@belgarion.home>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 29 Jan 2018 19:37:08 +0200
+Subject: [resend,
+ PATCH v1] ARM: pxa/raumfeld: use PROPERTY_ENTRY_U32() directly
+Message-ID: <20180129173708.59097-1-andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com> writes:
+Instead of using PROPERTY_ENTRY_INTEGER() with explicitly supplied type,
+use PROPERTY_ENTRY_U32() dedicated macro.
 
-> On Mon, 2018-01-22 at 14:55 +0200, Andy Shevchenko wrote:
->> Instead of using PROPERTY_ENTRY_INTEGER() with explicitly supplied
->> type,
->> use PROPERTY_ENTRY_U32() dedicated macro.
->> 
->> It will help modify internals of built-in device properties API.
->> 
->> No functional change intended.
->> 
->
-> Can someone apply that, or at least Ack? It's needed as a prerequisite
-> to fix one bug in device property core API.
-I can certainly ack it :
+It will help modify internals of built-in device properties API.
+
+No functional change intended.
+
 Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+---
+- resend
+ arch/arm/mach-pxa/raumfeld.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-I would have gladly taken it into my pxa/for-next branch, but for a reason your
-original mail did not land in my mailbox ... computers can be deceiving
-sometimes.
-
-I you send it to me again I'll apply it to my tree.
-
-Cheers.
-
---
-Robert
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 9d662fed03ec..0bf5419a9d10 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -378,9 +378,9 @@ static struct gpiod_lookup_table raumfeld_rotary_gpios_table = {
+ };
+ 
+ static const struct property_entry raumfeld_rotary_properties[] __initconst = {
+-	PROPERTY_ENTRY_INTEGER("rotary-encoder,steps-per-period", u32, 24),
+-	PROPERTY_ENTRY_INTEGER("linux,axis",			  u32, REL_X),
+-	PROPERTY_ENTRY_INTEGER("rotary-encoder,relative_axis",	  u32, 1),
++	PROPERTY_ENTRY_U32("rotary-encoder,steps-per-period", 24),
++	PROPERTY_ENTRY_U32("linux,axis",		      REL_X),
++	PROPERTY_ENTRY_U32("rotary-encoder,relative_axis",    1),
+ 	{ },
+ };
+ 
+-- 
+2.15.1
