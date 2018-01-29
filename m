@@ -1,188 +1,128 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 29 Jan 2018 10:41:28 +0530
-Subject: [PATCH 14/15] ARM: dts: ipq8074: Add pcie nodes
+Date: Mon, 29 Jan 2018 10:41:27 +0530
+Subject: [PATCH 13/15] ARM: dts: ipq8074: Add peripheral nodes
 In-Reply-To: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
 References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517202689-14212-15-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1517202689-14212-14-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver/phy support for ipq8074 is available now.
-So enabling the nodes in DT.
+Add serial, i2c, bam, spi, qpic peripheral nodes.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/ipq8074.dtsi | 155 +++++++++++++++++++++++++++++++++-
- 1 file changed, 154 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi | 103 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-index 07d3bf7..9bfbad9 100644
+index 2bc5dec..07d3bf7 100644
 --- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
 +++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-@@ -24,7 +24,7 @@
- 		ranges = <0 0 0 0xffffffff>;
- 		compatible = "simple-bus";
- 
--		pinctrl at 1000000 {
-+		tlmm: pinctrl at 1000000 {
- 			compatible = "qcom,ipq8074-pinctrl";
- 			reg = <0x1000000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
-@@ -227,6 +227,159 @@
- 			dma-names = "tx", "rx", "cmd";
+@@ -124,6 +124,109 @@
+ 			clock-names = "core", "iface";
  			status = "disabled";
  		};
 +
-+		pcie_phy0: phy at 86000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x86000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy0_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE0_PHY_BCR>,
-+				<&gcc GCC_PCIE0PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
++		blsp_dma: dma at 7884000 {
++			compatible = "qcom,bam-v1.7.0";
++			reg = <0x07884000 0x2b000>;
++			interrupts = <GIC_SPI 238 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "bam_clk";
++			#dma-cells = <1>;
++			qcom,ee = <0>;
 +		};
 +
-+		pcie0: pci at 20000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x20000000 0xf1d
-+				0x20000F20 0xa8
-+				0x80000 0x2000
-+				0x20100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <0>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy0>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x20200000 0x20200000
-+				  0 0x00100000   /* downstream I/O */
-+				  0x82000000 0 0x20300000 0x20300000
-+				  0 0x00d00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 52 IRQ_TYPE_NONE>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 75
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 78
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 79
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 83
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE0_AHB_CLK>,
-+				 <&gcc GCC_PCIE0_AUX_CLK>;
-+
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
-+				 <&gcc GCC_PCIE0_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE0_AHB_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
++		serial_blsp0: serial at 78af000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78af000 0x200>;
++			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>,
++				 <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
 +			status = "disabled";
 +		};
 +
-+		pcie_phy1: phy at 8e000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x8e000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy1_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE1_PHY_BCR>,
-+				<&gcc GCC_PCIE1PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
++		serial_blsp2: serial at 78B1000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78B1000 0x200>;
++			interrupts = <GIC_SPI 306 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_UART3_APPS_CLK>,
++				<&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			dmas = <&blsp_dma 4>,
++				<&blsp_dma 5>;
++			dma-names = "tx", "rx";
++			status = "disabled";
 +		};
 +
-+		pcie1: pci at 10000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x10000000 0xf1d
-+				0x10000F20 0xa8
-+				0x88000 0x2000
-+				0x10100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <1>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
++		spi_0: spi at 78b5000 {
++			compatible = "qcom,spi-qup-v2.2.1";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x78b5000 0x600>;
++			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
++			spi-max-frequency = <50000000>;
++			clocks = <&gcc GCC_BLSP1_QUP1_SPI_APPS_CLK>,
++				<&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			dmas = <&blsp_dma 12>, <&blsp_dma 13>;
++			dma-names = "tx", "rx";
++			status = "disabled";
++		};
 +
-+			phys = <&pcie_phy1>;
-+			phy-names = "pciephy";
++		i2c_0: i2c at 78b6000 {
++			compatible = "qcom,i2c-qup-v2.2.1";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x78b6000 0x600>;
++			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
++				<&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
++			clock-names = "iface", "core";
++			clock-frequency  = <400000>;
++			dmas = <&blsp_dma 15>, <&blsp_dma 14>;
++			dma-names = "rx", "tx";
++		};
 +
-+			ranges = <0x81000000 0 0x10200000 0x10200000
-+				  0 0x00100000   /* downstream I/O */
-+				  0x82000000 0 0x10300000 0x10300000
-+				  0 0x00d00000>; /* non-prefetchable memory */
++		i2c_1: i2c at 78b7000 {
++			compatible = "qcom,i2c-qup-v2.2.1";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x78b7000 0x600>;
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
++				<&gcc GCC_BLSP1_QUP3_I2C_APPS_CLK>;
++			clock-names = "iface", "core";
++			clock-frequency  = <100000>;
++			dmas = <&blsp_dma 17>, <&blsp_dma 16>;
++			dma-names = "rx", "tx";
++		};
 +
-+			interrupts = <0 85 0>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 142
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 143
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 144
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 145
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
++		qpic_bam: dma at 7984000 {
++			compatible = "qcom,bam-v1.7.0";
++			reg = <0x7984000 0x1a000>;
++			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_QPIC_AHB_CLK>;
++			clock-names = "bam_clk";
++			#dma-cells = <1>;
++			qcom,ee = <0>;
++			status = "disabled";
++		};
 +
-+			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE1_AHB_CLK>,
-+				 <&gcc GCC_PCIE1_AUX_CLK>;
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
-+				 <&gcc GCC_PCIE1_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE1_AHB_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
++		qpic_nand: nand at 79b0000 {
++			compatible = "qcom,ipq8074-nand";
++			reg = <0x79b0000 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&gcc GCC_QPIC_CLK>,
++				 <&gcc GCC_QPIC_AHB_CLK>;
++			clock-names = "core", "aon";
++
++			dmas = <&qpic_bam 0>,
++			       <&qpic_bam 1>,
++			       <&qpic_bam 2>;
++			dma-names = "tx", "rx", "cmd";
 +			status = "disabled";
 +		};
  	};
