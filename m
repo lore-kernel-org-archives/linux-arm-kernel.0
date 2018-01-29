@@ -1,69 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Jan 2018 15:34:02 +0100
-Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <CACRpkdYAGwUjr2C-w5U+WuG48pZAOUcnxFjznLbdF6Lmy1uZuQ@mail.gmail.com>
-References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
- <20180129082533.6edmqgbauo6q5dgz@flea.lan>
- <CACRpkdYAGwUjr2C-w5U+WuG48pZAOUcnxFjznLbdF6Lmy1uZuQ@mail.gmail.com>
-Message-ID: <CAK8P3a2HmPOTHAzqBnmim388pcWOE=fG50mG5HJifT=vzKOaTg@mail.gmail.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Mon, 29 Jan 2018 07:51:41 -0700
+Subject: [PATCH 0/4] efi/arm64: unmap the kernel during runtime service
+ calls
+In-Reply-To: <20180125103131.19168-1-ard.biesheuvel@linaro.org>
+References: <20180125103131.19168-1-ard.biesheuvel@linaro.org>
+Message-ID: <bdba264b-6619-6e9f-2849-d9d82a820ab0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 10:25 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Mon, Jan 29, 2018 at 9:25 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Sat, Jan 27, 2018 at 05:14:26PM +0100, Linus Walleij wrote:
->> However, in DT systems, that
->> field is filled only with the parent's node dma-ranges property. In
->> our case, and since the DT parenthood is based on the "control" bus,
->> and not the "data" bus, our parent node would be the AXI bus, and not
->> the memory bus that enforce those constraints.
->>
->> And other devices doing DMA through regular DMA accesses won't have
->> that mapping, so we definitely shouldn't enforce it for all the
->> devices there, but only the one connected to the separate memory bus.
->>
->> tl; dr: the DT is not really an option to store that info.
->>
->> I suggested setting dma_pfn_offset at probe, but Arnd didn't seem too
->> fond of that approach either at the time.
->>
->> So, well, I guess we could do better. We just have no idea how :)
->
-> Usually of Arnd cannot suggest something smart, neither can I :(
->
-> If some aspect of the memory layout of the system *really* doesn't
-> fit into DT because of the assumptions that DT is doing about
-> how systems work, we have a problem.
->
-> Is the problem that DT's model assumes that devices have one and
-> only one data port to the system memory, and that is how it
-> populates the Linux devices?
->
-> I guess, if nothing else works, I would use auxdata in the board file.
-> It is our definitive last resort when DT doesn't hold.
->
-> I.e. I would go into struct of_dev_auxdata
-> (from <linux/of_platform.h>) and add a
-> dma_pfn_offset field that gets set into the device's dma_pfn_offset
-> in drivers/of/platform.c overriding anything else and use that to hammer
-> it down in the boardfile.
->
-> But I bet some DT people are going to have other ideas.
+On 1/25/2018 3:31 AM, Ard Biesheuvel wrote:
 
-At one point we had discussed adding a 'dma-masters' property that
-lists all the buses on which a device can be a dma master, and
-the respective properties of those masters (iommu, coherency,
-offset, ...).
+> Note that capsule update has been omitted. This is a bit involved, and
+> I'd rather get some feedback before burning too many cycles on that. All
+> other services should be functional, with the caveat that EFI variable
+> names are now limited to 1024 [wide] characters, and UEFI variables
+> themselves to 64 KB.
+> 
 
-IIRC at the time we decided that we could live without that complexity,
-but perhaps we cannot.
+I'm curious, why these limitations?
 
-Another local hack that we can do here is to have two separate
-device nodes and let the device driver bind to one device and then
-look up the other one through a phandle to look up a platform_device
-for it, which it can then use with the DMA mapping interface.
+We don't have any concern about the name length limitation at this time, 
+but the variable size one is concerning.
 
-      Arnd
+We have a feature which creates a variable greater than 64KB that we 
+want to utilize from Linux.  The size limitation would seem to prevent that.
+
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
