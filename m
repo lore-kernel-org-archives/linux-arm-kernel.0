@@ -1,83 +1,84 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 29 Jan 2018 18:30:20 +0200
-Subject: [PATCH v3 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
- binding
-In-Reply-To: <20180129161134.tm6dhsygvbt3ogxf@rob-hp-laptop>
-References: <cover.1516105893.git.baruch@tkos.co.il>
- <248ce2c6c79b281261184a0ccde8513a9074af4c.1516105893.git.baruch@tkos.co.il>
- <20180129161134.tm6dhsygvbt3ogxf@rob-hp-laptop>
-Message-ID: <20180129163020.yr3orbrwg4wmq7p4@sapphire.tkos.co.il>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 29 Jan 2018 17:31:57 +0100
+Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
+ support
+In-Reply-To: <20180129155135.u2ncqwylg4rhyh6k@verge.net.au>
+References: <20180103121840.29316-1-horms+renesas@verge.net.au>
+ <20180103121840.29316-3-horms+renesas@verge.net.au>
+ <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
+ <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
+ <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
+ <20180129142357.sw3d4f5d4hwmveua@verge.net.au>
+ <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
+ <20180129151928.ooh5uirmjgtyjcjm@verge.net.au>
+ <20180129155135.u2ncqwylg4rhyh6k@verge.net.au>
+Message-ID: <20180129163156.5i3alvmmigfbzr73@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Thanks for reviewing.
-
-On Mon, Jan 29, 2018 at 10:11:34AM -0600, Rob Herring wrote:
-> On Tue, Jan 16, 2018 at 02:45:08PM +0200, Baruch Siach wrote:
-> > The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
-> > I2C. The firmware mailbox interface allows the ARM core to control the
-> > GPIO lines.
+On Mon, Jan 29, 2018 at 04:51:35PM +0100, Simon Horman wrote:
+> On Mon, Jan 29, 2018 at 04:19:29PM +0100, Simon Horman wrote:
+> > On Mon, Jan 29, 2018 at 04:01:49PM +0100, Geert Uytterhoeven wrote:
+> > > Hi Simon,
+> > > 
+> > > On Mon, Jan 29, 2018 at 3:24 PM, Simon Horman <horms@verge.net.au> wrote:
+> > > > On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
+> > > >> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
+> > > >> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
+> > > >> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > > >> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > >> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+> > > >> >> >
+> > > >> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > >>
+> > > >> >> As the CPG/MSSR driver now has suspend/resume support, do we need
+> > > >> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
+> > > >> >> by cpufreq during system resume, for both the primary and the secondary
+> > > >> >> CPU cores?
+> > > >> >
+> > > >> > I am a bit unsure.
+> > > >> >
+> > > >> > When using the A57 cores, which is the default case, the Z clk is queried
+> > > >> > by CPUFreq on resume. It appears that on my system its already set to the
+> > > >> > correct value but I assume if it was not then it would be reset. However,
+> > > >> > this does not cover Z2 clk. So perhaps to be safe we need to register
+> > > >> > notifiers and make sure they they play nicely with CPUFreq?
+> > > >>
+> > > >> Of course the CPU is special: unlike many other devices, it must be running
+> > > >> when the kernel is reentered upon system resume.
+> > > >> It may be running using a different frequency setting, though.
+> > > >> However, following "opp-suspend", the system will always suspend with the
+> > > >> Z clock running at 1.5GHz, which is the default?
+> > > >> So Z is probably OK.
+> > > >>
+> > > >> It's more interesting to check what happens when the little cores are
+> > > >> enabled as well (unfortunately that requires different firmware).
+> > > >> 1. Does cpufreq handle them correctly when they are onlined again during
+> > > >>    system resume?
+> > > >
+> > > > I tested this by updating the firmware on an H3 ES2.0 / Salvator-XS
+> > > > using the instructions at
+> > > > https://elinux.org/R-Car/Virtualization#Enabling_HYP_Support
+> > > 
+> > > > # grep -E -w "pll[01]|z|z2" /sys/kernel/debug/clk/clk_summary
+> > > >           z2                              0            0  1198080000          0 0
+> > > >        .pll1                              1            1  3194880000          0 0
+> > > >        .pll0                              0            0  2995200000          0 0
+> > > >           z                               0            0  1497600000          0 0
+> > > 
+> > > You know it's PLL2, not PLL1, you want to look at? ;-)
 > > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > ---
-> > v3:
-> >   * Rename node name.
-> > 
-> > v2:
-> >   * Rename compatible string to raspberrypi,firmware-gpio
-> > ---
-> >  .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 24 ++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-> > new file mode 100644
-> > index 000000000000..936dc59eba12
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
-> > @@ -0,0 +1,24 @@
-> > +Raspberry Pi GPIO expander
-> > +
-> > +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
-> > +firmware exposes a mailbox interface that allows the ARM core to control the
-> > +GPIO lines on the expander.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible : Should be "raspberrypi,firmware-gpio"
-> > +- gpio-controller : Marks the device node as a gpio controller
-> > +- #gpio-cells : Should be two.  The first cell is the pin number, and
-> > +  the second cell is used to specify the gpio polarity:
-> > +  0 = active high
-> > +  1 = active low
-> > +- firmware : Reference to the RPi firmware device node
-> > +
-> > +Example:
-> > +
-> > +expgpio: gpio-expander {
+> > Sorry, I will double check but I had looked at PLL2 earlier:
+> > I just messed things up when preparing things to post in email.
 > 
-> Still not right. The correct generic node name is "gpio".
+> I checked, PLL2 is constant at 2396160000 across the test described
+> in my earlier email.
 
-I'll fix that.
+I have now been able to reproduce an equivalent result on
+an M3W ES1.0 / Salvator-X.
 
-> > +	compatible = "raspberrypi,firmware-gpio";
-> > +	gpio-controller;
-> > +	#gpio-cells = <2>;
-> > +	firmware = <&firmware>;
-> 
-> Can you make this a child of the firmware node instead?
-
-I guess I can, I'll need to look into it. What is the advantage of that? What 
-about the existing raspberrypi,bcm2835-power[1] node in bcm2835-rpi.dtsi? 
-Should it move under the firmware node as well?
-
-[1] Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> > > Thanks for checking, looks all good!
+> > 
+> > Ok, so do you think we can merge this series with
+> > the off-by-one problem fixed?
