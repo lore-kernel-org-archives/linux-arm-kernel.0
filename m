@@ -1,97 +1,41 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 16:58:05 +0100
-Subject: [PATCH v4 1/6] media: rc: update sunxi-ir driver to get base clock
- frequency from devicetree
+Date: Mon, 29 Jan 2018 16:58:08 +0100
+Subject: [PATCH v4 4/6] arm: dts: sun8i: a83t: Add support for the cir
+ interface
 In-Reply-To: <20180129155810.7867-1-embed3d@gmail.com>
 References: <20180129155810.7867-1-embed3d@gmail.com>
-Message-ID: <20180129155810.7867-2-embed3d@gmail.com>
+Message-ID: <20180129155810.7867-5-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the sunxi-ir driver to set the base clock frequency from
-devicetree.
-
-This is necessary since there are different ir receivers on the
-market, that operate with different frequencies. So this value could be
-set if the attached ir receiver needs a different base clock frequency,
-than the default 8 MHz.
+The cir interface is like on the H3 located at 0x01f02000 and is exactly
+the same. This patch adds support for the ir interface on the A83T.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-Acked-by: Sean Young <sean@mess.org>
 ---
- drivers/media/rc/sunxi-cir.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
-index 97f367b446c4..f500cea228a9 100644
---- a/drivers/media/rc/sunxi-cir.c
-+++ b/drivers/media/rc/sunxi-cir.c
-@@ -72,12 +72,8 @@
- /* CIR_REG register idle threshold */
- #define REG_CIR_ITHR(val)    (((val) << 8) & (GENMASK(15, 8)))
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 06e96db7c41a..ddc0d592107f 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -605,6 +605,16 @@
+ 			#reset-cells = <1>;
+ 		};
  
--/* Required frequency for IR0 or IR1 clock in CIR mode */
-+/* Required frequency for IR0 or IR1 clock in CIR mode (default) */
- #define SUNXI_IR_BASE_CLK     8000000
--/* Frequency after IR internal divider  */
--#define SUNXI_IR_CLK          (SUNXI_IR_BASE_CLK / 64)
--/* Sample period in ns */
--#define SUNXI_IR_SAMPLE       (1000000000ul / SUNXI_IR_CLK)
- /* Noise threshold in samples  */
- #define SUNXI_IR_RXNOISE      1
- /* Idle Threshold in samples */
-@@ -122,7 +118,8 @@ static irqreturn_t sunxi_ir_irq(int irqno, void *dev_id)
- 			/* for each bit in fifo */
- 			dt = readb(ir->base + SUNXI_IR_RXFIFO_REG);
- 			rawir.pulse = (dt & 0x80) != 0;
--			rawir.duration = ((dt & 0x7f) + 1) * SUNXI_IR_SAMPLE;
-+			rawir.duration = ((dt & 0x7f) + 1) *
-+					 ir->rc->rx_resolution;
- 			ir_raw_event_store_with_filter(ir->rc, &rawir);
- 		}
- 	}
-@@ -148,6 +145,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- 	struct device_node *dn = dev->of_node;
- 	struct resource *res;
- 	struct sunxi_ir *ir;
-+	u32 b_clk_freq = SUNXI_IR_BASE_CLK;
- 
- 	ir = devm_kzalloc(dev, sizeof(struct sunxi_ir), GFP_KERNEL);
- 	if (!ir)
-@@ -172,6 +170,9 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- 		return PTR_ERR(ir->clk);
- 	}
- 
-+	/* Base clock frequency (optional) */
-+	of_property_read_u32(dn, "clock-frequency", &b_clk_freq);
++		cir: cir at 01f02000 {
++			compatible = "allwinner,sun5i-a13-ir";
++			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
++			clock-names = "apb", "ir";
++			resets = <&r_ccu RST_APB0_IR>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			reg = <0x01f02000 0x400>;
++			status = "disabled";
++		};
 +
- 	/* Reset (optional) */
- 	ir->rst = devm_reset_control_get_optional_exclusive(dev, NULL);
- 	if (IS_ERR(ir->rst))
-@@ -180,11 +181,12 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
-+	ret = clk_set_rate(ir->clk, b_clk_freq);
- 	if (ret) {
- 		dev_err(dev, "set ir base clock failed!\n");
- 		goto exit_reset_assert;
- 	}
-+	dev_dbg(dev, "set base clock frequency to %d Hz.\n", b_clk_freq);
- 
- 	if (clk_prepare_enable(ir->apb_clk)) {
- 		dev_err(dev, "try to enable apb_ir_clk failed\n");
-@@ -225,7 +227,8 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- 	ir->rc->map_name = ir->map_name ?: RC_MAP_EMPTY;
- 	ir->rc->dev.parent = dev;
- 	ir->rc->allowed_protocols = RC_PROTO_BIT_ALL_IR_DECODER;
--	ir->rc->rx_resolution = SUNXI_IR_SAMPLE;
-+	/* Frequency after IR internal divider with sample period in ns */
-+	ir->rc->rx_resolution = (1000000000ul / (b_clk_freq / 64));
- 	ir->rc->timeout = MS_TO_NS(SUNXI_IR_TIMEOUT);
- 	ir->rc->driver_name = SUNXI_IR_DEV;
- 
+ 		r_pio: pinctrl at 1f02c00 {
+ 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
 -- 
 2.11.0
