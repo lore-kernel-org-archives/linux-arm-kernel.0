@@ -1,50 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Jan 2018 10:21:45 +0100
-Subject: [PATCH v2 02/16] arm: config: sunxi_defconfig: enable SUN4I_GPADC
-In-Reply-To: <20180128232919.12639-3-embed3d@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-3-embed3d@gmail.com>
-Message-ID: <20180129092145.4pagdnfmhilwaj2r@flea.lan>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Mon, 29 Jan 2018 10:22:23 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sunxi: h3/h5: Add DAI node for HDMI
+Message-ID: <20180129092223.12423-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Marcus Cooper <codekipper@gmail.com>
 
-On Mon, Jan 29, 2018 at 12:29:05AM +0100, Philipp Rossak wrote:
-> This commit enables the SUN4I_GPADC config option and
-> sets the value to yes. This is needed to enable the ths sensors.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  arch/arm/configs/sunxi_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-> index 5caaf971fb50..52c3990b9d91 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -131,6 +131,7 @@ CONFIG_DMA_SUN6I=y
->  CONFIG_EXTCON=y
->  CONFIG_IIO=y
->  CONFIG_AXP20X_ADC=y
-> +CONFIG_SUN4I_GPADC=y
+Add the new DAI block for I2S2 which is used for HDMI audio.
 
-Unfortunately, we can't do that since TOUCHSCREEN_SUN4I is already
-enabled and we have a depends on !TOUCHSCREEN_SUN4I.
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-One more reason to stop worrying about replacing that driver DT
-binding.
-
-Maxime
-
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 7a83b15225c7..238e7007d5b9 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -568,6 +568,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2s2: i2s at 1c22800 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-h3-i2s";
++			reg = <0x01c22800 0x400>;
++			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_I2S2>, <&ccu CLK_I2S2>;
++			clock-names = "apb", "mod";
++			dmas = <&dma 27>;
++			resets = <&ccu RST_BUS_I2S2>;
++			dma-names = "tx";
++			status = "disabled";
++		};
++
+ 		codec: codec at 1c22c00 {
+ 			#sound-dai-cells = <0>;
+ 			compatible = "allwinner,sun8i-h3-codec";
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/5e8fd0c5/attachment.sig>
+2.16.1
