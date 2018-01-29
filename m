@@ -1,59 +1,53 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 29 Jan 2018 17:24:14 +0000
-Subject: [PATCH 10/16] arm64: Make KPTI strict CPU local feature
-In-Reply-To: <4bf35de5-ae61-93b8-f202-52d734997cc5@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-11-suzuki.poulose@arm.com>
- <20180126122519.GR5862@e103592.cambridge.arm.com>
- <4bf35de5-ae61-93b8-f202-52d734997cc5@arm.com>
-Message-ID: <20180129172414.GC5862@e103592.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 29 Jan 2018 11:29:16 -0600
+Subject: [PATCH 3/4] dt-bindings: add binding for i.MX8MQ CCM
+In-Reply-To: <20180117182950.26460-3-l.stach@pengutronix.de>
+References: <20180117182950.26460-1-l.stach@pengutronix.de>
+ <20180117182950.26460-3-l.stach@pengutronix.de>
+Message-ID: <20180129172916.ek5l5jscsn4qipx5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 03:46:59PM +0000, Suzuki K Poulose wrote:
-> On 26/01/18 12:25, Dave Martin wrote:
-> >On Tue, Jan 23, 2018 at 12:28:03PM +0000, Suzuki K Poulose wrote:
-> >>KPTI capability is a security feature which should be enabled
-> >>when at least one CPU on the system needs it. Any late CPU
-> >>which needs the kernel support, should be prevented from
-> >>booting (and thus making the system unsecure) if the feature
-> >>was not already enabled.
-> >
-> >Is there an actual change to behaviour here?
+On Wed, Jan 17, 2018 at 07:29:49PM +0100, Lucas Stach wrote:
+> This adds the binding for the i.MX8MQ Clock Controller Module.
 > 
-> Yes, we now prevent any new CPU from booting if it *matches* the capability,
-> which we didn't do earlier.
-
-Ok
-
-> >
-> >It's not very obvious from the commit message, or the patch when read in
-> >isolation.
-> >
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  .../devicetree/bindings/clock/imx8mq-clock.txt       | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
 > 
-> I will fix the commit message to indicate the current behavior. How about :
+> diff --git a/Documentation/devicetree/bindings/clock/imx8mq-clock.txt b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+> new file mode 100644
+> index 000000000000..c9b0123b80d0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+> @@ -0,0 +1,20 @@
+> +* Clock bindings for NXP i.MX8M Quad
+> +
+> +Required properties:
+> +- compatible: Should be "nxp,imx8mq-ccm"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +- clocks: list of clock specifiers, must contain an entry for each required
+> +          entry in clock-names
+> +- clock-names: should include the following entries:
+> +    - "ckil"
+> +    - "osc_25m"
+> +    - "osc_27m"
+> +    - "clk_ext1"
+> +    - "clk_ext2"
+> +    - "clk_ext3"
+> +    - "clk_ext4"
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx8mq-clock.h
+
+This header belongs in this patch. With that,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+> +for the full list of i.MX8M Quad clock IDs.
+> -- 
+> 2.11.0
 > 
-> "KPTI is treated as a system wide feature, where we enable the feature
-> when all the CPUs on the system suffers from the security vulnerability,
-> unless it is enabled via kernel command line. Also, we ignore a late CPU
-
-Maybe "enabled" -> "forcibly enabled", if the command-line really is
-supposed to have override semantics (which I guess it is).
-
-> which might need the defense if the KPTI is not enabled, making the system
-> insecure. This is not sufficient, as
-> we should enable the defense when at least one CPU needs it. Also, if
-> it is not enabled at boot-time, we can no longer enable it when a late
-> CPU turns up. This patch makes sure that the KPTI is checked on all CPUs
-
-There's some repetition here.  Does the following work:
-
-"[...] command line.  Also, if a late CPU needs KPTI but KPTI was not
-enabled at boot time, the CPU is currently allowed to boot, which is a
-potential security vulnerability.  This patch ensures that late CPUs
-are rejected as appropriate if they need KPTI but it wasn't enabled."
-
-Hmmm.  That's no shorter after all.  Oh well :P
-
-Cheers
----Dave
