@@ -1,34 +1,90 @@
-From: lionel.Debieve@st.com (Lionel Debieve)
-Date: Mon, 29 Jan 2018 15:28:11 +0100
-Subject: [PATCH 3/3] crypto: stm32/hash: rework padding length
-In-Reply-To: <20180129142811.13273-1-lionel.Debieve@st.com>
-References: <20180129142811.13273-1-lionel.Debieve@st.com>
-Message-ID: <20180129142811.13273-4-lionel.Debieve@st.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Mon, 29 Jan 2018 16:31:44 +0200
+Subject: [patch v18 3/4] Documentation: jtag: Add bindings for Aspeed SoC 24xx
+ and 25xx families JTAG master driver
+In-Reply-To: <1517236305-4880-1-git-send-email-oleksandrs@mellanox.com>
+References: <1517236305-4880-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1517236305-4880-4-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lionel Debieve <lionel.debieve@st.com>
+It has been tested on Mellanox system with BMC equipped with
+Aspeed 2520 SoC for programming CPLD devices.
 
-Due to another patch, the dma fails when padding is
-needed as the given length is not correct.
-
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/crypto/stm32/stm32-hash.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v17->v18
+v16->v17
+v15->v16
+Comments pointed by Joel Stanley <joel.stan@gmail.com>
+- change clocks = <&clk_apb> to proper clocks = <&syscon ASPEED_CLK_APB>
+- add reset descriptions in bndings file
 
-diff --git a/drivers/crypto/stm32/stm32-hash.c b/drivers/crypto/stm32/stm32-hash.c
-index d8444aeb6609..80b9ec76bbb5 100644
---- a/drivers/crypto/stm32/stm32-hash.c
-+++ b/drivers/crypto/stm32/stm32-hash.c
-@@ -626,7 +626,7 @@ static int stm32_hash_dma_send(struct stm32_hash_dev *hdev)
- 			writesl(hdev->io_base + HASH_DIN, buffer,
- 				DIV_ROUND_UP(ncp, sizeof(u32)));
- 		}
--		stm32_hash_set_nblw(hdev, DIV_ROUND_UP(ncp, sizeof(u32)));
-+		stm32_hash_set_nblw(hdev, ncp);
- 		reg = stm32_hash_read(hdev, HASH_STR);
- 		reg |= HASH_STR_DCAL;
- 		stm32_hash_write(hdev, HASH_STR, reg);
+v14->v15
+v13->v14
+v12->v13
+v11->v12
+v10->v11
+v9->v10
+v8->v9
+v7->v8
+Comments pointed by pointed by Joel Stanley <joel.stan@gmail.com>
+- Change compatible string to ast2400 and ast2000
+
+V6->v7
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+ - Fix spell "Doccumentation" -> "Documentation"
+
+v5->v6
+Comments pointed by Tobias Klauser <tklauser@distanz.ch>
+- Small nit: s/documentation/Documentation/
+
+v4->v5
+
+V3->v4
+Comments pointed by Rob Herring <robh@kernel.org>
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+
+v2->v3
+Comments pointed by Rob Herring <robh@kernel.org>
+- split Aspeed jtag driver and binding to sepatrate patches
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+---
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   22 ++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+
+diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+new file mode 100644
+index 0000000..7c36eb6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+@@ -0,0 +1,22 @@
++Aspeed JTAG driver for ast2400 and ast2500 SoC
++
++Required properties:
++- compatible:		Should be one of
++      - "aspeed,ast2400-jtag"
++      - "aspeed,ast2500-jtag"
++- reg			contains the offset and length of the JTAG memory
++			region
++- clocks		root clock of bus, should reference the APB
++			clock in the second cell
++- resets		phandle to reset controller with the reset number in
++			the second cell
++- interrupts		should contain JTAG controller interrupt
++
++Example:
++jtag: jtag at 1e6e4000 {
++	compatible = "aspeed,ast2500-jtag";
++	reg = <0x1e6e4000 0x1c>;
++	clocks = <&syscon ASPEED_CLK_APB>;
++	resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
++	interrupts = <43>;
++};
 -- 
-2.15.1
+1.7.1
