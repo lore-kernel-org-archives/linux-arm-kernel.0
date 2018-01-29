@@ -1,51 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jan 2018 15:38:39 +0000
-Subject: [PATCH 1/2] arm64: Remove unimplemented syscall log message
-In-Reply-To: <20180122212026.26262-2-michael.weiser@gmx.de>
-References: <20180122131851.GA28638@arm.com>
- <20180122212026.26262-2-michael.weiser@gmx.de>
-Message-ID: <20180129153839.GB24444@arm.com>
+Date: Mon, 29 Jan 2018 15:39:40 +0000
+Subject: [PATCH v12 0/3] iommu/smmu-v3: Workaround for hisilicon
+ 161010801 erratum(reserve HW MSI)
+In-Reply-To: <20171214160957.13716-1-shameerali.kolothum.thodi@huawei.com>
+References: <20171214160957.13716-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20180129153939.GC24972@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 10:20:25PM +0100, Michael Weiser wrote:
-> Stop printing a (ratelimited) kernel message for each instance of an
-> unimplemented syscall being called. Userland making an unimplemented
-> syscall is not necessarily misbehaviour and to be expected with a
-> current userland running on an older kernel. Also, the current message
-> looks scary to users but does not actually indicate a real problem nor
-> help them narrow down the cause. Just rely on sys_ni_syscall() to return
-> -ENOSYS.
-> 
-> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
-> ---
->  arch/arm64/kernel/traps.c | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index bbb0fde2780e..0ef28b7f6aa7 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -526,14 +526,6 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
->  	}
->  #endif
->  
-> -	if (show_unhandled_signals_ratelimited()) {
-> -		pr_info("%s[%d]: syscall %d\n", current->comm,
-> -			task_pid_nr(current), regs->syscallno);
-> -		dump_instr("", regs);
-> -		if (user_mode(regs))
-> -			__show_regs(regs);
-> -	}
-> -
->  	return sys_ni_syscall();
->  }
+Hi Shameer,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+On Thu, Dec 14, 2017 at 04:09:54PM +0000, Shameer Kolothum wrote:
+> On certain HiSilicon platforms (hip06/hip07) the GIC ITS and PCIe RC
+> deviates from the standard implementation and this breaks PCIe MSI
+> functionality when SMMU is enabled.
+> 
+> The HiSilicon erratum 161010801 describes this limitation of certain
+> HiSilicon platforms to support the SMMU mappings for MSI transactions.
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the MSI
+> payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI.
+> 
+> This patch implements an ACPI based quirk to reserve the hw msi regions
+> in the smmu-v3 driver which means these address regions will not be
+> translated and will be excluded from iova allocations.
+> 
+> To implement this quirk, the following changes are incorporated:
+> 1. Added a generic helper function to IORT code to retrieve and reserve
+>    the associated ITS base address from a device IORT node. The function
+>    has a check for smmu model to determine whether the platform requires
+>    the HW MSI reservation or not.
+> 2. Added smmu node entries and explicitly disabled them in hip06/hip07
+>     dts files so that users are warned about the non-DT support for this
+>     erratum.
 
-I'm also strongly inclined to change the default value of
-show_unhandled_signals to be zero. I find it odd that it defaults to 1
-when it can be changed via proc anyway, although this is consistent with
-other architectures.
+[...]
+
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi |  56 ++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hip07.dtsi |  25 +++++++
+>  drivers/acpi/arm64/iort.c                | 111 ++++++++++++++++++++++++++++++-
+>  drivers/iommu/dma-iommu.c                |   8 ++-
+>  drivers/irqchip/irq-gic-v3-its.c         |   3 +-
+>  include/linux/acpi_iort.h                |   7 +-
+>  6 files changed, 204 insertions(+), 6 deletions(-)
+
+It occurred to me this morning that this series probably isn't queued
+anywhere because it's not obvious which tree is supposed to take it and
+I can't see it in -next.
+
+Is this one for arm64, IOMMU, irqchip or something else? It's probably
+missed the boat for 4.16 now...
 
 Will
