@@ -1,63 +1,108 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 29 Jan 2018 10:05:38 -0800
-Subject: [PATCH v3 4/6] arm: Add icache invalidation on switch_mm for
- Cortex-A15
-In-Reply-To: <20180128115554.7a52a735@why.wild-wind.fr.eu.org>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-5-marc.zyngier@arm.com>
- <f3af9f2b-ddc2-f0e2-3c80-6e93f9839861@gmail.com>
- <20180128115554.7a52a735@why.wild-wind.fr.eu.org>
-Message-ID: <e01cc81a-8648-d53b-b00f-413028b7370e@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Jan 2018 17:45:55 +0000
+Subject: [PATCH v2 12/16] firmware/psci: Expose PSCI conduit
+In-Reply-To: <20180129174559.1866-1-marc.zyngier@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+Message-ID: <20180129174559.1866-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/2018 03:55 AM, Marc Zyngier wrote:
-> On Sat, 27 Jan 2018 14:23:57 -0800
-> Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 
->> On 01/25/2018 07:21 AM, Marc Zyngier wrote:
->>> In order to avoid aliasing attacks against the branch predictor,
->>> Cortex-A15 require to invalidate the BTB when switching
->>> from one user context to another. The only way to do so on this
->>> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
->>> mode.  
->>
->> Even though this is a platform design mistake, let's say your Linux
->> kernel boots in secure supervisor mode, we could have code
->> that tries to set ACTLR[0] as early as possible, since the writes are
->> ignored if executing from non-secure mode. If Linux is booted normally
->> either PL1 or PL2 non-secure we could still check ACTLR[0].
->>
->> My concern is that without doing this, we may have a hard time catching
->> improper firmware as well as having bogus bug reports. This is
->> completely RFC though since:
->>
->> - I could not quite figure out yet why update ca15_actlr_status from
->> assembly is not reflected in the C code despite using PC relative loads
-> 
-> One potential problem is that you're writing this with the MMU off, and
-> reading it with the MMU on. Unless you've added CMOs to make this
-> visible, it will not be reliable.
+In order to call into the firmware to apply workarounds, it is
+useful to find out whether we're using HVC or SMC. Let's expose
+this through the psci_ops.
 
-I did not, let's change that.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+ include/linux/psci.h    |  7 +++++++
+ 2 files changed, 30 insertions(+), 5 deletions(-)
 
-> 
-> Also, I'm not sure how this works with MCPM.
-
-I just started looking at MCPM, do you know roughly at what point do
-non-MCPM and MCPM entry points converge? If we moved the check for
-ACTLR[0] there, would that be too late.
-
-> 
->> - this is done in __ca15mp_setup and __b15mp_setup because we know by
->> then that we have either of these two CPUs but we could presumably move
->> this check under a Kconfig option and earlier where all erratas are checked
-> 
-> Thanks,
-> 
-> 	M.
-> 
-
-
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 8b25d31e8401..e9493da2b111 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
+ 	return cpu == resident_cpu;
+ }
+ 
+-struct psci_operations psci_ops;
++struct psci_operations psci_ops = {
++	.conduit = PSCI_CONDUIT_NONE,
++};
+ 
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+@@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+ 			      0, 0, 0);
+ }
+ 
++static void set_conduit(enum psci_conduit conduit)
++{
++	switch (conduit) {
++	case PSCI_CONDUIT_HVC:
++		invoke_psci_fn = __invoke_psci_fn_hvc;
++		break;
++	case PSCI_CONDUIT_SMC:
++		invoke_psci_fn = __invoke_psci_fn_smc;
++		break;
++	default:
++		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
++	}
++
++	psci_ops.conduit = conduit;
++}
++
+ static int get_set_conduit_method(struct device_node *np)
+ {
+ 	const char *method;
+@@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
+ 	}
+ 
+ 	if (!strcmp("hvc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	} else if (!strcmp("smc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 	} else {
+ 		pr_warn("invalid \"method\" property: %s\n", method);
+ 		return -EINVAL;
+@@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
+ 	pr_info("probing for conduit method from ACPI.\n");
+ 
+ 	if (acpi_psci_use_hvc())
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	else
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 
+ 	return psci_probe();
+ }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index f724fd8c78e8..f2679e5faa4f 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
+ int psci_cpu_init_idle(unsigned int cpu);
+ int psci_cpu_suspend_enter(unsigned long index);
+ 
++enum psci_conduit {
++	PSCI_CONDUIT_NONE,
++	PSCI_CONDUIT_SMC,
++	PSCI_CONDUIT_HVC,
++};
++
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -34,6 +40,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	enum psci_conduit conduit;
+ };
+ 
+ extern struct psci_operations psci_ops;
 -- 
-Florian
+2.14.2
