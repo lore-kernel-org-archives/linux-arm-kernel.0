@@ -1,71 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 13:01:30 -0600
-Subject: [PATCH] pinctrl: at91-pio4: add support for drive-strength
- property
-In-Reply-To: <CACRpkdanweSmHd_M+feHauEHtvKSW+-W=djb186BFdbxTf20Jg@mail.gmail.com>
-References: <20180118160208.16461-1-ludovic.desroches@microchip.com>
- <CACRpkdanweSmHd_M+feHauEHtvKSW+-W=djb186BFdbxTf20Jg@mail.gmail.com>
-Message-ID: <20180129190130.qjej6hmudszzbfdz@rob-hp-laptop>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 29 Jan 2018 14:01:59 -0500
+Subject: [PATCH] ACPI/PCI: pci_link: reduce verbosity when IRQ is enabled
+In-Reply-To: <20180116214939.GC10860@bhelgaas-glaptop.roam.corp.google.com>
+References: <1516128664-23634-1-git-send-email-okaya@codeaurora.org>
+ <f508e749-2976-ec6f-681a-553b79c4ab76@codeaurora.org>
+ <20180116214939.GC10860@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <fde756f4-eb74-4002-6ac4-a44405bad2da@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 09:37:38AM +0100, Linus Walleij wrote:
-> On Thu, Jan 18, 2018 at 5:02 PM, Ludovic Desroches
-> <ludovic.desroches@microchip.com> wrote:
-> 
-> > Add support for the drive-strength property. Usually its value is
-> > expressed in mA. Since the numeric value depends on VDDIOP voltage,
-> > the controller uses low, medium and high to define the drive-strengh.
-> 
-> Aha I see. That's complex. It certainly results in a certain mA drive
-> strength in the end, but what you're saying is that this is not usually
-> what we configure.
-> 
-> > The PIO controller accepts two values for the low drive: 0 or 1. Most
-> > of the time, we don't care about the drive strength, there is no need
-> > to change it, so 0 is considered as the default value.
-> 
-> Do you mean default value as in "whatever the hardware was set
-> up as at boot time"?
-> 
-> > The low-drive
-> > value won't be advertised through pinconf-pins file excepted if it
-> 
-> except?
-> 
-> > has been set explicitly in the device tree ie if its value is
-> > different from 0.
-> >
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> 
-> OK I think I get it.
-> 
-> >  Optional properties:
-> >  - GENERIC_PINCONFIG: generic pinconfig options to use, bias-disable,
-> > -bias-pull-down, bias-pull-up, drive-open-drain, input-schmitt-enable,
-> > -input-debounce, output-low, output-high.
-> > +bias-pull-down, bias-pull-up, drive-open-drain, drive-strength,
-> > +input-schmitt-enable, input-debounce, output-low, output-high.
-> (...)
-> > +                       drive-strength = <ATMEL_PIO_DRVSTR_LO>;
-> 
-> So you say you support this argument and it will be something like
-> 
-> include/dt-bindings/pinctrl/at91.h:#define ATMEL_PIO_DRVSTR_LO  1
-> include/dt-bindings/pinctrl/at91.h:#define ATMEL_PIO_DRVSTR_ME  2
-> include/dt-bindings/pinctrl/at91.h:#define ATMEL_PIO_DRVSTR_HI  3
-> 
-> But the definition if generic drive strength is actually in mA.
+Rafael,
 
-Yes, and the reason we put unit suffixes on properties is to avoid 
-differing units.
- 
-> I think it is OK to deviate from stating it in mA, but you should
-> write this in the DT bindings so people do not get confused.
+On 1/16/2018 4:49 PM, Bjorn Helgaas wrote:
+> On Tue, Jan 16, 2018 at 01:53:00PM -0500, Sinan Kaya wrote:
+>> Correcting linux-pci email.
+>>
+>> On 1/16/2018 1:51 PM, Sinan Kaya wrote:
+>>> When ACPI Link object is enabled, the message is printed with a warning
+>>> prefix. Some test tools are capturing warning and test error types as
+>>> errors. Let's reduce the verbosity of success case.
+>>>
+>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> Looks like this was a result of 4d9391557b68 ("ACPI: add missing KERN_*
+> constants to printks"), which I think added the wrong level in this case.
+> 
 
-I don't think it is okay. If "drive-strength" doesn't work, then use 
-a vendor specific property ("atmel,drive-strength"). Of course, I might 
-forget this in the next version and tell you to use a standard property 
-in mA. 
+Any chance of merging this for 4.16?
 
-Rob
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
