@@ -1,148 +1,46 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Tue, 30 Jan 2018 00:20:31 +0100
-Subject: [PATCH] sound/tlv320dac33: Add device tree support
-In-Reply-To: <20180129230539.GA18280@amd>
-References: <20180129230539.GA18280@amd>
-Message-ID: <20180129232031.GA7695@lenoch>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 29 Jan 2018 17:21:27 -0600
+Subject: [PATCH v3] arm64: dts: rockchip: add roc-rk3328-cc board
+In-Reply-To: <20180123021017.24110-1-djw@t-chip.com.cn>
+References: <20180106094538.15568-1-djw@t-chip.com.cn>
+ <20180123021017.24110-1-djw@t-chip.com.cn>
+Message-ID: <20180129232127.unanaujy44q42bul@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
+On Tue, Jan 23, 2018 at 10:10:17AM +0800, djw at t-chip.com.cn wrote:
+> From: Levin Du <djw@t-chip.com.cn>
 > 
-> This adds device tree support to tlv320dac33.c.
+> Hi all,
 > 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> v3:
+> Use pmic at 18 instead of rk805 at 18
+> Use macro definition RK_Pxx in gpio number
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> new file mode 100644
-> index 0000000..6cbd311
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> @@ -0,0 +1,32 @@
-> +Texas Instruments - tlv320dac33 Codec module
-> +
-> +The tlv320dac33 serial control bus communicates through I2C protocols.
-> +
-> +Required properties:
-> +
-> +- compatible - "ti,tlv320dac33"
-> +- reg - I2C slave address
-> +
-> +Optional properties:
-> +
-> +- power-gpios - gpio pin to power the device, active high
+> v2:
+> Use SPDX license tag
+> 
+> Thanks.
 
-While driver used gpio in platform data, isn't it more likely
-regulator which powers device?
+All of this above belongs below the '---' so it is not in the commit 
+msg.
 
-> +- interrupts       - The interrupt output from the device.
-> +- interrupt-parent - The parent interrupt controller.
-> +
-> +- ti,keep-bclk 	- Keep the BCLK running in FIFO modes
-> +- ti,burst-bclkdiv - BCLK divider value in burst mode
-> +
-> +Example:
-> +
-> +tlv320dac33: audio-codec at 19 {
-> +	compatible = "ti,tlv320dac33";
-> +	reg = <0x19>;
-> +
-> +	interrupt-parent = <&gpio2>;
-> +	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
-> +	power-gpio = <&gpio2 28 0>; /* gpio_60 */
-> +
-> +	ti,keep-bclk;
-> +	ti,burst-bclkdiv = <3>;
-> +};
-> diff --git a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
-> index 5b94a15..2a0fe06 100644
-> --- a/sound/soc/codecs/tlv320dac33.c
-> +++ b/sound/soc/codecs/tlv320dac33.c
-> @@ -30,6 +32,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/gpio.h>
->  #include <linux/regulator/consumer.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/slab.h>
->  #include <sound/core.h>
->  #include <sound/pcm.h>
-> @@ -105,7 +108,7 @@ struct tlv320dac33_priv {
->  	unsigned int nsample;		/* burst read amount from host */
->  	int mode1_latency;		/* latency caused by the i2c writes in
->  					 * us */
-> -	u8 burst_bclkdiv;		/* BCLK divider value in burst mode */
-> +	u32 burst_bclkdiv;		/* BCLK divider value in burst mode */
->  	unsigned int burst_rate;	/* Interface speed in Burst modes */
->  
->  	int keep_bclk;			/* Keep the BCLK continuously running
-> @@ -1484,16 +1487,11 @@ static struct snd_soc_dai_driver dac33_dai = {
->  static int dac33_i2c_probe(struct i2c_client *client,
->  			   const struct i2c_device_id *id)
->  {
-> -	struct tlv320dac33_platform_data *pdata;
-> +	struct tlv320dac33_platform_data *pdata = client->dev.platform_data;
->  	struct tlv320dac33_priv *dac33;
-> +	struct device_node *np = client->dev.of_node;
->  	int ret, i;
->  
-> -	if (client->dev.platform_data == NULL) {
-> -		dev_err(&client->dev, "Platform data not set\n");
-> -		return -ENODEV;
-> -	}
-> -	pdata = client->dev.platform_data;
-> -
->  	dac33 = devm_kzalloc(&client->dev, sizeof(struct tlv320dac33_priv),
->  			     GFP_KERNEL);
->  	if (dac33 == NULL)
-> @@ -1505,10 +1503,26 @@ static int dac33_i2c_probe(struct i2c_client *client,
->  
->  	i2c_set_clientdata(client, dac33);
->  
-> -	dac33->power_gpio = pdata->power_gpio;
-> -	dac33->burst_bclkdiv = pdata->burst_bclkdiv;
-> -	dac33->keep_bclk = pdata->keep_bclk;
-> -	dac33->mode1_latency = pdata->mode1_latency;
-> +	if (pdata) {
-> +		dac33->power_gpio = pdata->power_gpio;
-> +		dac33->burst_bclkdiv = pdata->burst_bclkdiv;
-> +		dac33->keep_bclk = pdata->keep_bclk;
-> +		dac33->mode1_latency = pdata->mode1_latency;
-> +	} else if (np) {
-> +		ret = of_get_named_gpio(np, "power-gpios", 0);
-> +		if (ret >= 0)
-> +			dac33->power_gpio = ret;
-> +		else
-> +			dac33->power_gpio = -1;
-> +
-> +		if (of_property_read_bool(np, "ti,keep-bclk"))
-> +			dac33->keep_bclk = true;
-> +
-> +		of_property_read_u32(np, "ti,burst-bclkdiv", &dac33->burst_bclkdiv);
-> +	} else {
-> +		dev_err(&client->dev, "Platform data not set\n");
-> +		return -ENODEV;
-> +	}
->  	if (!dac33->mode1_latency)
->  		dac33->mode1_latency = 10000; /* 10ms */
->  	dac33->irq = client->irq;
-> @@ -1574,9 +1588,16 @@ static const struct i2c_device_id tlv320dac33_i2c_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, tlv320dac33_i2c_id);
->  
-> +static const struct of_device_id tlv320dac33_of_match[] = {
-> +	{ .compatible = "ti,tlv320dac33", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(i2c, tlv320dac33_of_match);
-> +
->  static struct i2c_driver tlv320dac33_i2c_driver = {
->  	.driver = {
->  		.name = "tlv320dac33-codec",
-> +		.of_match_table = of_match_ptr(tlv320dac33_of_match),
->  	},
->  	.probe		= dac33_i2c_probe,
->  	.remove		= dac33_i2c_remove,
+Otherwise,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+> The roc-rk3328-cc is a credit card size single board computer using the
+> Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
+> up to 2GB 2133MHz LPDDR4 memory. It provides eMMC module socket, MicroSD
+> Card slot, USB 2.0/3.0, Gigabit Ethernet, HDMI/CVBS, Infrared Receiver,
+> SPDIF/I2S, and SPI/I2C/UART/PWM interfaces.
 > 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> The devicetree currently supports basic peripherals.
+> 
+> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+> ---
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+>  arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     | 276 +++++++++++++++++++++
+>  3 files changed, 281 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
