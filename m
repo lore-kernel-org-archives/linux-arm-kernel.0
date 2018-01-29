@@ -1,191 +1,336 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 29 Jan 2018 17:12:27 +0900
-Subject: [PATCH] arm64: kdump: retain reserved memory regions
-In-Reply-To: <5A61D90E.1000907@arm.com>
-References: <20180110100943.6082-1-takahiro.akashi@linaro.org>
- <5A55F87F.2080501@arm.com> <20180111113840.GF18820@linaro.org>
- <5A61D90E.1000907@arm.com>
-Message-ID: <20180129081225.GA23847@linaro.org>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 29 Jan 2018 13:43:52 +0530
+Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <20180126221501.GD28313@codeaurora.org>
+References: <20180125163216.29018-1-rnayak@codeaurora.org>
+ <20180125163216.29018-2-rnayak@codeaurora.org>
+ <20180126221501.GD28313@codeaurora.org>
+Message-ID: <514c49cc-71f9-ee21-250a-04f8fab151c0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
 
-On Fri, Jan 19, 2018 at 11:39:58AM +0000, James Morse wrote:
-> Hi Akashi,
-> 
-> On 11/01/18 11:38, AKASHI Takahiro wrote:
-> > On Wed, Jan 10, 2018 at 11:26:55AM +0000, James Morse wrote:
-> >> On 10/01/18 10:09, AKASHI Takahiro wrote:
-> >>> This is a fix against the issue that crash dump kernel may hang up
-> >>> during booting, which can happen on any ACPI-based system with "ACPI
-> >>> Reclaim Memory."
-> 
-> >>> (diagnosis)
-> >>> * This fault is a data abort, alignment fault (ESR=0x96000021)
-> >>>   during reading out ACPI table.
-> >>> * Initial ACPI tables are normally stored in system ram and marked as
-> >>>   "ACPI Reclaim memory" by the firmware.
-> >>> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
-> >>>   memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
-> >>>   removing NOMAP bit and they are instead "memblock-reserved".
-> >>> * When crash dump kernel boots up, it tries to accesses ACPI tables by
-> >>>   ioremap'ing them (through acpi_os_ioremap()).
-> >>> * Since those regions are not included in device tree's
-> >>>   "usable-memory-range" and so not recognized as part of crash dump
-> >>>   kernel's system ram, ioremap() will create a non-cacheable mapping here.
-> >>
-> >> Ugh, because acpi_os_ioremap() looks at the efi memory map through the prism of
-> >> what we pulled into memblock, which is different during kdump.
-> >>
-> >> Is an alternative to teach acpi_os_ioremap() to ask
-> >> efi_mem_attributes() directly for the attributes to use?
-> >> (e.g. arch_apei_get_mem_attribute())
-> > 
-> > I didn't think of this approach.
-> > Do you mean a change like the patch below?
-> 
-> Yes. Aha, you can pretty much re-use the helper directly.
-> 
-> It was just a suggestion, removing the extra abstraction that is causing the bug
-> could be cleaner ...
-> 
-> > (I'm still debugging this code since the kernel fails to boot.)
-> 
-> ... but might be too fragile.
-> 
-> There are points during boot when the EFI memory map isn't mapped.
 
-Right, this was a problem for my patch.
-Attached is the revised and workable one.
-Efi_memmap_init_late() may alternatively be called in acpi_early_init() or
-even in acpi_os_ioremap(), but either way it looks a bit odd.
-
-Thanks,
--Takahiro AKASHI
-
-> I think that
-> helper will return 'device memory' for everything when this happens.
+On 01/27/2018 03:45 AM, Stephen Boyd wrote:
+> On 01/25, Rajendra Nayak wrote:
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dtsi
 > 
-> 
-> Thanks,
-> 
-> James
-===8<===
->From c88f4c8106ba7a918c835b1cdf538b1d21019863 Mon Sep 17 00:00:00 2001
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Date: Mon, 29 Jan 2018 15:07:43 +0900
-Subject: [PATCH] arm64: kdump: make acpi_os_ioremap() more generic
+> Do we really need two files? Maybe collapse the two?
 
----
- arch/arm64/include/asm/acpi.h | 23 ++++++++++++++++-------
- arch/arm64/kernel/acpi.c      |  7 ++-----
- init/main.c                   |  4 ++++
- 3 files changed, 22 insertions(+), 12 deletions(-)
+will do. Not sure why, but this is how all other qualcomm
+boards are structured with an almost empty .dts file.
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 32f465a80e4e..d53c95f4e1a9 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -12,10 +12,12 @@
- #ifndef _ASM_ACPI_H
- #define _ASM_ACPI_H
- 
-+#include <linux/efi.h>
- #include <linux/memblock.h>
- #include <linux/psci.h>
- 
- #include <asm/cputype.h>
-+#include <asm/io.h>
- #include <asm/smp_plat.h>
- #include <asm/tlbflush.h>
- 
-@@ -29,18 +31,22 @@
- 
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
-+
- /* ACPI table mapping after acpi_permanent_mmap is set */
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
-+	/* For normal memory we already have a cacheable mapping. */
-+	if (memblock_is_map_memory(phys))
-+		return (void __iomem *)__phys_to_virt(phys);
-+
- 	/*
--	 * EFI's reserve_regions() call adds memory with the WB attribute
--	 * to memblock via early_init_dt_add_memory_arch().
-+	 * We should still honor the memory's attribute here because
-+	 * crash dump kernel possibly excludes some ACPI (reclaim)
-+	 * regions from memblock list.
- 	 */
--	if (!memblock_is_memory(phys))
--		return ioremap(phys, size);
--
--	return ioremap_cache(phys, size);
-+	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
- }
- #define acpi_os_ioremap acpi_os_ioremap
- 
-@@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
-  * for compatibility.
-  */
- #define acpi_disable_cmcff 1
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-+static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+{
-+	return __acpi_get_mem_attribute(addr);
-+}
- #endif /* CONFIG_ACPI_APEI */
- 
- #ifdef CONFIG_ACPI_NUMA
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index b3162715ed78..f94bdf7be439 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -31,10 +31,9 @@
- #include <asm/cpu_ops.h>
- #include <asm/smp_plat.h>
- 
--#ifdef CONFIG_ACPI_APEI
-+/* CONFIG_ACPI_APEI */
- # include <linux/efi.h>
- # include <asm/pgtable.h>
--#endif
- 
- int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
- int acpi_disabled = 1;
-@@ -239,8 +238,7 @@ void __init acpi_boot_table_init(void)
- 	}
- }
- 
--#ifdef CONFIG_ACPI_APEI
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- {
- 	/*
- 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
-@@ -261,4 +259,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_NC);
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
--#endif
-diff --git a/init/main.c b/init/main.c
-index a8100b954839..a479ece2bae9 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -674,6 +674,10 @@ asmlinkage __visible void __init start_kernel(void)
- 	debug_objects_mem_init();
- 	setup_per_cpu_pageset();
- 	numa_policy_init();
-+#if defined(CONFIG_ARM64) && defined(CONFIG_EFI)
-+	efi_memmap_init_late(efi.memmap.phys_map,
-+			efi.memmap.nr_map * efi.memmap.desc_size);
-+#endif
- 	acpi_early_init();
- 	if (late_time_init)
- 		late_time_init();
+> 
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> new file mode 100644
+>> index 000000000000..a21f4912b3e2
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> @@ -0,0 +1,308 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+>> + */
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +
+>> +/ {
+>> +	model = "Qualcomm Technologies, Inc. SDM845";
+>> +
+>> +	interrupt-parent = <&intc>;
+>> +
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
+>> +
+>> +	chosen { };
+>> +
+>> +	memory {
+>> +		device_type = "memory";
+>> +		/* We expect the bootloader to fill in the reg */
+>> +		reg = <0 0 0 0>;
+>> +	};
+>> +
+>> +	cpus {
+>> +		#address-cells = <2>;
+>> +		#size-cells = <0>;
+>> +
+>> +		CPU0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x0>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_0>;
+>> +			L2_0: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +				L3_0: l3-cache {
+>> +				      compatible = "cache";
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +		CPU1: cpu at 100 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x100>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_100>;
+>> +			L2_100: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		CPU2: cpu at 200 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x200>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_200>;
+>> +			L2_200: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		CPU3: cpu at 300 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x300>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_300>;
+>> +			L2_300: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		CPU4: cpu at 400 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x400>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_400>;
+>> +			L2_400: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		CPU5: cpu at 500 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x500>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_500>;
+>> +			L2_500: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		CPU6: cpu at 600 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x600>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_600>;
+>> +			L2_600: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		CPU7: cpu at 700 {
+>> +			device_type = "cpu";
+>> +			compatible = "qcom,kryo";
+>> +			reg = <0x0 0x700>;
+>> +			enable-method = "psci";
+>> +			next-level-cache = <&L2_700>;
+>> +			L2_700: l2-cache {
+>> +				compatible = "cache";
+>> +				next-level-cache = <&L3_0>;
+>> +			};
+>> +		};
+>> +
+>> +		cpu-map {
+>> +			cluster0 {
+>> +				core0 {
+>> +					cpu = <&CPU0>;
+>> +				};
+>> +
+>> +				core1 {
+>> +					cpu = <&CPU1>;
+>> +				};
+>> +
+>> +				core2 {
+>> +					cpu = <&CPU2>;
+>> +				};
+>> +
+>> +				core3 {
+>> +					cpu = <&CPU3>;
+>> +				};
+>> +			};
+>> +
+>> +			cluster1 {
+>> +				core0 {
+>> +					cpu = <&CPU4>;
+>> +				};
+>> +
+>> +				core1 {
+>> +					cpu = <&CPU5>;
+>> +				};
+>> +
+>> +				core2 {
+>> +					cpu = <&CPU6>;
+>> +				};
+>> +
+>> +				core3 {
+>> +					cpu = <&CPU7>;
+>> +				};
+>> +			};
+>> +		};
+> 
+> From what I recall, this layout causes the kernel to spew
+> warnings? I mean to say this is the power/performance view, but
+> not the architectural view.
+
+hmm, I haven't seen any warnings with this when I boot up on my sdm845
+MTP. Will recheck.
+
+> 
+>> +	};
+>> +
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupts = <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> 
+> Are we supposed to use the GIC_CPU_MASK_SIMPLE macros still?
+
+Not sure, is there another way?
+
+> 
+>> +			     <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 3 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 0 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+>> +	};
+>> +
+>> +	clocks {
+>> +		xo_board: xo_board {
+>> +			compatible = "fixed-clock";
+>> +			#clock-cells = <0>;
+>> +			clock-frequency = <19200000>;
+>> +			clock-output-names = "xo_board";
+> 
+> We can drop clock-output-names on these.
+
+will do.
+
+> 
+>> +		};
+>> +
+>> +		sleep_clk: sleep_clk {
+>> +			compatible = "fixed-clock";
+>> +			#clock-cells = <0>;
+>> +			clock-frequency = <32764>;
+>> +			clock-output-names = "sleep_clk";
+>> +		};
+>> +	};
+>> +
+>> +	psci {
+>> +		compatible = "arm,psci-1.0";
+>> +		method = "smc";
+>> +	};
+>> +
+>> +	soc: soc {
+> 
+> Will anyone use this phandle?
+
+maybe not, will drop.
+
+> 
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges = <0 0 0 0xffffffff>;
+>> +		compatible = "simple-bus";
+>> +
+>> +		intc: interrupt-controller at 17a00000 {
+>> +			compatible = "arm,gic-v3";
+>> +			#interrupt-cells = <3>;
+>> +			interrupt-controller;
+>> +			#redistributor-regions = <1>;
+>> +			redistributor-stride = <0x0 0x20000>;
+>> +			reg = <0x17a00000 0x10000>,     /* GICD */
+>> +			      <0x17a60000 0x100000>;    /* GICR * 8 */
+>> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> Can you also add the ITS node please and mark it as disabled?
+> I'll send a patch to the list to skip status = "disabled" ones.
+> We may want to support ITS on these SoCs if the firmware is
+> different. 
+
+will add.
+
+> 
+>> +		};
+>> +
+>> +		gcc: clock-controller at 100000 {
+>> +			compatible = "qcom,gcc-sdm845";
+>> +			reg = <0x100000 0x1f0000>;
+>> +			#clock-cells = <1>;
+>> +			#reset-cells = <1>;
+>> +		};
+>> +
+>> +		tlmm: pinctrl at 03400000 {
+> 
+> Drop leading zeroes please.
+> 
+>> +			compatible = "qcom,sdm845-pinctrl";
+>> +			reg = <0x03400000 0xc00000>;
+>> +			interrupts = <GIC_SPI 208 IRQ_TYPE_NONE>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +		};
+>> +
+>> +		timer at 17C90000 {
+> 
+> Lowercase hex please.
+> 
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +			compatible = "arm,armv7-timer-mem";
+>> +			reg = <0x17C90000 0x1000>;
+> 
+> Lowercase hex please.
+> 
+>> +			clock-frequency = <19200000>;
+> 
+> Drop this? Or we can't read it from the hardware so we have to
+> hardcode it?
+
+will drop, shouldn't be needed.
+
+> 
+>> +
+>> +			frame at 17CA0000 {
+> 
+> Lowecase again.
+> 
+>> +				frame-number = <0>;
+>> +				interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+>> +					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+>> +				reg = <0x17CA0000 0x1000>,
+>> +				      <0x17CB0000 0x1000>;
+>> +			};
+>> +
+> 
+
 -- 
-2.15.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
