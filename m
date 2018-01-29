@@ -1,95 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 29 Jan 2018 18:39:33 +0000
-Subject: [PATCH v2 13/16] firmware/psci: Expose SMCCC version through
- psci_ops
-In-Reply-To: <20180129174559.1866-14-marc.zyngier@arm.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-14-marc.zyngier@arm.com>
-Message-ID: <20180129183933.GB24577@e107981-ln.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Jan 2018 16:41:07 -0200
+Subject: [PATCH v2 1/6] arm: Add BTB invalidation on switch_mm for
+ Cortex-A9, A12 and A17
+In-Reply-To: <671e1901-f321-0731-45c7-19732970923b@arm.com>
+References: <20180108185533.9698-1-marc.zyngier@arm.com>
+ <20180108185533.9698-2-marc.zyngier@arm.com>
+ <20180110175322.GZ3875@atomide.com>
+ <6662dd72-121c-0cfb-ea31-aeecad4c7d03@arm.com>
+ <87c06809-e035-52d7-0822-5fffb402c1dd@ti.com>
+ <671e1901-f321-0731-45c7-19732970923b@arm.com>
+Message-ID: <CAOMZO5DK9xq-DfPbyerLL8+CHcsBjmd=ZBP27gWswTbFv-W1fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 05:45:56PM +0000, Marc Zyngier wrote:
-> Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
-> let's do that at boot time, and expose the version of the calling
-> convention as part of the psci_ops structure.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/firmware/psci.c | 21 +++++++++++++++++++++
->  include/linux/psci.h    |  6 ++++++
->  2 files changed, 27 insertions(+)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index e9493da2b111..dd035aaa1c33 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -511,6 +511,26 @@ static void __init psci_init_migrate(void)
->  	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
->  }
->  
-> +static void __init psci_init_smccc(u32 ver)
-> +{
-> +	int feature = PSCI_RET_NOT_SUPPORTED;
-> +
-> +	if (PSCI_VERSION_MAJOR(ver) >= 1)
-> +		feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
-> +
-> +	if (feature == PSCI_RET_NOT_SUPPORTED) {
-> +		psci_ops.variant = SMCCC_VARIANT_1_0;
-> +	} else {
-> +		ver = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
-> +		if (ver != ARM_SMCCC_VERSION_1_1)
-> +			psci_ops.variant = SMCCC_VARIANT_1_0;
-> +		else
-> +			psci_ops.variant = SMCCC_VARIANT_1_1;
-> +	}
-> +
-> +	pr_info("SMC Calling Convention v1.%d\n", psci_ops.variant);
-> +}
-> +
->  static void __init psci_0_2_set_functions(void)
->  {
->  	pr_info("Using standard PSCI v0.2 function IDs\n");
-> @@ -557,6 +577,7 @@ static int __init psci_probe(void)
->  	psci_0_2_set_functions();
->  
->  	psci_init_migrate();
-> +	psci_init_smccc(ver);
+Hi Marc,
 
-Given that SMCCC_VARIANT_1_0 is already the default value (unless you do
-the same we did with the conduit) we can move psci_init_smccc() call
-inside the if below (that is there to detect a callable psci_features())
-and remove the check in psci_init_smccc(), up to you.
+On Thu, Jan 11, 2018 at 7:03 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
->  
->  	if (PSCI_VERSION_MAJOR(ver) >= 1) {
->  		psci_init_cpu_suspend();
-> diff --git a/include/linux/psci.h b/include/linux/psci.h
-> index f2679e5faa4f..83fd16a37be3 100644
-> --- a/include/linux/psci.h
-> +++ b/include/linux/psci.h
-> @@ -31,6 +31,11 @@ enum psci_conduit {
->  	PSCI_CONDUIT_HVC,
->  };
->  
-> +enum smccc_variant {
-> +	SMCCC_VARIANT_1_0,
-> +	SMCCC_VARIANT_1_1,
-> +};
-> +
->  struct psci_operations {
->  	u32 (*get_version)(void);
->  	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-> @@ -41,6 +46,7 @@ struct psci_operations {
->  			unsigned long lowest_affinity_level);
->  	int (*migrate_info_type)(void);
->  	enum psci_conduit conduit;
-> +	enum smccc_variant variant;
+>> OK. in u-boot, I had helped on the following:
+>> http://git.denx.de/?p=u-boot.git;a=commitdiff;h=5902f4ce0f2bd1411e40dc0ece3598a0fc19b2ae
+>>
+>> maybe be build off that?
+>
+> Turn that into something unconditional, and you'll be good.
 
-Nit: I would add an smccc_ prefix to the variant field (or rename it
-to smccc_version).
+Do you mean like this?
 
-You can add my:
+--- a/arch/arm/cpu/armv7/start.S
++++ b/arch/arm/cpu/armv7/start.S
+@@ -249,7 +249,6 @@ skip_errata_801819:
+        pop     {r1-r5}                 @ Restore the cpu info - fall through
+ #endif
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+-#ifdef CONFIG_ARM_ERRATA_430973
+        mrc     p15, 0, r0, c1, c0, 1   @ Read ACR
+
+        cmp     r2, #0x21               @ Only on < r2p1
+@@ -258,7 +257,6 @@ skip_errata_801819:
+        push    {r1-r5}                 @ Save the cpu info registers
+        bl      v7_arch_cp15_set_acr
+        pop     {r1-r5}                 @ Restore the cpu info - fall through
+-#endif
+
+ #ifdef CONFIG_ARM_ERRATA_621766
+        mrc     p15, 0, r0, c1, c0, 1   @ Read ACR
+
+Thanks
