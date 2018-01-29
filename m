@@ -1,66 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 29 Jan 2018 08:49:33 -0800
-Subject: [PATCH] irqchip/gic-v3: Ignore disabled ITS nodes
-Message-ID: <20180129164933.25479-1-sboyd@codeaurora.org>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 29 Jan 2018 17:56:52 +0100
+Subject: [PATCH 1/4] dt-bindings: at24: sort manufacturers alphabetically
+In-Reply-To: <20180129161727.g4kdrr5sih22vs5a@rob-hp-laptop>
+References: <20180116160618.27859-1-peda@axentia.se>
+ <20180116160618.27859-2-peda@axentia.se>
+ <20180129161727.g4kdrr5sih22vs5a@rob-hp-laptop>
+Message-ID: <CAMRc=Mcqj36KP7dG71dzSn_7cxw-Tru5kNtXdr5-SiH=jbCfMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms there's an ITS available but it's not enabled
-because reading or writing the registers is denied by the
-firmware. In fact, reading or writing them will cause the system
-to reset. We could remove the node from DT in such a case, but
-it's better to skip nodes that are marked as "disabled" in DT so
-that we can describe the hardware that exists and use the status
-property to indicate how the firmware has configured things.
+2018-01-29 17:17 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Tue, Jan 16, 2018 at 05:06:15PM +0100, Peter Rosin wrote:
+>> Makes them easier to find.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  Documentation/devicetree/bindings/eeprom/at24.txt | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> This one should go into 4.16. I can apply after rc1 or apply to tree
+> with at24.txt changes queued.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+> Rob
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c      | 2 ++
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 2 ++
- drivers/irqchip/irq-gic-v3-its.c              | 2 ++
- 3 files changed, 6 insertions(+)
+Wolfram,
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index 77931214d954..6b5f50e1fc72 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -132,6 +132,8 @@ static int __init its_pci_of_msi_init(void)
- 
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
-+		if (!of_device_is_available(np))
-+			continue;
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
- 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 833a90fe33ae..8881a053c173 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -154,6 +154,8 @@ static void __init its_pmsi_of_init(void)
- 
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
-+		if (!of_device_is_available(np))
-+			continue;
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
- 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 284738add89b..a84ee6ce244d 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1815,6 +1815,8 @@ static int __init its_of_probe(struct device_node *node)
- 
- 	for (np = of_find_matching_node(node, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
-+		if (!of_device_is_available(np))
-+			continue;
- 		if (!of_property_read_bool(np, "msi-controller")) {
- 			pr_warn("%s: no msi-controller property, ITS ignored\n",
- 				np->full_name);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+can you take this via the i2c tree for 4.16?
+
+Thanks,
+Bartosz
