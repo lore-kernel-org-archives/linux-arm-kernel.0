@@ -1,62 +1,102 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jan 2018 11:59:51 +0000
-Subject: [PATCH v2 0/9] Fix kpti-enabled kernels for Cavium ThunderX
-Message-ID: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 29 Jan 2018 11:59:53 +0000
+Subject: [PATCH v2 2/9] arm64: kpti: Make use of nG dependent on
+ arm64_kernel_unmapped_at_el0()
+In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1517227200-20412-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+To allow systems which do not require kpti to continue running with
+global kernel mappings (which appears to be a requirement for Cavium
+ThunderX due to a CPU erratum), make the use of nG in the kernel page
+tables dependent on arm64_kernel_unmapped_at_el0(), which is resolved
+at runtime.
 
-This is version two of the patches I posted on Friday:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kernel-pgtable.h | 12 ++----------
+ arch/arm64/include/asm/pgtable-prot.h   | 30 ++++++++++++++----------------
+ 2 files changed, 16 insertions(+), 26 deletions(-)
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556304.html
-
-Changes since v1 include:
-
-  * Use SCTLR_ELx_M instead of open-coded #1
-  * Changed section attributes for .idmap.text to reflect actual mappings
-  * Rejigged phys_to_pte for consistency with pte_to_phys
-  * Added reviewer tags
-
-Cheers,
-
-Will
-
---->8
-
-Marc Zyngier (1):
-  arm64: Force KPTI to be disabled on Cavium ThunderX
-
-Shanker Donthineni (1):
-  arm64: Add software workaround for Falkor erratum 1041
-
-Will Deacon (7):
-  arm64: kpti: Make use of nG dependent on
-    arm64_kernel_unmapped_at_el0()
-  arm64: mm: Permit transitioning from Global to Non-Global without BBM
-  arm64: kpti: Add ->enable callback to remap swapper using nG mappings
-  arm64: assembler: Change order of macro arguments in phys_to_ttbr
-  arm64: entry: Reword comment about post_ttbr_update_workaround
-  arm64: assembler: Align phys_to_pte with pte_to_phys
-  arm64: idmap: Use "awx" flags for .idmap.text .pushsection directives
-
- Documentation/arm64/silicon-errata.txt  |   1 +
- arch/arm64/Kconfig                      |  12 +-
- arch/arm64/include/asm/assembler.h      |  36 +++++-
- arch/arm64/include/asm/kernel-pgtable.h |  12 +-
- arch/arm64/include/asm/pgtable-prot.h   |  30 +++--
- arch/arm64/kernel/cpu-reset.S           |   3 +-
- arch/arm64/kernel/cpufeature.c          |  42 ++++++-
- arch/arm64/kernel/efi-entry.S           |   2 +
- arch/arm64/kernel/entry.S               |  12 +-
- arch/arm64/kernel/head.S                |  31 +----
- arch/arm64/kernel/hibernate-asm.S       |   4 +-
- arch/arm64/kernel/relocate_kernel.S     |   1 +
- arch/arm64/kernel/sleep.S               |   2 +-
- arch/arm64/kvm/hyp-init.S               |   3 +-
- arch/arm64/mm/mmu.c                     |   4 +
- arch/arm64/mm/proc.S                    | 212 ++++++++++++++++++++++++++++++--
- 16 files changed, 324 insertions(+), 83 deletions(-)
-
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index 82386e860dd2..a780f6714b44 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -123,16 +123,8 @@
+ /*
+  * Initial memory map attributes.
+  */
+-#define _SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define _SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+-
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-#define SWAPPER_PTE_FLAGS	(_SWAPPER_PTE_FLAGS | PTE_NG)
+-#define SWAPPER_PMD_FLAGS	(_SWAPPER_PMD_FLAGS | PMD_SECT_NG)
+-#else
+-#define SWAPPER_PTE_FLAGS	_SWAPPER_PTE_FLAGS
+-#define SWAPPER_PMD_FLAGS	_SWAPPER_PMD_FLAGS
+-#endif
++#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+ 
+ #if ARM64_SWAPPER_USES_SECTION_MAPS
+ #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+index 22a926825e3f..2db84df5eb42 100644
+--- a/arch/arm64/include/asm/pgtable-prot.h
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -37,13 +37,11 @@
+ #define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+ #define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_NG)
+-#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_SECT_NG)
+-#else
+-#define PROT_DEFAULT		_PROT_DEFAULT
+-#define PROT_SECT_DEFAULT	_PROT_SECT_DEFAULT
+-#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++#define PTE_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PTE_NG : 0)
++#define PMD_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PMD_SECT_NG : 0)
++
++#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_MAYBE_NG)
++#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_MAYBE_NG)
+ 
+ #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+ #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+@@ -55,22 +53,22 @@
+ #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ 
+-#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+-#define _HYP_PAGE_DEFAULT	(_PAGE_DEFAULT & ~PTE_NG)
++#define _PAGE_DEFAULT		(_PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
++#define _HYP_PAGE_DEFAULT	_PAGE_DEFAULT
+ 
+-#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+-#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+-#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
++#define PAGE_KERNEL		__pgprot(PROT_NORMAL)
++#define PAGE_KERNEL_RO		__pgprot((PROT_NORMAL & ~PTE_WRITE) | PTE_RDONLY)
++#define PAGE_KERNEL_ROX		__pgprot((PROT_NORMAL & ~(PTE_WRITE | PTE_PXN)) | PTE_RDONLY)
++#define PAGE_KERNEL_EXEC	__pgprot(PROT_NORMAL & ~PTE_PXN)
++#define PAGE_KERNEL_EXEC_CONT	__pgprot((PROT_NORMAL & ~PTE_PXN) | PTE_CONT)
+ 
+ #define PAGE_HYP		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+ #define PAGE_HYP_EXEC		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+ #define PAGE_HYP_RO		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ 
+-#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+-#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
++#define PAGE_S2			__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+ 
+ #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
+ #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
 -- 
 2.1.4
