@@ -1,105 +1,116 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jan 2018 12:00:00 +0000
-Subject: [PATCH v2 9/9] arm64: idmap: Use "awx" flags for .idmap.text
- .pushsection directives
+Date: Mon, 29 Jan 2018 11:59:57 +0000
+Subject: [PATCH v2 6/9] arm64: assembler: Change order of macro arguments in
+ phys_to_ttbr
 In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
 References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517227200-20412-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1517227200-20412-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The identity map is mapped as both writeable and executable by the
-SWAPPER_MM_MMUFLAGS and this is relied upon by the kpti code to manage
-a synchronisation flag. Update the .pushsection flags to reflect the
-actual mapping attributes.
+Since AArch64 assembly instructions take the destination register as
+their first operand, do the same thing for the phys_to_ttbr macro.
 
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/cpu-reset.S | 2 +-
- arch/arm64/kernel/head.S      | 2 +-
- arch/arm64/kernel/sleep.S     | 2 +-
- arch/arm64/mm/proc.S          | 8 ++++----
- 4 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/assembler.h | 2 +-
+ arch/arm64/kernel/head.S           | 4 ++--
+ arch/arm64/kernel/hibernate-asm.S  | 4 ++--
+ arch/arm64/kvm/hyp-init.S          | 2 +-
+ arch/arm64/mm/proc.S               | 6 +++---
+ 5 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-index 2a752cb2a0f3..8021b46c9743 100644
---- a/arch/arm64/kernel/cpu-reset.S
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -16,7 +16,7 @@
- #include <asm/virt.h>
- 
- .text
--.pushsection    .idmap.text, "ax"
-+.pushsection    .idmap.text, "awx"
- 
- /*
-  * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 23251eae6e8a..e4495ef96058 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -514,7 +514,7 @@ alternative_endif
+  * 	phys:	physical address, preserved
+  * 	ttbr:	returns the TTBR value
+  */
+-	.macro	phys_to_ttbr, phys, ttbr
++	.macro	phys_to_ttbr, ttbr, phys
+ #ifdef CONFIG_ARM64_PA_BITS_52
+ 	orr	\ttbr, \phys, \phys, lsr #46
+ 	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 25f5b2e400fb..2b6b8b24e5ab 100644
+index ba3ab04788dc..341649c08337 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -455,7 +455,7 @@ ENDPROC(__primary_switched)
-  * end early head section, begin head code that is also used for
-  * hotplug and needs to have the same protections as the text region
+@@ -776,8 +776,8 @@ ENTRY(__enable_mmu)
+ 	update_early_cpu_boot_status 0, x1, x2
+ 	adrp	x1, idmap_pg_dir
+ 	adrp	x2, swapper_pg_dir
+-	phys_to_ttbr x1, x3
+-	phys_to_ttbr x2, x4
++	phys_to_ttbr x3, x1
++	phys_to_ttbr x4, x2
+ 	msr	ttbr0_el1, x3			// load TTBR0
+ 	msr	ttbr1_el1, x4			// load TTBR1
+ 	isb
+diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+index 84f5d52fddda..dd14ab8c9f72 100644
+--- a/arch/arm64/kernel/hibernate-asm.S
++++ b/arch/arm64/kernel/hibernate-asm.S
+@@ -34,12 +34,12 @@
+  * each stage of the walk.
   */
--	.section ".idmap.text","ax"
-+	.section ".idmap.text","awx"
+ .macro break_before_make_ttbr_switch zero_page, page_table, tmp
+-	phys_to_ttbr \zero_page, \tmp
++	phys_to_ttbr \tmp, \zero_page
+ 	msr	ttbr1_el1, \tmp
+ 	isb
+ 	tlbi	vmalle1
+ 	dsb	nsh
+-	phys_to_ttbr \page_table, \tmp
++	phys_to_ttbr \tmp, \page_table
+ 	msr	ttbr1_el1, \tmp
+ 	isb
+ .endm
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index e086c6eff8c6..5aa9ccf6db99 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -63,7 +63,7 @@ __do_hyp_init:
+ 	cmp	x0, #HVC_STUB_HCALL_NR
+ 	b.lo	__kvm_handle_stub_hvc
  
- ENTRY(kimage_vaddr)
- 	.quad		_text - TEXT_OFFSET
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 10dd16d7902d..bebec8ef9372 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -96,7 +96,7 @@ ENTRY(__cpu_suspend_enter)
- 	ret
- ENDPROC(__cpu_suspend_enter)
+-	phys_to_ttbr x0, x4
++	phys_to_ttbr x4, x0
+ 	msr	ttbr0_el2, x4
  
--	.pushsection ".idmap.text", "ax"
-+	.pushsection ".idmap.text", "awx"
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	bl	__cpu_setup
+ 	mrs	x4, tcr_el1
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index cfd22ba9b510..71baed7e592a 100644
+index ab8660eb55ca..cfd22ba9b510 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -90,7 +90,7 @@ ENDPROC(cpu_do_suspend)
-  *
-  * x0: Address of context pointer
-  */
--	.pushsection ".idmap.text", "ax"
-+	.pushsection ".idmap.text", "awx"
- ENTRY(cpu_do_resume)
- 	ldp	x2, x3, [x0]
- 	ldp	x4, x5, [x0, #16]
-@@ -165,7 +165,7 @@ ENTRY(cpu_do_switch_mm)
- 	b	post_ttbr_update_workaround	// Back to C code...
- ENDPROC(cpu_do_switch_mm)
- 
--	.pushsection ".idmap.text", "ax"
-+	.pushsection ".idmap.text", "awx"
+@@ -153,7 +153,7 @@ ENDPROC(cpu_do_resume)
+ ENTRY(cpu_do_switch_mm)
+ 	mrs	x2, ttbr1_el1
+ 	mmid	x1, x1				// get mm->context.id
+-	phys_to_ttbr x0, x3
++	phys_to_ttbr x3, x0
+ #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+ 	bfi	x3, x1, #48, #16		// set the ASID field in TTBR0
+ #endif
+@@ -169,7 +169,7 @@ ENDPROC(cpu_do_switch_mm)
  
  .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
  	adrp	\tmp1, empty_zero_page
-@@ -199,7 +199,7 @@ ENDPROC(idmap_cpu_replace_ttbr1)
- 	.popsection
+-	phys_to_ttbr \tmp1, \tmp2
++	phys_to_ttbr \tmp2, \tmp1
+ 	msr	ttbr1_el1, \tmp2
+ 	isb
+ 	tlbi	vmalle1
+@@ -188,7 +188,7 @@ ENTRY(idmap_cpu_replace_ttbr1)
  
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--	.pushsection ".idmap.text", "ax"
-+	.pushsection ".idmap.text", "awx"
+ 	__idmap_cpu_set_reserved_ttbr1 x1, x3
  
- 	.macro	__idmap_kpti_get_pgtable_ent, type
- 	dc	cvac, cur_\()\type\()p		// Ensure any existing dirty
-@@ -388,7 +388,7 @@ ENDPROC(idmap_kpti_install_ng_mappings)
-  *	Initialise the processor for turning the MMU on.  Return in x0 the
-  *	value of the SCTLR_EL1 register.
-  */
--	.pushsection ".idmap.text", "ax"
-+	.pushsection ".idmap.text", "awx"
- ENTRY(__cpu_setup)
- 	tlbi	vmalle1				// Invalidate local TLB
- 	dsb	nsh
+-	phys_to_ttbr x0, x3
++	phys_to_ttbr x3, x0
+ 	msr	ttbr1_el1, x3
+ 	isb
+ 
 -- 
 2.1.4
