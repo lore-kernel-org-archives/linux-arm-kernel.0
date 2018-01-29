@@ -1,74 +1,148 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Jan 2018 10:27:39 +0100
-Subject: [PATCH v2 04/16] iio: adc: sun4i-gpadc-iio: rework: sampling
- start/end code readout reg
-In-Reply-To: <20180128232919.12639-5-embed3d@gmail.com>
+Date: Mon, 29 Jan 2018 10:31:14 +0100
+Subject: [PATCH v2 05/16] iio: adc: sun4i-gpadc-iio: rework: support
+ clocks and reset
+In-Reply-To: <20180128232919.12639-6-embed3d@gmail.com>
 References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-5-embed3d@gmail.com>
-Message-ID: <20180129092739.665yh3k7pb3ty33u@flea.lan>
+ <20180128232919.12639-6-embed3d@gmail.com>
+Message-ID: <20180129093114.nwohas57kxh347w6@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jan 29, 2018 at 12:29:07AM +0100, Philipp Rossak wrote:
+On Mon, Jan 29, 2018 at 12:29:08AM +0100, Philipp Rossak wrote:
 > For adding newer sensor some basic rework of the code is necessary.
 > 
-> This commit reworks the code and allows the sampling start/end code and
-> the position of value readout register to be altered. Later the start/end
-> functions will be used to configure the ths and start/stop the
-> sampling.
+> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
+> inputs (bus clock and sampling clock) and a reset. The registers are
+> also re-arranged.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> This commit reworks the code, adds the process of the clocks and
+> resets.
+> 
 > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-That signed-off-by chain doesn't really make much sense. If Icenowy is
-the author, she should be reported as such in the commit, and if
-you're the author, you shouldn't have her Signed-off-by.
+Same remark for the SoB
 
 > ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 44 ++++++++++++++++++++++++++++++++++-----
->  1 file changed, 39 insertions(+), 5 deletions(-)
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 71 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
 > 
 > diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 03804ff9c006..db57d9fffe48 100644
+> index db57d9fffe48..51ec0104d678 100644
 > --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 > +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -49,6 +49,15 @@ static unsigned int sun6i_gpadc_chan_select(unsigned int chan)
->  	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
->  }
+> @@ -22,6 +22,7 @@
+>   * shutdown for not being used.
+>   */
 >  
-> +struct sun4i_gpadc_iio;
-> +
-> +/*
-> + * Prototypes for these functions, which enable these functions to be
-> + * referenced in gpadc_data structures.
-> + */
-> +static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info);
-> +static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info);
-> +
->  struct gpadc_data {
->  	int		temp_offset;
->  	int		temp_scale;
-> @@ -56,6 +65,9 @@ struct gpadc_data {
->  	unsigned int	tp_adc_select;
->  	unsigned int	(*adc_chan_select)(unsigned int chan);
->  	unsigned int	adc_chan_mask;
-> +	unsigned int	temp_data;
-> +	int		(*sample_start)(struct sun4i_gpadc_iio *info);
-> +	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+> +#include <linux/clk.h>
+>  #include <linux/completion.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> @@ -31,6 +32,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> +#include <linux/reset.h>
+>  #include <linux/thermal.h>
+>  #include <linux/delay.h>
+>  
+> @@ -68,6 +70,9 @@ struct gpadc_data {
+>  	unsigned int	temp_data;
+>  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+> +	bool		has_bus_clk;
+> +	bool		has_bus_rst;
+> +	bool		has_mod_clk;
+
+Is there SoCs where this insn't all true, or all false?
+
 >  };
 >  
 >  static const struct gpadc_data sun4i_gpadc_data = {
-> @@ -65,6 +77,9 @@ static const struct gpadc_data sun4i_gpadc_data = {
->  	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
->  	.adc_chan_select = &sun4i_gpadc_chan_select,
->  	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
-> +	.temp_data = SUN4I_GPADC_TEMP_DATA,
+> @@ -127,6 +132,9 @@ struct sun4i_gpadc_iio {
+>  	atomic_t			ignore_temp_data_irq;
+>  	const struct gpadc_data		*data;
+>  	bool				no_irq;
+> +	struct clk			*bus_clk;
+> +	struct clk			*mod_clk;
+> +	struct reset_control		*reset;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+>  	struct thermal_zone_device	*tzd;
+> @@ -420,6 +428,10 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>  
+> +	clk_disable(info->mod_clk);
+> +
 
-You can use a regmap_field there.
+Why clk_disable?
 
-Thanks!
+> +	clk_disable(info->bus_clk);
+> +
+
+You can tie the bus_clk to the regmap directly, instead of having to
+maintain it yourself here.
+
+And you can probably put the device in reset and out of reset here as
+well.
+
+>  	return info->data->sample_end(info);
+>  }
+>  
+> @@ -446,6 +458,10 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>  
+> +	clk_enable(info->mod_clk);
+> +
+> +	clk_enable(info->bus_clk);
+> +
+>  	return info->data->sample_start(info);
+>  }
+>  
+> @@ -560,10 +576,59 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  		return ret;
+>  	}
+>  
+> +	if (info->data->has_bus_rst) {
+> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
+> +		if (IS_ERR(info->reset)) {
+> +			ret = PTR_ERR(info->reset);
+> +			return ret;
+> +		}
+> +
+> +		ret = reset_control_deassert(info->reset);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	if (info->data->has_bus_clk) {
+> +		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
+> +		if (IS_ERR(info->bus_clk)) {
+> +			ret = PTR_ERR(info->bus_clk);
+> +			goto assert_reset;
+> +		}
+> +
+> +		ret = clk_prepare_enable(info->bus_clk);
+> +		if (ret)
+> +			goto assert_reset;
+> +	}
+> +
+> +	if (info->data->has_mod_clk) {
+> +		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
+> +		if (IS_ERR(info->mod_clk)) {
+> +			ret = PTR_ERR(info->mod_clk);
+> +			goto disable_bus_clk;
+> +		}
+> +
+> +		/* Running at 6MHz */
+> +		ret = clk_set_rate(info->mod_clk, 4000000);
+
+Your comment and the line below doesn't really make much sense :)
+
 Maxime
 
 -- 
@@ -81,4 +155,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/fc2a1896/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/8fb943c0/attachment.sig>
