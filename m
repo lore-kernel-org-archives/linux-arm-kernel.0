@@ -1,59 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jan 2018 15:04:00 +0000
-Subject: [PATCH v2] irqchip: stm32: Fix copyright
-In-Reply-To: <alpine.DEB.2.20.1801291550550.1849@nanos>
-References: <20171130084500.23439-1-benjamin.gaignard@st.com>
- <CALszF6Dfj5VzjU8gqbnGjLT3aty_OrXkFjP_8Jtp7mieXz4h=Q@mail.gmail.com>
- <CA+M3ks6Hc34NDfdkJPNFqJd-0Q+1KPn-G5DFa+bpd8LyukQsdg@mail.gmail.com>
- <alpine.DEB.2.20.1801291550550.1849@nanos>
-Message-ID: <08a3bea5-0859-307f-2527-e96982581301@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 29 Jan 2018 16:19:29 +0100
+Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
+ support
+In-Reply-To: <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
+References: <20180103121840.29316-1-horms+renesas@verge.net.au>
+ <20180103121840.29316-3-horms+renesas@verge.net.au>
+ <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
+ <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
+ <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
+ <20180129142357.sw3d4f5d4hwmveua@verge.net.au>
+ <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
+Message-ID: <20180129151928.ooh5uirmjgtyjcjm@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 14:51, Thomas Gleixner wrote:
-> On Mon, 29 Jan 2018, Benjamin Gaignard wrote:
->> 2017-11-30 10:15 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
->>> 2017-11-30 9:45 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
->>>> Uniformize STMicroelectronics copyrights header
->>>> Add SPDX identifier
->>>>
->>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->>>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>> CC: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>> ---
->>>>  drivers/irqchip/irq-stm32-exti.c | 3 ++-
->>>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
->>>> index 31ab0dee2ce7..36f0fbe36c35 100644
->>>> --- a/drivers/irqchip/irq-stm32-exti.c
->>>> +++ b/drivers/irqchip/irq-stm32-exti.c
->>>> @@ -1,7 +1,8 @@
->>>> +// SPDX-License-Identifier: GPL-2.0
->>>>  /*
->>>>   * Copyright (C) Maxime Coquelin 2015
->>>> + * Copyright (C) STMicroelectronics 2017
->>>>   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>> - * License terms:  GNU General Public License (GPL), version 2
->>>>   */
->>>>
->>>>  #include <linux/bitops.h>
->>>> --
->>>> 2.15.0
->>>>
->>>
->>> Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>
->>
->> Gentle ping on this simple SPDX patch.
+On Mon, Jan 29, 2018 at 04:01:49PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> I'll pick it up if Marc hasn't done yet.
+> On Mon, Jan 29, 2018 at 3:24 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
+> >> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
+> >> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> >> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+> >> >> >
+> >> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>
+> >> >> As the CPG/MSSR driver now has suspend/resume support, do we need
+> >> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
+> >> >> by cpufreq during system resume, for both the primary and the secondary
+> >> >> CPU cores?
+> >> >
+> >> > I am a bit unsure.
+> >> >
+> >> > When using the A57 cores, which is the default case, the Z clk is queried
+> >> > by CPUFreq on resume. It appears that on my system its already set to the
+> >> > correct value but I assume if it was not then it would be reset. However,
+> >> > this does not cover Z2 clk. So perhaps to be safe we need to register
+> >> > notifiers and make sure they they play nicely with CPUFreq?
+> >>
+> >> Of course the CPU is special: unlike many other devices, it must be running
+> >> when the kernel is reentered upon system resume.
+> >> It may be running using a different frequency setting, though.
+> >> However, following "opp-suspend", the system will always suspend with the
+> >> Z clock running at 1.5GHz, which is the default?
+> >> So Z is probably OK.
+> >>
+> >> It's more interesting to check what happens when the little cores are
+> >> enabled as well (unfortunately that requires different firmware).
+> >> 1. Does cpufreq handle them correctly when they are onlined again during
+> >>    system resume?
+> >
+> > I tested this by updating the firmware on an H3 ES2.0 / Salvator-XS
+> > using the instructions at
+> > https://elinux.org/R-Car/Virtualization#Enabling_HYP_Support
+> 
+> > # grep -E -w "pll[01]|z|z2" /sys/kernel/debug/clk/clk_summary
+> >           z2                              0            0  1198080000          0 0
+> >        .pll1                              1            1  3194880000          0 0
+> >        .pll0                              0            0  2995200000          0 0
+> >           z                               0            0  1497600000          0 0
+> 
+> You know it's PLL2, not PLL1, you want to look at? ;-)
 
-I must have missed it, sorry about that. Thomas, please to pick it up if
-you can.
+Sorry, I will double check but I had looked at PLL2 earlier:
+I just messed things up when preparing things to post in email.
 
-Thanks,
+> Thanks for checking, looks all good!
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ok, so do you think we can merge this series with
+the off-by-one problem fixed?
