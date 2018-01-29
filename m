@@ -1,27 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 29 Jan 2018 11:32:48 +0000
-Subject: [linux-sunxi] [PATCH 1/3] ASoC: sun4i-i2s: Add set_tdm_slot
- functionality
-In-Reply-To: <CAEKpxBn6FNLCN22Bax1RiTdZbsHOqq6Ls5k2JYz6QJt4_77ffA@mail.gmail.com>
-References: <20180124141101.12867-1-codekipper@gmail.com>
- <20180124141101.12867-2-codekipper@gmail.com>
- <CAGb2v67eYFP1cnJ8iY9-Y-50kSbuY_Wip51q0veqx9z0_Prenw@mail.gmail.com>
- <CAEKpxBn6FNLCN22Bax1RiTdZbsHOqq6Ls5k2JYz6QJt4_77ffA@mail.gmail.com>
-Message-ID: <20180129113248.GA10969@sirena.org.uk>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Mon, 29 Jan 2018 19:36:34 +0800
+Subject: [PATCH v3 0/6] 32bit ARM branch predictor hardening
+In-Reply-To: <20180125152139.32431-1-marc.zyngier@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+Message-ID: <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 08:34:00AM +0100, Code Kipper wrote:
+Hi Marc,
 
-> I'm not sure..I was looking for a clean example of being able to
-> override the number of bclks in the lrclk width and some other
-> devices(Rpi) were doing it this way.  I open to suggestions,
+On 2018/1/25 23:21, Marc Zyngier wrote:
+> This small series implements some basic BP hardening by invalidating
+> the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
+> attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
+> 32bit kernels that run on 64bit capable CPUs. This series doesn't
+> mitigate Spectre variant 1 either.
+> 
+> These patches are closely modelled against what we do on arm64,
+> although simpler as we can rely on an architected instruction to
+> perform the invalidation. The notable exception is Cortex-A15, where
+> BTB invalidation behaves like a NOP, and the only way to shoot the
+> predictor down is to invalidate the icache *and* to have ACTLR[0] set
+> to 1 (which is a secure-only operation).
+> 
+> The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
+> generalises it to be used on all affected CPUs. The second perform the
+> same invalidation on prefetch abort outside of the userspace
+> range. The third one nukes it on guest exit, and results in some major
+> surgery as we cannot take a branch from the vectors (that, and Thumb2
+> being a massive pain).
+> 
+> Patches 4 to 6 are doing a similar thing for Cortex-A15, which the
+> aforementioned ICIALLU.
 
-You're looking for set_bclk_ratio() I think.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/2569891e/attachment.sig>
+I have tested this patch set on A9 and A15 based machines, but with
+no kvm support, it booted ok, and passed our test framework which
+has thousands of test cases (not related to performance :) ), so
+with patch 1,2,4,5 in this patch set,
+
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+By the way, this patch set just enable branch predictor hardening
+on arm32 unconditionally, but some of machines (such as wireless
+network base station) will not be exposed to user to take advantage
+of variant 2, and those machines will be pretty sensitive for
+performance, so can we introduce Kconfig or boot option to disable
+branch predictor hardening as an option?
+
+Thanks
+Hanjun
