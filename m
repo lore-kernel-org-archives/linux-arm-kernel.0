@@ -1,55 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 30 Jan 2018 00:33:01 +0100
-Subject: [PATCH] sound/tlv320dac33: Add device tree support
-In-Reply-To: <20180129232031.GA7695@lenoch>
-References: <20180129230539.GA18280@amd>
- <20180129232031.GA7695@lenoch>
-Message-ID: <20180129233301.GA18104@amd>
+From: anders.roxell@linaro.org (Anders Roxell)
+Date: Tue, 30 Jan 2018 00:49:00 +0100
+Subject: [PATCH] arch/arm/Kconfig: enable ARM_MODULE_PLTS when LOCKDEP=y
+Message-ID: <20180129234900.11121-1-anders.roxell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
-> On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
-> > 
-> > This adds device tree support to tlv320dac33.c.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> > new file mode 100644
-> > index 0000000..6cbd311
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> > @@ -0,0 +1,32 @@
-> > +Texas Instruments - tlv320dac33 Codec module
-> > +
-> > +The tlv320dac33 serial control bus communicates through I2C protocols.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible - "ti,tlv320dac33"
-> > +- reg - I2C slave address
-> > +
-> > +Optional properties:
-> > +
-> > +- power-gpios - gpio pin to power the device, active high
-> 
-> While driver used gpio in platform data, isn't it more likely
-> regulator which powers device?
+While testing multi_v7_defconfig with LOCKDEP enabled, the kernel
+fails to load simple modules, as reported by kselftest:
 
-                power-gpios = <&gpio2 28 0>; /* gpio_60 */
+[   34.107620] test_printf: section 4 reloc 2 sym 'memset': relocation
+28 out of range (0xbf046044 -> 0xc109f720)
+selftests: printf.sh [FAIL]
 
-Looks like GPIO to me -- example is from Nokia N9. So this appears to
-be correct.
+The problem that is seen when LOCKDEP is enabled without
+ARM_MODULE_PLTS, is that LOCKDEP eats so much memory that the top of the
+kernel gets out of reach from the bottom of the module area.
 
-								Pavel
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 51c8df561077..a339157497c6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -20,6 +20,7 @@ config ARM
+ 	select ARCH_USE_BUILTIN_BSWAP
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+ 	select ARCH_WANT_IPC_PARSE_VERSION
++	select ARM_MODULE_PLTS if LOCKDEP
+ 	select BUILDTIME_EXTABLE_SORT if MMU
+ 	select CLONE_BACKWARDS
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/a8d14f82/attachment.sig>
+2.11.0
