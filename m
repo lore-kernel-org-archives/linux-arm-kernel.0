@@ -1,34 +1,104 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 16:58:07 +0100
-Subject: [PATCH v4 3/6] arm: dts: sun8i: a83t: Add the cir pin for the A83T
-In-Reply-To: <20180129155810.7867-1-embed3d@gmail.com>
-References: <20180129155810.7867-1-embed3d@gmail.com>
-Message-ID: <20180129155810.7867-4-embed3d@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 29 Jan 2018 16:09:41 +0000
+Subject: [RFC PATCH] tty: pl011: Avoid stuck-off spurious interrupts
+Message-ID: <1517242181-20652-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CIR Pin of the A83T is located at PL12.
+Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+clears the RX and receive timeout interrupts on pl011 startup, to
+avoid a screaming-interrupt scenario that can occur when the
+firmware or bootloader leaves these interrupts spuriously
+asserted.
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+This has been noted as an issue when running Linux on qemu [1].
+
+Unfortunately, the above fix seems to lead to potential
+misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
+on driver startup, if the RX FIFO is also already full to the
+trigger level.
+
+Clearing the RX FIFO interrupt does not change the FIFO fill level.
+In this scenario, because the interrupt is now clear and because
+the FIFO is already full to the trigger level, no new assertion of
+the RX FIFO interrupt can occur unless the FIFO is drained back
+below the trigger level.  This never occurs because the pl011
+driver is waiting for an RX FIFO interrupt to tell it that there is
+something to read, and does not read the FIFO at all until that
+interrupt occurs.
+
+Thus, simply clearing "spurious" interrupts on startup may be
+misguided, since there is no way to be sure that the interrupts are
+truly spurious, and things can go wrong if they are not.
+
+This patch attempts to handle (suspected) spurious interrupts more
+robustly, by allowing the interrupt(s) to fire but quenching the
+scream.
+
+pl011_int() runs and attempts to drain the FIFO anyway just as if
+the interrupts were real.  If the FIFO is already empty, great.  To
+avoid a screaming spurious interrupt, the RX FIFO and timeout
+interrupts are now explicitly cleared in between committing to
+drain the RX FIFO and actually draining it.  We do not have to
+worry about lost interrupts here, because we are effectively in
+polled mode inside pl011_int() until the RX FIFO becomes empty:
+
+  * A new char received before the RX FIFO is fully drained will be
+    drained out synchronously by pl011_int() along with the other
+    chars already pending.  A new char received after the RX FIFO
+    is drained will result in correct RX FIFO interrupt assertion,
+    because emptying the RX FIFO guarantees that the RX FIFO /
+    timeout interrupt state machines are back in a sane state.
+
+  * A new RX timeout before the RX FIFO is fully drained is no
+    problem, because pl011_int() has already committed to emptying
+    the FIFO at this point, guaranteeing that no stray chars will
+    be left behind.  A new RX timeout after the RX FIFO is fully
+    drained will result in correct interrupt assertion.
+
+This patch does not attempt to address the case where the RX FIFO
+fills faster than it can be drained: that is a pathological
+condition that is beyond the scope of the driver to work around.
+Users cannot expect this to work unless they enable hardware flow
+control.
+
+[1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
+before enabled the interruption
+https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
+
+Reported-by: Wei Xu <xuwei5@hisilicon.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Peter Maydell <peter.maydell@linaro.org>
+Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/tty/serial/amba-pl011.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index de5119a2a91c..06e96db7c41a 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -617,6 +617,11 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 04af8de..e7b5fc6 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1492,9 +1492,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
+ 		do {
+ 			check_apply_cts_event_workaround(uap);
  
-+			cir_pins: cir-pins at 0 {
-+				pins = "PL12";
-+				function = "s_cir_rx";
-+			};
-+
- 			r_rsb_pins: r-rsb-pins {
- 				pins = "PL0", "PL1";
- 				function = "s_rsb";
+-			pl011_write(status & ~(UART011_TXIS|UART011_RTIS|
+-					       UART011_RXIS),
+-				    uap, REG_ICR);
++			pl011_write(status & ~UART011_TXIS, uap, REG_ICR);
+ 
+ 			if (status & (UART011_RTIS|UART011_RXIS)) {
+ 				if (pl011_dma_rx_running(uap))
+@@ -1733,8 +1731,6 @@ static void pl011_enable_interrupts(struct uart_amba_port *uap)
+ {
+ 	spin_lock_irq(&uap->port.lock);
+ 
+-	/* Clear out any spuriously appearing RX interrupts */
+-	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
+ 	uap->im = UART011_RTIM;
+ 	if (!pl011_dma_rx_running(uap))
+ 		uap->im |= UART011_RXIM;
 -- 
-2.11.0
+2.1.4
