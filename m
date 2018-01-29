@@ -1,31 +1,57 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 29 Jan 2018 10:41:17 +0530
-Subject: [PATCH 03/15] ARM: dts: ipq4019: Change the max opp frequency
+Date: Mon, 29 Jan 2018 10:41:18 +0530
+Subject: [PATCH 04/15] ARM: dts: ipq4019: Update ipq4019-dk01.1 board data
 In-Reply-To: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
 References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517202689-14212-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1517202689-14212-5-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The max opp frequency is 716MHZ. So update that.
+Adds missing memory and reserved-memory node.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 28 +++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index e38fffa..2ee71c2 100644
---- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -47,7 +47,7 @@
- 				48000	1100000
- 				200000	1100000
- 				500000	1100000
--				666000	1100000
-+				716000  1100000
- 			>;
- 			clock-latency = <256000>;
- 		};
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+index e413b21e..ad0fbc9 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+@@ -20,6 +20,34 @@
+ 	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
+ 	compatible = "qcom,ipq4019";
+ 
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256MB */
++	};
++
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		rsvd1 at 87000000 {
++			/* Reserved for other subsystem */
++			reg = <0x87000000 0x500000>;
++			no-map;
++		};
++
++		wifi_dump at 87500000 {
++			reg = <0x87500000 0x600000>;
++			no-map;
++		};
++
++		rsvd2 at 87B00000 {
++			/* Reserved for other subsystem */
++			reg = <0x87B00000 0x500000>;
++			no-map;
++		};
++	};
++
+ 	soc {
+ 		rng at 22000 {
+ 			status = "ok";
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
