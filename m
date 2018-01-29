@@ -1,174 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 29 Jan 2018 10:14:44 +0800
-Subject: [PATCH v2 15/19] drm/sun4i: backend: Check for the number of
- alpha planes
-In-Reply-To: <7371f62a1385f2cbe3ed75dfca2e746338eb2286.1516617243.git-series.maxime.ripard@free-electrons.com>
+Date: Mon, 29 Jan 2018 10:22:54 +0800
+Subject: [PATCH v2 16/19] drm/sun4i: backend: Assign the pipes
+ automatically
+In-Reply-To: <d4ae26685ad75bd2dde3c3c3b7d086fb544347cc.1516617243.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
- <7371f62a1385f2cbe3ed75dfca2e746338eb2286.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66widuPE1im1kykAsh3y8Pj-dpSBF9xyvDtytFFh8XDNQ@mail.gmail.com>
+ <d4ae26685ad75bd2dde3c3c3b7d086fb544347cc.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v662Qx6nY3Tgvnh=CRMoSDsFwNEiZwW+X8YuN8zMaNwLgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jan 22, 2018 at 6:35 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Due to the way the composition is done in hardware, we can only have a
-> single alpha-enabled plane active at a time, placed in the second (highest
-> priority) pipe.
+> Since we now have a way to enforce the zpos, check for the number of alpha
+> planes, the only missing part is to assign our pipe automatically instead
+> of hardcoding it.
 >
-> Make sure of that in our atomic_check to not end up in an impossible
-> scenario.
+> The algorithm is quite simple, but requires two iterations over the list of
+> planes.
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 50 ++++++++++++++++++++++++++++-
->  drivers/gpu/drm/sun4i/sun4i_backend.h |  2 +-
->  drivers/gpu/drm/sun4i/sun4i_layer.c   | 23 +-------------
->  3 files changed, 53 insertions(+), 22 deletions(-)
+> In the first one (which is the same one that we've had to check for alpha,
+> the frontend usage, and so on), we order the planes by their zpos.
 >
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index c4986054909b..eb1749d2c0d5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -329,6 +329,8 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
->         struct drm_atomic_state *state = crtc_state->state;
->         struct drm_device *drm = state->dev;
->         struct drm_plane *plane;
-> +       unsigned int num_planes = 0;
-> +       unsigned int num_alpha_planes = 0;
->         unsigned int num_frontend_planes = 0;
+> We can then do a second iteration over that array by ascending zpos
+> starting with the pipe 0. When and if we encounter our alpha plane, we put
+> it and all the other subsequent planes in the second pipe.
 >
->         DRM_DEBUG_DRIVER("Starting checking our planes\n");
-> @@ -341,6 +343,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
->                         drm_atomic_get_plane_state(state, plane);
->                 struct sun4i_layer_state *layer_state =
->                         state_to_sun4i_layer_state(plane_state);
-> +               struct drm_framebuffer *fb = plane_state->fb;
->
->                 if (sun4i_backend_plane_uses_frontend(plane_state)) {
->                         DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
-> @@ -351,6 +354,50 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
->                 } else {
->                         layer_state->uses_frontend = false;
->                 }
-> +
-> +               DRM_DEBUG_DRIVER("Plane FB format is %s\n",
-> +                                drm_get_format_name(fb->format->format,
-> +                                                    &format_name));
-> +               if (fb->format->has_alpha)
-> +                       num_alpha_planes++;
-> +
-> +               num_planes++;
-> +       }
-> +
-> +       /*
-> +        * The hardware is a bit unusual here.
-> +        *
-> +        * Even though it supports 4 layers, it does the composition
-> +        * in two separate steps.
-> +        *
-> +        * The first one is assigning a layer to one of its two
-> +        * pipes. If more that 1 layer is assigned to the same pipe,
-> +        * and if pixels overlaps, the pipe will take the pixel from
-> +        * the layer with the highest priority.
-> +        *
-> +        * The second step is the actual alpha blending, that takes
-> +        * the two pipes as input, and uses the eventual alpha
-> +        * component to do the transparency between the two.
-> +        *
-> +        * This two steps scenario makes us unable to guarantee a
-> +        * robust alpha blending between the 4 layers in all
-> +        * situations, since this means that we need to have one layer
-> +        * with alpha at the lowest position of our two pipes.
-> +        *
-> +        * However, we cannot even do that, since the hardware has a
-> +        * bug where the lowest plane of the lowest pipe (pipe 0,
-> +        * priority 0), if it has any alpha, will discard the pixel
-> +        * entirely and just display the pixels in the background
-> +        * color (black by default).
-> +        *
-> +        * Since means that we effectively have only three valid
+> And since we have runtime checks and pipe assignments now, we can just
+> remove the static declaration of the planes we used to have.
 
-             ^^^^^ This
-
-> +        * configurations with alpha, all of them with the alpha being
-> +        * on pipe1 with the lowest position, which can be 1, 2 or 3
-> +        * depending on the number of planes and their zpos.
-> +        */
-> +       if (num_alpha_planes > SUN4I_BACKEND_NUM_ALPHA_LAYERS) {
-> +               DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
-> +               return -EINVAL;
->         }
->
->         if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
-> @@ -358,6 +405,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
->                 return -EINVAL;
->         }
->
-> +       DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video\n",
-> +                        num_planes, num_alpha_planes, num_frontend_planes);
-> +
->         return 0;
->  }
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> index 04a4f11b87a8..52e77591186a 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> @@ -146,6 +146,8 @@
->  #define SUN4I_BACKEND_HWCCOLORTAB_OFF          0x4c00
->  #define SUN4I_BACKEND_PIPE_OFF(p)              (0x5000 + (0x400 * (p)))
->
-> +#define SUN4I_BACKEND_NUM_LAYERS               4
-> +#define SUN4I_BACKEND_NUM_ALPHA_LAYERS         1
->  #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS      1
->
->  struct sun4i_backend {
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index fbf25d59cf88..900e716443b8 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -201,32 +201,11 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
->         struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
->         int i;
->
-> -       planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
-> +       planes = devm_kcalloc(drm->dev, SUN4I_BACKEND_NUM_LAYERS,
->                               sizeof(*planes), GFP_KERNEL);
-
-The returned "planes" array has to have a sentinel at the end, as we
-never return the actual number of layers created. That is what the +1
-was for in the original code.
-
-Otherwise,
+It would be slightly better if you could split this out into a separate
+patch. It's not immediately obvious to others that the changes to
+sun4i_layer.c are self-contained, while the change to sun4i_layer.h
+is part of the new pipeline tracking thing. Plus I think the way you
+structured everything means it won't break if you split it out.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
->         if (!planes)
->                 return ERR_PTR(-ENOMEM);
->
-> -       /*
-> -        * The hardware is a bit unusual here.
-> -        *
-> -        * Even though it supports 4 layers, it does the composition
-> -        * in two separate steps.
-> -        *
-> -        * The first one is assigning a layer to one of its two
-> -        * pipes. If more that 1 layer is assigned to the same pipe,
-> -        * and if pixels overlaps, the pipe will take the pixel from
-> -        * the layer with the highest priority.
-> -        *
-> -        * The second step is the actual alpha blending, that takes
-> -        * the two pipes as input, and uses the eventual alpha
-> -        * component to do the transparency between the two.
-> -        *
-> -        * This two steps scenario makes us unable to guarantee a
-> -        * robust alpha blending between the 4 layers in all
-> -        * situations. So we just expose two layers, one per pipe. On
-> -        * SoCs that support it, sprites could fill the need for more
-> -        * layers.
-> -        */
->         for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
->                 const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
->                 struct sun4i_layer *layer;
-> --
-> git-series 0.9.1
