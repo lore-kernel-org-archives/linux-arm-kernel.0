@@ -1,58 +1,83 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 10:27:14 -0600
-Subject: [PATCH 2/3] ARM: dts: exynos: Fix missing missing reg warning
- for syscon restart nodes
-In-Reply-To: <20180116213129.16209-2-krzk@kernel.org>
-References: <20180116213129.16209-1-krzk@kernel.org>
- <20180116213129.16209-2-krzk@kernel.org>
-Message-ID: <20180129162714.2xrqrkfd2xo4jn2g@rob-hp-laptop>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 29 Jan 2018 18:30:20 +0200
+Subject: [PATCH v3 2/4] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
+In-Reply-To: <20180129161134.tm6dhsygvbt3ogxf@rob-hp-laptop>
+References: <cover.1516105893.git.baruch@tkos.co.il>
+ <248ce2c6c79b281261184a0ccde8513a9074af4c.1516105893.git.baruch@tkos.co.il>
+ <20180129161134.tm6dhsygvbt3ogxf@rob-hp-laptop>
+Message-ID: <20180129163020.yr3orbrwg4wmq7p4@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 16, 2018 at 10:31:28PM +0100, Krzysztof Kozlowski wrote:
-> Fix DTC warnings like:
-> 
->     arch/arm/boot/dts/exynos4412-trats2.dtb: Warning (simple_bus_reg):
->         Node /soc/syscon-poweroff missing or empty reg/ranges property
->     arch/arm/boot/dts/exynos4412-trats2.dtb: Warning (simple_bus_reg):
->         Node /soc/syscon-reboot missing or empty reg/ranges property
-> 
-> by moving the syscon poweroff and restart nodes into the PMU (Power
-> Management Unit) node.  The PMU node is the actual block responsible for
-> power management, including typical Exynos on/off/restart procedures.
-> Therefore the syscon poweroff and restart nodes logically belong to it.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> ---
-> 
-> Tested on Exynos5420 and Exynos4412. Other tests are welcomed.
-> ---
->  .../devicetree/bindings/arm/samsung/pmu.txt        |  4 +++-
->  arch/arm/boot/dts/exynos-syscon-restart.dtsi       | 28 ++++++++++------------
->  arch/arm/boot/dts/exynos3250.dtsi                  |  4 ++--
->  arch/arm/boot/dts/exynos4.dtsi                     |  5 ++--
->  arch/arm/boot/dts/exynos4412.dtsi                  |  2 +-
->  arch/arm/boot/dts/exynos5.dtsi                     |  1 -
->  arch/arm/boot/dts/exynos5250.dtsi                  |  3 ++-
->  arch/arm/boot/dts/exynos5410.dtsi                  |  3 ++-
->  arch/arm/boot/dts/exynos5420.dtsi                  |  3 ++-
->  9 files changed, 27 insertions(+), 26 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-> index 779f5614bcee..405646655ec7 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-> @@ -12,6 +12,8 @@ Properties:
->  		   - "samsung,exynos5433-pmu" - for Exynos5433 SoC.
->  		   - "samsung,exynos7-pmu" - for Exynos7 SoC.
->  		second value must be always "syscon".
-> +		If PMU contains optional syscon-poweroff or syscon-restart nodes,
-> +		then third value must be "simple-mfd".
+Hi Rob,
 
-I don't think this is right. simple-mfd is only for cases where the 
-parent has no setup that the child nodes are dependent on. You need the 
-regmap setup by the parent before the child can be enumerated. The 
-correct thing to do here is add an of_platform_default_populate() call.
+Thanks for reviewing.
 
-Rob
+On Mon, Jan 29, 2018 at 10:11:34AM -0600, Rob Herring wrote:
+> On Tue, Jan 16, 2018 at 02:45:08PM +0200, Baruch Siach wrote:
+> > The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+> > I2C. The firmware mailbox interface allows the ARM core to control the
+> > GPIO lines.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> > v3:
+> >   * Rename node name.
+> > 
+> > v2:
+> >   * Rename compatible string to raspberrypi,firmware-gpio
+> > ---
+> >  .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 24 ++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+> > new file mode 100644
+> > index 000000000000..936dc59eba12
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+> > @@ -0,0 +1,24 @@
+> > +Raspberry Pi GPIO expander
+> > +
+> > +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
+> > +firmware exposes a mailbox interface that allows the ARM core to control the
+> > +GPIO lines on the expander.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible : Should be "raspberrypi,firmware-gpio"
+> > +- gpio-controller : Marks the device node as a gpio controller
+> > +- #gpio-cells : Should be two.  The first cell is the pin number, and
+> > +  the second cell is used to specify the gpio polarity:
+> > +  0 = active high
+> > +  1 = active low
+> > +- firmware : Reference to the RPi firmware device node
+> > +
+> > +Example:
+> > +
+> > +expgpio: gpio-expander {
+> 
+> Still not right. The correct generic node name is "gpio".
+
+I'll fix that.
+
+> > +	compatible = "raspberrypi,firmware-gpio";
+> > +	gpio-controller;
+> > +	#gpio-cells = <2>;
+> > +	firmware = <&firmware>;
+> 
+> Can you make this a child of the firmware node instead?
+
+I guess I can, I'll need to look into it. What is the advantage of that? What 
+about the existing raspberrypi,bcm2835-power[1] node in bcm2835-rpi.dtsi? 
+Should it move under the firmware node as well?
+
+[1] Documentation/devicetree/bindings/soc/bcm/raspberrypi,bcm2835-power.txt
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
