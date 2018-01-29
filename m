@@ -1,50 +1,31 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 29 Jan 2018 10:41:15 +0530
-Subject: [PATCH 01/15] firmware: qcom: scm: Add ipq4019 soc compatible
+Date: Mon, 29 Jan 2018 10:41:17 +0530
+Subject: [PATCH 03/15] ARM: dts: ipq4019: Change the max opp frequency
 In-Reply-To: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
 References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517202689-14212-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1517202689-14212-4-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the compatible for ipq4019.
-This does not need clocks to do scm calls.
+The max opp frequency is 716MHZ. So update that.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- Documentation/devicetree/bindings/firmware/qcom,scm.txt | 3 ++-
- drivers/firmware/qcom_scm.c                             | 3 +++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-index 7b40054..fcf6979 100644
---- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-+++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-@@ -11,9 +11,10 @@ Required properties:
-  * "qcom,scm-msm8660" for MSM8660 platforms
-  * "qcom,scm-msm8690" for MSM8690 platforms
-  * "qcom,scm-msm8996" for MSM8996 platforms
-+ * "qcom,scm-ipq4019" for IPQ4019 platforms
-  * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
- - clocks: One to three clocks may be required based on compatible.
-- * No clock required for "qcom,scm-msm8996"
-+ * No clock required for "qcom,scm-msm8996", "qcom,scm-ipq4019"
-  * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
-  * Core, iface, and bus clocks required for "qcom,scm"
- - clock-names: Must contain "core" for the core clock, "iface" for the interface
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index af4c752..ddc9ea8 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -603,6 +603,9 @@ static void qcom_scm_shutdown(struct platform_device *pdev)
- 	{ .compatible = "qcom,scm-msm8996",
- 	  .data = NULL, /* no clocks */
- 	},
-+	{ .compatible = "qcom,scm-ipq4019",
-+	  .data = NULL, /* no clocks */
-+	},
- 	{ .compatible = "qcom,scm",
- 	  .data = (void *)(SCM_HAS_CORE_CLK
- 			   | SCM_HAS_IFACE_CLK
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index e38fffa..2ee71c2 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -47,7 +47,7 @@
+ 				48000	1100000
+ 				200000	1100000
+ 				500000	1100000
+-				666000	1100000
++				716000  1100000
+ 			>;
+ 			clock-latency = <256000>;
+ 		};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
