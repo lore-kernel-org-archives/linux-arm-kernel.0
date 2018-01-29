@@ -1,141 +1,191 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Mon, 29 Jan 2018 08:52:12 +0100
-Subject: [linux-sunxi] [PATCH 1/3] ASoC: sun4i-i2s: Add set_tdm_slot
- functionality
-In-Reply-To: <CAGb2v65-Cg4GNL6YcJin6x27bu+R4-X8zjhjYO3pnpatGvE+ew@mail.gmail.com>
-References: <20180124141101.12867-1-codekipper@gmail.com>
- <20180124141101.12867-2-codekipper@gmail.com>
- <CAGb2v67eYFP1cnJ8iY9-Y-50kSbuY_Wip51q0veqx9z0_Prenw@mail.gmail.com>
- <CAEKpxBn6FNLCN22Bax1RiTdZbsHOqq6Ls5k2JYz6QJt4_77ffA@mail.gmail.com>
- <CAGb2v65-Cg4GNL6YcJin6x27bu+R4-X8zjhjYO3pnpatGvE+ew@mail.gmail.com>
-Message-ID: <CAEKpxB=MP1S8pbVYAVEGvsxLKaTQOHmq7jJpiD1gDtH7ieCJCw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 29 Jan 2018 17:12:27 +0900
+Subject: [PATCH] arm64: kdump: retain reserved memory regions
+In-Reply-To: <5A61D90E.1000907@arm.com>
+References: <20180110100943.6082-1-takahiro.akashi@linaro.org>
+ <5A55F87F.2080501@arm.com> <20180111113840.GF18820@linaro.org>
+ <5A61D90E.1000907@arm.com>
+Message-ID: <20180129081225.GA23847@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2018 at 08:38, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, Jan 29, 2018 at 3:34 PM, Code Kipper <codekipper@gmail.com> wrote:
->> On 29 January 2018 at 02:50, Chen-Yu Tsai <wens@csie.org> wrote:
->>> On Wed, Jan 24, 2018 at 10:10 PM,  <codekipper@gmail.com> wrote:
->>>> From: Marcus Cooper <codekipper@gmail.com>
->>>>
->>>> Some codecs require a different amount of a bit clocks per frame than
->>>> what is calculated by the sample width. Use the tdm slot bindings to
->>>> provide this mechanism.
->>>>
->>>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->>>> ---
->>>>  sound/soc/sunxi/sun4i-i2s.c | 23 +++++++++++++++++++++--
->>>>  1 file changed, 21 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
->>>> index dca1143c1150..d7a9141514cf 100644
->>>> --- a/sound/soc/sunxi/sun4i-i2s.c
->>>> +++ b/sound/soc/sunxi/sun4i-i2s.c
->>>> @@ -96,6 +96,7 @@
->>>>  #define SUN8I_I2S_CTRL_BCLK_OUT                        BIT(18)
->>>>  #define SUN8I_I2S_CTRL_LRCK_OUT                        BIT(17)
->>>>
->>>> +#define SUN8I_I2S_FMT0_LRCK_MAX_PERIOD         (GENMASK(17, 8) >> 8)
->>>>  #define SUN8I_I2S_FMT0_LRCK_PERIOD_MASK                GENMASK(17, 8)
->>>>  #define SUN8I_I2S_FMT0_LRCK_PERIOD(period)     ((period - 1) << 8)
->>>>
->>>> @@ -193,6 +194,9 @@ struct sun4i_i2s {
->>>>         struct regmap_field     *field_rxchansel;
->>>>
->>>>         const struct sun4i_i2s_quirks   *variant;
->>>> +
->>>> +       unsigned int    tdm_slots;
->>>> +       unsigned int    slot_width;
->>>>  };
->>>>
->>>>  struct sun4i_i2s_clk_div {
->>>> @@ -344,7 +348,7 @@ static int sun4i_i2s_set_clk_rate(struct snd_soc_dai *dai,
->>>>         if (i2s->variant->has_fmt_set_lrck_period)
->>>>                 regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
->>>>                                    SUN8I_I2S_FMT0_LRCK_PERIOD_MASK,
->>>> -                                  SUN8I_I2S_FMT0_LRCK_PERIOD(32));
->>>> +                                  SUN8I_I2S_FMT0_LRCK_PERIOD(word_size));
->>>>
->>>>         return 0;
->>>>  }
->>>> @@ -418,7 +422,8 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
->>>>                            sr + i2s->variant->fmt_offset);
->>>>
->>>>         return sun4i_i2s_set_clk_rate(dai, params_rate(params),
->>>> -                                     params_width(params));
->>>> +                                     i2s->tdm_slots ?
->>>> +                                     i2s->slot_width : params_width(params));
->>>>  }
->>>>
->>>>  static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
->>>> @@ -691,6 +696,19 @@ static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
->>>>         return 0;
->>>>  }
->>>>
->>>> +static int sun4i_i2s_set_dai_tdm_slot(struct snd_soc_dai *dai,
->>>> +       unsigned int tx_mask, unsigned int rx_mask,
->>>> +       int slots, int width)
->>>> +{
->>>> +       struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
->>>> +
->>>> +       i2s->tdm_slots = slots;
->>>> +
->>>> +       i2s->slot_width = width;
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +
->>>
->>> IIRC some of the DAI controllers actually support TDM. Would this
->>> change conflict with that in the future?
->>
->> Hi Wens,
->> I'm not sure..I was looking for a clean example of being able to
->> override the number of bclks in the lrclk width and some other
->> devices(Rpi) were doing it this way.  I open to suggestions,
->
-> I'm not familiar with the issue either. If Mark doesn't have any
-> objections, we could merge it for now, and fix it later if there
-> are any complications.
->
-> BTW, you didn't provide a device tree example (if any) for how
-> to use this.
+James,
 
-Hi Wens,
+On Fri, Jan 19, 2018 at 11:39:58AM +0000, James Morse wrote:
+> Hi Akashi,
+> 
+> On 11/01/18 11:38, AKASHI Takahiro wrote:
+> > On Wed, Jan 10, 2018 at 11:26:55AM +0000, James Morse wrote:
+> >> On 10/01/18 10:09, AKASHI Takahiro wrote:
+> >>> This is a fix against the issue that crash dump kernel may hang up
+> >>> during booting, which can happen on any ACPI-based system with "ACPI
+> >>> Reclaim Memory."
+> 
+> >>> (diagnosis)
+> >>> * This fault is a data abort, alignment fault (ESR=0x96000021)
+> >>>   during reading out ACPI table.
+> >>> * Initial ACPI tables are normally stored in system ram and marked as
+> >>>   "ACPI Reclaim memory" by the firmware.
+> >>> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+> >>>   memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
+> >>>   removing NOMAP bit and they are instead "memblock-reserved".
+> >>> * When crash dump kernel boots up, it tries to accesses ACPI tables by
+> >>>   ioremap'ing them (through acpi_os_ioremap()).
+> >>> * Since those regions are not included in device tree's
+> >>>   "usable-memory-range" and so not recognized as part of crash dump
+> >>>   kernel's system ram, ioremap() will create a non-cacheable mapping here.
+> >>
+> >> Ugh, because acpi_os_ioremap() looks at the efi memory map through the prism of
+> >> what we pulled into memblock, which is different during kdump.
+> >>
+> >> Is an alternative to teach acpi_os_ioremap() to ask
+> >> efi_mem_attributes() directly for the attributes to use?
+> >> (e.g. arch_apei_get_mem_attribute())
+> > 
+> > I didn't think of this approach.
+> > Do you mean a change like the patch below?
+> 
+> Yes. Aha, you can pretty much re-use the helper directly.
+> 
+> It was just a suggestion, removing the extra abstraction that is causing the bug
+> could be cleaner ...
+> 
+> > (I'm still debugging this code since the kernel fails to boot.)
+> 
+> ... but might be too fragile.
+> 
+> There are points during boot when the EFI memory map isn't mapped.
 
-here is an example that I use for the Pine64 audio hat.
-https://github.com/codekipper/linux-sunxi/commit/faa9dfba955bf71ca23b089b1cb678a14443216f#diff-1473a38b339685d191c5a87aab9c0fdfR80
+Right, this was a problem for my patch.
+Attached is the revised and workable one.
+Efi_memmap_init_late() may alternatively be called in acpi_early_init() or
+even in acpi_os_ioremap(), but either way it looks a bit odd.
 
-I've done the same on the A64 for HDMI and analog audio which both use
-the i2s and seem to require 32bit LRCK width.
+Thanks,
+-Takahiro AKASHI
 
-BR,
-CK
+> I think that
+> helper will return 'device memory' for everything when this happens.
+> 
+> 
+> Thanks,
+> 
+> James
+===8<===
+>From c88f4c8106ba7a918c835b1cdf538b1d21019863 Mon Sep 17 00:00:00 2001
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Date: Mon, 29 Jan 2018 15:07:43 +0900
+Subject: [PATCH] arm64: kdump: make acpi_os_ioremap() more generic
 
->
-> ChenYu
->
->> BR,
->> CK
->>>
->>> Thanks
->>> ChenYu
->>>
->>>>  static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
->>>>         .hw_params      = sun4i_i2s_hw_params,
->>>>         .set_fmt        = sun4i_i2s_set_fmt,
->>>> @@ -698,6 +716,7 @@ static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
->>>>         .shutdown       = sun4i_i2s_shutdown,
->>>>         .startup        = sun4i_i2s_startup,
->>>>         .trigger        = sun4i_i2s_trigger,
->>>> +       .set_tdm_slot   = sun4i_i2s_set_dai_tdm_slot,
->>>>  };
->>>>
->>>>  static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
->>>> --
->>>> 2.16.0
->>>>
->>>> --
->>>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->>>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->>>> For more options, visit https://groups.google.com/d/optout.
+---
+ arch/arm64/include/asm/acpi.h | 23 ++++++++++++++++-------
+ arch/arm64/kernel/acpi.c      |  7 ++-----
+ init/main.c                   |  4 ++++
+ 3 files changed, 22 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 32f465a80e4e..d53c95f4e1a9 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -12,10 +12,12 @@
+ #ifndef _ASM_ACPI_H
+ #define _ASM_ACPI_H
+ 
++#include <linux/efi.h>
+ #include <linux/memblock.h>
+ #include <linux/psci.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/io.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -29,18 +31,22 @@
+ 
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
++pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
++
+ /* ACPI table mapping after acpi_permanent_mmap is set */
+ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+ 					    acpi_size size)
+ {
++	/* For normal memory we already have a cacheable mapping. */
++	if (memblock_is_map_memory(phys))
++		return (void __iomem *)__phys_to_virt(phys);
++
+ 	/*
+-	 * EFI's reserve_regions() call adds memory with the WB attribute
+-	 * to memblock via early_init_dt_add_memory_arch().
++	 * We should still honor the memory's attribute here because
++	 * crash dump kernel possibly excludes some ACPI (reclaim)
++	 * regions from memblock list.
+ 	 */
+-	if (!memblock_is_memory(phys))
+-		return ioremap(phys, size);
+-
+-	return ioremap_cache(phys, size);
++	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
+ }
+ #define acpi_os_ioremap acpi_os_ioremap
+ 
+@@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
+  * for compatibility.
+  */
+ #define acpi_disable_cmcff 1
+-pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
++static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
++{
++	return __acpi_get_mem_attribute(addr);
++}
+ #endif /* CONFIG_ACPI_APEI */
+ 
+ #ifdef CONFIG_ACPI_NUMA
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index b3162715ed78..f94bdf7be439 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -31,10 +31,9 @@
+ #include <asm/cpu_ops.h>
+ #include <asm/smp_plat.h>
+ 
+-#ifdef CONFIG_ACPI_APEI
++/* CONFIG_ACPI_APEI */
+ # include <linux/efi.h>
+ # include <asm/pgtable.h>
+-#endif
+ 
+ int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+ int acpi_disabled = 1;
+@@ -239,8 +238,7 @@ void __init acpi_boot_table_init(void)
+ 	}
+ }
+ 
+-#ifdef CONFIG_ACPI_APEI
+-pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
++pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
+ {
+ 	/*
+ 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
+@@ -261,4 +259,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+ 		return __pgprot(PROT_NORMAL_NC);
+ 	return __pgprot(PROT_DEVICE_nGnRnE);
+ }
+-#endif
+diff --git a/init/main.c b/init/main.c
+index a8100b954839..a479ece2bae9 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -674,6 +674,10 @@ asmlinkage __visible void __init start_kernel(void)
+ 	debug_objects_mem_init();
+ 	setup_per_cpu_pageset();
+ 	numa_policy_init();
++#if defined(CONFIG_ARM64) && defined(CONFIG_EFI)
++	efi_memmap_init_late(efi.memmap.phys_map,
++			efi.memmap.nr_map * efi.memmap.desc_size);
++#endif
+ 	acpi_early_init();
+ 	if (late_time_init)
+ 		late_time_init();
+-- 
+2.15.1
