@@ -1,425 +1,49 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Mon, 29 Jan 2018 15:56:39 +0200
-Subject: [PATCH v2 1/2] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB board
-Message-ID: <1517234202-1892-1-git-send-email-stefan@olimex.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 29 Jan 2018 15:11:51 +0100
+Subject: [PATCH v2] irqchip: stm32: Fix copyright
+In-Reply-To: <CALszF6Dfj5VzjU8gqbnGjLT3aty_OrXkFjP_8Jtp7mieXz4h=Q@mail.gmail.com>
+References: <20171130084500.23439-1-benjamin.gaignard@st.com>
+ <CALszF6Dfj5VzjU8gqbnGjLT3aty_OrXkFjP_8Jtp7mieXz4h=Q@mail.gmail.com>
+Message-ID: <CA+M3ks6Hc34NDfdkJPNFqJd-0Q+1KPn-G5DFa+bpd8LyukQsdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is new System-On-Module platform with universal dimm socket for
-easy insertation. The EVB board is designed to be universal with
-future modules. Product page is located here [1].
+2017-11-30 10:15 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> 2017-11-30 9:45 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+>> Uniformize STMicroelectronics copyrights header
+>> Add SPDX identifier
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> CC: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  drivers/irqchip/irq-stm32-exti.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+>> index 31ab0dee2ce7..36f0fbe36c35 100644
+>> --- a/drivers/irqchip/irq-stm32-exti.c
+>> +++ b/drivers/irqchip/irq-stm32-exti.c
+>> @@ -1,7 +1,8 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>>  /*
+>>   * Copyright (C) Maxime Coquelin 2015
+>> + * Copyright (C) STMicroelectronics 2017
+>>   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> - * License terms:  GNU General Public License (GPL), version 2
+>>   */
+>>
+>>  #include <linux/bitops.h>
+>> --
+>> 2.15.0
+>>
+>
+> Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>
 
-There are two dts files - one for base model and another for eMMC variant.
+Gentle ping on this simple SPDX patch.
 
-Base features of A20-SOM204 board includes:
-	* 1GB DDR3 RAM
-	* AXP209 PMU
-	* KSZ9031 Gigabit PHY
-	* AT24C16 EEPROM
-	* Status LED
-	* LCD connector
-	* GPIO connector
+Regards,
+Benjamin
 
-There will be variants with the following options:
-	* Second LAN8710A Megabit PHY
-	* 16MB SPI Flash memory
-	* eMMC card
-	* ATECC508 crypto device
-
-The EVB board has:
-	* Debug UART
-	* MicroSD card connector
-	* USB-OTG connector
-	* Two USB host
-	* RTL8723BS WiFi/BT combo
-	* IrDA transceiver/receiver
-	* HDMI connector
-	* VGA connector
-	* Megabit ethernet transceiver
-	* Gigabit ethernet transceiver
-	* SATA connector
-	* CAN driver
-	* CSI camera
-	* MIC and HP connectors
-	* PCIe x4 connector
-	* USB3 connector
-	* Two UEXT connectors
-	* Two user LEDs
-
-Some of the features are multiplexed and cannot be used the same time:
-CAN and Megabit PHY. Others are not usable with A20 SoC: PCIe and USB3.
-
-[1] https://www.olimex.com/Products/SOM204/
-
-Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
----
- Changes for v2:
-  - Replace license header with SPDX-License-Identifier
-  - Removed useless pinctrl child nodes
-  - Removed dual reset for RTL8723BS:
-      Bluetooth reset will be performed in userspace
-  - Renamed all leds with same prefix
-  - Removed duplicate nodes with eMMC dts
-  - Removed IR_TX pin
-  - Add some comm
-
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts | 335 ++++++++++++++++++++++
- 2 files changed, 336 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..d88f04d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -918,6 +918,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-m3.dtb \
- 	sun7i-a20-mk808c.dtb \
- 	sun7i-a20-olimex-som-evb.dtb \
-+	sun7i-a20-olimex-som204-evb.dtb \
- 	sun7i-a20-olinuxino-lime.dtb \
- 	sun7i-a20-olinuxino-lime2.dtb \
- 	sun7i-a20-olinuxino-lime2-emmc.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-new file mode 100644
-index 0000000..eae8e26
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-@@ -0,0 +1,335 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device Tree Source for A20-SOM204-EVB Board
-+ *
-+ * Copyright (C) 2018 Olimex Ltd.
-+ *   Author: Stefan Mavrodiev <stefan@olimex.com>
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pwm/pwm.h>
-+
-+/ {
-+	model = "Olimex A20-SOM204-EVB";
-+	compatible = "olimex,a20-olimex-som204-evb", "allwinner,sun7i-a20";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart4;
-+		serial2 = &uart7;
-+		spi0 = &spi1;
-+		spi1 = &spi2;
-+		ethernet1 = &rtl8723bs;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		stat {
-+			label = "a20-som204-evb:green:stat";
-+			gpios = <&pio 8 0 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		led1 {
-+			label = "a20-som204-evb:green:led1";
-+			gpios = <&pio 8 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		led2 {
-+			label = "a20-som204-evb:yellow:led2";
-+			gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	rtl_pwrseq: rtl_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&pio 6 9 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&can0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&can0_pins_a>;
-+	status = "okay";
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&de {
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy3>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&reg_vcc3v3>;
-+
-+	snps,reset-gpio = <&pio 0 17 GPIO_ACTIVE_HIGH>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	status = "okay";
-+
-+	phy3: ethernet-phy at 3 {
-+		reg = <3>;
-+	};
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+/* Exposed to UEXT1 */
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	eeprom: eeprom at 50 {
-+		compatible = "atmel,24c16";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
-+
-+/* Exposed to UEXT2 */
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_rx_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc3_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&rtl_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	rtl8723bs: sdio_wifi at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	bt_uart_pins: bt_uart_pins at 0 {
-+		pins = "PG6", "PG7", "PG8";
-+		function = "uart3";
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
-+&reg_ahci_5v {
-+	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1300000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_ldo4 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pg";
-+};
-+
-+&reg_usb0_vbus {
-+	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+/* Exposed to UEXT1 */
-+&spi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi1_pins_a>,
-+		    <&spi1_cs0_pins_a>;
-+	status = "okay";
-+};
-+
-+/* Exposed to UEXT2 */
-+&spi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi2_pins_a>,
-+		    <&spi2_cs0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+/* Used for RTL8723BS bluetooth */
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&bt_uart_pins>;
-+	status = "okay";
-+};
-+
-+/* Exposed to UEXT1 */
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart4_pins_a>;
-+	status = "okay";
-+};
-+
-+/* Exposed to UEXT2 */
-+&uart7 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart7_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.7.4
+> Maxime
