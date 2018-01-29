@@ -1,84 +1,130 @@
-From: yong.deng@magewell.com (Yong Deng)
-Date: Mon, 29 Jan 2018 17:18:53 +0800
-Subject: [PATCH v7 1/2] dt-bindings: media: Add Allwinner V3s Camera Sensor
- Interface (CSI)
-Message-ID: <1517217533-17657-1-git-send-email-yong.deng@magewell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jan 2018 10:19:37 +0100
+Subject: [PATCH v2 01/16] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3 & A83T
+In-Reply-To: <20180128232919.12639-2-embed3d@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-2-embed3d@gmail.com>
+Message-ID: <20180129091937.w3c3btvva5yaqlf6@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for Allwinner V3s CSI.
+Hi Philipp,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Yong Deng <yong.deng@magewell.com>
----
- .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+On Mon, Jan 29, 2018 at 12:29:04AM +0100, Philipp Rossak wrote:
+> Allwinner H3 features a thermal sensor like the one in A33, but has its
+> register re-arranged, the clock divider moved to CCU (originally the
+> clock divider is in ADC) and added a pair of bus clock and reset.
+> 
+> Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
+> the bus clock and the reset was removed from the CCU. The THS in A83T
+> has a clock that is directly connected and runs with 24 MHz.
+> 
+> Update the binding document to cover H3 and A83T.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 
-diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-new file mode 100644
-index 0000000..2ff47a9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-@@ -0,0 +1,59 @@
-+Allwinner V3s Camera Sensor Interface
-+-------------------------------------
-+
-+Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-+interface and CSI1 is used for parallel interface.
-+
-+Required properties:
-+  - compatible: value must be "allwinner,sun8i-v3s-csi"
-+  - reg: base address and size of the memory-mapped region.
-+  - interrupts: interrupt associated to this IP
-+  - clocks: phandles to the clocks feeding the CSI
-+    * bus: the CSI interface clock
-+    * mod: the CSI module clock
-+    * ram: the CSI DRAM clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset line driving the CSI
-+
-+Each CSI node should contain one 'port' child node with one child 'endpoint'
-+node, according to the bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
-+above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
-+Bt656 for CSI1.
-+
-+Endpoint node properties for CSI1
-+---------------------------------
-+
-+- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-+			   node
-+- bus-width:		: (required) must be 8, 10, 12 or 16
-+- pclk-sample		: (optional) (default: sample on falling edge)
-+- hsync-active		: (only required for parallel)
-+- vsync-active		: (only required for parallel)
-+
-+Example:
-+
-+csi1: csi at 1cb4000 {
-+	compatible = "allwinner,sun8i-v3s-csi";
-+	reg = <0x01cb4000 0x1000>;
-+	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&ccu CLK_BUS_CSI>,
-+		 <&ccu CLK_CSI1_SCLK>,
-+		 <&ccu CLK_DRAM_CSI>;
-+	clock-names = "bus", "mod", "ram";
-+	resets = <&ccu RST_BUS_CSI>;
-+
-+	port {
-+		/* Parallel bus endpoint */
-+		csi1_ep: endpoint {
-+			remote-endpoint = <&adv7611_ep>;
-+			bus-width = <16>;
-+
-+			/* If hsync-active/vsync-active are missing,
-+			   embedded BT.656 sync is used */
-+			hsync-active = <0>; /* Active low */
-+			vsync-active = <0>; /* Active low */
-+			pclk-sample = <1>;  /* Rising */
-+		};
-+	};
-+};
+Thanks a lot for tackling this.
+
+> ---
+>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 50 ++++++++++++++++++++--
+>  1 file changed, 47 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> index 86dd8191b04c..22df0c5c23d4 100644
+> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> @@ -4,12 +4,35 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+>  and sometimes as a touchscreen controller.
+>  
+>  Required properties:
+> -  - compatible: "allwinner,sun8i-a33-ths",
+> +  - compatible: must contain one of the following compatibles:
+> +		- "allwinner,sun8i-a33-ths"
+> +		- "allwinner,sun8i-h3-ths"
+> +		- "allwinner,sun8i-a83t-ths"
+>    - reg: mmio address range of the chip,
+> -  - #thermal-sensor-cells: shall be 0,
+> +  - #thermal-sensor-cells: shall be 0 or 1,
+>    - #io-channel-cells: shall be 0,
+>  
+> -Example:
+> +Required properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +		- "allwinner,sun8i-a83t-ths"
+> +  - interrupts: the sampling interrupt of the ADC,
+> +
+> +Required properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +  - clocks: the bus clock and the input clock of the ADC,
+> +  - clock-names: should be "bus" and "mod",
+> +  - resets: the bus reset of the ADC,
+> +
+> +Optional properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
+> +		If unspecified default values shall be used. The size should
+> +		be 0x2 * sensorcount.
+> +  - nvmem-cell-names: Should be "calibration".
+> +
+> +Details see: bindings/nvmem/nvmem.txt
+> +
+> +Example for A33:
+>  	ths: ths at 1c25000 {
+>  		compatible = "allwinner,sun8i-a33-ths";
+>  		reg = <0x01c25000 0x100>;
+> @@ -17,6 +40,27 @@ Example:
+>  		#io-channel-cells = <0>;
+>  	};
+>  
+> +Example for H3:
+> +	ths: thermal-sensor at 1c25000 {
+> +		compatible = "allwinner,sun8i-h3-ths";
+> +		reg = <0x01c25000 0x400>;
+> +		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
+> +		clock-names = "bus", "mod";
+> +		resets = <&ccu RST_BUS_THS>;
+> +		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+> +		#thermal-sensor-cells = <0>;
+> +		#io-channel-cells = <0>;
+> +	};
+> +
+> +Example for A83T:
+> +	ths: thermal-sensor at 1f04000 {
+> +		compatible = "allwinner,sun8i-a83t-ths";
+> +		reg = <0x01f04000 0x100>;
+> +		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+> +		#thermal-sensor-cells = <1>;
+> +		#io-channel-cells = <0>;
+> +	};
+> +
+
+I'm wondering if this is actually needed. We've used this convoluted
+constructs to be compatible with the old driver, but I'm not sure this
+is actually worth it now, and this is causing several issues, among
+which:
+  - We need to have a bunch of quirks to handle all the DT cases.
+  - We need to have an MFD, which isn't really optimal
+
+So I'd rather introduce a new compatible for the old SoCs, keep the
+old driver around, and simplify a lot that driver code that will ease
+further developments. And we can also get rid of the MFD in the
+process. I discussed it with Quentin, and he was ok with it, what do
+you think?
+
+(and that would involve creating a new file for the bindings you
+introduce here).
+
+Maxime
+
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/789d6743/attachment.sig>
