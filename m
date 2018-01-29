@@ -1,158 +1,170 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Jan 2018 10:31:14 +0100
-Subject: [PATCH v2 05/16] iio: adc: sun4i-gpadc-iio: rework: support
- clocks and reset
-In-Reply-To: <20180128232919.12639-6-embed3d@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-6-embed3d@gmail.com>
-Message-ID: <20180129093114.nwohas57kxh347w6@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Jan 2018 09:36:14 +0000
+Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+ support
+In-Reply-To: <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
+References: <20180126142847.31240-1-marc.zyngier@arm.com>
+ <20180126142847.31240-15-marc.zyngier@arm.com>
+ <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
+Message-ID: <8c487a64-ec34-5fe8-cc78-5c280051675e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 12:29:08AM +0100, Philipp Rossak wrote:
-> For adding newer sensor some basic rework of the code is necessary.
+On 28/01/18 23:08, Ard Biesheuvel wrote:
+> On 26 January 2018 at 14:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
+>> It is lovely. Really.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kernel/bpi.S        | 20 ++++++++++++
+>>  arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
+>>  2 files changed, 90 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>> index 76225c2611ea..add7e08a018d 100644
+>> --- a/arch/arm64/kernel/bpi.S
+>> +++ b/arch/arm64/kernel/bpi.S
+>> @@ -17,6 +17,7 @@
+>>   */
+>>
+>>  #include <linux/linkage.h>
+>> +#include <linux/arm-smccc.h>
+>>
+>>  .macro ventry target
+>>         .rept 31
+>> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+>>         .endr
+>>         ldp     x29, x30, [sp], #16
+>>  ENTRY(__qcom_hyp_sanitize_link_stack_end)
+>> +
+>> +.macro smccc_workaround_1 inst
+>> +       sub     sp, sp, #(8 * 4)
+>> +       stp     x2, x3, [sp, #(16 * 0)]
+>> +       stp     x0, x1, [sp, #(16 * 1)]
+>> +       orr     w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
+>> +       \inst   #0
+>> +       ldp     x2, x3, [sp, #(16 * 0)]
+>> +       ldp     x0, x1, [sp, #(16 * 1)]
+>> +       add     sp, sp, #(8 * 4)
+>> +.endm
+>> +
+>> +ENTRY(__smccc_workaround_1_smc_start)
+>> +       smccc_workaround_1      smc
+>> +ENTRY(__smccc_workaround_1_smc_end)
+>> +
+>> +ENTRY(__smccc_workaround_1_hvc_start)
+>> +       smccc_workaround_1      hvc
+>> +ENTRY(__smccc_workaround_1_hvc_end)
+>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>> index ed6881882231..f1501873f2e4 100644
+>> --- a/arch/arm64/kernel/cpu_errata.c
+>> +++ b/arch/arm64/kernel/cpu_errata.c
+>> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>>  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+>>  extern char __qcom_hyp_sanitize_link_stack_start[];
+>>  extern char __qcom_hyp_sanitize_link_stack_end[];
+>> +extern char __smccc_workaround_1_smc_start[];
+>> +extern char __smccc_workaround_1_smc_end[];
+>> +extern char __smccc_workaround_1_hvc_start[];
+>> +extern char __smccc_workaround_1_hvc_end[];
+>>
+>>  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>>                                 const char *hyp_vecs_end)
+>> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>  #define __psci_hyp_bp_inval_end                        NULL
+>>  #define __qcom_hyp_sanitize_link_stack_start   NULL
+>>  #define __qcom_hyp_sanitize_link_stack_end     NULL
+>> +#define __smccc_workaround_1_smc_start         NULL
+>> +#define __smccc_workaround_1_smc_end           NULL
+>> +#define __smccc_workaround_1_hvc_start         NULL
+>> +#define __smccc_workaround_1_hvc_end           NULL
+>>
+>>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>                                       const char *hyp_vecs_start,
+>> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+>>         __install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+>>  }
+>>
+>> +#include <uapi/linux/psci.h>
+>> +#include <linux/arm-smccc.h>
+>>  #include <linux/psci.h>
+>>
+>> +static void call_smc_arch_workaround_1(void)
+>> +{
+>> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+>> +       asm volatile("smc       #0\n"
+>> +                    : "+r" (w0));
+>> +}
+>> +
+>> +static void call_hvc_arch_workaround_1(void)
+>> +{
+>> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+>> +       asm volatile("hvc       #0\n"
+>> +                    : "+r" (w0));
+>> +}
+>> +
+>> +static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+>> +{
+>> +       bp_hardening_cb_t cb;
+>> +       void *smccc_start, *smccc_end;
+>> +       struct arm_smccc_res res;
+>> +
+>> +       if (psci_ops.variant == SMCCC_VARIANT_1_0)
+>> +               return false;
+>> +
+>> +       switch (psci_ops.conduit) {
+>> +       case PSCI_CONDUIT_HVC:
+>> +               arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
+>> +                             &res);
+>> +               if (res.a0)
+>> +                       return false;
+>> +               cb = call_hvc_arch_workaround_1;
+>> +               smccc_start = __smccc_workaround_1_hvc_start;
+>> +               smccc_end = __smccc_workaround_1_hvc_end;
+>> +               break;
+>> +
+>> +       case PSCI_CONDUIT_SMC:
+>> +               arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
+>> +                             &res);
 > 
-> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
-> inputs (bus clock and sampling clock) and a reset. The registers are
-> also re-arranged.
+> This compiles to
 > 
-> This commit reworks the code, adds the process of the clocks and
-> resets.
+>  4a8:   928fffe1        mov     x1, #0xffffffffffff8000         // #-32768
+>  4ac:   b26187e0        mov     x0, #0xffffffff80000001         // #-2147483647
+>  4b0:   d2800007        mov     x7, #0x0                        // #0
+>  4b4:   d2800006        mov     x6, #0x0                        // #0
+>  4b8:   d2800005        mov     x5, #0x0                        // #0
+>  4bc:   d2800004        mov     x4, #0x0                        // #0
+>  4c0:   d2800003        mov     x3, #0x0                        // #0
+>  4c4:   d2800002        mov     x2, #0x0                        // #0
+>  4c8:   f2b00001        movk    x1, #0x8000, lsl #16
+>  4cc:   94000000        bl      0 <__arm_smccc_smc>
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> so it seems we're missing a UL suffix somewhere.
 
-Same remark for the SoB
+Yeah, this seems to stem from ARM_SMCCC_FAST_CALL, which is bit 31 and
+isn't advertised as unsigned. It still works because both x0 and x1 are
+used as 32bit quantities in this particular SMC context, but that has
+the potential of triggering unexpected behaviours in broken implementations.
 
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 71 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index db57d9fffe48..51ec0104d678 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -22,6 +22,7 @@
->   * shutdown for not being used.
->   */
->  
-> +#include <linux/clk.h>
->  #include <linux/completion.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> @@ -31,6 +32,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/regmap.h>
-> +#include <linux/reset.h>
->  #include <linux/thermal.h>
->  #include <linux/delay.h>
->  
-> @@ -68,6 +70,9 @@ struct gpadc_data {
->  	unsigned int	temp_data;
->  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
->  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
-> +	bool		has_bus_clk;
-> +	bool		has_bus_rst;
-> +	bool		has_mod_clk;
+I'll have a look at it.
 
-Is there SoCs where this insn't all true, or all false?
+> Also, adding some printks here reveals that this function is called 32
+> times in total, i.e., 4 times per CPU on my Overdrive. This is with
+> the patches applied onto v4.15-rc9, so perhaps the rework takes care
+> of this?
 
->  };
->  
->  static const struct gpadc_data sun4i_gpadc_data = {
-> @@ -127,6 +132,9 @@ struct sun4i_gpadc_iio {
->  	atomic_t			ignore_temp_data_irq;
->  	const struct gpadc_data		*data;
->  	bool				no_irq;
-> +	struct clk			*bus_clk;
-> +	struct clk			*mod_clk;
-> +	struct reset_control		*reset;
->  	/* prevents concurrent reads of temperature and ADC */
->  	struct mutex			mutex;
->  	struct thermal_zone_device	*tzd;
-> @@ -420,6 +428,10 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
->  {
->  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
->  
-> +	clk_disable(info->mod_clk);
-> +
+There is some ugly explosion in the number of callbacks as all of the
+various implementations all share the same capability number. We can
+take a shortcut and do an MIDR check early instead of late though.
 
-Why clk_disable?
+But Suzuki is also reworking some of this, so I'll have a check with him.
 
-> +	clk_disable(info->bus_clk);
-> +
+Thanks,
 
-You can tie the bus_clk to the regmap directly, instead of having to
-maintain it yourself here.
-
-And you can probably put the device in reset and out of reset here as
-well.
-
->  	return info->data->sample_end(info);
->  }
->  
-> @@ -446,6 +458,10 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
->  {
->  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
->  
-> +	clk_enable(info->mod_clk);
-> +
-> +	clk_enable(info->bus_clk);
-> +
->  	return info->data->sample_start(info);
->  }
->  
-> @@ -560,10 +576,59 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  		return ret;
->  	}
->  
-> +	if (info->data->has_bus_rst) {
-> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
-> +		if (IS_ERR(info->reset)) {
-> +			ret = PTR_ERR(info->reset);
-> +			return ret;
-> +		}
-> +
-> +		ret = reset_control_deassert(info->reset);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	if (info->data->has_bus_clk) {
-> +		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
-> +		if (IS_ERR(info->bus_clk)) {
-> +			ret = PTR_ERR(info->bus_clk);
-> +			goto assert_reset;
-> +		}
-> +
-> +		ret = clk_prepare_enable(info->bus_clk);
-> +		if (ret)
-> +			goto assert_reset;
-> +	}
-> +
-> +	if (info->data->has_mod_clk) {
-> +		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
-> +		if (IS_ERR(info->mod_clk)) {
-> +			ret = PTR_ERR(info->mod_clk);
-> +			goto disable_bus_clk;
-> +		}
-> +
-> +		/* Running at 6MHz */
-> +		ret = clk_set_rate(info->mod_clk, 4000000);
-
-Your comment and the line below doesn't really make much sense :)
-
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/8fb943c0/attachment.sig>
+Jazz is not dead. It just smells funny...
