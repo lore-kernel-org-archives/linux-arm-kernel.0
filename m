@@ -1,33 +1,67 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 16:58:10 +0100
-Subject: [PATCH v4 6/6] arm: dts: sun8i: h3-h8: ir register size should be the
- whole memory block
-In-Reply-To: <20180129155810.7867-1-embed3d@gmail.com>
-References: <20180129155810.7867-1-embed3d@gmail.com>
-Message-ID: <20180129155810.7867-7-embed3d@gmail.com>
+Date: Mon, 29 Jan 2018 16:58:04 +0100
+Subject: [PATCH v4 0/6] arm: sunxi: IR support for A83T
+Message-ID: <20180129155810.7867-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The size of the register should be the size of the whole memory block,
-not just the registers, that are needed.
+This patch series adds support for the sunxi A83T ir module and enhances 
+the sunxi-ir driver. Right now the base clock frequency for the ir driver
+is a hard coded define and is set to 8 MHz.
+This works for the most common ir receivers. On the Sinovoip Bananapi M3 
+the ir receiver needs, a 3 MHz base clock frequency to work without
+problems with this driver.
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch series adds support for an optinal property that makes it able
+to override the default base clock frequency and enables the ir interface 
+on the a83t and the Bananapi M3.
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 8d40c00d64bb..a9caeda4a574 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -674,7 +674,7 @@
- 			clock-names = "apb", "ir";
- 			resets = <&r_ccu RST_APB0_IR>;
- 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
--			reg = <0x01f02000 0x40>;
-+			reg = <0x01f02000 0x400>;
- 			status = "disabled";
- 		};
- 
+In general this is a resend of the v3 Patchseries, but with collected acked-by
+and reviewed-by and some typos fixed.
+
+changes since v3:
+* collecting all acks & reviewd by
+* fixed typos
+
+changes since v2:
+* reorder cir pin (alphabetical)
+* fix typo in documentation
+
+changes since v1:
+* fix typos, reword Documentation
+* initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
+* change dev_info() to dev_dbg()
+* change naming to cir* in dts/dtsi
+* Added acked Ackedi-by to related patch
+* use whole memory block instead of registers needed + fix for h3/h5
+
+changes since rfc:
+* The property is now optinal. If the property is not available in 
+  the dtb the driver uses the default base clock frequency.
+* the driver prints out the the selected base clock frequency.
+* changed devicetree property from base-clk-frequency to clock-frequency
+
+Regards,
+Philipp
+
+
+Philipp Rossak (6):
+  media: rc: update sunxi-ir driver to get base clock frequency from
+    devicetree
+  media: dt: bindings: Update binding documentation for sunxi IR
+    controller
+  arm: dts: sun8i: a83t: Add the cir pin for the A83T
+  arm: dts: sun8i: a83t: Add support for the cir interface
+  arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+  arm: dts: sun8i: h3-h8: ir register size should be the whole memory
+    block
+
+ Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  7 +++++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi                    | 15 +++++++++++++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
+ drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
+ 5 files changed, 37 insertions(+), 9 deletions(-)
+
 -- 
 2.11.0
