@@ -1,152 +1,193 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Jan 2018 10:40:45 +0100
-Subject: [PATCH v2 07/16] iio: adc: sun4i-gpadc-iio: rework: support
- nvmem calibration data
-In-Reply-To: <20180128232919.12639-8-embed3d@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-8-embed3d@gmail.com>
-Message-ID: <20180129094045.sagz2dnzvdadd4yx@flea.lan>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 29 Jan 2018 09:42:50 +0000
+Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
+ support
+In-Reply-To: <8c487a64-ec34-5fe8-cc78-5c280051675e@arm.com>
+References: <20180126142847.31240-1-marc.zyngier@arm.com>
+ <20180126142847.31240-15-marc.zyngier@arm.com>
+ <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
+ <8c487a64-ec34-5fe8-cc78-5c280051675e@arm.com>
+Message-ID: <CAKv+Gu88To1dsV2Av2b5fsAZw9YOnyOMas5sZOXncdUSBSY2nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 12:29:10AM +0100, Philipp Rossak wrote:
-> This patch reworks the driver to support nvmem calibration cells.
-> The driver checks if the nvmem calibration is supported and reads out
-> the nvmem.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 44 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index ac9ad2f8232f..74eeb5cd5218 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -27,6 +27,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> +#include <linux/nvmem-consumer.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> @@ -74,6 +75,7 @@ struct gpadc_data {
->  	bool		has_bus_rst;
->  	bool		has_mod_clk;
->  	int		sensor_count;
-> +	bool		supports_nvmem;
+On 29 January 2018 at 09:36, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 28/01/18 23:08, Ard Biesheuvel wrote:
+>> On 26 January 2018 at 14:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
+>>> It is lovely. Really.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/kernel/bpi.S        | 20 ++++++++++++
+>>>  arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
+>>>  2 files changed, 90 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+>>> index 76225c2611ea..add7e08a018d 100644
+>>> --- a/arch/arm64/kernel/bpi.S
+>>> +++ b/arch/arm64/kernel/bpi.S
+>>> @@ -17,6 +17,7 @@
+>>>   */
+>>>
+>>>  #include <linux/linkage.h>
+>>> +#include <linux/arm-smccc.h>
+>>>
+>>>  .macro ventry target
+>>>         .rept 31
+>>> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+>>>         .endr
+>>>         ldp     x29, x30, [sp], #16
+>>>  ENTRY(__qcom_hyp_sanitize_link_stack_end)
+>>> +
+>>> +.macro smccc_workaround_1 inst
+>>> +       sub     sp, sp, #(8 * 4)
+>>> +       stp     x2, x3, [sp, #(16 * 0)]
+>>> +       stp     x0, x1, [sp, #(16 * 1)]
+>>> +       orr     w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
+>>> +       \inst   #0
+>>> +       ldp     x2, x3, [sp, #(16 * 0)]
+>>> +       ldp     x0, x1, [sp, #(16 * 1)]
+>>> +       add     sp, sp, #(8 * 4)
+>>> +.endm
+>>> +
+>>> +ENTRY(__smccc_workaround_1_smc_start)
+>>> +       smccc_workaround_1      smc
+>>> +ENTRY(__smccc_workaround_1_smc_end)
+>>> +
+>>> +ENTRY(__smccc_workaround_1_hvc_start)
+>>> +       smccc_workaround_1      hvc
+>>> +ENTRY(__smccc_workaround_1_hvc_end)
+>>> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+>>> index ed6881882231..f1501873f2e4 100644
+>>> --- a/arch/arm64/kernel/cpu_errata.c
+>>> +++ b/arch/arm64/kernel/cpu_errata.c
+>>> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+>>>  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+>>>  extern char __qcom_hyp_sanitize_link_stack_start[];
+>>>  extern char __qcom_hyp_sanitize_link_stack_end[];
+>>> +extern char __smccc_workaround_1_smc_start[];
+>>> +extern char __smccc_workaround_1_smc_end[];
+>>> +extern char __smccc_workaround_1_hvc_start[];
+>>> +extern char __smccc_workaround_1_hvc_end[];
+>>>
+>>>  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
+>>>                                 const char *hyp_vecs_end)
+>>> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>>  #define __psci_hyp_bp_inval_end                        NULL
+>>>  #define __qcom_hyp_sanitize_link_stack_start   NULL
+>>>  #define __qcom_hyp_sanitize_link_stack_end     NULL
+>>> +#define __smccc_workaround_1_smc_start         NULL
+>>> +#define __smccc_workaround_1_smc_end           NULL
+>>> +#define __smccc_workaround_1_hvc_start         NULL
+>>> +#define __smccc_workaround_1_hvc_end           NULL
+>>>
+>>>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+>>>                                       const char *hyp_vecs_start,
+>>> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+>>>         __install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
+>>>  }
+>>>
+>>> +#include <uapi/linux/psci.h>
+>>> +#include <linux/arm-smccc.h>
+>>>  #include <linux/psci.h>
+>>>
+>>> +static void call_smc_arch_workaround_1(void)
+>>> +{
+>>> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+>>> +       asm volatile("smc       #0\n"
+>>> +                    : "+r" (w0));
+>>> +}
+>>> +
+>>> +static void call_hvc_arch_workaround_1(void)
+>>> +{
+>>> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
+>>> +       asm volatile("hvc       #0\n"
+>>> +                    : "+r" (w0));
+>>> +}
+>>> +
+>>> +static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+>>> +{
+>>> +       bp_hardening_cb_t cb;
+>>> +       void *smccc_start, *smccc_end;
+>>> +       struct arm_smccc_res res;
+>>> +
+>>> +       if (psci_ops.variant == SMCCC_VARIANT_1_0)
+>>> +               return false;
+>>> +
+>>> +       switch (psci_ops.conduit) {
+>>> +       case PSCI_CONDUIT_HVC:
+>>> +               arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>>> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
+>>> +                             &res);
+>>> +               if (res.a0)
+>>> +                       return false;
+>>> +               cb = call_hvc_arch_workaround_1;
+>>> +               smccc_start = __smccc_workaround_1_hvc_start;
+>>> +               smccc_end = __smccc_workaround_1_hvc_end;
+>>> +               break;
+>>> +
+>>> +       case PSCI_CONDUIT_SMC:
+>>> +               arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>>> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
+>>> +                             &res);
+>>
+>> This compiles to
+>>
+>>  4a8:   928fffe1        mov     x1, #0xffffffffffff8000         // #-32768
+>>  4ac:   b26187e0        mov     x0, #0xffffffff80000001         // #-2147483647
+>>  4b0:   d2800007        mov     x7, #0x0                        // #0
+>>  4b4:   d2800006        mov     x6, #0x0                        // #0
+>>  4b8:   d2800005        mov     x5, #0x0                        // #0
+>>  4bc:   d2800004        mov     x4, #0x0                        // #0
+>>  4c0:   d2800003        mov     x3, #0x0                        // #0
+>>  4c4:   d2800002        mov     x2, #0x0                        // #0
+>>  4c8:   f2b00001        movk    x1, #0x8000, lsl #16
+>>  4cc:   94000000        bl      0 <__arm_smccc_smc>
+>>
+>> so it seems we're missing a UL suffix somewhere.
+>
+> Yeah, this seems to stem from ARM_SMCCC_FAST_CALL, which is bit 31 and
+> isn't advertised as unsigned. It still works because both x0 and x1 are
+> used as 32bit quantities in this particular SMC context, but that has
+> the potential of triggering unexpected behaviours in broken implementations.
+>
 
-I think you should add some documentation along with all the fields
-you're adding.
+Are you sure about that? To me, it looks like this code
 
->  };
->  
->  static const struct gpadc_data sun4i_gpadc_data = {
-> @@ -87,6 +89,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
->  	.sample_start = sun4i_gpadc_sample_start,
->  	.sample_end = sun4i_gpadc_sample_end,
->  	.sensor_count = 1,
-> +	.supports_nvmem = false,
+static int32_t smccc_arch_features(u_register_t arg)
+{
+    switch (arg) {
+    case SMCCC_VERSION:
+    case SMCCC_ARCH_FEATURES:
+        return SMC_OK;
+#if WORKAROUND_CVE_2017_5715
+    case SMCCC_ARCH_WORKAROUND_1:
+        return SMC_OK;
+#endif
+    default:
+        return SMC_UNK;
+    }
+}
 
-That's already its value if you leave it out.
+will end up comparing 0xffffffff80008000 to 0x80008000, and fail
+(which is what it did when I tried it)
 
->  };
->  
->  static const struct gpadc_data sun5i_gpadc_data = {
-> @@ -100,6 +103,7 @@ static const struct gpadc_data sun5i_gpadc_data = {
->  	.sample_start = sun4i_gpadc_sample_start,
->  	.sample_end = sun4i_gpadc_sample_end,
->  	.sensor_count = 1,
-> +	.supports_nvmem = false,
->  };
->  
->  static const struct gpadc_data sun6i_gpadc_data = {
-> @@ -113,6 +117,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
->  	.sample_start = sun4i_gpadc_sample_start,
->  	.sample_end = sun4i_gpadc_sample_end,
->  	.sensor_count = 1,
-> +	.supports_nvmem = false,
->  };
->  
->  static const struct gpadc_data sun8i_a33_gpadc_data = {
-> @@ -123,6 +128,7 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
->  	.sample_start = sun4i_gpadc_sample_start,
->  	.sample_end = sun4i_gpadc_sample_end,
->  	.sensor_count = 1,
-> +	.supports_nvmem = false,
->  };
->  
->  struct sun4i_gpadc_iio {
-> @@ -141,6 +147,8 @@ struct sun4i_gpadc_iio {
->  	struct clk			*mod_clk;
->  	struct reset_control		*reset;
->  	int				sensor_id;
-> +	u32				calibration_data[2];
-> +	bool				has_calibration_data[2];
 
-Why do you have two different values here?
 
->  	/* prevents concurrent reads of temperature and ADC */
->  	struct mutex			mutex;
->  	struct thermal_zone_device	*tzd;
-> @@ -561,6 +569,9 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  	struct resource *mem;
->  	void __iomem *base;
->  	int ret;
-> +	struct nvmem_cell *cell;
-> +	ssize_t cell_size;
-> +	u64 *cell_data;
->  
->  	info->data = of_device_get_match_data(&pdev->dev);
->  	if (!info->data)
-> @@ -575,6 +586,39 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  	if (IS_ERR(base))
->  		return PTR_ERR(base);
->  
-> +	info->has_calibration_data[0] = false;
-> +	info->has_calibration_data[1] = false;
-> +
-> +	if (!info->data->supports_nvmem)
-> +		goto no_nvmem;
-> +
-> +	cell = nvmem_cell_get(&pdev->dev, "calibration");
-> +	if (IS_ERR(cell)) {
-> +		if (PTR_ERR(cell) == -EPROBE_DEFER)
-> +			return PTR_ERR(cell);
-> +		goto no_nvmem;
-
-goto considered evil ? :)
-
-> +	}
-> +
-> +	cell_data = (u64 *)nvmem_cell_read(cell, &cell_size);
-> +	nvmem_cell_put(cell);
-> +	switch (cell_size) {
-> +		case 8:
-> +		case 6:
-> +			info->has_calibration_data[1] = true;
-> +			info->calibration_data[1] = be32_to_cpu(
-> +					upper_32_bits(cell_data[0]));
-> +		case 4:
-> +		case 2:
-> +			info->has_calibration_data[0] = true;
-> +			info->calibration_data[0] = be32_to_cpu(
-> +					lower_32_bits(cell_data[0]));
-
-Why do you need that switch?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/01879a92/attachment.sig>
+>> Also, adding some printks here reveals that this function is called 32
+>> times in total, i.e., 4 times per CPU on my Overdrive. This is with
+>> the patches applied onto v4.15-rc9, so perhaps the rework takes care
+>> of this?
+>
+> There is some ugly explosion in the number of callbacks as all of the
+> various implementations all share the same capability number. We can
+> take a shortcut and do an MIDR check early instead of late though.
+>
+> But Suzuki is also reworking some of this, so I'll have a check with him.
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
