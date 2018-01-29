@@ -1,54 +1,59 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 29 Jan 2018 17:01:54 +0200
-Subject: [PATCH v1] ARM: pxa/raumfeld: use PROPERTY_ENTRY_U32() directly
-In-Reply-To: <20180122125529.6291-1-andriy.shevchenko@linux.intel.com>
-References: <20180122125529.6291-1-andriy.shevchenko@linux.intel.com>
-Message-ID: <1517238114.7000.1299.camel@linux.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Jan 2018 15:04:00 +0000
+Subject: [PATCH v2] irqchip: stm32: Fix copyright
+In-Reply-To: <alpine.DEB.2.20.1801291550550.1849@nanos>
+References: <20171130084500.23439-1-benjamin.gaignard@st.com>
+ <CALszF6Dfj5VzjU8gqbnGjLT3aty_OrXkFjP_8Jtp7mieXz4h=Q@mail.gmail.com>
+ <CA+M3ks6Hc34NDfdkJPNFqJd-0Q+1KPn-G5DFa+bpd8LyukQsdg@mail.gmail.com>
+ <alpine.DEB.2.20.1801291550550.1849@nanos>
+Message-ID: <08a3bea5-0859-307f-2527-e96982581301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-01-22 at 14:55 +0200, Andy Shevchenko wrote:
-> Instead of using PROPERTY_ENTRY_INTEGER() with explicitly supplied
-> type,
-> use PROPERTY_ENTRY_U32() dedicated macro.
+On 29/01/18 14:51, Thomas Gleixner wrote:
+> On Mon, 29 Jan 2018, Benjamin Gaignard wrote:
+>> 2017-11-30 10:15 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+>>> 2017-11-30 9:45 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+>>>> Uniformize STMicroelectronics copyrights header
+>>>> Add SPDX identifier
+>>>>
+>>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>>> CC: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-stm32-exti.c | 3 ++-
+>>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+>>>> index 31ab0dee2ce7..36f0fbe36c35 100644
+>>>> --- a/drivers/irqchip/irq-stm32-exti.c
+>>>> +++ b/drivers/irqchip/irq-stm32-exti.c
+>>>> @@ -1,7 +1,8 @@
+>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>>  /*
+>>>>   * Copyright (C) Maxime Coquelin 2015
+>>>> + * Copyright (C) STMicroelectronics 2017
+>>>>   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>>> - * License terms:  GNU General Public License (GPL), version 2
+>>>>   */
+>>>>
+>>>>  #include <linux/bitops.h>
+>>>> --
+>>>> 2.15.0
+>>>>
+>>>
+>>> Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>>
+>>
+>> Gentle ping on this simple SPDX patch.
 > 
-> It will help modify internals of built-in device properties API.
-> 
-> No functional change intended.
-> 
+> I'll pick it up if Marc hasn't done yet.
 
-Can someone apply that, or at least Ack? It's needed as a prerequisite
-to fix one bug in device property core API.
+I must have missed it, sorry about that. Thomas, please to pick it up if
+you can.
 
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> ---
->  arch/arm/mach-pxa/raumfeld.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-
-> pxa/raumfeld.c
-> index 9d662fed03ec..0bf5419a9d10 100644
-> --- a/arch/arm/mach-pxa/raumfeld.c
-> +++ b/arch/arm/mach-pxa/raumfeld.c
-> @@ -378,9 +378,9 @@ static struct gpiod_lookup_table
-> raumfeld_rotary_gpios_table = {
->  };
->  
->  static const struct property_entry raumfeld_rotary_properties[]
-> __initconst = {
-> -	PROPERTY_ENTRY_INTEGER("rotary-encoder,steps-per-period",
-> u32, 24),
-> -	PROPERTY_ENTRY_INTEGER("linux,axis",			 
->  u32, REL_X),
-> -	PROPERTY_ENTRY_INTEGER("rotary-encoder,relative_axis",	
->   u32, 1),
-> +	PROPERTY_ENTRY_U32("rotary-encoder,steps-per-period", 24),
-> +	PROPERTY_ENTRY_U32("linux,axis",		      REL_X),
-> +	PROPERTY_ENTRY_U32("rotary-encoder,relative_axis",    1),
->  	{ },
->  };
->  
+Thanks,
 
+	M.
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Jazz is not dead. It just smells funny...
