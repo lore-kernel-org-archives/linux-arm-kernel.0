@@ -1,98 +1,87 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 29 Jan 2018 22:19:51 +0100
-Subject: [PATCH] dt-bindings: Nokia N9 audio support
-In-Reply-To: <20180119201546.v4ua72kejql3w2ro@rob-hp-laptop>
-References: <20171227091828.GA3307@amd>
- <20171227180000.6ejpbqmr736nqx5i@kekkonen.localdomain>
- <20171227200147.GB16799@amd>
- <20171227211643.nnwtm4j6cyftlm66@kekkonen.localdomain>
- <20180102124450.GA18659@amd>
- <20180105160137.nr7oqvpbp2oao5fm@rob-hp-laptop>
- <20180108222054.GA17452@amd> <20180110085315.GA17841@amd>
- <20180119201546.v4ua72kejql3w2ro@rob-hp-laptop>
-Message-ID: <20180129211636.GA3873@amd>
+From: airlied@gmail.com (Dave Airlie)
+Date: Tue, 30 Jan 2018 07:43:21 +1000
+Subject: [PATCH V4 05/26] agp: nvidia: deprecate pci_get_bus_and_slot()
+In-Reply-To: <9b3cf544-173e-2450-589c-4bf14af307f2@codeaurora.org>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+ <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
+ <9b3cf544-173e-2450-589c-4bf14af307f2@codeaurora.org>
+Message-ID: <CAPM=9tzWpgF3mtq+ztKJ=P1Nw3Vh8ZEUfYH8Ep=+fRDZTbTtUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 3 January 2018 at 22:44, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 12/19/2017 12:37 AM, Sinan Kaya wrote:
+>> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+>> where a PCI device is present. This restricts the device drivers to be
+>> reused for other domain numbers.
 
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/ti-wl1273.txt
-> > @@ -0,0 +1,36 @@
-> > +Texas Instruments - wl1273 radio/bluetooth module
-> 
-> bluetooth chips have a binding location: bindings/net/bluetooth.
-> 
-> And we already have a WL1273 binding. Plus there's the one for the Nokia 
-> BT which I think can be TI chips with a different firmware and protocol. 
-> Is this related?
+So not a major problem, but it would be pretty much impossible for either
+of these agp drivers to be used in any other domain ever.
 
-Ok, let me investigate wl1273 (and postpone it, audio is critical, FM
-radio -- not so much).
+What does this buy us, maybe just rename pci_get_bus_and_slot to
+pci_get_domain0_bus_and_slot as a helper, or just pass the pdev in
+and have it do the right thing always.
 
-> > index 0000000..230b1eb
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/sound/nokia,n9.txt
-> > @@ -0,0 +1,32 @@
-> > +* Nokia N9/N950 audio setup
-> > +
-> > +Required properties:
-> > +- compatible: "nokia,n9-audio"
-> > +
-> > +- nokia,twl4030-cpu-dai: phandle for the McBSP node connected to TWL4030
-> > +- nokia,tlv320dac33-cpu-dai: phandle for the McBSP node connected to TLV320DAC33
-> > +- nokia,wl1273-cpu-dai: phandle for the McBSP node connected to WL1273
-> > +
-> > +- nokia,twl4030-codec: phandle for the TWL4030 codec
-> > +- nokia,tlv320dac33-codec: phandle for the TLV320DAC33 codec
-> > +- nokia,wl1273-codec: phandle for the WL1273 codec
-> 
-> Both dais and codecs should just be lists with a defined order.
-> 
-> > +- nokia,headphone-amplifier: phandle for the TPA6130A2 node
-> 
-> The simple card or graph card binding don't work? At least follow them 
-> to the extent that they do work. 
+Dave.
 
-Yep, that quite big changes for the driver... Thanks for pointers. I'm
-not sure what features simple card / graph card miss. 
-
-> > +Texas Instruments - tlv320dac33 Codec module
-> > +
-> > +The tlv320dac33 serial control bus communicates through I2C protocols.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible - "ti,tlv320dac33"
-> > +- reg - I2C slave address
-> > +
-> > +Optional properties:
-> > +
-> > +- power-gpio - gpio pin to power the device
-> 
-> power-gpios.
-> 
-> Active high or low?
-
-Ok, this one can be fixed easily, and I guess tlv320dac33 driver might
-be useful for someone else, so I'll try to merge it first.
-
-Thanks for review,
-
-> > +	ti,burst-bclkdiv = /bits/ 8 <3>;
-
-Oh and I'll make this plain int. No need to play with bits.
-
-Best regards
-								Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/f37f00db/attachment.sig>
+>>
+>> Getting ready to remove pci_get_bus_and_slot() function in favor of
+>> pci_get_domain_bus_and_slot().
+>>
+>> Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
+>> and extract the domain number from struct pci_dev.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/char/agp/nvidia-agp.c | 12 +++++++++---
+>>  drivers/char/agp/sworks-agp.c |  3 ++-
+>>  2 files changed, 11 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/char/agp/nvidia-agp.c b/drivers/char/agp/nvidia-agp.c
+>> index 828b344..623205b 100644
+>> --- a/drivers/char/agp/nvidia-agp.c
+>> +++ b/drivers/char/agp/nvidia-agp.c
+>> @@ -340,11 +340,17 @@ static int agp_nvidia_probe(struct pci_dev *pdev,
+>>       u8 cap_ptr;
+>>
+>>       nvidia_private.dev_1 =
+>> -             pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
+>> +             pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+>> +                                         (unsigned int)pdev->bus->number,
+>> +                                         PCI_DEVFN(0, 1));
+>>       nvidia_private.dev_2 =
+>> -             pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
+>> +             pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+>> +                                         (unsigned int)pdev->bus->number,
+>> +                                         PCI_DEVFN(0, 2));
+>>       nvidia_private.dev_3 =
+>> -             pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
+>> +             pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+>> +                                         (unsigned int)pdev->bus->number,
+>> +                                         PCI_DEVFN(30, 0));
+>>
+>>       if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
+>>               printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
+>> diff --git a/drivers/char/agp/sworks-agp.c b/drivers/char/agp/sworks-agp.c
+>> index 03be4ac..4dbdd3b 100644
+>> --- a/drivers/char/agp/sworks-agp.c
+>> +++ b/drivers/char/agp/sworks-agp.c
+>> @@ -474,7 +474,8 @@ static int agp_serverworks_probe(struct pci_dev *pdev,
+>>       }
+>>
+>>       /* Everything is on func 1 here so we are hardcoding function one */
+>> -     bridge_dev = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
+>> +     bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+>> +                     (unsigned int)pdev->bus->number,
+>>                       PCI_DEVFN(0, 1));
+>>       if (!bridge_dev) {
+>>               dev_info(&pdev->dev, "can't find secondary device\n");
+>>
+>
+> Any feedback here? most of the remaining patches have the ACK except these.
+>
+>
+> --
+> Sinan Kaya
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
