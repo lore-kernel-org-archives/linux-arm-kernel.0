@@ -1,78 +1,74 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 29 Jan 2018 03:30:41 +0000
-Subject: [RFC/RFT usb-next v1 5/6] usb: chipidea: do not set the "phy"
- field in struct usb_hcd
-In-Reply-To: <CAFBinCCzghJxHe-1Jzwa1ohHYYytn53QAsXYue229dVu7tB7UQ@mail.gmail.com>
-References: <20180125001639.14681-1-martin.blumenstingl@googlemail.com>
- <20180125001639.14681-6-martin.blumenstingl@googlemail.com>
- <HE1PR04MB145071FCFAF041E0A9252FF08BE00@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <CAFBinCCzghJxHe-1Jzwa1ohHYYytn53QAsXYue229dVu7tB7UQ@mail.gmail.com>
-Message-ID: <HE1PR04MB14504462F7C7A247E1CF9F308BE50@HE1PR04MB1450.eurprd04.prod.outlook.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Mon, 29 Jan 2018 09:44:21 +0530
+Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
+In-Reply-To: <5f9d5de7-4597-b9e9-64fe-666230b12bce@st.com>
+References: <20180125155504.8611-1-philippe.cornu@st.com>
+ <CA+ASDXOLYaL1zT-K0FvVTFGQ2BA12eHkrZw_mau50aUBdy=vhA@mail.gmail.com>
+ <5f9d5de7-4597-b9e9-64fe-666230b12bce@st.com>
+Message-ID: <075514d0-ff00-606e-4616-e2db4fb75d0d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> >>
-> >> Now that usb_add_hcd parses all generic PHYs anyways the code which
-> >> skips initialization of a single PHY will go away.
-> >> Remove the code which sets struct usb_hcd's phy field from the
-> >> chipidea driver as this field will go away soon.
-> >>
-> >> Signed-off-by: Martin Blumenstingl
-> >> <martin.blumenstingl@googlemail.com>
-> >> ---
-> >>  drivers/usb/chipidea/host.c | 4 +---
-> >>  1 file changed, 1 insertion(+), 3 deletions(-)
-> >>
-> >> diff --git a/drivers/usb/chipidea/host.c
-> >> b/drivers/usb/chipidea/host.c index 19d60ed7e41f..fc324767cb0f 100644
-> >> --- a/drivers/usb/chipidea/host.c
-> >> +++ b/drivers/usb/chipidea/host.c
-> >> @@ -124,9 +124,7 @@ static int host_start(struct ci_hdrc *ci)
-> >>
-> >>       hcd->power_budget = ci->platdata->power_budget;
-> >>       hcd->tpl_support = ci->platdata->tpl_support;
-> >> -     if (ci->phy)
-> >> -             hcd->phy = ci->phy;
-> >> -     else
-> >> +     if (!ci->phy)
-> >>               hcd->usb_phy = ci->usb_phy;
-> >>
-> >
-> > The reason hcd->phy is initialized by chipidea core is we do not need
-> > HCD core to touch PHY, and PHY operation is shared for both device and host
-> mode for chipidea.
-> Chunfeng wanted me to drop the mtu3 patch because I forgot about device mode in
-> the mtu3 driver.
-> however, the chipidea driver seems to be different because I'm not dropping the
-> whole phy_{init,power_on,power_off,exit} code from it, but only a "flag" that tells the
-> HCD core to skip managing the USB PHY
-> 
-> > If I understand correct, your HCD core PHY wrapper patch set will do
-> > PHY operation if there is a "phy" node under controller's? If it is
-> > correct, you may supply one way to let the HCD core bypass phy operations for
-> some USB controllers, eg dual-role controllers.
-> > Thanks.
-> could you please explain why the HCD core should not manage the the PHYs when
-> the chipidea driver is used?
-> 
-> my understanding is that all phy_{init,power_on,power_off,exit}
-> operations are ref-counted internally in the PHY framework this means that if the
-> chipidea driver calls phy_{init,power_on} first then the same functions called from
-> within the HCD core are no-ops (except for the ref-counting) so I think it should not
-> change anything - however, I have no hardware to actually prove that.
 
-Martin, you design has no problem for most of cases, but some hardware needs special
-sequence for phy control. I will give an example below.
 
-> it would be great if you could explain the issue behind this (and thereby answer the
-> question: why we would not want the HCD core to manage the PHY states)!
+On 01/26/2018 03:24 PM, Philippe CORNU wrote:
+> Hi Brian,
+> And a big thanks for your Tested-by
+> 
+> On 01/25/2018 11:47 PM, Brian Norris wrote:
+>> On Thu, Jan 25, 2018 at 7:55 AM, Philippe Cornu <philippe.cornu@st.com> wrote:
+>>> The "adjusted_mode" clock value (ie the real pixel clock) is more
+>>> accurate than "mode" clock value (ie the panel/bridge requested
+>>> clock value). It offers a better preciseness for timing
+>>> computations and allows to reduce the extra dsi bandwidth in
+>>> burst mode (from ~20% to ~10-12%, hw platform dependant).
+>>>
+>>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>>> ---
+>>> Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel clock"
+>>
+>> These two appear to be the same for my cases, but at least nothing breaks:
+>>
+> 
+> In drivers/gpu/drm/rockchip/rockchip_drm_vop.c function
+> vop_crtc_mode_fixup(), the adjusted_mode->clock (ie. vop px clk output =
+> dw dsi px clk input) is updated according to rockchip hw pll/dividers...
+> 
+> So you "may" have a different value in adjusted_mode->clock compare to
+> mode->clock. Maybe there is no difference for the panel you are using
+> because its px clock matches perfectly with rockchip hw pll/dividers...
+> or has been set to match with ;-)
+> 
+> I did a similar patch (see [1]) and it works "fine" on stm, the only
+> difference with the rockchip vop is that clk_round_rate() returns odd
+> values on stm so I used set/get_rate instead.
+> 
+> So now, both rockchip & stm crtc have an "adjusted_mode->clock" so it
+> makes sense to use it in dw dsi :)
+
+Could you get the patch [1] queued on drm-misc-next? I can queue this patch
+after it.
+
+Thanks,
+Archit
+
+> 
+> Philippe :-)
+> 
+> [1] https://patchwork.freedesktop.org/patch/200720/
+> "[PATCH] drm/stm: ltdc: use crtc_mode_fixup to update adjusted_mode clock"
 > 
 > 
-Eg, taking Qualcomm USB2 controller as an example, it even does not allow chipidea core
-to manage its power operation, see CI_HDRC_OVERRIDE_PHY_CONTROL at chipidea driver
-(usb/chipidea/core.c). Its phy_power_on is called after ehci controller reset has finished. 
-(usb/chipidea/ci_hdrc_msm.c).
+>> Tested-by: Brian Norris <briannorris@chromium.org>
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-Peter
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
