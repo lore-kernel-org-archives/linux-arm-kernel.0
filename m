@@ -1,62 +1,32 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Mon, 29 Jan 2018 18:05:19 +0100
-Subject: [PATCH 3/5] hwrng: stm32 - allow disable clock error detection
-In-Reply-To: <20180129170521.1862-1-lionel.debieve@st.com>
-References: <20180129170521.1862-1-lionel.debieve@st.com>
-Message-ID: <20180129170521.1862-4-lionel.debieve@st.com>
+Date: Mon, 29 Jan 2018 18:05:16 +0100
+Subject: [PATCH 0/5] hwrng: stm32 - Improvement for stm32-rng 
+Message-ID: <20180129170521.1862-1-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new property that allow to disable the clock error
-detection which is required when the clock source selected
-is out of specification (which is not mandatory).
+This set of patches add extended functionalities for stm32 rng
+driver.
+Patch #1 includes a reset during probe to avoid any error status
+which can occur during bootup process and keep safe rng integrity.
 
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
----
- drivers/char/hw_random/stm32-rng.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Patch #3 adds a new property to manage the clock error detection
+feature which can be disabled on specific target.
 
-diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-index 83c695938a2d..709a8d061be3 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -26,6 +26,7 @@
- 
- #define RNG_CR 0x00
- #define RNG_CR_RNGEN BIT(2)
-+#define RNG_CR_CED BIT(5)
- 
- #define RNG_SR 0x04
- #define RNG_SR_SEIS BIT(6)
-@@ -48,6 +49,7 @@ struct stm32_rng_private {
- 	void __iomem *base;
- 	struct clk *clk;
- 	struct reset_control *rst;
-+	bool ced;
- };
- 
- static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
-@@ -101,7 +103,11 @@ static int stm32_rng_init(struct hwrng *rng)
- 	if (err)
- 		return err;
- 
--	writel_relaxed(RNG_CR_RNGEN, priv->base + RNG_CR);
-+	if (priv->ced)
-+		writel_relaxed(RNG_CR_RNGEN, priv->base + RNG_CR);
-+	else
-+		writel_relaxed(RNG_CR_RNGEN | RNG_CR_CED,
-+			       priv->base + RNG_CR);
- 
- 	/* clear error indicators */
- 	writel_relaxed(0, priv->base + RNG_SR);
-@@ -149,6 +155,8 @@ static int stm32_rng_probe(struct platform_device *ofdev)
- 		reset_control_deassert(priv->rst);
- 	}
- 
-+	priv->ced = of_property_read_bool(np, "clock-error-detect");
-+
- 	dev_set_drvdata(dev, priv);
- 
- 	priv->rng.name = dev_driver_string(dev),
+Patch #5 rework the timeout calculation for read value that was
+previously defined based on loop operation and is now based on
+timer.
+
+Lionel Debieve (5):
+  hwrng: stm32 - add reset during probe
+  dt-bindings: rng: add reset node for stm32
+  hwrng: stm32 - allow disable clock error detection
+  dt-bindings: rng: add clock detection error for stm32
+  hwrng: stm32 - rework read timeout calculation
+
+ .../devicetree/bindings/rng/st,stm32-rng.txt       |  4 ++
+ drivers/char/hw_random/stm32-rng.c                 | 44 ++++++++++++++--------
+ 2 files changed, 32 insertions(+), 16 deletions(-)
+
 -- 
 2.15.1
