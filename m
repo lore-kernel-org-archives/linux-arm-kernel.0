@@ -1,58 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jan 2018 11:59:56 +0000
-Subject: [PATCH v2 5/9] arm64: Force KPTI to be disabled on Cavium ThunderX
+Date: Mon, 29 Jan 2018 11:59:58 +0000
+Subject: [PATCH v2 7/9] arm64: entry: Reword comment about
+ post_ttbr_update_workaround
 In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
 References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517227200-20412-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1517227200-20412-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+We don't fully understand the Cavium ThunderX erratum, but it appears
+that mapping the kernel as nG can lead to horrible consequences such as
+attempting to execute userspace from kernel context. Since kpti isn't
+enabled for these CPUs anyway, simplify the comment justifying the lack
+of post_ttbr_update_workaround in the exception trampoline.
 
-Cavium ThunderX's erratum 27456 results in a corruption of icache
-entries that are loaded from memory that is mapped as non-global
-(i.e. ASID-tagged).
-
-As KPTI is based on memory being mapped non-global, let's prevent
-it from kicking in if this erratum is detected.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-[will: Update comment]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/entry.S | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index cd9f46952db3..0ff8ab79352c 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -855,12 +855,23 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 				int __unused)
- {
-+	char const *str = "command line option";
- 	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
- 
--	/* Forced on command line? */
-+	/*
-+	 * For reasons that aren't entirely clear, enabling KPTI on Cavium
-+	 * ThunderX leads to apparent I-cache corruption of kernel text, which
-+	 * ends as well as you might imagine. Don't even try.
-+	 */
-+	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_27456)) {
-+		str = "ARM64_WORKAROUND_CAVIUM_27456";
-+		__kpti_forced = -1;
-+	}
-+
-+	/* Forced? */
- 	if (__kpti_forced) {
--		pr_info_once("kernel page table isolation forced %s by command line option\n",
--			     __kpti_forced > 0 ? "ON" : "OFF");
-+		pr_info_once("kernel page table isolation forced %s by %s\n",
-+			     __kpti_forced > 0 ? "ON" : "OFF", str);
- 		return __kpti_forced > 0;
- 	}
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b34e717d7597..fbe1444324b3 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -1013,16 +1013,8 @@ alternative_else_nop_endif
+ 	orr	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
+ 	/*
+-	 * We avoid running the post_ttbr_update_workaround here because the
+-	 * user and kernel ASIDs don't have conflicting mappings, so any
+-	 * "blessing" as described in:
+-	 *
+-	 *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
+-	 *
+-	 * will not hurt correctness. Whilst this may partially defeat the
+-	 * point of using split ASIDs in the first place, it avoids
+-	 * the hit of invalidating the entire I-cache on every return to
+-	 * userspace.
++	 * We avoid running the post_ttbr_update_workaround here because
++	 * it's only needed by Cavium ThunderX, which doesn't require kpti.
+ 	 */
+ 	.endm
  
 -- 
 2.1.4
