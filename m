@@ -1,74 +1,102 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 29 Jan 2018 16:19:29 +0100
-Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
- support
-In-Reply-To: <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
-References: <20180103121840.29316-1-horms+renesas@verge.net.au>
- <20180103121840.29316-3-horms+renesas@verge.net.au>
- <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
- <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
- <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
- <20180129142357.sw3d4f5d4hwmveua@verge.net.au>
- <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
-Message-ID: <20180129151928.ooh5uirmjgtyjcjm@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jan 2018 15:37:30 +0000
+Subject: [PATCH 2/2] arm64: Mirror arm for unimplemented compat syscalls
+In-Reply-To: <20180122212026.26262-3-michael.weiser@gmx.de>
+References: <20180122131851.GA28638@arm.com>
+ <20180122212026.26262-3-michael.weiser@gmx.de>
+Message-ID: <20180129153730.GA24444@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 04:01:49PM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Mon, Jan 29, 2018 at 3:24 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
-> >> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
-> >> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> >> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
-> >> >> >
-> >> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>
-> >> >> As the CPG/MSSR driver now has suspend/resume support, do we need
-> >> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
-> >> >> by cpufreq during system resume, for both the primary and the secondary
-> >> >> CPU cores?
-> >> >
-> >> > I am a bit unsure.
-> >> >
-> >> > When using the A57 cores, which is the default case, the Z clk is queried
-> >> > by CPUFreq on resume. It appears that on my system its already set to the
-> >> > correct value but I assume if it was not then it would be reset. However,
-> >> > this does not cover Z2 clk. So perhaps to be safe we need to register
-> >> > notifiers and make sure they they play nicely with CPUFreq?
-> >>
-> >> Of course the CPU is special: unlike many other devices, it must be running
-> >> when the kernel is reentered upon system resume.
-> >> It may be running using a different frequency setting, though.
-> >> However, following "opp-suspend", the system will always suspend with the
-> >> Z clock running at 1.5GHz, which is the default?
-> >> So Z is probably OK.
-> >>
-> >> It's more interesting to check what happens when the little cores are
-> >> enabled as well (unfortunately that requires different firmware).
-> >> 1. Does cpufreq handle them correctly when they are onlined again during
-> >>    system resume?
-> >
-> > I tested this by updating the firmware on an H3 ES2.0 / Salvator-XS
-> > using the instructions at
-> > https://elinux.org/R-Car/Virtualization#Enabling_HYP_Support
-> 
-> > # grep -E -w "pll[01]|z|z2" /sys/kernel/debug/clk/clk_summary
-> >           z2                              0            0  1198080000          0 0
-> >        .pll1                              1            1  3194880000          0 0
-> >        .pll0                              0            0  2995200000          0 0
-> >           z                               0            0  1497600000          0 0
-> 
-> You know it's PLL2, not PLL1, you want to look at? ;-)
+Hi Michael,
 
-Sorry, I will double check but I had looked at PLL2 earlier:
-I just messed things up when preparing things to post in email.
+On Mon, Jan 22, 2018 at 10:20:26PM +0100, Michael Weiser wrote:
+> Mirror arm behaviour for unimplemented syscalls: Below 2048 return
+> -ENOSYS. Above 2048 raise SIGILL and print a ratelimited message with
+> details. dump_instr() is made non-static and added to system_misc.h so
+> it can be used in compat_arm_syscall(). Also it is synced with the arm
+> implementation to support thumb instructions.
+> 
+> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+> ---
+>  arch/arm64/include/asm/system_misc.h |  1 +
+>  arch/arm64/kernel/sys_compat.c       | 27 ++++++++++++++++++++++++++-
+>  arch/arm64/kernel/traps.c            | 14 ++++++++++----
+>  3 files changed, 37 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> index 07aa8e3c5630..0f73b6c1ca63 100644
+> --- a/arch/arm64/include/asm/system_misc.h
+> +++ b/arch/arm64/include/asm/system_misc.h
+> @@ -42,6 +42,7 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+>  struct mm_struct;
+>  extern void show_pte(unsigned long addr);
+>  extern void __show_regs(struct pt_regs *);
+> +extern void dump_instr(const char *lvl, struct pt_regs *regs);
+>  
+>  extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>  
+> diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
+> index 8b8bbd3eaa52..3a5b3809b671 100644
+> --- a/arch/arm64/kernel/sys_compat.c
+> +++ b/arch/arm64/kernel/sys_compat.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/uaccess.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/system_misc.h>
+>  #include <asm/unistd.h>
+>  
+>  static long
+> @@ -67,6 +68,7 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
+>   */
+>  long compat_arm_syscall(struct pt_regs *regs)
+>  {
+> +	siginfo_t info;
+>  	unsigned int no = regs->regs[7];
+>  
+>  	switch (no) {
+> @@ -99,6 +101,31 @@ long compat_arm_syscall(struct pt_regs *regs)
+>  		return 0;
+>  
+>  	default:
+> -		return -ENOSYS;
+> +		/*
+> +		 * Calls 9f00xx..9f07ff are defined to return -ENOSYS
+> +		 * if not implemented, rather than raising SIGILL. This
+> +		 * way the calling program can gracefully determine whether
+> +		 * a feature is supported.
+> +		 */
+> +		if ((no & 0xffff) <= 0x7ff)
+> +			return -ENOSYS;
+> +		break;
+>  	}
+> +
+> +	if (show_unhandled_signals_ratelimited()) {
+> +		pr_err("[%d] %s: arm syscall %d\n",
+> +		       task_pid_nr(current), current->comm, no);
+> +		dump_instr("", regs);
+> +		if (user_mode(regs))
+> +			__show_regs(regs);
+> +	}
+> +
+> +	info.si_signo = SIGILL;
+> +	info.si_errno = 0;
+> +	info.si_code  = ILL_ILLTRP;
+> +	info.si_addr  = (void __user *)instruction_pointer(regs) -
+> +			 (compat_thumb_mode(regs) ? 2 : 4);
+> +
+> +	arm64_notify_die("Oops - bad syscall(2)", regs, &info, no);
+> +	return 0;
 
-> Thanks for checking, looks all good!
+Whilst I think it's worth mirroring the SIGILL behaviour here, I don't think
+we need to both with the show_unhandled_signals_ratelimited() hunk. It's
+predicated on CONFI_DEBUG_USER for arch/arm/ anyway, so it's something that
+can be relied upon but really more of a debug aid that we can live without
+for now.
 
-Ok, so do you think we can merge this series with
-the off-by-one problem fixed?
+So I'd suggest simply dropping that hunk and the changes to __dump_instr.
+
+Cheers,
+
+Will
