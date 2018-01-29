@@ -1,55 +1,177 @@
-From: l.stelmach@samsung.com (=?utf-8?Q?=C5=81ukasz_Stelmach?=)
-Date: Mon, 29 Jan 2018 14:24:00 +0100
-Subject: [PATCH][next] hwrng: exynos: check for -ve error return from
- readl_poll_timeout
-In-Reply-To: <20180112163048.26960-1-colin.king@canonical.com>
-References: <20180112163048.26960-1-colin.king@canonical.com>
- <CGME20180129132405eucas1p244f341793274cd1c11aa09e0b1d2c4bd@eucas1p2.samsung.com>
-Message-ID: <87fu6oyf0v.fsf%l.stelmach@samsung.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 29 Jan 2018 14:27:46 +0100
+Subject: [Patch v7 12/12] Documention: v4l: Documentation for HEVC CIDs
+In-Reply-To: <1517229778.29374.9.camel@smitha-fedora>
+References: <1516791584-7980-1-git-send-email-smitha.t@samsung.com>
+ <CGME20180124112406epcas2p3820cea581731825c7ad72ebbb1ca060c@epcas2p3.samsung.com>
+ <1516791584-7980-13-git-send-email-smitha.t@samsung.com>
+ <127cfd7f-113f-6724-297c-6f3c3746a8ff@xs4all.nl>
+ <1517229778.29374.9.camel@smitha-fedora>
+Message-ID: <f1ea8bcc-30b9-06b5-b815-e76fecc22a8a@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was <2018-01-12 pi? 17:30>, when Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
->
-> Currently, the return from readl_poll_timeout is being assigned to
-> a u32 and this is being checked for a -ve return which is always
-> false since a u32 cannot be less than zero.  Fix this by changing
-> val to an int so that error returns can be correctly detected.
->
-> Detected by CoverityScan, CID#1463776 ("Logically dead code")
->
-> Fixes: 6cd225cc5d8a ("hwrng: exynos - add Samsung Exynos True RNG driver")
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/char/hw_random/exynos-trng.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/char/hw_random/exynos-trng.c b/drivers/char/hw_random/exynos-trng.c
-> index 34d6f51ecbee..f4643e3ec346 100644
-> --- a/drivers/char/hw_random/exynos-trng.c
-> +++ b/drivers/char/hw_random/exynos-trng.c
-> @@ -55,7 +55,7 @@ static int exynos_trng_do_read(struct hwrng *rng, void *data, size_t max,
->  			       bool wait)
->  {
->  	struct exynos_trng_dev *trng;
-> -	u32 val;
-> +	int val;
->  
->  	max = min_t(size_t, max, (EXYNOS_TRNG_FIFO_LEN * 4));
+On 01/29/2018 01:42 PM, Smitha T Murthy wrote:
+> On Wed, 2018-01-24 at 15:16 +0100, Hans Verkuil wrote:
+>> On 24/01/18 11:59, Smitha T Murthy wrote:
+>>> Added V4l2 controls for HEVC encoder
+>>>
+>>> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+>>> ---
+>>>  Documentation/media/uapi/v4l/extended-controls.rst | 400 +++++++++++++++++++++
+>>>  1 file changed, 400 insertions(+)
+>>>
+>>> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+>>> index dfe49ae..46ee2bf 100644
+>>> --- a/Documentation/media/uapi/v4l/extended-controls.rst
+>>> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+>>> @@ -1960,6 +1960,406 @@ enum v4l2_vp8_golden_frame_sel -
+>>>      1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
+>>>  
+>>>  
+>>> +High Efficiency Video Coding (HEVC/H.265) Control Reference
+>>> +-----------------------------------------------------------
+>>> +
+>>> +The HEVC/H.265 controls include controls for encoding parameters of HEVC/H.265
+>>> +video codec.
+>>> +
+>>> +
+>>> +.. _hevc-control-id:
+>>> +
+>>> +HEVC/H.265 Control IDs
+>>> +^^^^^^^^^^^^^^^^^^^^^^
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP (integer)``
+>>> +    Minimum quantization parameter for HEVC.
+>>> +    Valid range: from 0 to 51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP (integer)``
+>>> +    Maximum quantization parameter for HEVC.
+>>> +    Valid range: from 0 to 51.
+>>
+>> You probably should mention the default values for MIN_QP and MAX_QP
+>> (I assume those are 0 and 51 and are not driver specific).
+>>
+> Yes these values are not driver specific.
+> I followed the way MAX_QP and MIN_QP are defined for other codecs like
+> H264, H263, MPEG4 where only valid range is mentioned.
+> 
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP (integer)``
+>>> +    Quantization parameter for an I frame for HEVC.
+>>> +    Valid range: from 0 to 51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP (integer)``
+>>> +    Quantization parameter for a P frame for HEVC.
+>>> +    Valid range: from 0 to 51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP (integer)``
+>>> +    Quantization parameter for a B frame for HEVC.
+>>> +    Valid range: from 0 to 51.
+>>
+>> Sorry, this still isn't clear to me.
+>>
+>> If I set V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP to 50, can I then still set
+>> V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP to 51? Or is 50 then the maximum?
+>>
+>> In other words, what is the relationship between these three controls
+>> and the MIN_QP/MAX_QP controls.
+>>
+> If we set V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP as 50 then
+> V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP or
+> 4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP or
+> V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP will have maximum as 50.
+> Similarly for minimum as well, the above three controls will adhere to
+> the V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP set.
+> These controls have similar in relation as seen with
+> V4L2_CID_MPEG_VIDEO_H264_P_FRAME_QP and V4L2_CID_MPEG_VIDEO_H264_MAX_QP 
+> 
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_QP (boolean)``
+>>> +    HIERARCHICAL_QP allows the host to specify the quantization parameter
+>>> +    values for each temporal layer through HIERARCHICAL_QP_LAYER. This is
+>>> +    valid only if HIERARCHICAL_CODING_LAYER is greater than 1. Setting the
+>>> +    control value to 1 enables setting of the QP values for the layers.
+>>> +
+>>> +.. _v4l2-hevc-hier-coding-type:
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_TYPE``
+>>> +    (enum)
+>>> +
+>>> +enum v4l2_mpeg_video_hevc_hier_coding_type -
+>>> +    Selects the hierarchical coding type for encoding. Possible values are:
+>>> +
+>>> +.. raw:: latex
+>>> +
+>>> +    \begin{adjustbox}{width=\columnwidth}
+>>> +
+>>> +.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
+>>> +
+>>> +.. flat-table::
+>>> +    :header-rows:  0
+>>> +    :stub-columns: 0
+>>> +
+>>> +    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B``
+>>> +      - Use the B frame for hierarchical coding.
+>>> +    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P``
+>>> +      - Use the P frame for hierarchical coding.
+>>> +
+>>> +.. raw:: latex
+>>> +
+>>> +    \end{adjustbox}
+>>> +
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER (integer)``
+>>> +    Selects the hierarchical coding layer. In normal encoding
+>>> +    (non-hierarchial coding), it should be zero. Possible values are [0, 6].
+>>> +    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
+>>> +    LAYER 1 and so on.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L0_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 0.
+>>> +    For HEVC it can have a value of 0-51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L1_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 1.
+>>> +    For HEVC it can have a value of 0-51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L2_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 2.
+>>> +    For HEVC it can have a value of 0-51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L3_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 3.
+>>> +    For HEVC it can have a value of 0-51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L4_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 4.
+>>> +    For HEVC it can have a value of 0-51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L5_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 5.
+>>> +    For HEVC it can have a value of 0-51.
+>>> +
+>>> +``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_QP (integer)``
+>>> +    Indicates quantization parameter for hierarchical coding layer 6.
+>>> +    For HEVC it can have a value of 0-51.
+>>
+>> Same here: how does MIN_QP/MAX_QP influence these controls, if at all.
+>>
+>> Regards,
+>>
+>> 	Hans
+>>
+>>
+> The values set in V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP and
+> V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP will give the limits for the L0-L6 QP
+> values that can be set.
 
-Fixed.
+OK. If you can clarify this in the documentation, then I can Ack this.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git/commit/?id=a8bc71d4960391f732ec0307ebd69e4a25aaf4d3
+Note: if userspace changes MIN_QP or MAX_QP, then the driver should call
+v4l2_ctrl_modify_range() to update the ranges of the controls that are
+impacted by QP range changes. I'm not sure if that's done at the moment.
 
--- 
-?ukasz Stelmach
-Samsung R&D Institute Poland
-Samsung Electronics
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 472 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/dd38b2f7/attachment.sig>
+Regards,
+
+	Hans
