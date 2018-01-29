@@ -1,21 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Jan 2018 11:23:06 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable HDMI support on the
- MK808C
-In-Reply-To: <20180129092310.12477-1-codekipper@gmail.com>
-References: <20180129092310.12477-1-codekipper@gmail.com>
-Message-ID: <20180129102306.5r7rui674kljy43h@flea.lan>
+Date: Mon, 29 Jan 2018 11:24:38 +0100
+Subject: [PATCH v7 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1517217533-17657-1-git-send-email-yong.deng@magewell.com>
+References: <1517217533-17657-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <20180129102438.rbvs5sra2dkls5db@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 10:23:10AM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+On Mon, Jan 29, 2018 at 05:18:53PM +0800, Yong Deng wrote:
+> Add binding documentation for Allwinner V3s CSI.
 > 
-> Enable the display pipeline and HDMI output
-> 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-queued for 4.17, thanks!
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
 Maxime
 
 -- 
@@ -28,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/3920b843/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/4021a2ca/attachment.sig>
