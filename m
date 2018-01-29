@@ -1,63 +1,33 @@
-From: juliac@eso.teric.us (Julia Cartwright)
-Date: Mon, 29 Jan 2018 09:56:00 -0600
-Subject: [patch v18 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1517236305-4880-2-git-send-email-oleksandrs@mellanox.com>
-References: <1517236305-4880-1-git-send-email-oleksandrs@mellanox.com>
- <1517236305-4880-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <20180129155600.GA1924@kryptos.localdomain>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Mon, 29 Jan 2018 16:58:10 +0100
+Subject: [PATCH v4 6/6] arm: dts: sun8i: h3-h8: ir register size should be the
+ whole memory block
+In-Reply-To: <20180129155810.7867-1-embed3d@gmail.com>
+References: <20180129155810.7867-1-embed3d@gmail.com>
+Message-ID: <20180129155810.7867-7-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 04:31:42PM +0200, Oleksandr Shamray wrote:
-> Initial patch for JTAG driver
-> JTAG class driver provide infrastructure to support hardware/software
-> JTAG platform drivers. It provide user layer API interface for flashing
-> and debugging external devices which equipped with JTAG interface
-> using standard transactions.
-> 
-> Driver exposes set of IOCTL to user space for:
-> - XFER:
-> - SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
-> - SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
-> - RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
->   number of clocks).
-> - SIOCFREQ/GIOCFREQ for setting and reading JTAG frequency.
-> 
-> Driver core provides set of internal APIs for allocation and
-> registration:
-> - jtag_register;
-> - jtag_unregister;
-> - jtag_alloc;
-> - jtag_free;
-> 
-> Platform driver on registration with jtag-core creates the next
-> entry in dev folder:
-> /dev/jtagX
-> 
-> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Signed-off-by: Jiri Pirko <jiri@mellanox.com>
-> Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
-[..]
-> diff --git a/drivers/jtag/jtag.c b/drivers/jtag/jtag.c
-[..]
-> +struct jtag *jtag_alloc(size_t priv_size, const struct jtag_ops *ops)
-> +{
-> +	struct jtag *jtag;
-> +
-> +	jtag = kzalloc(sizeof(*jtag) + priv_size, GFP_KERNEL);
-> +	if (!jtag)
-> +		return NULL;
-> +
-> +	if (!ops)
-> +		return NULL;
-> +
-> +	if (!ops->idle || !ops->mode_set || !ops->status_get || !ops->xfer)
-> +		return NULL;
+The size of the register should be the size of the whole memory block,
+not just the registers, that are needed.
 
-Did you think through this?
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-You leak 'jtag' here and above.
-
-Perform all the ops checks prior to the allocation.
-
-   Julia
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 8d40c00d64bb..a9caeda4a574 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -674,7 +674,7 @@
+ 			clock-names = "apb", "ir";
+ 			resets = <&r_ccu RST_APB0_IR>;
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+-			reg = <0x01f02000 0x40>;
++			reg = <0x01f02000 0x400>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.11.0
