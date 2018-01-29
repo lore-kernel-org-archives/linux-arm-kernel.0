@@ -1,58 +1,44 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 29 Jan 2018 13:49:14 -0800
-Subject: [PATCH v7 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <1517217696-17816-1-git-send-email-yong.deng@magewell.com>
-References: <1517217696-17816-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <c86097d7-dade-01e5-3826-3f22f9ca4b4f@infradead.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 29 Jan 2018 17:01:51 -0500
+Subject: [PATCH V4 05/26] agp: nvidia: deprecate pci_get_bus_and_slot()
+In-Reply-To: <CAPM=9tzWpgF3mtq+ztKJ=P1Nw3Vh8ZEUfYH8Ep=+fRDZTbTtUg@mail.gmail.com>
+References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
+ <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
+ <9b3cf544-173e-2450-589c-4bf14af307f2@codeaurora.org>
+ <CAPM=9tzWpgF3mtq+ztKJ=P1Nw3Vh8ZEUfYH8Ep=+fRDZTbTtUg@mail.gmail.com>
+Message-ID: <4fd0d418-ff34-8a3f-a233-5cdf80fe744f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2018 01:21 AM, Yong Deng wrote:
-> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> interface and CSI1 is used for parallel interface. This is not
-> documented in datasheet but by test and guess.
+On 1/29/2018 4:43 PM, Dave Airlie wrote:
+>>  12/19/2017 12:37 AM, Sinan Kaya wrote:
+>>> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+>>> where a PCI device is present. This restricts the device drivers to be
+>>> reused for other domain numbers.
+> So not a major problem, but it would be pretty much impossible for either
+> of these agp drivers to be used in any other domain ever.
 > 
-> This patch implement a v4l2 framework driver for it.
-> 
-> Currently, the driver only support the parallel interface. MIPI-CSI2,
-> ISP's support are not included in this patch.
-> 
-> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> ---
+> What does this buy us, maybe just rename pci_get_bus_and_slot to
+> pci_get_domain0_bus_and_slot as a helper, or just pass the pdev in
+> and have it do the right thing always.
+
+There is nothing wrong with doing all three. Since nobody replied until
+patch v4, I did the heavy-lifting and converted code to use pci_domain_nr()
+as much as I can rather than hard-coding a 0 while calling
+pci_get_domain_bus_and_slot().
+
+>From PCI coding perspective, pci_domain_nr() call is the right thing. It is
+guaranteed to work no matter what your domain number is. 
+
+People look at other code for examples on how to write a PCI driver
+in general. You want to minimize the exceptions as much as possible.
+
+Some discussion here about the benefits:
+
+https://lkml.org/lkml/2017/12/19/349
 
 
-A previous version (I think v6) had a build error with the use of
-PHYS_OFFSET, so Kconfig was modified to depend on ARM and ARCH_SUNXI
-(one of which seems to be overkill).  As is here, the COMPILE_TEST piece is
-meaningless for all arches except ARM.  If you care enough for COMPILE_TEST
-(and I would), then you could make COMPILE_TEST useful on any arch by
-removing the "depends on ARM" (the ARCH_SUNXI takes care of that) and by
-having an alternate value for PHYS_OFFSET, like so:
-
-+#if defined(CONFIG_COMPILE_TEST) && !defined(PHYS_OFFSET)
-+#define PHYS_OFFSET	0
-+#endif
-
-With those 2 changes, the driver builds for me on x86_64.
-
-> diff --git a/drivers/media/platform/sunxi/sun6i-csi/Kconfig b/drivers/media/platform/sunxi/sun6i-csi/Kconfig
-> new file mode 100644
-> index 0000000..f80c965
-> --- /dev/null
-> +++ b/drivers/media/platform/sunxi/sun6i-csi/Kconfig
-> @@ -0,0 +1,10 @@
-> +config VIDEO_SUN6I_CSI
-> +	tristate "Allwinner V3s Camera Sensor Interface driver"
-> +	depends on ARM
-> +	depends on VIDEO_V4L2 && COMMON_CLK && VIDEO_V4L2_SUBDEV_API && HAS_DMA
-> +	depends on ARCH_SUNXI || COMPILE_TEST
-> +	select VIDEOBUF2_DMA_CONTIG
-> +	select REGMAP_MMIO
-> +	select V4L2_FWNODE
-> +	---help---
-> +	   Support for the Allwinner Camera Sensor Interface Controller on V3s.
-
-thanks,
 -- 
-~Randy
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
