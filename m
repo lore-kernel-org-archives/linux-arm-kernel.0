@@ -1,102 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jan 2018 11:59:53 +0000
-Subject: [PATCH v2 2/9] arm64: kpti: Make use of nG dependent on
- arm64_kernel_unmapped_at_el0()
-In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517227200-20412-3-git-send-email-will.deacon@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 29 Jan 2018 12:59:46 +0100
+Subject: [RFC 09/10] x86/enter: Create macros to restrict/unrestrict
+ Indirect Branch Speculation
+In-Reply-To: <20180125171616.GA25130@kroah.com>
+References: <CA+55aFxUEPHc7JRQG3zmxEsfmfJOiJa1QqFBKCBNb5Tt5vfiSg@mail.gmail.com>
+ <1516566497.9814.78.camel@infradead.org>
+ <CA+55aFwOkH8RH12Dzs=hT3e7eS3Ckz9Ed6x_-9a0zs1cw9zbKA@mail.gmail.com>
+ <1516572013.9814.109.camel@infradead.org>
+ <CA+55aFwoxXmY0u84iPT-RP8DoG+Qb8t-mh2r8RLhKVAH3jm6qg@mail.gmail.com>
+ <1516638426.9521.20.camel@infradead.org>
+ <20180123072930.soz25cyky3u4hpgv@gmail.com>
+ <20180123075358.nztpyxympwfkyi2a@gmail.com>
+ <1516699832.9521.123.camel@infradead.org>
+ <d77abfaf-077a-0ae6-8ed7-3b5354938a52@free.fr>
+ <20180125171616.GA25130@kroah.com>
+Message-ID: <1b430c16-2090-41e3-82d7-ef3d9b63fe2b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow systems which do not require kpti to continue running with
-global kernel mappings (which appears to be a requirement for Cavium
-ThunderX due to a CPU erratum), make the use of nG in the kernel page
-tables dependent on arm64_kernel_unmapped_at_el0(), which is resolved
-at runtime.
+[ Dropping large CC list ]
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/kernel-pgtable.h | 12 ++----------
- arch/arm64/include/asm/pgtable-prot.h   | 30 ++++++++++++++----------------
- 2 files changed, 16 insertions(+), 26 deletions(-)
+On 25/01/2018 18:16, Greg Kroah-Hartman wrote:
 
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index 82386e860dd2..a780f6714b44 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -123,16 +123,8 @@
- /*
-  * Initial memory map attributes.
-  */
--#define _SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
--#define _SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
--
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--#define SWAPPER_PTE_FLAGS	(_SWAPPER_PTE_FLAGS | PTE_NG)
--#define SWAPPER_PMD_FLAGS	(_SWAPPER_PMD_FLAGS | PMD_SECT_NG)
--#else
--#define SWAPPER_PTE_FLAGS	_SWAPPER_PTE_FLAGS
--#define SWAPPER_PMD_FLAGS	_SWAPPER_PMD_FLAGS
--#endif
-+#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
-+#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
- 
- #if ARM64_SWAPPER_USES_SECTION_MAPS
- #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 22a926825e3f..2db84df5eb42 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -37,13 +37,11 @@
- #define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
- #define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_NG)
--#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_SECT_NG)
--#else
--#define PROT_DEFAULT		_PROT_DEFAULT
--#define PROT_SECT_DEFAULT	_PROT_SECT_DEFAULT
--#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-+#define PTE_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PTE_NG : 0)
-+#define PMD_MAYBE_NG		(arm64_kernel_unmapped_at_el0() ? PMD_SECT_NG : 0)
-+
-+#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_MAYBE_NG)
-+#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_MAYBE_NG)
- 
- #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-@@ -55,22 +53,22 @@
- #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
- #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
- 
--#define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
--#define _HYP_PAGE_DEFAULT	(_PAGE_DEFAULT & ~PTE_NG)
-+#define _PAGE_DEFAULT		(_PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
-+#define _HYP_PAGE_DEFAULT	_PAGE_DEFAULT
- 
--#define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
--#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
--#define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
--#define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
--#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
-+#define PAGE_KERNEL		__pgprot(PROT_NORMAL)
-+#define PAGE_KERNEL_RO		__pgprot((PROT_NORMAL & ~PTE_WRITE) | PTE_RDONLY)
-+#define PAGE_KERNEL_ROX		__pgprot((PROT_NORMAL & ~(PTE_WRITE | PTE_PXN)) | PTE_RDONLY)
-+#define PAGE_KERNEL_EXEC	__pgprot(PROT_NORMAL & ~PTE_PXN)
-+#define PAGE_KERNEL_EXEC_CONT	__pgprot((PROT_NORMAL & ~PTE_PXN) | PTE_CONT)
- 
- #define PAGE_HYP		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
- #define PAGE_HYP_EXEC		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
- #define PAGE_HYP_RO		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
- #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
- 
--#define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
--#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
-+#define PAGE_S2			__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
-+#define PAGE_S2_DEVICE		__pgprot(_PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
- 
- #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
- #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
--- 
-2.1.4
+> On Thu, Jan 25, 2018 at 05:19:04PM +0100, Mason wrote:
+> 
+>> On 23/01/2018 10:30, David Woodhouse wrote:
+>>
+>>> Skylake takes predictions from the generic branch target buffer when
+>>> the RSB underflows.
+>>
+>> Adding LAKML.
+>>
+>> AFAIU, some ARM Cortex cores have the same optimization.
+>> (A9 maybe, A17 probably, some recent 64-bit cores)
+>>
+>> Are there software work-arounds for Spectre planned for arm32 and arm64?
+> 
+> Yes, I think they are currently buried in one of the arm64 trees, and
+> they have been posted to the mailing list a few times in the past.
+
+Found the burial ground, thanks Greg.
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
+
+Via https://developer.arm.com/support/security-update
+
+"For Cortex-R8, Cortex-A8, Cortex-A9, and Cortex-A17, invalidate
+the branch predictor using a BPIALL instruction."
+
+The latest arm32 patch series was submitted recently:
+
+  https://www.spinics.net/lists/arm-kernel/msg630892.html
+
+Regards.
