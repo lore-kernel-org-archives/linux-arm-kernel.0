@@ -1,60 +1,100 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 13:48:40 -0600
-Subject: [RFC PATCH 0/9] initial support for "suniv" Allwinner new ARM9 SoC
-In-Reply-To: <20180125153520.lxcfvh3yvi36uiux@flea.lan>
-References: <20180119231735.61504-1-icenowy@aosc.io>
- <20180122121435.bpayxk4uzfqbhqse@flea.lan>
- <14593819.uISRktVE4V@ice-x220i>
- <20180125153520.lxcfvh3yvi36uiux@flea.lan>
-Message-ID: <20180129194840.fcwlre3wmikphg2f@rob-hp-laptop>
+Date: Mon, 29 Jan 2018 13:53:15 -0600
+Subject: [PATCH v6 01/41] dt-bindings: clock: Add new bindings for TI
+ Davinci PLL clocks
+In-Reply-To: <1516468460-4908-2-git-send-email-david@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-2-git-send-email-david@lechnology.com>
+Message-ID: <20180129195315.bjanym7pmeh7bhaa@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 04:35:20PM +0100, Maxime Ripard wrote:
-> Hi,
+On Sat, Jan 20, 2018 at 11:13:40AM -0600, David Lechner wrote:
+> This adds a new binding for the PLL IP blocks in the mach-davinci
+> family of processors. Currently, only da850 has device tree support
+> but these bindings can also work for other SoCs in this family just
+> by adding new compatible strings.
 > 
-> On Wed, Jan 24, 2018 at 09:10:34PM +0800, Icenowy Zheng wrote:
-> > ? 2018?1?22???? CST ??8:14:35?Maxime Ripard ???
-> > > On Sat, Jan 20, 2018 at 07:17:26AM +0800, Icenowy Zheng wrote:
-> > > > This is the RFC initial patchset for the "new" Allwinner SUNIV ARM9 SoC.
-> > > > 
-> > > > The same die is packaged differently, come with different co-packaged
-> > > > DRAM or shipped with different SDK; and then made many model names: F23,
-> > > > F25, F1C100A, F1C100S, F1C200S, F1C500, F1C600, R6, etc. These SoCs all
-> > > > share a common feature set and are packaged similarly (eLQFP128 for SoCs
-> > > > without co-packaged DRAM, QFN88 for with DRAM). As their's no
-> > > > functionality hidden on the QFN88 models (except DRAM interface not
-> > > > exported), it's not clever to differentiate them. So I will use suniv as
-> > > > common name of all these SoCs.
-> > > 
-> > > Where is that suniv prefix coming from?
-> > 
-> > The BSP (Melis and Linux). (e.g. "libs/suniv" directory of the Melis SDK and 
-> > "arch/arm/boot/dts/sunivw1p1.dtsi" in the Linux SDK)
+> Note: Although these PLL controllers are very similar to the TI Keystone
+> SoCs, we are not re-using those bindings. The Keystone bindings use a
+> legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
+> have a slightly different PLL register layout and a number of quirks
+> that can't be handled by the existing bindings, so the keystone bindings
+> could not be used as-is anyway.
 > 
-> Do you have a link to that BSP?
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
 > 
-> > > You should really answer two questions here:
-> > >   - Are you able to predict whether you'll find an SoC part of that
-> > >     family in the future that derives a bit and will need a compatible
-> > >     of its own?
-> > >   - Are you able to predict which quirks we'll need along the way to
-> > >     support all the SoCs you've listed there?
-> > > 
-> > > If you can't answer yes to both these questions, with a 100%
-> > > certainty, then you'll need a SoC name in the compatible.
-> > > 
-> > > Which doesn't prevent you from sharing as much as possible the DT like
-> > > we did between the A10s and the A13 for example.
-> > 
-> > So the suniv-f1c100s.dtsi will still be kept empty and all peripherals known 
-> > should go through suniv.dtsi.
+> v6 changes:
+> - Added clock-names property
+> - Added ti,clkmode-square-wave property
+> - Added pllout child node
+> - Added obsclk child node
+> - Expanded examples
 > 
-> Sorry if I wasn't really clear. You can totally keep the current DT
-> structure if that makes sense (and judging by what you're saying, it
-> does.), but the compatibles should have the SoC name in it.
+>  .../devicetree/bindings/clock/ti/davinci/pll.txt   | 96 ++++++++++++++++++++++
+>  1 file changed, 96 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+> new file mode 100644
+> index 0000000..36998e1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+> @@ -0,0 +1,96 @@
+> +Binding for TI DaVinci PLL Controllers
+> +
+> +The PLL provides clocks to most of the components on the SoC. In addition
+> +to the PLL itself, this controller also contains bypasses, gates, dividers,
+> +an multiplexers for various clock signals.
+> +
+> +Required properties:
+> +- compatible: shall be one of:
+> +	- "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
+> +	- "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
+> +- reg: physical base address and size of the controller's register area.
+> +- clocks: phandles corresponding to the clock names
+> +- clock-names: names of the clock sources - depends on compatible string
+> +	- for "ti,da850-pll0", shall be "clksrc", "extclksrc"
+> +	- for "ti,da850-pll1", shall be "clksrc"
+> +
+> +Optional properties:
+> +- ti,clkmode-square-wave: Indicates that the the board is supplying a square
+> +	wave input on the OSCIN pin instead of using a crystal oscillator.
+> +	This property is only valid when compatible = "ti,da850-pll0".
+> +
+> +
+> +Optional child nodes:
+> +
+> +pllout
+> +	Describes the main PLL clock output (before POSTDIV). The node name must
+> +	be "pllout".
+> +
+> +	Required properties:
+> +	- #clock-cells: shall be 0
+> +
+> +sysclk
+> +	Describes the PLLDIVn divider clocks that provide the SYSCLKn clock
+> +	domains. The node name must be "sysclk". Consumers of this node should
+> +	use "n" in "SYSCLKn" as the index parameter for the clock cell.
+> +
+> +	Required properties:
+> +	- #clock-cells: shall be 1
+> +
+> +auxclk
+> +	Describes the AUXCLK output of the PLL. The node name must be "auxclk".
+> +	This child node is only valid when compatible = "ti,da850-pll0".
+> +
+> +	Required properties:
+> +	- #clock-cells: shall be 0
+> +
+> +obsclk
+> +	Describes the OBSCLK output of the PLL. The node name must be "obsclk".
+> +
+> +	Required properties:
+> +	- #clock-cells: shall be 0
 
-In case it's not clear, the compatible strings and any new bindings need 
-to be documented.
+So why have all these child nodes vs. just defining a single number 
+space of clock ids?
 
 Rob
