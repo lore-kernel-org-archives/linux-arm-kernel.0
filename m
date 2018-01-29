@@ -1,170 +1,189 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jan 2018 09:36:14 +0000
-Subject: [PATCH 14/14] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
- <20180126142847.31240-15-marc.zyngier@arm.com>
- <CAKv+Gu_1=Z=KaiW=Ltj4a31A5a-XFzPfc0SMk0E5PAwdGDAhMg@mail.gmail.com>
-Message-ID: <8c487a64-ec34-5fe8-cc78-5c280051675e@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jan 2018 10:37:38 +0100
+Subject: [PATCH v2 06/16] iio: adc: sun4i-gpadc-iio: rework: support
+ multiple sensors
+In-Reply-To: <20180128232919.12639-7-embed3d@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-7-embed3d@gmail.com>
+Message-ID: <20180129093738.5edpjclcbtsoneiw@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/18 23:08, Ard Biesheuvel wrote:
-> On 26 January 2018 at 14:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
->> It is lovely. Really.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kernel/bpi.S        | 20 ++++++++++++
->>  arch/arm64/kernel/cpu_errata.c | 71 +++++++++++++++++++++++++++++++++++++++++-
->>  2 files changed, 90 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
->> index 76225c2611ea..add7e08a018d 100644
->> --- a/arch/arm64/kernel/bpi.S
->> +++ b/arch/arm64/kernel/bpi.S
->> @@ -17,6 +17,7 @@
->>   */
->>
->>  #include <linux/linkage.h>
->> +#include <linux/arm-smccc.h>
->>
->>  .macro ventry target
->>         .rept 31
->> @@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
->>         .endr
->>         ldp     x29, x30, [sp], #16
->>  ENTRY(__qcom_hyp_sanitize_link_stack_end)
->> +
->> +.macro smccc_workaround_1 inst
->> +       sub     sp, sp, #(8 * 4)
->> +       stp     x2, x3, [sp, #(16 * 0)]
->> +       stp     x0, x1, [sp, #(16 * 1)]
->> +       orr     w0, wzr, #ARM_SMCCC_ARCH_WORKAROUND_1
->> +       \inst   #0
->> +       ldp     x2, x3, [sp, #(16 * 0)]
->> +       ldp     x0, x1, [sp, #(16 * 1)]
->> +       add     sp, sp, #(8 * 4)
->> +.endm
->> +
->> +ENTRY(__smccc_workaround_1_smc_start)
->> +       smccc_workaround_1      smc
->> +ENTRY(__smccc_workaround_1_smc_end)
->> +
->> +ENTRY(__smccc_workaround_1_hvc_start)
->> +       smccc_workaround_1      hvc
->> +ENTRY(__smccc_workaround_1_hvc_end)
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index ed6881882231..f1501873f2e4 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
->>  extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
->>  extern char __qcom_hyp_sanitize_link_stack_start[];
->>  extern char __qcom_hyp_sanitize_link_stack_end[];
->> +extern char __smccc_workaround_1_smc_start[];
->> +extern char __smccc_workaround_1_smc_end[];
->> +extern char __smccc_workaround_1_hvc_start[];
->> +extern char __smccc_workaround_1_hvc_end[];
->>
->>  static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
->>                                 const char *hyp_vecs_end)
->> @@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->>  #define __psci_hyp_bp_inval_end                        NULL
->>  #define __qcom_hyp_sanitize_link_stack_start   NULL
->>  #define __qcom_hyp_sanitize_link_stack_end     NULL
->> +#define __smccc_workaround_1_smc_start         NULL
->> +#define __smccc_workaround_1_smc_end           NULL
->> +#define __smccc_workaround_1_hvc_start         NULL
->> +#define __smccc_workaround_1_hvc_end           NULL
->>
->>  static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->>                                       const char *hyp_vecs_start,
->> @@ -142,17 +150,78 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
->>         __install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
->>  }
->>
->> +#include <uapi/linux/psci.h>
->> +#include <linux/arm-smccc.h>
->>  #include <linux/psci.h>
->>
->> +static void call_smc_arch_workaround_1(void)
->> +{
->> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
->> +       asm volatile("smc       #0\n"
->> +                    : "+r" (w0));
->> +}
->> +
->> +static void call_hvc_arch_workaround_1(void)
->> +{
->> +       register int w0 asm("w0") = ARM_SMCCC_ARCH_WORKAROUND_1;
->> +       asm volatile("hvc       #0\n"
->> +                    : "+r" (w0));
->> +}
->> +
->> +static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
->> +{
->> +       bp_hardening_cb_t cb;
->> +       void *smccc_start, *smccc_end;
->> +       struct arm_smccc_res res;
->> +
->> +       if (psci_ops.variant == SMCCC_VARIANT_1_0)
->> +               return false;
->> +
->> +       switch (psci_ops.conduit) {
->> +       case PSCI_CONDUIT_HVC:
->> +               arm_smccc_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
->> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
->> +                             &res);
->> +               if (res.a0)
->> +                       return false;
->> +               cb = call_hvc_arch_workaround_1;
->> +               smccc_start = __smccc_workaround_1_hvc_start;
->> +               smccc_end = __smccc_workaround_1_hvc_end;
->> +               break;
->> +
->> +       case PSCI_CONDUIT_SMC:
->> +               arm_smccc_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
->> +                             ARM_SMCCC_ARCH_WORKAROUND_1, 0, 0, 0, 0, 0, 0,
->> +                             &res);
+Hi,
+
+On Mon, Jan 29, 2018 at 12:29:09AM +0100, Philipp Rossak wrote:
+> For adding newer sensor some basic rework of the code is necessary.
 > 
-> This compiles to
+> This patch reworks the driver to be able to handle more than one
+> thermal sensor. Newer SoC like the A80 have 4 thermal sensors.
+> Because of this the maximal sensor count value was set to 4.
 > 
->  4a8:   928fffe1        mov     x1, #0xffffffffffff8000         // #-32768
->  4ac:   b26187e0        mov     x0, #0xffffffff80000001         // #-2147483647
->  4b0:   d2800007        mov     x7, #0x0                        // #0
->  4b4:   d2800006        mov     x6, #0x0                        // #0
->  4b8:   d2800005        mov     x5, #0x0                        // #0
->  4bc:   d2800004        mov     x4, #0x0                        // #0
->  4c0:   d2800003        mov     x3, #0x0                        // #0
->  4c4:   d2800002        mov     x2, #0x0                        // #0
->  4c8:   f2b00001        movk    x1, #0x8000, lsl #16
->  4cc:   94000000        bl      0 <__arm_smccc_smc>
+> The sensor_id value is set during sensor registration and is for each
+> registered sensor indiviual. This makes it able to differntiate the
+> sensors when the value is read from the register.
 > 
-> so it seems we're missing a UL suffix somewhere.
+> In function sun4i_gpadc_read_raw(), the sensor number of the ths sensor
+> was directly set to 0 (sun4i_gpadc_temp_read(x,x,0)). This selects
+> in the temp_read function automatically sensor 0. A check for the
+> sensor_id is here not required since the old sensors only have one
+> thermal sensor. In addition to that is the sun4i_gpadc_read_raw()
+> function only used by the "older" sensors (before A33) where the
+> thermal sensor was a cobination of an adc and a thermal sensor.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 36 +++++++++++++++++++++++-------------
+>  include/linux/mfd/sun4i-gpadc.h   |  3 +++
+>  2 files changed, 26 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 51ec0104d678..ac9ad2f8232f 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -67,12 +67,13 @@ struct gpadc_data {
+>  	unsigned int	tp_adc_select;
+>  	unsigned int	(*adc_chan_select)(unsigned int chan);
+>  	unsigned int	adc_chan_mask;
+> -	unsigned int	temp_data;
+> +	unsigned int	temp_data[MAX_SENSOR_COUNT];
+>  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+>  	bool		has_bus_clk;
+>  	bool		has_bus_rst;
+>  	bool		has_mod_clk;
+> +	int		sensor_count;
+>  };
+>  
+>  static const struct gpadc_data sun4i_gpadc_data = {
+> @@ -82,9 +83,10 @@ static const struct gpadc_data sun4i_gpadc_data = {
+>  	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>  	.adc_chan_select = &sun4i_gpadc_chan_select,
+>  	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>  	.sample_start = sun4i_gpadc_sample_start,
+>  	.sample_end = sun4i_gpadc_sample_end,
+> +	.sensor_count = 1,
+>  };
+>  
+>  static const struct gpadc_data sun5i_gpadc_data = {
+> @@ -94,9 +96,10 @@ static const struct gpadc_data sun5i_gpadc_data = {
+>  	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>  	.adc_chan_select = &sun4i_gpadc_chan_select,
+>  	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>  	.sample_start = sun4i_gpadc_sample_start,
+>  	.sample_end = sun4i_gpadc_sample_end,
+> +	.sensor_count = 1,
+>  };
+>  
+>  static const struct gpadc_data sun6i_gpadc_data = {
+> @@ -106,18 +109,20 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  	.tp_adc_select = SUN6I_GPADC_CTRL1_TP_ADC_SELECT,
+>  	.adc_chan_select = &sun6i_gpadc_chan_select,
+>  	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
+> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>  	.sample_start = sun4i_gpadc_sample_start,
+>  	.sample_end = sun4i_gpadc_sample_end,
+> +	.sensor_count = 1,
+>  };
+>  
+>  static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.temp_offset = -1662,
+>  	.temp_scale = 162,
+>  	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
+> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>  	.sample_start = sun4i_gpadc_sample_start,
+>  	.sample_end = sun4i_gpadc_sample_end,
+> +	.sensor_count = 1,
+>  };
+>  
+>  struct sun4i_gpadc_iio {
+> @@ -135,6 +140,7 @@ struct sun4i_gpadc_iio {
+>  	struct clk			*bus_clk;
+>  	struct clk			*mod_clk;
+>  	struct reset_control		*reset;
+> +	int				sensor_id;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+>  	struct thermal_zone_device	*tzd;
+> @@ -302,14 +308,15 @@ static int sun4i_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
+>  	return sun4i_gpadc_read(indio_dev, channel, val, info->fifo_data_irq);
+>  }
+>  
+> -static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+> +static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
+> +				int sensor)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  
+>  	if (info->no_irq) {
+>  		pm_runtime_get_sync(indio_dev->dev.parent);
+>  
+> -		regmap_read(info->regmap, info->data->temp_data, val);
+> +		regmap_read(info->regmap, info->data->temp_data[sensor], val);
+>  
+>  		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>  		pm_runtime_put_autosuspend(indio_dev->dev.parent);
+> @@ -356,7 +363,7 @@ static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
+>  			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
+>  						   val);
+>  		else
+> -			ret = sun4i_gpadc_temp_read(indio_dev, val);
+> +			ret = sun4i_gpadc_temp_read(indio_dev, val, 0);
+>  
+>  		if (ret)
+>  			return ret;
+> @@ -470,7 +477,7 @@ static int sun4i_gpadc_get_temp(void *data, int *temp)
+>  	struct sun4i_gpadc_iio *info = data;
+>  	int val, scale, offset;
+>  
+> -	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
+> +	if (sun4i_gpadc_temp_read(info->indio_dev, &val, info->sensor_id))
+>  		return -ETIMEDOUT;
+>  
+>  	sun4i_gpadc_temp_scale(info->indio_dev, &scale);
+> @@ -712,7 +719,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  {
+>  	struct sun4i_gpadc_iio *info;
+>  	struct iio_dev *indio_dev;
+> -	int ret;
+> +	int ret, i;
+>  
+>  	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>  	if (!indio_dev)
+> @@ -745,9 +752,12 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	pm_runtime_enable(&pdev->dev);
+>  
+>  	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+> -		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+> -							    0, info,
+> -							    &sun4i_ts_tz_ops);
+> +		for (i = 0; i < info->data->sensor_count; i++) {
+> +			info->sensor_id = i;
+> +			info->tzd = thermal_zone_of_sensor_register(
+> +					info->sensor_device,
+> +					i, info, &sun4i_ts_tz_ops);
+> +		}
 
-Yeah, this seems to stem from ARM_SMCCC_FAST_CALL, which is bit 31 and
-isn't advertised as unsigned. It still works because both x0 and x1 are
-used as 32bit quantities in this particular SMC context, but that has
-the potential of triggering unexpected behaviours in broken implementations.
+I'm not sure how that works. Isn't the info structure shared between
+all the sensors? The sensor_id value would be always set to the last
+sensor then.
 
-I'll have a look at it.
+Thanks!
+Maxime
 
-> Also, adding some printks here reveals that this function is called 32
-> times in total, i.e., 4 times per CPU on my Overdrive. This is with
-> the patches applied onto v4.15-rc9, so perhaps the rework takes care
-> of this?
-
-There is some ugly explosion in the number of callbacks as all of the
-various implementations all share the same capability number. We can
-take a shortcut and do an MIDR check early instead of late though.
-
-But Suzuki is also reworking some of this, so I'll have a check with him.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/92db8553/attachment.sig>
