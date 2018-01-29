@@ -1,20 +1,22 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 29 Jan 2018 17:01:51 -0500
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 29 Jan 2018 16:38:21 -0600
 Subject: [PATCH V4 05/26] agp: nvidia: deprecate pci_get_bus_and_slot()
 In-Reply-To: <CAPM=9tzWpgF3mtq+ztKJ=P1Nw3Vh8ZEUfYH8Ep=+fRDZTbTtUg@mail.gmail.com>
 References: <1513661883-28662-1-git-send-email-okaya@codeaurora.org>
  <1513661883-28662-6-git-send-email-okaya@codeaurora.org>
  <9b3cf544-173e-2450-589c-4bf14af307f2@codeaurora.org>
  <CAPM=9tzWpgF3mtq+ztKJ=P1Nw3Vh8ZEUfYH8Ep=+fRDZTbTtUg@mail.gmail.com>
-Message-ID: <4fd0d418-ff34-8a3f-a233-5cdf80fe744f@codeaurora.org>
+Message-ID: <20180129223821.GE232763@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/29/2018 4:43 PM, Dave Airlie wrote:
->>  12/19/2017 12:37 AM, Sinan Kaya wrote:
->>> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
->>> where a PCI device is present. This restricts the device drivers to be
->>> reused for other domain numbers.
+On Tue, Jan 30, 2018 at 07:43:21AM +1000, Dave Airlie wrote:
+> On 3 January 2018 at 22:44, Sinan Kaya <okaya@codeaurora.org> wrote:
+> > On 12/19/2017 12:37 AM, Sinan Kaya wrote:
+> >> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> >> where a PCI device is present. This restricts the device drivers to be
+> >> reused for other domain numbers.
+> 
 > So not a major problem, but it would be pretty much impossible for either
 > of these agp drivers to be used in any other domain ever.
 > 
@@ -22,23 +24,71 @@ On 1/29/2018 4:43 PM, Dave Airlie wrote:
 > pci_get_domain0_bus_and_slot as a helper, or just pass the pdev in
 > and have it do the right thing always.
 
-There is nothing wrong with doing all three. Since nobody replied until
-patch v4, I did the heavy-lifting and converted code to use pci_domain_nr()
-as much as I can rather than hard-coding a 0 while calling
-pci_get_domain_bus_and_slot().
+I already have this patch on my "next" branch, planned for the v4.16
+merge window, so it's done unless you have a major objection.
 
->From PCI coding perspective, pci_domain_nr() call is the right thing. It is
-guaranteed to work no matter what your domain number is. 
-
-People look at other code for examples on how to write a PCI driver
-in general. You want to minimize the exceptions as much as possible.
-
-Some discussion here about the benefits:
-
-https://lkml.org/lkml/2017/12/19/349
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> >> Getting ready to remove pci_get_bus_and_slot() function in favor of
+> >> pci_get_domain_bus_and_slot().
+> >>
+> >> Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
+> >> and extract the domain number from struct pci_dev.
+> >>
+> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >> ---
+> >>  drivers/char/agp/nvidia-agp.c | 12 +++++++++---
+> >>  drivers/char/agp/sworks-agp.c |  3 ++-
+> >>  2 files changed, 11 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/char/agp/nvidia-agp.c b/drivers/char/agp/nvidia-agp.c
+> >> index 828b344..623205b 100644
+> >> --- a/drivers/char/agp/nvidia-agp.c
+> >> +++ b/drivers/char/agp/nvidia-agp.c
+> >> @@ -340,11 +340,17 @@ static int agp_nvidia_probe(struct pci_dev *pdev,
+> >>       u8 cap_ptr;
+> >>
+> >>       nvidia_private.dev_1 =
+> >> -             pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
+> >> +             pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> >> +                                         (unsigned int)pdev->bus->number,
+> >> +                                         PCI_DEVFN(0, 1));
+> >>       nvidia_private.dev_2 =
+> >> -             pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
+> >> +             pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> >> +                                         (unsigned int)pdev->bus->number,
+> >> +                                         PCI_DEVFN(0, 2));
+> >>       nvidia_private.dev_3 =
+> >> -             pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
+> >> +             pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> >> +                                         (unsigned int)pdev->bus->number,
+> >> +                                         PCI_DEVFN(30, 0));
+> >>
+> >>       if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
+> >>               printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
+> >> diff --git a/drivers/char/agp/sworks-agp.c b/drivers/char/agp/sworks-agp.c
+> >> index 03be4ac..4dbdd3b 100644
+> >> --- a/drivers/char/agp/sworks-agp.c
+> >> +++ b/drivers/char/agp/sworks-agp.c
+> >> @@ -474,7 +474,8 @@ static int agp_serverworks_probe(struct pci_dev *pdev,
+> >>       }
+> >>
+> >>       /* Everything is on func 1 here so we are hardcoding function one */
+> >> -     bridge_dev = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
+> >> +     bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
+> >> +                     (unsigned int)pdev->bus->number,
+> >>                       PCI_DEVFN(0, 1));
+> >>       if (!bridge_dev) {
+> >>               dev_info(&pdev->dev, "can't find secondary device\n");
+> >>
+> >
+> > Any feedback here? most of the remaining patches have the ACK except these.
+> >
+> >
+> > --
+> > Sinan Kaya
+> > Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+> > Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
