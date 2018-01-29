@@ -1,53 +1,119 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 29 Jan 2018 09:53:52 +0800
-Subject: [PATCH v2 13/19] drm/sun4i: backend: Set a default zpos in our
- reset hook
-In-Reply-To: <b6a183234f0ad5a9a58c780c9cabbe29cbf40888.1516617243.git-series.maxime.ripard@free-electrons.com>
+Date: Mon, 29 Jan 2018 10:01:00 +0800
+Subject: [PATCH v2 14/19] drm/sun4i: backend: Add support for zpos
+In-Reply-To: <b006853e908bd06661c5bc1f2191121523bce0e4.1516617243.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9e7b6a702e4d90a13d08fbe3b0a319cbf4db687f.1516617243.git-series.maxime.ripard@free-electrons.com>
- <b6a183234f0ad5a9a58c780c9cabbe29cbf40888.1516617243.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64Ps0=vz0-Sg+UvpKABG7qjLKZ+QLV8EGUhpP+7co=WEA@mail.gmail.com>
+ <b006853e908bd06661c5bc1f2191121523bce0e4.1516617243.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66Sd_cTkP6CypHPva40FOS5qUa0gfhFKXEQ=FNF0mV8tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jan 22, 2018 at 6:35 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> The our plane state zpos value will be set only if there's an existing
-
-      ^^^ extra word
-
-Otherwise,
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-> state attached to the plane when creating the property.
+> Our various planes have a configurable zpos, that combined with the pipes
+> allow to configure the composition.
 >
-> However, this is not the case during the probe, and we therefore need to
-> put our default value in our reset hook.
+> Since the interaction between the pipes, zpos and alphas framebuffers are
+
+                                                                        ^^^ is
+
+> not trivials, let's just enable the zpos as an immutable property for now,
+
+       ^^^^^^^ trivial
+
+> and use that zpos in our atomic_update part.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/gpu/drm/sun4i/sun4i_layer.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/gpu/drm/sun4i/sun4i_backend.c     | 15 +++++++++++++++
+>  drivers/gpu/drm/sun4i/sun4i_backend.h     |  2 ++
+>  drivers/gpu/drm/sun4i/sun4i_framebuffer.c |  4 ++++
+>  drivers/gpu/drm/sun4i/sun4i_layer.c       |  3 +++
+>  4 files changed, 24 insertions(+)
 >
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index c448cb6b9fa9..03549646528a 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -28,6 +28,7 @@ struct sun4i_plane_desc {
->
->  static void sun4i_backend_layer_reset(struct drm_plane *plane)
->  {
-> +       struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
->         struct sun4i_layer_state *state;
->
->         if (plane->state) {
-> @@ -43,6 +44,7 @@ static void sun4i_backend_layer_reset(struct drm_plane *plane)
->         if (state) {
->                 plane->state = &state->state;
->                 plane->state->plane = plane;
-> +               plane->state->zpos = layer->id;
->         }
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> index a18c86a15748..c4986054909b 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> @@ -272,6 +272,21 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+>         return 0;
 >  }
 >
+> +int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
+> +                                   struct drm_plane *plane)
+> +{
+> +       struct drm_plane_state *state = plane->state;
+> +       unsigned int priority = state->normalized_zpos;
+> +
+> +       DRM_DEBUG_DRIVER("Setting layer %d priority to %d\n", layer, priority);
+
+You might want to make the statement less ambiguous, like
+
+  "Setting layer %d's priority ..."
+
+Otherwise,
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+
+
+> +
+> +       regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_ATTCTL_REG0(layer),
+> +                          SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK,
+> +                          SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(priority));
+> +
+> +       return 0;
+> +}
+> +
+>  static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
+>  {
+>         u16 src_h = state->src_h >> 16;
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+> index 1ca8b7db6807..04a4f11b87a8 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+> @@ -182,5 +182,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+>                                       int layer, struct drm_plane *plane);
+>  int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
+>                                         int layer, uint32_t in_fmt);
+> +int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
+> +                                   int layer, struct drm_plane *plane);
+>
+>  #endif /* _SUN4I_BACKEND_H_ */
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> index e68004844abe..5b3986437a50 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> @@ -35,6 +35,10 @@ static int sun4i_de_atomic_check(struct drm_device *dev,
+>         if (ret)
+>                 return ret;
+>
+> +       ret = drm_atomic_normalize_zpos(dev, state);
+> +       if (ret)
+> +               return ret;
+> +
+>         return drm_atomic_helper_check_planes(dev, state);
+>  }
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> index 03549646528a..fbf25d59cf88 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> @@ -115,6 +115,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+>         }
+>
+>         sun4i_backend_update_layer_coord(backend, layer->id, plane);
+> +       sun4i_backend_update_layer_zpos(backend, layer->id, plane);
+>         sun4i_backend_layer_enable(backend, layer->id, true);
+>  }
+>
+> @@ -237,6 +238,8 @@ struct drm_plane **sun4i_layers_init(struct drm_device *drm,
+>                         return ERR_CAST(layer);
+>                 };
+>
+> +               drm_plane_create_zpos_immutable_property(&layer->plane, i);
+> +
+>                 DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+>                                  i ? "overlay" : "primary", plane->pipe);
+>                 regmap_update_bits(engine->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
 > --
 > git-series 0.9.1
