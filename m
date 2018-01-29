@@ -1,55 +1,58 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 29 Jan 2018 12:59:46 +0100
-Subject: [RFC 09/10] x86/enter: Create macros to restrict/unrestrict
- Indirect Branch Speculation
-In-Reply-To: <20180125171616.GA25130@kroah.com>
-References: <CA+55aFxUEPHc7JRQG3zmxEsfmfJOiJa1QqFBKCBNb5Tt5vfiSg@mail.gmail.com>
- <1516566497.9814.78.camel@infradead.org>
- <CA+55aFwOkH8RH12Dzs=hT3e7eS3Ckz9Ed6x_-9a0zs1cw9zbKA@mail.gmail.com>
- <1516572013.9814.109.camel@infradead.org>
- <CA+55aFwoxXmY0u84iPT-RP8DoG+Qb8t-mh2r8RLhKVAH3jm6qg@mail.gmail.com>
- <1516638426.9521.20.camel@infradead.org>
- <20180123072930.soz25cyky3u4hpgv@gmail.com>
- <20180123075358.nztpyxympwfkyi2a@gmail.com>
- <1516699832.9521.123.camel@infradead.org>
- <d77abfaf-077a-0ae6-8ed7-3b5354938a52@free.fr>
- <20180125171616.GA25130@kroah.com>
-Message-ID: <1b430c16-2090-41e3-82d7-ef3d9b63fe2b@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jan 2018 11:59:56 +0000
+Subject: [PATCH v2 5/9] arm64: Force KPTI to be disabled on Cavium ThunderX
+In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1517227200-20412-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Dropping large CC list ]
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-On 25/01/2018 18:16, Greg Kroah-Hartman wrote:
+Cavium ThunderX's erratum 27456 results in a corruption of icache
+entries that are loaded from memory that is mapped as non-global
+(i.e. ASID-tagged).
 
-> On Thu, Jan 25, 2018 at 05:19:04PM +0100, Mason wrote:
-> 
->> On 23/01/2018 10:30, David Woodhouse wrote:
->>
->>> Skylake takes predictions from the generic branch target buffer when
->>> the RSB underflows.
->>
->> Adding LAKML.
->>
->> AFAIU, some ARM Cortex cores have the same optimization.
->> (A9 maybe, A17 probably, some recent 64-bit cores)
->>
->> Are there software work-arounds for Spectre planned for arm32 and arm64?
-> 
-> Yes, I think they are currently buried in one of the arm64 trees, and
-> they have been posted to the mailing list a few times in the past.
+As KPTI is based on memory being mapped non-global, let's prevent
+it from kicking in if this erratum is detected.
 
-Found the burial ground, thanks Greg.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+[will: Update comment]
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=kpti
-
-Via https://developer.arm.com/support/security-update
-
-"For Cortex-R8, Cortex-A8, Cortex-A9, and Cortex-A17, invalidate
-the branch predictor using a BPIALL instruction."
-
-The latest arm32 patch series was submitted recently:
-
-  https://www.spinics.net/lists/arm-kernel/msg630892.html
-
-Regards.
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index cd9f46952db3..0ff8ab79352c 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -855,12 +855,23 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 				int __unused)
+ {
++	char const *str = "command line option";
+ 	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+ 
+-	/* Forced on command line? */
++	/*
++	 * For reasons that aren't entirely clear, enabling KPTI on Cavium
++	 * ThunderX leads to apparent I-cache corruption of kernel text, which
++	 * ends as well as you might imagine. Don't even try.
++	 */
++	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_27456)) {
++		str = "ARM64_WORKAROUND_CAVIUM_27456";
++		__kpti_forced = -1;
++	}
++
++	/* Forced? */
+ 	if (__kpti_forced) {
+-		pr_info_once("kernel page table isolation forced %s by command line option\n",
+-			     __kpti_forced > 0 ? "ON" : "OFF");
++		pr_info_once("kernel page table isolation forced %s by %s\n",
++			     __kpti_forced > 0 ? "ON" : "OFF", str);
+ 		return __kpti_forced > 0;
+ 	}
+ 
+-- 
+2.1.4
