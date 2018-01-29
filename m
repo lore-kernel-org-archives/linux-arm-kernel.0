@@ -1,32 +1,32 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Mon, 29 Jan 2018 18:05:16 +0100
-Subject: [PATCH 0/5] hwrng: stm32 - Improvement for stm32-rng 
-Message-ID: <20180129170521.1862-1-lionel.debieve@st.com>
+Date: Mon, 29 Jan 2018 18:05:18 +0100
+Subject: [PATCH 2/5] dt-bindings: rng: add reset node for stm32
+In-Reply-To: <20180129170521.1862-1-lionel.debieve@st.com>
+References: <20180129170521.1862-1-lionel.debieve@st.com>
+Message-ID: <20180129170521.1862-3-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches add extended functionalities for stm32 rng
-driver.
-Patch #1 includes a reset during probe to avoid any error status
-which can occur during bootup process and keep safe rng integrity.
+Adding optional resets property for rng.
 
-Patch #3 adds a new property to manage the clock error detection
-feature which can be disabled on specific target.
+Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+---
+ Documentation/devicetree/bindings/rng/st,stm32-rng.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Patch #5 rework the timeout calculation for read value that was
-previously defined based on loop operation and is now based on
-timer.
-
-Lionel Debieve (5):
-  hwrng: stm32 - add reset during probe
-  dt-bindings: rng: add reset node for stm32
-  hwrng: stm32 - allow disable clock error detection
-  dt-bindings: rng: add clock detection error for stm32
-  hwrng: stm32 - rework read timeout calculation
-
- .../devicetree/bindings/rng/st,stm32-rng.txt       |  4 ++
- drivers/char/hw_random/stm32-rng.c                 | 44 ++++++++++++++--------
- 2 files changed, 32 insertions(+), 16 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/rng/st,stm32-rng.txt b/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
+index 47f04176f93b..cb7ca78135ff 100644
+--- a/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
++++ b/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
+@@ -11,6 +11,9 @@ Required properties:
+ - interrupts : The designated IRQ line for the RNG
+ - clocks : The clock needed to enable the RNG
+ 
++Optional properties:
++- resets : The reset to properly start RNG
++
+ Example:
+ 
+ 	rng: rng at 50060800 {
 -- 
 2.15.1
