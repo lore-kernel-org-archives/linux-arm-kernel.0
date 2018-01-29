@@ -1,95 +1,105 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jan 2018 11:59:59 +0000
-Subject: [PATCH v2 8/9] arm64: assembler: Align phys_to_pte with pte_to_phys
+Date: Mon, 29 Jan 2018 12:00:00 +0000
+Subject: [PATCH v2 9/9] arm64: idmap: Use "awx" flags for .idmap.text
+ .pushsection directives
 In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
 References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517227200-20412-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1517227200-20412-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pte_to_phys lives in assembler.h and takes its destination register as
-the first argument. Move phys_to_pte out of head.S to sit with its
-counterpart and rejig it to follow the same calling convention.
+The identity map is mapped as both writeable and executable by the
+SWAPPER_MM_MMUFLAGS and this is relied upon by the kpti code to manage
+a synchronisation flag. Update the .pushsection flags to reflect the
+actual mapping attributes.
 
+Reported-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 14 ++++++++++++++
- arch/arm64/kernel/head.S           | 24 ++----------------------
- 2 files changed, 16 insertions(+), 22 deletions(-)
+ arch/arm64/kernel/cpu-reset.S | 2 +-
+ arch/arm64/kernel/head.S      | 2 +-
+ arch/arm64/kernel/sleep.S     | 2 +-
+ arch/arm64/mm/proc.S          | 8 ++++----
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index e4495ef96058..f311a1ed34d0 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -523,6 +523,20 @@ alternative_endif
- #endif
- 	.endm
+diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+index 2a752cb2a0f3..8021b46c9743 100644
+--- a/arch/arm64/kernel/cpu-reset.S
++++ b/arch/arm64/kernel/cpu-reset.S
+@@ -16,7 +16,7 @@
+ #include <asm/virt.h>
  
-+	.macro	phys_to_pte, pte, phys
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+	/*
-+	 * We assume \phys is 64K aligned and this is guaranteed by only
-+	 * supporting this configuration with 64K pages.
-+	 */
-+	orr	\pte, \phys, \phys, lsr #36
-+	and	\pte, \pte, #PTE_ADDR_MASK
-+#else
-+	mov	\pte, \phys
-+#endif
-+	.endm
-+
-+
- 	.macro	pte_to_phys, phys, pte
- #ifdef CONFIG_ARM64_PA_BITS_52
- 	ror	\phys, \pte, #16
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 341649c08337..25f5b2e400fb 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -148,26 +148,6 @@ preserve_boot_args:
- ENDPROC(preserve_boot_args)
+ .text
+-.pushsection    .idmap.text, "ax"
++.pushsection    .idmap.text, "awx"
  
  /*
-- * Macro to arrange a physical address in a page table entry, taking care of
-- * 52-bit addresses.
-- *
-- * Preserves:	phys
-- * Returns:	pte
-- */
--	.macro	phys_to_pte, phys, pte
--#ifdef CONFIG_ARM64_PA_BITS_52
--	/*
--	 * We assume \phys is 64K aligned and this is guaranteed by only
--	 * supporting this configuration with 64K pages.
--	 */
--	orr	\pte, \phys, \phys, lsr #36
--	and	\pte, \pte, #PTE_ADDR_MASK
--#else
--	mov	\pte, \phys
--#endif
--	.endm
--
--/*
-  * Macro to create a table entry to the next page.
+  * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 25f5b2e400fb..2b6b8b24e5ab 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -455,7 +455,7 @@ ENDPROC(__primary_switched)
+  * end early head section, begin head code that is also used for
+  * hotplug and needs to have the same protections as the text region
+  */
+-	.section ".idmap.text","ax"
++	.section ".idmap.text","awx"
+ 
+ ENTRY(kimage_vaddr)
+ 	.quad		_text - TEXT_OFFSET
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index 10dd16d7902d..bebec8ef9372 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -96,7 +96,7 @@ ENTRY(__cpu_suspend_enter)
+ 	ret
+ ENDPROC(__cpu_suspend_enter)
+ 
+-	.pushsection ".idmap.text", "ax"
++	.pushsection ".idmap.text", "awx"
+ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+ 	bl	__cpu_setup
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index cfd22ba9b510..71baed7e592a 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -90,7 +90,7 @@ ENDPROC(cpu_do_suspend)
   *
-  *	tbl:	page table address
-@@ -181,7 +161,7 @@ ENDPROC(preserve_boot_args)
+  * x0: Address of context pointer
   */
- 	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
- 	add	\tmp1, \tbl, #PAGE_SIZE
--	phys_to_pte \tmp1, \tmp2
-+	phys_to_pte \tmp2, \tmp1
- 	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
- 	lsr	\tmp1, \virt, #\shift
- 	sub	\ptrs, \ptrs, #1
-@@ -207,7 +187,7 @@ ENDPROC(preserve_boot_args)
-  * Returns:	rtbl
+-	.pushsection ".idmap.text", "ax"
++	.pushsection ".idmap.text", "awx"
+ ENTRY(cpu_do_resume)
+ 	ldp	x2, x3, [x0]
+ 	ldp	x4, x5, [x0, #16]
+@@ -165,7 +165,7 @@ ENTRY(cpu_do_switch_mm)
+ 	b	post_ttbr_update_workaround	// Back to C code...
+ ENDPROC(cpu_do_switch_mm)
+ 
+-	.pushsection ".idmap.text", "ax"
++	.pushsection ".idmap.text", "awx"
+ 
+ .macro	__idmap_cpu_set_reserved_ttbr1, tmp1, tmp2
+ 	adrp	\tmp1, empty_zero_page
+@@ -199,7 +199,7 @@ ENDPROC(idmap_cpu_replace_ttbr1)
+ 	.popsection
+ 
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-	.pushsection ".idmap.text", "ax"
++	.pushsection ".idmap.text", "awx"
+ 
+ 	.macro	__idmap_kpti_get_pgtable_ent, type
+ 	dc	cvac, cur_\()\type\()p		// Ensure any existing dirty
+@@ -388,7 +388,7 @@ ENDPROC(idmap_kpti_install_ng_mappings)
+  *	Initialise the processor for turning the MMU on.  Return in x0 the
+  *	value of the SCTLR_EL1 register.
   */
- 	.macro populate_entries, tbl, rtbl, index, eindex, flags, inc, tmp1
--.Lpe\@:	phys_to_pte \rtbl, \tmp1
-+.Lpe\@:	phys_to_pte \tmp1, \rtbl
- 	orr	\tmp1, \tmp1, \flags	// tmp1 = table entry
- 	str	\tmp1, [\tbl, \index, lsl #3]
- 	add	\rtbl, \rtbl, \inc	// rtbl = pa next level
+-	.pushsection ".idmap.text", "ax"
++	.pushsection ".idmap.text", "awx"
+ ENTRY(__cpu_setup)
+ 	tlbi	vmalle1				// Invalidate local TLB
+ 	dsb	nsh
 -- 
 2.1.4
