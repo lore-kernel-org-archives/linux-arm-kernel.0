@@ -1,62 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jan 2018 10:08:30 +0000
-Subject: [PATCH 12/14] firmware/psci: Expose PSCI conduit
-In-Reply-To: <CAKv+Gu8RAzwpcGqrSxsegYnVgfFQCkYp+sgaPzm8906A4QMLCw@mail.gmail.com>
-References: <20180126142847.31240-1-marc.zyngier@arm.com>
- <20180126142847.31240-13-marc.zyngier@arm.com>
- <CAKv+Gu8RAzwpcGqrSxsegYnVgfFQCkYp+sgaPzm8906A4QMLCw@mail.gmail.com>
-Message-ID: <26bcd8c6-c834-3d3a-426a-98fca3dfbbbf@arm.com>
+From: yong.deng@magewell.com (Yong Deng)
+Date: Mon, 29 Jan 2018 17:18:53 +0800
+Subject: [PATCH v7 1/2] dt-bindings: media: Add Allwinner V3s Camera Sensor
+ Interface (CSI)
+Message-ID: <1517217533-17657-1-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 10:04, Ard Biesheuvel wrote:
-> On 26 January 2018 at 14:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> In order to call into the firmware to apply workarounds, it is
->> useful to find out whether we're using HVC or SMC. Let's expose
->> this through the psci_ops.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/firmware/psci.c | 26 +++++++++++++++++++++-----
->>  include/linux/psci.h    |  7 +++++++
->>  2 files changed, 28 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
->> index 8b25d31e8401..570187e5d084 100644
->> --- a/drivers/firmware/psci.c
->> +++ b/drivers/firmware/psci.c
->> @@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
->>         return cpu == resident_cpu;
->>  }
->>
->> -struct psci_operations psci_ops;
->> +struct psci_operations psci_ops = {
->> +       .conduit = PSCI_CONDUIT_NONE,
->> +};
->>
->>  typedef unsigned long (psci_fn)(unsigned long, unsigned long,
->>                                 unsigned long, unsigned long);
->> @@ -210,6 +212,20 @@ static unsigned long psci_migrate_info_up_cpu(void)
->>                               0, 0, 0);
->>  }
->>
->> +static void set_conduit(enum psci_conduit conduit)
->> +{
->> +       switch (conduit) {
->> +       case PSCI_CONDUIT_HVC:
->> +               invoke_psci_fn = __invoke_psci_fn_hvc;
->> +               break;
->> +       case PSCI_CONDUIT_SMC:
->> +               invoke_psci_fn = __invoke_psci_fn_smc;
->> +               break;
-> 
-> I get a GCC warning here about PSCI_CONDUIT_NONE not being handled.
+Add binding documentation for Allwinner V3s CSI.
 
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Yong Deng <yong.deng@magewell.com>
+---
+ .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
 
-Yup, I fixed it already.
-
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+new file mode 100644
+index 0000000..2ff47a9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+@@ -0,0 +1,59 @@
++Allwinner V3s Camera Sensor Interface
++-------------------------------------
++
++Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
++interface and CSI1 is used for parallel interface.
++
++Required properties:
++  - compatible: value must be "allwinner,sun8i-v3s-csi"
++  - reg: base address and size of the memory-mapped region.
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the CSI
++    * bus: the CSI interface clock
++    * mod: the CSI module clock
++    * ram: the CSI DRAM clock
++  - clock-names: the clock names mentioned above
++  - resets: phandles to the reset line driving the CSI
++
++Each CSI node should contain one 'port' child node with one child 'endpoint'
++node, according to the bindings defined in
++Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
++above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
++Bt656 for CSI1.
++
++Endpoint node properties for CSI1
++---------------------------------
++
++- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
++			   node
++- bus-width:		: (required) must be 8, 10, 12 or 16
++- pclk-sample		: (optional) (default: sample on falling edge)
++- hsync-active		: (only required for parallel)
++- vsync-active		: (only required for parallel)
++
++Example:
++
++csi1: csi at 1cb4000 {
++	compatible = "allwinner,sun8i-v3s-csi";
++	reg = <0x01cb4000 0x1000>;
++	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&ccu CLK_BUS_CSI>,
++		 <&ccu CLK_CSI1_SCLK>,
++		 <&ccu CLK_DRAM_CSI>;
++	clock-names = "bus", "mod", "ram";
++	resets = <&ccu RST_BUS_CSI>;
++
++	port {
++		/* Parallel bus endpoint */
++		csi1_ep: endpoint {
++			remote-endpoint = <&adv7611_ep>;
++			bus-width = <16>;
++
++			/* If hsync-active/vsync-active are missing,
++			   embedded BT.656 sync is used */
++			hsync-active = <0>; /* Active low */
++			vsync-active = <0>; /* Active low */
++			pclk-sample = <1>;  /* Rising */
++		};
++	};
++};
 -- 
-Jazz is not dead. It just smells funny...
+1.8.3.1
