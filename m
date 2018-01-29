@@ -1,32 +1,32 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Mon, 29 Jan 2018 18:05:18 +0100
-Subject: [PATCH 2/5] dt-bindings: rng: add reset node for stm32
+Date: Mon, 29 Jan 2018 18:05:20 +0100
+Subject: [PATCH 4/5] dt-bindings: rng: add clock detection error for stm32
 In-Reply-To: <20180129170521.1862-1-lionel.debieve@st.com>
 References: <20180129170521.1862-1-lionel.debieve@st.com>
-Message-ID: <20180129170521.1862-3-lionel.debieve@st.com>
+Message-ID: <20180129170521.1862-5-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding optional resets property for rng.
+Add optional property to enable the clock detection error
+on rng block. It is used to allow slow clock source which
+give correct entropy for rng.
 
 Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
 ---
- Documentation/devicetree/bindings/rng/st,stm32-rng.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/devicetree/bindings/rng/st,stm32-rng.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/rng/st,stm32-rng.txt b/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
-index 47f04176f93b..cb7ca78135ff 100644
+index cb7ca78135ff..1dfa7d51e006 100644
 --- a/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
 +++ b/Documentation/devicetree/bindings/rng/st,stm32-rng.txt
-@@ -11,6 +11,9 @@ Required properties:
- - interrupts : The designated IRQ line for the RNG
- - clocks : The clock needed to enable the RNG
+@@ -13,6 +13,7 @@ Required properties:
  
-+Optional properties:
-+- resets : The reset to properly start RNG
-+
+ Optional properties:
+ - resets : The reset to properly start RNG
++- clock-error-detect : Enable the clock detection management
+ 
  Example:
  
- 	rng: rng at 50060800 {
 -- 
 2.15.1
