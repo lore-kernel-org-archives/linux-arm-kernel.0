@@ -1,95 +1,113 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 11:52:43 -0600
-Subject: [PATCH 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <20180117183244.28303-3-l.stach@pengutronix.de>
-References: <20180117183244.28303-1-l.stach@pengutronix.de>
- <20180117183244.28303-3-l.stach@pengutronix.de>
-Message-ID: <20180129175243.yw2ja3bakqw2ih7n@rob-hp-laptop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Jan 2018 17:55:23 +0000
+Subject: [PATCH v2 12/16] firmware/psci: Expose PSCI conduit
+In-Reply-To: <20180129174559.1866-13-marc.zyngier@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-13-marc.zyngier@arm.com>
+Message-ID: <20180129175523.GA24577@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 17, 2018 at 07:32:43PM +0100, Lucas Stach wrote:
-> This is the evaluation kit board for the i.MX8M. The current level of
-> support yields a working console and is able to boot userspace from
-> SD card or Network.
+On Mon, Jan 29, 2018 at 05:45:55PM +0000, Marc Zyngier wrote:
+> In order to call into the firmware to apply workarounds, it is
+> useful to find out whether we're using HVC or SMC. Let's expose
+> this through the psci_ops.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/boot/dts/nxp/Makefile       |   3 +
->  arch/arm64/boot/dts/nxp/imx8mq-evk.dts | 287 +++++++++++++++++++++++++++++++++
->  2 files changed, 290 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/nxp/Makefile
->  create mode 100644 arch/arm64/boot/dts/nxp/imx8mq-evk.dts
+>  drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+>  include/linux/psci.h    |  7 +++++++
+>  2 files changed, 30 insertions(+), 5 deletions(-)
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 8b25d31e8401..e9493da2b111 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
+>  	return cpu == resident_cpu;
+>  }
+>  
+> -struct psci_operations psci_ops;
+> +struct psci_operations psci_ops = {
+> +	.conduit = PSCI_CONDUIT_NONE,
+> +};
+>  
+>  typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+>  				unsigned long, unsigned long);
+> @@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+>  			      0, 0, 0);
+>  }
+>  
+> +static void set_conduit(enum psci_conduit conduit)
+> +{
+> +	switch (conduit) {
+> +	case PSCI_CONDUIT_HVC:
+> +		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +		break;
+> +	case PSCI_CONDUIT_SMC:
+> +		invoke_psci_fn = __invoke_psci_fn_smc;
+> +		break;
+> +	default:
+> +		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
+> +	}
+> +
+> +	psci_ops.conduit = conduit;
+> +}
+> +
+>  static int get_set_conduit_method(struct device_node *np)
+>  {
+>  	const char *method;
+> @@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
+>  	}
+>  
+>  	if (!strcmp("hvc", method)) {
+> -		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +		set_conduit(PSCI_CONDUIT_HVC);
+>  	} else if (!strcmp("smc", method)) {
+> -		invoke_psci_fn = __invoke_psci_fn_smc;
+> +		set_conduit(PSCI_CONDUIT_SMC);
+>  	} else {
+>  		pr_warn("invalid \"method\" property: %s\n", method);
+>  		return -EINVAL;
+> @@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
+>  	pr_info("probing for conduit method from ACPI.\n");
+>  
+>  	if (acpi_psci_use_hvc())
+> -		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +		set_conduit(PSCI_CONDUIT_HVC);
+>  	else
+> -		invoke_psci_fn = __invoke_psci_fn_smc;
+> +		set_conduit(PSCI_CONDUIT_SMC);
+>  
+>  	return psci_probe();
+>  }
+> diff --git a/include/linux/psci.h b/include/linux/psci.h
+> index f724fd8c78e8..f2679e5faa4f 100644
+> --- a/include/linux/psci.h
+> +++ b/include/linux/psci.h
+> @@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
+>  int psci_cpu_init_idle(unsigned int cpu);
+>  int psci_cpu_suspend_enter(unsigned long index);
+>  
+> +enum psci_conduit {
+> +	PSCI_CONDUIT_NONE,
+> +	PSCI_CONDUIT_SMC,
+> +	PSCI_CONDUIT_HVC,
+> +};
+> +
+>  struct psci_operations {
+>  	u32 (*get_version)(void);
+>  	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+> @@ -34,6 +40,7 @@ struct psci_operations {
+>  	int (*affinity_info)(unsigned long target_affinity,
+>  			unsigned long lowest_affinity_level);
+>  	int (*migrate_info_type)(void);
+> +	enum psci_conduit conduit;
+>  };
+>  
+>  extern struct psci_operations psci_ops;
+> -- 
+> 2.14.2
 > 
-> diff --git a/arch/arm64/boot/dts/nxp/Makefile b/arch/arm64/boot/dts/nxp/Makefile
-> new file mode 100644
-> index 000000000000..1aebb1f16708
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/nxp/Makefile
-> @@ -0,0 +1,3 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +
-> +dtb-$(CONFIG_SOC_IMX8MQ) += imx8m-evk.dtb
-> diff --git a/arch/arm64/boot/dts/nxp/imx8mq-evk.dts b/arch/arm64/boot/dts/nxp/imx8mq-evk.dts
-> new file mode 100644
-> index 000000000000..ff77fdbcbfe3
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/nxp/imx8mq-evk.dts
-> @@ -0,0 +1,287 @@
-> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> +
-> +/dts-v1/;
-> +
-> +#include "imx8mq.dtsi"
-> +
-> +/ {
-> +	model = "NXP i.MX8MQ EVK";
-> +	compatible = "nxp,imx8mq-evk", "nxp,imx8mq";
-
-Documentation?
-
-> +
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x40000000 0 0xc0000000>;
-> +	};
-> +
-> +	reg_usdhc2_vmmc: usdhc2_vmmc {
-
-Don't use '_'. Also, ideally this would follow generic node name 
-convention, but we don't have anything defined and regulator binding is 
-a bit odd. "regulator-3V3" perhaps.
-
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_reg_usdhc2>;
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VSD_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +};
-> +
-> +&fec1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_fec1>;
-> +	phy-mode = "rgmii-id";
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +
-> +	pfuze100 at 8 {
-
-pmic at 8
-
-Rob
