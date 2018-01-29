@@ -1,41 +1,34 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 16:58:09 +0100
-Subject: [PATCH v5 5/6] arm: dts: sun8i: a83t: bananapi-m3: Enable IR
- controller
+Date: Mon, 29 Jan 2018 16:58:07 +0100
+Subject: [PATCH v4 3/6] arm: dts: sun8i: a83t: Add the cir pin for the A83T
 In-Reply-To: <20180129155810.7867-1-embed3d@gmail.com>
 References: <20180129155810.7867-1-embed3d@gmail.com>
-Message-ID: <20180129155810.7867-6-embed3d@gmail.com>
+Message-ID: <20180129155810.7867-4-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M3 has an onboard IR receiver.
-This enables the onboard IR receiver subnode.
-Unlike the other IR receivers this one needs a base clock frequency
-of 3000000 Hz (3 MHz), to be able to work.
+The CIR Pin of the A83T is located at PL12.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 6550bf0e594b..ffc6445fd281 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -82,6 +82,13 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index de5119a2a91c..06e96db7c41a 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -617,6 +617,11 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
  
-+&cir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cir_pins>;
-+	clock-frequency = <3000000>;
-+	status = "okay";
-+};
++			cir_pins: cir-pins at 0 {
++				pins = "PL12";
++				function = "s_cir_rx";
++			};
 +
- &ehci0 {
- 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
- 	status = "okay";
+ 			r_rsb_pins: r-rsb-pins {
+ 				pins = "PL0", "PL1";
+ 				function = "s_rsb";
 -- 
 2.11.0
