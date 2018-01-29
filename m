@@ -1,26 +1,77 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 29 Jan 2018 08:58:45 -0600
-Subject: [PATCH v3 0/6] 32bit ARM branch predictor hardening
-In-Reply-To: <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
-Message-ID: <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Jan 2018 16:01:49 +0100
+Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
+ support
+In-Reply-To: <20180129142357.sw3d4f5d4hwmveua@verge.net.au>
+References: <20180103121840.29316-1-horms+renesas@verge.net.au>
+ <20180103121840.29316-3-horms+renesas@verge.net.au>
+ <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
+ <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
+ <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
+ <20180129142357.sw3d4f5d4hwmveua@verge.net.au>
+Message-ID: <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 5:36 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
-[...]
+Hi Simon,
 
-> By the way, this patch set just enable branch predictor hardening
-> on arm32 unconditionally, but some of machines (such as wireless
-> network base station) will not be exposed to user to take advantage
-> of variant 2, and those machines will be pretty sensitive for
-> performance, so can we introduce Kconfig or boot option to disable
-> branch predictor hardening as an option?
+On Mon, Jan 29, 2018 at 3:24 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
+>> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+>> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+>> >> >
+>> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> >> As the CPG/MSSR driver now has suspend/resume support, do we need
+>> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
+>> >> by cpufreq during system resume, for both the primary and the secondary
+>> >> CPU cores?
+>> >
+>> > I am a bit unsure.
+>> >
+>> > When using the A57 cores, which is the default case, the Z clk is queried
+>> > by CPUFreq on resume. It appears that on my system its already set to the
+>> > correct value but I assume if it was not then it would be reset. However,
+>> > this does not cover Z2 clk. So perhaps to be safe we need to register
+>> > notifiers and make sure they they play nicely with CPUFreq?
+>>
+>> Of course the CPU is special: unlike many other devices, it must be running
+>> when the kernel is reentered upon system resume.
+>> It may be running using a different frequency setting, though.
+>> However, following "opp-suspend", the system will always suspend with the
+>> Z clock running at 1.5GHz, which is the default?
+>> So Z is probably OK.
+>>
+>> It's more interesting to check what happens when the little cores are
+>> enabled as well (unfortunately that requires different firmware).
+>> 1. Does cpufreq handle them correctly when they are onlined again during
+>>    system resume?
+>
+> I tested this by updating the firmware on an H3 ES2.0 / Salvator-XS
+> using the instructions at
+> https://elinux.org/R-Car/Virtualization#Enabling_HYP_Support
 
-I am curious: Have you seen performance degradation with this series?
-If yes, is it possible to share the information?
+> # grep -E -w "pll[01]|z|z2" /sys/kernel/debug/clk/clk_summary
+>           z2                              0            0  1198080000          0 0
+>        .pll1                              1            1  3194880000          0 0
+>        .pll0                              0            0  2995200000          0 0
+>           z                               0            0  1497600000          0 0
 
----
-Regards,
-Nishanth Menon
+You know it's PLL2, not PLL1, you want to look at? ;-)
+
+Thanks for checking, looks all good!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
