@@ -1,99 +1,140 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 29 Jan 2018 11:46:35 +0200
-Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
-In-Reply-To: <20180125155504.8611-1-philippe.cornu@st.com>
-References: <20180125155504.8611-1-philippe.cornu@st.com>
-Message-ID: <2782155.lsFkNecG25@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jan 2018 10:46:50 +0100
+Subject: [PATCH v2 09/16] iio: adc: sun4i-gpadc-iio: add support for H3
+ thermal sensor
+In-Reply-To: <20180128232919.12639-10-embed3d@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-10-embed3d@gmail.com>
+Message-ID: <20180129094650.kpbhtbcpo42huadl@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
-
-(CC'ing Daniel Vetter)
-
-Thank you for the patch.
-
-On Thursday, 25 January 2018 17:55:04 EET Philippe Cornu wrote:
-> The "adjusted_mode" clock value (ie the real pixel clock) is more
-> accurate than "mode" clock value (ie the panel/bridge requested
-> clock value). It offers a better preciseness for timing
-> computations and allows to reduce the extra dsi bandwidth in
-> burst mode (from ~20% to ~10-12%, hw platform dependant).
+On Mon, Jan 29, 2018 at 12:29:12AM +0100, Philipp Rossak wrote:
+> This patch adds support for the H3 ths sensor.
 > 
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-
-The adjusted mode is documented as
-
-    /**
-     * @adjusted_mode:
-     *
-     * Internal display timings which can be used by the driver to handle
-     * differences between the mode requested by userspace in @mode and what
-     * is actually programmed into the hardware. It is purely driver
-     * implementation defined what exactly this adjusted mode means. Usually
-     * it is used to store the hardware display timings used between the
-     * CRTC and encoder blocks.
-     */
-
-This is easy to handle when the CRTC and encoder are controlled by the same 
-driver, as the field is "implementation defined" by a single driver . However, 
-when using bridges, there are two drivers involved, and they must both agree 
-to meaningfully use the adjusted mode. I can't see how to do so without 
-standardizing the meaning of the adjusted mode field.
-
-Daniel, what's your opinion on this ?
-
+> The H3 supports interrupts. The interrupt is configured to update the
+> the sensor values every second. The calibration data is writen at the
+> begin of the init process.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
-> Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel
-> clock"
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 86 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/sun4i-gpadc.h   | 22 ++++++++++
+>  2 files changed, 108 insertions(+)
 > 
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
-> ed8af32f8e52..b926b62e9e33 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct
-> drm_bridge *bridge,
-> 
->  	clk_prepare_enable(dsi->pclk);
-> 
-> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
-> +	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode, dsi->mode_flags,
->  				     dsi->lanes, dsi->format, &dsi->lane_mbps);
->  	if (ret)
->  		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
-> 
->  	pm_runtime_get_sync(dsi->dev);
->  	dw_mipi_dsi_init(dsi);
-> -	dw_mipi_dsi_dpi_config(dsi, mode);
-> +	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
->  	dw_mipi_dsi_packet_handler_config(dsi);
->  	dw_mipi_dsi_video_mode_config(dsi);
-> -	dw_mipi_dsi_video_packet_config(dsi, mode);
-> +	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
->  	dw_mipi_dsi_command_mode_config(dsi);
-> -	dw_mipi_dsi_line_timer_config(dsi, mode);
-> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
-> +	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
-> +	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
-> 
->  	dw_mipi_dsi_dphy_init(dsi);
->  	dw_mipi_dsi_dphy_timing_config(dsi);
-> @@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct
-> drm_bridge *bridge,
-> 
->  	dw_mipi_dsi_dphy_enable(dsi);
-> 
-> -	dw_mipi_dsi_wait_for_two_frames(mode);
-> +	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
-> 
->  	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
->  	dw_mipi_dsi_set_mode(dsi, 0);
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index b7b5451226b0..8196203d65fe 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -61,6 +61,9 @@ struct sun4i_gpadc_iio;
+>  static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info);
+>  static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info);
+>  
+> +static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info);
+> +static int sunxi_ths_sample_end(struct sun4i_gpadc_iio *info);
+> +
+>  struct gpadc_data {
+>  	int		temp_offset;
+>  	int		temp_scale;
+> @@ -71,6 +74,10 @@ struct gpadc_data {
+>  	unsigned int	temp_data[MAX_SENSOR_COUNT];
+>  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+> +	u32		ctrl0_map;
+> +	u32		ctrl2_map;
+> +	u32		sensor_en_map;
+> +	u32		filter_map;
+
+You can use a regmap_field for that.
+
+>  	u32		irq_clear_map;
+>  	u32		irq_control_map;
+>  	bool		has_bus_clk;
+> @@ -138,6 +145,31 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.support_irq = false,
+>  };
+>  
+> +static const struct gpadc_data sun8i_h3_ths_data = {
+> +	.temp_offset = -1791,
+> +	.temp_scale = -121,
+> +	.temp_data = {SUN8I_H3_THS_TDATA0, 0, 0, 0},
+> +	.sample_start = sunxi_ths_sample_start,
+> +	.sample_end = sunxi_ths_sample_end,
+> +	.has_bus_clk = true,
+> +	.has_bus_rst = true,
+> +	.has_mod_clk = true,
+> +	.sensor_count = 1,
+> +	.supports_nvmem = true,
+> +	.support_irq = true,
+> +	.ctrl0_map = SUN4I_GPADC_CTRL0_T_ACQ(0xff),
+> +	.ctrl2_map = SUN8I_H3_THS_ACQ1(0x3f),
+> +	.sensor_en_map = SUN8I_H3_THS_TEMP_SENSE_EN0,
+> +	.filter_map = SUN4I_GPADC_CTRL3_FILTER_EN |
+> +		SUN4I_GPADC_CTRL3_FILTER_TYPE(0x2),
+> +	.irq_clear_map = SUN8I_H3_THS_INTS_ALARM_INT_0 |
+> +			SUN8I_H3_THS_INTS_SHUT_INT_0   |
+> +			SUN8I_H3_THS_INTS_TDATA_IRQ_0  |
+> +			SUN8I_H3_THS_INTS_ALARM_OFF_0,
+> +	.irq_control_map = SUN8I_H3_THS_INTC_TDATA_IRQ_EN0 |
+> +		SUN8I_H3_THS_TEMP_PERIOD(0x7),
+> +};
+> +
+>  struct sun4i_gpadc_iio {
+>  	struct iio_dev			*indio_dev;
+>  	struct completion		completion;
+> @@ -462,6 +494,16 @@ static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sunxi_ths_sample_end(struct sun4i_gpadc_iio *info)
+> +{
+> +	/* Disable ths interrupt */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC, 0x0);
+> +	/* Disable temperature sensor */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2, 0x0);
+> +
+> +	return 0;
+> +}
+> +
+>  static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+> @@ -473,6 +515,17 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  	return info->data->sample_end(info);
+>  }
+>  
+> +static void sunxi_calibrate(struct sun4i_gpadc_iio *info)
+> +{
+> +	if (info->has_calibration_data[0])
+> +		regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
+> +			info->calibration_data[0]);
+> +
+> +	if (info->has_calibration_data[1])
+> +		regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
+> +			info->calibration_data[1]);
+> +}
+> +
+>  static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
+>  {
+>  	/* clkin = 6MHz */
+> @@ -492,6 +545,35 @@ static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info)
+
+Please remain consistent with the prefixes used in the driver
+
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/36163df3/attachment.sig>
