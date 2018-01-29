@@ -1,170 +1,61 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 29 Jan 2018 10:41:20 +0530
-Subject: [PATCH 06/15] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+Date: Mon, 29 Jan 2018 10:41:19 +0530
+Subject: [PATCH 05/15] ARM: dts: ipq4019: Add ipq4019-ap-dk01-c2 board file
 In-Reply-To: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
 References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517202689-14212-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1517202689-14212-6-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the common parts for the dk04 boards.
+The board has a spi-nand interface on spi0 bus chipselect1.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi | 147 ++++++++++++++++++++++++++
- 1 file changed, 147 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9..21ed56d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -724,6 +724,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8084-ifc6540.dtb \
+ 	qcom-apq8084-mtp.dtb \
+ 	qcom-ipq4019-ap.dk01.1-c1.dtb \
++	qcom-ipq4019-ap.dk01.1-c2.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
 new file mode 100644
-index 0000000..c25f3e3
+index 0000000..e3442da
 --- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
-@@ -0,0 +1,147 @@
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
+@@ -0,0 +1,25 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
 +
-+#include "qcom-ipq4019.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
++#include "qcom-ipq4019-ap.dk01.1.dtsi"
 +
 +/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1";
-+	compatible = "qcom,ipq4019";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256MB */
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		rsvd1 at 87000000 {
-+			/* Reserved for other subsystem */
-+			reg = <0x87000000 0x500000>;
-+			no-map;
-+		};
-+
-+		wifi_dump at 87500000 {
-+			reg = <0x87500000 0x600000>;
-+			no-map;
-+		};
-+
-+		rsvd2 at 87B00000 {
-+			/* Reserved for other subsystem */
-+			reg = <0x87B00000 0x500000>;
-+			no-map;
-+		};
-+	};
++	model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK01.1-C2";
 +
 +	soc {
-+		pinctrl at 1000000 {
-+			serial_0_pins: serial0_pinmux {
-+				mux {
-+					pins = "gpio16", "gpio17";
-+					function = "blsp_uart0";
-+					bias-disable;
-+				};
-+			};
-+
-+			serial_1_pins: serial1_pinmux {
-+				mux {
-+					pins = "gpio8", "gpio9",
-+						"gpio10", "gpio11";
-+					function = "blsp_uart1";
-+					bias-disable;
-+				};
-+			};
-+
-+			spi_0_pins: spi_0_pinmux {
-+				pinmux {
-+					function = "blsp_spi0";
-+					pins = "gpio13", "gpio14", "gpio15";
-+					bias-disable;
-+				};
-+				pinmux_cs {
-+					function = "gpio";
-+					pins = "gpio12";
-+					bias-disable;
-+					output-high;
-+				};
-+			};
-+
-+			i2c_0_pins: i2c_0_pinmux {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "blsp_i2c0";
-+					bias-disable;
-+				};
-+			};
-+
-+			nand_pins: nand_pins {
-+				pullups {
-+					pins = "gpio52", "gpio53", "gpio58",
-+						"gpio59";
-+					function = "qpic";
-+					bias-pull-up;
-+				};
-+
-+				pulldowns {
-+					pins = "gpio54", "gpio55", "gpio56",
-+						"gpio57", "gpio60", "gpio61",
-+						"gpio62", "gpio63", "gpio64",
-+						"gpio65", "gpio66", "gpio67",
-+						"gpio68", "gpio69";
-+					function = "qpic";
-+					bias-pull-down;
-+				};
-+			};
-+		};
-+
-+		serial at 78af000 {
-+			pinctrl-0 = <&serial_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		serial at 78b0000 {
-+			pinctrl-0 = <&serial_1_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		blsp_dma: dma at 7884000 {
-+			status = "ok";
-+		};
-+
 +		spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
-+			pinctrl-0 = <&spi_0_pins>;
-+			pinctrl-names = "default";
 +			status = "ok";
-+			cs-gpios = <&tlmm 12 0>;
++			cs-gpios = <&tlmm 54 0>, <&tlmm 59 0>;
++			num-cs = <2>;
 +
-+			m25p80 at 0 {
++			mt29f at 1 {
 +				#address-cells = <1>;
 +				#size-cells = <1>;
-+				reg = <0>;
-+				compatible = "n25q128a11";
++				compatible = "spinand,mt29f";
++				reg = <1>;
 +				spi-max-frequency = <24000000>;
 +			};
-+		};
 +
-+		pcie0: pci at 40000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 38 0x1>;
-+		};
-+
-+		qpic_bam: dma at 7984000{
-+			status = "ok";
-+		};
-+
-+		nand: qpic-nand at 79b0000 {
-+			pinctrl-0 = <&nand_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
 +		};
 +	};
 +};
