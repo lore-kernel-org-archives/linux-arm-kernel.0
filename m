@@ -1,197 +1,50 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 29 Jan 2018 10:41:16 +0530
-Subject: [PATCH 02/15] ARM: dts: ipq4019: Add a few peripheral nodes
+Date: Mon, 29 Jan 2018 10:41:15 +0530
+Subject: [PATCH 01/15] firmware: qcom: scm: Add ipq4019 soc compatible
 In-Reply-To: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
 References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517202689-14212-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1517202689-14212-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now with the driver updates for some peripherals being there,
-add i2c, spi, pcie, bam, qpic-nand, scm nodes to enhance the available
-peripheral support.
+Add the compatible for ipq4019.
+This does not need clocks to do scm calls.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019.dtsi | 134 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 134 insertions(+)
+ Documentation/devicetree/bindings/firmware/qcom,scm.txt | 3 ++-
+ drivers/firmware/qcom_scm.c                             | 3 +++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index 10d112a..e38fffa 100644
---- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -25,7 +25,9 @@
- 
- 	aliases {
- 		spi0 = &spi_0;
-+		spi1 = &spi_1;
- 		i2c0 = &i2c_0;
-+		i2c1 = &i2c_1;
- 	};
- 
- 	cpus {
-@@ -104,6 +106,12 @@
- 		};
- 	};
- 
-+	firmware {
-+		scm {
-+			compatible = "qcom,scm-ipq4019";
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <1 2 0xf08>,
-@@ -172,6 +180,22 @@
- 			clock-names = "core", "iface";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			dmas = <&blsp_dma 5>, <&blsp_dma 4>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		spi_1: spi at 78b6000 { /* BLSP1 QUP2 */
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x78b6000 0x600>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP2_SPI_APPS_CLK>,
-+				<&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			dmas = <&blsp_dma 7>, <&blsp_dma 6>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-@@ -184,9 +208,24 @@
- 			clock-names = "iface", "core";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			dmas = <&blsp_dma 9>, <&blsp_dma 8>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-+		i2c_1: i2c at 78b8000 { /* BLSP1 QUP4 */
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			reg = <0x78b8000 0x600>;
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			dmas = <&blsp_dma 11>, <&blsp_dma 10>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
- 
- 		cryptobam: dma at 8e04000 {
- 			compatible = "qcom,bam-v1.7.0";
-@@ -293,6 +332,101 @@
- 			reg = <0x4ab000 0x4>;
- 		};
- 
-+		pcie0: pci at 40000000 {
-+			compatible = "qcom,pcie-ipq4019", "snps,dw-pcie";
-+			reg =  <0x40000000 0xf1d
-+				0x40000f20 0xa8
-+				0x80000 0x2000
-+				0x40100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <0>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			ranges = <0x81000000 0 0x40200000 0x40200000 0 0x00100000
-+				  0x82000000 0 0x48000000 0x48000000 0 0x10000000>;
-+
-+			interrupts = <GIC_SPI 141 IRQ_TYPE_NONE>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 142 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 143 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 144 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 145 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+			clocks = <&gcc GCC_PCIE_AHB_CLK>,
-+				 <&gcc GCC_PCIE_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE_AXI_S_CLK>;
-+			clock-names = "aux",
-+				      "master_bus",
-+				      "slave_bus";
-+
-+			resets = <&gcc PCIE_AXI_M_ARES>,
-+				 <&gcc PCIE_AXI_S_ARES>,
-+				 <&gcc PCIE_PIPE_ARES>,
-+				 <&gcc PCIE_AXI_M_VMIDMT_ARES>,
-+				 <&gcc PCIE_AXI_S_XPU_ARES>,
-+				 <&gcc PCIE_PARF_XPU_ARES>,
-+				 <&gcc PCIE_PHY_ARES>,
-+				 <&gcc PCIE_AXI_M_STICKY_ARES>,
-+				 <&gcc PCIE_PIPE_STICKY_ARES>,
-+				 <&gcc PCIE_PWR_ARES>,
-+				 <&gcc PCIE_AHB_ARES>,
-+				 <&gcc PCIE_PHY_AHB_ARES>;
-+			reset-names = "axi_m",
-+				      "axi_s",
-+				      "pipe",
-+				      "axi_m_vmid",
-+				      "axi_s_xpu",
-+				      "parf",
-+				      "phy",
-+				      "axi_m_sticky",
-+				      "pipe_sticky",
-+				      "pwr",
-+				      "ahb",
-+				      "phy_ahb";
-+
-+			status = "disabled";
-+		};
-+
-+		qpic_bam: dma at 7984000 {
-+			compatible = "qcom,bam-v1.7.0";
-+			reg = <0x7984000 0x1a000>;
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_QPIC_CLK>;
-+			clock-names = "bam_clk";
-+			#dma-cells = <1>;
-+			qcom,ee = <0>;
-+			status = "disabled";
-+		};
-+
-+		nand: qpic-nand at 79b0000 {
-+			compatible = "qcom,ipq4019-nand";
-+			reg = <0x79b0000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&gcc GCC_QPIC_CLK>,
-+				 <&gcc GCC_QPIC_AHB_CLK>;
-+			clock-names = "core", "aon";
-+
-+			dmas = <&qpic_bam 0>,
-+			       <&qpic_bam 1>,
-+			       <&qpic_bam 2>;
-+			dma-names = "tx", "rx", "cmd";
-+			status = "disabled";
-+
-+			nand at 0 {
-+				reg = <0>;
-+
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+				nand-bus-width = <8>;
-+			};
-+		};
-+
- 		wifi0: wifi at a000000 {
- 			compatible = "qcom,ipq4019-wifi";
- 			reg = <0xa000000 0x200000>;
+diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+index 7b40054..fcf6979 100644
+--- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
++++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+@@ -11,9 +11,10 @@ Required properties:
+  * "qcom,scm-msm8660" for MSM8660 platforms
+  * "qcom,scm-msm8690" for MSM8690 platforms
+  * "qcom,scm-msm8996" for MSM8996 platforms
++ * "qcom,scm-ipq4019" for IPQ4019 platforms
+  * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
+ - clocks: One to three clocks may be required based on compatible.
+- * No clock required for "qcom,scm-msm8996"
++ * No clock required for "qcom,scm-msm8996", "qcom,scm-ipq4019"
+  * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
+  * Core, iface, and bus clocks required for "qcom,scm"
+ - clock-names: Must contain "core" for the core clock, "iface" for the interface
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index af4c752..ddc9ea8 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -603,6 +603,9 @@ static void qcom_scm_shutdown(struct platform_device *pdev)
+ 	{ .compatible = "qcom,scm-msm8996",
+ 	  .data = NULL, /* no clocks */
+ 	},
++	{ .compatible = "qcom,scm-ipq4019",
++	  .data = NULL, /* no clocks */
++	},
+ 	{ .compatible = "qcom,scm",
+ 	  .data = (void *)(SCM_HAS_CORE_CLK
+ 			   | SCM_HAS_IFACE_CLK
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
