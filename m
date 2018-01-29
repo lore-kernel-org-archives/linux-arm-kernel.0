@@ -1,174 +1,83 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 13:33:12 +0100
-Subject: [PATCH v2 07/16] iio: adc: sun4i-gpadc-iio: rework: support nvmem
- calibration data
-In-Reply-To: <20180129094045.sagz2dnzvdadd4yx@flea.lan>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-8-embed3d@gmail.com>
- <20180129094045.sagz2dnzvdadd4yx@flea.lan>
-Message-ID: <e319fde5-9ede-8be0-03ae-f0a22d50250c@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Jan 2018 13:53:41 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <18ec71dc-a785-a771-76d4-176d95032c97@micronovasrl.com>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180125152117.qikemrwl7f35ssjg@flea.lan>
+ <d79602b9-8e04-8250-fd7f-f52b8e16c575@micronovasrl.com>
+ <20180126145608.5s6c6ltpvrko7iyv@flea.lan>
+ <18ec71dc-a785-a771-76d4-176d95032c97@micronovasrl.com>
+Message-ID: <20180129125341.elup47ymedzxornn@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 29.01.2018 10:40, Maxime Ripard wrote:
-> On Mon, Jan 29, 2018 at 12:29:10AM +0100, Philipp Rossak wrote:
->> This patch reworks the driver to support nvmem calibration cells.
->> The driver checks if the nvmem calibration is supported and reads out
->> the nvmem.
->>
->> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> ---
->>   drivers/iio/adc/sun4i-gpadc-iio.c | 44 +++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 44 insertions(+)
->>
->> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
->> index ac9ad2f8232f..74eeb5cd5218 100644
->> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
->> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
->> @@ -27,6 +27,7 @@
->>   #include <linux/interrupt.h>
->>   #include <linux/io.h>
->>   #include <linux/module.h>
->> +#include <linux/nvmem-consumer.h>
->>   #include <linux/of.h>
->>   #include <linux/of_device.h>
->>   #include <linux/platform_device.h>
->> @@ -74,6 +75,7 @@ struct gpadc_data {
->>   	bool		has_bus_rst;
->>   	bool		has_mod_clk;
->>   	int		sensor_count;
->> +	bool		supports_nvmem;
+On Fri, Jan 26, 2018 at 04:55:54PM +0100, Giulio Benetti wrote:
+> > > > > It behaves the same way as A20, so as I mean IO polarity,
+> > > > > all signals(except D0-D23), are inverted.
+> > > > > For A33 I've used A33-OLinuXino.
+> > > > > For A20 our LiNova1.
+> > > > 
+> > > > Indeed, HSYNC and VSYNC look inverted.
+> > > 
+> > > Yes, so they should be inverted inside the driver.
+> > 
+> > Yep. And the LCD panels used on our boards as well in order to avoid
+> > any breakages.
 > 
-> I think you should add some documentation along with all the fields
-> you're adding.
+> Can you provide a list?
+> Or is there a way I can find it on my own?
+> I can create a whole patch-set providing this too on panel-simple.c
+> Ok?
 
-ok I will add more informations in the next version into the commit message.
+Grepping through the DT, it seems like there's only the A13 q8 tablet
+and the SinA33. The former uses simple-panel, the latter a custom
+panel driver.
 
+> > > A little out of thread but:
+> > > I'd like to send one for u-boot too,
+> > > but this means also to modify every sunxi "sync:3" to "sync:0" and
+> > > vice-versa.
+> > > 
+> > > What do you think?
+> > 
+> > That it's going to be a nightmare... We've advertised since the very
+> > beginning something, and we're about to break it. I'm not sure we want
+> > to do that.
 > 
->>   };
->>   
->>   static const struct gpadc_data sun4i_gpadc_data = {
->> @@ -87,6 +89,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
->>   	.sample_start = sun4i_gpadc_sample_start,
->>   	.sample_end = sun4i_gpadc_sample_end,
->>   	.sensor_count = 1,
->> +	.supports_nvmem = false,
+> I can take care about that.
+> But I also think that a lot of displays work because they use only DE-mode,
+> almost ignoring HSync and VSync signals(HV-mode).
 > 
-> That's already its value if you leave it out.
-> 
->>   };
->>   
->>   static const struct gpadc_data sun5i_gpadc_data = {
->> @@ -100,6 +103,7 @@ static const struct gpadc_data sun5i_gpadc_data = {
->>   	.sample_start = sun4i_gpadc_sample_start,
->>   	.sample_end = sun4i_gpadc_sample_end,
->>   	.sensor_count = 1,
->> +	.supports_nvmem = false,
->>   };
->>   
->>   static const struct gpadc_data sun6i_gpadc_data = {
->> @@ -113,6 +117,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
->>   	.sample_start = sun4i_gpadc_sample_start,
->>   	.sample_end = sun4i_gpadc_sample_end,
->>   	.sensor_count = 1,
->> +	.supports_nvmem = false,
->>   };
->>   
->>   static const struct gpadc_data sun8i_a33_gpadc_data = {
->> @@ -123,6 +128,7 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
->>   	.sample_start = sun4i_gpadc_sample_start,
->>   	.sample_end = sun4i_gpadc_sample_end,
->>   	.sensor_count = 1,
->> +	.supports_nvmem = false,
->>   };
->>   
->>   struct sun4i_gpadc_iio {
->> @@ -141,6 +147,8 @@ struct sun4i_gpadc_iio {
->>   	struct clk			*mod_clk;
->>   	struct reset_control		*reset;
->>   	int				sensor_id;
->> +	u32				calibration_data[2];
->> +	bool				has_calibration_data[2];
-> 
-> Why do you have two different values here?
-> 
+> In any case I have to produce these patches because of my company's board
+> based on A20 and A33, and modify defconfig according to it.
+> The only technical nightmare I see is to produce a commit for every
+> defconfig to be modified and copy-paste che commit-log substituing board
+> name(1-2 days of work).
+> Problem is testing, but we're speaking about something that probably was
+> badly working, but you couldn't see it on display.
+> So I think this is only an improvement at the end.
 
-I think my idea was too complex! I thought it would be better to check 
-if calibration data was read, and is able to be written to hardware. 
-those information were split per register.
+It really is a separate discussion, but you would also need to fix all
+the environments everywhere, which is simply not feasible.
 
-I think a u64 should be fine for calibration_data. When I write the 
-calibration data I can check on the sensor count and write only the 
-lower 32 bits if there are less than 3 sensors.
+Maxime
 
-Is this ok for you?
-
-
->>   	/* prevents concurrent reads of temperature and ADC */
->>   	struct mutex			mutex;
->>   	struct thermal_zone_device	*tzd;
->> @@ -561,6 +569,9 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->>   	struct resource *mem;
->>   	void __iomem *base;
->>   	int ret;
->> +	struct nvmem_cell *cell;
->> +	ssize_t cell_size;
->> +	u64 *cell_data;
->>   
->>   	info->data = of_device_get_match_data(&pdev->dev);
->>   	if (!info->data)
->> @@ -575,6 +586,39 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->>   	if (IS_ERR(base))
->>   		return PTR_ERR(base);
->>   
->> +	info->has_calibration_data[0] = false;
->> +	info->has_calibration_data[1] = false;
->> +
->> +	if (!info->data->supports_nvmem)
->> +		goto no_nvmem;
->> +
->> +	cell = nvmem_cell_get(&pdev->dev, "calibration");
->> +	if (IS_ERR(cell)) {
->> +		if (PTR_ERR(cell) == -EPROBE_DEFER)
->> +			return PTR_ERR(cell);
->> +		goto no_nvmem;
-> 
-> goto considered evil ? :)
-> 
-
-this was a suggestion from Jonatan in version one, to make the code 
-better readable.
-.
->> +	}
->> +
->> +	cell_data = (u64 *)nvmem_cell_read(cell, &cell_size);
->> +	nvmem_cell_put(cell);
->> +	switch (cell_size) {
->> +		case 8:
->> +		case 6:
->> +			info->has_calibration_data[1] = true;
->> +			info->calibration_data[1] = be32_to_cpu(
->> +					upper_32_bits(cell_data[0]));
->> +		case 4:
->> +		case 2:
->> +			info->has_calibration_data[0] = true;
->> +			info->calibration_data[0] = be32_to_cpu(
->> +					lower_32_bits(cell_data[0]));
-> 
-> Why do you need that switch?
-
-You are right! The calibration reg seems to be always 64 bit wide. [1]
-So I will just check for the length of 8.
-
-
-> 
-> Thanks!
-> Maxime
-> 
-
-[1]: http://linux-sunxi.org/SID_Register_Guide#eFUSE
-
-Thanks,
-Philipp
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/884737a3/attachment-0001.sig>
