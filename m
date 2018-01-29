@@ -1,49 +1,35 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 12:56:38 +0100
-Subject: [PATCH v2 13/16] arm: dts: sun8i: h3: add thermal zone to H3
-In-Reply-To: <20180129095034.5crx7ydq5k6f7omv@flea.lan>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-14-embed3d@gmail.com>
- <20180129095034.5crx7ydq5k6f7omv@flea.lan>
-Message-ID: <e3b3e604-1155-804e-b7b0-a670b954a876@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jan 2018 11:59:54 +0000
+Subject: [PATCH v2 3/9] arm64: mm: Permit transitioning from Global to
+ Non-Global without BBM
+In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1517227200-20412-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Break-before-make is not needed when transitioning from Global to
+Non-Global mappings, provided that the contiguous hint is not being used.
 
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/mmu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-On 29.01.2018 10:50, Maxime Ripard wrote:
-> On Mon, Jan 29, 2018 at 12:29:16AM +0100, Philipp Rossak wrote:
->> This patch adds the thermal zones to the H3. We have only one sensor and
->> that is placed in the cpu.
->>
->> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->> ---
->>   arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> index fbb007e5798e..3f83f6a27c74 100644
->> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> @@ -72,6 +72,15 @@
->>   		};
->>   	};
->>   
->> +	thermal-zones {
->> +		cpu-thermal {
->> +			/* milliseconds */
->> +			polling-delay-passive = <250>;
->> +			polling-delay = <1000>;
->> +			thermal-sensors = <&ths 0>;
-> 
-> if the thermal-sensor-cells value is indeed 0, the phandle parsing
-> will be broken here.
-> 
-> Maxime
-> 
-
-Ok, then I will remove the 0.
-
-Thanks,
-
-Philipp
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index b44992ec9643..fc7902bda02b 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -118,6 +118,10 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+ 	if ((old | new) & PTE_CONT)
+ 		return false;
+ 
++	/* Transitioning from Global to Non-Global is safe */
++	if (((old ^ new) == PTE_NG) && (new & PTE_NG))
++		return true;
++
+ 	return ((old ^ new) & ~mask) == 0;
+ }
+ 
+-- 
+2.1.4
