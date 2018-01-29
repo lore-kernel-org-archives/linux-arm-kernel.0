@@ -1,84 +1,105 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 29 Jan 2018 17:31:57 +0100
-Subject: [PATCH v4 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider
- support
-In-Reply-To: <20180129155135.u2ncqwylg4rhyh6k@verge.net.au>
-References: <20180103121840.29316-1-horms+renesas@verge.net.au>
- <20180103121840.29316-3-horms+renesas@verge.net.au>
- <CAMuHMdXcLhFD825Xi2Uk=6_OAgLd7BEp14rWpgb7pv6rOM2H2Q@mail.gmail.com>
- <20180105140401.7iitpzdrlyqtasvz@verge.net.au>
- <CAMuHMdWk3ke6GriUdxHp_62r-REYV3P4qNiNGOcGRiCQWCyKAg@mail.gmail.com>
- <20180129142357.sw3d4f5d4hwmveua@verge.net.au>
- <CAMuHMdU734+i3n5fa1jZfzY+kanH5k07YRLJq_b_UprOh=hSNw@mail.gmail.com>
- <20180129151928.ooh5uirmjgtyjcjm@verge.net.au>
- <20180129155135.u2ncqwylg4rhyh6k@verge.net.au>
-Message-ID: <20180129163156.5i3alvmmigfbzr73@verge.net.au>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 29 Jan 2018 16:35:35 +0000
+Subject: [PATCH 01/16] arm64: capabilities: Update prototype for enable
+ call back
+In-Reply-To: <51abe4ec-5c4f-aa7e-c045-59057e2fd2f6@arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-2-suzuki.poulose@arm.com>
+ <20180123145204.GR22781@e103592.cambridge.arm.com>
+ <5d32970c-ef6b-791b-4140-0e7de37364c8@arm.com>
+ <20180125153611.GI5862@e103592.cambridge.arm.com>
+ <51abe4ec-5c4f-aa7e-c045-59057e2fd2f6@arm.com>
+Message-ID: <20180129163532.GY5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 04:51:35PM +0100, Simon Horman wrote:
-> On Mon, Jan 29, 2018 at 04:19:29PM +0100, Simon Horman wrote:
-> > On Mon, Jan 29, 2018 at 04:01:49PM +0100, Geert Uytterhoeven wrote:
-> > > Hi Simon,
-> > > 
-> > > On Mon, Jan 29, 2018 at 3:24 PM, Simon Horman <horms@verge.net.au> wrote:
-> > > > On Fri, Jan 05, 2018 at 03:35:13PM +0100, Geert Uytterhoeven wrote:
-> > > >> On Fri, Jan 5, 2018 at 3:04 PM, Simon Horman <horms@verge.net.au> wrote:
-> > > >> > On Wed, Jan 03, 2018 at 01:47:08PM +0100, Geert Uytterhoeven wrote:
-> > > >> >> On Wed, Jan 3, 2018 at 1:18 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > > >> >> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > >> >> > This patch adds Z2 clock divider support for R-Car Gen3 SoC.
-> > > >> >> >
-> > > >> >> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > >>
-> > > >> >> As the CPG/MSSR driver now has suspend/resume support, do we need
-> > > >> >> a notifier to restore the Z or Z2 registers? Or is that handled automatically
-> > > >> >> by cpufreq during system resume, for both the primary and the secondary
-> > > >> >> CPU cores?
-> > > >> >
-> > > >> > I am a bit unsure.
-> > > >> >
-> > > >> > When using the A57 cores, which is the default case, the Z clk is queried
-> > > >> > by CPUFreq on resume. It appears that on my system its already set to the
-> > > >> > correct value but I assume if it was not then it would be reset. However,
-> > > >> > this does not cover Z2 clk. So perhaps to be safe we need to register
-> > > >> > notifiers and make sure they they play nicely with CPUFreq?
-> > > >>
-> > > >> Of course the CPU is special: unlike many other devices, it must be running
-> > > >> when the kernel is reentered upon system resume.
-> > > >> It may be running using a different frequency setting, though.
-> > > >> However, following "opp-suspend", the system will always suspend with the
-> > > >> Z clock running at 1.5GHz, which is the default?
-> > > >> So Z is probably OK.
-> > > >>
-> > > >> It's more interesting to check what happens when the little cores are
-> > > >> enabled as well (unfortunately that requires different firmware).
-> > > >> 1. Does cpufreq handle them correctly when they are onlined again during
-> > > >>    system resume?
-> > > >
-> > > > I tested this by updating the firmware on an H3 ES2.0 / Salvator-XS
-> > > > using the instructions at
-> > > > https://elinux.org/R-Car/Virtualization#Enabling_HYP_Support
-> > > 
-> > > > # grep -E -w "pll[01]|z|z2" /sys/kernel/debug/clk/clk_summary
-> > > >           z2                              0            0  1198080000          0 0
-> > > >        .pll1                              1            1  3194880000          0 0
-> > > >        .pll0                              0            0  2995200000          0 0
-> > > >           z                               0            0  1497600000          0 0
-> > > 
-> > > You know it's PLL2, not PLL1, you want to look at? ;-)
-> > 
-> > Sorry, I will double check but I had looked at PLL2 earlier:
-> > I just messed things up when preparing things to post in email.
+On Thu, Jan 25, 2018 at 04:57:22PM +0000, Suzuki K Poulose wrote:
+> On 25/01/18 15:36, Dave Martin wrote:
+> >On Tue, Jan 23, 2018 at 03:38:37PM +0000, Suzuki K Poulose wrote:
+> >>On 23/01/18 14:52, Dave Martin wrote:
+> >>>On Tue, Jan 23, 2018 at 12:27:54PM +0000, Suzuki K Poulose wrote:
+> >>>>From: Dave Martin <dave.martin@arm.com>
+> >>>>
+> >>>>We issue the enable() call back for all CPU hwcaps capabilities
+> >>>>available on the system, on all the CPUs. So far we have ignored
+> >>>>the argument passed to the call back, which had a prototype to
+> >>>>accept a "void *" for use with on_each_cpu() and later with
+> >>>>stop_machine(). However, with commit 0a0d111d40fd1
+> >>>>("arm64: cpufeature: Pass capability structure to ->enable callback"),
+> >>>>there are some users of the argument who wants the matching capability
+> >>>>struct pointer where there are multiple matching criteria for a single
+> >>>>capability. Update the prototype for enable to accept a const pointer.
+
+[...]
+
+> >>>>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> >>>>index ac67cfc2585a..cefbd685292c 100644
+> >>>>--- a/arch/arm64/include/asm/cpufeature.h
+> >>>>+++ b/arch/arm64/include/asm/cpufeature.h
+> >>>>@@ -97,7 +97,8 @@ struct arm64_cpu_capabilities {
+> >>>>  	u16 capability;
+> >>>>  	int def_scope;			/* default scope */
+> >>>>  	bool (*matches)(const struct arm64_cpu_capabilities *caps, int scope);
+> >>>>-	int (*enable)(void *);		/* Called on all active CPUs */
+
+[...]
+
+> >>/*
+> >>  * Called on all active CPUs if the capability associated with
+> >>  * this entry is set.
+> >>  */
+> >
+> >Maybe, but now we have the new concept of "setting" a capability.
+> >
+> >Really, this is enabling the capability for a CPU, not globally, so
+> >maybe it could be renamed to "cpu_enable".
+> >
+> >Could we describe the method in terms of what it is required to do,
+> >as well as the circumstances of the call, e.g.:
+> >
+> >/*
+> >  * Take the appropriate actions to enable this capability for this cpu.
+> >  * Every time a cpu is booted, this method is called under stop_machine()
+> >  * for each globally enabled capability.
+> >  */
 > 
-> I checked, PLL2 is constant at 2396160000 across the test described
-> in my earlier email.
+> Make sense, except for the "stop_machine" part. It is called under stop_machine
+> for all CPUs brought up by kernel, for capabilities which are enabled from
+> setup_cpu_features(), i.e, after all the CPUs are booted. But, it is called
+> directly on the CPU, if the CPU is booted after it has been enabled on CPUs
+> in the system. (e.g, a CPU brought up by the user - via __verify_local_cpu_caps -,
+> or a capability that is enabled early by boot CPU - will post the changes in the next
+> revision).
 
-I have now been able to reproduce an equivalent result on
-an M3W ES1.0 / Salvator-X.
+Fair enough.  Saying "this cpu" is probably sufficient to hint that
+preemption will be disabled etc.
 
-> > > Thanks for checking, looks all good!
-> > 
-> > Ok, so do you think we can merge this series with
-> > the off-by-one problem fixed?
+> >(I'm hoping that "globally enabled" is meaningful wording, though
+> >perhaps not.)
+> 
+> Hmm.. "globally enabled" kind of sounds recursive for describing "enable" :-).
+> How about "globally accepted" or "globally detected" ?
+
+"Detected" is probably better, since this terminology at least exists
+today in the code (if not very much).
+
+Alternatively, the "enable" method could be renamed to something that
+doesn't contain the word "enable" at all, like "cpu_setup" or similar.
+That might avoid ambiguity about what is meant by "enable".  This has
+no functional value though, and it's probably not worth the churn.
+
+> >Also, what does the return value of this method mean?
+> 
+> Thats a good point. We ignore it. I believe it is best to leave it to the method
+> to decide, what to do about it if there is a failure. It was there just to make
+> sure we comply with what stop_machine expected. Now that we don't pass it to
+> stop_machine directly, we could change it to void.
+> >Previously, the return value was ignored, but other patches in this
+> >series might change that.
+
+If we don't change it to void, it would be good to have a comment saying
+that it is ignored for now, and method implementations should return 0
+for now.
+
+Cheers
+---Dave
