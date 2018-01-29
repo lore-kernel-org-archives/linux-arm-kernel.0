@@ -1,68 +1,76 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jan 2018 17:45:54 +0000
-Subject: [PATCH v2 11/16] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+Date: Mon, 29 Jan 2018 17:45:53 +0000
+Subject: [PATCH v2 10/16] arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP
+ hardening support
 In-Reply-To: <20180129174559.1866-1-marc.zyngier@arm.com>
 References: <20180129174559.1866-1-marc.zyngier@arm.com>
-Message-ID: <20180129174559.1866-12-marc.zyngier@arm.com>
+Message-ID: <20180129174559.1866-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
-So let's intercept it as early as we can by testing for the
-function call number as soon as we've identified a HVC call
-coming from the guest.
+A new feature of SMCCC 1.1 is that it offers firmware-based CPU
+workarounds. In particular, SMCCC_ARCH_WORKAROUND_1 provides
+BP hardening for CVE-2017-5715.
+
+If the host has some mitigation for this issue, report that
+we deal with it using SMCCC_ARCH_WORKAROUND_1, as we apply the
+host workaround on every guest exit.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ include/linux/arm-smccc.h |  5 +++++
+ virt/kvm/arm/psci.c       | 17 +++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index e4f37b9dd47c..f36464bd57c5 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index dc68aa5a7261..e1ef944ef1da 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -73,6 +73,11 @@
+ 			   ARM_SMCCC_SMC_32,				\
+ 			   0, 1)
  
-+#include <linux/arm-smccc.h>
- #include <linux/linkage.h>
- 
- #include <asm/alternative.h>
-@@ -64,10 +65,11 @@ alternative_endif
- 	lsr	x0, x1, #ESR_ELx_EC_SHIFT
- 
- 	cmp	x0, #ESR_ELx_EC_HVC64
-+	ccmp	x0, #ESR_ELx_EC_HVC32, #4, ne
- 	b.ne	el1_trap
- 
--	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
--	cbnz	x1, el1_trap		// called HVC
-+	mrs	x1, vttbr_el2		// If vttbr is valid, the guest
-+	cbnz	x1, el1_hvc_guest	// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
- 	ldp	x0, x1, [sp], #16
-@@ -100,6 +102,20 @@ alternative_endif
- 
- 	eret
- 
-+el1_hvc_guest:
-+	/*
-+	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
-+	 * The workaround has already been applied on the host,
-+	 * so let's quickly get back to the guest. We don't bother
-+	 * restoring x1, as it can be clobbered anyway.
-+	 */
-+	ldr	x1, [sp]				// Guest's x0
-+	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	cbnz	w1, el1_trap
-+	mov	x0, x1
-+	add	sp, sp, #16
-+	eret
++#define ARM_SMCCC_ARCH_WORKAROUND_1					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_32,				\
++			   0, 0x8000)
 +
- el1_trap:
- 	/*
- 	 * x0: ESR_EC
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/linkage.h>
+diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+index a021b62ed762..5677d16abc71 100644
+--- a/virt/kvm/arm/psci.c
++++ b/virt/kvm/arm/psci.c
+@@ -407,14 +407,27 @@ static int kvm_psci_call(struct kvm_vcpu *vcpu)
+ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ {
+ 	u32 func_id = smccc_get_function(vcpu);
+-	u32 val;
++	u32 val, feature;
+ 
+ 	switch (func_id) {
+ 	case ARM_SMCCC_VERSION_FUNC_ID:
+ 		val = ARM_SMCCC_VERSION_1_1;
+ 		break;
+ 	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
+-		val = -1;	/* Nothing supported yet */
++		feature = smccc_get_arg1(vcpu);
++		switch(feature) {
++#ifdef CONFIG_ARM64
++		case ARM_SMCCC_ARCH_WORKAROUND_1:
++			if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR))
++				val = 0;
++			else
++				val = -1;
++			break;
++#endif
++		default:
++			val = -1;
++			break;
++		}
+ 		break;
+ 	default:
+ 		return kvm_psci_call(vcpu);
 -- 
 2.14.2
