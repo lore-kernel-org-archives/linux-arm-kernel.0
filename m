@@ -1,60 +1,50 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 29 Jan 2018 10:19:02 +0100
-Subject: [linux-sunxi][PATCH v2 4/5] arm64: allwinner: a64: Add DAI nodes
+Date: Mon, 29 Jan 2018 10:19:00 +0100
+Subject: [linux-sunxi][PATCH v2 2/5] arm64: allwinner: a64: Add SPDIF to the
+ A64
 In-Reply-To: <20180129091903.12319-1-codekipper@gmail.com>
 References: <20180129091903.12319-1-codekipper@gmail.com>
-Message-ID: <20180129091903.12319-5-codekipper@gmail.com>
+Message-ID: <20180129091903.12319-3-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the DAI blocks to the device tree. I2S0 and I2S1 are for
-connecting to an external codec.
+Add the device tree sound bindings for the S/PDIF block.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 28 +++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index b9e69657a2e8..1b6dc31e7d91 100644
+index 43c54a2133f0..b9e69657a2e8 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -421,6 +421,34 @@
- 			status = "disabled";
- 		};
+@@ -112,6 +112,24 @@
+ 		method = "smc";
+ 	};
  
-+		i2s0: i2s at 1c22000 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun50i-a64-i2s",
-+				     "allwinner,sun8i-h3-i2s";
-+			reg = <0x01c22000 0x400>;
-+			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2S0>, <&ccu CLK_I2S0>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_I2S0>;
-+			dma-names = "rx", "tx";
-+			dmas = <&dma 3>, <&dma 3>;
-+			status = "disabled";
++	sound_spdif {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "On-board SPDIF";
++
++		simple-audio-card,cpu {
++			sound-dai = <&spdif>;
 +		};
 +
-+		i2s1: i2s at 1c22400 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun50i-a64-i2s",
-+				     "allwinner,sun8i-h3-i2s";
-+			reg = <0x01c22400 0x400>;
-+			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2S1>, <&ccu CLK_I2S1>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_I2S1>;
-+			dma-names = "rx", "tx";
-+			dmas = <&dma 4>, <&dma 4>;
-+			status = "disabled";
++		simple-audio-card,codec {
++			sound-dai = <&spdif_out>;
 +		};
++	};
 +
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
++	spdif_out: spdif-out {
++		#sound-dai-cells = <0>;
++		compatible = "linux,spdif-dit";
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
 -- 
 2.16.1
