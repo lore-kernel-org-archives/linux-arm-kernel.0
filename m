@@ -1,59 +1,77 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sun, 28 Jan 2018 16:51:30 -0800
-Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
-In-Reply-To: <042b6cea-38f7-a660-0059-5f24fc7db9eb@codeaurora.org>
-References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
- <20180128232310.GA12728@builder>
- <042b6cea-38f7-a660-0059-5f24fc7db9eb@codeaurora.org>
-Message-ID: <20180129005129.GB12728@builder>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 29 Jan 2018 09:48:57 +0800
+Subject: [PATCH 1/1] dt-bindings: thermal: imx: update the binding to new
+ method
+In-Reply-To: <1516862269-25543-1-git-send-email-aisheng.dong@nxp.com>
+References: <1516862269-25543-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180129014855.GA12957@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 28 Jan 15:29 PST 2018, Timur Tabi wrote:
-
-> On 1/28/18 5:23 PM, Bjorn Andersson wrote:
-> > What platform has multiple TLMMs?
-> > 
-> > [..]
+On Thu, Jan 25, 2018 at 02:37:49PM +0800, Dong Aisheng wrote:
+> Due to the old method has already been marked as deprecated in binding
+> doc, so obviously it's better to update the example to new bindings
+> as well.
 > 
-> An upcoming one.
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+
+Acked-by: Shawn Guo <shawnguo@kernel.org>
+
+Please use my kernel.org address for kernel patches.
+
+Shawn
+
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  .../devicetree/bindings/thermal/imx-thermal.txt    | 25 ++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-
-Cool :)
-
-> > > diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-> > > index b7b6849625ec..4dc76e15bd14 100644
-> > > --- a/drivers/pinctrl/qcom/pinctrl-msm.c
-> > > +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-> > > @@ -901,7 +901,7 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
-> > >   		return -EINVAL;
-> > >   	chip = &pctrl->chip;
-> > > -	chip->base = 0;
+> diff --git a/Documentation/devicetree/bindings/thermal/imx-thermal.txt b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> index 28be51a..379eb76 100644
+> --- a/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/imx-thermal.txt
+> @@ -22,7 +22,32 @@ Optional properties:
+>  - clocks : thermal sensor's clock source.
+>  
+>  Example:
+> +ocotp: ocotp at 21bc000 {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	compatible = "fsl,imx6sx-ocotp", "syscon";
+> +	reg = <0x021bc000 0x4000>;
+> +	clocks = <&clks IMX6SX_CLK_OCOTP>;
+>  
+> +	tempmon_calib: calib at 38 {
+> +		reg = <0x38 4>;
+> +	};
+> +
+> +	tempmon_temp_grade: temp-grade at 20 {
+> +		reg = <0x20 4>;
+> +	};
+> +};
+> +
+> +tempmon: tempmon {
+> +	compatible = "fsl,imx6sx-tempmon", "fsl,imx6q-tempmon";
+> +	interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+> +	fsl,tempmon = <&anatop>;
+> +	nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
+> +	nvmem-cell-names = "calib", "temp_grade";
+> +	clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
+> +};
+> +
+> +Legacy method (Deprecated):
+>  tempmon {
+>  	compatible = "fsl,imx6q-tempmon";
+>  	fsl,tempmon = <&anatop>;
+> -- 
+> 2.7.4
 > 
-> > My bad, this should have been -1.
-> 
-> Perhaps, but it's been 0 for a very long time, so I don't want to break any
-> existing platforms by suddenly relocating all GPIOs across all Qualcomm
-> platforms.
-> 
-
-Yeah, I see that I got this wrong when I wrote the driver 4 years ago...
-
-There should be no in-kernel users depending on these numbers being hard
-coded, so anyone depending on these numbers starting at 0 would be user
-space - doing so incorrectly.
-
-> What do you think about my other idea?
-> 
-
-With static numbering of gpios you end up having cross-instance and
-cross-driver tweaks to make things fit the number space. In particular
-when you combine different gpio chips in different ways for different
-devices this becomes a mess.
-
-That's why the idea of static gpio numbering was abandoned a long long
-time ago. So while it does solve an immediate problem for you it is
-proven not to be the right solution in the long run...
-
-Regards,
-Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
