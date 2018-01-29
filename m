@@ -1,44 +1,41 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 29 Jan 2018 16:58:06 +0100
-Subject: [PATCH v4 2/6] media: dt: bindings: Update binding documentation for
- sunxi IR controller
+Date: Mon, 29 Jan 2018 16:58:09 +0100
+Subject: [PATCH v5 5/6] arm: dts: sun8i: a83t: bananapi-m3: Enable IR
+ controller
 In-Reply-To: <20180129155810.7867-1-embed3d@gmail.com>
 References: <20180129155810.7867-1-embed3d@gmail.com>
-Message-ID: <20180129155810.7867-3-embed3d@gmail.com>
+Message-ID: <20180129155810.7867-6-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates documentation for Device-Tree bindings for sunxi IR
-controller and adds the new optional property for the base clock
-frequency.
+The Bananapi M3 has an onboard IR receiver.
+This enables the onboard IR receiver subnode.
+Unlike the other IR receivers this one needs a base clock frequency
+of 3000000 Hz (3 MHz), to be able to work.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/media/sunxi-ir.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-index 91648c569b1e..278098987edb 100644
---- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-+++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - linux,rc-map-name: see rc.txt file in the same directory.
- - resets : phandle + reset specifier pair
-+- clock-frequency  : IR Receiver clock frequency, in Hertz. Defaults to 8 MHz
-+		     if missing.
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 6550bf0e594b..ffc6445fd281 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -82,6 +82,13 @@
+ 	};
+ };
  
- Example:
- 
-@@ -18,6 +20,7 @@ ir0: ir at 1c21800 {
- 	compatible = "allwinner,sun4i-a10-ir";
- 	clocks = <&apb0_gates 6>, <&ir0_clk>;
- 	clock-names = "apb", "ir";
++&cir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cir_pins>;
 +	clock-frequency = <3000000>;
- 	resets = <&apb0_rst 1>;
- 	interrupts = <0 5 1>;
- 	reg = <0x01C21800 0x40>;
++	status = "okay";
++};
++
+ &ehci0 {
+ 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
+ 	status = "okay";
 -- 
 2.11.0
