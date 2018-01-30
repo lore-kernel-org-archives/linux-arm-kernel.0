@@ -1,48 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jan 2018 14:04:39 +0100
-Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add registers clock
- for SPI nodes
-In-Reply-To: <87372n1otf.fsf@free-electrons.com>
-References: <20180130111455.10101-1-gregory.clement@free-electrons.com>
- <20180130112138.4xopqhgllnbq4xhb@sapphire.tkos.co.il>
- <20180130122640.wx2r3mnqusz362ju@sapphire.tkos.co.il>
- <87bmhb1pry.fsf@free-electrons.com>
- <20180130135320.39899ef5@windsurf.lan>
- <87372n1otf.fsf@free-electrons.com>
-Message-ID: <20180130140439.1abb59e6@windsurf.lan>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 30 Jan 2018 13:15:00 +0000
+Subject: [PATCH v2 04/16] arm/arm64: KVM: Add PSCI_VERSION helper
+In-Reply-To: <20180129174559.1866-5-marc.zyngier@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-5-marc.zyngier@arm.com>
+Message-ID: <818aa8cd-9fa3-3234-297b-dea8540e1bb2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 30 Jan 2018 14:03:24 +0100, Gregory CLEMENT wrote:
-
-> >> Actually this is the reason of these changes. The clock driver is wrong,
-> >> now that we got new documentation about the clocks, we saw that the
-> >> clock tree descried in this driver was not correct. There is no relation
-> >> between clock 17 and clock 21 for instance. But in order to be able to
-> >> fix the clock driver, first we have to make sure that all the driver of
-> >> the peripherals really select their own clocks.
-> >> 
-> >> I have already the patch fixing the clock ready and once I will have
-> >> converted the remaining peripheral I will be able to submit it.  
-> >
-> > Of course I do agree with Gr?gory here, since we discussed this at
-> > length. However, I think Baruch has a point in that this should be
-> > explained in the commit log.  
+On 29/01/18 17:45, Marc Zyngier wrote:
+> As we're about to trigger a PSCI version explosion, it doesn't
+> hurt to introduce a PSCI_VERSION helper that is going to be
+> used everywhere.
 > 
-> It was explained in the series modifying the drivers. But here it is
-> only about correctly describing the hardware ressource in the device
-> tree, the fact that the linux clock driver may or not automatically
-> select some of the clock should not be taking into account.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   include/kvm/arm_psci.h | 5 +++--
+>   virt/kvm/arm/psci.c    | 2 +-
+>   2 files changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+> index 2042bb909474..3a408c846c09 100644
+> --- a/include/kvm/arm_psci.h
+> +++ b/include/kvm/arm_psci.h
+> @@ -18,8 +18,9 @@
+>   #ifndef __KVM_ARM_PSCI_H__
+>   #define __KVM_ARM_PSCI_H__
+>   
+> -#define KVM_ARM_PSCI_0_1	1
+> -#define KVM_ARM_PSCI_0_2	2
+> +#define PSCI_VERSION(x,y)	((((x) & 0x7fff) << 16) | ((y) & 0xffff))
 
-Agreed, but there is no reference to the driver commits in your commit
-log, and I still think a better commit log would be nice. The simple
-fact that Baruch had to ask is a good indication that the commit log is
-not detailed enough, IMO.
+I see virt/kvm/arm/psci.c already pulls in uapi/linux/psci.h, so maybe 
+this guy could go in there alongside the other PSCI_VERSION_* gubbins?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Robin.
+
+> +#define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
+> +#define KVM_ARM_PSCI_0_2	PSCI_VERSION(0, 2)
+>   
+>   int kvm_psci_version(struct kvm_vcpu *vcpu);
+>   int kvm_psci_call(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+> index b322e46fd142..c00bb324e14e 100644
+> --- a/virt/kvm/arm/psci.c
+> +++ b/virt/kvm/arm/psci.c
+> @@ -222,7 +222,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>   		 * Bits[31:16] = Major Version = 0
+>   		 * Bits[15:0] = Minor Version = 2
+>   		 */
+> -		val = 2;
+> +		val = KVM_ARM_PSCI_0_2;
+>   		break;
+>   	case PSCI_0_2_FN_CPU_SUSPEND:
+>   	case PSCI_0_2_FN64_CPU_SUSPEND:
+> 
