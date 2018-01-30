@@ -1,82 +1,68 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Tue, 30 Jan 2018 10:38:38 +0100
-Subject: [PATCH] sound/tlv320dac33: Add device tree support
-In-Reply-To: <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
-References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
- <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
- <20180130085314.GA4585@amd>
- <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
-Message-ID: <20180130093838.GA15195@lenoch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 30 Jan 2018 01:48:16 -0800
+Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <514c49cc-71f9-ee21-250a-04f8fab151c0@codeaurora.org>
+References: <20180125163216.29018-1-rnayak@codeaurora.org>
+ <20180125163216.29018-2-rnayak@codeaurora.org>
+ <20180126221501.GD28313@codeaurora.org>
+ <514c49cc-71f9-ee21-250a-04f8fab151c0@codeaurora.org>
+Message-ID: <20180130094816.GJ28313@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 10:11:02AM +0100, Filip Matijevi? wrote:
-> Hi,
+On 01/29, Rajendra Nayak wrote:
 > 
-> On 01/30/2018 09:53 AM, Pavel Machek wrote:
-> > On Tue 2018-01-30 09:34:46, Ladislav Michl wrote:
-> >> On Tue, Jan 30, 2018 at 12:33:01AM +0100, Pavel Machek wrote:
-> >>> On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
-> >>>> On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
-> >>>>>
-> >>>>> This adds device tree support to tlv320dac33.c.
-> >>>>>
-> >>>>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> >>>>>
-> >>>>> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> >>>>> new file mode 100644
-> >>>>> index 0000000..6cbd311
-> >>>>> --- /dev/null
-> >>>>> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> >>>>> @@ -0,0 +1,32 @@
-> >>>>> +Texas Instruments - tlv320dac33 Codec module
-> >>>>> +
-> >>>>> +The tlv320dac33 serial control bus communicates through I2C protocols.
-> >>>>> +
-> >>>>> +Required properties:
-> >>>>> +
-> >>>>> +- compatible - "ti,tlv320dac33"
-> >>>>> +- reg - I2C slave address
-> >>>>> +
-> >>>>> +Optional properties:
-> >>>>> +
-> >>>>> +- power-gpios - gpio pin to power the device, active high
-> >>>>
-> >>>> While driver used gpio in platform data, isn't it more likely
-> >>>> regulator which powers device?
-> >>>
-> >>>                 power-gpios = <&gpio2 28 0>; /* gpio_60 */
-> >>>
-> >>> Looks like GPIO to me -- example is from Nokia N9. So this appears to
-> >>> be correct.
-> >>
-> >> Device datasheet doesn't list any pin which looks like "power-gpio"
-> >> http://www.ti.com/lit/ds/symlink/tlv320dac32.pdf
-> >> Unfortunately I do not know much about N9, but was able to find Nokia 5610
-> >> scheme to get clue how could be tlv320dac33 hardwired (see page 2):
-> >> http://mastermobile.spb.ru/service/nokia_5610_rm-242_service_schematics.pdf
-> >> Here AVDD is powered by LP3985 voltage regulator which is enabled using
-> >> VEN pin which might be connected to gpio. Or there could be completely
-> >> different voltage regulator with different controls. And since Linux
-> >> already has voltage regulator class, lets not limit ourselves to gpio
-> >> pins.
+> 
+> On 01/27/2018 03:45 AM, Stephen Boyd wrote:
+> > On 01/25, Rajendra Nayak wrote:
+> >>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> >>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dtsi
 > > 
-> > Well, notice I'm converting existing driver to device tree. And that
-> > one already has GPIO dependency. It is possible that more work needs
-> > to be done there, but that should not be a reason to delay this. Feel
-> > free to help.
+> > Do we really need two files? Maybe collapse the two?
+> 
+> will do. Not sure why, but this is how all other qualcomm
+> boards are structured with an almost empty .dts file.
 
-Adding DT properties that need to be maintained for compatibility reasons
-is a bad idea and very good reason to delay merging unfinished stuff.
-And meanwhile it turned out it is not power-gpio :)
+I think it's because we have v1, v2, v3, etc. when we're sorting
+out the versions of silicon, but then those are all dropped when
+everything is done. Upstream we probably never care.
 
-> According to N9 schematics
-> http://www.s-manuals.com/manuals/phone/nokia/nokia_n9_rm-696_service_schematics_v1.pdf
-> it's in fact GPIO pin that is connected to reset line (labeled
-> CODEC_RST). So calling it "power" might be misleading, but the driver
-> code is quite clear as it labels that GPIO as "tlv320dac33 reset"
+> >> +
+> >> +				core2 {
+> >> +					cpu = <&CPU6>;
+> >> +				};
+> >> +
+> >> +				core3 {
+> >> +					cpu = <&CPU7>;
+> >> +				};
+> >> +			};
+> >> +		};
+> > 
+> > From what I recall, this layout causes the kernel to spew
+> > warnings? I mean to say this is the power/performance view, but
+> > not the architectural view.
+> 
+> hmm, I haven't seen any warnings with this when I boot up on my sdm845
+> MTP. Will recheck.
 
-Thanks a lot! So now it is clear that gpio is connected to codec's nRESET pin,
-therefore "reset-gpios" property seems reasonable here.
+Ok! I will recheck as well.
 
-	ladis
+> 
+> > 
+> >> +	};
+> >> +
+> >> +	timer {
+> >> +		compatible = "arm,armv8-timer";
+> >> +		interrupts = <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> > 
+> > Are we supposed to use the GIC_CPU_MASK_SIMPLE macros still?
+> 
+> Not sure, is there another way?
+
+Me either. See this thread from Marc[1]. I guess just drop them?
+
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1702.0/03522.html
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
