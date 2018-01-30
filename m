@@ -1,81 +1,162 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Jan 2018 08:54:17 +0000
-Subject: [PATCH v2 15/16] arm/arm64: smccc: Implement SMCCC v1.1 inline
- primitive
-In-Reply-To: <04d16ecd-044c-fe56-f9be-78d0cb591e71@arm.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-16-marc.zyngier@arm.com>
- <04d16ecd-044c-fe56-f9be-78d0cb591e71@arm.com>
-Message-ID: <84eaa3ee-6838-466a-9974-98b6092b9e6c@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 30 Jan 2018 10:01:01 +0100
+Subject: [PATCH v2] clk: Properly update prepare/enable count on orphan
+ clock reparent
+In-Reply-To: <20180127004917.GI28313@codeaurora.org>
+References: <CGME20180126091902eucas1p2b3ad9978e3ab09bd7a2bd9123c9eecaa@eucas1p2.samsung.com>
+ <20180126091845.11902-1-m.szyprowski@samsung.com>
+ <20180127004917.GI28313@codeaurora.org>
+Message-ID: <7c7810e0-efcb-c837-1b18-328e59c3b2df@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 19:07, Robin Murphy wrote:
-> On 29/01/18 17:45, Marc Zyngier wrote:
->> One of the major improvement of SMCCC v1.1 is that it only clobbers
->> the first 4 registers, both on 32 and 64bit. This means that it
->> becomes very easy to provide an inline version of the SMC call
->> primitive, and avoid performing a function call to stash the
->> registers that would otherwise be clobbered by SMCCC v1.0.
-> 
-> This is disgusting... I love it :D
+Hi Stephen
 
-I expected nothing less from you! ;-)
+On 2018-01-27 01:49, Stephen Boyd wrote:
+> On 01/26, Marek Szyprowski wrote:
+>> If orphaned clock has been already prepared/enabled (for example if it or
+>> one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+>> counters of the newly assigned parent are not updated correctly. This
+>> might later cause warnings during changing clock parents.
+> This doesn't feel right. Perhaps we should delay enabling a clk
+> if it's CRITICAL until we adopt an orphaned clk. Good news is we
+> have orphan status tracking now so this should be pretty simple.
 
-> 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   include/linux/arm-smccc.h | 157 ++++++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 157 insertions(+)
->>
->> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
->> index dd44d8458c04..bc5843728909 100644
->> --- a/include/linux/arm-smccc.h
->> +++ b/include/linux/arm-smccc.h
->> @@ -150,5 +150,162 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
->>   
->>   #define arm_smccc_hvc_quirk(...) __arm_smccc_hvc(__VA_ARGS__)
->>   
->> +/* SMCCC v1.1 implementation madness follows */
->> +#ifdef CONFIG_ARM64
->> +
->> +#define SMCCC_SMC_INST	"smc	#0"
->> +#define SMCCC_HVC_INST	"hvc	#0"
->> +
->> +#define __arm_smccc_1_1_prologue(inst)					\
->> +	inst "\n"							\
->> +	"cbz	%[ptr], 1f\n"						\
->> +	"stp	%x[r0], %x[r1], %[ra0]\n"				\
->> +	"stp	%x[r2], %x[r3], %[ra2]\n"				\
->> +	"1:\n"								\
->> +	: [ra0] "=Ump" (*(&___res->a0)),				\
->> +	  [ra2] "=Ump" (*(&___res->a2)),
-> 
-> Rather than embedding a guaranteed spill to memory, I wonder if there's 
-> money in just always declaring r0-r3 as in-out operands, and propagating 
-> them by value afterwards, i.e.:
-> 
-> 	asm(...);
-> 	if (___res)
-> 		*___res = (struct arm_smccc_res){ r0, r1, r2, r3 };
-> 
-> In theory, for sufficiently simple callers that might allow res to stay 
-> in registers for its entire lifetime and give nicer codegen. It *might* 
-> also simplify some of this macro machinery too, although at this point 
-> in the evening I can't really tell...
+Not really. It won't be so simple, because we would need to track the
+status of the whole clock sub-tree for enabling critical clocks. Even
+then we would need to delay enabling them until the real top clock is
+registered.
 
-I just implemented it, and this is indeed much better. In most cases,
-the store gets optimized away, mostly because we either pass NULL (and
-the condition is dropped) or the store doesn't need to take place as we
-evaluate a condition and discard the structure, like in
-check_smccc_arch_workaround_1.
+> Otherwise migrating the count up is complicated and requires us
+> to call the prepare/enable ops on a critical clk and then keep
+> doing that each time it gets re-parented. Do you have this case,
+> where some clk is marked as CRITICAL, and then we need to migrate
+> that enable/prepare count to the parent?
 
-In all cases, this allows for slightly reduced levels of cpp madness,
-and better codegen. I also suspect it will solve Ard's register
-allocation issue.
+Yes, this is the case of Exynos5422-based boards, where we have a
+bunch of critical clocks, which are reparented from internal PLL to
+external oscillator when respective power domain is suspended.
 
-Thanks,
+It took me a while to gather all the needed information from the
+debug logs. Here is one example of such clock tree:
 
-	M.
+fin_pll (clk1, top clock, external pll)
+ ??? fout_dpll (clk2)
+ ??? ??? mout_sclk_dpll (clk3)
+ ??? ??? ??? mout_aclk300_disp1 (clk4)
+ ??? ??? ??? ??? dout_aclk300_disp1 (clk5)
+ ??? ??? ??? ??? ??? mout_sw_aclk300_disp1 (clk6)
+ ??? ??? ??? ??? ??? ??? mout_user_aclk300_disp1 (clk7)
+ ??? ??? ??? ??? ??? ??? ??? aclk300_disp1 (clk8, critical)
+
+Before turning off power domains, aclk300_disp1 is reparented
+directly to fin_pll (this is a hardware requirement). When power
+domain is turned on again, aclk300_disp1 is reparented back to
+mout_user_aclk300_disp1.
+
+Clocks are registered in the following order:
+1, 2, 7, 3, 6, 5, 8, 4.
+
+In this case when critical clock is registered, clk4 is not yet
+available, so clocks 1-3 won't get proper prepare/enable count.
+Then this causes a warning during reparenting clk8 to clk1:
+
+ ?------------[ cut here ]------------
+ ?WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:811 
+clk_core_disable_lock+0x18/0x24
+ ?Modules linked in:
+ ?CPU: 0 PID: 59 Comm: kworker/0:1 Not tainted 
+4.15.0-next-20180130-dirty #131
+ ?Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+ ?Workqueue: pm genpd_power_off_work_fn
+ ?[<c01114e4>] (unwind_backtrace) from [<c010dbc0>] (show_stack+0x10/0x14)
+ ?[<c010dbc0>] (show_stack) from [<c09b7b94>] (dump_stack+0x90/0xc8)
+ ?[<c09b7b94>] (dump_stack) from [<c0124ff8>] (__warn+0xe4/0x110)
+ ?[<c0124ff8>] (__warn) from [<c0125064>] (warn_slowpath_null+0x40/0x48)
+ ?[<c0125064>] (warn_slowpath_null) from [<c048e650>] 
+(clk_core_disable_lock+0x18/0x24)
+ ?[<c048e650>] (clk_core_disable_lock) from [<c048f51c>] 
+(clk_core_disable_unprepare+0xc/0x20)
+ ?[<c048f51c>] (clk_core_disable_unprepare) from [<c048faec>] 
+(__clk_set_parent_after+0x48/0x4c)
+ ?[<c048faec>] (__clk_set_parent_after) from [<c048fd28>] 
+(clk_core_set_parent_nolock+0x238/0x5d0)
+ ?[<c048fd28>] (clk_core_set_parent_nolock) from [<c04902e4>] 
+(clk_set_parent+0x38/0x6c)
+ ?[<c04902e4>] (clk_set_parent) from [<c049d760>] 
+(exynos_pd_power+0x74/0x1cc)
+ ?[<c049d760>] (exynos_pd_power) from [<c0552064>] 
+(genpd_power_off+0x164/0x264)
+ ?[<c0552064>] (genpd_power_off) from [<c0552430>] 
+(genpd_power_off_work_fn+0x2c/0x40)
+ ?[<c0552430>] (genpd_power_off_work_fn) from [<c014355c>] 
+(process_one_work+0x1d0/0x7bc)
+ ?[<c014355c>] (process_one_work) from [<c0143bb4>] 
+(worker_thread+0x34/0x4dc)
+ ?[<c0143bb4>] (worker_thread) from [<c014a348>] (kthread+0x128/0x164)
+ ?[<c014a348>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+ ?Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+ ?1fa0:???????????????????????????????????? 00000000 00000000 00000000 
+00000000
+ ?1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+00000000
+ ?1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ ?---[ end trace 48eea511a44c78ef ]---
+ ?------------[ cut here ]------------
+ ?WARNING: CPU: 0 PID: 59 at drivers/clk/clk.c:684 
+clk_core_disable_unprepare+0x18/0x20
+ ?Modules linked in:
+ ?CPU: 0 PID: 59 Comm: kworker/0:1 Tainted: G??????? W 
+4.15.0-next-20180130-dirty #131
+ ?Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+ ?Workqueue: pm genpd_power_off_work_fn
+ ?[<c01114e4>] (unwind_backtrace) from [<c010dbc0>] (show_stack+0x10/0x14)
+ ?[<c010dbc0>] (show_stack) from [<c09b7b94>] (dump_stack+0x90/0xc8)
+ ?[<c09b7b94>] (dump_stack) from [<c0124ff8>] (__warn+0xe4/0x110)
+ ?[<c0124ff8>] (__warn) from [<c0125064>] (warn_slowpath_null+0x40/0x48)
+ ?[<c0125064>] (warn_slowpath_null) from [<c048f528>] 
+(clk_core_disable_unprepare+0x18/0x20)
+ ?[<c048f528>] (clk_core_disable_unprepare) from [<c048faec>] 
+(__clk_set_parent_after+0x48/0x4c)
+ ?[<c048faec>] (__clk_set_parent_after) from [<c048fd28>] 
+(clk_core_set_parent_nolock+0x238/0x5d0)
+ ?[<c048fd28>] (clk_core_set_parent_nolock) from [<c04902e4>] 
+(clk_set_parent+0x38/0x6c)
+ ?[<c04902e4>] (clk_set_parent) from [<c049d760>] 
+(exynos_pd_power+0x74/0x1cc)
+ ?[<c049d760>] (exynos_pd_power) from [<c0552064>] 
+(genpd_power_off+0x164/0x264)
+ ?[<c0552064>] (genpd_power_off) from [<c0552430>] 
+(genpd_power_off_work_fn+0x2c/0x40)
+ ?[<c0552430>] (genpd_power_off_work_fn) from [<c014355c>] 
+(process_one_work+0x1d0/0x7bc)
+ ?[<c014355c>] (process_one_work) from [<c0143bb4>] 
+(worker_thread+0x34/0x4dc)
+ ?[<c0143bb4>] (worker_thread) from [<c014a348>] (kthread+0x128/0x164)
+ ?[<c014a348>] (kthread) from [<c01010b4>] (ret_from_fork+0x14/0x20)
+ ?Exception stack(0xeeb01fb0 to 0xeeb01ff8)
+ ?1fa0:???????????????????????????????????? 00000000 00000000 00000000 
+00000000
+ ?1fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+00000000
+ ?1fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+ ?---[ end trace 48eea511a44c78f0 ]---
+
+Please note that this pattern happens for other critical clocks too.
+
+> Hopefully it isn't the worser case, where the clk is handed out
+> to some consumer but it's still orphaned at that point, and then
+> we have little control over the migration of state to the parent.
+
+Well, in my opinion my patch is simplest fix for the regression
+introduced by commit f8f8f1d04494 ("clk: Don't touch hardware when
+reparenting during registration"). It also doesn't have any side-effects
+as it affects only the situation when orphaned clock has been already
+prepared/enabled, what in practice means it or one of its children has
+critical flag. Reworking critical clock handling will be much more
+complicated.
+
+Best regards
 -- 
-Jazz is not dead. It just smells funny...
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
