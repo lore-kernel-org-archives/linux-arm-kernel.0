@@ -1,76 +1,101 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 30 Jan 2018 11:25:51 +0000
-Subject: [PATCH 09/16] arm64: capabilities: Introduce strict features
- based on local CPU
-In-Reply-To: <20180126121219.GQ5862@e103592.cambridge.arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-10-suzuki.poulose@arm.com>
- <20180126121219.GQ5862@e103592.cambridge.arm.com>
-Message-ID: <d12c2c77-8813-75ed-1011-7ba42bff663e@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Jan 2018 11:31:48 +0000
+Subject: [PATCH 2/5] drm: add ARM flush implementation
+In-Reply-To: <20180130101436.GK25930@phenom.ffwll.local>
+References: <20180124025606.3020-2-gurchetansingh@chromium.org>
+ <20180130101436.GK25930@phenom.ffwll.local>
+Message-ID: <20180130113147.GD9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 12:12, Dave Martin wrote:
-> On Tue, Jan 23, 2018 at 12:28:02PM +0000, Suzuki K Poulose wrote:
->> Add type for features that are detected on individual CPUs,
->> rather than on a system wide safe features. This behavior
+On Tue, Jan 30, 2018 at 11:14:36AM +0100, Daniel Vetter wrote:
+> On Tue, Jan 23, 2018 at 06:56:03PM -0800, Gurchetan Singh wrote:
+> > The dma_cache_maint_page function is important for cache maintenance on
+> > ARM32 (this was determined via testing).
+> > 
+> > Since we desire direct control of the caches in drm_cache.c, let's make
+> > a copy of the function, rename it and use it.
+> > 
+> > v2: Don't use DMA API, call functions directly (Daniel)
+> > 
+> > Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
 > 
-> feature
+> fwiw, in principle, this approach has my Ack from the drm side.
 > 
->> is similar to that of a strict cpu erratum, where a later
->> CPU is not allowed to boot if the system doesn't posses it.
->>
->> Use this for software prefetching capability.
->>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/include/asm/cpufeature.h | 7 +++++++
->>   arch/arm64/kernel/cpufeature.c      | 2 +-
->>   2 files changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index a621d2184227..4c3d6987acfc 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -118,6 +118,13 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->>    */
->>   #define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	\
->>   	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE)
->> +/*
->> + * CPU feature detected at boot time based on feature of one or more CPUs.
->> + * It is not safe for a late CPU to have this feature, when the system doesn't
->> + * have it. But it is safe to miss the feature if the system has it.
->> + */
->> +#define ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE	\
->> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS)
-> 
-> "STRICT" seem quite odd here, since we never require all CPUs to have
-> the feature.  The case we forbid is when the boot-time decision is that
-> the system doesn't tolerate this feature.  So this feels erratum-like.
-> 
->>   struct arm64_cpu_capabilities {
->>   	const char *desc;
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 7ae5cf9092d0..111f6c4b4cd7 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -951,7 +951,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->>   	{
->>   		.desc = "Software prefetching using PRFM",
->>   		.capability = ARM64_HAS_NO_HW_PREFETCH,
->> -		.type = ARM64_CPUCAP_BOOT_SYSTEM_FEATURE,
->> +		.type = ARM64_CPUCAP_STRICT_CPU_LOCAL_FEATURE,
->>   		.matches = has_no_hw_prefetch,
-> 
-> For ARM64_HAS_NO_HW_PREFETCH this is more describing an implementation
-> option that only affects performance -- in that case it's not obvious
-> that we should be strict at all.
-> 
-> This suggests ARM64_CPUCAP_SCOPE_LOCAL_CPU |
-> 	ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE |
-> 	ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS.
+> But if we can't get any agreement from the arch side then I guess we'll
+> just have to suck it up and mandate that any dma-buf on ARM32 must be wc
+> mapped, always. Not sure that's a good idea either, but should at least
+> get things moving.
 
-You're right. This is more like a WEAK feature we add for DBM. I will switch it.
+Let me expand on my objection, as I find your tone to be problematical
+here.
 
-Cheers
-Suzuki
+The patch 2 (which is the earliest patch in this series) makes use of
+facilities such as dmac_map_area(), and those are defined as macros in
+arch/arm/mm/mm.h.  I see no way that drm_cache.c can pick up on that
+_unless_ there's another patch (maybe that's patch 1) which moves the
+definition.
+
+dmac_map_area() is non-trivial to export (it's not a function, it's
+macro which either points to a function or a function pointer structure
+member) so it's likely that this patch also breaks building DRM as a
+module.
+
+We've been here before with drivers abusing the architecture private APIs,
+which is _exactly_ why dmac_map_area() is defined in arch/arm/mm.h and not
+in some kernel-wide asm header file - it's an implementation detail of the
+architectures DMA API that drivers have no business mucking about with.
+
+I've always said if the interfaces don't do what you want, talk to
+architecture people, don't go poking about in architecture private parts
+of the kernel and start abusing stuff.  I say this because years ago, we
+had people doing _exactly_ that for the older virtually cached ARMs.  Then
+ARMv6 came along, which needed an entire revamp of the architecture cache
+interfaces, and lo and behold, drivers got broken because of this kind of
+abuse.  IOW, abusing interfaces makes kernel maintenance harder.
+
+For example, interfaces designed for flushing the cache when page tables
+get torn down were abused in drivers to flush data for DMA or coherency
+purposes, which meant that on ARMv6, where we no longer needed to flush
+for page table maintenance, suddenly the interfaces that drivers were
+using became no-ops.
+
+In this case, dmac_map_area() exists to perform any cache maintenance
+for the kernel view of that memory required for a non-coherent DMA
+mapping.  What it does depends on the processsor and the requested
+DMA_xxx type - it _may_ invalidate (discard) or clean (writeback but
+leave in the cache) cache lines, or do nothing.
+
+dmac_unmap_area() has the same issues - what it does depends on what
+operation is being requested and what the processor requires to
+achieve coherency.
+
+The two functions are designed to work _together_, dmac_map_area()
+before the DMA operation and dmac_unmap_area() after the DMA operation.
+Only when they are both used together do you get the correct behaviour.
+
+These functions are only guaranteed to operate on the kernel mapping
+passed in as virtual addresses to the dmac_* functions.  They make no
+guarantees about other mappings of the same memory elsewhere in the
+system, which, depending on the architecture of the caches, may also
+contain dirty cache lines (the same comment applies to the DMA API too.)
+On certain cache architectures (VIPT) where colouring effects apply,
+flushing the kernel mapping may not even be appropriate if the desired
+effect is to flush data from a user mapping.
+
+This is exactly why abusing APIs (like what is done in this patch) is
+completely unacceptable from the architecture point of view - while
+it may _appear_ to work, it may only work for one class of CPU or one
+implementation.
+
+Hence why the dmac_{un,}map_area() interfaces are not exported to
+drivers.  You can't just abuse one of them.  They are a pair that
+must be used together, and the DMA API knows that, and the DMA API
+requirements ensure that happens.  It's not really surprising, these
+functions were written to support the DMA API, and the DMA API is
+the kernel-wide interface to these functions.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
