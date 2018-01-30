@@ -1,74 +1,167 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 29 Jan 2018 16:00:40 -0800
-Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
-In-Reply-To: <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
-References: <20180123132220.29886-1-linus.walleij@linaro.org>
- <87inbqppm4.fsf@anholt.net>
- <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
-Message-ID: <87tvv4w6zb.fsf@anholt.net>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Tue, 30 Jan 2018 10:35:52 +0530
+Subject: [PATCH v3 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
+ driver
+In-Reply-To: <1516836074-4149-3-git-send-email-jollys@xilinx.com>
+References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
+ <1516836074-4149-3-git-send-email-jollys@xilinx.com>
+Message-ID: <CAKfKVtGGf8AexOTEvyyi7cmQ_Xopa3Fszf-jOuNSfBJpE2EzCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi,
 
-> On Thu, Jan 25, 2018 at 4:46 AM, Eric Anholt <eric@anholt.net> wrote:
->
->>> +     pl111_choose_max_resolution(dev, priv->memory_bw,
->>> +                                 &mode_config->max_width,
->>> +                                 &mode_config->max_height, &bpp);
->>> +     dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
->>> +              mode_config->max_width, mode_config->max_height, bpp);
->>
->> I think this is the wrong place in the pipeline to be doing this, but I
->> don't have a complete solution so I'm not necessarily saying no.
->
-> So currently the driver does this:
->
-> mode_config->max_width = 1024;
-> mode_config->max_height = 768;
->
-> And that is because it cannot really handle anything. I guess ideally
-> the DRM driver should set these to -1 or something so that any widths
-> and heights negotiated will work.
+Thanks for the patch.
+A few questions below.
 
-The PPL field only gets you up to 1024 width.  Looks like LPP lets you
-get up to 1024 height, though, even if the top level of the PL111 docs
-say 1024x768 is the max.
 
->>  Things I think we should do for bandwidth limits:
->>
->> A new pl111_mode_valid() rejects modes with width*height*2 > bandwidth
->> (if we can't scan it out with our smallest format, don't advertise it).
->>
->> pl111_display_check() rejects modes with width*height*bpp > bandwidth
->> (if we can't scan out this particular configuration, let them know we
->> can't set the mode).
->>
->> Ideally given those two things, fbdev and X11 would notice that the
->> preferred mode fails at 24bpp and fall back to 16bpp.  I don't think
->> either of those does so today, though.
->>
->> Interested in tackling any of these?
+On Thu, Jan 25, 2018 at 4:51 AM, Jolly Shah <jolly.shah@xilinx.com> wrote:
+> This patch is adding communication layer with firmware.
+> Firmware driver provides an interface to firmware APIs.
+> Interface APIs can be used by any driver to communicate to
+> PMUFW(Platform Management Unit). All requests go through ATF.
 >
-> I tried the pl111_display_check() version. It just made the driver
-> fail to initialize anything, at least when using the dumb VGA
-> bridge.
+> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> ---
+<snip>
 >
-> There are .mode_valid() callbacks on the bridges we use
-> (panel and dumb VGA) but neither uses it at the moment, hm.
-> I could just assign my own .mode_valid() callback to the bridge,
-> but it seems a bit fragile. But it's worth a hack, I'll try it.
->
-> I sent a sent of lesser controversial patches in the meantime,
-> and rebased this on top of those so we can deal with the
-> memory BW issue separately.
 
-The memory-bandwidth field is in the pl111 binding, so I do think we
-should handle it there.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/c5e8b0cf/attachment.sig>
+> +/**
+> + * zynqmp_pm_clock_enable - Enable the clock for given id
+> + * @clock_id:  ID of the clock to be enabled
+
+Does it enable all the parents also if they are disabled?
+
+> + *
+> + * This function is used by master to enable the clock
+> + * including peripherals and PLL clocks.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+> +static int zynqmp_pm_clock_enable(u32 clock_id)
+> +{
+> +       return invoke_pm_fn(PM_CLOCK_ENABLE, clock_id, 0, 0, 0, NULL);
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_disable - Disable the clock for given id
+> + * @clock_id:  ID of the clock to be disable
+> + *
+> + * This function is used by master to disable the clock
+> + * including peripherals and PLL clocks.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+> +static int zynqmp_pm_clock_disable(u32 clock_id)
+> +{
+> +       return invoke_pm_fn(PM_CLOCK_DISABLE, clock_id, 0, 0, 0, NULL);
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_getstate - Get the clock state for given id
+> + * @clock_id:  ID of the clock to be queried
+> + * @state:     1/0 (Enabled/Disabled)
+> + *
+> + * This function is used by master to get the state of clock
+> + * including peripherals and PLL clocks.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+> +static int zynqmp_pm_clock_getstate(u32 clock_id, u32 *state)
+> +{
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +
+> +       ret = invoke_pm_fn(PM_CLOCK_GETSTATE, clock_id, 0, 0, 0, ret_payload);
+> +       *state = ret_payload[1];
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_setdivider - Set the clock divider for given id
+> + * @clock_id:  ID of the clock
+> + * @div_type:  TYPE_DIV1: div1
+> + *             TYPE_DIV2: div2
+div type didnt see in the signature.
+
+
+
+> + * @divider:   divider value.
+> + *
+> + * This function is used by master to set divider for any clock
+> + * to achieve desired rate.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+> +static int zynqmp_pm_clock_setdivider(u32 clock_id, u32 divider)
+> +{
+> +       return invoke_pm_fn(PM_CLOCK_SETDIVIDER, clock_id, divider, 0, 0, NULL);
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_getdivider - Get the clock divider for given id
+> + * @clock_id:  ID of the clock
+> + * @div_type:  TYPE_DIV1: div1
+> + *             TYPE_DIV2: div2
+didnt see this  below.
+
+> + * @divider:   divider value.
+> + *
+> + * This function is used by master to get divider values
+> + * for any clock.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+> +static int zynqmp_pm_clock_getdivider(u32 clock_id, u32 *divider)
+> +{
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +
+> +       ret = invoke_pm_fn(PM_CLOCK_GETDIVIDER, clock_id, 0, 0, 0, ret_payload);
+> +       *divider = ret_payload[1];
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_setrate - Set the clock rate for given id
+> + * @clock_id:  ID of the clock
+> + * @rate:      rate value in hz
+> + *
+> + * This function is used by master to set rate for any clock.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+So this can set rate only 4G max ?
+
+> +static int zynqmp_pm_clock_setrate(u32 clock_id, u32 rate)
+> +{
+> +       return invoke_pm_fn(PM_CLOCK_SETRATE, clock_id, rate, 0, 0, NULL);
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_getrate - Get the clock rate for given id
+> + * @clock_id:  ID of the clock
+> + * @rate:      rate value in hz
+> + *
+> + * This function is used by master to get rate
+> + * for any clock.
+> + *
+> + * Return:     Returns status, either success or error+reason.
+> + */
+Same question here?
+
+> +static int zynqmp_pm_clock_getrate(u32 clock_id, u32 *rate)
+> +{
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +
+> +       ret = invoke_pm_fn(PM_CLOCK_GETRATE, clock_id, 0, 0, 0, ret_payload);
+> +       *rate = ret_payload[1];
+> +
+> +       return ret;
+> +}
+> +
+Also  what is the difference between set rate and set divider?
