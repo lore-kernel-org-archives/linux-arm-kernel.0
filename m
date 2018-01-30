@@ -1,39 +1,33 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 30 Jan 2018 18:46:55 +0100
-Subject: [PATCH v5 5/6] arm: dts: sun8i: a83t: bananapi-m3: Enable IR
- controller
+Date: Tue, 30 Jan 2018 18:46:56 +0100
+Subject: [PATCH v5 6/6] arm: dts: sun8i: h3-h5: ir register size should be the
+ whole memory block
 In-Reply-To: <20180130174656.10657-1-embed3d@gmail.com>
 References: <20180130174656.10657-1-embed3d@gmail.com>
-Message-ID: <20180130174656.10657-6-embed3d@gmail.com>
+Message-ID: <20180130174656.10657-7-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M3 has an onboard IR receiver.
-This enables the onboard IR receiver subnode.
-Unlike the other IR receivers this one needs a base clock frequency
-of 3000000 Hz (3 MHz), to be able to work.
+The size of the register should be the size of the whole memory block,
+not just the registers, that are needed.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 6550bf0e594b..26c015fd4f4d 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -145,6 +145,11 @@
- 	status = "okay";
- };
- 
-+&r_cir {
-+	clock-frequency = <3000000>;
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 7a83b15225c7..22f6e126b8df 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -712,7 +712,7 @@
+ 			clock-names = "apb", "ir";
+ 			resets = <&r_ccu RST_APB0_IR>;
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+-			reg = <0x01f02000 0x40>;
++			reg = <0x01f02000 0x400>;
+ 			status = "disabled";
+ 		};
  
 -- 
 2.11.0
