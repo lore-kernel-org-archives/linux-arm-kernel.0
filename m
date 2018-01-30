@@ -1,86 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 30 Jan 2018 12:38:35 +0000
-Subject: [PATCH v2 10/16] arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP
- hardening support
-In-Reply-To: <20180129174559.1866-11-marc.zyngier@arm.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-11-marc.zyngier@arm.com>
-Message-ID: <748db3f9-bf6c-17d6-ff92-e814ec06aa20@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 30 Jan 2018 13:42:05 +0100
+Subject: [PATCH 2/3] KVM: arm/arm64: Fix userspace_irqchip_in_use counting
+In-Reply-To: <20180130124206.12262-1-christoffer.dall@linaro.org>
+References: <20180130124206.12262-1-christoffer.dall@linaro.org>
+Message-ID: <20180130124206.12262-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 17:45, Marc Zyngier wrote:
-> A new feature of SMCCC 1.1 is that it offers firmware-based CPU
-> workarounds. In particular, SMCCC_ARCH_WORKAROUND_1 provides
-> BP hardening for CVE-2017-5715.
-> 
-> If the host has some mitigation for this issue, report that
-> we deal with it using SMCCC_ARCH_WORKAROUND_1, as we apply the
-> host workaround on every guest exit.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   include/linux/arm-smccc.h |  5 +++++
->   virt/kvm/arm/psci.c       | 17 +++++++++++++++--
->   2 files changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> index dc68aa5a7261..e1ef944ef1da 100644
-> --- a/include/linux/arm-smccc.h
-> +++ b/include/linux/arm-smccc.h
-> @@ -73,6 +73,11 @@
->   			   ARM_SMCCC_SMC_32,				\
->   			   0, 1)
->   
-> +#define ARM_SMCCC_ARCH_WORKAROUND_1					\
-> +	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-> +			   ARM_SMCCC_SMC_32,				\
-> +			   0, 0x8000)
-> +
->   #ifndef __ASSEMBLY__
->   
->   #include <linux/linkage.h>
-> diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-> index a021b62ed762..5677d16abc71 100644
-> --- a/virt/kvm/arm/psci.c
-> +++ b/virt/kvm/arm/psci.c
-> @@ -407,14 +407,27 @@ static int kvm_psci_call(struct kvm_vcpu *vcpu)
->   int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
->   {
->   	u32 func_id = smccc_get_function(vcpu);
-> -	u32 val;
-> +	u32 val, feature;
->   
->   	switch (func_id) {
->   	case ARM_SMCCC_VERSION_FUNC_ID:
->   		val = ARM_SMCCC_VERSION_1_1;
->   		break;
->   	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
-> -		val = -1;	/* Nothing supported yet */
+We were not decrementing the static key count in the right location.
+kvm_arch_vcpu_destroy() is only called to clean up after a failed
+VCPU create attempt, whereas kvm_arch_vcpu_free() is called on teardown
+of the VM as well.  Move the static key decrement call to
+kvm_arch_vcpu_free().
 
-Conceptually, might it still make sense to initialise val to 
-NOT_SUPPORTED here, then overwrite it if and when a feature actually is 
-present? It would in this case save a few lines as well, but I know 
-multiple assignment can be one of those religious issues, so I'm not too 
-fussed either way.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arm.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Robin.
-
-> +		feature = smccc_get_arg1(vcpu);
-> +		switch(feature) {
-> +#ifdef CONFIG_ARM64
-> +		case ARM_SMCCC_ARCH_WORKAROUND_1:
-> +			if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR))
-> +				val = 0;
-> +			else
-> +				val = -1;
-> +			break;
-> +#endif
-> +		default:
-> +			val = -1;
-> +			break;
-> +		}
->   		break;
->   	default:
->   		return kvm_psci_call(vcpu);
-> 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 639dca0c0560..04ee7a327870 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -295,6 +295,9 @@ void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
+ 
+ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ {
++	if (vcpu->arch.has_run_once && unlikely(!irqchip_in_kernel(vcpu->kvm)))
++		static_branch_dec(&userspace_irqchip_in_use);
++
+ 	kvm_mmu_free_memory_caches(vcpu);
+ 	kvm_timer_vcpu_terminate(vcpu);
+ 	kvm_pmu_vcpu_destroy(vcpu);
+@@ -304,8 +307,6 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ 
+ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+ {
+-	if (vcpu->arch.has_run_once && unlikely(!irqchip_in_kernel(vcpu->kvm)))
+-		static_branch_dec(&userspace_irqchip_in_use);
+ 	kvm_arch_vcpu_free(vcpu);
+ }
+ 
+-- 
+2.14.2
