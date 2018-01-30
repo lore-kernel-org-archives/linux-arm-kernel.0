@@ -1,101 +1,30 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Jan 2018 11:31:48 +0000
-Subject: [PATCH 2/5] drm: add ARM flush implementation
-In-Reply-To: <20180130101436.GK25930@phenom.ffwll.local>
-References: <20180124025606.3020-2-gurchetansingh@chromium.org>
- <20180130101436.GK25930@phenom.ffwll.local>
-Message-ID: <20180130113147.GD9418@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 30 Jan 2018 11:32:38 +0000
+Subject: [PATCH] sound/tlv320dac33: Add device tree support
+In-Reply-To: <20180130085314.GA4585@amd>
+References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
+ <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
+ <20180130085314.GA4585@amd>
+Message-ID: <20180130113238.GA10525@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 11:14:36AM +0100, Daniel Vetter wrote:
-> On Tue, Jan 23, 2018 at 06:56:03PM -0800, Gurchetan Singh wrote:
-> > The dma_cache_maint_page function is important for cache maintenance on
-> > ARM32 (this was determined via testing).
-> > 
-> > Since we desire direct control of the caches in drm_cache.c, let's make
-> > a copy of the function, rename it and use it.
-> > 
-> > v2: Don't use DMA API, call functions directly (Daniel)
-> > 
-> > Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
-> 
-> fwiw, in principle, this approach has my Ack from the drm side.
-> 
-> But if we can't get any agreement from the arch side then I guess we'll
-> just have to suck it up and mandate that any dma-buf on ARM32 must be wc
-> mapped, always. Not sure that's a good idea either, but should at least
-> get things moving.
+On Tue, Jan 30, 2018 at 09:53:14AM +0100, Pavel Machek wrote:
 
-Let me expand on my objection, as I find your tone to be problematical
-here.
+> Well, notice I'm converting existing driver to device tree. And that
+> one already has GPIO dependency. It is possible that more work needs
+> to be done there, but that should not be a reason to delay this. Feel
+> free to help.
 
-The patch 2 (which is the earliest patch in this series) makes use of
-facilities such as dmac_map_area(), and those are defined as macros in
-arch/arm/mm/mm.h.  I see no way that drm_cache.c can pick up on that
-_unless_ there's another patch (maybe that's patch 1) which moves the
-definition.
-
-dmac_map_area() is non-trivial to export (it's not a function, it's
-macro which either points to a function or a function pointer structure
-member) so it's likely that this patch also breaks building DRM as a
-module.
-
-We've been here before with drivers abusing the architecture private APIs,
-which is _exactly_ why dmac_map_area() is defined in arch/arm/mm.h and not
-in some kernel-wide asm header file - it's an implementation detail of the
-architectures DMA API that drivers have no business mucking about with.
-
-I've always said if the interfaces don't do what you want, talk to
-architecture people, don't go poking about in architecture private parts
-of the kernel and start abusing stuff.  I say this because years ago, we
-had people doing _exactly_ that for the older virtually cached ARMs.  Then
-ARMv6 came along, which needed an entire revamp of the architecture cache
-interfaces, and lo and behold, drivers got broken because of this kind of
-abuse.  IOW, abusing interfaces makes kernel maintenance harder.
-
-For example, interfaces designed for flushing the cache when page tables
-get torn down were abused in drivers to flush data for DMA or coherency
-purposes, which meant that on ARMv6, where we no longer needed to flush
-for page table maintenance, suddenly the interfaces that drivers were
-using became no-ops.
-
-In this case, dmac_map_area() exists to perform any cache maintenance
-for the kernel view of that memory required for a non-coherent DMA
-mapping.  What it does depends on the processsor and the requested
-DMA_xxx type - it _may_ invalidate (discard) or clean (writeback but
-leave in the cache) cache lines, or do nothing.
-
-dmac_unmap_area() has the same issues - what it does depends on what
-operation is being requested and what the processor requires to
-achieve coherency.
-
-The two functions are designed to work _together_, dmac_map_area()
-before the DMA operation and dmac_unmap_area() after the DMA operation.
-Only when they are both used together do you get the correct behaviour.
-
-These functions are only guaranteed to operate on the kernel mapping
-passed in as virtual addresses to the dmac_* functions.  They make no
-guarantees about other mappings of the same memory elsewhere in the
-system, which, depending on the architecture of the caches, may also
-contain dirty cache lines (the same comment applies to the DMA API too.)
-On certain cache architectures (VIPT) where colouring effects apply,
-flushing the kernel mapping may not even be appropriate if the desired
-effect is to flush data from a user mapping.
-
-This is exactly why abusing APIs (like what is done in this patch) is
-completely unacceptable from the architecture point of view - while
-it may _appear_ to work, it may only work for one class of CPU or one
-implementation.
-
-Hence why the dmac_{un,}map_area() interfaces are not exported to
-drivers.  You can't just abuse one of them.  They are a pair that
-must be used together, and the DMA API knows that, and the DMA API
-requirements ensure that happens.  It's not really surprising, these
-functions were written to support the DMA API, and the DMA API is
-the kernel-wide interface to these functions.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+No, it's a very good reason to delay merging something.  A DT binding is
+an ABI so we need to sort out interface issues and describe things as
+well as we can, with board files it's not an ABI so we can just do any
+old thing that happens to work and while it might not be ideal it
+doesn't really matter since we can change it later if we need to.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/44c7a5d7/attachment.sig>
