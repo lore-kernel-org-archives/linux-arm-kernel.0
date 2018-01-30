@@ -1,28 +1,29 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue, 30 Jan 2018 19:32:54 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun4i: Enable HDMI support on the MK802
-Message-ID: <20180130183254.20529-1-codekipper@gmail.com>
+Date: Tue, 30 Jan 2018 19:33:27 +0100
+Subject: [linux-sunxi][PATCH] ARM: sun6i: a31: Enable HDMI support on the Mele
+ I7
+Message-ID: <20180130183327.20825-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Enable the display pipeline and HDMI output.
+The Mele I7 has an HDMI connector wired to the HDMI pins
+on the SoC. Enable the display pipeline and HDMI output.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-mk802.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-i7.dts | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-index 7198b34e2e50..982a704d5663 100644
---- a/arch/arm/boot/dts/sun4i-a10-mk802.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
-@@ -56,12 +56,27 @@
- 	chosen {
+diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
+index 010a84c7c012..4f69be4988a5 100644
+--- a/arch/arm/boot/dts/sun6i-a31-i7.dts
++++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
+@@ -58,6 +58,17 @@
  		stdout-path = "serial0:115200n8";
  	};
-+
+ 
 +	hdmi-connector {
 +		compatible = "hdmi-connector";
 +		type = "a";
@@ -33,9 +34,11 @@ index 7198b34e2e50..982a704d5663 100644
 +			};
 +		};
 +	};
- };
- 
- &codec {
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -93,6 +104,10 @@
  	status = "okay";
  };
  
@@ -46,7 +49,7 @@ index 7198b34e2e50..982a704d5663 100644
  &ehci0 {
  	status = "okay";
  };
-@@ -70,6 +85,16 @@
+@@ -101,6 +116,16 @@
  	status = "okay";
  };
  
@@ -60,8 +63,19 @@ index 7198b34e2e50..982a704d5663 100644
 +	};
 +};
 +
- &mmc0 {
- 	vmmc-supply = <&reg_vcc3v3>;
- 	bus-width = <4>;
+ &gmac {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&gmac_pins_mii_a>;
+@@ -161,6 +186,10 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.16.1
