@@ -1,54 +1,73 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 30 Jan 2018 14:18:45 +0530
-Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
- sdm845 SoC and MTP
-In-Reply-To: <CAE=gft7hEc1GGJeYk0LRq1FAZyZhujfPWAnc=y+-HLzLKbVgtw@mail.gmail.com>
-References: <20180125163216.29018-1-rnayak@codeaurora.org>
- <20180125163216.29018-2-rnayak@codeaurora.org>
- <CAE=gft7hEc1GGJeYk0LRq1FAZyZhujfPWAnc=y+-HLzLKbVgtw@mail.gmail.com>
-Message-ID: <201dcf54-768d-6928-5997-94157e6adb98@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Jan 2018 09:53:14 +0100
+Subject: [PATCH] sound/tlv320dac33: Add device tree support
+In-Reply-To: <20180130083446.GA13498@lenoch>
+References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
+ <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
+Message-ID: <20180130085314.GA4585@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue 2018-01-30 09:34:46, Ladislav Michl wrote:
+> On Tue, Jan 30, 2018 at 12:33:01AM +0100, Pavel Machek wrote:
+> > On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
+> > > On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
+> > > > 
+> > > > This adds device tree support to tlv320dac33.c.
+> > > > 
+> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> > > > new file mode 100644
+> > > > index 0000000..6cbd311
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> > > > @@ -0,0 +1,32 @@
+> > > > +Texas Instruments - tlv320dac33 Codec module
+> > > > +
+> > > > +The tlv320dac33 serial control bus communicates through I2C protocols.
+> > > > +
+> > > > +Required properties:
+> > > > +
+> > > > +- compatible - "ti,tlv320dac33"
+> > > > +- reg - I2C slave address
+> > > > +
+> > > > +Optional properties:
+> > > > +
+> > > > +- power-gpios - gpio pin to power the device, active high
+> > > 
+> > > While driver used gpio in platform data, isn't it more likely
+> > > regulator which powers device?
+> > 
+> >                 power-gpios = <&gpio2 28 0>; /* gpio_60 */
+> > 
+> > Looks like GPIO to me -- example is from Nokia N9. So this appears to
+> > be correct.
+> 
+> Device datasheet doesn't list any pin which looks like "power-gpio"
+> http://www.ti.com/lit/ds/symlink/tlv320dac32.pdf
+> Unfortunately I do not know much about N9, but was able to find Nokia 5610
+> scheme to get clue how could be tlv320dac33 hardwired (see page 2):
+> http://mastermobile.spb.ru/service/nokia_5610_rm-242_service_schematics.pdf
+> Here AVDD is powered by LP3985 voltage regulator which is enabled using
+> VEN pin which might be connected to gpio. Or there could be completely
+> different voltage regulator with different controls. And since Linux
+> already has voltage regulator class, lets not limit ourselves to gpio
+> pins.
 
-On 01/27/2018 02:01 AM, Evan Green wrote:
-> Hi Rajendra,
-> 
-> On Thu, Jan 25, 2018 at 8:32 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->> Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
->>
->> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
->> ---
->>  arch/arm64/boot/dts/qcom/Makefile        |   1 +
->>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts  |  13 ++
->>  arch/arm64/boot/dts/qcom/sdm845-mtp.dtsi |  11 ++
->>  arch/arm64/boot/dts/qcom/sdm845.dtsi     | 308 +++++++++++++++++++++++++++++++
->>  4 files changed, 333 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dtsi
->>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
->> index 55ec5ee7f7e8..c57701bed084 100644
->> --- a/arch/arm64/boot/dts/qcom/Makefile
->> +++ b/arch/arm64/boot/dts/qcom/Makefile
->> @@ -6,3 +6,4 @@ dtb-$(CONFIG_ARCH_QCOM) += msm8916-mtp.dtb
->>  dtb-$(CONFIG_ARCH_QCOM)        += msm8992-bullhead-rev-101.dtb
->>  dtb-$(CONFIG_ARCH_QCOM)        += msm8994-angler-rev-101.dtb
->>  dtb-$(CONFIG_ARCH_QCOM)        += msm8996-mtp.dtb
->> +dtb-$(CONFIG_ARCH_QCOM) += sdm845-mtp.dtb
-> 
-> Minor nit: This should be a tab before the += to be consistent.
+Well, notice I'm converting existing driver to device tree. And that
+one already has GPIO dependency. It is possible that more work needs
+to be done there, but that should not be a reason to delay this. Feel
+free to help.
 
-thanks, will fix when I respin.
-
-> 
-> (Unfortunately I don't have the expertise quite yet to comment on the
-> rest of this).
-> 
-> -Evan
-> 
-
+									Pavel
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/b3e457c9/attachment-0001.sig>
