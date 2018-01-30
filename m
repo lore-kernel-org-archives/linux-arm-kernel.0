@@ -1,58 +1,101 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Jan 2018 11:08:18 -0600
-Subject: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
- firmware
-In-Reply-To: <1516836074-4149-2-git-send-email-jollys@xilinx.com>
-References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
- <1516836074-4149-2-git-send-email-jollys@xilinx.com>
-Message-ID: <20180130170818.tz4hoqvyekrl7uio@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jan 2018 17:27:56 +0000
+Subject: [PATCH v3 1/6] arm: Add BTB invalidation on switch_mm for
+ Cortex-A9, A12 and A17
+In-Reply-To: <1e81134a-c88f-1764-a193-24e55eb43819@gmail.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-2-marc.zyngier@arm.com>
+ <1e81134a-c88f-1764-a193-24e55eb43819@gmail.com>
+Message-ID: <fc094bd7-098d-f7d2-7fd0-78871e73a4c2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 24, 2018 at 03:21:11PM -0800, Jolly Shah wrote:
-> Add documentation to describe Xilinx ZynqMP firmware driver
-> bindings. Firmware driver provides an interface to firmware
-> APIs. Interface APIs can be used by any driver to communicate
-> to PMUFW (Platform Management Unit).
+On 26/01/18 20:44, Florian Fainelli wrote:
+> On 01/25/2018 07:21 AM, Marc Zyngier wrote:
+>> In order to avoid aliasing attacks against the branch predictor,
+>> some implementations require to invalidate the BTB when switching
+>> from one user context to another.
+>>
+>> For this, we reuse the existing implementation for Cortex-A8, and
+>> apply it to A9, A12 and A17.
 > 
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> ---
->  .../bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt    | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+> Should this read: and apply it to A8, A9, A12 and A17
+
+A8 already has a BTB invalidation there. We are expanding the use of
+that function to other v7 cores. Or am I missing something obvious?
+
 > 
-> diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> new file mode 100644
-> index 0000000..a7aaf56
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> @@ -0,0 +1,16 @@
-> +Xilinx Zynq MPSoC Firmware Device Tree Bindings
-> +
-> +The zynqmp-firmware node describes the interface to platform firmware.
-
-Please define this a is child of /firmware.
-
-Also, some brief summary of what functions the firmware provides would 
-be nice.
-
-> +
-> +Required properties:
-> + - compatible:	Must contain:  "xlnx,zynqmp-firmware"
-> + - method:	The method of calling the PM-API firmware layer.
-> +		Permitted values are:
-> +		 - "smc" : To be used in configurations without a hypervisor
-> +		 - "hvc" : To be used when hypervisor is present
-
-Do you really need to support hvc?
-
-> +
-> +Examples:
-> +	zynqmp_firmware: zynqmp-firmware {
-> +		compatible = "xlnx,zynqmp-firmware";
-> +		method = "smc";
-> +	};
-> -- 
-> 2.7.4
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/mm/proc-v7-2level.S |  4 ++--
+>>  arch/arm/mm/proc-v7-3level.S |  6 ++++++
+>>  arch/arm/mm/proc-v7.S        | 30 +++++++++++++++---------------
+>>  3 files changed, 23 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+>> index c6141a5435c3..0422e58b74e8 100644
+>> --- a/arch/arm/mm/proc-v7-2level.S
+>> +++ b/arch/arm/mm/proc-v7-2level.S
+>> @@ -41,7 +41,7 @@
+>>   *	even on Cortex-A8 revisions not affected by 430973.
+>>   *	If IBE is not set, the flush BTAC/BTB won't do anything.
+>>   */
+>> -ENTRY(cpu_ca8_switch_mm)
+>> +ENTRY(cpu_v7_btbinv_switch_mm)
+>>  #ifdef CONFIG_MMU
+>>  	mov	r2, #0
+>>  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+>> @@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
+>>  #endif
+>>  	bx	lr
+>>  ENDPROC(cpu_v7_switch_mm)
+>> -ENDPROC(cpu_ca8_switch_mm)
+>> +ENDPROC(cpu_v7_btbinv_switch_mm)
+>>  
+>>  /*
+>>   *	cpu_v7_set_pte_ext(ptep, pte)
+>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>> index 7d16bbc4102b..934272e1fa08 100644
+>> --- a/arch/arm/mm/proc-v7-3level.S
+>> +++ b/arch/arm/mm/proc-v7-3level.S
+>> @@ -54,6 +54,11 @@
+>>   * Set the translation table base pointer to be pgd_phys (physical address of
+>>   * the new TTB).
+>>   */
+>> +ENTRY(cpu_v7_btbinv_switch_mm)
+>> +#ifdef CONFIG_MMU
+>> +	mov	r2, #0
+>> +	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
+>> +#endif
+>>  ENTRY(cpu_v7_switch_mm)
+>>  #ifdef CONFIG_MMU
+>>  	mmid	r2, r2
+>> @@ -64,6 +69,7 @@ ENTRY(cpu_v7_switch_mm)
+>>  #endif
+>>  	ret	lr
+>>  ENDPROC(cpu_v7_switch_mm)
+>> +ENDPROC(cpu_v7_btbinv_switch_mm)
+>>  
+>>  #ifdef __ARMEB__
+>>  #define rl r3
+>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>> index 01d64c0b2563..0a14967fd400 100644
+>> --- a/arch/arm/mm/proc-v7.S
+>> +++ b/arch/arm/mm/proc-v7.S
+>> @@ -159,18 +159,18 @@ ENDPROC(cpu_v7_do_resume)
+>>  #endif
+>>  
+>>  /*
+>> - * Cortex-A8
+>> + * Cortex-A8/A12/A17 that require a BTB invalidation on switch_mm
 > 
+> Should this read Cortex-A8/A9/A12/A17?
+
+Indeed, I missed our dear A9 friend.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
