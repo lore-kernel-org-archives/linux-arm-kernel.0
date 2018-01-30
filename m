@@ -1,64 +1,125 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 30 Jan 2018 14:56:37 +0000
-Subject: [PATCH 05/16] arm64: Add flags to check the safety of a
- capability for late CPU
-In-Reply-To: <6313a0f1-ed3c-b5b3-7bbd-5f98862a74c6@arm.com>
+Date: Tue, 30 Jan 2018 15:06:24 +0000
+Subject: [PATCH 08/16] arm64: capabilities: Group handling of features
+ and errata
+In-Reply-To: <b52a705d-67b3-5d46-007e-3eb48d824ec0@arm.com>
 References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-6-suzuki.poulose@arm.com>
- <20180126101020.GM5862@e103592.cambridge.arm.com>
- <6313a0f1-ed3c-b5b3-7bbd-5f98862a74c6@arm.com>
-Message-ID: <20180130145636.GE5862@e103592.cambridge.arm.com>
+ <20180123122809.16269-9-suzuki.poulose@arm.com>
+ <20180126114708.GP5862@e103592.cambridge.arm.com>
+ <cdd7ab66-9d9e-286d-cb39-c1684bde9c19@arm.com>
+ <20180129171410.GB5862@e103592.cambridge.arm.com>
+ <b52a705d-67b3-5d46-007e-3eb48d824ec0@arm.com>
+Message-ID: <20180130150623.GF5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 11:17:38AM +0000, Suzuki K Poulose wrote:
-> On 26/01/18 10:10, Dave Martin wrote:
-> >On Tue, Jan 23, 2018 at 12:27:58PM +0000, Suzuki K Poulose wrote:
-> >>Add two different flags to indicate if the conflict of a capability
-> >>on a late CPU with the current system state
+On Mon, Jan 29, 2018 at 05:22:26PM +0000, Suzuki K Poulose wrote:
+> On 29/01/18 17:14, Dave Martin wrote:
+> >On Fri, Jan 26, 2018 at 12:31:18PM +0000, Suzuki K Poulose wrote:
+> >>On 26/01/18 11:47, Dave Martin wrote:
+> >>>On Tue, Jan 23, 2018 at 12:28:01PM +0000, Suzuki K Poulose wrote:
+> >>>>So far we have had separate routes for triggering errata and feature
+> >>>
+> >>>"triggering errata" ? ;)
+> >>>
 > >>
-> >>  1) Can a CPU have a capability when the system doesn't have it ?
+> >>:-). Should have been "triggering errata and feature capability *checks*.
 > >>
-> >>     Most arm64 features could have this set. While erratum work arounds
-> >>     cannot have this, as we may miss work arounds.
+> >>>Maybe "[...] for determining whether to activate errata workarounds and
+> >>>whether to enable feature capabilities."
+> >>>
 > >>
-> >>  2) Can a CPU miss a capability when the system has it ?
-> >>     This could be set for arm64 erratum work arounds as we don't
-> >>     care if a CPU doesn't need the work around. However it should
-> >>     be clear for features.
 > >>
-> >>These flags could be added to certain entries based on their nature.
+> >>>>capabilities. Also, we never allowed "features" based on local CPU
+> >>>>and "errata" based on System wide safe registers. This patch
+> >>>>groups the handling of errata and features and also allows them
+> >>>>to have all the possible scopes.
+> >>>>
+> >>>>So, we now run through the arm64_features and arm64_errata:
+> >>>
+> >>>when?
 > >>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> >>  arch/arm64/include/asm/cpufeature.h | 35 +++++++++++++++++++++++++++++++----
-> >>  1 file changed, 31 insertions(+), 4 deletions(-)
-> >>
-> >>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> >>index 4fd5de8ef33e..27d037bb0451 100644
-> >>--- a/arch/arm64/include/asm/cpufeature.h
-> >>+++ b/arch/arm64/include/asm/cpufeature.h
-> >>@@ -94,10 +94,25 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
-> >>  #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
-> >>  #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
-> >>-/* CPU errata detected at boot time based on feature of one or more CPUs */
-> >>-#define ARM64_CPUCAP_STRICT_CPU_LOCAL_ERRATUM	(ARM64_CPUCAP_SCOPE_LOCAL_CPU)
-> >>-/* CPU feature detected at boot time based on system-wide value of a feature */
-> >>-#define ARM64_CPUCAP_BOOT_SYSTEM_FEATURE	(ARM64_CPUCAP_SCOPE_SYSTEM)
-> >>+/* Is it safe for a late CPU to have this capability when system doesn't already have */
-> >>+#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_HAVE	BIT(2)
-> >>+/* Is it safe for a late CPU to miss this capability when system has it */
-> >>+#define ARM64_CPUCAP_LATE_CPU_SAFE_TO_MISS	BIT(3)
+> >>with this patch.
 > >
-> >Maybe _OPTIONAL and _PERMITTED would be a bit less verbose?
-> >
-> >Alternatively,
-> >	ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU
-> >	ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU
+> >I mean, when at runtime?
 > 
-> Sounds better than what I have. I have picked them up.
+> Sorry, I thought that was evident from the comment below :
 
-Cool, I had resigned myself to probably not winning that one ;)
+Sort of, but you talk about things being done on boot-time enabled CPUs,
+rather than saying the check actually happens at boot time.  The
+description isn't wrong, but I just ended up a bit unsure about exactly
+what was being guaranteed.
+
+My confusion was partly due to my understanding of the code still being
+incomplete when I responsed to this patch.
+
+
+Maybe say "we run through arm64_features and arm64_errata in two phases
+during the boot process"
+
+> 
+> >
+> >>>What about late cpus?
+> >>>
+> >>
+> >>We don't detect any new capabilities on them. They continue to get
+> >>verified against the enabled capabilities.
+
+If this patch doesn't intentionally change what happens for late CPUs
+after kernel boot, but nonetheless does unifiy the errata/feature
+verification code for late CPUs then this may also be worth noting here.
+
+> >>
+> >>>>  1) with SCOPE_LOCAL_CPU filter on each boot time enabeld CPUs,
+> >>>>     via update_cpu_local_capabilities().
+> 
+> Here ^^.  Earlier we ran only through the errata list. But now, we
+> run through errata and the features, using a type filter of SCOPE_LOCAL_CPU.
+> 
+> It also said :
+> 
+>   2) with SCOPE_SYSTEM filter only once after all boot time enabled
+>     CPUs are active.
+> 
+> (2) happens from setup_cpu_features(), just like it was done earlier, but
+> with a filter of SCOPE_SYSTEM.
+> 
+> >>>
+> >>>"each [...] enabeld CPUs" -> "each [...] enabled CPU"
+> >>>
+> >>>Also, changing "boot time" -> "boot-time" helps avoid this being misread
+> >>>as "on each boot", which could be taken to mean "each time a CPU comes
+> >>>online".  I'm guessing that's not the intended meaning here.
+> >>
+> 
+> >>>
+> >>>   }
+> >>>>  DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+> >>>>@@ -1422,9 +1435,7 @@ void __init setup_cpu_features(void)
+> >>>>  	u32 cwg;
+> >>>>  	int cls;
+> >>>>-	/* Set the CPU feature capabilies */
+> >>>>-	setup_feature_capabilities();
+> >>>>-	enable_errata_workarounds();
+> >>>>+	setup_system_capabilities();
+> >>>>  	mark_const_caps_ready();
+> >>>>  	setup_elf_hwcaps(arm64_elf_hwcaps);
+> >>>
+> >>>I wonder whether we could unify the elf hwcaps handling too.
+> >>
+> >>I was thinking about it today. The only catch is how do we know
+> >>if we have "the capability", as it is spread across multiple bitmasks.
+> >>(HWCAP, COMPAT_HWCAP, COMPAT_HWCAP2).
+> >
+> >An easy-ish solution might be to maintain our own bitmap in the style
+> >of cpu_hwcaps, and set bits in parallel with the elf_hwcap etc. bits.
+> >Or, add a method that knows how to set/query the appropriate bit.
+> >
+> >I guess we could do this later.  It's certainly not urgent.
+> 
+> Yes, I understand.
+
+OK, cool
 
 Cheers
 ---Dave
