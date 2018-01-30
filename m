@@ -1,108 +1,78 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 30 Jan 2018 19:18:57 +0000
-Subject: [PATCH v6 11/13] KVM: arm64: Handle RAS SErrors from EL1 on guest
- exit
-In-Reply-To: <20180123153245.GN21802@cbox>
-References: <20180115193906.30053-1-james.morse@arm.com>
- <20180115193906.30053-12-james.morse@arm.com> <20180119192055.GH21802@cbox>
- <5A662B0E.7060305@arm.com> <20180123153245.GN21802@cbox>
-Message-ID: <5A70C521.2020903@arm.com>
+Date: Tue, 30 Jan 2018 19:19:18 +0000
+Subject: [PATCH v5 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <1516969885-150532-2-git-send-email-xiexiuqi@huawei.com>
+References: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
+ <1516969885-150532-2-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <5A70C536.7040208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Xie XiuQi,
 
-On 23/01/18 15:32, Christoffer Dall wrote:
-> On Mon, Jan 22, 2018 at 06:18:54PM +0000, James Morse wrote:
->> On 19/01/18 19:20, Christoffer Dall wrote:
->>> On Mon, Jan 15, 2018 at 07:39:04PM +0000, James Morse wrote:
->>>> If only some of the CPUs support RAS the guest will see the cpufeature
->>>> sanitised version of the id registers, but we may still take RAS SError
->>>> on this CPU. Move the SError handling out of handle_exit() into a new
->>>> handler that runs before we can be preempted. This allows us to use
->>>> this_cpu_has_cap(), via arm64_is_ras_serror().
->>>
->>> Would it be possible to optimize this a bit later on by caching
->>> this_cpu_has_cap() in vcpu_load() so that we can use a single
->>> handle_exit function to process all exits?
->>
->> If vcpu_load() prevents pre-emption between the guest-exit exception and the
->> this_cpu_has_cap() test then we wouldn't need a separate handle_exit().
+On 26/01/18 12:31, Xie XiuQi wrote:
+> With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
+> are consumed. According to the existing process, errors occurred in the
+> kernel, leading to direct panic, if it occurred the user-space, we should
+> just kill process.
 > 
-> It doesn't, but you'd get another vcpu_put() / vcpu_load() if you get
-> preempted, and you could record anything you need to know about the CPU
-> that actually ran the guest in vcpu_put().
+> But there is a class of error, in fact, is not necessary to kill
+> process, you can recover and continue to run the process. Such as
+> the instruction data corrupted, where the memory page might be
+> read-only, which is has not been modified, the disk might have the
+> correct data, so you can directly drop the page, ant reload it when
+> necessary.
 
-Snazzy!
-
-> So it might be possible to call some "process pending serror" function
-> in vcpu_put().
-
-Hmm, maybe. When we exit the guest its because we've had a notification an error
-occurred, but we don't know what/where yet. The case that worries me is we
-reschedule() onto some other affected task, and it gets notification of the
-error too.
-
-For notifications signalled by an SError I'd like to feed them into the RAS
-machinery before we unmask SError on the host, so that the first error is
-handled first. Otherwise KVM has to eyeball the SError ESR and guess as to
-whether the host is affected by the error, before re-enabling preemption on the
-grounds it 'probably only affects this guest'.
+With firmware-first support, we do all this...
 
 
->> But, if we support kernel-first RAS or firmware-first's NOTIFY_SEI we shouldn't
->> unmask SError until we've fed the guest-exit:SError into the RAS code. This
->> would also need the SError related handle_exit() calls to be separate/earlier.
->> (there was some verbiage on this in the cover letter).
+> So this patchset is just try to solve such problem: if the error is
+> consumed in user-space and the error occurs on a clean page, you can
+> directly drop the memory page without killing process.
 > 
-> Yeah, I sort-of understood where this was going...
+> If the corrupted page is clean, just dropped it and return to user-space
+> without side effects. And if corrupted page is dirty, memory_failure()
+> will send SIGBUS with code=BUS_MCEERR_AR. While without this patchset,
+> do_sea() will just send SIGBUS, so the process was killed in the same place.
 
-(sorry, I assume not everyone reads the cover letter!)
+... but this happens too. I agree its something we should fix, but I don't think
+this is the best way to do it.
 
-
->> (I started down the 'make handle_exit() non-preemptible', but WF{E,I}'s
->> kvm_vcpu_block()->schedule() and kvm_vcpu_on_spin()s use of kvm_vcpu_yield_to()
->> put an end to that).
-> 
-> It's not clear to me exactly how that would work, as handle_exit() can
-> also block on stuff like allocating memory.  
-
-Yes, it was a dead end. I figured two handle_exit()s was a bit ugly, I assumed
-you were asking about moving back to a single handle_exit()...
+This series is pulling the memory-failure-queue details back into the arch-code
+to build a second list, that gets processed as extra work when we return to
+user-space.
 
 
-> I suppose enabling
-> preemption could be per exit reason, but that might be hard to maintain.
+The root of the issue is ghes_notify_sea() claims the notification as something
+APEI has dealt with, ... but it hasn't done it yet. The signals will be
+generated by something currently stuck in a queue. (Evidently x86 doesn't handle
+synchronous errors like this using firmware-first).
+
+I think a smaller fix is to give the queues that may be holding the
+memory_failure() work a kick as part of the code that calls ghes_notify_sea().
+This means that by the time we return to do_sea() ghes_notify_sea()'s claim that
+APEI has dealt with it is true as any generated signals are pending. We can then
+skip the existing SIGBUS generation code.
 
 
->> In terms of caching this_cpu_has_cap() value, is this due to a performance
->> concern? It's all called behind 'exception_index == ARM_EXCEPTION_EL1_SERROR',
->> so we've already taken an SError out of the guest. Once its all put together
->> we're likely to have a pending signal for user-space.
->> 'Corrected' (or at least ignorable) errors are going to be the odd one out, I
->> don't think we should worry about these!
-> 
-> The performance concern is having to call another function to check the
-> return value again in the critical path.
+> Because memory_failure() may sleep, we can not call it directly in SEA
 
-My justification for this sort of thing has been we've taken an SError, we may
-panic() the host if its uncontained. Provided there is no extra cost on the 'no
-SError' path, I don't think the 'we've taken an SError' paths need to be fast.
+(this one is more serious, I've attempted to fix it by moving all NMI-like
+GHES-notifications to use the estatus queue).
 
 
-> On older implementations this
-> kind of thing is actually measureable, and there's a tendency to add a
-> call here and a call there for any new aspect of the architecture, and
-> it will eventually weigh things down, I believe.
+> exception context. So we saved faulting physical address associated with
+> a process in the ghes handler and set __TIF_SEA_NOTIFY. When we return
+> from SEA exception context and get into do_notify_resume() before the
+> process running, we could check it and call memory_failure() to do
+> recovery.
 
-I'll keep this in mind.
+> It's safe, because we are in process context.
 
-
-> On the other hand,having a "process some things before we enable preemption"
->  which is your handle_exit_early() function (could this also have been called
-> handle_exit_nopreempt() ?)
-
-Yes, and that would have been a better name!
+I think this is the trick. When we take a Synchronous-external-abort out of
+userspace, we're in process context too. We can add helpers to drain the
+memory_failure_queue which can be called when do_sea() when we know we're
+preemptible and interrupts-et-al are unmasked.
 
 
 Thanks,
@@ -110,5 +80,18 @@ Thanks,
 James
 
 
-> is a potentially generally useful thing to
-> have and a reasonable thing overall.
+[0] https://www.spinics.net/lists/linux-acpi/msg80149.html
+
+> ---
+>  arch/arm64/Kconfig                   |  11 +++
+>  arch/arm64/include/asm/ras.h         |  23 ++++++
+>  arch/arm64/include/asm/thread_info.h |   4 +-
+>  arch/arm64/kernel/Makefile           |   1 +
+>  arch/arm64/kernel/ras.c              | 142 +++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/signal.c           |   7 ++
+>  arch/arm64/mm/fault.c                |  27 +++++--
+>  drivers/acpi/apei/ghes.c             |   8 +-
+>  include/acpi/ghes.h                  |   3 +
+>  9 files changed, 216 insertions(+), 10 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/ras.h
+>  create mode 100644 arch/arm64/kernel/ras.c
