@@ -1,30 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 Jan 2018 23:21:45 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d4: fix pinctrl compatible string
-In-Reply-To: <20180118143847.15309-1-ludovic.desroches@microchip.com>
-References: <20180118143847.15309-1-ludovic.desroches@microchip.com>
-Message-ID: <20180130222145.GO2809@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 30 Jan 2018 22:39:36 +0000
+Subject: [GIT PULL] arm64 updates for 4.16
+In-Reply-To: <CA+55aFxwU54sa=b=kE0pCromBJAQRhYqCwkJZXy9vDqY2D=kJw@mail.gmail.com>
+References: <20180130192636.sctfdnedffxv7vmv@armageddon.cambridge.arm.com>
+ <CA+55aFxwU54sa=b=kE0pCromBJAQRhYqCwkJZXy9vDqY2D=kJw@mail.gmail.com>
+Message-ID: <20180130223935.rabtqvlvtqps53fg@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/2018 at 15:38:47 +0100, Ludovic Desroches wrote:
-> From: Santiago Esteban <Santiago.Esteban@microchip.com>
+On Tue, Jan 30, 2018 at 02:02:45PM -0800, Linus Torvalds wrote:
+> On Tue, Jan 30, 2018 at 11:26 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
 > 
-> The compatible string is incorrect. Add atmel,sama5d3-pinctrl since
-> it's the appropriate compatible string. Remove the
-> atmel,at91rm9200-pinctrl compatible string, this fallback is
-> useless, there are too many changes.
-> 
-> Signed-off-by: Santiago Esteban <Santiago.Esteban@microchip.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> Cc: stable at vger.kernel.org #v3.18
-> ---
->  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-Applied, thanks.
+> I got some fairly trivial conflicts on the merge, and I expect them to
+> be fine but since I don't do a build/boot test on arm64 somebody
+> should verify that.
+
+Sorry, I forgot to include my merge resolution with the pull request.
+Mainline looks fine.
+
+Thanks.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Catalin
