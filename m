@@ -1,54 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Jan 2018 13:48:36 +0000
-Subject: [BUG] perf, arm64, acpi: sleeping function called from invalid
- context
-In-Reply-To: <20180129173054.GD794@hc>
-References: <20180129173054.GD794@hc>
-Message-ID: <20180130134836.GC28882@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jan 2018 13:51:22 +0000
+Subject: [PATCH v2 13/16] firmware/psci: Expose SMCCC version through
+ psci_ops
+In-Reply-To: <c1fddec5-4d8a-5e43-470b-855b0dba705e@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-14-marc.zyngier@arm.com>
+ <c1fddec5-4d8a-5e43-470b-855b0dba705e@arm.com>
+Message-ID: <6bb72d9d-ac47-70c1-19a1-25d2bd477018@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan, [+LinusW, Lee]
-
-On Mon, Jan 29, 2018 at 06:30:54PM +0100, Jan Glauber wrote:
-> I'm seeing the following warning with 4.15 (and earlier) using ACPI & perf:
+On 30/01/18 12:55, Robin Murphy wrote:
+> On 29/01/18 17:45, Marc Zyngier wrote:
+>> Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
+>> let's do that at boot time, and expose the version of the calling
+>> convention as part of the psci_ops structure.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   drivers/firmware/psci.c | 21 +++++++++++++++++++++
+>>   include/linux/psci.h    |  6 ++++++
+>>   2 files changed, 27 insertions(+)
+>>
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index e9493da2b111..dd035aaa1c33 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -511,6 +511,26 @@ static void __init psci_init_migrate(void)
+>>   	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+>>   }
+>>   
+>> +static void __init psci_init_smccc(u32 ver)
+>> +{
+>> +	int feature = PSCI_RET_NOT_SUPPORTED;
+>> +
+>> +	if (PSCI_VERSION_MAJOR(ver) >= 1)
+>> +		feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
+>> +
+>> +	if (feature == PSCI_RET_NOT_SUPPORTED) {
+>> +		psci_ops.variant = SMCCC_VARIANT_1_0;
 > 
-> [   34.823577] BUG: sleeping function called from invalid context at mm/slab.h:419
-> [   34.830881] in_atomic(): 0, irqs_disabled(): 128, pid: 14, name: cpuhp/0
-> [   34.837574] 1 lock held by cpuhp/0/14:
-> [   34.841314]  #0:  (cpuhp_state-up){....}, at: [<00000000f44ba116>] cpuhp_thread_fun+0x148/0x290
-> [   34.850032] CPU: 0 PID: 14 Comm: cpuhp/0 Not tainted 4.15.0-rc9-jang+ #13
-> [   34.856810] Hardware name: Default string Cavium ThunderX2/Default string, BIOS 5.13 12/18/2017
-> [   34.865499] Call trace:
-> [   34.867941]  dump_backtrace+0x0/0x160
-> [   34.871595]  show_stack+0x24/0x30
-> [   34.874905]  dump_stack+0x9c/0xd0
-> [   34.878214]  ___might_sleep+0x140/0x1a0
-> [   34.882042]  __might_sleep+0x58/0x90
-> [   34.885610]  kmem_cache_alloc_trace+0x2c4/0x320
-> [   34.890134]  armpmu_alloc+0x38/0x1b0
-> [   34.893701]  arm_pmu_acpi_cpu_starting+0x10c/0x138
-> [   34.898484]  cpuhp_invoke_callback+0x120/0xaa8
-> [   34.902920]  cpuhp_thread_fun+0xec/0x290
-> [   34.906834]  smpboot_thread_fn+0x21c/0x2b8
-> [   34.910923]  kthread+0x10c/0x138
-> [   34.914143]  ret_from_fork+0x10/0x18
-> 
-> Changing the allocations in arm_pmu_alloc() to GFP_ATOMIC didn't help,
-> as the interrupt request is also not happy in this context.
-> 
-> Would it be possible to init the PMUs later?
+> Presumably at some point in the future we might want to update PSCI 
+> itself to use 'fast' calls if available, at which point this 
+> initialisation is a bit backwards given that you've already made a call 
+> using *some* convention. Even I think relying on the enum value working 
+> out OK is a bit subtle, so perhaps it's best to default-initialise 
+> psci_ops.variant to 1.0 (either statically, or dynamically before the 
+> first call), then only update it to 1.1 if and when we discover that.
 
-I know that Mark's had a good go at fixing this, but we ran into problems
-having the fix co-exist with the IRQ bouncing workaround we perform for the
-PMU on U8500 platforms. Frustratingly, those platforms don't appear to be
-available any more, so we're being held up by something that we're unable
-to test and might be considered dead.
+Indeed. Lorenzo already suggested something along those lines, and I now
+(statically) default to 1.0.
 
-Linus, Lee: do we still need to support PMU interrupts on U8500? It's
-causing us real headaches with ACPI-based arm64 systems. [the answer might
-be "yes", but I have to ask!]
+Thanks,
 
-Cheers,
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
