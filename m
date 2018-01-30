@@ -1,35 +1,57 @@
 From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 29 Jan 2018 18:32:47 -0600
-Subject: [PATCH 6/8] rockchip/rga: fix potential integer overflow in
- rga_buf_map
-In-Reply-To: <cover.1517268667.git.gustavo@embeddedor.com>
-References: <cover.1517268667.git.gustavo@embeddedor.com>
-Message-ID: <715937d1ae955d5e5d531ef93d503177865f4083.1517268668.git.gustavo@embeddedor.com>
+Date: Mon, 29 Jan 2018 19:07:42 -0600
+Subject: [PATCH resend 0/8] fix potential integer overflows
+Message-ID: <cover.1517268667.git.gustavo@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cast p to dma_addr_t in order to avoid a potential integer overflow.
-This variable is being used in a context that expects an expression
-of type dma_addr_t (u64).
+Hello,
 
-Addresses-Coverity-ID: 1458347 ("Unintentional integer overflow")
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
----
+I'm resending this cover letter due to a typo in the ARM and LKML
+addresses in the previous e-mail.
+
+This patchset aims to fix potential integer overflows reported
+by Coverity.
+
+In all cases the potential overflowing expressions are evaluated
+using 32-bit arithmetic before being used in contexts that expect
+a 64-bit arithmetic. So a cast to the proper type was added to each
+of those expressions in order to avoid any potential integer overflow.
+
+This also gives the compiler complete information about the proper
+arithmetic for each expression and improves code quality.
+
+Addresses the following Coverity IDs reported as
+"Unintentional integer overflow" issues:
+
+200604, 1056807, 1056808, 1271223,
+1324146, 1392628, 1392630, 1446589,
+1454996, 1458347.
+
+Thank you
+
+Gustavo A. R. Silva (8):
+  rtl2832: fix potential integer overflow
+  dvb-frontends: ves1820: fix potential integer overflow
+  i2c: max2175: fix potential integer overflow in max2175_set_nco_freq
+  i2c: ov9650: fix potential integer overflow in
+    __ov965x_set_frame_interval
+  pci: cx88-input: fix potential integer overflow
+  rockchip/rga: fix potential integer overflow in rga_buf_map
+  platform: sh_veu: fix potential integer overflow in
+    sh_veu_colour_offset
+  platform: vivid-cec: fix potential integer overflow in
+    vivid_cec_pin_adap_events
+
+ drivers/media/dvb-frontends/rtl2832.c         | 4 ++--
+ drivers/media/dvb-frontends/ves1820.c         | 2 +-
+ drivers/media/i2c/max2175.c                   | 2 +-
+ drivers/media/i2c/ov9650.c                    | 2 +-
+ drivers/media/pci/cx88/cx88-input.c           | 4 ++--
  drivers/media/platform/rockchip/rga/rga-buf.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/platform/sh_veu.c               | 4 ++--
+ drivers/media/platform/vivid/vivid-cec.c      | 2 +-
+ 8 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/media/platform/rockchip/rga/rga-buf.c b/drivers/media/platform/rockchip/rga/rga-buf.c
-index 49cacc7..3dd29b2 100644
---- a/drivers/media/platform/rockchip/rga/rga-buf.c
-+++ b/drivers/media/platform/rockchip/rga/rga-buf.c
-@@ -140,7 +140,7 @@ void rga_buf_map(struct vb2_buffer *vb)
- 		address = sg_phys(sgl);
- 
- 		for (p = 0; p < len; p++) {
--			dma_addr_t phys = address + (p << PAGE_SHIFT);
-+			dma_addr_t phys = address + ((dma_addr_t)p << PAGE_SHIFT);
- 
- 			pages[mapped_size + p] = phys;
- 		}
 -- 
 2.7.4
