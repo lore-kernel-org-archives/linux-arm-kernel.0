@@ -1,101 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Jan 2018 17:27:56 +0000
-Subject: [PATCH v3 1/6] arm: Add BTB invalidation on switch_mm for
- Cortex-A9, A12 and A17
-In-Reply-To: <1e81134a-c88f-1764-a193-24e55eb43819@gmail.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-2-marc.zyngier@arm.com>
- <1e81134a-c88f-1764-a193-24e55eb43819@gmail.com>
-Message-ID: <fc094bd7-098d-f7d2-7fd0-78871e73a4c2@arm.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
+Date: Tue, 30 Jan 2018 23:01:06 +0530
+Subject: [PATCH 0/2] mtd: fsl-quadspi: Update slave device hwcap based on mode
+ provided in dtsi file
+Message-ID: <1517333468-17153-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/18 20:44, Florian Fainelli wrote:
-> On 01/25/2018 07:21 AM, Marc Zyngier wrote:
->> In order to avoid aliasing attacks against the branch predictor,
->> some implementations require to invalidate the BTB when switching
->> from one user context to another.
->>
->> For this, we reuse the existing implementation for Cortex-A8, and
->> apply it to A9, A12 and A17.
-> 
-> Should this read: and apply it to A8, A9, A12 and A17
+This patch-set added support to update hwcap of slave device connected to
+FSL QUADSPI controller by reading values from the device tree files.
 
-A8 already has a BTB invalidation there. We are expanding the use of
-that function to other v7 cores. Or am I missing something obvious?
+Mode information is available via "spi-tx-bus-width" and
+"spi-rx-bus-width" nodes of device tree for the connected slave device.
 
-> 
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/mm/proc-v7-2level.S |  4 ++--
->>  arch/arm/mm/proc-v7-3level.S |  6 ++++++
->>  arch/arm/mm/proc-v7.S        | 30 +++++++++++++++---------------
->>  3 files changed, 23 insertions(+), 17 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
->> index c6141a5435c3..0422e58b74e8 100644
->> --- a/arch/arm/mm/proc-v7-2level.S
->> +++ b/arch/arm/mm/proc-v7-2level.S
->> @@ -41,7 +41,7 @@
->>   *	even on Cortex-A8 revisions not affected by 430973.
->>   *	If IBE is not set, the flush BTAC/BTB won't do anything.
->>   */
->> -ENTRY(cpu_ca8_switch_mm)
->> +ENTRY(cpu_v7_btbinv_switch_mm)
->>  #ifdef CONFIG_MMU
->>  	mov	r2, #0
->>  	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
->> @@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
->>  #endif
->>  	bx	lr
->>  ENDPROC(cpu_v7_switch_mm)
->> -ENDPROC(cpu_ca8_switch_mm)
->> +ENDPROC(cpu_v7_btbinv_switch_mm)
->>  
->>  /*
->>   *	cpu_v7_set_pte_ext(ptep, pte)
->> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->> index 7d16bbc4102b..934272e1fa08 100644
->> --- a/arch/arm/mm/proc-v7-3level.S
->> +++ b/arch/arm/mm/proc-v7-3level.S
->> @@ -54,6 +54,11 @@
->>   * Set the translation table base pointer to be pgd_phys (physical address of
->>   * the new TTB).
->>   */
->> +ENTRY(cpu_v7_btbinv_switch_mm)
->> +#ifdef CONFIG_MMU
->> +	mov	r2, #0
->> +	mcr	p15, 0, r2, c7, c5, 6			@ flush BTAC/BTB
->> +#endif
->>  ENTRY(cpu_v7_switch_mm)
->>  #ifdef CONFIG_MMU
->>  	mmid	r2, r2
->> @@ -64,6 +69,7 @@ ENTRY(cpu_v7_switch_mm)
->>  #endif
->>  	ret	lr
->>  ENDPROC(cpu_v7_switch_mm)
->> +ENDPROC(cpu_v7_btbinv_switch_mm)
->>  
->>  #ifdef __ARMEB__
->>  #define rl r3
->> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> index 01d64c0b2563..0a14967fd400 100644
->> --- a/arch/arm/mm/proc-v7.S
->> +++ b/arch/arm/mm/proc-v7.S
->> @@ -159,18 +159,18 @@ ENDPROC(cpu_v7_do_resume)
->>  #endif
->>  
->>  /*
->> - * Cortex-A8
->> + * Cortex-A8/A12/A17 that require a BTB invalidation on switch_mm
-> 
-> Should this read Cortex-A8/A9/A12/A17?
+Update read and write hwcap capability for slave device by reading
+"spi-rx-bus-width" and "spi-tx-bus-width" respectively.
 
-Indeed, I missed our dear A9 friend.
+Added usage example by adding support for spi-rx-bus-width
+and spi-tx-bus-width binding.
 
-Thanks,
+Yogesh Gaur (2):
+  mtd: fsl-quadspi: Update slave device hwcap based on mode provided in
+    dtsi file
+  dt-bindings: fsl-quadspi: spi-rx/tx-bus-width usage example
 
-	M.
+ .../devicetree/bindings/mtd/fsl-quadspi.txt        | 30 ++++++++++++
+ drivers/mtd/spi-nor/fsl-quadspi.c                  | 56 ++++++++++++++++++++--
+ 2 files changed, 81 insertions(+), 5 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
