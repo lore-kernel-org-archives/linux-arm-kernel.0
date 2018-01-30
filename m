@@ -1,109 +1,125 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Jan 2018 12:27:23 +0000
-Subject: [PATCH v2 15/16] arm/arm64: smccc: Implement SMCCC v1.1 inline
- primitive
-In-Reply-To: <CAKv+Gu_aXX70tLL+kyHDy-=4+ZiTEmOtMbfzt5oqs41B6ag1kg@mail.gmail.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-16-marc.zyngier@arm.com>
- <CAKv+Gu_aXX70tLL+kyHDy-=4+ZiTEmOtMbfzt5oqs41B6ag1kg@mail.gmail.com>
-Message-ID: <03484caa-2e18-7126-7d99-8d0b1e0a83c6@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 30 Jan 2018 13:27:24 +0100
+Subject: [PATCH 2/5] drm: add ARM flush implementation
+In-Reply-To: <20180130113147.GD9418@n2100.armlinux.org.uk>
+References: <20180124025606.3020-2-gurchetansingh@chromium.org>
+ <20180130101436.GK25930@phenom.ffwll.local>
+ <20180130113147.GD9418@n2100.armlinux.org.uk>
+Message-ID: <CAKMK7uGDJKbnMtgakVNqPprJj9riipp97ix4OedQu48BbrTP3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 21:45, Ard Biesheuvel wrote:
-> On 29 January 2018 at 17:45, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> One of the major improvement of SMCCC v1.1 is that it only clobbers
->> the first 4 registers, both on 32 and 64bit. This means that it
->> becomes very easy to provide an inline version of the SMC call
->> primitive, and avoid performing a function call to stash the
->> registers that would otherwise be clobbered by SMCCC v1.0.
+On Tue, Jan 30, 2018 at 12:31 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Jan 30, 2018 at 11:14:36AM +0100, Daniel Vetter wrote:
+>> On Tue, Jan 23, 2018 at 06:56:03PM -0800, Gurchetan Singh wrote:
+>> > The dma_cache_maint_page function is important for cache maintenance on
+>> > ARM32 (this was determined via testing).
+>> >
+>> > Since we desire direct control of the caches in drm_cache.c, let's make
+>> > a copy of the function, rename it and use it.
+>> >
+>> > v2: Don't use DMA API, call functions directly (Daniel)
+>> >
+>> > Signed-off-by: Gurchetan Singh <gurchetansingh@chromium.org>
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/linux/arm-smccc.h | 157 ++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 157 insertions(+)
+>> fwiw, in principle, this approach has my Ack from the drm side.
 >>
->> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
->> index dd44d8458c04..bc5843728909 100644
->> --- a/include/linux/arm-smccc.h
->> +++ b/include/linux/arm-smccc.h
->> @@ -150,5 +150,162 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
->>
->>  #define arm_smccc_hvc_quirk(...) __arm_smccc_hvc(__VA_ARGS__)
->>
->> +/* SMCCC v1.1 implementation madness follows */
->> +#ifdef CONFIG_ARM64
->> +
->> +#define SMCCC_SMC_INST "smc    #0"
->> +#define SMCCC_HVC_INST "hvc    #0"
->> +
->> +#define __arm_smccc_1_1_prologue(inst)                                 \
->> +       inst "\n"                                                       \
->> +       "cbz    %[ptr], 1f\n"                                           \
->> +       "stp    %x[r0], %x[r1], %[ra0]\n"                               \
->> +       "stp    %x[r2], %x[r3], %[ra2]\n"                               \
->> +       "1:\n"                                                          \
->> +       : [ra0] "=Ump" (*(&___res->a0)),                                \
->> +         [ra2] "=Ump" (*(&___res->a2)),
->> +
->> +#define __arm_smccc_1_1_epilogue       : "memory"
->> +
->> +#endif
->> +
->> +#ifdef CONFIG_ARM
->> +#include <asm/opcodes-sec.h>
->> +#include <asm/opcodes-virt.h>
->> +
->> +#define SMCCC_SMC_INST __SMC(0)
->> +#define SMCCC_HVC_INST __HVC(0)
->> +
->> +#define __arm_smccc_1_1_prologue(inst)                                 \
->> +       inst "\n"                                                       \
->> +       "cmp    %[ptr], #0\n"                                           \
->> +       "stmne  %[ptr], {%[r0], %[r1], %[r2], %[r3]}\n"                 \
->> +       : "=m" (*___res),
->> +
->> +#define __arm_smccc_1_1_epilogue       : "memory", "cc"
->> +
->> +#endif
->> +
->> +#define __constraint_write_0                                           \
->> +       [r0] "+r" (r0), [r1] "=r" (r1), [r2] "=r" (r2), [r3] "=r" (r3)
->> +#define __constraint_write_1                                           \
->> +       [r0] "+r" (r0), [r1] "+r" (r1), [r2] "=r" (r2), [r3] "=r" (r3)
->> +#define __constraint_write_2                                           \
->> +       [r0] "+r" (r0), [r1] "+r" (r1), [r2] "+r" (r2), [r3] "=r" (r3)
->> +#define __constraint_write_3                                           \
->> +       [r0] "+r" (r0), [r1] "+r" (r1), [r2] "+r" (r2), [r3] "+r" (r3)
-> 
-> It seems you need +r for all arguments, otherwise the compiler will
-> notice that the value is never used, and may assign the register to
-> 'res' instead, i.e.,
-> 
->  3e4:   320107e0        mov     w0, #0x80000001                 // #-2147483647
->  3e8:   320183e1        mov     w1, #0x80008000                 // #-2147450880
->  3ec:   910123a2        add     x2, x29, #0x48
->  3f0:   d4000002        hvc     #0x0
->  3f4:   b4000062        cbz     x2, 400 <enable_psci_bp_hardening+0x88>
->  3f8:   a90487a0        stp     x0, x1, [x29, #72]
->  3fc:   a9058fa2        stp     x2, x3, [x29, #88]
-> 
-> (for the code generated in the next patch)
+>> But if we can't get any agreement from the arch side then I guess we'll
+>> just have to suck it up and mandate that any dma-buf on ARM32 must be wc
+>> mapped, always. Not sure that's a good idea either, but should at least
+>> get things moving.
+>
+> Let me expand on my objection, as I find your tone to be problematical
+> here.
+>
+> The patch 2 (which is the earliest patch in this series) makes use of
+> facilities such as dmac_map_area(), and those are defined as macros in
+> arch/arm/mm/mm.h.  I see no way that drm_cache.c can pick up on that
+> _unless_ there's another patch (maybe that's patch 1) which moves the
+> definition.
+>
+> dmac_map_area() is non-trivial to export (it's not a function, it's
+> macro which either points to a function or a function pointer structure
+> member) so it's likely that this patch also breaks building DRM as a
+> module.
+>
+> We've been here before with drivers abusing the architecture private APIs,
+> which is _exactly_ why dmac_map_area() is defined in arch/arm/mm.h and not
+> in some kernel-wide asm header file - it's an implementation detail of the
+> architectures DMA API that drivers have no business mucking about with.
+>
+> I've always said if the interfaces don't do what you want, talk to
+> architecture people, don't go poking about in architecture private parts
+> of the kernel and start abusing stuff.  I say this because years ago, we
+> had people doing _exactly_ that for the older virtually cached ARMs.  Then
+> ARMv6 came along, which needed an entire revamp of the architecture cache
+> interfaces, and lo and behold, drivers got broken because of this kind of
+> abuse.  IOW, abusing interfaces makes kernel maintenance harder.
+>
+> For example, interfaces designed for flushing the cache when page tables
+> get torn down were abused in drivers to flush data for DMA or coherency
+> purposes, which meant that on ARMv6, where we no longer needed to flush
+> for page table maintenance, suddenly the interfaces that drivers were
+> using became no-ops.
+>
+> In this case, dmac_map_area() exists to perform any cache maintenance
+> for the kernel view of that memory required for a non-coherent DMA
+> mapping.  What it does depends on the processsor and the requested
+> DMA_xxx type - it _may_ invalidate (discard) or clean (writeback but
+> leave in the cache) cache lines, or do nothing.
+>
+> dmac_unmap_area() has the same issues - what it does depends on what
+> operation is being requested and what the processor requires to
+> achieve coherency.
+>
+> The two functions are designed to work _together_, dmac_map_area()
+> before the DMA operation and dmac_unmap_area() after the DMA operation.
+> Only when they are both used together do you get the correct behaviour.
+>
+> These functions are only guaranteed to operate on the kernel mapping
+> passed in as virtual addresses to the dmac_* functions.  They make no
+> guarantees about other mappings of the same memory elsewhere in the
+> system, which, depending on the architecture of the caches, may also
+> contain dirty cache lines (the same comment applies to the DMA API too.)
+> On certain cache architectures (VIPT) where colouring effects apply,
+> flushing the kernel mapping may not even be appropriate if the desired
+> effect is to flush data from a user mapping.
+>
+> This is exactly why abusing APIs (like what is done in this patch) is
+> completely unacceptable from the architecture point of view - while
+> it may _appear_ to work, it may only work for one class of CPU or one
+> implementation.
+>
+> Hence why the dmac_{un,}map_area() interfaces are not exported to
+> drivers.  You can't just abuse one of them.  They are a pair that
+> must be used together, and the DMA API knows that, and the DMA API
+> requirements ensure that happens.  It's not really surprising, these
+> functions were written to support the DMA API, and the DMA API is
+> the kernel-wide interface to these functions.
 
-Well spotted.
+With "in principle" I meant that from a design pov I think it's
+totally fine if drm drivers do implement their own cache management.
+The implementation isn't fine, since it misses the invalidate/flush
+pair (which happens to be the same on x86), largely also because the
+CrOS use-case is very limited. I commented on that in the previous
+discussion, the current proposed changes.
 
-I think this is because of the lack of early-clobber for the unassigned
-registers. The compiler assumes the whole sequence is a single
-instruction, with the output registers being affected at the end. If we
-mark those with '=&r', we will prevent GCC from emitting this kind of
-horror.
+It's also clear that any such usage essentially makes the driver very
+tied to the platform it's running on. I think that's also fine. Like I
+said, drivers/gpu is already full of such hacks. I also don't care
+what we end up caling these (there's a patch 1, somehow the threading
+is broken and it's not part of the patch series).
 
-Note that with Robin's trick of moving the assignment back to C code,
-this is a bit moot as this is really a single instruction (smc/hvc), and
-there is no intermediate register evaluation.
-
-Thanks,
-
-	M.
+I think in an ideal world we'd split the dma_sync* stuff into a struct
+device and cpu specific parts. Plus figure out clear semantics for
+dma-buf around who must flush when, and how exactly snooped vs.
+non-snooped bus transactions are agreed on. And also fix up all the
+existing drivers ofc. But there's no one even close to willing to do
+all that work, so realistically muddling on is the one option we do
+have.
+-Daniel
 -- 
-Jazz is not dead. It just smells funny...
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
