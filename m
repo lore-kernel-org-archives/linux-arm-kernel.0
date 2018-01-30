@@ -1,43 +1,44 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 30 Jan 2018 20:22:51 +0000
-Subject: [RFC v3 18/25] clk: renesas: r8a7794: Add rwdt clock
+Date: Tue, 30 Jan 2018 20:22:53 +0000
+Subject: [RFC v3 20/25] ARM: dts: r8a7745: Add watchdog support to SoC dtsi
 In-Reply-To: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517343778-27902-19-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517343778-27902-21-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "rwdt" clock to r8a7794_mod_clks. Also, since we may need to access
-the watchdog registers at any time, declare the clock as critical.
+This patch adds watchdog support to the r8a7745 SoC dtsi.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v1->v3:
 * no change
 
- drivers/clk/renesas/r8a7794-cpg-mssr.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/clk/renesas/r8a7794-cpg-mssr.c b/drivers/clk/renesas/r8a7794-cpg-mssr.c
-index ec091a4..2a40bbe 100644
---- a/drivers/clk/renesas/r8a7794-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7794-cpg-mssr.c
-@@ -121,6 +121,7 @@ static const struct mssr_mod_clk r8a7794_mod_clks[] __initconst = {
- 	DEF_MOD("cmt1",			 329,	R8A7794_CLK_R),
- 	DEF_MOD("usbhs-dmac0",		 330,	R8A7794_CLK_HP),
- 	DEF_MOD("usbhs-dmac1",		 331,	R8A7794_CLK_HP),
-+	DEF_MOD("rwdt",			 402,	R8A7794_CLK_R),
- 	DEF_MOD("irqc",			 407,	R8A7794_CLK_CP),
- 	DEF_MOD("intc-sys",		 408,	R8A7794_CLK_ZS),
- 	DEF_MOD("audio-dmac0",		 502,	R8A7794_CLK_HP),
-@@ -190,6 +191,7 @@ static const struct mssr_mod_clk r8a7794_mod_clks[] __initconst = {
- };
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 6bc1cf4..5d1b8f2 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -321,6 +321,16 @@
+ 			reg = <0 0xe6160000 0 0x100>;
+ 		};
  
- static const unsigned int r8a7794_crit_mod_clks[] __initconst = {
-+	MOD_CLK_ID(402),	/* RWDT */
- 	MOD_CLK_ID(408),	/* INTC-SYS (GIC) */
- };
- 
++		rwdt: watchdog at e6020000 {
++			compatible = "renesas,r8a7745-wdt",
++				     "renesas,rcar-gen2-wdt";
++			reg = <0 0xe6020000 0 0x0c>;
++			clocks = <&cpg CPG_MOD 402>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 402>;
++			status = "disabled";
++		};
++
+ 		sysc: system-controller at e6180000 {
+ 			compatible = "renesas,r8a7745-sysc";
+ 			reg = <0 0xe6180000 0 0x200>;
 -- 
 2.7.4
