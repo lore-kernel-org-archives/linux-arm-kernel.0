@@ -1,44 +1,39 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 30 Jan 2018 20:22:55 +0000
-Subject: [RFC v3 22/25] ARM: dts: r8a7791: Add watchdog support to SoC dtsi
+Date: Tue, 30 Jan 2018 20:22:58 +0000
+Subject: [RFC v3 25/25] ARM: dts: iwg22m: Add watchdog support to SoM dtsi
 In-Reply-To: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517343778-27902-23-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517343778-27902-26-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds watchdog support to the r8a7791 dtsi.
+This patch enables the watchdog from within the iwg20m SoM dtsi.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v1->v3:
-* rwdt moved before gpio at e6050000
+* no change
 
- arch/arm/boot/dts/r8a7791.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index d2a4546..80e20ecd 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -142,6 +142,16 @@
- 		#size-cells = <2>;
- 		ranges;
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+index 8d0a392b..29b6e10 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
++++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+@@ -91,6 +91,11 @@
+ 	};
+ };
  
-+		rwdt: watchdog at e6020000 {
-+			compatible = "renesas,r8a7791-wdt",
-+				     "renesas,rcar-gen2-wdt";
-+			reg = <0 0xe6020000 0 0x0c>;
-+			clocks = <&cpg CPG_MOD 402>;
-+			power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
-+			resets = <&cpg 402>;
-+			status = "disabled";
-+		};
++&rwdt {
++	timeout-sec = <60>;
++	status = "okay";
++};
 +
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a7791",
- 				     "renesas,rcar-gen2-gpio";
+ &sdhi1 {
+ 	pinctrl-0 = <&sdhi1_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.4
