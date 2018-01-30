@@ -1,21 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 30 Jan 2018 12:53:33 -0600
-Subject: [PATCH 2/2] dt-bindings: fsl-quadspi: spi-rx/tx-bus-width usage
- example
-In-Reply-To: <1517333637-17331-3-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1517333637-17331-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1517333637-17331-3-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <CAL_JsqLBUDNEWkcrNcrOmuYcR=Gbf2ALD=z4s9AP4poOcBxNRQ@mail.gmail.com>
+From: ulfalizer@gmail.com (Ulf Magnusson)
+Date: Tue, 30 Jan 2018 20:05:29 +0100
+Subject: [PATCH 07/10] MIPS: BCM63XX: kconfig: Remove empty help text
+In-Reply-To: <20180130190555.6577-1-ulfalizer@gmail.com>
+References: <20180130190555.6577-1-ulfalizer@gmail.com>
+Message-ID: <20180130190555.6577-8-ulfalizer@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 11:33 AM, Yogesh Gaur
-<yogeshnarayan.gaur@nxp.com> wrote:
-> Added usage example by adding support for spi-rx-bus-width
-> and spi-tx-bus-width binding.
+In preparation for adding a warning ("kconfig: Warn if help text is
+blank"): https://lkml.org/lkml/2018/1/30/516
 
-Why not just add to existing example? Is there something unclear about
-adding these properties to warrant an example? We don't need every
-possible option enumerated.
+Signed-off-by: Ulf Magnusson <ulfalizer@gmail.com>
+---
+ arch/mips/bcm63xx/boards/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-Rob
+diff --git a/arch/mips/bcm63xx/boards/Kconfig b/arch/mips/bcm63xx/boards/Kconfig
+index 6ff0a7481081..f60d96610ace 100644
+--- a/arch/mips/bcm63xx/boards/Kconfig
++++ b/arch/mips/bcm63xx/boards/Kconfig
+@@ -7,6 +7,5 @@ choice
+ config BOARD_BCM963XX
+        bool "Generic Broadcom 963xx boards"
+ 	select SSB
+-       help
+ 
+ endchoice
+-- 
+2.14.1
