@@ -1,166 +1,310 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 30 Jan 2018 18:00:13 +0000
-Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
- <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Tue, 30 Jan 2018 23:44:33 +0530
+Subject: [RFC PATCH] mmc: sdhci-of-arasan: Add auto tuning support for ZynqMP
+ Platform
+Message-ID: <1517336073-18142-1-git-send-email-mnarani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 10:39:20AM +0000, Shameerali Kolothum Thodi wrote:
-> Hi Neil/Lorenzo,
-> 
-> > -----Original Message-----
-> > From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> > On Behalf Of Neil Leeder
-> > Sent: Friday, August 04, 2017 8:59 PM
-> > To: Will Deacon <will.deacon@arm.com>; Mark Rutland
-> > <mark.rutland@arm.com>
-> > Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
-> > <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
-> > kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
-> > <msalter@redhat.com>; nleeder at codeaurora.org; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
-> > 
-> > Add support for the SMMU Performance Monitor Counter Group
-> > information from ACPI. This is in preparation for its use
-> > in the SMMU v3 PMU driver.
-> 
-> [...]
-> 
-> >  static __init
-> >  const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node
-> > *node)
-> >  {
-> > @@ -1001,6 +1041,8 @@ const struct iort_iommu_config
-> > *iort_get_iommu_cfg(struct acpi_iort_node *node)
-> >  		return &iort_arm_smmu_v3_cfg;
-> >  	case ACPI_IORT_NODE_SMMU:
-> >  		return &iort_arm_smmu_cfg;
-> > +	case ACPI_IORT_NODE_PMCG:
-> > +		return &iort_arm_smmu_pmcg_cfg;
-> 
-> I understand this series will be revised based on the iort spec update.
-> 
-> This Is to clarify few queries we have with respect to one of our hisilicon 
-> platform which has support for SMMU v3 PMCG. In our implementation
-> the base address for the PMCG is defined at a IMP DEF address offset
-> within the SMMUv3 page 0 address space. And as per SMMU spec, 
-> 
-> " The Performance Monitor Counter Groups are standalone monitoring 
-> facilities  and, as such, can be implemented in separate components that
-> are all associated with (but not necessarily part of) an SMMU"
-> 
-> It looks like PMCG can be part of SMMU,  it is not clear whether this kind
-> of address mapping is forbidden or not. If this is an accepted  scenario, then
-> the devm_ioremap_resource() call in SMMv3 probe will fail as it reports conflict.
-> 
-> As far as I can see, the above code just checks the iort node type is PMCG
-> and assumes that its SMMU PMCG. As per IORT spec, it make sense to check
-> the node reference filed and make that call. 
-> 
-> And to fix the resource conflict issue we have, is it possible to treat the PMCG
-> node as the child of the SMMU and call the platform_device_add() appropriately
-> to avoid the conflict? I am not sure this will fix the issue and also about the order
-> in which SMMU and PMCG devices will be populated will have an impact on this.
-> 
-> Please let me know your thoughts on this.
+This patch adds support of SD auto tuning for ZynqMP platform. Auto
+tuning sequence sends tuning block to card when operating in UHS-1
+modes. This resets the DLL and sends CMD19/CMD21 as a part of the auto
+tuning process. Once the auto tuning process gets completed, reset the
+DLL to load the newly obtained SDHC tuned tap value.
 
-I went back and re-read the patches, I think the point here is that the
-perf driver (ie PATCH 2 that, by the way, is not maiinline) uses
-devm_ioremap_resource() to map the counters and that's what is causing
-failures when PMCG is part of SMMUv3 registers.
+Signed-off-by: Manish Narani <mnarani@xilinx.com>
+---
+ .../devicetree/bindings/mmc/arasan,sdhci.txt       |   1 +
+ drivers/mmc/host/sdhci-of-arasan.c                 | 219 ++++++++++++++++++++-
+ 2 files changed, 219 insertions(+), 1 deletion(-)
 
-It is the resources hierarchy that is wrong and in turn, I do not think
-devm_request_mem_region() is the right way of requesting it for the
-PMCG driver.
+diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index 60481bf..7d29751 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -14,6 +14,7 @@ Required Properties:
+     - "arasan,sdhci-4.9a": generic Arasan SDHCI 4.9a PHY
+     - "arasan,sdhci-5.1": generic Arasan SDHCI 5.1 PHY
+     - "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1": rk3399 eMMC PHY
++    - "xlnx,zynqmp-8.9a": Xilinx ZynqMP 8.9a PHY
+       For this device it is strongly suggested to include arasan,soc-ctl-syscon.
+   - reg: From mmc bindings: Register location and length.
+   - clocks: From clock bindings: Handles to clock inputs.
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index 0720ea7..7673db4 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -24,15 +24,18 @@
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/phy/phy.h>
++#include <linux/mmc/mmc.h>
+ #include <linux/regmap.h>
+ #include "sdhci-pltfm.h"
+ #include <linux/of.h>
++#include <linux/firmware/xilinx/zynqmp/firmware.h>
 
-I need to look into this but I suspect that's something that should
-be handled in the PMCG driver, that has to request the memory region
-_differently_ (ie ioremap copes with this overlap - it is the
-devm_request_mem_region() in devm_ioremap_resource() that fails, correct
-?).
+ #define SDHCI_ARASAN_VENDOR_REGISTER   0x78
 
-Certainly we need to create in IORT the resources with the correct
-hierarchy (I reckon DT does it already if the right device hierarchy is
-specified).
+ #define VENDOR_ENHANCED_STROBE         BIT(0)
 
-Lorenzo
+ #define PHY_CLK_TOO_SLOW_HZ            400000
++#define MAX_TUNING_LOOP                        40
 
-> 
-> Thanks,
-> Shameer
->   
-> >  	default:
-> >  		return NULL;
-> >  	}
-> > @@ -1056,6 +1098,15 @@ static int __init
-> > iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> >  	if (ret)
-> >  		goto dev_put;
-> > 
-> > +	/* End of init for PMCG */
-> > +	if (node->type == ACPI_IORT_NODE_PMCG) {
-> > +		ret = platform_device_add(pdev);
-> > +		if (ret)
-> > +			goto dev_put;
-> > +
-> > +		return 0;
-> > +	}
-> > +
-> >  	/*
-> >  	 * We expect the dma masks to be equivalent for
-> >  	 * all SMMUs set-ups
-> > @@ -1131,6 +1182,9 @@ static void __init iort_init_platform_devices(void)
-> >  				acpi_free_fwnode_static(fwnode);
-> >  				return;
-> >  			}
-> > +		} else if (iort_node->type == ACPI_IORT_NODE_PMCG) {
-> > +			if (iort_add_smmu_platform_device(iort_node))
-> > +				return;
-> >  		}
-> > 
-> >  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-> > diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-> > index 707dda74..2169b6f 100644
-> > --- a/include/acpi/actbl2.h
-> > +++ b/include/acpi/actbl2.h
-> > @@ -695,7 +695,8 @@ enum acpi_iort_node_type {
-> >  	ACPI_IORT_NODE_NAMED_COMPONENT = 0x01,
-> >  	ACPI_IORT_NODE_PCI_ROOT_COMPLEX = 0x02,
-> >  	ACPI_IORT_NODE_SMMU = 0x03,
-> > -	ACPI_IORT_NODE_SMMU_V3 = 0x04
-> > +	ACPI_IORT_NODE_SMMU_V3 = 0x04,
-> > +	ACPI_IORT_NODE_PMCG = 0x05
-> >  };
-> > 
-> >  struct acpi_iort_id_mapping {
-> > @@ -811,6 +812,12 @@ struct acpi_iort_smmu_v3 {
-> >  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
-> >  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
-> > 
-> > +struct acpi_iort_pmcg {
-> > +	u64 base_address;	/* PMCG base address */
-> > +	u32 overflow_gsiv;
-> > +	u32 node_reference;
-> > +};
-> > +
-> > 
-> > /****************************************************************
-> > ***************
-> >   *
-> >   * IVRS - I/O Virtualization Reporting Structure
-> > --
-> > Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-> > Technologies Inc.
-> > Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-> > a Linux Foundation Collaborative Project.
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ /*
+  * On some SoCs the syscon area has a feature where the upper 16-bits of
+@@ -88,6 +91,7 @@ struct sdhci_arasan_data {
+        struct sdhci_host *host;
+        struct clk      *clk_ahb;
+        struct phy      *phy;
++       u32             device_id;
+        bool            is_phy_on;
+
+        struct clk_hw   sdcardclk_hw;
+@@ -157,6 +161,213 @@ static int sdhci_arasan_syscon_write(struct sdhci_host *host,
+        return ret;
+ }
+
++/**
++ * arasan_zynqmp_dll_reset - Issue the DLL reset.
++ * @deviceid:          Unique Id of device
++ */
++void zynqmp_dll_reset(u8 deviceid)
++{
++       const struct zynqmp_eemi_ops *eemi_ops = get_eemi_ops();
++
++       if (!eemi_ops || !eemi_ops->ioctl)
++               return;
++
++       /* Issue DLL Reset */
++       if (deviceid == 0)
++               eemi_ops->ioctl(NODE_SD_0, IOCTL_SD_DLL_RESET,
++                               PM_DLL_RESET_PULSE, 0, NULL);
++       else
++               eemi_ops->ioctl(NODE_SD_1, IOCTL_SD_DLL_RESET,
++                               PM_DLL_RESET_PULSE, 0, NULL);
++}
++
++static void arasan_zynqmp_dll_reset(struct sdhci_host *host, u8 deviceid)
++{
++       u16 clk;
++       unsigned long timeout;
++
++       clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
++       clk &= ~(SDHCI_CLOCK_CARD_EN | SDHCI_CLOCK_INT_EN);
++       sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
++
++       /* Issue DLL Reset */
++       zynqmp_dll_reset(deviceid);
++
++       clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
++       clk |= SDHCI_CLOCK_INT_EN;
++       sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
++
++       /* Wait max 20 ms */
++       timeout = 20;
++       while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
++                               & SDHCI_CLOCK_INT_STABLE)) {
++               if (timeout == 0) {
++                       dev_err(mmc_dev(host->mmc),
++                               ": Internal clock never stabilised.\n");
++                       return;
++               }
++               timeout--;
++               mdelay(1);
++       }
++
++       clk |= SDHCI_CLOCK_CARD_EN;
++       sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
++}
++
++static int arasan_zynqmp_execute_tuning(struct sdhci_host *host, u32 opcode)
++{
++       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++       struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
++       struct mmc_host *mmc = host->mmc;
++       u16 ctrl;
++       int tuning_loop_counter = MAX_TUNING_LOOP;
++       int err = 0;
++       unsigned long flags;
++       unsigned int tuning_count = 0;
++
++       spin_lock_irqsave(&host->lock, flags);
++
++       if (host->tuning_mode == SDHCI_TUNING_MODE_1)
++               tuning_count = host->tuning_count;
++
++       ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
++       ctrl |= SDHCI_CTRL_EXEC_TUNING;
++       if (host->quirks2 & SDHCI_QUIRK2_TUNING_WORK_AROUND)
++               ctrl |= SDHCI_CTRL_TUNED_CLK;
++       sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
++
++       mdelay(1);
++
++       arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
++
++       /*
++        * As per the Host Controller spec v3.00, tuning command
++        * generates Buffer Read Ready interrupt, so enable that.
++        *
++        * Note: The spec clearly says that when tuning sequence
++        * is being performed, the controller does not generate
++        * interrupts other than Buffer Read Ready interrupt. But
++        * to make sure we don't hit a controller bug, we _only_
++        * enable Buffer Read Ready interrupt here.
++        */
++       sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_INT_ENABLE);
++       sdhci_writel(host, SDHCI_INT_DATA_AVAIL, SDHCI_SIGNAL_ENABLE);
++
++       /*
++        * Issue CMD19 repeatedly till Execute Tuning is set to 0 or the number
++        * of loops reaches 40 times or a timeout of 150ms occurs.
++        */
++       do {
++               struct mmc_command cmd = {0};
++               struct mmc_request mrq = {NULL};
++
++               cmd.opcode = opcode;
++               cmd.arg = 0;
++               cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
++               cmd.retries = 0;
++               cmd.data = NULL;
++               cmd.mrq = &mrq;
++               cmd.error = 0;
++
++               if (tuning_loop_counter-- == 0)
++                       break;
++
++               mrq.cmd = &cmd;
++
++               /*
++                * In response to CMD19, the card sends 64 bytes of tuning
++                * block to the Host Controller. So we set the block size
++                * to 64 here.
++                */
++               if (cmd.opcode == MMC_SEND_TUNING_BLOCK_HS200) {
++                       if (mmc->ios.bus_width == MMC_BUS_WIDTH_8) {
++                               sdhci_writew(host, SDHCI_MAKE_BLKSZ(7, 128),
++                                            SDHCI_BLOCK_SIZE);
++                       } else if (mmc->ios.bus_width == MMC_BUS_WIDTH_4) {
++                               sdhci_writew(host, SDHCI_MAKE_BLKSZ(7, 64),
++                                            SDHCI_BLOCK_SIZE);
++                       }
++               } else {
++                       sdhci_writew(host, SDHCI_MAKE_BLKSZ(7, 64),
++                                    SDHCI_BLOCK_SIZE);
++               }
++
++               /*
++                * The tuning block is sent by the card to the host controller.
++                * So we set the TRNS_READ bit in the Transfer Mode register.
++                * This also takes care of setting DMA Enable and Multi Block
++                * Select in the same register to 0.
++                */
++               sdhci_writew(host, SDHCI_TRNS_READ, SDHCI_TRANSFER_MODE);
++
++               sdhci_send_command(host, &cmd);
++
++               host->cmd = NULL;
++
++               spin_unlock_irqrestore(&host->lock, flags);
++               /* Wait for Buffer Read Ready interrupt */
++               wait_event_interruptible_timeout(host->buf_ready_int,
++                                       (host->tuning_done == 1),
++                                       msecs_to_jiffies(50));
++               spin_lock_irqsave(&host->lock, flags);
++
++               if (!host->tuning_done) {
++                       dev_warn(mmc_dev(host->mmc),
++                                ": Timeout for Buffer Read Ready interrupt, back to fixed sampling clock\n");
++                       ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
++                       ctrl &= ~SDHCI_CTRL_TUNED_CLK;
++                       ctrl &= ~SDHCI_CTRL_EXEC_TUNING;
++                       sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
++
++                       err = -EIO;
++                       goto out;
++               }
++
++               host->tuning_done = 0;
++
++               ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
++
++               /* eMMC spec does not require a delay between tuning cycles */
++               if (opcode == MMC_SEND_TUNING_BLOCK)
++                       mdelay(1);
++       } while (ctrl & SDHCI_CTRL_EXEC_TUNING);
++
++       /*
++        * The Host Driver has exhausted the maximum number of loops allowed,
++        * so use fixed sampling frequency.
++        */
++       if (tuning_loop_counter < 0) {
++               ctrl &= ~SDHCI_CTRL_TUNED_CLK;
++               sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
++       }
++       if (!(ctrl & SDHCI_CTRL_TUNED_CLK)) {
++               dev_warn(mmc_dev(host->mmc),
++                        ": Tuning failed, back to fixed sampling clock\n");
++               err = -EIO;
++       } else {
++               arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
++       }
++
++out:
++       /*
++        * In case tuning fails, host controllers which support
++        * re-tuning can try tuning again at a later time, when the
++        * re-tuning timer expires.  So for these controllers, we
++        * return 0. Since there might be other controllers who do not
++        * have this capability, we return error for them.
++        */
++       if (tuning_count)
++               err = 0;
++
++       host->mmc->retune_period = err ? 0 : tuning_count;
++
++       sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++       sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
++       spin_unlock_irqrestore(&host->lock, flags);
++
++       return err;
++}
++
+ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+ {
+        struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+@@ -262,7 +473,7 @@ static int sdhci_arasan_voltage_switch(struct mmc_host *mmc,
+        return -EINVAL;
+ }
+
+-static const struct sdhci_ops sdhci_arasan_ops = {
++static struct sdhci_ops sdhci_arasan_ops = {
+        .set_clock = sdhci_arasan_set_clock,
+        .get_max_clock = sdhci_pltfm_clk_get_max_clock,
+        .get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
+@@ -371,6 +582,7 @@ static const struct of_device_id sdhci_arasan_of_match[] = {
+        { .compatible = "arasan,sdhci-8.9a" },
+        { .compatible = "arasan,sdhci-5.1" },
+        { .compatible = "arasan,sdhci-4.9a" },
++       { .compatible = "xlnx,zynqmp-8.9a" },
+
+        { /* sentinel */ }
+ };
+@@ -642,6 +854,11 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+                goto unreg_clk;
+        }
+
++       if (of_device_is_compatible(pdev->dev.of_node, "xlnx,zynqmp-8.9a")) {
++               sdhci_arasan_ops.platform_execute_tuning =
++                       arasan_zynqmp_execute_tuning;
++       }
++
+        sdhci_arasan->phy = ERR_PTR(-ENODEV);
+        if (of_device_is_compatible(pdev->dev.of_node,
+                                    "arasan,sdhci-5.1")) {
+--
+2.7.4
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
