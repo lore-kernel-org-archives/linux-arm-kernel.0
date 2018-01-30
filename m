@@ -1,70 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Jan 2018 10:30:41 +0000
-Subject: [PATCH v2 4/9] arm64: kpti: Add ->enable callback to remap
- swapper using nG mappings
-In-Reply-To: <1517227200-20412-5-git-send-email-will.deacon@arm.com>
-References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
- <1517227200-20412-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20180130103041.GA29693@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Jan 2018 11:35:38 +0100
+Subject: [PATCH] sound/tlv320dac33: Add device tree support
+In-Reply-To: <20180130101046.GA16474@lenoch>
+References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
+ <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
+ <20180130085314.GA4585@amd>
+ <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
+ <20180130093838.GA15195@lenoch> <20180130100023.GB18104@amd>
+ <20180130101046.GA16474@lenoch>
+Message-ID: <20180130103538.GD18104@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 11:59:55AM +0000, Will Deacon wrote:
-> Defaulting to global mappings for kernel space is generally good for
-> performance and appears to be necessary for Cavium ThunderX. If we
-> subsequently decide that we need to enable kpti, then we need to rewrite
-> our existing page table entries to be non-global. This is fiddly, and
-> made worse by the possible use of contiguous mappings, which require
-> a strict break-before-make sequence.
+On Tue 2018-01-30 11:10:46, Ladislav Michl wrote:
+> On Tue, Jan 30, 2018 at 11:00:23AM +0100, Pavel Machek wrote:
+> > On Tue 2018-01-30 10:38:38, Ladislav Michl wrote:
+> > > On Tue, Jan 30, 2018 at 10:11:02AM +0100, Filip Matijevi? wrote:
+> > > > Hi,
+> > > > 
+> > 
+> > > > > Well, notice I'm converting existing driver to device tree. And that
+> > > > > one already has GPIO dependency. It is possible that more work needs
+> > > > > to be done there, but that should not be a reason to delay this. Feel
+> > > > > free to help.
+> > > 
+> > > Adding DT properties that need to be maintained for compatibility reasons
+> > > is a bad idea and very good reason to delay merging unfinished stuff.
+> > > And meanwhile it turned out it is not power-gpio :)
+> > 
+> > I believe reset-gpios and power-gpios are commonly used like
+> > this... and that's what the old code does.
 > 
-> Since the enable callback runs on each online CPU from stop_machine
-> context, we can have all CPUs enter the idmap, where secondaries can
-> wait for the primary CPU to rewrite swapper with its MMU off. It's all
-> fairly horrible, but at least it only runs once.
+> Why do you care about old code when introducing new DT property?
+> Either it is reset, then lets call it reset-gpios or it is power supply
+> and then voltage regulator should be used (VAUX4.OUT is such a regulator
+> although it is unclear to me how it is controlled (*)).
+
+power gpio = !reset gpio. Difference is only in polarity.
+
+> > You are not helping.
 > 
-> Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/assembler.h |  10 ++
->  arch/arm64/kernel/cpufeature.c     |  25 +++++
->  arch/arm64/mm/proc.S               | 204 +++++++++++++++++++++++++++++++++++--
->  3 files changed, 231 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 3873dd7b5a32..23251eae6e8a 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -523,6 +523,16 @@ alternative_endif
->  #endif
->  	.endm
->  
-> +	.macro	pte_to_phys, phys, pte
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +	ror	\phys, \pte, #16
-> +	bfi	\phys, \phys, #(16 + 12), #32
-> +	lsr	\phys, \phys, #12
+> The only way I can help here is to resend your patch with "reset-gpios"
+> used, which I'm pretty sure you can handle yourself.
 
-I spun this up on a model with 52-bit PA support and it doesn't work,
-unfortunately, because the lsr of #12 leaves 4 bits of the OA in the bottom
-nybble. Instead, we need the following on top:
+Well, you can do that, and then you can argue with the next person who
+feels one of the properties has to get his preferred color. Hard part
+is not changing code :-(.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index f311a1ed34d0..f4f3350f697e 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -539,9 +539,9 @@ alternative_endif
- 
- 	.macro	pte_to_phys, phys, pte
- #ifdef CONFIG_ARM64_PA_BITS_52
--	ror	\phys, \pte, #16
--	bfi	\phys, \phys, #(16 + 12), #32
--	lsr	\phys, \phys, #12
-+	ubfiz	\phys, \pte, #(48 - 16 - 12), #16
-+	bfxil	\phys, \pte, #16, #32
-+	lsl	\phys, \phys, #16
- #else
- 	and	\phys, \pte, #PTE_ADDR_MASK
- #endif
+									Pavel
 
-Will
+> (*) Remark "DAC33 enabled (for example, plug in a headset to the 3.5mm
+> AV connector and start music playback from the device)" in schematics
+> suggests it is controlled somehow.
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/0c334b78/attachment.sig>
