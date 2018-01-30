@@ -1,65 +1,142 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 30 Jan 2018 11:35:38 +0100
-Subject: [PATCH] sound/tlv320dac33: Add device tree support
-In-Reply-To: <20180130101046.GA16474@lenoch>
-References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
- <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
- <20180130085314.GA4585@amd>
- <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
- <20180130093838.GA15195@lenoch> <20180130100023.GB18104@amd>
- <20180130101046.GA16474@lenoch>
-Message-ID: <20180130103538.GD18104@amd>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Tue, 30 Jan 2018 10:39:20 +0000
+Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+In-Reply-To: <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-01-30 11:10:46, Ladislav Michl wrote:
-> On Tue, Jan 30, 2018 at 11:00:23AM +0100, Pavel Machek wrote:
-> > On Tue 2018-01-30 10:38:38, Ladislav Michl wrote:
-> > > On Tue, Jan 30, 2018 at 10:11:02AM +0100, Filip Matijevi? wrote:
-> > > > Hi,
-> > > > 
-> > 
-> > > > > Well, notice I'm converting existing driver to device tree. And that
-> > > > > one already has GPIO dependency. It is possible that more work needs
-> > > > > to be done there, but that should not be a reason to delay this. Feel
-> > > > > free to help.
-> > > 
-> > > Adding DT properties that need to be maintained for compatibility reasons
-> > > is a bad idea and very good reason to delay merging unfinished stuff.
-> > > And meanwhile it turned out it is not power-gpio :)
-> > 
-> > I believe reset-gpios and power-gpios are commonly used like
-> > this... and that's what the old code does.
+Hi Neil/Lorenzo,
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Neil Leeder
+> Sent: Friday, August 04, 2017 8:59 PM
+> To: Will Deacon <will.deacon@arm.com>; Mark Rutland
+> <mark.rutland@arm.com>
+> Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
+> <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
+> kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
+> <msalter@redhat.com>; nleeder at codeaurora.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
 > 
-> Why do you care about old code when introducing new DT property?
-> Either it is reset, then lets call it reset-gpios or it is power supply
-> and then voltage regulator should be used (VAUX4.OUT is such a regulator
-> although it is unclear to me how it is controlled (*)).
+> Add support for the SMMU Performance Monitor Counter Group
+> information from ACPI. This is in preparation for its use
+> in the SMMU v3 PMU driver.
 
-power gpio = !reset gpio. Difference is only in polarity.
+[...]
 
-> > You are not helping.
+>  static __init
+>  const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node
+> *node)
+>  {
+> @@ -1001,6 +1041,8 @@ const struct iort_iommu_config
+> *iort_get_iommu_cfg(struct acpi_iort_node *node)
+>  		return &iort_arm_smmu_v3_cfg;
+>  	case ACPI_IORT_NODE_SMMU:
+>  		return &iort_arm_smmu_cfg;
+> +	case ACPI_IORT_NODE_PMCG:
+> +		return &iort_arm_smmu_pmcg_cfg;
+
+I understand this series will be revised based on the iort spec update.
+
+This Is to clarify few queries we have with respect to one of our hisilicon 
+platform which has support for SMMU v3 PMCG. In our implementation
+the base address for the PMCG is defined at a IMP DEF address offset
+within the SMMUv3 page 0 address space. And as per SMMU spec, 
+
+" The Performance Monitor Counter Groups are standalone monitoring 
+facilities  and, as such, can be implemented in separate components that
+are all associated with (but not necessarily part of) an SMMU"
+
+It looks like PMCG can be part of SMMU,  it is not clear whether this kind
+of address mapping is forbidden or not. If this is an accepted  scenario, then
+the devm_ioremap_resource() call in SMMv3 probe will fail as it reports conflict.
+
+As far as I can see, the above code just checks the iort node type is PMCG
+and assumes that its SMMU PMCG. As per IORT spec, it make sense to check
+the node reference filed and make that call. 
+
+And to fix the resource conflict issue we have, is it possible to treat the PMCG
+node as the child of the SMMU and call the platform_device_add() appropriately
+to avoid the conflict? I am not sure this will fix the issue and also about the order
+in which SMMU and PMCG devices will be populated will have an impact on this.
+
+Please let me know your thoughts on this.
+
+Thanks,
+Shameer
+  
+>  	default:
+>  		return NULL;
+>  	}
+> @@ -1056,6 +1098,15 @@ static int __init
+> iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>  	if (ret)
+>  		goto dev_put;
 > 
-> The only way I can help here is to resend your patch with "reset-gpios"
-> used, which I'm pretty sure you can handle yourself.
-
-Well, you can do that, and then you can argue with the next person who
-feels one of the properties has to get his preferred color. Hard part
-is not changing code :-(.
-
-									Pavel
-
-> (*) Remark "DAC33 enabled (for example, plug in a headset to the 3.5mm
-> AV connector and start music playback from the device)" in schematics
-> suggests it is controlled somehow.
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/0c334b78/attachment.sig>
+> +	/* End of init for PMCG */
+> +	if (node->type == ACPI_IORT_NODE_PMCG) {
+> +		ret = platform_device_add(pdev);
+> +		if (ret)
+> +			goto dev_put;
+> +
+> +		return 0;
+> +	}
+> +
+>  	/*
+>  	 * We expect the dma masks to be equivalent for
+>  	 * all SMMUs set-ups
+> @@ -1131,6 +1182,9 @@ static void __init iort_init_platform_devices(void)
+>  				acpi_free_fwnode_static(fwnode);
+>  				return;
+>  			}
+> +		} else if (iort_node->type == ACPI_IORT_NODE_PMCG) {
+> +			if (iort_add_smmu_platform_device(iort_node))
+> +				return;
+>  		}
+> 
+>  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> index 707dda74..2169b6f 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -695,7 +695,8 @@ enum acpi_iort_node_type {
+>  	ACPI_IORT_NODE_NAMED_COMPONENT = 0x01,
+>  	ACPI_IORT_NODE_PCI_ROOT_COMPLEX = 0x02,
+>  	ACPI_IORT_NODE_SMMU = 0x03,
+> -	ACPI_IORT_NODE_SMMU_V3 = 0x04
+> +	ACPI_IORT_NODE_SMMU_V3 = 0x04,
+> +	ACPI_IORT_NODE_PMCG = 0x05
+>  };
+> 
+>  struct acpi_iort_id_mapping {
+> @@ -811,6 +812,12 @@ struct acpi_iort_smmu_v3 {
+>  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
+>  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
+> 
+> +struct acpi_iort_pmcg {
+> +	u64 base_address;	/* PMCG base address */
+> +	u32 overflow_gsiv;
+> +	u32 node_reference;
+> +};
+> +
+> 
+> /****************************************************************
+> ***************
+>   *
+>   * IVRS - I/O Virtualization Reporting Structure
+> --
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
