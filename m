@@ -1,60 +1,55 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Tue, 30 Jan 2018 19:39:49 +0530
-Subject: [PATCH v2 1/2] drm/bridge/synopsys: dsi: Add a warning msg on dsi
- read requests
-In-Reply-To: <20180126004441.k4pymmsr6brcdzmq@ban.mtv.corp.google.com>
-References: <20180125103800.1999-1-philippe.cornu@st.com>
- <20180125103800.1999-2-philippe.cornu@st.com>
- <20180126004441.k4pymmsr6brcdzmq@ban.mtv.corp.google.com>
-Message-ID: <18888350-d764-f6bd-5285-a7fac3d300e0@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 30 Jan 2018 15:18:44 +0100
+Subject: [PATCH v2] ARM64: dts: marvell: armada-cp110: Add registers clock for
+ SPI nodes
+Message-ID: <20180130141844.18827-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This extra clock is needed to access the registers of the SPI controller
+used on Armada 7K/8K SoCs.
 
+This follows the changes already made in the binding documentation (as
+well as in the driver) in:
+'commit 92ae112e477ac412decc3fdd5c1eeb6c90c266b4 ("spi: orion: Fix clock
+resource by adding an optional bus clock")'.
 
-On 01/26/2018 06:14 AM, Brian Norris wrote:
-> On Thu, Jan 25, 2018 at 11:37:59AM +0100, Philippe Cornu wrote:
->> The dcs/generic dsi read feature is not yet implemented so it
->> is important to warn the host_transfer() caller in case of
->> read operation requests.
->>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> 
-> Awesome, thanks.
-> 
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
-> 
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
 
-Queued to drm-misc-next.
+Changelog:
 
-Thanks,
-Archit
+v1 -> v2
+Add comment about the commit modifying the driver in the commit log
 
->> ---
->>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> index daec7881be6d..72ecaeb40822 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> @@ -405,6 +405,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->>   	struct mipi_dsi_packet packet;
->>   	int ret;
->>   
->> +	if (msg->rx_buf || msg->rx_len) {
->> +		/* TODO dw drv improvements: implement read feature */
->> +		dev_warn(dsi->dev, "read operations not yet implemented\n");
->> +		return -EINVAL;
->> +	}
->> +
->>   	ret = mipi_dsi_create_packet(&packet, msg);
->>   	if (ret) {
->>   		dev_err(dsi->dev, "failed to create packet: %d\n", ret);
->> -- 
->> 2.15.1
->>
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index a8af4136dbe7..0ab921861a2f 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -257,7 +257,9 @@
+ 			reg = <0x700600 0x50>;
+ 			#address-cells = <0x1>;
+ 			#size-cells = <0x0>;
+-			clocks = <&CP110_LABEL(clk) 1 21>;
++			clock-names = "core", "axi";
++			clocks = <&CP110_LABEL(clk) 1 21>,
++				 <&CP110_LABEL(clk) 1 17>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -266,7 +268,9 @@
+ 			reg = <0x700680 0x50>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			clocks = <&CP110_LABEL(clk) 1 21>;
++			clock-names = "core", "axi";
++			clocks = <&CP110_LABEL(clk) 1 21>,
++				 <&CP110_LABEL(clk) 1 17>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.15.1
