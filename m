@@ -1,35 +1,32 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 30 Jan 2018 20:22:46 +0000
-Subject: [RFC v3 13/25] ARM: shmobile: defconfig: Enable CONFIG_RENESAS_WDT
-In-Reply-To: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517343778-27902-14-git-send-email-fabrizio.castro@bp.renesas.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 30 Jan 2018 22:18:17 +0100
+Subject: [PATCH v2 2/4] ARM: dts: exynos: Remove duplicated inclusion of
+ syscon restart nodes on Exynos5410
+In-Reply-To: <20180130211819.17139-1-krzk@kernel.org>
+References: <20180130211819.17139-1-krzk@kernel.org>
+Message-ID: <20180130211819.17139-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
-its driver by default.
+The exynos-syscon-restart.dtsi is already included by exynos5.dtsi
+(through exynos54xx.dtsi).
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
-v1->v3:
-* CONFIG_RENESAS_WDT_GEN2 -> CONFIG_RENESAS_WDT
+ arch/arm/boot/dts/exynos5410.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 578434c..d5cdad8 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
-+CONFIG_RENESAS_WDT=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 1886aa00b2db..1e6b57d013c4 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include "exynos54xx.dtsi"
+-#include "exynos-syscon-restart.dtsi"
+ #include <dt-bindings/clock/exynos5410.h>
+ #include <dt-bindings/clock/exynos-audss-clk.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
 -- 
-2.7.4
+2.11.0
