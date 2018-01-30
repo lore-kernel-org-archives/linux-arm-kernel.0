@@ -1,10 +1,10 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 30 Jan 2018 13:57:12 +0100
-Subject: [PATCH v2 2/5] arm64: dts: mt6797: add pwrap support for mt6797
-In-Reply-To: <20180129090944.28687-2-argus.lin@mediatek.com>
+Date: Tue, 30 Jan 2018 13:58:28 +0100
+Subject: [PATCH v2 1/5] dt-bindings: pwrap: mediatek: add pwrap support
+ for MT6797
+In-Reply-To: <20180129090944.28687-1-argus.lin@mediatek.com>
 References: <20180129090944.28687-1-argus.lin@mediatek.com>
- <20180129090944.28687-2-argus.lin@mediatek.com>
-Message-ID: <dcb5d00a-2239-b214-70a2-cef2e66570fa@gmail.com>
+Message-ID: <ffcadc29-c6f2-eb8c-b662-1c0016648cbc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,51 +13,32 @@ List-Id: linux-arm-kernel.lists.infradead.org
 On 01/29/2018 10:09 AM, argus.lin at mediatek.com wrote:
 > From: Argus Lin <argus.lin@mediatek.com>
 > 
-> mt6797 is a highly integrated SoCs, and it uses
-> mt6351 as Power Management IC.
-> We need to add pwrap device to communicate with
-> mt6351 by SPI.
-> The base address of pwrap is 0x1000d000, and IRQ
-> number is 178. It also using fixed 26Mhz clock
-> as SPI CLK.
+> We add pwrap support for MT6797 SoCs.
 > 
 > Signed-off-by: Argus Lin <argus.lin@mediatek.com>
 > ---
-
-For the next round, can you put the dts patch at the end of the series. Binding
-description should be the first patch, but actual dts(i) inclusion should be the
-last one. It's bike shedding I know, but as you need a new series anyway.
-
-Thanks.
-
->  arch/arm64/boot/dts/mediatek/mt6797.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  Documentation/devicetree/bindings/soc/mediatek/pwrap.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-> index 4beaa71107d7..485546efc9bf 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-> @@ -161,6 +161,20 @@
->  		      <0 0x10220690 0 0x10>;
->  	};
->  
-> +	pwrap: pwrap at 1000d000 {
-> +		compatible = "mediatek,mt6797-pwrap";
-> +		reg = <0 0x1000d000 0 0x1000>;
-> +		reg-names = "pwrap";
-> +		interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clk26m>, <&clk26m>;
-> +		clock-names = "spi", "wrap";
-> +
-> +		pmic: mt6351 {
-> +			compatible = "mediatek,mt6351";
-> +			interrupt-controller;
-> +		};
-> +	};
-> +
->  	uart0: serial at 11002000 {
->  		compatible = "mediatek,mt6797-uart",
->  			     "mediatek,mt6577-uart";
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+> index bf80e3f96f8c..f9987c30f0d5 100644
+> --- a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+> +++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+> @@ -19,6 +19,7 @@ IP Pairing
+>  Required properties in pwrap device node.
+>  - compatible:
+>  	"mediatek,mt2701-pwrap" for MT2701/7623 SoCs
+> +	"mediatek,mt6797-pwrap" for MT6797 SoCs
+
+Looks good to me. When you send the new series, would you mind to add a cover
+letter in which you describe which changes you made in every version of the
+patch series? That makes the reviewing for me much easier :)
+
+Thanks!
+
+>  	"mediatek,mt7622-pwrap" for MT7622 SoCs
+>  	"mediatek,mt8135-pwrap" for MT8135 SoCs
+>  	"mediatek,mt8173-pwrap" for MT8173 SoCs
 > -- 
 > 2.12.5
 > 
