@@ -1,29 +1,44 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 30 Jan 2018 11:51:54 +0100
-Subject: [PATCH] dt-bindings: display: stm32: correct clock-names in dsi
- panel example
-In-Reply-To: <20180129231518.mocdpegeagbs4z5n@rob-hp-laptop>
-References: <20180122153547.23470-1-philippe.cornu@st.com>
- <20180129231518.mocdpegeagbs4z5n@rob-hp-laptop>
-Message-ID: <CA+M3ks78kufDB4QSd38Ah15zidbuHnY3kHMHXB_0iQFFg1VVkA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 30 Jan 2018 12:14:55 +0100
+Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add registers clock for
+ SPI nodes
+Message-ID: <20180130111455.10101-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-30 0:15 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Mon, Jan 22, 2018 at 04:35:47PM +0100, Philippe Cornu wrote:
->> In the dsi panel example, clock names in the "clock-names"
->> field have been swapped:
->> * "pclk" (peripheral clock) is <&rcc 1 CLK_F469_DSI> on stm32f4
->> * "ref" (dsi phy pll ref clock) is <&clk_hse> on stm32f4
->>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
->> ---
->>  Documentation/devicetree/bindings/display/st,stm32-ltdc.txt | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> Reviewed-by: Rob Herring <robh@kernel.org>
->
-Applied on drm-misc-next.
+This extra clock is needed to access the registers of the SPI controller
+used on Armada 7K/8K SoCs.
 
-Regards,
-Benjamin
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index a8af4136dbe7..0ab921861a2f 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -257,7 +257,9 @@
+ 			reg = <0x700600 0x50>;
+ 			#address-cells = <0x1>;
+ 			#size-cells = <0x0>;
+-			clocks = <&CP110_LABEL(clk) 1 21>;
++			clock-names = "core", "axi";
++			clocks = <&CP110_LABEL(clk) 1 21>,
++				 <&CP110_LABEL(clk) 1 17>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -266,7 +268,9 @@
+ 			reg = <0x700680 0x50>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			clocks = <&CP110_LABEL(clk) 1 21>;
++			clock-names = "core", "axi";
++			clocks = <&CP110_LABEL(clk) 1 21>,
++				 <&CP110_LABEL(clk) 1 17>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.15.1
