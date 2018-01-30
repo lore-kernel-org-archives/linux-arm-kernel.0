@@ -1,64 +1,73 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 30 Jan 2018 10:01:26 +0200
-Subject: [PATCH 2/2] arm64: dts: marvell: mcbin: enable uart headers
-In-Reply-To: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
-References: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
-Message-ID: <97a7416bb0eb19c9d32e41984e292a869ff14230.1517299286.git.baruch@tkos.co.il>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Jan 2018 09:32:05 +0100
+Subject: [PATCH v2 10/16] iio: adc: sun4i-gpadc-iio: add support for A83T
+ thermal sensor
+In-Reply-To: <94bc070d-8675-95fe-2857-188f7cc66071@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-11-embed3d@gmail.com>
+ <20180129094803.uiojqkmaeuihbe4p@flea.lan>
+ <94bc070d-8675-95fe-2857-188f7cc66071@gmail.com>
+Message-ID: <20180130083205.j4b2wua7knymkfn6@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description of the J25 and J27 UART headers of the Macchiatobin. They use
-uart peripherals that the CP0 (J25) and CP1 (J27) provides.
+1;5002;0c
+On Mon, Jan 29, 2018 at 12:53:48PM +0100, Philipp Rossak wrote:
+> 
+> 
+> On 29.01.2018 10:48, Maxime Ripard wrote:
+> > On Mon, Jan 29, 2018 at 12:29:13AM +0100, Philipp Rossak wrote:
+> > > This patch adds support for the A83T ths sensor.
+> > > 
+> > > The A83T supports interrupts. The interrupt is configured to update the
+> > > the sensor values every second.
+> > > 
+> > > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> > > ---
+> > >   drivers/iio/adc/sun4i-gpadc-iio.c | 38 ++++++++++++++++++++++++++++++++++++++
+> > >   include/linux/mfd/sun4i-gpadc.h   | 18 ++++++++++++++++++
+> > >   2 files changed, 56 insertions(+)
+> > > 
+> > > diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> > > index 8196203d65fe..9f7895ba1966 100644
+> > > --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> > > +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> > > @@ -170,6 +170,40 @@ static const struct gpadc_data sun8i_h3_ths_data = {
+> > >   		SUN8I_H3_THS_TEMP_PERIOD(0x7),
+> > >   };
+> > > +static const struct gpadc_data sun8i_a83t_ths_data = {
+> > > +	.temp_offset = -2724,
+> > > +	.temp_scale = -70,
+> > > +	.temp_data = {SUN8I_H3_THS_TDATA0,
+> > > +		SUN8I_A83T_THS_TDATA1,
+> > > +		SUN8I_A83T_THS_TDATA2,
+> > > +		0},
+> > > +	.sample_start = sunxi_ths_sample_start,
+> > > +	.sample_end = sunxi_ths_sample_end,
+> > > +	.sensor_count = 3,
+> > > +	.supports_nvmem = false,
+> > > +	.support_irq = true,
+> > > +	.ctrl0_map = SUN4I_GPADC_CTRL0_T_ACQ(0x1f3),
+> > > +	.ctrl2_map = SUN8I_H3_THS_ACQ1(0x1f3),
+> > 
+> > Where are these values coming from?
+> > 
+> 
+> These values are calculated with the formulas from the datasheet and also
+> tested on hardware. These settings seem ok.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+You should at least put a comment explaining how you got to these values.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index 626e9d0462c3..3ce15b740bb0 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -163,6 +163,12 @@
- 	};
- };
- 
-+&cp0_uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp0_uart1_pins>;
-+	status = "okay";
-+};
-+
- &cp0_mdio {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&cp0_ge_mdio_pins>;
-@@ -195,6 +201,10 @@
- 		marvell,pins = "mpp37", "mpp38";
- 		marvell,function = "i2c0";
- 	};
-+	cp0_uart1_pins: uart1-pins {
-+		marvell,pins = "mpp40", "mpp41";
-+		marvell,function = "uart1";
-+	};
- 	cp0_xhci_vbus_pins: xhci0-vbus-pins {
- 		marvell,pins = "mpp47";
- 		marvell,function = "gpio";
-@@ -290,6 +300,16 @@
- 		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
- 		marvell,function = "spi1";
- 	};
-+	cp1_uart0_pins: uart0-pins {
-+		marvell,pins = "mpp6", "mpp7";
-+		marvell,function = "uart0";
-+	};
-+};
-+
-+&cp1_uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp1_uart0_pins>;
-+	status = "okay";
- };
- 
- &cp1_sata0 {
+Maxime
+
 -- 
-2.15.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/13ffd600/attachment.sig>
