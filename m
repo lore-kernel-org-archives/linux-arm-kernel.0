@@ -1,68 +1,64 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 30 Jan 2018 10:01:25 +0200
-Subject: [PATCH 1/2] arm64: dts: marvell: add CP110 uart peripherals
-Message-ID: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
+Date: Tue, 30 Jan 2018 10:01:26 +0200
+Subject: [PATCH 2/2] arm64: dts: marvell: mcbin: enable uart headers
+In-Reply-To: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
+References: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
+Message-ID: <97a7416bb0eb19c9d32e41984e292a869ff14230.1517299286.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CP110 component has 4 uart peripherals. All of them use the same clock
-gate for slow peripherals that is shared with the i2c and spi peripherals.
+Add description of the J25 and J27 UART headers of the Macchiatobin. They use
+uart peripherals that the CP0 (J25) and CP1 (J27) provides.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index a8af4136dbe7..a422cd981a0b 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -290,6 +290,46 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+index 626e9d0462c3..3ce15b740bb0 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+@@ -163,6 +163,12 @@
+ 	};
+ };
  
-+		CP110_LABEL(uart0): serial at 702000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x702000 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-io-width = <1>;
-+			clocks = <&CP110_LABEL(clk) 1 21>;
-+			status = "disabled";
-+		};
++&cp0_uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp0_uart1_pins>;
++	status = "okay";
++};
 +
-+		CP110_LABEL(uart1): serial at 702100 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x702100 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-io-width = <1>;
-+			clocks = <&CP110_LABEL(clk) 1 21>;
-+			status = "disabled";
-+		};
+ &cp0_mdio {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&cp0_ge_mdio_pins>;
+@@ -195,6 +201,10 @@
+ 		marvell,pins = "mpp37", "mpp38";
+ 		marvell,function = "i2c0";
+ 	};
++	cp0_uart1_pins: uart1-pins {
++		marvell,pins = "mpp40", "mpp41";
++		marvell,function = "uart1";
++	};
+ 	cp0_xhci_vbus_pins: xhci0-vbus-pins {
+ 		marvell,pins = "mpp47";
+ 		marvell,function = "gpio";
+@@ -290,6 +300,16 @@
+ 		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
+ 		marvell,function = "spi1";
+ 	};
++	cp1_uart0_pins: uart0-pins {
++		marvell,pins = "mpp6", "mpp7";
++		marvell,function = "uart0";
++	};
++};
 +
-+		CP110_LABEL(uart2): serial at 702200 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x702200 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <ICU_GRP_NSR 124 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-io-width = <1>;
-+			clocks = <&CP110_LABEL(clk) 1 21>;
-+			status = "disabled";
-+		};
-+
-+		CP110_LABEL(uart3): serial at 702300 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x702300 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <ICU_GRP_NSR 125 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-io-width = <1>;
-+			clocks = <&CP110_LABEL(clk) 1 21>;
-+			status = "disabled";
-+		};
-+
- 		CP110_LABEL(nand): nand at 720000 {
- 			/*
- 			* Due to the limitation of the pins available
++&cp1_uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp1_uart0_pins>;
++	status = "okay";
+ };
+ 
+ &cp1_sata0 {
 -- 
 2.15.1
