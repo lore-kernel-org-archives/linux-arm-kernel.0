@@ -1,26 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 Jan 2018 23:15:51 +0100
-Subject: [PATCH 4/4] ARM: dts: at91: tse850: use the correct compatible
- for the eeprom
-In-Reply-To: <20180116160618.27859-5-peda@axentia.se>
-References: <20180116160618.27859-1-peda@axentia.se>
- <20180116160618.27859-5-peda@axentia.se>
-Message-ID: <20180130221551.GM2809@piout.net>
+Date: Tue, 30 Jan 2018 23:19:52 +0100
+Subject: [PATCH v2 0/3] Device tree fixes for Axentia TSE-850 and Nattis
+In-Reply-To: <20180118114616.6639-1-peda@axentia.se>
+References: <20180118114616.6639-1-peda@axentia.se>
+Message-ID: <20180130221952.GN2809@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/2018 at 17:06:18 +0100, Peter Rosin wrote:
-> The used part does contain an eeprom compatible with an Atmel 24c02
-> chip and it is from NXP, but it is not called 24c02. It's actually a
-> se97b chip. Adjust the compatible accordingly.
+On 18/01/2018 at 12:46:13 +0100, Peter Rosin wrote:
+> Hi!
 > 
-> Fixes: 21dd0ece34c2 ("ARM: dts: at91: add devicetree for the Axentia TSE-850")
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Here's a series that is of the "documentation" kind. It fixes things
+> that don't really need fixing, but the fixes are correct none-the-less
+> and should prevent possible confusion.
 > 
-Applied, thanks.
+> Changes since v1:
+> 
+> - One more fix added to patch 1/3. The size of the rootfs partition
+>   should be 504MB, as the flash is 512MB total.
+> 
+> Sorry for the noise.
+> 
+
+All applied. I'm planning to send that for 4.17 as they are not urgent.
 
 -- 
 Alexandre Belloni, Free Electrons
