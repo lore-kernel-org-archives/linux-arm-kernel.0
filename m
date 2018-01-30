@@ -1,73 +1,81 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 30 Jan 2018 09:53:14 +0100
-Subject: [PATCH] sound/tlv320dac33: Add device tree support
-In-Reply-To: <20180130083446.GA13498@lenoch>
-References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
- <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
-Message-ID: <20180130085314.GA4585@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jan 2018 08:54:17 +0000
+Subject: [PATCH v2 15/16] arm/arm64: smccc: Implement SMCCC v1.1 inline
+ primitive
+In-Reply-To: <04d16ecd-044c-fe56-f9be-78d0cb591e71@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-16-marc.zyngier@arm.com>
+ <04d16ecd-044c-fe56-f9be-78d0cb591e71@arm.com>
+Message-ID: <84eaa3ee-6838-466a-9974-98b6092b9e6c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-01-30 09:34:46, Ladislav Michl wrote:
-> On Tue, Jan 30, 2018 at 12:33:01AM +0100, Pavel Machek wrote:
-> > On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
-> > > On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
-> > > > 
-> > > > This adds device tree support to tlv320dac33.c.
-> > > > 
-> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> > > > new file mode 100644
-> > > > index 0000000..6cbd311
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-> > > > @@ -0,0 +1,32 @@
-> > > > +Texas Instruments - tlv320dac33 Codec module
-> > > > +
-> > > > +The tlv320dac33 serial control bus communicates through I2C protocols.
-> > > > +
-> > > > +Required properties:
-> > > > +
-> > > > +- compatible - "ti,tlv320dac33"
-> > > > +- reg - I2C slave address
-> > > > +
-> > > > +Optional properties:
-> > > > +
-> > > > +- power-gpios - gpio pin to power the device, active high
-> > > 
-> > > While driver used gpio in platform data, isn't it more likely
-> > > regulator which powers device?
-> > 
-> >                 power-gpios = <&gpio2 28 0>; /* gpio_60 */
-> > 
-> > Looks like GPIO to me -- example is from Nokia N9. So this appears to
-> > be correct.
+On 29/01/18 19:07, Robin Murphy wrote:
+> On 29/01/18 17:45, Marc Zyngier wrote:
+>> One of the major improvement of SMCCC v1.1 is that it only clobbers
+>> the first 4 registers, both on 32 and 64bit. This means that it
+>> becomes very easy to provide an inline version of the SMC call
+>> primitive, and avoid performing a function call to stash the
+>> registers that would otherwise be clobbered by SMCCC v1.0.
 > 
-> Device datasheet doesn't list any pin which looks like "power-gpio"
-> http://www.ti.com/lit/ds/symlink/tlv320dac32.pdf
-> Unfortunately I do not know much about N9, but was able to find Nokia 5610
-> scheme to get clue how could be tlv320dac33 hardwired (see page 2):
-> http://mastermobile.spb.ru/service/nokia_5610_rm-242_service_schematics.pdf
-> Here AVDD is powered by LP3985 voltage regulator which is enabled using
-> VEN pin which might be connected to gpio. Or there could be completely
-> different voltage regulator with different controls. And since Linux
-> already has voltage regulator class, lets not limit ourselves to gpio
-> pins.
+> This is disgusting... I love it :D
 
-Well, notice I'm converting existing driver to device tree. And that
-one already has GPIO dependency. It is possible that more work needs
-to be done there, but that should not be a reason to delay this. Feel
-free to help.
+I expected nothing less from you! ;-)
 
-									Pavel
+> 
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   include/linux/arm-smccc.h | 157 ++++++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 157 insertions(+)
+>>
+>> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+>> index dd44d8458c04..bc5843728909 100644
+>> --- a/include/linux/arm-smccc.h
+>> +++ b/include/linux/arm-smccc.h
+>> @@ -150,5 +150,162 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+>>   
+>>   #define arm_smccc_hvc_quirk(...) __arm_smccc_hvc(__VA_ARGS__)
+>>   
+>> +/* SMCCC v1.1 implementation madness follows */
+>> +#ifdef CONFIG_ARM64
+>> +
+>> +#define SMCCC_SMC_INST	"smc	#0"
+>> +#define SMCCC_HVC_INST	"hvc	#0"
+>> +
+>> +#define __arm_smccc_1_1_prologue(inst)					\
+>> +	inst "\n"							\
+>> +	"cbz	%[ptr], 1f\n"						\
+>> +	"stp	%x[r0], %x[r1], %[ra0]\n"				\
+>> +	"stp	%x[r2], %x[r3], %[ra2]\n"				\
+>> +	"1:\n"								\
+>> +	: [ra0] "=Ump" (*(&___res->a0)),				\
+>> +	  [ra2] "=Ump" (*(&___res->a2)),
+> 
+> Rather than embedding a guaranteed spill to memory, I wonder if there's 
+> money in just always declaring r0-r3 as in-out operands, and propagating 
+> them by value afterwards, i.e.:
+> 
+> 	asm(...);
+> 	if (___res)
+> 		*___res = (struct arm_smccc_res){ r0, r1, r2, r3 };
+> 
+> In theory, for sufficiently simple callers that might allow res to stay 
+> in registers for its entire lifetime and give nicer codegen. It *might* 
+> also simplify some of this macro machinery too, although at this point 
+> in the evening I can't really tell...
+
+I just implemented it, and this is indeed much better. In most cases,
+the store gets optimized away, mostly because we either pass NULL (and
+the condition is dropped) or the store doesn't need to take place as we
+evaluate a condition and discard the structure, like in
+check_smccc_arch_workaround_1.
+
+In all cases, this allows for slightly reduced levels of cpp madness,
+and better codegen. I also suspect it will solve Ard's register
+allocation issue.
+
+Thanks,
+
+	M.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180130/b3e457c9/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
