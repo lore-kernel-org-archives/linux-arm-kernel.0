@@ -1,71 +1,45 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 30 Jan 2018 22:18:16 +0100
-Subject: [PATCH v2 1/4] soc: samsung: pmu: Populate children syscon nodes
-In-Reply-To: <20180130211819.17139-1-krzk@kernel.org>
-References: <20180130211819.17139-1-krzk@kernel.org>
-Message-ID: <20180130211819.17139-2-krzk@kernel.org>
+Date: Tue, 30 Jan 2018 22:18:15 +0100
+Subject: [PATCH v2 0/4] ARM/arm64: exynos: Fix missing missing reg warning for
+ syscon restart nodes
+Message-ID: <20180130211819.17139-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The syscon poweroff and restart nodes logically belong to the Power
-Management Unit so populate possible children.
 
-This also requires providing compatibles for Exynos5410 and Exynos7 so
-the PMU device and its children will be instantiated for them as well.
-Just like Exynos5433, these chipsets are not yet supported by the PMU
-driver.
+Hi,
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- Documentation/devicetree/bindings/arm/samsung/pmu.txt | 6 ++++++
- drivers/soc/samsung/exynos-pmu.c                      | 7 +++++++
- 2 files changed, 13 insertions(+)
+Changes since v1:
+1. New patch (1/4) calling devm_of_platform_populate() in PMU driver,
+   following Rob's advice.
+2. The DTS patches moving reboot/poweroff nodes (3/4 and 4/4) now depend
+   on this.
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-index 779f5614bcee..16685787d2bd 100644
---- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
-@@ -43,6 +43,12 @@ following properties:
- - interrupt-parent: a phandle indicating which interrupt controller
-   this PMU signals interrupts to.
- 
-+
-+Optional nodes:
-+
-+- nodes defining the restart and poweroff syscon children
-+
-+
- Example :
- pmu_system_controller: system-controller at 10040000 {
- 	compatible = "samsung,exynos5250-pmu", "syscon";
-diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index f56adbd9fb8b..d34ca201b8b7 100644
---- a/drivers/soc/samsung/exynos-pmu.c
-+++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -85,10 +85,14 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
- 		.compatible = "samsung,exynos5250-pmu",
- 		.data = exynos_pmu_data_arm_ptr(exynos5250_pmu_data),
- 	}, {
-+		.compatible = "samsung,exynos5410-pmu",
-+	}, {
- 		.compatible = "samsung,exynos5420-pmu",
- 		.data = exynos_pmu_data_arm_ptr(exynos5420_pmu_data),
- 	}, {
- 		.compatible = "samsung,exynos5433-pmu",
-+	}, {
-+		.compatible = "samsung,exynos7-pmu",
- 	},
- 	{ /*sentinel*/ },
- };
-@@ -126,6 +130,9 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, pmu_context);
- 
-+	if (devm_of_platform_populate(dev))
-+		dev_err(dev, "Error populating children, reboot and poweroff might not work properly\n");
-+
- 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
- 	return 0;
- }
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (4):
+  soc: samsung: pmu: Populate children syscon nodes
+  ARM: dts: exynos: Remove duplicated inclusion of syscon restart nodes
+    on Exynos5410
+  ARM: dts: exynos: Fix missing missing reg warning for syscon restart
+    nodes
+  arm64: dts: exynos: Fix missing missing reg warning for syscon restart
+    nodes
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |  6 +++++
+ arch/arm/boot/dts/exynos-syscon-restart.dtsi       | 28 ++++++++++------------
+ arch/arm/boot/dts/exynos3250.dtsi                  |  2 +-
+ arch/arm/boot/dts/exynos4.dtsi                     |  3 ++-
+ arch/arm/boot/dts/exynos5.dtsi                     |  1 -
+ arch/arm/boot/dts/exynos5250.dtsi                  |  1 +
+ arch/arm/boot/dts/exynos5410.dtsi                  |  2 +-
+ arch/arm/boot/dts/exynos5420.dtsi                  |  1 +
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 14 +++++------
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            | 12 +++++-----
+ drivers/soc/samsung/exynos-pmu.c                   |  3 +++
+ 11 files changed, 40 insertions(+), 33 deletions(-)
+
 -- 
 2.11.0
