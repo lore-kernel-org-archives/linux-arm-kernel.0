@@ -1,76 +1,45 @@
-From: filip.matijevic.pz@gmail.com (=?UTF-8?Q?Filip_Matijevi=c4=87?=)
-Date: Tue, 30 Jan 2018 10:11:02 +0100
-Subject: [PATCH] sound/tlv320dac33: Add device tree support
-In-Reply-To: <20180130085314.GA4585@amd>
-References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
- <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
- <20180130085314.GA4585@amd>
-Message-ID: <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Jan 2018 10:24:48 +0100
+Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180130075441.rqxzkwero6sdfak6@flea.lan>
+References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+ <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
+ <20180129082533.6edmqgbauo6q5dgz@flea.lan>
+ <CACRpkdYAGwUjr2C-w5U+WuG48pZAOUcnxFjznLbdF6Lmy1uZuQ@mail.gmail.com>
+ <CAK8P3a2HmPOTHAzqBnmim388pcWOE=fG50mG5HJifT=vzKOaTg@mail.gmail.com>
+ <20180130075441.rqxzkwero6sdfak6@flea.lan>
+Message-ID: <CAK8P3a0QxQE=GM=SGPtT82=UreiqsgY6uMThvQ_woA3rjK0zjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jan 30, 2018 at 8:54 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Jan 29, 2018 at 03:34:02PM +0100, Arnd Bergmann wrote:
+>> On Mon, Jan 29, 2018 at 10:25 AM, Linus Walleij
+>> <linus.walleij@linaro.org> wrote:
+>> > On Mon, Jan 29, 2018 at 9:25 AM, Maxime Ripard
+>> > <maxime.ripard@free-electrons.com> wrote:
+>> >> On Sat, Jan 27, 2018 at 05:14:26PM +0100, Linus Walleij wrote:
 
-On 01/30/2018 09:53 AM, Pavel Machek wrote:
-> On Tue 2018-01-30 09:34:46, Ladislav Michl wrote:
->> On Tue, Jan 30, 2018 at 12:33:01AM +0100, Pavel Machek wrote:
->>> On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
->>>> On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
->>>>>
->>>>> This adds device tree support to tlv320dac33.c.
->>>>>
->>>>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
->>>>> new file mode 100644
->>>>> index 0000000..6cbd311
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
->>>>> @@ -0,0 +1,32 @@
->>>>> +Texas Instruments - tlv320dac33 Codec module
->>>>> +
->>>>> +The tlv320dac33 serial control bus communicates through I2C protocols.
->>>>> +
->>>>> +Required properties:
->>>>> +
->>>>> +- compatible - "ti,tlv320dac33"
->>>>> +- reg - I2C slave address
->>>>> +
->>>>> +Optional properties:
->>>>> +
->>>>> +- power-gpios - gpio pin to power the device, active high
->>>>
->>>> While driver used gpio in platform data, isn't it more likely
->>>> regulator which powers device?
->>>
->>>                 power-gpios = <&gpio2 28 0>; /* gpio_60 */
->>>
->>> Looks like GPIO to me -- example is from Nokia N9. So this appears to
->>> be correct.
 >>
->> Device datasheet doesn't list any pin which looks like "power-gpio"
->> http://www.ti.com/lit/ds/symlink/tlv320dac32.pdf
->> Unfortunately I do not know much about N9, but was able to find Nokia 5610
->> scheme to get clue how could be tlv320dac33 hardwired (see page 2):
->> http://mastermobile.spb.ru/service/nokia_5610_rm-242_service_schematics.pdf
->> Here AVDD is powered by LP3985 voltage regulator which is enabled using
->> VEN pin which might be connected to gpio. Or there could be completely
->> different voltage regulator with different controls. And since Linux
->> already has voltage regulator class, lets not limit ourselves to gpio
->> pins.
-> 
-> Well, notice I'm converting existing driver to device tree. And that
-> one already has GPIO dependency. It is possible that more work needs
-> to be done there, but that should not be a reason to delay this. Feel
-> free to help.
-> 
-> 									Pavel
-> 
+>> At one point we had discussed adding a 'dma-masters' property that
+>> lists all the buses on which a device can be a dma master, and
+>> the respective properties of those masters (iommu, coherency,
+>> offset, ...).
+>>
+>> IIRC at the time we decided that we could live without that complexity,
+>> but perhaps we cannot.
+>
+> Are you talking about this ?
+> https://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/dma/dma.txt#L41
+>
+> It doesn't seem to be related to that issue to me. And in our
+> particular cases, all the devices are DMA masters, the RAM is just
+> mapped to another address.
 
-According to N9 schematics
-http://www.s-manuals.com/manuals/phone/nokia/nokia_n9_rm-696_service_schematics_v1.pdf
-it's in fact GPIO pin that is connected to reset line (labeled
-CODEC_RST). So calling it "power" might be misleading, but the driver
-code is quite clear as it labels that GPIO as "tlv320dac33 reset"
+No, that's not the one I was thinking of. The idea at the time was much
+more generic, and not limited to dma engines. I don't recall the details,
+but I think that Thierry was either involved or made the proposal at the
+time.
 
-Filip
+       Arnd
