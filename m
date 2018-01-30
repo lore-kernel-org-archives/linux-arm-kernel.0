@@ -1,48 +1,72 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Jan 2018 16:58:44 +0000
-Subject: [PATCH 2/2] arm64: dts: marvell: mcbin: enable uart headers
-In-Reply-To: <20180130164712.qplfkmtimpi44xxa@sapphire.tkos.co.il>
-References: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
- <97a7416bb0eb19c9d32e41984e292a869ff14230.1517299286.git.baruch@tkos.co.il>
- <20180130160516.GE9418@n2100.armlinux.org.uk>
- <20180130164712.qplfkmtimpi44xxa@sapphire.tkos.co.il>
-Message-ID: <20180130165844.GF9418@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 30 Jan 2018 11:05:15 -0600
+Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <20180124103516.2571-9-jeffy.chen@rock-chips.com>
+References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
+ <20180124103516.2571-9-jeffy.chen@rock-chips.com>
+Message-ID: <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 06:47:12PM +0200, Baruch Siach wrote:
-> Hi Russell,
+On Wed, Jan 24, 2018 at 06:35:11PM +0800, Jeffy Chen wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
 > 
-> On Tue, Jan 30, 2018 at 04:05:17PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Jan 30, 2018 at 10:01:26AM +0200, Baruch Siach wrote:
-> > > Add description of the J25 and J27 UART headers of the Macchiatobin. They use
-> > > uart peripherals that the CP0 (J25) and CP1 (J27) provides.
-> > 
-> > The headers are just fed with the GPIO-level signals, which means any
-> > industry standard usage would require additional RS232 level shifting
-> > hardware.  So, they're certainly not "generic" serial ports.
-> > 
-> > While these are labelled up as UARTs, there's no reason to dedicate
-> > them as such, they could equally be used to connect to a smart battery/
-> > UPS system as a SMBus port, or even to control system LEDs / read
-> > the status of system buttons.
-> > 
-> > Do you have an application for these headers?  If not, it's probably
-> > best to leave them alone (until we have DT overlay support sorted to
-> > allow boot-loader configuration of hardware such as these - which is
-> > being worked on for TI and other boards.)
+> Current code relies on master driver enabling necessary clocks before
+> IOMMU is accessed, however there are cases when the IOMMU should be
+> accessed while the master is not running yet, for example allocating
+> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
+> mapping API and doesn't engage the master driver at all.
 > 
-> The console UART on the FTDI CON9 microUSB is not accessible when the board is 
-> mounted on a COTS ATX enclosure. So some users would like UART access through 
-> the UART headers.
+> This patch fixes the problem by letting clocks needed for IOMMU
+> operation to be listed in Device Tree and making the driver enable them
+> for the time of accessing the hardware.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> ---
+> 
+> Changes in v5:
+> Use clk_bulk APIs.
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  8 +++
 
-Please include this information in the commit log.
+Please split binding patches to a separate patch.
 
-I'll also point out that the latest board revision also offers a UART
-header for the standard console port too, so even if the microUSB is
-not available, the standard console is still usable.
+>  drivers/iommu/rockchip-iommu.c                     | 74 ++++++++++++++++++++--
+>  2 files changed, 76 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+> index 2098f7732264..33dd853359fa 100644
+> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+> @@ -14,6 +14,13 @@ Required properties:
+>                      "single-master" device, and needs no additional information
+>                      to associate with its master device.  See:
+>                      Documentation/devicetree/bindings/iommu/iommu.txt
+> +Optional properties:
+> +- clocks : A list of master clocks requires for the IOMMU to be accessible
+> +           by the host CPU. The number of clocks depends on the master
+> +           block and might as well be zero. See [1] for generic clock
+> +           bindings description.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Hardware blocks don't have a variable number of clock connections. This 
+needs to be a defined number of clocks (per compatible string if there 
+are different implementations with different # of clocks).
+
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  
+>  Optional properties:
+>  - rockchip,disable-mmu-reset : Don't use the mmu reset operation.
+> @@ -27,5 +34,6 @@ Example:
+>  		reg = <0xff940300 0x100>;
+>  		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vopl_mmu";
+> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
+>  		#iommu-cells = <0>;
+>  	};
