@@ -1,95 +1,190 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 29 Jan 2018 18:06:53 -0600
-Subject: [PATCH 1/4] dt-bindings: dwc3: add binding documentation for
- UniPhier dwc3 glue driver
-In-Reply-To: <1516712454-2915-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1516712454-2915-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1516712454-2915-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180130000653.rvxqttpwz2mf2yrm@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Jan 2018 00:23:28 +0000
+Subject: [PATCH v2 08/16] arm/arm64: KVM: Advertise SMCCC v1.1
+In-Reply-To: <20180129174559.1866-9-marc.zyngier@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-9-marc.zyngier@arm.com>
+Message-ID: <20180130002328.GB9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 23, 2018 at 10:00:51PM +0900, Kunihiko Hayashi wrote:
-> Add devicetree binding documentation for dwc3 glue driver implemented
-> on Socionext UniPhier SoCs.
+On Mon, Jan 29, 2018 at 05:45:51PM +0000, Marc Zyngier wrote:
+> The new SMC Calling Convention (v1.1) allows for a reduced overhead
+> when calling into the firmware, and provides a new feature discovery
+> mechanism.
 > 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Make it visible to KVM guests.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  .../devicetree/bindings/usb/dwc3-uniphier.txt      | 58 ++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/dwc3-uniphier.txt
+>  Documentation/virtual/kvm/arm/psci.txt | 12 +++++++-----
+>  arch/arm/kvm/handle_exit.c             |  2 +-
+>  arch/arm64/kvm/handle_exit.c           |  2 +-
+>  include/kvm/arm_psci.h                 |  2 +-
+>  include/linux/arm-smccc.h              | 13 +++++++++++++
+>  virt/kvm/arm/psci.c                    | 24 +++++++++++++++++++++++-
+>  6 files changed, 46 insertions(+), 9 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/dwc3-uniphier.txt b/Documentation/devicetree/bindings/usb/dwc3-uniphier.txt
-> new file mode 100644
-> index 0000000..677e072
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/dwc3-uniphier.txt
-> @@ -0,0 +1,58 @@
-> +UniPhier DWC3 glue layer
-> +
-> +This describes the devicetree bindings for dwc3-uniphier driver implemented on
-> +Socionext UniPhier SoCs.
-> +
-> +Required properties:
-> +- compatible:
-> +  - "socionext,uniphier-pxs2-dwc3" : For UniPhier PXs2 SoC
-> +  - "socionext,uniphier-ld20-dwc3" : For UniPhier LD20 SoC
-> +- reg: Address and range of the glue logic
-> +- clocks: List of phandles for the clocks, and the number of phandles depends
-> +	  on SoC platform.
+> diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
+> index 2e49a4e9f084..aafdab887b04 100644
+> --- a/Documentation/virtual/kvm/arm/psci.txt
+> +++ b/Documentation/virtual/kvm/arm/psci.txt
+> @@ -13,7 +13,7 @@ a migration causes a different PSCI version to be exposed out of the
+>  blue to an unsuspecting guest.
+>  
+>  In order to remedy this situation, KVM exposes a set of "firmware
+> -pseuodo-registers" that can be manipulated using the GET/SET_ONE_REG
+> +pseudo-registers" that can be manipulated using the GET/SET_ONE_REG
 
-Number of clocks needs to be specific. It should be fixed per 
-compatible.
+This should surely be in patch 7?
 
+>  interface. These registers can be saved/restored by userspace, and set
+>  to a convenient value if required.
+>  
+> @@ -21,8 +21,10 @@ The following register is defined:
+>  
+>  * KVM_REG_ARM_PSCI_VERSION:
+>  
+> -  - Only valid if the vcpu has KVM_ARM_VCPU_PSCI_0_2 feature set
+> -  - Returns the current PSCI version on GET_ONE_REG
+> -  - Allows any supported PSCI version compatible with v0.2 to be set
+> -    with SET_ONE_REG
+> +  - Only valid if the vcpu has the KVM_ARM_VCPU_PSCI_0_2 feature set
+> +    (and thus has already been initialized)
+> +  - Returns the current PSCI version on GET_ONE_REG (defaulting to the
+> +    highest PSCI version implemented by KVM and compatible with v0.2)
+> +  - Allows any PSCI version implemented by KVM and compatible with
+> +    v0.2 to be set with SET_ONE_REG
+>    - Affects the whole VM (even if the register view is per-vcpu)
+> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+> index e020cc82c4b1..a4520c7118d2 100644
+> --- a/arch/arm/kvm/handle_exit.c
+> +++ b/arch/arm/kvm/handle_exit.c
+> @@ -36,7 +36,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		      kvm_vcpu_hvc_get_imm(vcpu));
+>  	vcpu->stat.hvc_exit_stat++;
+>  
+> -	ret = kvm_psci_call(vcpu);
+> +	ret = kvm_hvc_call_handler(vcpu);
+>  	if (ret < 0) {
+>  		vcpu_set_reg(vcpu, 0, ~0UL);
+>  		return 1;
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 97e8d64a203d..bb6e1518d819 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -52,7 +52,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  			    kvm_vcpu_hvc_get_imm(vcpu));
+>  	vcpu->stat.hvc_exit_stat++;
+>  
+> -	ret = kvm_psci_call(vcpu);
+> +	ret = kvm_hvc_call_handler(vcpu);
+>  	if (ret < 0) {
+>  		vcpu_set_reg(vcpu, 0, ~0UL);
+>  		return 1;
+> diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+> index f2fa7d752c4e..4876bfac2195 100644
+> --- a/include/kvm/arm_psci.h
+> +++ b/include/kvm/arm_psci.h
+> @@ -26,7 +26,7 @@
+>  #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
+>  
+>  int kvm_psci_version(struct kvm_vcpu *vcpu);
+> -int kvm_psci_call(struct kvm_vcpu *vcpu);
+> +int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
+>  
+>  struct kvm_one_reg;
+>  
+> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> index 4c5bca38c653..dc68aa5a7261 100644
+> --- a/include/linux/arm-smccc.h
+> +++ b/include/linux/arm-smccc.h
+> @@ -60,6 +60,19 @@
+>  #define ARM_SMCCC_QUIRK_NONE		0
+>  #define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
+>  
+> +#define ARM_SMCCC_VERSION_1_0		0x10000
+> +#define ARM_SMCCC_VERSION_1_1		0x10001
 > +
-> +Optional properties:
-> +- resets: List of phandles for the resets, and the number of phandles depends
-> +	on SoC platform.
-
-Same here.
-
-> +- nvmem-cells: Phandles to nvmem cell that contains the trimming data.
-> +	Available only for LD20, and if unspecified, default value is used.
-> +- nvmem-cell-names: Should be the following names, which correspond to each
-> +	nvmem-cells. N is the number indicating a port of phy.
-> +	All of the 3 parameters associated with the following names are
-> +	required for each port, if any one is omitted, the trimming data
-> +	of the port will not be set at all.
-> +	- "rtermN", "sel_tN", "hs_iN" : Each cell name for phy parameters
+> +#define ARM_SMCCC_VERSION_FUNC_ID					\
+> +	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
+> +			   ARM_SMCCC_SMC_32,				\
+> +			   0, 0)
 > +
-> +Required child node:
-> +A child node must exist to represent the core DWC3 IP block. The name of
-> +the node is not important. The content of the node is defined in dwc3.txt.
+> +#define ARM_SMCCC_ARCH_FEATURES_FUNC_ID					\
+> +	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
+> +			   ARM_SMCCC_SMC_32,				\
+> +			   0, 1)
 > +
-> +Example:
+>  #ifndef __ASSEMBLY__
+>  
+>  #include <linux/linkage.h>
+> diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+> index 682f9be6264b..3bb336ac7d7d 100644
+> --- a/virt/kvm/arm/psci.c
+> +++ b/virt/kvm/arm/psci.c
+> @@ -15,6 +15,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/arm-smccc.h>
+>  #include <linux/preempt.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/uaccess.h>
+> @@ -353,6 +354,7 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
+>  		case PSCI_0_2_FN_SYSTEM_OFF:
+>  		case PSCI_0_2_FN_SYSTEM_RESET:
+>  		case PSCI_1_0_FN_PSCI_FEATURES:
+> +		case ARM_SMCCC_VERSION_FUNC_ID:
+>  			val = 0;
+>  			break;
+>  		default:
+> @@ -407,7 +409,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>   * Errors:
+>   * -EINVAL: Unrecognized PSCI function
+>   */
+> -int kvm_psci_call(struct kvm_vcpu *vcpu)
+> +static int kvm_psci_call(struct kvm_vcpu *vcpu)
+>  {
+>  	switch (kvm_psci_version(vcpu)) {
+>  	case KVM_ARM_PSCI_1_0:
+> @@ -421,6 +423,26 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
+>  	};
+>  }
+>  
+> +int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+> +{
+> +	u32 func_id = smccc_get_function(vcpu);
+> +	u32 val;
 > +
-> +	usb: usb at 65b00000 {
-> +		compatible = "socionext,uniphier-ld20-dwc3";
-> +		reg = <0x65b00000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		clocks = <&sys_clk 14>, <&sys_clk 16>, <&sys_clk 17>;
-> +		resets = <&sys_rst 12>, <&sys_rst 16>, <&sys_rst 17>,
-> +			 <&sys_rst 18>, <&sys_rst 19>;
-> +		nvmem-cells = <&usb_rterm0>, <&usb_rterm1>,
-> +			      <&usb_rterm2>, <&usb_rterm3>,
-> +			      <&usb_sel_t0>, <&usb_sel_t1>,
-> +			      <&usb_sel_t2>, <&usb_sel_t3>,
-> +			      <&usb_hs_i0>,  <&usb_hs_i0>,
-> +			      <&usb_hs_i2>,  <&usb_hs_i2>;
-> +		nvmem-cell-names = "rterm0", "rterm1", "rterm2", "rterm3",
-> +				   "sel_t0", "sel_t1", "sel_t2", "sel_t3",
-> +				   "hs_i0",  "hs_i1",  "hs_i2",  "hs_i3";
-> +		ranges;
+> +	switch (func_id) {
+> +	case ARM_SMCCC_VERSION_FUNC_ID:
+> +		val = ARM_SMCCC_VERSION_1_1;
+> +		break;
+> +	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
+> +		val = -1;	/* Nothing supported yet */
+> +		break;
+> +	default:
+> +		return kvm_psci_call(vcpu);
+> +	}
 > +
-> +		dwc3 at 65a00000 {
-> +			compatible = "snps,dwc3";
-> +			reg = <0x65a00000 0xcd00>;
-> +			interrupt-names = "host";
-> +			interrupts = <0 134 4>;
-> +			dr_mode = "host";
-> +		};
-> +	};
+> +	smccc_set_retval(vcpu, val, 0, 0, 0);
+> +	return 1;
+> +}
+> +
+>  int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu)
+>  {
+>  	return 1;		/* PSCI version */
 > -- 
-> 2.7.4
+> 2.14.2
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
