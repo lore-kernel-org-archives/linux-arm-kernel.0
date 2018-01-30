@@ -1,106 +1,32 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 30 Jan 2018 15:58:03 +0000
-Subject: [PATCH 13/16] arm64: Add support for checking errata based on a
- list of MIDRS
-In-Reply-To: <951cb77f-c5f3-56f1-abc7-3cc51248e15d@arm.com>
-References: <20180123122809.16269-1-suzuki.poulose@arm.com>
- <20180123122809.16269-14-suzuki.poulose@arm.com>
- <20180126141610.GU5862@e103592.cambridge.arm.com>
- <0558db28-b1f1-b249-6098-99e1071f613f@arm.com>
- <20180130151644.GG5862@e103592.cambridge.arm.com>
- <951cb77f-c5f3-56f1-abc7-3cc51248e15d@arm.com>
-Message-ID: <20180130155802.GJ5862@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Jan 2018 16:05:17 +0000
+Subject: [PATCH 2/2] arm64: dts: marvell: mcbin: enable uart headers
+In-Reply-To: <97a7416bb0eb19c9d32e41984e292a869ff14230.1517299286.git.baruch@tkos.co.il>
+References: <1ebd25aace6c9ab93abe7fb6e42ef9e275eee321.1517299286.git.baruch@tkos.co.il>
+ <97a7416bb0eb19c9d32e41984e292a869ff14230.1517299286.git.baruch@tkos.co.il>
+Message-ID: <20180130160516.GE9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 03:38:44PM +0000, Suzuki K Poulose wrote:
-> On 30/01/18 15:16, Dave Martin wrote:
-> >On Fri, Jan 26, 2018 at 03:57:44PM +0000, Suzuki K Poulose wrote:
-> >>On 26/01/18 14:16, Dave Martin wrote:
-> >>>On Tue, Jan 23, 2018 at 12:28:06PM +0000, Suzuki K Poulose wrote:
-> >>>>Add helpers for detecting an errata on list of midr ranges
-> >>>>of affected CPUs.
-> >>>
-> >>>This doesn't describe what the patch does: instead, helpers are being
-> >>>added for checking whether an MIDR falls in one of multiple affected
-> >>>model(s) and or revision(s).
-> >>>
-> >>>Doing this makes sense, but is it really worth it?
-> >>
-> >>Well, we need th MIDR list helpers anyway for other things:
-> >>   - White list of CPUs where we know KPTI is not needed
-> >>   - Black list of CPUs where DBM shouldn't be enabled.
-> >>
-> >>So all we do is add a new type which could reduce the number of entries.
-> >>
-> >>>
-> >>>We might save 100-200 bytes in the kernel image for now, but a common
-> >>>workaround for errata on multiple unrelated cpus is surely a rare case.
-> >>>
-> >>>Only if there are many such lists, or if the lists become large does
-> >>>this start to seem a clear win.
-> >>>
-> >>>>
-> >>>>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>>>---
-> >>>>  arch/arm64/include/asm/cpufeature.h |  1 +
-> >>>>  arch/arm64/kernel/cpu_errata.c      | 40 ++++++++++++++++++++++---------------
-> >>>>  2 files changed, 25 insertions(+), 16 deletions(-)
-> >>>>
-> >>>>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+On Tue, Jan 30, 2018 at 10:01:26AM +0200, Baruch Siach wrote:
+> Add description of the J25 and J27 UART headers of the Macchiatobin. They use
+> uart peripherals that the CP0 (J25) and CP1 (J27) provides.
 
-[...]
+The headers are just fed with the GPIO-level signals, which means any
+industry standard usage would require additional RS232 level shifting
+hardware.  So, they're certainly not "generic" serial ports.
 
-> >>>>-	{
-> >>>>-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> >>>>-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-> >>>>-		.enable = enable_psci_bp_hardening,
-> >>>>-	},
-> >>>>-	{
-> >>>>-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> >>>>-		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-> >>>>+		ERRATA_MIDR_RANGE_LIST(cortex_bp_harden_cpus),
-> >>>
-> >>>Could we just use a macro to generate multiple structs, instead of
-> >>>inventing a new type of struct?
-> >>
-> >>We could. Somehow, I don't think we are over engineering much here.
-> >
-> >There is a flipside to this: I commented elsewhere that not allowing
-> >mutiple match criteria per capability struct complicates verification
-> >for late CPUs and/or makes it more costly.
-> >
-> >Your changes here do implement support for multiple match criteria,
-> >albeit only for the specific case of MIDR matching.
-> >
-> >It could be worth generalising this in the future, but that's
-> >probably not for this series.
-> 
-> It is not that complex, right now. See below.
-> 
-> >
-> >OTOH, if MIDR matching is the only scenario where we have duplicate
-> >cap structs with different match criteria and this patch allows all
-> >those duplicates to be removed, then is there still a need to walk
-> >the whole list in verify_local_cpu_features(), as introduced in
-> >67948af41f2e ("arm64: capabilities: Handle duplicate entries for a
-> >capability")?  Or can that now be simplified?
-> 
-> I have added support for this in my v2. So here is what I have done :
-> 
-> 1) Continue to use midr_list for capability entries that just matches
-> MIDRS and share the same enable() call back.
-> 
->  and
-> 
-> 2) Add support for wrapper entries where a capability is determined
-> by two or more entries with different matches()/enable() call backs.
-> 
-> And that can get rid of the changes introduced in commit 67948af41f2e
-> ("arm64: capabilities: Handle duplicate entries for a capability").
+While these are labelled up as UARTs, there's no reason to dedicate
+them as such, they could equally be used to connect to a smart battery/
+UPS system as a SMBus port, or even to control system LEDs / read
+the status of system buttons.
 
-OK, cool.  I was presuming that might be too much work to be justified
-here, but if not, great.
+Do you have an application for these headers?  If not, it's probably
+best to leave them alone (until we have DT overlay support sorted to
+allow boot-loader configuration of hardware such as these - which is
+being worked on for TI and other boards.)
 
-Cheers
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
