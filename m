@@ -1,48 +1,116 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Jan 2018 16:34:07 +0100
-Subject: [BUG] perf, arm64,
- acpi: sleeping function called from invalid context
-In-Reply-To: <20180130134836.GC28882@arm.com>
-References: <20180129173054.GD794@hc> <20180130134836.GC28882@arm.com>
-Message-ID: <CACRpkdZUdOzGnhGxeZwHQEArQnttiXC=QPZBW9KLoxQtmaASXA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 30 Jan 2018 15:38:44 +0000
+Subject: [PATCH 13/16] arm64: Add support for checking errata based on a
+ list of MIDRS
+In-Reply-To: <20180130151644.GG5862@e103592.cambridge.arm.com>
+References: <20180123122809.16269-1-suzuki.poulose@arm.com>
+ <20180123122809.16269-14-suzuki.poulose@arm.com>
+ <20180126141610.GU5862@e103592.cambridge.arm.com>
+ <0558db28-b1f1-b249-6098-99e1071f613f@arm.com>
+ <20180130151644.GG5862@e103592.cambridge.arm.com>
+Message-ID: <951cb77f-c5f3-56f1-abc7-3cc51248e15d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 2:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-
->> Changing the allocations in arm_pmu_alloc() to GFP_ATOMIC didn't help,
->> as the interrupt request is also not happy in this context.
+On 30/01/18 15:16, Dave Martin wrote:
+> On Fri, Jan 26, 2018 at 03:57:44PM +0000, Suzuki K Poulose wrote:
+>> On 26/01/18 14:16, Dave Martin wrote:
+>>> On Tue, Jan 23, 2018 at 12:28:06PM +0000, Suzuki K Poulose wrote:
+>>>> Add helpers for detecting an errata on list of midr ranges
+>>>> of affected CPUs.
+>>>
+>>> This doesn't describe what the patch does: instead, helpers are being
+>>> added for checking whether an MIDR falls in one of multiple affected
+>>> model(s) and or revision(s).
+>>>
+>>> Doing this makes sense, but is it really worth it?
 >>
->> Would it be possible to init the PMUs later?
->
-> I know that Mark's had a good go at fixing this, but we ran into problems
-> having the fix co-exist with the IRQ bouncing workaround we perform for the
-> PMU on U8500 platforms. Frustratingly, those platforms don't appear to be
-> available any more, so we're being held up by something that we're unable
-> to test and might be considered dead.
+>> Well, we need th MIDR list helpers anyway for other things:
+>>    - White list of CPUs where we know KPTI is not needed
+>>    - Black list of CPUs where DBM shouldn't be enabled.
+>>
+>> So all we do is add a new type which could reduce the number of entries.
+>>
+>>>
+>>> We might save 100-200 bytes in the kernel image for now, but a common
+>>> workaround for errata on multiple unrelated cpus is surely a rare case.
+>>>
+>>> Only if there are many such lists, or if the lists become large does
+>>> this start to seem a clear win.
+>>>
+>>>>
+>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> ---
+>>>>   arch/arm64/include/asm/cpufeature.h |  1 +
+>>>>   arch/arm64/kernel/cpu_errata.c      | 40 ++++++++++++++++++++++---------------
+>>>>   2 files changed, 25 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>>>> index a3d54c2c411f..70712de687c7 100644
+>>>> --- a/arch/arm64/include/asm/cpufeature.h
+>>>> +++ b/arch/arm64/include/asm/cpufeature.h
+>>>
+>>> [...]
+>>>
+>>>> @@ -330,22 +353,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>>>>   #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+>>>>   	{
+>>>>   		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>>>> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+>>>> -		.enable = enable_psci_bp_hardening,
+>>>> -	},
+>>>> -	{
+>>>> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>>>> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+>>>> -		.enable = enable_psci_bp_hardening,
+>>>> -	},
+>>>> -	{
+>>>> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>>>> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+>>>> -		.enable = enable_psci_bp_hardening,
+>>>> -	},
+>>>> -	{
+>>>> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>>>> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+>>>> +		ERRATA_MIDR_RANGE_LIST(cortex_bp_harden_cpus),
+>>>
+>>> Could we just use a macro to generate multiple structs, instead of
+>>> inventing a new type of struct?
+>>
+>> We could. Somehow, I don't think we are over engineering much here.
+> 
+> There is a flipside to this: I commented elsewhere that not allowing
+> mutiple match criteria per capability struct complicates verification
+> for late CPUs and/or makes it more costly.
+> 
+> Your changes here do implement support for multiple match criteria,
+> albeit only for the specific case of MIDR matching.
+> 
+> It could be worth generalising this in the future, but that's
+> probably not for this series.
 
-Not any more dead than the OMAP3 based Nokia n900 or the
-Samsung S3C stuff I would say. Just these don't have weird PMU
-counter interrupts :D
+It is not that complex, right now. See below.
 
-The Ux500 Galaxy S Advance phone from Samsung was picked up by
-hobbyists from PostmarketOS as a hacking target, maybe that needs to
-become more accessible using just upstream, mea culpa.
+> 
+> OTOH, if MIDR matching is the only scenario where we have duplicate
+> cap structs with different match criteria and this patch allows all
+> those duplicates to be removed, then is there still a need to walk
+> the whole list in verify_local_cpu_features(), as introduced in
+> 67948af41f2e ("arm64: capabilities: Handle duplicate entries for a
+> capability")?  Or can that now be simplified?
 
-I am willing to test any patches on the reference designs though.
+I have added support for this in my v2. So here is what I have done :
 
-> Linus, Lee: do we still need to support PMU interrupts on U8500? It's
-> causing us real headaches with ACPI-based arm64 systems. [the answer might
-> be "yes", but I have to ask!]
+1) Continue to use midr_list for capability entries that just matches
+MIDRS and share the same enable() call back.
 
-Can we still use perf without the IRQs? I.e. I guess it will it fall
-back to some
-sampling method that is "good enough"? We don't do a lot of performance
-testing using perf admittedly.
+  and
 
-I do think it is unfair to have to support a bunch of weird
-workarounds just because ST Micro decided to connect these two IRQs
-to the same GIC line using an OR gate. IIRC that was the issue.
+2) Add support for wrapper entries where a capability is determined
+by two or more entries with different matches()/enable() call backs.
 
-Yours,
-Linus Walleij
+And that can get rid of the changes introduced in commit 67948af41f2e
+("arm64: capabilities: Handle duplicate entries for a capability").
+
+Cheers
+Suzuki
