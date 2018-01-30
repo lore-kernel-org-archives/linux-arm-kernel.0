@@ -1,96 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 30 Jan 2018 19:39:40 +0000
-Subject: [PATCH v9 3/7] acpi: apei: Add SEI notification type support
- for ARMv8
-In-Reply-To: <168c3f61-0d11-13a4-c383-1f6a97d0ef37@huawei.com>
-References: <1515254577-6460-1-git-send-email-gengdongjiu@huawei.com>
- <1515254577-6460-4-git-send-email-gengdongjiu@huawei.com>
- <5A663DEC.8080804@arm.com> <168c3f61-0d11-13a4-c383-1f6a97d0ef37@huawei.com>
-Message-ID: <5A70C9FC.5080100@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 30 Jan 2018 21:11:24 +0100
+Subject: [PATCH 2/3] ARM: dts: exynos: Fix missing missing reg warning
+ for syscon restart nodes
+In-Reply-To: <20180129162714.2xrqrkfd2xo4jn2g@rob-hp-laptop>
+References: <20180116213129.16209-1-krzk@kernel.org>
+ <20180116213129.16209-2-krzk@kernel.org>
+ <20180129162714.2xrqrkfd2xo4jn2g@rob-hp-laptop>
+Message-ID: <20180130201124.v7jik3ds4kejsa3m@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+On Mon, Jan 29, 2018 at 10:27:14AM -0600, Rob Herring wrote:
+> On Tue, Jan 16, 2018 at 10:31:28PM +0100, Krzysztof Kozlowski wrote:
+> > Fix DTC warnings like:
+> > 
+> >     arch/arm/boot/dts/exynos4412-trats2.dtb: Warning (simple_bus_reg):
+> >         Node /soc/syscon-poweroff missing or empty reg/ranges property
+> >     arch/arm/boot/dts/exynos4412-trats2.dtb: Warning (simple_bus_reg):
+> >         Node /soc/syscon-reboot missing or empty reg/ranges property
+> > 
+> > by moving the syscon poweroff and restart nodes into the PMU (Power
+> > Management Unit) node.  The PMU node is the actual block responsible for
+> > power management, including typical Exynos on/off/restart procedures.
+> > Therefore the syscon poweroff and restart nodes logically belong to it.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > 
+> > ---
+> > 
+> > Tested on Exynos5420 and Exynos4412. Other tests are welcomed.
+> > ---
+> >  .../devicetree/bindings/arm/samsung/pmu.txt        |  4 +++-
+> >  arch/arm/boot/dts/exynos-syscon-restart.dtsi       | 28 ++++++++++------------
+> >  arch/arm/boot/dts/exynos3250.dtsi                  |  4 ++--
+> >  arch/arm/boot/dts/exynos4.dtsi                     |  5 ++--
+> >  arch/arm/boot/dts/exynos4412.dtsi                  |  2 +-
+> >  arch/arm/boot/dts/exynos5.dtsi                     |  1 -
+> >  arch/arm/boot/dts/exynos5250.dtsi                  |  3 ++-
+> >  arch/arm/boot/dts/exynos5410.dtsi                  |  3 ++-
+> >  arch/arm/boot/dts/exynos5420.dtsi                  |  3 ++-
+> >  9 files changed, 27 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> > index 779f5614bcee..405646655ec7 100644
+> > --- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> > +++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+> > @@ -12,6 +12,8 @@ Properties:
+> >  		   - "samsung,exynos5433-pmu" - for Exynos5433 SoC.
+> >  		   - "samsung,exynos7-pmu" - for Exynos7 SoC.
+> >  		second value must be always "syscon".
+> > +		If PMU contains optional syscon-poweroff or syscon-restart nodes,
+> > +		then third value must be "simple-mfd".
+> 
+> I don't think this is right. simple-mfd is only for cases where the 
+> parent has no setup that the child nodes are dependent on. You need the 
+> regmap setup by the parent before the child can be enumerated. The 
+> correct thing to do here is add an of_platform_default_populate() call.
 
-On 23/01/18 09:23, gengdongjiu wrote:
-> On 2018/1/23 3:39, James Morse wrote:
->> gengdongjiu wrote:
->>> This error source parsing and handling method
->>> is similar with the SEA.
->>
->> There are problems with doing this:
->>
->> Oct. 18, 2017, 10:26 a.m. James Morse wrote:
->> | How do SEA and SEI interact?
->> |
->> | As far as I can see they can both interrupt each other, which isn't something
->> | the single in_nmi() path in APEI can handle. I thinks we should fix this
->> | first.
->>
->> [..]
->>
->> | SEA gets away with a lot of things because its synchronous. SEI isn't. Xie
->> | XiuQi pointed to the memory_failure_queue() code. We can use this directly
->> | from SEA, but not SEI. (what happens if an SError arrives while we are
->> | queueing memory_failure work from an IRQ).
->> |
->> | The one that scares me is the trace-point reporting stuff. What happens if an
->> | SError arrives while we are enabling a trace point? (these are static-keys
->> | right?)
->> |
->> |  I don't think we can just plumb SEI in like this and be done with it.
->> |  (I'm looking at teasing out the estatus cache code from being x86:NMI only.
->> |  This way we solve the same 'cant do this from NMI context' with the same
->> |  code'.)
->>
->>
->> I will post what I've got for this estatus-cache thing as an RFC, its not ready
->> to be considered yet.
+I understand, makes sense. I will send a follow-up.
 
-> Yes, I know you are dong that. Your serial's patch will consider all above things, right?
+Thanks for feedback!
 
-Assuming I got it right, yes. It currently makes the race Xie XiuQi spotted
-worse, which I want to fix too. (details on the cover letter)
-
-
-> If your patch can be consider that, this patch can based on your patchset. thanks.
-
-I'd like to pick these patches onto the end of that series, but first I want to
-know what NOTIFY_SEI means for any OS. The ACPI spec doesn't say, and because
-its asynchronous, route-able and mask-able, there are many more corners than
-NOTFIY_SEA.
-
-This thing is a notification using an emulated SError exception. (emulated
-because physical-SError must be routed to EL3 for firmware-first, and
-virtual-SError belongs to EL2).
-
-Does your firmware emulate SError exactly as the TakeException() pseudo code in
-the Arm-Arm?
-Is the emulated SError routed following the routing rules for HCR_EL2.{AMO, TGE}?
-What does your firmware do when it wants to emulate SError but its masked?
-(e.g.1: The physical-SError interrupted EL2 and the SPSR shows EL2 had PSTATE.A
- set.
- e.g.2: The physical-SError interrupted EL2 but HCR_EL2 indicates the emulated
- SError should go to EL1. This effectively masks SError.)
-
-
-Answers to these let us determine whether a bug is in the firmware or the
-kernel. If firmware is expecting the OS to do something special, I'd like to
-know about it from the beginning!
-
-
->>> Expose API ghes_notify_sei() to external users. External
->>> modules can call this exposed API to parse APEI table and
->>> handle the SEI notification.
->>
->> external modules? You mean called by the arch code when it gets this NOTIFY_SEI?
-
-> yes, called by kernel ARCH code, such as below, I remember I have discussed with you.
-
-Sure. The phrase 'external modules' usually means the '.ko' files that live in
-/lib/modules, nothing outside the kernel tree should be doing this stuff.
-
-
-Thanks,
-
-James
+Best regards,
+Krzysztof
