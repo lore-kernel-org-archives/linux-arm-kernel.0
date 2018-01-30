@@ -1,110 +1,82 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 30 Jan 2018 09:28:58 +0000
-Subject: [RFC PATCH] tty: pl011: Avoid stuck-off spurious interrupts
-In-Reply-To: <5A6F5EDB.20405@hisilicon.com>
-References: <1517242181-20652-1-git-send-email-Dave.Martin@arm.com>
- <5A6F5EDB.20405@hisilicon.com>
-Message-ID: <5A703ADA.404@hisilicon.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 30 Jan 2018 10:38:38 +0100
+Subject: [PATCH] sound/tlv320dac33: Add device tree support
+In-Reply-To: <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
+References: <20180129230539.GA18280@amd> <20180129232031.GA7695@lenoch>
+ <20180129233301.GA18104@amd> <20180130083446.GA13498@lenoch>
+ <20180130085314.GA4585@amd>
+ <1141b126-b883-a246-85ad-c5a69acb90bb@gmail.com>
+Message-ID: <20180130093838.GA15195@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On 2018/1/29 17:50, Wei Xu wrote:
-> Hi Dave,
+On Tue, Jan 30, 2018 at 10:11:02AM +0100, Filip Matijevi? wrote:
+> Hi,
 > 
-> On 2018/1/29 16:09, Dave Martin wrote:
->> Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
->> clears the RX and receive timeout interrupts on pl011 startup, to
->> avoid a screaming-interrupt scenario that can occur when the
->> firmware or bootloader leaves these interrupts spuriously
->> asserted.
->>
->> This has been noted as an issue when running Linux on qemu [1].
->>
->> Unfortunately, the above fix seems to lead to potential
->> misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
->> on driver startup, if the RX FIFO is also already full to the
->> trigger level.
->>
->> Clearing the RX FIFO interrupt does not change the FIFO fill level.
->> In this scenario, because the interrupt is now clear and because
->> the FIFO is already full to the trigger level, no new assertion of
->> the RX FIFO interrupt can occur unless the FIFO is drained back
->> below the trigger level.  This never occurs because the pl011
->> driver is waiting for an RX FIFO interrupt to tell it that there is
->> something to read, and does not read the FIFO at all until that
->> interrupt occurs.
->>
->> Thus, simply clearing "spurious" interrupts on startup may be
->> misguided, since there is no way to be sure that the interrupts are
->> truly spurious, and things can go wrong if they are not.
->>
->> This patch attempts to handle (suspected) spurious interrupts more
->> robustly, by allowing the interrupt(s) to fire but quenching the
->> scream.
->>
->> pl011_int() runs and attempts to drain the FIFO anyway just as if
->> the interrupts were real.  If the FIFO is already empty, great.  To
->> avoid a screaming spurious interrupt, the RX FIFO and timeout
->> interrupts are now explicitly cleared in between committing to
->> drain the RX FIFO and actually draining it.  We do not have to
->> worry about lost interrupts here, because we are effectively in
->> polled mode inside pl011_int() until the RX FIFO becomes empty:
->>
->>   * A new char received before the RX FIFO is fully drained will be
->>     drained out synchronously by pl011_int() along with the other
->>     chars already pending.  A new char received after the RX FIFO
->>     is drained will result in correct RX FIFO interrupt assertion,
->>     because emptying the RX FIFO guarantees that the RX FIFO /
->>     timeout interrupt state machines are back in a sane state.
->>
->>   * A new RX timeout before the RX FIFO is fully drained is no
->>     problem, because pl011_int() has already committed to emptying
->>     the FIFO at this point, guaranteeing that no stray chars will
->>     be left behind.  A new RX timeout after the RX FIFO is fully
->>     drained will result in correct interrupt assertion.
->>
->> This patch does not attempt to address the case where the RX FIFO
->> fills faster than it can be drained: that is a pathological
->> condition that is beyond the scope of the driver to work around.
->> Users cannot expect this to work unless they enable hardware flow
->> control.
->>
->> [1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
->> before enabled the interruption
->> https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
->>
->> Reported-by: Wei Xu <xuwei5@hisilicon.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Peter Maydell <peter.maydell@linaro.org>
->> Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
->> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> ---
->>  drivers/tty/serial/amba-pl011.c | 6 +-----
->>  1 file changed, 1 insertion(+), 5 deletions(-)
->>
-> 
-> After commented the 1549 line in the amba-pl011.c[1] and applied this patch,
-> the console is not hanged any more.
+> On 01/30/2018 09:53 AM, Pavel Machek wrote:
+> > On Tue 2018-01-30 09:34:46, Ladislav Michl wrote:
+> >> On Tue, Jan 30, 2018 at 12:33:01AM +0100, Pavel Machek wrote:
+> >>> On Tue 2018-01-30 00:20:31, Ladislav Michl wrote:
+> >>>> On Tue, Jan 30, 2018 at 12:05:39AM +0100, Pavel Machek wrote:
+> >>>>>
+> >>>>> This adds device tree support to tlv320dac33.c.
+> >>>>>
+> >>>>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> >>>>>
+> >>>>> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> >>>>> new file mode 100644
+> >>>>> index 0000000..6cbd311
+> >>>>> --- /dev/null
+> >>>>> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> >>>>> @@ -0,0 +1,32 @@
+> >>>>> +Texas Instruments - tlv320dac33 Codec module
+> >>>>> +
+> >>>>> +The tlv320dac33 serial control bus communicates through I2C protocols.
+> >>>>> +
+> >>>>> +Required properties:
+> >>>>> +
+> >>>>> +- compatible - "ti,tlv320dac33"
+> >>>>> +- reg - I2C slave address
+> >>>>> +
+> >>>>> +Optional properties:
+> >>>>> +
+> >>>>> +- power-gpios - gpio pin to power the device, active high
+> >>>>
+> >>>> While driver used gpio in platform data, isn't it more likely
+> >>>> regulator which powers device?
+> >>>
+> >>>                 power-gpios = <&gpio2 28 0>; /* gpio_60 */
+> >>>
+> >>> Looks like GPIO to me -- example is from Nokia N9. So this appears to
+> >>> be correct.
+> >>
+> >> Device datasheet doesn't list any pin which looks like "power-gpio"
+> >> http://www.ti.com/lit/ds/symlink/tlv320dac32.pdf
+> >> Unfortunately I do not know much about N9, but was able to find Nokia 5610
+> >> scheme to get clue how could be tlv320dac33 hardwired (see page 2):
+> >> http://mastermobile.spb.ru/service/nokia_5610_rm-242_service_schematics.pdf
+> >> Here AVDD is powered by LP3985 voltage regulator which is enabled using
+> >> VEN pin which might be connected to gpio. Or there could be completely
+> >> different voltage regulator with different controls. And since Linux
+> >> already has voltage regulator class, lets not limit ourselves to gpio
+> >> pins.
+> > 
+> > Well, notice I'm converting existing driver to device tree. And that
+> > one already has GPIO dependency. It is possible that more work needs
+> > to be done there, but that should not be a reason to delay this. Feel
+> > free to help.
 
-Sorry, it should be line 1678[1] for the 4.15-rc9.
+Adding DT properties that need to be maintained for compatibility reasons
+is a bad idea and very good reason to delay merging unfinished stuff.
+And meanwhile it turned out it is not power-gpio :)
 
-> 
-> The UART011_ICR is cleared in the pl011_hwinit that will clear the
-> RX interruption as well.
-> Is it OK to remove 1549 as well?
-> Thanks!
-> 
-> [1]:http://elixir.free-electrons.com/linux/v4.4/source/drivers/tty/serial/amba-pl011.c#L1549
+> According to N9 schematics
+> http://www.s-manuals.com/manuals/phone/nokia/nokia_n9_rm-696_service_schematics_v1.pdf
+> it's in fact GPIO pin that is connected to reset line (labeled
+> CODEC_RST). So calling it "power" might be misleading, but the driver
+> code is quite clear as it labels that GPIO as "tlv320dac33 reset"
 
-[1]: http://elixir.free-electrons.com/linux/v4.15-rc9/source/drivers/tty/serial/amba-pl011.c#L1678
+Thanks a lot! So now it is clear that gpio is connected to codec's nRESET pin,
+therefore "reset-gpios" property seems reasonable here.
 
-Best Regards,
-Wei
-
-> 
-> Best Regards,
-> Wei
-> 
+	ladis
