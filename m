@@ -1,97 +1,96 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 30 Jan 2018 12:55:01 +0000
-Subject: [PATCH v2 13/16] firmware/psci: Expose SMCCC version through
- psci_ops
-In-Reply-To: <20180129174559.1866-14-marc.zyngier@arm.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-14-marc.zyngier@arm.com>
-Message-ID: <c1fddec5-4d8a-5e43-470b-855b0dba705e@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 30 Jan 2018 13:55:47 +0100
+Subject: [PATCH v2 3/5] soc: mediatek: pwrap: add int1_en_all and
+ capability flag
+In-Reply-To: <20180129090944.28687-3-argus.lin@mediatek.com>
+References: <20180129090944.28687-1-argus.lin@mediatek.com>
+ <20180129090944.28687-3-argus.lin@mediatek.com>
+Message-ID: <3f4ce745-32e0-2ae6-1463-af041d608d8c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/18 17:45, Marc Zyngier wrote:
-> Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
-> let's do that at boot time, and expose the version of the calling
-> convention as part of the psci_ops structure.
+
+
+On 01/29/2018 10:09 AM, argus.lin at mediatek.com wrote:
+> From: Argus Lin <argus.lin@mediatek.com>
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> New pwrap support int1_en flag for starvation and channel
+> request exception. We need to register it for interrupt
+> handler.
+> We also add pwrap capability flag used to declare if we
+
+"We also" wording is nearly always a hint, that this should be done
+in two independent patches.
+
+> support BRIDGE, RESET, DCM, PRIORITY_SEL and INT1_EN
+> or not.
+> 
+> Signed-off-by: Argus Lin <argus.lin@mediatek.com>
 > ---
->   drivers/firmware/psci.c | 21 +++++++++++++++++++++
->   include/linux/psci.h    |  6 ++++++
->   2 files changed, 27 insertions(+)
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index e9493da2b111..dd035aaa1c33 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -511,6 +511,26 @@ static void __init psci_init_migrate(void)
->   	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
->   }
->   
-> +static void __init psci_init_smccc(u32 ver)
-> +{
-> +	int feature = PSCI_RET_NOT_SUPPORTED;
-> +
-> +	if (PSCI_VERSION_MAJOR(ver) >= 1)
-> +		feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
-> +
-> +	if (feature == PSCI_RET_NOT_SUPPORTED) {
-> +		psci_ops.variant = SMCCC_VARIANT_1_0;
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index e9e054a15b7d..9f924d3f8645 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -76,6 +76,13 @@
+>  #define PWRAP_SLV_CAP_SECURITY	BIT(2)
+>  #define HAS_CAP(_c, _x)	(((_c) & (_x)) == (_x))
+>  
+> +/* Group of bits used for shown pwrap capability */
+> +#define PWRAP_CAP_BRIDGE	BIT(0)
+> +#define PWRAP_CAP_RESET		BIT(1)
+> +#define PWRAP_CAP_DCM		BIT(2)
 
-Presumably at some point in the future we might want to update PSCI 
-itself to use 'fast' calls if available, at which point this 
-initialisation is a bit backwards given that you've already made a call 
-using *some* convention. Even I think relying on the enum value working 
-out OK is a bit subtle, so perhaps it's best to default-initialise 
-psci_ops.variant to 1.0 (either statically, or dynamically before the 
-first call), then only update it to 1.1 if and when we discover that.
+As you told me the driver will be upstreamed in April, please add this flag when
+you upstream the driver, as this will be in a different kernel version.
 
-Robin.
+> +#define PWRAP_CAP_PRIORITY_SEL	BIT(3)
+> +#define PWRAP_CAP_INT1_EN	BIT(4)
+> +
 
-> +	} else {
-> +		ver = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
-> +		if (ver != ARM_SMCCC_VERSION_1_1)
-> +			psci_ops.variant = SMCCC_VARIANT_1_0;
-> +		else
-> +			psci_ops.variant = SMCCC_VARIANT_1_1;
-> +	}
-> +
-> +	pr_info("SMC Calling Convention v1.%d\n", psci_ops.variant);
-> +}
-> +
->   static void __init psci_0_2_set_functions(void)
->   {
->   	pr_info("Using standard PSCI v0.2 function IDs\n");
-> @@ -557,6 +577,7 @@ static int __init psci_probe(void)
->   	psci_0_2_set_functions();
->   
->   	psci_init_migrate();
-> +	psci_init_smccc(ver);
->   
->   	if (PSCI_VERSION_MAJOR(ver) >= 1) {
->   		psci_init_cpu_suspend();
-> diff --git a/include/linux/psci.h b/include/linux/psci.h
-> index f2679e5faa4f..83fd16a37be3 100644
-> --- a/include/linux/psci.h
-> +++ b/include/linux/psci.h
-> @@ -31,6 +31,11 @@ enum psci_conduit {
->   	PSCI_CONDUIT_HVC,
->   };
->   
-> +enum smccc_variant {
-> +	SMCCC_VARIANT_1_0,
-> +	SMCCC_VARIANT_1_1,
-> +};
-> +
->   struct psci_operations {
->   	u32 (*get_version)(void);
->   	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-> @@ -41,6 +46,7 @@ struct psci_operations {
->   			unsigned long lowest_affinity_level);
->   	int (*migrate_info_type)(void);
->   	enum psci_conduit conduit;
-> +	enum smccc_variant variant;
->   };
->   
->   extern struct psci_operations psci_ops;
+Add each flag when you add the user of the flag.
+
+>  /* defines for slave device wrapper registers */
+>  enum dew_regs {
+>  	PWRAP_DEW_BASE,
+> @@ -681,9 +688,11 @@ struct pmic_wrapper_type {
+>  	enum pwrap_type type;
+>  	u32 arb_en_all;
+>  	u32 int_en_all;
+> +	u32 int1_en_all;
+>  	u32 spi_w;
+>  	u32 wdt_src;
+> -	unsigned int has_bridge:1;
+> +	/* Flags indicating the capability for the target pwrap */
+> +	u32 caps;
+
+NAK, this will not compile. Please make sure that every patch on it's own does
+not break compilation.
+
+Regards,
+Matthias
+
+>  	int (*init_reg_clock)(struct pmic_wrapper *wrp);
+>  	int (*init_soc_specific)(struct pmic_wrapper *wrp);
+>  };
+> -- 
+> 2.12.5
+> 
+> ************* Email Confidentiality Notice
+>  ********************
+> The information contained in this e-mail message (including any 
+> attachments) may be confidential, proprietary, privileged, or otherwise
+> exempt from disclosure under applicable laws. It is intended to be 
+> conveyed only to the designated recipient(s). Any use, dissemination, 
+> distribution, printing, retaining or copying of this e-mail (including its 
+> attachments) by unintended recipient(s) is strictly prohibited and may 
+> be unlawful. If you are not an intended recipient of this e-mail, or believe
+>  
+> that you have received this e-mail in error, please notify the sender 
+> immediately (by replying to this e-mail), delete any and all copies of 
+> this e-mail (including any attachments) from your system, and do not
+> disclose the content of this e-mail to any other person. Thank
+>  you!
 > 
