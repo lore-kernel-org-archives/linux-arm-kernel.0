@@ -1,44 +1,35 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 30 Jan 2018 20:22:54 +0000
-Subject: [RFC v3 21/25] ARM: dts: r8a7790: Add watchdog support to SoC dtsi
+Date: Tue, 30 Jan 2018 20:22:46 +0000
+Subject: [RFC v3 13/25] ARM: shmobile: defconfig: Enable CONFIG_RENESAS_WDT
 In-Reply-To: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517343778-27902-22-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517343778-27902-14-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds watchdog support to the r8a7790 dtsi.
+R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
+its driver by default.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v1->v3:
-* rwdt moved before gpio at e6050000
+* CONFIG_RENESAS_WDT_GEN2 -> CONFIG_RENESAS_WDT
 
- arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index a84bf35..83d6704 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -218,6 +218,16 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		rwdt: watchdog at e6020000 {
-+			compatible = "renesas,r8a7790-wdt",
-+				     "renesas,rcar-gen2-wdt";
-+			reg = <0 0xe6020000 0 0x0c>;
-+			clocks = <&cpg CPG_MOD 402>;
-+			power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
-+			resets = <&cpg 402>;
-+			status = "disabled";
-+		};
-+
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a7790",
- 				     "renesas,rcar-gen2-gpio";
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 578434c..d5cdad8 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=y
++CONFIG_RENESAS_WDT=y
+ CONFIG_MFD_AS3711=y
+ CONFIG_MFD_DA9063=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
 -- 
 2.7.4
