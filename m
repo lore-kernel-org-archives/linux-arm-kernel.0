@@ -1,78 +1,74 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 29 Jan 2018 15:55:41 -0800
-Subject: [PATCH 4/4] drm/pl111: Support multiple endpoints on the CLCD
-In-Reply-To: <20180126132033.19744-4-linus.walleij@linaro.org>
-References: <20180126132033.19744-1-linus.walleij@linaro.org>
- <20180126132033.19744-4-linus.walleij@linaro.org>
-Message-ID: <87wp00w77m.fsf@anholt.net>
+Date: Mon, 29 Jan 2018 16:00:40 -0800
+Subject: [PATCH] drm/pl111: Use max memory bandwidth for resolution
+In-Reply-To: <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
+References: <20180123132220.29886-1-linus.walleij@linaro.org>
+ <87inbqppm4.fsf@anholt.net>
+ <CACRpkdZ6p+ooAeRAk3BnGryiU07_i4RCb9Vq-k5wpHQLWRY=cg@mail.gmail.com>
+Message-ID: <87tvv4w6zb.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Linus Walleij <linus.walleij@linaro.org> writes:
 
-> The Versatile PL110 implementations use multiple endpoints:
-> from the PL111 port, the lines are routed through a PLD,
-> and from there forked so the same lines go to a VGA DAC and
-> an external TFT panel connector. This is discrete wireing
-> so there is no way to turn of one output, i.e. this is
-> really two endpoints, not two ports.
+> On Thu, Jan 25, 2018 at 4:46 AM, Eric Anholt <eric@anholt.net> wrote:
 >
-> We model this with multiple endpoints, so we need to loop
-> over the available endpoints, check for panel or bridge on
-> each and accumulate the result before continuing.
+>>> +     pl111_choose_max_resolution(dev, priv->memory_bw,
+>>> +                                 &mode_config->max_width,
+>>> +                                 &mode_config->max_height, &bpp);
+>>> +     dev_info(dev->dev, "cap resolution at %u x %u, %u BPP\n",
+>>> +              mode_config->max_width, mode_config->max_height, bpp);
+>>
+>> I think this is the wrong place in the pipeline to be doing this, but I
+>> don't have a complete solution so I'm not necessarily saying no.
 >
-> The code already will give the panel preference over the
-> bridge, if present, so the output will be sent to the panel
-> if both a panel and a bridge is present on two endpoints
-> of the same port.
+> So currently the driver does this:
 >
-> If they all return -EPROBE_DEFER we return -EPROBE_DEFER
-> as well.
+> mode_config->max_width = 1024;
+> mode_config->max_height = 768;
 >
-> If just one endpoint is present on the port, the behaviour
-> is the same as before.
+> And that is because it cannot really handle anything. I guess ideally
+> the DRM driver should set these to -1 or something so that any widths
+> and heights negotiated will work.
+
+The PPL field only gets you up to 1024 width.  Looks like LPP lets you
+get up to 1024 height, though, even if the top level of the PL111 docs
+say 1024x768 is the max.
+
+>>  Things I think we should do for bandwidth limits:
+>>
+>> A new pl111_mode_valid() rejects modes with width*height*2 > bandwidth
+>> (if we can't scan it out with our smallest format, don't advertise it).
+>>
+>> pl111_display_check() rejects modes with width*height*bpp > bandwidth
+>> (if we can't scan out this particular configuration, let them know we
+>> can't set the mode).
+>>
+>> Ideally given those two things, fbdev and X11 would notice that the
+>> preferred mode fails at 24bpp and fall back to 16bpp.  I don't think
+>> either of those does so today, though.
+>>
+>> Interested in tackling any of these?
 >
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> I tried the pl111_display_check() version. It just made the driver
+> fail to initialize anything, at least when using the dumb VGA
+> bridge.
+>
+> There are .mode_valid() callbacks on the bridges we use
+> (panel and dumb VGA) but neither uses it at the moment, hm.
+> I could just assign my own .mode_valid() callback to the bridge,
+> but it seems a bit fragile. But it's worth a hack, I'll try it.
+>
+> I sent a sent of lesser controversial patches in the meantime,
+> and rebased this on top of those so we can deal with the
+> memory BW issue separately.
 
-Huh, from the binding I would have thought that we were describing
-things to the point of the pins coming out of the PLD, not past whatever
-splitting comes after that.
-
-I'm also confused how this would work.  You're talking about the DT
-looking like:
-
-	clcd at 10020000 {
-		compatible = "arm,pl111", "arm,primecell";
-		reg = <0x10020000 0x1000>;
-		interrupt-names = "combined";
-		interrupts = <0 44 4>;
-		clocks = <&oscclk1>, <&oscclk2>;
-		clock-names = "clcdclk", "apb_pclk";
-		max-memory-bandwidth = <94371840>; /* Bps, 1024x768 at 60 16bpp */
-
-		port {
-			dac_pads: endpoint1 {
-				remote-endpoint = <&vgadac>;
-				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-			};
-			tft_pads: endpoint2 {
-				remote-endpoint = <&tftpanel>;
-				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-			};
-		};
-
-	};
-
-
-Are you anticipating that a DT would actually connect up to two
-endpoints on the CLCD?  How should we resolve the pads property, in that
-case?  Is there much point in supporting this, if we don't actually
-support panels or bridges on both of the endpoints at once (since we
-pick only one to do panel/bridge setup/teardown on)?
+The memory-bandwidth field is in the pl111 binding, so I do think we
+should handle it there.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/bc00e80f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180129/c5e8b0cf/attachment.sig>
