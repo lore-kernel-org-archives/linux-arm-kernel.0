@@ -1,99 +1,70 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Tue, 30 Jan 2018 23:14:22 +0530
-Subject: [PATCH v2] arm64: dts: ls1088a: Add qspi device node for ls1088a-rdb
-Message-ID: <1517334262-17969-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Tue, 30 Jan 2018 18:46:50 +0100
+Subject: [PATCH v5 0/6] IR support for A83T
+Message-ID: <20180130174656.10657-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes and properties for QSPI controller.
-Add support for spansion flash, s25fs512s, as slave device for
-QSPI controller.
+This patch series adds support for the sunxi A83T ir module and enhances 
+the sunxi-ir driver. Right now the base clock frequency for the ir driver
+is a hard coded define and is set to 8 MHz.
+This works for the most common ir receivers. On the Sinovoip Bananapi M3 
+the ir receiver needs, a 3 MHz base clock frequency to work without
+problems with this driver.
 
-Added entry of "fsl,ls1088a-qspi" in fsl-quadspi.txt binding file.
+This patch series adds support for an optinal property that makes it able
+to override the default base clock frequency and enables the ir interface 
+on the a83t and the Bananapi M3.
 
-Signed-off-by: Suresh Gupta <suresh.gupta@nxp.com>
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Depends on
- https://patchwork.ozlabs.org/project/linux-mtd/list/?series=26084
+changes since v4:
+* rename cir pin from cir_pins to r_cir_pin
+* drop unit-adress from r_cir_pin
+* add a83t compatible to the cir node
+* move muxing options to dtsi
+* rename cir label and reorder it in the bananpim3.dts file
 
-Changes for v2:
-- Move property spi-rx-bus-width and spi-tx-bus-width from controller
-  to connected slave device node.
+changes since v3:
+* collecting all acks & reviewd by
+* fixed typos
 
- .../devicetree/bindings/mtd/fsl-quadspi.txt        |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts  | 23 ++++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 12 +++++++++++
- 3 files changed, 36 insertions(+)
+changes since v2:
+* reorder cir pin (alphabetical)
+* fix typo in documentation
 
-diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-index 811da0e..956c23c 100644
---- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-@@ -7,6 +7,7 @@ Required properties:
- 		 or
- 		 "fsl,ls2080a-qspi" followed by "fsl,ls1021a-qspi",
- 		 "fsl,ls1043a-qspi" followed by "fsl,ls1021a-qspi"
-+		 "fsl,ls2080a-qspi" followed by "fsl,ls1088a-qspi",
-   - reg : the first contains the register location and length,
-           the second contains the memory mapping address and length
-   - reg-names: Should contain the reg names "QuadSPI" and "QuadSPI-memory"
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 0f6fcda..8afe536 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -94,6 +94,29 @@
- 	};
- };
- 
-+&qspi {
-+	status = "okay";
-+	fsl,qspi-has-second-chip;
-+	qflash0: s25fs512s at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
-+	};
-+
-+	qflash1: s25fs512s at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		reg = <1>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
-+	};
-+
-+};
-+
- &ifc {
- 	ranges = <0 0 0x5 0x30000000 0x00010000
- 		  2 0 0x5 0x20000000 0x00010000>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index bd80e9a..b45a522 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -394,6 +394,18 @@
- 			status = "disabled";
- 		};
- 
-+		qspi: quadspi at 20c0000 {
-+			compatible = "fsl,ls2080a-qspi", "fsl,ls1088a-qspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x20c0000 0x0 0x10000>,
-+				<0x0 0x20000000 0x0 0x10000000>;
-+			reg-names = "QuadSPI", "QuadSPI-memory";
-+			interrupts = <0 25 0x4>; /* Level high type */
-+			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
-+			clock-names = "qspi_en", "qspi";
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
+changes since v1:
+* fix typos, reword Documentation
+* initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
+* change dev_info() to dev_dbg()
+* change naming to cir* in dts/dtsi
+* Added acked Ackedi-by to related patch
+* use whole memory block instead of registers needed + fix for h3/h5
+
+changes since rfc:
+* The property is now optinal. If the property is not available in 
+  the dtb the driver uses the default base clock frequency.
+* the driver prints out the the selected base clock frequency.
+* changed devicetree property from base-clk-frequency to clock-frequency
+
+Regards,
+Philipp
+
+Philipp Rossak (6):
+  media: rc: update sunxi-ir driver to get base clock frequency from
+    devicetree
+  media: dt: bindings: Update binding documentation for sunxi IR
+    controller
+  arm: dts: sun8i: a83t: Add the cir pin for the A83T
+  arm: dts: sun8i: a83t: Add support for the cir interface
+  arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+  arm: dts: sun8i: h3-h5: ir register size should be the whole memory
+    block
+
+ Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
+ drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
+ 5 files changed, 38 insertions(+), 9 deletions(-)
+
 -- 
-1.9.1
+2.11.0
