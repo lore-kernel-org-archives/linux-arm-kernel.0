@@ -1,78 +1,43 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 30 Jan 2018 20:22:45 +0000
-Subject: [RFC v3 12/25] ARM: shmobile: rcar-gen2: Add watchdog support
+Date: Tue, 30 Jan 2018 20:22:49 +0000
+Subject: [RFC v3 16/25] clk: renesas: r8a7790: Add rwdt clock
 In-Reply-To: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517343778-27902-13-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517343778-27902-17-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds watchdog support by installing shmobile_boot_vector_gen2
-to ICRAM1 when enough memory is available, in which case we also keep a
-copy of MPIDR to complete the reset vector logic.
+Add "rwdt" clock to r8a7790_mod_clks. Also, since we may need to access
+the watchdog registers at any time, declare the clock as critical.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 ---
-v2->v3:
-* purge shmobile_wdt_clock status and save mpidr of boot cpu
+v1->v3:
+* no change
 
-v1->v2:
-* make the reset vector backward compatible
+ drivers/clk/renesas/r8a7790-cpg-mssr.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm/mach-shmobile/platsmp-apmu.c |  1 +
- arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++++++++---
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 4422b61..ba732ef 100644
---- a/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -191,6 +191,7 @@ static void __init shmobile_smp_apmu_setup_boot(void)
- {
- 	/* install boot code shared by all CPUs */
- 	shmobile_boot_fn = __pa_symbol(shmobile_smp_boot);
-+	shmobile_boot_fn_gen2 = shmobile_boot_fn;
- }
+diff --git a/drivers/clk/renesas/r8a7790-cpg-mssr.c b/drivers/clk/renesas/r8a7790-cpg-mssr.c
+index 46bb55b..f936cb7 100644
+--- a/drivers/clk/renesas/r8a7790-cpg-mssr.c
++++ b/drivers/clk/renesas/r8a7790-cpg-mssr.c
+@@ -140,6 +140,7 @@ static const struct mssr_mod_clk r8a7790_mod_clks[] __initconst = {
+ 	DEF_MOD("cmt1",			 329,	R8A7790_CLK_R),
+ 	DEF_MOD("usbhs-dmac0",		 330,	R8A7790_CLK_HP),
+ 	DEF_MOD("usbhs-dmac1",		 331,	R8A7790_CLK_HP),
++	DEF_MOD("rwdt",			 402,	R8A7790_CLK_R),
+ 	DEF_MOD("irqc",			 407,	R8A7790_CLK_CP),
+ 	DEF_MOD("intc-sys",		 408,	R8A7790_CLK_ZS),
+ 	DEF_MOD("audio-dmac1",		 501,	R8A7790_CLK_HP),
+@@ -211,6 +212,7 @@ static const struct mssr_mod_clk r8a7790_mod_clks[] __initconst = {
+ };
  
- void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
-diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-index e5f215c..bfad202 100644
---- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-@@ -17,6 +17,7 @@
- #include <linux/smp.h>
- #include <linux/soc/renesas/rcar-sysc.h>
- #include <asm/io.h>
-+#include <asm/cputype.h>
- #include "common.h"
- #include "rcar-gen2.h"
+ static const unsigned int r8a7790_crit_mod_clks[] __initconst = {
++	MOD_CLK_ID(402),	/* RWDT */
+ 	MOD_CLK_ID(408),	/* INTC-SYS (GIC) */
+ };
  
-@@ -37,7 +38,6 @@
- #define CA7RESCNT_CODE	0x5a5a0000
- #define CA7RESCNT_CPUS	0xf		/* CPU0-3 */
- 
--
- /* On-chip RAM */
- #define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
- 
-@@ -119,8 +119,15 @@ void __init rcar_gen2_pm_init(void)
- 	p = ioremap(res.start, resource_size(&res));
- 	if (!p)
- 		return;
--
--	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
-+	/* install the reset vector, use the largest version if we have enough
-+	 * memory available */
-+	if (resource_size(&res) >= shmobile_boot_size_gen2) {
-+		shmobile_boot_cpu_gen2 = read_cpuid_mpidr();
-+		memcpy_toio(p, shmobile_boot_vector_gen2,
-+			    shmobile_boot_size_gen2);
-+	} else {
-+		memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
-+	}
- 	iounmap(p);
- 
- 	/* setup reset vectors */
 -- 
 2.7.4
