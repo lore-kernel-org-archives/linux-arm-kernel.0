@@ -1,131 +1,166 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 30 Jan 2018 17:49:35 +0000
-Subject: [RFC PATCH v2] tty: pl011: Avoid spuriously stuck-off interrupts
-Message-ID: <1517334575-4698-1-git-send-email-Dave.Martin@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 30 Jan 2018 18:00:13 +0000
+Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+ <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-clears the RX and receive timeout interrupts on pl011 startup, to
-avoid a screaming-interrupt scenario that can occur when the
-firmware or bootloader leaves these interrupts asserted.
+On Tue, Jan 30, 2018 at 10:39:20AM +0000, Shameerali Kolothum Thodi wrote:
+> Hi Neil/Lorenzo,
+> 
+> > -----Original Message-----
+> > From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> > On Behalf Of Neil Leeder
+> > Sent: Friday, August 04, 2017 8:59 PM
+> > To: Will Deacon <will.deacon@arm.com>; Mark Rutland
+> > <mark.rutland@arm.com>
+> > Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
+> > <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
+> > kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
+> > <msalter@redhat.com>; nleeder at codeaurora.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+> > 
+> > Add support for the SMMU Performance Monitor Counter Group
+> > information from ACPI. This is in preparation for its use
+> > in the SMMU v3 PMU driver.
+> 
+> [...]
+> 
+> >  static __init
+> >  const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node
+> > *node)
+> >  {
+> > @@ -1001,6 +1041,8 @@ const struct iort_iommu_config
+> > *iort_get_iommu_cfg(struct acpi_iort_node *node)
+> >  		return &iort_arm_smmu_v3_cfg;
+> >  	case ACPI_IORT_NODE_SMMU:
+> >  		return &iort_arm_smmu_cfg;
+> > +	case ACPI_IORT_NODE_PMCG:
+> > +		return &iort_arm_smmu_pmcg_cfg;
+> 
+> I understand this series will be revised based on the iort spec update.
+> 
+> This Is to clarify few queries we have with respect to one of our hisilicon 
+> platform which has support for SMMU v3 PMCG. In our implementation
+> the base address for the PMCG is defined at a IMP DEF address offset
+> within the SMMUv3 page 0 address space. And as per SMMU spec, 
+> 
+> " The Performance Monitor Counter Groups are standalone monitoring 
+> facilities  and, as such, can be implemented in separate components that
+> are all associated with (but not necessarily part of) an SMMU"
+> 
+> It looks like PMCG can be part of SMMU,  it is not clear whether this kind
+> of address mapping is forbidden or not. If this is an accepted  scenario, then
+> the devm_ioremap_resource() call in SMMv3 probe will fail as it reports conflict.
+> 
+> As far as I can see, the above code just checks the iort node type is PMCG
+> and assumes that its SMMU PMCG. As per IORT spec, it make sense to check
+> the node reference filed and make that call. 
+> 
+> And to fix the resource conflict issue we have, is it possible to treat the PMCG
+> node as the child of the SMMU and call the platform_device_add() appropriately
+> to avoid the conflict? I am not sure this will fix the issue and also about the order
+> in which SMMU and PMCG devices will be populated will have an impact on this.
+> 
+> Please let me know your thoughts on this.
 
-This has been noted as an issue when running Linux on qemu [1].
+I went back and re-read the patches, I think the point here is that the
+perf driver (ie PATCH 2 that, by the way, is not maiinline) uses
+devm_ioremap_resource() to map the counters and that's what is causing
+failures when PMCG is part of SMMUv3 registers.
 
-Unfortunately, the above fix seems to lead to potential
-misbehaviour if the RX FIFO interrupt is asserted _non_ spuriously
-on driver startup, if the RX FIFO is also already full to the
-trigger level.
+It is the resources hierarchy that is wrong and in turn, I do not think
+devm_request_mem_region() is the right way of requesting it for the
+PMCG driver.
 
-Clearing the RX FIFO interrupt does not change the FIFO fill level.
-In this scenario, because the interrupt is now clear and because
-the FIFO is already full to the trigger level, no new assertion of
-the RX FIFO interrupt can occur unless the FIFO is drained back
-below the trigger level.  This never occurs because the pl011
-driver is waiting for an RX FIFO interrupt to tell it that there is
-something to read, and does not read the FIFO at all until that
-interrupt occurs.
+I need to look into this but I suspect that's something that should
+be handled in the PMCG driver, that has to request the memory region
+_differently_ (ie ioremap copes with this overlap - it is the
+devm_request_mem_region() in devm_ioremap_resource() that fails, correct
+?).
 
-Thus, simply clearing "spurious" interrupts on startup may be
-misguided, since there is no way to be sure that the interrupts are
-truly spurious, and things can go wrong if they are not.
+Certainly we need to create in IORT the resources with the correct
+hierarchy (I reckon DT does it already if the right device hierarchy is
+specified).
 
-This patch attempts to handle (suspected) spurious interrupts more
-robustly, by allowing the interrupt(s) to fire but quenching the
-scream.
+Lorenzo
 
-pl011_int() runs and attempts to drain the FIFO anyway just as if
-the interrupts were real.  If the FIFO is already empty, great.  To
-avoid a screaming spurious interrupt, the RX FIFO and timeout
-interrupts are now explicitly cleared in between committing to
-drain the RX FIFO and actually draining it.  We do not have to
-worry about lost interrupts here, because we are effectively in
-polled mode inside pl011_int() until the RX FIFO becomes empty:
-
-  * A new char received before the RX FIFO is fully drained will be
-    drained out synchronously by pl011_int() along with the other
-    chars already pending.  A new char received after the RX FIFO
-    is drained will result in correct RX FIFO interrupt assertion,
-    because emptying the RX FIFO guarantees that the RX FIFO /
-    timeout interrupt state machines are back in a sane state.
-
-  * A new RX timeout before the RX FIFO is fully drained is no
-    problem, because pl011_int() has already committed to emptying
-    the FIFO at this point, guaranteeing that no stray chars will
-    be left behind.  A new RX timeout after the RX FIFO is fully
-    drained will result in correct interrupt assertion.
-
-This patch does not attempt to address the case where the RX FIFO
-fills faster than it can be drained: that is a pathological
-condition that is beyond the scope of the driver to work around.
-Users cannot expect this to work unless they enable hardware flow
-control.
-
-[1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo
-before enabled the interruption
-https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-
-Reported-by: Wei Xu <xuwei5@hisilicon.com>
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Fixes: 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
----
-
-Wei, are you happy for me to add your Tested-by?
-
-Keeping this as RFC, since I'm still not sure about possible side-
-effects.  I'll wait a bit to see if anyone else can test the patch
-or has comments.
-
-Changes since RFC v1:
-
-Requested by Wei Xu:
-
-  * Also don't clear those interrupts in pl011_hwinit(), which can
-    probably trigger the same issue.
----
- drivers/tty/serial/amba-pl011.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 04af8de..dd6c285 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1492,9 +1492,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 		do {
- 			check_apply_cts_event_workaround(uap);
- 
--			pl011_write(status & ~(UART011_TXIS|UART011_RTIS|
--					       UART011_RXIS),
--				    uap, REG_ICR);
-+			pl011_write(status & ~UART011_TXIS, uap, REG_ICR);
- 
- 			if (status & (UART011_RTIS|UART011_RXIS)) {
- 				if (pl011_dma_rx_running(uap))
-@@ -1674,9 +1672,8 @@ static int pl011_hwinit(struct uart_port *port)
- 
- 	uap->port.uartclk = clk_get_rate(uap->clk);
- 
--	/* Clear pending error and receive interrupts */
--	pl011_write(UART011_OEIS | UART011_BEIS | UART011_PEIS |
--		    UART011_FEIS | UART011_RTIS | UART011_RXIS,
-+	/* Clear pending error interrupts */
-+	pl011_write(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS,
- 		    uap, REG_ICR);
- 
- 	/*
-@@ -1733,8 +1730,6 @@ static void pl011_enable_interrupts(struct uart_amba_port *uap)
- {
- 	spin_lock_irq(&uap->port.lock);
- 
--	/* Clear out any spuriously appearing RX interrupts */
--	pl011_write(UART011_RTIS | UART011_RXIS, uap, REG_ICR);
- 	uap->im = UART011_RTIM;
- 	if (!pl011_dma_rx_running(uap))
- 		uap->im |= UART011_RXIM;
--- 
-2.1.4
+> 
+> Thanks,
+> Shameer
+>   
+> >  	default:
+> >  		return NULL;
+> >  	}
+> > @@ -1056,6 +1098,15 @@ static int __init
+> > iort_add_smmu_platform_device(struct acpi_iort_node *node)
+> >  	if (ret)
+> >  		goto dev_put;
+> > 
+> > +	/* End of init for PMCG */
+> > +	if (node->type == ACPI_IORT_NODE_PMCG) {
+> > +		ret = platform_device_add(pdev);
+> > +		if (ret)
+> > +			goto dev_put;
+> > +
+> > +		return 0;
+> > +	}
+> > +
+> >  	/*
+> >  	 * We expect the dma masks to be equivalent for
+> >  	 * all SMMUs set-ups
+> > @@ -1131,6 +1182,9 @@ static void __init iort_init_platform_devices(void)
+> >  				acpi_free_fwnode_static(fwnode);
+> >  				return;
+> >  			}
+> > +		} else if (iort_node->type == ACPI_IORT_NODE_PMCG) {
+> > +			if (iort_add_smmu_platform_device(iort_node))
+> > +				return;
+> >  		}
+> > 
+> >  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> > diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> > index 707dda74..2169b6f 100644
+> > --- a/include/acpi/actbl2.h
+> > +++ b/include/acpi/actbl2.h
+> > @@ -695,7 +695,8 @@ enum acpi_iort_node_type {
+> >  	ACPI_IORT_NODE_NAMED_COMPONENT = 0x01,
+> >  	ACPI_IORT_NODE_PCI_ROOT_COMPLEX = 0x02,
+> >  	ACPI_IORT_NODE_SMMU = 0x03,
+> > -	ACPI_IORT_NODE_SMMU_V3 = 0x04
+> > +	ACPI_IORT_NODE_SMMU_V3 = 0x04,
+> > +	ACPI_IORT_NODE_PMCG = 0x05
+> >  };
+> > 
+> >  struct acpi_iort_id_mapping {
+> > @@ -811,6 +812,12 @@ struct acpi_iort_smmu_v3 {
+> >  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
+> >  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
+> > 
+> > +struct acpi_iort_pmcg {
+> > +	u64 base_address;	/* PMCG base address */
+> > +	u32 overflow_gsiv;
+> > +	u32 node_reference;
+> > +};
+> > +
+> > 
+> > /****************************************************************
+> > ***************
+> >   *
+> >   * IVRS - I/O Virtualization Reporting Structure
+> > --
+> > Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> > Technologies Inc.
+> > Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+> > a Linux Foundation Collaborative Project.
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
