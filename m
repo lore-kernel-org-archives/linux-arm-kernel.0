@@ -1,71 +1,109 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 30 Jan 2018 14:26:40 +0200
-Subject: [PATCH] ARM64: dts: marvell: armada-cp110: Add registers clock
- for SPI nodes
-In-Reply-To: <20180130112138.4xopqhgllnbq4xhb@sapphire.tkos.co.il>
-References: <20180130111455.10101-1-gregory.clement@free-electrons.com>
- <20180130112138.4xopqhgllnbq4xhb@sapphire.tkos.co.il>
-Message-ID: <20180130122640.wx2r3mnqusz362ju@sapphire.tkos.co.il>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jan 2018 12:27:23 +0000
+Subject: [PATCH v2 15/16] arm/arm64: smccc: Implement SMCCC v1.1 inline
+ primitive
+In-Reply-To: <CAKv+Gu_aXX70tLL+kyHDy-=4+ZiTEmOtMbfzt5oqs41B6ag1kg@mail.gmail.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-16-marc.zyngier@arm.com>
+ <CAKv+Gu_aXX70tLL+kyHDy-=4+ZiTEmOtMbfzt5oqs41B6ag1kg@mail.gmail.com>
+Message-ID: <03484caa-2e18-7126-7d99-8d0b1e0a83c6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Tue, Jan 30, 2018 at 01:21:38PM +0200, Baruch Siach wrote:
-> On Tue, Jan 30, 2018 at 12:14:55PM +0100, Gregory CLEMENT wrote:
-> > This extra clock is needed to access the registers of the SPI controller
-> > used on Armada 7K/8K SoCs.
+On 29/01/18 21:45, Ard Biesheuvel wrote:
+> On 29 January 2018 at 17:45, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> One of the major improvement of SMCCC v1.1 is that it only clobbers
+>> the first 4 registers, both on 32 and 64bit. This means that it
+>> becomes very easy to provide an inline version of the SMC call
+>> primitive, and avoid performing a function call to stash the
+>> registers that would otherwise be clobbered by SMCCC v1.0.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/arm-smccc.h | 157 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 157 insertions(+)
+>>
+>> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+>> index dd44d8458c04..bc5843728909 100644
+>> --- a/include/linux/arm-smccc.h
+>> +++ b/include/linux/arm-smccc.h
+>> @@ -150,5 +150,162 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+>>
+>>  #define arm_smccc_hvc_quirk(...) __arm_smccc_hvc(__VA_ARGS__)
+>>
+>> +/* SMCCC v1.1 implementation madness follows */
+>> +#ifdef CONFIG_ARM64
+>> +
+>> +#define SMCCC_SMC_INST "smc    #0"
+>> +#define SMCCC_HVC_INST "hvc    #0"
+>> +
+>> +#define __arm_smccc_1_1_prologue(inst)                                 \
+>> +       inst "\n"                                                       \
+>> +       "cbz    %[ptr], 1f\n"                                           \
+>> +       "stp    %x[r0], %x[r1], %[ra0]\n"                               \
+>> +       "stp    %x[r2], %x[r3], %[ra2]\n"                               \
+>> +       "1:\n"                                                          \
+>> +       : [ra0] "=Ump" (*(&___res->a0)),                                \
+>> +         [ra2] "=Ump" (*(&___res->a2)),
+>> +
+>> +#define __arm_smccc_1_1_epilogue       : "memory"
+>> +
+>> +#endif
+>> +
+>> +#ifdef CONFIG_ARM
+>> +#include <asm/opcodes-sec.h>
+>> +#include <asm/opcodes-virt.h>
+>> +
+>> +#define SMCCC_SMC_INST __SMC(0)
+>> +#define SMCCC_HVC_INST __HVC(0)
+>> +
+>> +#define __arm_smccc_1_1_prologue(inst)                                 \
+>> +       inst "\n"                                                       \
+>> +       "cmp    %[ptr], #0\n"                                           \
+>> +       "stmne  %[ptr], {%[r0], %[r1], %[r2], %[r3]}\n"                 \
+>> +       : "=m" (*___res),
+>> +
+>> +#define __arm_smccc_1_1_epilogue       : "memory", "cc"
+>> +
+>> +#endif
+>> +
+>> +#define __constraint_write_0                                           \
+>> +       [r0] "+r" (r0), [r1] "=r" (r1), [r2] "=r" (r2), [r3] "=r" (r3)
+>> +#define __constraint_write_1                                           \
+>> +       [r0] "+r" (r0), [r1] "+r" (r1), [r2] "=r" (r2), [r3] "=r" (r3)
+>> +#define __constraint_write_2                                           \
+>> +       [r0] "+r" (r0), [r1] "+r" (r1), [r2] "+r" (r2), [r3] "=r" (r3)
+>> +#define __constraint_write_3                                           \
+>> +       [r0] "+r" (r0), [r1] "+r" (r1), [r2] "+r" (r2), [r3] "+r" (r3)
 > 
-> Don't we need this also for I2C and UART?
+> It seems you need +r for all arguments, otherwise the compiler will
+> notice that the value is never used, and may assign the register to
+> 'res' instead, i.e.,
+> 
+>  3e4:   320107e0        mov     w0, #0x80000001                 // #-2147483647
+>  3e8:   320183e1        mov     w1, #0x80008000                 // #-2147450880
+>  3ec:   910123a2        add     x2, x29, #0x48
+>  3f0:   d4000002        hvc     #0x0
+>  3f4:   b4000062        cbz     x2, 400 <enable_psci_bp_hardening+0x88>
+>  3f8:   a90487a0        stp     x0, x1, [x29, #72]
+>  3fc:   a9058fa2        stp     x2, x3, [x29, #88]
+> 
+> (for the code generated in the next patch)
 
-So you posted a patch for I2C as well.
+Well spotted.
 
-Looking at the cp110-system-controller.c driver (cp110_syscon_common_probe()), 
-I see that clock gate #17 (CP110_GATE_MAIN) is automatically enabled when #21 
-(CP110_GATE_SLOW_IO) is enabled. So this additional clock specifier should not 
-be needed.
+I think this is because of the lack of early-clobber for the unassigned
+registers. The compiler assumes the whole sequence is a single
+instruction, with the output registers being affected at the end. If we
+mark those with '=&r', we will prevent GCC from emitting this kind of
+horror.
 
-Also, as I understand, 'clocks' and 'clock-names' properties are meant to 
-describe the clock input from the peripheral device point of view. But gate 
-#17 is an internal clock controller gate that is not visible to the SPI master 
-or I2C master device.
+Note that with Robin's trick of moving the assignment back to C code,
+this is a bit moot as this is really a single instruction (smc/hvc), and
+there is no intermediate register evaluation.
 
-What problem is this patch meant to solve?
+Thanks,
 
-baruch
-
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > ---
-> >  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 8 ++++++--
-> >  1 file changed, 6 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> > index a8af4136dbe7..0ab921861a2f 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> > +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> > @@ -257,7 +257,9 @@
-> >  			reg = <0x700600 0x50>;
-> >  			#address-cells = <0x1>;
-> >  			#size-cells = <0x0>;
-> > -			clocks = <&CP110_LABEL(clk) 1 21>;
-> > +			clock-names = "core", "axi";
-> > +			clocks = <&CP110_LABEL(clk) 1 21>,
-> > +				 <&CP110_LABEL(clk) 1 17>;
-> >  			status = "disabled";
-> >  		};
-> >  
-> > @@ -266,7 +268,9 @@
-> >  			reg = <0x700680 0x50>;
-> >  			#address-cells = <1>;
-> >  			#size-cells = <0>;
-> > -			clocks = <&CP110_LABEL(clk) 1 21>;
-> > +			clock-names = "core", "axi";
-> > +			clocks = <&CP110_LABEL(clk) 1 21>,
-> > +				 <&CP110_LABEL(clk) 1 17>;
-> >  			status = "disabled";
-> >  		};
-
+	M.
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Jazz is not dead. It just smells funny...
