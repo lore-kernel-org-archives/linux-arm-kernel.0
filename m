@@ -1,44 +1,34 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 30 Jan 2018 18:46:52 +0100
-Subject: [PATCH v5 2/6] media: dt: bindings: Update binding documentation for
- sunxi IR controller
+Date: Tue, 30 Jan 2018 18:46:53 +0100
+Subject: [PATCH v5 3/6] arm: dts: sun8i: a83t: Add the cir pin for the A83T
 In-Reply-To: <20180130174656.10657-1-embed3d@gmail.com>
 References: <20180130174656.10657-1-embed3d@gmail.com>
-Message-ID: <20180130174656.10657-3-embed3d@gmail.com>
+Message-ID: <20180130174656.10657-4-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates documentation for Device-Tree bindings for sunxi IR
-controller and adds the new optional property for the base clock
-frequency.
+The CIR Pin of the A83T is located at PL12.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/media/sunxi-ir.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/sunxi-ir.txt b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-index 91648c569b1e..278098987edb 100644
---- a/Documentation/devicetree/bindings/media/sunxi-ir.txt
-+++ b/Documentation/devicetree/bindings/media/sunxi-ir.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - linux,rc-map-name: see rc.txt file in the same directory.
- - resets : phandle + reset specifier pair
-+- clock-frequency  : IR Receiver clock frequency, in Hertz. Defaults to 8 MHz
-+		     if missing.
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 7f4955a5fab7..f7f78a27e21d 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -716,6 +716,11 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
  
- Example:
- 
-@@ -18,6 +20,7 @@ ir0: ir at 1c21800 {
- 	compatible = "allwinner,sun4i-a10-ir";
- 	clocks = <&apb0_gates 6>, <&ir0_clk>;
- 	clock-names = "apb", "ir";
-+	clock-frequency = <3000000>;
- 	resets = <&apb0_rst 1>;
- 	interrupts = <0 5 1>;
- 	reg = <0x01C21800 0x40>;
++			r_cir_pin: r-cir-pin {
++				pins = "PL12";
++				function = "s_cir_rx";
++			};
++
+ 			r_rsb_pins: r-rsb-pins {
+ 				pins = "PL0", "PL1";
+ 				function = "s_rsb";
 -- 
 2.11.0
