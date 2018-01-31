@@ -1,125 +1,43 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 31 Jan 2018 19:42:36 +0100
-Subject: [PATCH v2 06/16] iio: adc: sun4i-gpadc-iio: rework: support
- multiple sensors
-In-Reply-To: <20180128232919.12639-7-embed3d@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-7-embed3d@gmail.com>
-Message-ID: <20180131184236.4yhp732l5kenhmp2@qschulz>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 31 Jan 2018 18:24:22 +0000
+Subject: [RFC v4 18/26] clk: renesas: r8a7791/r8a7793: Add rwdt clock
+In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517423070-24236-19-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Add "rwdt" clock to r8a7791_mod_clks. Also, since we may need to access
+the watchdog registers at any time, declare the clock as critical.
 
-On Mon, Jan 29, 2018 at 12:29:09AM +0100, Philipp Rossak wrote:
-> For adding newer sensor some basic rework of the code is necessary.
-> 
-> This patch reworks the driver to be able to handle more than one
-> thermal sensor. Newer SoC like the A80 have 4 thermal sensors.
-> Because of this the maximal sensor count value was set to 4.
-> 
-> The sensor_id value is set during sensor registration and is for each
-> registered sensor indiviual. This makes it able to differntiate the
-> sensors when the value is read from the register.
-> 
-> In function sun4i_gpadc_read_raw(), the sensor number of the ths sensor
-> was directly set to 0 (sun4i_gpadc_temp_read(x,x,0)). This selects
-> in the temp_read function automatically sensor 0. A check for the
-> sensor_id is here not required since the old sensors only have one
-> thermal sensor. In addition to that is the sun4i_gpadc_read_raw()
-> function only used by the "older" sensors (before A33) where the
-> thermal sensor was a cobination of an adc and a thermal sensor.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 36 +++++++++++++++++++++++-------------
->  include/linux/mfd/sun4i-gpadc.h   |  3 +++
->  2 files changed, 26 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 51ec0104d678..ac9ad2f8232f 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -67,12 +67,13 @@ struct gpadc_data {
->  	unsigned int	tp_adc_select;
->  	unsigned int	(*adc_chan_select)(unsigned int chan);
->  	unsigned int	adc_chan_mask;
-> -	unsigned int	temp_data;
-> +	unsigned int	temp_data[MAX_SENSOR_COUNT];
->  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
->  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
->  	bool		has_bus_clk;
->  	bool		has_bus_rst;
->  	bool		has_mod_clk;
-> +	int		sensor_count;
->  };
->  
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+---
+v3->4:
+* no change
 
-I've noticed that for H3, A83T, A64 (at least), if DATA reg of sensor 0
-is e.g. 0x80, DATA reg of sensor N is at 0x80 + 0x04 * N.
+ drivers/clk/renesas/r8a7791-cpg-mssr.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Is that verified for other SoCs? Does anyone have some input on this?
-
-We could then just use temp_data as the DATA reg "base" and increment by
-0x4 depending on the sensor id instead of using a fixed-size array.
-
->  static const struct gpadc_data sun4i_gpadc_data = {
-> @@ -82,9 +83,10 @@ static const struct gpadc_data sun4i_gpadc_data = {
->  	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
->  	.adc_chan_select = &sun4i_gpadc_chan_select,
->  	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
-> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
-> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
->  	.sample_start = sun4i_gpadc_sample_start,
->  	.sample_end = sun4i_gpadc_sample_end,
-> +	.sensor_count = 1,
-
-If the solution above is not desirable/possible, could we use something
-like:
-
-unsigned int sun4i_temp_data[] = {SUN4I_GPADC_TEMP_DATA,};
-
-static const struct gpadc_data sun4i_gpadc_data = {
-	.temp_data = &sun4i_temp_data,
-	.sensor_count = ARRAY_SIZE(sun4i_temp_data),
-};
-
-That avoids 1) inconsistencies between the array size and the array
-itself, 2) does not require to pad the array with zeroes.
-
-[...]
-
-> @@ -745,9 +752,12 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  	pm_runtime_enable(&pdev->dev);
->  
->  	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
-> -		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
-> -							    0, info,
-> -							    &sun4i_ts_tz_ops);
-> +		for (i = 0; i < info->data->sensor_count; i++) {
-> +			info->sensor_id = i;
-> +			info->tzd = thermal_zone_of_sensor_register(
-> +					info->sensor_device,
-> +					i, info, &sun4i_ts_tz_ops);
-> +		}
-
-As Maxime said, this does not work.
-
-One way would be to have a new structure being:
-struct sun4i_sensor_info {
-	struct sun4i_gpadc_iio	*info;
-	unsigned int		sensor_id;
-};
-
-Or since we only use the iio_dev within the sun4i_gpadc_iio in the
-.get_temp function, we may replace info by struct iio_dev *indio_dev
-above.
-
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/9b0655e7/attachment-0001.sig>
+diff --git a/drivers/clk/renesas/r8a7791-cpg-mssr.c b/drivers/clk/renesas/r8a7791-cpg-mssr.c
+index c0b51f9..820b220 100644
+--- a/drivers/clk/renesas/r8a7791-cpg-mssr.c
++++ b/drivers/clk/renesas/r8a7791-cpg-mssr.c
+@@ -128,6 +128,7 @@ static const struct mssr_mod_clk r8a7791_mod_clks[] __initconst = {
+ 	DEF_MOD("cmt1",			 329,	R8A7791_CLK_R),
+ 	DEF_MOD("usbhs-dmac0",		 330,	R8A7791_CLK_HP),
+ 	DEF_MOD("usbhs-dmac1",		 331,	R8A7791_CLK_HP),
++	DEF_MOD("rwdt",			 402,	R8A7791_CLK_R),
+ 	DEF_MOD("irqc",			 407,	R8A7791_CLK_CP),
+ 	DEF_MOD("intc-sys",		 408,	R8A7791_CLK_ZS),
+ 	DEF_MOD("audio-dmac1",		 501,	R8A7791_CLK_HP),
+@@ -209,6 +210,7 @@ static const struct mssr_mod_clk r8a7791_mod_clks[] __initconst = {
+ };
+ 
+ static const unsigned int r8a7791_crit_mod_clks[] __initconst = {
++	MOD_CLK_ID(402),	/* RWDT */
+ 	MOD_CLK_ID(408),	/* INTC-SYS (GIC) */
+ };
+ 
+-- 
+2.7.4
