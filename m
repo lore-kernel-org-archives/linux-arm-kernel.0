@@ -1,49 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 Jan 2018 14:28:07 +0000
-Subject: [PATCH v2] KVM: arm/arm64: Fix arch timers with userspace irqchips
-In-Reply-To: <20180131121425.7252-1-christoffer.dall@linaro.org>
-References: <20180131121425.7252-1-christoffer.dall@linaro.org>
-Message-ID: <2417c8c5-e09c-a2fb-a4c5-b04cc39b35a5@arm.com>
+From: aapo@tuxera.com (Aapo Vienamo)
+Date: Wed, 31 Jan 2018 14:34:07 +0000
+Subject: [RFC] ARM: dts: imx7d: cl-som-imx7: fix pinctrl_enet
+Message-ID: <20180131143407.8324-1-aapo@tuxera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/18 12:14, Christoffer Dall wrote:
-> When introducing support for irqchip in userspace we needed a way to
-> mask the timer signal to prevent the guest continuously exiting due to a
-> screaming timer.
-> 
-> We did this by disabling the corresponding percpu interrupt on the
-> host interrupt controller, because we cannot rely on the host system
-> having a GIC, and therefore cannot make any assumptions about having an
-> active state to hide the timer signal.
-> 
-> Unfortunately, when introducing this feature, it became entirely
-> possible that a VCPU which belongs to a VM that has a userspace irqchip
-> can disable the vtimer irq on the host on some physical CPU, and then go
-> away without ever enabling the vtimer irq on that physical CPU again.
-> 
-> This means that using irqchips in userspace on a system that also
-> supports running VMs with an in-kernel GIC can prevent forward progress
-> from in-kernel GIC VMs.
-> 
-> Later on, when we started taking virtual timer interrupts in the arch
-> timer code, we would also leave this timer state active for userspace
-> irqchip VMs, because we leave it up to a VGIC-enabled guest to
-> deactivate the hardware IRQ using the HW bit in the LR.
-> 
-> Both issues are solved by only using the enable/disable trick on systems
-> that do not have a host GIC which supports the active state, because all
-> VMs on such systems must use irqchips in userspace.  Systems that have a
-> working GIC with support for an active state use the active state to
-> mask the timer signal for both userspace and in-kernel irqchips.
-> 
-> Cc: Alexander Graf <agraf@suse.de>
-> Cc: <stable@vger.kernel.org> # v4.12+
-> Fixes: d9e139778376 ("KVM: arm/arm64: Support arch timers with a userspace gic")
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+The missing last digit of the CONFIG values is added. Looks like a typo
+of some sort when comparing to the downstream dt. This fixes
+intermittent behavior behaviour of the ethernet controllers.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Aapo Vienamo <aapo@tuxera.com>
+---
+ arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 52 ++++++++++++++++-----------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
-	M.
+diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+index ae45af1ad062..3cc1fb9ce441 100644
+--- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
++++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+@@ -213,37 +213,37 @@
+ &iomuxc {
+ 	pinctrl_enet1: enet1grp {
+ 		fsl,pins = <
+-			MX7D_PAD_SD2_CD_B__ENET1_MDIO			0x3
+-			MX7D_PAD_SD2_WP__ENET1_MDC			0x3
+-			MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x1
+-			MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x1
+-			MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x1
+-			MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x1
+-			MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x1
+-			MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x1
+-			MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x1
+-			MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x1
+-			MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x1
+-			MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x1
+-			MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x1
+-			MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x1
++			MX7D_PAD_SD2_CD_B__ENET1_MDIO			0x30
++			MX7D_PAD_SD2_WP__ENET1_MDC			0x30
++			MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x11
++			MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x11
++			MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x11
++			MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x11
++			MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x11
++			MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x11
++			MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x11
++			MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x11
++			MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x11
++			MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x11
++			MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x11
++			MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x11
+ 		>;
+ 	};
+ 
+ 	pinctrl_enet2: enet2grp {
+ 		fsl,pins = <
+-			MX7D_PAD_EPDC_GDSP__ENET2_RGMII_TXC		0x1
+-			MX7D_PAD_EPDC_SDCE2__ENET2_RGMII_TD0		0x1
+-			MX7D_PAD_EPDC_SDCE3__ENET2_RGMII_TD1		0x1
+-			MX7D_PAD_EPDC_GDCLK__ENET2_RGMII_TD2		0x1
+-			MX7D_PAD_EPDC_GDOE__ENET2_RGMII_TD3		0x1
+-			MX7D_PAD_EPDC_GDRL__ENET2_RGMII_TX_CTL		0x1
+-			MX7D_PAD_EPDC_SDCE1__ENET2_RGMII_RXC		0x1
+-			MX7D_PAD_EPDC_SDCLK__ENET2_RGMII_RD0		0x1
+-			MX7D_PAD_EPDC_SDLE__ENET2_RGMII_RD1		0x1
+-			MX7D_PAD_EPDC_SDOE__ENET2_RGMII_RD2		0x1
+-			MX7D_PAD_EPDC_SDSHR__ENET2_RGMII_RD3		0x1
+-			MX7D_PAD_EPDC_SDCE0__ENET2_RGMII_RX_CTL		0x1
++			MX7D_PAD_EPDC_GDSP__ENET2_RGMII_TXC		0x11
++			MX7D_PAD_EPDC_SDCE2__ENET2_RGMII_TD0		0x11
++			MX7D_PAD_EPDC_SDCE3__ENET2_RGMII_TD1		0x11
++			MX7D_PAD_EPDC_GDCLK__ENET2_RGMII_TD2		0x11
++			MX7D_PAD_EPDC_GDOE__ENET2_RGMII_TD3		0x11
++			MX7D_PAD_EPDC_GDRL__ENET2_RGMII_TX_CTL		0x11
++			MX7D_PAD_EPDC_SDCE1__ENET2_RGMII_RXC		0x11
++			MX7D_PAD_EPDC_SDCLK__ENET2_RGMII_RD0		0x11
++			MX7D_PAD_EPDC_SDLE__ENET2_RGMII_RD1		0x11
++			MX7D_PAD_EPDC_SDOE__ENET2_RGMII_RD2		0x11
++			MX7D_PAD_EPDC_SDSHR__ENET2_RGMII_RD3		0x11
++			MX7D_PAD_EPDC_SDCE0__ENET2_RGMII_RX_CTL		0x11
+ 		>;
+ 	};
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
