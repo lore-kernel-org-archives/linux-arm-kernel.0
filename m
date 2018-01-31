@@ -1,60 +1,188 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 Jan 2018 14:11:06 +0000
-Subject: [PATCH v2 16/16] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
- hardening support
-In-Reply-To: <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-17-marc.zyngier@arm.com>
- <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
-Message-ID: <49853e5e-f093-2e79-1cfb-182f51fcd6a0@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 31 Jan 2018 14:25:34 +0000
+Subject: [PATCH v3 3/6] arm: KVM: Invalidate BTB on guest exit for
+ Cortex-A12/A17
+In-Reply-To: <044733c7-ac45-adc1-acfb-fbae32ba09b3@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-4-marc.zyngier@arm.com>
+ <361ff814-cf1e-ad1f-329a-0fe416c2b6f7@arm.com>
+ <044733c7-ac45-adc1-acfb-fbae32ba09b3@arm.com>
+Message-ID: <2d3c55f9-88c0-3d21-f497-3d9d1f70ec61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/18 13:56, Hanjun Guo wrote:
-> Hi Marc,
+On 31/01/18 12:11, Marc Zyngier wrote:
+> Hi Robin,
 > 
-> On 2018/1/30 1:45, Marc Zyngier wrote:
->>  static int enable_psci_bp_hardening(void *data)
->>  {
->>  	const struct arm64_cpu_capabilities *entry = data;
->>  
->> -	if (psci_ops.get_version)
->> +	if (psci_ops.get_version) {
->> +		if (check_smccc_arch_workaround_1(entry))
->> +			return 0;
+> On 26/01/18 17:12, Robin Murphy wrote:
+>> On 25/01/18 15:21, Marc Zyngier wrote:
+>>> In order to avoid aliasing attacks against the branch predictor,
+>>> let's invalidate the BTB on guest exit. This is made complicated
+>>> by the fact that we cannot take a branch before invalidating the
+>>> BTB.
+>>>
+>>> We only apply this to A12 and A17, which are the only two ARM
+>>> cores on which this useful.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>    arch/arm/include/asm/kvm_asm.h |  2 --
+>>>    arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
+>>>    arch/arm/kvm/hyp/hyp-entry.S   | 62 ++++++++++++++++++++++++++++++++++++++++--
+>>>    3 files changed, 72 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+>>> index 36dd2962a42d..df24ed48977d 100644
+>>> --- a/arch/arm/include/asm/kvm_asm.h
+>>> +++ b/arch/arm/include/asm/kvm_asm.h
+>>> @@ -61,8 +61,6 @@ struct kvm_vcpu;
+>>>    extern char __kvm_hyp_init[];
+>>>    extern char __kvm_hyp_init_end[];
+>>>    
+>>> -extern char __kvm_hyp_vector[];
+>>> -
+>>>    extern void __kvm_flush_vm_context(void);
+>>>    extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>>>    extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>>> index eb46fc81a440..b47db5b9e407 100644
+>>> --- a/arch/arm/include/asm/kvm_mmu.h
+>>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>>> @@ -37,6 +37,7 @@
+>>>    
+>>>    #include <linux/highmem.h>
+>>>    #include <asm/cacheflush.h>
+>>> +#include <asm/cputype.h>
+>>>    #include <asm/pgalloc.h>
+>>>    #include <asm/stage2_pgtable.h>
+>>>    
+>>> @@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>>>    
+>>>    static inline void *kvm_get_hyp_vector(void)
+>>>    {
+>>> -	return kvm_ksym_ref(__kvm_hyp_vector);
+>>> +	extern char __kvm_hyp_vector[];
+>>> +	extern char __kvm_hyp_vector_bp_inv[];
+>>> +
+>>> +	switch(read_cpuid_part()) {
+>>> +	case ARM_CPU_PART_CORTEX_A12:
+>>> +	case ARM_CPU_PART_CORTEX_A17:
+>>> +		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+>>> +
+>>> +	default:
+>>> +		return kvm_ksym_ref(__kvm_hyp_vector);
+>>> +	}
+>>>    }
+>>>    
+>>>    static inline int kvm_map_vectors(void)
+>>> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+>>> index 95a2faefc070..aab6b0c06a19 100644
+>>> --- a/arch/arm/kvm/hyp/hyp-entry.S
+>>> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+>>> @@ -70,6 +70,57 @@ __kvm_hyp_vector:
+>>>    	W(b)	hyp_hvc
+>>>    	W(b)	hyp_irq
+>>>    	W(b)	hyp_fiq
+>>> +	
+>>> +	.align 5
+>>> +__kvm_hyp_vector_bp_inv:
+>>> +	.global __kvm_hyp_vector_bp_inv
+>>> +
+>>> +	/*
+>>> +	 * We encode the exception entry in the bottom 3 bits of
+>>> +	 * SP, and we have to guarantee to be 8 bytes aligned.
+>>> +	 */
+>>> +	W(add)	sp, sp, #1	/* Reset 	  7 */
+>>> +	W(add)	sp, sp, #1	/* Undef	  6 */
+>>> +	W(add)	sp, sp, #1	/* Syscall	  5 */
+>>> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
+>>> +	W(add)	sp, sp, #1	/* Data abort	  3 */
+>>> +	W(add)	sp, sp, #1	/* HVC		  2 */
+>>> +	W(add)	sp, sp, #1	/* IRQ		  1 */
+>>> +	W(nop)			/* FIQ		  0 */
+>>> +
+>>> +	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+>>> +	isb
+>>> +
+>>
+>> The below is quite a bit of faff; might it be worth an
+>>
+>> #ifdef CONFIG_THUMB2_KERNEL
+>>
+>>> +	/*
+>>> +	 * Yet another silly hack: Use VPIDR as a temp register.
+>>> +	 * Thumb2 is really a pain, as SP cannot be used with most
+>>> +	 * of the bitwise instructions. The vect_br macro ensures
+>>> +	 * things gets cleaned-up.
+>>> +	 */
+>>> +	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
+>>> +	mov	r0, sp
+>>> +	and	r0, r0, #7
+>>> +	sub	sp, sp, r0
+>>> +	push	{r1, r2}
+>>> +	mov	r1, r0
+>>> +	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+>>> +	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+>>> +	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+>>
+>> #endif
+>>
+>>> +
+>>> +.macro vect_br val, targ
+>>
+>> ARM(cmp		sp, #val)
 > 
-> If I'm using the new version SMCCC, the firmware have the choice to decide
-> whether this machine needs the workaround, even if the CPU is vulnerable
-> for CVE-2017-5715, but..
+> Doesn't quite work, as we still have all the top bits that contain the
+> stack address. But I like the idea of making it baster for non-T2. How
+> about this instead?
+
+Right, the CMP is indeed totally bogus - I hadn't exactly reasoned this 
+through in detail ;)
+
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> index 2377ed86e20b..23c954a9e441 100644
+> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -114,6 +114,8 @@ __kvm_hyp_vector_bp_inv:
+>   	isb
+>   
+>   decode_vectors:
+> +
+> +#ifdef CONFIG_THUMB2_KERNEL
+>   	/*
+>   	 * Yet another silly hack: Use VPIDR as a temp register.
+>   	 * Thumb2 is really a pain, as SP cannot be used with most
+> @@ -129,10 +131,16 @@ decode_vectors:
+>   	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+>   	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+>   	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+> +#endif
+>   
+>   .macro vect_br val, targ
+> -	cmp	r1, #\val
+> -	popeq	{r1, r2}
+> +ARM(	eor	sp, sp, #\val	)
+> +ARM(	tst	sp, #7		)
+> +ARM(	eorne	sp, sp, #\val	)
+> +
+> +THUMB(	cmp	r1, #\val	)
+> +THUMB(	popeq	{r1, r2}	)
+> +
+>   	beq	\targ
+>   .endm
+>   
 > 
->> +
->>  		install_bp_hardening_cb(entry,
->>  				       (bp_hardening_cb_t)psci_ops.get_version,
->>  				       __psci_hyp_bp_inval_start,
->>  				       __psci_hyp_bp_inval_end);
 > 
-> ..the code above seems will enable get_psci_version() for CPU and will
-> trap to trust firmware even the new version of firmware didn't say
-> we need the workaround, did I understand it correctly?
+>> THUMB(cmp	r1, #\val)
+>> THUMB(popeq	{r1, r2}
+>>
+>>> +	beq	\targ
+>>> +.endm
+>>
+>> ...to keep the "normal" path relatively streamlined?
+> 
+> I think the above achieves it... Thoughts?
 
-Well, you only get there if we've established that your CPU is affected
-(it has an entry matching its MIDR with the HARDEN_BRANCH_PREDICTOR
-capability), and that entry points to enable_psci_bp_hardening. It is
-not the firmware that decides whether we need hardening, but the kernel.
-The firmware merely provides a facility to apply the hardening.
+Yeah, that looks like it should do the trick; very cunning!
 
-> I'm ask this because some platform will not expose to users to
-> take advantage of CVE-2017-5715, and we can use different firmware
-> to report we need such workaround or not, then use a single kernel
-> image for both vulnerable platforms and no vulnerable ones.
-
-You cannot have your cake and eat it. If you don't want to workaround
-the issue, you can disable the hardening. But asking for the same kernel
-to do both depending on what the firmware reports doesn't make much
-sense to me.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Robin.
