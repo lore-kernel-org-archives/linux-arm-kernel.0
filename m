@@ -1,35 +1,96 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 31 Jan 2018 18:24:18 +0000
-Subject: [RFC v4 14/26] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
+Date: Wed, 31 Jan 2018 18:24:16 +0000
+Subject: [RFC v4 12/26] watchdog: renesas_wdt: Add R-Car Gen2 support
 In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517423070-24236-15-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517423070-24236-13-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
-its driver by default.
+Due to commits:
+* "ARM: shmobile: Add watchdog support",
+* "ARM: shmobile: rcar-gen2: Add watchdog support", and
+* "soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2",
+we now have everything we needed for the watchdog to work on Gen2 and
+RZ/G1.
+
+This commit adds "renesas,rcar-gen2-wdt" as compatible string for R-Car
+Gen2 and RZ/G1, and since on those platforms the rwdt clock needs to be
+always ON, when suspending to RAM we need to explicitly disable the
+counting by clearing TME from RWTCSRA.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 ---
 v3->4:
-* no change
+* in this new version the changes to the driver have been splitted into
+  two commits, this patch takes care of the basic Gen2 support, patch 13/26
+  takes care of the restart handler.
 
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/watchdog/renesas_wdt.c | 42 +++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 37 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 578434c..d5cdad8 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
-+CONFIG_RENESAS_WDT=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
+diff --git a/drivers/watchdog/renesas_wdt.c b/drivers/watchdog/renesas_wdt.c
+index 831ef83..0a1a402 100644
+--- a/drivers/watchdog/renesas_wdt.c
++++ b/drivers/watchdog/renesas_wdt.c
+@@ -203,13 +203,42 @@ static int rwdt_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-/*
+- * This driver does also fit for R-Car Gen2 (r8a779[0-4]) WDT. However, for SMP
+- * to work there, one also needs a RESET (RST) driver which does not exist yet
+- * due to HW issues. This needs to be solved before adding compatibles here.
+- */
++#ifdef CONFIG_PM
++static int rwdt_suspend(struct device *dev)
++{
++	struct platform_device *pdev;
++	struct rwdt_priv *priv;
++
++	pdev = to_platform_device(dev);
++	priv = platform_get_drvdata(pdev);
++	if (watchdog_active(&priv->wdev)) {
++		rwdt_write(priv, priv->cks, RWTCSRA);
++	}
++	return 0;
++}
++
++static int rwdt_resume(struct device *dev)
++{
++	struct platform_device *pdev;
++	struct rwdt_priv *priv;
++
++	pdev = to_platform_device(dev);
++	priv = platform_get_drvdata(pdev);
++	if (watchdog_active(&priv->wdev)) {
++		rwdt_write(priv, priv->cks | RWTCSRA_TME, RWTCSRA);
++	}
++	return 0;
++}
++
++static const struct dev_pm_ops rwdt_pm = {
++	.suspend = rwdt_suspend,
++	.resume = rwdt_resume,
++};
++#endif
++
+ static const struct of_device_id rwdt_ids[] = {
+ 	{ .compatible = "renesas,rcar-gen3-wdt", },
++	{ .compatible = "renesas,rcar-gen2-wdt", },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, rwdt_ids);
+@@ -218,6 +247,9 @@ static struct platform_driver rwdt_driver = {
+ 	.driver = {
+ 		.name = "renesas_wdt",
+ 		.of_match_table = rwdt_ids,
++#ifdef CONFIG_PM
++		.pm = &rwdt_pm,
++#endif
+ 	},
+ 	.probe = rwdt_probe,
+ 	.remove = rwdt_remove,
 -- 
 2.7.4
