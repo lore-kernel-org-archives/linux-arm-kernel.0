@@ -1,67 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 31 Jan 2018 09:46:30 +0100
-Subject: [RFC v3 10/25] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2
- support
-In-Reply-To: <1517343778-27902-11-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517343778-27902-11-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdXkHF9R0XfcG++s0RRup+Mdtam5p=FXw26z86wAOJhZfQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Jan 2018 08:59:20 +0000
+Subject: [PATCH 1/3] KVM: arm/arm64: Fix incorrect timer_is_pending logic
+In-Reply-To: <20180130124206.12262-2-christoffer.dall@linaro.org>
+References: <20180130124206.12262-1-christoffer.dall@linaro.org>
+ <20180130124206.12262-2-christoffer.dall@linaro.org>
+Message-ID: <7aec2a2b-874c-10cf-468b-62cf982f71e3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+On 30/01/18 12:42, Christoffer Dall wrote:
+> After the recently introduced support for level-triggered mapped
+> interrupt, I accidentally left the VCPU thread busily going back and
+> forward between the guest and the hypervisor whenever the guest was
+> blocking, because I would always incorrectly report that a timer
+> interrupt was pending.
+> 
+> This is because the timer->irq.level field is not valid for mapped
+> interrupts, where we offload the level state to the hardware, and as a
+> result this field is always true.
+> 
+> Luckily the problem can be relatively easily solved by not checking the
+> cached signal state of either timer in kvm_timer_should_fire() but
+> instead compute the timer state on the fly, which we do already if the
+> cached signal state wasn't high.  In fact, the only reason for checking
+> the cached signal state was a tiny optimization which would only be
+> potentially faster when the polling loop detects a pending timer
+> interrupt, which is quite unlikely.
+> 
+> Instead of duplicating the logic from kvm_arch_timer_handler(), we
+> enlighten kvm_timer_should_fire() to report something valid when the
+> timer state is loaded onto the hardware.  We can then call this from
+> kvm_arch_timer_handler() as well and avoid the call to
+> __timer_snapshot_state() in kvm_arch_timer_get_input_level().
+> 
+> Reported-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-On Tue, Jan 30, 2018 at 9:22 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> This commit documents the compatibility with R-Car Gen2 and RZ/G
-> devices by defining the generic compatible string "renesas,rcar-gen2-wdt".
-> Also, this patch expands the list of SoC-specific compatible strings to
-> include RZ/G and R-Car Gen2 devices.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks for your patch!
-
-> --- a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-> @@ -1,17 +1,25 @@
->  Renesas Watchdog Timer (WDT) Controller
->
->  Required properties:
-> -- compatible : Should be "renesas,<soctype>-wdt", and
-> -              "renesas,rcar-gen3-wdt" or "renesas,rza-wdt" as fallback.
-> + - compatible : Must be "renesas,<soctype>-wdt", followed by a generic
-> +               fallback compatible string when compatible with the generic
-> +               version.
->                Examples with soctypes are:
-> +                - "renesas,r8a7743-wdt" (RZ/G1M)
-> +                - "renesas,r8a7745-wdt" (RZ/G1E)
-> +                - "renesas,r8a7790-wdt" (R-Car H2)
-> +                - "renesas,r8a7791-wdt" (R-Car M2-W)
-> +                - "renesas,r8a7792-wdt" (R-Car V2H)
-> +                - "renesas,r8a7793-wdt" (R-Car M2-N)
-> +                - "renesas,r8a7794-wdt" (R-Car E2)
->                  - "renesas,r8a7795-wdt" (R-Car H3)
->                  - "renesas,r8a7796-wdt" (R-Car M3-W)
->                  - "renesas,r8a77995-wdt" (R-Car D3)
->                  - "renesas,r7s72100-wdt" (RZ/A1)
-> +               The generic compatible string must be:
-> +                - "renesas,rcar-gen2-wdt" for R-Car Gen2 and RZ/G
-> +                - "renesas,rcar-gen3-wdt" for R-Car Gen3
-
-You've lost the generic "renesas,rza-wdt".
-
-With that fixed:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Jazz is not dead. It just smells funny...
