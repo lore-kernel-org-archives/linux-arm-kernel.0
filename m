@@ -1,48 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:35:03 +0100
-Subject: [PULL 24/28] KVM: arm/arm64: Handle CPU_PM_ENTER_FAILED
-In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
-References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-25-christoffer.dall@linaro.org>
+From: ulfalizer@gmail.com (Ulf Magnusson)
+Date: Wed, 31 Jan 2018 10:34:26 +0100
+Subject: [PATCH 07/11] MIPS: BCM63XX: kconfig: Remove blank help text
+In-Reply-To: <20180131093434.20050-1-ulfalizer@gmail.com>
+References: <20180131093434.20050-1-ulfalizer@gmail.com>
+Message-ID: <20180131093434.20050-8-ulfalizer@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+Blank help texts are probably either a typo, a Kconfig misunderstanding,
+or some kind of half-committing to adding a help text (in which case a
+TODO comment would be clearer, if the help text really can't be added
+right away).
 
-cpu_pm_enter() calls the pm notifier chain with CPU_PM_ENTER, then if
-there is a failure: CPU_PM_ENTER_FAILED.
+Best to remove them, IMO.
 
-When KVM receives CPU_PM_ENTER it calls cpu_hyp_reset() which will
-return us to the hyp-stub. If we subsequently get a CPU_PM_ENTER_FAILED,
-KVM does nothing, leaving the CPU running with the hyp-stub, at odds
-with kvm_arm_hardware_enabled.
-
-Add CPU_PM_ENTER_FAILED as a fallthrough for CPU_PM_EXIT, this reloads
-KVM based on kvm_arm_hardware_enabled. This is safe even if CPU_PM_ENTER
-never gets as far as KVM, as cpu_hyp_reinit() calls cpu_hyp_reset()
-to make sure the hyp-stub is loaded before reloading KVM.
-
-Fixes: 67f691976662 ("arm64: kvm: allows kvm cpu hotplug")
-Cc: <stable@vger.kernel.org> # v4.7+
-CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: James Morse <james.morse@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Ulf Magnusson <ulfalizer@gmail.com>
 ---
- virt/kvm/arm/arm.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/mips/bcm63xx/boards/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 59d8e04c19fa..639dca0c0560 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1262,6 +1262,7 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 			cpu_hyp_reset();
+diff --git a/arch/mips/bcm63xx/boards/Kconfig b/arch/mips/bcm63xx/boards/Kconfig
+index 6ff0a7481081..f60d96610ace 100644
+--- a/arch/mips/bcm63xx/boards/Kconfig
++++ b/arch/mips/bcm63xx/boards/Kconfig
+@@ -7,6 +7,5 @@ choice
+ config BOARD_BCM963XX
+        bool "Generic Broadcom 963xx boards"
+ 	select SSB
+-       help
  
- 		return NOTIFY_OK;
-+	case CPU_PM_ENTER_FAILED:
- 	case CPU_PM_EXIT:
- 		if (__this_cpu_read(kvm_arm_hardware_enabled))
- 			/* The hardware was enabled before suspend. */
+ endchoice
 -- 
-2.14.2
+2.14.1
