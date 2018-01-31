@@ -1,85 +1,142 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 31 Jan 2018 18:27:57 +0000
-Subject: [PATCH v2 10/20] arm64: capabilities: Restrict KPTI detection to
- boot-time CPUs
+Date: Wed, 31 Jan 2018 18:27:54 +0000
+Subject: [PATCH v2 07/20] arm64: capabilities: Filter the entries based on a
+ given mask
 In-Reply-To: <20180131182807.32134-1-suzuki.poulose@arm.com>
 References: <20180131182807.32134-1-suzuki.poulose@arm.com>
-Message-ID: <20180131182807.32134-11-suzuki.poulose@arm.com>
+Message-ID: <20180131182807.32134-8-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KPTI is treated as a system wide feature, where we enable the feature
-when all the CPUs on the system suffers from the security vulnerability,
-unless it is forced via kernel command line. Also, if a late CPU needs
-KPTI but KPTI was not enabled at boot time, the CPU is currently allowed
-to boot, which is a potential security vulnerability.  This patch ensures
-that late CPUs are rejected as appropriate if they need KPTI but it wasn't
-enabled.
+While processing the list of capabilities, it is useful to
+filter out some of the entries based on the given mask for the
+scope of the capabilities to allow better control. This can be
+used later for handling LOCAL vs SYSTEM wide capabilities and more.
+All capabilities should have their scope set to either LOCAL_CPU or
+SYSTEM. No functional/flow change.
 
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Dave Martin <dave.martin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |  9 +++++++++
- arch/arm64/kernel/cpufeature.c      | 11 ++++++-----
- 2 files changed, 15 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |  2 ++
+ arch/arm64/kernel/cpufeature.c      | 35 ++++++++++++++++++++++++-----------
+ 2 files changed, 26 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 7bb3fdec827e..71993dd4afae 100644
+index 69b5ce366598..cda62b70d338 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -223,6 +223,15 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
- 	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
- 	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
+@@ -198,6 +198,8 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+ /* Is it safe for a late CPU to miss this capability when system has it */
+ #define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
  
-+/*
-+ * CPU feature detected at boot time, on one or more CPUs. A late CPU
-+ * is not allowed to have the capability when the system doesn't have it.
-+ * It is Ok for a late CPU to miss the feature.
-+ */
-+#define ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE	\
-+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
-+	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
-+
- struct arm64_cpu_capabilities {
- 	const char *desc;
- 	u16 capability;
++#define ARM64_CPUCAP_SCOPE_ALL			 \
++	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_SCOPE_SYSTEM)
+ /*
+  * CPU errata detected at boot time based on feature of one or more CPUs.
+  * It is not safe for a late CPU to have this feature when the system doesn't
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index ecc87aa74c64..4a55492784b7 100644
+index 5e4d581c97f1..5163dc51b975 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -862,9 +862,8 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- 
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
--				int __unused)
-+				int scope)
- {
--	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
- 
- 	/* Forced on command line? */
- 	if (__kpti_forced) {
-@@ -885,8 +884,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	}
- 
- 	/* Defer to CPU feature registers */
--	return !cpuid_feature_extract_unsigned_field(pfr0,
--						     ID_AA64PFR0_CSV3_SHIFT);
-+	return !has_cpuid_feature(entry, scope);
+@@ -1185,10 +1185,12 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
  }
  
- static int __init parse_kpti(char *str)
-@@ -1008,7 +1006,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "Kernel page table isolation (KPTI)",
- 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
--		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.type = ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
-+		.min_field_value = 1,
- 		.matches = unmap_kernel_at_el0,
- 	},
- #endif
+ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+-			    const char *info)
++				    u16 scope_mask, const char *info)
+ {
++	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+ 	for (; caps->matches; caps++) {
+-		if (!caps->matches(caps, cpucap_default_scope(caps)))
++		if (!(caps->type & scope_mask) ||
++		    !caps->matches(caps, cpucap_default_scope(caps)))
+ 			continue;
+ 
+ 		if (!cpus_have_cap(caps->capability) && caps->desc)
+@@ -1210,12 +1212,14 @@ static int __enable_cpu_capability(void *arg)
+  * Run through the enabled capabilities and enable() it on all active
+  * CPUs
+  */
+-static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
++static void __init
++enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
+ {
++	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+ 	for (; caps->matches; caps++) {
+ 		unsigned int num = caps->capability;
+ 
+-		if (!cpus_have_cap(num))
++		if (!(caps->type & scope_mask) || !cpus_have_cap(num))
+ 			continue;
+ 
+ 		/* Ensure cpus_have_const_cap(num) works */
+@@ -1240,12 +1244,18 @@ static void __init enable_cpu_capabilities(const struct arm64_cpu_capabilities *
+  *
+  * Returns "false" on conflicts.
+  */
+-static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
++static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list,
++				    u16 scope_mask)
+ {
+ 	bool cpu_has_cap, system_has_cap;
+ 	const struct arm64_cpu_capabilities *caps = caps_list;
+ 
++	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+ 	for (; caps->matches; caps++) {
++
++		if (!(caps->type & scope_mask))
++			continue;
++
+ 		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
+ 		system_has_cap =  cpus_have_cap(caps->capability);
+ 
+@@ -1307,7 +1317,7 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+ 
+ static void verify_local_cpu_features(void)
+ {
+-	if (!__verify_local_cpu_caps(arm64_features))
++	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_SCOPE_ALL))
+ 		cpu_die_early();
+ }
+ 
+@@ -1335,18 +1345,20 @@ static void verify_sve_features(void)
+  */
+ static void verify_local_cpu_errata_workarounds(void)
+ {
+-	if (!__verify_local_cpu_caps(arm64_errata))
++	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_SCOPE_ALL))
+ 		cpu_die_early();
+ }
+ 
+ static void update_cpu_errata_workarounds(void)
+ {
+-	update_cpu_capabilities(arm64_errata, "enabling workaround for");
++	update_cpu_capabilities(arm64_errata,
++				ARM64_CPUCAP_SCOPE_ALL,
++				"enabling workaround for");
+ }
+ 
+ static void __init enable_errata_workarounds(void)
+ {
+-	enable_cpu_capabilities(arm64_errata);
++	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_SCOPE_ALL);
+ }
+ 
+ /*
+@@ -1395,8 +1407,9 @@ void check_local_cpu_capabilities(void)
+ 
+ static void __init setup_feature_capabilities(void)
+ {
+-	update_cpu_capabilities(arm64_features, "detected feature:");
+-	enable_cpu_capabilities(arm64_features);
++	update_cpu_capabilities(arm64_features,
++				ARM64_CPUCAP_SCOPE_ALL, "detected feature:");
++	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_SCOPE_ALL);
+ }
+ 
+ DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
 -- 
 2.14.3
