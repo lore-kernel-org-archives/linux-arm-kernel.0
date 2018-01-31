@@ -1,85 +1,25 @@
-From: benoit.thebaudeau.dev@gmail.com (=?UTF-8?q?Beno=C3=AEt=20Th=C3=A9baudeau?=)
-Date: Wed, 31 Jan 2018 01:05:14 +0100
-Subject: [PATCH v2 2/2] ARM: dts: imx25-pinfunc: Always set SION for eSDHC CMD
-In-Reply-To: <20180131000514.5286-1-benoit.thebaudeau.dev@gmail.com>
-References: <20180131000514.5286-1-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <20180131000514.5286-2-benoit.thebaudeau.dev@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 30 Jan 2018 16:22:41 -0800
+Subject: [PATCH v3 0/5] ARM64: dts: meson-axg: UART DT updates
+In-Reply-To: <7hr2q6c2r4.fsf@baylibre.com>
+References: <20180111023401.125658-1-yixun.lan@amlogic.com>
+ <7hr2q6c2r4.fsf@baylibre.com>
+Message-ID: <CAOi56cW4ufsegpy7heK1+pCxvZ2gz5Lf3dkUgxkZCgMq5oBzSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eSDHC does not work properly if the SION bit is not set for the
-bidirectional CMD signal, whatever the eSDHC instance and the selected
-pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
-this for MX25_PAD_*__ESDHCn_CMD in imx25-pinfunc.h in order to enforce
-this behavior for all boards.
+On Tue, Jan 30, 2018 at 4:04 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Yixun Lan <yixun.lan@amlogic.com> writes:
+>
+>> HI Kevin
+>>  These are the UART DT updates for the Meson-AXG platform.
+>>
+>>  The patch 1 is a general fix.
+>> Other patches are about adding clock & pinctrl info, then using them.
+>> Last patch enable UART_A which connect to a BT module on the S400 board.
+>
+> Applied to v4.16/dt64,
 
-This had already been done for eSDHC1, but not for eSDHC2. Also, define
-MX25_PAD_FEC_MDC__ESDHC2_CMD so that all the possible cases are covered
-from now on.
+Oops, I meant v4.17.
 
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes v1 -> v2:
- - Update eSDHC instance and port naming following the addition of "ARM:
-   dts: imx25-pinfunc: Use consistent naming for eSDHC".
- - Reference the more verbose comment for MX25_PAD_SD1_CMD__ESDHC1_CMD
-   instead of copying the same less detailed comment everywhere
-   (suggested by Uwe).
----
- arch/arm/boot/dts/imx25-pinfunc.h | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-index 2915c65a13c9..71a61c4c984f 100644
---- a/arch/arm/boot/dts/imx25-pinfunc.h
-+++ b/arch/arm/boot/dts/imx25-pinfunc.h
-@@ -236,7 +236,8 @@
- #define MX25_PAD_LD8__LD8			0x0e8 0x2e0 0x000 0x00 0x000
- #define MX25_PAD_LD8__UART4_RXD			0x0e8 0x2e0 0x570 0x02 0x000
- #define MX25_PAD_LD8__FEC_TX_ERR		0x0e8 0x2e0 0x000 0x05 0x000
--#define MX25_PAD_LD8__ESDHC2_CMD		0x0e8 0x2e0 0x4e0 0x06 0x000
-+/* See the comment for MX25_PAD_SD1_CMD__ESDHC1_CMD. */
-+#define MX25_PAD_LD8__ESDHC2_CMD		0x0e8 0x2e0 0x4e0 0x16 0x000
- 
- #define MX25_PAD_LD9__LD9			0x0ec 0x2e4 0x000 0x00 0x000
- #define MX25_PAD_LD9__UART4_TXD			0x0ec 0x2e4 0x000 0x02 0x000
-@@ -316,7 +317,8 @@
- #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x07 0x000
- 
- #define MX25_PAD_CSI_D6__CSI_D6			0x130 0x328 0x000 0x00 0x000
--#define MX25_PAD_CSI_D6__ESDHC2_CMD		0x130 0x328 0x4e0 0x02 0x001
-+/* See the comment for MX25_PAD_SD1_CMD__ESDHC1_CMD. */
-+#define MX25_PAD_CSI_D6__ESDHC2_CMD		0x130 0x328 0x4e0 0x12 0x001
- #define MX25_PAD_CSI_D6__SIM1_PD0		0x130 0x328 0x000 0x04 0x000
- #define MX25_PAD_CSI_D6__GPIO_1_31		0x130 0x328 0x000 0x05 0x000
- 
-@@ -419,11 +421,11 @@
- #define MX25_PAD_UART2_CTS__GPIO_4_29		0x18c 0x384 0x000 0x05 0x000
- 
- /*
-- * Removing the SION bit from MX25_PAD_SD1_CMD__ESDHC1_CMD breaks detecting an
-- * SD card. According to the i.MX25 reference manual (e.g. Figure 23-2 in
-- * IMX25RM Rev. 2 from 01/2011) this pin is bidirectional. So it seems to be a
-- * silicon bug that configuring the ESDHC1_CMD function doesn't enable the input
-- * path for this pin.
-+ * Removing the SION bit from MX25_PAD_*__ESDHCn_CMD breaks detecting an SD
-+ * card. According to the i.MX25 reference manual (e.g. Figure 23-2 in IMX25RM
-+ * Rev. 2 from 01/2011) this pin is bidirectional. So it seems to be a silicon
-+ * bug that configuring the ESDHCn_CMD function doesn't enable the input path
-+ * for this pin.
-  * This might have side effects for other hardware units that are connected to
-  * that pin and use the respective function as input.
-  */
-@@ -496,6 +498,8 @@
- #define MX25_PAD_KPP_COL3__GPIO_3_4		0x1c4 0x3bc 0x000 0x05 0x000
- 
- #define MX25_PAD_FEC_MDC__FEC_MDC		0x1c8 0x3c0 0x000 0x00 0x000
-+/* See the comment for MX25_PAD_SD1_CMD__ESDHC1_CMD. */
-+#define MX25_PAD_FEC_MDC__ESDHC2_CMD		0x1c8 0x3c0 0x4e0 0x11 0x002
- #define MX25_PAD_FEC_MDC__AUD4_TXD		0x1c8 0x3c0 0x464 0x02 0x001
- #define MX25_PAD_FEC_MDC__GPIO_3_5		0x1c8 0x3c0 0x000 0x05 0x000
- 
--- 
-2.14.1
+Kevin
