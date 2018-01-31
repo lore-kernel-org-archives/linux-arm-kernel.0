@@ -1,47 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 31 Jan 2018 08:26:44 +0100
-Subject: [PATCH v2 1/2] ARM: dts: imx25-pinfunc: Use consistent naming
- for eSDHC
-In-Reply-To: <20180131000514.5286-1-benoit.thebaudeau.dev@gmail.com>
-References: <20180131000514.5286-1-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <20180131072644.nbr6t5rhx7yb4dhj@pengutronix.de>
+From: houlong.wei@mediatek.com (houlong.wei at mediatek.com)
+Date: Wed, 31 Jan 2018 15:28:09 +0800
+Subject: [PATCH v21 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1517383693-25591-1-git-send-email-houlong.wei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Wed, Jan 31, 2018 at 01:05:13AM +0100, Beno?t Th?baudeau wrote:
-> This file had several naming inconsistencies for eSDHC:
->  - the instances were named sometimes SDn, sometimes SDHCn, whereas they
->    are named ESDHCn in the reference manual, e.g.:
->      MX25_PAD_SD1_CMD__SD1_CMD
->      MX25_PAD_D15__SDHC1_DAT7
->  - the data ports were named sometimes DATAn, sometimes DATn like in the
->    reference manual, e.g.:
->      MX25_PAD_SD1_DATA0__SD1_DATA0
->      MX25_PAD_D15__SDHC1_DAT7
->  - in one case, the clock port was named DAT_CLK instead of CLK:
->      MX25_PAD_CSI_D7__SDHC2_DAT_CLK
-> 
-> This change:
->  - introduces new definitions using the naming from the reference
->    manual,
->  - keeps definitions using the legacy naming in order not to break
->    compatibility for out-of-tree users (they can be removed later),
->  - updates the in-tree files that were using the legacy naming.
-> 
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
-> ---
-> Changes v1 -> v2:
->  - New patch (suggested by Uwe).
-That's why I like it:
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
+ 
+Changes since v20:
+ -rebase to v4.15-rc1
+ -move dma_map_single outside of spinlock
+Changes since v19:
+ -rebase to v4.10-rc2
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+hs.liao at mediatek.com (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  mailbox: mediatek: Add Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  soc: mediatek: Add Mediatek CMDQ helper
 
-:-)
-Uwe
+ .../devicetree/bindings/mailbox/mtk-gce.txt        |   43 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   10 +
+ drivers/mailbox/Kconfig                            |   10 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/mtk-cmdq-mailbox.c                 |  594 ++++++++++++++++++++
+ drivers/soc/mediatek/Kconfig                       |   12 +
+ drivers/soc/mediatek/Makefile                      |    1 +
+ drivers/soc/mediatek/mtk-cmdq-helper.c             |  322 +++++++++++
+ include/linux/mailbox/mtk-cmdq-mailbox.h           |   77 +++
+ include/linux/soc/mediatek/mtk-cmdq.h              |  174 ++++++
+ 10 files changed, 1245 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+ create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+ create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
+ create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.9.5 
