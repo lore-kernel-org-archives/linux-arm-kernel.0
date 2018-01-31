@@ -1,150 +1,75 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 31 Jan 2018 20:07:18 +0100
-Subject: [PATCH v2 08/16] iio: adc: sun4i-gpadc-iio: rework: add
- interrupt support
-In-Reply-To: <20180128232919.12639-9-embed3d@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-9-embed3d@gmail.com>
-Message-ID: <20180131190718.ustqzwdxzw7mqe52@qschulz>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Jan 2018 19:07:48 +0000
+Subject: [PATCH v3 0/6] 32bit ARM branch predictor hardening
+In-Reply-To: <c25089e9-540b-2b09-555c-a2c9d8850610@gmail.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
+ <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
+ <e34add95-a672-b76c-1746-e2d9d152624c@huawei.com>
+ <c25089e9-540b-2b09-555c-a2c9d8850610@gmail.com>
+Message-ID: <61cd49b5-264c-d34b-872f-79c1eaa959ea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Mon, Jan 29, 2018 at 12:29:11AM +0100, Philipp Rossak wrote:
-> This patch rewors the driver to support interrupts for the thermal part
-> of the sensor.
+On 31/01/18 18:53, Florian Fainelli wrote:
+> On 01/31/2018 04:45 AM, Hanjun Guo wrote:
+>> On 2018/1/29 22:58, Nishanth Menon wrote:
+>>> On Mon, Jan 29, 2018 at 5:36 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+>>> [...]
+>>>
+>>>> By the way, this patch set just enable branch predictor hardening
+>>>> on arm32 unconditionally, but some of machines (such as wireless
+>>>> network base station) will not be exposed to user to take advantage
+>>>> of variant 2, and those machines will be pretty sensitive for
+>>>> performance, so can we introduce Kconfig or boot option to disable
+>>>> branch predictor hardening as an option?
+>>>
+>>> I am curious: Have you seen performance degradation with this series?
+>>> If yes, is it possible to share the information?
+>>
+>> Sorry for the late reply, the performance data for context switch (CFS)
+>> is about 6%~12% drop (A9 based machine) for the first around test, but
+>> the data is not stable, I need to retest then I will update here.
 > 
-> This is only available for the newer sensor (currently H3 and A83T).
-> The interrupt will be trigerd on data available and triggers the update
-> for the thermal sensors. All newer sensors have different amount of
-> sensors and different interrupts for each device the reset of the
-> interrupts need to be done different
+> What tool did you use to measure this? On a Brahma-B15 platform clocked
+> at 1.5Ghz, across kernels 4.1, 4.9 (4.15 in progress as we speak), I
+> measured the following, with two memory configurations, one giving 256MB
+> of usable memory, another giving 3GB of usable memory, results below are
+> only the most extreme 256MB case. This is running 13 groups because the
+> ASID space is 256bits so this should force at least two full ASID
+> generation rollovers (assuming the logic is correct here).
 > 
-> For the newer sensors is the autosuspend disabled.
+> for i in $(seq 0 9)
+> do
+> 	hackbench 13 process 10000
+> done
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> Acked-by: Jonathan  Cameron <jonathan.cameron@huawei.com>
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 60 +++++++++++++++++++++++++++++++++++----
->  include/linux/mfd/sun4i-gpadc.h   |  2 ++
->  2 files changed, 56 insertions(+), 6 deletions(-)
+> Average values, in seconds:
 > 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 74eeb5cd5218..b7b5451226b0 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -71,11 +71,14 @@ struct gpadc_data {
->  	unsigned int	temp_data[MAX_SENSOR_COUNT];
->  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
->  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
-> +	u32		irq_clear_map;
-> +	u32		irq_control_map;
+> 1) 4.1.45, ACTLR[0] = 0, no spectre variant 2 patches: 114,2666
+> 2) 4.1.45, ACTLR[0] = 1, no spectre variant 2 patches: 114,2952
+> 3) 4.1.45, ACTLR[0] =1 , spectre variant 2 patches: 115,5853
+> 
+> => 3) is a 1.15% degradation against 1)
+> 
+> 4.9.51, ACTLR[0] = 0, no spectre variant 2 patches: 130,7676
+> 4.9.51, ACTLR[0] = 1, no spectre variant 2 patches: 130,6848
+> 4.9.51, ACTLR[0] =1 , spectre variant 2 patches: 132,4274
+> 
+> => 3) is a 1.26% degradation against 1)
+> 
+> The relative differences between 4.1 and 4.9 appear consistent (with 4.9
+> being slower for a reason I ignore).
+> 
+> Marc, are there any performance tests/results that you ran that you
+> could share?
 
-I would say to use a regmap_irq_chip for controlling IRQs.
+None. I usually don't run benchmarks, because they are not
+representative of a real workload. I urge people to run their own real
+workload, as it is very unlikely to have hackbench's profile...
 
->  	bool		has_bus_clk;
->  	bool		has_bus_rst;
->  	bool		has_mod_clk;
->  	int		sensor_count;
->  	bool		supports_nvmem;
-> +	bool		support_irq;
->  };
->  
->  static const struct gpadc_data sun4i_gpadc_data = {
-> @@ -90,6 +93,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
->  	.sample_end = sun4i_gpadc_sample_end,
->  	.sensor_count = 1,
->  	.supports_nvmem = false,
-> +	.support_irq = false,
+Thanks,
 
-False is the default, no need to set support_irq.
-
-[...]
-
->  struct sun4i_gpadc_iio {
-> @@ -332,6 +339,11 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
->  		return 0;
->  	}
->  
-> +	if (info->data->support_irq) {
-> +		regmap_read(info->regmap, info->data->temp_data[sensor], val);
-> +		return 0;
-> +	}
-> +
-
-Maybe you could define a new thermal_zone_of_device_ops for these new
-thermal sensors? That way, you don't even need the boolean support_irq.
-
->  	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
->  }
->  
-> @@ -429,6 +441,17 @@ static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> +static irqreturn_t sunxi_irq_thread(int irq, void *data)
-
-I think we're trying to avoid sunxi mentions but rather using the name
-of the first IP (in term of product release, not support) using this
-function.
-
-> +{
-> +	struct sun4i_gpadc_iio *info = data;
-> +
-> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT, info->data->irq_clear_map);
-> +
-
-Will be handled by regmap_irq_chip.
-[...]
-> -	info->no_irq = true;
-> +	if (info->data->support_irq) {
-> +		/* only the new versions of ths support right now irqs */
-> +		irq = platform_get_irq(pdev, 0);
-> +		if (irq < 0) {
-> +			dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
-> +			return irq;
-> +		}
-> +
-> +		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-> +				sunxi_irq_thread, IRQF_ONESHOT,
-> +				dev_name(&pdev->dev), info);
-> +		if (ret)
-> +			return ret;
-> +
-> +	} else
-> +		info->no_irq = true;
-> +
-
-That's a bit funny to have two booleans named no_irq and support_irq :)
-
->  	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
->  	indio_dev->channels = sun8i_a33_gpadc_channels;
->  
-> @@ -789,11 +829,13 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> -	pm_runtime_set_autosuspend_delay(&pdev->dev,
-> -					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
-> -	pm_runtime_use_autosuspend(&pdev->dev);
-> -	pm_runtime_set_suspended(&pdev->dev);
-> -	pm_runtime_enable(&pdev->dev);
-> +	if (!info->data->support_irq) {
-> +		pm_runtime_set_autosuspend_delay(&pdev->dev,
-> +						 SUN4I_GPADC_AUTOSUSPEND_DELAY);
-> +		pm_runtime_use_autosuspend(&pdev->dev);
-> +		pm_runtime_set_suspended(&pdev->dev);
-> +		pm_runtime_enable(&pdev->dev);
-> +	}
-
-Why would you not want your IP to do runtime PM?
-
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/b8de4a9e/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
