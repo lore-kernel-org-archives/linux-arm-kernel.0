@@ -1,63 +1,35 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 31 Jan 2018 18:24:15 +0000
-Subject: [RFC v4 11/26] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2
- support
+Date: Wed, 31 Jan 2018 18:24:18 +0000
+Subject: [RFC v4 14/26] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
 In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517423070-24236-12-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517423070-24236-15-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit documents the compatibility with R-Car Gen2 and RZ/G
-devices by defining the generic compatible string "renesas,rcar-gen2-wdt".
-Also, this patch expands the list of SoC-specific compatible strings to
-include RZ/G and R-Car Gen2 devices.
+R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
+its driver by default.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v3->4:
-* Reinstated lost "renesas,rza-wdt" compatible string
+* no change
 
- .../devicetree/bindings/watchdog/renesas-wdt.txt      | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-index bf6d1ca..4815128 100644
---- a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-@@ -1,17 +1,26 @@
- Renesas Watchdog Timer (WDT) Controller
- 
- Required properties:
--- compatible : Should be "renesas,<soctype>-wdt", and
--	       "renesas,rcar-gen3-wdt" or "renesas,rza-wdt" as fallback.
-+ - compatible : Must be "renesas,<soctype>-wdt", followed by a generic
-+		fallback compatible string when compatible with the generic
-+		version.
- 	       Examples with soctypes are:
-+		 - "renesas,r8a7743-wdt" (RZ/G1M)
-+		 - "renesas,r8a7745-wdt" (RZ/G1E)
-+	         - "renesas,r8a7790-wdt" (R-Car H2)
-+	         - "renesas,r8a7791-wdt" (R-Car M2-W)
-+	         - "renesas,r8a7792-wdt" (R-Car V2H)
-+	         - "renesas,r8a7793-wdt" (R-Car M2-N)
-+	         - "renesas,r8a7794-wdt" (R-Car E2)
- 	         - "renesas,r8a7795-wdt" (R-Car H3)
- 	         - "renesas,r8a7796-wdt" (R-Car M3-W)
- 	         - "renesas,r8a77995-wdt" (R-Car D3)
- 	         - "renesas,r7s72100-wdt" (RZ/A1)
-+		The generic compatible string must be:
-+		 - "renesas,rza-wdt" for RZ/A
-+		 - "renesas,rcar-gen2-wdt" for R-Car Gen2 and RZ/G
-+		 - "renesas,rcar-gen3-wdt" for R-Car Gen3
- 
--  When compatible with the generic version, nodes must list the SoC-specific
--  version corresponding to the platform first, followed by the generic
--  version.
- 
- - reg : Should contain WDT registers location and length
- - clocks : the clock feeding the watchdog timer.
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 578434c..d5cdad8 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=y
++CONFIG_RENESAS_WDT=y
+ CONFIG_MFD_AS3711=y
+ CONFIG_MFD_DA9063=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
 -- 
 2.7.4
