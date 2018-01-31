@@ -1,39 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Jan 2018 12:19:31 +0000
-Subject: Handling of chars received while a UART is not open
-In-Reply-To: <20180131120628.GL5862@e103592.cambridge.arm.com>
-References: <20180131120628.GL5862@e103592.cambridge.arm.com>
-Message-ID: <20180131121931.GH9418@n2100.armlinux.org.uk>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 31 Jan 2018 13:24:16 +0100
+Subject: [PATCH v3 33/41] KVM: arm64: Configure FPSIMD traps on vcpu
+ load/put
+In-Reply-To: <20180112120747.27999-34-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-34-christoffer.dall@linaro.org>
+Message-ID: <582cf940-51b3-1492-f23a-980b99331d00@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 12:06:29PM +0000, Dave Martin wrote:
-> Hi all,
+On 12.01.2018 13:07, Christoffer Dall wrote:
+> There is no need to enable/disable traps to FP registers on every switch
+> to/from the VM, because the host kernel does not use this resource
+> without calling vcpu_put.  We can therefore move things around enough
+> that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
+> only program these during vcpu load/put.
 > 
-> Question:
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm64/include/asm/kvm_hyp.h |  6 +++++
+>   arch/arm64/kvm/hyp/switch.c      | 51 +++++++++++++++++++++++++++++-----------
+>   arch/arm64/kvm/hyp/sysreg-sr.c   | 12 ++++++++--
+>   3 files changed, 53 insertions(+), 16 deletions(-)
 > 
->  1) Should a UART definitely discard the RX FIFO on ->startup()?
 
-Yes; POSIX makes no guarantees about the configuration of the port
-while it is closed, and when it is re-opened, it is permitted that
-the port is reset back to a set of default parameters rather than
-the previous parameter set that was configured.
+[...]
 
-You also have the CREAD flag which indicates whether we want the
-receiver enabled or not, but it is not defined by POSIX whether the
-receiver remains enabled when the port is closed.
+>   
+> -static void __hyp_text __deactivate_traps_nvhe(void)
+> -{
+> +static void __hyp_text __deactivate_traps_nvhe(void) {
 
-Linux behaviour has always been to flush the port of received
-characters at close and open time (see 8250 driver), meaning that
-characters received while the TTY is closed are ignored - just like
-what happens on the physical console keyboard, which is also a TTY.
-Doing otherwise is likely to confuse applications and potentially
-introduce buggy behaviour that would only be detected on UARTs with
-differing behaviour to 8250.
+Nit: unrelated change.
 
-Linux follows POSIX General Terminal Interface for its TTY handling.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Tomasz
