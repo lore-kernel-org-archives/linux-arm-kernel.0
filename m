@@ -1,33 +1,23 @@
-From: k.raymond@overkiz.com (=?iso-8859-1?Q?K=E9vin?= Raymond)
-Date: Wed, 31 Jan 2018 18:04:53 +0100
-Subject: Patch submission process about at91 DTS
-Message-ID: <20180131170453.GA16869@tp.shaiton.org>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Wed, 31 Jan 2018 18:16:03 +0100
+Subject: [PULL 00/28] KVM/ARM Changes for v4.16
+In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
+References: <20180131093507.22219-1-christoffer.dall@linaro.org>
+Message-ID: <20180131171602.GA26944@flask>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi there,
+2018-01-31 10:34+0100, Christoffer Dall:
+> Hi Paolo and Radim,
+> 
+> Apologies for getting this pull request to you rather late; there were a
+> number of issues that I wanted to make sure we could fix properly before
+> including some of the changes in this pull request.
+> 
+> The changes for this version include icache invalidation optimizations
+> (improving VM startup time), support for forwarded level-triggered
+> interrupts (improved performance for timers and passthrough platform
+> devices), a small fix for power-management notifiers, and some cosmetic
+> changes.
 
-We have several at91-kizbox* DTSs and I have few patches to suggest.
-The idea is to split one dts over dtsi + several dts.
-
-My current patches are based an tested over the linux repo[0] against the
-master branch (4e19652 Update the RISC-V MAINTAINERS file).
-
-Should I rebase them against the linux-at91[1] repository? Which branch,
-at91-next? I would love them to reach the 4.14 branch but am not sure of
-the right path to submit those changes.
-
-Thanks for your help,
-
-[0]_git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-[1]_git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-
---
-K?vin Raymond
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/07360d40/attachment.sig>
+Pulled, thanks.
