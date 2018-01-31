@@ -1,154 +1,144 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:35:02 +0100
-Subject: [PULL 23/28] arm64: mm: Add additional parameter to
- uaccess_ttbr0_disable
+Date: Wed, 31 Jan 2018 10:34:59 +0100
+Subject: [PULL 20/28] KVM: arm/arm64: Preserve Exec permission across R/W
+ permission faults
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-24-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-21-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an extra temporary register parameter to uaccess_ttbr0_disable which
-is about to be required for arm64 PAN support.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch doesn't introduce any functional change but ensures that the
-kernel compiles once the KVM/ARM tree is merged with the arm64 tree by
-ensuring a trivially mergable conflict with commit
-6b88a32c7af68895134872cdec3b6bfdb532d94e
-("arm64: kpti: Fix the interaction between ASID switching and software PAN").
+So far, we loose the Exec property whenever we take permission
+faults, as we always reconstruct the PTE/PMD from scratch. This
+can be counter productive as we can end-up with the following
+fault sequence:
 
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+	X -> RO -> ROX -> RW -> RWX
+
+Instead, we can lookup the existing PTE/PMD and clear the XN bit in the
+new entry if it was already cleared in the old one, leadig to a much
+nicer fault sequence:
+
+	X -> ROX -> RWX
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/asm-uaccess.h | 8 ++++----
- arch/arm64/lib/clear_user.S          | 2 +-
- arch/arm64/lib/copy_from_user.S      | 2 +-
- arch/arm64/lib/copy_in_user.S        | 2 +-
- arch/arm64/lib/copy_to_user.S        | 2 +-
- arch/arm64/mm/cache.S                | 4 ++--
- arch/arm64/xen/hypercall.S           | 2 +-
- 7 files changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 10 ++++++++++
+ arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
+ virt/kvm/arm/mmu.c               | 27 +++++++++++++++++++++++++++
+ 3 files changed, 47 insertions(+)
 
-diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-index b67563d2024c..03064261ee0b 100644
---- a/arch/arm64/include/asm/asm-uaccess.h
-+++ b/arch/arm64/include/asm/asm-uaccess.h
-@@ -25,7 +25,7 @@
- 	isb
- 	.endm
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 4d7a54cbb3ab..aab64fe52146 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -107,6 +107,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
+ 	return (pte_val(*pte) & L_PTE_S2_RDWR) == L_PTE_S2_RDONLY;
+ }
  
--	.macro	uaccess_ttbr0_disable, tmp1
-+	.macro	uaccess_ttbr0_disable, tmp1, tmp2
- alternative_if_not ARM64_HAS_PAN
- 	__uaccess_ttbr0_disable \tmp1
- alternative_else_nop_endif
-@@ -39,7 +39,7 @@ alternative_if_not ARM64_HAS_PAN
- alternative_else_nop_endif
- 	.endm
- #else
--	.macro	uaccess_ttbr0_disable, tmp1
-+	.macro	uaccess_ttbr0_disable, tmp1, tmp2
- 	.endm
++static inline bool kvm_s2pte_exec(pte_t *pte)
++{
++	return !(pte_val(*pte) & L_PTE_XN);
++}
++
+ static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+ {
+ 	pmd_val(*pmd) = (pmd_val(*pmd) & ~L_PMD_S2_RDWR) | L_PMD_S2_RDONLY;
+@@ -117,6 +122,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ 	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
+ }
  
- 	.macro	uaccess_ttbr0_enable, tmp1, tmp2, tmp3
-@@ -49,8 +49,8 @@ alternative_else_nop_endif
- /*
-  * These macros are no-ops when UAO is present.
-  */
--	.macro	uaccess_disable_not_uao, tmp1
--	uaccess_ttbr0_disable \tmp1
-+	.macro	uaccess_disable_not_uao, tmp1, tmp2
-+	uaccess_ttbr0_disable \tmp1, \tmp2
- alternative_if ARM64_ALT_PAN_NOT_UAO
- 	SET_PSTATE_PAN(1)
- alternative_else_nop_endif
-diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
-index e88fb99c1561..8932e5f7a6f3 100644
---- a/arch/arm64/lib/clear_user.S
-+++ b/arch/arm64/lib/clear_user.S
-@@ -50,7 +50,7 @@ uao_user_alternative 9f, strh, sttrh, wzr, x0, 2
- 	b.mi	5f
- uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
- 5:	mov	x0, #0
--	uaccess_disable_not_uao x2
-+	uaccess_disable_not_uao x2, x3
- 	ret
- ENDPROC(__clear_user)
++static inline bool kvm_s2pmd_exec(pmd_t *pmd)
++{
++	return !(pmd_val(*pmd) & PMD_SECT_XN);
++}
++
+ static inline bool kvm_page_empty(void *ptr)
+ {
+ 	struct page *ptr_page = virt_to_page(ptr);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 1e1b20cb348f..126abefffe7f 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -203,6 +203,11 @@ static inline bool kvm_s2pte_readonly(pte_t *pte)
+ 	return (pte_val(*pte) & PTE_S2_RDWR) == PTE_S2_RDONLY;
+ }
  
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index 4b5d826895ff..bc108634992c 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -67,7 +67,7 @@ ENTRY(__arch_copy_from_user)
- 	uaccess_enable_not_uao x3, x4
- 	add	end, x0, x2
- #include "copy_template.S"
--	uaccess_disable_not_uao x3
-+	uaccess_disable_not_uao x3, x4
- 	mov	x0, #0				// Nothing to copy
- 	ret
- ENDPROC(__arch_copy_from_user)
-diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
-index b24a830419ad..e6dd59dd4053 100644
---- a/arch/arm64/lib/copy_in_user.S
-+++ b/arch/arm64/lib/copy_in_user.S
-@@ -68,7 +68,7 @@ ENTRY(raw_copy_in_user)
- 	uaccess_enable_not_uao x3, x4
- 	add	end, x0, x2
- #include "copy_template.S"
--	uaccess_disable_not_uao x3
-+	uaccess_disable_not_uao x3, x4
- 	mov	x0, #0
- 	ret
- ENDPROC(raw_copy_in_user)
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index 351f0766f7a6..bd20f9f7dd84 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -66,7 +66,7 @@ ENTRY(__arch_copy_to_user)
- 	uaccess_enable_not_uao x3, x4
- 	add	end, x0, x2
- #include "copy_template.S"
--	uaccess_disable_not_uao x3
-+	uaccess_disable_not_uao x3, x4
- 	mov	x0, #0
- 	ret
- ENDPROC(__arch_copy_to_user)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 5a52811f47e9..758bde7e2fa6 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -63,7 +63,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
- 	invalidate_icache_by_line x0, x1, x2, x3, 9f
- 	mov	x0, #0
- 1:
--	uaccess_ttbr0_disable x1
-+	uaccess_ttbr0_disable x1, x2
- 	ret
- 9:
- 	mov	x0, #-EFAULT
-@@ -85,7 +85,7 @@ ENTRY(invalidate_icache_range)
- 	invalidate_icache_by_line x0, x1, x2, x3, 2f
- 	mov	x0, xzr
- 1:
--	uaccess_ttbr0_disable x1
-+	uaccess_ttbr0_disable x1, x2
- 	ret
- 2:
- 	mov	x0, #-EFAULT
-diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
-index acdbd2c9e899..c5f05c4a4d00 100644
---- a/arch/arm64/xen/hypercall.S
-+++ b/arch/arm64/xen/hypercall.S
-@@ -107,6 +107,6 @@ ENTRY(privcmd_call)
- 	/*
- 	 * Disable userspace access from kernel once the hyp call completed.
- 	 */
--	uaccess_ttbr0_disable x6
-+	uaccess_ttbr0_disable x6, x7
- 	ret
- ENDPROC(privcmd_call);
++static inline bool kvm_s2pte_exec(pte_t *pte)
++{
++	return !(pte_val(*pte) & PTE_S2_XN);
++}
++
+ static inline void kvm_set_s2pmd_readonly(pmd_t *pmd)
+ {
+ 	kvm_set_s2pte_readonly((pte_t *)pmd);
+@@ -213,6 +218,11 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ 	return kvm_s2pte_readonly((pte_t *)pmd);
+ }
+ 
++static inline bool kvm_s2pmd_exec(pmd_t *pmd)
++{
++	return !(pmd_val(*pmd) & PMD_S2_XN);
++}
++
+ static inline bool kvm_page_empty(void *ptr)
+ {
+ 	struct page *ptr_page = virt_to_page(ptr);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index f956efbd933d..b83b5a8442bb 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -926,6 +926,25 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ 	return 0;
+ }
+ 
++static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
++{
++	pmd_t *pmdp;
++	pte_t *ptep;
++
++	pmdp = stage2_get_pmd(kvm, NULL, addr);
++	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
++		return false;
++
++	if (pmd_thp_or_huge(*pmdp))
++		return kvm_s2pmd_exec(pmdp);
++
++	ptep = pte_offset_kernel(pmdp, addr);
++	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
++		return false;
++
++	return kvm_s2pte_exec(ptep);
++}
++
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 			  phys_addr_t addr, const pte_t *new_pte,
+ 			  unsigned long flags)
+@@ -1407,6 +1426,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		if (exec_fault) {
+ 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+ 			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
++		} else if (fault_status == FSC_PERM) {
++			/* Preserve execute if XN was already cleared */
++			if (stage2_is_exec(kvm, fault_ipa))
++				new_pmd = kvm_s2pmd_mkexec(new_pmd);
+ 		}
+ 
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+@@ -1425,6 +1448,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		if (exec_fault) {
+ 			new_pte = kvm_s2pte_mkexec(new_pte);
+ 			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
++		} else if (fault_status == FSC_PERM) {
++			/* Preserve execute if XN was already cleared */
++			if (stage2_is_exec(kvm, fault_ipa))
++				new_pte = kvm_s2pte_mkexec(new_pte);
+ 		}
+ 
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
 -- 
 2.14.2
