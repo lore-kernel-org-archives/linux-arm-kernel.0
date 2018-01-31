@@ -1,59 +1,209 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 31 Jan 2018 18:27:56 +0000
-Subject: [PATCH v2 09/20] arm64: capabilities: Introduce weak features based
- on local CPU
+Date: Wed, 31 Jan 2018 18:27:55 +0000
+Subject: [PATCH v2 08/20] arm64: capabilities: Group handling of features and
+ errata
 In-Reply-To: <20180131182807.32134-1-suzuki.poulose@arm.com>
 References: <20180131182807.32134-1-suzuki.poulose@arm.com>
-Message-ID: <20180131182807.32134-10-suzuki.poulose@arm.com>
+Message-ID: <20180131182807.32134-9-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the flexibility of defining system features based
-on individual CPUs, introduce CPU feature type that can be detected
-on a local SCOPE and ignores the conflict on late CPUs. This is
-applicable for ARM64_HAS_NO_HW_PREFETCH, where it is fine for
-the system to have CPUs without hardware prefetch turning up
-later. We only suffer a performance penalty, nothing fatal.
+So far we have had separate routes for triggering errata and feature
+capability detection. Also, we never allowed "features" based on local
+CPU and "errata" based on System wide safe registers. This patch
+groups the handling of errata and features and also allows them
+to have all the possible scopes. So we now run through both
+arm64_features and arm64_errata, in two phases for detection.
 
-Cc: Will Deacon <will.deacon@arm.com>
+ 1) with SCOPE_LOCAL_CPU filter on each boot time enabled CPUs,
+    via update_cpu_local_capabilities().
+
+ 2) with SCOPE_SYSTEM filter only once after all boot time enabled
+    CPUs are active, triggered from setup_cpu_features().
+
+A late CPU goes through both the tables for verification against
+established capabilities, as before.
+
+We could ideally merge the two tables into one. But leave it as
+it is for easy access to the list of particular type.
+
 Cc: Dave Martin <dave.martin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 8 ++++++++
- arch/arm64/kernel/cpufeature.c      | 2 +-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/cpufeature.c | 77 ++++++++++++++++++++++++------------------
+ 1 file changed, 44 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index cda62b70d338..7bb3fdec827e 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -214,6 +214,14 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
-  */
- #define ARM64_CPUCAP_SYSTEM_FEATURE	\
- 	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
-+/*
-+ * CPU feature detected at boot time based on feature of one or more CPUs.
-+ * All possible conflicts for a late CPU are ignored.
-+ */
-+#define ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE		\
-+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
-+	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
-+	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
- 
- struct arm64_cpu_capabilities {
- 	const char *desc;
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c710ef28524e..ecc87aa74c64 100644
+index 5163dc51b975..c710ef28524e 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -956,7 +956,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "Software prefetching using PRFM",
- 		.capability = ARM64_HAS_NO_HW_PREFETCH,
--		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE,
- 		.matches = has_no_hw_prefetch,
- 	},
- #ifdef CONFIG_ARM64_UAO
+@@ -504,7 +504,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ }
+ 
+ extern const struct arm64_cpu_capabilities arm64_errata[];
+-static void update_cpu_errata_workarounds(void);
++static void update_cpu_local_capabilities(void);
+ 
+ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ {
+@@ -553,7 +553,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 	 * Run the errata work around checks on the boot CPU, once we have
+ 	 * initialised the cpu feature infrastructure.
+ 	 */
+-	update_cpu_errata_workarounds();
++	update_cpu_local_capabilities();
+ }
+ 
+ static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+@@ -1184,8 +1184,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+ 	return false;
+ }
+ 
+-static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+-				    u16 scope_mask, const char *info)
++static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
++				      u16 scope_mask, const char *info)
+ {
+ 	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+ 	for (; caps->matches; caps++) {
+@@ -1199,6 +1199,13 @@ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 	}
+ }
+ 
++static void update_cpu_capabilities(u16 scope_mask)
++{
++	__update_cpu_capabilities(arm64_features, scope_mask,
++				"detected feature:");
++	__update_cpu_capabilities(arm64_errata, scope_mask,
++				"enabling work around for");
++}
+ 
+ static int __enable_cpu_capability(void *arg)
+ {
+@@ -1213,7 +1220,7 @@ static int __enable_cpu_capability(void *arg)
+  * CPUs
+  */
+ static void __init
+-enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
++__enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
+ {
+ 	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+ 	for (; caps->matches; caps++) {
+@@ -1293,6 +1300,12 @@ static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_li
+ 	return true;
+ }
+ 
++static bool verify_local_cpu_caps(u16 scope_mask)
++{
++	return __verify_local_cpu_caps(arm64_features, scope_mask) &&
++	       __verify_local_cpu_caps(arm64_errata, scope_mask);
++}
++
+ /*
+  * Check for CPU features that are used in early boot
+  * based on the Boot CPU value.
+@@ -1315,12 +1328,6 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+ 		}
+ }
+ 
+-static void verify_local_cpu_features(void)
+-{
+-	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_SCOPE_ALL))
+-		cpu_die_early();
+-}
+-
+ static void verify_sve_features(void)
+ {
+ 	u64 safe_zcr = read_sanitised_ftr_reg(SYS_ZCR_EL1);
+@@ -1339,26 +1346,28 @@ static void verify_sve_features(void)
+ }
+ 
+ /*
+- * The CPU Errata work arounds are detected and applied at boot time
+- * and the related information is freed soon after. If the new CPU requires
+- * an errata not detected at boot, fail this CPU.
++ * Check for all capablities within the scope of local CPU.
++ * This is run on all boot time activated CPUs.
+  */
+-static void verify_local_cpu_errata_workarounds(void)
++static void update_cpu_local_capabilities(void)
+ {
+-	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_SCOPE_ALL))
+-		cpu_die_early();
++	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_LOCAL_CPU);
+ }
+ 
+-static void update_cpu_errata_workarounds(void)
++/*
++ * Check for all capablities with a system wide scope.
++ * This is run only once after all the boot CPUs are
++ * brought online.
++ */
++static void update_system_capabilities(void)
+ {
+-	update_cpu_capabilities(arm64_errata,
+-				ARM64_CPUCAP_SCOPE_ALL,
+-				"enabling workaround for");
++	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_SYSTEM);
+ }
+ 
+-static void __init enable_errata_workarounds(void)
++static void enable_cpu_capabilities(u16 scope_mask)
+ {
+-	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_SCOPE_ALL);
++	__enable_cpu_capabilities(arm64_errata, scope_mask);
++	__enable_cpu_capabilities(arm64_features, scope_mask);
+ }
+ 
+ /*
+@@ -1371,8 +1380,8 @@ static void __init enable_errata_workarounds(void)
+  */
+ static void verify_local_cpu_capabilities(void)
+ {
+-	verify_local_cpu_errata_workarounds();
+-	verify_local_cpu_features();
++	if (!verify_local_cpu_caps(ARM64_CPUCAP_SCOPE_ALL))
++		cpu_die_early();
+ 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
+ 
+ 	if (system_supports_32bit_el0())
+@@ -1400,16 +1409,20 @@ void check_local_cpu_capabilities(void)
+ 	 * advertised capabilities.
+ 	 */
+ 	if (!sys_caps_initialised)
+-		update_cpu_errata_workarounds();
++		update_cpu_local_capabilities();
+ 	else
+ 		verify_local_cpu_capabilities();
+ }
+ 
+-static void __init setup_feature_capabilities(void)
++static void __init setup_system_capabilities(void)
+ {
+-	update_cpu_capabilities(arm64_features,
+-				ARM64_CPUCAP_SCOPE_ALL, "detected feature:");
+-	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_SCOPE_ALL);
++	/*
++	 * We have finalised the system wide safe feature registers,
++	 * finalise the capabilities that depend on it.
++	 */
++	update_system_capabilities();
++	/* Enable all the available capabilities */
++	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_ALL);
+ }
+ 
+ DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+@@ -1433,9 +1446,7 @@ void __init setup_cpu_features(void)
+ 	u32 cwg;
+ 	int cls;
+ 
+-	/* Set the CPU feature capabilies */
+-	setup_feature_capabilities();
+-	enable_errata_workarounds();
++	setup_system_capabilities();
+ 	mark_const_caps_ready();
+ 	setup_elf_hwcaps(arm64_elf_hwcaps);
+ 
 -- 
 2.14.3
