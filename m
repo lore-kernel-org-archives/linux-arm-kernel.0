@@ -1,42 +1,41 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 31 Jan 2018 14:16:31 +0100
-Subject: [PATCH] KVM: arm/arm64: Fix arch timers with userspace irqchips
-In-Reply-To: <CAMJs5B_H16cxgAmzZ1+xU9FJWpaG3pHgziN=RBb62nMbQrZdhw@mail.gmail.com>
-References: <20180130124609.15076-1-christoffer.dall@linaro.org>
- <9eb4f221-2aad-8656-912a-4a7e068a23eb@arm.com>
- <20180131100530.GZ21802@cbox>
- <560b5cbc-4ac7-a55a-3f11-9a32b1ffc9e0@arm.com>
- <CAMJs5B_H16cxgAmzZ1+xU9FJWpaG3pHgziN=RBb62nMbQrZdhw@mail.gmail.com>
-Message-ID: <20180131131631.hecvgdsa67bhf2gv@kamzik.brq.redhat.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 31 Jan 2018 13:19:41 +0000
+Subject: [RFC PATCH] tty: pl011: Avoid stuck-off spurious interrupts
+In-Reply-To: <CACRpkdb8=vNmwOYYTAuDM21CtoCw1868js8wnHTTofK-pZYKGQ@mail.gmail.com>
+References: <1517242181-20652-1-git-send-email-Dave.Martin@arm.com>
+ <CACRpkdb8=vNmwOYYTAuDM21CtoCw1868js8wnHTTofK-pZYKGQ@mail.gmail.com>
+Message-ID: <20180131131941.GM5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 12:23:09PM +0100, Christoffer Dall wrote:
-> Did I mention that I hate this feature, which keeps breaking, and
-> which really isn't covered by a simple kvm-unit-test script?
->
+On Wed, Jan 31, 2018 at 01:28:43PM +0100, Linus Walleij wrote:
+> On Mon, Jan 29, 2018 at 5:09 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> 
+> > Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
+> > clears the RX and receive timeout interrupts on pl011 startup, to
+> > avoid a screaming-interrupt scenario that can occur when the
+> > firmware or bootloader leaves these interrupts spuriously
+> > asserted.
+> 
+> It looks OK to me.
 
-Doesn't running the kvm-unit-tests' timer tests with
-'-machine kernel_irqchip=off' exercise at least some
-of these paths? If so, then the kvm-unit-tests patch
-below may help
+You mean, the original patch?
 
-Thanks,
-drew
+I think there is a real potential bug here for SBSA UART, but I also
+haven't been able to reproduce it on hardware.
 
+I'm not sure whether it can happen on a real pl011, given that the
+driver turns the FIFOs off and on etc.  That may get us back into a
+sane state.  On the SBSA UART this does nothing: the SBSA UART
+cannot be reset or disabled directly IIRC.
 
-diff --git a/arm/unittests.cfg b/arm/unittests.cfg
-index 44b98cfc7afde..7c0041e44d5f3 100644
---- a/arm/unittests.cfg
-+++ b/arm/unittests.cfg
-@@ -116,3 +116,10 @@ file = timer.flat
- groups = timer
- timeout = 2s
- arch = arm64
-+
-+[timer-userspace-gic]
-+file = timer.flat
-+extra_params = -machine kernel_irqchip=off
-+groups = timer
-+timeout = 2s
-+arch = arm64
+> I could never reproduce this issue myself, it was just reported by
+> Chanho, and we came up with this fix. AFAICR it was working fine
+> on ARM reference designs and my ST-Ericsson platforms before
+> and after.
+> 
+> I do not remember what hardware Chanho was seeing this problem
+> on, but let's loop in Chanho and ask.
+
+OK, thanks
+---Dave
