@@ -1,220 +1,235 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 31 Jan 2018 20:15:16 +0100
-Subject: [PATCH v2 07/16] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <86dc5223-3fa9-688d-fb2d-8bc911356eba@arm.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-8-marc.zyngier@arm.com>
- <20180131173824.leyfy4vlqq3vmd37@kamzik.brq.redhat.com>
- <1de5a7a8-8118-597f-d1a3-14c406b57b0e@arm.com>
- <20180131180330.ev5cypq5k5ai43wm@kamzik.brq.redhat.com>
- <86dc5223-3fa9-688d-fb2d-8bc911356eba@arm.com>
-Message-ID: <20180131191516.gnz6jk7pbt25crcx@kamzik.brq.redhat.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 31 Jan 2018 20:23:54 +0100
+Subject: [PATCH v2 09/16] iio: adc: sun4i-gpadc-iio: add support for H3
+ thermal sensor
+In-Reply-To: <20180128232919.12639-10-embed3d@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-10-embed3d@gmail.com>
+Message-ID: <20180131192354.sb7zmcwc6c3eisqj@qschulz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 06:36:38PM +0000, Marc Zyngier wrote:
-> On 31/01/18 18:03, Andrew Jones wrote:
-> > On Wed, Jan 31, 2018 at 05:45:56PM +0000, Marc Zyngier wrote:
-> >> On 31/01/18 17:38, Andrew Jones wrote:
-> >>> On Mon, Jan 29, 2018 at 05:45:50PM +0000, Marc Zyngier wrote:
-> >>>> Although we've implemented PSCI 1.0 and 1.1, nothing can select them
-> >>>> Since all the new PSCI versions are backward compatible, we decide to
-> >>>> default to the latest version of the PSCI implementation. This is no
-> >>>> different from doing a firmware upgrade on KVM.
-> >>>>
-> >>>> But in order to give a chance to hypothetical badly implemented guests
-> >>>> that would have a fit by discovering something other than PSCI 0.2,
-> >>>> let's provide a new API that allows userspace to pick one particular
-> >>>> version of the API.
-> >>>>
-> >>>> This is implemented as a new class of "firmware" registers, where
-> >>>> we expose the PSCI version. This allows the PSCI version to be
-> >>>> save/restored as part of a guest migration, and also set to
-> >>>> any supported version if the guest requires it.
-> >>>>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  Documentation/virtual/kvm/api.txt      |  3 +-
-> >>>>  Documentation/virtual/kvm/arm/psci.txt | 28 ++++++++++++++
-> >>>>  arch/arm/include/asm/kvm_host.h        |  3 ++
-> >>>>  arch/arm/include/uapi/asm/kvm.h        |  6 +++
-> >>>>  arch/arm/kvm/guest.c                   | 13 +++++++
-> >>>>  arch/arm64/include/asm/kvm_host.h      |  3 ++
-> >>>>  arch/arm64/include/uapi/asm/kvm.h      |  6 +++
-> >>>>  arch/arm64/kvm/guest.c                 | 14 ++++++-
-> >>>>  include/kvm/arm_psci.h                 |  9 +++++
-> >>>>  virt/kvm/arm/psci.c                    | 68 +++++++++++++++++++++++++++++++++-
-> >>>>  10 files changed, 149 insertions(+), 4 deletions(-)
-> >>>>  create mode 100644 Documentation/virtual/kvm/arm/psci.txt
-> >>>>
-> >>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> >>>> index 57d3ee9e4bde..334905202141 100644
-> >>>> --- a/Documentation/virtual/kvm/api.txt
-> >>>> +++ b/Documentation/virtual/kvm/api.txt
-> >>>> @@ -2493,7 +2493,8 @@ Possible features:
-> >>>>  	  and execute guest code when KVM_RUN is called.
-> >>>>  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
-> >>>>  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
-> >>>> -	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-> >>>> +	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 (or a future revision
-> >>>> +          backward compatible with v0.2) for the CPU.
-> >>>>  	  Depends on KVM_CAP_ARM_PSCI_0_2.
-> >>>>  	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
-> >>>>  	  Depends on KVM_CAP_ARM_PMU_V3.
-> >>>> diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
-> >>>> new file mode 100644
-> >>>> index 000000000000..2e49a4e9f084
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/virtual/kvm/arm/psci.txt
-> >>>> @@ -0,0 +1,28 @@
-> >>>> +KVM implements the PSCI (Power State Coordination Interface)
-> >>>> +specification in order to provide services such as CPU on/off, reset
-> >>>> +and power-off to the guest.
-> >>>> +
-> >>>> +The PSCI specification is regularly updated to provide new features,
-> >>>> +and KVM implements these updates if they make sense from a virtualization
-> >>>> +point of view.
-> >>>> +
-> >>>> +This means that a guest booted on two different versions of KVM can
-> >>>> +observe two different "firmware" revisions. This could cause issues if
-> >>>> +a given guest is tied to a particular PSCI revision (unlikely), or if
-> >>>> +a migration causes a different PSCI version to be exposed out of the
-> >>>> +blue to an unsuspecting guest.
-> >>>> +
-> >>>> +In order to remedy this situation, KVM exposes a set of "firmware
-> >>>> +pseuodo-registers" that can be manipulated using the GET/SET_ONE_REG
-> >>>> +interface. These registers can be saved/restored by userspace, and set
-> >>>> +to a convenient value if required.
-> >>>
-> >>> Userspace can save/restore any state it deems necessary. 
-> >>
-> >> Only if it has access to it. Until now, that wasn't an option.
-> >>
-> >>> Is there another
-> >>> reason to invent a pseudo register? Considering the PSCI version is VM
-> >>> state, then maybe a VM "device" attribute[*], like s390 use, would fit
-> >>> better. 
-> >>
-> >> Possibly. But that means current userspace won't engage the mitigation
-> >> by default, and that's pretty bad.
-> >>
-> >>> Or, if keeping it VCPU state has some benefit, then we already
-> >>> have VCPU device attribute support for ARM that we could extend with
-> >>> another attribute. An advantage of using the device-attr API is that it
-> >>> has KVM_HAS_DEVICE_ATTR, allowing the new attribute support to be probed.
-> >>> How should userspace check if the pseudo register is supported? Maybe
-> >>> by just failing with NOT_SUPPORTED to get/set it?
-> >>>
-> >>> [*] Documentation/virtual/kvm/devices/vm.txt
-> >>
-> >> Frankly, I have no opinion on the way to implement it. My only
-> >> requirement is that it becomes enabled by default, without any userspace
-> >> change.
-> > 
-> > I think we can turn it on by default in KVM, no matter what API we choose,
-> > and then enable userspace (with whatever API) to turn it off. Newer
-> > machine types certainly wouldn't do that, and, as later PSCI is compatible
-> > with older PSCI, we're probably safe (safer regarding the BTB) not using
-> > the older PSCI with older machine types either - although that would be up
-> > for debate and the whole point of adding the API.
+Hi Philipp,
+
+On Mon, Jan 29, 2018 at 12:29:12AM +0100, Philipp Rossak wrote:
+> This patch adds support for the H3 ths sensor.
 > 
-> OK. At least we're aligned on this. As for your question about finding
-> out about the register, here's what I have in kvmtool:
-
-Actually I was starting to have some second thoughts about that default,
-but...
-
+> The H3 supports interrupts. The interrupt is configured to update the
+> the sensor values every second. The calibration data is writen at the
+> begin of the init process.
 > 
-> +       reg.addr = (u64)&data;
-> +       reg.id = KVM_REG_ARM_PSCI_VERSION;
-> +       err = ioctl(vcpu->vcpu_fd, KVM_GET_ONE_REG, &reg);
-> +       if (err < 0)
-> +               pr_info("Unable to get PSCI version\n");
-> +       else
-> +               pr_info("PSCI version %llx\n", data);
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 86 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/sun4i-gpadc.h   | 22 ++++++++++
+>  2 files changed, 108 insertions(+)
 > 
-> If you get an error, the feature doesn't exist. One of the reasons for
-> using a register is that migration works with today's QEMU. And if you
-> try to restore a VM that's aware of the PSCI version (and possibly of
-> the BTB invalidation) on a host that doesn't support it, you get a fail
-> without any change of userspace.
-> 
-> To me, that's a pretty good argument in favour of this method. But if
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index b7b5451226b0..8196203d65fe 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -61,6 +61,9 @@ struct sun4i_gpadc_iio;
+>  static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info);
+>  static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info);
+>  
+> +static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info);
+> +static int sunxi_ths_sample_end(struct sun4i_gpadc_iio *info);
+> +
 
-...I agree that does sound like a good argument.
+We try to avoid using the generic sunxi prefix.
 
-> you have strong feelings about it and would like me to implement
-> something else, please let me know ASAP. We'd like this series to land
-> in -rc1, so we only have a few days left...
+>  struct gpadc_data {
+>  	int		temp_offset;
+>  	int		temp_scale;
+> @@ -71,6 +74,10 @@ struct gpadc_data {
+>  	unsigned int	temp_data[MAX_SENSOR_COUNT];
+>  	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>  	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+> +	u32		ctrl0_map;
+> +	u32		ctrl2_map;
+> +	u32		sensor_en_map;
+> +	u32		filter_map;
+>  	u32		irq_clear_map;
+>  	u32		irq_control_map;
+>  	bool		has_bus_clk;
+> @@ -138,6 +145,31 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.support_irq = false,
+>  };
+>  
+> +static const struct gpadc_data sun8i_h3_ths_data = {
+> +	.temp_offset = -1791,
+> +	.temp_scale = -121,
+> +	.temp_data = {SUN8I_H3_THS_TDATA0, 0, 0, 0},
+> +	.sample_start = sunxi_ths_sample_start,
+> +	.sample_end = sunxi_ths_sample_end,
+> +	.has_bus_clk = true,
+> +	.has_bus_rst = true,
+> +	.has_mod_clk = true,
+> +	.sensor_count = 1,
+> +	.supports_nvmem = true,
+> +	.support_irq = true,
+> +	.ctrl0_map = SUN4I_GPADC_CTRL0_T_ACQ(0xff),
+> +	.ctrl2_map = SUN8I_H3_THS_ACQ1(0x3f),
+> +	.sensor_en_map = SUN8I_H3_THS_TEMP_SENSE_EN0,
+> +	.filter_map = SUN4I_GPADC_CTRL3_FILTER_EN |
+> +		SUN4I_GPADC_CTRL3_FILTER_TYPE(0x2),
+> +	.irq_clear_map = SUN8I_H3_THS_INTS_ALARM_INT_0 |
+> +			SUN8I_H3_THS_INTS_SHUT_INT_0   |
+> +			SUN8I_H3_THS_INTS_TDATA_IRQ_0  |
+> +			SUN8I_H3_THS_INTS_ALARM_OFF_0,
+> +	.irq_control_map = SUN8I_H3_THS_INTC_TDATA_IRQ_EN0 |
+> +		SUN8I_H3_THS_TEMP_PERIOD(0x7),
 
-I'll do some experiments tomorrow and let you know if my second thoughts
-are valid concerns right away.
+>From what I've understood, ACQ regs are basically clock dividers. We
+should make a better job at explaining it :)
 
-> 
-> >>
-> >>>
-> >>>> +
-> >>>> +The following register is defined:
-> >>>> +
-> >>>> +* KVM_REG_ARM_PSCI_VERSION:
-> >>>> +
-> >>>> +  - Only valid if the vcpu has KVM_ARM_VCPU_PSCI_0_2 feature set
-> >>>> +  - Returns the current PSCI version on GET_ONE_REG
-> >>>> +  - Allows any supported PSCI version compatible with v0.2 to be set
-> >>>> +    with SET_ONE_REG
-> >>>> +  - Affects the whole VM (even if the register view is per-vcpu)
-> >>>
-> >>>
-> >>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >>>> index acbf9ec7b396..e9d57060d88c 100644
-> >>>> --- a/arch/arm/include/asm/kvm_host.h
-> >>>> +++ b/arch/arm/include/asm/kvm_host.h
-> >>>> @@ -75,6 +75,9 @@ struct kvm_arch {
-> >>>>  	/* Interrupt controller */
-> >>>>  	struct vgic_dist	vgic;
-> >>>>  	int max_vcpus;
-> >>>> +
-> >>>> +	/* Mandated version of PSCI */
-> >>>> +	u32 psci_version;
-> >>>>  };
-> >>>>  
-> >>>>  #define KVM_NR_MEM_OBJS     40
-> >>>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> >>>> index 6edd177bb1c7..47dfc99f5cd0 100644
-> >>>> --- a/arch/arm/include/uapi/asm/kvm.h
-> >>>> +++ b/arch/arm/include/uapi/asm/kvm.h
-> >>>> @@ -186,6 +186,12 @@ struct kvm_arch_memory_slot {
-> >>>>  #define KVM_REG_ARM_VFP_FPINST		0x1009
-> >>>>  #define KVM_REG_ARM_VFP_FPINST2		0x100A
-> >>>>  
-> >>>> +/* KVM-as-firmware specific pseudo-registers */
-> >>>> +#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-> >>>
-> >>> Is this 0x14 documented somewhere? I'm just curious how the space for
-> >>> pseudo registers is reserved. Is there a common place that we should
-> >>> document that 0x14 is for the firmware (if it's not documented there
-> >>> already)?
-> >>
-> >> No. First come, first served.
-> > 
-> > Should we document it in Documentation/ somewhere?
-> We can. I tend to see the uapi/asm/kvm.h file as the reference (and I
-> feel that a text file would simply be an English translation of that
-> file), but I'm not opposed to it either. I'm not sure I have the
-> bandwidth for that at the moment though.
+> +};
+> +
+>  struct sun4i_gpadc_iio {
+>  	struct iio_dev			*indio_dev;
+>  	struct completion		completion;
+> @@ -462,6 +494,16 @@ static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sunxi_ths_sample_end(struct sun4i_gpadc_iio *info)
+> +{
+> +	/* Disable ths interrupt */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC, 0x0);
+> +	/* Disable temperature sensor */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2, 0x0);
+> +
+> +	return 0;
+> +}
+> +
+>  static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+> @@ -473,6 +515,17 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  	return info->data->sample_end(info);
+>  }
+>  
+> +static void sunxi_calibrate(struct sun4i_gpadc_iio *info)
+> +{
+> +	if (info->has_calibration_data[0])
+> +		regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
+> +			info->calibration_data[0]);
+> +
+> +	if (info->has_calibration_data[1])
+> +		regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
+> +			info->calibration_data[1]);
+> +}
+> +
+>  static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
+>  {
+>  	/* clkin = 6MHz */
+> @@ -492,6 +545,35 @@ static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sunxi_ths_sample_start(struct sun4i_gpadc_iio *info)
+> +{
+> +	u32 value;
+> +	sunxi_calibrate(info);
+> +
+> +	if (info->data->ctrl0_map)
+> +		regmap_write(info->regmap, SUN8I_H3_THS_CTRL0,
+> +			info->data->ctrl0_map);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2,
+> +		info->data->ctrl2_map);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT,
+> +			info->data->irq_clear_map);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_FILTER,
+> +		info->data->filter_map);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC,
+> +		info->data->irq_control_map);
+> +
+> +	regmap_read(info->regmap, SUN8I_H3_THS_CTRL2, &value);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2,
+> +		info->data->sensor_en_map | value);
+> +
+> +	return 0;
+> +}
+> +
 
-Yeah, docs can come later. But now that I look, I think we just need a
-couple lines in Documentation/virtual/kvm/api.txt like
+I'm a bit worried. Will all the sensors have the same sample start? Or
+will we need at some point also entries in info->data for register
+addresses, if they have ctrl2 or filter, etc...
 
-ARM 32-bit firmware registers have the following id bit patterns:
-  0x4030 0000 0014 0 <regno:16>
+Maybe we could define a sample_start for the h3 only and reuse-it if
+possible and if not declare another sample start? All depends if the
+sample start is most likely to change in the near future or not. If it
+is, then we should avoid adding a lot of variables in info->data and
+just go for a single sample_start per SoC.
 
-ARM 64-bit firmware registers have the following id bit patterns:
-  0x6030 0000 0014 0 <regno:16>
+>  static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+> @@ -582,6 +664,10 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
+>  		.compatible = "allwinner,sun8i-a33-ths",
+>  		.data = &sun8i_a33_gpadc_data,
+>  	},
+> +	{
+> +		.compatible = "allwinner,sun8i-h3-ths",
+> +		.data = &sun8i_h3_ths_data,
+> +	},
+>  	{ /* sentinel */ }
+>  };
+>  
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 458f2159a95a..80b79c31cea3 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -91,7 +91,29 @@
+>  #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
+>  
+>  /* SUNXI_THS COMMON REGISTERS + DEFINES */
+> +#define SUN8I_H3_THS_CTRL0				0x00
+> +#define SUN8I_H3_THS_CTRL2				0x40
+>  #define SUN8I_H3_THS_INTC				0x44
+> +#define SUN8I_H3_THS_STAT				0x48
+> +#define SUN8I_H3_THS_FILTER				0x70
+> +#define SUNXI_THS_CDATA_0_1				0x74
+> +#define SUNXI_THS_CDATA_2_3				0x78
+> +#define SUN8I_H3_THS_TDATA0				0x80
+> +
+> +#define SUN8I_H3_THS_ACQ1(x)				(GENMASK(31, 16) & ((x) << 16))
+> +
+> +#define SUN8I_H3_THS_TEMP_SENSE_EN0			BIT(0)
+> +
+> +#define SUN8I_H3_THS_TEMP_PERIOD(x)			(GENMASK(31, 12) & ((x) << 12))
+> +
+> +#define SUN8I_H3_THS_INTS_ALARM_INT_0			BIT(0)
+> +#define SUN8I_H3_THS_INTS_SHUT_INT_0			BIT(4)
+> +#define SUN8I_H3_THS_INTS_TDATA_IRQ_0			BIT(8)
+> +#define SUN8I_H3_THS_INTS_ALARM_OFF_0			BIT(12)
+> +
+> +#define SUN8I_H3_THS_INTC_ALARM_INT_EN0			BIT(0)
+> +#define SUN8I_H3_THS_INTC_SHUT_INT_EN0			BIT(4)
+> +#define SUN8I_H3_THS_INTC_TDATA_IRQ_EN0			BIT(8)
+>  
 
-(I'm not sure those are correct. I'd expect both to start with 4 like
- the other entries in that file, but maybe not, or the other 64-bit
- entries in that file aren't correct?)
+Personal taste here but I prefer the register bits to be defined just
+below the register address define.
 
-Thanks,
-drew
+i.e.:
+
+#define SUN8I_H3_THS_CTRL2                           0x40
+#define SUN8I_H3_THS_ACQ1(x)                         (GENMASK(31, 16) & ((x) << 16))
+#define SUN8I_H3_THS_TEMP_SENSE_EN0                  BIT(0)
+
+that way we know for which register we should use which constants.
+
+Quentin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/afed5b09/attachment.sig>
