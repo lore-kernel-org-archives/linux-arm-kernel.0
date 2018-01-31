@@ -1,128 +1,254 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:35:00 +0100
-Subject: [PULL 21/28] KVM: arm/arm64: Drop vcpu parameter from guest cache
- maintenance operartions
-In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
-References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-22-christoffer.dall@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Jan 2018 09:37:31 +0000
+Subject: [PATCH] KVM: arm/arm64: Fix arch timers with userspace irqchips
+In-Reply-To: <20180130124609.15076-1-christoffer.dall@linaro.org>
+References: <20180130124609.15076-1-christoffer.dall@linaro.org>
+Message-ID: <9eb4f221-2aad-8656-912a-4a7e068a23eb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On 30/01/18 12:46, Christoffer Dall wrote:
+> When introducing support for irqchip in userspace we needed a way to
+> mask the timer signal to prevent the guest continuously exiting due to a
+> screaming timer.
+> 
+> We did this by disabling the corresponding percpu interrupt on the
+> host interrupt controller, because we cannot rely on the host system
+> having a GIC, and therefore cannot make any assumptions about having an
+> active state to hide the timer signal.
+> 
+> Unfortunately, when introducing this feature, it became entirely
+> possible that a VCPU which belongs to a VM that has a userspace irqchip
+> can disable the vtimer irq on the host on some physical CPU, and then go
+> away without ever enabling the vimter irq on that physical CPU again.
 
-The vcpu parameter isn't used for anything, and gets in the way of
-further cleanups. Let's get rid of it.
+vtimer
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/asm/kvm_mmu.h   |  7 ++-----
- arch/arm64/include/asm/kvm_mmu.h |  7 ++-----
- virt/kvm/arm/mmu.c               | 18 ++++++++----------
- 3 files changed, 12 insertions(+), 20 deletions(-)
+> 
+> This means that using irqchips in userspace on a system that also
+> supports running VMs with an in-kernel GIC can prevent forward progress
+> from in-kernel GIC VMs.
+> 
+> Later on, when we started taking virtual timer interrupts in the arch
+> timer code, we would also leave this timer state active for userspace
+> irqchip VMs, because we leave it up to a VGIC-enabled guest to
+> deactivate the hardware IRQ using the HW bit in the LR.
+> 
+> Both issues are solved by only using the enable/disable trick on systems
+> that do not have a host GIC which supports the active state, because all
+> VMs on such systems must use irqchips in userspace.  Systems that have a
+> working GIC with support for an active state use the active state to
+> mask the timer signal for both userspace an in-kernel irqchips.
+> 
+> Cc: Alexander Graf <agraf@suse.de>
+> Cc: <stable@vger.kernel.org> # v4.12+
+> Fixes: d9e139778376 ("KVM: arm/arm64: Support arch timers with a userspace gic")
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> This conflicts horribly with everything when applied to either
+> kvmarm/queue or kvmarm/master.  Therefore, this patch is written for
+> (and applies to) v4.15 with kvmarm/queue merged and should therefore
+> apply cleanly after v4.16-rc1.  An example with this patch applied can
+> be found on kvmarm/temp-for-v4.16-rc2.  I plan on sending this along
+> with any other potential fixes post v4.16-rc1.
+> 
+>  virt/kvm/arm/arch_timer.c | 77 ++++++++++++++++++++++++++---------------------
+>  1 file changed, 42 insertions(+), 35 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 70268c0bec79..228906ceb722 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -35,6 +35,7 @@
+>  static struct timecounter *timecounter;
+>  static unsigned int host_vtimer_irq;
+>  static u32 host_vtimer_irq_flags;
+> +static bool has_gic_active_state;
+>  
+>  static const struct kvm_irq_level default_ptimer_irq = {
+>  	.irq	= 30,
+> @@ -69,25 +70,6 @@ static void soft_timer_cancel(struct hrtimer *hrt, struct work_struct *work)
+>  		cancel_work_sync(work);
+>  }
+>  
+> -static void kvm_vtimer_update_mask_user(struct kvm_vcpu *vcpu)
+> -{
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> -
+> -	/*
+> -	 * When using a userspace irqchip with the architected timers, we must
+> -	 * prevent continuously exiting from the guest, and therefore mask the
+> -	 * physical interrupt by disabling it on the host interrupt controller
+> -	 * when the virtual level is high, such that the guest can make
+> -	 * forward progress.  Once we detect the output level being
+> -	 * de-asserted, we unmask the interrupt again so that we exit from the
+> -	 * guest when the timer fires.
+> -	 */
+> -	if (vtimer->irq.level)
+> -		disable_percpu_irq(host_vtimer_irq);
+> -	else
+> -		enable_percpu_irq(host_vtimer_irq, 0);
+> -}
+> -
+>  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>  {
+>  	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
+> @@ -107,8 +89,8 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>  		kvm_timer_update_irq(vcpu, true, vtimer);
+>  
+>  	if (static_branch_unlikely(&userspace_irqchip_in_use) &&
+> -	    unlikely(!irqchip_in_kernel(vcpu->kvm)))
+> -		kvm_vtimer_update_mask_user(vcpu);
+> +	    unlikely(!irqchip_in_kernel(vcpu->kvm)) && !has_gic_active_state)
+> +		disable_percpu_irq(host_vtimer_irq);
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index aab64fe52146..bc70a1f0f42d 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -150,9 +150,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
- }
- 
--static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
--					     kvm_pfn_t pfn,
--					     unsigned long size)
-+static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
- 	/*
- 	 * Clean the dcache to the Point of Coherency.
-@@ -177,8 +175,7 @@ static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
- 	}
- }
- 
--static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
--						  kvm_pfn_t pfn,
-+static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
- 						  unsigned long size)
- {
- 	u32 iclsz;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 126abefffe7f..06f1f9794679 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -252,17 +252,14 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
- }
- 
--static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
--					     kvm_pfn_t pfn,
--					     unsigned long size)
-+static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
- 	void *va = page_address(pfn_to_page(pfn));
- 
- 	kvm_flush_dcache_to_poc(va, size);
- }
- 
--static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
--						  kvm_pfn_t pfn,
-+static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
- 						  unsigned long size)
- {
- 	if (icache_is_aliasing()) {
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b83b5a8442bb..a1ea43fa75cf 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1276,16 +1276,14 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
- 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
- }
- 
--static void clean_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--				    unsigned long size)
-+static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
--	__clean_dcache_guest_page(vcpu, pfn, size);
-+	__clean_dcache_guest_page(pfn, size);
- }
- 
--static void invalidate_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--					 unsigned long size)
-+static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
- {
--	__invalidate_icache_guest_page(vcpu, pfn, size);
-+	__invalidate_icache_guest_page(pfn, size);
- }
- 
- static void kvm_send_hwpoison_signal(unsigned long address,
-@@ -1421,11 +1419,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		}
- 
- 		if (fault_status != FSC_PERM)
--			clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
-+			clean_dcache_guest_page(pfn, PMD_SIZE);
- 
- 		if (exec_fault) {
- 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
--			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+			invalidate_icache_guest_page(pfn, PMD_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			if (stage2_is_exec(kvm, fault_ipa))
-@@ -1443,11 +1441,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		}
- 
- 		if (fault_status != FSC_PERM)
--			clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
-+			clean_dcache_guest_page(pfn, PAGE_SIZE);
- 
- 		if (exec_fault) {
- 			new_pte = kvm_s2pte_mkexec(new_pte);
--			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+			invalidate_icache_guest_page(pfn, PAGE_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			if (stage2_is_exec(kvm, fault_ipa))
+nit: this is the negated version of the fix you posted earlier
+(0e23cb34af26 in kvmarm/queue), plus a new term... How about rewriting
+this as:
+
+static inline bool userspace_irqchip(struct kvm *kvm)
+{
+	return (static_branch_unlikely(&userspace_irqchip_in_use) &&
+		unlikely(!irqchip_in_kernel(kvm)));
+}
+
+and this becomes:
+
+	if (userspace_irqchip(vcpu->kvm) && !has_gic_active_state)
+		[...]
+
+which I find much more readable.
+
+Same for kvm_timer_update_irq():
+
+	if (!userspace_irqchip(vcpu->kvm))
+		[...]
+
+>  
+>  	return IRQ_HANDLED;
+>  }
+> @@ -460,13 +442,16 @@ static void set_cntvoff(u64 cntvoff)
+>  	kvm_call_hyp(__kvm_timer_set_cntvoff, low, high);
+>  }
+>  
+> -static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
+> +static void kvm_timer_vcpu_load_gic(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  	bool phys_active;
+>  	int ret;
+>  
+> -	phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
+> +	if (irqchip_in_kernel(vcpu->kvm))
+> +		phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
+> +	else
+> +		phys_active = vtimer->irq.level;
+
+You could use the above helper here too.
+
+>  
+>  	ret = irq_set_irqchip_state(host_vtimer_irq,
+>  				    IRQCHIP_STATE_ACTIVE,
+> @@ -474,9 +459,24 @@ static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
+>  	WARN_ON(ret);
+>  }
+>  
+> -static void kvm_timer_vcpu_load_user(struct kvm_vcpu *vcpu)
+> +static void kvm_timer_vcpu_load_nogic(struct kvm_vcpu *vcpu)
+>  {
+> -	kvm_vtimer_update_mask_user(vcpu);
+> +	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> +
+> +	/*
+> +	 * When using a userspace irqchip with the architected timers and a
+> +	 * host interrupt controller that doesn't support an active state, we
+> +	 * must still we must prevent continuously exiting from the guest, and
+> +	 * therefore mask the physical interrupt by disabling it on the host
+> +	 * interrupt controller when the virtual level is high, such that the
+> +	 * guest can make forward progress.  Once we detect the output level
+> +	 * being de-asserted, we unmask the interrupt again so that we exit
+> +	 * from the guest when the timer fires.
+> +	 */
+> +	if (vtimer->irq.level)
+> +		disable_percpu_irq(host_vtimer_irq);
+> +	else
+> +		enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
+>  }
+>  
+>  void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+> @@ -487,10 +487,10 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+>  	if (unlikely(!timer->enabled))
+>  		return;
+>  
+> -	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
+> -		kvm_timer_vcpu_load_user(vcpu);
+> +	if (has_gic_active_state)
+
+likely()?
+
+> +		kvm_timer_vcpu_load_gic(vcpu);
+>  	else
+> -		kvm_timer_vcpu_load_vgic(vcpu);
+> +		kvm_timer_vcpu_load_nogic(vcpu);
+>  
+>  	set_cntvoff(vtimer->cntvoff);
+>  
+> @@ -555,18 +555,23 @@ static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  
+> -	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
+> -		__timer_snapshot_state(vtimer);
+> -		if (!kvm_timer_should_fire(vtimer)) {
+> -			kvm_timer_update_irq(vcpu, false, vtimer);
+> -			kvm_vtimer_update_mask_user(vcpu);
+> -		}
+> +	__timer_snapshot_state(vtimer);
+> +	if (!kvm_timer_should_fire(vtimer)) {
+> +		kvm_timer_update_irq(vcpu, false, vtimer);
+> +		if (!has_gic_active_state)
+
+unlikely()?
+
+> +			enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
+>  	}
+>  }
+>  
+>  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+>  {
+> -	unmask_vtimer_irq_user(vcpu);
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +	if (unlikely(!timer->enabled))
+> +		return;
+> +
+> +	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
+> +		unmask_vtimer_irq_user(vcpu);
+>  }
+>  
+>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+> @@ -753,6 +758,8 @@ int kvm_timer_hyp_init(bool has_gic)
+>  			kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
+>  			goto out_free_irq;
+>  		}
+> +
+> +		has_gic_active_state = true;
+
+or even better, how about turning this into a static key? This is a
+one-off thing, and nobody is going to remove the GIC from the system, so
+we might as well optimize it in our favour.
+
+>  	}
+>  
+>  	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
+> 
+
+These nits aside, this looks like the right thing to do.
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
+
+	M.
 -- 
-2.14.2
+Jazz is not dead. It just smells funny...
