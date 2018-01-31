@@ -1,42 +1,30 @@
 From: olivier.moysan@st.com (Olivier Moysan)
-Date: Wed, 31 Jan 2018 17:47:02 +0100
-Subject: [PATCH 1/2] ASoC: stm32: spdifrx: fix typo in function name.
+Date: Wed, 31 Jan 2018 17:47:03 +0100
+Subject: [PATCH 2/2] ASoC: stm32: spdifrx: Use default dai name
 In-Reply-To: <1517417223-21899-1-git-send-email-olivier.moysan@st.com>
 References: <1517417223-21899-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1517417223-21899-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <1517417223-21899-3-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix function name prefix for naming consistency.
+Use dai name provided by framework from dev_name() function.
 
 Signed-off-by: olivier moysan <olivier.moysan@st.com>
 ---
- sound/soc/stm/stm32_spdifrx.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ sound/soc/stm/stm32_spdifrx.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
-index b9bdefc..42ad2ae 100644
+index 42ad2ae..373df4f 100644
 --- a/sound/soc/stm/stm32_spdifrx.c
 +++ b/sound/soc/stm/stm32_spdifrx.c
-@@ -858,8 +858,8 @@ static void stm32_spdifrx_shutdown(struct snd_pcm_substream *substream,
- 	{}
- };
+@@ -819,7 +819,6 @@ static void stm32_spdifrx_shutdown(struct snd_pcm_substream *substream,
  
--static int stm_spdifrx_parse_of(struct platform_device *pdev,
--				struct stm32_spdifrx_data *spdifrx)
-+static int stm32_spdifrx_parse_of(struct platform_device *pdev,
-+				  struct stm32_spdifrx_data *spdifrx)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id;
-@@ -914,7 +914,7 @@ static int stm32_spdifrx_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, spdifrx);
- 
--	ret = stm_spdifrx_parse_of(pdev, spdifrx);
-+	ret = stm32_spdifrx_parse_of(pdev, spdifrx);
- 	if (ret)
- 		return ret;
- 
+ static struct snd_soc_dai_driver stm32_spdifrx_dai[] = {
+ 	{
+-		.name = "spdifrx-capture-cpu-dai",
+ 		.probe = stm32_spdifrx_dai_probe,
+ 		.capture = {
+ 			.stream_name = "CPU-Capture",
 -- 
 1.9.1
