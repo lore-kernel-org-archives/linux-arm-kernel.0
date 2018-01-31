@@ -1,46 +1,83 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 31 Jan 2018 13:45:14 +0000
-Subject: Handling of chars received while a UART is not open
-In-Reply-To: <20180131121931.GH9418@n2100.armlinux.org.uk>
-References: <20180131120628.GL5862@e103592.cambridge.arm.com>
- <20180131121931.GH9418@n2100.armlinux.org.uk>
-Message-ID: <20180131134514.GO5862@e103592.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 31 Jan 2018 07:50:59 -0600
+Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
+References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
+ <20180124103516.2571-9-jeffy.chen@rock-chips.com>
+ <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
+ <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
+Message-ID: <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 12:19:31PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 31, 2018 at 12:06:29PM +0000, Dave Martin wrote:
-> > Hi all,
-> > 
-> > Question:
-> > 
-> >  1) Should a UART definitely discard the RX FIFO on ->startup()?
-> 
-> Yes; POSIX makes no guarantees about the configuration of the port
-> while it is closed, and when it is re-opened, it is permitted that
-> the port is reset back to a set of default parameters rather than
-> the previous parameter set that was configured.
-> 
-> You also have the CREAD flag which indicates whether we want the
-> receiver enabled or not, but it is not defined by POSIX whether the
-> receiver remains enabled when the port is closed.
-> 
-> Linux behaviour has always been to flush the port of received
-> characters at close and open time (see 8250 driver), meaning that
-> characters received while the TTY is closed are ignored - just like
-> what happens on the physical console keyboard, which is also a TTY.
-> Doing otherwise is likely to confuse applications and potentially
-> introduce buggy behaviour that would only be detected on UARTs with
-> differing behaviour to 8250.
-> 
-> Linux follows POSIX General Terminal Interface for its TTY handling.
+On Wed, Jan 31, 2018 at 1:52 AM, Tomasz Figa <tfiga@chromium.org> wrote:
+> Hi Rob,
+>
+> On Wed, Jan 31, 2018 at 2:05 AM, Rob Herring <robh@kernel.org> wrote:
+>> On Wed, Jan 24, 2018 at 06:35:11PM +0800, Jeffy Chen wrote:
+>>> From: Tomasz Figa <tfiga@chromium.org>
+>>>
+>>> Current code relies on master driver enabling necessary clocks before
+>>> IOMMU is accessed, however there are cases when the IOMMU should be
+>>> accessed while the master is not running yet, for example allocating
+>>> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
+>>> mapping API and doesn't engage the master driver at all.
+>>>
+>>> This patch fixes the problem by letting clocks needed for IOMMU
+>>> operation to be listed in Device Tree and making the driver enable them
+>>> for the time of accessing the hardware.
+>>>
+>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+>>> ---
+>>>
+>>> Changes in v5:
+>>> Use clk_bulk APIs.
+>>>
+>>> Changes in v4: None
+>>> Changes in v3: None
+>>> Changes in v2: None
+>>>
+>>>  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  8 +++
+>>
+>> Please split binding patches to a separate patch.
+>>
+>>>  drivers/iommu/rockchip-iommu.c                     | 74 ++++++++++++++++++++--
+>>>  2 files changed, 76 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>> index 2098f7732264..33dd853359fa 100644
+>>> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>>> @@ -14,6 +14,13 @@ Required properties:
+>>>                      "single-master" device, and needs no additional information
+>>>                      to associate with its master device.  See:
+>>>                      Documentation/devicetree/bindings/iommu/iommu.txt
+>>> +Optional properties:
+>>> +- clocks : A list of master clocks requires for the IOMMU to be accessible
+>>> +           by the host CPU. The number of clocks depends on the master
+>>> +           block and might as well be zero. See [1] for generic clock
+>>> +           bindings description.
+>>
+>> Hardware blocks don't have a variable number of clock connections.
+>
+> I think you underestimate the imagination of hardware designers. :)
 
-OK, that all sounds good.
+Learned long ago to never do that. If there are 2 ways to do
+something, they will find a 3rd way.
 
-Explicitly reading the RX FIFO until empty on startup seems compatible
-with this, and harmless even on hardware that can't show the lockup.
+> For Rockchip IOMMU, there is a set of clocks, which all need to be
+> enabled for IOMMU register access to succeed. The clocks are not
+> directly fed to the IOMMU, but they are needed for the various buses
+> and intermediate blocks on the way to the IOMMU to work.
 
-I'll cook up another patch.
+The binding should describe the clock connections, not what clocks a
+driver needs (currently). It sounds like a lack of managing bus clocks
+to me.
 
-Cheers
----Dave
+In any case, the binding must be written so it can be verified. If you
+can have any number of clocks with any names, there's no point in
+documenting.
+
+Rob
