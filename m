@@ -1,70 +1,42 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 31 Jan 2018 18:51:06 +0100
-Subject: [PATCH v2 04/16] iio: adc: sun4i-gpadc-iio: rework: sampling
- start/end code readout reg
-In-Reply-To: <20180128232919.12639-5-embed3d@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-5-embed3d@gmail.com>
-Message-ID: <20180131175106.agrvwioaruioavqk@qschulz>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Wed, 31 Jan 2018 20:58:01 +0300
+Subject: About testing A64 DE2 patches
+In-Reply-To: <250579B6-D23B-4E40-8678-1E3F30FA0A16@aosc.io>
+References: <41ed8d45-d8a1-303b-dd1f-ad6686a60ba5@orpaltech.com>
+ <250579B6-D23B-4E40-8678-1E3F30FA0A16@aosc.io>
+Message-ID: <03b23ea2-540a-515c-9387-5eac74504c09@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 01/31/2018 08:47 PM, Icenowy Zheng wrote:
+>
+> ? 2018?2?1? GMT+08:00 ??1:42:01, Sergey Suloev <ssuloev@orpaltech.com> ??:
+>> Hi, kernel people,
+>>
+>> I am testing A64 DE2 patches from the list below, series v4, with my
+>> NanoPi A64 and 4.15
+>>
+>> https://patchwork.kernel.org/project/linux-arm-kernel/list/?submitter=173461&page=1
+>>
+>> and I'm getting the following issue regarding SRAM:
+>>
+>> sunxi-de2-clks 1000000.clock: Error couldn't map SRAM to device
+> Could you check whether it's finally probed?
+>
+> DE2 clock may be probed before SRAM controller, so
+> the probe might be deferred. When SRAM controller is ready
+> it will retry.
+>
+>> Here is my full dmesg https://pastebin.com/SQvDfJF0
+>>
+>> Thanks
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-On Mon, Jan 29, 2018 at 12:29:07AM +0100, Philipp Rossak wrote:
-> For adding newer sensor some basic rework of the code is necessary.
-> 
-> This commit reworks the code and allows the sampling start/end code and
-> the position of value readout register to be altered. Later the start/end
-> functions will be used to configure the ths and start/stop the
-> sampling.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 44 ++++++++++++++++++++++++++++++++++-----
->  1 file changed, 39 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 03804ff9c006..db57d9fffe48 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -49,6 +49,15 @@ static unsigned int sun6i_gpadc_chan_select(unsigned int chan)
->  	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
->  }
->  
-> +struct sun4i_gpadc_iio;
-> +
-> +/*
-> + * Prototypes for these functions, which enable these functions to be
-> + * referenced in gpadc_data structures.
-> + */
+thanks for reply
 
-Comment not needed.
-
-> +static int sun4i_gpadc_sample_start(struct sun4i_gpadc_iio *info);
-> +static int sun4i_gpadc_sample_end(struct sun4i_gpadc_iio *info);
-> +
->  struct gpadc_data {
->  	int		temp_offset;
->  	int		temp_scale;
-> @@ -56,6 +65,9 @@ struct gpadc_data {
->  	unsigned int	tp_adc_select;
->  	unsigned int	(*adc_chan_select)(unsigned int chan);
->  	unsigned int	adc_chan_mask;
-> +	unsigned int	temp_data;
-
-Does not really have anything to do with sample_start/end. I would have
-made a different commit for it.
-
-Otherwise,
-Reviewed-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/fbd143db/attachment.sig>
+ok , I will check
