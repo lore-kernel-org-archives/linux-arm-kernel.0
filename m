@@ -1,34 +1,42 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 31 Jan 2018 13:12:15 +0000
-Subject: Handling of chars received while a UART is not open
-In-Reply-To: <20180131120628.GL5862@e103592.cambridge.arm.com>
-References: <20180131120628.GL5862@e103592.cambridge.arm.com>
-Message-ID: <CAFEAcA8D2RLSbHO-OdULHre4oVr=vU+Yb+6sp55XiP6Mrtg1xA@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 31 Jan 2018 14:16:31 +0100
+Subject: [PATCH] KVM: arm/arm64: Fix arch timers with userspace irqchips
+In-Reply-To: <CAMJs5B_H16cxgAmzZ1+xU9FJWpaG3pHgziN=RBb62nMbQrZdhw@mail.gmail.com>
+References: <20180130124609.15076-1-christoffer.dall@linaro.org>
+ <9eb4f221-2aad-8656-912a-4a7e068a23eb@arm.com>
+ <20180131100530.GZ21802@cbox>
+ <560b5cbc-4ac7-a55a-3f11-9a32b1ffc9e0@arm.com>
+ <CAMJs5B_H16cxgAmzZ1+xU9FJWpaG3pHgziN=RBb62nMbQrZdhw@mail.gmail.com>
+Message-ID: <20180131131631.hecvgdsa67bhf2gv@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2018 at 12:06, Dave Martin <Dave.Martin@arm.com> wrote:
-> Now, Qemu has a facility for stuffing some input to an emulated UART
-> immediately on boot, and wouldn't work in case (2) above.  OTOH, that
-> may be a mistaken approach: it's unlikely to work reliably on hardware
-> due to the problem of knowing when a physical UART is actually ready to
-> receive input.  So maybe Qemu should be waiting for a prompt to be
-> transmitted before stuffing input.  In case (1) or (3), qemu probably
-> needs to do something like that.
+On Wed, Jan 31, 2018 at 12:23:09PM +0100, Christoffer Dall wrote:
+> Did I mention that I hate this feature, which keeps breaking, and
+> which really isn't covered by a simple kvm-unit-test script?
+>
 
-FWIW, there isn't a QEMU "facility" for doing this particularly:
-we just don't take any trouble to stop the user from providing
-input whenever the user likes. (If the user is an automatic test
-script then it's that script's job to wait for suitable prompts
-from the guest before feeding input into the emulated serial port
-if it wants to be reliable, the same way you'd have to if you
-were feeding the data to a real serial line.)
+Doesn't running the kvm-unit-tests' timer tests with
+'-machine kernel_irqchip=off' exercise at least some
+of these paths? If so, then the kvm-unit-tests patch
+below may help
 
-What QEMU doesn't do and probably should fix is that we allow data
-into the FIFO even if UARTCR.UARTEN is 0 ("UART disabled"). This
-(I think) wouldn't affect the behaviour here, though, because the
-data will just get held in QEMU's input buffer until the guest
-driver sets UARTEN and then immediately fill the FIFO.
+Thanks,
+drew
 
-thanks
--- PMM
+
+diff --git a/arm/unittests.cfg b/arm/unittests.cfg
+index 44b98cfc7afde..7c0041e44d5f3 100644
+--- a/arm/unittests.cfg
++++ b/arm/unittests.cfg
+@@ -116,3 +116,10 @@ file = timer.flat
+ groups = timer
+ timeout = 2s
+ arch = arm64
++
++[timer-userspace-gic]
++file = timer.flat
++extra_params = -machine kernel_irqchip=off
++groups = timer
++timeout = 2s
++arch = arm64
