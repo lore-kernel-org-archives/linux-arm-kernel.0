@@ -1,53 +1,33 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 31 Jan 2018 15:27:02 +0000
-Subject: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
-In-Reply-To: <007dd1e3-70fd-69ad-fd02-4719e958b41c@roeck-us.net>
-References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517343778-27902-12-git-send-email-fabrizio.castro@bp.renesas.com>
- <20180130220504.GA16709@roeck-us.net>
- <TY1PR06MB0895ECB2936323F9D281C1EFC0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <CAMuHMdViQgCjVFbs0kkBObAAoFTzvz8yPFUHPWHrtYzkbnYm_g@mail.gmail.com>
- <007dd1e3-70fd-69ad-fd02-4719e958b41c@roeck-us.net>
-Message-ID: <TY1PR06MB0895EDD2AEE12D4CA53994C9C0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Jan 2018 16:31:13 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun4i: Enable HDMI support on the
+ MK802
+In-Reply-To: <20180130183254.20529-1-codekipper@gmail.com>
+References: <20180130183254.20529-1-codekipper@gmail.com>
+Message-ID: <20180131153113.usp5swikljnee7qy@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Guenter, Geert
+On Tue, Jan 30, 2018 at 07:32:54PM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> Enable the display pipeline and HDMI output.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-thank you for your feedback!
+Please put Chen-Yu in Cc of your patches.
 
-> >
-> > IIRC, the reason we don't have the restart callback on R-Car Gen3 is the
-> > arm64 maintainers insisting on using PSCI, and vetoing other means,
-> > to restart the system.
-> >
->
-> You could just give it lower priority than PSCI.
+Applied, thanks
+Maxime
 
-I am looking at the implementation of machine_restart() for both arm and arm64,
-and it looks like that if arm_pm_restart gets set, then arm_pm_restart has the
-highest priority of all. If arm_pm_restart is not set, then the kernel will go through
-the restart_handler_list, and the registered priority for the restart method will matter
-at that point.
-My understanding is that Gen3 does set arm_pm_restart due to
-drivers/firmware/psci.c, and therefore other restart handlers shouldn't matter too
-much, but I am not familiar with Gen3 at all.
-Shall I just set the restart priority to 128 and leave the callback in place for both Gen2
-and Gen3?
-
-Thanks,
-Fab
-
->
-> > Which leaves us with a few boards where we have to use the watchdog, and
-> > wait until the timeout triggers...
-> >
->
-> Which means the veto is counter-productive and thus meaningless.
->
-> Guenter
->
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/e4aa6a05/attachment.sig>
