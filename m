@@ -1,52 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 31 Jan 2018 00:13:19 -0200
-Subject: [PATCH v3 2/6] arm: Invalidate BTB on prefetch abort outside of
- user mapping on Cortex A8, A9, A12 and A17
-In-Reply-To: <20180125152139.32431-3-marc.zyngier@arm.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <20180125152139.32431-3-marc.zyngier@arm.com>
-Message-ID: <CAOMZO5BztwQy7AzQ75YRQYGK-=6+aCGTX8BH=kXBKcZCp5e6-g@mail.gmail.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Wed, 31 Jan 2018 10:25:45 +0800
+Subject: [PATCH v3 0/5] ARM64: dts: meson-axg: UART DT updates
+In-Reply-To: <CAOi56cW4ufsegpy7heK1+pCxvZ2gz5Lf3dkUgxkZCgMq5oBzSA@mail.gmail.com>
+References: <20180111023401.125658-1-yixun.lan@amlogic.com>
+ <7hr2q6c2r4.fsf@baylibre.com>
+ <CAOi56cW4ufsegpy7heK1+pCxvZ2gz5Lf3dkUgxkZCgMq5oBzSA@mail.gmail.com>
+Message-ID: <8990554d-e995-e432-8f50-3b247f71b0fd@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-On Thu, Jan 25, 2018 at 1:21 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -21,6 +21,7 @@
->  #include <linux/highmem.h>
->  #include <linux/perf_event.h>
->
-> +#include <asm/cp15.h>
->  #include <asm/exception.h>
->  #include <asm/pgtable.h>
->  #include <asm/system_misc.h>
-> @@ -181,6 +182,7 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
->         si.si_errno = 0;
->         si.si_code = code;
->         si.si_addr = (void __user *)addr;
-> +
+On 01/31/18 08:22, Kevin Hilman wrote:
+> On Tue, Jan 30, 2018 at 4:04 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Yixun Lan <yixun.lan@amlogic.com> writes:
+>>
+>>> HI Kevin
+>>>  These are the UART DT updates for the Meson-AXG platform.
+>>>
+>>>  The patch 1 is a general fix.
+>>> Other patches are about adding clock & pinctrl info, then using them.
+>>> Last patch enable UART_A which connect to a BT module on the S400 board.
+>>
+>> Applied to v4.16/dt64,
+> 
+> Oops, I meant v4.17.
+> 
 
-Unneeded blank line.
+Hi Kevin
+ I should warn you about the patch 3 [1], it actually depend on the gpio
+renaming patch [2]
 
->         force_sig_info(sig, &si, tsk);
->  }
->
-> @@ -396,12 +398,35 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->         __do_kernel_fault(mm, addr, fsr, regs);
->         return 0;
->  }
-> +
-> +static int
-> +do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-> +{
-> +       if (addr > TASK_SIZE) {
-> +               switch(read_cpuid_part()) {
+ I'm still waiting Linus to take patch [2], then update according
+(or you could help amend the patch? it's simply a
+'s/uart_ao_b_gpioz/uart_ao_b_z/g)
 
-checkpatch complains here:
+Yixun
 
-ERROR: space required before the open parenthesis '('
-#62: FILE: arch/arm/mm/fault.c:406:
-+        switch(read_cpuid_part()) {
+
+
+[1] [PATCH v3 3/5] ARM64: dts: meson-axg: uart: Add the pinctrl info
+description
+
+http://lists.infradead.org/pipermail/linux-amlogic/2018-January/006096.html
+
+
+[2] [PATCH] pinctrl: meson-axg: adjust uart_ao_b pin group naming
+http://lists.infradead.org/pipermail/linux-amlogic/2018-January/006201.html
