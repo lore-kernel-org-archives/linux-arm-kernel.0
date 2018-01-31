@@ -1,79 +1,46 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 31 Jan 2018 15:41:49 +0800
-Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard device
- tree parsing
-Message-ID: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+Date: Wed, 31 Jan 2018 15:42:41 +0800
+Subject: [PATCH v2 1/5] clk: mediatek: update missing clock data for MT7622
+ audsys
+In-Reply-To: <cover.1515639336.git.ryder.lee@mediatek.com>
+References: <cover.1515639336.git.ryder.lee@mediatek.com>
+Message-ID: <ec2dfe750291a996c54cc8aaeafafa333b992c4f.1515639336.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A root complex usually consist of a host bridge and multiple P2P bridges,
-and someone may express that in the form of a root node with many subnodes
-and list all four interrupts for each slot (child node) in the root node
-like this:
-
-	pcie-controller {
-		...
-		interrupt-map-mask = <0xf800 0 0 7>;
-		interrupt-map = <0x0000 0 0 {INTx} &{interrupt parent} ...>
-				 0x0800 0 0 {INTx} &{interrupt parent} ...>;
-
-		pcie at 0,0 {
-			reg = <0x0000 0 0 0 0>;
-			...
-		};
-
-		pcie at 1,0 {
-			reg = <0x0800 0 0 0 0>;
-			...
-		};
-	};
-
-As shown above, we'd like to propagate IRQs from a root port to the devices
-in the hierarchy below it in this way.  However, it seems that the current
-parser couldn't handle such cases and will get something unexpected below:
-
-	pcieport 0000:00:01.0: assign IRQ: got 213
-	igb 0000:01:00.0: assign IRQ: got 212
-
-There is a device which is connected to 2nd slot, but the port doesn't share
-the same IRQ with its downstream devices.  The problem here is that, if the
-loop found a P2P bridge, it wouldn't check whether the reg property exists
-in ppnode or not but just pass the subordinate devfn to of_irq_parse_raw(),
-thus the subsequent flow couldn't correctly resolve them.
-
-Fix this by adding a check to fallback to standard device tree parsing.
+Add missing clock data 'CLK_AUDIO_AFE_CONN' for MT7622 audsys.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
-Please refer to the previous discussion thread: https://patchwork.ozlabs.org/patch/829108/
----
- drivers/of/of_pci_irq.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ drivers/clk/mediatek/clk-mt7622-aud.c  | 1 +
+ include/dt-bindings/clock/mt7622-clk.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
-index 3a05568..e445866 100644
---- a/drivers/of/of_pci_irq.c
-+++ b/drivers/of/of_pci_irq.c
-@@ -86,8 +86,18 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
- 	out_irq->np = ppnode;
- 	out_irq->args_count = 1;
- 	out_irq->args[0] = pin;
--	laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
--	laddr[1] = laddr[2] = cpu_to_be32(0);
-+
-+	if (!dn && ppnode) {
-+		const __be32 *addr;
-+
-+		addr = of_get_property(ppnode, "reg", NULL);
-+		if (addr)
-+			memcpy(laddr, addr, 3);
-+	} else {
-+		laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
-+		laddr[1] = laddr[2] = cpu_to_be32(0);
-+	}
-+
- 	rc = of_irq_parse_raw(laddr, out_irq);
- 	if (rc)
- 		goto err;
+diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+index fad7d9f..13f752d 100644
+--- a/drivers/clk/mediatek/clk-mt7622-aud.c
++++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+@@ -106,6 +106,7 @@
+ 	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
+ 	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
+ 	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
++	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
+ 	/* AUDIO2 */
+ 	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
+ 	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
+diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
+index 3e514ed..e9d77f0 100644
+--- a/include/dt-bindings/clock/mt7622-clk.h
++++ b/include/dt-bindings/clock/mt7622-clk.h
+@@ -235,7 +235,8 @@
+ #define CLK_AUDIO_MEM_ASRC3		43
+ #define CLK_AUDIO_MEM_ASRC4		44
+ #define CLK_AUDIO_MEM_ASRC5		45
+-#define CLK_AUDIO_NR_CLK		46
++#define CLK_AUDIO_AFE_CONN		46
++#define CLK_AUDIO_NR_CLK		47
+ 
+ /* SSUSBSYS */
+ 
 -- 
 1.9.1
