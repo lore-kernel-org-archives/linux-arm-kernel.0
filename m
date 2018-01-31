@@ -1,136 +1,119 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 31 Jan 2018 18:38:24 +0100
-Subject: [PATCH v2 07/16] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <20180129174559.1866-8-marc.zyngier@arm.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-8-marc.zyngier@arm.com>
-Message-ID: <20180131173824.leyfy4vlqq3vmd37@kamzik.brq.redhat.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 31 Jan 2018 18:40:59 +0100
+Subject: [PATCH v2 01/16] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3 & A83T
+In-Reply-To: <20180128232919.12639-2-embed3d@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-2-embed3d@gmail.com>
+Message-ID: <20180131174058.f7gog7yahcu67sqr@qschulz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 05:45:50PM +0000, Marc Zyngier wrote:
-> Although we've implemented PSCI 1.0 and 1.1, nothing can select them
-> Since all the new PSCI versions are backward compatible, we decide to
-> default to the latest version of the PSCI implementation. This is no
-> different from doing a firmware upgrade on KVM.
+Hi Philipp,
+
+On Mon, Jan 29, 2018 at 12:29:04AM +0100, Philipp Rossak wrote:
+> Allwinner H3 features a thermal sensor like the one in A33, but has its
+> register re-arranged, the clock divider moved to CCU (originally the
+> clock divider is in ADC) and added a pair of bus clock and reset.
 > 
-> But in order to give a chance to hypothetical badly implemented guests
-> that would have a fit by discovering something other than PSCI 0.2,
-> let's provide a new API that allows userspace to pick one particular
-> version of the API.
+> Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
+> the bus clock and the reset was removed from the CCU. The THS in A83T
+> has a clock that is directly connected and runs with 24 MHz.
 > 
-> This is implemented as a new class of "firmware" registers, where
-> we expose the PSCI version. This allows the PSCI version to be
-> save/restored as part of a guest migration, and also set to
-> any supported version if the guest requires it.
+> Update the binding document to cover H3 and A83T.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
->  Documentation/virtual/kvm/api.txt      |  3 +-
->  Documentation/virtual/kvm/arm/psci.txt | 28 ++++++++++++++
->  arch/arm/include/asm/kvm_host.h        |  3 ++
->  arch/arm/include/uapi/asm/kvm.h        |  6 +++
->  arch/arm/kvm/guest.c                   | 13 +++++++
->  arch/arm64/include/asm/kvm_host.h      |  3 ++
->  arch/arm64/include/uapi/asm/kvm.h      |  6 +++
->  arch/arm64/kvm/guest.c                 | 14 ++++++-
->  include/kvm/arm_psci.h                 |  9 +++++
->  virt/kvm/arm/psci.c                    | 68 +++++++++++++++++++++++++++++++++-
->  10 files changed, 149 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/virtual/kvm/arm/psci.txt
+>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 50 ++++++++++++++++++++--
+>  1 file changed, 47 insertions(+), 3 deletions(-)
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 57d3ee9e4bde..334905202141 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2493,7 +2493,8 @@ Possible features:
->  	  and execute guest code when KVM_RUN is called.
->  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
->  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
-> -	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-> +	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 (or a future revision
-> +          backward compatible with v0.2) for the CPU.
->  	  Depends on KVM_CAP_ARM_PSCI_0_2.
->  	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
->  	  Depends on KVM_CAP_ARM_PMU_V3.
-> diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
-> new file mode 100644
-> index 000000000000..2e49a4e9f084
-> --- /dev/null
-> +++ b/Documentation/virtual/kvm/arm/psci.txt
-> @@ -0,0 +1,28 @@
-> +KVM implements the PSCI (Power State Coordination Interface)
-> +specification in order to provide services such as CPU on/off, reset
-> +and power-off to the guest.
-> +
-> +The PSCI specification is regularly updated to provide new features,
-> +and KVM implements these updates if they make sense from a virtualization
-> +point of view.
-> +
-> +This means that a guest booted on two different versions of KVM can
-> +observe two different "firmware" revisions. This could cause issues if
-> +a given guest is tied to a particular PSCI revision (unlikely), or if
-> +a migration causes a different PSCI version to be exposed out of the
-> +blue to an unsuspecting guest.
-> +
-> +In order to remedy this situation, KVM exposes a set of "firmware
-> +pseuodo-registers" that can be manipulated using the GET/SET_ONE_REG
-> +interface. These registers can be saved/restored by userspace, and set
-> +to a convenient value if required.
-
-Userspace can save/restore any state it deems necessary. Is there another
-reason to invent a pseudo register? Considering the PSCI version is VM
-state, then maybe a VM "device" attribute[*], like s390 use, would fit
-better. Or, if keeping it VCPU state has some benefit, then we already
-have VCPU device attribute support for ARM that we could extend with
-another attribute. An advantage of using the device-attr API is that it
-has KVM_HAS_DEVICE_ATTR, allowing the new attribute support to be probed.
-How should userspace check if the pseudo register is supported? Maybe
-by just failing with NOT_SUPPORTED to get/set it?
-
-[*] Documentation/virtual/kvm/devices/vm.txt
-
-> +
-> +The following register is defined:
-> +
-> +* KVM_REG_ARM_PSCI_VERSION:
-> +
-> +  - Only valid if the vcpu has KVM_ARM_VCPU_PSCI_0_2 feature set
-> +  - Returns the current PSCI version on GET_ONE_REG
-> +  - Allows any supported PSCI version compatible with v0.2 to be set
-> +    with SET_ONE_REG
-> +  - Affects the whole VM (even if the register view is per-vcpu)
-
-
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index acbf9ec7b396..e9d57060d88c 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -75,6 +75,9 @@ struct kvm_arch {
->  	/* Interrupt controller */
->  	struct vgic_dist	vgic;
->  	int max_vcpus;
-> +
-> +	/* Mandated version of PSCI */
-> +	u32 psci_version;
->  };
+> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> index 86dd8191b04c..22df0c5c23d4 100644
+> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> @@ -4,12 +4,35 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+>  and sometimes as a touchscreen controller.
 >  
->  #define KVM_NR_MEM_OBJS     40
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 6edd177bb1c7..47dfc99f5cd0 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -186,6 +186,12 @@ struct kvm_arch_memory_slot {
->  #define KVM_REG_ARM_VFP_FPINST		0x1009
->  #define KVM_REG_ARM_VFP_FPINST2		0x100A
+>  Required properties:
+> -  - compatible: "allwinner,sun8i-a33-ths",
+> +  - compatible: must contain one of the following compatibles:
+> +		- "allwinner,sun8i-a33-ths"
+> +		- "allwinner,sun8i-h3-ths"
+> +		- "allwinner,sun8i-a83t-ths"
+>    - reg: mmio address range of the chip,
+> -  - #thermal-sensor-cells: shall be 0,
+> +  - #thermal-sensor-cells: shall be 0 or 1,
+
+Well, thermal-sensor-cells is either 0 or 1 :)
+
+Better to point to the documentation describing this
+thermal-sensor-cells IMHO.
+
+>    - #io-channel-cells: shall be 0,
 >  
-> +/* KVM-as-firmware specific pseudo-registers */
-> +#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
+> -Example:
+> +Required properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +		- "allwinner,sun8i-a83t-ths"
+> +  - interrupts: the sampling interrupt of the ADC,
+> +
+> +Required properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +  - clocks: the bus clock and the input clock of the ADC,
+> +  - clock-names: should be "bus" and "mod",
+> +  - resets: the bus reset of the ADC,
+> +
+> +Optional properties for the following compatibles:
+> +		- "allwinner,sun8i-h3-ths"
+> +  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
+> +		If unspecified default values shall be used. The size should
+> +		be 0x2 * sensorcount.
 
-Is this 0x14 documented somewhere? I'm just curious how the space for
-pseudo registers is reserved. Is there a common place that we should
-document that 0x14 is for the firmware (if it's not documented there
-already)?
+"twice the number of sensors" ?
 
-Thanks,
-drew
+> +  - nvmem-cell-names: Should be "calibration".
+> +
+> +Details see: bindings/nvmem/nvmem.txt
+> +
+> +Example for A33:
+>  	ths: ths at 1c25000 {
+>  		compatible = "allwinner,sun8i-a33-ths";
+>  		reg = <0x01c25000 0x100>;
+> @@ -17,6 +40,27 @@ Example:
+>  		#io-channel-cells = <0>;
+>  	};
+>  
+> +Example for H3:
+> +	ths: thermal-sensor at 1c25000 {
+> +		compatible = "allwinner,sun8i-h3-ths";
+> +		reg = <0x01c25000 0x400>;
+> +		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
+> +		clock-names = "bus", "mod";
+> +		resets = <&ccu RST_BUS_THS>;
+> +		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+> +		#thermal-sensor-cells = <0>;
+> +		#io-channel-cells = <0>;
+> +	};
+> +
+> +Example for A83T:
+> +	ths: thermal-sensor at 1f04000 {
+> +		compatible = "allwinner,sun8i-a83t-ths";
+> +		reg = <0x01f04000 0x100>;
+> +		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+> +		#thermal-sensor-cells = <1>;
+> +		#io-channel-cells = <0>;
+> +	};
+> +
+
+Aside from Maxime's comment on how we would like to refactor GPADC/THS,
+I'm not sure we really want an example for each an every thermal sensor
+supported.
+
+Quentin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/f784ab6e/attachment.sig>
