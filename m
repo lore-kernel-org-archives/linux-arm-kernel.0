@@ -1,41 +1,35 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:35:07 +0100
-Subject: [PULL 28/28] KVM: arm/arm64: Fixup userspace irqchip static key
- optimization
+Date: Wed, 31 Jan 2018 10:35:04 +0100
+Subject: [PULL 25/28] KVM: arm/arm64: Fix trailing semicolon
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-29-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-26-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When I introduced a static key to avoid work in the critical path for
-userspace irqchips which is very rarely used, I accidentally messed up
-my logic and used && where I should have used ||, because the point was
-to short-circuit the evaluation in case userspace irqchips weren't even
-in use.
+From: Luis de Bethencourt <luisbg@kernel.org>
 
-This fixes an issue when running in-kernel irqchip VMs alongside
-userspace irqchip VMs.
+The trailing semicolon is an empty statement that does no operation.
+Removing it since it doesn't do anything.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Fixes: c44c232ee2d3 ("KVM: arm/arm64: Avoid work when userspace iqchips are not used")
+Signed-off-by: Luis de Bethencourt <luisbg@kernel.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 2 +-
+ arch/arm/include/asm/kvm_emulate.h | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 63cf828f3c4f..fb6bd9b9845e 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -286,7 +286,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
- 				   timer_ctx->irq.level);
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 3d22eb87f919..9003bd19cb70 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -131,7 +131,7 @@ static inline bool mode_has_spsr(struct kvm_vcpu *vcpu)
+ static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
+ {
+ 	unsigned long cpsr_mode = vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr & MODE_MASK;
+-	return cpsr_mode > USR_MODE;;
++	return cpsr_mode > USR_MODE;
+ }
  
--	if (!static_branch_unlikely(&userspace_irqchip_in_use) &&
-+	if (!static_branch_unlikely(&userspace_irqchip_in_use) ||
- 	    likely(irqchip_in_kernel(vcpu->kvm))) {
- 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 					  timer_ctx->irq.irq,
+ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
 -- 
 2.14.2
