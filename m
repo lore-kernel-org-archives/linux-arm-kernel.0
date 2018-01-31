@@ -1,167 +1,133 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 31 Jan 2018 18:20:12 +0000
-Subject: [PATCH v3 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
- driver
-In-Reply-To: <1516836074-4149-3-git-send-email-jollys@xilinx.com>
-References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
- <1516836074-4149-3-git-send-email-jollys@xilinx.com>
-Message-ID: <20180131182012.oshjmvahetaizlbu@lakrids.cambridge.arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 31 Jan 2018 18:24:05 +0000
+Subject: [RFC v4 01/26] ARM: shmobile: Add watchdog support
+In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517423070-24236-2-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 24, 2018 at 03:21:12PM -0800, Jolly Shah wrote:
-> This patch is adding communication layer with firmware.
-> Firmware driver provides an interface to firmware APIs.
-> Interface APIs can be used by any driver to communicate to
-> PMUFW(Platform Management Unit). All requests go through ATF.
+On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
+boot CPUs run a routine designed to bring up SMP and deal with hot plug.
+The value contained in the SBAR registers is not initialized by a WDT
+triggered reset, which means that after a WDT triggered reset we jump
+to the SMP bring up routine, preventing the system from executing the
+bootrom code.
 
-> +/**
-> + * zynqmp_pm_set_wakeup_source - PM call to specify the wakeup source
-> + *					while suspended
-> + * @target:	Node ID of the targeted PU or subsystem
-> + * @wakeup_node:Node ID of the wakeup peripheral
-> + * @enable:	Enable or disable the specified peripheral as wake source
-> + *
-> + * Return:	Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_set_wakeup_source(const u32 target,
-> +				       const u32 wakeup_node,
-> +				       const u32 enable)
-> +{
-> +	return invoke_pm_fn(PM_SET_WAKEUP_SOURCE, target,
-> +			    wakeup_node, enable, 0, NULL);
-> +}
+The purpose of this patch is to jump to the bootrom code in case of a
+WDT triggered reset, and keep the SMP functionality untouched.
+In order to tell if the code had been called due to the WDT overflowing
+we are testing WOVF from register RWTCSRA.
 
-I see many functions take a "Node ID" parameter, but these don't appear
-to be in any DT binding, and drivers (other than the debugfs driver)
-aren't using them.
+The new function shmobile_boot_vector_gen2 isn't replacing
+shmobile_boot_vector for backward compatibility reasons. The kernel
+will install the best option (either shmobile_boot_vector or
+shmobile_boot_vector_gen2) to ICRAM1 after parsing the device tree,
+according to the amount of memory available.
 
-What's the plan for making use of these? Where are the node IDs going to
-come from in practice?
+Since shmobile_boot_vector has become bigger, "reg" property of nodes
+compatible with "renesas,smp-sram" now need to be set to a value
+greater or equal to "<0 0x60>".
 
-> +/**
-> + * zynqmp_pm_system_shutdown - PM call to request a system shutdown or restart
-> + * @type:	Shutdown or restart? 0 for shutdown, 1 for restart
-> + * @subtype:	Specifies which system should be restarted or shut down
-> + *
-> + * Return:	Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_system_shutdown(const u32 type, const u32 subtype)
-> +{
-> +	return invoke_pm_fn(PM_SYSTEM_SHUTDOWN, type, subtype, 0, 0, NULL);
-> +}
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+---
+v3->4:
+* no change
 
-PSCI already has this functionality, so I'm a little confused by the
-duplication.
+ arch/arm/mach-shmobile/common.h  |  6 +++++
+ arch/arm/mach-shmobile/headsmp.S | 55 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
 
-[...]
-
-> +/**
-> + * zynqmp_pm_get_node_status - PM call to request a node's current power state
-> + * @node:		ID of the component or sub-system in question
-> + * @status:		Current operating state of the requested node
-> + * @requirements:	Current requirements asserted on the node,
-> + *			used for slave nodes only.
-> + * @usage:		Usage information, used for slave nodes only:
-> + *			0 - No master is currently using the node
-> + *			1 - Only requesting master is currently using the node
-> + *			2 - Only other masters are currently using the node
-> + *			3 - Both the current and at least one other master
-> + *			is currently using the node
-
-These should probably have corresponding macros or enum values.
-
-[...]
-
-> +/**
-> + * zynqmp_pm_sha_hash - Access the SHA engine to calculate the hash
-> + * @address:	Address of the data/ Address of output buffer where
-> + *		hash should be stored.
-> + * @size:	Size of the data.
-> + * @flags:
-> + *	BIT(0) - Sha3 init (Here address and size inputs can be NULL)
-> + *	BIT(1) - Sha3 update (address should holds the )
-
-Missing "data", I guess?
-
-> + *	BIT(2) - Sha3 final (address should hold the address of
-> + *		 buffer to store hash)
-
-Is the SHA engine coherent? Or is cache maintenance necessary?
-
-[...]
-
-> +/**
-> + * zynqmp_pm_pinctrl_request - Request Pin from firmware
-> + * @pin:	Pin number to request
-> + *
-
-No DT binding for the pinctrl bits?
-
-[...]
-
-> +/**
-> + * zynqmp_pm_clock_enable - Enable the clock for given id
-> + * @clock_id:	ID of the clock to be enabled
-> + *
-
-Likewise for the clocks?
-
-> +/**
-> + * get_eemi_ops	- Get eemi ops functions
-> + *
-> + * Return:	- pointer of eemi_ops structure
-> + */
-> +const struct zynqmp_eemi_ops *get_eemi_ops(void)
-> +{
-> +	return &eemi_ops;
-> +}
-> +EXPORT_SYMBOL_GPL(get_eemi_ops);
-> +
-> +static int __init zynqmp_plat_init(void)
-> +{
-> +	struct device_node *np;
-> +	int ret = 0;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp");
-> +	if (!np)
-> +		return 0;
-> +	of_node_put(np);
-> +
-> +	/* We're running on a ZynqMP machine, the PM node is mandatory. */
-> +	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp-firmware");
-> +	if (!np) {
-> +		pr_warn("%s: pm node not found\n", __func__);
-> +		return -ENXIO;
-> +	}
-> +
-> +	ret = get_set_conduit_method(np);
-> +	if (ret) {
-> +		of_node_put(np);
-> +		return ret;
-> +	}
-> +
-> +	/* Check PM API version number */
-> +	zynqmp_pm_get_api_version(&pm_api_version);
-> +	if (pm_api_version != ZYNQMP_PM_VERSION) {
-> +		panic("%s power management API version error. Expected: v%d.%d - Found: v%d.%d\n",
-> +		      __func__,
-> +		      ZYNQMP_PM_VERSION_MAJOR, ZYNQMP_PM_VERSION_MINOR,
-> +		      pm_api_version >> 16, pm_api_version & 0xffff);
-> +	}
-> +
-> +	pr_info("%s Power management API v%d.%d\n", __func__,
-> +		ZYNQMP_PM_VERSION_MAJOR, ZYNQMP_PM_VERSION_MINOR);
-> +
-> +	of_node_put(np);
-> +
-> +	return ret;
-> +}
-> +
-> +early_initcall(zynqmp_plat_init);
-
-Why does this need to be an early initcall? Can't we probe this as a
-platform device?
-
-Thanks,
-Mark.
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index a8fa4f7..d8c11f5 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -7,6 +7,12 @@ extern void shmobile_init_delay(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_size;
++#ifdef CONFIG_ARCH_RCAR_GEN2
++extern void shmobile_boot_vector_gen2(void);
++extern unsigned long shmobile_boot_fn_gen2;
++extern unsigned long shmobile_boot_cpu_gen2;
++extern unsigned long shmobile_boot_size_gen2;
++#endif /* CONFIG_ARCH_RCAR_GEN2 */
+ extern void shmobile_smp_boot(void);
+ extern void shmobile_smp_sleep(void);
+ extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 32e0bf6..cef8e8c 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -16,6 +16,11 @@
+ #include <asm/assembler.h>
+ #include <asm/memory.h>
+ 
++#define SCTLR_MMU	0x01
++#define BOOTROM_ADDRESS	0xE6340000
++#define RWTCSRA_ADDRESS 0xE6020004
++#define RWTCSRA_WOVF	0x10
++
+ /*
+  * Reset vector for secondary CPUs.
+  * This will be mapped at address 0 by SBAR register.
+@@ -37,6 +42,56 @@ shmobile_boot_fn:
+ shmobile_boot_size:
+ 	.long	. - shmobile_boot_vector
+ 
++#ifdef CONFIG_ARCH_RCAR_GEN2
++/*
++ * Reset vector for R-Car Gen2 and RZ/G1 secondary CPUs.
++ * This will be mapped at address 0 by SBAR register.
++ */
++ENTRY(shmobile_boot_vector_gen2)
++	mrc	p15, 0, r0, c0, c0, 5		@ r0 = MPIDR
++	ldr	r1, shmobile_boot_cpu_gen2
++	cmp	r0, r1
++	bne	shmobile_smp_continue_gen2
++
++	mrc	p15, 0, r1, c1, c0, 0		@ r1 = SCTLR
++	and	r0, r1, #SCTLR_MMU
++	cmp	r0, #SCTLR_MMU
++	beq	shmobile_smp_continue_gen2
++
++	ldr	r0, rwtcsra
++	mov	r1, #0
++	ldrb	r1, [r0]
++	and	r0, r1, #RWTCSRA_WOVF
++	cmp	r0, #RWTCSRA_WOVF
++	bne	shmobile_smp_continue_gen2
++
++	ldr	r0, bootrom
++	bx	r0
++
++shmobile_smp_continue_gen2:
++	ldr     r1, shmobile_boot_fn_gen2
++	bx	r1
++
++ENDPROC(shmobile_boot_vector_gen2)
++
++	.align	4
++rwtcsra:
++	.word	RWTCSRA_ADDRESS
++bootrom:
++	.word	BOOTROM_ADDRESS
++	.globl	shmobile_boot_cpu_gen2
++shmobile_boot_cpu_gen2:
++	.word	0x00000000
++
++	.align	2
++	.globl	shmobile_boot_fn_gen2
++shmobile_boot_fn_gen2:
++	.space	4
++	.globl	shmobile_boot_size_gen2
++shmobile_boot_size_gen2:
++	.long	. - shmobile_boot_vector_gen2
++#endif /* CONFIG_ARCH_RCAR_GEN2 */
++
+ /*
+  * Per-CPU SMP boot function/argument selection code based on MPIDR
+  */
+-- 
+2.7.4
