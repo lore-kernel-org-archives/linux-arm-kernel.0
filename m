@@ -1,83 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 31 Jan 2018 07:50:59 -0600
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
- <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
-Message-ID: <CAL_JsqKFW0USD_TgGCO-s4wMBw9O2psToMObjeSEwCNReq-3=w@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 31 Jan 2018 21:56:10 +0800
+Subject: [PATCH v2 16/16] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
+ hardening support
+In-Reply-To: <20180129174559.1866-17-marc.zyngier@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-17-marc.zyngier@arm.com>
+Message-ID: <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 1:52 AM, Tomasz Figa <tfiga@chromium.org> wrote:
-> Hi Rob,
->
-> On Wed, Jan 31, 2018 at 2:05 AM, Rob Herring <robh@kernel.org> wrote:
->> On Wed, Jan 24, 2018 at 06:35:11PM +0800, Jeffy Chen wrote:
->>> From: Tomasz Figa <tfiga@chromium.org>
->>>
->>> Current code relies on master driver enabling necessary clocks before
->>> IOMMU is accessed, however there are cases when the IOMMU should be
->>> accessed while the master is not running yet, for example allocating
->>> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
->>> mapping API and doesn't engage the master driver at all.
->>>
->>> This patch fixes the problem by letting clocks needed for IOMMU
->>> operation to be listed in Device Tree and making the driver enable them
->>> for the time of accessing the hardware.
->>>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
->>> ---
->>>
->>> Changes in v5:
->>> Use clk_bulk APIs.
->>>
->>> Changes in v4: None
->>> Changes in v3: None
->>> Changes in v2: None
->>>
->>>  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  8 +++
->>
->> Please split binding patches to a separate patch.
->>
->>>  drivers/iommu/rockchip-iommu.c                     | 74 ++++++++++++++++++++--
->>>  2 files changed, 76 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
->>> index 2098f7732264..33dd853359fa 100644
->>> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
->>> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
->>> @@ -14,6 +14,13 @@ Required properties:
->>>                      "single-master" device, and needs no additional information
->>>                      to associate with its master device.  See:
->>>                      Documentation/devicetree/bindings/iommu/iommu.txt
->>> +Optional properties:
->>> +- clocks : A list of master clocks requires for the IOMMU to be accessible
->>> +           by the host CPU. The number of clocks depends on the master
->>> +           block and might as well be zero. See [1] for generic clock
->>> +           bindings description.
->>
->> Hardware blocks don't have a variable number of clock connections.
->
-> I think you underestimate the imagination of hardware designers. :)
+Hi Marc,
 
-Learned long ago to never do that. If there are 2 ways to do
-something, they will find a 3rd way.
+On 2018/1/30 1:45, Marc Zyngier wrote:
+>  static int enable_psci_bp_hardening(void *data)
+>  {
+>  	const struct arm64_cpu_capabilities *entry = data;
+>  
+> -	if (psci_ops.get_version)
+> +	if (psci_ops.get_version) {
+> +		if (check_smccc_arch_workaround_1(entry))
+> +			return 0;
 
-> For Rockchip IOMMU, there is a set of clocks, which all need to be
-> enabled for IOMMU register access to succeed. The clocks are not
-> directly fed to the IOMMU, but they are needed for the various buses
-> and intermediate blocks on the way to the IOMMU to work.
+If I'm using the new version SMCCC, the firmware have the choice to decide
+whether this machine needs the workaround, even if the CPU is vulnerable
+for CVE-2017-5715, but..
 
-The binding should describe the clock connections, not what clocks a
-driver needs (currently). It sounds like a lack of managing bus clocks
-to me.
+> +
+>  		install_bp_hardening_cb(entry,
+>  				       (bp_hardening_cb_t)psci_ops.get_version,
+>  				       __psci_hyp_bp_inval_start,
+>  				       __psci_hyp_bp_inval_end);
 
-In any case, the binding must be written so it can be verified. If you
-can have any number of clocks with any names, there's no point in
-documenting.
+..the code above seems will enable get_psci_version() for CPU and will
+trap to trust firmware even the new version of firmware didn't say
+we need the workaround, did I understand it correctly?
 
-Rob
+I'm ask this because some platform will not expose to users to
+take advantage of CVE-2017-5715, and we can use different firmware
+to report we need such workaround or not, then use a single kernel
+image for both vulnerable platforms and no vulnerable ones.
+
+Thanks
+Hanjun
