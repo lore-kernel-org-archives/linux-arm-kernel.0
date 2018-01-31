@@ -1,72 +1,52 @@
-From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Wed, 31 Jan 2018 02:00:40 +0000
-Subject: [PATCH v3 5/5] ARM: dts: imx7s: add CAAM device node
-In-Reply-To: <1517364040-27607-1-git-send-email-pure.logic@nexus-software.ie>
-References: <1517364040-27607-1-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <1517364040-27607-6-git-send-email-pure.logic@nexus-software.ie>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 31 Jan 2018 00:13:19 -0200
+Subject: [PATCH v3 2/6] arm: Invalidate BTB on prefetch abort outside of
+ user mapping on Cortex A8, A9, A12 and A17
+In-Reply-To: <20180125152139.32431-3-marc.zyngier@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-3-marc.zyngier@arm.com>
+Message-ID: <CAOMZO5BztwQy7AzQ75YRQYGK-=6+aCGTX8BH=kXBKcZCp5e6-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rui Miguel Silva <rui.silva@linaro.org>
+Hi Marc,
 
-Add CAAM device node to the i.MX7s device tree.
+On Thu, Jan 25, 2018 at 1:21 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Signed-off-by: Rui Miguel Silva <rui.silva@linaro.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: "Horia Geant?" <horia.geanta@nxp.com>
-Cc: Aymen Sghaier <aymen.sghaier@nxp.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Peng Fan <peng.fan@nxp.com>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Lukas Auer <lukas.auer@aisec.fraunhofer.de>
-Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
----
- arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/highmem.h>
+>  #include <linux/perf_event.h>
+>
+> +#include <asm/cp15.h>
+>  #include <asm/exception.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/system_misc.h>
+> @@ -181,6 +182,7 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>         si.si_errno = 0;
+>         si.si_code = code;
+>         si.si_addr = (void __user *)addr;
+> +
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 82ad26e..e38c159 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -805,6 +805,37 @@
- 				status = "disabled";
- 			};
- 
-+			crypto: caam at 30900000 {
-+				compatible = "fsl,sec-v4.0";
-+				fsl,sec-era = <4>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x30900000 0x40000>;
-+				ranges = <0 0x30900000 0x40000>;
-+				interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CAAM_CLK>,
-+					 <&clks IMX7D_AHB_CHANNEL_ROOT_CLK>;
-+				clock-names = "ipg", "aclk";
-+
-+				sec_jr0: jr0 at 1000 {
-+					compatible = "fsl,sec-v4.0-job-ring";
-+					reg = <0x1000 0x1000>;
-+					interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+
-+				sec_jr1: jr1 at 2000 {
-+					compatible = "fsl,sec-v4.0-job-ring";
-+					reg = <0x2000 0x1000>;
-+					interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+
-+				sec_jr2: jr1 at 3000 {
-+					compatible = "fsl,sec-v4.0-job-ring";
-+					reg = <0x3000 0x1000>;
-+					interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+
- 			flexcan1: can at 30a00000 {
- 				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
- 				reg = <0x30a00000 0x10000>;
--- 
-2.7.4
+Unneeded blank line.
+
+>         force_sig_info(sig, &si, tsk);
+>  }
+>
+> @@ -396,12 +398,35 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+>         __do_kernel_fault(mm, addr, fsr, regs);
+>         return 0;
+>  }
+> +
+> +static int
+> +do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+> +{
+> +       if (addr > TASK_SIZE) {
+> +               switch(read_cpuid_part()) {
+
+checkpatch complains here:
+
+ERROR: space required before the open parenthesis '('
+#62: FILE: arch/arm/mm/fault.c:406:
++        switch(read_cpuid_part()) {
