@@ -1,31 +1,34 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 31 Jan 2018 20:45:56 +0800
-Subject: [PATCH v3 0/6] 32bit ARM branch predictor hardening
-In-Reply-To: <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
-References: <20180125152139.32431-1-marc.zyngier@arm.com>
- <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
- <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
-Message-ID: <e34add95-a672-b76c-1746-e2d9d152624c@huawei.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 31 Jan 2018 13:12:15 +0000
+Subject: Handling of chars received while a UART is not open
+In-Reply-To: <20180131120628.GL5862@e103592.cambridge.arm.com>
+References: <20180131120628.GL5862@e103592.cambridge.arm.com>
+Message-ID: <CAFEAcA8D2RLSbHO-OdULHre4oVr=vU+Yb+6sp55XiP6Mrtg1xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/1/29 22:58, Nishanth Menon wrote:
-> On Mon, Jan 29, 2018 at 5:36 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
-> [...]
-> 
->> By the way, this patch set just enable branch predictor hardening
->> on arm32 unconditionally, but some of machines (such as wireless
->> network base station) will not be exposed to user to take advantage
->> of variant 2, and those machines will be pretty sensitive for
->> performance, so can we introduce Kconfig or boot option to disable
->> branch predictor hardening as an option?
-> 
-> I am curious: Have you seen performance degradation with this series?
-> If yes, is it possible to share the information?
+On 31 January 2018 at 12:06, Dave Martin <Dave.Martin@arm.com> wrote:
+> Now, Qemu has a facility for stuffing some input to an emulated UART
+> immediately on boot, and wouldn't work in case (2) above.  OTOH, that
+> may be a mistaken approach: it's unlikely to work reliably on hardware
+> due to the problem of knowing when a physical UART is actually ready to
+> receive input.  So maybe Qemu should be waiting for a prompt to be
+> transmitted before stuffing input.  In case (1) or (3), qemu probably
+> needs to do something like that.
 
-Sorry for the late reply, the performance data for context switch (CFS)
-is about 6%~12% drop (A9 based machine) for the first around test, but
-the data is not stable, I need to retest then I will update here.
+FWIW, there isn't a QEMU "facility" for doing this particularly:
+we just don't take any trouble to stop the user from providing
+input whenever the user likes. (If the user is an automatic test
+script then it's that script's job to wait for suitable prompts
+from the guest before feeding input into the emulated serial port
+if it wants to be reliable, the same way you'd have to if you
+were feeding the data to a real serial line.)
 
-Thanks
-Hanjun
+What QEMU doesn't do and probably should fix is that we allow data
+into the FIFO even if UARTCR.UARTEN is 0 ("UART disabled"). This
+(I think) wouldn't affect the behaviour here, though, because the
+data will just get held in QEMU's input buffer until the guest
+driver sets UARTEN and then immediately fill the FIFO.
+
+thanks
+-- PMM
