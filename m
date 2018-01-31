@@ -1,75 +1,81 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 31 Jan 2018 16:52:44 +0900
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
-Message-ID: <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 31 Jan 2018 15:42:44 +0800
+Subject: [PATCH v2 4/5] dt-bindings: clock: mediatek: update audsys
+ documentation to adapt MFD device
+In-Reply-To: <cover.1515639336.git.ryder.lee@mediatek.com>
+References: <cover.1515639336.git.ryder.lee@mediatek.com>
+Message-ID: <8651585c91ee40f6ab3e30b893bcfb90fe5c2c25.1515639336.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+As the MediaTek audio hardware block that expose functionalities that are
+handled by separate subsystems in the kernel, and there are registers that
+are shared between related drivers.
 
-On Wed, Jan 31, 2018 at 2:05 AM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Jan 24, 2018 at 06:35:11PM +0800, Jeffy Chen wrote:
->> From: Tomasz Figa <tfiga@chromium.org>
->>
->> Current code relies on master driver enabling necessary clocks before
->> IOMMU is accessed, however there are cases when the IOMMU should be
->> accessed while the master is not running yet, for example allocating
->> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
->> mapping API and doesn't engage the master driver at all.
->>
->> This patch fixes the problem by letting clocks needed for IOMMU
->> operation to be listed in Device Tree and making the driver enable them
->> for the time of accessing the hardware.
->>
->> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
->> ---
->>
->> Changes in v5:
->> Use clk_bulk APIs.
->>
->> Changes in v4: None
->> Changes in v3: None
->> Changes in v2: None
->>
->>  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  8 +++
->
-> Please split binding patches to a separate patch.
->
->>  drivers/iommu/rockchip-iommu.c                     | 74 ++++++++++++++++++++--
->>  2 files changed, 76 insertions(+), 6 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
->> index 2098f7732264..33dd853359fa 100644
->> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
->> @@ -14,6 +14,13 @@ Required properties:
->>                      "single-master" device, and needs no additional information
->>                      to associate with its master device.  See:
->>                      Documentation/devicetree/bindings/iommu/iommu.txt
->> +Optional properties:
->> +- clocks : A list of master clocks requires for the IOMMU to be accessible
->> +           by the host CPU. The number of clocks depends on the master
->> +           block and might as well be zero. See [1] for generic clock
->> +           bindings description.
->
-> Hardware blocks don't have a variable number of clock connections.
+Switch the current device to an MFD device, add more descriptions about the
+subsystem and modify example accordingly.
 
-I think you underestimate the imagination of hardware designers. :)
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ .../bindings/arm/mediatek/mediatek,audsys.txt      | 37 ++++++++++++++++++----
+ 1 file changed, 30 insertions(+), 7 deletions(-)
 
-For Rockchip IOMMU, there is a set of clocks, which all need to be
-enabled for IOMMU register access to succeed. The clocks are not
-directly fed to the IOMMU, but they are needed for the various buses
-and intermediate blocks on the way to the IOMMU to work.
-
-And the set varies based on next to which master block the IOMMU block
-is located, because the hierarchy of buses and intermediate blocks is
-different.
-
-Best regards,
-Tomasz
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+index 9b8f578..677af40 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+@@ -1,22 +1,45 @@
+-MediaTek AUDSYS controller
++MediaTek Audio Subsystem
+ ============================
++The audio subsystem is one of the multi-function blocks of MediaTek SoCs.
++It contains a system controller, which provides a number registers giving
++access to two features: AUDSYS clocks and Audio Front End (AFE) components.
+ 
++For the top level node:
++- compatible: must be: "syscon", "simple-mfd";
++- reg: register area of the Audio Subsystem
++
++Required sub-nodes:
++
++AUDSYS clocks:
++-------
+ The MediaTek AUDSYS controller provides various clocks to the system.
+ 
+ Required Properties:
+ 
+ - compatible: Should be one of:
+-	- "mediatek,mt7622-audsys", "syscon"
++	- "mediatek,mt2701-audsys";
++	- "mediatek,mt7622-audsys";
+ - #clock-cells: Must be 1
+ 
+ The AUDSYS controller uses the common clk binding from
+ Documentation/devicetree/bindings/clock/clock-bindings.txt
+ The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+ 
++AFE components:
++-------
++For common binding part and usage, refer to
++../sonud/mt2701-afe-pcm.txt.
++
+ Example:
+ 
+-audsys: audsys at 11220000 {
+-	compatible = "mediatek,mt7622-audsys", "syscon";
+-	reg = <0 0x11220000 0 0x1000>;
+-	#clock-cells = <1>;
+-};
++	audio-subsystem at 11220000 {
++		compatible = "syscon", "simple-mfd";
++		reg = <0 0x11220000 0 0x2000>;
++
++		audsys: clock {
++			compatible = "mediatek,mt2701-audsys";
++			#clock-cells = <1>;
++		};
++
++		...
++	};
+-- 
+1.9.1
