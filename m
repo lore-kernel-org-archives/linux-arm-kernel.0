@@ -1,38 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 12:00:14 +0100
-Subject: [PULL 01/28] arm64: KVM: Hide PMU from guests when disabled
-In-Reply-To: <20180131105431.fsvyaeffujzwh2lu@kamzik.brq.redhat.com>
-References: <20180131093507.22219-1-christoffer.dall@linaro.org>
- <20180131093507.22219-2-christoffer.dall@linaro.org>
- <20180131105431.fsvyaeffujzwh2lu@kamzik.brq.redhat.com>
-Message-ID: <CAMJs5B_C6m7bx13j7fJnGERTsTnpu3wEda9gsJy5_2_fzY4YeQ@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 31 Jan 2018 19:15:12 +0800
+Subject: [PATCH] arch/arm/Kconfig: enable ARM_MODULE_PLTS when LOCKDEP=y
+In-Reply-To: <20180129234900.11121-1-anders.roxell@linaro.org>
+References: <20180129234900.11121-1-anders.roxell@linaro.org>
+Message-ID: <201801311838.6wYPcwCD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Drew,
+Hi Anders,
 
-On Wed, Jan 31, 2018 at 11:54 AM, Andrew Jones <drjones@redhat.com> wrote:
-> On Wed, Jan 31, 2018 at 10:34:40AM +0100, Christoffer Dall wrote:
->> From: Andrew Jones <drjones@redhat.com>
->>
->> Since commit 93390c0a1b20 ("arm64: KVM: Hide unsupported AArch64 CPU
->> features from guests") we can hide cpu features from guests. Apply
->> this to a long standing issue where guests see a PMU available, but
->> it's not, because it was not enabled by KVM's userspace.
->>
->> Signed-off-by: Andrew Jones <drjones@redhat.com>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> ---
->>  arch/arm64/kvm/sys_regs.c | 35 +++++++++++++++++++++--------------
->>  1 file changed, 21 insertions(+), 14 deletions(-)
->>
->
-> I think this patch got into the PULL by mistake, because you pointed out
-> to me a while back that it broke migration.
->
+Thank you for the patch! Perhaps something to improve:
 
-Patch 12 reverts the patch - I didn't feel like rebasing next with all
-the other things that are going on for this merge window.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.15 next-20180126]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks,
--Christoffer
+url:    https://github.com/0day-ci/linux/commits/Anders-Roxell/arch-arm-Kconfig-enable-ARM_MODULE_PLTS-when-LOCKDEP-y/20180131-115917
+config: arm-moxart_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All warnings (new ones prefixed by >>):
+
+warning: (ARM) selects ARM_MODULE_PLTS which has unmet direct dependencies (MODULES)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 12748 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/e8de4963/attachment-0001.gz>
