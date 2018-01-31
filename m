@@ -1,129 +1,183 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 31 Jan 2018 12:10:47 +0000
-Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
-In-Reply-To: <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
- <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
- <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838641882@FRAEML521-MBX.china.huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Jan 2018 12:11:57 +0000
+Subject: [PATCH v3 3/6] arm: KVM: Invalidate BTB on guest exit for
+ Cortex-A12/A17
+In-Reply-To: <361ff814-cf1e-ad1f-329a-0fe416c2b6f7@arm.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <20180125152139.32431-4-marc.zyngier@arm.com>
+ <361ff814-cf1e-ad1f-329a-0fe416c2b6f7@arm.com>
+Message-ID: <044733c7-ac45-adc1-acfb-fbae32ba09b3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi Robin,
 
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Tuesday, January 30, 2018 6:00 PM
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> Cc: Neil Leeder <nleeder@codeaurora.org>; Mark Langsdorf
-> <mlangsdo@redhat.com>; Jon Masters <jcm@redhat.com>; Timur Tabi
-> <timur@codeaurora.org>; linux-kernel at vger.kernel.org; Mark Brown
-> <broonie@kernel.org>; Mark Salter <msalter@redhat.com>; linux-arm-
-> kernel at lists.infradead.org; Will Deacon <will.deacon@arm.com>; Mark
-> Rutland <mark.rutland@arm.com>; Linuxarm <linuxarm@huawei.com>
-> Subject: Re: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+On 26/01/18 17:12, Robin Murphy wrote:
+> On 25/01/18 15:21, Marc Zyngier wrote:
+>> In order to avoid aliasing attacks against the branch predictor,
+>> let's invalidate the BTB on guest exit. This is made complicated
+>> by the fact that we cannot take a branch before invalidating the
+>> BTB.
+>>
+>> We only apply this to A12 and A17, which are the only two ARM
+>> cores on which this useful.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   arch/arm/include/asm/kvm_asm.h |  2 --
+>>   arch/arm/include/asm/kvm_mmu.h | 13 ++++++++-
+>>   arch/arm/kvm/hyp/hyp-entry.S   | 62 ++++++++++++++++++++++++++++++++++++++++--
+>>   3 files changed, 72 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+>> index 36dd2962a42d..df24ed48977d 100644
+>> --- a/arch/arm/include/asm/kvm_asm.h
+>> +++ b/arch/arm/include/asm/kvm_asm.h
+>> @@ -61,8 +61,6 @@ struct kvm_vcpu;
+>>   extern char __kvm_hyp_init[];
+>>   extern char __kvm_hyp_init_end[];
+>>   
+>> -extern char __kvm_hyp_vector[];
+>> -
+>>   extern void __kvm_flush_vm_context(void);
+>>   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>>   extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index eb46fc81a440..b47db5b9e407 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -37,6 +37,7 @@
+>>   
+>>   #include <linux/highmem.h>
+>>   #include <asm/cacheflush.h>
+>> +#include <asm/cputype.h>
+>>   #include <asm/pgalloc.h>
+>>   #include <asm/stage2_pgtable.h>
+>>   
+>> @@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>>   
+>>   static inline void *kvm_get_hyp_vector(void)
+>>   {
+>> -	return kvm_ksym_ref(__kvm_hyp_vector);
+>> +	extern char __kvm_hyp_vector[];
+>> +	extern char __kvm_hyp_vector_bp_inv[];
+>> +
+>> +	switch(read_cpuid_part()) {
+>> +	case ARM_CPU_PART_CORTEX_A12:
+>> +	case ARM_CPU_PART_CORTEX_A17:
+>> +		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+>> +
+>> +	default:
+>> +		return kvm_ksym_ref(__kvm_hyp_vector);
+>> +	}
+>>   }
+>>   
+>>   static inline int kvm_map_vectors(void)
+>> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+>> index 95a2faefc070..aab6b0c06a19 100644
+>> --- a/arch/arm/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+>> @@ -70,6 +70,57 @@ __kvm_hyp_vector:
+>>   	W(b)	hyp_hvc
+>>   	W(b)	hyp_irq
+>>   	W(b)	hyp_fiq
+>> +	
+>> +	.align 5
+>> +__kvm_hyp_vector_bp_inv:
+>> +	.global __kvm_hyp_vector_bp_inv
+>> +
+>> +	/*
+>> +	 * We encode the exception entry in the bottom 3 bits of
+>> +	 * SP, and we have to guarantee to be 8 bytes aligned.
+>> +	 */
+>> +	W(add)	sp, sp, #1	/* Reset 	  7 */
+>> +	W(add)	sp, sp, #1	/* Undef	  6 */
+>> +	W(add)	sp, sp, #1	/* Syscall	  5 */
+>> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
+>> +	W(add)	sp, sp, #1	/* Data abort	  3 */
+>> +	W(add)	sp, sp, #1	/* HVC		  2 */
+>> +	W(add)	sp, sp, #1	/* IRQ		  1 */
+>> +	W(nop)			/* FIQ		  0 */
+>> +
+>> +	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+>> +	isb
+>> +
 > 
-> On Tue, Jan 30, 2018 at 10:39:20AM +0000, Shameerali Kolothum Thodi wrote:
-> > Hi Neil/Lorenzo,
-> >
-> > > -----Original Message-----
-> > > From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org]
-> > > On Behalf Of Neil Leeder
-> > > Sent: Friday, August 04, 2017 8:59 PM
-> > > To: Will Deacon <will.deacon@arm.com>; Mark Rutland
-> > > <mark.rutland@arm.com>
-> > > Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
-> > > <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
-> > > kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
-> > > <msalter@redhat.com>; nleeder at codeaurora.org; linux-arm-
-> > > kernel at lists.infradead.org
-> > > Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
-> > >
-> > > Add support for the SMMU Performance Monitor Counter Group
-> > > information from ACPI. This is in preparation for its use
-> > > in the SMMU v3 PMU driver.
-> >
-> > [...]
-> >
-> > >  static __init
-> > >  const struct iort_iommu_config *iort_get_iommu_cfg(struct
-> acpi_iort_node
-> > > *node)
-> > >  {
-> > > @@ -1001,6 +1041,8 @@ const struct iort_iommu_config
-> > > *iort_get_iommu_cfg(struct acpi_iort_node *node)
-> > >  		return &iort_arm_smmu_v3_cfg;
-> > >  	case ACPI_IORT_NODE_SMMU:
-> > >  		return &iort_arm_smmu_cfg;
-> > > +	case ACPI_IORT_NODE_PMCG:
-> > > +		return &iort_arm_smmu_pmcg_cfg;
-> >
-> > I understand this series will be revised based on the iort spec update.
-> >
-> > This Is to clarify few queries we have with respect to one of our hisilicon
-> > platform which has support for SMMU v3 PMCG. In our implementation
-> > the base address for the PMCG is defined at a IMP DEF address offset
-> > within the SMMUv3 page 0 address space. And as per SMMU spec,
-> >
-> > " The Performance Monitor Counter Groups are standalone monitoring
-> > facilities  and, as such, can be implemented in separate components that
-> > are all associated with (but not necessarily part of) an SMMU"
-> >
-> > It looks like PMCG can be part of SMMU,  it is not clear whether this kind
-> > of address mapping is forbidden or not. If this is an accepted  scenario, then
-> > the devm_ioremap_resource() call in SMMv3 probe will fail as it reports
-> conflict.
-> >
-> > As far as I can see, the above code just checks the iort node type is PMCG
-> > and assumes that its SMMU PMCG. As per IORT spec, it make sense to check
-> > the node reference filed and make that call.
-> >
-> > And to fix the resource conflict issue we have, is it possible to treat the PMCG
-> > node as the child of the SMMU and call the platform_device_add()
-> appropriately
-> > to avoid the conflict? I am not sure this will fix the issue and also about the
-> order
-> > in which SMMU and PMCG devices will be populated will have an impact on
-> this.
-> >
-> > Please let me know your thoughts on this.
+> The below is quite a bit of faff; might it be worth an
 > 
-> I went back and re-read the patches, I think the point here is that the
-> perf driver (ie PATCH 2 that, by the way, is not maiinline) uses
-> devm_ioremap_resource() to map the counters and that's what is causing
-> failures when PMCG is part of SMMUv3 registers.
-
-Thanks for going through this.  No, this is not where we are seeing the failure.
-May be I was not clear in my earlier mail. The failure happens in SMMUv3
-driver probe function when it calls devm_ioremap_resource().
-
-> It is the resources hierarchy that is wrong and in turn, I do not think
-> devm_request_mem_region() is the right way of requesting it for the
-> PMCG driver.
+> #ifdef CONFIG_THUMB2_KERNEL
 > 
-> I need to look into this but I suspect that's something that should
-> be handled in the PMCG driver, that has to request the memory region
-> _differently_ (ie ioremap copes with this overlap - it is the
-> devm_request_mem_region() in devm_ioremap_resource() that fails, correct
-> ?).
+>> +	/*
+>> +	 * Yet another silly hack: Use VPIDR as a temp register.
+>> +	 * Thumb2 is really a pain, as SP cannot be used with most
+>> +	 * of the bitwise instructions. The vect_br macro ensures
+>> +	 * things gets cleaned-up.
+>> +	 */
+>> +	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
+>> +	mov	r0, sp
+>> +	and	r0, r0, #7
+>> +	sub	sp, sp, r0
+>> +	push	{r1, r2}
+>> +	mov	r1, r0
+>> +	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+>> +	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+>> +	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+> 
+> #endif
+> 
+>> +
+>> +.macro vect_br val, targ
+> 
+> ARM(cmp		sp, #val)
 
-It looks like, in IORT code,
+Doesn't quite work, as we still have all the top bits that contain the 
+stack address. But I like the idea of making it baster for non-T2. How
+about this instead?
 
-iort_add_platform_device()--> platform_device_add()-->insert_resource(), inserts
-both SMMUv3 and PMCG resources into the resource tree and then when the probe
-of SMMUv3 is called, it detects the conflict.
-
-[   85.548749] arm-smmu-v3 arm-smmu-v3.0.auto: can't request region for resource [mem 0x148000000-0x14801ffff]                      
-
-Of course, changing devm_ioremap_resource() to devm_ioremap() in SMMv3
-driver probe solves the issue for us, but not sure that's the right approach or not.
-
-Thanks,
-Shameer
-
-> Certainly we need to create in IORT the resources with the correct
-> hierarchy (I reckon DT does it already if the right device hierarchy is
-> specified).
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 2377ed86e20b..23c954a9e441 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -114,6 +114,8 @@ __kvm_hyp_vector_bp_inv:
+ 	isb
  
+ decode_vectors:
++
++#ifdef CONFIG_THUMB2_KERNEL
+ 	/*
+ 	 * Yet another silly hack: Use VPIDR as a temp register.
+ 	 * Thumb2 is really a pain, as SP cannot be used with most
+@@ -129,10 +131,16 @@ decode_vectors:
+ 	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+ 	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+ 	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
++#endif
+ 
+ .macro vect_br val, targ
+-	cmp	r1, #\val
+-	popeq	{r1, r2}
++ARM(	eor	sp, sp, #\val	)
++ARM(	tst	sp, #7		)
++ARM(	eorne	sp, sp, #\val	)
++
++THUMB(	cmp	r1, #\val	)
++THUMB(	popeq	{r1, r2}	)
++
+ 	beq	\targ
+ .endm
+ 
+
+
+> THUMB(cmp	r1, #\val)
+> THUMB(popeq	{r1, r2}
+> 
+>> +	beq	\targ
+>> +.endm
+> 
+> ...to keep the "normal" path relatively streamlined?
+
+I think the above achieves it... Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
