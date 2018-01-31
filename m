@@ -1,35 +1,128 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:35:04 +0100
-Subject: [PULL 25/28] KVM: arm/arm64: Fix trailing semicolon
+Date: Wed, 31 Jan 2018 10:35:00 +0100
+Subject: [PULL 21/28] KVM: arm/arm64: Drop vcpu parameter from guest cache
+ maintenance operartions
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-26-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-22-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Luis de Bethencourt <luisbg@kernel.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-The trailing semicolon is an empty statement that does no operation.
-Removing it since it doesn't do anything.
+The vcpu parameter isn't used for anything, and gets in the way of
+further cleanups. Let's get rid of it.
 
-Signed-off-by: Luis de Bethencourt <luisbg@kernel.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_emulate.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_mmu.h   |  7 ++-----
+ arch/arm64/include/asm/kvm_mmu.h |  7 ++-----
+ virt/kvm/arm/mmu.c               | 18 ++++++++----------
+ 3 files changed, 12 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 3d22eb87f919..9003bd19cb70 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -131,7 +131,7 @@ static inline bool mode_has_spsr(struct kvm_vcpu *vcpu)
- static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
- {
- 	unsigned long cpsr_mode = vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr & MODE_MASK;
--	return cpsr_mode > USR_MODE;;
-+	return cpsr_mode > USR_MODE;
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index aab64fe52146..bc70a1f0f42d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -150,9 +150,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
  }
  
- static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+-static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
+-					     kvm_pfn_t pfn,
+-					     unsigned long size)
++static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+ 	/*
+ 	 * Clean the dcache to the Point of Coherency.
+@@ -177,8 +175,7 @@ static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
+ 	}
+ }
+ 
+-static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+-						  kvm_pfn_t pfn,
++static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
+ 						  unsigned long size)
+ {
+ 	u32 iclsz;
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 126abefffe7f..06f1f9794679 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -252,17 +252,14 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+ }
+ 
+-static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
+-					     kvm_pfn_t pfn,
+-					     unsigned long size)
++static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+ 	void *va = page_address(pfn_to_page(pfn));
+ 
+ 	kvm_flush_dcache_to_poc(va, size);
+ }
+ 
+-static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
+-						  kvm_pfn_t pfn,
++static inline void __invalidate_icache_guest_page(kvm_pfn_t pfn,
+ 						  unsigned long size)
+ {
+ 	if (icache_is_aliasing()) {
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b83b5a8442bb..a1ea43fa75cf 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1276,16 +1276,14 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+ 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+ }
+ 
+-static void clean_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+-				    unsigned long size)
++static void clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+-	__clean_dcache_guest_page(vcpu, pfn, size);
++	__clean_dcache_guest_page(pfn, size);
+ }
+ 
+-static void invalidate_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+-					 unsigned long size)
++static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ {
+-	__invalidate_icache_guest_page(vcpu, pfn, size);
++	__invalidate_icache_guest_page(pfn, size);
+ }
+ 
+ static void kvm_send_hwpoison_signal(unsigned long address,
+@@ -1421,11 +1419,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		}
+ 
+ 		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
++			clean_dcache_guest_page(pfn, PMD_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+-			invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
++			invalidate_icache_guest_page(pfn, PMD_SIZE);
+ 		} else if (fault_status == FSC_PERM) {
+ 			/* Preserve execute if XN was already cleared */
+ 			if (stage2_is_exec(kvm, fault_ipa))
+@@ -1443,11 +1441,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		}
+ 
+ 		if (fault_status != FSC_PERM)
+-			clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
++			clean_dcache_guest_page(pfn, PAGE_SIZE);
+ 
+ 		if (exec_fault) {
+ 			new_pte = kvm_s2pte_mkexec(new_pte);
+-			invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
++			invalidate_icache_guest_page(pfn, PAGE_SIZE);
+ 		} else if (fault_status == FSC_PERM) {
+ 			/* Preserve execute if XN was already cleared */
+ 			if (stage2_is_exec(kvm, fault_ipa))
 -- 
 2.14.2
