@@ -1,231 +1,75 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 31 Jan 2018 15:42:43 +0800
-Subject: [PATCH v2 3/5] clk: mediatek: add audsys support for MT2701
-In-Reply-To: <cover.1515639336.git.ryder.lee@mediatek.com>
-References: <cover.1515639336.git.ryder.lee@mediatek.com>
-Message-ID: <99afcd2aeb87ad30dd565cb9bf86ee3239142e08.1515639336.git.ryder.lee@mediatek.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 31 Jan 2018 16:52:44 +0900
+Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
+ the IOMMU
+In-Reply-To: <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
+References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
+ <20180124103516.2571-9-jeffy.chen@rock-chips.com>
+ <20180130170515.3g6wtadqgmehxh5b@rob-hp-laptop>
+Message-ID: <CAAFQd5A383Ey3Ntg_hcsvzHj2DsSuW6RMQ+kP=LPAZ1YmqjHOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock driver support for MT2701 audsys.
+Hi Rob,
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/clk/mediatek/Kconfig          |   6 ++
- drivers/clk/mediatek/Makefile         |   1 +
- drivers/clk/mediatek/clk-mt2701-aud.c | 175 ++++++++++++++++++++++++++++++++++
- 3 files changed, 182 insertions(+)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
+On Wed, Jan 31, 2018 at 2:05 AM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Jan 24, 2018 at 06:35:11PM +0800, Jeffy Chen wrote:
+>> From: Tomasz Figa <tfiga@chromium.org>
+>>
+>> Current code relies on master driver enabling necessary clocks before
+>> IOMMU is accessed, however there are cases when the IOMMU should be
+>> accessed while the master is not running yet, for example allocating
+>> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
+>> mapping API and doesn't engage the master driver at all.
+>>
+>> This patch fixes the problem by letting clocks needed for IOMMU
+>> operation to be listed in Device Tree and making the driver enable them
+>> for the time of accessing the hardware.
+>>
+>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+>> ---
+>>
+>> Changes in v5:
+>> Use clk_bulk APIs.
+>>
+>> Changes in v4: None
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>  .../devicetree/bindings/iommu/rockchip,iommu.txt   |  8 +++
+>
+> Please split binding patches to a separate patch.
+>
+>>  drivers/iommu/rockchip-iommu.c                     | 74 ++++++++++++++++++++--
+>>  2 files changed, 76 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>> index 2098f7732264..33dd853359fa 100644
+>> --- a/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+>> @@ -14,6 +14,13 @@ Required properties:
+>>                      "single-master" device, and needs no additional information
+>>                      to associate with its master device.  See:
+>>                      Documentation/devicetree/bindings/iommu/iommu.txt
+>> +Optional properties:
+>> +- clocks : A list of master clocks requires for the IOMMU to be accessible
+>> +           by the host CPU. The number of clocks depends on the master
+>> +           block and might as well be zero. See [1] for generic clock
+>> +           bindings description.
+>
+> Hardware blocks don't have a variable number of clock connections.
 
-diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-index 59dc0aa..efb6f58 100644
---- a/drivers/clk/mediatek/Kconfig
-+++ b/drivers/clk/mediatek/Kconfig
-@@ -50,6 +50,12 @@ config COMMON_CLK_MT2701_BDPSYS
- 	---help---
- 	  This driver supports Mediatek MT2701 bdpsys clocks.
- 
-+config COMMON_CLK_MT2701_AUDSYS
-+	bool "Clock driver for Mediatek MT2701 audsys"
-+	depends on COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 audsys clocks.
-+
- config COMMON_CLK_MT2712
- 	bool "Clock driver for Mediatek MT2712"
- 	depends on (ARCH_MEDIATEK && ARM64) || COMPILE_TEST
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index c421ffc..c4ab7d3 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
- obj-$(CONFIG_COMMON_CLK_MT6797_VDECSYS) += clk-mt6797-vdec.o
- obj-$(CONFIG_COMMON_CLK_MT6797_VENCSYS) += clk-mt6797-venc.o
- obj-$(CONFIG_COMMON_CLK_MT2701) += clk-mt2701.o
-+obj-$(CONFIG_COMMON_CLK_MT2701_AUDSYS) += clk-mt2701-aud.o
- obj-$(CONFIG_COMMON_CLK_MT2701_BDPSYS) += clk-mt2701-bdp.o
- obj-$(CONFIG_COMMON_CLK_MT2701_ETHSYS) += clk-mt2701-eth.o
- obj-$(CONFIG_COMMON_CLK_MT2701_HIFSYS) += clk-mt2701-hif.o
-diff --git a/drivers/clk/mediatek/clk-mt2701-aud.c b/drivers/clk/mediatek/clk-mt2701-aud.c
-new file mode 100644
-index 0000000..d8005b3
---- /dev/null
-+++ b/drivers/clk/mediatek/clk-mt2701-aud.c
-@@ -0,0 +1,175 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Ryder Lee <ryder.lee@mediatek.com>
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+#include "clk-mtk.h"
-+#include "clk-gate.h"
-+
-+#include <dt-bindings/clock/mt2701-clk.h>
-+
-+#define GATE_AUDIO0(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio0_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+#define GATE_AUDIO1(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio1_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+#define GATE_AUDIO2(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio2_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+#define GATE_AUDIO3(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio3_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+static const struct mtk_gate_regs audio0_cg_regs = {
-+	.set_ofs = 0x0,
-+	.clr_ofs = 0x0,
-+	.sta_ofs = 0x0,
-+};
-+
-+static const struct mtk_gate_regs audio1_cg_regs = {
-+	.set_ofs = 0x10,
-+	.clr_ofs = 0x10,
-+	.sta_ofs = 0x10,
-+};
-+
-+static const struct mtk_gate_regs audio2_cg_regs = {
-+	.set_ofs = 0x14,
-+	.clr_ofs = 0x14,
-+	.sta_ofs = 0x14,
-+};
-+
-+static const struct mtk_gate_regs audio3_cg_regs = {
-+	.set_ofs = 0x634,
-+	.clr_ofs = 0x634,
-+	.sta_ofs = 0x634,
-+};
-+
-+static const struct mtk_gate audio_clks[] = {
-+	/* AUDIO0 */
-+	GATE_AUDIO0(CLK_AUD_AFE, "audio_afe", "aud_intbus_sel", 2),
-+	GATE_AUDIO0(CLK_AUD_HDMI, "audio_hdmi", "audpll_sel", 20),
-+	GATE_AUDIO0(CLK_AUD_SPDF, "audio_spdf", "audpll_sel", 21),
-+	GATE_AUDIO0(CLK_AUD_SPDF2, "audio_spdf2", "audpll_sel", 22),
-+	GATE_AUDIO0(CLK_AUD_APLL, "audio_apll", "audpll_sel", 23),
-+	/* AUDIO1 */
-+	GATE_AUDIO1(CLK_AUD_I2SIN1, "audio_i2sin1", "aud_mux1_sel", 0),
-+	GATE_AUDIO1(CLK_AUD_I2SIN2, "audio_i2sin2", "aud_mux1_sel", 1),
-+	GATE_AUDIO1(CLK_AUD_I2SIN3, "audio_i2sin3", "aud_mux1_sel", 2),
-+	GATE_AUDIO1(CLK_AUD_I2SIN4, "audio_i2sin4", "aud_mux1_sel", 3),
-+	GATE_AUDIO1(CLK_AUD_I2SIN5, "audio_i2sin5", "aud_mux1_sel", 4),
-+	GATE_AUDIO1(CLK_AUD_I2SIN6, "audio_i2sin6", "aud_mux1_sel", 5),
-+	GATE_AUDIO1(CLK_AUD_I2SO1, "audio_i2so1", "aud_mux1_sel", 6),
-+	GATE_AUDIO1(CLK_AUD_I2SO2, "audio_i2so2", "aud_mux1_sel", 7),
-+	GATE_AUDIO1(CLK_AUD_I2SO3, "audio_i2so3", "aud_mux1_sel", 8),
-+	GATE_AUDIO1(CLK_AUD_I2SO4, "audio_i2so4", "aud_mux1_sel", 9),
-+	GATE_AUDIO1(CLK_AUD_I2SO5, "audio_i2so5", "aud_mux1_sel", 10),
-+	GATE_AUDIO1(CLK_AUD_I2SO6, "audio_i2so6", "aud_mux1_sel", 11),
-+	GATE_AUDIO1(CLK_AUD_ASRCI1, "audio_asrci1", "asm_h_sel", 12),
-+	GATE_AUDIO1(CLK_AUD_ASRCI2, "audio_asrci2", "asm_h_sel", 13),
-+	GATE_AUDIO1(CLK_AUD_ASRCO1, "audio_asrco1", "asm_h_sel", 14),
-+	GATE_AUDIO1(CLK_AUD_ASRCO2, "audio_asrco2", "asm_h_sel", 15),
-+	GATE_AUDIO1(CLK_AUD_INTDIR, "audio_intdir", "intdir_sel", 20),
-+	GATE_AUDIO1(CLK_AUD_A1SYS, "audio_a1sys", "aud_mux1_sel", 21),
-+	GATE_AUDIO1(CLK_AUD_A2SYS, "audio_a2sys", "aud_mux2_sel", 22),
-+	GATE_AUDIO1(CLK_AUD_AFE_CONN, "audio_afe_conn", "aud_mux1_sel", 23),
-+	GATE_AUDIO1(CLK_AUD_AFE_MRGIF, "audio_afe_mrgif", "aud_mux1_sel", 25),
-+	/* AUDIO2 */
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL1, "audio_ul1", "aud_mux1_sel", 0),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL2, "audio_ul2", "aud_mux1_sel", 1),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL3, "audio_ul3", "aud_mux1_sel", 2),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL4, "audio_ul4", "aud_mux1_sel", 3),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL5, "audio_ul5", "aud_mux1_sel", 4),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL6, "audio_ul6", "aud_mux1_sel", 5),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL1, "audio_dl1", "aud_mux1_sel", 6),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL2, "audio_dl2", "aud_mux1_sel", 7),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL3, "audio_dl3", "aud_mux1_sel", 8),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL4, "audio_dl4", "aud_mux1_sel", 9),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL5, "audio_dl5", "aud_mux1_sel", 10),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL6, "audio_dl6", "aud_mux1_sel", 11),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DLMCH, "audio_dlmch", "aud_mux1_sel", 12),
-+	GATE_AUDIO2(CLK_AUD_MMIF_ARB1, "audio_arb1", "aud_mux1_sel", 13),
-+	GATE_AUDIO2(CLK_AUD_MMIF_AWB1, "audio_awb", "aud_mux1_sel", 14),
-+	GATE_AUDIO2(CLK_AUD_MMIF_AWB2, "audio_awb2", "aud_mux1_sel", 15),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DAI, "audio_dai", "aud_mux1_sel", 16),
-+	/* AUDIO3 */
-+	GATE_AUDIO3(CLK_AUD_ASRCI3, "audio_asrci3", "asm_h_sel", 2),
-+	GATE_AUDIO3(CLK_AUD_ASRCI4, "audio_asrci4", "asm_h_sel", 3),
-+	GATE_AUDIO3(CLK_AUD_ASRCI5, "audio_asrci5", "asm_h_sel", 4),
-+	GATE_AUDIO3(CLK_AUD_ASRCI6, "audio_asrci6", "asm_h_sel", 5),
-+	GATE_AUDIO3(CLK_AUD_ASRCO3, "audio_asrco3", "asm_h_sel", 6),
-+	GATE_AUDIO3(CLK_AUD_ASRCO4, "audio_asrco4", "asm_h_sel", 7),
-+	GATE_AUDIO3(CLK_AUD_ASRCO5, "audio_asrco5", "asm_h_sel", 8),
-+	GATE_AUDIO3(CLK_AUD_ASRCO6, "audio_asrco6", "asm_h_sel", 9),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC1, "audio_mem_asrc1", "asm_h_sel", 10),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC2, "audio_mem_asrc2", "asm_h_sel", 11),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC3, "audio_mem_asrc3", "asm_h_sel", 12),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC4, "audio_mem_asrc4", "asm_h_sel", 13),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC5, "audio_mem_asrc5", "asm_h_sel", 14),
-+};
-+
-+static const struct of_device_id of_match_clk_mt2701_aud[] = {
-+	{ .compatible = "mediatek,mt2701-audsys", },
-+	{}
-+};
-+
-+static int clk_mt2701_aud_probe(struct platform_device *pdev)
-+{
-+	struct clk_onecell_data *clk_data;
-+	struct device_node *node = pdev->dev.of_node;
-+	struct device_node *pnode = pdev->dev.parent->of_node;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_AUD_NR);
-+
-+	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
-+			       clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		dev_err(&pdev->dev,
-+			"could not register clock provider: %s: %d\n",
-+			pdev->name, r);
-+
-+	return r;
-+}
-+
-+static struct platform_driver clk_mt2701_aud_drv = {
-+	.probe = clk_mt2701_aud_probe,
-+	.driver = {
-+		.name = "clk-mt2701-aud",
-+		.of_match_table = of_match_clk_mt2701_aud,
-+	},
-+};
-+
-+builtin_platform_driver(clk_mt2701_aud_drv);
--- 
-1.9.1
+I think you underestimate the imagination of hardware designers. :)
+
+For Rockchip IOMMU, there is a set of clocks, which all need to be
+enabled for IOMMU register access to succeed. The clocks are not
+directly fed to the IOMMU, but they are needed for the various buses
+and intermediate blocks on the way to the IOMMU to work.
+
+And the set varies based on next to which master block the IOMMU block
+is located, because the hierarchy of buses and intermediate blocks is
+different.
+
+Best regards,
+Tomasz
