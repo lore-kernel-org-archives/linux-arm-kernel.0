@@ -1,41 +1,58 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 31 Jan 2018 13:19:41 +0000
-Subject: [RFC PATCH] tty: pl011: Avoid stuck-off spurious interrupts
-In-Reply-To: <CACRpkdb8=vNmwOYYTAuDM21CtoCw1868js8wnHTTofK-pZYKGQ@mail.gmail.com>
-References: <1517242181-20652-1-git-send-email-Dave.Martin@arm.com>
- <CACRpkdb8=vNmwOYYTAuDM21CtoCw1868js8wnHTTofK-pZYKGQ@mail.gmail.com>
-Message-ID: <20180131131941.GM5862@e103592.cambridge.arm.com>
+Date: Wed, 31 Jan 2018 13:32:14 +0000
+Subject: Handling of chars received while a UART is not open
+In-Reply-To: <CAFEAcA8D2RLSbHO-OdULHre4oVr=vU+Yb+6sp55XiP6Mrtg1xA@mail.gmail.com>
+References: <20180131120628.GL5862@e103592.cambridge.arm.com>
+ <CAFEAcA8D2RLSbHO-OdULHre4oVr=vU+Yb+6sp55XiP6Mrtg1xA@mail.gmail.com>
+Message-ID: <20180131133213.GN5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 01:28:43PM +0100, Linus Walleij wrote:
-> On Mon, Jan 29, 2018 at 5:09 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+On Wed, Jan 31, 2018 at 01:12:15PM +0000, Peter Maydell wrote:
+> On 31 January 2018 at 12:06, Dave Martin <Dave.Martin@arm.com> wrote:
+> > Now, Qemu has a facility for stuffing some input to an emulated UART
+> > immediately on boot, and wouldn't work in case (2) above.  OTOH, that
+> > may be a mistaken approach: it's unlikely to work reliably on hardware
+> > due to the problem of knowing when a physical UART is actually ready to
+> > receive input.  So maybe Qemu should be waiting for a prompt to be
+> > transmitted before stuffing input.  In case (1) or (3), qemu probably
+> > needs to do something like that.
 > 
-> > Commit 9b96fbacda34 ("serial: PL011: clear pending interrupts")
-> > clears the RX and receive timeout interrupts on pl011 startup, to
-> > avoid a screaming-interrupt scenario that can occur when the
-> > firmware or bootloader leaves these interrupts spuriously
-> > asserted.
-> 
-> It looks OK to me.
+> FWIW, there isn't a QEMU "facility" for doing this particularly:
+> we just don't take any trouble to stop the user from providing
+> input whenever the user likes. (If the user is an automatic test
+> script then it's that script's job to wait for suitable prompts
+> from the guest before feeding input into the emulated serial port
+> if it wants to be reliable, the same way you'd have to if you
+> were feeding the data to a real serial line.)
 
-You mean, the original patch?
+Fair enough.  I misunderstood slightly there.
 
-I think there is a real potential bug here for SBSA UART, but I also
-haven't been able to reproduce it on hardware.
+> (I think) wouldn't affect the behaviour here, though, because the
+> data will just get held in QEMU's input buffer until the guest
+> driver sets UARTEN and then immediately fill the FIFO.
 
-I'm not sure whether it can happen on a real pl011, given that the
-driver turns the FIFOs off and on etc.  That may get us back into a
-sane state.  On the SBSA UART this does nothing: the SBSA UART
-cannot be reset or disabled directly IIRC.
+On the Linux side, I guess we nonetheless need to cope with input
+stuffed early for the SBSA UART case, but if you're saying that
+qemu (or software talking to qemu) shouldn't assume that input
+stuffed at boot will actually be received (unless it qemu waits for
+UARTEN) then we have some flexibility in the amba-pl011 driver here.
 
-> I could never reproduce this issue myself, it was just reported by
-> Chanho, and we came up with this fix. AFAICR it was working fine
-> on ARM reference designs and my ST-Ericsson platforms before
-> and after.
-> 
-> I do not remember what hardware Chanho was seeing this problem
-> on, but let's loop in Chanho and ask.
+Based on Russell's comments, I guess the fix for the SBSA UART case
+would be to read and discard the contents of the RX FIFO on UART open.
+It seems harmless to do that for pl011 also, so I would suggest putting
+it on the common code path.  This likely minimises the chance of being
+tripped up by vendor-specific quirks.
 
-OK, thanks
+> What QEMU doesn't do and probably should fix is that we allow data
+> into the FIFO even if UARTCR.UARTEN is 0 ("UART disabled"). This
+
+That probably does makes sense, providing qemu models a pl011.
+A real pl011 wouldn't receive anything while that bit is clear.
+
+SBSA UART doesn't have this control (or most of the others): it's
+just always on.
+
+
+Cheers
 ---Dave
