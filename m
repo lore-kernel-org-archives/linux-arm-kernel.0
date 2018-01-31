@@ -1,22 +1,72 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 30 Jan 2018 16:33:28 -0800
-Subject: [PATCH] ARM64: dts: meson: accept MAC addr from u-boot environment
-In-Reply-To: <1516186587-22157-1-git-send-email-jramirez@baylibre.com> (Jorge
- Ramirez-Ortiz's message of "Wed, 17 Jan 2018 11:56:27 +0100")
-References: <1516186587-22157-1-git-send-email-jramirez@baylibre.com>
-Message-ID: <7hd11qc1ev.fsf@baylibre.com>
+From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
+Date: Wed, 31 Jan 2018 02:00:40 +0000
+Subject: [PATCH v3 5/5] ARM: dts: imx7s: add CAAM device node
+In-Reply-To: <1517364040-27607-1-git-send-email-pure.logic@nexus-software.ie>
+References: <1517364040-27607-1-git-send-email-pure.logic@nexus-software.ie>
+Message-ID: <1517364040-27607-6-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jorge Ramirez-Ortiz <jramirez@baylibre.com> writes:
+From: Rui Miguel Silva <rui.silva@linaro.org>
 
-> Extend configuring the MAC address from u-boot to all meson boards.
->
-> I didn't test this changeset but having checked libretech's u-boot
-> tree I believe it should just work.
->
-> Signed-off-by: Jorge Ramirez-Ortiz <jramirez@baylibre.com>
+Add CAAM device node to the i.MX7s device tree.
 
-Applied for v4.17, let's see we find any breakage in linux-next,
+Signed-off-by: Rui Miguel Silva <rui.silva@linaro.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: "Horia Geant?" <horia.geanta@nxp.com>
+Cc: Aymen Sghaier <aymen.sghaier@nxp.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Peng Fan <peng.fan@nxp.com>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Lukas Auer <lukas.auer@aisec.fraunhofer.de>
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Kevin
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 82ad26e..e38c159 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -805,6 +805,37 @@
+ 				status = "disabled";
+ 			};
+ 
++			crypto: caam at 30900000 {
++				compatible = "fsl,sec-v4.0";
++				fsl,sec-era = <4>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x30900000 0x40000>;
++				ranges = <0 0x30900000 0x40000>;
++				interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_CAAM_CLK>,
++					 <&clks IMX7D_AHB_CHANNEL_ROOT_CLK>;
++				clock-names = "ipg", "aclk";
++
++				sec_jr0: jr0 at 1000 {
++					compatible = "fsl,sec-v4.0-job-ring";
++					reg = <0x1000 0x1000>;
++					interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
++				};
++
++				sec_jr1: jr1 at 2000 {
++					compatible = "fsl,sec-v4.0-job-ring";
++					reg = <0x2000 0x1000>;
++					interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
++				};
++
++				sec_jr2: jr1 at 3000 {
++					compatible = "fsl,sec-v4.0-job-ring";
++					reg = <0x3000 0x1000>;
++					interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
++				};
++			};
++
+ 			flexcan1: can at 30a00000 {
+ 				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
+ 				reg = <0x30a00000 0x10000>;
+-- 
+2.7.4
