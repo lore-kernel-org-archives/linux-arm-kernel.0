@@ -1,43 +1,65 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 31 Jan 2018 18:24:22 +0000
-Subject: [RFC v4 18/26] clk: renesas: r8a7791/r8a7793: Add rwdt clock
-In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517423070-24236-19-git-send-email-fabrizio.castro@bp.renesas.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 31 Jan 2018 10:53:53 -0800
+Subject: [PATCH v3 0/6] 32bit ARM branch predictor hardening
+In-Reply-To: <e34add95-a672-b76c-1746-e2d9d152624c@huawei.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
+ <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
+ <e34add95-a672-b76c-1746-e2d9d152624c@huawei.com>
+Message-ID: <c25089e9-540b-2b09-555c-a2c9d8850610@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "rwdt" clock to r8a7791_mod_clks. Also, since we may need to access
-the watchdog registers at any time, declare the clock as critical.
+On 01/31/2018 04:45 AM, Hanjun Guo wrote:
+> On 2018/1/29 22:58, Nishanth Menon wrote:
+>> On Mon, Jan 29, 2018 at 5:36 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+>> [...]
+>>
+>>> By the way, this patch set just enable branch predictor hardening
+>>> on arm32 unconditionally, but some of machines (such as wireless
+>>> network base station) will not be exposed to user to take advantage
+>>> of variant 2, and those machines will be pretty sensitive for
+>>> performance, so can we introduce Kconfig or boot option to disable
+>>> branch predictor hardening as an option?
+>>
+>> I am curious: Have you seen performance degradation with this series?
+>> If yes, is it possible to share the information?
+> 
+> Sorry for the late reply, the performance data for context switch (CFS)
+> is about 6%~12% drop (A9 based machine) for the first around test, but
+> the data is not stable, I need to retest then I will update here.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
----
-v3->4:
-* no change
+What tool did you use to measure this? On a Brahma-B15 platform clocked
+at 1.5Ghz, across kernels 4.1, 4.9 (4.15 in progress as we speak), I
+measured the following, with two memory configurations, one giving 256MB
+of usable memory, another giving 3GB of usable memory, results below are
+only the most extreme 256MB case. This is running 13 groups because the
+ASID space is 256bits so this should force at least two full ASID
+generation rollovers (assuming the logic is correct here).
 
- drivers/clk/renesas/r8a7791-cpg-mssr.c | 2 ++
- 1 file changed, 2 insertions(+)
+for i in $(seq 0 9)
+do
+	hackbench 13 process 10000
+done
 
-diff --git a/drivers/clk/renesas/r8a7791-cpg-mssr.c b/drivers/clk/renesas/r8a7791-cpg-mssr.c
-index c0b51f9..820b220 100644
---- a/drivers/clk/renesas/r8a7791-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7791-cpg-mssr.c
-@@ -128,6 +128,7 @@ static const struct mssr_mod_clk r8a7791_mod_clks[] __initconst = {
- 	DEF_MOD("cmt1",			 329,	R8A7791_CLK_R),
- 	DEF_MOD("usbhs-dmac0",		 330,	R8A7791_CLK_HP),
- 	DEF_MOD("usbhs-dmac1",		 331,	R8A7791_CLK_HP),
-+	DEF_MOD("rwdt",			 402,	R8A7791_CLK_R),
- 	DEF_MOD("irqc",			 407,	R8A7791_CLK_CP),
- 	DEF_MOD("intc-sys",		 408,	R8A7791_CLK_ZS),
- 	DEF_MOD("audio-dmac1",		 501,	R8A7791_CLK_HP),
-@@ -209,6 +210,7 @@ static const struct mssr_mod_clk r8a7791_mod_clks[] __initconst = {
- };
- 
- static const unsigned int r8a7791_crit_mod_clks[] __initconst = {
-+	MOD_CLK_ID(402),	/* RWDT */
- 	MOD_CLK_ID(408),	/* INTC-SYS (GIC) */
- };
- 
+Average values, in seconds:
+
+1) 4.1.45, ACTLR[0] = 0, no spectre variant 2 patches: 114,2666
+2) 4.1.45, ACTLR[0] = 1, no spectre variant 2 patches: 114,2952
+3) 4.1.45, ACTLR[0] =1 , spectre variant 2 patches: 115,5853
+
+=> 3) is a 1.15% degradation against 1)
+
+4.9.51, ACTLR[0] = 0, no spectre variant 2 patches: 130,7676
+4.9.51, ACTLR[0] = 1, no spectre variant 2 patches: 130,6848
+4.9.51, ACTLR[0] =1 , spectre variant 2 patches: 132,4274
+
+=> 3) is a 1.26% degradation against 1)
+
+The relative differences between 4.1 and 4.9 appear consistent (with 4.9
+being slower for a reason I ignore).
+
+Marc, are there any performance tests/results that you ran that you
+could share?
 -- 
-2.7.4
+Florian
