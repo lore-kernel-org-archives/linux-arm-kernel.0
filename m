@@ -1,14 +1,14 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 Jan 2018 20:24:09 +0000
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 31 Jan 2018 21:24:27 +0100
 Subject: [PATCHv2] arch/arm/Kconfig: default ARM_MODULE_PLTS to 'y'
 In-Reply-To: <20180131201911.19253-1-anders.roxell@linaro.org>
 References: <20180129234900.11121-1-anders.roxell@linaro.org>
  <20180131201911.19253-1-anders.roxell@linaro.org>
-Message-ID: <CAKv+Gu-r40TKuPZyfhFBkqPT=Fg+3Z=sP0fJBOdU4FqUETQCsw@mail.gmail.com>
+Message-ID: <CAK8P3a2o88rAs9_qLY-iBXcyFgtUKUofSYXt2pJpgzypQJnRvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2018 at 20:19, Anders Roxell <anders.roxell@linaro.org> wrote:
+On Wed, Jan 31, 2018 at 9:19 PM, Anders Roxell <anders.roxell@linaro.org> wrote:
 > While testing multi_v7_defconfig with LOCKDEP enabled, the kernel
 > fails to load simple modules, as reported by kselftest:
 >
@@ -19,12 +19,15 @@ On 31 January 2018 at 20:19, Anders Roxell <anders.roxell@linaro.org> wrote:
 > The problem that is seen when LOCKDEP is enabled without
 > ARM_MODULE_PLTS, is that LOCKDEP eats so much memory that the top of the
 > kernel gets out of reach from the bottom of the module area.
->
+
+I think we could still use a better explanation here, as Russell said anything
+could cause the size to grow too much, it's just that you happened to run into
+it through lockdep, which can cause a very significant growth.
+
+      Arnd
+
 > Suggested-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
 > ---
 >  arch/arm/Kconfig | 1 +
 >  1 file changed, 1 insertion(+)
@@ -44,8 +47,3 @@ Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > --
 > 2.11.0
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
