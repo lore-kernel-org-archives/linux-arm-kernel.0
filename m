@@ -1,25 +1,26 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 30 Jan 2018 16:22:41 -0800
-Subject: [PATCH v3 0/5] ARM64: dts: meson-axg: UART DT updates
-In-Reply-To: <7hr2q6c2r4.fsf@baylibre.com>
-References: <20180111023401.125658-1-yixun.lan@amlogic.com>
- <7hr2q6c2r4.fsf@baylibre.com>
-Message-ID: <CAOi56cW4ufsegpy7heK1+pCxvZ2gz5Lf3dkUgxkZCgMq5oBzSA@mail.gmail.com>
+Date: Tue, 30 Jan 2018 16:32:37 -0800
+Subject: [PATCH v2] ARM64: dts: meson s905x: accept MAC addr from u-boot
+ environment
+In-Reply-To: <1516186543-22056-1-git-send-email-jramirez@baylibre.com> (Jorge
+ Ramirez-Ortiz's message of "Wed, 17 Jan 2018 11:55:43 +0100")
+References: <1516186543-22056-1-git-send-email-jramirez@baylibre.com>
+Message-ID: <7hinbic1ga.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 4:04 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Yixun Lan <yixun.lan@amlogic.com> writes:
->
->> HI Kevin
->>  These are the UART DT updates for the Meson-AXG platform.
->>
->>  The patch 1 is a general fix.
->> Other patches are about adding clock & pinctrl info, then using them.
->> Last patch enable UART_A which connect to a BT module on the S400 board.
->
-> Applied to v4.16/dt64,
+Jorge Ramirez-Ortiz <jramirez@baylibre.com> writes:
 
-Oops, I meant v4.17.
+> With the adequate configuration settings, u-boot will loop through the
+> list of aliases looking for "ethernetX".
+>
+> By adding an ethernet alias, u-boot can fixup the local-mac-address
+> property in the kernel's device tree using a value held in its
+> environment variable ethaddr.
+>
+> Tested-by: Jorge Ramirez-Ortiz <jramirez@baylibre.com>
+> Signed-off-by: Jorge Ramirez-Ortiz <jramirez@baylibre.com>
+
+Applied to v4.17/dt64,
 
 Kevin
