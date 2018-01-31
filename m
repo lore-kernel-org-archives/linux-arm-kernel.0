@@ -1,203 +1,48 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 30 Jan 2018 18:36:17 -0800
-Subject: [PATCH v5 3/4] of: unittest: Add phandle remapping test
+Date: Tue, 30 Jan 2018 18:36:18 -0800
+Subject: [PATCH v5 4/4] gpio: Support gpio nexus dt bindings
 In-Reply-To: <20180131023618.14292-1-stephen.boyd@linaro.org>
 References: <20180131023618.14292-1-stephen.boyd@linaro.org>
-Message-ID: <20180131023618.14292-4-stephen.boyd@linaro.org>
+Message-ID: <20180131023618.14292-5-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Test the functionality of of_parse_phandle_with_args_map().
+Platforms like 96boards have a standardized connector/expansion
+slot that exposes signals like GPIOs to expansion boards in an
+SoC agnostic way. We'd like the DT overlays for the expansion
+boards to be written once without knowledge of the SoC on the
+other side of the connector. This avoids the unscalable
+combinatorial explosion of a different DT overlay for each
+expansion board and SoC pair.
+
+Now that we have nexus support in the OF core let's change the
+function call here that parses the phandle lists of gpios to use
+the nexus variant. This allows us to remap phandles and their
+arguments through any number of nexus nodes and end up with the
+actual gpio provider being used.
 
 Cc: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/of/unittest-data/tests-phandle.dtsi |  25 ++++++
- drivers/of/unittest.c                       | 120 ++++++++++++++++++++++++++++
- 2 files changed, 145 insertions(+)
+ drivers/gpio/gpiolib-of.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/of/unittest-data/tests-phandle.dtsi b/drivers/of/unittest-data/tests-phandle.dtsi
-index 3c2f09e56b61..6b33be4c4416 100644
---- a/drivers/of/unittest-data/tests-phandle.dtsi
-+++ b/drivers/of/unittest-data/tests-phandle.dtsi
-@@ -26,6 +26,18 @@
- 				#phandle-cells = <3>;
- 			};
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index 72a0695d2ac3..09217a87e7ff 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -75,8 +75,8 @@ struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
+ 	struct gpio_desc *desc;
+ 	int ret;
  
-+			provider4: provider4 {
-+				#phandle-cells = <2>;
-+				phandle-map = <0 1 &provider1 3>,
-+					      <4 0 &provider0>,
-+					      <16 5 &provider3 3 5 0>,
-+					      <200 8 &provider2 23 6>,
-+					      <19 0 &provider2 15 0>,
-+					      <2 3 &provider3 2 5 3>;
-+				phandle-map-mask = <0xff 0xf>;
-+				phandle-map-pass-thru = <0x0 0xf0>;
-+			};
-+
- 			consumer-a {
- 				phandle-list =	<&provider1 1>,
- 						<&provider2 2 0>,
-@@ -44,6 +56,19 @@
- 				unterminated-string = [40 41 42 43];
- 				unterminated-string-list = "first", "second", [40 41 42 43];
- 			};
-+
-+			consumer-b {
-+				phandle-list =	<&provider1 1>,
-+						<&provider4 2 3>,
-+						<0>,
-+						<&provider4 4 0x100>,
-+						<&provider4 0 0x61>,
-+						<&provider0>,
-+						<&provider4 19 0x20>;
-+				phandle-list-bad-phandle = <12345678 0 0>;
-+				phandle-list-bad-args = <&provider2 1 0>,
-+							<&provider4 0>;
-+			};
- 		};
- 	};
- };
-diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
-index 0f8052f1355c..de27f62a8e8d 100644
---- a/drivers/of/unittest.c
-+++ b/drivers/of/unittest.c
-@@ -452,6 +452,125 @@ static void __init of_unittest_parse_phandle_with_args(void)
- 	unittest(rc == -EINVAL, "expected:%i got:%i\n", -EINVAL, rc);
- }
- 
-+static void __init of_unittest_parse_phandle_with_args_map(void)
-+{
-+	struct device_node *np, *p0, *p1, *p2, *p3;
-+	struct of_phandle_args args;
-+	int i, rc;
-+
-+	np = of_find_node_by_path("/testcase-data/phandle-tests/consumer-b");
-+	if (!np) {
-+		pr_err("missing testcase data\n");
-+		return;
-+	}
-+
-+	p0 = of_find_node_by_path("/testcase-data/phandle-tests/provider0");
-+	if (!p0) {
-+		pr_err("missing testcase data\n");
-+		return;
-+	}
-+
-+	p1 = of_find_node_by_path("/testcase-data/phandle-tests/provider1");
-+	if (!p1) {
-+		pr_err("missing testcase data\n");
-+		return;
-+	}
-+
-+	p2 = of_find_node_by_path("/testcase-data/phandle-tests/provider2");
-+	if (!p2) {
-+		pr_err("missing testcase data\n");
-+		return;
-+	}
-+
-+	p3 = of_find_node_by_path("/testcase-data/phandle-tests/provider3");
-+	if (!p3) {
-+		pr_err("missing testcase data\n");
-+		return;
-+	}
-+
-+	rc = of_count_phandle_with_args(np, "phandle-list", "#phandle-cells");
-+	unittest(rc == 7, "of_count_phandle_with_args() returned %i, expected 7\n", rc);
-+
-+	for (i = 0; i < 8; i++) {
-+		bool passed = true;
-+
-+		rc = of_parse_phandle_with_args_map(np, "phandle-list",
-+						    "phandle", i, &args);
-+
-+		/* Test the values from tests-phandle.dtsi */
-+		switch (i) {
-+		case 0:
-+			passed &= !rc;
-+			passed &= (args.np == p1);
-+			passed &= (args.args_count == 1);
-+			passed &= (args.args[0] == 1);
-+			break;
-+		case 1:
-+			passed &= !rc;
-+			passed &= (args.np == p3);
-+			passed &= (args.args_count == 3);
-+			passed &= (args.args[0] == 2);
-+			passed &= (args.args[1] == 5);
-+			passed &= (args.args[2] == 3);
-+			break;
-+		case 2:
-+			passed &= (rc == -ENOENT);
-+			break;
-+		case 3:
-+			passed &= !rc;
-+			passed &= (args.np == p0);
-+			passed &= (args.args_count == 0);
-+			break;
-+		case 4:
-+			passed &= !rc;
-+			passed &= (args.np == p1);
-+			passed &= (args.args_count == 1);
-+			passed &= (args.args[0] == 3);
-+			break;
-+		case 5:
-+			passed &= !rc;
-+			passed &= (args.np == p0);
-+			passed &= (args.args_count == 0);
-+			break;
-+		case 6:
-+			passed &= !rc;
-+			passed &= (args.np == p2);
-+			passed &= (args.args_count == 2);
-+			passed &= (args.args[0] == 15);
-+			passed &= (args.args[1] == 0x20);
-+			break;
-+		case 7:
-+			passed &= (rc == -ENOENT);
-+			break;
-+		default:
-+			passed = false;
-+		}
-+
-+		unittest(passed, "index %i - data error on node %s rc=%i\n",
-+			 i, args.np->full_name, rc);
-+	}
-+
-+	/* Check for missing list property */
-+	rc = of_parse_phandle_with_args_map(np, "phandle-list-missing",
-+					    "phandle", 0, &args);
-+	unittest(rc == -ENOENT, "expected:%i got:%i\n", -ENOENT, rc);
-+
-+	/* Check for missing cells,map,mask property */
-+	rc = of_parse_phandle_with_args_map(np, "phandle-list",
-+					    "phandle-missing", 0, &args);
-+	unittest(rc == -EINVAL, "expected:%i got:%i\n", -EINVAL, rc);
-+
-+	/* Check for bad phandle in list */
-+	rc = of_parse_phandle_with_args_map(np, "phandle-list-bad-phandle",
-+					    "phandle", 0, &args);
-+	unittest(rc == -EINVAL, "expected:%i got:%i\n", -EINVAL, rc);
-+
-+	/* Check for incorrectly formed argument list */
-+	rc = of_parse_phandle_with_args_map(np, "phandle-list-bad-args",
-+					    "phandle", 1, &args);
-+	unittest(rc == -EINVAL, "expected:%i got:%i\n", -EINVAL, rc);
-+}
-+
- static void __init of_unittest_property_string(void)
- {
- 	const char *strings[4];
-@@ -2354,6 +2473,7 @@ static int __init of_unittest(void)
- 	of_unittest_find_node_by_name();
- 	of_unittest_dynamic();
- 	of_unittest_parse_phandle_with_args();
-+	of_unittest_parse_phandle_with_args_map();
- 	of_unittest_printf();
- 	of_unittest_property_string();
- 	of_unittest_property_copy();
+-	ret = of_parse_phandle_with_args(np, propname, "#gpio-cells", index,
+-					 &gpiospec);
++	ret = of_parse_phandle_with_args_map(np, propname, "gpio", index,
++					     &gpiospec);
+ 	if (ret) {
+ 		pr_debug("%s: can't parse '%s' property of node '%pOF[%d]'\n",
+ 			__func__, propname, np, index);
 -- 
 2.14.GIT
