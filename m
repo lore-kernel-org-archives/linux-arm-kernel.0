@@ -1,27 +1,51 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 31 Jan 2018 09:00:55 +0200
-Subject: [PATCH] arm64: dts: marvell: mcbin: fix board name typo
-Message-ID: <19520b813a8f8f9ac3d8cbd777a955c8cd6eccdf.1517382055.git.baruch@tkos.co.il>
+From: maxime.ripard@free-electrons.com (maxime ripard)
+Date: Wed, 31 Jan 2018 08:16:16 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sunxi: h3/h5: Add DAI node for HDMI
+In-Reply-To: <27087126.4975652.1517222127863.JavaMail.zimbra@musers.siol.net>
+References: <20180129092223.12423-1-codekipper@gmail.com>
+ <20180129102227.ejmbifzjqmba3yja@flea.lan>
+ <27087126.4975652.1517222127863.JavaMail.zimbra@musers.siol.net>
+Message-ID: <20180131071616.jrkd465cq4mgyyvm@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, Jan 29, 2018 at 11:35:27AM +0100, Jernej ?krabec wrote:
+> Hi Maxime,
+> 
+> (previously I respond only to linux-sunxi mailing list)
+> 
+> >On Mon, Jan 29, 2018 at 10:22:23AM +0100, codekipper at gmail.com wrote:
+> >> From: Marcus Cooper <codekipper@gmail.com>
+> >> 
+> >> Add the new DAI block for I2S2 which is used for HDMI audio.
+> >> 
+> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> >
+> >queued for 4.17, thanks!
+> >Maxime
+> 
+> Please note that HDMI I2S has usable 4 I2S lanes, since HDMI
+> supports 8 channel audio. As Marcus said, other blocks probably
+> support them too, they are just not wired out on pins.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index 122d2257ebc4..787bc6c44e2d 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -49,7 +49,7 @@
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
--	model = "Marvell 8040 MACHIATOBin";
-+	model = "Marvell 8040 MACCHIATOBin";
- 	compatible = "marvell,armada8040-mcbin", "marvell,armada8040",
- 			"marvell,armada-ap806-quad", "marvell,armada-ap806";
- 
+I've dropped those patches for now.
+
+> Should we change compatible for HDMI?
+
+I guess, another way of doing things if they are strictly identical
+but for the number of lanes they support would be to add a DT property
+for that number of lanes.
+
+Maxime
+
 -- 
-2.15.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/36d6c694/attachment-0001.sig>
