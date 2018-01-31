@@ -1,62 +1,97 @@
-From: maxime.ripard@free-electrons.com (maxime ripard)
-Date: Wed, 31 Jan 2018 16:57:51 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sunxi: h3/h5: Add DAI node for HDMI
-In-Reply-To: <CAEKpxBmVzeUN=1F=APVomu4s4h2s83R4JX3EG1=1Mu_ZBSF96g@mail.gmail.com>
-References: <20180129092223.12423-1-codekipper@gmail.com>
- <20180129102227.ejmbifzjqmba3yja@flea.lan>
- <27087126.4975652.1517222127863.JavaMail.zimbra@musers.siol.net>
- <20180131071616.jrkd465cq4mgyyvm@flea.lan>
- <CAEKpxBmVzeUN=1F=APVomu4s4h2s83R4JX3EG1=1Mu_ZBSF96g@mail.gmail.com>
-Message-ID: <20180131155751.jlqf4wb74aoslkjs@flea.lan>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 31 Jan 2018 10:02:43 -0600
+Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
+ device tree parsing
+In-Reply-To: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+Message-ID: <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 10:54:29AM +0100, Code Kipper wrote:
-> On 31 January 2018 at 08:16, maxime ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Jan 29, 2018 at 11:35:27AM +0100, Jernej ?krabec wrote:
-> >> Hi Maxime,
-> >>
-> >> (previously I respond only to linux-sunxi mailing list)
-> >>
-> >> >On Mon, Jan 29, 2018 at 10:22:23AM +0100, codekipper at gmail.com wrote:
-> >> >> From: Marcus Cooper <codekipper@gmail.com>
-> >> >>
-> >> >> Add the new DAI block for I2S2 which is used for HDMI audio.
-> >> >>
-> >> >> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> >> >
-> >> >queued for 4.17, thanks!
-> >> >Maxime
-> >>
-> >> Please note that HDMI I2S has usable 4 I2S lanes, since HDMI
-> >> supports 8 channel audio. As Marcus said, other blocks probably
-> >> support them too, they are just not wired out on pins.
-> >
-> > I've dropped those patches for now.
-> >
-> >> Should we change compatible for HDMI?
-> >
-> > I guess, another way of doing things if they are strictly identical
-> > but for the number of lanes they support would be to add a DT property
-> > for that number of lanes.
-> >
-> That's fine...I'll look into adding a dt property and how we would map
-> channels to lanes.
-> Do you know of any examples?,
+On Wed, Jan 31, 2018 at 1:41 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> A root complex usually consist of a host bridge and multiple P2P bridges,
+> and someone may express that in the form of a root node with many subnodes
+> and list all four interrupts for each slot (child node) in the root node
+> like this:
+>
+>         pcie-controller {
+>                 ...
+>                 interrupt-map-mask = <0xf800 0 0 7>;
+>                 interrupt-map = <0x0000 0 0 {INTx} &{interrupt parent} ...>
+>                                  0x0800 0 0 {INTx} &{interrupt parent} ...>;
+>
+>                 pcie at 0,0 {
+>                         reg = <0x0000 0 0 0 0>;
+>                         ...
+>                 };
+>
+>                 pcie at 1,0 {
+>                         reg = <0x0800 0 0 0 0>;
+>                         ...
+>                 };
+>         };
+>
+> As shown above, we'd like to propagate IRQs from a root port to the devices
+> in the hierarchy below it in this way.  However, it seems that the current
+> parser couldn't handle such cases and will get something unexpected below:
+>
+>         pcieport 0000:00:01.0: assign IRQ: got 213
+>         igb 0000:01:00.0: assign IRQ: got 212
+>
+> There is a device which is connected to 2nd slot, but the port doesn't share
+> the same IRQ with its downstream devices.  The problem here is that, if the
+> loop found a P2P bridge, it wouldn't check whether the reg property exists
+> in ppnode or not but just pass the subordinate devfn to of_irq_parse_raw(),
+> thus the subsequent flow couldn't correctly resolve them.
+>
+> Fix this by adding a check to fallback to standard device tree parsing.
+>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+> Please refer to the previous discussion thread: https://patchwork.ozlabs.org/patch/829108/
+> ---
+>  drivers/of/of_pci_irq.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
+> index 3a05568..e445866 100644
+> --- a/drivers/of/of_pci_irq.c
+> +++ b/drivers/of/of_pci_irq.c
+> @@ -86,8 +86,18 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
+>         out_irq->np = ppnode;
+>         out_irq->args_count = 1;
+>         out_irq->args[0] = pin;
+> -       laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
+> -       laddr[1] = laddr[2] = cpu_to_be32(0);
+> +
+> +       if (!dn && ppnode) {
 
-Grepping for of_property_read_u32 should give you plenty of examples :)
+I would think whether you have a child device in DT or not is
+irrelevant. If it's the bridge address you need to look at for
+resolving interrupts, that would be true regardless.
 
-maxime
+> +               const __be32 *addr;
+> +
+> +               addr = of_get_property(ppnode, "reg", NULL);
+> +               if (addr)
+> +                       memcpy(laddr, addr, 3);
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/c2a55199/attachment-0001.sig>
+Can't you just adjust pdev to be ppdev in this case and then use the
+existing code to set laddr?
+
+Please copy the powerpc list on this. I worry that touching this
+function will break something.
+
+BTW, this code is moving to drivers/pci/ in 4.16.
+
+> +       } else {
+> +               laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
+> +               laddr[1] = laddr[2] = cpu_to_be32(0);
+> +       }
+> +
+>         rc = of_irq_parse_raw(laddr, out_irq);
+>         if (rc)
+>                 goto err;
+> --
+> 1.9.1
+>
