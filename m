@@ -1,127 +1,218 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:34:51 +0100
-Subject: [PULL 12/28] Revert "arm64: KVM: Hide PMU from guests when disabled"
+Date: Wed, 31 Jan 2018 10:34:47 +0100
+Subject: [PULL 08/28] KVM: arm/arm64: Support VGIC dist pend/active changes
+ for mapped IRQs
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-13-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0c0543a128bd1c6a4c8610d0d9d869053fa2fbf5 breaks migration and
-introduces a regression with existing userspace because it introduces an
-ordering requirement of setting up all VCPU features before writing ID
-registers which we didn't have before.
+For mapped IRQs (with the HW bit set in the LR) we have to follow some
+rules of the architecture.  One of these rules is that VM must not be
+allowed to deactivate a virtual interrupt with the HW bit set unless the
+physical interrupt is also active.
 
-Revert this commit for now until we have a proper fix.
+This works fine when injecting mapped interrupts, because we leave it up
+to the injector to either set EOImode==1 or manually set the active
+state of the physical interrupt.
 
+However, the guest can set virtual interrupt to be pending or active by
+writing to the virtual distributor, which could lead to deactivating a
+virtual interrupt with the HW bit set without the physical interrupt
+being active.
+
+We could set the physical interrupt to active whenever we are about to
+enter the VM with a HW interrupt either pending or active, but that
+would be really slow, especially on GICv2.  So we take the long way
+around and do the hard work when needed, which is expected to be
+extremely rare.
+
+When the VM sets the pending state for a HW interrupt on the virtual
+distributor we set the active state on the physical distributor, because
+the virtual interrupt can become active and then the guest can
+deactivate it.
+
+When the VM clears the pending state we also clear it on the physical
+side, because the injector might otherwise raise the interrupt.  We also
+clear the physical active state when the virtual interrupt is not
+active, since otherwise a SPEND/CPEND sequence from the guest would
+prevent signaling of future interrupts.
+
+Changing the state of mapped interrupts from userspace is not supported,
+and it's expected that userspace unmaps devices from VFIO before
+attempting to set the interrupt state, because the interrupt state is
+driven by hardware.
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 35 ++++++++++++++---------------------
- 1 file changed, 14 insertions(+), 21 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio.c | 71 +++++++++++++++++++++++++++++++++++++++----
+ virt/kvm/arm/vgic/vgic.c      |  7 +++++
+ virt/kvm/arm/vgic/vgic.h      |  1 +
+ 3 files changed, 73 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 503144f13af0..1830ebc227d1 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -881,25 +881,18 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index fdad95f62fa3..83d82bd7dc4e 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -16,6 +16,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <kvm/iodev.h>
++#include <kvm/arm_arch_timer.h>
+ #include <kvm/arm_vgic.h>
+ 
+ #include "vgic.h"
+@@ -143,10 +144,22 @@ static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
+ 	return vcpu;
  }
  
- /* Read a sanitised cpufeature ID register by sys_reg_desc */
--static u64 read_id_reg(struct kvm_vcpu *vcpu,
--		       struct sys_reg_desc const *r,
--		       bool raz)
-+static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
- {
- 	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
- 			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
- 	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
- 
--	switch (id) {
--	case SYS_ID_AA64DFR0_EL1:
--		if (!kvm_arm_pmu_v3_ready(vcpu))
--			val &= ~(0xfUL << ID_AA64DFR0_PMUVER_SHIFT);
--		break;
--	case SYS_ID_AA64PFR0_EL1:
-+	if (id == SYS_ID_AA64PFR0_EL1) {
- 		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
- 			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
- 				    task_pid_nr(current));
++/* Must be called with irq->irq_lock held */
++static void vgic_hw_irq_spending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
++				 bool is_uaccess)
++{
++	if (is_uaccess)
++		return;
 +
- 		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
--		break;
++	irq->pending_latch = true;
++	vgic_irq_set_phys_active(irq, true);
++}
++
+ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+ 			      gpa_t addr, unsigned int len,
+ 			      unsigned long val)
+ {
++	bool is_uaccess = !vgic_get_mmio_requester_vcpu();
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 	int i;
+ 	unsigned long flags;
+@@ -155,17 +168,45 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+ 		spin_lock_irqsave(&irq->irq_lock, flags);
+-		irq->pending_latch = true;
+-
++		if (irq->hw)
++			vgic_hw_irq_spending(vcpu, irq, is_uaccess);
++		else
++			irq->pending_latch = true;
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
+ 		vgic_put_irq(vcpu->kvm, irq);
  	}
- 
- 	return val;
-@@ -915,7 +908,7 @@ static bool __access_id_reg(struct kvm_vcpu *vcpu,
- 	if (p->is_write)
- 		return write_to_read_only(vcpu, p, r);
- 
--	p->regval = read_id_reg(vcpu, r, raz);
-+	p->regval = read_id_reg(r, raz);
- 	return true;
  }
  
-@@ -944,17 +937,17 @@ static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
-  * are stored, and for set_id_reg() we don't allow the effective value
-  * to be changed.
-  */
--static int __get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
--			void __user *uaddr, bool raz)
-+static int __get_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
-+			bool raz)
++/* Must be called with irq->irq_lock held */
++static void vgic_hw_irq_cpending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
++				 bool is_uaccess)
++{
++	if (is_uaccess)
++		return;
++
++	irq->pending_latch = false;
++
++	/*
++	 * We don't want the guest to effectively mask the physical
++	 * interrupt by doing a write to SPENDR followed by a write to
++	 * CPENDR for HW interrupts, so we clear the active state on
++	 * the physical side if the virtual interrupt is not active.
++	 * This may lead to taking an additional interrupt on the
++	 * host, but that should not be a problem as the worst that
++	 * can happen is an additional vgic injection.  We also clear
++	 * the pending state to maintain proper semantics for edge HW
++	 * interrupts.
++	 */
++	vgic_irq_set_phys_pending(irq, false);
++	if (!irq->active)
++		vgic_irq_set_phys_active(irq, false);
++}
++
+ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 			      gpa_t addr, unsigned int len,
+ 			      unsigned long val)
  {
- 	const u64 id = sys_reg_to_index(rd);
--	const u64 val = read_id_reg(vcpu, rd, raz);
-+	const u64 val = read_id_reg(rd, raz);
++	bool is_uaccess = !vgic_get_mmio_requester_vcpu();
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 	int i;
+ 	unsigned long flags;
+@@ -175,7 +216,10 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
  
- 	return reg_to_user(uaddr, &val, id);
+ 		spin_lock_irqsave(&irq->irq_lock, flags);
+ 
+-		irq->pending_latch = false;
++		if (irq->hw)
++			vgic_hw_irq_cpending(vcpu, irq, is_uaccess);
++		else
++			irq->pending_latch = false;
+ 
+ 		spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 		vgic_put_irq(vcpu->kvm, irq);
+@@ -202,8 +246,19 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+ 	return value;
  }
  
--static int __set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
--			void __user *uaddr, bool raz)
-+static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
-+			bool raz)
++/* Must be called with irq->irq_lock held */
++static void vgic_hw_irq_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
++				      bool active, bool is_uaccess)
++{
++	if (is_uaccess)
++		return;
++
++	irq->active = active;
++	vgic_irq_set_phys_active(irq, active);
++}
++
+ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+-				    bool new_active_state)
++				    bool active)
  {
- 	const u64 id = sys_reg_to_index(rd);
- 	int err;
-@@ -965,7 +958,7 @@ static int __set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		return err;
+ 	unsigned long flags;
+ 	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
+@@ -231,8 +286,12 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
  
- 	/* This is what we mean by invariant: you can't change it. */
--	if (val != read_id_reg(vcpu, rd, raz))
-+	if (val != read_id_reg(rd, raz))
- 		return -EINVAL;
- 
- 	return 0;
-@@ -974,25 +967,25 @@ static int __set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		      const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __get_id_reg(vcpu, rd, uaddr, false);
-+	return __get_id_reg(rd, uaddr, false);
+-	irq->active = new_active_state;
+-	if (new_active_state)
++	if (irq->hw)
++		vgic_hw_irq_change_active(vcpu, irq, active, !requester_vcpu);
++	else
++		irq->active = active;
++
++	if (irq->active)
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
+ 	else
+ 		spin_unlock_irqrestore(&irq->irq_lock, flags);
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index d57b3bf8eb36..c7c5ef190afa 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -144,6 +144,13 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
+ 	kfree(irq);
  }
  
- static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		      const struct kvm_one_reg *reg, void __user *uaddr)
++void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending)
++{
++	WARN_ON(irq_set_irqchip_state(irq->host_irq,
++				      IRQCHIP_STATE_PENDING,
++				      pending));
++}
++
+ bool vgic_get_phys_line_level(struct vgic_irq *irq)
  {
--	return __set_id_reg(vcpu, rd, uaddr, false);
-+	return __set_id_reg(rd, uaddr, false);
- }
- 
- static int get_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 			  const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __get_id_reg(vcpu, rd, uaddr, true);
-+	return __get_id_reg(rd, uaddr, true);
- }
- 
- static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 			  const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __set_id_reg(vcpu, rd, uaddr, true);
-+	return __set_id_reg(rd, uaddr, true);
- }
- 
- /* sys_reg_desc initialiser for known cpufeature ID registers */
+ 	bool line_level;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index d0787983a357..12c37b89f7a3 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -146,6 +146,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
+ bool vgic_get_phys_line_level(struct vgic_irq *irq);
++void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending);
+ void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
+ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
+ 			   unsigned long flags);
 -- 
 2.14.2
