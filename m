@@ -1,46 +1,88 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:35:06 +0100
-Subject: [PULL 27/28] KVM: arm/arm64: Fix userspace_irqchip_in_use counting
+Date: Wed, 31 Jan 2018 10:35:01 +0100
+Subject: [PULL 22/28] arm64: mm: Add additional parameter to
+ uaccess_ttbr0_enable
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-28-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-23-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were not decrementing the static key count in the right location.
-kvm_arch_vcpu_destroy() is only called to clean up after a failed
-VCPU create attempt, whereas kvm_arch_vcpu_free() is called on teardown
-of the VM as well.  Move the static key decrement call to
-kvm_arch_vcpu_free().
+Add an extra temporary register parameter to uaccess_ttbr0_enable which
+is about to be required for arm64 PAN support.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+This patch doesn't introduce any functional change but ensures that the
+kernel compiles once the KVM/ARM tree is merged with the arm64 tree by
+ensuring a trivially mergable conflict with commit
+27a921e75711d924617269e0ba4adb8bae9fd0d1
+("arm64: mm: Fix and re-enable ARM64_SW_TTBR0_PAN").
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arm.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/asm-uaccess.h | 4 ++--
+ arch/arm64/mm/cache.S                | 4 ++--
+ arch/arm64/xen/hypercall.S           | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 639dca0c0560..04ee7a327870 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -295,6 +295,9 @@ void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
+index b3da6c886835..b67563d2024c 100644
+--- a/arch/arm64/include/asm/asm-uaccess.h
++++ b/arch/arm64/include/asm/asm-uaccess.h
+@@ -31,7 +31,7 @@ alternative_if_not ARM64_HAS_PAN
+ alternative_else_nop_endif
+ 	.endm
  
- void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
- {
-+	if (vcpu->arch.has_run_once && unlikely(!irqchip_in_kernel(vcpu->kvm)))
-+		static_branch_dec(&userspace_irqchip_in_use);
-+
- 	kvm_mmu_free_memory_caches(vcpu);
- 	kvm_timer_vcpu_terminate(vcpu);
- 	kvm_pmu_vcpu_destroy(vcpu);
-@@ -304,8 +307,6 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+-	.macro	uaccess_ttbr0_enable, tmp1, tmp2
++	.macro	uaccess_ttbr0_enable, tmp1, tmp2, tmp3
+ alternative_if_not ARM64_HAS_PAN
+ 	save_and_disable_irq \tmp2		// avoid preemption
+ 	__uaccess_ttbr0_enable \tmp1
+@@ -42,7 +42,7 @@ alternative_else_nop_endif
+ 	.macro	uaccess_ttbr0_disable, tmp1
+ 	.endm
  
- void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
- {
--	if (vcpu->arch.has_run_once && unlikely(!irqchip_in_kernel(vcpu->kvm)))
--		static_branch_dec(&userspace_irqchip_in_use);
- 	kvm_arch_vcpu_free(vcpu);
- }
+-	.macro	uaccess_ttbr0_enable, tmp1, tmp2
++	.macro	uaccess_ttbr0_enable, tmp1, tmp2, tmp3
+ 	.endm
+ #endif
  
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index bedd23da83f4..5a52811f47e9 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -49,7 +49,7 @@ ENTRY(flush_icache_range)
+  *	- end     - virtual end address of region
+  */
+ ENTRY(__flush_cache_user_range)
+-	uaccess_ttbr0_enable x2, x3
++	uaccess_ttbr0_enable x2, x3, x4
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x4, x0, x3
+@@ -80,7 +80,7 @@ ENDPROC(__flush_cache_user_range)
+  *	- end     - virtual end address of region
+  */
+ ENTRY(invalidate_icache_range)
+-	uaccess_ttbr0_enable x2, x3
++	uaccess_ttbr0_enable x2, x3, x4
+ 
+ 	invalidate_icache_by_line x0, x1, x2, x3, 2f
+ 	mov	x0, xzr
+diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
+index 401ceb71540c..acdbd2c9e899 100644
+--- a/arch/arm64/xen/hypercall.S
++++ b/arch/arm64/xen/hypercall.S
+@@ -101,7 +101,7 @@ ENTRY(privcmd_call)
+ 	 * need the explicit uaccess_enable/disable if the TTBR0 PAN emulation
+ 	 * is enabled (it implies that hardware UAO and PAN disabled).
+ 	 */
+-	uaccess_ttbr0_enable x6, x7
++	uaccess_ttbr0_enable x6, x7, x8
+ 	hvc XEN_IMM
+ 
+ 	/*
 -- 
 2.14.2
