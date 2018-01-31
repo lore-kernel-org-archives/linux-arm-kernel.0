@@ -1,62 +1,55 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Thu, 1 Feb 2018 02:11:36 +0800
-Subject: [PATCH v2 07/16] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <20180129174559.1866-8-marc.zyngier@arm.com>
-References: <20180129174559.1866-8-marc.zyngier@arm.com>
-Message-ID: <201802010127.RqriruTy%fengguang.wu@intel.com>
+Date: Thu, 1 Feb 2018 05:47:20 +0800
+Subject: [PATCH v2 08/16] iio: adc: sun4i-gpadc-iio: rework: add
+ interrupt support
+In-Reply-To: <20180128232919.12639-9-embed3d@gmail.com>
+References: <20180128232919.12639-9-embed3d@gmail.com>
+Message-ID: <201802010523.kyQGQJeE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Philipp,
 
-I love your patch! Yet something to improve:
+Thank you for the patch! Yet something to improve:
 
-[auto build test ERROR on arm64/for-next/core]
-[cannot apply to kvmarm/next linus/master v4.15 next-20180126]
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.15 next-20180126]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Marc-Zyngier/arm64-Add-SMCCC-v1-1-support-and-CVE-2017-5715-Spectre-variant-2-mitigation/20180131-234336
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+url:    https://github.com/0day-ci/linux/commits/Philipp-Rossak/IIO-based-thermal-sensor-driver-for-Allwinner-H3-and-A83T-SoC/20180201-043415
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 7.2.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+        make.cross ARCH=xtensa 
 
-Note: the linux-review/Marc-Zyngier/arm64-Add-SMCCC-v1-1-support-and-CVE-2017-5715-Spectre-variant-2-mitigation/20180131-234336 HEAD 8c17f9fc363230480b44d05f728350e6fa448bd4 builds fine.
+Note: the linux-review/Philipp-Rossak/IIO-based-thermal-sensor-driver-for-Allwinner-H3-and-A83T-SoC/20180201-043415 HEAD e571c3ced84a9d7f150cb2d239919d31d25114e2 builds fine.
       It only hurts bisectibility.
 
 All errors (new ones prefixed by >>):
 
-   arch/arm64/kvm/../../../virt/kvm/arm/psci.c: In function 'kvm_arm_get_fw_reg':
->> arch/arm64/kvm/../../../virt/kvm/arm/psci.c:443:9: error: too many arguments to function 'kvm_psci_version'
-      val = kvm_psci_version(vcpu, vcpu->kvm);
-            ^~~~~~~~~~~~~~~~
-   arch/arm64/kvm/../../../virt/kvm/arm/psci.c:237:5: note: declared here
-    int kvm_psci_version(struct kvm_vcpu *vcpu)
-        ^~~~~~~~~~~~~~~~
+   drivers/iio/adc/sun4i-gpadc-iio.c: In function 'sunxi_irq_thread':
+>> drivers/iio/adc/sun4i-gpadc-iio.c:448:29: error: 'SUN8I_H3_THS_STAT' undeclared (first use in this function); did you mean 'SUN8I_H3_THS_INTC'?
+     regmap_write(info->regmap, SUN8I_H3_THS_STAT, info->data->irq_clear_map);
+                                ^~~~~~~~~~~~~~~~~
+                                SUN8I_H3_THS_INTC
+   drivers/iio/adc/sun4i-gpadc-iio.c:448:29: note: each undeclared identifier is reported only once for each function it appears in
 
-vim +/kvm_psci_version +443 arch/arm64/kvm/../../../virt/kvm/arm/psci.c
+vim +448 drivers/iio/adc/sun4i-gpadc-iio.c
 
-   436	
-   437	int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-   438	{
-   439		if (reg->id == KVM_REG_ARM_PSCI_VERSION) {
-   440			void __user *uaddr = (void __user *)(long)reg->addr;
-   441			u64 val;
-   442	
- > 443			val = kvm_psci_version(vcpu, vcpu->kvm);
-   444			if (val == KVM_ARM_PSCI_0_1)
-   445				return -EINVAL;
-   446			if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
-   447				return -EFAULT;
-   448	
-   449			return 0;
-   450		}
+   443	
+   444	static irqreturn_t sunxi_irq_thread(int irq, void *data)
+   445	{
+   446		struct sun4i_gpadc_iio *info = data;
+   447	
+ > 448		regmap_write(info->regmap, SUN8I_H3_THS_STAT, info->data->irq_clear_map);
+   449	
+   450		thermal_zone_device_update(info->tzd, THERMAL_EVENT_TEMP_SAMPLE);
    451	
-   452		return -EINVAL;
+   452		return IRQ_HANDLED;
    453	}
    454	
 
@@ -67,6 +60,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 37478 bytes
+Size: 52622 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/15788a39/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/9f9857b6/attachment-0001.gz>
