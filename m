@@ -1,109 +1,127 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:34:55 +0100
-Subject: [PULL 16/28] arm: KVM: Add optimized PIPT icache flushing
+Date: Wed, 31 Jan 2018 10:34:52 +0100
+Subject: [PULL 13/28] KVM: arm/arm64: Detangle kvm_mmu.h from kvm_hyp.h
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-17-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-14-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Calling __cpuc_coherent_user_range to invalidate the icache on
-a PIPT icache machine has some pointless overhead, as it starts
-by cleaning the dcache to the PoU, while we're guaranteed to
-have already cleaned it to the PoC.
+kvm_hyp.h has an odd dependency on kvm_mmu.h, which makes the
+opposite inclusion impossible. Let's start with breaking that
+useless dependency.
 
-As KVM is the only user of such a feature, let's implement some
-ad-hoc cache flushing in kvm_mmu.h. Should it become useful to
-other subsystems, it can be moved to a more global location.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_hyp.h |  2 ++
- arch/arm/include/asm/kvm_mmu.h | 32 +++++++++++++++++++++++++++++---
- 2 files changed, 31 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h   | 1 -
+ arch/arm/kvm/hyp/switch.c        | 1 +
+ arch/arm/kvm/hyp/tlb.c           | 1 +
+ arch/arm64/include/asm/kvm_hyp.h | 1 -
+ arch/arm64/kvm/hyp/debug-sr.c    | 1 +
+ arch/arm64/kvm/hyp/switch.c      | 1 +
+ arch/arm64/kvm/hyp/tlb.c         | 1 +
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 1 +
+ 8 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index 76368de7237b..1ab8329e9ff7 100644
+index ab20ffa8b9e7..76368de7237b 100644
 --- a/arch/arm/include/asm/kvm_hyp.h
 +++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -68,6 +68,8 @@
- #define HIFAR		__ACCESS_CP15(c6, 4, c0, 2)
- #define HPFAR		__ACCESS_CP15(c6, 4, c0, 4)
- #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
-+#define BPIALLIS	__ACCESS_CP15(c7, 0, c1, 6)
-+#define ICIMVAU		__ACCESS_CP15(c7, 0, c5, 1)
- #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
- #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
- #define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 9fa4b2520974..bc8d21e76637 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -37,6 +37,8 @@
+@@ -21,7 +21,6 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ #include <asm/cp15.h>
+-#include <asm/kvm_mmu.h>
+ #include <asm/vfp.h>
  
- #include <linux/highmem.h>
- #include <asm/cacheflush.h>
-+#include <asm/cputype.h>
-+#include <asm/kvm_hyp.h>
- #include <asm/pgalloc.h>
- #include <asm/stage2_pgtable.h>
+ #define __hyp_text __section(.hyp.text) notrace
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 330c9ce34ba5..ae45ae96aac2 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -18,6 +18,7 @@
  
-@@ -157,6 +159,8 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
- 						  kvm_pfn_t pfn,
- 						  unsigned long size)
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ __asm__(".arch_extension     virt");
+ 
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+index 6d810af2d9fd..c0edd450e104 100644
+--- a/arch/arm/kvm/hyp/tlb.c
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ /**
+  * Flush per-VMID TLBs
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 08d3bb66c8b7..f26f9cd70c72 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -20,7 +20,6 @@
+ 
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+-#include <asm/kvm_mmu.h>
+ #include <asm/sysreg.h>
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 321c9c05dd9e..360455f86346 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -21,6 +21,7 @@
+ #include <asm/debug-monitors.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ #define read_debug(r,n)		read_sysreg(r##n##_el1)
+ #define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index f7c651f3a8c0..f3d8bed096f5 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -21,6 +21,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
+ 
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 73464a96c365..131c7772703c 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/tlbflush.h>
+ 
+ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index d7fd46fe9efb..4fe6e797e8b3 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -21,6 +21,7 @@
+ 
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
+ 
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
  {
-+	u32 iclsz;
-+
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
- 	 * either VIPT or PIPT, there is a potential problem where the host
-@@ -181,18 +185,40 @@ static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
- 		return;
- 	}
- 
--	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
-+	/*
-+	 * CTR IminLine contains Log2 of the number of words in the
-+	 * cache line, so we can get the number of words as
-+	 * 2 << (IminLine - 1).  To get the number of bytes, we
-+	 * multiply by 4 (the number of bytes in a 32-bit word), and
-+	 * get 4 << (IminLine).
-+	 */
-+	iclsz = 4 << (read_cpuid(CPUID_CACHETYPE) & 0xf);
-+
- 	while (size) {
- 		void *va = kmap_atomic_pfn(pfn);
-+		void *end = va + PAGE_SIZE;
-+		void *addr = va;
- 
--		__cpuc_coherent_user_range((unsigned long)va,
--					   (unsigned long)va + PAGE_SIZE);
-+		do {
-+			write_sysreg(addr, ICIMVAU);
-+			addr += iclsz;
-+		} while (addr < end);
-+
-+		dsb(ishst);
-+		isb();
- 
- 		size -= PAGE_SIZE;
- 		pfn++;
- 
- 		kunmap_atomic(va);
- 	}
-+
-+	/* Check if we need to invalidate the BTB */
-+	if ((read_cpuid_ext(CPUID_EXT_MMFR1) >> 28) != 4) {
-+		write_sysreg(0, BPIALLIS);
-+		dsb(ishst);
-+		isb();
-+	}
- }
- 
- static inline void __kvm_flush_dcache_pte(pte_t pte)
 -- 
 2.14.2
