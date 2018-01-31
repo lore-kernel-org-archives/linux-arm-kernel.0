@@ -1,79 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 31 Jan 2018 14:38:15 +0000
-Subject: [PATCH v2 16/16] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
- hardening support
-In-Reply-To: <CAKv+Gu-XidYPh0hi1nzG5m0AO7EfRE6bnKfxCToG+9zsmvzmNg@mail.gmail.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-17-marc.zyngier@arm.com>
- <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
- <49853e5e-f093-2e79-1cfb-182f51fcd6a0@arm.com>
- <CAKv+Gu-XidYPh0hi1nzG5m0AO7EfRE6bnKfxCToG+9zsmvzmNg@mail.gmail.com>
-Message-ID: <CAKv+Gu-L0WOLSUbcHSTQ_FVDNSJoXQv25ExUmtv8ZEYhkCSQ-Q@mail.gmail.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Wed, 31 Jan 2018 14:47:53 +0000
+Subject: [linux-sunxi] Re: [PATCH v6 2/2] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <20180131074212.7hvb3nqkt22h2chg@flea.lan>
+References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+ <201801260759.RyNhDZz4%fengguang.wu@intel.com>
+ <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
+ <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
+ <20180131030807.GA19945@bart.dudau.co.uk>
+ <20180131074212.7hvb3nqkt22h2chg@flea.lan>
+Message-ID: <20180131144753.GB19945@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2018 at 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 31 January 2018 at 14:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 31/01/18 13:56, Hanjun Guo wrote:
->>> Hi Marc,
->>>
->>> On 2018/1/30 1:45, Marc Zyngier wrote:
->>>>  static int enable_psci_bp_hardening(void *data)
->>>>  {
->>>>      const struct arm64_cpu_capabilities *entry = data;
->>>>
->>>> -    if (psci_ops.get_version)
->>>> +    if (psci_ops.get_version) {
->>>> +            if (check_smccc_arch_workaround_1(entry))
->>>> +                    return 0;
->>>
->>> If I'm using the new version SMCCC, the firmware have the choicARM_SMCCC_ARCH_WORKAROUND_1e to decide
->>> whether this machine needs the workaround, even if the CPU is vulnerable
->>> for CVE-2017-5715, but..
->>>
->>>> +
->>>>              install_bp_hardening_cb(entry,
->>>>                                     (bp_hardening_cb_t)psci_ops.get_version,
->>>>                                     __psci_hyp_bp_inval_start,
->>>>                                     __psci_hyp_bp_inval_end);
->>>
->>> ..the code above seems will enable get_psci_version() for CPU and will
->>> trap to trust firmware even the new version of firmware didn't say
->>> we need the workaround, did I understand it correctly?
->>
->> Well, you only get there if we've established that your CPU is affected
->> (it has an entry matching its MIDR with the HARDEN_BRANCH_PREDICTOR
->> capability), and that entry points to enable_psci_bp_hardening. It is
->> not the firmware that decides whether we need hardening, but the kernel.
->> The firmware merely provides a facility to apply the hardening.
->>
->>> I'm ask this because some platform will not expose to users to
->>> take advantage of CVE-2017-5715, and we can use different firmware
->>> to report we need such workaround or not, then use a single kernel
->>> image for both vulnerable platforms and no vulnerable ones.
->>
->> You cannot have your cake and eat it. If you don't want to workaround
->> the issue, you can disable the hardening. But asking for the same kernel
->> to do both depending on what the firmware reports doesn't make much
->> sense to me.
->
-> The SMCCC v1.1. document does appear to imply that systems that
-> implement SMCCC v1.1 but don't implement ARM_SMCCC_ARCH_WORKAROUND_1
-> should be assumed to be unaffected.
->
-> """
-> If the discovery call returns NOT_SUPPORTED:
-> ? SMCCC_ARCH_WORKAROUND_1 must not be invoked on any PE in the system, and
-> ? none of the PEs in the system require firmware mitigation for CVE-2017-5715.
-> """
->
-> How to deal with conflicting information in this regard (quirk table
-> vs firmware implementation) is a matter of policy, of course.
+On Wed, Jan 31, 2018 at 08:42:12AM +0100, Maxime Ripard wrote:
+> Hi Liviu,
 
-... and actually, perhaps it makes sense for the
-SMCCC_ARCH_WORKAROUND_1 check to be completely independent of MIDR
-based errata matching?
+Hi Maxime,
 
-I.e., if SMCCC v1.1 and SMCCC_ARCH_WORKAROUND_1 are both implemented,
-we should probably invoke it even if the MIDR is not known to belong
-to an affected implementation.
+> 
+> On Wed, Jan 31, 2018 at 03:08:08AM +0000, Liviu Dudau wrote:
+> > On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
+> > > Hi Maxime,
+> > > 
+> > > On Fri, 26 Jan 2018 09:46:58 +0800
+> > > Yong <yong.deng@magewell.com> wrote:
+> > > 
+> > > > Hi Maxime,
+> > > > 
+> > > > Do you have any experience in solving this problem?
+> > > > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
+> > > 
+> > > Got it.
+> > > Should I add 'depends on ARM' in Kconfig?
+> > 
+> > No, I don't think you should do that, you should fix the code.
+> > 
+> > The dma_addr_t addr that you've got is ideally coming from dma_alloc_coherent(),
+> > in which case the addr is already "suitable" for use by the device (because the
+> > bus where the device is attached to does all the address translations).
+> 
+> Like we're discussing in that other part of the thread with Thierry
+> and Arnd, things are slightly more complicated than that :)
+
+Yeah, sorry, my threading of the discussion was broken and I've seen the rest of the 
+thread after I have replied. My bad!
+
+> 
+> In our case, the bus where the device is attached will not do the
+> address translations, and shouldn't.
+
+In my view, the bus is already doing address translation at physical level, AFAIU it
+remaps the memory to zero. What you (we?) need is a simple bus driver that registers
+the correct virt_to_bus()/bus_to_virt() hooks for the device that do this translation
+at the DMA API level as well.
+
+> 
+> > If you apply PHYS_OFFSET forcefully to it you might get unexpected
+> > results.
+> 
+> Out of curiosity, what would be these unexpected results?
+
+If in the future (or a parallel world setup) the device is sitting behind an IOMMU, the
+addr value might well be smaller than PHYS_OFFSET and you will under-wrap, possibly
+starting to hit kernel physical addresses (or anything sitting at the top of the physical
+memory).
+
+>From my time playing with IOMMUs and PCI domains, I've learned to treat the dma_addr_t as
+a cookie value and never try to do arithmetics with it.
+
+Best regards,
+Liviu
+
+> 
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
