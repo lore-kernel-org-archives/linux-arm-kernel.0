@@ -1,127 +1,193 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:34:52 +0100
-Subject: [PULL 13/28] KVM: arm/arm64: Detangle kvm_mmu.h from kvm_hyp.h
+Date: Wed, 31 Jan 2018 10:34:53 +0100
+Subject: [PULL 14/28] KVM: arm/arm64: Split dcache/icache flushing
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-14-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-15-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-kvm_hyp.h has an odd dependency on kvm_mmu.h, which makes the
-opposite inclusion impossible. Let's start with breaking that
-useless dependency.
+As we're about to introduce opportunistic invalidation of the icache,
+let's split dcache and icache flushing.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_hyp.h   | 1 -
- arch/arm/kvm/hyp/switch.c        | 1 +
- arch/arm/kvm/hyp/tlb.c           | 1 +
- arch/arm64/include/asm/kvm_hyp.h | 1 -
- arch/arm64/kvm/hyp/debug-sr.c    | 1 +
- arch/arm64/kvm/hyp/switch.c      | 1 +
- arch/arm64/kvm/hyp/tlb.c         | 1 +
- virt/kvm/arm/hyp/vgic-v2-sr.c    | 1 +
- 8 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 60 ++++++++++++++++++++++++++++------------
+ arch/arm64/include/asm/kvm_mmu.h | 13 +++++++--
+ virt/kvm/arm/mmu.c               | 20 ++++++++++----
+ 3 files changed, 67 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index ab20ffa8b9e7..76368de7237b 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -21,7 +21,6 @@
- #include <linux/compiler.h>
- #include <linux/kvm_host.h>
- #include <asm/cp15.h>
--#include <asm/kvm_mmu.h>
- #include <asm/vfp.h>
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index fa6f2174276b..9fa4b2520974 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -126,21 +126,12 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
+ }
  
- #define __hyp_text __section(.hyp.text) notrace
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 330c9ce34ba5..ae45ae96aac2 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -18,6 +18,7 @@
- 
- #include <asm/kvm_asm.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- 
- __asm__(".arch_extension     virt");
- 
-diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
-index 6d810af2d9fd..c0edd450e104 100644
---- a/arch/arm/kvm/hyp/tlb.c
-+++ b/arch/arm/kvm/hyp/tlb.c
-@@ -19,6 +19,7 @@
-  */
- 
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- 
- /**
-  * Flush per-VMID TLBs
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 08d3bb66c8b7..f26f9cd70c72 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -20,7 +20,6 @@
- 
- #include <linux/compiler.h>
- #include <linux/kvm_host.h>
--#include <asm/kvm_mmu.h>
- #include <asm/sysreg.h>
- 
- #define __hyp_text __section(.hyp.text) notrace
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 321c9c05dd9e..360455f86346 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -21,6 +21,7 @@
- #include <asm/debug-monitors.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- 
- #define read_debug(r,n)		read_sysreg(r##n##_el1)
- #define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index f7c651f3a8c0..f3d8bed096f5 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -21,6 +21,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- #include <asm/fpsimd.h>
- #include <asm/debug-monitors.h>
- 
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index 73464a96c365..131c7772703c 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -16,6 +16,7 @@
-  */
- 
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- #include <asm/tlbflush.h>
- 
- static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index d7fd46fe9efb..4fe6e797e8b3 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -21,6 +21,7 @@
- 
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- 
- static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+-static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+-					       kvm_pfn_t pfn,
+-					       unsigned long size)
++static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
++					     kvm_pfn_t pfn,
++					     unsigned long size)
  {
+ 	/*
+-	 * If we are going to insert an instruction page and the icache is
+-	 * either VIPT or PIPT, there is a potential problem where the host
+-	 * (or another VM) may have used the same page as this guest, and we
+-	 * read incorrect data from the icache.  If we're using a PIPT cache,
+-	 * we can invalidate just that page, but if we are using a VIPT cache
+-	 * we need to invalidate the entire icache - damn shame - as written
+-	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
+-	 *
+-	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
+-	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
++	 * Clean the dcache to the Point of Coherency.
+ 	 *
+ 	 * We need to do this through a kernel mapping (using the
+ 	 * user-space mapping has proved to be the wrong
+@@ -155,19 +146,52 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+ 
+ 		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+ 
+-		if (icache_is_pipt())
+-			__cpuc_coherent_user_range((unsigned long)va,
+-						   (unsigned long)va + PAGE_SIZE);
+-
+ 		size -= PAGE_SIZE;
+ 		pfn++;
+ 
+ 		kunmap_atomic(va);
+ 	}
++}
+ 
+-	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
++static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
++						  kvm_pfn_t pfn,
++						  unsigned long size)
++{
++	/*
++	 * If we are going to insert an instruction page and the icache is
++	 * either VIPT or PIPT, there is a potential problem where the host
++	 * (or another VM) may have used the same page as this guest, and we
++	 * read incorrect data from the icache.  If we're using a PIPT cache,
++	 * we can invalidate just that page, but if we are using a VIPT cache
++	 * we need to invalidate the entire icache - damn shame - as written
++	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
++	 *
++	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
++	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
++	 */
++
++	VM_BUG_ON(size & ~PAGE_MASK);
++
++	if (icache_is_vivt_asid_tagged())
++		return;
++
++	if (!icache_is_pipt()) {
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
++		return;
++	}
++
++	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
++	while (size) {
++		void *va = kmap_atomic_pfn(pfn);
++
++		__cpuc_coherent_user_range((unsigned long)va,
++					   (unsigned long)va + PAGE_SIZE);
++
++		size -= PAGE_SIZE;
++		pfn++;
++
++		kunmap_atomic(va);
+ 	}
+ }
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..8034b96fb3a4 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -230,19 +230,26 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
+ }
+ 
+-static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+-					       kvm_pfn_t pfn,
+-					       unsigned long size)
++static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
++					     kvm_pfn_t pfn,
++					     unsigned long size)
+ {
+ 	void *va = page_address(pfn_to_page(pfn));
+ 
+ 	kvm_flush_dcache_to_poc(va, size);
++}
+ 
++static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
++						  kvm_pfn_t pfn,
++						  unsigned long size)
++{
+ 	if (icache_is_aliasing()) {
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
+ 	} else if (is_kernel_in_hyp_mode() || !icache_is_vpipt()) {
+ 		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
++		void *va = page_address(pfn_to_page(pfn));
++
+ 		flush_icache_range((unsigned long)va,
+ 				   (unsigned long)va + size);
+ 	}
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b36945d49986..2174244f6317 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1257,10 +1257,16 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+ 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+ }
+ 
+-static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+-				      unsigned long size)
++static void clean_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
++				    unsigned long size)
+ {
+-	__coherent_cache_guest_page(vcpu, pfn, size);
++	__clean_dcache_guest_page(vcpu, pfn, size);
++}
++
++static void invalidate_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
++					 unsigned long size)
++{
++	__invalidate_icache_guest_page(vcpu, pfn, size);
+ }
+ 
+ static void kvm_send_hwpoison_signal(unsigned long address,
+@@ -1391,7 +1397,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
+ 		}
+-		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
++		clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
++		invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
++
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, mem_type);
+@@ -1401,7 +1409,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_pfn_dirty(pfn);
+ 			mark_page_dirty(kvm, gfn);
+ 		}
+-		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE);
++		clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
++		invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
++
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
+ 	}
+ 
 -- 
 2.14.2
