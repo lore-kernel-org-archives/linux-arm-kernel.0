@@ -1,205 +1,265 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 31 Jan 2018 10:28:39 +0530
-Subject: [PATCH v6 01/41] dt-bindings: clock: Add new bindings for TI
- Davinci PLL clocks
-In-Reply-To: <7064a0d6-0969-81a0-00af-84cca339b813@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-2-git-send-email-david@lechnology.com>
- <20180129195315.bjanym7pmeh7bhaa@rob-hp-laptop>
- <ffec7cac-22cd-f19b-8c1b-ce3223606d20@lechnology.com>
- <CAL_JsqK+c-C9VJnEOr0Em3Y-dtvE+CSbsc6m-0JoWJSZxKeR_g@mail.gmail.com>
- <7064a0d6-0969-81a0-00af-84cca339b813@lechnology.com>
-Message-ID: <a31b79a0-cf09-8c59-5b14-33daf6c1dccb@ti.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Wed, 31 Jan 2018 11:20:20 +0530
+Subject: [PATCH] arm64: kdump: retain reserved memory regions
+In-Reply-To: <CAKv+Gu-Y+Y-h8q0jW4p+ckz76NFZBYLfdhvX=qtzvTnkJWS0FA@mail.gmail.com>
+References: <20180110100943.6082-1-takahiro.akashi@linaro.org>
+ <5A55F87F.2080501@arm.com> <20180111113840.GF18820@linaro.org>
+ <5A61D90E.1000907@arm.com> <20180129081225.GA23847@linaro.org>
+ <CAKv+Gu-Y+Y-h8q0jW4p+ckz76NFZBYLfdhvX=qtzvTnkJWS0FA@mail.gmail.com>
+Message-ID: <CACi5LpNyKYCouWERPMYONO09kcvfnyM06_88QSu7kS8Qa2KeuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 January 2018 12:16 AM, David Lechner wrote:
-> On 01/30/2018 08:50 AM, Rob Herring wrote:
->> On Mon, Jan 29, 2018 at 3:14 PM, David Lechner <david@lechnology.com>
->> wrote:
->>> On 01/29/2018 01:53 PM, Rob Herring wrote:
->>>>
->>>> On Sat, Jan 20, 2018 at 11:13:40AM -0600, David Lechner wrote:
->>>>>
->>>>> This adds a new binding for the PLL IP blocks in the mach-davinci
->>>>> family of processors. Currently, only da850 has device tree support
->>>>> but these bindings can also work for other SoCs in this family just
->>>>> by adding new compatible strings.
->>>>>
->>>>> Note: Although these PLL controllers are very similar to the TI
->>>>> Keystone
->>>>> SoCs, we are not re-using those bindings. The Keystone bindings use a
->>>>> legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
->>>>> have a slightly different PLL register layout and a number of quirks
->>>>> that can't be handled by the existing bindings, so the keystone
->>>>> bindings
->>>>> could not be used as-is anyway.
->>>>>
->>>>> Signed-off-by: David Lechner <david@lechnology.com>
->>>>> ---
->>>>>
->>>>> v6 changes:
->>>>> - Added clock-names property
->>>>> - Added ti,clkmode-square-wave property
->>>>> - Added pllout child node
->>>>> - Added obsclk child node
->>>>> - Expanded examples
->>>>>
->>>>> ?? .../devicetree/bindings/clock/ti/davinci/pll.txt?? | 96
->>>>> ++++++++++++++++++++++
->>>>> ?? 1 file changed, 96 insertions(+)
->>>>> ?? create mode 100644
->>>>> Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>>>>
->>>>> diff --git
->>>>> a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>>>> b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>>>> new file mode 100644
->>>>> index 0000000..36998e1
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
->>>>> @@ -0,0 +1,96 @@
->>>>> +Binding for TI DaVinci PLL Controllers
->>>>> +
->>>>> +The PLL provides clocks to most of the components on the SoC. In
->>>>> addition
->>>>> +to the PLL itself, this controller also contains bypasses, gates,
->>>>> dividers,
->>>>> +an multiplexers for various clock signals.
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible: shall be one of:
->>>>> +?????? - "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
->>>>> +?????? - "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
->>>>> +- reg: physical base address and size of the controller's register
->>>>> area.
->>>>> +- clocks: phandles corresponding to the clock names
->>>>> +- clock-names: names of the clock sources - depends on compatible
->>>>> string
->>>>> +?????? - for "ti,da850-pll0", shall be "clksrc", "extclksrc"
->>>>> +?????? - for "ti,da850-pll1", shall be "clksrc"
->>>>> +
->>>>> +Optional properties:
->>>>> +- ti,clkmode-square-wave: Indicates that the the board is supplying a
->>>>> square
->>>>> +?????? wave input on the OSCIN pin instead of using a crystal
->>>>> oscillator.
->>>>> +?????? This property is only valid when compatible = "ti,da850-pll0".
->>>>> +
->>>>> +
->>>>> +Optional child nodes:
->>>>> +
->>>>> +pllout
->>>>> +?????? Describes the main PLL clock output (before POSTDIV). The node
->>>>> name must
->>>>> +?????? be "pllout".
->>>>> +
->>>>> +?????? Required properties:
->>>>> +?????? - #clock-cells: shall be 0
->>>>> +
->>>>> +sysclk
->>>>> +?????? Describes the PLLDIVn divider clocks that provide the SYSCLKn
->>>>> clock
->>>>> +?????? domains. The node name must be "sysclk". Consumers of this
->>>>> node
->>>>> should
->>>>> +?????? use "n" in "SYSCLKn" as the index parameter for the clock
->>>>> cell.
->>>>> +
->>>>> +?????? Required properties:
->>>>> +?????? - #clock-cells: shall be 1
->>>>> +
->>>>> +auxclk
->>>>> +?????? Describes the AUXCLK output of the PLL. The node name must be
->>>>> "auxclk".
->>>>> +?????? This child node is only valid when compatible =
->>>>> "ti,da850-pll0".
->>>>> +
->>>>> +?????? Required properties:
->>>>> +?????? - #clock-cells: shall be 0
->>>>> +
->>>>> +obsclk
->>>>> +?????? Describes the OBSCLK output of the PLL. The node name must be
->>>>> "obsclk".
->>>>> +
->>>>> +?????? Required properties:
->>>>> +?????? - #clock-cells: shall be 0
->>>>
->>>>
->>>> So why have all these child nodes vs. just defining a single number
->>>> space of clock ids?
->>>>
->>>> Rob
->>>>
->>>
->>> I think that it makes the bindings more self-documenting. Not all
->>> PLLs have
->>> all of possible types of output clocks, so the presence or absence of a
->>> child node indicates if a PLL actually has that output or not.
->>
->> Doesn't the compatible string do that?
-> 
-> Sure.
-> 
->>
->>> It is also complicated by the fact that one of the child nodes (sysclk)
->>> is? already an array of clocks.
->>>
->>> To do what you are suggesting might look something like this...
->>>
->>> ---
->>>
->>> Required properties:
->>> - compatible: shall be one of:
->>> ???????? - "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
->>> ???????? - "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
->>> - reg: physical base address and size of the controller's register area.
->>> - clocks: phandles corresponding to the clock names
->>> - clock-names: names of the clock sources - depends on compatible string
->>> ???????? - for "ti,da850-pll0", shall be "clksrc", "extclksrc"
->>> ???????? - for "ti,da850-pll1", shall be "clksrc"
->>> - #clock-cells: shall be set to <2>.
->>>
->>> Consumers:
->>>
->>> The clock cell values for consumers work as follows...
->>>
->>> The first index is one of the constants defined in ti-davinci-pll.h
->>>
->>> The second index is 0 unless the first index is TI_DAVINCI_SYSCLK. In
->>> the
->>> case
->>> of TI_DAVINCI_SYSCLK the second index the SYSCLK domain ID (n in
->>> SYSCLKn).
->>>
->>> For compatible = "ti,da850-pll0":
->>> ???????? - <&pll0 TI_DAVINCI_PLLOUT 0> is the PLLOUT clock
->>> ???????? - <&pll0 TI_DAVINCI_SYSCLK n> is one of the SYSCLKn clock
->>> domains
->>> where n is 1 to 7
->>> ???????? - <&pll0 TI_DAVINCI_AUXCLK 0> is the AUXCLK clock domain
->>> ???????? - <&pll0 TI_DAVINCI_OBSCLK 0> is the OBSCLK clock domain
->>> ???????? - all other index combinations are invalid
->>>
->>> For compatible = "ti,da850-pll1":
->>> ???????? - <&pll0 TI_DAVINCI_SYSCLK n> is one of the SYSCLKn clock
->>> domains
->>> where n is 1 to 3
->>> ???????? - <&pll0 TI_DAVINCI_OBSCLK 0> is the OBSCLK clock domain
->>> ???????? - all other index combinations are invalid
->>
->> You don't really need 2 cells here. I guess if you want to keep the
->> child nodes, that is fine.
-> 
-> OK, I can see how it could work with one cell.
-> 
-> Since this is already implemented and working, I'm inclined to leave it
-> as-is if it is "good enough". But, I am fine going either way if there
-> are other opinions on the matter.
+Hi Ard, Akashi,
 
-FWIW, I think the current binding is fine too. The clocks are of
-different kind (fixed clock, fixed divider, flexible divider etc). So,
-its slightly better to have child nodes, I guess.
+On Mon, Jan 29, 2018 at 5:41 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 29 January 2018 at 08:12, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+>> James,
+>>
+>> On Fri, Jan 19, 2018 at 11:39:58AM +0000, James Morse wrote:
+>>> Hi Akashi,
+>>>
+>>> On 11/01/18 11:38, AKASHI Takahiro wrote:
+>>> > On Wed, Jan 10, 2018 at 11:26:55AM +0000, James Morse wrote:
+>>> >> On 10/01/18 10:09, AKASHI Takahiro wrote:
+>>> >>> This is a fix against the issue that crash dump kernel may hang up
+>>> >>> during booting, which can happen on any ACPI-based system with "ACPI
+>>> >>> Reclaim Memory."
+>>>
+>>> >>> (diagnosis)
+>>> >>> * This fault is a data abort, alignment fault (ESR=0x96000021)
+>>> >>>   during reading out ACPI table.
+>>> >>> * Initial ACPI tables are normally stored in system ram and marked as
+>>> >>>   "ACPI Reclaim memory" by the firmware.
+>>> >>> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+>>> >>>   memory as MEMBLOCK_NOMAP"), those regions' attribute were changed
+>>> >>>   removing NOMAP bit and they are instead "memblock-reserved".
+>>> >>> * When crash dump kernel boots up, it tries to accesses ACPI tables by
+>>> >>>   ioremap'ing them (through acpi_os_ioremap()).
+>>> >>> * Since those regions are not included in device tree's
+>>> >>>   "usable-memory-range" and so not recognized as part of crash dump
+>>> >>>   kernel's system ram, ioremap() will create a non-cacheable mapping here.
+>>> >>
+>>> >> Ugh, because acpi_os_ioremap() looks at the efi memory map through the prism of
+>>> >> what we pulled into memblock, which is different during kdump.
+>>> >>
+>>> >> Is an alternative to teach acpi_os_ioremap() to ask
+>>> >> efi_mem_attributes() directly for the attributes to use?
+>>> >> (e.g. arch_apei_get_mem_attribute())
+>>> >
+>>> > I didn't think of this approach.
+>>> > Do you mean a change like the patch below?
+>>>
+>>> Yes. Aha, you can pretty much re-use the helper directly.
+>>>
+>>> It was just a suggestion, removing the extra abstraction that is causing the bug
+>>> could be cleaner ...
+>>>
+>>> > (I'm still debugging this code since the kernel fails to boot.)
+>>>
+>>> ... but might be too fragile.
+>>>
+>>> There are points during boot when the EFI memory map isn't mapped.
+>>
+>> Right, this was a problem for my patch.
+>> Attached is the revised and workable one.
+>> Efi_memmap_init_late() may alternatively be called in acpi_early_init() or
+>> even in acpi_os_ioremap(), but either way it looks a bit odd.
+>>
+>
+> Akashi-san,
+>
+> efi_memmap_init_late() is currently being called from
+> arm_enable_runtime_services(), which is an early initcall. If that is
+> too late for acpi_early_init(), we could perhaps move the call
+> forward, i.e., sth like
+>
+> ---------8<------------
+> diff --git a/drivers/firmware/efi/arm-runtime.c
+> b/drivers/firmware/efi/arm-runtime.c
+> index 6f60d659b323..e835d3b20af6 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -117,7 +117,7 @@ static bool __init efi_virtmap_init(void)
+>   * non-early mapping of the UEFI system table and virtual mappings for all
+>   * EFI_MEMORY_RUNTIME regions.
+>   */
+> -static int __init arm_enable_runtime_services(void)
+> +void __init efi_enter_virtual_mode(void)
+>  {
+>         u64 mapsize;
+>
+> @@ -156,7 +156,6 @@ static int __init arm_enable_runtime_services(void)
+>
+>         return 0;
+>  }
+> -early_initcall(arm_enable_runtime_services);
+>
+>  void efi_virtmap_load(void)
+>  {
+> diff --git a/init/main.c b/init/main.c
+> index a8100b954839..2d0927768e2d 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -674,6 +674,9 @@ asmlinkage __visible void __init start_kernel(void)
+>         debug_objects_mem_init();
+>         setup_per_cpu_pageset();
+>         numa_policy_init();
+> +       if (IS_ENABLED(CONFIG_EFI) &&
+> +           (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
+> +               efi_enter_virtual_mode();
+>         acpi_early_init();
+>         if (late_time_init)
+>                 late_time_init();
+> ---------8<------------
+>
+> would be reasonable imo. Also, I think it is justifiable to make ACPI
+> depend on UEFI on arm64, which is notably different from x86.
+>
+> (I know 'efi_enter_virtual_mode' is not entirely accurate here, given
+> that we call SetVirtualAddressMap from the UEFI stub on ARM, but it is
+> still close enough, given that one could argue that EFI is not in
+> 'virtual mode' until the mappings are in place)
+>
+>
+>
+>> ===8<===
+>> From c88f4c8106ba7a918c835b1cdf538b1d21019863 Mon Sep 17 00:00:00 2001
+>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> Date: Mon, 29 Jan 2018 15:07:43 +0900
+>> Subject: [PATCH] arm64: kdump: make acpi_os_ioremap() more generic
+>>
+>> ---
+>>  arch/arm64/include/asm/acpi.h | 23 ++++++++++++++++-------
+>>  arch/arm64/kernel/acpi.c      |  7 ++-----
+>>  init/main.c                   |  4 ++++
+>>  3 files changed, 22 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 32f465a80e4e..d53c95f4e1a9 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -12,10 +12,12 @@
+>>  #ifndef _ASM_ACPI_H
+>>  #define _ASM_ACPI_H
+>>
+>> +#include <linux/efi.h>
+>>  #include <linux/memblock.h>
+>>  #include <linux/psci.h>
+>>
+>>  #include <asm/cputype.h>
+>> +#include <asm/io.h>
+>>  #include <asm/smp_plat.h>
+>>  #include <asm/tlbflush.h>
+>>
+>> @@ -29,18 +31,22 @@
+>>
+>>  /* Basic configuration for ACPI */
+>>  #ifdef CONFIG_ACPI
+>> +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
+>> +
+>>  /* ACPI table mapping after acpi_permanent_mmap is set */
+>>  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+>>                                             acpi_size size)
+>>  {
+>> +       /* For normal memory we already have a cacheable mapping. */
+>> +       if (memblock_is_map_memory(phys))
+>> +               return (void __iomem *)__phys_to_virt(phys);
+>> +
+>>         /*
+>> -        * EFI's reserve_regions() call adds memory with the WB attribute
+>> -        * to memblock via early_init_dt_add_memory_arch().
+>> +        * We should still honor the memory's attribute here because
+>> +        * crash dump kernel possibly excludes some ACPI (reclaim)
+>> +        * regions from memblock list.
+>>          */
+>> -       if (!memblock_is_memory(phys))
+>> -               return ioremap(phys, size);
+>> -
+>> -       return ioremap_cache(phys, size);
+>> +       return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
+>>  }
+>>  #define acpi_os_ioremap acpi_os_ioremap
+>>
+>> @@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
+>>   * for compatibility.
+>>   */
+>>  #define acpi_disable_cmcff 1
+>> -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+>> +static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>> +{
+>> +       return __acpi_get_mem_attribute(addr);
+>> +}
+>>  #endif /* CONFIG_ACPI_APEI */
+>>
+>>  #ifdef CONFIG_ACPI_NUMA
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index b3162715ed78..f94bdf7be439 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -31,10 +31,9 @@
+>>  #include <asm/cpu_ops.h>
+>>  #include <asm/smp_plat.h>
+>>
+>> -#ifdef CONFIG_ACPI_APEI
+>> +/* CONFIG_ACPI_APEI */
+>>  # include <linux/efi.h>
+>>  # include <asm/pgtable.h>
+>> -#endif
+>>
+>>  int acpi_noirq = 1;            /* skip ACPI IRQ initialization */
+>>  int acpi_disabled = 1;
+>> @@ -239,8 +238,7 @@ void __init acpi_boot_table_init(void)
+>>         }
+>>  }
+>>
+>> -#ifdef CONFIG_ACPI_APEI
+>> -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>> +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
+>>  {
+>>         /*
+>>          * According to "Table 8 Map: EFI memory types to AArch64 memory
+>> @@ -261,4 +259,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>>                 return __pgprot(PROT_NORMAL_NC);
+>>         return __pgprot(PROT_DEVICE_nGnRnE);
+>>  }
+>> -#endif
+>> diff --git a/init/main.c b/init/main.c
+>> index a8100b954839..a479ece2bae9 100644
+>> --- a/init/main.c
+>> +++ b/init/main.c
+>> @@ -674,6 +674,10 @@ asmlinkage __visible void __init start_kernel(void)
+>>         debug_objects_mem_init();
+>>         setup_per_cpu_pageset();
+>>         numa_policy_init();
+>> +#if defined(CONFIG_ARM64) && defined(CONFIG_EFI)
+>> +       efi_memmap_init_late(efi.memmap.phys_map,
+>> +                       efi.memmap.nr_map * efi.memmap.desc_size);
+>> +#endif
+>>         acpi_early_init();
+>>         if (late_time_init)
+>>                 late_time_init();
+>> --
+>> 2.15.1
+>>
 
-Thanks,
-Sekhar
+I tested Ard's patch (on top of Akashi's proposed changes) on the
+huawei taishan machine (where I originally found the problem) and I
+can confirm that I am able to boot the kdump kernel properly and also
+save the crashcore dump on local disk.
+
+Also as Ard mentioned, 'efi_enter_virtual_mode' is probably not the
+best name for the proposed function as we have already called
+'SetVirtualAddressMap', but I cannot think of anything better. If
+there are other opinions we can consider the same, otherwise may be we
+can formalize this and queue it up as crashkernel is bricked on arm64
+machines which support acpi boot machines without the same (and
+several kdump users are affected because of the same).
+
+Please feel free to add:
+
+Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+
+Regards,
+Bhupesh
