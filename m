@@ -1,9 +1,9 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 31 Jan 2018 18:24:10 +0000
-Subject: [RFC v4 06/26] ARM: dts: r8a7792: Adjust SMP routine size
+Date: Wed, 31 Jan 2018 18:24:09 +0000
+Subject: [RFC v4 05/26] ARM: dts: r8a7791: Adjust SMP routine size
 In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1517423070-24236-7-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1517423070-24236-6-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,14 +18,14 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 v3->4:
 * no change
 
- arch/arm/boot/dts/r8a7792.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 268987f..bea0f12 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -341,7 +341,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index dc65935..d2a4546 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -407,7 +407,7 @@
  
  			smp-sram at 0 {
  				compatible = "renesas,smp-sram";
