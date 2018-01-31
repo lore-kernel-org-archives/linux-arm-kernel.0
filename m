@@ -1,87 +1,86 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Wed, 31 Jan 2018 14:47:53 +0000
-Subject: [linux-sunxi] Re: [PATCH v6 2/2] media: V3s: Add support for
- Allwinner CSI.
-In-Reply-To: <20180131074212.7hvb3nqkt22h2chg@flea.lan>
-References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <201801260759.RyNhDZz4%fengguang.wu@intel.com>
- <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
- <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
- <20180131030807.GA19945@bart.dudau.co.uk>
- <20180131074212.7hvb3nqkt22h2chg@flea.lan>
-Message-ID: <20180131144753.GB19945@bart.dudau.co.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 31 Jan 2018 06:48:21 -0800
+Subject: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
+In-Reply-To: <CAMuHMdViQgCjVFbs0kkBObAAoFTzvz8yPFUHPWHrtYzkbnYm_g@mail.gmail.com>
+References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1517343778-27902-12-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20180130220504.GA16709@roeck-us.net>
+ <TY1PR06MB0895ECB2936323F9D281C1EFC0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <CAMuHMdViQgCjVFbs0kkBObAAoFTzvz8yPFUHPWHrtYzkbnYm_g@mail.gmail.com>
+Message-ID: <007dd1e3-70fd-69ad-fd02-4719e958b41c@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 08:42:12AM +0100, Maxime Ripard wrote:
-> Hi Liviu,
-
-Hi Maxime,
-
+On 01/31/2018 04:13 AM, Geert Uytterhoeven wrote:
+> Hi Fabrizio,
 > 
-> On Wed, Jan 31, 2018 at 03:08:08AM +0000, Liviu Dudau wrote:
-> > On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
-> > > Hi Maxime,
-> > > 
-> > > On Fri, 26 Jan 2018 09:46:58 +0800
-> > > Yong <yong.deng@magewell.com> wrote:
-> > > 
-> > > > Hi Maxime,
-> > > > 
-> > > > Do you have any experience in solving this problem?
-> > > > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
-> > > 
-> > > Got it.
-> > > Should I add 'depends on ARM' in Kconfig?
-> > 
-> > No, I don't think you should do that, you should fix the code.
-> > 
-> > The dma_addr_t addr that you've got is ideally coming from dma_alloc_coherent(),
-> > in which case the addr is already "suitable" for use by the device (because the
-> > bus where the device is attached to does all the address translations).
+> On Wed, Jan 31, 2018 at 11:47 AM, Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+>>> Subject: Re: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
+>>> On Tue, Jan 30, 2018 at 08:22:44PM +0000, Fabrizio Castro wrote:
+>>>> On R-Car Gen2 and RZ/G1 the rwdt clock needs to be always ON, therefore
+>>>> when suspending to RAM we need to explicitly disable the counting by
+>>>> clearing TME from RWTCSRA.
+>>>> Also, on some systems RWDT is the only piece of HW that allows the SoC
+>>>> to be restarted, therefore this patch implements the restart callback.
+>>>>
+>>>> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+>>>> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+>>>> ---
+>>>> Wolfram, was the restart callback implementation missing for a reason?
+>>>> Is its implementation going to break any Gen3 platform?
+>>>
+>>> The changes clearly are way more than claimed in the subject. Adding
+>>> restart handler and PM support may be prerequisites for Gen2, but the
+>>> changes apply to Gen3 as well. What happened to "one patch per logical
+>>> change" ?
+>>
+>> The PM implementation should be ok for Gen3 too, without this patch series the kernel
+>> would disable the rwdt clock when suspending to RAM, this would "pause" the counting.
+>> This patch series declares the rwdt clock as critical for Gen2 and RZ/G1, which means we
+>> need to explicitly disable the counting to keep the same behaviour in place.
 > 
-> Like we're discussing in that other part of the thread with Thierry
-> and Arnd, things are slightly more complicated than that :)
-
-Yeah, sorry, my threading of the discussion was broken and I've seen the rest of the 
-thread after I have replied. My bad!
-
+> Note that if the kernel crashes after rwdt_suspend(), the watchdog won't
+> restart the system. But that's an issue common to many watchdog driver, right?
 > 
-> In our case, the bus where the device is attached will not do the
-> address translations, and shouldn't.
+If so, that would be buggy.
 
-In my view, the bus is already doing address translation at physical level, AFAIU it
-remaps the memory to zero. What you (we?) need is a simple bus driver that registers
-the correct virt_to_bus()/bus_to_virt() hooks for the device that do this translation
-at the DMA API level as well.
-
+>> With respect to the restart callback implementation, that may well have consequences on
+>> Gen3, hopefully Wolfram will give us a feedback on this.
+>> In particular I would like to know if we should be installing the restart callback only when
+>> we use "renesas,rcar-gen2-wdt" as compatible string, or it's ok to make it available for
+>> Gen3 as well.
 > 
-> > If you apply PHYS_OFFSET forcefully to it you might get unexpected
-> > results.
+> IIRC, the reason we don't have the restart callback on R-Car Gen3 is the
+> arm64 maintainers insisting on using PSCI, and vetoing other means,
+> to restart the system.
 > 
-> Out of curiosity, what would be these unexpected results?
 
-If in the future (or a parallel world setup) the device is sitting behind an IOMMU, the
-addr value might well be smaller than PHYS_OFFSET and you will under-wrap, possibly
-starting to hit kernel physical addresses (or anything sitting at the top of the physical
-memory).
+You could just give it lower priority than PSCI.
 
->From my time playing with IOMMUs and PCI domains, I've learned to treat the dma_addr_t as
-a cookie value and never try to do arithmetics with it.
-
-Best regards,
-Liviu
-
+> Which leaves us with a few boards where we have to use the watchdog, and
+> wait until the timeout triggers...
 > 
-> Thanks!
-> Maxime
+
+Which means the veto is counter-productive and thus meaningless.
+
+Guenter
+
+>> The only way to reboot iWave's boards iwg20d and iwg22d is to use the internal watchdog,
+>> that's why the restart implementation was merged into this patch.
+>> I can split this patch in two, one for PM support and one for restart support for the next
+>> version, what do you think about this?
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Splitting in individual logical changes sounds like a good idea to me.
 > 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> Gr{oetje,eeting}s,
+> 
+>                          Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+> 
