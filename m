@@ -1,147 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 31 Jan 2018 10:37:37 +0100
-Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20180131072910.ajp3jc5dmetsjtf2@flea.lan>
-References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
- <20180129082533.6edmqgbauo6q5dgz@flea.lan>
- <CACRpkdYAGwUjr2C-w5U+WuG48pZAOUcnxFjznLbdF6Lmy1uZuQ@mail.gmail.com>
- <CAK8P3a2HmPOTHAzqBnmim388pcWOE=fG50mG5HJifT=vzKOaTg@mail.gmail.com>
- <20180130075441.rqxzkwero6sdfak6@flea.lan>
- <CAK8P3a0QxQE=GM=SGPtT82=UreiqsgY6uMThvQ_woA3rjK0zjA@mail.gmail.com>
- <20180130095916.GA23047@ulmo> <20180130100150.GB23047@ulmo>
- <20180131072910.ajp3jc5dmetsjtf2@flea.lan>
-Message-ID: <CAK8P3a0X2bpLjKE6xKehG1junZoG1N_DjepOBQ+SZetKf6sgfA@mail.gmail.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 31 Jan 2018 10:27:29 +0000
+Subject: [RFC v3 10/25] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2
+ support
+In-Reply-To: <CAMuHMdXkHF9R0XfcG++s0RRup+Mdtam5p=FXw26z86wAOJhZfQ@mail.gmail.com>
+References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1517343778-27902-11-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdXkHF9R0XfcG++s0RRup+Mdtam5p=FXw26z86wAOJhZfQ@mail.gmail.com>
+Message-ID: <TY1PR06MB089525525DC23EEAEAE97795C0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 8:29 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Thierry,
+Hi Geert,
+
+> Subject: Re: [RFC v3 10/25] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
 >
-> On Tue, Jan 30, 2018 at 11:01:50AM +0100, Thierry Reding wrote:
->> On Tue, Jan 30, 2018 at 10:59:16AM +0100, Thierry Reding wrote:
->> > On Tue, Jan 30, 2018 at 10:24:48AM +0100, Arnd Bergmann wrote:
->> > > On Tue, Jan 30, 2018 at 8:54 AM, Maxime Ripard
->> > > <maxime.ripard@free-electrons.com> wrote:
->> > > > On Mon, Jan 29, 2018 at 03:34:02PM +0100, Arnd Bergmann wrote:
->> > > >> On Mon, Jan 29, 2018 at 10:25 AM, Linus Walleij
->> > > >> <linus.walleij@linaro.org> wrote:
->> > > >> > On Mon, Jan 29, 2018 at 9:25 AM, Maxime Ripard
->> > > >> > <maxime.ripard@free-electrons.com> wrote:
->> > > >> >> On Sat, Jan 27, 2018 at 05:14:26PM +0100, Linus Walleij wrote:
->> > >
->> > > >>
->> > > >> At one point we had discussed adding a 'dma-masters' property that
->> > > >> lists all the buses on which a device can be a dma master, and
->> > > >> the respective properties of those masters (iommu, coherency,
->> > > >> offset, ...).
->> > > >>
->> > > >> IIRC at the time we decided that we could live without that complexity,
->> > > >> but perhaps we cannot.
->> > > >
->> > > > Are you talking about this ?
->> > > > https://elixir.free-electrons.com/linux/latest/source/Documentation/devicetree/bindings/dma/dma.txt#L41
->> > > >
->> > > > It doesn't seem to be related to that issue to me. And in our
->> > > > particular cases, all the devices are DMA masters, the RAM is just
->> > > > mapped to another address.
->> > >
->> > > No, that's not the one I was thinking of. The idea at the time was much
->> > > more generic, and not limited to dma engines. I don't recall the details,
->> > > but I think that Thierry was either involved or made the proposal at the
->> > > time.
->> >
->> > Yeah, I vaguely remember discussing something like this before. A quick
->> > search through my inbox yielded these two threads, mostly related to
->> > IOMMU but I think there were some mentions about dma-ranges and so on as
->> > well. I'll have to dig deeper into those threads to refresh my memories,
->> > but I won't get around to it until later today.
->> >
->> > If someone wants to read up on this in the meantime, here are the links:
->> >
->> >     https://lkml.org/lkml/2014/4/27/346
->> >     http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/257200.html
->> >
->> > From a quick glance the issue of dma-ranges was something that we hand-
->> > waved at the time.
->>
->> Also found this, which seems to be relevant as well:
->>
->>       http://lists.infradead.org/pipermail/linux-arm-kernel/2014-May/252715.html
->>
->> Adding Dave.
+> Hi Fabrizio,
 >
-> Thanks for the pointers, I started to read through it.
+> On Tue, Jan 30, 2018 at 9:22 PM, Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> > This commit documents the compatibility with R-Car Gen2 and RZ/G
+> > devices by defining the generic compatible string "renesas,rcar-gen2-wdt".
+> > Also, this patch expands the list of SoC-specific compatible strings to
+> > include RZ/G and R-Car Gen2 devices.
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 >
-> I guess we have to come up with two solutions here: a short term one
-> to address the users we already have in the kernel properly, and a
-> long term one where we could use that discussion as a starting point.
+> Thanks for your patch!
+
+Thanks for your feedback!
+
 >
-> For the short term one, could we just set the device dma_pfn_offset to
-> PHYS_OFFSET at probe time, and use our dma_addr_t directly later on,
-> or would this also cause some issues?
-
-That would certainly be an improvement over the current version,
-it keeps the hack more localized. That's fine with me. Note that both
-PHYS_OFFSET and dma_pfn_offset have architecture specific
-meanings and they could in theory change, so ideally we'd do that
-fixup somewhere in arch/arm/mach-sunxi/ at boot time before the
-driver gets probed, but this wouldn't work on arm64 if we need it
-there too.
-
-> For the long term plan, from what I read from the discussion, it's
-> mostly centered around IOMMU indeed, and we don't have that. What we
-> would actually need is to break the assumption that the DMA "parent"
-> bus is the DT node's parent bus.
+> > --- a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
+> > +++ b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
+> > @@ -1,17 +1,25 @@
+> >  Renesas Watchdog Timer (WDT) Controller
+> >
+> >  Required properties:
+> > -- compatible : Should be "renesas,<soctype>-wdt", and
+> > -              "renesas,rcar-gen3-wdt" or "renesas,rza-wdt" as fallback.
+> > + - compatible : Must be "renesas,<soctype>-wdt", followed by a generic
+> > +               fallback compatible string when compatible with the generic
+> > +               version.
+> >                Examples with soctypes are:
+> > +                - "renesas,r8a7743-wdt" (RZ/G1M)
+> > +                - "renesas,r8a7745-wdt" (RZ/G1E)
+> > +                - "renesas,r8a7790-wdt" (R-Car H2)
+> > +                - "renesas,r8a7791-wdt" (R-Car M2-W)
+> > +                - "renesas,r8a7792-wdt" (R-Car V2H)
+> > +                - "renesas,r8a7793-wdt" (R-Car M2-N)
+> > +                - "renesas,r8a7794-wdt" (R-Car E2)
+> >                  - "renesas,r8a7795-wdt" (R-Car H3)
+> >                  - "renesas,r8a7796-wdt" (R-Car M3-W)
+> >                  - "renesas,r8a77995-wdt" (R-Car D3)
+> >                  - "renesas,r7s72100-wdt" (RZ/A1)
+> > +               The generic compatible string must be:
+> > +                - "renesas,rcar-gen2-wdt" for R-Car Gen2 and RZ/G
+> > +                - "renesas,rcar-gen3-wdt" for R-Car Gen3
 >
-> And I guess this could be done quite easily by adding a dma-parent
-> property with a phandle to the bus controller, that would have a
-> dma-ranges property of its own with the proper mapping described
-> there. It should be simple enough to support, but is there anything
-> that could prevent something like that to work properly (such as
-> preventing further IOMMU-related developments that were described in
-> those mail threads).
+> You've lost the generic "renesas,rza-wdt".
 
-I've thought about it a little bit now. A dma-parent property would nicely
-solve two problems:
+Ooops, I'll fix that.
 
-- a device on a memory mapped control bus that is a bus master on
-  a different bus. This is the case we are talking about here AFAICT
+Cheers,
+Fab
 
-- a device that is on a different kind of bus (i2c, spi, usb, ...) but also
-  happens to be a dma master on another bus. I suspect we have
-  some of these today and they work by accident because we set the
-  dma_mask and dma_map_ops quite liberally in the DT probe code,
-  but it really shouldn't work according to our bindings. We may also
-  have drivers that work around the issue by forcing the correct dma
-  mask and map_ops today, which makes them work but is rather
-  fragile.
+>
+> With that fixed:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
 
-I can think of a couple of other problems that may or may not be
-relevant in the future that would require a more complex solution:
 
-- a device that is a bus master on more than one bus, e.g. a
-  DMA engine that can copy between the CPU address space and
-  another memory controller that is not visible to the CPU
 
-- a device that is connected to main memory both through an IOMMU
-  and directly through its parent bus, and the device itself is in
-  control over which of the two it uses (usually the IOMMU would
-  contol whether a device is bypassing translation)
-
-- a device that has a single DMA address space with some form
-  of non-linear mapping to one or more parent buses. Some of these
-  can be expressed using the parent's dma-ranges properties, but
-  our code currently only looks at the first entry in dma-ranges.
-
-Another problem is the interaction with the dma-ranges and iommu
-properties. I have not found any real problems here, but we certainly
-need to be careful to define what happens in all combinations and
-make sure that we document it well in the bindings and have those
-reviewed by the affected parties, at least the ARM and PowerPC
-architecture folks as well as the Nvidia and Renesas platform
-maintainers, which in my experience have the most complex DMA
-hardware.
-
-       Arnd
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
