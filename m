@@ -1,73 +1,129 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 31 Jan 2018 12:06:29 +0000
-Subject: Handling of chars received while a UART is not open
-Message-ID: <20180131120628.GL5862@e103592.cambridge.arm.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Wed, 31 Jan 2018 12:10:47 +0000
+Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+In-Reply-To: <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+ <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
+ <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838641882@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Lorenzo,
 
-Question:
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: Tuesday, January 30, 2018 6:00 PM
+> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+> Cc: Neil Leeder <nleeder@codeaurora.org>; Mark Langsdorf
+> <mlangsdo@redhat.com>; Jon Masters <jcm@redhat.com>; Timur Tabi
+> <timur@codeaurora.org>; linux-kernel at vger.kernel.org; Mark Brown
+> <broonie@kernel.org>; Mark Salter <msalter@redhat.com>; linux-arm-
+> kernel at lists.infradead.org; Will Deacon <will.deacon@arm.com>; Mark
+> Rutland <mark.rutland@arm.com>; Linuxarm <linuxarm@huawei.com>
+> Subject: Re: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+> 
+> On Tue, Jan 30, 2018 at 10:39:20AM +0000, Shameerali Kolothum Thodi wrote:
+> > Hi Neil/Lorenzo,
+> >
+> > > -----Original Message-----
+> > > From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org]
+> > > On Behalf Of Neil Leeder
+> > > Sent: Friday, August 04, 2017 8:59 PM
+> > > To: Will Deacon <will.deacon@arm.com>; Mark Rutland
+> > > <mark.rutland@arm.com>
+> > > Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
+> > > <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
+> > > kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
+> > > <msalter@redhat.com>; nleeder at codeaurora.org; linux-arm-
+> > > kernel at lists.infradead.org
+> > > Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+> > >
+> > > Add support for the SMMU Performance Monitor Counter Group
+> > > information from ACPI. This is in preparation for its use
+> > > in the SMMU v3 PMU driver.
+> >
+> > [...]
+> >
+> > >  static __init
+> > >  const struct iort_iommu_config *iort_get_iommu_cfg(struct
+> acpi_iort_node
+> > > *node)
+> > >  {
+> > > @@ -1001,6 +1041,8 @@ const struct iort_iommu_config
+> > > *iort_get_iommu_cfg(struct acpi_iort_node *node)
+> > >  		return &iort_arm_smmu_v3_cfg;
+> > >  	case ACPI_IORT_NODE_SMMU:
+> > >  		return &iort_arm_smmu_cfg;
+> > > +	case ACPI_IORT_NODE_PMCG:
+> > > +		return &iort_arm_smmu_pmcg_cfg;
+> >
+> > I understand this series will be revised based on the iort spec update.
+> >
+> > This Is to clarify few queries we have with respect to one of our hisilicon
+> > platform which has support for SMMU v3 PMCG. In our implementation
+> > the base address for the PMCG is defined at a IMP DEF address offset
+> > within the SMMUv3 page 0 address space. And as per SMMU spec,
+> >
+> > " The Performance Monitor Counter Groups are standalone monitoring
+> > facilities  and, as such, can be implemented in separate components that
+> > are all associated with (but not necessarily part of) an SMMU"
+> >
+> > It looks like PMCG can be part of SMMU,  it is not clear whether this kind
+> > of address mapping is forbidden or not. If this is an accepted  scenario, then
+> > the devm_ioremap_resource() call in SMMv3 probe will fail as it reports
+> conflict.
+> >
+> > As far as I can see, the above code just checks the iort node type is PMCG
+> > and assumes that its SMMU PMCG. As per IORT spec, it make sense to check
+> > the node reference filed and make that call.
+> >
+> > And to fix the resource conflict issue we have, is it possible to treat the PMCG
+> > node as the child of the SMMU and call the platform_device_add()
+> appropriately
+> > to avoid the conflict? I am not sure this will fix the issue and also about the
+> order
+> > in which SMMU and PMCG devices will be populated will have an impact on
+> this.
+> >
+> > Please let me know your thoughts on this.
+> 
+> I went back and re-read the patches, I think the point here is that the
+> perf driver (ie PATCH 2 that, by the way, is not maiinline) uses
+> devm_ioremap_resource() to map the counters and that's what is causing
+> failures when PMCG is part of SMMUv3 registers.
 
- 1) Should a UART definitely discard the RX FIFO on ->startup()?
+Thanks for going through this.  No, this is not where we are seeing the failure.
+May be I was not clear in my earlier mail. The failure happens in SMMUv3
+driver probe function when it calls devm_ioremap_resource().
 
- 2) Should a UART definitely *not* discard the RX FIFO on ->startup()?
-    (as in my fix).
+> It is the resources hierarchy that is wrong and in turn, I do not think
+> devm_request_mem_region() is the right way of requesting it for the
+> PMCG driver.
+> 
+> I need to look into this but I suspect that's something that should
+> be handled in the PMCG driver, that has to request the memory region
+> _differently_ (ie ioremap copes with this overlap - it is the
+> devm_request_mem_region() in devm_ioremap_resource() that fails, correct
+> ?).
 
- 3) Or is there no clear answer here?
+It looks like, in IORT code,
 
+iort_add_platform_device()--> platform_device_add()-->insert_resource(), inserts
+both SMMUv3 and PMCG resources into the resource tree and then when the probe
+of SMMUv3 is called, it detects the conflict.
 
-Background:
+[   85.548749] arm-smmu-v3 arm-smmu-v3.0.auto: can't request region for resource [mem 0x148000000-0x14801ffff]                      
 
-Working on a fix for an RX lockup issue with amba-pl011 [1], I came up
-with the idea that the driver's attempt to clear spurious interrupts on
-startup is going wrong when the interrupt is not spurious (i.e., the RX
-FIFO is initially full to the interrupt trigger threshold).
+Of course, changing devm_ioremap_resource() to devm_ioremap() in SMMv3
+driver probe solves the issue for us, but not sure that's the right approach or not.
 
-I have a fix [2] based on this.  It removes the attempt to clear
-spurious interrupts so that the RX FIFO will definitely get drained if
-need be, in the pl011 interrupt handler.
+Thanks,
+Shameer
 
-This should mean that amba-pl011 implements (2) with my patch.
-
-But this may have unwanted side-effects, depending on the answer to
-the above question.
-
-
-Now, Qemu has a facility for stuffing some input to an emulated UART
-immediately on boot, and wouldn't work in case (2) above.  OTOH, that
-may be a mistaken approach: it's unlikely to work reliably on hardware
-due to the problem of knowing when a physical UART is actually ready to
-receive input.  So maybe Qemu should be waiting for a prompt to be
-transmitted before stuffing input.  In case (1) or (3), qemu probably
-needs to do something like that.
-
-(1) is also odd though.  Garbage on the wire while the UART is closed
-will then be seen when a process opens the UART.  If there is a
-non-trivial amount of data, an overrun error will most likely be
-reported too.  User programs intended to be robust (getty, pppd etc.)
-should perhaps be doing an explicit flush on startup, but this will
-race against the UART driver unless the UART driver flushes the FIFO in
-its ->startup().  Wire protocols are inherently realtime and need
-another way to negotiate startup (DCD/DSR/DTR signalling for example)
-or to recover from a bad state on one or both ends.
-
-So I don't know what the right answer is.
-
-
-Wei's proposed fix in qemu [1] attempts to detect readiness by waiting
-for the emulated system to enable interrupts on the UART, but this
-makes assumptions about the driver running inside the emultaion: for
-a polled-mode driver, it would most likely not work.
-
-The pl011 hardware provides no way to distinguish spurious from
-non-spurious RX FIFO interrupts other than reading the FIFO to see if
-there's anything in there.  Moreover, the interrupt state machine in
-the hardware can get stuck if the FIFO is not drained sufficiently.
-
-
-[1] [Qemu-devel] [Qemu-arm] [PATCH] pl011: do not put into fifo before enabl
-https://lists.gnu.org/archive/html/qemu-devel/2018-01/msg06446.html
-
-[2] [RFC PATCH v2] tty: pl011: Avoid spuriously stuck-off interrupts
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556897.html
+> Certainly we need to create in IORT the resources with the correct
+> hierarchy (I reckon DT does it already if the right device hierarchy is
+> specified).
+ 
