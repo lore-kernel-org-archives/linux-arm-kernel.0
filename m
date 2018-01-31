@@ -1,58 +1,70 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 31 Jan 2018 13:32:14 +0000
-Subject: Handling of chars received while a UART is not open
-In-Reply-To: <CAFEAcA8D2RLSbHO-OdULHre4oVr=vU+Yb+6sp55XiP6Mrtg1xA@mail.gmail.com>
-References: <20180131120628.GL5862@e103592.cambridge.arm.com>
- <CAFEAcA8D2RLSbHO-OdULHre4oVr=vU+Yb+6sp55XiP6Mrtg1xA@mail.gmail.com>
-Message-ID: <20180131133213.GN5862@e103592.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 31 Jan 2018 14:37:06 +0100
+Subject: [PATCH] KVM: arm/arm64: Fix arch timers with userspace irqchips
+In-Reply-To: <20180131131631.hecvgdsa67bhf2gv@kamzik.brq.redhat.com>
+References: <20180130124609.15076-1-christoffer.dall@linaro.org>
+ <9eb4f221-2aad-8656-912a-4a7e068a23eb@arm.com> <20180131100530.GZ21802@cbox>
+ <560b5cbc-4ac7-a55a-3f11-9a32b1ffc9e0@arm.com>
+ <CAMJs5B_H16cxgAmzZ1+xU9FJWpaG3pHgziN=RBb62nMbQrZdhw@mail.gmail.com>
+ <20180131131631.hecvgdsa67bhf2gv@kamzik.brq.redhat.com>
+Message-ID: <CAMJs5B-e7THiBQsH9BXR0Ks2CkttMWpv5KqJHDpJZLbnQ1QM=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 01:12:15PM +0000, Peter Maydell wrote:
-> On 31 January 2018 at 12:06, Dave Martin <Dave.Martin@arm.com> wrote:
-> > Now, Qemu has a facility for stuffing some input to an emulated UART
-> > immediately on boot, and wouldn't work in case (2) above.  OTOH, that
-> > may be a mistaken approach: it's unlikely to work reliably on hardware
-> > due to the problem of knowing when a physical UART is actually ready to
-> > receive input.  So maybe Qemu should be waiting for a prompt to be
-> > transmitted before stuffing input.  In case (1) or (3), qemu probably
-> > needs to do something like that.
-> 
-> FWIW, there isn't a QEMU "facility" for doing this particularly:
-> we just don't take any trouble to stop the user from providing
-> input whenever the user likes. (If the user is an automatic test
-> script then it's that script's job to wait for suitable prompts
-> from the guest before feeding input into the emulated serial port
-> if it wants to be reliable, the same way you'd have to if you
-> were feeding the data to a real serial line.)
+On Wed, Jan 31, 2018 at 2:16 PM, Andrew Jones <drjones@redhat.com> wrote:
+> On Wed, Jan 31, 2018 at 12:23:09PM +0100, Christoffer Dall wrote:
+>> Did I mention that I hate this feature, which keeps breaking, and
+>> which really isn't covered by a simple kvm-unit-test script?
+>>
+>
+> Doesn't running the kvm-unit-tests' timer tests with
+> '-machine kernel_irqchip=off' exercise at least some
+> of these paths? If so, then the kvm-unit-tests patch
+> below may help
+>
 
-Fair enough.  I misunderstood slightly there.
+I do this by hand currently (for kvm-unit-tests and for other tests),
+but as you say, it only covers a tiny portion of the overall problem.
 
-> (I think) wouldn't affect the behaviour here, though, because the
-> data will just get held in QEMU's input buffer until the guest
-> driver sets UARTEN and then immediately fill the FIFO.
+To test this properly, you have to run at least 4 VMs in parallel,
+some that use irqchip in userspace and some that use an in-kernel
+irqchip, and then you have to reboot some of these machines while the
+other machines are running workloads (to catch the
+deactivate-before-ack thing), and really hammer on the timer while
+migrating the VCPUs around.
 
-On the Linux side, I guess we nonetheless need to cope with input
-stuffed early for the SBSA UART case, but if you're saying that
-qemu (or software talking to qemu) shouldn't assume that input
-stuffed at boot will actually be received (unless it qemu waits for
-UARTEN) then we have some flexibility in the amba-pl011 driver here.
+Then you have to run all of this on a GICv2 machine.  And on a GICv3
+machine.  And on a non-GIC (or broken GIC - is there any other kind?)
+machine.
 
-Based on Russell's comments, I guess the fix for the SBSA UART case
-would be to read and discard the contents of the RX FIFO on UART open.
-It seems harmless to do that for pl011 also, so I would suggest putting
-it on the common code path.  This likely minimises the chance of being
-tripped up by vendor-specific quirks.
+So I've done that, using my https://github.com/chazy/vm-loop-test
+thing, and found these issues, but I'm probably not going to do this
+for every patch, so most likely we'll see breakages.
 
-> What QEMU doesn't do and probably should fix is that we allow data
-> into the FIFO even if UARTCR.UARTEN is 0 ("UART disabled"). This
+>
+> diff --git a/arm/unittests.cfg b/arm/unittests.cfg
+> index 44b98cfc7afde..7c0041e44d5f3 100644
+> --- a/arm/unittests.cfg
+> +++ b/arm/unittests.cfg
+> @@ -116,3 +116,10 @@ file = timer.flat
+>  groups = timer
+>  timeout = 2s
+>  arch = arm64
+> +
+> +[timer-userspace-gic]
+> +file = timer.flat
+> +extra_params = -machine kernel_irqchip=off
+> +groups = timer
+> +timeout = 2s
+> +arch = arm64
 
-That probably does makes sense, providing qemu models a pl011.
-A real pl011 wouldn't receive anything while that bit is clear.
+you probably want "gic_version=2" as well, since otherwise some
+versions of QEMU pretend they can support a GICv3 in userspace, which
+they cannot.  Also, this feature is broken around v2.9.1, so there's
+another fun data point when debugging this.
 
-SBSA UART doesn't have this control (or most of the others): it's
-just always on.
+It definitely doesn't hurt if we add this to kvm-unit-test.  Then
+perhaps someone else than me occasionally tests this feature.
 
-
-Cheers
----Dave
+Thanks,
+-Christoffer
