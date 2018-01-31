@@ -1,29 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 Jan 2018 09:00:57 +0000
-Subject: [PATCH 3/3] KVM: arm/arm64: Fixup userspace irqchip static key
- optimization
-In-Reply-To: <20180130124206.12262-4-christoffer.dall@linaro.org>
-References: <20180130124206.12262-1-christoffer.dall@linaro.org>
- <20180130124206.12262-4-christoffer.dall@linaro.org>
-Message-ID: <0c5d993f-d690-abca-47bc-783756c381da@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 31 Jan 2018 09:43:35 +0100
+Subject: [RFC v3 06/25] ARM: dts: r8a7792: Adjust SMP routine size
+In-Reply-To: <1517343778-27902-7-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1517343778-27902-7-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdXX2Ow2dB81FuUFTqdQ84nBzBPPQe_eETpC8mB1zuVYnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/18 12:42, Christoffer Dall wrote:
-> When I introduced a static key to avoid work in the critical path for
-> userspace irqchips which is very rarely used, I accidentally messed up
-> my logic and used && where I should have used ||, because the point was
-> to short-circuit the evaluation in case userspace irqchips weren't even
-> in use.
-> 
-> This fixes an issue when running in-kernel irqchip VMs alongside
-> userspace irqchip VMs.
-> 
-> Fixes: c44c232ee2d3 ("KVM: arm/arm64: Avoid work when userspace iqchips are not used")
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Tue, Jan 30, 2018 at 9:22 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> This patch adjusts the definition of the SMP routine size according
+> to the latest changes made by commit:
+> "ARM: shmobile: Add watchdog support"
+>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
