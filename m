@@ -1,193 +1,221 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 31 Jan 2018 10:34:53 +0100
-Subject: [PULL 14/28] KVM: arm/arm64: Split dcache/icache flushing
+Date: Wed, 31 Jan 2018 10:34:50 +0100
+Subject: [PULL 11/28] KVM: arm/arm64: Delete outdated forwarded irq
+ documentation
 In-Reply-To: <20180131093507.22219-1-christoffer.dall@linaro.org>
 References: <20180131093507.22219-1-christoffer.dall@linaro.org>
-Message-ID: <20180131093507.22219-15-christoffer.dall@linaro.org>
+Message-ID: <20180131093507.22219-12-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+The reason I added this documentation originally was that the concept of
+"never taking the interrupt", but just use the timer to generate an exit
+from the guest, was confusing to most, and we had to explain it several
+times over.  But as we can clearly see, we've failed to update the
+documentation as the code has evolved, and people who need to understand
+these details are probably better off reading the code.
 
-As we're about to introduce opportunistic invalidation of the icache,
-let's split dcache and icache flushing.
+Let's lighten our maintenance burden slightly and just get rid of this.
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 60 ++++++++++++++++++++++++++++------------
- arch/arm64/include/asm/kvm_mmu.h | 13 +++++++--
- virt/kvm/arm/mmu.c               | 20 ++++++++++----
- 3 files changed, 67 insertions(+), 26 deletions(-)
+ Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 187 ---------------------
+ 1 file changed, 187 deletions(-)
+ delete mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index fa6f2174276b..9fa4b2520974 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -126,21 +126,12 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_cp15(vcpu, c1_SCTLR) & 0b101) == 0b101;
- }
- 
--static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
--					       kvm_pfn_t pfn,
--					       unsigned long size)
-+static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
-+					     kvm_pfn_t pfn,
-+					     unsigned long size)
- {
- 	/*
--	 * If we are going to insert an instruction page and the icache is
--	 * either VIPT or PIPT, there is a potential problem where the host
--	 * (or another VM) may have used the same page as this guest, and we
--	 * read incorrect data from the icache.  If we're using a PIPT cache,
--	 * we can invalidate just that page, but if we are using a VIPT cache
--	 * we need to invalidate the entire icache - damn shame - as written
--	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
--	 *
--	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
--	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
-+	 * Clean the dcache to the Point of Coherency.
- 	 *
- 	 * We need to do this through a kernel mapping (using the
- 	 * user-space mapping has proved to be the wrong
-@@ -155,19 +146,52 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
- 
- 		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
- 
--		if (icache_is_pipt())
--			__cpuc_coherent_user_range((unsigned long)va,
--						   (unsigned long)va + PAGE_SIZE);
+diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+deleted file mode 100644
+index 38bca2835278..000000000000
+--- a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
++++ /dev/null
+@@ -1,187 +0,0 @@
+-KVM/ARM VGIC Forwarded Physical Interrupts
+-==========================================
 -
- 		size -= PAGE_SIZE;
- 		pfn++;
- 
- 		kunmap_atomic(va);
- 	}
-+}
- 
--	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
-+static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
-+						  kvm_pfn_t pfn,
-+						  unsigned long size)
-+{
-+	/*
-+	 * If we are going to insert an instruction page and the icache is
-+	 * either VIPT or PIPT, there is a potential problem where the host
-+	 * (or another VM) may have used the same page as this guest, and we
-+	 * read incorrect data from the icache.  If we're using a PIPT cache,
-+	 * we can invalidate just that page, but if we are using a VIPT cache
-+	 * we need to invalidate the entire icache - damn shame - as written
-+	 * in the ARM ARM (DDI 0406C.b - Page B3-1393).
-+	 *
-+	 * VIVT caches are tagged using both the ASID and the VMID and doesn't
-+	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
-+	 */
-+
-+	VM_BUG_ON(size & ~PAGE_MASK);
-+
-+	if (icache_is_vivt_asid_tagged())
-+		return;
-+
-+	if (!icache_is_pipt()) {
- 		/* any kind of VIPT cache */
- 		__flush_icache_all();
-+		return;
-+	}
-+
-+	/* PIPT cache. As for the d-side, use a temporary kernel mapping. */
-+	while (size) {
-+		void *va = kmap_atomic_pfn(pfn);
-+
-+		__cpuc_coherent_user_range((unsigned long)va,
-+					   (unsigned long)va + PAGE_SIZE);
-+
-+		size -= PAGE_SIZE;
-+		pfn++;
-+
-+		kunmap_atomic(va);
- 	}
- }
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 672c8684d5c2..8034b96fb3a4 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -230,19 +230,26 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
- }
- 
--static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
--					       kvm_pfn_t pfn,
--					       unsigned long size)
-+static inline void __clean_dcache_guest_page(struct kvm_vcpu *vcpu,
-+					     kvm_pfn_t pfn,
-+					     unsigned long size)
- {
- 	void *va = page_address(pfn_to_page(pfn));
- 
- 	kvm_flush_dcache_to_poc(va, size);
-+}
- 
-+static inline void __invalidate_icache_guest_page(struct kvm_vcpu *vcpu,
-+						  kvm_pfn_t pfn,
-+						  unsigned long size)
-+{
- 	if (icache_is_aliasing()) {
- 		/* any kind of VIPT cache */
- 		__flush_icache_all();
- 	} else if (is_kernel_in_hyp_mode() || !icache_is_vpipt()) {
- 		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
-+		void *va = page_address(pfn_to_page(pfn));
-+
- 		flush_icache_range((unsigned long)va,
- 				   (unsigned long)va + size);
- 	}
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b36945d49986..2174244f6317 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1257,10 +1257,16 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
- 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
- }
- 
--static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--				      unsigned long size)
-+static void clean_dcache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
-+				    unsigned long size)
- {
--	__coherent_cache_guest_page(vcpu, pfn, size);
-+	__clean_dcache_guest_page(vcpu, pfn, size);
-+}
-+
-+static void invalidate_icache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
-+					 unsigned long size)
-+{
-+	__invalidate_icache_guest_page(vcpu, pfn, size);
- }
- 
- static void kvm_send_hwpoison_signal(unsigned long address,
-@@ -1391,7 +1397,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
-+		clean_dcache_guest_page(vcpu, pfn, PMD_SIZE);
-+		invalidate_icache_guest_page(vcpu, pfn, PMD_SIZE);
-+
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, mem_type);
-@@ -1401,7 +1409,9 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_pfn_dirty(pfn);
- 			mark_page_dirty(kvm, gfn);
- 		}
--		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE);
-+		clean_dcache_guest_page(vcpu, pfn, PAGE_SIZE);
-+		invalidate_icache_guest_page(vcpu, pfn, PAGE_SIZE);
-+
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
- 	}
- 
+-The KVM/ARM code implements software support for the ARM Generic
+-Interrupt Controller's (GIC's) hardware support for virtualization by
+-allowing software to inject virtual interrupts to a VM, which the guest
+-OS sees as regular interrupts.  The code is famously known as the VGIC.
+-
+-Some of these virtual interrupts, however, correspond to physical
+-interrupts from real physical devices.  One example could be the
+-architected timer, which itself supports virtualization, and therefore
+-lets a guest OS program the hardware device directly to raise an
+-interrupt at some point in time.  When such an interrupt is raised, the
+-host OS initially handles the interrupt and must somehow signal this
+-event as a virtual interrupt to the guest.  Another example could be a
+-passthrough device, where the physical interrupts are initially handled
+-by the host, but the device driver for the device lives in the guest OS
+-and KVM must therefore somehow inject a virtual interrupt on behalf of
+-the physical one to the guest OS.
+-
+-These virtual interrupts corresponding to a physical interrupt on the
+-host are called forwarded physical interrupts, but are also sometimes
+-referred to as 'virtualized physical interrupts' and 'mapped interrupts'.
+-
+-Forwarded physical interrupts are handled slightly differently compared
+-to virtual interrupts generated purely by a software emulated device.
+-
+-
+-The HW bit
+-----------
+-Virtual interrupts are signalled to the guest by programming the List
+-Registers (LRs) on the GIC before running a VCPU.  The LR is programmed
+-with the virtual IRQ number and the state of the interrupt (Pending,
+-Active, or Pending+Active).  When the guest ACKs and EOIs a virtual
+-interrupt, the LR state moves from Pending to Active, and finally to
+-inactive.
+-
+-The LRs include an extra bit, called the HW bit.  When this bit is set,
+-KVM must also program an additional field in the LR, the physical IRQ
+-number, to link the virtual with the physical IRQ.
+-
+-When the HW bit is set, KVM must EITHER set the Pending OR the Active
+-bit, never both at the same time.
+-
+-Setting the HW bit causes the hardware to deactivate the physical
+-interrupt on the physical distributor when the guest deactivates the
+-corresponding virtual interrupt.
+-
+-
+-Forwarded Physical Interrupts Life Cycle
+-----------------------------------------
+-
+-The state of forwarded physical interrupts is managed in the following way:
+-
+-  - The physical interrupt is acked by the host, and becomes active on
+-    the physical distributor (*).
+-  - KVM sets the LR.Pending bit, because this is the only way the GICV
+-    interface is going to present it to the guest.
+-  - LR.Pending will stay set as long as the guest has not acked the interrupt.
+-  - LR.Pending transitions to LR.Active on the guest read of the IAR, as
+-    expected.
+-  - On guest EOI, the *physical distributor* active bit gets cleared,
+-    but the LR.Active is left untouched (set).
+-  - KVM clears the LR on VM exits when the physical distributor
+-    active state has been cleared.
+-
+-(*): The host handling is slightly more complicated.  For some forwarded
+-interrupts (shared), KVM directly sets the active state on the physical
+-distributor before entering the guest, because the interrupt is never actually
+-handled on the host (see details on the timer as an example below).  For other
+-forwarded interrupts (non-shared) the host does not deactivate the interrupt
+-when the host ISR completes, but leaves the interrupt active until the guest
+-deactivates it.  Leaving the interrupt active is allowed, because Linux
+-configures the physical GIC with EOIMode=1, which causes EOI operations to
+-perform a priority drop allowing the GIC to receive other interrupts of the
+-default priority.
+-
+-
+-Forwarded Edge and Level Triggered PPIs and SPIs
+-------------------------------------------------
+-Forwarded physical interrupts injected should always be active on the
+-physical distributor when injected to a guest.
+-
+-Level-triggered interrupts will keep the interrupt line to the GIC
+-asserted, typically until the guest programs the device to deassert the
+-line.  This means that the interrupt will remain pending on the physical
+-distributor until the guest has reprogrammed the device.  Since we
+-always run the VM with interrupts enabled on the CPU, a pending
+-interrupt will exit the guest as soon as we switch into the guest,
+-preventing the guest from ever making progress as the process repeats
+-over and over.  Therefore, the active state on the physical distributor
+-must be set when entering the guest, preventing the GIC from forwarding
+-the pending interrupt to the CPU.  As soon as the guest deactivates the
+-interrupt, the physical line is sampled by the hardware again and the host
+-takes a new interrupt if and only if the physical line is still asserted.
+-
+-Edge-triggered interrupts do not exhibit the same problem with
+-preventing guest execution that level-triggered interrupts do.  One
+-option is to not use HW bit at all, and inject edge-triggered interrupts
+-from a physical device as pure virtual interrupts.  But that would
+-potentially slow down handling of the interrupt in the guest, because a
+-physical interrupt occurring in the middle of the guest ISR would
+-preempt the guest for the host to handle the interrupt.  Additionally,
+-if you configure the system to handle interrupts on a separate physical
+-core from that running your VCPU, you still have to interrupt the VCPU
+-to queue the pending state onto the LR, even though the guest won't use
+-this information until the guest ISR completes.  Therefore, the HW
+-bit should always be set for forwarded edge-triggered interrupts.  With
+-the HW bit set, the virtual interrupt is injected and additional
+-physical interrupts occurring before the guest deactivates the interrupt
+-simply mark the state on the physical distributor as Pending+Active.  As
+-soon as the guest deactivates the interrupt, the host takes another
+-interrupt if and only if there was a physical interrupt between injecting
+-the forwarded interrupt to the guest and the guest deactivating the
+-interrupt.
+-
+-Consequently, whenever we schedule a VCPU with one or more LRs with the
+-HW bit set, the interrupt must also be active on the physical
+-distributor.
+-
+-
+-Forwarded LPIs
+---------------
+-LPIs, introduced in GICv3, are always edge-triggered and do not have an
+-active state.  They become pending when a device signal them, and as
+-soon as they are acked by the CPU, they are inactive again.
+-
+-It therefore doesn't make sense, and is not supported, to set the HW bit
+-for physical LPIs that are forwarded to a VM as virtual interrupts,
+-typically virtual SPIs.
+-
+-For LPIs, there is no other choice than to preempt the VCPU thread if
+-necessary, and queue the pending state onto the LR.
+-
+-
+-Putting It Together: The Architected Timer
+-------------------------------------------
+-The architected timer is a device that signals interrupts with level
+-triggered semantics.  The timer hardware is directly accessed by VCPUs
+-which program the timer to fire at some point in time.  Each VCPU on a
+-system programs the timer to fire at different times, and therefore the
+-hardware is multiplexed between multiple VCPUs.  This is implemented by
+-context-switching the timer state along with each VCPU thread.
+-
+-However, this means that a scenario like the following is entirely
+-possible, and in fact, typical:
+-
+-1.  KVM runs the VCPU
+-2.  The guest programs the time to fire in T+100
+-3.  The guest is idle and calls WFI (wait-for-interrupts)
+-4.  The hardware traps to the host
+-5.  KVM stores the timer state to memory and disables the hardware timer
+-6.  KVM schedules a soft timer to fire in T+(100 - time since step 2)
+-7.  KVM puts the VCPU thread to sleep (on a waitqueue)
+-8.  The soft timer fires, waking up the VCPU thread
+-9.  KVM reprograms the timer hardware with the VCPU's values
+-10. KVM marks the timer interrupt as active on the physical distributor
+-11. KVM injects a forwarded physical interrupt to the guest
+-12. KVM runs the VCPU
+-
+-Notice that KVM injects a forwarded physical interrupt in step 11 without
+-the corresponding interrupt having actually fired on the host.  That is
+-exactly why we mark the timer interrupt as active in step 10, because
+-the active state on the physical distributor is part of the state
+-belonging to the timer hardware, which is context-switched along with
+-the VCPU thread.
+-
+-If the guest does not idle because it is busy, the flow looks like this
+-instead:
+-
+-1.  KVM runs the VCPU
+-2.  The guest programs the time to fire in T+100
+-4.  At T+100 the timer fires and a physical IRQ causes the VM to exit
+-    (note that this initially only traps to EL2 and does not run the host ISR
+-    until KVM has returned to the host).
+-5.  With interrupts still disabled on the CPU coming back from the guest, KVM
+-    stores the virtual timer state to memory and disables the virtual hw timer.
+-6.  KVM looks at the timer state (in memory) and injects a forwarded physical
+-    interrupt because it concludes the timer has expired.
+-7.  KVM marks the timer interrupt as active on the physical distributor
+-7.  KVM enables the timer, enables interrupts, and runs the VCPU
+-
+-Notice that again the forwarded physical interrupt is injected to the
+-guest without having actually been handled on the host.  In this case it
+-is because the physical interrupt is never actually seen by the host because the
+-timer is disabled upon guest return, and the virtual forwarded interrupt is
+-injected on the KVM guest entry path.
 -- 
 2.14.2
