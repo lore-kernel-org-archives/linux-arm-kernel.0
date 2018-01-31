@@ -1,86 +1,95 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 31 Jan 2018 06:48:21 -0800
-Subject: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
-In-Reply-To: <CAMuHMdViQgCjVFbs0kkBObAAoFTzvz8yPFUHPWHrtYzkbnYm_g@mail.gmail.com>
-References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517343778-27902-12-git-send-email-fabrizio.castro@bp.renesas.com>
- <20180130220504.GA16709@roeck-us.net>
- <TY1PR06MB0895ECB2936323F9D281C1EFC0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <CAMuHMdViQgCjVFbs0kkBObAAoFTzvz8yPFUHPWHrtYzkbnYm_g@mail.gmail.com>
-Message-ID: <007dd1e3-70fd-69ad-fd02-4719e958b41c@roeck-us.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 31 Jan 2018 15:05:53 +0000
+Subject: [PATCH v2 16/16] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
+ hardening support
+In-Reply-To: <CAKv+Gu-L0WOLSUbcHSTQ_FVDNSJoXQv25ExUmtv8ZEYhkCSQ-Q@mail.gmail.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-17-marc.zyngier@arm.com>
+ <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
+ <49853e5e-f093-2e79-1cfb-182f51fcd6a0@arm.com>
+ <CAKv+Gu-XidYPh0hi1nzG5m0AO7EfRE6bnKfxCToG+9zsmvzmNg@mail.gmail.com>
+ <CAKv+Gu-L0WOLSUbcHSTQ_FVDNSJoXQv25ExUmtv8ZEYhkCSQ-Q@mail.gmail.com>
+Message-ID: <501451b6-cc84-e8d3-b7b6-49a7de953976@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2018 04:13 AM, Geert Uytterhoeven wrote:
-> Hi Fabrizio,
-> 
-> On Wed, Jan 31, 2018 at 11:47 AM, Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com> wrote:
->>> Subject: Re: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
->>> On Tue, Jan 30, 2018 at 08:22:44PM +0000, Fabrizio Castro wrote:
->>>> On R-Car Gen2 and RZ/G1 the rwdt clock needs to be always ON, therefore
->>>> when suspending to RAM we need to explicitly disable the counting by
->>>> clearing TME from RWTCSRA.
->>>> Also, on some systems RWDT is the only piece of HW that allows the SoC
->>>> to be restarted, therefore this patch implements the restart callback.
+On 31/01/18 14:38, Ard Biesheuvel wrote:
+> On 31 January 2018 at 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 31 January 2018 at 14:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 31/01/18 13:56, Hanjun Guo wrote:
+>>>> Hi Marc,
 >>>>
->>>> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
->>>> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
->>>> ---
->>>> Wolfram, was the restart callback implementation missing for a reason?
->>>> Is its implementation going to break any Gen3 platform?
+>>>> On 2018/1/30 1:45, Marc Zyngier wrote:
+>>>>>  static int enable_psci_bp_hardening(void *data)
+>>>>>  {
+>>>>>      const struct arm64_cpu_capabilities *entry = data;
+>>>>>
+>>>>> -    if (psci_ops.get_version)
+>>>>> +    if (psci_ops.get_version) {
+>>>>> +            if (check_smccc_arch_workaround_1(entry))
+>>>>> +                    return 0;
+>>>>
+>>>> If I'm using the new version SMCCC, the firmware have the choicARM_SMCCC_ARCH_WORKAROUND_1e to decide
+>>>> whether this machine needs the workaround, even if the CPU is vulnerable
+>>>> for CVE-2017-5715, but..
+>>>>
+>>>>> +
+>>>>>              install_bp_hardening_cb(entry,
+>>>>>                                     (bp_hardening_cb_t)psci_ops.get_version,
+>>>>>                                     __psci_hyp_bp_inval_start,
+>>>>>                                     __psci_hyp_bp_inval_end);
+>>>>
+>>>> ..the code above seems will enable get_psci_version() for CPU and will
+>>>> trap to trust firmware even the new version of firmware didn't say
+>>>> we need the workaround, did I understand it correctly?
 >>>
->>> The changes clearly are way more than claimed in the subject. Adding
->>> restart handler and PM support may be prerequisites for Gen2, but the
->>> changes apply to Gen3 as well. What happened to "one patch per logical
->>> change" ?
+>>> Well, you only get there if we've established that your CPU is affected
+>>> (it has an entry matching its MIDR with the HARDEN_BRANCH_PREDICTOR
+>>> capability), and that entry points to enable_psci_bp_hardening. It is
+>>> not the firmware that decides whether we need hardening, but the kernel.
+>>> The firmware merely provides a facility to apply the hardening.
+>>>
+>>>> I'm ask this because some platform will not expose to users to
+>>>> take advantage of CVE-2017-5715, and we can use different firmware
+>>>> to report we need such workaround or not, then use a single kernel
+>>>> image for both vulnerable platforms and no vulnerable ones.
+>>>
+>>> You cannot have your cake and eat it. If you don't want to workaround
+>>> the issue, you can disable the hardening. But asking for the same kernel
+>>> to do both depending on what the firmware reports doesn't make much
+>>> sense to me.
 >>
->> The PM implementation should be ok for Gen3 too, without this patch series the kernel
->> would disable the rwdt clock when suspending to RAM, this would "pause" the counting.
->> This patch series declares the rwdt clock as critical for Gen2 and RZ/G1, which means we
->> need to explicitly disable the counting to keep the same behaviour in place.
-> 
-> Note that if the kernel crashes after rwdt_suspend(), the watchdog won't
-> restart the system. But that's an issue common to many watchdog driver, right?
-> 
-If so, that would be buggy.
+>> The SMCCC v1.1. document does appear to imply that systems that
+>> implement SMCCC v1.1 but don't implement ARM_SMCCC_ARCH_WORKAROUND_1
+>> should be assumed to be unaffected.
+>>
+>> """
+>> If the discovery call returns NOT_SUPPORTED:
+>> ? SMCCC_ARCH_WORKAROUND_1 must not be invoked on any PE in the system, and
+>> ? none of the PEs in the system require firmware mitigation for CVE-2017-5715.
+>> """
+>>
+>> How to deal with conflicting information in this regard (quirk table
+>> vs firmware implementation) is a matter of policy, of course.
 
->> With respect to the restart callback implementation, that may well have consequences on
->> Gen3, hopefully Wolfram will give us a feedback on this.
->> In particular I would like to know if we should be installing the restart callback only when
->> we use "renesas,rcar-gen2-wdt" as compatible string, or it's ok to make it available for
->> Gen3 as well.
-> 
-> IIRC, the reason we don't have the restart callback on R-Car Gen3 is the
-> arm64 maintainers insisting on using PSCI, and vetoing other means,
-> to restart the system.
-> 
+Yup. And the current approach fits the spec, I believe. The
+PSCI_GET_VERSION band-aid should normally be removed shortly after these
+patches hit mainline.
 
-You could just give it lower priority than PSCI.
+> 
+> ... and actually, perhaps it makes sense for the
+> SMCCC_ARCH_WORKAROUND_1 check to be completely independent of MIDR
+> based errata matching?
+> 
+> I.e., if SMCCC v1.1 and SMCCC_ARCH_WORKAROUND_1 are both implemented,
+> we should probably invoke it even if the MIDR is not known to belong
+> to an affected implementation.
 
-> Which leaves us with a few boards where we have to use the watchdog, and
-> wait until the timeout triggers...
-> 
+This would have an impact on big-little systems, for which there is
+often a bunch of unaffected CPUs.
 
-Which means the veto is counter-productive and thus meaningless.
+Thanks,
 
-Guenter
-
->> The only way to reboot iWave's boards iwg20d and iwg22d is to use the internal watchdog,
->> that's why the restart implementation was merged into this patch.
->> I can split this patch in two, one for PM support and one for restart support for the next
->> version, what do you think about this?
-> 
-> Splitting in individual logical changes sounds like a good idea to me.
-> 
-> Gr{oetje,eeting}s,
-> 
->                          Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
