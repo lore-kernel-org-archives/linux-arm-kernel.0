@@ -1,31 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
 Date: Wed, 31 Jan 2018 09:43:49 +0100
-Subject: [RFC v3 07/25] ARM: dts: r8a7793: Adjust SMP routine size
-In-Reply-To: <1517343778-27902-8-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517343778-27902-8-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdVY5XMN01diHN4h_yF+u9KJs8oQ8U89FMOVEg0E22ivyw@mail.gmail.com>
+Subject: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali changing dclk
+ frequency
+In-Reply-To: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180131084349.du2ijvhh5rxa5vvt@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 30, 2018 at 9:22 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> This patch adjusts the definition of the SMP routine size according
-> to the latest changes made by commit:
-> "ARM: shmobile: Add watchdog support"
+Hi,
+
+On Wed, Jan 31, 2018 at 12:23:59AM +0100, Giulio Benetti wrote:
+> When mali.ko is inserted, it set default clocks and call all parent
+> clocks to stay into range, causing pll-video0 to change and
+> subsequently to change dclk to wrong frequencies.
+
+This is what you should fix.
+
+> "gpu" clock has lot of parent plls inside driver, but on sun7i
+> pll8-gpu does not depend on pll-video0, pll-ve, pll-video1.
 >
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> It only depends on 24Mhz main clock.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I don't really know why you are mentionning that. The GPU clock has
+all the parents described in the driver. And the parents' parents are
+irrelevant to this particular issue.
 
-Gr{oetje,eeting}s,
+> Remove all pll parents from gpu_parents_sun7i except "pll-gpu".
 
-                        Geert
+However, this is not a proper fix for your issue.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+What kernel version did you use?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/f36c9a5b/attachment.sig>
