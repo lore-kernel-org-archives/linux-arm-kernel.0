@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 31 Jan 2018 09:43:09 +0100
-Subject: [RFC v3 04/25] ARM: dts: r8a7790: Adjust SMP routine size
-In-Reply-To: <1517343778-27902-5-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Wed, 31 Jan 2018 09:43:22 +0100
+Subject: [RFC v3 05/25] ARM: dts: r8a7791: Adjust SMP routine size
+In-Reply-To: <1517343778-27902-6-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517343778-27902-5-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdWnr=hqJ3fB9ExeQcvJWubz6est+uFkkEJf765bKuk6oQ@mail.gmail.com>
+ <1517343778-27902-6-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdVF2HsgPP7zbvtbOgfrNXdAQQr64g5=RS1fOFiYsbEQ1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
