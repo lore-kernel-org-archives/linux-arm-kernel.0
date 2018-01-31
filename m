@@ -1,74 +1,62 @@
-From: mlyle@lyle.org (Michael Lyle)
-Date: Tue, 30 Jan 2018 23:40:27 -0800
-Subject: [PATCH v2] ARM: dts: exynos-artik5: add support for wlan
-Message-ID: <20180131074027.387-1-mlyle@lyle.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Jan 2018 08:42:12 +0100
+Subject: [linux-sunxi] Re: [PATCH v6 2/2] media: V3s: Add support for
+ Allwinner CSI.
+In-Reply-To: <20180131030807.GA19945@bart.dudau.co.uk>
+References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
+ <201801260759.RyNhDZz4%fengguang.wu@intel.com>
+ <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
+ <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
+ <20180131030807.GA19945@bart.dudau.co.uk>
+Message-ID: <20180131074212.7hvb3nqkt22h2chg@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
-it, and turn on the regulator used for it, so that both wifi & bluetooth
-work.
+Hi Liviu,
 
-Verified to work on the Artik 520 evaluation board.
+On Wed, Jan 31, 2018 at 03:08:08AM +0000, Liviu Dudau wrote:
+> On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
+> > Hi Maxime,
+> > 
+> > On Fri, 26 Jan 2018 09:46:58 +0800
+> > Yong <yong.deng@magewell.com> wrote:
+> > 
+> > > Hi Maxime,
+> > > 
+> > > Do you have any experience in solving this problem?
+> > > It seems the PHYS_OFFSET maybe undeclared when the ARCH is not arm.
+> > 
+> > Got it.
+> > Should I add 'depends on ARM' in Kconfig?
+> 
+> No, I don't think you should do that, you should fix the code.
+> 
+> The dma_addr_t addr that you've got is ideally coming from dma_alloc_coherent(),
+> in which case the addr is already "suitable" for use by the device (because the
+> bus where the device is attached to does all the address translations).
 
-Signed-off-by: Michael Lyle <mlyle@lyle.org>
----
- arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Like we're discussing in that other part of the thread with Thierry
+and Arnd, things are slightly more complicated than that :)
 
-diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-index 0aa577fe9f95..b2d441b1a7e3 100644
---- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
-+++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-@@ -245,6 +245,7 @@
- 				regulator-name = "VLDO23_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
- 			};
- 
- 			ldo24_reg: LDO24 {
-@@ -316,6 +317,41 @@
- 	status = "okay";
- };
- 
-+&pinctrl_1 {
-+	wlanen: wlanen {
-+		samsung,pins = "gpx2-3";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
-+		samsung,pin-val = <1>;
-+	};
-+};
-+
-+&mshc_1 {
-+	cap-sd-highspeed;
-+	cap-sdio-irq;
-+	disable-wp;
-+	broken-cd;
-+	bypass-smu;
-+	keep-power-in-suspend;
-+	fifo-depth = <0x40>;
-+	vqmmc-supply = <&ldo11_reg>;
-+	/* Voltage negotiation is broken for the SDIO periph so we
-+	 * can't actually set the voltage here.
-+	 * vmmc-supply = <&ldo23_reg>;
-+	 */
-+	card-detect-delay = <500>;
-+	clock-frequency = <100000000>;
-+	max-frequency = <100000000>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <0 1>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
- &rtc {
- 	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
- 	clock-names = "rtc", "rtc_src";
+In our case, the bus where the device is attached will not do the
+address translations, and shouldn't.
+
+> If you apply PHYS_OFFSET forcefully to it you might get unexpected
+> results.
+
+Out of curiosity, what would be these unexpected results?
+
+Thanks!
+Maxime
+
 -- 
-2.14.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/7fd45ec6/attachment-0001.sig>
