@@ -1,84 +1,170 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 31 Jan 2018 10:27:29 +0000
-Subject: [RFC v3 10/25] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2
- support
-In-Reply-To: <CAMuHMdXkHF9R0XfcG++s0RRup+Mdtam5p=FXw26z86wAOJhZfQ@mail.gmail.com>
+Date: Wed, 31 Jan 2018 10:47:30 +0000
+Subject: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
+In-Reply-To: <20180130220504.GA16709@roeck-us.net>
 References: <1517343778-27902-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517343778-27902-11-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdXkHF9R0XfcG++s0RRup+Mdtam5p=FXw26z86wAOJhZfQ@mail.gmail.com>
-Message-ID: <TY1PR06MB089525525DC23EEAEAE97795C0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <1517343778-27902-12-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20180130220504.GA16709@roeck-us.net>
+Message-ID: <TY1PR06MB0895ECB2936323F9D281C1EFC0FB0@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hello Guenter,
 
-> Subject: Re: [RFC v3 10/25] dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
+thank you for your feedback.
+
+> Subject: Re: [RFC v3 11/25] watchdog: renesas_wdt: Add R-Car Gen2 support
 >
-> Hi Fabrizio,
->
-> On Tue, Jan 30, 2018 at 9:22 PM, Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com> wrote:
-> > This commit documents the compatibility with R-Car Gen2 and RZ/G
-> > devices by defining the generic compatible string "renesas,rcar-gen2-wdt".
-> > Also, this patch expands the list of SoC-specific compatible strings to
-> > include RZ/G and R-Car Gen2 devices.
+> On Tue, Jan 30, 2018 at 08:22:44PM +0000, Fabrizio Castro wrote:
+> > On R-Car Gen2 and RZ/G1 the rwdt clock needs to be always ON, therefore
+> > when suspending to RAM we need to explicitly disable the counting by
+> > clearing TME from RWTCSRA.
+> > Also, on some systems RWDT is the only piece of HW that allows the SoC
+> > to be restarted, therefore this patch implements the restart callback.
 > >
 > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
->
-> Thanks for your patch!
-
-Thanks for your feedback!
-
->
-> > --- a/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-> > +++ b/Documentation/devicetree/bindings/watchdog/renesas-wdt.txt
-> > @@ -1,17 +1,25 @@
-> >  Renesas Watchdog Timer (WDT) Controller
+> > ---
+> > Wolfram, was the restart callback implementation missing for a reason?
+> > Is its implementation going to break any Gen3 platform?
 > >
-> >  Required properties:
-> > -- compatible : Should be "renesas,<soctype>-wdt", and
-> > -              "renesas,rcar-gen3-wdt" or "renesas,rza-wdt" as fallback.
-> > + - compatible : Must be "renesas,<soctype>-wdt", followed by a generic
-> > +               fallback compatible string when compatible with the generic
-> > +               version.
-> >                Examples with soctypes are:
-> > +                - "renesas,r8a7743-wdt" (RZ/G1M)
-> > +                - "renesas,r8a7745-wdt" (RZ/G1E)
-> > +                - "renesas,r8a7790-wdt" (R-Car H2)
-> > +                - "renesas,r8a7791-wdt" (R-Car M2-W)
-> > +                - "renesas,r8a7792-wdt" (R-Car V2H)
-> > +                - "renesas,r8a7793-wdt" (R-Car M2-N)
-> > +                - "renesas,r8a7794-wdt" (R-Car E2)
-> >                  - "renesas,r8a7795-wdt" (R-Car H3)
-> >                  - "renesas,r8a7796-wdt" (R-Car M3-W)
-> >                  - "renesas,r8a77995-wdt" (R-Car D3)
-> >                  - "renesas,r7s72100-wdt" (RZ/A1)
-> > +               The generic compatible string must be:
-> > +                - "renesas,rcar-gen2-wdt" for R-Car Gen2 and RZ/G
-> > +                - "renesas,rcar-gen3-wdt" for R-Car Gen3
 >
-> You've lost the generic "renesas,rza-wdt".
+> The changes clearly are way more than claimed in the subject. Adding
+> restart handler and PM support may be prerequisites for Gen2, but the
+> changes apply to Gen3 as well. What happened to "one patch per logical
+> change" ?
 
-Ooops, I'll fix that.
+The PM implementation should be ok for Gen3 too, without this patch series the kernel
+would disable the rwdt clock when suspending to RAM, this would "pause" the counting.
+This patch series declares the rwdt clock as critical for Gen2 and RZ/G1, which means we
+need to explicitly disable the counting to keep the same behaviour in place.
+With respect to the restart callback implementation, that may well have consequences on
+Gen3, hopefully Wolfram will give us a feedback on this.
+In particular I would like to know if we should be installing the restart callback only when
+we use "renesas,rcar-gen2-wdt" as compatible string, or it's ok to make it available for
+Gen3 as well.
+The only way to reboot iWave's boards iwg20d and iwg22d is to use the internal watchdog,
+that's why the restart implementation was merged into this patch.
+I can split this patch in two, one for PM support and one for restart support for the next
+version, what do you think about this?
 
-Cheers,
+>
+> > v1->v3:
+> > * unified Gen2 and Gen3 drivers.
+> >
+> >  drivers/watchdog/renesas_wdt.c | 61 ++++++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 56 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/watchdog/renesas_wdt.c b/drivers/watchdog/renesas_wdt.c
+> > index 831ef83..eedb016 100644
+> > --- a/drivers/watchdog/renesas_wdt.c
+> > +++ b/drivers/watchdog/renesas_wdt.c
+> > @@ -107,6 +107,24 @@ static unsigned int rwdt_get_timeleft(struct watchdog_device *wdev)
+> >  return DIV_BY_CLKS_PER_SEC(priv, 65536 - val);
+> >  }
+> >
+> > +static int rwdt_restart(struct watchdog_device *wdev, unsigned long action,
+> > +void *data)
+> > +{
+> > +struct rwdt_priv *priv = watchdog_get_drvdata(wdev);
+> > +
+> > +pm_runtime_get_sync(wdev->parent);
+> > +
+> > +rwdt_write(priv, 0x00, RWTCSRB);
+> > +rwdt_write(priv, 0x00, RWTCSRA);
+> > +rwdt_write(priv, 0xffff, RWTCNT);
+> > +
+> > +while (readb_relaxed(priv->base + RWTCSRA) & RWTCSRA_WRFLG)
+> > +cpu_relax();
+> > +
+> > +rwdt_write(priv, 0x80, RWTCSRA);
+> > +return 0;
+> > +}
+> > +
+> >  static const struct watchdog_info rwdt_ident = {
+> >  .options = WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
+> >  .identity = "Renesas WDT Watchdog",
+> > @@ -118,6 +136,7 @@ static const struct watchdog_ops rwdt_ops = {
+> >  .stop = rwdt_stop,
+> >  .ping = rwdt_init_timeout,
+> >  .get_timeleft = rwdt_get_timeleft,
+> > +.restart = rwdt_restart,
+> >  };
+> >
+> >  static int rwdt_probe(struct platform_device *pdev)
+> > @@ -203,13 +222,42 @@ static int rwdt_remove(struct platform_device *pdev)
+> >  return 0;
+> >  }
+> >
+> > -/*
+> > - * This driver does also fit for R-Car Gen2 (r8a779[0-4]) WDT. However, for SMP
+> > - * to work there, one also needs a RESET (RST) driver which does not exist yet
+> > - * due to HW issues. This needs to be solved before adding compatibles here.
+> > - */
+>
+> Have those issues been resolved ?
+
+This patch series addresses precisely those issues. The first implementation
+used a flag that the watchdog driver needed to explicitly set to make everything
+work as expected. This new version uses a different concept that doesn't require
+such an hack, and that's why the proposal now is to merge Gen2 and Gen3 drivers.
+
+Thanks,
 Fab
 
 >
-> With that fixed:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+> > +#ifdef CONFIG_PM
+> > +static int rwdt_suspend(struct device *dev)
+> > +{
+> > +struct platform_device *pdev;
+> > +struct rwdt_priv *priv;
+> > +
+> > +pdev = to_platform_device(dev);
+> > +priv = platform_get_drvdata(pdev);
+> > +if (watchdog_active(&priv->wdev)) {
+> > +rwdt_write(priv, priv->cks, RWTCSRA);
+> > +}
+> > +return 0;
+> > +}
+> > +
+> > +static int rwdt_resume(struct device *dev)
+> > +{
+> > +struct platform_device *pdev;
+> > +struct rwdt_priv *priv;
+> > +
+> > +pdev = to_platform_device(dev);
+> > +priv = platform_get_drvdata(pdev);
+> > +if (watchdog_active(&priv->wdev)) {
+> > +rwdt_write(priv, priv->cks | RWTCSRA_TME, RWTCSRA);
+> > +}
+> > +return 0;
+> > +}
+> > +
+> > +static const struct dev_pm_ops rwdt_pm = {
+> > +.suspend = rwdt_suspend,
+> > +.resume = rwdt_resume,
+> > +};
+> > +#endif
+> > +
+> >  static const struct of_device_id rwdt_ids[] = {
+> >  { .compatible = "renesas,rcar-gen3-wdt", },
+> > +{ .compatible = "renesas,rcar-gen2-wdt", },
+> >  { /* sentinel */ }
+> >  };
+> >  MODULE_DEVICE_TABLE(of, rwdt_ids);
+> > @@ -218,6 +266,9 @@ static struct platform_driver rwdt_driver = {
+> >  .driver = {
+> >  .name = "renesas_wdt",
+> >  .of_match_table = rwdt_ids,
+> > +#ifdef CONFIG_PM
+> > +.pm = &rwdt_pm,
+> > +#endif
+> >  },
+> >  .probe = rwdt_probe,
+> >  .remove = rwdt_remove,
+> > --
+> > 2.7.4
+> >
 
 
 
