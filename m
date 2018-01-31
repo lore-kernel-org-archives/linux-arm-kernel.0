@@ -1,63 +1,31 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 31 Jan 2018 12:34:34 +0000
-Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838641882@FRAEML521-MBX.china.huawei.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
- <5FC3163CFD30C246ABAA99954A238FA8386400F7@FRAEML521-MBX.china.huawei.com>
- <20180130180013.GA16154@e107981-ln.cambridge.arm.com>
- <5FC3163CFD30C246ABAA99954A238FA838641882@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20180131123434.GA933@e107981-ln.cambridge.arm.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 31 Jan 2018 20:45:56 +0800
+Subject: [PATCH v3 0/6] 32bit ARM branch predictor hardening
+In-Reply-To: <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
+References: <20180125152139.32431-1-marc.zyngier@arm.com>
+ <d95c2261-febe-bb56-da37-5edc1a593cbb@huawei.com>
+ <CAGo_u6o8ahJxnXXN-XuHcsa6=LcA=BBbsGOZ-n8Q9+_dYYswjQ@mail.gmail.com>
+Message-ID: <e34add95-a672-b76c-1746-e2d9d152624c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 12:10:47PM +0000, Shameerali Kolothum Thodi wrote:
-
-[...]
-
-> > I went back and re-read the patches, I think the point here is that the
-> > perf driver (ie PATCH 2 that, by the way, is not maiinline) uses
-> > devm_ioremap_resource() to map the counters and that's what is causing
-> > failures when PMCG is part of SMMUv3 registers.
+On 2018/1/29 22:58, Nishanth Menon wrote:
+> On Mon, Jan 29, 2018 at 5:36 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> [...]
 > 
-> Thanks for going through this.  No, this is not where we are seeing the failure.
-> May be I was not clear in my earlier mail. The failure happens in SMMUv3
-> driver probe function when it calls devm_ioremap_resource().
-
-Understood - because the PMU PMCG driver calls it first, that's what
-I was referring to.
-
-My point is that:
-
-- the PMCG platform device resources should be built with the correct
-  resource hierarchy
-- and even then, I do not think that using devm_ioremap_resource() in
-  the PMCG PMU driver is the correct way of handling its resource
-  reservation (ie the kernel must be able to detect that a resource is
-  contained in a parent one but I am not sure devm_ioremap_resource()
-  is the way to handle this correctly)
-
-> > It is the resources hierarchy that is wrong and in turn, I do not think
-> > devm_request_mem_region() is the right way of requesting it for the
-> > PMCG driver.
-> > 
-> > I need to look into this but I suspect that's something that should
-> > be handled in the PMCG driver, that has to request the memory region
-> > _differently_ (ie ioremap copes with this overlap - it is the
-> > devm_request_mem_region() in devm_ioremap_resource() that fails, correct
-> > ?).
+>> By the way, this patch set just enable branch predictor hardening
+>> on arm32 unconditionally, but some of machines (such as wireless
+>> network base station) will not be exposed to user to take advantage
+>> of variant 2, and those machines will be pretty sensitive for
+>> performance, so can we introduce Kconfig or boot option to disable
+>> branch predictor hardening as an option?
 > 
-> It looks like, in IORT code,
-> 
-> iort_add_platform_device()--> platform_device_add()-->insert_resource(), inserts
-> both SMMUv3 and PMCG resources into the resource tree and then when the probe
-> of SMMUv3 is called, it detects the conflict.
-> 
-> [   85.548749] arm-smmu-v3 arm-smmu-v3.0.auto: can't request region for resource [mem 0x148000000-0x14801ffff]                      
-> 
-> Of course, changing devm_ioremap_resource() to devm_ioremap() in SMMv3
-> driver probe solves the issue for us, but not sure that's the right approach or not.
+> I am curious: Have you seen performance degradation with this series?
+> If yes, is it possible to share the information?
 
-See above.
+Sorry for the late reply, the performance data for context switch (CFS)
+is about 6%~12% drop (A9 based machine) for the first around test, but
+the data is not stable, I need to retest then I will update here.
 
-Lorenzo
+Thanks
+Hanjun
