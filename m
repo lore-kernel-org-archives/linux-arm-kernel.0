@@ -1,127 +1,94 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 31 Jan 2018 18:28:06 +0000
-Subject: [PATCH v2 19/20] arm64: Delay enabling hardware DBM feature
+Date: Wed, 31 Jan 2018 18:28:07 +0000
+Subject: [PATCH v2 20/20] arm64: Add work around for Arm Cortex-A55 Erratum
+ 1024718
 In-Reply-To: <20180131182807.32134-1-suzuki.poulose@arm.com>
 References: <20180131182807.32134-1-suzuki.poulose@arm.com>
-Message-ID: <20180131182807.32134-20-suzuki.poulose@arm.com>
+Message-ID: <20180131182807.32134-21-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable hardware DBM bit in a capable CPU, very early in the
-boot via __cpu_setup. This doesn't give us a flexibility of
-optionally disable the feature, as the clearing the bit
-is a bit costly as the TLB can cache the settings. Instead,
-we delay enabling the feature until the CPU is brought up
-into the kernel. We use the feature capability mechanism
-to handle it.
+Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+from an erratum 1024718, which causes incorrect updates when DBM/AP
+bits in a page table entry is modified without a break-before-make
+sequence. The work around is to skip enabling the hardware DBM feature
+on the affected cores. The hardware Access Flag management features
+is not affected. There are some other cores suffering from this
+errata, which could be added to the midr_list to trigger the work
+around.
 
-The hardware DBM is a non-conflicting feature. i.e, the kernel
-can safely run with a mix of CPUs with some using the feature
-and the others don't. So, it is safe for a late CPU to have
-this capability and enable it, even if the active CPUs don't.
-
-To get this handled properly by the infrastructure, we
-unconditionally set the capability and only enable it
-on CPUs which really have the feature.
-
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: ckadabi at codeaurora.org
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/kernel/cpufeature.c   | 40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/proc.S             |  9 +++------
- 3 files changed, 45 insertions(+), 7 deletions(-)
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 14 ++++++++++++++
+ arch/arm64/kernel/cpufeature.c         | 14 +++++++++++++-
+ 3 files changed, 28 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index bb263820de13..8df80cc828ac 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -45,7 +45,8 @@
- #define ARM64_HARDEN_BRANCH_PREDICTOR		24
- #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
- #define ARM64_HAS_RAS_EXTN			26
-+#define ARM64_HW_DBM				27
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index b9d93e981a05..5203e71c113d 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -55,6 +55,7 @@ stable kernels.
+ | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
+ | ARM            | Cortex-A72      | #853709         | N/A                         |
+ | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
++| ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
+ | ARM            | MMU-500         | #841119,#826419 | N/A                         |
+ |                |                 |                 |                             |
+ | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1d51c8edf34b..070efe1f7ec3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -461,6 +461,20 @@ config ARM64_ERRATUM_843419
  
--#define ARM64_NCAPS				27
-+#define ARM64_NCAPS				28
+ 	  If unsure, say Y.
  
- #endif /* __ASM_CPUCAPS_H */
++config ARM64_ERRATUM_1024718
++	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
++	default y
++	help
++	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
++
++	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
++	  update of the hardware dirty bit when the DBM/AP bits are updated
++	  without a break-before-make. The work around is to disable the usage
++	  of hardware DBM locally on the affected cores. CPUs not affected by
++	  erratum will continue to use the feature.
++
++	  If unsure, say Y.
++
+ config CAVIUM_ERRATUM_22375
+ 	bool "Cavium erratum 22375, 24313"
+ 	default y
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 13e30c1b1e99..1f695a998eed 100644
+index 1f695a998eed..410fbddec129 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -903,6 +903,33 @@ static int __init parse_kpti(char *str)
- __setup("kpti=", parse_kpti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+@@ -923,9 +923,21 @@ static inline void __cpu_enable_hw_dbm(void)
+ 	isb();
+ }
  
-+#ifdef CONFIG_ARM64_HW_AFDBM
-+static bool has_hw_dbm(const struct arm64_cpu_capabilities *entry, int scope)
++static bool cpu_has_erratum_1024718(void)
 +{
-+	/*
-+	 * DBM is a non-conflicting feature. i.e, the kernel can safely run
-+	 * a mix of CPUs with and without the feature. So, we unconditionally
-+	 * enable the capability to allow any late CPU to use the feature.
-+	 * We only enable the control bits on the CPU, if it actually supports.
-+	 */
-+	return true;
++	static const struct midr_range cpus[] = {
++		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),  // A55 r0p0 -r1p0
++		{},
++	};
++
++	return IS_ENABLED(CONFIG_ARM64_ERRATUM_1024718) &&
++	       is_midr_in_range_list(read_cpuid_id(), cpus);
 +}
 +
-+static inline void __cpu_enable_hw_dbm(void)
-+{
-+	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
-+
-+	write_sysreg(tcr, tcr_el1);
-+	isb();
-+}
-+
-+static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
-+{
-+	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU))
-+		__cpu_enable_hw_dbm();
-+}
-+#endif
-+
- static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
  {
- 	/*
-@@ -1059,6 +1086,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.cpu_enable = cpu_clear_disr,
- 	},
- #endif /* CONFIG_ARM64_RAS_EXTN */
-+#ifdef CONFIG_ARM64_HW_AFDBM
-+	{
-+		.desc = "Hardware pagetable Dirty Bit Management",
-+		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE,
-+		.capability = ARM64_HW_DBM,
-+		.sys_reg = SYS_ID_AA64MMFR1_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
-+		.min_field_value = 2,
-+		.matches = has_hw_dbm,
-+		.cpu_enable = cpu_enable_hw_dbm,
-+	},
-+#endif
- 	{},
- };
- 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 9f177aac6390..68e08ad54944 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -253,12 +253,9 @@ ENTRY(__cpu_setup)
- 	 */
- 	mrs	x9, ID_AA64MMFR1_EL1
- 	and	x9, x9, #0xf
--	cbz	x9, 2f
--	cmp	x9, #2
--	b.lt	1f
--	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
--1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
--2:
-+	cbz	x9, 1f
-+	orr	x10, x10, #TCR_HA		// hardware Access flag update
-+1:
- #endif	/* CONFIG_ARM64_HW_AFDBM */
- 	msr	tcr_el1, x10
- 	ret					// return to head.S
+-	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU))
++	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU) &&
++	    !cpu_has_erratum_1024718())
+ 		__cpu_enable_hw_dbm();
+ }
+ #endif
 -- 
 2.14.3
