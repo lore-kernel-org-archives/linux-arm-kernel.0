@@ -1,21 +1,74 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Jan 2018 16:33:43 +0100
-Subject: [PATCH v2 2/2] ARM: dts: sunxi: Add Olimex A20-SOM204-EVB-eMMC
- board
-In-Reply-To: <1517234202-1892-2-git-send-email-stefan@olimex.com>
-References: <1517234202-1892-1-git-send-email-stefan@olimex.com>
- <1517234202-1892-2-git-send-email-stefan@olimex.com>
-Message-ID: <20180131153343.nwuii3pmybn4t7dk@flea.lan>
+Date: Wed, 31 Jan 2018 16:34:32 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable HDMI support on the
+ Olimex EVB
+In-Reply-To: <20180130075054.6256-1-codekipper@gmail.com>
+References: <20180130075054.6256-1-codekipper@gmail.com>
+Message-ID: <20180131153431.ctpx2ea6wplw4anb@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 03:56:40PM +0200, Stefan Mavrodiev wrote:
-> A20-SOM204 board has option with onboard 16GB eMMC.
-> The chip is wired to MMC2 slot.
+On Tue, Jan 30, 2018 at 08:50:54AM +0100, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> Enable the display pipeline and HDMI output on the Olimex
+> A20-SOM-EVB.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> index 64c8ef9a2756..07906d4f8758 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> @@ -61,6 +61,17 @@
+>  		stdout-path = "serial0:115200n8";
+>  	};
+>  
+> +	hdmi-connector {
+> +		compatible = "hdmi-connector";
+> +		type = "a";
+> +
+> +		port {
+> +			hdmi_con_in: endpoint {
+> +				remote-endpoint = <&hdmi_out_con>;
+> +			};
+> +		};
+> +	};
+> +
+>  	leds {
+>  		compatible = "gpio-leds";
+>  		pinctrl-names = "default";
+> @@ -79,6 +90,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&de {
+> +	status = "okay";
+> +};
+> +
+>  &ehci0 {
+>  	status = "okay";
+>  };
+> @@ -107,6 +122,16 @@
+>  	};
+>  };
+>  
+> +&hdmi {
+> +	status = "okay";
+> +};
+> +
+> +&hdmi_out {
+> +	hdmi_out_con: endpoint {
+> +	remote-endpoint = <&hdmi_con_in>;
+> +	};
+> +};
+> +
 
-Queued both in 4.17, thanks!
+The indentation is not correct here.
+
 Maxime
 
 -- 
@@ -28,4 +81,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/50712f06/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180131/fa02445a/attachment.sig>
