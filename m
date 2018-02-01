@@ -1,69 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Feb 2018 13:45:51 +0100
-Subject: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali changing dclk
- frequency
-In-Reply-To: <7be1e297-4fac-a7a2-a8cc-54061d4e2fde@micronovasrl.com>
-References: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180131084349.du2ijvhh5rxa5vvt@flea.lan>
- <7be1e297-4fac-a7a2-a8cc-54061d4e2fde@micronovasrl.com>
-Message-ID: <20180201124551.kfyz6frx4lcx4wbz@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Feb 2018 12:48:30 +0000
+Subject: [PATCH v3 14/18] firmware/psci: Expose SMCCC version through
+ psci_ops
+In-Reply-To: <87705115-ca05-4d35-a169-51e1f3676133@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-15-marc.zyngier@arm.com>
+ <87705115-ca05-4d35-a169-51e1f3676133@arm.com>
+Message-ID: <83ae5571-c3a2-65df-b7d8-4c7dccb1fb02@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 01:05:38PM +0100, Giulio Benetti wrote:
-> Hi,
+On 01/02/18 12:32, Robin Murphy wrote:
+> On 01/02/18 11:46, Marc Zyngier wrote:
+>> Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
+>> let's do that at boot time, and expose the version of the calling
+>> convention as part of the psci_ops structure.
+>>
+>> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   drivers/firmware/psci.c | 19 +++++++++++++++++++
+>>   include/linux/psci.h    |  6 ++++++
+>>   2 files changed, 25 insertions(+)
+>>
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index e9493da2b111..8631906c414c 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -61,6 +61,7 @@ bool psci_tos_resident_on(int cpu)
+>>   
+>>   struct psci_operations psci_ops = {
+>>   	.conduit = PSCI_CONDUIT_NONE,
+>> +	.smccc_version = SMCCC_VERSION_1_0,
+>>   };
+>>   
+>>   typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+>> @@ -511,6 +512,23 @@ static void __init psci_init_migrate(void)
+>>   	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+>>   }
+>>   
+>> +static void __init psci_init_smccc(u32 ver)
+>> +{
+>> +	int feature;
+>> +
+>> +	feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
+>> +
+>> +	if (feature != PSCI_RET_NOT_SUPPORTED) {
+>> +		ver = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
+>> +		if (ver != ARM_SMCCC_VERSION_1_1)
+>> +			psci_ops.smccc_version = SMCCC_VERSION_1_0;
 > 
-> Il 31/01/2018 09:43, Maxime Ripard ha scritto:
-> > Hi,
-> > 
-> > On Wed, Jan 31, 2018 at 12:23:59AM +0100, Giulio Benetti wrote:
-> > > When mali.ko is inserted, it set default clocks and call all parent
-> > > clocks to stay into range, causing pll-video0 to change and
-> > > subsequently to change dclk to wrong frequencies.
-> > 
-> > This is what you should fix.
-> 
-> Ok, so it must be patch title(shrinked of course), right?
-> 
-> > 
-> > > "gpu" clock has lot of parent plls inside driver, but on sun7i
-> > > pll8-gpu does not depend on pll-video0, pll-ve, pll-video1.
-> > > 
-> > > It only depends on 24Mhz main clock.
-> > 
-> > I don't really know why you are mentionning that. The GPU clock has
-> > all the parents described in the driver. And the parents' parents are
-> > irrelevant to this particular issue.
-> > 
-> > > Remove all pll parents from gpu_parents_sun7i except "pll-gpu".
-> > 
-> > However, this is not a proper fix for your issue.
-> 
-> Yes, you're right, now I understand.
-> 
-> It is more complex than I thought.
-> I need to dig more and study better A20 CCU.
-> 
-> So this patch can be dropped.
-> 
-> > 
-> > What kernel version did you use?
-> 
-> Latest mainline.
+> AFAICS, unless you somehow run psci_probe() twice *and* have 
+> schizophrenic firmware, this assignment now does precisely nothing.
 
-I guess this patch could fix it:
-http://code.bulix.org/1kitrq-268936?raw
+That's a leftover of a previous tracing hack I had...  Embarrassing.
 
-Maxime
+> With the condition flipped and the redundant else case removed (or an 
+> explanation of why I'm wrong...)
+> 
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/09d92df4/attachment.sig>
+Jazz is not dead. It just smells funny...
