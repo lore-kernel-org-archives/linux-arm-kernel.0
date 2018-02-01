@@ -1,59 +1,69 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Feb 2018 16:09:26 +0100
-Subject: [PATCH] soc: mediatek: Handle return of of_match_device function
-In-Reply-To: <b8265d37-0ef0-9d24-8ace-8fae7f67477d@arm.com>
-References: <1517482822-28758-1-git-send-email-himanshujha199640@gmail.com>
- <b8265d37-0ef0-9d24-8ace-8fae7f67477d@arm.com>
-Message-ID: <CAMuHMdWxH9kQ7Zq5jCHL0hkA3Oin17f75TAq9dPC7FQMagT-vA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 1 Feb 2018 09:11:36 -0600
+Subject: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
+In-Reply-To: <DM2PR0201MB07674CED433B7273AEFC50D2B8FB0@DM2PR0201MB0767.namprd02.prod.outlook.com>
+References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
+ <1516836074-4149-2-git-send-email-jollys@xilinx.com>
+ <20180130170818.tz4hoqvyekrl7uio@rob-hp-laptop>
+ <DM2PR0201MB07674CED433B7273AEFC50D2B8FB0@DM2PR0201MB0767.namprd02.prod.outlook.com>
+Message-ID: <CAL_JsqJMfUyi06jMZOyQX956HjBvyHbKHEcBGt+GTZrj3Da5DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 1, 2018 at 4:02 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 01/02/18 11:00, Himanshu Jha wrote:
->> In scpsys_probe function, return value of of_match_device function which
->> returns null is dereferenced without checking. Therefore, add a check for
->> potential null dereference.
->>
->> Detected by CoverityScan, CID#1424087 "Dereference null return value"
->>
->> Fixes: commit 53fddb1a66dd ("soc: mediatek: reduce code duplication of
->> scpsys_probe across all SoCs")
->> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
->> ---
->>   drivers/soc/mediatek/mtk-scpsys.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/soc/mediatek/mtk-scpsys.c
->> b/drivers/soc/mediatek/mtk-scpsys.c
->> index 435ce5e..6e7f196 100644
->> --- a/drivers/soc/mediatek/mtk-scpsys.c
->> +++ b/drivers/soc/mediatek/mtk-scpsys.c
->> @@ -981,6 +981,9 @@ static int scpsys_probe(struct platform_device *pdev)
->>         int i, ret;
->>         match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
->> +       if (!match)
->> +               return -EINVAL;
->> +
->>         soc = (const struct scp_soc_data *)match->data;
+On Wed, Jan 31, 2018 at 12:03 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
+> Hi Rob,
+> Thanks for the review,
 >
-> You could of course replace the whole sequence with an
-> of_device_get_match_data() call, which happens to be inherently safe against
-> the no-match case even when that *is* impossible by design.
+>> -----Original Message-----
+>> From: Rob Herring [mailto:robh at kernel.org]
+>> Sent: Tuesday, January 30, 2018 9:08 AM
+>> To: Jolly Shah <JOLLYS@xilinx.com>
+>> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
+>> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+>> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
+>> dmitry.torokhov at gmail.com; michal.simek at xilinx.com;
+>> mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org; linux-
+>> kernel at vger.kernel.org; devicetree at vger.kernel.org; Jolly Shah
+>> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
+>> Subject: Re: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+>> firmware
+>>
+>> On Wed, Jan 24, 2018 at 03:21:11PM -0800, Jolly Shah wrote:
+>> > Add documentation to describe Xilinx ZynqMP firmware driver bindings.
+>> > Firmware driver provides an interface to firmware APIs. Interface APIs
+>> > can be used by any driver to communicate to PMUFW (Platform Management
+>> > Unit).
+>> >
+>> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+>> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+>> > ---
+>> >  .../bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt    | 16
+>> ++++++++++++++++
+>> >  1 file changed, 16 insertions(+)
+>> >  create mode 100644
+>> > Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware
+>> > .txt
+>> >
+>> > diff --git
+>> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+>> > re.txt
+>> > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+>> > re.txt
+>> > new file mode 100644
+>> > index 0000000..a7aaf56
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
+>> > +++ rmware.txt
+>> > @@ -0,0 +1,16 @@
+>> > +Xilinx Zynq MPSoC Firmware Device Tree Bindings
+>> > +
+>> > +The zynqmp-firmware node describes the interface to platform firmware.
+>>
+>> Please define this a is child of /firmware.
+>>
+> I dint get you. It is already under firmware/xilinx.
 
-+1
+Put it under a "firmware" node in DT. See other firmware bindings for examples.
 
->>         scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
-
-... followed by the static analyser gang complaining we may dereference
-NULL pointer soc...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Rob
