@@ -1,126 +1,69 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Thu, 1 Feb 2018 16:15:01 +0100
-Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
-In-Reply-To: <20180201131907.GO5453@intel.com>
-References: <20180201130446.6165-1-linus.walleij@linaro.org>
- <20180201131907.GO5453@intel.com>
-Message-ID: <0214a021-caae-e21f-f99f-74277b889608@tronnes.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Feb 2018 15:16:03 +0000
+Subject: [PATCH] soc: mediatek: Handle return of of_match_device function
+In-Reply-To: <CAMuHMdWxH9kQ7Zq5jCHL0hkA3Oin17f75TAq9dPC7FQMagT-vA@mail.gmail.com>
+References: <1517482822-28758-1-git-send-email-himanshujha199640@gmail.com>
+ <b8265d37-0ef0-9d24-8ace-8fae7f67477d@arm.com>
+ <CAMuHMdWxH9kQ7Zq5jCHL0hkA3Oin17f75TAq9dPC7FQMagT-vA@mail.gmail.com>
+Message-ID: <5fe8a04b-de13-87fb-2916-f3d26e320c4d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 01/02/18 15:09, Geert Uytterhoeven wrote:
+> On Thu, Feb 1, 2018 at 4:02 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> On 01/02/18 11:00, Himanshu Jha wrote:
+>>> In scpsys_probe function, return value of of_match_device function which
+>>> returns null is dereferenced without checking. Therefore, add a check for
+>>> potential null dereference.
+>>>
+>>> Detected by CoverityScan, CID#1424087 "Dereference null return value"
+>>>
+>>> Fixes: commit 53fddb1a66dd ("soc: mediatek: reduce code duplication of
+>>> scpsys_probe across all SoCs")
+>>> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+>>> ---
+>>>    drivers/soc/mediatek/mtk-scpsys.c | 3 +++
+>>>    1 file changed, 3 insertions(+)
+>>>
+>>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c
+>>> b/drivers/soc/mediatek/mtk-scpsys.c
+>>> index 435ce5e..6e7f196 100644
+>>> --- a/drivers/soc/mediatek/mtk-scpsys.c
+>>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+>>> @@ -981,6 +981,9 @@ static int scpsys_probe(struct platform_device *pdev)
+>>>          int i, ret;
+>>>          match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
+>>> +       if (!match)
+>>> +               return -EINVAL;
+>>> +
+>>>          soc = (const struct scp_soc_data *)match->data;
+>>
+>> You could of course replace the whole sequence with an
+>> of_device_get_match_data() call, which happens to be inherently safe against
+>> the no-match case even when that *is* impossible by design.
+> 
+> +1
+> 
+>>>          scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
+> 
+> ... followed by the static analyser gang complaining we may dereference
+> NULL pointer soc...
 
-Den 01.02.2018 14.19, skrev Ville Syrj?l?:
-> On Thu, Feb 01, 2018 at 02:04:46PM +0100, Linus Walleij wrote:
->> The following happened when migrating an old fbdev driver to DRM:
->>
->> The Integrator/CP PL111 supports 16BPP but only ARGB1555/ABGR1555
->> or XRGB1555/XBGR1555 i.e. the maximum depth is 15.
->>
->> This makes the initialization of the framebuffer fail since
->> the code in drm_fb_helper_single_fb_probe() assigns the same value
->> to sizes.surface_bpp and sizes.surface_depth. I.e. it simply assumes
->> a 1-to-1 mapping between BPP and depth, which is true in most cases
->> but typically not for this hardware.
->>
->> To support the odd case of a driver supporting 16BPP with only 15
->> bits of depth, this patch will make the code loop over the formats
->> supported on the primary plane and cap the depth to the maximum
->> supported.
->>
->> On the PL110 Integrator, this makes drm_mode_legacy_fb_format()
->> select DRM_FORMAT_XRGB1555 which is acceptable for this driver, and
->> thus we get framebuffer, penguin and console on the Integrator/CP.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>   drivers/gpu/drm/drm_fb_helper.c | 40 +++++++++++++++++++++++++++++++++++++++-
->>   1 file changed, 39 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
->> index e56166334455..5076f9103740 100644
->> --- a/drivers/gpu/drm/drm_fb_helper.c
->> +++ b/drivers/gpu/drm/drm_fb_helper.c
->> @@ -1720,6 +1720,8 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
->>   	int i;
->>   	struct drm_fb_helper_surface_size sizes;
->>   	int gamma_size = 0;
->> +	struct drm_plane *plane;
->> +	int best_depth = 0;
->>   
->>   	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
->>   	sizes.surface_depth = 24;
->> @@ -1727,7 +1729,10 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
->>   	sizes.fb_width = (u32)-1;
->>   	sizes.fb_height = (u32)-1;
->>   
->> -	/* if driver picks 8 or 16 by default use that for both depth/bpp */
->> +	/*
->> +	 * If driver picks 8 or 16 by default use that for both depth/bpp
->> +	 * to begin with
->> +	 */
->>   	if (preferred_bpp != sizes.surface_bpp)
->>   		sizes.surface_depth = sizes.surface_bpp = preferred_bpp;
->>   
->> @@ -1762,6 +1767,39 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
->>   		}
->>   	}
->>   
->> +	/*
->> +	 * If we run into a situation where, for example, the primary plane
->> +	 * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
->> +	 * 16) we need to scale down the depth of the sizes we request.
->> +	 */
->> +	drm_for_each_plane(plane, fb_helper->dev) {
->> +		/* Only check the primary plane */
->> +		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
->> +			continue;
-> I think this should look at crtc->primary for each of the crtcs managed
-> by the fb_helper.
->
-> Also this probably shouldn't look at YUV formats at all?
->
-> I do wonder if instead we should just have the driver specify the
-> pixel format explicitly instead of trying to guess based on bpp?
+Well, if the static analysers can't track the provenance of 
+dev->driver->of_match_table, let's keep ignoring them until they get 
+cleverer :P
 
-Can drm_mode_config.preferred_depth be used for this? The comment says that
-it is used for dumb buffers and drm_mode_create_dumb_ioctl() does this:
- ??? cpp = DIV_ROUND_UP(args->bpp, 8);
+Robin.
 
-So it looks like it should be possible to do preferred_depth=15.
-
-Noralf.
-
->> +
->> +		for (i = 0; i < plane->format_count; i++) {
->> +			const struct drm_format_info *fmt;
->> +
->> +			fmt = drm_format_info(plane->format_types[i]);
->> +			/* We found a perfect fit, great */
->> +			if (fmt->depth == sizes.surface_depth)
->> +				break;
->> +
->> +			/* Skip depths above what we're looking for */
->> +			if (fmt->depth > sizes.surface_depth)
->> +				continue;
->> +
->> +			/* Best depth found so far */
->> +			if (fmt->depth > best_depth)
->> +				best_depth = fmt->depth;
->> +		}
->> +	}
->> +	if (sizes.surface_depth != best_depth) {
->> +		DRM_DEBUG("requested bpp %d, scaled depth down to %d",
->> +			  sizes.surface_bpp, best_depth);
->> +		sizes.surface_depth = best_depth;
->> +	}
->> +
->>   	crtc_count = 0;
->>   	for (i = 0; i < fb_helper->crtc_count; i++) {
->>   		struct drm_display_mode *desired_mode;
->> -- 
->> 2.14.3
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> Gr{oetje,eeting}s,
+> 
+>                          Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
+> 
