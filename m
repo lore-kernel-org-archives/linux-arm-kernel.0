@@ -1,204 +1,195 @@
-From: ckadabi@codeaurora.org (Channa)
-Date: Thu, 01 Feb 2018 12:39:09 -0800
-Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
-In-Reply-To: <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
- <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
-Message-ID: <d2751939f5813c296cdcb7a92d5698bf@codeaurora.org>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Thu,  1 Feb 2018 20:39:03 +0000
+Subject: [PATCH] staging: vc04_services: remove unused files
+Message-ID: <1517517543-34957-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-02-01 02:44, Mark Rutland wrote:
-> On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
->> Documentation for last level cache controller device tree bindings,
->> client bindings usage examples.
->> 
->> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
->> ---
->>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 93 
->> ++++++++++++++++++++++
->>  1 file changed, 93 insertions(+)
->>  create mode 100644 
->> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt 
->> b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->> new file mode 100644
->> index 0000000..d433b0c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->> @@ -0,0 +1,93 @@
->> +* LLCC (Last Level Cache Controller)
->> +
->> +Properties:
->> +- compatible:
->> +	Usage: required
->> +	Value type: <string>
->> +	Definition: must be "qcom,llcc-core"
->> +
->> +- reg:
->> +	Usage: required
->> +	Value Type: <prop-encoded-array>
->> +	Definition: must be addresses and sizes of the LLCC registers
->> +
->> +- llcc-bank-off:
->> +	Usage: required
->> +	Value Type: <u32 array>
->> +	Definition: Offsets of llcc banks from llcc base address starting 
->> from
->> +		    LLCC bank0.
->> +
->> +- llcc-broadcast-off:
->> +	Usage: required
->> +	Value Type: <u32>
->> +	Definition: Offset of broadcast register from LLCC bank0 address.
-> 
-> Please could we use "offset" rather than "off" for both of these? That
-> way it's obvious these aren't properties for disabling some feature.
-> 
-> How variable are these offsets in practice? Is the memory map not 
-> fixed?
+All thoses files are not used by anybody.
+Lets just remove them.
 
-The offsets depends on the number of LLCC HW blocks. These number of HW 
-blocks vary from
-chipset to chipset and new registers could be added that changes the 
-offset.
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ .../interface/vchiq_arm/vchiq_build_info.h         | 37 --------------
+ .../interface/vchiq_arm/vchiq_memdrv.h             | 59 ----------------------
+ .../interface/vchiq_arm/vchiq_version.c            | 59 ----------------------
+ 3 files changed, 155 deletions(-)
+ delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
+ delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
+ delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
 
-> 
->> +
->> +- #cache-cells:
->> +	Usage: required
->> +	Value Type: <u32>
->> +	Definition: Number of cache cells, must be 1
-> 
-> What's this for, and how is it used?
-
-This is to obtain the phandle arguments from client devices. Related to 
-cache-slices property.
-
-> 
->> +
->> +- max-slices:
->> +	usage: required
->> +	Value Type: <u32>
->> +	Definition: Number of cache slices supported by hardware
->> +
->> +- status:
->> +	Usage: optional
->> +	Value type: <string>
->> +	Definition: Property to enable or disable the driver
-> 
-> This is a standard property, so I don't think it needs to be described
-> here.
-
-Sure, will remove it.
-
-> 
->> +
->> +== llcc amon device ==
->> +
->> +Properties:
->> +-qcom,fg-cnt : The value of fine grained counter of activity monitor
->> +	        block.
-> 
-> Could you elaborate on this?
-
-This is counter value programmed in the HW to detect live locks.
-This parameter is tunable to avoid false positives.
-
-> 
->> +
->> +compatible devices:
->> +		qcom,sdm845-llcc
-> 
-> Huh? The "qcom,sdm845-llcc" bindings wasn't described above, and it's
-> not clear what this means.
-> 
->> +
->> +Example:
->> +
->> +	qcom,system-cache at 1300000 {
->> +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
-> 
-> This looks very wrong. Why do you need syscon and simple-mfd?
-
-LLCC HW block has 3 functionalities:
-System cache core, ECC & AMON drivers for debugging.
-All three drivers use the same register space for configuration, status 
-etc.
-In order to avoid remapping the same address region across multiple 
-drivers,
-I have implemented this driver as a syncon and simple-mfd.
-
-> 
->> +		reg = <0x1300000 0x50000>;
->> +		reg-names = "llcc_base";
->> +
->> +		llcc: qcom,sdm845-llcc {
->> +			compatible = "qcom,sdm845-llcc";
-> 
-> Why is this a sub-node?
-qcom,sdm845-llcc: This core driver as mentioned in the list above.
-> 
-> Why isn't the top-level node just "qcom,sdm845-llcc" ?
-> 
->> +			#cache-cells = <1>;
->> +			max-slices = <32>;
->> +		};
->> +
->> +		qcom,llcc-ecc {
->> +			compatible = "qcom,llcc-ecc";
->> +		};
-
-qcom,llcc-ecc: Driver #2 for ECC
-
->> +
->> +		qcom,llcc-amon {
->> +			compatible = "qcom,llcc-amon";
->> +			qcom,fg-cnt = <0x7>;
->> +		};
->> +
-
-qcom,llcc-amon: Driver #3 for AMON
-
->> +	};
->> +
->> +== Client ==
->> +
->> +Properties:
->> +- cache-slice-names:
->> +	Usage: required
->> +	Value type: <stringlist>
->> +	Definition: A set of names that identify the usecase names of a 
->> client that uses
->> +		    cache slice. These strings are used to look up the cache slice
->> +		    entries by name.
->> +
->> +- cache-slices:
->> +	Usage: required
->> +	Value type: <prop-encoded-array>
->> +	Definition: The tuple has phandle to llcc device as the first 
->> argument and the
->> +		    second argument is the usecase id of the client.
-> 
-> What is a "usecase id" ?
-
-Usecase id for use case that wants to use system cache for eg: 
-video-encode and video-decode
-
-> 
-> Is this meant to align with #cache-cells? It would be best to keep a
-> common prefix (i.e. call that #cache-slice-cells).
-
-Yes. Will update the name.
-
-> 
-> Thanks,
-> Mark.
-
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
+deleted file mode 100644
+index df645813bdae..000000000000
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/**
+- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions, and the following disclaimer,
+- *    without modification.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- * 3. The names of the above-listed copyright holders may not be used
+- *    to endorse or promote products derived from this software without
+- *    specific prior written permission.
+- *
+- * ALTERNATIVELY, this software may be distributed under the terms of the
+- * GNU General Public License ("GPL") version 2, as published by the Free
+- * Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- */
+-
+-const char *vchiq_get_build_hostname(void);
+-const char *vchiq_get_build_version(void);
+-const char *vchiq_get_build_time(void);
+-const char *vchiq_get_build_date(void);
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
+deleted file mode 100644
+index c233b866725b..000000000000
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
++++ /dev/null
+@@ -1,59 +0,0 @@
+-/**
+- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions, and the following disclaimer,
+- *    without modification.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- * 3. The names of the above-listed copyright holders may not be used
+- *    to endorse or promote products derived from this software without
+- *    specific prior written permission.
+- *
+- * ALTERNATIVELY, this software may be distributed under the terms of the
+- * GNU General Public License ("GPL") version 2, as published by the Free
+- * Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- */
+-
+-#ifndef VCHIQ_MEMDRV_H
+-#define VCHIQ_MEMDRV_H
+-
+-/* ---- Include Files ----------------------------------------------------- */
+-
+-#include <linux/kernel.h>
+-#include "vchiq_if.h"
+-
+-/* ---- Constants and Types ---------------------------------------------- */
+-
+-/* ---- Variable Externs ------------------------------------------------- */
+-
+-/* ---- Function Prototypes ---------------------------------------------- */
+-
+-VCHIQ_STATUS_T vchiq_memdrv_initialise(void);
+-
+-VCHIQ_STATUS_T vchiq_userdrv_create_instance(
+-	const VCHIQ_PLATFORM_DATA_T * platform_data);
+-
+-VCHIQ_STATUS_T vchiq_userdrv_suspend(
+-	const VCHIQ_PLATFORM_DATA_T * platform_data);
+-
+-VCHIQ_STATUS_T vchiq_userdrv_resume(
+-	const VCHIQ_PLATFORM_DATA_T * platform_data);
+-
+-#endif
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
+deleted file mode 100644
+index 994b81798134..000000000000
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
++++ /dev/null
+@@ -1,59 +0,0 @@
+-/**
+- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions, and the following disclaimer,
+- *    without modification.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- * 3. The names of the above-listed copyright holders may not be used
+- *    to endorse or promote products derived from this software without
+- *    specific prior written permission.
+- *
+- * ALTERNATIVELY, this software may be distributed under the terms of the
+- * GNU General Public License ("GPL") version 2, as published by the Free
+- * Software Foundation.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- */
+-#include "vchiq_build_info.h"
+-#include <linux/broadcom/vc_debug_sym.h>
+-
+-VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_hostname, "dc4-arm-01");
+-VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_version, "9245b4c35b99b3870e1f7dc598c5692b3c66a6f0 (tainted)");
+-VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_time,    __TIME__);
+-VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_date,    __DATE__);
+-
+-const char *vchiq_get_build_hostname(void)
+-{
+-   return vchiq_build_hostname;
+-}
+-
+-const char *vchiq_get_build_version(void)
+-{
+-   return vchiq_build_version;
+-}
+-
+-const char *vchiq_get_build_date(void)
+-{
+-   return vchiq_build_date;
+-}
+-
+-const char *vchiq_get_build_time(void)
+-{
+-   return vchiq_build_time;
+-}
 -- 
---
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-a Linux Foundation Collaborative Project
+2.13.6
