@@ -1,42 +1,101 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 1 Feb 2018 08:51:51 +0800
-Subject: [PATCH 14/15] ARM: dts: ipq8074: Add pcie nodes
-In-Reply-To: <1517202689-14212-15-git-send-email-sricharan@codeaurora.org>
-References: <1517202689-14212-15-git-send-email-sricharan@codeaurora.org>
-Message-ID: <201802010850.o9m7cPXA%fengguang.wu@intel.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Thu, 1 Feb 2018 01:04:45 +0000
+Subject: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
+In-Reply-To: <20180131180354.mqf4gvvprdtycbn5@lakrids.cambridge.arm.com>
+References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
+ <1516836074-4149-2-git-send-email-jollys@xilinx.com>
+ <20180131180354.mqf4gvvprdtycbn5@lakrids.cambridge.arm.com>
+Message-ID: <CY1PR0201MB076454E915A6E6947A39F04BB8FA0@CY1PR0201MB0764.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+Hi Mark,
+Thanks for the review,
 
-Thank you for the patch! Yet something to improve:
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Wednesday, January 31, 2018 10:04 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
+> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; michal.simek at xilinx.com; robh+dt at kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; Jolly Shah <JOLLYS@xilinx.com>; Rajan Vaja
+> <RAJANV@xilinx.com>
+> Subject: Re: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+> firmware
+> 
+> On Wed, Jan 24, 2018 at 03:21:11PM -0800, Jolly Shah wrote:
+> > Add documentation to describe Xilinx ZynqMP firmware driver bindings.
+> > Firmware driver provides an interface to firmware APIs. Interface APIs
+> > can be used by any driver to communicate to PMUFW (Platform Management
+> > Unit).
+> >
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+> > ---
+> >  .../bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt    | 16
+> ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware
+> > .txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > new file mode 100644
+> > index 0000000..a7aaf56
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
+> > +++ rmware.txt
+> > @@ -0,0 +1,16 @@
+> > +Xilinx Zynq MPSoC Firmware Device Tree Bindings
+> > +
+> > +The zynqmp-firmware node describes the interface to platform firmware.
+> 
+> Is there any documentation for this that can be referred to?
+>
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.15]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Will add more information about supported APIs in next version patch.
+Below document describes interface APIs though it is not latest.   
+https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
 
-url:    https://github.com/0day-ci/linux/commits/Sricharan-R/ARM-dts-ipq-updates-to-enable-a-few-peripherals/20180201-061258
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
 
-All errors (new ones prefixed by >>):
+> > +
+> > +Required properties:
+> > + - compatible:	Must contain:  "xlnx,zynqmp-firmware"
+> > + - method:	The method of calling the PM-API firmware layer.
+> > +		Permitted values are:
+> > +		 - "smc" : To be used in configurations without a hypervisor
+> > +		 - "hvc" : To be used when hypervisor is present
+> 
+> Please specify what exactly these mean. I assume these follow the SMCCC.
+> If so, this can be:
+> 
+> - method: The method of calling the PM-API firmware layer.
+>           Permitted values are:
+> 	  - "smc" : SMC #0, following the SMCCC
+> 	  - "hvc" : HVC #0, following the SMCCC
+> 
+> Otherwise, this looks ok to me.
+> 
 
->> Error: arch/arm64/boot/dts/qcom/ipq8074.dtsi:235.19-20 syntax error
-   FATAL ERROR: Unable to parse input tree
+Yes it follows SMCCC. 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37419 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/e5ed418a/attachment-0001.gz>
+> Thanks,
+> Mark.
+> 
+> > +
+> > +Examples:
+> > +	zynqmp_firmware: zynqmp-firmware {
+> > +		compatible = "xlnx,zynqmp-firmware";
+> > +		method = "smc";
+> > +	};
+> > --
+> > 2.7.4
+> >
