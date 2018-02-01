@@ -1,59 +1,81 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 1 Feb 2018 14:52:26 +0800
-Subject: [PATCH v2 16/16] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
- hardening support
-In-Reply-To: <f6579ab5-8d52-3f62-e538-515b28376d59@huawei.com>
-References: <20180129174559.1866-1-marc.zyngier@arm.com>
- <20180129174559.1866-17-marc.zyngier@arm.com>
- <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
- <49853e5e-f093-2e79-1cfb-182f51fcd6a0@arm.com>
- <CAKv+Gu-XidYPh0hi1nzG5m0AO7EfRE6bnKfxCToG+9zsmvzmNg@mail.gmail.com>
- <CAKv+Gu-L0WOLSUbcHSTQ_FVDNSJoXQv25ExUmtv8ZEYhkCSQ-Q@mail.gmail.com>
- <501451b6-cc84-e8d3-b7b6-49a7de953976@arm.com>
- <f6579ab5-8d52-3f62-e538-515b28376d59@huawei.com>
-Message-ID: <876a9d85-31ee-d6fb-3e91-0a092eeb55c3@huawei.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Thu, 1 Feb 2018 08:25:37 +0100
+Subject: [linux-sunxi][PATCH] ARM: dts: sun7i: Enable HDMI support on the
+ Olimex EVB
+In-Reply-To: <20180131153431.ctpx2ea6wplw4anb@flea.lan>
+References: <20180130075054.6256-1-codekipper@gmail.com>
+ <20180131153431.ctpx2ea6wplw4anb@flea.lan>
+Message-ID: <CAEKpxBnv3K-56n2z2gbmc9zif9d3QLQ4DPtvLY-5rj0E7cpjMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/2/1 10:40, Hanjun Guo wrote:
-> On 2018/1/31 23:05, Marc Zyngier wrote:
->> On 31/01/18 14:38, Ard Biesheuvel wrote:
->>> On 31 January 2018 at 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>> On 31 January 2018 at 14:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> On 31/01/18 13:56, Hanjun Guo wrote:
->>>>>> Hi Marc,
->>>>>>
->>>>>> On 2018/1/30 1:45, Marc Zyngier wrote:
->>>>>>>  static int enable_psci_bp_hardening(void *data)
->>>>>>>  {
->>>>>>>      const struct arm64_cpu_capabilities *entry = data;
->>>>>>>
->>>>>>> -    if (psci_ops.get_version)
->>>>>>> +    if (psci_ops.get_version) {
->>>>>>> +            if (check_smccc_arch_workaround_1(entry))
->>>>>>> +                    return 0;
->>>>>>
->>>>>> If I'm using the new version SMCCC, the firmware have the choicARM_SMCCC_ARCH_WORKAROUND_1e to decide
->>>>>> whether this machine needs the workaround, even if the CPU is vulnerable
->>>>>> for CVE-2017-5715, but..
->>>>>>
->>>>>>> +
->>>>>>>              install_bp_hardening_cb(entry,
->>>>>>>                                     (bp_hardening_cb_t)psci_ops.get_version,
->>>>>>>                                     __psci_hyp_bp_inval_start,
->>>>>>>                                     __psci_hyp_bp_inval_end);
->>>>>>
->>>>>> ..the code above seems will enable get_psci_version() for CPU and will
->>>>>> trap to trust firmware even the new version of firmware didn't say
->>>>>> we need the workaround, did I understand it correctly?
->>>>>
->>>>> Well, you only get there if we've established that your CPU is affected
->>>>> (it has an entry matching its MIDR with the HARDEN_BRANCH_PREDICTOR
->>>>> capability), and that entry points to enable_psci_bp_hardening. It is
-> 
-> I understand, but A53, A57, A72 and etc are always in the list :)
-
-Sorry, A53 is not susceptible to branch predictor aliasing..
-
-Thanks
-Hanjun
+On 31 January 2018 at 16:34, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jan 30, 2018 at 08:50:54AM +0100, codekipper at gmail.com wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
+>>
+>> Enable the display pipeline and HDMI output on the Olimex
+>> A20-SOM-EVB.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+>> index 64c8ef9a2756..07906d4f8758 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+>> @@ -61,6 +61,17 @@
+>>               stdout-path = "serial0:115200n8";
+>>       };
+>>
+>> +     hdmi-connector {
+>> +             compatible = "hdmi-connector";
+>> +             type = "a";
+>> +
+>> +             port {
+>> +                     hdmi_con_in: endpoint {
+>> +                             remote-endpoint = <&hdmi_out_con>;
+>> +                     };
+>> +             };
+>> +     };
+>> +
+>>       leds {
+>>               compatible = "gpio-leds";
+>>               pinctrl-names = "default";
+>> @@ -79,6 +90,10 @@
+>>       status = "okay";
+>>  };
+>>
+>> +&de {
+>> +     status = "okay";
+>> +};
+>> +
+>>  &ehci0 {
+>>       status = "okay";
+>>  };
+>> @@ -107,6 +122,16 @@
+>>       };
+>>  };
+>>
+>> +&hdmi {
+>> +     status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +     hdmi_out_con: endpoint {
+>> +     remote-endpoint = <&hdmi_con_in>;
+>> +     };
+>> +};
+>> +
+>
+> The indentation is not correct here.
+ACK
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
