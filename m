@@ -1,59 +1,47 @@
-From: michael.weiser@gmx.de (Michael Weiser)
-Date: Thu,  1 Feb 2018 23:13:38 +0100
-Subject: [PATCH v2 3/3] arm64: Disable unhandled signal log messages by default
-In-Reply-To: <20180201221338.9952-1-michael.weiser@gmx.de>
-References: <20180201221338.9952-1-michael.weiser@gmx.de>
-Message-ID: <20180201221338.9952-4-michael.weiser@gmx.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 01 Feb 2018 14:36:58 -0800
+Subject: [PATCH v3 0/5] ARM64: dts: meson-axg: UART DT updates
+In-Reply-To: <8990554d-e995-e432-8f50-3b247f71b0fd@amlogic.com> (Yixun Lan's
+ message of "Wed, 31 Jan 2018 10:25:45 +0800")
+References: <20180111023401.125658-1-yixun.lan@amlogic.com>
+ <7hr2q6c2r4.fsf@baylibre.com>
+ <CAOi56cW4ufsegpy7heK1+pCxvZ2gz5Lf3dkUgxkZCgMq5oBzSA@mail.gmail.com>
+ <8990554d-e995-e432-8f50-3b247f71b0fd@amlogic.com>
+Message-ID: <7hinbg8hh1.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-aarch64 unhandled signal kernel messages are very verbose, suggesting
-them to be more of a debugging aid:
+Hi Yixun,
 
-sigsegv[33]: unhandled level 2 translation fault (11) at 0x00000000, esr
-0x92000046, in sigsegv[400000+71000]
-CPU: 1 PID: 33 Comm: sigsegv Tainted: G        W        4.15.0-rc3+ #3
-Hardware name: linux,dummy-virt (DT)
-pstate: 60000000 (nZCv daif -PAN -UAO)
-pc : 0x4003f4
-lr : 0x4006bc
-sp : 0000fffffe94a060
-x29: 0000fffffe94a070 x28: 0000000000000000
-x27: 0000000000000000 x26: 0000000000000000
-x25: 0000000000000000 x24: 00000000004001b0
-x23: 0000000000486ac8 x22: 00000000004001c8
-x21: 0000000000000000 x20: 0000000000400be8
-x19: 0000000000400b30 x18: 0000000000484728
-x17: 000000000865ffc8 x16: 000000000000270f
-x15: 00000000000000b0 x14: 0000000000000002
-x13: 0000000000000001 x12: 0000000000000000
-x11: 0000000000000000 x10: 0008000020008008
-x9 : 000000000000000f x8 : ffffffffffffffff
-x7 : 0004000000000000 x6 : ffffffffffffffff
-x5 : 0000000000000000 x4 : 0000000000000000
-x3 : 00000000004003e4 x2 : 0000fffffe94a1e8
-x1 : 000000000000000a x0 : 0000000000000000
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-Disable them by default, so they can be enabled using
-/proc/sys/debug/exception-trace.
+> On 01/31/18 08:22, Kevin Hilman wrote:
+>> On Tue, Jan 30, 2018 at 4:04 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>>> Yixun Lan <yixun.lan@amlogic.com> writes:
+>>>
+>>>> HI Kevin
+>>>>  These are the UART DT updates for the Meson-AXG platform.
+>>>>
+>>>>  The patch 1 is a general fix.
+>>>> Other patches are about adding clock & pinctrl info, then using them.
+>>>> Last patch enable UART_A which connect to a BT module on the S400 board.
+>>>
+>>> Applied to v4.16/dt64,
+>> 
+>> Oops, I meant v4.17.
+>> 
+>
+> Hi Kevin
+>  I should warn you about the patch 3 [1], it actually depend on the gpio
+> renaming patch [2]
+>
+>  I'm still waiting Linus to take patch [2], then update according
+> (or you could help amend the patch? it's simply a
+> 's/uart_ao_b_gpioz/uart_ao_b_z/g)
 
-Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
----
- arch/arm64/kernel/traps.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I've made that change in the version of the patch that I applied to the
+v4.17/dt64 branch.
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 0ef28b7f6aa7..eb2d15147e8d 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -57,7 +57,7 @@ static const char *handler[]= {
- 	"Error"
- };
- 
--int show_unhandled_signals = 1;
-+int show_unhandled_signals = 0;
- 
- static void dump_backtrace_entry(unsigned long where)
- {
--- 
-2.16.1
+It's harmless without the pinctrl patch applied anyways.
+
+Kevin
