@@ -1,44 +1,59 @@
 From: michael.weiser@gmx.de (Michael Weiser)
-Date: Thu,  1 Feb 2018 23:13:36 +0100
-Subject: [PATCH v2 1/3] arm64: Remove unimplemented syscall log message
+Date: Thu,  1 Feb 2018 23:13:38 +0100
+Subject: [PATCH v2 3/3] arm64: Disable unhandled signal log messages by default
 In-Reply-To: <20180201221338.9952-1-michael.weiser@gmx.de>
 References: <20180201221338.9952-1-michael.weiser@gmx.de>
-Message-ID: <20180201221338.9952-2-michael.weiser@gmx.de>
+Message-ID: <20180201221338.9952-4-michael.weiser@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stop printing a (ratelimited) kernel message for each instance of an
-unimplemented syscall being called. Userland making an unimplemented
-syscall is not necessarily misbehaviour and to be expected with a
-current userland running on an older kernel. Also, the current message
-looks scary to users but does not actually indicate a real problem nor
-help them narrow down the cause. Just rely on sys_ni_syscall() to return
--ENOSYS.
+aarch64 unhandled signal kernel messages are very verbose, suggesting
+them to be more of a debugging aid:
+
+sigsegv[33]: unhandled level 2 translation fault (11) at 0x00000000, esr
+0x92000046, in sigsegv[400000+71000]
+CPU: 1 PID: 33 Comm: sigsegv Tainted: G        W        4.15.0-rc3+ #3
+Hardware name: linux,dummy-virt (DT)
+pstate: 60000000 (nZCv daif -PAN -UAO)
+pc : 0x4003f4
+lr : 0x4006bc
+sp : 0000fffffe94a060
+x29: 0000fffffe94a070 x28: 0000000000000000
+x27: 0000000000000000 x26: 0000000000000000
+x25: 0000000000000000 x24: 00000000004001b0
+x23: 0000000000486ac8 x22: 00000000004001c8
+x21: 0000000000000000 x20: 0000000000400be8
+x19: 0000000000400b30 x18: 0000000000484728
+x17: 000000000865ffc8 x16: 000000000000270f
+x15: 00000000000000b0 x14: 0000000000000002
+x13: 0000000000000001 x12: 0000000000000000
+x11: 0000000000000000 x10: 0008000020008008
+x9 : 000000000000000f x8 : ffffffffffffffff
+x7 : 0004000000000000 x6 : ffffffffffffffff
+x5 : 0000000000000000 x4 : 0000000000000000
+x3 : 00000000004003e4 x2 : 0000fffffe94a1e8
+x1 : 000000000000000a x0 : 0000000000000000
+
+Disable them by default, so they can be enabled using
+/proc/sys/debug/exception-trace.
 
 Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
-Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/traps.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm64/kernel/traps.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index bbb0fde2780e..0ef28b7f6aa7 100644
+index 0ef28b7f6aa7..eb2d15147e8d 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -526,14 +526,6 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
- 	}
- #endif
+@@ -57,7 +57,7 @@ static const char *handler[]= {
+ 	"Error"
+ };
  
--	if (show_unhandled_signals_ratelimited()) {
--		pr_info("%s[%d]: syscall %d\n", current->comm,
--			task_pid_nr(current), regs->syscallno);
--		dump_instr("", regs);
--		if (user_mode(regs))
--			__show_regs(regs);
--	}
--
- 	return sys_ni_syscall();
- }
+-int show_unhandled_signals = 1;
++int show_unhandled_signals = 0;
  
+ static void dump_backtrace_entry(unsigned long where)
+ {
 -- 
 2.16.1
