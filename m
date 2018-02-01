@@ -1,56 +1,190 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 1 Feb 2018 14:24:54 +0300
-Subject: [PATCH 1/3] arm64: dts: renesas: v3msk: Remove renesas,
- no-ether-link property
-In-Reply-To: <20180115084125.8112-2-horms+renesas@verge.net.au>
-References: <20180115084125.8112-1-horms+renesas@verge.net.au>
- <20180115084125.8112-2-horms+renesas@verge.net.au>
-Message-ID: <8bba1973-3767-719e-373e-fa0e278dce8d@cogentembedded.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Feb 2018 11:34:18 +0000
+Subject: [PATCH v4 3/6] arm: KVM: Invalidate BTB on guest exit for
+ Cortex-A12/A17
+In-Reply-To: <20180201110738.5421-4-marc.zyngier@arm.com>
+References: <20180201110738.5421-1-marc.zyngier@arm.com>
+ <20180201110738.5421-4-marc.zyngier@arm.com>
+Message-ID: <0cccb2da-7a49-3d05-4bee-405e838a029d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2018 11:41 AM, Simon Horman wrote:
+On 01/02/18 11:07, Marc Zyngier wrote:
+> In order to avoid aliasing attacks against the branch predictor,
+> let's invalidate the BTB on guest exit. This is made complicated
+> by the fact that we cannot take a branch before invalidating the
+> BTB.
+> 
+> We only apply this to A12 and A17, which are the only two ARM
+> cores on which this useful.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_asm.h |  2 --
+>   arch/arm/include/asm/kvm_mmu.h | 18 ++++++++++-
+>   arch/arm/kvm/hyp/hyp-entry.S   | 71 ++++++++++++++++++++++++++++++++++++++++--
+>   3 files changed, 86 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 36dd2962a42d..df24ed48977d 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -61,8 +61,6 @@ struct kvm_vcpu;
+>   extern char __kvm_hyp_init[];
+>   extern char __kvm_hyp_init_end[];
+>   
+> -extern char __kvm_hyp_vector[];
+> -
+>   extern void __kvm_flush_vm_context(void);
+>   extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>   extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index a2d176a308bd..dedd4b8a3fa4 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -37,6 +37,7 @@
+>   
+>   #include <linux/highmem.h>
+>   #include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+>   #include <asm/pgalloc.h>
+>   #include <asm/stage2_pgtable.h>
+>   
+> @@ -228,7 +229,22 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>   
+>   static inline void *kvm_get_hyp_vector(void)
+>   {
+> -	return kvm_ksym_ref(__kvm_hyp_vector);
+> +	switch(read_cpuid_part()) {
+> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +	case ARM_CPU_PART_CORTEX_A12:
+> +	case ARM_CPU_PART_CORTEX_A17:
+> +	{
+> +		extern char __kvm_hyp_vector_bp_inv[];
 
-> Regarding Salvator-X and ULCB boards, Bogdan Mirea says:
-> 
->     The present change is a bug fix for AVB link iteratively up/down.
-> 
->     Steps to reproduce:
->     - start AVB TX stream (Using aplay via MSE),
->     - disconnect+reconnect the eth cable,
->     - after a reconnection the eth connection goes iteratively up/down
->       without user interaction,
->     - this may heal after some seconds or even stay for minutes.
-> 
->     As the documentation specifies, the "renesas,no-ether-link" option
->     should be used when a board does not provide a proper AVB_LINK signal.
->     There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
->     and ULCB starter kits since the AVB_LINK is correctly handled by HW.
-> 
->     Choosing to keep or remove the "renesas,no-ether-link" option will
->     have impact on the code flow in the following ways:
->     - keeping this option enabled may lead to unexpected behavior since
->       the RX & TX are enabled/disabled directly from adjust_link function
->       without any HW interrogation,
->     - removing this option, the RX & TX will only be enabled/disabled after
->       HW interrogation. The HW check is made through the LMON pin in PSR
->       register which specifies AVB_LINK signal value (0 - at low level;
->       1 - at high level).
-> 
->     In conclusion, the present change is also a safety improvement because
->     it removes the "renesas,no-ether-link" option leading to a proper way
->     of detecting the link state based on HW interrogation and not on
->     software heuristic.
-> 
-> On examination of the documentation for the V3M Starter Kit (v3msk) this
-> change seems necessary as AVB0_LINK is documented as being connected.
-> 
-> Fixes: a6b1b7359074 ("arm64: dts: renesas: v3msk: add EtherAVB support")
-> Cc: Bogdan Mirea <Bogdan-Stefan_Mirea@mentor.com>
-> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Super-nit: Is there a reason for scoping these declarations so tightly? 
+Fair enough if there's something subtle I'm missing, but if not then 
+it's probably a little more pleasant readability-wise to push them up a 
+step into the function scope.
 
-   NAK on this one -- I can't mount NFS root any more.
+Tangentially, I see there's already precedent so it's probably more of a 
+general future KVM cleanup thing and doesn't need addressing in this 
+context, but shouldn't these various code addresses strictly be const as 
+well?
 
-MBR, Sergei
+> +		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+> +	}
+> +
+> +#endif
+> +	default:
+> +	{
+> +		extern char __kvm_hyp_vector[];
+> +		return kvm_ksym_ref(__kvm_hyp_vector);
+> +	}
+> +	}
+>   }
+>   
+>   static inline int kvm_map_vectors(void)
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> index 95a2faefc070..e789f52a5129 100644
+> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -71,6 +71,66 @@ __kvm_hyp_vector:
+>   	W(b)	hyp_irq
+>   	W(b)	hyp_fiq
+>   
+> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +	.align 5
+> +__kvm_hyp_vector_bp_inv:
+> +	.global __kvm_hyp_vector_bp_inv
+> +
+> +	/*
+> +	 * We encode the exception entry in the bottom 3 bits of
+> +	 * SP, and we have to guarantee to be 8 bytes aligned.
+> +	 */
+> +	W(add)	sp, sp, #1	/* Reset 	  7 */
+> +	W(add)	sp, sp, #1	/* Undef	  6 */
+> +	W(add)	sp, sp, #1	/* Syscall	  5 */
+> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
+> +	W(add)	sp, sp, #1	/* Data abort	  3 */
+> +	W(add)	sp, sp, #1	/* HVC		  2 */
+> +	W(add)	sp, sp, #1	/* IRQ		  1 */
+> +	W(nop)			/* FIQ		  0 */
+> +
+> +	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+> +	isb
+> +
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +	/*
+> +	 * Yet another silly hack: Use VPIDR as a temp register.
+> +	 * Thumb2 is really a pain, as SP cannot be used with most
+> +	 * of the bitwise instructions. The vect_br macro ensures
+> +	 * things gets cleaned-up.
+> +	 */
+> +	mcr	p15, 4, r0, c0, c0, 0	/* VPIDR */
+> +	mov	r0, sp
+> +	and	r0, r0, #7
+> +	sub	sp, sp, r0
+> +	push	{r1, r2}
+> +	mov	r1, r0
+> +	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
+> +	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
+> +	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+> +#endif
+> +
+> +.macro vect_br val, targ
+> +ARM(	eor	sp, sp, #\val	)
+> +ARM(	tst	sp, #7		)
+> +ARM(	eorne	sp, sp, #\val	)
+> +
+> +THUMB(	cmp	r1, #\val	)
+> +THUMB(	popeq	{r1, r2}	)
+> +
+> +	beq	\targ
+> +.endm
+> +
+> +	vect_br	0, hyp_fiq
+> +	vect_br	1, hyp_irq
+> +	vect_br	2, hyp_hvc
+> +	vect_br	3, hyp_dabt
+> +	vect_br	4, hyp_pabt
+> +	vect_br	5, hyp_svc
+> +	vect_br	6, hyp_undef
+> +	vect_br	7, hyp_reset
+> +#endif
+> +
+
+Otherwise, this now seems like it's about as nice as it's ever going to 
+get (i.e. still not very...)
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+>   .macro invalid_vector label, cause
+>   	.align
+>   \label:	mov	r0, #\cause
+> @@ -149,7 +209,14 @@ hyp_hvc:
+>   	bx	ip
+>   
+>   1:
+> -	push	{lr}
+> +	/*
+> +	 * Pushing r2 here is just a way of keeping the stack aligned to
+> +	 * 8 bytes on any path that can trigger a HYP exception. Here,
+> +	 * we may well be about to jump into the guest, and the guest
+> +	 * exit would otherwise be badly decoded by our fancy
+> +	 * "decode-exception-without-a-branch" code...
+> +	 */
+> +	push	{r2, lr}
+>   
+>   	mov	lr, r0
+>   	mov	r0, r1
+> @@ -159,7 +226,7 @@ hyp_hvc:
+>   THUMB(	orr	lr, #1)
+>   	blx	lr			@ Call the HYP function
+>   
+> -	pop	{lr}
+> +	pop	{r2, lr}
+>   	eret
+>   
+>   guest_trap:
+> 
