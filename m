@@ -1,161 +1,114 @@
-From: shile.zhang@nokia-sbell.com (Zhang, Shile (NSB - CN/Hangzhou))
-Date: Thu, 1 Feb 2018 01:49:33 +0000
-Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb
- mappings
-In-Reply-To: <VI1PR0701MB2846C892037A515D0B3F4EF8A12B0@VI1PR0701MB2846.eurprd07.prod.outlook.com>
-References: <1509700757-34420-1-git-send-email-shile.zhang@nokia-sbell.com>
- <VI1PR0701MB2846C892037A515D0B3F4EF8A12B0@VI1PR0701MB2846.eurprd07.prod.outlook.com>
-Message-ID: <HE1PR07MB3097A80B2FF0E2CB72C97FD8A1FA0@HE1PR07MB3097.eurprd07.prod.outlook.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 1 Feb 2018 10:40:38 +0800
+Subject: [PATCH v2 16/16] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
+ hardening support
+In-Reply-To: <501451b6-cc84-e8d3-b7b6-49a7de953976@arm.com>
+References: <20180129174559.1866-1-marc.zyngier@arm.com>
+ <20180129174559.1866-17-marc.zyngier@arm.com>
+ <476d111e-6fb0-9bef-2448-a94d0cc03f45@huawei.com>
+ <49853e5e-f093-2e79-1cfb-182f51fcd6a0@arm.com>
+ <CAKv+Gu-XidYPh0hi1nzG5m0AO7EfRE6bnKfxCToG+9zsmvzmNg@mail.gmail.com>
+ <CAKv+Gu-L0WOLSUbcHSTQ_FVDNSJoXQv25ExUmtv8ZEYhkCSQ-Q@mail.gmail.com>
+ <501451b6-cc84-e8d3-b7b6-49a7de953976@arm.com>
+Message-ID: <f6579ab5-8d52-3f62-e538-515b28376d59@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russel
+On 2018/1/31 23:05, Marc Zyngier wrote:
+> On 31/01/18 14:38, Ard Biesheuvel wrote:
+>> On 31 January 2018 at 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> On 31 January 2018 at 14:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 31/01/18 13:56, Hanjun Guo wrote:
+>>>>> Hi Marc,
+>>>>>
+>>>>> On 2018/1/30 1:45, Marc Zyngier wrote:
+>>>>>>  static int enable_psci_bp_hardening(void *data)
+>>>>>>  {
+>>>>>>      const struct arm64_cpu_capabilities *entry = data;
+>>>>>>
+>>>>>> -    if (psci_ops.get_version)
+>>>>>> +    if (psci_ops.get_version) {
+>>>>>> +            if (check_smccc_arch_workaround_1(entry))
+>>>>>> +                    return 0;
+>>>>>
+>>>>> If I'm using the new version SMCCC, the firmware have the choicARM_SMCCC_ARCH_WORKAROUND_1e to decide
+>>>>> whether this machine needs the workaround, even if the CPU is vulnerable
+>>>>> for CVE-2017-5715, but..
+>>>>>
+>>>>>> +
+>>>>>>              install_bp_hardening_cb(entry,
+>>>>>>                                     (bp_hardening_cb_t)psci_ops.get_version,
+>>>>>>                                     __psci_hyp_bp_inval_start,
+>>>>>>                                     __psci_hyp_bp_inval_end);
+>>>>>
+>>>>> ..the code above seems will enable get_psci_version() for CPU and will
+>>>>> trap to trust firmware even the new version of firmware didn't say
+>>>>> we need the workaround, did I understand it correctly?
+>>>>
+>>>> Well, you only get there if we've established that your CPU is affected
+>>>> (it has an entry matching its MIDR with the HARDEN_BRANCH_PREDICTOR
+>>>> capability), and that entry points to enable_psci_bp_hardening. It is
 
-Sorry for spam!
-I'm not sure if you got this patch I sent before. Could you please help to check if it still available?
+I understand, but A53, A57, A72 and etc are always in the list :)
 
-Many thanks!
+>>>> not the firmware that decides whether we need hardening, but the kernel.
+>>>> The firmware merely provides a facility to apply the hardening.
+>>>>
+>>>>> I'm ask this because some platform will not expose to users to
+>>>>> take advantage of CVE-2017-5715, and we can use different firmware
+>>>>> to report we need such workaround or not, then use a single kernel
+>>>>> image for both vulnerable platforms and no vulnerable ones.
+>>>>
+>>>> You cannot have your cake and eat it. If you don't want to workaround
+>>>> the issue, you can disable the hardening. But asking for the same kernel
+>>>> to do both depending on what the firmware reports doesn't make much
+>>>> sense to me.
+>>>
+>>> The SMCCC v1.1. document does appear to imply that systems that
+>>> implement SMCCC v1.1 but don't implement ARM_SMCCC_ARCH_WORKAROUND_1
+>>> should be assumed to be unaffected.
+>>>
+>>> """
+>>> If the discovery call returns NOT_SUPPORTED:
+>>> ? SMCCC_ARCH_WORKAROUND_1 must not be invoked on any PE in the system, and
+>>> ? none of the PEs in the system require firmware mitigation for CVE-2017-5715.
+>>> """
+>>>
+>>> How to deal with conflicting information in this regard (quirk table
+>>> vs firmware implementation) is a matter of policy, of course.
+> 
+> Yup. And the current approach fits the spec, I believe. The
 
-BR, Shile
+Yes, approach in this patch set fits the spec, it just conflicts with
+MIDR based approach.
 
------Original Message-----
-From: Zhang, Shile (NSB - CN/Hangzhou) 
-Sent: Monday, November 13, 2017 1:32 PM
-To: Russell King <linux@armlinux.org.uk>
-Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: RE: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb mappings
+> PSCI_GET_VERSION band-aid should normally be removed shortly after these
+> patches hit mainline.
 
-Hi, Russell,
+I'm a big fan of this :)
 
-Have you any time to check this patch?
-I found this issue/missing in my works, the application cannot mmap big hugepage (about 360MB) due to no more contiguous vm from the default "TASK_UNMMAPPED_AREA" by legacy bottom-up.
-We need this patch to fix this issue.
+> 
+>>
+>> ... and actually, perhaps it makes sense for the
+>> SMCCC_ARCH_WORKAROUND_1 check to be completely independent of MIDR
+>> based errata matching?
+>>
+>> I.e., if SMCCC v1.1 and SMCCC_ARCH_WORKAROUND_1 are both implemented,
+>> we should probably invoke it even if the MIDR is not known to belong
+>> to an affected implementation.
+> 
+> This would have an impact on big-little systems, for which there is
+> often a bunch of unaffected CPUs.
 
-Could you please help check this patch?
+I think it's what we are doing now, SMCCC v1.1 didn't provide the ability
+to report per-cpu SMCCC_ARCH_WORKAROUND_1, and it said:
+ - The discovery call must return the same result on all PEs in the system.
+ - In heterogeneous systems with some PEs that require mitigation and others
+   that do not, the firmware must provide a safe implementation of this
+   function on all PEs.
 
-Thanks!
+So from the spec that it's the firmware to take care of unaffected CPUs,
+to the kernel it's the same.
 
-BR, Shile
-
------Original Message-----
-From: Shile Zhang [mailto:shile.zhang at nokia-sbell.com] 
-Sent: Friday, November 03, 2017 5:19 PM
-To: Russell King <linux@armlinux.org.uk>
-Cc: linux-kernel at vger.kernel.org; Zhang, Shile (NSB - CN/Hangzhou) <shile.zhang@nokia-sbell.com>
-Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb mappings
-
-merge from arch/x86
-
-Signed-off-by: Shile Zhang <shile.zhang@nokia-sbell.com>
----
- arch/arm/include/asm/page.h |  1 +
- arch/arm/mm/hugetlbpage.c   | 85 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
-
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index 4355f0e..994630f 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -144,6 +144,7 @@ extern void copy_page(void *to, const void *from);
- 
- #ifdef CONFIG_KUSER_HELPERS
- #define __HAVE_ARCH_GATE_AREA 1
-+#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
- #endif
- 
- #ifdef CONFIG_ARM_LPAE
-diff --git a/arch/arm/mm/hugetlbpage.c b/arch/arm/mm/hugetlbpage.c
-index fcafb52..46ed0c8 100644
---- a/arch/arm/mm/hugetlbpage.c
-+++ b/arch/arm/mm/hugetlbpage.c
-@@ -45,3 +45,88 @@ int pmd_huge(pmd_t pmd)
- {
- 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
- }
-+
-+#ifdef CONFIG_HUGETLB_PAGE
-+static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
-+		unsigned long addr, unsigned long len,
-+		unsigned long pgoff, unsigned long flags)
-+{
-+	struct hstate *h = hstate_file(file);
-+	struct vm_unmapped_area_info info;
-+
-+	info.flags = 0;
-+	info.length = len;
-+	info.low_limit = current->mm->mmap_legacy_base;
-+	info.high_limit = TASK_SIZE;
-+	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
-+	info.align_offset = 0;
-+	return vm_unmapped_area(&info);
-+}
-+
-+static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
-+		unsigned long addr0, unsigned long len,
-+		unsigned long pgoff, unsigned long flags)
-+{
-+	struct hstate *h = hstate_file(file);
-+	struct vm_unmapped_area_info info;
-+	unsigned long addr;
-+
-+	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-+	info.length = len;
-+	info.low_limit = PAGE_SIZE;
-+	info.high_limit = current->mm->mmap_base;
-+	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
-+	info.align_offset = 0;
-+	addr = vm_unmapped_area(&info);
-+
-+	/*
-+	 * A failed mmap() very likely causes application failure,
-+	 * so fall back to the bottom-up function here. This scenario
-+	 * can happen with large stack limits and large mmap()
-+	 * allocations.
-+	 */
-+	if (addr & ~PAGE_MASK) {
-+		VM_BUG_ON(addr != -ENOMEM);
-+		info.flags = 0;
-+		info.low_limit = TASK_UNMAPPED_BASE;
-+		info.high_limit = TASK_SIZE;
-+		addr = vm_unmapped_area(&info);
-+	}
-+
-+	return addr;
-+}
-+
-+unsigned long
-+hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
-+		unsigned long len, unsigned long pgoff, unsigned long flags)
-+{
-+	struct hstate *h = hstate_file(file);
-+	struct mm_struct *mm = current->mm;
-+	struct vm_area_struct *vma;
-+
-+	if (len & ~huge_page_mask(h))
-+		return -EINVAL;
-+	if (len > TASK_SIZE)
-+		return -ENOMEM;
-+
-+	if (flags & MAP_FIXED) {
-+		if (prepare_hugepage_range(file, addr, len))
-+			return -EINVAL;
-+		return addr;
-+	}
-+
-+	if (addr) {
-+		addr = ALIGN(addr, huge_page_size(h));
-+		vma = find_vma(mm, addr);
-+		if (TASK_SIZE - len >= addr &&
-+		    (!vma || addr + len <= vma->vm_start))
-+			return addr;
-+	}
-+	if (mm->get_unmapped_area == arch_get_unmapped_area)
-+		return hugetlb_get_unmapped_area_bottomup(file, addr, len,
-+				pgoff, flags);
-+	else
-+		return hugetlb_get_unmapped_area_topdown(file, addr, len,
-+				pgoff, flags);
-+}
-+#endif /* CONFIG_HUGETLB_PAGE */
--- 
-2.6.2
+Thanks
+Hanjun
