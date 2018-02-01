@@ -1,33 +1,30 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 2 Feb 2018 02:12:24 +0900
-Subject: [PATCH 07/11] MIPS: BCM63XX: kconfig: Remove blank help text
-In-Reply-To: <20180131093434.20050-8-ulfalizer@gmail.com>
-References: <20180131093434.20050-1-ulfalizer@gmail.com>
- <20180131093434.20050-8-ulfalizer@gmail.com>
-Message-ID: <CAK7LNAR5ji4mi7vOOUV+PDZWrbhSEuin-Qj0AMkE8-mW+CTmug@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Feb 2018 17:23:46 +0000
+Subject: [PATCH v2] irqchip/gic-v3: Ignore disabled ITS nodes
+In-Reply-To: <20180201170329.26916-1-sboyd@codeaurora.org>
+References: <20180201170329.26916-1-sboyd@codeaurora.org>
+Message-ID: <38dd5843-9290-28b2-8acb-aabb81acf00d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-01-31 18:34 GMT+09:00 Ulf Magnusson <ulfalizer@gmail.com>:
-> Blank help texts are probably either a typo, a Kconfig misunderstanding,
-> or some kind of half-committing to adding a help text (in which case a
-> TODO comment would be clearer, if the help text really can't be added
-> right away).
->
-> Best to remove them, IMO.
->
-> Signed-off-by: Ulf Magnusson <ulfalizer@gmail.com>
-> ---
+On 01/02/18 17:03, Stephen Boyd wrote:
+> On some platforms there's an ITS available but it's not enabled
+> because reading or writing the registers is denied by the
+> firmware. In fact, reading or writing them will cause the system
+> to reset. We could remove the node from DT in such a case, but
+> it's better to skip nodes that are marked as "disabled" in DT so
+> that we can describe the hardware that exists and use the status
+> property to indicate how the firmware has configured things.
+> 
+> Cc: Stuart Yoder <stuyoder@gmail.com>
+> Cc: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Rajendra Nayak <rnayak@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
+Queued, thanks Stephen.
 
-FYI.
-
-I picked up this patch to kbuild
-because I need this to suppress warning messages
-introduced by 11/11.
-
-I am planning to send a PR for this series next week.
-
+	M.
 -- 
-Best Regards
-Masahiro Yamada
+Jazz is not dead. It just smells funny...
