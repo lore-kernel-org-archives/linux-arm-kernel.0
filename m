@@ -1,20 +1,112 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 1 Feb 2018 17:52:57 +0530
-Subject: [PATCH v6 02/41] clk: davinci: New driver for davinci PLL clocks
-In-Reply-To: <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-3-git-send-email-david@lechnology.com>
- <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
-Message-ID: <2a833d5c-4cd7-5c55-4b4a-a02bd7fde6d9@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Feb 2018 12:25:01 +0000
+Subject: [PATCH v3 13/18] firmware/psci: Expose PSCI conduit
+In-Reply-To: <20180201114657.7323-14-marc.zyngier@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-14-marc.zyngier@arm.com>
+Message-ID: <434a53f3-0109-8a5f-414b-0f697bc153d6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 February 2018 01:31 PM, Sekhar Nori wrote:
-> One thing missing is DIV4.5 clock. It will be nice to add that too,
-> mostly just because it will make the binding complete.
+On 01/02/18 11:46, Marc Zyngier wrote:
+> In order to call into the firmware to apply workarounds, it is
+> useful to find out whether we're using HVC or SMC. Let's expose
+> this through the psci_ops.
 
-Ah, ignore this comment please. I noticed that its part of cfgchip
-clocks (which makes sense).
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Thanks,
-Sekhar
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+>   include/linux/psci.h    |  7 +++++++
+>   2 files changed, 30 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 8b25d31e8401..e9493da2b111 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
+>   	return cpu == resident_cpu;
+>   }
+>   
+> -struct psci_operations psci_ops;
+> +struct psci_operations psci_ops = {
+> +	.conduit = PSCI_CONDUIT_NONE,
+> +};
+>   
+>   typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+>   				unsigned long, unsigned long);
+> @@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+>   			      0, 0, 0);
+>   }
+>   
+> +static void set_conduit(enum psci_conduit conduit)
+> +{
+> +	switch (conduit) {
+> +	case PSCI_CONDUIT_HVC:
+> +		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +		break;
+> +	case PSCI_CONDUIT_SMC:
+> +		invoke_psci_fn = __invoke_psci_fn_smc;
+> +		break;
+> +	default:
+> +		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
+> +	}
+> +
+> +	psci_ops.conduit = conduit;
+> +}
+> +
+>   static int get_set_conduit_method(struct device_node *np)
+>   {
+>   	const char *method;
+> @@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
+>   	}
+>   
+>   	if (!strcmp("hvc", method)) {
+> -		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +		set_conduit(PSCI_CONDUIT_HVC);
+>   	} else if (!strcmp("smc", method)) {
+> -		invoke_psci_fn = __invoke_psci_fn_smc;
+> +		set_conduit(PSCI_CONDUIT_SMC);
+>   	} else {
+>   		pr_warn("invalid \"method\" property: %s\n", method);
+>   		return -EINVAL;
+> @@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
+>   	pr_info("probing for conduit method from ACPI.\n");
+>   
+>   	if (acpi_psci_use_hvc())
+> -		invoke_psci_fn = __invoke_psci_fn_hvc;
+> +		set_conduit(PSCI_CONDUIT_HVC);
+>   	else
+> -		invoke_psci_fn = __invoke_psci_fn_smc;
+> +		set_conduit(PSCI_CONDUIT_SMC);
+>   
+>   	return psci_probe();
+>   }
+> diff --git a/include/linux/psci.h b/include/linux/psci.h
+> index f724fd8c78e8..f2679e5faa4f 100644
+> --- a/include/linux/psci.h
+> +++ b/include/linux/psci.h
+> @@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
+>   int psci_cpu_init_idle(unsigned int cpu);
+>   int psci_cpu_suspend_enter(unsigned long index);
+>   
+> +enum psci_conduit {
+> +	PSCI_CONDUIT_NONE,
+> +	PSCI_CONDUIT_SMC,
+> +	PSCI_CONDUIT_HVC,
+> +};
+> +
+>   struct psci_operations {
+>   	u32 (*get_version)(void);
+>   	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+> @@ -34,6 +40,7 @@ struct psci_operations {
+>   	int (*affinity_info)(unsigned long target_affinity,
+>   			unsigned long lowest_affinity_level);
+>   	int (*migrate_info_type)(void);
+> +	enum psci_conduit conduit;
+>   };
+>   
+>   extern struct psci_operations psci_ops;
+> 
