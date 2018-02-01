@@ -1,92 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 1 Feb 2018 11:46:59 +0000
-Subject: [PATCH v4 6/6] arm: KVM: Invalidate icache on guest exit for
- Cortex-A15
-In-Reply-To: <20180201110738.5421-7-marc.zyngier@arm.com>
-References: <20180201110738.5421-1-marc.zyngier@arm.com>
- <20180201110738.5421-7-marc.zyngier@arm.com>
-Message-ID: <52547cd9-2821-3401-5a67-9aea5a93bbf9@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  1 Feb 2018 11:46:40 +0000
+Subject: [PATCH v3 01/18] arm64: KVM: Fix SMCCC handling of unimplemented
+ SMC/HVC calls
+In-Reply-To: <20180201114657.7323-1-marc.zyngier@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+Message-ID: <20180201114657.7323-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/18 11:07, Marc Zyngier wrote:
-> In order to avoid aliasing attacks against the branch predictor
-> on Cortex-A15, let's invalidate the BTB on guest exit, which can
-> only be done by invalidating the icache (with ACTLR[0] being set).
-> 
-> We use the same hack as for A12/A17 to perform the vector decoding.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/include/asm/kvm_mmu.h |  5 +++++
->   arch/arm/kvm/hyp/hyp-entry.S   | 24 ++++++++++++++++++++++++
->   2 files changed, 29 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index dedd4b8a3fa4..4216d40ca25c 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -238,6 +238,11 @@ static inline void *kvm_get_hyp_vector(void)
->   		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
->   	}
->   
-> +	case ARM_CPU_PART_CORTEX_A15:
-> +	{
-> +		extern char __kvm_hyp_vector_ic_inv[];
-> +		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
-> +	}
->   #endif
->   	default:
->   	{
-> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-> index e789f52a5129..918a05dd2d63 100644
-> --- a/arch/arm/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm/kvm/hyp/hyp-entry.S
-> @@ -72,6 +72,28 @@ __kvm_hyp_vector:
->   	W(b)	hyp_fiq
->   
->   #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-> +	.align 5
-> +__kvm_hyp_vector_ic_inv:
-> +	.global __kvm_hyp_vector_ic_inv
-> +
-> +	/*
-> +	 * We encode the exception entry in the bottom 3 bits of
-> +	 * SP, and we have to guarantee to be 8 bytes aligned.
-> +	 */
-> +	W(add)	sp, sp, #1	/* Reset 	  7 */
-> +	W(add)	sp, sp, #1	/* Undef	  6 */
-> +	W(add)	sp, sp, #1	/* Syscall	  5 */
-> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
-> +	W(add)	sp, sp, #1	/* Data abort	  3 */
-> +	W(add)	sp, sp, #1	/* HVC		  2 */
-> +	W(add)	sp, sp, #1	/* IRQ		  1 */
-> +	W(nop)			/* FIQ		  0 */
-> +
-> +	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
-> +	isb
-> +
-> +	b	decode_vectors
+KVM doesn't follow the SMCCC when it comes to unimplemented calls,
+and inject an UNDEF instead of returning an error. Since firmware
+calls are now used for security mitigation, they are becoming more
+common, and the undef is counter productive.
 
-Ultimately it might be worth macroising (or just duplicating) 
-decode_vectors so that we might reduce the almost-guaranteed "miss in 
-I$, take a full pipeline flush, miss in I$ again" penalty of this branch 
-to a single I$ miss, but until some numbers appear to prove that 
-worthwhile this is certainly the most expedient solution.
+Instead, let's follow the SMCCC which states that -1 must be returned
+to the caller when getting an unknown function number.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/handle_exit.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +
->   	.align 5
->   __kvm_hyp_vector_bp_inv:
->   	.global __kvm_hyp_vector_bp_inv
-> @@ -92,6 +114,8 @@ __kvm_hyp_vector_bp_inv:
->   	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
->   	isb
->   
-> +decode_vectors:
-> +
->   #ifdef CONFIG_THUMB2_KERNEL
->   	/*
->   	 * Yet another silly hack: Use VPIDR as a temp register.
-> 
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index c09fc5a576c7..520b0dad3c62 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -53,7 +53,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	ret = kvm_psci_call(vcpu);
+ 	if (ret < 0) {
+-		kvm_inject_undefined(vcpu);
++		vcpu_set_reg(vcpu, 0, ~0UL);
+ 		return 1;
+ 	}
+ 
+@@ -62,7 +62,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	kvm_inject_undefined(vcpu);
++	vcpu_set_reg(vcpu, 0, ~0UL);
+ 	return 1;
+ }
+ 
+-- 
+2.14.2
