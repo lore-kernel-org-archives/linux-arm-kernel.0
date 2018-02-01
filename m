@@ -1,71 +1,70 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Thu, 1 Feb 2018 13:19:28 +0000
-Subject: [alsa-devel] [PATCH 1/1] ASoC: stm32: add of dependency for stm32
- drivers
-In-Reply-To: <20180201091012.GA10746@lenoch>
-References: <1517475281-6444-1-git-send-email-olivier.moysan@st.com>
- <20180201091012.GA10746@lenoch>
-Message-ID: <3bd3ba89-5c69-4485-c913-ff1c1ad67190@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Feb 2018 13:24:06 +0000
+Subject: [PATCH] irqchip/gic-v3: Use wmb() instead of smb_wmb() in
+ gic_raise_softirq()
+In-Reply-To: <88d418ff-db83-c690-618e-69df3e3bb272@codeaurora.org>
+References: <1517443422-30693-1-git-send-email-shankerd@codeaurora.org>
+ <20180201103337.GA13705@arm.com>
+ <88d418ff-db83-c690-618e-69df3e3bb272@codeaurora.org>
+Message-ID: <5cb5eccf-8edd-bdcc-844a-56bd94355747@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hello,
-
-On 02/01/2018 10:10 AM, Ladislav Michl wrote:
-> On Thu, Feb 01, 2018 at 09:54:41AM +0100, Olivier Moysan wrote:
->> Add of dependency for STM32 ASoC drivers.
->> DFSDM of dependency is already inherited
->> from STM32_DFSDM_ADC dependency.
->>
->> Signed-off-by: olivier moysan <olivier.moysan@st.com>
->> ---
->>   sound/soc/stm/Kconfig | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
->> index 3ad881f..b5375f9 100644
->> --- a/sound/soc/stm/Kconfig
->> +++ b/sound/soc/stm/Kconfig
->> @@ -3,6 +3,7 @@ menu "STMicroelectronics STM32 SOC audio support"
->>   config SND_SOC_STM32_SAI
->>   	tristate "STM32 SAI interface (Serial Audio Interface) support"
->>   	depends on ARCH_STM32 || COMPILE_TEST
->> +	depends on OF
+On 01/02/18 12:55, Shanker Donthineni wrote:
+> Hi Will, Thanks for your quick reply.
 > 
-> depends on (ARCH_STM32 && OF) || COMPILE_TEST ?
-> 
-
-I can find in many configs "depends on OF && (ARCH_X || COMPILE_TEST)"
-This seems reasonable to me, as the driver always requires OF 
-dependency, regardless the compilation context.
-In fact, I cannot see why OF would not have to be selected
-for COMPILE_TEST.
-
-BRs
-
->>   	depends on SND_SOC
->>   	select SND_SOC_GENERIC_DMAENGINE_PCM
->>   	select REGMAP_MMIO
->> @@ -12,6 +13,7 @@ config SND_SOC_STM32_SAI
->>   config SND_SOC_STM32_I2S
->>   	tristate "STM32 I2S interface (SPI/I2S block) support"
->>   	depends on ARCH_STM32 || COMPILE_TEST
->> +	depends on OF
->>   	depends on SND_SOC
->>   	select SND_SOC_GENERIC_DMAENGINE_PCM
->>   	select REGMAP_MMIO
->> @@ -21,6 +23,7 @@ config SND_SOC_STM32_I2S
->>   config SND_SOC_STM32_SPDIFRX
->>   	tristate "STM32 S/PDIF receiver (SPDIFRX) support"
->>   	depends on ARCH_STM32 || COMPILE_TEST
->> +	depends on OF
->>   	depends on SND_SOC
->>   	select SND_SOC_GENERIC_DMAENGINE_PCM
->>   	select REGMAP_MMIO
->> -- 
->> 1.9.1
+> On 02/01/2018 04:33 AM, Will Deacon wrote:
+>> Hi Shanker,
 >>
->> _______________________________________________
->> Alsa-devel mailing list
->> Alsa-devel at alsa-project.org
->> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+>> On Wed, Jan 31, 2018 at 06:03:42PM -0600, Shanker Donthineni wrote:
+>>> A DMB instruction can be used to ensure the relative order of only
+>>> memory accesses before and after the barrier. Since writes to system
+>>> registers are not memory operations, barrier DMB is not sufficient
+>>> for observability of memory accesses that occur before ICC_SGI1R_EL1
+>>> writes.
+>>>
+>>> A DSB instruction ensures that no instructions that appear in program
+>>> order after the DSB instruction, can execute until the DSB instruction
+>>> has completed.
+>>>
+>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>> ---
+>>>  drivers/irqchip/irq-gic-v3.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>> index b56c3e2..980ae8e 100644
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -688,7 +688,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>>  	 * Ensure that stores to Normal memory are visible to the
+>>>  	 * other CPUs before issuing the IPI.
+>>>  	 */
+>>> -	smp_wmb();
+>>> +	wmb();
+>>
+>> I think this is the right thing to do and the smp_wmb() was accidentally
+>> pulled in here as a copy-paste from the GICv2 driver where it is sufficient
+>> in practice.
+>>
+>> Did you spot this by code inspection, or did the DMB actually cause
+>> observable failures? (trying to figure out whether or not this need to go
+>> to -stable).
+>>
+> 
+> We've inspected the code because kernel was causing failures in scheduler/IPI_RESCHDULE.
+> After some time of debugging, we landed in GIC driver and found that the issue was due
+> to the DMB barrier. 
+
+OK. I've applied this with a cc: stable and Will's Ack.
+
+> Side note, we're also missing synchronization barriers in GIC driver after writing some
+> of the ICC_XXX system registers. I'm planning to post those changes for comments.
+> 
+> e.g: gic_write_sgi1r(val) and gic_write_eoir(irqnr);
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
