@@ -1,29 +1,40 @@
-From: tuomas@tuxera.com (Tuomas Tynkkynen)
-Date: Thu, 1 Feb 2018 17:16:00 +0200
-Subject: [PATCH 1/2] ARM: dts: sunxi: Switch MMC nodes away from
- cd-inverted property
-In-Reply-To: <20180104150352.rsvtvviafxyuq2jp@flea.lan>
-References: <20171222205738.2389-1-tuomas@tuxera.com>
- <20180104150352.rsvtvviafxyuq2jp@flea.lan>
-Message-ID: <1517498160.5907.6.camel@tuxera.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Feb 2018 16:19:00 +0100
+Subject: [PATCH] arm: dts: sun7i: include correct ccu clock header
+In-Reply-To: <1517427086-66480-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1517427086-66480-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180201151900.2zabioxbq7iehl4v@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On Thu, 2018-01-04 at 16:03 +0100, Maxime Ripard wrote:
-> On Fri, Dec 22, 2017 at 10:57:37PM +0200, Tuomas Tynkkynen wrote:
-> > Using the cd-inverted property is not useful when GPIOs are used as
-> > card
-> > detects since the polarity can be specified with the usual
-> > GPIO_ACTIVE_(HIGH|LOW) GPIO flags. It has also caused confusion for
-> > U-Boot developers, so migrate all sunxi boards away from cd-
-> > inverted.
-> > 
-> > Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+On Wed, Jan 31, 2018 at 08:31:26PM +0100, Giulio Benetti wrote:
+> Include correct clock header sun7i-a20-ccu.h
+> instead of sun4i-a20-ccu.h.
+
+You should wrap at 72 characters.
+
+> Including sun4i header instead of sun7i
+> prevents using sun7i specific defines.
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Substitute header inclusion in sun7i-a20.dtsi
+> using right one.
 
-I was assuming these patches will go in through the sunxi tree but I
-don't see them applied anywhere, have these patches fallen through the
-cracks perhaps?
+This sentence is redundant with the first one.
+
+Dropped the first one, corrected the wrapping and applied, thanks
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/d1b215ed/attachment.sig>
