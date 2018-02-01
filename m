@@ -1,38 +1,590 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 1 Feb 2018 08:40:29 -0800
-Subject: [PATCH] irqchip/gic-v3: Ignore disabled ITS nodes
-In-Reply-To: <8e564636-aae3-4fee-a57c-6f1c01529b49@arm.com>
-References: <20180129164933.25479-1-sboyd@codeaurora.org>
- <8e564636-aae3-4fee-a57c-6f1c01529b49@arm.com>
-Message-ID: <20180201164029.GA23162@codeaurora.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 1 Feb 2018 10:41:21 -0600
+Subject: [PATCH 1/7] arm64: zynqmp: Add support for Xilinx zcu100-revC
+In-Reply-To: <7dd5614c878adb30e38caf4002921c0ca995329c.1516366474.git.michal.simek@xilinx.com>
+References: <cover.1516366474.git.michal.simek@xilinx.com>
+ <7dd5614c878adb30e38caf4002921c0ca995329c.1516366474.git.michal.simek@xilinx.com>
+Message-ID: <CAL_JsqKdEdyQP8maUmM39fvsAUcrvf6=_g21aRiaXqyv-ZogBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01, Marc Zyngier wrote:
-> On 29/01/18 16:49, Stephen Boyd wrote:
-> > @@ -1815,6 +1815,8 @@ static int __init its_of_probe(struct device_node *node)
-> >  
-> >  	for (np = of_find_matching_node(node, its_device_id); np;
-> >  	     np = of_find_matching_node(np, its_device_id)) {
-> > +		if (!of_device_is_available(np))
-> > +			continue;
-> >  		if (!of_property_read_bool(np, "msi-controller")) {
-> >  			pr_warn("%s: no msi-controller property, ITS ignored\n",
-> >  				np->full_name);
-> > 
-> 
-> Can you also address the same thing in
-> drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c?
+On Fri, Jan 19, 2018 at 6:55 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
+> port and usbs.
+> Board is using fixed clocks because clock driver hasn't been merged yet.
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>
+>  arch/arm64/boot/dts/xilinx/Makefile               |   1 +
+>  arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi        | 213 ++++++++++++++++
+>  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 298 ++++++++++++++++++++++
+>  3 files changed, 512 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
+>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+>
+> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
+> index eba179b23b17..7266a6a9c0cd 100644
+> --- a/arch/arm64/boot/dts/xilinx/Makefile
+> +++ b/arch/arm64/boot/dts/xilinx/Makefile
+> @@ -1,2 +1,3 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
+> new file mode 100644
+> index 000000000000..9c09baca7dd7
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
+> @@ -0,0 +1,213 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Clock specification for Xilinx ZynqMP
+> + *
+> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + */
+> +
+> +/ {
+> +       clk100: clk100 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <100000000>;
+> +       };
+> +
+> +       clk125: clk125 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <125000000>;
+> +       };
+> +
+> +       clk200: clk200 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <200000000>;
+> +       };
+> +
+> +       clk250: clk250 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <250000000>;
+> +       };
+> +
+> +       clk300: clk300 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <300000000>;
+> +       };
+> +
+> +       clk600: clk600 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <600000000>;
+> +       };
+> +
+> +       dp_aclk: clock0 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <100000000>;
+> +               clock-accuracy = <100>;
+> +       };
+> +
+> +       dp_aud_clk: clock1 {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <24576000>;
+> +               clock-accuracy = <100>;
+> +       };
+> +
+> +       dpdma_clk: dpdma_clk {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0x0>;
+> +               clock-frequency = <533000000>;
+> +       };
+> +
+> +       drm_clock: drm_clock {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0x0>;
+> +               clock-frequency = <262750000>;
+> +               clock-accuracy = <0x64>;
+> +       };
+> +};
+> +
+> +&can0 {
+> +       clocks = <&clk100 &clk100>;
+> +};
+> +
+> +&can1 {
+> +       clocks = <&clk100 &clk100>;
+> +};
+> +
+> +&fpd_dma_chan1 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan2 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan3 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan4 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan5 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan6 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan7 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&fpd_dma_chan8 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan1 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan2 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan3 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan4 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan5 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan6 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan7 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&lpd_dma_chan8 {
+> +       clocks = <&clk600>, <&clk100>;
+> +};
+> +
+> +&gem0 {
+> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+> +};
+> +
+> +&gem1 {
+> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+> +};
+> +
+> +&gem2 {
+> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+> +};
+> +
+> +&gem3 {
+> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+> +};
+> +
+> +&gpio {
+> +       clocks = <&clk100>;
+> +};
+> +
+> +&i2c0 {
+> +       clocks = <&clk100>;
+> +};
+> +
+> +&i2c1 {
+> +       clocks = <&clk100>;
+> +};
+> +
+> +&sata {
+> +       clocks = <&clk250>;
+> +};
+> +
+> +&sdhci0 {
+> +       clocks = <&clk200 &clk200>;
+> +};
+> +
+> +&sdhci1 {
+> +       clocks = <&clk200 &clk200>;
+> +};
+> +
+> +&spi0 {
+> +       clocks = <&clk200 &clk200>;
+> +};
+> +
+> +&spi1 {
+> +       clocks = <&clk200 &clk200>;
+> +};
+> +
+> +&uart0 {
+> +       clocks = <&clk100 &clk100>;
+> +};
+> +
+> +&uart1 {
+> +       clocks = <&clk100 &clk100>;
+> +};
+> +
+> +&usb0 {
+> +       clocks = <&clk250>, <&clk250>;
+> +};
+> +
+> +&usb1 {
+> +       clocks = <&clk250>, <&clk250>;
+> +};
+> +
+> +&watchdog0 {
+> +       clocks = <&clk250>;
+> +};
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> new file mode 100644
+> index 000000000000..01f5f95806d3
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> @@ -0,0 +1,298 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * dts file for Xilinx ZynqMP ZCU100 revC
+> + *
+> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
+> + *
+> + * Michal Simek <michal.simek@xilinx.com>
+> + * Nathalie Chan King Choy <nathalie@xilinx.com>
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "zynqmp.dtsi"
+> +#include "zynqmp-clk.dtsi"
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +       model = "ZynqMP ZCU100 RevC";
+> +       compatible = "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100", "xlnx,zynqmp";
 
-Sure.
+Documented?
 
-> 
-> Do we need a cc to stable for this?
-> 
+> +
+> +       aliases {
+> +               gpio0 = &gpio;
 
-We don't have any dts files with the disabled node in mainline,
-so no?
+Drop this.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> +               i2c0 = &i2c1;
+> +               rtc0 = &rtc;
+
+Is there more than one?
+
+> +               serial0 = &uart1;
+> +               serial1 = &uart0;
+> +               serial2 = &dcc;
+> +               spi0 = &spi0;
+> +               spi1 = &spi1;
+
+> +               usb0 = &usb0;
+> +               usb1 = &usb1;
+
+Drop these.
+
+> +               mmc0 = &sdhci0;
+> +               mmc1 = &sdhci1;
+> +       };
+> +
+> +       chosen {
+> +               bootargs = "earlycon";
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       memory at 0 {
+> +               device_type = "memory";
+> +               reg = <0x0 0x0 0x0 0x80000000>;
+> +       };
+> +
+> +       gpio-keys {
+> +               compatible = "gpio-keys";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               autorepeat;
+> +               sw4 {
+> +                       label = "sw4";
+> +                       gpios = <&gpio 23 GPIO_ACTIVE_LOW>;
+> +                       linux,code = <KEY_POWER>;
+> +                       gpio-key,wakeup;
+> +                       autorepeat;
+> +               };
+> +       };
+> +
+> +       leds {
+> +               compatible = "gpio-leds";
+> +               ds2 {
+> +                       label = "ds2";
+> +                       gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
+> +                       linux,default-trigger = "heartbeat";
+> +               };
+> +
+> +               ds3 {
+> +                       label = "ds3";
+> +                       gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
+> +                       linux,default-trigger = "phy0tx"; /* WLAN tx */
+> +                       default-state = "off";
+> +               };
+> +
+> +               ds4 {
+> +                       label = "ds4";
+> +                       gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
+> +                       linux,default-trigger = "phy0rx"; /* WLAN rx */
+> +                       default-state = "off";
+> +               };
+> +
+> +               ds5 {
+> +                       label = "ds5";
+> +                       gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
+> +                       linux,default-trigger = "bluetooth-power";
+> +               };
+> +
+> +               vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
+> +                       label = "vbus_det";
+> +                       gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
+> +                       default-state = "on";
+> +               };
+> +
+> +               bt_power {
+> +                       label = "bt_power";
+> +                       gpios = <&gpio 8 GPIO_ACTIVE_HIGH>;
+> +                       default-state = "on";
+> +               };
+> +       };
+> +
+> +       wmmcsdio_fixed: fixedregulator-mmcsdio {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "wmmcsdio_fixed";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               regulator-always-on;
+> +               regulator-boot-on;
+> +       };
+> +
+> +       sdio_pwrseq: sdio_pwrseq {
+> +               compatible = "mmc-pwrseq-simple";
+> +               reset-gpios = <&gpio 7 GPIO_ACTIVE_LOW>; /* WIFI_EN */
+> +       };
+> +};
+> +
+> +&dcc {
+> +       status = "okay";
+> +};
+> +
+> +&gpio {
+> +       status = "okay";
+> +       gpio-line-names = "UART1_TX", "UART1_RX", "UART0_RX", "UART0_TX", "I2C1_SCL",
+> +                         "I2C1_SDA", "SPI1_SCLK", "WLAN_EN", "BT_EN", "SPI1_CS",
+> +                         "SPI1_MISO", "SPI1_MOSI", "I2C_MUX_RESET", "SD0_DAT0", "SD0_DAT1",
+> +                         "SD0_DAT2", "SD0_DAT3", "PS_LED3", "PS_LED2", "PS_LED1",
+> +                         "PS_LED0", "SD0_CMD", "SD0_CLK", "GPIO_PB", "SD0_DETECT",
+> +                         "VBUS_DET", "POWER_INT", "DP_AUX", "DP_HPD", "DP_OE",
+> +                         "DP_AUX_IN", "INA226_ALERT", "PS_FP_PWR_EN", "PL_PWR_EN", "POWER_KILL",
+> +                         "", "GPIO-A", "GPIO-B", "SPI0_SCLK", "GPIO-C",
+> +                         "GPIO-D", "SPI0_CS", "SPI0_MISO", "SPI_MOSI", "GPIO-E",
+> +                         "GPIO-F", "SD1_D0", "SD1_D1", "SD1_D2", "SD1_D3",
+> +                         "SD1_CMD", "SD1_CLK", "USB0_CLK", "USB0_DIR", "USB0_DATA2",
+> +                         "USB0_NXT", "USB0_DATA0", "USB0_DATA1", "USB0_STP", "USB0_DATA3",
+> +                         "USB0_DATA4", "USB0_DATA5", "USB0_DATA6", "USB0_DATA7", "USB1_CLK",
+> +                         "USB1_DIR", "USB1_DATA2", "USB1_NXT", "USB1_DATA0", "USB1_DATA1",
+> +                         "USB1_STP", "USB1_DATA3", "USB1_DATA4", "USB1_DATA5", "USB1_DATA6",
+> +                         "USB_DATA7", "WLAN_IRQ", "PMIC_IRQ", /* MIO end and EMIO start */
+> +                         "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "", "", "", "", "", "", "",
+> +                         "", "", "", "";
+> +};
+> +
+> +&i2c1 {
+> +       status = "okay";
+> +       clock-frequency = <100000>;
+> +       i2cswitch at 75 { /* u11 */
+
+i2c-mux at 75
+
+> +               compatible = "nxp,pca9548";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               reg = <0x75>;
+> +               i2csw_0: i2c at 0 { /* i2c mw 75 0 1 */
+
+Linux commands for comments aren't relevant to dts files.
+
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0>;
+> +                       /*
+> +                        * LSEXP_I2C0
+
+Is this a 96boards design? If so, using "label" and with defined names
+is somewhat standard for defining low speed connector ports (and for
+LEDs). That should also remove any need for using aliases for I2C and
+SPI. Look at hikey or db410c.
+
+> +                        */
+> +               };
+> +               i2csw_1: i2c at 1 { /* i2c mw 75 0 2 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <1>;
+> +                       /*
+> +                        * LSEXP_I2C1
+> +                        */
+> +               };
+> +               i2csw_2: i2c at 2 { /* i2c mw 75 0 4 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <2>;
+> +                       /*
+> +                        * HSEXP_I2C2
+> +                        */
+> +               };
+> +               i2csw_3: i2c at 3 { /* i2c mw 75 0 8 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <3>;
+> +                       /*
+> +                        * HSEXP_I2C3
+> +                        */
+> +               };
+> +               i2csw_4: i2c at 4 { /* i2c mw 75 0 10 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0x4>;
+> +
+> +                       pmic: tps65086x at 5e { /* Custom TI PMIC u33 */
+
+pmic at 5e
+
+> +                               compatible = "ti,tps65086";
+> +                               reg = <0x5e>;
+> +                               interrupt-parent = <&gpio>;
+> +                               interrupts = <77 GPIO_ACTIVE_LOW>;
+> +                               #gpio-cells = <2>;
+> +                               gpio-controller;
+> +                       };
+> +               };
+> +               i2csw_5: i2c at 5 { /* i2c mw 75 0 20 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <5>;
+> +                       /* PS_PMBUS */
+> +                       ina226 at 40 { /* u35 */
+> +                               compatible = "ti,ina226";
+> +                               reg = <0x40>;
+> +                               shunt-resistor = <10000>;
+> +                               /* MIO31 is alert which should be routed to PMUFW */
+> +                       };
+> +               };
+> +               i2csw_6: i2c at 6 { /* i2c mw 75 0 40 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <6>;
+> +                       /*
+> +                        * Not Connected
+> +                        */
+> +               };
+> +               i2csw_7: i2c at 7 { /* i2c mw 75 0 80 */
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <7>;
+> +                       /*
+> +                        * usb5744 (DNP) - U5
+> +                        * 100kHz - this is default freq for us
+> +                        */
+> +               };
+> +       };
+> +};
+> +
+> +&rtc {
+> +       status = "okay";
+> +};
+> +
+> +/* SD0 only supports 3.3V, no level shifter */
+> +&sdhci0 {
+> +       status = "okay";
+> +       no-1-8-v;
+> +       broken-cd; /* CD has to be enabled by default */
+> +       disable-wp;
+> +};
+> +
+> +&sdhci1 {
+> +       status = "okay";
+> +       bus-width = <0x4>;
+> +       non-removable;
+> +       disable-wp;
+> +       cap-power-off-card;
+> +       mmc-pwrseq = <&sdio_pwrseq>;
+> +       vqmmc-supply = <&wmmcsdio_fixed>;
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +       wlcore: wlcore at 2 {
+
+wifi at 2
+
+> +               compatible = "ti,wl1831";
+> +               reg = <2>;
+> +               interrupt-parent = <&gpio>;
+> +               interrupts = <76 IRQ_TYPE_EDGE_RISING>; /* MIO76 WLAN_IRQ 1V8 */
+> +       };
+> +};
+> +
+> +&spi0 { /* Low Speed connector */
+> +       status = "okay";
+> +};
+> +
+> +&spi1 { /* High Speed connector */
+> +       status = "okay";
+> +};
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> +
+> +&uart1 {
+> +       status = "okay";
+> +
+> +};
+> +
+> +/* ULPI SMSC USB3320 */
+> +&usb0 {
+> +       status = "okay";
+> +};
+> +
+> +/* ULPI SMSC USB3320 */
+> +&usb1 {
+> +       status = "okay";
+> +};
+> +
+> +&watchdog0 {
+> +       status = "okay";
+> +};
+> --
+> 1.9.1
+>
