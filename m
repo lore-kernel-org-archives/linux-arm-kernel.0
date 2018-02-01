@@ -1,124 +1,126 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  1 Feb 2018 13:55:12 +0100
-Subject: [PATCH 4/5 v2] drm/pl111: Support variants with broken VBLANK
+Date: Thu,  1 Feb 2018 13:55:13 +0100
+Subject: [PATCH 5/5 v2] drm/pl111: Support multiple endpoints on the CLCD
 In-Reply-To: <20180201125513.5482-1-linus.walleij@linaro.org>
 References: <20180201125513.5482-1-linus.walleij@linaro.org>
-Message-ID: <20180201125513.5482-5-linus.walleij@linaro.org>
+Message-ID: <20180201125513.5482-6-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The early Integrator CLCD synthesized in the Integrator CP and
-IM-PD1 FPGAs are broken: their vertical and next base interrupts
-are not functional. Support these variants by simply disabling
-the use of the vblank interrupt on these variants.
+The Versatile PL110 implementations use multiple endpoints:
+from the PL111 port, the lines are routed through a PLD,
+and from there forked so the same lines go to a VGA DAC and
+an external TFT panel connector. This is discrete wireing
+so there is no way to turn of one output, i.e. this is
+really two endpoints, not two ports.
+
+We model this with multiple endpoints, so we need to loop
+over the available endpoints, check for panel or bridge on
+each and accumulate the result before continuing.
+
+The code already will give the panel preference over the
+bridge, if present, so the output will be sent to the panel
+if both a panel and a bridge is present on two endpoints
+of the same port.
+
+If they all return -EPROBE_DEFER we return -EPROBE_DEFER
+as well.
+
+If just one endpoint is present on the port, the behaviour
+is the same as before.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpu/drm/pl111/pl111_display.c   |  6 ++++--
- drivers/gpu/drm/pl111/pl111_drm.h       |  2 ++
- drivers/gpu/drm/pl111/pl111_drv.c       | 19 +++++++++++--------
- drivers/gpu/drm/pl111/pl111_versatile.c |  1 +
- 4 files changed, 18 insertions(+), 10 deletions(-)
+ drivers/gpu/drm/pl111/pl111_drv.c | 62 +++++++++++++++++++++++++++++++++++----
+ 1 file changed, 56 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 4d4e38b4c9d5..d75923896609 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -256,7 +256,8 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 	cntl |= CNTL_LCDPWR;
- 	writel(cntl, priv->regs + priv->ctrl);
- 
--	drm_crtc_vblank_on(crtc);
-+	if (!priv->variant->broken_vblank)
-+		drm_crtc_vblank_on(crtc);
- }
- 
- void pl111_display_disable(struct drm_simple_display_pipe *pipe)
-@@ -266,7 +267,8 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 	u32 cntl;
- 
--	drm_crtc_vblank_off(crtc);
-+	if (!priv->variant->broken_vblank)
-+		drm_crtc_vblank_off(crtc);
- 
- 	/* Power Down */
- 	cntl = readl(priv->regs + priv->ctrl);
-diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index f75c5d4645b2..d74076c6b7ef 100644
---- a/drivers/gpu/drm/pl111/pl111_drm.h
-+++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -40,6 +40,7 @@ struct drm_minor;
-  *	BGR/RGB routing
-  * @broken_clockdivider: the clock divider is broken and we need to
-  *	use the supplied clock directly
-+ * @broken_vblank: the vblank IRQ is broken on this variant
-  * @formats: array of supported pixel formats on this variant
-  * @nformats: the length of the array of supported pixel formats
-  */
-@@ -48,6 +49,7 @@ struct pl111_variant_data {
- 	bool is_pl110;
- 	bool external_bgr;
- 	bool broken_clockdivider;
-+	bool broken_vblank;
- 	const u32 *formats;
- 	unsigned int nformats;
- };
 diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 6967cd5428b2..e6fa897c740c 100644
+index e6fa897c740c..221f3af02fb4 100644
 --- a/drivers/gpu/drm/pl111/pl111_drv.c
 +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -131,10 +131,12 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	if (ret)
- 		return ret;
+@@ -58,6 +58,8 @@
+ #include <linux/dma-buf.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_graph.h>
  
--	ret = drm_vblank_init(dev, 1);
--	if (ret != 0) {
--		dev_err(dev->dev, "Failed to init vblank\n");
--		goto out_bridge;
-+	if (!priv->variant->broken_vblank) {
-+		ret = drm_vblank_init(dev, 1);
-+		if (ret != 0) {
-+			dev_err(dev->dev, "Failed to init vblank\n");
-+			goto out_bridge;
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic_helper.h>
+@@ -84,9 +86,13 @@ static int pl111_modeset_init(struct drm_device *dev)
+ {
+ 	struct drm_mode_config *mode_config;
+ 	struct pl111_drm_dev_private *priv = dev->dev_private;
+-	struct drm_panel *panel;
+-	struct drm_bridge *bridge;
++	struct device_node *np = dev->dev->of_node;
++	struct device_node *remote;
++	struct drm_panel *panel = NULL;
++	struct drm_bridge *bridge = NULL;
++	bool defer = false;
+ 	int ret = 0;
++	int i;
+ 
+ 	drm_mode_config_init(dev);
+ 	mode_config = &dev->mode_config;
+@@ -96,10 +102,54 @@ static int pl111_modeset_init(struct drm_device *dev)
+ 	mode_config->min_height = 1;
+ 	mode_config->max_height = 768;
+ 
+-	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
+-					  0, 0, &panel, &bridge);
+-	if (ret && ret != -ENODEV)
+-		return ret;
++	i = 0;
++	for_each_endpoint_of_node(np, remote) {
++		struct drm_panel *tmp_panel;
++		struct drm_bridge *tmp_bridge;
++
++		dev_dbg(dev->dev, "checking endpoint %d\n", i);
++
++		ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
++						  0, i,
++						  &tmp_panel,
++						  &tmp_bridge);
++		if (ret) {
++			if (ret == -EPROBE_DEFER) {
++				/*
++				 * Something deferred, but that is often just
++				 * another way of saying -ENODEV, but let's
++				 * cast a vote for later deferral.
++				 */
++				defer = true;
++			} else if (ret != -ENODEV) {
++				/* Continue, maybe something else is working */
++				dev_err(dev->dev,
++					"endpoint %d returns %d\n", i, ret);
++			}
 +		}
- 	}
- 
- 	drm_mode_config_reset(dev);
-@@ -184,10 +186,6 @@ static struct drm_driver pl111_drm_driver = {
- 	.dumb_create = drm_gem_cma_dumb_create,
- 	.gem_free_object_unlocked = drm_gem_cma_free_object,
- 	.gem_vm_ops = &drm_gem_cma_vm_ops,
--
--	.enable_vblank = pl111_enable_vblank,
--	.disable_vblank = pl111_disable_vblank,
--
- 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
- 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
- 	.gem_prime_import = drm_gem_prime_import,
-@@ -213,6 +211,11 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	if (!priv)
- 		return -ENOMEM;
- 
-+	if (!variant->broken_vblank) {
-+		pl111_drm_driver.enable_vblank = pl111_enable_vblank;
-+		pl111_drm_driver.disable_vblank = pl111_disable_vblank;
++
++		if (tmp_panel) {
++			dev_info(dev->dev,
++				 "found panel on endpoint %d\n", i);
++			panel = tmp_panel;
++		}
++		if (tmp_bridge) {
++			dev_info(dev->dev,
++				 "found bridge on endpoint %d\n", i);
++			bridge = tmp_bridge;
++		}
++
++		i++;
 +	}
 +
- 	drm = drm_dev_alloc(&pl111_drm_driver, dev);
- 	if (IS_ERR(drm))
- 		return PTR_ERR(drm);
-diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-index 0f228543a97c..26427b838b2c 100644
---- a/drivers/gpu/drm/pl111/pl111_versatile.c
-+++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-@@ -238,6 +238,7 @@ static const struct pl111_variant_data pl110_integrator = {
- 	.name = "PL110 Integrator",
- 	.is_pl110 = true,
- 	.broken_clockdivider = true,
-+	.broken_vblank = true,
- 	.formats = pl110_integrator_pixel_formats,
- 	.nformats = ARRAY_SIZE(pl110_integrator_pixel_formats),
- };
++	/*
++	 * If we can't find neither panel nor bridge on any of the
++	 * endpoints, and any of them retured -EPROBE_DEFER, then
++	 * let's defer this driver too.
++	 */
++	if ((!panel && !bridge) && defer)
++		return -EPROBE_DEFER;
++
+ 	if (panel) {
+ 		bridge = drm_panel_bridge_add(panel,
+ 					      DRM_MODE_CONNECTOR_Unknown);
 -- 
 2.14.3
