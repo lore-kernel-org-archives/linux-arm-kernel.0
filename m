@@ -1,81 +1,104 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Thu, 1 Feb 2018 10:42:40 +0300
-Subject: About testing A64 DE2 patches
-In-Reply-To: <D5C6CA19-6A9A-4D6E-BF4B-0F420BDFD160@aosc.io>
-References: <41ed8d45-d8a1-303b-dd1f-ad6686a60ba5@orpaltech.com>
- <250579B6-D23B-4E40-8678-1E3F30FA0A16@aosc.io>
- <8853283d-0efa-c151-257f-86ee54f4a86a@orpaltech.com>
- <D5C6CA19-6A9A-4D6E-BF4B-0F420BDFD160@aosc.io>
-Message-ID: <e7ef376f-e394-4de1-8c9a-54078d474910@orpaltech.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 1 Feb 2018 08:47:47 +0100
+Subject: [PATCH v2] ARM: dts: exynos-artik5: add support for wlan
+In-Reply-To: <20180131074027.387-1-mlyle@lyle.org>
+References: <20180131074027.387-1-mlyle@lyle.org>
+Message-ID: <CAJKOXPex=joAvYZem9ROft4aYi8z5Mb4oDce=US182waHtuXew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2018 03:47 AM, Icenowy Zheng wrote:
+On Wed, Jan 31, 2018 at 8:40 AM, Michael Lyle <mlyle@lyle.org> wrote:
 >
-> ? 2018?2?1? GMT+08:00 ??5:11:17, Sergey Suloev <ssuloev@orpaltech.com> ??:
->> On 01/31/2018 08:47 PM, Icenowy Zheng wrote:
->>> ? 2018?2?1? GMT+08:00 ??1:42:01, Sergey Suloev
->> <ssuloev@orpaltech.com> ??:
->>>> Hi, kernel people,
->>>>
->>>> I am testing A64 DE2 patches from the list below, series v4, with my
->>>> NanoPi A64 and 4.15
->>>>
->>>>
->> https://patchwork.kernel.org/project/linux-arm-kernel/list/?submitter=173461&page=1
->>>> and I'm getting the following issue regarding SRAM:
->>>>
->>>> sunxi-de2-clks 1000000.clock: Error couldn't map SRAM to device
->>> Could you check whether it's finally probed?
->>>
->>> DE2 clock may be probed before SRAM controller, so
->>> the probe might be deferred. When SRAM controller is ready
->>> it will retry.
->>>
->>>> Here is my full dmesg https://pastebin.com/SQvDfJF0
->>>>
->>>> Thanks
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> no it is not probed , because there is no special return code from the
->> function
-> But it receives special return code from sunxi_sram_claim.
->   
->> if (ccu->sram_needed) {
->> + ret = sunxi_sram_claim(&pdev->dev);
->> + if (ret) {
->> + dev_err(&pdev->dev,
->> + "Error couldn't map SRAM to device\n");
->> + return ret;
->> + }
->> + }
+> On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
+> it, and turn on the regulator used for it, so that both wifi & bluetooth
+> work.
+>
+> Verified to work on the Artik 520 evaluation board.
+>
+> Signed-off-by: Michael Lyle <mlyle@lyle.org>
+> ---
 
-well yes, it return -517
+Changelog would be nice to check what you changed in v2.
 
-it seems like actually probed
+>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> index 0aa577fe9f95..b2d441b1a7e3 100644
+> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> @@ -245,6 +245,7 @@
+>                                 regulator-name = "VLDO23_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+> +                               regulator-always-on;
+>                         };
+>
+>                         ldo24_reg: LDO24 {
+> @@ -316,6 +317,41 @@
+>         status = "okay";
+>  };
+>
+> +&pinctrl_1 {
 
+Still not alphabetically sorted - this should go after &rtc. Sorting
+alphabetically helps to reduce conflicts (e.g. when adding nodes not
+everyone will be editing end of file at the same of time) and makes it
+slightly easier to look for nodes.
 
-root at nanopia64-aapi:~# dmesg | grep "sunxi-de2-clks"
-[??? 0.197058] bus: 'platform': add driver sunxi-de2-clks
-[??? 0.197089] bus: 'platform': driver_probe_device: matched device 
-1000000.clock with driver sunxi-de2-clks
-[??? 0.197096] bus: 'platform': really_probe: probing driver 
-sunxi-de2-clks with device 1000000.clock
-[??? 0.197115] sunxi-de2-clks 1000000.clock: no pinctrl handle
-[??? 0.197247] sunxi-de2-clks 1000000.clock: Couldn't map SRAM to 
-device: -517
-[??? 0.197304] platform 1000000.clock: Driver sunxi-de2-clks requests 
-probe deferral
-[??? 0.322898] bus: 'platform': driver_probe_device: matched device 
-1000000.clock with driver sunxi-de2-clks
-[??? 0.322905] bus: 'platform': really_probe: probing driver 
-sunxi-de2-clks with device 1000000.clock
-[??? 0.322921] sunxi-de2-clks 1000000.clock: no pinctrl handle
-[??? 0.323597] driver: 'sunxi-de2-clks': driver_bound: bound to device 
-'1000000.clock'
-[??? 0.323632] bus: 'platform': really_probe: bound device 1000000.clock 
-to driver sunxi-de2-clks
+> +       wlanen: wlanen {
+> +               samsung,pins = "gpx2-3";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
+> +               samsung,pin-val = <1>;
+> +       };
+> +};
+> +
+> +&mshc_1 {
+> +       cap-sd-highspeed;
+> +       cap-sdio-irq;
+> +       disable-wp;
+> +       broken-cd;
+
+This really should not be broken-cd but non-removable. I understand
+that the SDIO wifi/br is not a card really - you cannot take it out.
+
+> +       bypass-smu;
+
+I think there is no such property.
+
+> +       keep-power-in-suspend;
+> +       fifo-depth = <0x40>;
+> +       vqmmc-supply = <&ldo11_reg>;
+> +       /* Voltage negotiation is broken for the SDIO periph so we
+
+Please use opening /* (like in kernel code).
+
+> +        * can't actually set the voltage here.
+> +        * vmmc-supply = <&ldo23_reg>;
+
+What did you find about the regulators?
+
+Best regards,
+Krzysztof
+
+> +        */
+> +       card-detect-delay = <500>;
+> +       clock-frequency = <100000000>;
+> +       max-frequency = <100000000>;
+> +       samsung,dw-mshc-ciu-div = <3>;
+> +       samsung,dw-mshc-sdr-timing = <0 1>;
+> +       samsung,dw-mshc-ddr-timing = <1 2>;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
+> +       bus-width = <4>;
+> +       status = "okay";
+> +};
+> +
+>  &rtc {
+>         clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
+>         clock-names = "rtc", "rtc_src";
+> --
+> 2.14.1
+>
