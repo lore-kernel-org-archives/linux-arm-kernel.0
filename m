@@ -1,63 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 1 Feb 2018 10:48:08 +0000
-Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
-In-Reply-To: <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
-Message-ID: <20180201104808.rxgqcrlsevtotq55@lakrids.cambridge.arm.com>
+From: himanshujha199640@gmail.com (Himanshu Jha)
+Date: Thu,  1 Feb 2018 16:30:22 +0530
+Subject: [PATCH] soc: mediatek: Handle return of of_match_device function
+Message-ID: <1517482822-28758-1-git-send-email-himanshujha199640@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
-> Documentation for last level cache controller device tree bindings,
-> client bindings usage examples.
-> 
-> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 93 ++++++++++++++++++++++
->  1 file changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-> 
-> +Example:
-> +
-> +	qcom,system-cache at 1300000 {
-> +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
-> +		reg = <0x1300000 0x50000>;
-> +		reg-names = "llcc_base";
-> +
-> +		llcc: qcom,sdm845-llcc {
-> +			compatible = "qcom,sdm845-llcc";
-> +			#cache-cells = <1>;
-> +			max-slices = <32>;
-> +		};
-> +
-> +		qcom,llcc-ecc {
-> +			compatible = "qcom,llcc-ecc";
-> +		};
-> +
-> +		qcom,llcc-amon {
-> +			compatible = "qcom,llcc-amon";
-> +			qcom,fg-cnt = <0x7>;
-> +		};
-> +
-> +	};
+In scpsys_probe function, return value of of_match_device function which
+returns null is dereferenced without checking. Therefore, add a check for
+potential null dereference.
 
-The "qcom,llcc-ecc" and "qcom,llcc-amon" bindings doesn't seem to be
-used by the driver in patch 2, and it's not clear how they are intended
-to be used, so I think they should go from the binding for now.
+Detected by CoverityScan, CID#1424087 "Dereference null return value"
 
-I don't think you need syscon and simple-mfd, and I think you can
-simplify the binding to a single node like:
+Fixes: commit 53fddb1a66dd ("soc: mediatek: reduce code duplication of scpsys_probe across all SoCs")
+Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-	qcom,system-cache at 1300000 {
-		compatible = "qcom,sdm845-llcc";
-		reg = <0x1300000 0x50000>;
-		#cache-slice-cells = <1>;
-		max-slices = <32>;
-	}
-
-If ECC and AMON are option features, we can always add boolean
-properties for those later, e.g. "has-ecc".
-
-Thanks,
-Mark.
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 435ce5e..6e7f196 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -981,6 +981,9 @@ static int scpsys_probe(struct platform_device *pdev)
+ 	int i, ret;
+ 
+ 	match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
++	if (!match)
++		return -EINVAL;
++
+ 	soc = (const struct scp_soc_data *)match->data;
+ 
+ 	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
+-- 
+2.7.4
