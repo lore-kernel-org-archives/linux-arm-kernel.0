@@ -1,10 +1,10 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 1 Feb 2018 10:44:34 +0000
+Date: Thu, 1 Feb 2018 10:48:08 +0000
 Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
 In-Reply-To: <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
 References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
  <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
-Message-ID: <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
+Message-ID: <20180201104808.rxgqcrlsevtotq55@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,97 +18,15 @@ On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
 >  1 file changed, 93 insertions(+)
 >  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-> new file mode 100644
-> index 0000000..d433b0c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-> @@ -0,0 +1,93 @@
-> +* LLCC (Last Level Cache Controller)
-> +
-> +Properties:
-> +- compatible:
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: must be "qcom,llcc-core"
-> +
-> +- reg:
-> +	Usage: required
-> +	Value Type: <prop-encoded-array>
-> +	Definition: must be addresses and sizes of the LLCC registers
-> +
-> +- llcc-bank-off:
-> +	Usage: required
-> +	Value Type: <u32 array>
-> +	Definition: Offsets of llcc banks from llcc base address starting from
-> +		    LLCC bank0.
-> +
-> +- llcc-broadcast-off:
-> +	Usage: required
-> +	Value Type: <u32>
-> +	Definition: Offset of broadcast register from LLCC bank0 address.
-
-Please could we use "offset" rather than "off" for both of these? That
-way it's obvious these aren't properties for disabling some feature.
-
-How variable are these offsets in practice? Is the memory map not fixed?
-
-> +
-> +- #cache-cells:
-> +	Usage: required
-> +	Value Type: <u32>
-> +	Definition: Number of cache cells, must be 1
-
-What's this for, and how is it used?
-
-> +
-> +- max-slices:
-> +	usage: required
-> +	Value Type: <u32>
-> +	Definition: Number of cache slices supported by hardware
-> +
-> +- status:
-> +	Usage: optional
-> +	Value type: <string>
-> +	Definition: Property to enable or disable the driver
-
-This is a standard property, so I don't think it needs to be described
-here.
-
-> +
-> +== llcc amon device ==
-> +
-> +Properties:
-> +-qcom,fg-cnt : The value of fine grained counter of activity monitor
-> +	        block.
-
-Could you elaborate on this?
-
-> +
-> +compatible devices:
-> +		qcom,sdm845-llcc
-
-Huh? The "qcom,sdm845-llcc" bindings wasn't described above, and it's
-not clear what this means.
-
-> +
 > +Example:
 > +
 > +	qcom,system-cache at 1300000 {
 > +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
-
-This looks very wrong. Why do you need syscon and simple-mfd?
-
 > +		reg = <0x1300000 0x50000>;
 > +		reg-names = "llcc_base";
 > +
 > +		llcc: qcom,sdm845-llcc {
 > +			compatible = "qcom,sdm845-llcc";
-
-Why is this a sub-node?
-
-Why isn't the top-level node just "qcom,sdm845-llcc" ?
-
 > +			#cache-cells = <1>;
 > +			max-slices = <32>;
 > +		};
@@ -123,27 +41,23 @@ Why isn't the top-level node just "qcom,sdm845-llcc" ?
 > +		};
 > +
 > +	};
-> +
-> +== Client ==
-> +
-> +Properties:
-> +- cache-slice-names:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: A set of names that identify the usecase names of a client that uses
-> +		    cache slice. These strings are used to look up the cache slice
-> +		    entries by name.
-> +
-> +- cache-slices:
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: The tuple has phandle to llcc device as the first argument and the
-> +		    second argument is the usecase id of the client.
 
-What is a "usecase id" ?
+The "qcom,llcc-ecc" and "qcom,llcc-amon" bindings doesn't seem to be
+used by the driver in patch 2, and it's not clear how they are intended
+to be used, so I think they should go from the binding for now.
 
-Is this meant to align with #cache-cells? It would be best to keep a
-common prefix (i.e. call that #cache-slice-cells).
+I don't think you need syscon and simple-mfd, and I think you can
+simplify the binding to a single node like:
+
+	qcom,system-cache at 1300000 {
+		compatible = "qcom,sdm845-llcc";
+		reg = <0x1300000 0x50000>;
+		#cache-slice-cells = <1>;
+		max-slices = <32>;
+	}
+
+If ECC and AMON are option features, we can always add boolean
+properties for those later, e.g. "has-ecc".
 
 Thanks,
 Mark.
