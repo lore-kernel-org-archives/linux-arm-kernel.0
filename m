@@ -1,126 +1,61 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  1 Feb 2018 13:55:13 +0100
-Subject: [PATCH 5/5 v2] drm/pl111: Support multiple endpoints on the CLCD
+Date: Thu,  1 Feb 2018 13:55:10 +0100
+Subject: [PATCH 2/5 v2] drm/pl111: Handle the Versatile RGB/BGR565 mode
 In-Reply-To: <20180201125513.5482-1-linus.walleij@linaro.org>
 References: <20180201125513.5482-1-linus.walleij@linaro.org>
-Message-ID: <20180201125513.5482-6-linus.walleij@linaro.org>
+Message-ID: <20180201125513.5482-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile PL110 implementations use multiple endpoints:
-from the PL111 port, the lines are routed through a PLD,
-and from there forked so the same lines go to a VGA DAC and
-an external TFT panel connector. This is discrete wireing
-so there is no way to turn of one output, i.e. this is
-really two endpoints, not two ports.
-
-We model this with multiple endpoints, so we need to loop
-over the available endpoints, check for panel or bridge on
-each and accumulate the result before continuing.
-
-The code already will give the panel preference over the
-bridge, if present, so the output will be sent to the panel
-if both a panel and a bridge is present on two endpoints
-of the same port.
-
-If they all return -EPROBE_DEFER we return -EPROBE_DEFER
-as well.
-
-If just one endpoint is present on the port, the behaviour
-is the same as before.
+The ARM Versatile series can do RGB/BGR565 with an external
+"PLD" (Programmable Logical Device). However the CLCD does not
+have control bits for this, so it needs to be set into the
+ordinary 16BPP mode, then the RGB/BGR565 handling of the pixel
+data is handled by configuring the PLD through the external
+register.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpu/drm/pl111/pl111_drv.c | 62 +++++++++++++++++++++++++++++++++++----
- 1 file changed, 56 insertions(+), 6 deletions(-)
+ChangeLog v1->v2:
+- Rebase on earlier changes.
+---
+ drivers/gpu/drm/pl111/pl111_display.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index e6fa897c740c..221f3af02fb4 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -58,6 +58,8 @@
- #include <linux/dma-buf.h>
- #include <linux/module.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_graph.h>
+diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+index 7fe4040aea46..55ada00ec974 100644
+--- a/drivers/gpu/drm/pl111/pl111_display.c
++++ b/drivers/gpu/drm/pl111/pl111_display.c
+@@ -199,10 +199,17 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 		cntl |= CNTL_LCDBPP24 | CNTL_BGR;
+ 		break;
+ 	case DRM_FORMAT_BGR565:
+-		cntl |= CNTL_LCDBPP16_565;
++		if (priv->variant->is_pl110)
++			cntl |= CNTL_LCDBPP16;
++		else
++			cntl |= CNTL_LCDBPP16_565;
+ 		break;
+ 	case DRM_FORMAT_RGB565:
+-		cntl |= CNTL_LCDBPP16_565 | CNTL_BGR;
++		if (priv->variant->is_pl110)
++			cntl |= CNTL_LCDBPP16;
++		else
++			cntl |= CNTL_LCDBPP16_565;
++		cntl |= CNTL_BGR;
+ 		break;
+ 	case DRM_FORMAT_ABGR1555:
+ 	case DRM_FORMAT_XBGR1555:
+@@ -226,6 +233,10 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 		break;
+ 	}
  
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
-@@ -84,9 +86,13 @@ static int pl111_modeset_init(struct drm_device *dev)
- {
- 	struct drm_mode_config *mode_config;
- 	struct pl111_drm_dev_private *priv = dev->dev_private;
--	struct drm_panel *panel;
--	struct drm_bridge *bridge;
-+	struct device_node *np = dev->dev->of_node;
-+	struct device_node *remote;
-+	struct drm_panel *panel = NULL;
-+	struct drm_bridge *bridge = NULL;
-+	bool defer = false;
- 	int ret = 0;
-+	int i;
++	/* The PL110 in Integrator/Versatile does the BGR routing externally */
++	if (priv->variant->external_bgr)
++		cntl &= ~CNTL_BGR;
++
+ 	/* Power sequence: first enable and chill */
+ 	writel(cntl, priv->regs + priv->ctrl);
  
- 	drm_mode_config_init(dev);
- 	mode_config = &dev->mode_config;
-@@ -96,10 +102,54 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	mode_config->min_height = 1;
- 	mode_config->max_height = 768;
- 
--	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
--					  0, 0, &panel, &bridge);
--	if (ret && ret != -ENODEV)
--		return ret;
-+	i = 0;
-+	for_each_endpoint_of_node(np, remote) {
-+		struct drm_panel *tmp_panel;
-+		struct drm_bridge *tmp_bridge;
-+
-+		dev_dbg(dev->dev, "checking endpoint %d\n", i);
-+
-+		ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
-+						  0, i,
-+						  &tmp_panel,
-+						  &tmp_bridge);
-+		if (ret) {
-+			if (ret == -EPROBE_DEFER) {
-+				/*
-+				 * Something deferred, but that is often just
-+				 * another way of saying -ENODEV, but let's
-+				 * cast a vote for later deferral.
-+				 */
-+				defer = true;
-+			} else if (ret != -ENODEV) {
-+				/* Continue, maybe something else is working */
-+				dev_err(dev->dev,
-+					"endpoint %d returns %d\n", i, ret);
-+			}
-+		}
-+
-+		if (tmp_panel) {
-+			dev_info(dev->dev,
-+				 "found panel on endpoint %d\n", i);
-+			panel = tmp_panel;
-+		}
-+		if (tmp_bridge) {
-+			dev_info(dev->dev,
-+				 "found bridge on endpoint %d\n", i);
-+			bridge = tmp_bridge;
-+		}
-+
-+		i++;
-+	}
-+
-+	/*
-+	 * If we can't find neither panel nor bridge on any of the
-+	 * endpoints, and any of them retured -EPROBE_DEFER, then
-+	 * let's defer this driver too.
-+	 */
-+	if ((!panel && !bridge) && defer)
-+		return -EPROBE_DEFER;
-+
- 	if (panel) {
- 		bridge = drm_panel_bridge_add(panel,
- 					      DRM_MODE_CONNECTOR_Unknown);
 -- 
 2.14.3
