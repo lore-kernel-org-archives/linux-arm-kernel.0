@@ -1,104 +1,38 @@
-From: ckadabi@codeaurora.org (Channa)
-Date: Thu, 01 Feb 2018 12:47:01 -0800
-Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
-In-Reply-To: <20180201104808.rxgqcrlsevtotq55@lakrids.cambridge.arm.com>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
- <20180201104808.rxgqcrlsevtotq55@lakrids.cambridge.arm.com>
-Message-ID: <2c343b57bf3ee8aeb3338aee0d27dc06@codeaurora.org>
+From: york.sun@nxp.com (York Sun)
+Date: Thu, 1 Feb 2018 20:56:33 +0000
+Subject: EDAC driver for ARMv8 L1/L2 cache
+References: <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
+ <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
+ <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180113113156.nnmkuh25rilzwf4p@pd.tnic>
+ <20180115142154.rj6cgnhlll7ivyew@lakrids.cambridge.arm.com>
+ <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
+ <VI1PR04MB20786DE6AE24D4BB555E87C69AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180115232321.ojo3lfvces2q2qhm@pd.tnic>
+ <VI1PR04MB207883AE86B7685B9D9DE3029AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
+ <20180115235248.snzpl5cajfkudluw@pd.tnic>
+Message-ID: <HE1PR04MB207371A103409F815745F49A9AFA0@HE1PR04MB2073.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-02-01 02:48, Mark Rutland wrote:
-> On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
->> Documentation for last level cache controller device tree bindings,
->> client bindings usage examples.
->> 
->> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
->> ---
->>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 93 
->> ++++++++++++++++++++++
->>  1 file changed, 93 insertions(+)
->>  create mode 100644 
->> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
->> 
->> +Example:
->> +
->> +	qcom,system-cache at 1300000 {
->> +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
->> +		reg = <0x1300000 0x50000>;
->> +		reg-names = "llcc_base";
->> +
->> +		llcc: qcom,sdm845-llcc {
->> +			compatible = "qcom,sdm845-llcc";
->> +			#cache-cells = <1>;
->> +			max-slices = <32>;
->> +		};
->> +
->> +		qcom,llcc-ecc {
->> +			compatible = "qcom,llcc-ecc";
->> +		};
->> +
->> +		qcom,llcc-amon {
->> +			compatible = "qcom,llcc-amon";
->> +			qcom,fg-cnt = <0x7>;
->> +		};
->> +
->> +	};
+On 01/15/2018 03:52 PM, Borislav Petkov wrote:
+> On Mon, Jan 15, 2018 at 11:28:14PM +0000, York Sun wrote:
+>> It is generic ARM64 thing. I believe only SError interrupt is available.
 > 
-> The "qcom,llcc-ecc" and "qcom,llcc-amon" bindings doesn't seem to be
-> used by the driver in patch 2, and it's not clear how they are intended
-> to be used, so I think they should go from the binding for now.
-
-Sure I can remove them for now and add them when the I push other 
-drivers
-for review.
-
+> So if it is, then I'd suggest you hammer out a proper design with the
+> ARM folks.
 > 
-> I don't think you need syscon and simple-mfd, and I think you can
 
-I used syscon and simple-mfd because three drivers touch the same 
-address space.
+I made some progress and need some help on coding. On the platform I am
+working on, it has A53 cores. Each A53 core has a signal nINTERRIRQ.
+They are connected to one GIC interrupt. I managed to inject errors to
+some safe address without triggering system error and I got the
+interrupt. I will need to find out which core has errors by reading
+register on each core (and clear the interrupt). How can I do this
+within interrupt service routine? I tried to use
+smp_call_function_single() but it doesn't like the IRQ being disabled.
 
-Driver 1:
-system cache core: The purpose of the driver is to partition the system 
-cache
-and program the settings such as priority, lines to probe while doing a 
-look up
-in the system cache, low power related settings etc.
-The driver also provides API for clients to query the cache slice 
-details,
-activate and deactivate them.
+Any suggestion is appreciated!
 
-Driver 2:
-ECC to detect single and double bit errors in LLCC memory.
-Implemented using EDAC framework.
-
-Driver 3:
-AMON: Activity Monitor to detect live lock ups in the HW block.
-Implemented as SOC driver similar to driver #1.
-
-Since the hardware block has multiple functional units the driver is 
-implemented
-to use syscon/regmap interface.
-
-> simplify the binding to a single node like:
-> 
-> 	qcom,system-cache at 1300000 {
-> 		compatible = "qcom,sdm845-llcc";
-> 		reg = <0x1300000 0x50000>;
-> 		#cache-slice-cells = <1>;
-> 		max-slices = <32>;
-> 	}
-> 
-> If ECC and AMON are option features, we can always add boolean
-> properties for those later, e.g. "has-ecc".
-> 
-> Thanks,
-> Mark.
-
--- 
---
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-a Linux Foundation Collaborative Project
+York
