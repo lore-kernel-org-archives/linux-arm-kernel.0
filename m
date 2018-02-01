@@ -1,58 +1,39 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu,  1 Feb 2018 19:31:23 +0100
-Subject: [PATCH v2 1/4] arm64: add basic Kconfig symbols for i.MX8
-Message-ID: <20180201183126.32384-1-l.stach@pengutronix.de>
+Date: Thu,  1 Feb 2018 19:31:26 +0100
+Subject: [PATCH v2 4/4] MAINTAINERS: add i.MX8 DT path to i.MX architecture
+In-Reply-To: <20180201183126.32384-1-l.stach@pengutronix.de>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+Message-ID: <20180201183126.32384-4-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic Kconfig symbols to make the MXC architecture available
-in the ARM64 world.
+Shawn agreed to take patches for the i.MX8 parts through his tree.
+Also add the NXP Linux team as a reviewer.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-v2: fix "enabled" typo.
----
- arch/arm64/Kconfig.platforms |  6 ++++++
- drivers/soc/imx/Kconfig      | 12 ++++++++++++
- 2 files changed, 18 insertions(+)
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 2401373565ff..ae3be0d2cdb5 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -131,6 +131,12 @@ config ARCH_MVEBU
- 	   - Armada 7K SoC Family
- 	   - Armada 8K SoC Family
- 
-+config ARCH_MXC
-+	bool "ARMv8 based NXP i.MX SoC family"
-+	help
-+	  This enables support for the ARMv8 based SoCs in the
-+	  NXP i.MX family.
-+
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
- 	select GPIOLIB
-diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
-index a5b86a28f343..8c9f04440896 100644
---- a/drivers/soc/imx/Kconfig
-+++ b/drivers/soc/imx/Kconfig
-@@ -8,3 +8,15 @@ config IMX7_PM_DOMAINS
- 	default y if SOC_IMX7D
- 
- endmenu
-+
-+if ARCH_MXC
-+
-+if ARM64
-+
-+config SOC_IMX8MQ
-+	bool "i.MX8MQ support"
-+	help
-+	  This enables support for the i.MX8MQ SoC.
-+endif
-+
-+endif
+diff --git a/MAINTAINERS b/MAINTAINERS
+index aa71ab52fd76..5e1f413d9ae5 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1382,6 +1382,7 @@ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+ M:	Shawn Guo <shawnguo@kernel.org>
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ R:	Fabio Estevam <fabio.estevam@nxp.com>
++R:	NXP Linux Team <linux-imx@nxp.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+@@ -1389,6 +1390,7 @@ F:	arch/arm/mach-imx/
+ F:	arch/arm/mach-mxs/
+ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
++F:	arch/arm64/boot/dts/freescale/imx*
+ F:	drivers/clk/imx/
+ F:	drivers/soc/imx/
+ F:	include/soc/imx/
 -- 
 2.15.1
