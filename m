@@ -1,75 +1,99 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 1 Feb 2018 06:55:46 -0600
-Subject: [PATCH] irqchip/gic-v3: Use wmb() instead of smb_wmb() in
- gic_raise_softirq()
-In-Reply-To: <20180201103337.GA13705@arm.com>
-References: <1517443422-30693-1-git-send-email-shankerd@codeaurora.org>
- <20180201103337.GA13705@arm.com>
-Message-ID: <88d418ff-db83-c690-618e-69df3e3bb272@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  1 Feb 2018 14:04:46 +0100
+Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
+Message-ID: <20180201130446.6165-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Thanks for your quick reply.
+The following happened when migrating an old fbdev driver to DRM:
 
-On 02/01/2018 04:33 AM, Will Deacon wrote:
-> Hi Shanker,
-> 
-> On Wed, Jan 31, 2018 at 06:03:42PM -0600, Shanker Donthineni wrote:
->> A DMB instruction can be used to ensure the relative order of only
->> memory accesses before and after the barrier. Since writes to system
->> registers are not memory operations, barrier DMB is not sufficient
->> for observability of memory accesses that occur before ICC_SGI1R_EL1
->> writes.
->>
->> A DSB instruction ensures that no instructions that appear in program
->> order after the DSB instruction, can execute until the DSB instruction
->> has completed.
->>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->>  drivers/irqchip/irq-gic-v3.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index b56c3e2..980ae8e 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -688,7 +688,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>  	 * Ensure that stores to Normal memory are visible to the
->>  	 * other CPUs before issuing the IPI.
->>  	 */
->> -	smp_wmb();
->> +	wmb();
-> 
-> I think this is the right thing to do and the smp_wmb() was accidentally
-> pulled in here as a copy-paste from the GICv2 driver where it is sufficient
-> in practice.
-> 
-> Did you spot this by code inspection, or did the DMB actually cause
-> observable failures? (trying to figure out whether or not this need to go
-> to -stable).
-> 
+The Integrator/CP PL111 supports 16BPP but only ARGB1555/ABGR1555
+or XRGB1555/XBGR1555 i.e. the maximum depth is 15.
 
-We've inspected the code because kernel was causing failures in scheduler/IPI_RESCHDULE.
-After some time of debugging, we landed in GIC driver and found that the issue was due
-to the DMB barrier. 
+This makes the initialization of the framebuffer fail since
+the code in drm_fb_helper_single_fb_probe() assigns the same value
+to sizes.surface_bpp and sizes.surface_depth. I.e. it simply assumes
+a 1-to-1 mapping between BPP and depth, which is true in most cases
+but typically not for this hardware.
 
-Side note, we're also missing synchronization barriers in GIC driver after writing some
-of the ICC_XXX system registers. I'm planning to post those changes for comments.
+To support the odd case of a driver supporting 16BPP with only 15
+bits of depth, this patch will make the code loop over the formats
+supported on the primary plane and cap the depth to the maximum
+supported.
 
-e.g: gic_write_sgi1r(val) and gic_write_eoir(irqnr);
+On the PL110 Integrator, this makes drm_mode_legacy_fb_format()
+select DRM_FORMAT_XRGB1555 which is acceptable for this driver, and
+thus we get framebuffer, penguin and console on the Integrator/CP.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpu/drm/drm_fb_helper.c | 40 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+index e56166334455..5076f9103740 100644
+--- a/drivers/gpu/drm/drm_fb_helper.c
++++ b/drivers/gpu/drm/drm_fb_helper.c
+@@ -1720,6 +1720,8 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
+ 	int i;
+ 	struct drm_fb_helper_surface_size sizes;
+ 	int gamma_size = 0;
++	struct drm_plane *plane;
++	int best_depth = 0;
  
-
-> Anyway:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Cheers,
-> 
-> Will
-> 
-
+ 	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
+ 	sizes.surface_depth = 24;
+@@ -1727,7 +1729,10 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
+ 	sizes.fb_width = (u32)-1;
+ 	sizes.fb_height = (u32)-1;
+ 
+-	/* if driver picks 8 or 16 by default use that for both depth/bpp */
++	/*
++	 * If driver picks 8 or 16 by default use that for both depth/bpp
++	 * to begin with
++	 */
+ 	if (preferred_bpp != sizes.surface_bpp)
+ 		sizes.surface_depth = sizes.surface_bpp = preferred_bpp;
+ 
+@@ -1762,6 +1767,39 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
+ 		}
+ 	}
+ 
++	/*
++	 * If we run into a situation where, for example, the primary plane
++	 * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
++	 * 16) we need to scale down the depth of the sizes we request.
++	 */
++	drm_for_each_plane(plane, fb_helper->dev) {
++		/* Only check the primary plane */
++		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
++			continue;
++
++		for (i = 0; i < plane->format_count; i++) {
++			const struct drm_format_info *fmt;
++
++			fmt = drm_format_info(plane->format_types[i]);
++			/* We found a perfect fit, great */
++			if (fmt->depth == sizes.surface_depth)
++				break;
++
++			/* Skip depths above what we're looking for */
++			if (fmt->depth > sizes.surface_depth)
++				continue;
++
++			/* Best depth found so far */
++			if (fmt->depth > best_depth)
++				best_depth = fmt->depth;
++		}
++	}
++	if (sizes.surface_depth != best_depth) {
++		DRM_DEBUG("requested bpp %d, scaled depth down to %d",
++			  sizes.surface_bpp, best_depth);
++		sizes.surface_depth = best_depth;
++	}
++
+ 	crtc_count = 0;
+ 	for (i = 0; i < fb_helper->crtc_count; i++) {
+ 		struct drm_display_mode *desired_mode;
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.14.3
