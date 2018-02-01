@@ -1,195 +1,104 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Thu,  1 Feb 2018 20:39:03 +0000
-Subject: [PATCH] staging: vc04_services: remove unused files
-Message-ID: <1517517543-34957-1-git-send-email-clabbe@baylibre.com>
+From: ckadabi@codeaurora.org (Channa)
+Date: Thu, 01 Feb 2018 12:47:01 -0800
+Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
+In-Reply-To: <20180201104808.rxgqcrlsevtotq55@lakrids.cambridge.arm.com>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+ <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
+ <20180201104808.rxgqcrlsevtotq55@lakrids.cambridge.arm.com>
+Message-ID: <2c343b57bf3ee8aeb3338aee0d27dc06@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All thoses files are not used by anybody.
-Lets just remove them.
+On 2018-02-01 02:48, Mark Rutland wrote:
+> On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
+>> Documentation for last level cache controller device tree bindings,
+>> client bindings usage examples.
+>> 
+>> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 93 
+>> ++++++++++++++++++++++
+>>  1 file changed, 93 insertions(+)
+>>  create mode 100644 
+>> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+>> 
+>> +Example:
+>> +
+>> +	qcom,system-cache at 1300000 {
+>> +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
+>> +		reg = <0x1300000 0x50000>;
+>> +		reg-names = "llcc_base";
+>> +
+>> +		llcc: qcom,sdm845-llcc {
+>> +			compatible = "qcom,sdm845-llcc";
+>> +			#cache-cells = <1>;
+>> +			max-slices = <32>;
+>> +		};
+>> +
+>> +		qcom,llcc-ecc {
+>> +			compatible = "qcom,llcc-ecc";
+>> +		};
+>> +
+>> +		qcom,llcc-amon {
+>> +			compatible = "qcom,llcc-amon";
+>> +			qcom,fg-cnt = <0x7>;
+>> +		};
+>> +
+>> +	};
+> 
+> The "qcom,llcc-ecc" and "qcom,llcc-amon" bindings doesn't seem to be
+> used by the driver in patch 2, and it's not clear how they are intended
+> to be used, so I think they should go from the binding for now.
 
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
----
- .../interface/vchiq_arm/vchiq_build_info.h         | 37 --------------
- .../interface/vchiq_arm/vchiq_memdrv.h             | 59 ----------------------
- .../interface/vchiq_arm/vchiq_version.c            | 59 ----------------------
- 3 files changed, 155 deletions(-)
- delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
- delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
- delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
+Sure I can remove them for now and add them when the I push other 
+drivers
+for review.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
-deleted file mode 100644
-index df645813bdae..000000000000
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
-+++ /dev/null
-@@ -1,37 +0,0 @@
--/**
-- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions
-- * are met:
-- * 1. Redistributions of source code must retain the above copyright
-- *    notice, this list of conditions, and the following disclaimer,
-- *    without modification.
-- * 2. Redistributions in binary form must reproduce the above copyright
-- *    notice, this list of conditions and the following disclaimer in the
-- *    documentation and/or other materials provided with the distribution.
-- * 3. The names of the above-listed copyright holders may not be used
-- *    to endorse or promote products derived from this software without
-- *    specific prior written permission.
-- *
-- * ALTERNATIVELY, this software may be distributed under the terms of the
-- * GNU General Public License ("GPL") version 2, as published by the Free
-- * Software Foundation.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- */
--
--const char *vchiq_get_build_hostname(void);
--const char *vchiq_get_build_version(void);
--const char *vchiq_get_build_time(void);
--const char *vchiq_get_build_date(void);
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
-deleted file mode 100644
-index c233b866725b..000000000000
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
-+++ /dev/null
-@@ -1,59 +0,0 @@
--/**
-- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions
-- * are met:
-- * 1. Redistributions of source code must retain the above copyright
-- *    notice, this list of conditions, and the following disclaimer,
-- *    without modification.
-- * 2. Redistributions in binary form must reproduce the above copyright
-- *    notice, this list of conditions and the following disclaimer in the
-- *    documentation and/or other materials provided with the distribution.
-- * 3. The names of the above-listed copyright holders may not be used
-- *    to endorse or promote products derived from this software without
-- *    specific prior written permission.
-- *
-- * ALTERNATIVELY, this software may be distributed under the terms of the
-- * GNU General Public License ("GPL") version 2, as published by the Free
-- * Software Foundation.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- */
--
--#ifndef VCHIQ_MEMDRV_H
--#define VCHIQ_MEMDRV_H
--
--/* ---- Include Files ----------------------------------------------------- */
--
--#include <linux/kernel.h>
--#include "vchiq_if.h"
--
--/* ---- Constants and Types ---------------------------------------------- */
--
--/* ---- Variable Externs ------------------------------------------------- */
--
--/* ---- Function Prototypes ---------------------------------------------- */
--
--VCHIQ_STATUS_T vchiq_memdrv_initialise(void);
--
--VCHIQ_STATUS_T vchiq_userdrv_create_instance(
--	const VCHIQ_PLATFORM_DATA_T * platform_data);
--
--VCHIQ_STATUS_T vchiq_userdrv_suspend(
--	const VCHIQ_PLATFORM_DATA_T * platform_data);
--
--VCHIQ_STATUS_T vchiq_userdrv_resume(
--	const VCHIQ_PLATFORM_DATA_T * platform_data);
--
--#endif
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
-deleted file mode 100644
-index 994b81798134..000000000000
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
-+++ /dev/null
-@@ -1,59 +0,0 @@
--/**
-- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions
-- * are met:
-- * 1. Redistributions of source code must retain the above copyright
-- *    notice, this list of conditions, and the following disclaimer,
-- *    without modification.
-- * 2. Redistributions in binary form must reproduce the above copyright
-- *    notice, this list of conditions and the following disclaimer in the
-- *    documentation and/or other materials provided with the distribution.
-- * 3. The names of the above-listed copyright holders may not be used
-- *    to endorse or promote products derived from this software without
-- *    specific prior written permission.
-- *
-- * ALTERNATIVELY, this software may be distributed under the terms of the
-- * GNU General Public License ("GPL") version 2, as published by the Free
-- * Software Foundation.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- */
--#include "vchiq_build_info.h"
--#include <linux/broadcom/vc_debug_sym.h>
--
--VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_hostname, "dc4-arm-01");
--VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_version, "9245b4c35b99b3870e1f7dc598c5692b3c66a6f0 (tainted)");
--VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_time,    __TIME__);
--VC_DEBUG_DECLARE_STRING_VAR(vchiq_build_date,    __DATE__);
--
--const char *vchiq_get_build_hostname(void)
--{
--   return vchiq_build_hostname;
--}
--
--const char *vchiq_get_build_version(void)
--{
--   return vchiq_build_version;
--}
--
--const char *vchiq_get_build_date(void)
--{
--   return vchiq_build_date;
--}
--
--const char *vchiq_get_build_time(void)
--{
--   return vchiq_build_time;
--}
+> 
+> I don't think you need syscon and simple-mfd, and I think you can
+
+I used syscon and simple-mfd because three drivers touch the same 
+address space.
+
+Driver 1:
+system cache core: The purpose of the driver is to partition the system 
+cache
+and program the settings such as priority, lines to probe while doing a 
+look up
+in the system cache, low power related settings etc.
+The driver also provides API for clients to query the cache slice 
+details,
+activate and deactivate them.
+
+Driver 2:
+ECC to detect single and double bit errors in LLCC memory.
+Implemented using EDAC framework.
+
+Driver 3:
+AMON: Activity Monitor to detect live lock ups in the HW block.
+Implemented as SOC driver similar to driver #1.
+
+Since the hardware block has multiple functional units the driver is 
+implemented
+to use syscon/regmap interface.
+
+> simplify the binding to a single node like:
+> 
+> 	qcom,system-cache at 1300000 {
+> 		compatible = "qcom,sdm845-llcc";
+> 		reg = <0x1300000 0x50000>;
+> 		#cache-slice-cells = <1>;
+> 		max-slices = <32>;
+> 	}
+> 
+> If ECC and AMON are option features, we can always add boolean
+> properties for those later, e.g. "has-ecc".
+> 
+> Thanks,
+> Mark.
+
 -- 
-2.13.6
+--
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+a Linux Foundation Collaborative Project
