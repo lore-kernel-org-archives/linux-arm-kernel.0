@@ -1,46 +1,92 @@
-From: horia.geanta@nxp.com (=?iso-8859-2?Q?Horia_Geant=E3?=)
-Date: Thu, 1 Feb 2018 11:44:23 +0000
-Subject: [PATCH v3 5/5] ARM: dts: imx7s: add CAAM device node
-References: <1517364040-27607-1-git-send-email-pure.logic@nexus-software.ie>
- <1517364040-27607-6-git-send-email-pure.logic@nexus-software.ie>
-Message-ID: <VI1PR0402MB334269ACFE0805A2E31D604B98FA0@VI1PR0402MB3342.eurprd04.prod.outlook.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 1 Feb 2018 11:46:59 +0000
+Subject: [PATCH v4 6/6] arm: KVM: Invalidate icache on guest exit for
+ Cortex-A15
+In-Reply-To: <20180201110738.5421-7-marc.zyngier@arm.com>
+References: <20180201110738.5421-1-marc.zyngier@arm.com>
+ <20180201110738.5421-7-marc.zyngier@arm.com>
+Message-ID: <52547cd9-2821-3401-5a67-9aea5a93bbf9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/31/2018 4:00 AM, Bryan O'Donoghue wrote:
-> From: Rui Miguel Silva <rui.silva@linaro.org>
+On 01/02/18 11:07, Marc Zyngier wrote:
+> In order to avoid aliasing attacks against the branch predictor
+> on Cortex-A15, let's invalidate the BTB on guest exit, which can
+> only be done by invalidating the icache (with ACTLR[0] being set).
 > 
-> Add CAAM device node to the i.MX7s device tree.
+> We use the same hack as for A12/A17 to perform the vector decoding.
 > 
-> Signed-off-by: Rui Miguel Silva <rui.silva@linaro.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: "Horia Geant?" <horia.geanta@nxp.com>
-> Cc: Aymen Sghaier <aymen.sghaier@nxp.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Peng Fan <peng.fan@nxp.com>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Lukas Auer <lukas.auer@aisec.fraunhofer.de>
-> Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/boot/dts/imx7s.dtsi | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+>   arch/arm/include/asm/kvm_mmu.h |  5 +++++
+>   arch/arm/kvm/hyp/hyp-entry.S   | 24 ++++++++++++++++++++++++
+>   2 files changed, 29 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 82ad26e..e38c159 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -805,6 +805,37 @@
->  				status = "disabled";
->  			};
->  
-> +			crypto: caam at 30900000 {
-> +				compatible = "fsl,sec-v4.0";
-> +				fsl,sec-era = <4>;
-CCBVID[CAAM_ERA] = 8.
-Either remove this (optional) property and let the bootloader add it
-dynamically, or provide a correct value for it.
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index dedd4b8a3fa4..4216d40ca25c 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -238,6 +238,11 @@ static inline void *kvm_get_hyp_vector(void)
+>   		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+>   	}
+>   
+> +	case ARM_CPU_PART_CORTEX_A15:
+> +	{
+> +		extern char __kvm_hyp_vector_ic_inv[];
+> +		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
+> +	}
+>   #endif
+>   	default:
+>   	{
+> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> index e789f52a5129..918a05dd2d63 100644
+> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> @@ -72,6 +72,28 @@ __kvm_hyp_vector:
+>   	W(b)	hyp_fiq
+>   
+>   #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +	.align 5
+> +__kvm_hyp_vector_ic_inv:
+> +	.global __kvm_hyp_vector_ic_inv
+> +
+> +	/*
+> +	 * We encode the exception entry in the bottom 3 bits of
+> +	 * SP, and we have to guarantee to be 8 bytes aligned.
+> +	 */
+> +	W(add)	sp, sp, #1	/* Reset 	  7 */
+> +	W(add)	sp, sp, #1	/* Undef	  6 */
+> +	W(add)	sp, sp, #1	/* Syscall	  5 */
+> +	W(add)	sp, sp, #1	/* Prefetch abort 4 */
+> +	W(add)	sp, sp, #1	/* Data abort	  3 */
+> +	W(add)	sp, sp, #1	/* HVC		  2 */
+> +	W(add)	sp, sp, #1	/* IRQ		  1 */
+> +	W(nop)			/* FIQ		  0 */
+> +
+> +	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
+> +	isb
+> +
+> +	b	decode_vectors
 
-Thanks,
-Horia
+Ultimately it might be worth macroising (or just duplicating) 
+decode_vectors so that we might reduce the almost-guaranteed "miss in 
+I$, take a full pipeline flush, miss in I$ again" penalty of this branch 
+to a single I$ miss, but until some numbers appear to prove that 
+worthwhile this is certainly the most expedient solution.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> +
+>   	.align 5
+>   __kvm_hyp_vector_bp_inv:
+>   	.global __kvm_hyp_vector_bp_inv
+> @@ -92,6 +114,8 @@ __kvm_hyp_vector_bp_inv:
+>   	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+>   	isb
+>   
+> +decode_vectors:
+> +
+>   #ifdef CONFIG_THUMB2_KERNEL
+>   	/*
+>   	 * Yet another silly hack: Use VPIDR as a temp register.
+> 
