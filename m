@@ -1,121 +1,129 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Feb 2018 16:54:32 +0100
-Subject: [linux-sunxi] Re: [PATCH v6 2/2] media: V3s: Add support for
- Allwinner CSI.
-In-Reply-To: <20180201113442.GC19945@bart.dudau.co.uk>
-References: <1516695531-23349-1-git-send-email-yong.deng@magewell.com>
- <201801260759.RyNhDZz4%fengguang.wu@intel.com>
- <20180126094658.aa70ed3f890464f6051e21e4@magewell.com>
- <20180126110041.f89848325b9ecfb07df387ca@magewell.com>
- <20180131030807.GA19945@bart.dudau.co.uk>
- <20180131074212.7hvb3nqkt22h2chg@flea.lan>
- <20180131144753.GB19945@bart.dudau.co.uk>
- <20180201083222.q6rqql4nngn2bhiy@flea.lan>
- <CAK8P3a01DqmVJKt6J2i_okVoeELJCUW0voW0r52EzBY7iF74xQ@mail.gmail.com>
- <20180201113442.GC19945@bart.dudau.co.uk>
-Message-ID: <20180201155432.odv6p6rals3sujhx@flea.lan>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Thu, 1 Feb 2018 17:09:33 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <20180201101411.d23efsjt7jdyi4zh@flea.lan>
+References: <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180125152117.qikemrwl7f35ssjg@flea.lan>
+ <d79602b9-8e04-8250-fd7f-f52b8e16c575@micronovasrl.com>
+ <20180126145608.5s6c6ltpvrko7iyv@flea.lan>
+ <18ec71dc-a785-a771-76d4-176d95032c97@micronovasrl.com>
+ <e3a8682c-7524-ee99-8d4f-c492709e6e49@micronovasrl.com>
+ <20180201101411.d23efsjt7jdyi4zh@flea.lan>
+Message-ID: <51323c6d-ba50-f09e-fcd7-d9b18d03673a@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 01, 2018 at 11:34:43AM +0000, Liviu Dudau wrote:
-> On Thu, Feb 01, 2018 at 10:20:28AM +0100, Arnd Bergmann wrote:
-> > On Thu, Feb 1, 2018 at 9:32 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > On Wed, Jan 31, 2018 at 02:47:53PM +0000, Liviu Dudau wrote:
-> > >> On Wed, Jan 31, 2018 at 08:42:12AM +0100, Maxime Ripard wrote:
-> > >> > On Wed, Jan 31, 2018 at 03:08:08AM +0000, Liviu Dudau wrote:
-> > >> > > On Fri, Jan 26, 2018 at 11:00:41AM +0800, Yong wrote:
-> > >>
-> > >> Yeah, sorry, my threading of the discussion was broken and I've seen
-> > >> the rest of the thread after I have replied. My bad!
-> > >>
-> > >> >
-> > >> > In our case, the bus where the device is attached will not do the
-> > >> > address translations, and shouldn't.
-> > >>
-> > >> In my view, the bus is already doing address translation at physical
-> > >> level, AFAIU it remaps the memory to zero.
-> > >
-> > > Not really. It uses a separate bus with a different mapping for the
-> > > DMA accesses (and only the DMA accesses). The AXI (or AHB, I'm not
-> > > sure, but, well, the "registers" bus) doesn't remap anything in
-> > > itself, and we only describe this one usually in our DTs.
+Il 01/02/2018 11:14, Maxime Ripard ha scritto:
+> On Sat, Jan 27, 2018 at 11:07:09PM +0100, Giulio Benetti wrote:
+>>>>>> I don't really know what the polarity of D0 would be just by
+>>>>>> judging at that capture, but we would have noticed if the colors
+>>>>>> were inverted for quite some time now.
+>>>>>
+>>>>> D0-D23 are correct.
+>>>>>
+>>>>> With that capture, I mean to show you instead dclk is inverted, as
+>>>>> dclk samples D0 on falling edge.
+>>>>
+>>>> Ah right, DCLK being the first channel?
+>>>
+>>> Yes, sorry I didn't place a label on channels
+>>>
+>>>>
+>>>>> So 0 is NEGEDGE and 1 is POSEDGE(1/3 of clock phase).
+>>>>> 1/3 clock phase seems enough to me to be considered POSEDGE,
+>>>>> 2/3 instead risks to go too much to the right of D0(even if it
+>>>>> could work).
+>>>>
+>>>> Do you have captures with both settings?
+>>>
+>>> Not now, but asap I'm going to take.
+>>
+>> Here we are:
+>> 1/3 phase: https://pasteboard.co/H4VehON.png
+>> 2/3 phase: https://pasteboard.co/H4Veq8a.png
+>>
+>> Yellow: D0
+>> Blue: DCLK
+>>
+>> As you can see:
+>> 1/3 phase has DCLK rising edge almost in the middle of D0
+>> 2/3 phase has DCLK rising edge that comes too late
+>>
+>> I would go for "1/3 phase" for Rising edge and "normal phase" for
+>> Falling edge.
+>>
+>> What do you think?
 > 
-> I was actually thinking about the DMA bus (AXI bus, most likely), not the
-> "registers" bus (yes, usually APB or AHB). The DMA bus is the one that does
-> the implicit remapping for the addresses it uses, if I understood you correctly.
+> It seems fair. This need a whole lot of comments though :)
+
+Yes, then, do I proceed resubmitting both corrected patches with 
+corrected commit logs?
+
 > 
-> > Exactly, the DT model fundamentally assumes that each a device is
-> > connected to exactly one bus, so we make up a device *tree* rather
-> > than a non-directed mesh topology that you might see in modern
-> > SoCs.
+>>>> That it's going to be a nightmare... We've advertised since the very
+>>>> beginning something, and we're about to break it. I'm not sure we want
+>>>> to do that.
+>>>
+>>> I can take care about that.
+>>> But I also think that a lot of displays work because they use only
+>>> DE-mode, almost ignoring HSync and VSync signals(HV-mode).
+>>>
+>>> In any case I have to produce these patches because of my company's
+>>> board based on A20 and A33, and modify defconfig according to it.
+>>> The only technical nightmare I see is to produce a commit for every
+>>> defconfig to be modified and copy-paste che commit-log substituing board
+>>> name(1-2 days of work).
+>>> Problem is testing, but we're speaking about something that probably was
+>>> badly working, but you couldn't see it on display.
+>>> So I think this is only an improvement at the end.
+>>>
+>>> I'm sorry I've taken bad news.
+>>> Drink 1 glass of Spritz to go over! :)
+>>
+>> IMHO I think that we have only to take care about displays that don't have
+>> DE signal.
+>>
+>> If DE signal exists, then displays are driven through DE only for back and
+>> front porch as I know, and on most displays I've used, Hsync and VSync are
+>> ignored.
+>> DE is used not only for Data Enable, but also for sync the very beginning of
+>> frame, the rest of syncing is done by pause between every line sent.
+>> This is should be why nobody noticed it before,
+>> I think almost every display is used in DE mode only.
+>> So, if we fix bug for HSync and VSync, risk should be very low.
+>> Indeed, everybody or almost, use sync:3 because display ignore those 2
+>> signals (HSync and VSYnc) in favour of DE.
+>> And I don't know how many people checked with oscilloscope signals after
+>> getting display working in a few.
 > 
-> I think you are right, but we also have the registers property for a device node
-> and that can be used for describing the "registers" bus. Now, it is possible
-> that some driver code gets confused between accessing the device registers
-> (which in Arm world happens through an APB or AHB bus) and the device doing system
-> read/writes which usually happends through an AXI (or for very old systems, AHB) bus.
+> I know I did, but I apparently didn't pay attention to that and was
+> more focused on getting the timings right :)
 > 
-> For the sake of making sure we are talking about the same thing and in hope
-> that Maxime or Yong can give a more detailed picture of this device
+> But clearly this is a separate discussion that needs to be held on the
+> U-Boot ML.
 
-Keep in mind that this part is heavily under-documented to us, and
-this is mostly information collected through testing and reading
-through the various vendor trees.
+Ok, so I'd create a patch regarding HSync and VSync polarity and send it 
+to uboot ML.
 
-As far as I know, a few devices (Display Engine, hardware codec, the
-CSI driver that spawned this discussion) are connected to the memory
-through a proprietary bus that does the remapping. The registers part
-is connected to an AHB bus.
-
-> I'll re-iterate what a lot of devices in the Arm world look like
-> nowadays:
 > 
-> - they have a bus for accessing the "registers" of the device, for controlling
->   the behaviour of that device. Inside the SoC, that happens through the
->   APB bus and it has a separate clock. The CPU has a view of those registers
->   through some mapping in the address space that has been backed by the hardware
->   engineers at design time and in DT we express that through the "registers" property,
->   plus the "apb_clk" for most of the bindings. In DT world we express the mapping
->   vis-a-vis the parent bus by using the "ranges" property.
+> Maxime
+> 
 
-We do have that.
-
-> - they have a high speed bus for doing data transfers. Inside the SoC that
->   happens through an AXI or more modern CCI interconnect bus. The CPU does not
->   have a direct view on those transfers, but by using IOMMUs, SMMUs or simple
->   bus mastering capabilities it can gain knowledge of the state of the transfers
->   and/or influence the target memory.
-
-Part of that bus controller allows to probe the bus bandwidth and / or
-set limits for the various controllers connected to it, so it seems to
-match that description.
-
->   In the DT world, we use the "dma-ranges" property like you say to
->   express the translations that happen on that bus.
-
-Right, except that the way dma-ranges is parsed at the moment is that
-it will look on the parent node for dma-ranges. In this case, the
-parent in the DT will be our AHB bus, and not all the devices
-connected on that AHB bus that do DMA go through that DMA bus with the
-different mapping. So setting it there isn't an option.
-
-> Maxime/Yong: does your device have more than one AXI bus for doing
-> transfers?
-
-Not as far as I know.
-
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/923d8ebe/attachment.sig>
+Giulio Benetti
+R&D Manager &
+Advanced Research
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
