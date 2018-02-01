@@ -1,21 +1,20 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 1 Feb 2018 17:47:09 +0530
-Subject: [PATCH v6 16/41] clk: davinci: Add platform information for TI
- DM646x PSC
-In-Reply-To: <1516468460-4908-17-git-send-email-david@lechnology.com>
+Date: Thu, 1 Feb 2018 17:52:57 +0530
+Subject: [PATCH v6 02/41] clk: davinci: New driver for davinci PLL clocks
+In-Reply-To: <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-17-git-send-email-david@lechnology.com>
-Message-ID: <f382c0fa-5a5f-c5bb-1f37-6d356e427dc1@ti.com>
+ <1516468460-4908-3-git-send-email-david@lechnology.com>
+ <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
+Message-ID: <2a833d5c-4cd7-5c55-4b4a-a02bd7fde6d9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
-> This adds platform-specific declarations for the PSC clocks on TI
-> DM646x based systems.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+On Thursday 01 February 2018 01:31 PM, Sekhar Nori wrote:
+> One thing missing is DIV4.5 clock. It will be nice to add that too,
+> mostly just because it will make the binding complete.
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Ah, ignore this comment please. I noticed that its part of cfgchip
+clocks (which makes sense).
 
 Thanks,
 Sekhar
