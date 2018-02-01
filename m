@@ -1,142 +1,65 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 1 Feb 2018 12:57:52 -0600
-Subject: [PATCH v6 02/41] clk: davinci: New driver for davinci PLL clocks
-In-Reply-To: <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
+Date: Thu, 1 Feb 2018 13:04:03 -0600
+Subject: [PATCH v6 04/41] clk: davinci: Add platform information for TI
+ DA850 PLL
+In-Reply-To: <834cb7ce-9406-a806-3ec1-a59766bd8a9d@ti.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-3-git-send-email-david@lechnology.com>
- <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
-Message-ID: <3ed91881-8753-a541-31aa-c835329141b3@lechnology.com>
+ <1516468460-4908-5-git-send-email-david@lechnology.com>
+ <834cb7ce-9406-a806-3ec1-a59766bd8a9d@ti.com>
+Message-ID: <6f0146e4-72bc-7bc2-2135-44950949cd77@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2018 02:01 AM, Sekhar Nori wrote:
+On 02/01/2018 02:58 AM, Sekhar Nori wrote:
 > On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
->> This adds a new driver for mach-davinci PLL clocks. This is porting the
->> code from arch/arm/mach-davinci/clock.c to the common clock framework.
->> Additionally, it adds device tree support for these clocks.
->>
->> The ifeq ($(CONFIG_COMMON_CLK), y) in the Makefile is needed to prevent
->> compile errors until the clock code in arch/arm/mach-davinci is removed.
->>
->> Note: although there are similar clocks for TI Keystone we are not able
->> to share the code for a few reasons. The keystone clocks are device tree
->> only and use legacy one-node-per-clock bindings. Also the register
->> layouts are a bit different, which would add even more if/else mess
->> to the keystone clocks. And the keystone PLL driver doesn't support
->> setting clock rates.
+>> This adds platform-specific declarations for the PLL clocks on TI DA850/
+>> OMAP-L138/AM18XX SoCs.
 >>
 >> Signed-off-by: David Lechner <david@lechnology.com>
 > 
-> Looks nice and clean to me. There is still some feedback though.
+>> +static const struct davinci_pll_clk_info da850_pll1_info __initconst = {
+>> +	.name = "pll1",
+>> +	.unlock_reg = CFGCHIP(3),
+>> +	.unlock_mask = CFGCHIP3_PLL1_MASTER_LOCK,
 > 
-> One thing missing is DIV4.5 clock. It will be nice to add that too,
-> mostly just because it will make the binding complete.
+> I guess this will change with the cfgchip handling discussion last week.
+
+Actually no, there really weren't any changes to the clock drivers because
+of this change. Only a small change in mach-davinci.
+
 > 
->> +void of_davinci_pll_init(struct device_node *node,
->> +			 const struct davinci_pll_clk_info *info,
->> +			 const struct davinci_pll_obsclk_info *obsclk_info,
->> +			 const struct davinci_pll_sysclk_info *div_info,
->> +			 u8 max_sysclk_id)
+>> +	.pllm_mask = GENMASK(4, 0),
+>> +	.pllm_min = 4,
+>> +	.pllm_max = 32,
+>> +	.pllout_min_rate = 300000000,
+>> +	.pllout_max_rate = 600000000,
+>> +	.flags = PLL_HAS_POSTDIV,
+>> +};
+>> +
+> 
+> [...]
+> 
+>> +void __init da850_pll_clk_init(void __iomem *pll0, void __iomem *pll1)
 >> +{
->> +	struct device_node *child;
->> +	const char *parent_name;
->> +	void __iomem *base;
->> +	struct clk *clk;
+>> +	const struct davinci_pll_sysclk_info *info;
 >> +
->> +	base = of_iomap(node, 0);
->> +	if (!base) {
->> +		pr_err("ioremap failed");
->> +		return;
->> +	}
+>> +	davinci_pll_clk_register(&da850_pll0_info, "ref_clk", pll0);
 >> +
->> +	if (info->flags & PLL_HAS_OSCIN)
->> +		parent_name = of_clk_get_parent_name(node, 0);
->> +	else
->> +		parent_name = OSCIN_CLK_NAME;
+>> +	davinci_pll_auxclk_register("pll0_auxclk", pll0);
+>> +
+>> +	for (info = da850_pll0_sysclk_info; info->name; info++)
+>> +		davinci_pll_sysclk_register(info, pll0);
+>> +
+>> +	davinci_pll_obsclk_register(&da850_pll0_obsclk_info, pll0);
+>> +
+>> +	davinci_pll_clk_register(&da850_pll1_info, "oscin", pll1);
 > 
-> I don't think the reference clock input handling is fully correct/flexible.
+> Both PLL0 and PLL1 use the same reference clock. So this should be
+> "ref_clk". I dont think we ever need to register a clock called oscin
+> along with "ref_clk". There is only one reference clock. It can either
+> be obtained using internal oscillator or external oscillator.
 > 
-> There are two ways to provide input clock (ref_clk) to PLL. Either use
-> the internal oscillator with a crystal connected between OSCIN and
-> OSCOUT (CLKMODE = 0) or a clean clock input (CLKMODE = 1) connected to
-> OSCIN (OSCOUT disconnected).
-> 
-> This is a board specific decision. On the LogicPD EVM, the former option
-> is used, on the LCDK board, the later.
-> 
-> So, I think what we need is a DT property like
-> "ti,davinci-use-internal-osc" for the PLL. Boards can set or ignore it
-> and you can switch CLKMODE on or off based on that.
-> 
-> Setting CLKMODE = 1 will switch off the internal oscillator (and
-> presumably save power), but it does not act as a mux. This explains why
-> not worrying about setting this correctly in current mainline still works.
-> 
-> I am also not sure if we really need PLL_HAS_OSCIN since all DaVinci
-> SoCs set it anyway.
 
-
-I realize this is a bit confusing. I think that part of this comes from
-the fact that OSCIN is not used consistently in the TRMs. It is used as
-the name of the actual pin on the SoC for connecting an external clock
-signal or crystal. It is also used as an input to CLKMODE where it means
-the output of the internal oscillator rather than the external pin (some
-SoCs show CLKMODE as a mux with OSCIN and CLKIN, but I agree that it is
-not really a mux since OSCIN and CLKIN are the same external pin on the
-SoC - then other SoCs show OSCIN meaning only the external pin here).
-Furthermore, OSCIN is listed as one of the inputs of EXTCLKSRC also as
-one of the inputs of OBSCLK on da850-type SoCs.
-
-So, the option I went with here is that "ref_clk" is the external clock
-connected to the OSCIN pin and that the "oscin" clock is the clock domain
-_after_ CLKMODE. This matches the use of OSCIN in the TRMs where "OSCIN"
-is used as an input for EXTCLKSRC and OBSCLK. Also the fact that the
-external reference clock is sometimes called CLKSRC instead of OSCIN
-influenced the decision go with "oscin" being the internal (to the PLL)
-clock domain.
-
-I think what I should have done, though, is named PLL_HAS_OSCIN as
-PLL_HAS_CLKMODE instead. I think what you are missing here is that
-PLL_HAS_OSCIN (or PLL_HAS_CLKMODE) only means that the PLL _has_
-PLLCTL[CLKMODE]. It does _not_ mean that we set (or clear) PLLCTL[CLKMODE].
-On SoCs with two PLLs, only one of them has the PLLCTL[CLKMODE] bit (and
-therefore the PLL_HAS_OSCIN flag) and the output of this is shared by both
-PLLs, e.g. Figure 7-1. PLLC Structure in the AM1808 TRM (spruh82c). So,
-the clock tree in Linux ends up looking like this:
-
-ref_clk - the external clock - aka CLKSRC
-+-oscin - internal clock domain after CLKMODE - shared by both PLLs
-   +-pll0_extclksrc
-   +-pll0_prediv
-   +-pll0_auxclk
-   +-pll0_obsclk - via the OSCSRC mux
-   +-pll1_pllen
-   +-pll1_pllout
-   +-pll1_obsclk - via the OSCSRC mux
-
-Clocks beyond two levels deep are omitted for brevity.
-
-It should be easy to see the correlation here Figure 7-1 with the
-exception that in Figure 7-1 "OSCIN" has the meaning of "the physical
-pin on the chip" (which Linux calls "ref_clk") and there is no clear
-label in Figure 7-1 of what the clock domain after PLLCTL[CLKMODE] is
-called (which Linux calls "oscin").
-
-Sure, it would work just fine if we left "oscin" out of the picture,
-but it simplifies the driver implementation by having a known "oscin"
-clock that is fully controlled by the clock driver code instead of
-having to pass the user-supplied "ref_clk" around a bunch of places.
-And, we could try to call it something other than "oscin" to try
-to avoid confusion, but then you will just cause confusion in other
-places (which could be less total confusion, so I am open to change
-here).
-
----
-
-Switching topics to CLKMODE and DT...
-
-There is a "ti,clkmode-square-wave" property in the proposed DT bindings
-that does exactly what you have suggested, except the logic is
-reversed. When omitted, it assumes the use of a crystal oscillator.
-I believe this is the most common configuration, which is why I made
-it the default instead of the other way around.
+As per my response to the previous path, this depends on which both
+which SoC and which diagram in the TRM for that SoC you are looking at.
+It works either way.
