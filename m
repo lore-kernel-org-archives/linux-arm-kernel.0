@@ -1,104 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 1 Feb 2018 21:17:25 +0000
-Subject: [PATCH v3 14/18] firmware/psci: Expose SMCCC version through
- psci_ops
-In-Reply-To: <20180201114657.7323-15-marc.zyngier@arm.com>
-References: <20180201114657.7323-1-marc.zyngier@arm.com>
- <20180201114657.7323-15-marc.zyngier@arm.com>
-Message-ID: <CAKv+Gu9Fpmc+Q2iQ-EoJ0TYkzh1nh59XQthuzh9Q9W+66pHSZg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu,  1 Feb 2018 15:32:40 -0600
+Subject: [PATCH RESEND] arm64: dts: cavium: fix PCI bus dtc warnings
+Message-ID: <20180201213240.28862-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2018 at 11:46, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
-> let's do that at boot time, and expose the version of the calling
-> convention as part of the psci_ops structure.
->
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/firmware/psci.c | 19 +++++++++++++++++++
->  include/linux/psci.h    |  6 ++++++
->  2 files changed, 25 insertions(+)
->
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index e9493da2b111..8631906c414c 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -61,6 +61,7 @@ bool psci_tos_resident_on(int cpu)
->
->  struct psci_operations psci_ops = {
->         .conduit = PSCI_CONDUIT_NONE,
-> +       .smccc_version = SMCCC_VERSION_1_0,
->  };
->
->  typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-> @@ -511,6 +512,23 @@ static void __init psci_init_migrate(void)
->         pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
->  }
->
-> +static void __init psci_init_smccc(u32 ver)
-> +{
-> +       int feature;
-> +
-> +       feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
-> +
-> +       if (feature != PSCI_RET_NOT_SUPPORTED) {
-> +               ver = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
-> +               if (ver != ARM_SMCCC_VERSION_1_1)
-> +                       psci_ops.smccc_version = SMCCC_VERSION_1_0;
-> +               else
-> +                       psci_ops.smccc_version = SMCCC_VERSION_1_1;
-> +       }
-> +
-> +       pr_info("SMC Calling Convention v1.%d\n", psci_ops.smccc_version);
+dtc recently added PCI bus checks. Fix these warnings:
 
-This is a bit nasty: you are returning the numeric value of the enum
-as the minor number, and hardcoding the major version number as 1,
-while the return value of ARM_SMCCC_VERSION_FUNC_ID gives you the
-exact numbers. I assume nobody is expecting SMCCC v2.3 anytime soon,
-but it would still be a lot nicer to simply decode the value of 'ver'
-(and make it default to ARM_SMCCC_VERSION_1_0 if the PSCI feature call
-fails)
+arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (pci_bridge): Node /pci missing bus-range for PCI bridge
+arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (unit_address_vs_reg): Node /pci has a reg or ranges property, but no unit name
 
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Jayachandran C <jnair@caviumnetworks.com>
+---
+Arnd, Olof,
 
-> +}
-> +
->  static void __init psci_0_2_set_functions(void)
->  {
->         pr_info("Using standard PSCI v0.2 function IDs\n");
-> @@ -559,6 +577,7 @@ static int __init psci_probe(void)
->         psci_init_migrate();
->
->         if (PSCI_VERSION_MAJOR(ver) >= 1) {
-> +               psci_init_smccc(ver);
->                 psci_init_cpu_suspend();
->                 psci_init_system_suspend();
->         }
-> diff --git a/include/linux/psci.h b/include/linux/psci.h
-> index f2679e5faa4f..8b1b3b5935ab 100644
-> --- a/include/linux/psci.h
-> +++ b/include/linux/psci.h
-> @@ -31,6 +31,11 @@ enum psci_conduit {
->         PSCI_CONDUIT_HVC,
->  };
->
-> +enum smccc_version {
-> +       SMCCC_VERSION_1_0,
-> +       SMCCC_VERSION_1_1,
-> +};
-> +
->  struct psci_operations {
->         u32 (*get_version)(void);
->         int (*cpu_suspend)(u32 state, unsigned long entry_point);
-> @@ -41,6 +46,7 @@ struct psci_operations {
->                         unsigned long lowest_affinity_level);
->         int (*migrate_info_type)(void);
->         enum psci_conduit conduit;
-> +       enum smccc_version smccc_version;
->  };
->
->  extern struct psci_operations psci_ops;
-> --
-> 2.14.2
->
+Going thru my backlog of patches and found this one never made it 
+upstream. Please apply.
+
+Rob
+
+ arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
+index 4220fbdcb24a..ff5c4c47b22b 100644
+--- a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
++++ b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
+@@ -98,7 +98,7 @@
+ 		clock-output-names = "clk125mhz";
+ 	};
+ 
+-	pci {
++	pcie at 30000000 {
+ 		compatible = "pci-host-ecam-generic";
+ 		device_type = "pci";
+ 		#interrupt-cells = <1>;
+@@ -118,6 +118,7 @@
+ 		ranges =
+ 		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
+ 		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
++		bus-range = <0 0xff>;
+ 		interrupt-map-mask = <0 0 0 7>;
+ 		interrupt-map =
+ 		      /* addr  pin  ic   icaddr  icintr */
+-- 
+2.14.1
