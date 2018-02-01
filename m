@@ -1,55 +1,130 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 1 Feb 2018 12:04:14 +0100
-Subject: [PATCH] soc: mediatek: Handle return of of_match_device function
-In-Reply-To: <1517482822-28758-1-git-send-email-himanshujha199640@gmail.com>
-References: <1517482822-28758-1-git-send-email-himanshujha199640@gmail.com>
-Message-ID: <CAMuHMdVzDpWdc-qav2Y0_p8m6u_jdmjtZ37B4-V7k2vuFTTRVA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  1 Feb 2018 11:07:36 +0000
+Subject: [PATCH v4 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <20180201110738.5421-1-marc.zyngier@arm.com>
+References: <20180201110738.5421-1-marc.zyngier@arm.com>
+Message-ID: <20180201110738.5421-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Himanshu,
+In order to avoid aliasing attacks against the branch predictor,
+Cortex-A15 require to invalidate the BTB when switching
+from one user context to another. The only way to do so on this
+CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+mode.
 
-On Thu, Feb 1, 2018 at 12:00 PM, Himanshu Jha
-<himanshujha199640@gmail.com> wrote:
-> In scpsys_probe function, return value of of_match_device function which
-> returns null is dereferenced without checking. Therefore, add a check for
-> potential null dereference.
->
-> Detected by CoverityScan, CID#1424087 "Dereference null return value"
->
-> Fixes: commit 53fddb1a66dd ("soc: mediatek: reduce code duplication of scpsys_probe across all SoCs")
-> Signed-off-by: Himanshu Jha <himanshujha199640@gmail.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
+ arch/arm/mm/proc-v7-3level.S | 10 ++++++++++
+ arch/arm/mm/proc-v7.S        | 23 ++++++++++++++++++++++-
+ 3 files changed, 42 insertions(+), 1 deletion(-)
 
-This is a false positive: as this is a pure-OF driver, scpsys_probe()
-is called if
-and only if a match was found in of_scpsys_match_tbl[].
-
-> ---
->  drivers/soc/mediatek/mtk-scpsys.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index 435ce5e..6e7f196 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -981,6 +981,9 @@ static int scpsys_probe(struct platform_device *pdev)
->         int i, ret;
->
->         match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
-> +       if (!match)
-> +               return -EINVAL;
-> +
->         soc = (const struct scp_soc_data *)match->data;
->
->         scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 0422e58b74e8..6d81ed7b2cb0 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -40,7 +40,16 @@
+  *	Note that we always need to flush BTAC/BTB if IBE is set
+  *	even on Cortex-A8 revisions not affected by 430973.
+  *	If IBE is not set, the flush BTAC/BTB won't do anything.
++ *
++ *	Cortex-A15 requires ACTLR[0] to be set from secure in order
++ *	for the icache invalidation to also invalidate the BTB.
+  */
++ENTRY(cpu_v7_icinv_switch_mm)
++#ifdef CONFIG_MMU
++	mcr	p15, 0, r0, c7, c5, 0		@ ICIALLU
++	/* Fall through to switch_mm... */
++#endif
++
+ ENTRY(cpu_v7_btbinv_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mov	r2, #0
+@@ -67,6 +76,7 @@ ENTRY(cpu_v7_switch_mm)
+ 	bx	lr
+ ENDPROC(cpu_v7_switch_mm)
+ ENDPROC(cpu_v7_btbinv_switch_mm)
++ENDPROC(cpu_v7_icinv_switch_mm)
+ 
+ /*
+  *	cpu_v7_set_pte_ext(ptep, pte)
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index c616afd1b8f4..797053980755 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -54,6 +54,15 @@
+  * Set the translation table base pointer to be pgd_phys (physical address of
+  * the new TTB).
+  */
++ENTRY(cpu_v7_icinv_switch_mm)
++#ifdef CONFIG_MMU
++	/*
++	 * Cortex-A15 requires ACTLR[0] to be set from secure in order
++	 * for the icache invalidation to also invalidate the BTB.
++	 */
++	mcr	p15, 0, r0, c7, c5, 0		@ ICIALLU
++	/* Fall through to switch_mm... */
++#endif
+ ENTRY(cpu_v7_btbinv_switch_mm)
+ #ifdef CONFIG_MMU
+ 	mcr	p15, 0, r0, c7, c5, 6			@ flush BTAC/BTB
+@@ -69,6 +78,7 @@ ENTRY(cpu_v7_switch_mm)
+ 	ret	lr
+ ENDPROC(cpu_v7_switch_mm)
+ ENDPROC(cpu_v7_btbinv_switch_mm)
++ENDPROC(cpu_v7_icinv_switch_mm)
+ 
+ #ifdef __ARMEB__
+ #define rl r3
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 389a7c442058..ba13e4e45c3b 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -232,6 +232,26 @@ ENDPROC(cpu_ca9mp_do_resume)
+ 	globl_equ	cpu_ca17_do_resume,	cpu_v7_do_resume
+ #endif
+ 
++/*
++ * Cortex-A15
++ */
++	globl_equ	cpu_ca15_proc_init,	cpu_v7_proc_init
++	globl_equ	cpu_ca15_proc_fin,	cpu_v7_proc_fin
++	globl_equ	cpu_ca15_reset,		cpu_v7_reset
++	globl_equ	cpu_ca15_do_idle,	cpu_v7_do_idle
++	globl_equ	cpu_ca15_dcache_clean_area, cpu_v7_dcache_clean_area
++	globl_equ	cpu_ca15_set_pte_ext,	cpu_v7_set_pte_ext
++	globl_equ	cpu_ca15_suspend_size,	cpu_v7_suspend_size
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	globl_equ	cpu_ca15_switch_mm,	cpu_v7_icinv_switch_mm
++#else
++	globl_equ	cpu_ca15_switch_mm,	cpu_v7_switch_mm
++#endif
++#ifdef CONFIG_ARM_CPU_SUSPEND
++	globl_equ	cpu_ca15_do_suspend,	cpu_v7_do_suspend
++	globl_equ	cpu_ca15_do_resume,	cpu_v7_do_resume
++#endif
++
+ #ifdef CONFIG_CPU_PJ4B
+ 	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
+ 	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
+@@ -573,6 +593,7 @@ __v7_setup_stack:
+ 
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+ 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions ca15, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ 	define_processor_functions ca17, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+ #ifndef CONFIG_ARM_LPAE
+ 	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
+@@ -694,7 +715,7 @@ __v7_ca12mp_proc_info:
+ __v7_ca15mp_proc_info:
+ 	.long	0x410fc0f0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup
++	__v7_proc __v7_ca15mp_proc_info, __v7_ca15mp_setup, proc_fns = ca15_processor_functions
+ 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+ 
+ 	/*
+-- 
+2.14.2
