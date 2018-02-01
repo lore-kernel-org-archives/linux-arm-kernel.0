@@ -1,159 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Feb 2018 11:46:56 +0000
-Subject: [PATCH v3 17/18] arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening
- support
-In-Reply-To: <20180201114657.7323-1-marc.zyngier@arm.com>
-References: <20180201114657.7323-1-marc.zyngier@arm.com>
-Message-ID: <20180201114657.7323-18-marc.zyngier@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 1 Feb 2018 17:25:35 +0530
+Subject: [PATCH v6 14/41] clk: davinci: Add platform information for TI
+ DM365 PSC
+In-Reply-To: <1516468460-4908-15-git-send-email-david@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-15-git-send-email-david@lechnology.com>
+Message-ID: <9da9db42-a43a-0627-6b9f-b63c6da187a1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the detection and runtime code for ARM_SMCCC_ARCH_WORKAROUND_1.
-It is lovely. Really.
+On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
+> This adds platform-specific declarations for the PSC clocks on TI
+> DM365 based systems.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/bpi.S        | 20 +++++++++++++
- arch/arm64/kernel/cpu_errata.c | 68 +++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 87 insertions(+), 1 deletion(-)
+Apart from comment given on 13/41 that applies here:
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index 76225c2611ea..fdeed629f2c6 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <linux/arm-smccc.h>
- 
- .macro ventry target
- 	.rept 31
-@@ -85,3 +86,22 @@ ENTRY(__qcom_hyp_sanitize_link_stack_start)
- 	.endr
- 	ldp	x29, x30, [sp], #16
- ENTRY(__qcom_hyp_sanitize_link_stack_end)
-+
-+.macro smccc_workaround_1 inst
-+	sub	sp, sp, #(8 * 4)
-+	stp	x2, x3, [sp, #(8 * 0)]
-+	stp	x0, x1, [sp, #(8 * 2)]
-+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	\inst	#0
-+	ldp	x2, x3, [sp, #(8 * 0)]
-+	ldp	x0, x1, [sp, #(8 * 2)]
-+	add	sp, sp, #(8 * 4)
-+.endm
-+
-+ENTRY(__smccc_workaround_1_smc_start)
-+	smccc_workaround_1	smc
-+ENTRY(__smccc_workaround_1_smc_end)
-+
-+ENTRY(__smccc_workaround_1_hvc_start)
-+	smccc_workaround_1	hvc
-+ENTRY(__smccc_workaround_1_hvc_end)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index ed6881882231..9e77809a3b23 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -70,6 +70,10 @@ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
- extern char __qcom_hyp_sanitize_link_stack_start[];
- extern char __qcom_hyp_sanitize_link_stack_end[];
-+extern char __smccc_workaround_1_smc_start[];
-+extern char __smccc_workaround_1_smc_end[];
-+extern char __smccc_workaround_1_hvc_start[];
-+extern char __smccc_workaround_1_hvc_end[];
- 
- static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 				const char *hyp_vecs_end)
-@@ -116,6 +120,10 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- #define __psci_hyp_bp_inval_end			NULL
- #define __qcom_hyp_sanitize_link_stack_start	NULL
- #define __qcom_hyp_sanitize_link_stack_end	NULL
-+#define __smccc_workaround_1_smc_start		NULL
-+#define __smccc_workaround_1_smc_end		NULL
-+#define __smccc_workaround_1_hvc_start		NULL
-+#define __smccc_workaround_1_hvc_end		NULL
- 
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
-@@ -142,17 +150,75 @@ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
- 	__install_bp_hardening_cb(fn, hyp_vecs_start, hyp_vecs_end);
- }
- 
-+#include <uapi/linux/psci.h>
-+#include <linux/arm-smccc.h>
- #include <linux/psci.h>
- 
-+static void call_smc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
-+static void call_hvc_arch_workaround_1(void)
-+{
-+	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
-+}
-+
-+static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-+{
-+	bp_hardening_cb_t cb;
-+	void *smccc_start, *smccc_end;
-+	struct arm_smccc_res res;
-+
-+	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
-+		return false;
-+
-+	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
-+		return false;
-+
-+	switch (psci_ops.conduit) {
-+	case PSCI_CONDUIT_HVC:
-+		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+		if (res.a0)
-+			return false;
-+		cb = call_hvc_arch_workaround_1;
-+		smccc_start = __smccc_workaround_1_hvc_start;
-+		smccc_end = __smccc_workaround_1_hvc_end;
-+		break;
-+
-+	case PSCI_CONDUIT_SMC:
-+		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+		if (res.a0)
-+			return false;
-+		cb = call_smc_arch_workaround_1;
-+		smccc_start = __smccc_workaround_1_smc_start;
-+		smccc_end = __smccc_workaround_1_smc_end;
-+		break;
-+
-+	default:
-+		return false;
-+	}
-+
-+	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
-+
-+	return true;
-+}
-+
- static int enable_psci_bp_hardening(void *data)
- {
- 	const struct arm64_cpu_capabilities *entry = data;
- 
--	if (psci_ops.get_version)
-+	if (psci_ops.get_version) {
-+		if (check_smccc_arch_workaround_1(entry))
-+			return 0;
-+
- 		install_bp_hardening_cb(entry,
- 				       (bp_hardening_cb_t)psci_ops.get_version,
- 				       __psci_hyp_bp_inval_start,
- 				       __psci_hyp_bp_inval_end);
-+	}
- 
- 	return 0;
- }
--- 
-2.14.2
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
