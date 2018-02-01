@@ -1,57 +1,51 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 1 Feb 2018 14:28:57 +0530
-Subject: [PATCH v6 04/41] clk: davinci: Add platform information for TI
- DA850 PLL
-In-Reply-To: <1516468460-4908-5-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-5-git-send-email-david@lechnology.com>
-Message-ID: <834cb7ce-9406-a806-3ec1-a59766bd8a9d@ti.com>
+From: florian.vaussard@gmail.com (Florian Vaussard)
+Date: Thu, 1 Feb 2018 10:03:11 +0100
+Subject: Patch submission process about at91 DTS
+In-Reply-To: <20180131170453.GA16869@tp.shaiton.org>
+References: <20180131170453.GA16869@tp.shaiton.org>
+Message-ID: <1337f0d7-c112-e9db-6677-cbd2c58b1b06@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
-> This adds platform-specific declarations for the PLL clocks on TI DA850/
-> OMAP-L138/AM18XX SoCs.
+Hi K?vin,
+
+Le 31. 01. 18 ? 18:04, K?vin Raymond a ?crit?:
+> Hi there,
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> We have several at91-kizbox* DTSs and I have few patches to suggest.
+> The idea is to split one dts over dtsi + several dts.
+> 
+> My current patches are based an tested over the linux repo[0] against the
+> master branch (4e19652 Update the RISC-V MAINTAINERS file).
+> 
+> Should I rebase them against the linux-at91[1] repository? Which branch,
+> at91-next? I would love them to reach the 4.14 branch but am not sure of
+> the right path to submit those changes.
+> 
 
-> +static const struct davinci_pll_clk_info da850_pll1_info __initconst = {
-> +	.name = "pll1",
-> +	.unlock_reg = CFGCHIP(3),
-> +	.unlock_mask = CFGCHIP3_PLL1_MASTER_LOCK,
+Linux 4.14 is already out, so only patches for a stable release can be
+backported. See in Documentation/process/stable-kernel-rules.rst for the
+rules. I guess that your patches do not apply for stable. So your patches
+will be applied to a latter release (4.16 if you are lucky as the merge window
+is now opened but most probably 4.17+).
 
-I guess this will change with the cfgchip handling discussion last week.
+For the submission process itself, please read Documentation/process/* and
+especially "5.Posting.rst" and "submitting-patches.rst". There is also a
+documentation specific to DT patches in Documentation/devicetree/bindings/
+submitting-patches.txt.
 
-> +	.pllm_mask = GENMASK(4, 0),
-> +	.pllm_min = 4,
-> +	.pllm_max = 32,
-> +	.pllout_min_rate = 300000000,
-> +	.pllout_max_rate = 600000000,
-> +	.flags = PLL_HAS_POSTDIV,
-> +};
-> +
+TL;DR look into the MAINTAINERS file or use ./scripts/get_maintainer.pl.
+For your AT91 patches, you should CC the maintainers:
 
-[...]
+- Nicolas Ferre <nicolas.ferre@microchip.com>
+- Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-> +void __init da850_pll_clk_init(void __iomem *pll0, void __iomem *pll1)
-> +{
-> +	const struct davinci_pll_sysclk_info *info;
-> +
-> +	davinci_pll_clk_register(&da850_pll0_info, "ref_clk", pll0);
-> +
-> +	davinci_pll_auxclk_register("pll0_auxclk", pll0);
-> +
-> +	for (info = da850_pll0_sysclk_info; info->name; info++)
-> +		davinci_pll_sysclk_register(info, pll0);
-> +
-> +	davinci_pll_obsclk_register(&da850_pll0_obsclk_info, pll0);
-> +
-> +	davinci_pll_clk_register(&da850_pll1_info, "oscin", pll1);
+You should also CC the DT mainling list.
 
-Both PLL0 and PLL1 use the same reference clock. So this should be
-"ref_clk". I dont think we ever need to register a clock called oscin
-along with "ref_clk". There is only one reference clock. It can either
-be obtained using internal oscillator or external oscillator.
+Finally the AT91 Git tree is here [1]. Use that unless told differently by the
+maintainers.
 
-Thanks,
-Sekhar
+Best,
+Florian
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
