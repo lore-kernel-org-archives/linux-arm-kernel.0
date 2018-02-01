@@ -1,68 +1,52 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Feb 2018 11:46:51 +0000
-Subject: [PATCH v3 12/18] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+Date: Thu,  1 Feb 2018 11:46:54 +0000
+Subject: [PATCH v3 15/18] arm/arm64: smccc: Make function identifiers an
+ unsigned quantity
 In-Reply-To: <20180201114657.7323-1-marc.zyngier@arm.com>
 References: <20180201114657.7323-1-marc.zyngier@arm.com>
-Message-ID: <20180201114657.7323-13-marc.zyngier@arm.com>
+Message-ID: <20180201114657.7323-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
-So let's intercept it as early as we can by testing for the
-function call number as soon as we've identified a HVC call
-coming from the guest.
+Function identifiers are a 32bit, unsigned quantity. But we never
+tell so to the compiler, resulting in the following:
 
+ 4ac:   b26187e0        mov     x0, #0xffffffff80000001
+
+We thus rely on the firmware narrowing it for us, which is not
+always a reasonable expectation.
+
+Cc: stable at vger.kernel.org
+Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ include/linux/arm-smccc.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index e4f37b9dd47c..f36464bd57c5 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index e1ef944ef1da..dd44d8458c04 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -14,14 +14,16 @@
+ #ifndef __LINUX_ARM_SMCCC_H
+ #define __LINUX_ARM_SMCCC_H
+ 
++#include <uapi/linux/const.h>
++
+ /*
+  * This file provides common defines for ARM SMC Calling Convention as
+  * specified in
+  * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
   */
  
-+#include <linux/arm-smccc.h>
- #include <linux/linkage.h>
+-#define ARM_SMCCC_STD_CALL		0
+-#define ARM_SMCCC_FAST_CALL		1
++#define ARM_SMCCC_STD_CALL	        _AC(0,U)
++#define ARM_SMCCC_FAST_CALL	        _AC(1,U)
+ #define ARM_SMCCC_TYPE_SHIFT		31
  
- #include <asm/alternative.h>
-@@ -64,10 +65,11 @@ alternative_endif
- 	lsr	x0, x1, #ESR_ELx_EC_SHIFT
- 
- 	cmp	x0, #ESR_ELx_EC_HVC64
-+	ccmp	x0, #ESR_ELx_EC_HVC32, #4, ne
- 	b.ne	el1_trap
- 
--	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
--	cbnz	x1, el1_trap		// called HVC
-+	mrs	x1, vttbr_el2		// If vttbr is valid, the guest
-+	cbnz	x1, el1_hvc_guest	// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
- 	ldp	x0, x1, [sp], #16
-@@ -100,6 +102,20 @@ alternative_endif
- 
- 	eret
- 
-+el1_hvc_guest:
-+	/*
-+	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
-+	 * The workaround has already been applied on the host,
-+	 * so let's quickly get back to the guest. We don't bother
-+	 * restoring x1, as it can be clobbered anyway.
-+	 */
-+	ldr	x1, [sp]				// Guest's x0
-+	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
-+	cbnz	w1, el1_trap
-+	mov	x0, x1
-+	add	sp, sp, #16
-+	eret
-+
- el1_trap:
- 	/*
- 	 * x0: ESR_EC
+ #define ARM_SMCCC_SMC_32		0
 -- 
 2.14.2
