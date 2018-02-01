@@ -1,174 +1,92 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Feb 2018 11:07:33 +0000
-Subject: [PATCH v4 1/6] arm: Add BTB invalidation on switch_mm for Cortex-A9,
- A12 and A17
-In-Reply-To: <20180201110738.5421-1-marc.zyngier@arm.com>
-References: <20180201110738.5421-1-marc.zyngier@arm.com>
-Message-ID: <20180201110738.5421-2-marc.zyngier@arm.com>
+Date: Thu,  1 Feb 2018 11:07:32 +0000
+Subject: [PATCH v4 0/6] 32bit ARM branch predictor hardening
+Message-ID: <20180201110738.5421-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid aliasing attacks against the branch predictor,
-some implementations require to invalidate the BTB when switching
-from one user context to another.
+This small series implements some basic BP hardening by invalidating
+the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
+attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
+32bit kernels that run on 64bit capable CPUs. This series doesn't
+mitigate Spectre variant 1 either.
 
-For this, we reuse the existing implementation for Cortex-A8, and
-apply it to A9, A12 and A17.
+These patches are closely modelled against what we do on arm64,
+although simpler as we can rely on an architected instruction to
+perform the invalidation. The notable exception is Cortex-A15, where
+BTB invalidation behaves like a NOP, and the only way to shoot the
+predictor down is to invalidate the icache *and* to have ACTLR[0] set
+to 1 (which is a secure-only operation).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mm/Kconfig          | 17 +++++++++++++++++
- arch/arm/mm/proc-v7-2level.S |  4 ++--
- arch/arm/mm/proc-v7-3level.S |  5 +++++
- arch/arm/mm/proc-v7.S        | 30 ++++++++++++++++++++++++++++--
- 4 files changed, 52 insertions(+), 4 deletions(-)
+The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
+generalises it to be used on all affected CPUs. The second perform the
+same invalidation on prefetch abort outside of the userspace
+range. The third one nukes it on guest exit, and results in some major
+surgery as we cannot take a branch from the vectors (that, and Thumb2
+being a massive pain).
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index fd9077a74fce..4b50b36dec55 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1092,3 +1092,20 @@ config DEBUG_ALIGN_RODATA
- 	  additional section-aligned split of rodata from kernel text so it
- 	  can be made explicitly non-executable. This padding may waste memory
- 	  space to gain the additional protection.
-+
-+config HARDEN_BRANCH_PREDICTOR
-+	bool "Harden the branch predictor against aliasing attacks" if EXPERT
-+	default y
-+	help
-+	  Speculation attacks against some high-performance processors rely on
-+	  being able to manipulate the branch predictor for a victim context by
-+	  executing aliasing branches in the attacker context.  Such attacks
-+	  can be partially mitigated against by clearing internal branch
-+	  predictor state and limiting the prediction logic in some situations.
-+
-+	  This config option will take CPU-specific actions to harden the
-+	  branch predictor against aliasing attacks and may rely on specific
-+	  instruction sequences or control bits being set by the system
-+	  firmware.
-+
-+	  If unsure, say Y.
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index c6141a5435c3..0422e58b74e8 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -41,7 +41,7 @@
-  *	even on Cortex-A8 revisions not affected by 430973.
-  *	If IBE is not set, the flush BTAC/BTB won't do anything.
-  */
--ENTRY(cpu_ca8_switch_mm)
-+ENTRY(cpu_v7_btbinv_switch_mm)
- #ifdef CONFIG_MMU
- 	mov	r2, #0
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
-@@ -66,7 +66,7 @@ ENTRY(cpu_v7_switch_mm)
- #endif
- 	bx	lr
- ENDPROC(cpu_v7_switch_mm)
--ENDPROC(cpu_ca8_switch_mm)
-+ENDPROC(cpu_v7_btbinv_switch_mm)
- 
- /*
-  *	cpu_v7_set_pte_ext(ptep, pte)
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 7d16bbc4102b..c616afd1b8f4 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -54,6 +54,10 @@
-  * Set the translation table base pointer to be pgd_phys (physical address of
-  * the new TTB).
-  */
-+ENTRY(cpu_v7_btbinv_switch_mm)
-+#ifdef CONFIG_MMU
-+	mcr	p15, 0, r0, c7, c5, 6			@ flush BTAC/BTB
-+#endif
- ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_MMU
- 	mmid	r2, r2
-@@ -64,6 +68,7 @@ ENTRY(cpu_v7_switch_mm)
- #endif
- 	ret	lr
- ENDPROC(cpu_v7_switch_mm)
-+ENDPROC(cpu_v7_btbinv_switch_mm)
- 
- #ifdef __ARMEB__
- #define rl r3
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 01d64c0b2563..389a7c442058 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -168,6 +168,7 @@ ENDPROC(cpu_v7_do_resume)
- 	globl_equ	cpu_ca8_dcache_clean_area, cpu_v7_dcache_clean_area
- 	globl_equ	cpu_ca8_set_pte_ext,	cpu_v7_set_pte_ext
- 	globl_equ	cpu_ca8_suspend_size,	cpu_v7_suspend_size
-+	globl_equ	cpu_ca8_switch_mm,	cpu_v7_btbinv_switch_mm
- #ifdef CONFIG_ARM_CPU_SUSPEND
- 	globl_equ	cpu_ca8_do_suspend,	cpu_v7_do_suspend
- 	globl_equ	cpu_ca8_do_resume,	cpu_v7_do_resume
-@@ -181,7 +182,11 @@ ENDPROC(cpu_v7_do_resume)
- 	globl_equ	cpu_ca9mp_reset,	cpu_v7_reset
- 	globl_equ	cpu_ca9mp_do_idle,	cpu_v7_do_idle
- 	globl_equ	cpu_ca9mp_dcache_clean_area, cpu_v7_dcache_clean_area
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_btbinv_switch_mm
-+#else
- 	globl_equ	cpu_ca9mp_switch_mm,	cpu_v7_switch_mm
-+#endif
- 	globl_equ	cpu_ca9mp_set_pte_ext,	cpu_v7_set_pte_ext
- .globl	cpu_ca9mp_suspend_size
- .equ	cpu_ca9mp_suspend_size, cpu_v7_suspend_size + 4 * 2
-@@ -207,6 +212,26 @@ ENTRY(cpu_ca9mp_do_resume)
- ENDPROC(cpu_ca9mp_do_resume)
- #endif
- 
-+/*
-+ * Cortex-A12/A17
-+ */
-+	globl_equ	cpu_ca17_proc_init,	cpu_v7_proc_init
-+	globl_equ	cpu_ca17_proc_fin,	cpu_v7_proc_fin
-+	globl_equ	cpu_ca17_reset,		cpu_v7_reset
-+	globl_equ	cpu_ca17_do_idle,	cpu_v7_do_idle
-+	globl_equ	cpu_ca17_dcache_clean_area, cpu_v7_dcache_clean_area
-+	globl_equ	cpu_ca17_set_pte_ext,	cpu_v7_set_pte_ext
-+	globl_equ	cpu_ca17_suspend_size,	cpu_v7_suspend_size
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	globl_equ	cpu_ca17_switch_mm,	cpu_v7_btbinv_switch_mm
-+#else
-+	globl_equ	cpu_ca17_switch_mm,	cpu_v7_switch_mm
-+#endif
-+#ifdef CONFIG_ARM_CPU_SUSPEND
-+	globl_equ	cpu_ca17_do_suspend,	cpu_v7_do_suspend
-+	globl_equ	cpu_ca17_do_resume,	cpu_v7_do_resume
-+#endif
-+
- #ifdef CONFIG_CPU_PJ4B
- 	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
- 	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
-@@ -548,6 +573,7 @@ __v7_setup_stack:
- 
- 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
- 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+	define_processor_functions ca17, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
- #ifndef CONFIG_ARM_LPAE
- 	define_processor_functions ca8, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
- 	define_processor_functions ca9mp, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-@@ -658,7 +684,7 @@ __v7_ca7mp_proc_info:
- __v7_ca12mp_proc_info:
- 	.long	0x410fc0d0
- 	.long	0xff0ffff0
--	__v7_proc __v7_ca12mp_proc_info, __v7_ca12mp_setup
-+	__v7_proc __v7_ca12mp_proc_info, __v7_ca12mp_setup, proc_fns = ca17_processor_functions
- 	.size	__v7_ca12mp_proc_info, . - __v7_ca12mp_proc_info
- 
- 	/*
-@@ -688,7 +714,7 @@ __v7_b15mp_proc_info:
- __v7_ca17mp_proc_info:
- 	.long	0x410fc0e0
- 	.long	0xff0ffff0
--	__v7_proc __v7_ca17mp_proc_info, __v7_ca17mp_setup
-+	__v7_proc __v7_ca17mp_proc_info, __v7_ca17mp_setup, proc_fns = ca17_processor_functions
- 	.size	__v7_ca17mp_proc_info, . - __v7_ca17mp_proc_info
- 
- 	/*
+Patches 4 to 6 are doing a similar thing for Cortex-A15, with the
+aforementioned ICIALLU.
+
+To sum up the requirements:
+
+- Cortex-A15 need to have ACTLR.IBE (bit 0) set to 1 from secure
+  mode. Cortex-A8 also needs to have ACTLR.IBE (bit 6) set, overlaping
+  with ARM_ERRATA_430973 which also requires it.
+- Cortex-A9, A12 and A17 do not require any extra configuration.
+
+Note 1: Contrary to the initial version, this new series relies on
+the arm64/kpti branch (I reuse the per-CPU vector hook for KVM).
+
+Note 2: M-class CPUs are not affected and for R-class cores, the
+mitigation doesn't make much sense since we do not enforce user/kernel
+isolation.
+
+[Christoffer: since the patches have significantly changed since v3,
+I've dropped your RB tags]
+
+* From v3:
+  - Added configuration option
+  - Reorganized the proc-v7 code to be neater
+  - Make the Thumb2 KVM madness Thumb2 specific
+  - Cleanups all over
+
+* From v2:
+  - Fixed !MMU build
+  - Small KVM optimisation (suggested by Robin)
+  - Fixed register zeroing in cpu_v7_btbinv_switch_mm (noticed by
+    Andre)
+  
+* From v1:
+  - Fixed broken hyp_fiq vector (noticed by Ard)
+  - Fixed broken BTB invalidation in LPAE switch_mm (reported by Andre)
+  - Revamped invalidation on PABT (noticed by James on arm64,
+    suggested by Will)
+  - Rewrote the whole HYP sequence, as Thumb2 was pretty unhappy about
+    arithmetic with the stack pointer
+
+Marc Zyngier (6):
+  arm: Add BTB invalidation on switch_mm for Cortex-A9, A12 and A17
+  arm: Invalidate BTB on prefetch abort outside of user mapping on
+    Cortex A8, A9, A12 and A17
+  arm: KVM: Invalidate BTB on guest exit for Cortex-A12/A17
+  arm: Add icache invalidation on switch_mm for Cortex-A15
+  arm: Invalidate icache on prefetch abort outside of user mapping on
+    Cortex-A15
+  arm: KVM: Invalidate icache on guest exit for Cortex-A15
+
+ arch/arm/include/asm/cp15.h    |  3 ++
+ arch/arm/include/asm/kvm_asm.h |  2 -
+ arch/arm/include/asm/kvm_mmu.h | 23 +++++++++-
+ arch/arm/kvm/hyp/hyp-entry.S   | 95 +++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mm/Kconfig            | 17 ++++++++
+ arch/arm/mm/fault.c            | 29 +++++++++++++
+ arch/arm/mm/fsr-2level.c       |  4 +-
+ arch/arm/mm/fsr-3level.c       | 69 ++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7-2level.S   | 14 ++++++-
+ arch/arm/mm/proc-v7-3level.S   | 15 +++++++
+ arch/arm/mm/proc-v7.S          | 53 +++++++++++++++++++++--
+ 11 files changed, 312 insertions(+), 12 deletions(-)
+
 -- 
 2.14.2
