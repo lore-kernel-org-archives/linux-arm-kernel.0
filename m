@@ -1,147 +1,53 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Thu, 1 Feb 2018 16:30:36 +0100
-Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
-In-Reply-To: <0214a021-caae-e21f-f99f-74277b889608@tronnes.org>
-References: <20180201130446.6165-1-linus.walleij@linaro.org>
- <20180201131907.GO5453@intel.com>
- <0214a021-caae-e21f-f99f-74277b889608@tronnes.org>
-Message-ID: <27c55fd6-4c8f-101a-aa44-16c7918adb5d@tronnes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Feb 2018 16:36:04 +0100
+Subject: [PATCH v6 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180201152908.mdei742x5k4fye6p@flea.lan>
+References: <CACRpkdan52UB7HOyH1gnHWg4CDke_VQxAdq8cBgwUroibE59Ow@mail.gmail.com>
+ <20180129082533.6edmqgbauo6q5dgz@flea.lan>
+ <CACRpkdYAGwUjr2C-w5U+WuG48pZAOUcnxFjznLbdF6Lmy1uZuQ@mail.gmail.com>
+ <CAK8P3a2HmPOTHAzqBnmim388pcWOE=fG50mG5HJifT=vzKOaTg@mail.gmail.com>
+ <20180130075441.rqxzkwero6sdfak6@flea.lan>
+ <CAK8P3a0QxQE=GM=SGPtT82=UreiqsgY6uMThvQ_woA3rjK0zjA@mail.gmail.com>
+ <20180130095916.GA23047@ulmo> <20180130100150.GB23047@ulmo>
+ <20180131072910.ajp3jc5dmetsjtf2@flea.lan>
+ <CAK8P3a0X2bpLjKE6xKehG1junZoG1N_DjepOBQ+SZetKf6sgfA@mail.gmail.com>
+ <20180201152908.mdei742x5k4fye6p@flea.lan>
+Message-ID: <CAK8P3a2+wH_n6sKNOyzv7sGBuvYX++5ffahfz780WtKr3Bvj=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Den 01.02.2018 16.15, skrev Noralf Tr?nnes:
+On Thu, Feb 1, 2018 at 4:29 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Jan 31, 2018 at 10:37:37AM +0100, Arnd Bergmann wrote:
+>> On Wed, Jan 31, 2018 at 8:29 AM, Maxime Ripard
 >
-> Den 01.02.2018 14.19, skrev Ville Syrj?l?:
->> On Thu, Feb 01, 2018 at 02:04:46PM +0100, Linus Walleij wrote:
->>> The following happened when migrating an old fbdev driver to DRM:
->>>
->>> The Integrator/CP PL111 supports 16BPP but only ARGB1555/ABGR1555
->>> or XRGB1555/XBGR1555 i.e. the maximum depth is 15.
->>>
->>> This makes the initialization of the framebuffer fail since
->>> the code in drm_fb_helper_single_fb_probe() assigns the same value
->>> to sizes.surface_bpp and sizes.surface_depth. I.e. it simply assumes
->>> a 1-to-1 mapping between BPP and depth, which is true in most cases
->>> but typically not for this hardware.
->>>
->>> To support the odd case of a driver supporting 16BPP with only 15
->>> bits of depth, this patch will make the code loop over the formats
->>> supported on the primary plane and cap the depth to the maximum
->>> supported.
->>>
->>> On the PL110 Integrator, this makes drm_mode_legacy_fb_format()
->>> select DRM_FORMAT_XRGB1555 which is acceptable for this driver, and
->>> thus we get framebuffer, penguin and console on the Integrator/CP.
->>>
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> ? drivers/gpu/drm/drm_fb_helper.c | 40 
->>> +++++++++++++++++++++++++++++++++++++++-
->>> ? 1 file changed, 39 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/gpu/drm/drm_fb_helper.c 
->>> b/drivers/gpu/drm/drm_fb_helper.c
->>> index e56166334455..5076f9103740 100644
->>> --- a/drivers/gpu/drm/drm_fb_helper.c
->>> +++ b/drivers/gpu/drm/drm_fb_helper.c
->>> @@ -1720,6 +1720,8 @@ static int 
->>> drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
->>> ????? int i;
->>> ????? struct drm_fb_helper_surface_size sizes;
->>> ????? int gamma_size = 0;
->>> +??? struct drm_plane *plane;
->>> +??? int best_depth = 0;
->>> ? ????? memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
->>> ????? sizes.surface_depth = 24;
->>> @@ -1727,7 +1729,10 @@ static int 
->>> drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
->>> ????? sizes.fb_width = (u32)-1;
->>> ????? sizes.fb_height = (u32)-1;
->>> ? -??? /* if driver picks 8 or 16 by default use that for both 
->>> depth/bpp */
->>> +??? /*
->>> +???? * If driver picks 8 or 16 by default use that for both depth/bpp
->>> +???? * to begin with
->>> +???? */
->>> ????? if (preferred_bpp != sizes.surface_bpp)
->>> ????????? sizes.surface_depth = sizes.surface_bpp = preferred_bpp;
->>> ? @@ -1762,6 +1767,39 @@ static int 
->>> drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
->>> ????????? }
->>> ????? }
->>> ? +??? /*
->>> +???? * If we run into a situation where, for example, the primary 
->>> plane
->>> +???? * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, 
->>> depth
->>> +???? * 16) we need to scale down the depth of the sizes we request.
->>> +???? */
->>> +??? drm_for_each_plane(plane, fb_helper->dev) {
->>> +??????? /* Only check the primary plane */
->>> +??????? if (plane->type != DRM_PLANE_TYPE_PRIMARY)
->>> +??????????? continue;
->> I think this should look at crtc->primary for each of the crtcs managed
->> by the fb_helper.
+>> I can think of a couple of other problems that may or may not be
+>> relevant in the future that would require a more complex solution:
 >>
->> Also this probably shouldn't look at YUV formats at all?
+>> - a device that is a bus master on more than one bus, e.g. a
+>>   DMA engine that can copy between the CPU address space and
+>>   another memory controller that is not visible to the CPU
 >>
->> I do wonder if instead we should just have the driver specify the
->> pixel format explicitly instead of trying to guess based on bpp?
+>> - a device that is connected to main memory both through an IOMMU
+>>   and directly through its parent bus, and the device itself is in
+>>   control over which of the two it uses (usually the IOMMU would
+>>   contol whether a device is bypassing translation)
+>>
+>> - a device that has a single DMA address space with some form
+>>   of non-linear mapping to one or more parent buses. Some of these
+>>   can be expressed using the parent's dma-ranges properties, but
+>>   our code currently only looks at the first entry in dma-ranges.
 >
-> Can drm_mode_config.preferred_depth be used for this? The comment says 
-> that
-> it is used for dumb buffers and drm_mode_create_dumb_ioctl() does this:
-> ??? cpp = DIV_ROUND_UP(args->bpp, 8);
->
-> So it looks like it should be possible to do preferred_depth=15.
->
+> As far as I know, we're in neither of these cases.
 
-Hmm, maybe not. vc4 sets preferred_depth=24, should that be RGB888 or
-XRGB8888? The driver prefers 32bpp, but would end up with 24bpp.
+The point here was more about the general question of where we are
+heading with the complexity of finding the right DMA settings. It's
+already too complicated for anyone to fully understand what is
+going on with DMA masks, offset, coherency etc when we look
+at the existing DT bindings. Adding more complexity makes it
+worse, so if anyone else is in need of a solution for the issues
+above, we should try to accommodate their needs at the same time
+to avoid adding more complexity now and again later on if we
+can come up with a way that works for everyone now.
 
-I'm working on generic fbdev emulation coupled with a in-kernel client
-api, so I'm interested in a solution to this for the client api.
-
-> Noralf.
->
->>> +
->>> +??????? for (i = 0; i < plane->format_count; i++) {
->>> +??????????? const struct drm_format_info *fmt;
->>> +
->>> +??????????? fmt = drm_format_info(plane->format_types[i]);
->>> +??????????? /* We found a perfect fit, great */
->>> +??????????? if (fmt->depth == sizes.surface_depth)
->>> +??????????????? break;
->>> +
->>> +??????????? /* Skip depths above what we're looking for */
->>> +??????????? if (fmt->depth > sizes.surface_depth)
->>> +??????????????? continue;
->>> +
->>> +??????????? /* Best depth found so far */
->>> +??????????? if (fmt->depth > best_depth)
->>> +??????????????? best_depth = fmt->depth;
->>> +??????? }
->>> +??? }
->>> +??? if (sizes.surface_depth != best_depth) {
->>> +??????? DRM_DEBUG("requested bpp %d, scaled depth down to %d",
->>> +????????????? sizes.surface_bpp, best_depth);
->>> +??????? sizes.surface_depth = best_depth;
->>> +??? }
->>> +
->>> ????? crtc_count = 0;
->>> ????? for (i = 0; i < fb_helper->crtc_count; i++) {
->>> ????????? struct drm_display_mode *desired_mode;
->>> -- 
->>> 2.14.3
->>>
->>> _______________________________________________
->>> dri-devel mailing list
->>> dri-devel at lists.freedesktop.org
->>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+     Arnd
