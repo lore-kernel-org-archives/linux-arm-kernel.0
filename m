@@ -1,119 +1,271 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 1 Feb 2018 18:26:19 +0100
-Subject: [PATCH 2/7] arm64: zynqmp: Add support for Xilinx zcu102
-In-Reply-To: <CAL_Jsq+N-_8s0d=jD=fMD4y7e76M=tT0kt2vsH0kbOqs-eQ95w@mail.gmail.com>
+Date: Thu, 1 Feb 2018 18:33:25 +0100
+Subject: [PATCH 1/7] arm64: zynqmp: Add support for Xilinx zcu100-revC
+In-Reply-To: <CAL_JsqKdEdyQP8maUmM39fvsAUcrvf6=_g21aRiaXqyv-ZogBw@mail.gmail.com>
 References: <cover.1516366474.git.michal.simek@xilinx.com>
- <63760114db981535bf22c25be2daf0049f1b9709.1516366474.git.michal.simek@xilinx.com>
- <CAL_Jsq+N-_8s0d=jD=fMD4y7e76M=tT0kt2vsH0kbOqs-eQ95w@mail.gmail.com>
-Message-ID: <8136bf01-9571-2dc2-dcb1-d05b078772a9@xilinx.com>
+ <7dd5614c878adb30e38caf4002921c0ca995329c.1516366474.git.michal.simek@xilinx.com>
+ <CAL_JsqKdEdyQP8maUmM39fvsAUcrvf6=_g21aRiaXqyv-ZogBw@mail.gmail.com>
+Message-ID: <57604f7c-8f0a-13a9-e03a-75b0441bdb98@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1.2.2018 17:46, Rob Herring wrote:
+On 1.2.2018 17:41, Rob Herring wrote:
 > On Fri, Jan 19, 2018 at 6:55 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> This patch is adding revA, revB and rev1.0. There are also other
->> revisions between which should be backward compatible with previous
->> versions. Unfortunately all revs are still in use.
-> 
-> Similar comments to the 1st patch. I won't repeat them here.
-> 
+>> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
+>> port and usbs.
+>> Board is using fixed clocks because clock driver hasn't been merged yet.
 >>
 >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 >> ---
 >>
->>  arch/arm64/boot/dts/xilinx/Makefile                |   3 +
->>  .../arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts |  36 ++
->>  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts  | 556 +++++++++++++++++++++
->>  arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts  |  42 ++
->>  4 files changed, 637 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revB.dts
+>>  arch/arm64/boot/dts/xilinx/Makefile               |   1 +
+>>  arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi        | 213 ++++++++++++++++
+>>  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 298 ++++++++++++++++++++++
+>>  3 files changed, 512 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
+>>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
 >>
 >> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
->> index 7266a6a9c0cd..24e3ce801304 100644
+>> index eba179b23b17..7266a6a9c0cd 100644
 >> --- a/arch/arm64/boot/dts/xilinx/Makefile
 >> +++ b/arch/arm64/boot/dts/xilinx/Makefile
->> @@ -1,3 +1,6 @@
+>> @@ -1,2 +1,3 @@
 >>  # SPDX-License-Identifier: GPL-2.0
 >>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
->>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
->> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revA.dtb
->> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-revB.dtb
->> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu102-rev1.0.dtb
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts
+>> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
+>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
 >> new file mode 100644
->> index 000000000000..4b7477795fbd
+>> index 000000000000..9c09baca7dd7
 >> --- /dev/null
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-rev1.0.dts
->> @@ -0,0 +1,36 @@
+>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
+>> @@ -0,0 +1,213 @@
 >> +// SPDX-License-Identifier: GPL-2.0+
 >> +/*
->> + * dts file for Xilinx ZynqMP ZCU102 Rev1.0
->> + *
->> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
->> + *
->> + * Michal Simek <michal.simek@xilinx.com>
->> + */
->> +
->> +#include "zynqmp-zcu102-revB.dts"
->> +
->> +/ {
->> +       model = "ZynqMP ZCU102 Rev1.0";
->> +       compatible = "xlnx,zynqmp-zcu102-rev1.0", "xlnx,zynqmp-zcu102", "xlnx,zynqmp";
-> 
-> Documented?
-
-What exactly should be documented? All compatible strings?  Or just
-xlnx,zynqmp one?
-
-Some user space libraries are checking this compatible strings and
-changing behavior based on that. That's why I am putting there all of them.
-
-
-
-> 
->> +};
->> +
->> +&eeprom {
->> +       #address-cells = <1>;
->> +       #size-cells = <1>;
->> +
->> +       board_sn: board_sn at 0 {
-> 
-> Use '-' rather than '_' in node and property names.
-
-ok.
-
-> 
->> +               reg = <0x0 0x14>;
->> +       };
->> +
->> +       eth_mac: eth_mac at 20 {
->> +               reg = <0x20 0x6>;
->> +       };
->> +
->> +       board_name: board_name at d0 {
->> +               reg = <0xd0 0x6>;
->> +       };
->> +
->> +       board_revision: board_revision at e0 {
->> +               reg = <0xe0 0x3>;
->> +       };
->> +};
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
->> new file mode 100644
->> index 000000000000..6a15aacf65ef
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts
->> @@ -0,0 +1,556 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + * dts file for Xilinx ZynqMP ZCU102 RevA
+>> + * Clock specification for Xilinx ZynqMP
 >> + *
 >> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
 >> + *
 >> + * Michal Simek <michal.simek@xilinx.com>
+>> + */
+>> +
+>> +/ {
+>> +       clk100: clk100 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <100000000>;
+>> +       };
+>> +
+>> +       clk125: clk125 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <125000000>;
+>> +       };
+>> +
+>> +       clk200: clk200 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <200000000>;
+>> +       };
+>> +
+>> +       clk250: clk250 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <250000000>;
+>> +       };
+>> +
+>> +       clk300: clk300 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <300000000>;
+>> +       };
+>> +
+>> +       clk600: clk600 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <600000000>;
+>> +       };
+>> +
+>> +       dp_aclk: clock0 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <100000000>;
+>> +               clock-accuracy = <100>;
+>> +       };
+>> +
+>> +       dp_aud_clk: clock1 {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0>;
+>> +               clock-frequency = <24576000>;
+>> +               clock-accuracy = <100>;
+>> +       };
+>> +
+>> +       dpdma_clk: dpdma_clk {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0x0>;
+>> +               clock-frequency = <533000000>;
+>> +       };
+>> +
+>> +       drm_clock: drm_clock {
+>> +               compatible = "fixed-clock";
+>> +               #clock-cells = <0x0>;
+>> +               clock-frequency = <262750000>;
+>> +               clock-accuracy = <0x64>;
+>> +       };
+>> +};
+>> +
+>> +&can0 {
+>> +       clocks = <&clk100 &clk100>;
+>> +};
+>> +
+>> +&can1 {
+>> +       clocks = <&clk100 &clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan1 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan2 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan3 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan4 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan5 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan6 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan7 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&fpd_dma_chan8 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan1 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan2 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan3 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan4 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan5 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan6 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan7 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&lpd_dma_chan8 {
+>> +       clocks = <&clk600>, <&clk100>;
+>> +};
+>> +
+>> +&gem0 {
+>> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+>> +};
+>> +
+>> +&gem1 {
+>> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+>> +};
+>> +
+>> +&gem2 {
+>> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+>> +};
+>> +
+>> +&gem3 {
+>> +       clocks = <&clk125>, <&clk125>, <&clk125>;
+>> +};
+>> +
+>> +&gpio {
+>> +       clocks = <&clk100>;
+>> +};
+>> +
+>> +&i2c0 {
+>> +       clocks = <&clk100>;
+>> +};
+>> +
+>> +&i2c1 {
+>> +       clocks = <&clk100>;
+>> +};
+>> +
+>> +&sata {
+>> +       clocks = <&clk250>;
+>> +};
+>> +
+>> +&sdhci0 {
+>> +       clocks = <&clk200 &clk200>;
+>> +};
+>> +
+>> +&sdhci1 {
+>> +       clocks = <&clk200 &clk200>;
+>> +};
+>> +
+>> +&spi0 {
+>> +       clocks = <&clk200 &clk200>;
+>> +};
+>> +
+>> +&spi1 {
+>> +       clocks = <&clk200 &clk200>;
+>> +};
+>> +
+>> +&uart0 {
+>> +       clocks = <&clk100 &clk100>;
+>> +};
+>> +
+>> +&uart1 {
+>> +       clocks = <&clk100 &clk100>;
+>> +};
+>> +
+>> +&usb0 {
+>> +       clocks = <&clk250>, <&clk250>;
+>> +};
+>> +
+>> +&usb1 {
+>> +       clocks = <&clk250>, <&clk250>;
+>> +};
+>> +
+>> +&watchdog0 {
+>> +       clocks = <&clk250>;
+>> +};
+>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+>> new file mode 100644
+>> index 000000000000..01f5f95806d3
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+>> @@ -0,0 +1,298 @@
+>> +// SPDX-License-Identifier: GPL-2.0+
+>> +/*
+>> + * dts file for Xilinx ZynqMP ZCU100 revC
+>> + *
+>> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
+>> + *
+>> + * Michal Simek <michal.simek@xilinx.com>
+>> + * Nathalie Chan King Choy <nathalie@xilinx.com>
 >> + */
 >> +
 >> +/dts-v1/;
@@ -121,23 +273,42 @@ ok.
 >> +#include "zynqmp.dtsi"
 >> +#include "zynqmp-clk.dtsi"
 >> +#include <dt-bindings/input/input.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
 >> +#include <dt-bindings/gpio/gpio.h>
 >> +
 >> +/ {
->> +       model = "ZynqMP ZCU102 RevA";
->> +       compatible = "xlnx,zynqmp-zcu102-revA", "xlnx,zynqmp-zcu102", "xlnx,zynqmp";
+>> +       model = "ZynqMP ZCU100 RevC";
+>> +       compatible = "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100", "xlnx,zynqmp";
+> 
+> Documented?
+> 
 >> +
 >> +       aliases {
->> +               ethernet0 = &gem3;
 >> +               gpio0 = &gpio;
->> +               i2c0 = &i2c0;
->> +               i2c1 = &i2c1;
->> +               mmc0 = &sdhci1;
+> 
+> Drop this.
+> 
+>> +               i2c0 = &i2c1;
 >> +               rtc0 = &rtc;
->> +               serial0 = &uart0;
->> +               serial1 = &uart1;
+> 
+> Is there more than one?
+
+In programmable logic logic there can be plenty of them.
+
+> 
+>> +               serial0 = &uart1;
+>> +               serial1 = &uart0;
 >> +               serial2 = &dcc;
+>> +               spi0 = &spi0;
+>> +               spi1 = &spi1;
+> 
 >> +               usb0 = &usb0;
+>> +               usb1 = &usb1;
+> 
+> Drop these.
+> 
+>> +               mmc0 = &sdhci0;
+>> +               mmc1 = &sdhci1;
 >> +       };
 >> +
 >> +       chosen {
@@ -147,7 +318,7 @@ ok.
 >> +
 >> +       memory at 0 {
 >> +               device_type = "memory";
->> +               reg = <0x0 0x0 0x0 0x80000000>, <0x8 0x00000000 0x0 0x80000000>;
+>> +               reg = <0x0 0x0 0x0 0x80000000>;
 >> +       };
 >> +
 >> +       gpio-keys {
@@ -155,10 +326,10 @@ ok.
 >> +               #address-cells = <1>;
 >> +               #size-cells = <0>;
 >> +               autorepeat;
->> +               sw19 {
->> +                       label = "sw19";
->> +                       gpios = <&gpio 22 GPIO_ACTIVE_HIGH>;
->> +                       linux,code = <KEY_DOWN>;
+>> +               sw4 {
+>> +                       label = "sw4";
+>> +                       gpios = <&gpio 23 GPIO_ACTIVE_LOW>;
+>> +                       linux,code = <KEY_POWER>;
 >> +                       gpio-key,wakeup;
 >> +                       autorepeat;
 >> +               };
@@ -166,372 +337,132 @@ ok.
 >> +
 >> +       leds {
 >> +               compatible = "gpio-leds";
->> +               heartbeat_led {
->> +                       label = "heartbeat";
->> +                       gpios = <&gpio 23 GPIO_ACTIVE_HIGH>;
+>> +               ds2 {
+>> +                       label = "ds2";
+>> +                       gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
 >> +                       linux,default-trigger = "heartbeat";
 >> +               };
->> +       };
->> +};
 >> +
->> +&can1 {
->> +       status = "okay";
+>> +               ds3 {
+>> +                       label = "ds3";
+>> +                       gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
+>> +                       linux,default-trigger = "phy0tx"; /* WLAN tx */
+>> +                       default-state = "off";
+>> +               };
+>> +
+>> +               ds4 {
+>> +                       label = "ds4";
+>> +                       gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
+>> +                       linux,default-trigger = "phy0rx"; /* WLAN rx */
+>> +                       default-state = "off";
+>> +               };
+>> +
+>> +               ds5 {
+>> +                       label = "ds5";
+>> +                       gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
+>> +                       linux,default-trigger = "bluetooth-power";
+>> +               };
+>> +
+>> +               vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
+>> +                       label = "vbus_det";
+>> +                       gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
+>> +                       default-state = "on";
+>> +               };
+>> +
+>> +               bt_power {
+>> +                       label = "bt_power";
+>> +                       gpios = <&gpio 8 GPIO_ACTIVE_HIGH>;
+>> +                       default-state = "on";
+>> +               };
+>> +       };
+>> +
+>> +       wmmcsdio_fixed: fixedregulator-mmcsdio {
+>> +               compatible = "regulator-fixed";
+>> +               regulator-name = "wmmcsdio_fixed";
+>> +               regulator-min-microvolt = <3300000>;
+>> +               regulator-max-microvolt = <3300000>;
+>> +               regulator-always-on;
+>> +               regulator-boot-on;
+>> +       };
+>> +
+>> +       sdio_pwrseq: sdio_pwrseq {
+>> +               compatible = "mmc-pwrseq-simple";
+>> +               reset-gpios = <&gpio 7 GPIO_ACTIVE_LOW>; /* WIFI_EN */
+>> +       };
 >> +};
 >> +
 >> +&dcc {
 >> +       status = "okay";
 >> +};
 >> +
->> +&fpd_dma_chan1 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan2 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan3 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan4 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan5 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan6 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan7 {
->> +       status = "okay";
->> +};
->> +
->> +&fpd_dma_chan8 {
->> +       status = "okay";
->> +};
->> +
->> +&gem3 {
->> +       status = "okay";
->> +       phy-handle = <&phy0>;
->> +       phy-mode = "rgmii-id";
->> +       phy0: phy at 21 {
->> +               reg = <21>;
->> +               ti,rx-internal-delay = <0x8>;
->> +               ti,tx-internal-delay = <0xa>;
->> +               ti,fifo-depth = <0x1>;
->> +       };
->> +};
->> +
 >> +&gpio {
 >> +       status = "okay";
->> +};
->> +
->> +&i2c0 {
->> +       status = "okay";
->> +       clock-frequency = <400000>;
->> +
->> +       tca6416_u97: gpio at 20 {
->> +               /*
->> +                * Enable all GTs to out from U-Boot
->> +                * i2c mw 20 6 0  - setup IO to output
->> +                * i2c mw 20 2 ef - setup output values on pins 0-7
->> +                * i2c mw 20 3 ff - setup output values on pins 10-17
->> +                */
->> +               compatible = "ti,tca6416";
->> +               reg = <0x20>;
->> +               gpio-controller;
->> +               #gpio-cells = <2>;
->> +               /*
->> +                * IRQ not connected
->> +                * Lines:
->> +                * 0 - PS_GTR_LAN_SEL0
->> +                * 1 - PS_GTR_LAN_SEL1
->> +                * 2 - PS_GTR_LAN_SEL2
->> +                * 3 - PS_GTR_LAN_SEL3
->> +                * 4 - PCI_CLK_DIR_SEL
->> +                * 5 - IIC_MUX_RESET_B
->> +                * 6 - GEM3_EXP_RESET_B
->> +                * 7, 10 - 17 - not connected
->> +                */
->> +
->> +               gtr_sel0 {
->> +                       gpio-hog;
->> +                       gpios = <0 0>;
->> +                       output-low; /* PCIE = 0, DP = 1 */
->> +                       line-name = "sel0";
->> +               };
->> +               gtr_sel1 {
->> +                       gpio-hog;
->> +                       gpios = <1 0>;
->> +                       output-high; /* PCIE = 0, DP = 1 */
->> +                       line-name = "sel1";
->> +               };
->> +               gtr_sel2 {
->> +                       gpio-hog;
->> +                       gpios = <2 0>;
->> +                       output-high; /* PCIE = 0, USB0 = 1 */
->> +                       line-name = "sel2";
->> +               };
->> +               gtr_sel3 {
->> +                       gpio-hog;
->> +                       gpios = <3 0>;
->> +                       output-high; /* PCIE = 0, SATA = 1 */
->> +                       line-name = "sel3";
->> +               };
->> +       };
->> +
->> +       tca6416_u61: gpio at 21 { /* enable it by i2c mw 21 6 0 */
->> +               compatible = "ti,tca6416";
->> +               reg = <0x21>;
->> +               gpio-controller;
->> +               #gpio-cells = <2>;
->> +               /*
->> +                * IRQ not connected
->> +                * Lines:
->> +                * 0 - VCCPSPLL_EN
->> +                * 1 - MGTRAVCC_EN
->> +                * 2 - MGTRAVTT_EN
->> +                * 3 - VCCPSDDRPLL_EN
->> +                * 4 - MIO26_PMU_INPUT_LS
->> +                * 5 - PL_PMBUS_ALERT
->> +                * 6 - PS_PMBUS_ALERT
->> +                * 7 - MAXIM_PMBUS_ALERT
->> +                * 10 - PL_DDR4_VTERM_EN
->> +                * 11 - PL_DDR4_VPP_2V5_EN
->> +                * 12 - PS_DIMM_VDDQ_TO_PSVCCO_ON
->> +                * 13 - PS_DIMM_SUSPEND_EN
->> +                * 14 - PS_DDR4_VTERM_EN
->> +                * 15 - PS_DDR4_VPP_2V5_EN
->> +                * 16 - 17 - not connected
->> +                */
->> +       };
->> +
->> +       i2cswitch at 75 { /* u60 */
->> +               compatible = "nxp,pca9544";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x75>;
->> +               i2c at 0 { /* i2c mw 75 0 1 */
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <0>;
->> +                       /* PS_PMBUS */
->> +                       ina226 at 40 { /* u76 */
-> 
-> Should be what the device does, not part numbers if possible. Standard
-> names are defined in the DT spec (additions welcome).
-
-I need to document also identification from schematics because without
-it it won't be clear which one is which part on schematics and at the
-end it will be just a mess.
-
-
-
-> 
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x40>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 41 { /* u77 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x41>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 42 { /* u78 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x42>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 43 { /* u87 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x43>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 44 { /* u85 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x44>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 45 { /* u86 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x45>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 46 { /* u93 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x46>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 47 { /* u88 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x47>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 4a { /* u15 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x4a>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 4b { /* u92 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x4b>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +               };
->> +               i2c at 1 { /* i2c mw 75 0 1 */
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <1>;
->> +                       /* PL_PMBUS */
->> +                       ina226 at 40 { /* u79 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x40>;
->> +                               shunt-resistor = <2000>;
->> +                       };
->> +                       ina226 at 41 { /* u81 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x41>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 42 { /* u80 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x42>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 43 { /* u84 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x43>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 44 { /* u16 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x44>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 45 { /* u65 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x45>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 46 { /* u74 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x46>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +                       ina226 at 47 { /* u75 */
->> +                               compatible = "ti,ina226";
->> +                               reg = <0x47>;
->> +                               shunt-resistor = <5000>;
->> +                       };
->> +               };
->> +               i2c at 2 { /* i2c mw 75 0 1 */
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <2>;
->> +                       /* MAXIM_PMBUS - 00 */
->> +                       max15301 at a { /* u46 */
->> +                               compatible = "maxim,max15301";
->> +                               reg = <0xa>;
->> +                       };
->> +                       max15303 at b { /* u4 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0xb>;
->> +                       };
->> +                       max15303 at 10 { /* u13 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x10>;
->> +                       };
->> +                       max15301 at 13 { /* u47 */
->> +                               compatible = "maxim,max15301";
->> +                               reg = <0x13>;
->> +                       };
->> +                       max15303 at 14 { /* u7 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x14>;
->> +                       };
->> +                       max15303 at 15 { /* u6 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x15>;
->> +                       };
->> +                       max15303 at 16 { /* u10 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x16>;
->> +                       };
->> +                       max15303 at 17 { /* u9 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x17>;
->> +                       };
->> +                       max15301 at 18 { /* u63 */
->> +                               compatible = "maxim,max15301";
->> +                               reg = <0x18>;
->> +                       };
->> +                       max15303 at 1a { /* u49 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x1a>;
->> +                       };
->> +                       max15303 at 1d { /* u18 */
->> +                               compatible = "maxim,max15303";
->> +                               reg = <0x1d>;
->> +                       };
->> +                       max15303 at 20 { /* u8 */
->> +                               compatible = "maxim,max15303";
->> +                               status = "disabled"; /* unreachable */
->> +                               reg = <0x20>;
->> +                       };
->> +
->> +                       max20751 at 72 { /* u95 */
->> +                               compatible = "maxim,max20751";
->> +                               reg = <0x72>;
->> +                       };
->> +                       max20751 at 73 { /* u96 */
->> +                               compatible = "maxim,max20751";
->> +                               reg = <0x73>;
->> +                       };
->> +               };
->> +               /* Bus 3 is not connected */
->> +       };
+>> +       gpio-line-names = "UART1_TX", "UART1_RX", "UART0_RX", "UART0_TX", "I2C1_SCL",
+>> +                         "I2C1_SDA", "SPI1_SCLK", "WLAN_EN", "BT_EN", "SPI1_CS",
+>> +                         "SPI1_MISO", "SPI1_MOSI", "I2C_MUX_RESET", "SD0_DAT0", "SD0_DAT1",
+>> +                         "SD0_DAT2", "SD0_DAT3", "PS_LED3", "PS_LED2", "PS_LED1",
+>> +                         "PS_LED0", "SD0_CMD", "SD0_CLK", "GPIO_PB", "SD0_DETECT",
+>> +                         "VBUS_DET", "POWER_INT", "DP_AUX", "DP_HPD", "DP_OE",
+>> +                         "DP_AUX_IN", "INA226_ALERT", "PS_FP_PWR_EN", "PL_PWR_EN", "POWER_KILL",
+>> +                         "", "GPIO-A", "GPIO-B", "SPI0_SCLK", "GPIO-C",
+>> +                         "GPIO-D", "SPI0_CS", "SPI0_MISO", "SPI_MOSI", "GPIO-E",
+>> +                         "GPIO-F", "SD1_D0", "SD1_D1", "SD1_D2", "SD1_D3",
+>> +                         "SD1_CMD", "SD1_CLK", "USB0_CLK", "USB0_DIR", "USB0_DATA2",
+>> +                         "USB0_NXT", "USB0_DATA0", "USB0_DATA1", "USB0_STP", "USB0_DATA3",
+>> +                         "USB0_DATA4", "USB0_DATA5", "USB0_DATA6", "USB0_DATA7", "USB1_CLK",
+>> +                         "USB1_DIR", "USB1_DATA2", "USB1_NXT", "USB1_DATA0", "USB1_DATA1",
+>> +                         "USB1_STP", "USB1_DATA3", "USB1_DATA4", "USB1_DATA5", "USB1_DATA6",
+>> +                         "USB_DATA7", "WLAN_IRQ", "PMIC_IRQ", /* MIO end and EMIO start */
+>> +                         "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "", "", "", "", "", "", "",
+>> +                         "", "", "", "";
 >> +};
 >> +
 >> +&i2c1 {
 >> +       status = "okay";
->> +       clock-frequency = <400000>;
->> +
->> +       /* PL i2c via PCA9306 - u45 */
->> +       i2cswitch at 74 { /* u34 */
+>> +       clock-frequency = <100000>;
+>> +       i2cswitch at 75 { /* u11 */
+> 
+> i2c-mux at 75
+> 
 >> +               compatible = "nxp,pca9548";
 >> +               #address-cells = <1>;
 >> +               #size-cells = <0>;
->> +               reg = <0x74>;
->> +               i2c at 0 { /* i2c mw 74 0 1 */
+>> +               reg = <0x75>;
+>> +               i2csw_0: i2c at 0 { /* i2c mw 75 0 1 */
+> 
+> Linux commands for comments aren't relevant to dts files.
+
+I was removing this from others and forget this one.
+Just a note: It is u-boot command.
+
+> 
 >> +                       #address-cells = <1>;
 >> +                       #size-cells = <0>;
 >> +                       reg = <0>;
 >> +                       /*
->> +                        * IIC_EEPROM 1kB memory which uses 256B blocks
->> +                        * where every block has different address.
->> +                        *    0 - 256B address 0x54
->> +                        * 256B - 512B address 0x55
->> +                        * 512B - 768B address 0x56
->> +                        * 768B - 1024B address 0x57
->> +                        */
->> +                       eeprom: eeprom at 54 { /* u23 */
->> +                               compatible = "atmel,24c08";
->> +                               reg = <0x54>;
->> +                       };
->> +               };
->> +               i2c at 1 { /* i2c mw 74 0 2 */
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <1>;
->> +                       si5341: clock-generator1 at 36 { /* SI5341 - u69 */
+>> +                        * LSEXP_I2C0
 > 
-> Drop the 1 on clock-generator1.
+> Is this a 96boards design? If so, using "label" and with defined names
+> is somewhat standard for defining low speed connector ports (and for
+> LEDs). That should also remove any need for using aliases for I2C and
+> SPI. Look at hikey or db410c.
 
-ok.
+i2c, spi is easy
+label = "HS-I2C2";
+
+leds are also fine and fixed.
+
+serial labeling depends on configuration. It means serial0 can be
+LS-UART0 or 1 or PL based uart can be connected there.
 
 Thanks,
 Michal
