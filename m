@@ -1,29 +1,29 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Thu,  1 Feb 2018 09:37:00 +0100
-Subject: [linux-sunxi][PATCH v2] ARM: dts: sun7i: Enable HDMI support on the
- Olimex EVB
-Message-ID: <20180201083700.13021-1-codekipper@gmail.com>
+Date: Thu,  1 Feb 2018 09:37:37 +0100
+Subject: [linux-sunxi][PATCH v2] ARM: sun6i: a31: Enable HDMI support on the
+ Mele I7
+Message-ID: <20180201083737.13211-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Enable the display pipeline and HDMI output on the Olimex
-A20-SOM-EVB.
+The Mele I7 has an HDMI connector wired to the HDMI pins
+on the SoC. Enable the display pipeline and HDMI output.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
 v2 changes compared to v1 are:
-- corrected indentation.
+- Reordered nodes.
 ---
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-i7.dts | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-index 64c8ef9a2756..44b9eefdbbf9 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -61,6 +61,17 @@
+diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
+index 010a84c7c012..a3b70173c527 100644
+--- a/arch/arm/boot/dts/sun6i-a31-i7.dts
++++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
+@@ -58,6 +58,17 @@
  		stdout-path = "serial0:115200n8";
  	};
  
@@ -41,7 +41,7 @@ index 64c8ef9a2756..44b9eefdbbf9 100644
  	leds {
  		compatible = "gpio-leds";
  		pinctrl-names = "default";
-@@ -79,6 +90,10 @@
+@@ -93,6 +104,10 @@
  	status = "okay";
  };
  
@@ -52,7 +52,7 @@ index 64c8ef9a2756..44b9eefdbbf9 100644
  &ehci0 {
  	status = "okay";
  };
-@@ -107,6 +122,16 @@
+@@ -113,6 +128,16 @@
  	};
  };
  
@@ -66,8 +66,19 @@ index 64c8ef9a2756..44b9eefdbbf9 100644
 +	};
 +};
 +
- &i2c0 {
+ &ir {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins_a>;
+ 	pinctrl-0 = <&ir_pins_a>;
+@@ -161,6 +186,10 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.16.1
