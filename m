@@ -1,10 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 2 Feb 2018 02:11:57 +0900
-Subject: [PATCH 09/11] arm: vt8500: kconfig: Remove blank help text
-In-Reply-To: <20180131093434.20050-10-ulfalizer@gmail.com>
+Date: Fri, 2 Feb 2018 02:12:24 +0900
+Subject: [PATCH 07/11] MIPS: BCM63XX: kconfig: Remove blank help text
+In-Reply-To: <20180131093434.20050-8-ulfalizer@gmail.com>
 References: <20180131093434.20050-1-ulfalizer@gmail.com>
- <20180131093434.20050-10-ulfalizer@gmail.com>
-Message-ID: <CAK7LNAQTDWe4oHO13AsE0vtL_wuWiPsduKScAZh1LP49OV8SMg@mail.gmail.com>
+ <20180131093434.20050-8-ulfalizer@gmail.com>
+Message-ID: <CAK7LNAR5ji4mi7vOOUV+PDZWrbhSEuin-Qj0AMkE8-mW+CTmug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,3 +27,7 @@ because I need this to suppress warning messages
 introduced by 11/11.
 
 I am planning to send a PR for this series next week.
+
+-- 
+Best Regards
+Masahiro Yamada
