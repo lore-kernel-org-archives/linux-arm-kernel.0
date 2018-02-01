@@ -1,104 +1,34 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 1 Feb 2018 08:47:47 +0100
-Subject: [PATCH v2] ARM: dts: exynos-artik5: add support for wlan
-In-Reply-To: <20180131074027.387-1-mlyle@lyle.org>
-References: <20180131074027.387-1-mlyle@lyle.org>
-Message-ID: <CAJKOXPex=joAvYZem9ROft4aYi8z5Mb4oDce=US182waHtuXew@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 1 Feb 2018 08:57:20 +0100
+Subject: [PATCH v3 2/2] ARM: dts: imx25-pinfunc: Always set SION for
+ eSDHC CMD
+In-Reply-To: <20180131213544.4508-2-benoit.thebaudeau.dev@gmail.com>
+References: <20180131213544.4508-1-benoit.thebaudeau.dev@gmail.com>
+ <20180131213544.4508-2-benoit.thebaudeau.dev@gmail.com>
+Message-ID: <20180201075720.3fj7ozvclpp6yovz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 8:40 AM, Michael Lyle <mlyle@lyle.org> wrote:
->
-> On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
-> it, and turn on the regulator used for it, so that both wifi & bluetooth
-> work.
->
-> Verified to work on the Artik 520 evaluation board.
->
-> Signed-off-by: Michael Lyle <mlyle@lyle.org>
-> ---
+On Wed, Jan 31, 2018 at 10:35:44PM +0100, Beno?t Th?baudeau wrote:
+> The eSDHC does not work properly if the SION bit is not set for the
+> bidirectional CMD signal, whatever the eSDHC instance and the selected
+> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
+> this for MX25_PAD_*__ESDHCn_CMD in imx25-pinfunc.h in order to enforce
+> this behavior for all boards.
+> 
+> This had already been done for eSDHC1, but not for eSDHC2. Also, define
+> MX25_PAD_FEC_MDC__ESDHC2_CMD so that all the possible cases are covered
+> from now on.
+> 
+> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Changelog would be nice to check what you changed in v2.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
->  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> index 0aa577fe9f95..b2d441b1a7e3 100644
-> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> @@ -245,6 +245,7 @@
->                                 regulator-name = "VLDO23_1.8V";
->                                 regulator-min-microvolt = <1800000>;
->                                 regulator-max-microvolt = <1800000>;
-> +                               regulator-always-on;
->                         };
->
->                         ldo24_reg: LDO24 {
-> @@ -316,6 +317,41 @@
->         status = "okay";
->  };
->
-> +&pinctrl_1 {
+Thanks
+Uwe
 
-Still not alphabetically sorted - this should go after &rtc. Sorting
-alphabetically helps to reduce conflicts (e.g. when adding nodes not
-everyone will be editing end of file at the same of time) and makes it
-slightly easier to look for nodes.
-
-> +       wlanen: wlanen {
-> +               samsung,pins = "gpx2-3";
-> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
-> +               samsung,pin-val = <1>;
-> +       };
-> +};
-> +
-> +&mshc_1 {
-> +       cap-sd-highspeed;
-> +       cap-sdio-irq;
-> +       disable-wp;
-> +       broken-cd;
-
-This really should not be broken-cd but non-removable. I understand
-that the SDIO wifi/br is not a card really - you cannot take it out.
-
-> +       bypass-smu;
-
-I think there is no such property.
-
-> +       keep-power-in-suspend;
-> +       fifo-depth = <0x40>;
-> +       vqmmc-supply = <&ldo11_reg>;
-> +       /* Voltage negotiation is broken for the SDIO periph so we
-
-Please use opening /* (like in kernel code).
-
-> +        * can't actually set the voltage here.
-> +        * vmmc-supply = <&ldo23_reg>;
-
-What did you find about the regulators?
-
-Best regards,
-Krzysztof
-
-> +        */
-> +       card-detect-delay = <500>;
-> +       clock-frequency = <100000000>;
-> +       max-frequency = <100000000>;
-> +       samsung,dw-mshc-ciu-div = <3>;
-> +       samsung,dw-mshc-sdr-timing = <0 1>;
-> +       samsung,dw-mshc-ddr-timing = <1 2>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
-> +       bus-width = <4>;
-> +       status = "okay";
-> +};
-> +
->  &rtc {
->         clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
->         clock-names = "rtc", "rtc_src";
-> --
-> 2.14.1
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
