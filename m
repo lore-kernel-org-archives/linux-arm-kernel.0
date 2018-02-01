@@ -1,99 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  1 Feb 2018 14:04:46 +0100
-Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
-Message-ID: <20180201130446.6165-1-linus.walleij@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Feb 2018 13:10:38 +0000
+Subject: [PATCH] irqchip/gic-v3: Ignore disabled ITS nodes
+In-Reply-To: <20180129164933.25479-1-sboyd@codeaurora.org>
+References: <20180129164933.25479-1-sboyd@codeaurora.org>
+Message-ID: <8e564636-aae3-4fee-a57c-6f1c01529b49@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following happened when migrating an old fbdev driver to DRM:
+On 29/01/18 16:49, Stephen Boyd wrote:
+> On some platforms there's an ITS available but it's not enabled
+> because reading or writing the registers is denied by the
+> firmware. In fact, reading or writing them will cause the system
+> to reset.
 
-The Integrator/CP PL111 supports 16BPP but only ARGB1555/ABGR1555
-or XRGB1555/XBGR1555 i.e. the maximum depth is 15.
+Wow. Funky.
 
-This makes the initialization of the framebuffer fail since
-the code in drm_fb_helper_single_fb_probe() assigns the same value
-to sizes.surface_bpp and sizes.surface_depth. I.e. it simply assumes
-a 1-to-1 mapping between BPP and depth, which is true in most cases
-but typically not for this hardware.
+>  We could remove the node from DT in such a case, but
+> it's better to skip nodes that are marked as "disabled" in DT so
+> that we can describe the hardware that exists and use the status
+> property to indicate how the firmware has configured things.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Rajendra Nayak <rnayak@codeaurora.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c      | 2 ++
+>  drivers/irqchip/irq-gic-v3-its-platform-msi.c | 2 ++
+>  drivers/irqchip/irq-gic-v3-its.c              | 2 ++
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> index 77931214d954..6b5f50e1fc72 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> @@ -132,6 +132,8 @@ static int __init its_pci_of_msi_init(void)
+>  
+>  	for (np = of_find_matching_node(NULL, its_device_id); np;
+>  	     np = of_find_matching_node(np, its_device_id)) {
+> +		if (!of_device_is_available(np))
+> +			continue;
+>  		if (!of_property_read_bool(np, "msi-controller"))
+>  			continue;
+>  
+> diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> index 833a90fe33ae..8881a053c173 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> @@ -154,6 +154,8 @@ static void __init its_pmsi_of_init(void)
+>  
+>  	for (np = of_find_matching_node(NULL, its_device_id); np;
+>  	     np = of_find_matching_node(np, its_device_id)) {
+> +		if (!of_device_is_available(np))
+> +			continue;
+>  		if (!of_property_read_bool(np, "msi-controller"))
+>  			continue;
+>  
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 284738add89b..a84ee6ce244d 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1815,6 +1815,8 @@ static int __init its_of_probe(struct device_node *node)
+>  
+>  	for (np = of_find_matching_node(node, its_device_id); np;
+>  	     np = of_find_matching_node(np, its_device_id)) {
+> +		if (!of_device_is_available(np))
+> +			continue;
+>  		if (!of_property_read_bool(np, "msi-controller")) {
+>  			pr_warn("%s: no msi-controller property, ITS ignored\n",
+>  				np->full_name);
+> 
 
-To support the odd case of a driver supporting 16BPP with only 15
-bits of depth, this patch will make the code loop over the formats
-supported on the primary plane and cap the depth to the maximum
-supported.
+Can you also address the same thing in
+drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c?
 
-On the PL110 Integrator, this makes drm_mode_legacy_fb_format()
-select DRM_FORMAT_XRGB1555 which is acceptable for this driver, and
-thus we get framebuffer, penguin and console on the Integrator/CP.
+Do we need a cc to stable for this?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpu/drm/drm_fb_helper.c | 40 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 39 insertions(+), 1 deletion(-)
+Thanks,
 
-diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
-index e56166334455..5076f9103740 100644
---- a/drivers/gpu/drm/drm_fb_helper.c
-+++ b/drivers/gpu/drm/drm_fb_helper.c
-@@ -1720,6 +1720,8 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
- 	int i;
- 	struct drm_fb_helper_surface_size sizes;
- 	int gamma_size = 0;
-+	struct drm_plane *plane;
-+	int best_depth = 0;
- 
- 	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
- 	sizes.surface_depth = 24;
-@@ -1727,7 +1729,10 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
- 	sizes.fb_width = (u32)-1;
- 	sizes.fb_height = (u32)-1;
- 
--	/* if driver picks 8 or 16 by default use that for both depth/bpp */
-+	/*
-+	 * If driver picks 8 or 16 by default use that for both depth/bpp
-+	 * to begin with
-+	 */
- 	if (preferred_bpp != sizes.surface_bpp)
- 		sizes.surface_depth = sizes.surface_bpp = preferred_bpp;
- 
-@@ -1762,6 +1767,39 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
- 		}
- 	}
- 
-+	/*
-+	 * If we run into a situation where, for example, the primary plane
-+	 * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
-+	 * 16) we need to scale down the depth of the sizes we request.
-+	 */
-+	drm_for_each_plane(plane, fb_helper->dev) {
-+		/* Only check the primary plane */
-+		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
-+			continue;
-+
-+		for (i = 0; i < plane->format_count; i++) {
-+			const struct drm_format_info *fmt;
-+
-+			fmt = drm_format_info(plane->format_types[i]);
-+			/* We found a perfect fit, great */
-+			if (fmt->depth == sizes.surface_depth)
-+				break;
-+
-+			/* Skip depths above what we're looking for */
-+			if (fmt->depth > sizes.surface_depth)
-+				continue;
-+
-+			/* Best depth found so far */
-+			if (fmt->depth > best_depth)
-+				best_depth = fmt->depth;
-+		}
-+	}
-+	if (sizes.surface_depth != best_depth) {
-+		DRM_DEBUG("requested bpp %d, scaled depth down to %d",
-+			  sizes.surface_bpp, best_depth);
-+		sizes.surface_depth = best_depth;
-+	}
-+
- 	crtc_count = 0;
- 	for (i = 0; i < fb_helper->crtc_count; i++) {
- 		struct drm_display_mode *desired_mode;
+	M.
 -- 
-2.14.3
+Jazz is not dead. It just smells funny...
