@@ -1,153 +1,145 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Feb 2018 11:46:43 +0000
-Subject: [PATCH v3 04/18] arm/arm64: KVM: Consolidate the PSCI include files
+Date: Thu,  1 Feb 2018 11:46:48 +0000
+Subject: [PATCH v3 09/18] arm/arm64: KVM: Advertise SMCCC v1.1
 In-Reply-To: <20180201114657.7323-1-marc.zyngier@arm.com>
 References: <20180201114657.7323-1-marc.zyngier@arm.com>
-Message-ID: <20180201114657.7323-5-marc.zyngier@arm.com>
+Message-ID: <20180201114657.7323-10-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to update the PSCI support, and because I'm lazy,
-let's move the PSCI include file to include/kvm so that both
-ARM architectures can find it.
+The new SMC Calling Convention (v1.1) allows for a reduced overhead
+when calling into the firmware, and provides a new feature discovery
+mechanism.
+
+Make it visible to KVM guests.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_psci.h                    | 27 ----------------------
- arch/arm/kvm/handle_exit.c                         |  2 +-
- arch/arm64/kvm/handle_exit.c                       |  3 ++-
- .../asm/kvm_psci.h => include/kvm/arm_psci.h       |  6 ++---
- virt/kvm/arm/arm.c                                 |  2 +-
- virt/kvm/arm/psci.c                                |  3 ++-
- 6 files changed, 9 insertions(+), 34 deletions(-)
- delete mode 100644 arch/arm/include/asm/kvm_psci.h
- rename arch/arm64/include/asm/kvm_psci.h => include/kvm/arm_psci.h (89%)
+ arch/arm/kvm/handle_exit.c   |  2 +-
+ arch/arm64/kvm/handle_exit.c |  2 +-
+ include/kvm/arm_psci.h       |  2 +-
+ include/linux/arm-smccc.h    | 13 +++++++++++++
+ virt/kvm/arm/psci.c          | 24 +++++++++++++++++++++++-
+ 5 files changed, 39 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
-deleted file mode 100644
-index 6bda945d31fa..000000000000
---- a/arch/arm/include/asm/kvm_psci.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * Copyright (C) 2012 - ARM Ltd
-- * Author: Marc Zyngier <marc.zyngier@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __ARM_KVM_PSCI_H__
--#define __ARM_KVM_PSCI_H__
--
--#define KVM_ARM_PSCI_0_1	1
--#define KVM_ARM_PSCI_0_2	2
--
--int kvm_psci_version(struct kvm_vcpu *vcpu);
--int kvm_psci_call(struct kvm_vcpu *vcpu);
--
--#endif /* __ARM_KVM_PSCI_H__ */
 diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index a4bf0f6f024a..230ae4079108 100644
+index 230ae4079108..910bd8dabb3c 100644
 --- a/arch/arm/kvm/handle_exit.c
 +++ b/arch/arm/kvm/handle_exit.c
-@@ -21,7 +21,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_mmu.h>
--#include <asm/kvm_psci.h>
-+#include <kvm/arm_psci.h>
- #include <trace/events/kvm.h>
+@@ -36,7 +36,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		      kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
  
- #include "trace.h"
+-	ret = kvm_psci_call(vcpu);
++	ret = kvm_hvc_call_handler(vcpu);
+ 	if (ret < 0) {
+ 		vcpu_set_reg(vcpu, 0, ~0UL);
+ 		return 1;
 diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 5493bbefbd0d..588f910632a7 100644
+index 588f910632a7..e5e741bfffe1 100644
 --- a/arch/arm64/kvm/handle_exit.c
 +++ b/arch/arm64/kvm/handle_exit.c
-@@ -22,13 +22,14 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
+@@ -52,7 +52,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			    kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
  
-+#include <kvm/arm_psci.h>
-+
- #include <asm/esr.h>
- #include <asm/exception.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_mmu.h>
--#include <asm/kvm_psci.h>
- #include <asm/debug-monitors.h>
- #include <asm/traps.h>
- 
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/include/kvm/arm_psci.h
-similarity index 89%
-rename from arch/arm64/include/asm/kvm_psci.h
-rename to include/kvm/arm_psci.h
-index bc39e557c56c..2042bb909474 100644
---- a/arch/arm64/include/asm/kvm_psci.h
+-	ret = kvm_psci_call(vcpu);
++	ret = kvm_hvc_call_handler(vcpu);
+ 	if (ret < 0) {
+ 		vcpu_set_reg(vcpu, 0, ~0UL);
+ 		return 1;
+diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+index 4ee098c39e01..7b2e12697d4f 100644
+--- a/include/kvm/arm_psci.h
 +++ b/include/kvm/arm_psci.h
-@@ -15,8 +15,8 @@
+@@ -27,7 +27,7 @@
+ #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
+ 
+ int kvm_psci_version(struct kvm_vcpu *vcpu);
+-int kvm_psci_call(struct kvm_vcpu *vcpu);
++int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
+ 
+ struct kvm_one_reg;
+ 
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index 4c5bca38c653..dc68aa5a7261 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -60,6 +60,19 @@
+ #define ARM_SMCCC_QUIRK_NONE		0
+ #define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
+ 
++#define ARM_SMCCC_VERSION_1_0		0x10000
++#define ARM_SMCCC_VERSION_1_1		0x10001
++
++#define ARM_SMCCC_VERSION_FUNC_ID					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_32,				\
++			   0, 0)
++
++#define ARM_SMCCC_ARCH_FEATURES_FUNC_ID					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
++			   ARM_SMCCC_SMC_32,				\
++			   0, 1)
++
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/linkage.h>
+diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+index 5c8366b71639..53272e8e0d37 100644
+--- a/virt/kvm/arm/psci.c
++++ b/virt/kvm/arm/psci.c
+@@ -15,6 +15,7 @@
   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
  
--#ifndef __ARM64_KVM_PSCI_H__
--#define __ARM64_KVM_PSCI_H__
-+#ifndef __KVM_ARM_PSCI_H__
-+#define __KVM_ARM_PSCI_H__
++#include <linux/arm-smccc.h>
+ #include <linux/preempt.h>
+ #include <linux/kvm_host.h>
+ #include <linux/uaccess.h>
+@@ -351,6 +352,7 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
+ 		case PSCI_0_2_FN_SYSTEM_OFF:
+ 		case PSCI_0_2_FN_SYSTEM_RESET:
+ 		case PSCI_1_0_FN_PSCI_FEATURES:
++		case ARM_SMCCC_VERSION_FUNC_ID:
+ 			val = 0;
+ 			break;
+ 		default:
+@@ -405,7 +407,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+  * Errors:
+  * -EINVAL: Unrecognized PSCI function
+  */
+-int kvm_psci_call(struct kvm_vcpu *vcpu)
++static int kvm_psci_call(struct kvm_vcpu *vcpu)
+ {
+ 	switch (kvm_psci_version(vcpu)) {
+ 	case KVM_ARM_PSCI_1_0:
+@@ -419,6 +421,26 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
+ 	};
+ }
  
- #define KVM_ARM_PSCI_0_1	1
- #define KVM_ARM_PSCI_0_2	2
-@@ -24,4 +24,4 @@
- int kvm_psci_version(struct kvm_vcpu *vcpu);
- int kvm_psci_call(struct kvm_vcpu *vcpu);
- 
--#endif /* __ARM64_KVM_PSCI_H__ */
-+#endif /* __KVM_ARM_PSCI_H__ */
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 15bf026eb182..af3e98fc377e 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -31,6 +31,7 @@
- #include <linux/irqbypass.h>
- #include <trace/events/kvm.h>
- #include <kvm/arm_pmu.h>
-+#include <kvm/arm_psci.h>
- 
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -46,7 +47,6 @@
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
--#include <asm/kvm_psci.h>
- #include <asm/sections.h>
- 
- #ifdef REQUIRES_VIRT
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index f1e363bab5e8..b322e46fd142 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -21,9 +21,10 @@
- 
- #include <asm/cputype.h>
- #include <asm/kvm_emulate.h>
--#include <asm/kvm_psci.h>
- #include <asm/kvm_host.h>
- 
-+#include <kvm/arm_psci.h>
++int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
++{
++	u32 func_id = smccc_get_function(vcpu);
++	u32 val = PSCI_RET_NOT_SUPPORTED;
 +
- #include <uapi/linux/psci.h>
- 
- /*
++	switch (func_id) {
++	case ARM_SMCCC_VERSION_FUNC_ID:
++		val = ARM_SMCCC_VERSION_1_1;
++		break;
++	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
++		/* Nothing supported yet */
++		break;
++	default:
++		return kvm_psci_call(vcpu);
++	}
++
++	smccc_set_retval(vcpu, val, 0, 0, 0);
++	return 1;
++}
++
+ int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu)
+ {
+ 	return 1;		/* PSCI version */
 -- 
 2.14.2
