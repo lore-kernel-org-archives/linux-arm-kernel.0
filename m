@@ -1,37 +1,66 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 1 Feb 2018 08:32:11 +0100
-Subject: [PATCH] ACPI/PCI: pci_link: reduce verbosity when IRQ is enabled
-In-Reply-To: <fde756f4-eb74-4002-6ac4-a44405bad2da@codeaurora.org>
-References: <1516128664-23634-1-git-send-email-okaya@codeaurora.org>
- <f508e749-2976-ec6f-681a-553b79c4ab76@codeaurora.org>
- <20180116214939.GC10860@bhelgaas-glaptop.roam.corp.google.com>
- <fde756f4-eb74-4002-6ac4-a44405bad2da@codeaurora.org>
-Message-ID: <CAJZ5v0jNVENRq-3QjF6nY9_5-0ff=6j_qneLqCQ57h6t1R4Fow@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 1 Feb 2018 09:39:11 +0200
+Subject: [PATCHv2] tlv320dac33: Add device tree bindings
+In-Reply-To: <20180131190112.GA31608@amd>
+References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
+Message-ID: <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 8:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Rafael,
->
-> On 1/16/2018 4:49 PM, Bjorn Helgaas wrote:
->> On Tue, Jan 16, 2018 at 01:53:00PM -0500, Sinan Kaya wrote:
->>> Correcting linux-pci email.
->>>
->>> On 1/16/2018 1:51 PM, Sinan Kaya wrote:
->>>> When ACPI Link object is enabled, the message is printed with a warning
->>>> prefix. Some test tools are capturing warning and test error types as
->>>> errors. Let's reduce the verbosity of success case.
->>>>
->>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
->>
->> Looks like this was a result of 4d9391557b68 ("ACPI: add missing KERN_*
->> constants to printks"), which I think added the wrong level in this case.
->>
->
-> Any chance of merging this for 4.16?
 
-There is.
 
-I've just got back home from travels and will be looking at patches to
-pick up for 4.16 shortly.
+On 2018-01-31 21:01, Pavel Machek wrote:
+> 
+> This adds device tree bindings for tlv320dac33.c.
+
+Can you CC me for dac33 patches in the future, please?
+
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> new file mode 100644
+> index 0000000..7fdda95
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
+> @@ -0,0 +1,32 @@
+> +Texas Instruments - tlv320dac33 Codec module
+> +
+> +The tlv320dac33 serial control bus communicates through I2C protocols.
+> +
+> +Required properties:
+> +
+> +- compatible - "ti,tlv320dac33"
+> +- reg - I2C slave address
+> +
+> +Optional properties:
+> +
+> +- reset-gpios - gpio pin to power the device, active low
+> +
+> +- interrupts       - The interrupt output from the device.
+> +- interrupt-parent - The parent interrupt controller.
+> +
+> +- ti,keep-bclk 	- Keep the BCLK running in FIFO modes
+> +- ti,burst-bclkdiv - BCLK divider value in burst mode
+> +
+> +Example:
+> +
+> +tlv320dac33: audio-codec at 19 {
+> +	compatible = "ti,tlv320dac33";
+> +	reg = <0x19>;
+> +
+> +	interrupt-parent = <&gpio2>;
+> +	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
+> +	reset-gpios = <&gpio2 28 0>; /* gpio_60 */
+> +
+> +	ti,keep-bclk;
+> +	ti,burst-bclkdiv = <3>;
+> +};
+> 
+> 
+
+- P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
