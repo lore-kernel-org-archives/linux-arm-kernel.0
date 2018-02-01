@@ -1,77 +1,104 @@
-From: mlyle@lyle.org (Michael Lyle)
-Date: Thu,  1 Feb 2018 13:16:56 -0800
-Subject: [PATCH v3] ARM: dts: exynos-artik5: add support for wlan
-Message-ID: <20180201211656.11829-1-mlyle@lyle.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 1 Feb 2018 21:17:25 +0000
+Subject: [PATCH v3 14/18] firmware/psci: Expose SMCCC version through
+ psci_ops
+In-Reply-To: <20180201114657.7323-15-marc.zyngier@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-15-marc.zyngier@arm.com>
+Message-ID: <CAKv+Gu9Fpmc+Q2iQ-EoJ0TYkzh1nh59XQthuzh9Q9W+66pHSZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
-it, and turn on the regulator used for it, so that both wifi & bluetooth
-work.
+On 1 February 2018 at 11:46, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Since PSCI 1.0 allows the SMCCC version to be (indirectly) probed,
+> let's do that at boot time, and expose the version of the calling
+> convention as part of the psci_ops structure.
+>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/firmware/psci.c | 19 +++++++++++++++++++
+>  include/linux/psci.h    |  6 ++++++
+>  2 files changed, 25 insertions(+)
+>
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index e9493da2b111..8631906c414c 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -61,6 +61,7 @@ bool psci_tos_resident_on(int cpu)
+>
+>  struct psci_operations psci_ops = {
+>         .conduit = PSCI_CONDUIT_NONE,
+> +       .smccc_version = SMCCC_VERSION_1_0,
+>  };
+>
+>  typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+> @@ -511,6 +512,23 @@ static void __init psci_init_migrate(void)
+>         pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+>  }
+>
+> +static void __init psci_init_smccc(u32 ver)
+> +{
+> +       int feature;
+> +
+> +       feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
+> +
+> +       if (feature != PSCI_RET_NOT_SUPPORTED) {
+> +               ver = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
+> +               if (ver != ARM_SMCCC_VERSION_1_1)
+> +                       psci_ops.smccc_version = SMCCC_VERSION_1_0;
+> +               else
+> +                       psci_ops.smccc_version = SMCCC_VERSION_1_1;
+> +       }
+> +
+> +       pr_info("SMC Calling Convention v1.%d\n", psci_ops.smccc_version);
 
-Verified to work on the Artik 520 evaluation board.
+This is a bit nasty: you are returning the numeric value of the enum
+as the minor number, and hardcoding the major version number as 1,
+while the return value of ARM_SMCCC_VERSION_FUNC_ID gives you the
+exact numbers. I assume nobody is expecting SMCCC v2.3 anytime soon,
+but it would still be a lot nicer to simply decode the value of 'ver'
+(and make it default to ARM_SMCCC_VERSION_1_0 if the PSCI feature call
+fails)
 
-v2: accidentally sent out v1
-v3: non-removable instead of broken-cd, alphabetical order, formatting
 
-Signed-off-by: Michael Lyle <mlyle@lyle.org>
----
- arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-index 0aa577fe9f95..620b50c19ead 100644
---- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
-+++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-@@ -245,6 +245,7 @@
- 				regulator-name = "VLDO23_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
- 			};
- 
- 			ldo24_reg: LDO24 {
-@@ -316,6 +317,41 @@
- 	status = "okay";
- };
- 
-+&mshc_1 {
-+	cap-sd-highspeed;
-+	cap-sdio-irq;
-+	disable-wp;
-+	non-removable;
-+	keep-power-in-suspend;
-+	fifo-depth = <0x40>;
-+	vqmmc-supply = <&ldo11_reg>;
-+	/*
-+	 * Voltage negotiation is broken for the SDIO periph so we
-+	 * can't actually set the voltage here.
-+	 * vmmc-supply = <&ldo23_reg>;
-+	 */
-+	card-detect-delay = <500>;
-+	clock-frequency = <100000000>;
-+	max-frequency = <100000000>;
-+	samsung,dw-mshc-ciu-div = <3>;
-+	samsung,dw-mshc-sdr-timing = <0 1>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&pinctrl_1 {
-+	wlanen: wlanen {
-+		samsung,pins = "gpx2-3";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
-+		samsung,pin-val = <1>;
-+	};
-+};
-+
- &rtc {
- 	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
- 	clock-names = "rtc", "rtc_src";
--- 
-2.14.1
+> +}
+> +
+>  static void __init psci_0_2_set_functions(void)
+>  {
+>         pr_info("Using standard PSCI v0.2 function IDs\n");
+> @@ -559,6 +577,7 @@ static int __init psci_probe(void)
+>         psci_init_migrate();
+>
+>         if (PSCI_VERSION_MAJOR(ver) >= 1) {
+> +               psci_init_smccc(ver);
+>                 psci_init_cpu_suspend();
+>                 psci_init_system_suspend();
+>         }
+> diff --git a/include/linux/psci.h b/include/linux/psci.h
+> index f2679e5faa4f..8b1b3b5935ab 100644
+> --- a/include/linux/psci.h
+> +++ b/include/linux/psci.h
+> @@ -31,6 +31,11 @@ enum psci_conduit {
+>         PSCI_CONDUIT_HVC,
+>  };
+>
+> +enum smccc_version {
+> +       SMCCC_VERSION_1_0,
+> +       SMCCC_VERSION_1_1,
+> +};
+> +
+>  struct psci_operations {
+>         u32 (*get_version)(void);
+>         int (*cpu_suspend)(u32 state, unsigned long entry_point);
+> @@ -41,6 +46,7 @@ struct psci_operations {
+>                         unsigned long lowest_affinity_level);
+>         int (*migrate_info_type)(void);
+>         enum psci_conduit conduit;
+> +       enum smccc_version smccc_version;
+>  };
+>
+>  extern struct psci_operations psci_ops;
+> --
+> 2.14.2
+>
