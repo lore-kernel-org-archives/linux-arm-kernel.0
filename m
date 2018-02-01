@@ -1,69 +1,126 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Feb 2018 09:11:36 -0600
-Subject: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
- firmware
-In-Reply-To: <DM2PR0201MB07674CED433B7273AEFC50D2B8FB0@DM2PR0201MB0767.namprd02.prod.outlook.com>
-References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
- <1516836074-4149-2-git-send-email-jollys@xilinx.com>
- <20180130170818.tz4hoqvyekrl7uio@rob-hp-laptop>
- <DM2PR0201MB07674CED433B7273AEFC50D2B8FB0@DM2PR0201MB0767.namprd02.prod.outlook.com>
-Message-ID: <CAL_JsqJMfUyi06jMZOyQX956HjBvyHbKHEcBGt+GTZrj3Da5DA@mail.gmail.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Thu, 1 Feb 2018 16:15:01 +0100
+Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
+In-Reply-To: <20180201131907.GO5453@intel.com>
+References: <20180201130446.6165-1-linus.walleij@linaro.org>
+ <20180201131907.GO5453@intel.com>
+Message-ID: <0214a021-caae-e21f-f99f-74277b889608@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 12:03 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
-> Hi Rob,
-> Thanks for the review,
+
+Den 01.02.2018 14.19, skrev Ville Syrj?l?:
+> On Thu, Feb 01, 2018 at 02:04:46PM +0100, Linus Walleij wrote:
+>> The following happened when migrating an old fbdev driver to DRM:
+>>
+>> The Integrator/CP PL111 supports 16BPP but only ARGB1555/ABGR1555
+>> or XRGB1555/XBGR1555 i.e. the maximum depth is 15.
+>>
+>> This makes the initialization of the framebuffer fail since
+>> the code in drm_fb_helper_single_fb_probe() assigns the same value
+>> to sizes.surface_bpp and sizes.surface_depth. I.e. it simply assumes
+>> a 1-to-1 mapping between BPP and depth, which is true in most cases
+>> but typically not for this hardware.
+>>
+>> To support the odd case of a driver supporting 16BPP with only 15
+>> bits of depth, this patch will make the code loop over the formats
+>> supported on the primary plane and cap the depth to the maximum
+>> supported.
+>>
+>> On the PL110 Integrator, this makes drm_mode_legacy_fb_format()
+>> select DRM_FORMAT_XRGB1555 which is acceptable for this driver, and
+>> thus we get framebuffer, penguin and console on the Integrator/CP.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>>   drivers/gpu/drm/drm_fb_helper.c | 40 +++++++++++++++++++++++++++++++++++++++-
+>>   1 file changed, 39 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+>> index e56166334455..5076f9103740 100644
+>> --- a/drivers/gpu/drm/drm_fb_helper.c
+>> +++ b/drivers/gpu/drm/drm_fb_helper.c
+>> @@ -1720,6 +1720,8 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
+>>   	int i;
+>>   	struct drm_fb_helper_surface_size sizes;
+>>   	int gamma_size = 0;
+>> +	struct drm_plane *plane;
+>> +	int best_depth = 0;
+>>   
+>>   	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
+>>   	sizes.surface_depth = 24;
+>> @@ -1727,7 +1729,10 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
+>>   	sizes.fb_width = (u32)-1;
+>>   	sizes.fb_height = (u32)-1;
+>>   
+>> -	/* if driver picks 8 or 16 by default use that for both depth/bpp */
+>> +	/*
+>> +	 * If driver picks 8 or 16 by default use that for both depth/bpp
+>> +	 * to begin with
+>> +	 */
+>>   	if (preferred_bpp != sizes.surface_bpp)
+>>   		sizes.surface_depth = sizes.surface_bpp = preferred_bpp;
+>>   
+>> @@ -1762,6 +1767,39 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
+>>   		}
+>>   	}
+>>   
+>> +	/*
+>> +	 * If we run into a situation where, for example, the primary plane
+>> +	 * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
+>> +	 * 16) we need to scale down the depth of the sizes we request.
+>> +	 */
+>> +	drm_for_each_plane(plane, fb_helper->dev) {
+>> +		/* Only check the primary plane */
+>> +		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
+>> +			continue;
+> I think this should look at crtc->primary for each of the crtcs managed
+> by the fb_helper.
 >
->> -----Original Message-----
->> From: Rob Herring [mailto:robh at kernel.org]
->> Sent: Tuesday, January 30, 2018 9:08 AM
->> To: Jolly Shah <JOLLYS@xilinx.com>
->> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
->> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
->> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
->> dmitry.torokhov at gmail.com; michal.simek at xilinx.com;
->> mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org; linux-
->> kernel at vger.kernel.org; devicetree at vger.kernel.org; Jolly Shah
->> <JOLLYS@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>
->> Subject: Re: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
->> firmware
->>
->> On Wed, Jan 24, 2018 at 03:21:11PM -0800, Jolly Shah wrote:
->> > Add documentation to describe Xilinx ZynqMP firmware driver bindings.
->> > Firmware driver provides an interface to firmware APIs. Interface APIs
->> > can be used by any driver to communicate to PMUFW (Platform Management
->> > Unit).
->> >
->> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
->> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
->> > ---
->> >  .../bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt    | 16
->> ++++++++++++++++
->> >  1 file changed, 16 insertions(+)
->> >  create mode 100644
->> > Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware
->> > .txt
->> >
->> > diff --git
->> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
->> > re.txt
->> > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
->> > re.txt
->> > new file mode 100644
->> > index 0000000..a7aaf56
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
->> > +++ rmware.txt
->> > @@ -0,0 +1,16 @@
->> > +Xilinx Zynq MPSoC Firmware Device Tree Bindings
->> > +
->> > +The zynqmp-firmware node describes the interface to platform firmware.
->>
->> Please define this a is child of /firmware.
->>
-> I dint get you. It is already under firmware/xilinx.
+> Also this probably shouldn't look at YUV formats at all?
+>
+> I do wonder if instead we should just have the driver specify the
+> pixel format explicitly instead of trying to guess based on bpp?
 
-Put it under a "firmware" node in DT. See other firmware bindings for examples.
+Can drm_mode_config.preferred_depth be used for this? The comment says that
+it is used for dumb buffers and drm_mode_create_dumb_ioctl() does this:
+ ??? cpp = DIV_ROUND_UP(args->bpp, 8);
 
-Rob
+So it looks like it should be possible to do preferred_depth=15.
+
+Noralf.
+
+>> +
+>> +		for (i = 0; i < plane->format_count; i++) {
+>> +			const struct drm_format_info *fmt;
+>> +
+>> +			fmt = drm_format_info(plane->format_types[i]);
+>> +			/* We found a perfect fit, great */
+>> +			if (fmt->depth == sizes.surface_depth)
+>> +				break;
+>> +
+>> +			/* Skip depths above what we're looking for */
+>> +			if (fmt->depth > sizes.surface_depth)
+>> +				continue;
+>> +
+>> +			/* Best depth found so far */
+>> +			if (fmt->depth > best_depth)
+>> +				best_depth = fmt->depth;
+>> +		}
+>> +	}
+>> +	if (sizes.surface_depth != best_depth) {
+>> +		DRM_DEBUG("requested bpp %d, scaled depth down to %d",
+>> +			  sizes.surface_bpp, best_depth);
+>> +		sizes.surface_depth = best_depth;
+>> +	}
+>> +
+>>   	crtc_count = 0;
+>>   	for (i = 0; i < fb_helper->crtc_count; i++) {
+>>   		struct drm_display_mode *desired_mode;
+>> -- 
+>> 2.14.3
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
