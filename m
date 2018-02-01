@@ -1,50 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Feb 2018 11:07:37 +0000
-Subject: [PATCH v4 5/6] arm: Invalidate icache on prefetch abort outside of
- user mapping on Cortex-A15
+Date: Thu,  1 Feb 2018 11:07:38 +0000
+Subject: [PATCH v4 6/6] arm: KVM: Invalidate icache on guest exit for
+ Cortex-A15
 In-Reply-To: <20180201110738.5421-1-marc.zyngier@arm.com>
 References: <20180201110738.5421-1-marc.zyngier@arm.com>
-Message-ID: <20180201110738.5421-6-marc.zyngier@arm.com>
+Message-ID: <20180201110738.5421-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to prevent aliasing attacks on the branch predictor,
-invalidate the icache on Cortex-A15, which has the side effect
-of invalidating the BTB. This requires ACTLR[0] to be set to 1
-(secure operation).
+In order to avoid aliasing attacks against the branch predictor
+on Cortex-A15, let's invalidate the BTB on guest exit, which can
+only be done by invalidating the icache (with ACTLR[0] being set).
+
+We use the same hack as for A12/A17 to perform the vector decoding.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/cp15.h | 1 +
- arch/arm/mm/fault.c         | 4 ++++
- 2 files changed, 5 insertions(+)
+ arch/arm/include/asm/kvm_mmu.h |  5 +++++
+ arch/arm/kvm/hyp/hyp-entry.S   | 24 ++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-index 9e900ae855aa..07e27f212dc7 100644
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -66,6 +66,7 @@
- #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
- 
- #define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
-+#define ICIALLU				__ACCESS_CP15(c7, 0, c5, 0)
- 
- extern unsigned long cr_alignment;	/* defined in entry-armv.S */
- 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 2f945c994e25..1b05b4b3e761 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -410,6 +410,10 @@ do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 		case ARM_CPU_PART_CORTEX_A17:
- 			write_sysreg(0, BPIALL);
- 			break;
-+
-+		case ARM_CPU_PART_CORTEX_A15:
-+			write_sysreg(0, ICIALLU);
-+			break;
- 		}
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index dedd4b8a3fa4..4216d40ca25c 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -238,6 +238,11 @@ static inline void *kvm_get_hyp_vector(void)
+ 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
  	}
+ 
++	case ARM_CPU_PART_CORTEX_A15:
++	{
++		extern char __kvm_hyp_vector_ic_inv[];
++		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
++	}
  #endif
+ 	default:
+ 	{
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index e789f52a5129..918a05dd2d63 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -72,6 +72,28 @@ __kvm_hyp_vector:
+ 	W(b)	hyp_fiq
+ 
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	.align 5
++__kvm_hyp_vector_ic_inv:
++	.global __kvm_hyp_vector_ic_inv
++
++	/*
++	 * We encode the exception entry in the bottom 3 bits of
++	 * SP, and we have to guarantee to be 8 bytes aligned.
++	 */
++	W(add)	sp, sp, #1	/* Reset 	  7 */
++	W(add)	sp, sp, #1	/* Undef	  6 */
++	W(add)	sp, sp, #1	/* Syscall	  5 */
++	W(add)	sp, sp, #1	/* Prefetch abort 4 */
++	W(add)	sp, sp, #1	/* Data abort	  3 */
++	W(add)	sp, sp, #1	/* HVC		  2 */
++	W(add)	sp, sp, #1	/* IRQ		  1 */
++	W(nop)			/* FIQ		  0 */
++
++	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
++	isb
++
++	b	decode_vectors
++
+ 	.align 5
+ __kvm_hyp_vector_bp_inv:
+ 	.global __kvm_hyp_vector_bp_inv
+@@ -92,6 +114,8 @@ __kvm_hyp_vector_bp_inv:
+ 	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
+ 	isb
+ 
++decode_vectors:
++
+ #ifdef CONFIG_THUMB2_KERNEL
+ 	/*
+ 	 * Yet another silly hack: Use VPIDR as a temp register.
 -- 
 2.14.2
