@@ -1,203 +1,161 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Thu, 1 Feb 2018 01:23:48 +0000
-Subject: [PATCH v3 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
- driver
-In-Reply-To: <20180131182012.oshjmvahetaizlbu@lakrids.cambridge.arm.com>
-References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
- <1516836074-4149-3-git-send-email-jollys@xilinx.com>
- <20180131182012.oshjmvahetaizlbu@lakrids.cambridge.arm.com>
-Message-ID: <CY1PR0201MB0764D88D409A35B8379323B4B8FA0@CY1PR0201MB0764.namprd02.prod.outlook.com>
+From: shile.zhang@nokia-sbell.com (Zhang, Shile (NSB - CN/Hangzhou))
+Date: Thu, 1 Feb 2018 01:49:33 +0000
+Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb
+ mappings
+In-Reply-To: <VI1PR0701MB2846C892037A515D0B3F4EF8A12B0@VI1PR0701MB2846.eurprd07.prod.outlook.com>
+References: <1509700757-34420-1-git-send-email-shile.zhang@nokia-sbell.com>
+ <VI1PR0701MB2846C892037A515D0B3F4EF8A12B0@VI1PR0701MB2846.eurprd07.prod.outlook.com>
+Message-ID: <HE1PR07MB3097A80B2FF0E2CB72C97FD8A1FA0@HE1PR07MB3097.eurprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-Thanks for the review,
+Hi, Russel
 
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Wednesday, January 31, 2018 10:20 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
-> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
-> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
-> dmitry.torokhov at gmail.com; michal.simek at xilinx.com; robh+dt at kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; Jolly Shah <JOLLYS@xilinx.com>; Rajan Vaja
-> <RAJANV@xilinx.com>
-> Subject: Re: [PATCH v3 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
-> driver
-> 
-> On Wed, Jan 24, 2018 at 03:21:12PM -0800, Jolly Shah wrote:
-> > This patch is adding communication layer with firmware.
-> > Firmware driver provides an interface to firmware APIs.
-> > Interface APIs can be used by any driver to communicate to
-> > PMUFW(Platform Management Unit). All requests go through ATF.
-> 
-> > +/**
-> > + * zynqmp_pm_set_wakeup_source - PM call to specify the wakeup source
-> > + *					while suspended
-> > + * @target:	Node ID of the targeted PU or subsystem
-> > + * @wakeup_node:Node ID of the wakeup peripheral
-> > + * @enable:	Enable or disable the specified peripheral as wake source
-> > + *
-> > + * Return:	Returns status, either success or error+reason
-> > + */
-> > +static int zynqmp_pm_set_wakeup_source(const u32 target,
-> > +				       const u32 wakeup_node,
-> > +				       const u32 enable)
-> > +{
-> > +	return invoke_pm_fn(PM_SET_WAKEUP_SOURCE, target,
-> > +			    wakeup_node, enable, 0, NULL); }
-> 
-> I see many functions take a "Node ID" parameter, but these don't appear to be
-> in any DT binding, and drivers (other than the debugfs driver) aren't using them.
-> 
-> What's the plan for making use of these? Where are the node IDs going to come
-> from in practice?
-> 
-Node ids are defined in firmware.h. Node id refers to targeted PU/subsystem/peripheral for required action.
+Sorry for spam!
+I'm not sure if you got this patch I sent before. Could you please help to check if it still available?
 
-> > +/**
-> > + * zynqmp_pm_system_shutdown - PM call to request a system shutdown or
-> restart
-> > + * @type:	Shutdown or restart? 0 for shutdown, 1 for restart
-> > + * @subtype:	Specifies which system should be restarted or shut down
-> > + *
-> > + * Return:	Returns status, either success or error+reason
-> > + */
-> > +static int zynqmp_pm_system_shutdown(const u32 type, const u32
-> > +subtype) {
-> > +	return invoke_pm_fn(PM_SYSTEM_SHUTDOWN, type, subtype, 0, 0,
-> NULL);
-> > +}
-> 
-> PSCI already has this functionality, so I'm a little confused by the duplication.
-> 
-PSCI doesn't distinguish between shutdown scope. It can be APU/PS/System in this case.
+Many thanks!
 
-> [...]
-> 
-> > +/**
-> > + * zynqmp_pm_get_node_status - PM call to request a node's current power
-> state
-> > + * @node:		ID of the component or sub-system in question
-> > + * @status:		Current operating state of the requested node
-> > + * @requirements:	Current requirements asserted on the node,
-> > + *			used for slave nodes only.
-> > + * @usage:		Usage information, used for slave nodes only:
-> > + *			0 - No master is currently using the node
-> > + *			1 - Only requesting master is currently using the node
-> > + *			2 - Only other masters are currently using the node
-> > + *			3 - Both the current and at least one other master
-> > + *			is currently using the node
-> 
-> These should probably have corresponding macros or enum values.
-Will add macros in next version patch.
+BR, Shile
 
-> 
-> [...]
-> 
-> > +/**
-> > + * zynqmp_pm_sha_hash - Access the SHA engine to calculate the hash
-> > + * @address:	Address of the data/ Address of output buffer where
-> > + *		hash should be stored.
-> > + * @size:	Size of the data.
-> > + * @flags:
-> > + *	BIT(0) - Sha3 init (Here address and size inputs can be NULL)
-> > + *	BIT(1) - Sha3 update (address should holds the )
-> 
-> Missing "data", I guess?
-Yes will update in next version patch.
+-----Original Message-----
+From: Zhang, Shile (NSB - CN/Hangzhou) 
+Sent: Monday, November 13, 2017 1:32 PM
+To: Russell King <linux@armlinux.org.uk>
+Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb mappings
 
-> 
-> > + *	BIT(2) - Sha3 final (address should hold the address of
-> > + *		 buffer to store hash)
-> 
-> Is the SHA engine coherent? Or is cache maintenance necessary?
-> 
-> [...]
-It is coherent. Update/Final has below significance here:
-BIT(1) - To call Sha3_Update API which can be called multiple times when data is not contiguous.
-BIT(2) - to get final hash of the whole updated data. Hash will be overwritten at provided address with 48 bytes.
+Hi, Russell,
 
-> 
-> > +/**
-> > + * zynqmp_pm_pinctrl_request - Request Pin from firmware
-> > + * @pin:	Pin number to request
-> > + *
-> 
-> No DT binding for the pinctrl bits?
-> 
-> [...]
-It doesn't require any bindings. Calling drivers will have DT binding for pins they use. 
+Have you any time to check this patch?
+I found this issue/missing in my works, the application cannot mmap big hugepage (about 360MB) due to no more contiguous vm from the default "TASK_UNMMAPPED_AREA" by legacy bottom-up.
+We need this patch to fix this issue.
 
+Could you please help check this patch?
 
-> 
-> > +/**
-> > + * zynqmp_pm_clock_enable - Enable the clock for given id
-> > + * @clock_id:	ID of the clock to be enabled
-> > + *
-> 
-> Likewise for the clocks?
->
-It doesn't require bindings too. 
+Thanks!
+
+BR, Shile
+
+-----Original Message-----
+From: Shile Zhang [mailto:shile.zhang at nokia-sbell.com] 
+Sent: Friday, November 03, 2017 5:19 PM
+To: Russell King <linux@armlinux.org.uk>
+Cc: linux-kernel at vger.kernel.org; Zhang, Shile (NSB - CN/Hangzhou) <shile.zhang@nokia-sbell.com>
+Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb mappings
+
+merge from arch/x86
+
+Signed-off-by: Shile Zhang <shile.zhang@nokia-sbell.com>
+---
+ arch/arm/include/asm/page.h |  1 +
+ arch/arm/mm/hugetlbpage.c   | 85 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
+
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index 4355f0e..994630f 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -144,6 +144,7 @@ extern void copy_page(void *to, const void *from);
  
-> > +/**
-> > + * get_eemi_ops	- Get eemi ops functions
-> > + *
-> > + * Return:	- pointer of eemi_ops structure
-> > + */
-> > +const struct zynqmp_eemi_ops *get_eemi_ops(void) {
-> > +	return &eemi_ops;
-> > +}
-> > +EXPORT_SYMBOL_GPL(get_eemi_ops);
-> > +
-> > +static int __init zynqmp_plat_init(void) {
-> > +	struct device_node *np;
-> > +	int ret = 0;
-> > +
-> > +	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp");
-> > +	if (!np)
-> > +		return 0;
-> > +	of_node_put(np);
-> > +
-> > +	/* We're running on a ZynqMP machine, the PM node is mandatory. */
-> > +	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp-firmware");
-> > +	if (!np) {
-> > +		pr_warn("%s: pm node not found\n", __func__);
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	ret = get_set_conduit_method(np);
-> > +	if (ret) {
-> > +		of_node_put(np);
-> > +		return ret;
-> > +	}
-> > +
-> > +	/* Check PM API version number */
-> > +	zynqmp_pm_get_api_version(&pm_api_version);
-> > +	if (pm_api_version != ZYNQMP_PM_VERSION) {
-> > +		panic("%s power management API version error. Expected:
-> v%d.%d - Found: v%d.%d\n",
-> > +		      __func__,
-> > +		      ZYNQMP_PM_VERSION_MAJOR,
-> ZYNQMP_PM_VERSION_MINOR,
-> > +		      pm_api_version >> 16, pm_api_version & 0xffff);
-> > +	}
-> > +
-> > +	pr_info("%s Power management API v%d.%d\n", __func__,
-> > +		ZYNQMP_PM_VERSION_MAJOR,
-> ZYNQMP_PM_VERSION_MINOR);
-> > +
-> > +	of_node_put(np);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +early_initcall(zynqmp_plat_init);
-> 
-> Why does this need to be an early initcall? Can't we probe this as a platform
-> device?
-> 
-> Thanks,
-> Mark.
+ #ifdef CONFIG_KUSER_HELPERS
+ #define __HAVE_ARCH_GATE_AREA 1
++#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+ #endif
+ 
+ #ifdef CONFIG_ARM_LPAE
+diff --git a/arch/arm/mm/hugetlbpage.c b/arch/arm/mm/hugetlbpage.c
+index fcafb52..46ed0c8 100644
+--- a/arch/arm/mm/hugetlbpage.c
++++ b/arch/arm/mm/hugetlbpage.c
+@@ -45,3 +45,88 @@ int pmd_huge(pmd_t pmd)
+ {
+ 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
+ }
++
++#ifdef CONFIG_HUGETLB_PAGE
++static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
++		unsigned long addr, unsigned long len,
++		unsigned long pgoff, unsigned long flags)
++{
++	struct hstate *h = hstate_file(file);
++	struct vm_unmapped_area_info info;
++
++	info.flags = 0;
++	info.length = len;
++	info.low_limit = current->mm->mmap_legacy_base;
++	info.high_limit = TASK_SIZE;
++	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
++	info.align_offset = 0;
++	return vm_unmapped_area(&info);
++}
++
++static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
++		unsigned long addr0, unsigned long len,
++		unsigned long pgoff, unsigned long flags)
++{
++	struct hstate *h = hstate_file(file);
++	struct vm_unmapped_area_info info;
++	unsigned long addr;
++
++	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
++	info.length = len;
++	info.low_limit = PAGE_SIZE;
++	info.high_limit = current->mm->mmap_base;
++	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
++	info.align_offset = 0;
++	addr = vm_unmapped_area(&info);
++
++	/*
++	 * A failed mmap() very likely causes application failure,
++	 * so fall back to the bottom-up function here. This scenario
++	 * can happen with large stack limits and large mmap()
++	 * allocations.
++	 */
++	if (addr & ~PAGE_MASK) {
++		VM_BUG_ON(addr != -ENOMEM);
++		info.flags = 0;
++		info.low_limit = TASK_UNMAPPED_BASE;
++		info.high_limit = TASK_SIZE;
++		addr = vm_unmapped_area(&info);
++	}
++
++	return addr;
++}
++
++unsigned long
++hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
++		unsigned long len, unsigned long pgoff, unsigned long flags)
++{
++	struct hstate *h = hstate_file(file);
++	struct mm_struct *mm = current->mm;
++	struct vm_area_struct *vma;
++
++	if (len & ~huge_page_mask(h))
++		return -EINVAL;
++	if (len > TASK_SIZE)
++		return -ENOMEM;
++
++	if (flags & MAP_FIXED) {
++		if (prepare_hugepage_range(file, addr, len))
++			return -EINVAL;
++		return addr;
++	}
++
++	if (addr) {
++		addr = ALIGN(addr, huge_page_size(h));
++		vma = find_vma(mm, addr);
++		if (TASK_SIZE - len >= addr &&
++		    (!vma || addr + len <= vma->vm_start))
++			return addr;
++	}
++	if (mm->get_unmapped_area == arch_get_unmapped_area)
++		return hugetlb_get_unmapped_area_bottomup(file, addr, len,
++				pgoff, flags);
++	else
++		return hugetlb_get_unmapped_area_topdown(file, addr, len,
++				pgoff, flags);
++}
++#endif /* CONFIG_HUGETLB_PAGE */
+-- 
+2.6.2
