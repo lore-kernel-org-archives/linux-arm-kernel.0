@@ -1,468 +1,268 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 1 Feb 2018 18:33:25 +0100
-Subject: [PATCH 1/7] arm64: zynqmp: Add support for Xilinx zcu100-revC
-In-Reply-To: <CAL_JsqKdEdyQP8maUmM39fvsAUcrvf6=_g21aRiaXqyv-ZogBw@mail.gmail.com>
-References: <cover.1516366474.git.michal.simek@xilinx.com>
- <7dd5614c878adb30e38caf4002921c0ca995329c.1516366474.git.michal.simek@xilinx.com>
- <CAL_JsqKdEdyQP8maUmM39fvsAUcrvf6=_g21aRiaXqyv-ZogBw@mail.gmail.com>
-Message-ID: <57604f7c-8f0a-13a9-e03a-75b0441bdb98@xilinx.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 1 Feb 2018 17:34:26 +0000
+Subject: [PATCH] arm64: acpi,efi: fix alignment fault in accessing ACPI
+ tables at kdump
+In-Reply-To: <20180201090449.19514-1-takahiro.akashi@linaro.org>
+References: <20180201090449.19514-1-takahiro.akashi@linaro.org>
+Message-ID: <CAKv+Gu-2-cG3vse4briKPK0gpi5Zrg+pZHiiN7-4DSBPn0n_3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1.2.2018 17:41, Rob Herring wrote:
-> On Fri, Jan 19, 2018 at 6:55 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> This board has 2GB of memory, i2c, sd, wifi sdio, spis, uarts, display
->> port and usbs.
->> Board is using fixed clocks because clock driver hasn't been merged yet.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  arch/arm64/boot/dts/xilinx/Makefile               |   1 +
->>  arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi        | 213 ++++++++++++++++
->>  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 298 ++++++++++++++++++++++
->>  3 files changed, 512 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
->>  create mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
->>
->> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
->> index eba179b23b17..7266a6a9c0cd 100644
->> --- a/arch/arm64/boot/dts/xilinx/Makefile
->> +++ b/arch/arm64/boot/dts/xilinx/Makefile
->> @@ -1,2 +1,3 @@
->>  # SPDX-License-Identifier: GPL-2.0
->>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
->> +dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zcu100-revC.dtb
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
->> new file mode 100644
->> index 000000000000..9c09baca7dd7
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-clk.dtsi
->> @@ -0,0 +1,213 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + * Clock specification for Xilinx ZynqMP
->> + *
->> + * (C) Copyright 2015 - 2018, Xilinx, Inc.
->> + *
->> + * Michal Simek <michal.simek@xilinx.com>
->> + */
->> +
->> +/ {
->> +       clk100: clk100 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <100000000>;
->> +       };
->> +
->> +       clk125: clk125 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <125000000>;
->> +       };
->> +
->> +       clk200: clk200 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <200000000>;
->> +       };
->> +
->> +       clk250: clk250 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <250000000>;
->> +       };
->> +
->> +       clk300: clk300 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <300000000>;
->> +       };
->> +
->> +       clk600: clk600 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <600000000>;
->> +       };
->> +
->> +       dp_aclk: clock0 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <100000000>;
->> +               clock-accuracy = <100>;
->> +       };
->> +
->> +       dp_aud_clk: clock1 {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0>;
->> +               clock-frequency = <24576000>;
->> +               clock-accuracy = <100>;
->> +       };
->> +
->> +       dpdma_clk: dpdma_clk {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0x0>;
->> +               clock-frequency = <533000000>;
->> +       };
->> +
->> +       drm_clock: drm_clock {
->> +               compatible = "fixed-clock";
->> +               #clock-cells = <0x0>;
->> +               clock-frequency = <262750000>;
->> +               clock-accuracy = <0x64>;
->> +       };
->> +};
->> +
->> +&can0 {
->> +       clocks = <&clk100 &clk100>;
->> +};
->> +
->> +&can1 {
->> +       clocks = <&clk100 &clk100>;
->> +};
->> +
->> +&fpd_dma_chan1 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan2 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan3 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan4 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan5 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan6 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan7 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&fpd_dma_chan8 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan1 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan2 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan3 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan4 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan5 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan6 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan7 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&lpd_dma_chan8 {
->> +       clocks = <&clk600>, <&clk100>;
->> +};
->> +
->> +&gem0 {
->> +       clocks = <&clk125>, <&clk125>, <&clk125>;
->> +};
->> +
->> +&gem1 {
->> +       clocks = <&clk125>, <&clk125>, <&clk125>;
->> +};
->> +
->> +&gem2 {
->> +       clocks = <&clk125>, <&clk125>, <&clk125>;
->> +};
->> +
->> +&gem3 {
->> +       clocks = <&clk125>, <&clk125>, <&clk125>;
->> +};
->> +
->> +&gpio {
->> +       clocks = <&clk100>;
->> +};
->> +
->> +&i2c0 {
->> +       clocks = <&clk100>;
->> +};
->> +
->> +&i2c1 {
->> +       clocks = <&clk100>;
->> +};
->> +
->> +&sata {
->> +       clocks = <&clk250>;
->> +};
->> +
->> +&sdhci0 {
->> +       clocks = <&clk200 &clk200>;
->> +};
->> +
->> +&sdhci1 {
->> +       clocks = <&clk200 &clk200>;
->> +};
->> +
->> +&spi0 {
->> +       clocks = <&clk200 &clk200>;
->> +};
->> +
->> +&spi1 {
->> +       clocks = <&clk200 &clk200>;
->> +};
->> +
->> +&uart0 {
->> +       clocks = <&clk100 &clk100>;
->> +};
->> +
->> +&uart1 {
->> +       clocks = <&clk100 &clk100>;
->> +};
->> +
->> +&usb0 {
->> +       clocks = <&clk250>, <&clk250>;
->> +};
->> +
->> +&usb1 {
->> +       clocks = <&clk250>, <&clk250>;
->> +};
->> +
->> +&watchdog0 {
->> +       clocks = <&clk250>;
->> +};
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
->> new file mode 100644
->> index 000000000000..01f5f95806d3
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
->> @@ -0,0 +1,298 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + * dts file for Xilinx ZynqMP ZCU100 revC
->> + *
->> + * (C) Copyright 2016 - 2018, Xilinx, Inc.
->> + *
->> + * Michal Simek <michal.simek@xilinx.com>
->> + * Nathalie Chan King Choy <nathalie@xilinx.com>
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "zynqmp.dtsi"
->> +#include "zynqmp-clk.dtsi"
->> +#include <dt-bindings/input/input.h>
->> +#include <dt-bindings/interrupt-controller/irq.h>
->> +#include <dt-bindings/gpio/gpio.h>
->> +
->> +/ {
->> +       model = "ZynqMP ZCU100 RevC";
->> +       compatible = "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100", "xlnx,zynqmp";
-> 
-> Documented?
-> 
->> +
->> +       aliases {
->> +               gpio0 = &gpio;
-> 
-> Drop this.
-> 
->> +               i2c0 = &i2c1;
->> +               rtc0 = &rtc;
-> 
-> Is there more than one?
+On 1 February 2018 at 09:04, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> This is a fix against the issue that crash dump kernel may hang up
+> during booting, which can happen on any ACPI-based system with "ACPI
+> Reclaim Memory."
+>
+> (kernel messages after panic kicked off kdump)
+>            (snip...)
+>         Bye!
+>            (snip...)
+>         ACPI: Core revision 20170728
+>         pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
+>         Internal error: Oops: 96000021 [#1] SMP
+>         Modules linked in:
+>         CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
+>         task: ffff000008d05180 task.stack: ffff000008cc0000
+>         PC is at acpi_ns_lookup+0x25c/0x3c0
+>         LR is at acpi_ds_load1_begin_op+0xa4/0x294
+>            (snip...)
+>         Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
+>         Call trace:
+>            (snip...)
+>         [<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
+>         [<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
+>         [<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
+>         [<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
+>         [<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
+>         [<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
+>         [<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
+>         [<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
+>         [<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
+>         [<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
+>         [<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
+>         [<ffff000008badc20>] acpi_early_init+0x9c/0xd0
+>         [<ffff000008b70d50>] start_kernel+0x3b4/0x43c
+>         Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
+>         ---[ end trace c46ed37f9651c58e ]---
+>         Kernel panic - not syncing: Fatal exception
+>         Rebooting in 10 seconds..
+>
+> (diagnosis)
+> * This fault is a data abort, alignment fault (ESR=0x96000021)
+>   during reading out ACPI table.
+> * Initial ACPI tables are normally stored in system ram and marked as
+>   "ACPI Reclaim memory" by the firmware.
+> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+>   memory as MEMBLOCK_NOMAP"), those regions are differently handled
+>   as they are "memblock-reserved", without NOMAP bit.
+> * So they are now excluded from device tree's "usable-memory-range"
+>   which kexec-tools determines based on a current view of /proc/iomem.
 
-In programmable logic logic there can be plenty of them.
+So this patch does fix the fallout of how this issue affects ACPI boot
+in particular, but is it correct in the first place for the kexec
+tools to disregard memory that has been memblock_reserved()? For
+instance, the UEFI memory map is memblock_reserve()d as well, along
+with other parts of memory that have been populated by the firmware.
 
-> 
->> +               serial0 = &uart1;
->> +               serial1 = &uart0;
->> +               serial2 = &dcc;
->> +               spi0 = &spi0;
->> +               spi1 = &spi1;
-> 
->> +               usb0 = &usb0;
->> +               usb1 = &usb1;
-> 
-> Drop these.
-> 
->> +               mmc0 = &sdhci0;
->> +               mmc1 = &sdhci1;
->> +       };
->> +
->> +       chosen {
->> +               bootargs = "earlycon";
->> +               stdout-path = "serial0:115200n8";
->> +       };
->> +
->> +       memory at 0 {
->> +               device_type = "memory";
->> +               reg = <0x0 0x0 0x0 0x80000000>;
->> +       };
->> +
->> +       gpio-keys {
->> +               compatible = "gpio-keys";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               autorepeat;
->> +               sw4 {
->> +                       label = "sw4";
->> +                       gpios = <&gpio 23 GPIO_ACTIVE_LOW>;
->> +                       linux,code = <KEY_POWER>;
->> +                       gpio-key,wakeup;
->> +                       autorepeat;
->> +               };
->> +       };
->> +
->> +       leds {
->> +               compatible = "gpio-leds";
->> +               ds2 {
->> +                       label = "ds2";
->> +                       gpios = <&gpio 20 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "heartbeat";
->> +               };
->> +
->> +               ds3 {
->> +                       label = "ds3";
->> +                       gpios = <&gpio 19 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "phy0tx"; /* WLAN tx */
->> +                       default-state = "off";
->> +               };
->> +
->> +               ds4 {
->> +                       label = "ds4";
->> +                       gpios = <&gpio 18 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "phy0rx"; /* WLAN rx */
->> +                       default-state = "off";
->> +               };
->> +
->> +               ds5 {
->> +                       label = "ds5";
->> +                       gpios = <&gpio 17 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "bluetooth-power";
->> +               };
->> +
->> +               vbus_det { /* U5 USB5744 VBUS detection via MIO25 */
->> +                       label = "vbus_det";
->> +                       gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
->> +                       default-state = "on";
->> +               };
->> +
->> +               bt_power {
->> +                       label = "bt_power";
->> +                       gpios = <&gpio 8 GPIO_ACTIVE_HIGH>;
->> +                       default-state = "on";
->> +               };
->> +       };
->> +
->> +       wmmcsdio_fixed: fixedregulator-mmcsdio {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "wmmcsdio_fixed";
->> +               regulator-min-microvolt = <3300000>;
->> +               regulator-max-microvolt = <3300000>;
->> +               regulator-always-on;
->> +               regulator-boot-on;
->> +       };
->> +
->> +       sdio_pwrseq: sdio_pwrseq {
->> +               compatible = "mmc-pwrseq-simple";
->> +               reset-gpios = <&gpio 7 GPIO_ACTIVE_LOW>; /* WIFI_EN */
->> +       };
->> +};
->> +
->> +&dcc {
->> +       status = "okay";
->> +};
->> +
->> +&gpio {
->> +       status = "okay";
->> +       gpio-line-names = "UART1_TX", "UART1_RX", "UART0_RX", "UART0_TX", "I2C1_SCL",
->> +                         "I2C1_SDA", "SPI1_SCLK", "WLAN_EN", "BT_EN", "SPI1_CS",
->> +                         "SPI1_MISO", "SPI1_MOSI", "I2C_MUX_RESET", "SD0_DAT0", "SD0_DAT1",
->> +                         "SD0_DAT2", "SD0_DAT3", "PS_LED3", "PS_LED2", "PS_LED1",
->> +                         "PS_LED0", "SD0_CMD", "SD0_CLK", "GPIO_PB", "SD0_DETECT",
->> +                         "VBUS_DET", "POWER_INT", "DP_AUX", "DP_HPD", "DP_OE",
->> +                         "DP_AUX_IN", "INA226_ALERT", "PS_FP_PWR_EN", "PL_PWR_EN", "POWER_KILL",
->> +                         "", "GPIO-A", "GPIO-B", "SPI0_SCLK", "GPIO-C",
->> +                         "GPIO-D", "SPI0_CS", "SPI0_MISO", "SPI_MOSI", "GPIO-E",
->> +                         "GPIO-F", "SD1_D0", "SD1_D1", "SD1_D2", "SD1_D3",
->> +                         "SD1_CMD", "SD1_CLK", "USB0_CLK", "USB0_DIR", "USB0_DATA2",
->> +                         "USB0_NXT", "USB0_DATA0", "USB0_DATA1", "USB0_STP", "USB0_DATA3",
->> +                         "USB0_DATA4", "USB0_DATA5", "USB0_DATA6", "USB0_DATA7", "USB1_CLK",
->> +                         "USB1_DIR", "USB1_DATA2", "USB1_NXT", "USB1_DATA0", "USB1_DATA1",
->> +                         "USB1_STP", "USB1_DATA3", "USB1_DATA4", "USB1_DATA5", "USB1_DATA6",
->> +                         "USB_DATA7", "WLAN_IRQ", "PMIC_IRQ", /* MIO end and EMIO start */
->> +                         "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "", "", "", "", "", "", "",
->> +                         "", "", "", "";
->> +};
->> +
->> +&i2c1 {
->> +       status = "okay";
->> +       clock-frequency = <100000>;
->> +       i2cswitch at 75 { /* u11 */
-> 
-> i2c-mux at 75
-> 
->> +               compatible = "nxp,pca9548";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x75>;
->> +               i2csw_0: i2c at 0 { /* i2c mw 75 0 1 */
-> 
-> Linux commands for comments aren't relevant to dts files.
+> * When crash dump kernel boots up, it tries to accesses ACPI tables by
+>   mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
+>   since they are no longer part of mapped system ram.
+> * Given that ACPI accessor/helper functions are compiled in without
+>   unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
+>   any unaligned access to ACPI tables can cause a fatal panic.
+>
+> With this patch, acpi_os_ioremap() always honors a memory attribute
+> provided by the firmware (efi). Hence retaining cacheability in said cases
+> allows the kernel safe access to ACPI tables.
+>
+> Please note that arm_enable_runtime_services(), which is renamed to
+> efi_enter_virtual_mode() due to the similarity to x86's, is now called
+> earlier before acpi_early_init() since efi_mem_attributes() relies on
+> efi.memmap being mapped.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Suggested-by: James Morse <james.morse@arm.com>
+> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Reported-by and Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+> ---
+>  arch/arm64/include/asm/acpi.h      | 23 ++++++++++++++++-------
+>  arch/arm64/kernel/acpi.c           | 11 +++--------
 
-I was removing this from others and forget this one.
-Just a note: It is u-boot command.
+Split into two patches --here-- please
 
-> 
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <0>;
->> +                       /*
->> +                        * LSEXP_I2C0
-> 
-> Is this a 96boards design? If so, using "label" and with defined names
-> is somewhat standard for defining low speed connector ports (and for
-> LEDs). That should also remove any need for using aliases for I2C and
-> SPI. Look at hikey or db410c.
-
-i2c, spi is easy
-label = "HS-I2C2";
-
-leds are also fine and fixed.
-
-serial labeling depends on configuration. It means serial0 can be
-LS-UART0 or 1 or PL based uart can be connected there.
-
-Thanks,
-Michal
+>  drivers/firmware/efi/arm-runtime.c | 15 ++++++---------
+>  init/main.c                        |  3 +++
+>  4 files changed, 28 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 32f465a80e4e..d53c95f4e1a9 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -12,10 +12,12 @@
+>  #ifndef _ASM_ACPI_H
+>  #define _ASM_ACPI_H
+>
+> +#include <linux/efi.h>
+>  #include <linux/memblock.h>
+>  #include <linux/psci.h>
+>
+>  #include <asm/cputype.h>
+> +#include <asm/io.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/tlbflush.h>
+>
+> @@ -29,18 +31,22 @@
+>
+>  /* Basic configuration for ACPI */
+>  #ifdef CONFIG_ACPI
+> +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
+> +
+>  /* ACPI table mapping after acpi_permanent_mmap is set */
+>  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+>                                             acpi_size size)
+>  {
+> +       /* For normal memory we already have a cacheable mapping. */
+> +       if (memblock_is_map_memory(phys))
+> +               return (void __iomem *)__phys_to_virt(phys);
+> +
+>         /*
+> -        * EFI's reserve_regions() call adds memory with the WB attribute
+> -        * to memblock via early_init_dt_add_memory_arch().
+> +        * We should still honor the memory's attribute here because
+> +        * crash dump kernel possibly excludes some ACPI (reclaim)
+> +        * regions from memblock list.
+>          */
+> -       if (!memblock_is_memory(phys))
+> -               return ioremap(phys, size);
+> -
+> -       return ioremap_cache(phys, size);
+> +       return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
+>  }
+>  #define acpi_os_ioremap acpi_os_ioremap
+>
+> @@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
+>   * for compatibility.
+>   */
+>  #define acpi_disable_cmcff 1
+> -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+> +static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+> +{
+> +       return __acpi_get_mem_attribute(addr);
+> +}
+>  #endif /* CONFIG_ACPI_APEI */
+>
+>  #ifdef CONFIG_ACPI_NUMA
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index b3162715ed78..35702c5e58d2 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/acpi.h>
+>  #include <linux/bootmem.h>
+>  #include <linux/cpumask.h>
+> +# include <linux/efi.h>
+>  #include <linux/efi-bgrt.h>
+>  #include <linux/init.h>
+>  #include <linux/irq.h>
+> @@ -29,12 +30,8 @@
+>
+>  #include <asm/cputype.h>
+>  #include <asm/cpu_ops.h>
+> -#include <asm/smp_plat.h>
+> -
+> -#ifdef CONFIG_ACPI_APEI
+> -# include <linux/efi.h>
+>  # include <asm/pgtable.h>
+> -#endif
+> +#include <asm/smp_plat.h>
+>
+>  int acpi_noirq = 1;            /* skip ACPI IRQ initialization */
+>  int acpi_disabled = 1;
+> @@ -239,8 +236,7 @@ void __init acpi_boot_table_init(void)
+>         }
+>  }
+>
+> -#ifdef CONFIG_ACPI_APEI
+> -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+> +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
+>  {
+>         /*
+>          * According to "Table 8 Map: EFI memory types to AArch64 memory
+> @@ -261,4 +257,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>                 return __pgprot(PROT_NORMAL_NC);
+>         return __pgprot(PROT_DEVICE_nGnRnE);
+>  }
+> -#endif
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 1cc41c3d6315..16dd8a2d0237 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -115,23 +115,23 @@ static bool __init efi_virtmap_init(void)
+>   * non-early mapping of the UEFI system table and virtual mappings for all
+>   * EFI_MEMORY_RUNTIME regions.
+>   */
+> -static int __init arm_enable_runtime_services(void)
+> +void __init efi_enter_virtual_mode(void)
+>  {
+>         u64 mapsize;
+>
+>         if (!efi_enabled(EFI_BOOT)) {
+>                 pr_info("EFI services will not be available.\n");
+> -               return 0;
+> +               return;
+>         }
+>
+>         if (efi_runtime_disabled()) {
+>                 pr_info("EFI runtime services will be disabled.\n");
+> -               return 0;
+> +               return;
+>         }
+>
+>         if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+>                 pr_info("EFI runtime services access via paravirt.\n");
+> -               return 0;
+> +               return;
+>         }
+>
+>         pr_info("Remapping and enabling EFI services.\n");
+> @@ -140,21 +140,18 @@ static int __init arm_enable_runtime_services(void)
+>
+>         if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+>                 pr_err("Failed to remap EFI memory map\n");
+> -               return -ENOMEM;
+> +               return;
+>         }
+>
+>         if (!efi_virtmap_init()) {
+>                 pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
+> -               return -ENOMEM;
+> +               return;
+>         }
+>
+>         /* Set up runtime services function pointers */
+>         efi_native_runtime_setup();
+>         set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+> -
+> -       return 0;
+>  }
+> -early_initcall(arm_enable_runtime_services);
+>
+>  void efi_virtmap_load(void)
+>  {
+> diff --git a/init/main.c b/init/main.c
+> index a8100b954839..2d0927768e2d 100644
+> --- a/init/main.c
+> +++ b/init/main.c
+> @@ -674,6 +674,9 @@ asmlinkage __visible void __init start_kernel(void)
+>         debug_objects_mem_init();
+>         setup_per_cpu_pageset();
+>         numa_policy_init();
+> +       if (IS_ENABLED(CONFIG_EFI) &&
+> +           (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
+> +               efi_enter_virtual_mode();
+>         acpi_early_init();
+>         if (late_time_init)
+>                 late_time_init();
+> --
+> 2.15.1
+>
