@@ -1,92 +1,189 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Thu, 1 Feb 2018 17:17:11 +0100
-Subject: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali changing dclk
- frequency
-In-Reply-To: <20180201124551.kfyz6frx4lcx4wbz@flea.lan>
-References: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180131084349.du2ijvhh5rxa5vvt@flea.lan>
- <7be1e297-4fac-a7a2-a8cc-54061d4e2fde@micronovasrl.com>
- <20180201124551.kfyz6frx4lcx4wbz@flea.lan>
-Message-ID: <8c2fef37-8eb6-38c6-de3d-547edafac8b7@micronovasrl.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 2 Feb 2018 00:22:48 +0800
+Subject: [PATCH 2/2] soc: mediatek: add SCPSYS power domain driver for
+ MediaTek MT7623A SoC
+In-Reply-To: <f0675124-c5c7-0f98-9762-c0778d7f5807@gmail.com>
+References: <975fb80e1cdbe7f6d4a1d04fd3a2a21b619a193d.1517479588.git.sean.wang@mediatek.com>
+ <de07c071f968ae9da84543bb33cc5658ed184801.1517479588.git.sean.wang@mediatek.com>
+ <f0675124-c5c7-0f98-9762-c0778d7f5807@gmail.com>
+Message-ID: <1517502168.15199.43.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Il 01/02/2018 13:45, Maxime Ripard ha scritto:
-> On Wed, Jan 31, 2018 at 01:05:38PM +0100, Giulio Benetti wrote:
->> Hi,
->>
->> Il 31/01/2018 09:43, Maxime Ripard ha scritto:
->>> Hi,
->>>
->>> On Wed, Jan 31, 2018 at 12:23:59AM +0100, Giulio Benetti wrote:
->>>> When mali.ko is inserted, it set default clocks and call all parent
->>>> clocks to stay into range, causing pll-video0 to change and
->>>> subsequently to change dclk to wrong frequencies.
->>>
->>> This is what you should fix.
->>
->> Ok, so it must be patch title(shrinked of course), right?
->>
->>>
->>>> "gpu" clock has lot of parent plls inside driver, but on sun7i
->>>> pll8-gpu does not depend on pll-video0, pll-ve, pll-video1.
->>>>
->>>> It only depends on 24Mhz main clock.
->>>
->>> I don't really know why you are mentionning that. The GPU clock has
->>> all the parents described in the driver. And the parents' parents are
->>> irrelevant to this particular issue.
->>>
->>>> Remove all pll parents from gpu_parents_sun7i except "pll-gpu".
->>>
->>> However, this is not a proper fix for your issue.
->>
->> Yes, you're right, now I understand.
->>
->> It is more complex than I thought.
->> I need to dig more and study better A20 CCU.
->>
->> So this patch can be dropped.
->>
->>>
->>> What kernel version did you use?
->>
->> Latest mainline.
+On Thu, 2018-02-01 at 16:19 +0100, Matthias Brugger wrote:
 > 
-> I guess this patch could fix it:
-> http://code.bulix.org/1kitrq-268936?raw
-
-This should prevent from modifying parent clock.
-But my problem was different.
-On A20, gpu_clk can have different PLL,
-not I've found out the way to choose right one
-with assigned-parent-clocks.
-
-I have patchset ready for adding A20 mali node,
-but I need some more time to complete with OPP,
-then I will submit entire patchset.
-Now it works correctly, using right pll(dedicated PLL8),
-setting right frequency.
-
-Btw, do I need to add a board using it,
-or can I add only Mali node to sun7i-a20.dtsi(plus other little patches)?
-
+> On 02/01/2018 11:12 AM, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Add SCPSYS power domain driver for MT7623A SoC. The MT7623A's power
+> > domains are the subset of MT7623 SoC's ones. As MT7623 SoC has full
+> > features whereas MT7623A is being designed just for router applications.
+> > Thus, MT7623A doesn't include those power domains multimedia function
+> > belongs to. In order to avoid certain errors undoubtedly happening at
+> > registering those power domains on MT7623A SoC using the existing MT7623
+> > SCPSYS driver, it's required to define another setup specifically for
+> > MT7623A SoC. Also, use a meaningful definition for bus_prot_mask instead
+> > of just hardcoded for it.
 > 
-> Maxime
+> Also is nearly always a indicator to put it in a different patch. Could you
+> please do so?
 > 
 
+Sure, I will do so in the next version.
 
--- 
-Giulio Benetti
-R&D Manager &
-Advanced Research
+> Otherwise the series look good.
+> 
 
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+Really thanks for you prompt feedback
+
+> Regards,
+> Matthias
+> 
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  drivers/soc/mediatek/mtk-scpsys.c         | 60 +++++++++++++++++++++++++++++--
+> >  include/dt-bindings/power/mt7623a-power.h | 10 ++++++
+> >  include/linux/soc/mediatek/infracfg.h     |  4 +++
+> >  3 files changed, 72 insertions(+), 2 deletions(-)
+> >  create mode 100644 include/dt-bindings/power/mt7623a-power.h
+> > 
+> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> > index 435ce5e..fc55faa 100644
+> > --- a/drivers/soc/mediatek/mtk-scpsys.c
+> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> > @@ -24,6 +24,7 @@
+> >  #include <dt-bindings/power/mt2712-power.h>
+> >  #include <dt-bindings/power/mt6797-power.h>
+> >  #include <dt-bindings/power/mt7622-power.h>
+> > +#include <dt-bindings/power/mt7623a-power.h>
+> >  #include <dt-bindings/power/mt8173-power.h>
+> >  
+> >  #define SPM_VDE_PWR_CON			0x0210
+> > @@ -518,7 +519,8 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+> >  		.name = "conn",
+> >  		.sta_mask = PWR_STATUS_CONN,
+> >  		.ctl_offs = SPM_CONN_PWR_CON,
+> > -		.bus_prot_mask = 0x0104,
+> > +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN_M |
+> > +				 MT2701_TOP_AXI_PROT_EN_CONN_S,
+> >  		.clk_id = {CLK_NONE},
+> >  		.active_wakeup = true,
+> >  	},
+> > @@ -528,7 +530,7 @@ static const struct scp_domain_data scp_domain_data_mt2701[] = {
+> >  		.ctl_offs = SPM_DIS_PWR_CON,
+> >  		.sram_pdn_bits = GENMASK(11, 8),
+> >  		.clk_id = {CLK_MM},
+> > -		.bus_prot_mask = 0x0002,
+> > +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_MM_M0,
+> >  		.active_wakeup = true,
+> >  	},
+> >  	[MT2701_POWER_DOMAIN_MFG] = {
+> > @@ -794,6 +796,47 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+> >  };
+> >  
+> >  /*
+> > + * MT7623A power domain support
+> > + */
+> > +
+> > +static const struct scp_domain_data scp_domain_data_mt7623a[] = {
+> > +	[MT7623A_POWER_DOMAIN_CONN] = {
+> > +		.name = "conn",
+> > +		.sta_mask = PWR_STATUS_CONN,
+> > +		.ctl_offs = SPM_CONN_PWR_CON,
+> > +		.bus_prot_mask = MT2701_TOP_AXI_PROT_EN_CONN_M |
+> > +				 MT2701_TOP_AXI_PROT_EN_CONN_S,
+> > +		.clk_id = {CLK_NONE},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT7623A_POWER_DOMAIN_ETH] = {
+> > +		.name = "eth",
+> > +		.sta_mask = PWR_STATUS_ETH,
+> > +		.ctl_offs = SPM_ETH_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> > +		.clk_id = {CLK_ETHIF},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT7623A_POWER_DOMAIN_HIF] = {
+> > +		.name = "hif",
+> > +		.sta_mask = PWR_STATUS_HIF,
+> > +		.ctl_offs = SPM_HIF_PWR_CON,
+> > +		.sram_pdn_bits = GENMASK(11, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> > +		.clk_id = {CLK_ETHIF},
+> > +		.active_wakeup = true,
+> > +	},
+> > +	[MT7623A_POWER_DOMAIN_IFR_MSC] = {
+> > +		.name = "ifr_msc",
+> > +		.sta_mask = PWR_STATUS_IFR_MSC,
+> > +		.ctl_offs = SPM_IFR_MSC_PWR_CON,
+> > +		.clk_id = {CLK_NONE},
+> > +		.active_wakeup = true,
+> > +	},
+> > +};
+> > +
+> > +/*
+> >   * MT8173 power domain support
+> >   */
+> >  
+> > @@ -934,6 +977,16 @@ static const struct scp_soc_data mt7622_data = {
+> >  	.bus_prot_reg_update = true,
+> >  };
+> >  
+> > +static const struct scp_soc_data mt7623a_data = {
+> > +	.domains = scp_domain_data_mt7623a,
+> > +	.num_domains = ARRAY_SIZE(scp_domain_data_mt7623a),
+> > +	.regs = {
+> > +		.pwr_sta_offs = SPM_PWR_STATUS,
+> > +		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND
+> > +	},
+> > +	.bus_prot_reg_update = true,
+> > +};
+> > +
+> >  static const struct scp_soc_data mt8173_data = {
+> >  	.domains = scp_domain_data_mt8173,
+> >  	.num_domains = ARRAY_SIZE(scp_domain_data_mt8173),
+> > @@ -964,6 +1017,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
+> >  		.compatible = "mediatek,mt7622-scpsys",
+> >  		.data = &mt7622_data,
+> >  	}, {
+> > +		.compatible = "mediatek,mt7623a-scpsys",
+> > +		.data = &mt7623a_data,
+> > +	}, {
+> >  		.compatible = "mediatek,mt8173-scpsys",
+> >  		.data = &mt8173_data,
+> >  	}, {
+> > diff --git a/include/dt-bindings/power/mt7623a-power.h b/include/dt-bindings/power/mt7623a-power.h
+> > new file mode 100644
+> > index 0000000..ac15b5d
+> > --- /dev/null
+> > +++ b/include/dt-bindings/power/mt7623a-power.h
+> > @@ -0,0 +1,10 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +#ifndef _DT_BINDINGS_POWER_MT7623A_POWER_H
+> > +#define _DT_BINDINGS_POWER_MT7623A_POWER_H
+> > +
+> > +#define MT7623A_POWER_DOMAIN_CONN	0
+> > +#define MT7623A_POWER_DOMAIN_ETH	1
+> > +#define MT7623A_POWER_DOMAIN_HIF	2
+> > +#define MT7623A_POWER_DOMAIN_IFR_MSC	3
+> > +
+> > +#endif /* _DT_BINDINGS_POWER_MT2701_POWER_H */
+> > diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
+> > index b0a507d..fd25f01 100644
+> > --- a/include/linux/soc/mediatek/infracfg.h
+> > +++ b/include/linux/soc/mediatek/infracfg.h
+> > @@ -21,6 +21,10 @@
+> >  #define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
+> >  #define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
+> >  
+> > +#define MT2701_TOP_AXI_PROT_EN_MM_M0		BIT(1)
+> > +#define MT2701_TOP_AXI_PROT_EN_CONN_M		BIT(2)
+> > +#define MT2701_TOP_AXI_PROT_EN_CONN_S		BIT(8)
+> > +
+> >  #define MT7622_TOP_AXI_PROT_EN_ETHSYS		(BIT(3) | BIT(17))
+> >  #define MT7622_TOP_AXI_PROT_EN_HIF0		(BIT(24) | BIT(25))
+> >  #define MT7622_TOP_AXI_PROT_EN_HIF1		(BIT(26) | BIT(27) | \
+> > 
+> 
