@@ -1,97 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Feb 2018 14:20:00 +0000
-Subject: [PATCH v3 00/18] arm64: Add SMCCC v1.1 support and CVE-2017-5715
- (Spectre variant 2) mitigation
-In-Reply-To: <CAKv+Gu-oyOW4i1kAKcw7su-QDj=GPoxGrdBMwvOOty=JBgz9iw@mail.gmail.com>
-References: <20180201114657.7323-1-marc.zyngier@arm.com>
- <CAKv+Gu-oyOW4i1kAKcw7su-QDj=GPoxGrdBMwvOOty=JBgz9iw@mail.gmail.com>
-Message-ID: <86efm46bcf.wl-marc.zyngier@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 1 Feb 2018 14:24:55 +0000
+Subject: [alsa-devel] [PATCH 1/1] ASoC: stm32: add of dependency for
+ stm32 drivers
+In-Reply-To: <3bd3ba89-5c69-4485-c913-ff1c1ad67190@st.com>
+References: <1517475281-6444-1-git-send-email-olivier.moysan@st.com>
+ <20180201091012.GA10746@lenoch>
+ <3bd3ba89-5c69-4485-c913-ff1c1ad67190@st.com>
+Message-ID: <20180201142455.GB10785@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 01 Feb 2018 13:59:45 +0000,
-Ard Biesheuvel wrote:
-> 
-> On 1 February 2018 at 11:46, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > ARM has recently published a SMC Calling Convention (SMCCC)
-> > specification update[1] that provides an optimised calling convention
-> > and optional, discoverable support for mitigating CVE-2017-5715. ARM
-> > Trusted Firmware (ATF) has already gained such an implementation[2].
-> >
-> > This series addresses a few things:
-> >
-> > - It provides a KVM implementation of PSCI v1.0, which is a
-> >   prerequisite for being able to discover SMCCC v1.1, together with a
-> >   new userspace API to control the PSCI revision number that the guest
-> >   sees.
-> >
-> > - It allows KVM to advertise SMCCC v1.1, which is de-facto supported
-> >   already (it never corrupts any of the guest registers).
-> >
-> > - It implements KVM support for the ARCH_WORKAROUND_1 function that is
-> >   used to mitigate CVE-2017-5715 in a guest (if such mitigation is
-> >   available on the host).
-> >
-> > - It implements SMCCC v1.1 and ARCH_WORKAROUND_1 discovery support in
-> >   the kernel itself.
-> >
-> > - It finally provides firmware callbacks for CVE-2017-5715 for both
-> >   kernel and KVM and drop the initial PSCI_GET_VERSION based
-> >   mitigation.
-> >
-> > Patch 1 is already merged, and included here for reference. Patches on
-> > top of arm64/for-next/core. Tested on Seattle and Juno, the latter
-> > with ATF implementing SMCCC v1.1.
-> >
-> > [1]: https://developer.arm.com/support/security-update/downloads/
-> >
-> > [2]: https://github.com/ARM-software/arm-trusted-firmware/pull/1240
-> >
-> > * From v2:
-> >   - Fixed SMC handling in KVM
-> >   - PSCI fixes and tidying up
-> >   - SMCCC primitive rework for better code generation (both efficiency
-> >   and correctness)
-> >   - Remove PSCI_GET_VERSION as a mitigation vector
-> >
-> > * From v1:
-> >   - Fixed 32bit build
-> >   - Fix function number sign extension (Ard)
-> >   - Inline SMCCC v1.1 primitives (cpp soup)
-> >   - Prevent SMCCC spamming on feature probing
-> >   - Random fixes and tidying up
-> >
-> > Marc Zyngier (18):
-> >   arm64: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls
-> >   arm: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls
-> >   arm64: KVM: Increment PC after handling an SMC trap
-> >   arm/arm64: KVM: Consolidate the PSCI include files
-> >   arm/arm64: KVM: Add PSCI_VERSION helper
-> >   arm/arm64: KVM: Add smccc accessors to PSCI code
-> >   arm/arm64: KVM: Implement PSCI 1.0 support
-> >   arm/arm64: KVM: Add PSCI version selection API
-> >   arm/arm64: KVM: Advertise SMCCC v1.1
-> >   arm/arm64: KVM: Turn kvm_psci_version into a static inline
-> >   arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP hardening support
-> >   arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
-> >   firmware/psci: Expose PSCI conduit
-> >   firmware/psci: Expose SMCCC version through psci_ops
-> >   arm/arm64: smccc: Make function identifiers an unsigned quantity
-> >   arm/arm64: smccc: Implement SMCCC v1.1 inline primitive
-> >   arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support
-> >   arm64: Kill PSCI_GET_VERSION as a variant-2 workaround
-> >
-> 
-> I have given this a spin on my Overdrive, and everything seems to work
-> as expected, both in the host and in the guest (I single stepped
-> through the guest to ensure that it gets the expected answer from the
-> SMCCC feature info call)
-> 
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Thu, Feb 01, 2018 at 01:19:28PM +0000, Olivier MOYSAN wrote:
+> On 02/01/2018 10:10 AM, Ladislav Michl wrote:
 
-Awesome, thanks Ard.
+> > depends on (ARCH_STM32 && OF) || COMPILE_TEST ?
 
-	M.
+> I can find in many configs "depends on OF && (ARCH_X || COMPILE_TEST)"
+> This seems reasonable to me, as the driver always requires OF 
+> dependency, regardless the compilation context.
+> In fact, I cannot see why OF would not have to be selected
+> for COMPILE_TEST.
 
--- 
-Jazz is not dead, it just smell funny.
+There are some OF functions that are stubbed out when OF is disabled and
+some that aren't, if the driver is using the more obscure APIs that
+aren't stubbed it needs the hard dependency but if it's using the other
+bits that do have the stubs then it can be compile tested without OF
+being abled.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/01601556/attachment-0001.sig>
