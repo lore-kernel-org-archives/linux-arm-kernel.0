@@ -1,48 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu,  1 Feb 2018 15:32:40 -0600
-Subject: [PATCH RESEND] arm64: dts: cavium: fix PCI bus dtc warnings
-Message-ID: <20180201213240.28862-1-robh@kernel.org>
+From: michael.weiser@gmx.de (Michael Weiser)
+Date: Thu,  1 Feb 2018 23:13:37 +0100
+Subject: [PATCH v2 2/3] arm64: Mirror arm for unimplemented compat syscalls
+In-Reply-To: <20180201221338.9952-1-michael.weiser@gmx.de>
+References: <20180201221338.9952-1-michael.weiser@gmx.de>
+Message-ID: <20180201221338.9952-3-michael.weiser@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc recently added PCI bus checks. Fix these warnings:
+Mirror arm behaviour for unimplemented syscalls: Below 2048 return
+-ENOSYS, above 2048 raise SIGILL.
 
-arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (pci_bridge): Node /pci missing bus-range for PCI bridge
-arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (unit_address_vs_reg): Node /pci has a reg or ranges property, but no unit name
-
-Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Jayachandran C <jnair@caviumnetworks.com>
+Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
 ---
-Arnd, Olof,
+ arch/arm64/kernel/sys_compat.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-Going thru my backlog of patches and found this one never made it 
-upstream. Please apply.
-
-Rob
-
- arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
-index 4220fbdcb24a..ff5c4c47b22b 100644
---- a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
-+++ b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
-@@ -98,7 +98,7 @@
- 		clock-output-names = "clk125mhz";
- 	};
+diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
+index 8b8bbd3eaa52..4d5dfbb2c4cb 100644
+--- a/arch/arm64/kernel/sys_compat.c
++++ b/arch/arm64/kernel/sys_compat.c
+@@ -27,6 +27,7 @@
+ #include <linux/uaccess.h>
  
--	pci {
-+	pcie at 30000000 {
- 		compatible = "pci-host-ecam-generic";
- 		device_type = "pci";
- 		#interrupt-cells = <1>;
-@@ -118,6 +118,7 @@
- 		ranges =
- 		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
- 		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
-+		bus-range = <0 0xff>;
- 		interrupt-map-mask = <0 0 0 7>;
- 		interrupt-map =
- 		      /* addr  pin  ic   icaddr  icintr */
+ #include <asm/cacheflush.h>
++#include <asm/system_misc.h>
+ #include <asm/unistd.h>
+ 
+ static long
+@@ -67,6 +68,7 @@ do_compat_cache_op(unsigned long start, unsigned long end, int flags)
+  */
+ long compat_arm_syscall(struct pt_regs *regs)
+ {
++	siginfo_t info;
+ 	unsigned int no = regs->regs[7];
+ 
+ 	switch (no) {
+@@ -99,6 +101,23 @@ long compat_arm_syscall(struct pt_regs *regs)
+ 		return 0;
+ 
+ 	default:
+-		return -ENOSYS;
++		/*
++		 * Calls 9f00xx..9f07ff are defined to return -ENOSYS
++		 * if not implemented, rather than raising SIGILL. This
++		 * way the calling program can gracefully determine whether
++		 * a feature is supported.
++		 */
++		if ((no & 0xffff) <= 0x7ff)
++			return -ENOSYS;
++		break;
+ 	}
++
++	info.si_signo = SIGILL;
++	info.si_errno = 0;
++	info.si_code  = ILL_ILLTRP;
++	info.si_addr  = (void __user *)instruction_pointer(regs) -
++			 (compat_thumb_mode(regs) ? 2 : 4);
++
++	arm64_notify_die("Oops - bad syscall(2)", regs, &info, no);
++	return 0;
+ }
 -- 
-2.14.1
+2.16.1
