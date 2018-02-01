@@ -1,42 +1,40 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 1 Feb 2018 11:45:25 +0800
-Subject: [PATCH v3 3/3] dmaengine: mediatek: update MAINTAINERS entry with
- MediaTek DMA driver
-In-Reply-To: <cover.1517454174.git.sean.wang@mediatek.com>
-References: <cover.1517454174.git.sean.wang@mediatek.com>
-Message-ID: <a88934f6ce87227d67a00cc4de95f141141d14d6.1517454174.git.sean.wang@mediatek.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu,  1 Feb 2018 10:00:55 +0530
+Subject: [PATCH] arm64: dts: msm8996: Fix wrong use of GIC_CPU_MASK_SIMPLE()
+Message-ID: <20180201043055.14088-1-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+GICv3 does not have affinity bitmap in the binding for PPI
+interrupts. It can be specified using a 4th cell if needed
+as documented in the bindings. Clean up the wrong use of the
+affinity bitmap using the GIC_CPU_MASK_SIMPLE() macro
 
-I work for MediaTek and maintain SoC targeting to home gateway and
-also will keep extending and testing the function.
-
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c90687e..48f85f4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8786,6 +8786,15 @@ M:	Sean Wang <sean.wang@mediatek.com>
- S:	Maintained
- F:	drivers/media/rc/mtk-cir.c
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 4b2afcc4fdf4..07bd89978117 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -232,10 +232,10 @@
  
-+MEDIATEK DMA DRIVER
-+M:	Sean Wang <sean.wang@mediatek.com>
-+L:	dmaengine at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/dma/mtk-*
-+F:	drivers/dma/mediatek/
-+
- MEDIATEK PMIC LED DRIVER
- M:	Sean Wang <sean.wang@mediatek.com>
- S:	Maintained
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+-		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+ 	};
+ 
+ 	clocks {
 -- 
-2.7.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
