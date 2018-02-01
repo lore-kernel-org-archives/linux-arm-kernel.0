@@ -1,51 +1,56 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  1 Feb 2018 18:34:58 +0900
-Subject: [PATCH 1/2] arm64: kprobes: Remove unneeded address sanity check
+Date: Thu,  1 Feb 2018 18:34:59 +0900
+Subject: [PATCH 2/2] lkdtm: fix irq handler entry for arm64
 In-Reply-To: <20180201093459.20477-1-takahiro.akashi@linaro.org>
 References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
-Message-ID: <20180201093459.20477-2-takahiro.akashi@linaro.org>
+Message-ID: <20180201093459.20477-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masami Hiramatsu <mhiramat@kernel.org>
+Arm64 doesn't have "do_IRQ" function, instead *handle_arch_irq, which is
+initialized by irq chip (gic), is called from exception entry.
+This patch fixes this problem.
 
-Remove unneeded address sanity check in arch_prepare_kprobe().
-Since do_debug_exception() is already blacklisted for kprobes, no need
-to reject all __exception functions. Also, since generic kprobe
-framework already ensures the address is in kernel text, no need to
-check it is in rodata again.
-
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/probes/kprobes.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/misc/lkdtm_core.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index d849d9804011..3c487a389252 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
- int __kprobes arch_prepare_kprobe(struct kprobe *p)
- {
- 	unsigned long probe_addr = (unsigned long)p->addr;
--	extern char __start_rodata[];
--	extern char __end_rodata[];
+diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
+index ba92291508dc..e20343543053 100644
+--- a/drivers/misc/lkdtm_core.c
++++ b/drivers/misc/lkdtm_core.c
+@@ -249,13 +249,29 @@ static int lkdtm_register_cpoint(struct crashpoint *crashpoint,
+ 	if (lkdtm_kprobe != NULL)
+ 		unregister_kprobe(lkdtm_kprobe);
  
- 	if (probe_addr & 0x3)
- 		return -EINVAL;
-@@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
- 	/* copy instruction */
- 	p->opcode = le32_to_cpu(*p->addr);
- 
--	if (in_exception_text(probe_addr))
--		return -EINVAL;
--	if (probe_addr >= (unsigned long) __start_rodata &&
--	    probe_addr <= (unsigned long) __end_rodata)
--		return -EINVAL;
--
- 	/* decode instruction */
- 	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
- 	case INSN_REJECTED:	/* insn not supported */
++	if (IS_ENABLED(CONFIG_ARM64) &&
++			!strcmp(crashpoint->name, "INT_HARDWARE_ENTRY")) {
++		extern void (*handle_arch_irq)(struct pt_regs *regs);
++
++		crashpoint->kprobe.addr = (kprobe_opcode_t *)*handle_arch_irq;
++		/*
++		 * Instantiating kprobe.symbol_name here, say
++		 * with lookup_symbol_name(*handle_arch_irq),
++		 * would cause register_kprobe() to fail.
++		 */
++		crashpoint->kprobe.symbol_name = NULL;
++	}
+ 	lkdtm_crashpoint = crashpoint;
+ 	lkdtm_crashtype = crashtype;
+ 	lkdtm_kprobe = &crashpoint->kprobe;
+ 	ret = register_kprobe(lkdtm_kprobe);
+ 	if (ret < 0) {
+-		pr_info("Couldn't register kprobe %s\n",
+-			crashpoint->kprobe.symbol_name);
++		if (IS_ENABLED(CONFIG_ARM64))
++			pr_info("Couldn't register kprobe 0x%lx\n",
++				(unsigned long)crashpoint->kprobe.addr);
++		else
++			pr_info("Couldn't register kprobe %s\n",
++				crashpoint->kprobe.symbol_name);
+ 		lkdtm_kprobe = NULL;
+ 		lkdtm_crashpoint = NULL;
+ 		lkdtm_crashtype = NULL;
 -- 
 2.15.1
