@@ -1,92 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Feb 2018 11:07:32 +0000
-Subject: [PATCH v4 0/6] 32bit ARM branch predictor hardening
-Message-ID: <20180201110738.5421-1-marc.zyngier@arm.com>
+Date: Thu,  1 Feb 2018 11:07:37 +0000
+Subject: [PATCH v4 5/6] arm: Invalidate icache on prefetch abort outside of
+ user mapping on Cortex-A15
+In-Reply-To: <20180201110738.5421-1-marc.zyngier@arm.com>
+References: <20180201110738.5421-1-marc.zyngier@arm.com>
+Message-ID: <20180201110738.5421-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small series implements some basic BP hardening by invalidating
-the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
-attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
-32bit kernels that run on 64bit capable CPUs. This series doesn't
-mitigate Spectre variant 1 either.
+In order to prevent aliasing attacks on the branch predictor,
+invalidate the icache on Cortex-A15, which has the side effect
+of invalidating the BTB. This requires ACTLR[0] to be set to 1
+(secure operation).
 
-These patches are closely modelled against what we do on arm64,
-although simpler as we can rely on an architected instruction to
-perform the invalidation. The notable exception is Cortex-A15, where
-BTB invalidation behaves like a NOP, and the only way to shoot the
-predictor down is to invalidate the icache *and* to have ACTLR[0] set
-to 1 (which is a secure-only operation).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/cp15.h | 1 +
+ arch/arm/mm/fault.c         | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
-generalises it to be used on all affected CPUs. The second perform the
-same invalidation on prefetch abort outside of the userspace
-range. The third one nukes it on guest exit, and results in some major
-surgery as we cannot take a branch from the vectors (that, and Thumb2
-being a massive pain).
-
-Patches 4 to 6 are doing a similar thing for Cortex-A15, with the
-aforementioned ICIALLU.
-
-To sum up the requirements:
-
-- Cortex-A15 need to have ACTLR.IBE (bit 0) set to 1 from secure
-  mode. Cortex-A8 also needs to have ACTLR.IBE (bit 6) set, overlaping
-  with ARM_ERRATA_430973 which also requires it.
-- Cortex-A9, A12 and A17 do not require any extra configuration.
-
-Note 1: Contrary to the initial version, this new series relies on
-the arm64/kpti branch (I reuse the per-CPU vector hook for KVM).
-
-Note 2: M-class CPUs are not affected and for R-class cores, the
-mitigation doesn't make much sense since we do not enforce user/kernel
-isolation.
-
-[Christoffer: since the patches have significantly changed since v3,
-I've dropped your RB tags]
-
-* From v3:
-  - Added configuration option
-  - Reorganized the proc-v7 code to be neater
-  - Make the Thumb2 KVM madness Thumb2 specific
-  - Cleanups all over
-
-* From v2:
-  - Fixed !MMU build
-  - Small KVM optimisation (suggested by Robin)
-  - Fixed register zeroing in cpu_v7_btbinv_switch_mm (noticed by
-    Andre)
-  
-* From v1:
-  - Fixed broken hyp_fiq vector (noticed by Ard)
-  - Fixed broken BTB invalidation in LPAE switch_mm (reported by Andre)
-  - Revamped invalidation on PABT (noticed by James on arm64,
-    suggested by Will)
-  - Rewrote the whole HYP sequence, as Thumb2 was pretty unhappy about
-    arithmetic with the stack pointer
-
-Marc Zyngier (6):
-  arm: Add BTB invalidation on switch_mm for Cortex-A9, A12 and A17
-  arm: Invalidate BTB on prefetch abort outside of user mapping on
-    Cortex A8, A9, A12 and A17
-  arm: KVM: Invalidate BTB on guest exit for Cortex-A12/A17
-  arm: Add icache invalidation on switch_mm for Cortex-A15
-  arm: Invalidate icache on prefetch abort outside of user mapping on
-    Cortex-A15
-  arm: KVM: Invalidate icache on guest exit for Cortex-A15
-
- arch/arm/include/asm/cp15.h    |  3 ++
- arch/arm/include/asm/kvm_asm.h |  2 -
- arch/arm/include/asm/kvm_mmu.h | 23 +++++++++-
- arch/arm/kvm/hyp/hyp-entry.S   | 95 +++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mm/Kconfig            | 17 ++++++++
- arch/arm/mm/fault.c            | 29 +++++++++++++
- arch/arm/mm/fsr-2level.c       |  4 +-
- arch/arm/mm/fsr-3level.c       | 69 ++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v7-2level.S   | 14 ++++++-
- arch/arm/mm/proc-v7-3level.S   | 15 +++++++
- arch/arm/mm/proc-v7.S          | 53 +++++++++++++++++++++--
- 11 files changed, 312 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 9e900ae855aa..07e27f212dc7 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -66,6 +66,7 @@
+ #define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+ 
+ #define BPIALL				__ACCESS_CP15(c7, 0, c5, 6)
++#define ICIALLU				__ACCESS_CP15(c7, 0, c5, 0)
+ 
+ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+ 
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 2f945c994e25..1b05b4b3e761 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -410,6 +410,10 @@ do_pabt_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 		case ARM_CPU_PART_CORTEX_A17:
+ 			write_sysreg(0, BPIALL);
+ 			break;
++
++		case ARM_CPU_PART_CORTEX_A15:
++			write_sysreg(0, ICIALLU);
++			break;
+ 		}
+ 	}
+ #endif
 -- 
 2.14.2
