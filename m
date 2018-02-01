@@ -1,46 +1,26 @@
-From: olivier.moysan@st.com (Olivier Moysan)
-Date: Thu, 1 Feb 2018 09:54:41 +0100
-Subject: [PATCH 1/1] ASoC: stm32: add of dependency for stm32 drivers
-Message-ID: <1517475281-6444-1-git-send-email-olivier.moysan@st.com>
+From: ada@thorsis.com (Alexander Dahl)
+Date: Thu, 01 Feb 2018 09:29:24 +0100
+Subject: Patch submission process about at91 DTS
+In-Reply-To: <20180131170453.GA16869@tp.shaiton.org>
+References: <20180131170453.GA16869@tp.shaiton.org>
+Message-ID: <2019072.DmFbzY6CId@ada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of dependency for STM32 ASoC drivers.
-DFSDM of dependency is already inherited
-from STM32_DFSDM_ADC dependency.
+Hello K?vin,
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
----
- sound/soc/stm/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Am Mittwoch, 31. Januar 2018, 18:04:53 CET schrieb K?vin Raymond:
+> My current patches are based an tested over the linux repo[0] against the
+> master branch (4e19652 Update the RISC-V MAINTAINERS file).
+> 
+> Should I rebase them against the linux-at91[1] repository? Which branch,
+> at91-next? I would love them to reach the 4.14 branch but am not sure of
+> the right path to submit those changes.
 
-diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
-index 3ad881f..b5375f9 100644
---- a/sound/soc/stm/Kconfig
-+++ b/sound/soc/stm/Kconfig
-@@ -3,6 +3,7 @@ menu "STMicroelectronics STM32 SOC audio support"
- config SND_SOC_STM32_SAI
- 	tristate "STM32 SAI interface (Serial Audio Interface) support"
- 	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on OF
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-@@ -12,6 +13,7 @@ config SND_SOC_STM32_SAI
- config SND_SOC_STM32_I2S
- 	tristate "STM32 I2S interface (SPI/I2S block) support"
- 	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on OF
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-@@ -21,6 +23,7 @@ config SND_SOC_STM32_I2S
- config SND_SOC_STM32_SPDIFRX
- 	tristate "STM32 S/PDIF receiver (SPDIFRX) support"
- 	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on OF
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
--- 
-1.9.1
+As far as I understood the process, it is common to base those patches on the 
+last tag of Linus' tree at the time sending. At the moment this would be 
+v4.15, in two weeks it will be v4.16-rc1. If you rebase it on top another 
+tree, add this information to your introductory mail.
+
+Greets
+Alex
