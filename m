@@ -1,59 +1,42 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 01 Feb 2018 08:47:13 +0800
-Subject: About testing A64 DE2 patches
-In-Reply-To: <8853283d-0efa-c151-257f-86ee54f4a86a@orpaltech.com>
-References: <41ed8d45-d8a1-303b-dd1f-ad6686a60ba5@orpaltech.com>
- <250579B6-D23B-4E40-8678-1E3F30FA0A16@aosc.io>
- <8853283d-0efa-c151-257f-86ee54f4a86a@orpaltech.com>
-Message-ID: <D5C6CA19-6A9A-4D6E-BF4B-0F420BDFD160@aosc.io>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 1 Feb 2018 08:51:51 +0800
+Subject: [PATCH 14/15] ARM: dts: ipq8074: Add pcie nodes
+In-Reply-To: <1517202689-14212-15-git-send-email-sricharan@codeaurora.org>
+References: <1517202689-14212-15-git-send-email-sricharan@codeaurora.org>
+Message-ID: <201802010850.o9m7cPXA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sricharan,
 
+Thank you for the patch! Yet something to improve:
 
-? 2018?2?1? GMT+08:00 ??5:11:17, Sergey Suloev <ssuloev@orpaltech.com> ??:
->On 01/31/2018 08:47 PM, Icenowy Zheng wrote:
->>
->> ? 2018?2?1? GMT+08:00 ??1:42:01, Sergey Suloev
-><ssuloev@orpaltech.com> ??:
->>> Hi, kernel people,
->>>
->>> I am testing A64 DE2 patches from the list below, series v4, with my
->>> NanoPi A64 and 4.15
->>>
->>>
->https://patchwork.kernel.org/project/linux-arm-kernel/list/?submitter=173461&page=1
->>>
->>> and I'm getting the following issue regarding SRAM:
->>>
->>> sunxi-de2-clks 1000000.clock: Error couldn't map SRAM to device
->> Could you check whether it's finally probed?
->>
->> DE2 clock may be probed before SRAM controller, so
->> the probe might be deferred. When SRAM controller is ready
->> it will retry.
->>
->>> Here is my full dmesg https://pastebin.com/SQvDfJF0
->>>
->>> Thanks
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->no it is not probed , because there is no special return code from the 
->function
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.15]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-But it receives special return code from sunxi_sram_claim.
- 
->
->if (ccu->sram_needed) {
->+ ret = sunxi_sram_claim(&pdev->dev);
->+ if (ret) {
->+ dev_err(&pdev->dev,
->+ "Error couldn't map SRAM to device\n");
->+ return ret;
->+ }
->+ }
+url:    https://github.com/0day-ci/linux/commits/Sricharan-R/ARM-dts-ipq-updates-to-enable-a-few-peripherals/20180201-061258
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/qcom/ipq8074.dtsi:235.19-20 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 37419 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180201/e5ed418a/attachment-0001.gz>
