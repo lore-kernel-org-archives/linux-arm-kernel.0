@@ -1,36 +1,57 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Fri,  2 Feb 2018 11:01:24 +0530
-Subject: [PATCH v2 2/2] dt-bindings: spi: updated usage example for
- spi-rx/tx-bus-width properties
-In-Reply-To: <1517549484-6024-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1517549484-6024-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1517549484-6024-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 2 Feb 2018 13:36:32 +0800
+Subject: [PATCH] ARM: i.MX6: add new silicon revision number 1.6
+In-Reply-To: <1515502273.2493.9.camel@googlemail.com>
+References: <1515502273.2493.9.camel@googlemail.com>
+Message-ID: <20180202053630.GI20833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updated usage example by adding properties spi-rx-bus-width
-and spi-tx-bus-width for slave node binding.
+On Tue, Jan 09, 2018 at 01:51:13PM +0100, Christoph Fritz wrote:
+> This patch adds new silicon revision number 1.6 as specified in document
+> IMX6DQCEC.pdf.
+> 
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Changes for v2:
-- None
+We have a patch [1] from Bai Ping that reworks the code.  It makes your
+patch unnecessary?
 
- Documentation/devicetree/bindings/spi/spi-bus.txt | 2 ++
- 1 file changed, 2 insertions(+)
+Shawn
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-index 1f6e86f..4dbe267 100644
---- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-@@ -101,6 +101,8 @@ SPI example for an MPC5200 SPI bus:
- 			compatible = "micrel,ks8995m";
- 			spi-max-frequency = <1000000>;
- 			reg = <0>;
-+			spi-rx-bus-width = 4;
-+			spi-tx-bus-width = 4;
- 		};
- 
- 		codec at 1 {
--- 
-1.9.1
+[1] https://patchwork.ozlabs.org/patch/857284/
+
+> ---
+>  arch/arm/mach-imx/anatop.c | 4 ++++
+>  include/soc/imx/revision.h | 1 +
+>  2 files changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> index 649a84c..deb98b8 100644
+> --- a/arch/arm/mach-imx/anatop.c
+> +++ b/arch/arm/mach-imx/anatop.c
+> @@ -157,6 +157,10 @@ void __init imx_init_revision_from_anatop(void)
+>  		 */
+>  		revision = IMX_CHIP_REVISION_1_5;
+>  		break;
+> +	case 6:
+> +		/* marked as 'E' in part number last character */
+> +		revision = IMX_CHIP_REVISION_1_6;
+> +		break;
+>  	default:
+>  		/*
+>  		 * Fail back to return raw register value instead of 0xff.
+> diff --git a/include/soc/imx/revision.h b/include/soc/imx/revision.h
+> index 9ea3469..cd4c847 100644
+> --- a/include/soc/imx/revision.h
+> +++ b/include/soc/imx/revision.h
+> @@ -15,6 +15,7 @@
+>  #define IMX_CHIP_REVISION_1_3		0x13
+>  #define IMX_CHIP_REVISION_1_4		0x14
+>  #define IMX_CHIP_REVISION_1_5		0x15
+> +#define IMX_CHIP_REVISION_1_6		0x16
+>  #define IMX_CHIP_REVISION_2_0		0x20
+>  #define IMX_CHIP_REVISION_2_1		0x21
+>  #define IMX_CHIP_REVISION_2_2		0x22
+> -- 
+> 2.1.4
+> 
