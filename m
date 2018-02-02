@@ -1,80 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  2 Feb 2018 16:07:34 +0100
-Subject: [PATCH 1/2] ARM: kvm: fix building with gcc-8
-Message-ID: <20180202150756.420422-1-arnd@arndb.de>
+Date: Fri,  2 Feb 2018 16:07:35 +0100
+Subject: [PATCH 2/2] ARM: xscale: fix gcc-8 build
+In-Reply-To: <20180202150756.420422-1-arnd@arndb.de>
+References: <20180202150756.420422-1-arnd@arndb.de>
+Message-ID: <20180202150756.420422-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In banked-sr.c, we use a top-level '__asm__(".arch_extension virt")'
-statement to allow compilation of a multi-CPU kernel for ARMv6
-and older ARMv7-A that don't normally support access to the banked
-registers.
+We use a hack in xscale-cp0.c to allow building it for ARMv4 while
+also using ARMv5TE and iWMMXt specific inline assembly, by
+adding a top-level asm statement.
 
-This is considered to be a programming error by the gcc developers
-and will no longer work in gcc-8, where we now get a build error:
+Unfortunately that hack no longer works with gcc-8, since it will
+revert back to the normal architecture. The recommended way of
+handling this is to use __attribute__((target("armv5te"))) on the
+functions that need it, or #pragma GCC target("arch=armv5te").
+Either of those work with gcc-8, but not earlier versions, and
+it seems worse to combine that with the old hack.
 
-/tmp/cc4Qy7GR.s:34: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_usr'
-/tmp/cc4Qy7GR.s:41: Error: Banked registers are not available with this architecture. -- `mrs r3,ELR_hyp'
-/tmp/cc4Qy7GR.s:55: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_svc'
-/tmp/cc4Qy7GR.s:62: Error: Banked registers are not available with this architecture. -- `mrs r3,LR_svc'
-/tmp/cc4Qy7GR.s:69: Error: Banked registers are not available with this architecture. -- `mrs r3,SPSR_svc'
-/tmp/cc4Qy7GR.s:76: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_abt'
-
-Passign the '-march-armv7ve' flag to gcc works, and is ok here, because
-we know the functions won't ever be called on pre-ARMv7VE machines.
-Unfortunately, older compiler versions (4.8 and earlier) do not understand
-that flag, so we still need to keep the asm around.
-
-Backporting to stable kernels (4.6+) is needed to allow those to be built
-with future compilers as well.
+Instead, this adds the .arch statement to each inline assembler
+statement that needs it individually. That is also slightly uglier
+than the previous hack, but it works with all compiler versions
+and documents better why we need the override in the first place.
 
 Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84129
-Fixes: 33280b4cd1dc ("ARM: KVM: Add banked registers save/restore")
-Cc: stable at vger.kernel.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/kvm/hyp/Makefile    | 5 +++++
- arch/arm/kvm/hyp/banked-sr.c | 4 ++++
- 2 files changed, 9 insertions(+)
+ arch/arm/kernel/xscale-cp0.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-index 5638ce0c9524..63d6b404d88e 100644
---- a/arch/arm/kvm/hyp/Makefile
-+++ b/arch/arm/kvm/hyp/Makefile
-@@ -7,6 +7,8 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
+index 77a2eef72115..e06a2f6dac4f 100644
+--- a/arch/arm/kernel/xscale-cp0.c
++++ b/arch/arm/kernel/xscale-cp0.c
+@@ -17,11 +17,10 @@
+ #include <asm/thread_notify.h>
+ #include <asm/cputype.h>
  
- KVM=../../../../virt/kvm
- 
-+CFLAGS_ARMV7VE		   :=$(call cc-option, -march=armv7ve)
-+
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
-@@ -15,7 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
- obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
- obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
-+CFLAGS_banked-sr.o	   += $(CFLAGS_ARMV7VE)
-+
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-+CFLAGS_switch.o		   += $(CFLAGS_ARMV7VE)
- obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
-diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
-index 111bda8cdebd..be4b8b0a40ad 100644
---- a/arch/arm/kvm/hyp/banked-sr.c
-+++ b/arch/arm/kvm/hyp/banked-sr.c
-@@ -20,6 +20,10 @@
- 
- #include <asm/kvm_hyp.h>
- 
-+/*
-+ * gcc before 4.9 doesn't understand -march=armv7ve, so we have to
-+ * trick the assembler.
-+ */
- __asm__(".arch_extension     virt");
- 
- void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
+-asm("	.arch armv5te\n");
+-
+ static inline void dsp_save_state(u32 *state)
+ {
+ 	__asm__ __volatile__ (
++		".arch	armv5te\n\t"
+ 		"mrrc	p0, 0, %0, %1, c0\n"
+ 		: "=r" (state[0]), "=r" (state[1]));
+ }
+@@ -29,6 +28,7 @@ static inline void dsp_save_state(u32 *state)
+ static inline void dsp_load_state(u32 *state)
+ {
+ 	__asm__ __volatile__ (
++		".arch	armv5te\n\t"
+ 		"mcrr	p0, 0, %0, %1, c0\n"
+ 		: : "r" (state[0]), "r" (state[1]));
+ }
+@@ -134,7 +134,8 @@ static int __init cpu_has_iwmmxt(void)
+ 	 *	tmrrc	%0, %1, wR0
+ 	 */
+ 	__asm__ __volatile__ (
+-		"mcrr	p0, 0, %2, %3, c0\n"
++		".arch	armv5te\n\t"
++		"mcrr	p0, 0, %2, %3, c0\n\t"
+ 		"mrrc	p0, 0, %0, %1, c0\n"
+ 		: "=r" (lo), "=r" (hi)
+ 		: "r" (0), "r" (0x100));
 -- 
 2.9.0
