@@ -1,48 +1,154 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 2 Feb 2018 10:58:13 +0100
-Subject: [PATCH topic/renesas_defconfig] arm64: renesas_defconfig: enable
- R8A77970 SoC
-In-Reply-To: <20180202093609.19306-1-horms+renesas@verge.net.au>
-References: <20180202093609.19306-1-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWJM_OB7tRR4LjEOaigKNkL_ox7-KDUUTbnm5GgG6k0dw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 2 Feb 2018 11:05:40 +0100
+Subject: [PATCH v3 00/41] Optimize KVM/ARM for VHE systems
+In-Reply-To: <20180201161536.weg5f5kivjtleauc@yury-thinkpad>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <f886a2fd-e0f0-3252-9f6e-00422d895e9f@semihalf.com>
+ <20180201161536.weg5f5kivjtleauc@yury-thinkpad>
+Message-ID: <517cf93e-dd7b-33e1-d89d-3b7372ab8771@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 2, 2018 at 10:36 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Enable the Renesas R-Car V3H (R8A77970) SoC in the ARM64 renesas_defconfig.
+On 01.02.2018 17:15, Yury Norov wrote:
+> On Thu, Feb 01, 2018 at 02:57:59PM +0100, Tomasz Nowicki wrote:
+>> Hi Christoffer,
+>>
+>> I created simple module for VM kernel. It is spinning on PSCI version
+>> hypercall to measure the base exit cost as you suggested. Also, I measured
+>> CPU cycles for each loop and here are my results:
+>>
+>> My setup:
+>> 1-socket ThunderX2 running VM - 1VCPU
+>>
+>> Tested baselines:
+>> a) host kernel v4.15-rc3 and VM kernel v4.15-rc3
+>> b) host kernel v4.15-rc3 + vhe-optimize-v3-with-fixes and VM kernel
+>> v4.15-rc3
+>>
+>> Module was loaded from VM and the results are presented in [%] relative to
+>> average CPU cycles spending on PSCI version hypercall for vanilla VHE host
+>> kernel v4.15-rc3:
+>>
+>>               VHE  |  nVHE
+>> =========================
+>> baseline a)  100% |  130%
+>> =========================
+>> baseline a)  36%  |  123%
+>>
+>> So I confirm significant performance improvement, especially for VHE case.
+>> Additionally, I run network throughput tests with vhost-net but for that
+>> case no differences.
+> 
+> Hi Tomasz,
+> 
+> Can you share your test?
+> 
 
-R8A77980...
+Yes:
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm64/configs/renesas_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
->  Based on renesas-devel-20180202-v4.15
->
->  Not for upstream merge
->
-> diff --git a/arch/arm64/configs/renesas_defconfig b/arch/arm64/configs/renesas_defconfig
-> index 3087bba06d3c..386211464efa 100644
-> --- a/arch/arm64/configs/renesas_defconfig
-> +++ b/arch/arm64/configs/renesas_defconfig
-> @@ -34,6 +34,7 @@ CONFIG_ARCH_RENESAS=y
->  CONFIG_ARCH_R8A7795=y
->  CONFIG_ARCH_R8A7796=y
->  CONFIG_ARCH_R8A77970=y
-> +CONFIG_ARCH_R8A77980=y
->  CONFIG_ARCH_R8A77995=y
->  CONFIG_PCI=y
->  CONFIG_PCIEPORTBUS=y
+#include <linux/arm-smccc.h>
+#include <linux/err.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/kthread.h>
+#include <linux/mm.h>
+#include <linux/module.h>
+#include <linux/psci.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 
-Gr{oetje,eeting}s,
+#include <uapi/linux/psci.h>
 
-                        Geert
+#define SAMPLE_N	(10000UL)
+#define SAMPLES		(500)
+#define CPU_PINNED	(10)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+static struct task_struct *kvm_bench_task;
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
+			unsigned long arg0, unsigned long arg1,
+			unsigned long arg2)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+	return res.a0;
+}
+
+static u32 psci_get_version(void)
+{
+	return __invoke_psci_fn_hvc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+}
+
+static inline u64 get_cycles_custom(void)
+{
+	register u64 c;
+	__asm__ volatile("mrs %0, cntvct_el0" : "=r"(c));
+	return c;
+}
+
+static int kvm_bench_kthread(void *none)
+{
+	int test_iter, out = SAMPLES;
+	u64 time_before, time;
+         u32 ver = psci_get_version();
+
+	printk(KERN_INFO "Starting kvm exit cost test, using PSCI get version 
+hypercall");
+	printk(KERN_INFO "Obtained PSCIv%d.%d\n", PSCI_VERSION_MAJOR(ver),
+	       PSCI_VERSION_MINOR(ver));
+
+	for (test_iter = 0;; test_iter++) {
+		if (!(test_iter % SAMPLE_N)) {
+			time_before = get_cycles_custom();
+		}
+
+		psci_get_version();
+
+		if (!(test_iter % SAMPLE_N)) {
+			while (!out--) {
+				kvm_bench_task = NULL;
+				do_exit(0);
+			}
+			time = get_cycles_custom() - time_before;
+			printk(KERN_INFO "iter takes %llu cycles. \n", time);
+			if (kthread_should_stop())
+				break;
+			schedule();
+		}
+	}
+
+	return 0;
+}
+
+static int __init kvm_bench_init(void)
+{
+	int err;
+
+	printk(KERN_INFO "KVM exit cost benchmark\n");
+
+	kvm_bench_task = kthread_create(kvm_bench_kthread, NULL, "kvm_test");
+	if(IS_ERR(kvm_bench_task)) {
+		printk(KERN_INFO "Unable to start thread.\n");
+		err = PTR_ERR(kvm_bench_task);
+		return err;
+	}
+	kthread_bind(kvm_bench_task, CPU_PINNED);
+	wake_up_process(kvm_bench_task);
+	return 0;
+}
+
+static void __exit kvm_bench_cleanup(void)
+{
+	printk(KERN_INFO "KVM benchmark cleaning up\n");
+	if (kvm_bench_task)
+		kthread_stop(kvm_bench_task);
+}
+
+module_init(kvm_bench_init);
+module_exit(kvm_bench_cleanup);
+
+
+Thanks,
+Tomasz
