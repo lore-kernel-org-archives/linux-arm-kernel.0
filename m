@@ -1,150 +1,145 @@
 From: philippe.cornu@st.com (Philippe CORNU)
-Date: Fri, 2 Feb 2018 22:19:15 +0000
-Subject: [PATCH] drm/bridge/synopsys: dsi: Add 1.31 version support
-In-Reply-To: <20180122150819.22066-1-philippe.cornu@st.com>
-References: <20180122150819.22066-1-philippe.cornu@st.com>
-Message-ID: <37f38992-0ad3-317f-5337-fbe018bf5f45@st.com>
+Date: Fri, 2 Feb 2018 22:41:26 +0000
+Subject: [PATCH] drm/bridge/synopsys: dsi: use adjusted_mode in mode_set
+In-Reply-To: <108376394.4I4zMjzv2j@avalon>
+References: <20180125155504.8611-1-philippe.cornu@st.com>
+ <2782155.lsFkNecG25@avalon> <114a9fc1-3f31-decd-6bdc-803dc88b3b3c@st.com>
+ <108376394.4I4zMjzv2j@avalon>
+Message-ID: <7ec671c2-a777-5dcd-dcc9-e026fff89900@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit, Andrzej, Laurent & Brian,
+Hi Laurent & Daniel :-)
 
-What is your opinion regarding this patch? Do you have any advice for 
-handling hw versions?
+On 01/29/2018 11:40 AM, Laurent Pinchart wrote:
+> Hi Philippe,
+> 
+> On Monday, 29 January 2018 12:17:37 EET Philippe CORNU wrote:
+>> On 01/29/2018 10:46 AM, Laurent Pinchart wrote:
+>>> On Thursday, 25 January 2018 17:55:04 EET Philippe Cornu wrote:
+>>>
+>>>> The "adjusted_mode" clock value (ie the real pixel clock) is more
+>>>> accurate than "mode" clock value (ie the panel/bridge requested
+>>>> clock value). It offers a better preciseness for timing
+>>>> computations and allows to reduce the extra dsi bandwidth in
+>>>> burst mode (from ~20% to ~10-12%, hw platform dependant).
+>>>>
+>>>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>>>
+>>> The adjusted mode is documented as
+>>>
+>>>   /**
+>>>    * @adjusted_mode:
+>>>    *
+>>>    * Internal display timings which can be used by the driver to handle
+>>>    * differences between the mode requested by userspace in @mode and what
+>>>    * is actually programmed into the hardware. It is purely driver
+>>>    * implementation defined what exactly this adjusted mode means. Usually
+>>>    * it is used to store the hardware display timings used between the
+>>>    * CRTC and encoder blocks.
+>>>    */
+>>>
+>>> This is easy to handle when the CRTC and encoder are controlled by the
+>>> same driver, as the field is "implementation defined" by a single driver
+>>> . However, when using bridges, there are two drivers involved, and they
+>>> must both agree to meaningfully use the adjusted mode. I can't see how to
+>>> do so without standardizing the meaning of the adjusted mode field.
+>>
+>> This is exactly the reason why my first implementation used the dsi
+>> bridge "optional pixel clock" instead of the adjusted_mode (see [1])
+>>
+>> But after digging more into the drm source code, I think using
+>> adjusted_mode instead of the pixel clock here brings more advantages
+>> because:
+>> * adjusted_mode is an argument of bridge mode_set() probably for being
+>> used in any manner, maybe like this :)
+>> * if the bridge "user" (crtc or a master bridge drivers) does not need
+>> to modify its adjusted_mode then mode & adjusted_mode mode_set()
+>> arguments will have the same values so "no consequence" for the bridge.
+>> * if the bridge "user" (crtc or master bridge drivers) needs to adjust
+>> any value of the mode then this adjustment is available for the bridge.
+> 
+> Remember that there can be multiple chained bridges, and a single adjusted
+> mode field.
+> 
+>> * rockchip crtc updates a part of the mode (the clock), stm is doing the
+>> same (see [2]) but any future "user" of the dw_mipi_dsi bridge can
+>> adjust something else (blankings...) and the dw_mipi_dsi bridge will be
+>> then aware of...
+>>
+>> But maybe it is a wrong usage of the "adjusted_mode offer"...
+> 
+> I don't disagree that there's a need for using adjusted values, but I believe
+> we need to create a clear API to do so. Using the adjust_mode field as-is when
+> it's clearly documented as being implementation-defined is asking for trouble.
+> 
 
-Do not hesitate to comment.
+Laurent, do you think we can use "adjusted mode" here in this small 
+patch as the actual 2 "users" of this bridge (rockchip & stm) use both 
+"adjusted mode" in their crtc?
 
-Many thanks,
+>> Many thanks,
+>> Philippe :-)
+>> [1] https://patchwork.freedesktop.org/patch/200240/
+>> [2] https://patchwork.freedesktop.org/patch/200720/
+>>
+>>> Daniel, what's your opinion on this ?
+>>>
+
+Daniel, any opinion on the adjusted_mode usage?
+
+Many thanks to both of you,
 Philippe :-)
 
-
-On 01/22/2018 04:08 PM, Philippe Cornu wrote:
-> From: Philippe CORNU <philippe.cornu@st.com>
-> 
-> Add support for the Synopsys DesignWare MIPI DSI version 1.31
-> Two registers need to be updated/added for supporting 1.31:
-> * PHY_TMR_CFG 0x9c (updated)
->    1.30 [31:24] phy_hs2lp_time
->         [23:16] phy_lp2hs_time
->         [14: 0] max_rd_time
-> 
->    1.31 [25:16] phy_hs2lp_time
->         [ 9: 0] phy_lp2hs_time
-> 
-> * PHY_TMR_RD_CFG 0xf4 (new)
->    1.31 [14: 0] max_rd_time
-> 
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
->   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 52 +++++++++++++++++++++++----
->   1 file changed, 46 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index 735f38429c06..20a2ca14a7ad 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -25,7 +25,13 @@
->   #include <drm/bridge/dw_mipi_dsi.h>
->   #include <video/mipi_display.h>
->   
-> +#define HWVER_130			0x31333000	/* IP version 1.30 */
-> +#define HWVER_131			0x31333100	/* IP version 1.31 */
-> +#define HWVER_OLDEST			HWVER_130
-> +#define HWVER_NEWEST			HWVER_131
-> +
->   #define DSI_VERSION			0x00
-> +#define VERSION				GENMASK(31, 8)
->   
->   #define DSI_PWR_UP			0x04
->   #define RESET				0
-> @@ -161,11 +167,12 @@
->   #define PHY_CLKHS2LP_TIME(lbcc)		(((lbcc) & 0x3ff) << 16)
->   #define PHY_CLKLP2HS_TIME(lbcc)		((lbcc) & 0x3ff)
->   
-> -/* TODO Next register is slightly different between 1.30 & 1.31 IP version */
->   #define DSI_PHY_TMR_CFG			0x9c
-> -#define PHY_HS2LP_TIME(lbcc)		(((lbcc) & 0xff) << 24)
-> -#define PHY_LP2HS_TIME(lbcc)		(((lbcc) & 0xff) << 16)
-> -#define MAX_RD_TIME(lbcc)		((lbcc) & 0x7fff)
-> +#define PHY_HS2LP_TIME_V130(lbcc)	(((lbcc) & 0xff) << 24)
-> +#define PHY_LP2HS_TIME_V130(lbcc)	(((lbcc) & 0xff) << 16)
-> +#define MAX_RD_TIME_V130(lbcc)		((lbcc) & 0x7fff)
-> +#define PHY_HS2LP_TIME_V131(lbcc)	(((lbcc) & 0x3ff) << 16)
-> +#define PHY_LP2HS_TIME_V131(lbcc)	((lbcc) & 0x3ff)
->   
->   #define DSI_PHY_RSTZ			0xa0
->   #define PHY_DISFORCEPLL			0
-> @@ -204,7 +211,9 @@
->   #define DSI_INT_ST1			0xc0
->   #define DSI_INT_MSK0			0xc4
->   #define DSI_INT_MSK1			0xc8
-> +
->   #define DSI_PHY_TMR_RD_CFG		0xf4
-> +#define MAX_RD_TIME_V131(lbcc)		((lbcc) & 0x7fff)
->   
->   #define PHY_STATUS_TIMEOUT_US		10000
->   #define CMD_PKT_STATUS_TIMEOUT_US	20000
-> @@ -215,6 +224,7 @@ struct dw_mipi_dsi {
->   	struct drm_bridge *panel_bridge;
->   	struct device *dev;
->   	void __iomem *base;
-> +	u32 hw_version;
->   
->   	struct clk *pclk;
->   	struct clk *px_clk;
-> @@ -616,8 +626,14 @@ static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
->   	 * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
->   	 * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
->   	 */
-> -	dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
-> -		  | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
-> +	if (dsi->hw_version == HWVER_131) {
-> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V131(0x40) |
-> +			  PHY_LP2HS_TIME_V131(0x40));
-> +		dsi_write(dsi, DSI_PHY_TMR_RD_CFG, MAX_RD_TIME_V131(10000));
-> +	} else {
-> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V130(0x40) |
-> +			  PHY_LP2HS_TIME_V130(0x40) | MAX_RD_TIME_V130(10000));
-> +	}
->   
->   	dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
->   		  | PHY_CLKLP2HS_TIME(0x40));
-> @@ -791,6 +807,28 @@ static const struct drm_bridge_funcs dw_mipi_dsi_bridge_funcs = {
->   	.attach	      = dw_mipi_dsi_bridge_attach,
->   };
->   
-> +static void dsi_get_version(struct dw_mipi_dsi *dsi)
-> +{
-> +	u32 hw_version;
-> +
-> +	clk_prepare_enable(dsi->pclk);
-> +	hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
-> +	clk_disable_unprepare(dsi->pclk);
-> +
-> +	if (hw_version > HWVER_NEWEST) {
-> +		DRM_DEBUG("hw version: use 0x%08x for this recent 0x%08x\n",
-> +			  HWVER_NEWEST, hw_version);
-> +		hw_version = HWVER_NEWEST;
-> +
-> +	} else if (hw_version < HWVER_OLDEST) {
-> +		DRM_DEBUG("hw version: use 0x%08x for this old 0x%08x\n",
-> +			  HWVER_OLDEST, hw_version);
-> +		hw_version = HWVER_OLDEST;
-> +	}
-> +
-> +	dsi->hw_version = hw_version;
-> +}
-> +
->   static struct dw_mipi_dsi *
->   __dw_mipi_dsi_probe(struct platform_device *pdev,
->   		    const struct dw_mipi_dsi_plat_data *plat_data)
-> @@ -870,6 +908,8 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
->   		clk_disable_unprepare(dsi->pclk);
->   	}
->   
-> +	dsi_get_version(dsi);
-> +
->   	pm_runtime_enable(dev);
->   
->   	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+>>>> ---
+>>>> Note: This patch replaces "drm/bridge/synopsys: dsi: add optional pixel
+>>>> clock"
+>>>>
+>>>>    drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 12 ++++++------
+>>>>    1 file changed, 6 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>>> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
+>>>> ed8af32f8e52..b926b62e9e33 100644
+>>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>>> @@ -707,20 +707,20 @@ static void dw_mipi_dsi_bridge_mode_set(struct
+>>>> drm_bridge *bridge,
+>>>>
+>>>>    	clk_prepare_enable(dsi->pclk);
+>>>>
+>>>> -	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
+>>>> +	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode,
+>>>> dsi->mode_flags,
+>>>>    				     dsi->lanes, dsi->format, &dsi->lane_mbps);
+>>>>    if (ret)
+>>>>    	DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+>>>>
+>>>>    pm_runtime_get_sync(dsi->dev);
+>>>>    dw_mipi_dsi_init(dsi);
+>>>>
+>>>> -	dw_mipi_dsi_dpi_config(dsi, mode);
+>>>> +	dw_mipi_dsi_dpi_config(dsi, adjusted_mode);
+>>>>    dw_mipi_dsi_packet_handler_config(dsi);
+>>>>    dw_mipi_dsi_video_mode_config(dsi);
+>>>> -	dw_mipi_dsi_video_packet_config(dsi, mode);
+>>>> +	dw_mipi_dsi_video_packet_config(dsi, adjusted_mode);
+>>>>    dw_mipi_dsi_command_mode_config(dsi);
+>>>> -	dw_mipi_dsi_line_timer_config(dsi, mode);
+>>>> -	dw_mipi_dsi_vertical_timing_config(dsi, mode);
+>>>> +	dw_mipi_dsi_line_timer_config(dsi, adjusted_mode);
+>>>> +	dw_mipi_dsi_vertical_timing_config(dsi, adjusted_mode);
+>>>>    dw_mipi_dsi_dphy_init(dsi);
+>>>>    dw_mipi_dsi_dphy_timing_config(dsi);
+>>>>
+>>>> @@ -734,7 +734,7 @@ static void dw_mipi_dsi_bridge_mode_set(struct
+>>>> drm_bridge *bridge,
+>>>>
+>>>>    dw_mipi_dsi_dphy_enable(dsi);
+>>>>
+>>>> -	dw_mipi_dsi_wait_for_two_frames(mode);
+>>>> +	dw_mipi_dsi_wait_for_two_frames(adjusted_mode);
+>>>>
+>>>>    /* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
+>>>>    dw_mipi_dsi_set_mode(dsi, 0);
 > 
