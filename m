@@ -1,70 +1,69 @@
 From: david@lechnology.com (David Lechner)
-Date: Fri, 2 Feb 2018 12:03:36 -0600
-Subject: [PATCH v6 20/41] ARM: da830: add new clock init using common
+Date: Fri, 2 Feb 2018 12:05:08 -0600
+Subject: [PATCH v6 21/41] ARM: da850: add new clock init using common
  clock framework
-In-Reply-To: <4b2f45f5-7f0d-f0e6-6854-9992e19f45f2@ti.com>
+In-Reply-To: <73d2c30d-ee86-1269-dd4b-1ebfe88a3149@ti.com>
 References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-21-git-send-email-david@lechnology.com>
- <4b2f45f5-7f0d-f0e6-6854-9992e19f45f2@ti.com>
-Message-ID: <e5eb68e8-eb53-331d-5941-95df7d295074@lechnology.com>
+ <1516468460-4908-22-git-send-email-david@lechnology.com>
+ <73d2c30d-ee86-1269-dd4b-1ebfe88a3149@ti.com>
+Message-ID: <a54220c3-7108-1b53-9883-b4643eda2ef3@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2018 08:12 AM, Sekhar Nori wrote:
-> On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
->>   void __init da830_init_time(void)
+On 02/02/2018 08:20 AM, Sekhar Nori wrote:
+> On Saturday 20 January 2018 10:44 PM, David Lechner wrote:
+>>   void __init da850_init_time(void)
 >>   {
 >> +#ifdef CONFIG_COMMON_CLK
->> +	void __iomem *pll0, *psc0, *psc1;
+>> +	void __iomem *pll0, *pll1, *psc0, *psc1;
+>> +	struct regmap *cfgchip;
 >> +	struct clk *clk;
+>> +	struct clk_hw *parent;
 >> +
 >> +	pll0 = ioremap(DA8XX_PLL0_BASE, SZ_4K);
+>> +	pll1 = ioremap(DA850_PLL1_BASE, SZ_4K);
 >> +	psc0 = ioremap(DA8XX_PSC0_BASE, SZ_4K);
 >> +	psc1 = ioremap(DA8XX_PSC1_BASE, SZ_4K);
 >> +
->> +	da8xx_register_cfgchip();
+>> +	cfgchip = da8xx_register_cfgchip();
+>> +	if (WARN(IS_ERR(cfgchip), "failed to register CFGCHIP syscon"))
+>> +		return;
 >> +
->> +	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA830_REF_FREQ);
+>> +	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA850_REF_FREQ);
 >> +
->> +	da830_pll_clk_init(pll0);
+>> +	da850_pll_clk_init(pll0, pll1);
 >> +
->> +	da830_psc_clk_init(psc0, psc1);
+>> +	da8xx_cfgchip_register_div4p5(cfgchip);
 >> +
-> 
->> +	clk = clk_register_fixed_factor(NULL, "i2c0", "pll0_aux_clk", 0, 1, 1);
+>> +	da8xx_cfgchip_register_async1(cfgchip);
+>> +
+>> +	clk = clk_register_fixed_factor(NULL, "async2", "pll0_auxclk", 0, 1, 1);
 >> +	clk_register_clkdev(clk, NULL, "i2c_davinci.1");
->> +
->> +	clk = clk_register_fixed_factor(NULL, "timer0", "pll0_aux_clk", 0, 1, 1);
 >> +	clk_register_clkdev(clk, "timer0", NULL);
->> +
->> +	clk = clk_register_fixed_factor(NULL, "timer1", "pll0_aux_clk", 0, 1, 1);
 >> +	clk_register_clkdev(clk, NULL, "davinci-wdt");
 > 
-> Isn't this better done in da830_pll_clk_init() ? I think we can get rid
-> of the dummy fixed factor clock too and directly use the pll0_auxclk.
+> I think its better to get these clkdevs registered in
+> da850_pll_clk_init() itself.
 
-
-I considered it, but I kind of like keeping the fixed factor clocks for
-debugging purposes. If you just have "pll0_auxclk" the enable count is
-not helpful because you don't know which driver did the enabling.
-
-On the other hand, once things are working, you don't really need to
-do any debugging.
-
-
-> That reminds me, is "pll0_aux_clk" above correct, or should it be
-> "pll0_auxclk" like in da830_pll_clk_init()?
-
-Yes, it should be "pll0_auxclk".
+Sounds good to me.
 
 > 
+>> +
+>> +	clk = da8xx_cfgchip_register_async3(cfgchip);
+>> +
+>> +	/* pll1_sysclk2 is not affected by CPU scaling, so use it for async3 */
+>> +	parent = clk_hw_get_parent_by_index(__clk_get_hw(clk), 1);
+>> +	if (parent)
+>> +		clk_set_parent(clk, parent->clk);
+>> +	else
+>> +		pr_warn("%s: Failed to find async3 parent clock\n", __func__);
+>> +
+>> +	da850_psc_clk_init(psc0, psc1);
 >> +
 >> +	clk = clk_register_fixed_factor(NULL, "rmii", "pll0_sysclk7", 0, 1, 1);
 >> +	clk_register_clkdev(clk, "rmii", NULL);
 > 
-> I don't see any driver looking for this clock using con_id "rmii". I
-> know this came from existing code. But its most likely a vestige and can
-> be dropped.
+> Like in da830, can drop this rmii clock, I think.
 > 
 > Thanks,
 > Sekhar
