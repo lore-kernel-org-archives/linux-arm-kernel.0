@@ -1,24 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Feb 2018 17:48:41 +0000
-Subject: [PATCH 1/2] arm64: entry: Apply BP hardening for high-priority
- synchronous exceptions
-In-Reply-To: <1517592700-26497-2-git-send-email-will.deacon@arm.com>
-References: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
- <1517592700-26497-2-git-send-email-will.deacon@arm.com>
-Message-ID: <3f4e2a58-51be-91c6-04da-368bcc47f32f@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 2 Feb 2018 11:50:23 -0600
+Subject: [PATCH v6 17/41] dt-bindings: clock: Add bindings for DA8XX
+ CFGCHIP clocks
+In-Reply-To: <572e31a2-ac18-512b-03bb-82fffcf4d228@ti.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-18-git-send-email-david@lechnology.com>
+ <572e31a2-ac18-512b-03bb-82fffcf4d228@ti.com>
+Message-ID: <26fd0f01-ed14-6544-7443-e88c69ca9acb@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/18 17:31, Will Deacon wrote:
-> Software-step and PC alignment fault exceptions have higher priority than
-> instruction abort exceptions, so apply the BP hardening hooks there too
-> if the user PC appears to reside in kernel space.
+On 02/02/2018 12:20 AM, Sekhar Nori wrote:
+> On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
+>> +EMIFA clock source (ASYNC1)
+>> +---------------------------
+>> +Required properties:
+>> +- compatible: shall be "ti,da850-async1-clksrc".
+>> +- #clock-cells: from common clock binding; shall be set to 0.
+>> +- clocks: phandles to the parent clocks corresponding to clock-names
+>> +- clock-names: shall be "pll0_sysclk3", "div4.5"
 > 
-> Reported-by: Dan Hettena <dhettena@nvidia.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Is this clock really referred to as aysnc1 in documentation? I don't get
+> hits for async1 in OMAP-L138 TRM.
+> 
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+It looks like it is only called ASYNC1 in the datasheet, not the TRM.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Table 6-5. Maximum Internal Clock Frequencies at Each Voltage Operating
+Point
