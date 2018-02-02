@@ -1,140 +1,294 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 2 Feb 2018 12:05:00 +0800
-Subject: [PATCH v3 18/18] arm64: Kill PSCI_GET_VERSION as a variant-2
- workaround
-In-Reply-To: <20180201114657.7323-19-marc.zyngier@arm.com>
-References: <20180201114657.7323-1-marc.zyngier@arm.com>
- <20180201114657.7323-19-marc.zyngier@arm.com>
-Message-ID: <d130b0b5-edc3-b305-c33e-33f9954d0858@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 2 Feb 2018 13:35:21 +0900
+Subject: [PATCH] arm64: acpi,efi: fix alignment fault in accessing ACPI
+ tables at kdump
+In-Reply-To: <CAKv+Gu-2-cG3vse4briKPK0gpi5Zrg+pZHiiN7-4DSBPn0n_3A@mail.gmail.com>
+References: <20180201090449.19514-1-takahiro.akashi@linaro.org>
+ <CAKv+Gu-2-cG3vse4briKPK0gpi5Zrg+pZHiiN7-4DSBPn0n_3A@mail.gmail.com>
+Message-ID: <20180202043519.GD23847@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-Thank you for keeping me in the loop, just minor comments below.
-
-On 2018/2/1 19:46, Marc Zyngier wrote:
-> Now that we've standardised on SMCCC v1.1 to perform the branch
-> prediction invalidation, let's drop the previous band-aid.
-> If vendors haven't updated their firmware to do SMCCC 1.1, they
-> haven't updated PSCI either, so we don't loose anything.
+On Thu, Feb 01, 2018 at 05:34:26PM +0000, Ard Biesheuvel wrote:
+> On 1 February 2018 at 09:04, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> > This is a fix against the issue that crash dump kernel may hang up
+> > during booting, which can happen on any ACPI-based system with "ACPI
+> > Reclaim Memory."
+> >
+> > (kernel messages after panic kicked off kdump)
+> >            (snip...)
+> >         Bye!
+> >            (snip...)
+> >         ACPI: Core revision 20170728
+> >         pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
+> >         Internal error: Oops: 96000021 [#1] SMP
+> >         Modules linked in:
+> >         CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
+> >         task: ffff000008d05180 task.stack: ffff000008cc0000
+> >         PC is at acpi_ns_lookup+0x25c/0x3c0
+> >         LR is at acpi_ds_load1_begin_op+0xa4/0x294
+> >            (snip...)
+> >         Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
+> >         Call trace:
+> >            (snip...)
+> >         [<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
+> >         [<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
+> >         [<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
+> >         [<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
+> >         [<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
+> >         [<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
+> >         [<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
+> >         [<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
+> >         [<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
+> >         [<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
+> >         [<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
+> >         [<ffff000008badc20>] acpi_early_init+0x9c/0xd0
+> >         [<ffff000008b70d50>] start_kernel+0x3b4/0x43c
+> >         Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
+> >         ---[ end trace c46ed37f9651c58e ]---
+> >         Kernel panic - not syncing: Fatal exception
+> >         Rebooting in 10 seconds..
+> >
+> > (diagnosis)
+> > * This fault is a data abort, alignment fault (ESR=0x96000021)
+> >   during reading out ACPI table.
+> > * Initial ACPI tables are normally stored in system ram and marked as
+> >   "ACPI Reclaim memory" by the firmware.
+> > * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+> >   memory as MEMBLOCK_NOMAP"), those regions are differently handled
+> >   as they are "memblock-reserved", without NOMAP bit.
+> > * So they are now excluded from device tree's "usable-memory-range"
+> >   which kexec-tools determines based on a current view of /proc/iomem.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/bpi.S        | 24 -----------------------
->  arch/arm64/kernel/cpu_errata.c | 43 ++++++++++++------------------------------
->  arch/arm64/kvm/hyp/switch.c    | 14 --------------
->  3 files changed, 12 insertions(+), 69 deletions(-)
+> So this patch does fix the fallout of how this issue affects ACPI boot
+> in particular, but is it correct in the first place for the kexec
+> tools to disregard memory that has been memblock_reserved()?
+
+My previous patch[1] is just for this. It would work not only for
+the case here but also for any "reserved" memory regions.
+The only noticeable drawback that I see in this approach is that
+the meaning of "usable-memory-range" is now a bit obscure.
+
+Alternatively we may want to modify /proc/iomem, adding a specific
+resource entry for "ACPI Reclaim regions," and in turn kexec-tool so as
+to put them into "usable-memory-range", but it is rather a stopgap
+measure in my opinion. I don't like kexec relying heavily on userspace
+tool as exporting the reserved regions in /proc/iomem is also useless
+for most users.
+
+(In this sense, I would go for kexec_file :)
+
+> For
+> instance, the UEFI memory map is memblock_reserve()d as well, along
+> with other parts of memory that have been populated by the firmware.
 > 
-> diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-> index fdeed629f2c6..e5de33513b5d 100644
-> --- a/arch/arm64/kernel/bpi.S
-> +++ b/arch/arm64/kernel/bpi.S
-> @@ -54,30 +54,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
->  	vectors __kvm_hyp_vector
->  	.endr
->  ENTRY(__bp_harden_hyp_vecs_end)
-> -ENTRY(__psci_hyp_bp_inval_start)
-> -	sub	sp, sp, #(8 * 18)
-> -	stp	x16, x17, [sp, #(16 * 0)]
-> -	stp	x14, x15, [sp, #(16 * 1)]
-> -	stp	x12, x13, [sp, #(16 * 2)]
-> -	stp	x10, x11, [sp, #(16 * 3)]
-> -	stp	x8, x9, [sp, #(16 * 4)]
-> -	stp	x6, x7, [sp, #(16 * 5)]
-> -	stp	x4, x5, [sp, #(16 * 6)]
-> -	stp	x2, x3, [sp, #(16 * 7)]
-> -	stp	x0, x1, [sp, #(16 * 8)]
-> -	mov	x0, #0x84000000
-> -	smc	#0
-> -	ldp	x16, x17, [sp, #(16 * 0)]
-> -	ldp	x14, x15, [sp, #(16 * 1)]
-> -	ldp	x12, x13, [sp, #(16 * 2)]
-> -	ldp	x10, x11, [sp, #(16 * 3)]
-> -	ldp	x8, x9, [sp, #(16 * 4)]
-> -	ldp	x6, x7, [sp, #(16 * 5)]
-> -	ldp	x4, x5, [sp, #(16 * 6)]
-> -	ldp	x2, x3, [sp, #(16 * 7)]
-> -	ldp	x0, x1, [sp, #(16 * 8)]
-> -	add	sp, sp, #(8 * 18)
-> -ENTRY(__psci_hyp_bp_inval_end)
->  
->  ENTRY(__qcom_hyp_sanitize_link_stack_start)
->  	stp     x29, x30, [sp, #-16]!
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 9e77809a3b23..b8279a11f57b 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -67,7 +67,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
->  DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
->  
->  #ifdef CONFIG_KVM
-> -extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
->  extern char __qcom_hyp_sanitize_link_stack_start[];
->  extern char __qcom_hyp_sanitize_link_stack_end[];
->  extern char __smccc_workaround_1_smc_start[];
-> @@ -116,8 +115,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
->  	spin_unlock(&bp_lock);
->  }
->  #else
-> -#define __psci_hyp_bp_inval_start		NULL
-> -#define __psci_hyp_bp_inval_end			NULL
->  #define __qcom_hyp_sanitize_link_stack_start	NULL
->  #define __qcom_hyp_sanitize_link_stack_end	NULL
->  #define __smccc_workaround_1_smc_start		NULL
-> @@ -164,14 +161,15 @@ static void call_hvc_arch_workaround_1(void)
->  	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
->  }
->  
-> -static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-> +static int smccc_arch_workaround_1(void *data)
->  {
-> +	const struct arm64_cpu_capabilities *entry = data;
->  	bp_hardening_cb_t cb;
->  	void *smccc_start, *smccc_end;
->  	struct arm_smccc_res res;
->  
->  	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
+> > * When crash dump kernel boots up, it tries to accesses ACPI tables by
+> >   mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
+> >   since they are no longer part of mapped system ram.
+> > * Given that ACPI accessor/helper functions are compiled in without
+> >   unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
+> >   any unaligned access to ACPI tables can cause a fatal panic.
+> >
+> > With this patch, acpi_os_ioremap() always honors a memory attribute
+> > provided by the firmware (efi). Hence retaining cacheability in said cases
+> > allows the kernel safe access to ACPI tables.
+> >
+> > Please note that arm_enable_runtime_services(), which is renamed to
+> > efi_enter_virtual_mode() due to the similarity to x86's, is now called
+> > earlier before acpi_early_init() since efi_mem_attributes() relies on
+> > efi.memmap being mapped.
+> >
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Suggested-by: James Morse <james.morse@arm.com>
+> > Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Reported-by and Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
+> > ---
+> >  arch/arm64/include/asm/acpi.h      | 23 ++++++++++++++++-------
+> >  arch/arm64/kernel/acpi.c           | 11 +++--------
+> 
+> Split into two patches --here-- please
 
-entry->matches() will be called twice in this function, another
-one is in install_bp_hardening_cb() below, but install_bp_hardening_cb()
-will be called in qcom_enable_link_stack_sanitization(), and
-this is in the init path, so I think it's fine to keep as it is now.
+Sure, but only if this patch is a favorable approach over [1].
 
-> -		return false;
-> +		return 0;
->  
->  	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
->  		return false;
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/553098.html
 
-return 0;
+Thanks,
+-Takahiro AKASHI
 
-> @@ -181,7 +179,7 @@ static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *e
->  		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
->  				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
->  		if (res.a0)
-> -			return false;
-> +			return 0;
->  		cb = call_hvc_arch_workaround_1;
->  		smccc_start = __smccc_workaround_1_hvc_start;
->  		smccc_end = __smccc_workaround_1_hvc_end;
-> @@ -191,35 +189,18 @@ static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *e
->  		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
->  				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
->  		if (res.a0)
-> -			return false;
-> +			return 0;
->  		cb = call_smc_arch_workaround_1;
->  		smccc_start = __smccc_workaround_1_smc_start;
->  		smccc_end = __smccc_workaround_1_smc_end;
->  		break;
->  
->  	default:
-> -		return false;
-> +		return 0;
->  	}
->  
->  	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
-
-Thanks
-Hanjun
+> 
+> >  drivers/firmware/efi/arm-runtime.c | 15 ++++++---------
+> >  init/main.c                        |  3 +++
+> >  4 files changed, 28 insertions(+), 24 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> > index 32f465a80e4e..d53c95f4e1a9 100644
+> > --- a/arch/arm64/include/asm/acpi.h
+> > +++ b/arch/arm64/include/asm/acpi.h
+> > @@ -12,10 +12,12 @@
+> >  #ifndef _ASM_ACPI_H
+> >  #define _ASM_ACPI_H
+> >
+> > +#include <linux/efi.h>
+> >  #include <linux/memblock.h>
+> >  #include <linux/psci.h>
+> >
+> >  #include <asm/cputype.h>
+> > +#include <asm/io.h>
+> >  #include <asm/smp_plat.h>
+> >  #include <asm/tlbflush.h>
+> >
+> > @@ -29,18 +31,22 @@
+> >
+> >  /* Basic configuration for ACPI */
+> >  #ifdef CONFIG_ACPI
+> > +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
+> > +
+> >  /* ACPI table mapping after acpi_permanent_mmap is set */
+> >  static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+> >                                             acpi_size size)
+> >  {
+> > +       /* For normal memory we already have a cacheable mapping. */
+> > +       if (memblock_is_map_memory(phys))
+> > +               return (void __iomem *)__phys_to_virt(phys);
+> > +
+> >         /*
+> > -        * EFI's reserve_regions() call adds memory with the WB attribute
+> > -        * to memblock via early_init_dt_add_memory_arch().
+> > +        * We should still honor the memory's attribute here because
+> > +        * crash dump kernel possibly excludes some ACPI (reclaim)
+> > +        * regions from memblock list.
+> >          */
+> > -       if (!memblock_is_memory(phys))
+> > -               return ioremap(phys, size);
+> > -
+> > -       return ioremap_cache(phys, size);
+> > +       return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
+> >  }
+> >  #define acpi_os_ioremap acpi_os_ioremap
+> >
+> > @@ -125,7 +131,10 @@ static inline const char *acpi_get_enable_method(int cpu)
+> >   * for compatibility.
+> >   */
+> >  #define acpi_disable_cmcff 1
+> > -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+> > +static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+> > +{
+> > +       return __acpi_get_mem_attribute(addr);
+> > +}
+> >  #endif /* CONFIG_ACPI_APEI */
+> >
+> >  #ifdef CONFIG_ACPI_NUMA
+> > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> > index b3162715ed78..35702c5e58d2 100644
+> > --- a/arch/arm64/kernel/acpi.c
+> > +++ b/arch/arm64/kernel/acpi.c
+> > @@ -18,6 +18,7 @@
+> >  #include <linux/acpi.h>
+> >  #include <linux/bootmem.h>
+> >  #include <linux/cpumask.h>
+> > +# include <linux/efi.h>
+> >  #include <linux/efi-bgrt.h>
+> >  #include <linux/init.h>
+> >  #include <linux/irq.h>
+> > @@ -29,12 +30,8 @@
+> >
+> >  #include <asm/cputype.h>
+> >  #include <asm/cpu_ops.h>
+> > -#include <asm/smp_plat.h>
+> > -
+> > -#ifdef CONFIG_ACPI_APEI
+> > -# include <linux/efi.h>
+> >  # include <asm/pgtable.h>
+> > -#endif
+> > +#include <asm/smp_plat.h>
+> >
+> >  int acpi_noirq = 1;            /* skip ACPI IRQ initialization */
+> >  int acpi_disabled = 1;
+> > @@ -239,8 +236,7 @@ void __init acpi_boot_table_init(void)
+> >         }
+> >  }
+> >
+> > -#ifdef CONFIG_ACPI_APEI
+> > -pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+> > +pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
+> >  {
+> >         /*
+> >          * According to "Table 8 Map: EFI memory types to AArch64 memory
+> > @@ -261,4 +257,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+> >                 return __pgprot(PROT_NORMAL_NC);
+> >         return __pgprot(PROT_DEVICE_nGnRnE);
+> >  }
+> > -#endif
+> > diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> > index 1cc41c3d6315..16dd8a2d0237 100644
+> > --- a/drivers/firmware/efi/arm-runtime.c
+> > +++ b/drivers/firmware/efi/arm-runtime.c
+> > @@ -115,23 +115,23 @@ static bool __init efi_virtmap_init(void)
+> >   * non-early mapping of the UEFI system table and virtual mappings for all
+> >   * EFI_MEMORY_RUNTIME regions.
+> >   */
+> > -static int __init arm_enable_runtime_services(void)
+> > +void __init efi_enter_virtual_mode(void)
+> >  {
+> >         u64 mapsize;
+> >
+> >         if (!efi_enabled(EFI_BOOT)) {
+> >                 pr_info("EFI services will not be available.\n");
+> > -               return 0;
+> > +               return;
+> >         }
+> >
+> >         if (efi_runtime_disabled()) {
+> >                 pr_info("EFI runtime services will be disabled.\n");
+> > -               return 0;
+> > +               return;
+> >         }
+> >
+> >         if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+> >                 pr_info("EFI runtime services access via paravirt.\n");
+> > -               return 0;
+> > +               return;
+> >         }
+> >
+> >         pr_info("Remapping and enabling EFI services.\n");
+> > @@ -140,21 +140,18 @@ static int __init arm_enable_runtime_services(void)
+> >
+> >         if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+> >                 pr_err("Failed to remap EFI memory map\n");
+> > -               return -ENOMEM;
+> > +               return;
+> >         }
+> >
+> >         if (!efi_virtmap_init()) {
+> >                 pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
+> > -               return -ENOMEM;
+> > +               return;
+> >         }
+> >
+> >         /* Set up runtime services function pointers */
+> >         efi_native_runtime_setup();
+> >         set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+> > -
+> > -       return 0;
+> >  }
+> > -early_initcall(arm_enable_runtime_services);
+> >
+> >  void efi_virtmap_load(void)
+> >  {
+> > diff --git a/init/main.c b/init/main.c
+> > index a8100b954839..2d0927768e2d 100644
+> > --- a/init/main.c
+> > +++ b/init/main.c
+> > @@ -674,6 +674,9 @@ asmlinkage __visible void __init start_kernel(void)
+> >         debug_objects_mem_init();
+> >         setup_per_cpu_pageset();
+> >         numa_policy_init();
+> > +       if (IS_ENABLED(CONFIG_EFI) &&
+> > +           (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
+> > +               efi_enter_virtual_mode();
+> >         acpi_early_init();
+> >         if (late_time_init)
+> >                 late_time_init();
+> > --
+> > 2.15.1
+> >
