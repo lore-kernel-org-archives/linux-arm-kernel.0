@@ -1,68 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  2 Feb 2018 16:07:35 +0100
-Subject: [PATCH 2/2] ARM: xscale: fix gcc-8 build
-In-Reply-To: <20180202150756.420422-1-arnd@arndb.de>
-References: <20180202150756.420422-1-arnd@arndb.de>
-Message-ID: <20180202150756.420422-2-arnd@arndb.de>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Fri, 2 Feb 2018 16:24:49 +0100
+Subject: [PATCH v2 07/16] iio: adc: sun4i-gpadc-iio: rework: support nvmem
+ calibration data
+In-Reply-To: <20180130083642.cdpd7jnthkdrrk5r@flea.lan>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-8-embed3d@gmail.com>
+ <20180129094045.sagz2dnzvdadd4yx@flea.lan>
+ <e319fde5-9ede-8be0-03ae-f0a22d50250c@gmail.com>
+ <20180130083642.cdpd7jnthkdrrk5r@flea.lan>
+Message-ID: <aacb720f-2337-a016-e4e2-d99bd8da420b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use a hack in xscale-cp0.c to allow building it for ARMv4 while
-also using ARMv5TE and iWMMXt specific inline assembly, by
-adding a top-level asm statement.
 
-Unfortunately that hack no longer works with gcc-8, since it will
-revert back to the normal architecture. The recommended way of
-handling this is to use __attribute__((target("armv5te"))) on the
-functions that need it, or #pragma GCC target("arch=armv5te").
-Either of those work with gcc-8, but not earlier versions, and
-it seems worse to combine that with the old hack.
+>>
+>>>>    	/* prevents concurrent reads of temperature and ADC */
+>>>>    	struct mutex			mutex;
+>>>>    	struct thermal_zone_device	*tzd;
+>>>> @@ -561,6 +569,9 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>>>>    	struct resource *mem;
+>>>>    	void __iomem *base;
+>>>>    	int ret;
+>>>> +	struct nvmem_cell *cell;
+>>>> +	ssize_t cell_size;
+>>>> +	u64 *cell_data;
+>>>>    	info->data = of_device_get_match_data(&pdev->dev);
+>>>>    	if (!info->data)
+>>>> @@ -575,6 +586,39 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>>>>    	if (IS_ERR(base))
+>>>>    		return PTR_ERR(base);
+>>>> +	info->has_calibration_data[0] = false;
+>>>> +	info->has_calibration_data[1] = false;
+>>>> +
+>>>> +	if (!info->data->supports_nvmem)
+>>>> +		goto no_nvmem;
+>>>> +
+>>>> +	cell = nvmem_cell_get(&pdev->dev, "calibration");
+>>>> +	if (IS_ERR(cell)) {
+>>>> +		if (PTR_ERR(cell) == -EPROBE_DEFER)
+>>>> +			return PTR_ERR(cell);
+>>>> +		goto no_nvmem;
+>>>
+>>> goto considered evil ? :)
+>>
+>> this was a suggestion from Jonatan in version one, to make the code better
+>> readable.
+> 
+> Isn't
+> 
+> if (info->data->supports_nvmem && IS_ERR(cell = nvmem_cell_get()))
+> 
+> pretty much the same thing?
+> 
+> Maxime
+> 
+I would say :
 
-Instead, this adds the .arch statement to each inline assembler
-statement that needs it individually. That is also slightly uglier
-than the previous hack, but it works with all compiler versions
-and documents better why we need the override in the first place.
+if (info->data->supports_nvmem && !IS_ERR(cell = nvmem_cell_get())) is
 
-Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84129
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/kernel/xscale-cp0.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+the same.
+This would require an else if statement like this:
 
-diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
-index 77a2eef72115..e06a2f6dac4f 100644
---- a/arch/arm/kernel/xscale-cp0.c
-+++ b/arch/arm/kernel/xscale-cp0.c
-@@ -17,11 +17,10 @@
- #include <asm/thread_notify.h>
- #include <asm/cputype.h>
- 
--asm("	.arch armv5te\n");
--
- static inline void dsp_save_state(u32 *state)
- {
- 	__asm__ __volatile__ (
-+		".arch	armv5te\n\t"
- 		"mrrc	p0, 0, %0, %1, c0\n"
- 		: "=r" (state[0]), "=r" (state[1]));
- }
-@@ -29,6 +28,7 @@ static inline void dsp_save_state(u32 *state)
- static inline void dsp_load_state(u32 *state)
- {
- 	__asm__ __volatile__ (
-+		".arch	armv5te\n\t"
- 		"mcrr	p0, 0, %0, %1, c0\n"
- 		: : "r" (state[0]), "r" (state[1]));
- }
-@@ -134,7 +134,8 @@ static int __init cpu_has_iwmmxt(void)
- 	 *	tmrrc	%0, %1, wR0
- 	 */
- 	__asm__ __volatile__ (
--		"mcrr	p0, 0, %2, %3, c0\n"
-+		".arch	armv5te\n\t"
-+		"mcrr	p0, 0, %2, %3, c0\n\t"
- 		"mrrc	p0, 0, %0, %1, c0\n"
- 		: "=r" (lo), "=r" (hi)
- 		: "r" (0), "r" (0x100));
--- 
-2.9.0
+else if (info->data->supports_nvmem && PTR_ERR(cell) == -EPROBE_DEFER)
+		return PTR_ERR(cell);
+
+to avoid errors if the thermal sensor is probed before the sid driver.
+
+Philipp
