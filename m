@@ -1,58 +1,67 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 2 Feb 2018 11:56:08 -0600
-Subject: [PATCH v6 18/41] clk: davinci: New driver for TI DA8XX CFGCHIP
- clocks
-In-Reply-To: <c2138795-edcd-bb7d-094d-47dc049c33df@ti.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-19-git-send-email-david@lechnology.com>
- <c2138795-edcd-bb7d-094d-47dc049c33df@ti.com>
-Message-ID: <af157fd3-f1da-cf17-8b1a-47223ac3fd39@lechnology.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 2 Feb 2018 18:01:57 +0000
+Subject: [PATCH 2/2] arm64: entry: Apply BP hardening for suspicious
+ interrupts from EL0
+In-Reply-To: <1517592700-26497-3-git-send-email-will.deacon@arm.com>
+References: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
+ <1517592700-26497-3-git-send-email-will.deacon@arm.com>
+Message-ID: <6a3df8ca-dca1-c1e6-ae1d-1fe25fd0c9f9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2018 07:19 AM, Sekhar Nori wrote:
-> On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
->> +static const struct clk_ops da8xx_cfgchip_div4p5_clk_ops = {
->> +	.enable		= da8xx_cfgchip_gate_clk_enable,
->> +	.disable	= da8xx_cfgchip_gate_clk_disable,
->> +	.is_enabled	= da8xx_cfgchip_gate_clk_is_enabled,
+On 02/02/18 17:31, Will Deacon wrote:
+> It is possible to take an IRQ from EL0 following a branch to a kernel
+> address in such a way that the IRQ is prioritised over the instruction
+> abort. Whilst an attacker would need to get the starts to align here,
+
+Nit: I'm guessing that should probably be "stars", but given the context 
+of a theoretical race between a BP training sequence and an 
+IRQ-generating sequence, there's a little doubt left ;)
+
+Robin.
+
+> it might be sufficient with enough calibration so perform BP hardening
+> in the rare case that we see a kernel address in the ELR when handling
+> an IRQ from EL0.
 > 
-> I assume the reason for not using clk-gate.c is lack of regmap support
-> there?
-
-Correct.
-
-I couldn't find a way to get a lock from the regmap that could
-be passed to clk_register_gate() to prevent non-clock drivers from
-trying to use the regmap at the same the the clocks are.
-
+> Reported-by: Dan Hettena <dhettena@nvidia.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/kernel/entry.S | 5 +++++
+>   arch/arm64/mm/fault.c     | 6 ++++++
+>   2 files changed, 11 insertions(+)
 > 
->> +	.recalc_rate	= da8xx_cfgchip_div4p5_recalc_rate,
->> +};
->> +
->> +static struct clk * __init
->> +da8xx_cfgchip_gate_clk_register(const struct da8xx_cfgchip_gate_clk_info *info,
->> +				const char *parent_name,
->> +				struct regmap *regmap)
->> +{
->> +	struct da8xx_cfgchip_gate_clk *gate;
->> +	struct clk_init_data init;
->> +
->> +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
->> +	if (!gate)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	init.name = info->name;
->> +	if (info->flags & DA8XX_GATE_CLOCK_IS_DIV4P5)
->> +		init.ops = &da8xx_cfgchip_div4p5_clk_ops;
->> +	else
->> +		init.ops = &da8xx_cfgchip_gate_clk_ops;
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 394b149825b6..9bba6990e9b5 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -827,6 +827,11 @@ el0_irq_naked:
+>   #endif
+>   
+>   	ct_user_exit
+> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+> +	tbz	x22, #55, 1f
+> +	bl	do_el0_irq_bp_hardening
+> +1:
+> +#endif
+>   	irq_handler
+>   
+>   #ifdef CONFIG_TRACE_IRQFLAGS
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 445aa4475c67..3d2bcbfdb90b 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -708,6 +708,12 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+>   	arm64_notify_die("", regs, &info, esr);
+>   }
+>   
+> +asmlinkage void __exception do_el0_irq_bp_hardening(void)
+> +{
+> +	/* PC has already been checked in entry.S */
+> +	arm64_apply_bp_hardening();
+> +}
+> +
+>   asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
+>   						   unsigned int esr,
+>   						   struct pt_regs *regs)
 > 
-> This will be easier to read using ternary operator, I think. But you
-> will probably have line breaks.
-
-The names are so long that the ternary operator doesn't make it better IMHO.
-
-	init.ops = (info->flags & DA8XX_GATE_CLOCK_IS_DIV4P5) ?
-		&da8xx_cfgchip_div4p5_clk_ops :
-		&da8xx_cfgchip_gate_clk_ops;
