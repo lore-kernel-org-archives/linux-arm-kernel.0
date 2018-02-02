@@ -1,47 +1,37 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  3 Feb 2018 02:04:56 +0800
-Subject: [PATCH 3/3] ARM: sun8i: v3s: enable Ethernet port on the Lichee Pi
- Zero Dock
-In-Reply-To: <20180202180456.60378-1-icenowy@aosc.io>
-References: <20180202180456.60378-1-icenowy@aosc.io>
-Message-ID: <20180202180456.60378-4-icenowy@aosc.io>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 2 Feb 2018 12:06:12 -0600
+Subject: [PATCH v6 24/41] ARM: dm644x: add new clock init using common
+ clock framework
+In-Reply-To: <28508a72-2fc7-1dc2-8a2c-997139d70831@ti.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-25-git-send-email-david@lechnology.com>
+ <28508a72-2fc7-1dc2-8a2c-997139d70831@ti.com>
+Message-ID: <d8325090-e369-5a1a-b34a-8174123b01ff@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Lichee Pi Zero Dock has an Ethernet port connected to the internal
-PHY of the V3s SoC.
+On 02/02/2018 08:39 AM, Sekhar Nori wrote:
+> On Saturday 20 January 2018 10:44 PM, David Lechner wrote:
+>> This adds the new board-specific clock init in mach-davinci/dm644x.c
+>> using the new common clock framework drivers.
+>>
+>> The #ifdefs are needed to prevent compile errors until the entire
+>> ARCH_DAVINCI is converted.
+>>
+>> Also clean up the #includes since we are adding some here.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+> 
+> I did not notice this before, but the subject line for this and other
+> patches needs to be "ARM: davinci: "
 
-Enable it in the device tree.
+so "davinci" == "dm644x" and not any other SoC?
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-index d1311098ea45..9b3465cc0dcd 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-@@ -49,12 +49,20 @@
- 	compatible = "licheepi,licheepi-zero-dock", "licheepi,licheepi-zero",
- 		     "allwinner,sun8i-v3s";
- 
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
- 	leds {
- 		/* The LEDs use PG0~2 pins, which conflict with MMC1 */
- 		status = "disbaled";
- 	};
- };
- 
-+&emac {
-+	status = "okay";
-+};
-+
- &mmc1 {
- 	broken-cd;
- 	bus-width = <4>;
--- 
-2.15.1
+> 
+> Apart from that:
+> 
+> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+> 
+> Thanks,
+> Sekhar
+> 
