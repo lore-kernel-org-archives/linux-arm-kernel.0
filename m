@@ -1,48 +1,86 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 02 Feb 2018 22:47:23 +0100
-Subject: [PATCH v3] arm64: dts: rockchip: add roc-rk3328-cc board
-In-Reply-To: <20180123021017.24110-1-djw@t-chip.com.cn>
-References: <20180106094538.15568-1-djw@t-chip.com.cn>
- <20180123021017.24110-1-djw@t-chip.com.cn>
-Message-ID: <3332426.dR0IG2DWyn@phil>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Sat,  3 Feb 2018 00:45:57 +0300
+Subject: [PATCH] rtc: gemini/ftrtc010: disable clk on error paths in
+ ftrtc010_rtc_probe()
+Message-ID: <1517607957-5664-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Levin,
+ftrtc010_rtc_probe() leaves clks enabled in case of errors.
+The patch adds proper disabling code.
 
-Am Dienstag, 23. Januar 2018, 03:10:17 CET schrieb djw at t-chip.com.cn:
-> From: Levin Du <djw@t-chip.com.cn>
-> 
-> Hi all,
-> 
-> v3:
-> Use pmic at 18 instead of rk805 at 18
-> Use macro definition RK_Pxx in gpio number
-> 
-> v2:
-> Use SPDX license tag
-> 
-> Thanks.
-> 
-> The roc-rk3328-cc is a credit card size single board computer using the
-> Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
-> up to 2GB 2133MHz LPDDR4 memory. It provides eMMC module socket, MicroSD
-> Card slot, USB 2.0/3.0, Gigabit Ethernet, HDMI/CVBS, Infrared Receiver,
-> SPDIF/I2S, and SPI/I2C/UART/PWM interfaces.
-> 
-> The devicetree currently supports basic peripherals.
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+Found by Linux Driver Verification project (linuxtesting.org).
 
-I've applied the patch for 4.17 with some changes:
-- dropped the version prose in the commit message as noted by Rob
-- dropped the usbdrd3 elements for the time being.
-  Definitly not your fault and I did pick up the core usb3 enablement
-  for the rk3328, but it looks like this needs a bit more time as the phy
-  has this issue of not recognizing device unpluggs, making the controller
-  not taking any plug events after that at all.
-  So I want to make that actually work, before I bind myself to the binding
-  using the dwc3-of-simple stuff.
-  We can readd the dwc3 nodes to the roc-3328-cc once that works correctly.
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+---
+ drivers/rtc/rtc-ftrtc010.c | 37 ++++++++++++++++++++++++++++---------
+ 1 file changed, 28 insertions(+), 9 deletions(-)
 
-Heiko
+diff --git a/drivers/rtc/rtc-ftrtc010.c b/drivers/rtc/rtc-ftrtc010.c
+index af8d6beae20c..67a0aadf488c 100644
+--- a/drivers/rtc/rtc-ftrtc010.c
++++ b/drivers/rtc/rtc-ftrtc010.c
+@@ -147,33 +147,52 @@ static int ftrtc010_rtc_probe(struct platform_device *pdev)
+ 		ret = clk_prepare_enable(rtc->extclk);
+ 		if (ret) {
+ 			dev_err(dev, "failed to enable EXTCLK\n");
+-			return ret;
++			goto err_pclk;
+ 		}
+ 	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+-	if (!res)
+-		return -ENODEV;
++	if (!res) {
++		ret = -ENODEV;
++		goto err_extclk;
++	}
+ 
+ 	rtc->rtc_irq = res->start;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENODEV;
++	if (!res) {
++		ret = -ENODEV;
++		goto err_extclk;
++	}
+ 
+ 	rtc->rtc_base = devm_ioremap(dev, res->start,
+ 				     resource_size(res));
+-	if (!rtc->rtc_base)
+-		return -ENOMEM;
++	if (!rtc->rtc_base) {
++		ret = -ENOMEM;
++		goto err_extclk;
++	}
+ 
+ 	ret = devm_request_irq(dev, rtc->rtc_irq, ftrtc010_rtc_interrupt,
+ 			       IRQF_SHARED, pdev->name, dev);
+ 	if (unlikely(ret))
+-		return ret;
++		goto err_extclk;
+ 
+ 	rtc->rtc_dev = rtc_device_register(pdev->name, dev,
+ 					   &ftrtc010_rtc_ops, THIS_MODULE);
+-	return PTR_ERR_OR_ZERO(rtc->rtc_dev);
++	if (IS_ERR(rtc->rtc_dev)) {
++		ret = PTR_ERR(rtc->rtc_dev);
++		goto err_extclk;
++	}
++
++	return 0;
++
++err_extclk:
++	if (!IS_ERR(rtc->extclk))
++		clk_disable_unprepare(rtc->extclk);
++err_pclk:
++	if (!IS_ERR(rtc->pclk))
++		clk_disable_unprepare(rtc->pclk);
++	return ret;
+ }
+ 
+ static int ftrtc010_rtc_remove(struct platform_device *pdev)
+-- 
+2.7.4
