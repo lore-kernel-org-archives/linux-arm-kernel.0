@@ -1,25 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 2 Feb 2018 23:51:53 +0100
-Subject: [PATCH] ARM: dts: use 'atmel' as at24 manufacturer for sama5d34ek
-In-Reply-To: <20180124212346.3823-1-brgl@bgdev.pl>
-References: <20180124212346.3823-1-brgl@bgdev.pl>
-Message-ID: <20180202225153.GK3404@piout.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  2 Feb 2018 21:26:39 -0200
+Subject: [PATCH v2] ARM: dts: imx27-eukrea-cpuimx27: Put the clock node
+ directly into root
+Message-ID: <1517613999-6467-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/2018 at 22:23:46 +0100, Bartosz Golaszewski wrote:
-> Using compatible strings without the <manufacturer> part for at24 is
-> now deprecated. Use a correct 'atmel,<model>' value.
-> 
-> Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
-> ---
->  arch/arm/boot/dts/sama5d34ek.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-I forgot to reply but I applied all of them for 4.17, thanks.
+Put the UART clock node directly under root with a unique node name and
+drop unit-address in order to fix the following build warning with W=1:
 
+arch/arm/boot/dts/imx27-eukrea-mbimxsd27-baseboard.dtb: Warning (simple_bus_reg): Node /clocks/osc26m missing or empty reg/ranges property
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- Put the UART clock node directly under root (Shawn)
+
+ arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi | 15 ++++-----------
+ 1 file changed, 4 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi b/arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi
+index 2cf896c..6671a80 100644
+--- a/arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi
++++ b/arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi
+@@ -20,17 +20,10 @@
+ 		reg = <0xa0000000 0x04000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		compatible = "simple-bus";
+-
+-		clk14745600: clock at 0 {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <14745600>;
+-			reg = <0>;
+-		};
++	clk14745600: clk-uart {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <14745600>;
+ 	};
+ };
+ 
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.7.4
