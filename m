@@ -1,19 +1,35 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 2 Feb 2018 13:43:59 +0800
-Subject: [PATCH] ARM: imx: Remove epit support
-In-Reply-To: <1515511483-24706-1-git-send-email-fabio.estevam@nxp.com>
-References: <1515511483-24706-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20180202054358.GJ20833@dragon>
+Date: Fri, 2 Feb 2018 14:06:54 +0800
+Subject: [PATCH v5 0/6] ARM: dts: Add PHYTEC phyCORE-i.MX 6 and
+ phyBOARD-Mira carrier board support
+In-Reply-To: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
+References: <1515514200-9801-1-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <20180202060653.GK20833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 01:24:43PM -0200, Fabio Estevam wrote:
-> Currently there is no user of EPIT, so remove such unused code.
+On Tue, Jan 09, 2018 at 05:09:54PM +0100, Stefan Riedmueller wrote:
+> Changes since v4:
+> - Rearranged &m25p80 node in dts files to fit alphabetical order
+> - Fixed a parenthesis for uniformity in mira dtsi
 > 
-> If someone wants to add EPIT support back, then the person needs to
-> create a proper support into drivers/clocksource/ and add device
-> tree support, proper bindings, etc.
+> Christian Hemp (2):
+>   ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6Quad/Dual RDK
+>   ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6 DualLight/Solo
+>     RDK
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Enrico Scholz (1):
+>   ARM: dts: imx6: Add support for phyBOARD-Mira with i.MX 6QuadPlus
+> 
+> Stefan Riedmueller (3):
+>   ARM: dts: imx6: Add initial support for phyCORE-i.MX 6 SOM
+>   ARM: dts: imx6: Add initial support for phyBOARD-Mira
 
-Applied, thanks.
+Okay, I replaced v4 with this v5.
+
+>   ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor DA9062 driver
+
+This one still doesn't apply to imx/defconfig.  Please rebase and
+resend.
+
+Shawn
