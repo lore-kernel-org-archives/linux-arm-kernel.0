@@ -1,23 +1,59 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 2 Feb 2018 15:03:24 +0100
-Subject: [Patch v8 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <1517574348-22111-13-git-send-email-smitha.t@samsung.com>
-References: <1517574348-22111-1-git-send-email-smitha.t@samsung.com>
- <CGME20180202125020epcas2p2052bfe072a33069cffd3d9bfe7856ae5@epcas2p2.samsung.com>
- <1517574348-22111-13-git-send-email-smitha.t@samsung.com>
-Message-ID: <0fbf2708-0e26-d5d6-3149-245d940baa9a@xs4all.nl>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Fri, 2 Feb 2018 16:03:43 +0200
+Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
+In-Reply-To: <CACRpkdaFyKYxnVB-QuUiT+G9QcrpyPkzd2KXUm1sWNSgzyF9AA@mail.gmail.com>
+References: <20180201130446.6165-1-linus.walleij@linaro.org>
+ <20180201131907.GO5453@intel.com>
+ <CACRpkdaFyKYxnVB-QuUiT+G9QcrpyPkzd2KXUm1sWNSgzyF9AA@mail.gmail.com>
+Message-ID: <20180202140343.GX5453@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/18 13:25, Smitha T Murthy wrote:
-> Added V4l2 controls for HEVC encoder
+On Fri, Feb 02, 2018 at 02:56:30PM +0100, Linus Walleij wrote:
+> On Thu, Feb 1, 2018 at 2:19 PM, Ville Syrj?l?
+> <ville.syrjala@linux.intel.com> wrote:
+> > [Me]
+> >> +     /*
+> >> +      * If we run into a situation where, for example, the primary plane
+> >> +      * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
+> >> +      * 16) we need to scale down the depth of the sizes we request.
+> >> +      */
+> >> +     drm_for_each_plane(plane, fb_helper->dev) {
+> >> +             /* Only check the primary plane */
+> >> +             if (plane->type != DRM_PLANE_TYPE_PRIMARY)
+> >> +                     continue;
+> >
+> > I think this should look at crtc->primary for each of the crtcs managed
+> > by the fb_helper.
+> >
+> > Also this probably shouldn't look at YUV formats at all?
 > 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> I guess I can look into doing it this way, sorry for not knowing how to
+> properly inspect DRM objects, I'm lost sometimes...
+> 
+> > I do wonder if instead we should just have the driver specify the
+> > pixel format explicitly instead of trying to guess based on bpp?
+> 
+> That makes a lot more sense to me actually. It would
+> give a better sense of control so the driver feel it knows
+> what is actually going on.
+> 
+> So I would just update
+> drm_fb_cma_fbdev_init() and drm_fb_helper_initial_config()
+> to pass a reasonable pixel format instead and refactor all the
+> way down?
 
-Looks good.
+Yeah, something along those lines would seem like the better approach
+to me. But it's been a while since I've looked at this code so I might
+be totally wrong :)
 
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+> 
+> It does hit a lot of code on the way, but if everyone thinks this
+> is a good idea I can very well take a stab at it.
+> 
+> Yours,
+> Linus Walleij
 
-Regards,
-
-	Hans
+-- 
+Ville Syrj?l?
+Intel OTC
