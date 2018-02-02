@@ -1,168 +1,158 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Feb 2018 14:28:46 +0000
-Subject: [PATCH] irqchip/gic-v3: change pr_debug message to pr_devel
-In-Reply-To: <20180202142029.12568-1-msalter@redhat.com>
-References: <20180202142029.12568-1-msalter@redhat.com>
-Message-ID: <64e25ef3-f1f4-e05a-e659-07b249e53d9f@arm.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Fri, 2 Feb 2018 15:30:34 +0100
+Subject: [PATCH v2 08/16] iio: adc: sun4i-gpadc-iio: rework: add interrupt
+ support
+In-Reply-To: <20180131190718.ustqzwdxzw7mqe52@qschulz>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-9-embed3d@gmail.com>
+ <20180131190718.ustqzwdxzw7mqe52@qschulz>
+Message-ID: <8a3ff924-9752-e9dc-d70e-609436505b1a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/18 14:20, Mark Salter wrote:
-> The pr_debug() in gic-v3 gic_send_sgi() can trigger a circular locking
-> warning:
-> 
->  GICv3: CPU10: ICC_SGI1R_EL1 5000400
->  ======================================================
->  WARNING: possible circular locking dependency detected
->  4.15.0+ #1 Tainted: G        W
->  ------------------------------------------------------
->  dynamic_debug01/1873 is trying to acquire lock:
->   ((console_sem).lock){-...}, at: [<0000000099c891ec>] down_trylock+0x20/0x4c
-> 
->  but task is already holding lock:
->   (&rq->lock){-.-.}, at: [<00000000842e1587>] __task_rq_lock+0x54/0xdc
-> 
->  which lock already depends on the new lock.
-> 
->  the existing dependency chain (in reverse order) is:
-> 
->  -> #2 (&rq->lock){-.-.}:
->         __lock_acquire+0x3b4/0x6e0
->         lock_acquire+0xf4/0x2a8
->         _raw_spin_lock+0x4c/0x60
->         task_fork_fair+0x3c/0x148
->         sched_fork+0x10c/0x214
->         copy_process.isra.32.part.33+0x4e8/0x14f0
->         _do_fork+0xe8/0x78c
->         kernel_thread+0x48/0x54
->         rest_init+0x34/0x2a4
->         start_kernel+0x45c/0x488
-> 
->  -> #1 (&p->pi_lock){-.-.}:
->         __lock_acquire+0x3b4/0x6e0
->         lock_acquire+0xf4/0x2a8
->         _raw_spin_lock_irqsave+0x58/0x70
->         try_to_wake_up+0x48/0x600
->         wake_up_process+0x28/0x34
->         __up.isra.0+0x60/0x6c
->         up+0x60/0x68
->         __up_console_sem+0x4c/0x7c
->         console_unlock+0x328/0x634
->         vprintk_emit+0x25c/0x390
->         dev_vprintk_emit+0xc4/0x1fc
->         dev_printk_emit+0x88/0xa8
->         __dev_printk+0x58/0x9c
->         _dev_info+0x84/0xa8
->         usb_new_device+0x100/0x474
->         hub_port_connect+0x280/0x92c
->         hub_event+0x740/0xa84
->         process_one_work+0x240/0x70c
->         worker_thread+0x60/0x400
->         kthread+0x110/0x13c
->         ret_from_fork+0x10/0x18
-> 
->  -> #0 ((console_sem).lock){-...}:
->         validate_chain.isra.34+0x6e4/0xa20
->         __lock_acquire+0x3b4/0x6e0
->         lock_acquire+0xf4/0x2a8
->         _raw_spin_lock_irqsave+0x58/0x70
->         down_trylock+0x20/0x4c
->         __down_trylock_console_sem+0x3c/0x9c
->         console_trylock+0x20/0xb0
->         vprintk_emit+0x254/0x390
->         vprintk_default+0x58/0x90
->         vprintk_func+0xbc/0x164
->         printk+0x80/0xa0
->         __dynamic_pr_debug+0x84/0xac
->         gic_raise_softirq+0x184/0x18c
->         smp_cross_call+0xac/0x218
->         smp_send_reschedule+0x3c/0x48
->         resched_curr+0x60/0x9c
->         check_preempt_curr+0x70/0xdc
->         wake_up_new_task+0x310/0x470
->         _do_fork+0x188/0x78c
->         SyS_clone+0x44/0x50
->         __sys_trace_return+0x0/0x4
-> 
->  other info that might help us debug this:
-> 
->  Chain exists of:
->    (console_sem).lock --> &p->pi_lock --> &rq->lock
-> 
->   Possible unsafe locking scenario:
-> 
->         CPU0                    CPU1
->         ----                    ----
->    lock(&rq->lock);
->                                 lock(&p->pi_lock);
->                                 lock(&rq->lock);
->    lock((console_sem).lock);
-> 
->   *** DEADLOCK ***
-> 
->  2 locks held by dynamic_debug01/1873:
->   #0:  (&p->pi_lock){-.-.}, at: [<000000001366df53>] wake_up_new_task+0x40/0x470
->   #1:  (&rq->lock){-.-.}, at: [<00000000842e1587>] __task_rq_lock+0x54/0xdc
-> 
->  stack backtrace:
->  CPU: 10 PID: 1873 Comm: dynamic_debug01 Tainted: G        W        4.15.0+ #1
->  Hardware name: GIGABYTE R120-T34-00/MT30-GS2-00, BIOS T48 10/02/2017
->  Call trace:
->   dump_backtrace+0x0/0x188
->   show_stack+0x24/0x2c
->   dump_stack+0xa4/0xe0
->   print_circular_bug.isra.31+0x29c/0x2b8
->   check_prev_add.constprop.39+0x6c8/0x6dc
->   validate_chain.isra.34+0x6e4/0xa20
->   __lock_acquire+0x3b4/0x6e0
->   lock_acquire+0xf4/0x2a8
->   _raw_spin_lock_irqsave+0x58/0x70
->   down_trylock+0x20/0x4c
->   __down_trylock_console_sem+0x3c/0x9c
->   console_trylock+0x20/0xb0
->   vprintk_emit+0x254/0x390
->   vprintk_default+0x58/0x90
->   vprintk_func+0xbc/0x164
->   printk+0x80/0xa0
->   __dynamic_pr_debug+0x84/0xac
->   gic_raise_softirq+0x184/0x18c
->   smp_cross_call+0xac/0x218
->   smp_send_reschedule+0x3c/0x48
->   resched_curr+0x60/0x9c
->   check_preempt_curr+0x70/0xdc
->   wake_up_new_task+0x310/0x470
->   _do_fork+0x188/0x78c
->   SyS_clone+0x44/0x50
->   __sys_trace_return+0x0/0x4
->  GICv3: CPU0: ICC_SGI1R_EL1 12000
-> 
-> This could be fixed with printk_deferred() but that might lessen its
-> usefulness for debugging. So change it to pr_devel to keep it out of
-> production kernels. Developers working on gic-v3 can enable it as
-> needed in their kernels.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index a57c0fbbd34a..d71be9a1f9d2 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -673,7 +673,7 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
->  	       MPIDR_TO_SGI_RS(cluster_id)		|
->  	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
->  
-> -	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
-> +	pr_devel("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
->  	gic_write_sgi1r(val);
->  }
->  
-> 
 
-Queued, thanks.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On 31.01.2018 20:07, Quentin Schulz wrote:
+> Hi Philipp,
+> 
+> On Mon, Jan 29, 2018 at 12:29:11AM +0100, Philipp Rossak wrote:
+>> This patch rewors the driver to support interrupts for the thermal part
+>> of the sensor.
+>>
+>> This is only available for the newer sensor (currently H3 and A83T).
+>> The interrupt will be trigerd on data available and triggers the update
+>> for the thermal sensors. All newer sensors have different amount of
+>> sensors and different interrupts for each device the reset of the
+>> interrupts need to be done different
+>>
+>> For the newer sensors is the autosuspend disabled.
+>>
+>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>> Acked-by: Jonathan  Cameron <jonathan.cameron@huawei.com>
+>> ---
+>>   drivers/iio/adc/sun4i-gpadc-iio.c | 60 +++++++++++++++++++++++++++++++++++----
+>>   include/linux/mfd/sun4i-gpadc.h   |  2 ++
+>>   2 files changed, 56 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> index 74eeb5cd5218..b7b5451226b0 100644
+>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> @@ -71,11 +71,14 @@ struct gpadc_data {
+>>   	unsigned int	temp_data[MAX_SENSOR_COUNT];
+>>   	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>>   	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+>> +	u32		irq_clear_map;
+>> +	u32		irq_control_map;
+> 
+> I would say to use a regmap_irq_chip for controlling IRQs.
+> 
+Sounds good for me! I will rework that in the next version.
+>>   	bool		has_bus_clk;
+>>   	bool		has_bus_rst;
+>>   	bool		has_mod_clk;
+>>   	int		sensor_count;
+>>   	bool		supports_nvmem;
+>> +	bool		support_irq;
+>>   };
+>>   
+>>   static const struct gpadc_data sun4i_gpadc_data = {
+>> @@ -90,6 +93,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
+>>   	.sample_end = sun4i_gpadc_sample_end,
+>>   	.sensor_count = 1,
+>>   	.supports_nvmem = false,
+>> +	.support_irq = false,
+> 
+> False is the default, no need to set support_irq.
+> 
+> [...]
+> 
+>>   struct sun4i_gpadc_iio {
+>> @@ -332,6 +339,11 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
+>>   		return 0;
+>>   	}
+>>   
+>> +	if (info->data->support_irq) {
+>> +		regmap_read(info->regmap, info->data->temp_data[sensor], val);
+>> +		return 0;
+>> +	}
+>> +
+> 
+> Maybe you could define a new thermal_zone_of_device_ops for these new
+> thermal sensors? That way, you don't even need the boolean support_irq.
+> 
+Sounds good for me! I will rework that in the next version.
+
+>>   	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
+>>   }
+>>   
+>> @@ -429,6 +441,17 @@ static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
+>>   	return IRQ_HANDLED;
+>>   }
+>>   
+>> +static irqreturn_t sunxi_irq_thread(int irq, void *data)
+> 
+> I think we're trying to avoid sunxi mentions but rather using the name
+> of the first IP (in term of product release, not support) using this
+> function.
+> 
+>> +{
+>> +	struct sun4i_gpadc_iio *info = data;
+>> +
+>> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT, info->data->irq_clear_map);
+>> +
+> 
+> Will be handled by regmap_irq_chip.
+> [...]
+>> -	info->no_irq = true;
+>> +	if (info->data->support_irq) {
+>> +		/* only the new versions of ths support right now irqs */
+>> +		irq = platform_get_irq(pdev, 0);
+>> +		if (irq < 0) {
+>> +			dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
+>> +			return irq;
+>> +		}
+>> +
+>> +		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+>> +				sunxi_irq_thread, IRQF_ONESHOT,
+>> +				dev_name(&pdev->dev), info);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +	} else
+>> +		info->no_irq = true;
+>> +
+> 
+> That's a bit funny to have two booleans named no_irq and support_irq :)
+> 
+I know this looks very funny. I thought this would be better to keep, to 
+_not_ break anything. Since I will rework the whole driver and integrate 
+the mfd part I hope I can remove both.
+
+>>   	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
+>>   	indio_dev->channels = sun8i_a33_gpadc_channels;
+>>   
+>> @@ -789,11 +829,13 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>>   	if (ret)
+>>   		return ret;
+>>   
+>> -	pm_runtime_set_autosuspend_delay(&pdev->dev,
+>> -					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
+>> -	pm_runtime_use_autosuspend(&pdev->dev);
+>> -	pm_runtime_set_suspended(&pdev->dev);
+>> -	pm_runtime_enable(&pdev->dev);
+>> +	if (!info->data->support_irq) {
+>> +		pm_runtime_set_autosuspend_delay(&pdev->dev,
+>> +						 SUN4I_GPADC_AUTOSUSPEND_DELAY);
+>> +		pm_runtime_use_autosuspend(&pdev->dev);
+>> +		pm_runtime_set_suspended(&pdev->dev);
+>> +		pm_runtime_enable(&pdev->dev);
+>> +	}
+> 
+> Why would you not want your IP to do runtime PM?
+
+I will enable this again, in the next version! I had some issues with 
+this, thus I disabled this, but I know now what I did wrong!
+
+Thanks,
+Philipp
