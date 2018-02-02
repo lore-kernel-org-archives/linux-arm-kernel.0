@@ -1,44 +1,24 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Fri, 2 Feb 2018 09:47:23 -0800
-Subject: [PATCH 22/34] dma-mapping: add an arch_dma_supported hook
-In-Reply-To: <20180112084232.2857-23-hch@lst.de>
-References: <20180112084232.2857-1-hch@lst.de>
- <20180112084232.2857-23-hch@lst.de>
-Message-ID: <5d7dfb29-eeef-2280-13c9-5260e9104f67@infradead.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 2 Feb 2018 17:48:41 +0000
+Subject: [PATCH 1/2] arm64: entry: Apply BP hardening for high-priority
+ synchronous exceptions
+In-Reply-To: <1517592700-26497-2-git-send-email-will.deacon@arm.com>
+References: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
+ <1517592700-26497-2-git-send-email-will.deacon@arm.com>
+Message-ID: <3f4e2a58-51be-91c6-04da-368bcc47f32f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2018 12:42 AM, Christoph Hellwig wrote:
-> To implement the x86 forbid_dac and iommu_sac_force we want an arch hook
-> so that it can apply the global options across all dma_map_ops
-> implementations.
+On 02/02/18 17:31, Will Deacon wrote:
+> Software-step and PC alignment fault exceptions have higher priority than
+> instruction abort exceptions, so apply the BP hardening hooks there too
+> if the user PC appears to reside in kernel space.
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/x86/include/asm/dma-mapping.h |  3 +++
->  arch/x86/kernel/pci-dma.c          | 19 ++++++++++++-------
->  include/linux/dma-mapping.h        | 11 +++++++++++
->  3 files changed, 26 insertions(+), 7 deletions(-)
+> Reported-by: Dan Hettena <dhettena@nvidia.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index 88bcb1a8211d..d67742dad904 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -576,6 +576,14 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
->  	return 0;
->  }
->  
-> +/*
-> + * This is a hack for the legacy x86 forbid_dac and iommu_sac_force. Please
-> + * don't use this is new code.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-                     in new code.
-
-> + */
-> +#ifndef arch_dma_supported
-> +#define arch_dma_supported(dev, mask)	(1)
-> +#endif
-
-
+	M.
 -- 
-~Randy
+Jazz is not dead. It just smells funny...
