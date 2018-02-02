@@ -1,31 +1,59 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 2 Feb 2018 11:24:47 -0600
-Subject: [PATCH 0/2] I2C-DaVinci: Adjustments for davinci_i2c_probe()
-In-Reply-To: <4e668c87-65f5-8a00-132a-0184779faa08@users.sourceforge.net>
-References: <4e668c87-65f5-8a00-132a-0184779faa08@users.sourceforge.net>
-Message-ID: <310d5f2c-3a8d-80e3-a185-21da933d107f@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  2 Feb 2018 17:31:40 +0000
+Subject: [PATCH 2/2] arm64: entry: Apply BP hardening for suspicious
+ interrupts from EL0
+In-Reply-To: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
+References: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1517592700-26497-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It is possible to take an IRQ from EL0 following a branch to a kernel
+address in such a way that the IRQ is prioritised over the instruction
+abort. Whilst an attacker would need to get the starts to align here,
+it might be sufficient with enough calibration so perform BP hardening
+in the rare case that we see a kernel address in the ELR when handling
+an IRQ from EL0.
 
+Reported-by: Dan Hettena <dhettena@nvidia.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/entry.S | 5 +++++
+ arch/arm64/mm/fault.c     | 6 ++++++
+ 2 files changed, 11 insertions(+)
 
-On 02/02/2018 11:20 AM, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Fri, 2 Feb 2018 18:16:14 +0100
-> 
-> Two update suggestions were taken into account
-> from static source code analysis.
-> 
-> Markus Elfring (2):
->    Delete an error message for a failed memory allocation
->    Improve a size determination
-> 
->   drivers/i2c/busses/i2c-davinci.c | 7 ++-----
->   1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 394b149825b6..9bba6990e9b5 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -827,6 +827,11 @@ el0_irq_naked:
+ #endif
+ 
+ 	ct_user_exit
++#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
++	tbz	x22, #55, 1f
++	bl	do_el0_irq_bp_hardening
++1:
++#endif
+ 	irq_handler
+ 
+ #ifdef CONFIG_TRACE_IRQFLAGS
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 445aa4475c67..3d2bcbfdb90b 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -708,6 +708,12 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+ 	arm64_notify_die("", regs, &info, esr);
+ }
+ 
++asmlinkage void __exception do_el0_irq_bp_hardening(void)
++{
++	/* PC has already been checked in entry.S */
++	arm64_apply_bp_hardening();
++}
++
+ asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
+ 						   unsigned int esr,
+ 						   struct pt_regs *regs)
 -- 
-regards,
--grygorii
+2.1.4
