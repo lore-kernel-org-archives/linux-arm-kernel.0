@@ -1,48 +1,31 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 2 Feb 2018 08:47:15 +0800
-Subject: [PATCH V2 2/2] cpufreq: imx6q: add 696MHz operating point for
- i.mx6ul
-In-Reply-To: <1515235360-1628-2-git-send-email-Anson.Huang@nxp.com>
-References: <1515235360-1628-1-git-send-email-Anson.Huang@nxp.com>
- <1515235360-1628-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180202004713.GC20833@dragon>
+Date: Fri, 2 Feb 2018 09:26:36 +0800
+Subject: [PATCH v4 0/6] ARM: dts: Add PHYTEC phyCORE-i.MX 6 and
+ phyBOARD-Mira carrier board support
+In-Reply-To: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
+References: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
+Message-ID: <20180202012634.GE20833@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 06, 2018 at 06:42:40PM +0800, Anson Huang wrote:
-> Add 696MHz operating point for i.MX6UL, only for those
-> parts with speed grading fuse set to 2b'10 supports
-> 696MHz operating point, so, speed grading check is also
-> added for i.MX6UL in this patch, the clock tree for each
-> operating point are as below:
+On Mon, Jan 08, 2018 at 03:29:12PM +0100, Stefan Riedmueller wrote:
+> Christian Hemp (2):
+>   ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6Quad/Dual RDK
+>   ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6 DualLight/Solo
+>     RDK
 > 
-> 696MHz:
->     pll1                       696000000
->        pll1_bypass             696000000
->           pll1_sys             696000000
->              pll1_sw           696000000
->                 arm            696000000
-> 528MHz:
->     pll2                       528000000
->        pll2_bypass             528000000
->           pll2_bus             528000000
->              ca7_secondary_sel 528000000
->                 step           528000000
->                    pll1_sw     528000000
->                       arm      528000000
-> 396MHz:
->     pll2_pfd2_396m             396000000
->        ca7_secondary_sel       396000000
->           step                 396000000
->              pll1_sw           396000000
->                 arm            396000000
-> 198MHz:
->     pll2_pfd2_396m             396000000
->        ca7_secondary_sel       396000000
->           step                 396000000
->              pll1_sw           396000000
->                 arm            198000000
+> Enrico Scholz (1):
+>   ARM: dts: imx6: Add support for phyBOARD-Mira with i.MX 6QuadPlus
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Stefan Riedmueller (3):
+>   ARM: dts: imx6: Add initial support for phyCORE-i.MX 6 SOM
+>   ARM: dts: imx6: Add initial support for phyBOARD-Mira
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Applied above 5 patches.
+
+>   ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor DA9062 driver
+
+This one doesn't apply to my imx/defconfig branch.  Can you please
+rebase?  Thanks.
+
+Shawn
