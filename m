@@ -1,114 +1,185 @@
-From: ping.bai@nxp.com (Bai Ping)
-Date: Fri,  2 Feb 2018 16:06:27 +0800
-Subject: [PATCH v2] ARM: imx: Improve the soc revision calculation flow
-Message-ID: <1517558787-12858-1-git-send-email-ping.bai@nxp.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 2 Feb 2018 13:42:22 +0530
+Subject: [PATCH v6 02/41] clk: davinci: New driver for davinci PLL clocks
+In-Reply-To: <3ed91881-8753-a541-31aa-c835329141b3@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-3-git-send-email-david@lechnology.com>
+ <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
+ <3ed91881-8753-a541-31aa-c835329141b3@lechnology.com>
+Message-ID: <cbaee6d4-ff59-6684-4b3e-8b74b602c7ad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On our i.MX6 SOC, the DIGPROG register is used for representing the
-SOC ID and silicon revision. The revision has two part: MAJOR and
-MINOR. each is represented in 8 bits in the register.
+On Friday 02 February 2018 12:27 AM, David Lechner wrote:
+> On 02/01/2018 02:01 AM, Sekhar Nori wrote:
+>> On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
+>>> This adds a new driver for mach-davinci PLL clocks. This is porting the
+>>> code from arch/arm/mach-davinci/clock.c to the common clock framework.
+>>> Additionally, it adds device tree support for these clocks.
+>>>
+>>> The ifeq ($(CONFIG_COMMON_CLK), y) in the Makefile is needed to prevent
+>>> compile errors until the clock code in arch/arm/mach-davinci is removed.
+>>>
+>>> Note: although there are similar clocks for TI Keystone we are not able
+>>> to share the code for a few reasons. The keystone clocks are device tree
+>>> only and use legacy one-node-per-clock bindings. Also the register
+>>> layouts are a bit different, which would add even more if/else mess
+>>> to the keystone clocks. And the keystone PLL driver doesn't support
+>>> setting clock rates.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>
+>> Looks nice and clean to me. There is still some feedback though.
+>>
+>> One thing missing is DIV4.5 clock. It will be nice to add that too,
+>> mostly just because it will make the binding complete.
+>>
+>>> +void of_davinci_pll_init(struct device_node *node,
+>>> +???????????? const struct davinci_pll_clk_info *info,
+>>> +???????????? const struct davinci_pll_obsclk_info *obsclk_info,
+>>> +???????????? const struct davinci_pll_sysclk_info *div_info,
+>>> +???????????? u8 max_sysclk_id)
+>>> +{
+>>> +??? struct device_node *child;
+>>> +??? const char *parent_name;
+>>> +??? void __iomem *base;
+>>> +??? struct clk *clk;
+>>> +
+>>> +??? base = of_iomap(node, 0);
+>>> +??? if (!base) {
+>>> +??????? pr_err("ioremap failed");
+>>> +??????? return;
+>>> +??? }
+>>> +
+>>> +??? if (info->flags & PLL_HAS_OSCIN)
+>>> +??????? parent_name = of_clk_get_parent_name(node, 0);
+>>> +??? else
+>>> +??????? parent_name = OSCIN_CLK_NAME;
+>>
+>> I don't think the reference clock input handling is fully
+>> correct/flexible.
+>>
+>> There are two ways to provide input clock (ref_clk) to PLL. Either use
+>> the internal oscillator with a crystal connected between OSCIN and
+>> OSCOUT (CLKMODE = 0) or a clean clock input (CLKMODE = 1) connected to
+>> OSCIN (OSCOUT disconnected).
+>>
+>> This is a board specific decision. On the LogicPD EVM, the former option
+>> is used, on the LCDK board, the later.
+>>
+>> So, I think what we need is a DT property like
+>> "ti,davinci-use-internal-osc" for the PLL. Boards can set or ignore it
+>> and you can switch CLKMODE on or off based on that.
+>>
+>> Setting CLKMODE = 1 will switch off the internal oscillator (and
+>> presumably save power), but it does not act as a mux. This explains why
+>> not worrying about setting this correctly in current mainline still
+>> works.
+>>
+>> I am also not sure if we really need PLL_HAS_OSCIN since all DaVinci
+>> SoCs set it anyway.
+> 
+> 
+> I realize this is a bit confusing. I think that part of this comes from
+> the fact that OSCIN is not used consistently in the TRMs. It is used as
 
-bits [15:8]: reflect the MAJOR part of the revision;
-bits [7:0]: reflect the MINOR part of the revision;
+Thats right, I noticed that too. But all SoC datasheets I looked at
+supported both internal oscillator and external clock input. Also, no
+SoC had different reference clocks for its PLLs (DM355 has two crystal
+inputs, but one of them goes only to the video peripheral).
 
-In our linux kernel, the soc revision is represented in 8 bits.
-MAJOR part and MINOR each occupy 4 bits.
+So I still think there is benefit in standardizing on a single name in
+kernel/DT (I was hoping it can be "ref_clk").
 
-previous method does NOT take care about the MAJOR part in DIGPROG
-register. So reformat the revision read from the HW to be compatible
-with the revision format used in kernel.
+> the name of the actual pin on the SoC for connecting an external clock
+> signal or crystal. It is also used as an input to CLKMODE where it means
+> the output of the internal oscillator rather than the external pin (some
+> SoCs show CLKMODE as a mux with OSCIN and CLKIN, but I agree that it is
+> not really a mux since OSCIN and CLKIN are the same external pin on the
+> SoC - then other SoCs show OSCIN meaning only the external pin here).
+> Furthermore, OSCIN is listed as one of the inputs of EXTCLKSRC also as
+> one of the inputs of OBSCLK on da850-type SoCs.
 
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
----
-v2:
- - remove redundant line
- - use u8 instead of u16 for 'major_part'&'minor_part' variables
----
- arch/arm/mach-imx/anatop.c | 56 ++++++++++++++++------------------------------
- 1 file changed, 19 insertions(+), 37 deletions(-)
+Right.
 
-diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
-index 649a84c..61f3d94 100644
---- a/arch/arm/mach-imx/anatop.c
-+++ b/arch/arm/mach-imx/anatop.c
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (C) 2013-2015 Freescale Semiconductor, Inc.
-+ * Copyright 2017-2018 NXP.
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -116,6 +117,7 @@ void __init imx_init_revision_from_anatop(void)
- 	unsigned int revision;
- 	u32 digprog;
- 	u16 offset = ANADIG_DIGPROG;
-+	u8 major_part, minor_part;
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
- 	anatop_base = of_iomap(np, 0);
-@@ -127,45 +129,25 @@ void __init imx_init_revision_from_anatop(void)
- 	digprog = readl_relaxed(anatop_base + offset);
- 	iounmap(anatop_base);
- 
--	switch (digprog & 0xff) {
--	case 0:
--		/*
--		 * For i.MX6QP, most of the code for i.MX6Q can be resued,
--		 * so internally, we identify it as i.MX6Q Rev 2.0
--		 */
--		if (digprog >> 8 & 0x01)
--			revision = IMX_CHIP_REVISION_2_0;
--		else
--			revision = IMX_CHIP_REVISION_1_0;
--		break;
--	case 1:
--		revision = IMX_CHIP_REVISION_1_1;
--		break;
--	case 2:
--		revision = IMX_CHIP_REVISION_1_2;
--		break;
--	case 3:
--		revision = IMX_CHIP_REVISION_1_3;
--		break;
--	case 4:
--		revision = IMX_CHIP_REVISION_1_4;
--		break;
--	case 5:
--		/*
--		 * i.MX6DQ TO1.5 is defined as Rev 1.3 in Data Sheet, marked
--		 * as 'D' in Part Number last character.
--		 */
--		revision = IMX_CHIP_REVISION_1_5;
--		break;
--	default:
-+	/*
-+	 * On i.MX7D digprog value match linux version format, so
-+	 * it needn't map again and we can use register value directly.
-+	 */
-+	if (of_device_is_compatible(np, "fsl,imx7d-anatop")) {
-+		revision = digprog & 0xff;
-+	} else {
- 		/*
--		 * Fail back to return raw register value instead of 0xff.
--		 * It will be easy to know version information in SOC if it
--		 * can't be recognized by known version. And some chip's (i.MX7D)
--		 * digprog value match linux version format, so it needn't map
--		 * again and we can use register value directly.
-+		 * MAJOR: [15:8], the major silicon revison;
-+		 * MINOR: [7: 0], the minor silicon revison;
-+		 *
-+		 * please refer to the i.MX RM for the detailed
-+		 * silicon revison bit define.
-+		 * format the major part and minor part to match the
-+		 * linux kernel soc version format.
- 		 */
--		revision = digprog & 0xff;
-+		major_part = (digprog >> 8) & 0xf;
-+		minor_part = digprog & 0xf;
-+		revision = ((major_part + 1) << 4) | minor_part;
- 	}
- 
- 	mxc_set_cpu_type(digprog >> 16 & 0xff);
--- 
-1.9.1
+> So, the option I went with here is that "ref_clk" is the external clock
+> connected to the OSCIN pin and that the "oscin" clock is the clock domain
+> _after_ CLKMODE. This matches the use of OSCIN in the TRMs where "OSCIN"
+> is used as an input for EXTCLKSRC and OBSCLK. Also the fact that the
+> external reference clock is sometimes called CLKSRC instead of OSCIN
+> influenced the decision go with "oscin" being the internal (to the PLL)
+> clock domain.
+
+Okay, I think we need some comments in code to make this distinction clear.
+
+I do not yet understand why we need to differentiate between the
+external-to-chip clock domain from internal "after CLKMODE" domain.
+OTOH, I don't see a big harm in doing it either (as long as the
+distinction is clear).
+
+> 
+> I think what I should have done, though, is named PLL_HAS_OSCIN as
+> PLL_HAS_CLKMODE instead. I think what you are missing here is that
+> PLL_HAS_OSCIN (or PLL_HAS_CLKMODE) only means that the PLL _has_
+> PLLCTL[CLKMODE]. It does _not_ mean that we set (or clear) PLLCTL[CLKMODE].
+> On SoCs with two PLLs, only one of them has the PLLCTL[CLKMODE] bit (and
+> therefore the PLL_HAS_OSCIN flag) and the output of this is shared by both
+> PLLs, e.g. Figure 7-1. PLLC Structure in the AM1808 TRM (spruh82c). So,
+> the clock tree in Linux ends up looking like this:
+
+I agree with renaming PLL_HAS_OSCIN with PLL_HAS_CLKMODE will be much
+clearer.
+
+> 
+> ref_clk - the external clock - aka CLKSRC
+> +-oscin - internal clock domain after CLKMODE - shared by both PLLs
+> ? +-pll0_extclksrc
+> ? +-pll0_prediv
+> ? +-pll0_auxclk
+> ? +-pll0_obsclk - via the OSCSRC mux
+> ? +-pll1_pllen
+> ? +-pll1_pllout
+> ? +-pll1_obsclk - via the OSCSRC mux
+> 
+> Clocks beyond two levels deep are omitted for brevity.
+> 
+> It should be easy to see the correlation here Figure 7-1 with the
+> exception that in Figure 7-1 "OSCIN" has the meaning of "the physical
+> pin on the chip" (which Linux calls "ref_clk") and there is no clear
+> label in Figure 7-1 of what the clock domain after PLLCTL[CLKMODE] is
+> called (which Linux calls "oscin").
+
+Yeah, thats why I was not sure why need to make the distinction between
+these domains.
+
+> Sure, it would work just fine if we left "oscin" out of the picture,
+> but it simplifies the driver implementation by having a known "oscin"
+> clock that is fully controlled by the clock driver code instead of
+> having to pass the user-supplied "ref_clk" around a bunch of places.
+
+Okay.
+
+> And, we could try to call it something other than "oscin" to try
+> to avoid confusion, but then you will just cause confusion in other
+> places (which could be less total confusion, so I am open to change
+> here).
+
+Calling external clock as "ref_clk" and internal clock domain as "oscin"
+is fine. Its the best choice of names given the terminology
+inconsistency between TRMs of different devices.
+
+> ---
+> 
+> Switching topics to CLKMODE and DT...
+> 
+> There is a "ti,clkmode-square-wave" property in the proposed DT bindings
+> that does exactly what you have suggested, except the logic is
+> reversed. When omitted, it assumes the use of a crystal oscillator.
+> I believe this is the most common configuration, which is why I made
+> it the default instead of the other way around.
+
+This is fine and looks like I missed its existence while making my
+suggestion.
+
+Thanks,
+Sekhar
