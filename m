@@ -1,25 +1,22 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 2 Feb 2018 11:50:58 +0530
-Subject: [PATCH v6 17/41] dt-bindings: clock: Add bindings for DA8XX
- CFGCHIP clocks
-In-Reply-To: <1516468460-4908-18-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-18-git-send-email-david@lechnology.com>
-Message-ID: <572e31a2-ac18-512b-03bb-82fffcf4d228@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 2 Feb 2018 15:27:13 +0800
+Subject: [PATCH 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <ebc8b28d5c2948131cc187ac8177395c@codeaurora.org>
+References: <20180117183244.28303-1-l.stach@pengutronix.de>
+ <20180117183244.28303-2-l.stach@pengutronix.de>
+ <20180123103609.GD27764@dragon>
+ <1516713799.25726.21.camel@pengutronix.de>
+ <ebc8b28d5c2948131cc187ac8177395c@codeaurora.org>
+Message-ID: <20180202072712.GF25699@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
-> +EMIFA clock source (ASYNC1)
-> +---------------------------
-> +Required properties:
-> +- compatible: shall be "ti,da850-async1-clksrc".
-> +- #clock-cells: from common clock binding; shall be set to 0.
-> +- clocks: phandles to the parent clocks corresponding to clock-names
-> +- clock-names: shall be "pll0_sysclk3", "div4.5"
+On Thu, Jan 25, 2018 at 05:48:41PM +0800, aisheng.dong at codeaurora.org wrote:
+> (You can also send all IMX related patches to linux-imx at nxp.com maillist
+> i created recently for tracking all IMX related upstream activities.
+> Most Freescale/NXP driver owners are in this list that could help on
+> the review. Shawn, do you think if i can put it in MAINTAINER file?)
 
-Is this clock really referred to as aysnc1 in documentation? I don't get
-hits for async1 in OMAP-L138 TRM.
+Yeah, it will be very helpful.  Please send me a patch for that.
 
-Thanks,
-Sekhar
+Shawn
