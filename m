@@ -1,185 +1,1733 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 2 Feb 2018 13:42:22 +0530
-Subject: [PATCH v6 02/41] clk: davinci: New driver for davinci PLL clocks
-In-Reply-To: <3ed91881-8753-a541-31aa-c835329141b3@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-3-git-send-email-david@lechnology.com>
- <ff3a0549-2f76-9a8d-21bc-164649e8a6be@ti.com>
- <3ed91881-8753-a541-31aa-c835329141b3@lechnology.com>
-Message-ID: <cbaee6d4-ff59-6684-4b3e-8b74b602c7ad@ti.com>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Fri, 2 Feb 2018 08:13:56 +0000
+Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180201183126.32384-2-l.stach@pengutronix.de>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-2-l.stach@pengutronix.de>
+Message-ID: <HE1PR04MB3113FF72B02D642392D625DF87F90@HE1PR04MB3113.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 February 2018 12:27 AM, David Lechner wrote:
-> On 02/01/2018 02:01 AM, Sekhar Nori wrote:
->> On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
->>> This adds a new driver for mach-davinci PLL clocks. This is porting the
->>> code from arch/arm/mach-davinci/clock.c to the common clock framework.
->>> Additionally, it adds device tree support for these clocks.
->>>
->>> The ifeq ($(CONFIG_COMMON_CLK), y) in the Makefile is needed to prevent
->>> compile errors until the clock code in arch/arm/mach-davinci is removed.
->>>
->>> Note: although there are similar clocks for TI Keystone we are not able
->>> to share the code for a few reasons. The keystone clocks are device tree
->>> only and use legacy one-node-per-clock bindings. Also the register
->>> layouts are a bit different, which would add even more if/else mess
->>> to the keystone clocks. And the keystone PLL driver doesn't support
->>> setting clock rates.
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>
->> Looks nice and clean to me. There is still some feedback though.
->>
->> One thing missing is DIV4.5 clock. It will be nice to add that too,
->> mostly just because it will make the binding complete.
->>
->>> +void of_davinci_pll_init(struct device_node *node,
->>> +???????????? const struct davinci_pll_clk_info *info,
->>> +???????????? const struct davinci_pll_obsclk_info *obsclk_info,
->>> +???????????? const struct davinci_pll_sysclk_info *div_info,
->>> +???????????? u8 max_sysclk_id)
->>> +{
->>> +??? struct device_node *child;
->>> +??? const char *parent_name;
->>> +??? void __iomem *base;
->>> +??? struct clk *clk;
->>> +
->>> +??? base = of_iomap(node, 0);
->>> +??? if (!base) {
->>> +??????? pr_err("ioremap failed");
->>> +??????? return;
->>> +??? }
->>> +
->>> +??? if (info->flags & PLL_HAS_OSCIN)
->>> +??????? parent_name = of_clk_get_parent_name(node, 0);
->>> +??? else
->>> +??????? parent_name = OSCIN_CLK_NAME;
->>
->> I don't think the reference clock input handling is fully
->> correct/flexible.
->>
->> There are two ways to provide input clock (ref_clk) to PLL. Either use
->> the internal oscillator with a crystal connected between OSCIN and
->> OSCOUT (CLKMODE = 0) or a clean clock input (CLKMODE = 1) connected to
->> OSCIN (OSCOUT disconnected).
->>
->> This is a board specific decision. On the LogicPD EVM, the former option
->> is used, on the LCDK board, the later.
->>
->> So, I think what we need is a DT property like
->> "ti,davinci-use-internal-osc" for the PLL. Boards can set or ignore it
->> and you can switch CLKMODE on or off based on that.
->>
->> Setting CLKMODE = 1 will switch off the internal oscillator (and
->> presumably save power), but it does not act as a mux. This explains why
->> not worrying about setting this correctly in current mainline still
->> works.
->>
->> I am also not sure if we really need PLL_HAS_OSCIN since all DaVinci
->> SoCs set it anyway.
+> Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
 > 
+> This adds the basic DTS for the i.MX8MQ.
+> For now only the following peripherals are supported:
+> - IOMUXC (pin controller)
+> - CCM (clock controller)
+> - GPIO
+> - UART
+> - uSDHC (SD/eMMC controller)
+> - FEC (ethernet controller)
+> - i2c
 > 
-> I realize this is a bit confusing. I think that part of this comes from
-> the fact that OSCIN is not used consistently in the TRMs. It is used as
-
-Thats right, I noticed that too. But all SoC datasheets I looked at
-supported both internal oscillator and external clock input. Also, no
-SoC had different reference clocks for its PLLs (DM355 has two crystal
-inputs, but one of them goes only to the video peripheral).
-
-So I still think there is benefit in standardizing on a single name in
-kernel/DT (I was hoping it can be "ref_clk").
-
-> the name of the actual pin on the SoC for connecting an external clock
-> signal or crystal. It is also used as an input to CLKMODE where it means
-> the output of the internal oscillator rather than the external pin (some
-> SoCs show CLKMODE as a mux with OSCIN and CLKIN, but I agree that it is
-> not really a mux since OSCIN and CLKIN are the same external pin on the
-> SoC - then other SoCs show OSCIN meaning only the external pin here).
-> Furthermore, OSCIN is listed as one of the inputs of EXTCLKSRC also as
-> one of the inputs of OBSCLK on da850-type SoCs.
-
-Right.
-
-> So, the option I went with here is that "ref_clk" is the external clock
-> connected to the OSCIN pin and that the "oscin" clock is the clock domain
-> _after_ CLKMODE. This matches the use of OSCIN in the TRMs where "OSCIN"
-> is used as an input for EXTCLKSRC and OBSCLK. Also the fact that the
-> external reference clock is sometimes called CLKSRC instead of OSCIN
-> influenced the decision go with "oscin" being the internal (to the PLL)
-> clock domain.
-
-Okay, I think we need some comments in code to make this distinction clear.
-
-I do not yet understand why we need to differentiate between the
-external-to-chip clock domain from internal "after CLKMODE" domain.
-OTOH, I don't see a big harm in doing it either (as long as the
-distinction is clear).
-
+> This is enough to get a very basic board support up and running.
 > 
-> I think what I should have done, though, is named PLL_HAS_OSCIN as
-> PLL_HAS_CLKMODE instead. I think what you are missing here is that
-> PLL_HAS_OSCIN (or PLL_HAS_CLKMODE) only means that the PLL _has_
-> PLLCTL[CLKMODE]. It does _not_ mean that we set (or clear) PLLCTL[CLKMODE].
-> On SoCs with two PLLs, only one of them has the PLLCTL[CLKMODE] bit (and
-> therefore the PLL_HAS_OSCIN flag) and the output of this is shared by both
-> PLLs, e.g. Figure 7-1. PLLC Structure in the AM1808 TRM (spruh82c). So,
-> the clock tree in Linux ends up looking like this:
-
-I agree with renaming PLL_HAS_OSCIN with PLL_HAS_CLKMODE will be much
-clearer.
-
+> One known limitation is that the driver for the GPC interrupt
+> controller is still missing, rendering the CPU sleep states unusable
+> as there is nothing waking them up anymore. This will be fixed in
+> due course.
 > 
-> ref_clk - the external clock - aka CLKSRC
-> +-oscin - internal clock domain after CLKMODE - shared by both PLLs
-> ? +-pll0_extclksrc
-> ? +-pll0_prediv
-> ? +-pll0_auxclk
-> ? +-pll0_obsclk - via the OSCSRC mux
-> ? +-pll1_pllen
-> ? +-pll1_pllout
-> ? +-pll1_obsclk - via the OSCSRC mux
-> 
-> Clocks beyond two levels deep are omitted for brevity.
-> 
-> It should be easy to see the correlation here Figure 7-1 with the
-> exception that in Figure 7-1 "OSCIN" has the meaning of "the physical
-> pin on the chip" (which Linux calls "ref_clk") and there is no clear
-> label in Figure 7-1 of what the clock domain after PLLCTL[CLKMODE] is
-> called (which Linux calls "oscin").
 
-Yeah, thats why I was not sure why need to make the distinction between
-these domains.
+The cpu sleep states can NOT be supported in community kernel due to hardware limitation.
 
-> Sure, it would work just fine if we left "oscin" out of the picture,
-> but it simplifies the driver implementation by having a known "oscin"
-> clock that is fully controlled by the clock driver code instead of
-> having to pass the user-supplied "ref_clk" around a bunch of places.
-
-Okay.
-
-> And, we could try to call it something other than "oscin" to try
-> to avoid confusion, but then you will just cause confusion in other
-> places (which could be less total confusion, so I am open to change
-> here).
-
-Calling external clock as "ref_clk" and internal clock domain as "oscin"
-is fine. Its the best choice of names given the terminology
-inconsistency between TRMs of different devices.
-
+BR
+Jacky Bai
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > ---
+> v2:
+>  - move to freescale folder
+>  - change compatibles to "fsl" vendor prefix
+>  - remove unnecessary newlines
+>  - move status property to be the last in all node
+>  - remove imx21 compatibles from UART nodes
+>  - document compatible
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt  |   4 +
+>  arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h | 623
+> +++++++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/imx8mq.dtsi      | 411 ++++++++++++++++
+>  3 files changed, 1038 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h
+>  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq.dtsi
 > 
-> Switching topics to CLKMODE and DT...
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+> b/Documentation/devicetree/bindings/arm/fsl.txt
+> index cdb9dd705754..85d1c9ec6fa3 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -75,6 +75,10 @@ i.MX6q generic board
+>  Required root node properties:
+>      - compatible = "fsl,imx6q";
 > 
-> There is a "ti,clkmode-square-wave" property in the proposed DT bindings
-> that does exactly what you have suggested, except the logic is
-> reversed. When omitted, it assumes the use of a crystal oscillator.
-> I believe this is the most common configuration, which is why I made
-> it the default instead of the other way around.
-
-This is fine and looks like I missed its existence while making my
-suggestion.
-
-Thanks,
-Sekhar
+> +i.MX8MQ generic board
+> +Required root node properties:
+> +    - compatible = "fsl,imx8mq";
+> +
+>  Freescale Vybrid Platform Device Tree Bindings
+>  ----------------------------------------------
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h
+> b/arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h
+> new file mode 100644
+> index 000000000000..b94b02080a34
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h
+> @@ -0,0 +1,623 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017 NXP
+> + */
+> +
+> +#ifndef __DTS_IMX8MQ_PINFUNC_H
+> +#define __DTS_IMX8MQ_PINFUNC_H
+> +
+> +/*
+> + * The pin function ID is a tuple of
+> + * <mux_reg conf_reg input_reg mux_mode input_val>
+> + */
+> +
+> +#define
+> MX8MQ_IOMUXC_PMIC_STBY_REQ_CCMSRCGPCMIX_PMIC_STBY_REQ
+> 0x014 0x27C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_PMIC_ON_REQ_SNVSMIX_PMIC_ON_REQ
+> 0x018 0x280 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ONOFF_SNVSMIX_ONOFF
+> 0x01C 0x284 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_POR_B_SNVSMIX_POR_B
+> 0x020 0x288 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_RTC_RESET_B_SNVSMIX_RTC_RESET_B
+> 0x024 0x28C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO00_GPIO1_IO0
+> 0x028 0x290 0x000 0x0 0x0
+> +#define
+> MX8MQ_IOMUXC_GPIO1_IO00_CCMSRCGPCMIX_ENET_PHY_REF_CLK_ROOT
+> 0x028 0x290 0x4C0 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K
+> 0x028 0x290 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO00_CCMSRCGPCMIX_EXT_CLK1
+> 0x028 0x290 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO00_SJC_FAIL
+> 0x028 0x290 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO01_GPIO1_IO1
+> 0x02C 0x294 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO01_PWM1_OUT
+> 0x02C 0x294 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO01_ANAMIX_REF_CLK_24M
+> 0x02C 0x294 0x4BC 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO01_CCMSRCGPCMIX_EXT_CLK2
+> 0x02C 0x294 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO01_SJC_ACTIVE
+> 0x02C 0x294 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO02_GPIO1_IO2
+> 0x030 0x298 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B
+> 0x030 0x298 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_ANY
+> 0x030 0x298 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO02_SJC_DE_B
+> 0x030 0x298 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3
+> 0x034 0x29C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO03_USDHC1_VSELECT
+> 0x034 0x29C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO03_SDMA1_EXT_EVENT0
+> 0x034 0x29C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO03_ANAMIX_XTAL_OK
+> 0x034 0x29C 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO03_SJC_DONE
+> 0x034 0x29C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO04_GPIO1_IO4
+> 0x038 0x2A0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT
+> 0x038 0x2A0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO04_SDMA1_EXT_EVENT1
+> 0x038 0x2A0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO04_ANAMIX_XTAL_OK_LV
+> 0x038 0x2A0 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO04_USDHC1_TEST_TRIG
+> 0x038 0x2A0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO05_GPIO1_IO5
+> 0x03C 0x2A4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO05_M4_NMI
+> 0x03C 0x2A4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO05_CCMSRCGPCMIX_PMIC_READY
+> 0x03C 0x2A4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO05_CCMSRCGPCMIX_INT_BOOT
+> 0x03C 0x2A4 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO05_USDHC2_TEST_TRIG
+> 0x03C 0x2A4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO06_GPIO1_IO6
+> 0x040 0x2A8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO06_ENET1_MDC
+> 0x040 0x2A8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO06_USDHC1_CD_B
+> 0x040 0x2A8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO06_CCMSRCGPCMIX_EXT_CLK3
+> 0x040 0x2A8 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO06_ECSPI1_TEST_TRIG
+> 0x040 0x2A8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO07_GPIO1_IO7
+> 0x044 0x2AC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO07_ENET1_MDIO
+> 0x044 0x2AC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO07_USDHC1_WP
+> 0x044 0x2AC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO07_CCMSRCGPCMIX_EXT_CLK4
+> 0x044 0x2AC 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO07_ECSPI2_TEST_TRIG
+> 0x044 0x2AC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO08_GPIO1_IO8
+> 0x048 0x2B0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO08_ENET1_1588_EVENT0_IN
+> 0x048 0x2B0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO08_USDHC2_RESET_B
+> 0x048 0x2B0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO08_CCMSRCGPCMIX_WAIT
+> 0x048 0x2B0 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO08_QSPI_TEST_TRIG
+> 0x048 0x2B0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9
+> 0x04C 0x2B4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO09_ENET1_1588_EVENT0_OUT
+> 0x04C 0x2B4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO09_SDMA2_EXT_EVENT0
+> 0x04C 0x2B4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO09_CCMSRCGPCMIX_STOP
+> 0x04C 0x2B4 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO09_RAWNAND_TEST_TRIG
+> 0x04C 0x2B4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO10_GPIO1_IO10
+> 0x050 0x2B8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO10_USB1_OTG_ID
+> 0x050 0x2B8 0x000 0x1 0x0
+> +#define
+> MX8MQ_IOMUXC_GPIO1_IO10_OCOTP_CTRL_WRAPPER_FUSE_LATCHED
+> 0x050 0x2B8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO11_GPIO1_IO11
+> 0x054 0x2BC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO11_USB2_OTG_ID
+> 0x054 0x2BC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO11_CCMSRCGPCMIX_PMIC_READY
+> 0x054 0x2BC 0x4BC 0x5 0x1
+> +#define MX8MQ_IOMUXC_GPIO1_IO11_CCMSRCGPCMIX_OUT0
+> 0x054 0x2BC 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO11_CAAM_WRAPPER_RNG_OSC_OBS
+> 0x054 0x2BC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO12_GPIO1_IO12
+> 0x058 0x2C0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO12_USB1_OTG_PWR
+> 0x058 0x2C0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO12_SDMA2_EXT_EVENT1
+> 0x058 0x2C0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO12_CCMSRCGPCMIX_OUT1
+> 0x058 0x2C0 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO12_CSU_CSU_ALARM_AUT0
+> 0x058 0x2C0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13
+> 0x05C 0x2C4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO13_USB1_OTG_OC
+> 0x05C 0x2C4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO13_PWM2_OUT
+> 0x05C 0x2C4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO13_CCMSRCGPCMIX_OUT2
+> 0x05C 0x2C4 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO13_CSU_CSU_ALARM_AUT1
+> 0x05C 0x2C4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO14_GPIO1_IO14
+> 0x060 0x2C8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO14_USB2_OTG_PWR
+> 0x060 0x2C8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO14_PWM3_OUT
+> 0x060 0x2C8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO14_CCMSRCGPCMIX_CLKO1
+> 0x060 0x2C8 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO14_CSU_CSU_ALARM_AUT2
+> 0x060 0x2C8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO15_GPIO1_IO15
+> 0x064 0x2CC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO15_USB2_OTG_OC
+> 0x064 0x2CC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO15_PWM4_OUT
+> 0x064 0x2CC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2
+> 0x064 0x2CC 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_GPIO1_IO15_CSU_CSU_INT_DEB
+> 0x064 0x2CC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC
+> 0x068 0x2D0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_MDC_GPIO1_IO16
+> 0x068 0x2D0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO
+> 0x06C 0x2D4 0x4C0 0x0 0x1
+> +#define MX8MQ_IOMUXC_ENET_MDIO_GPIO1_IO17
+> 0x06C 0x2D4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3
+> 0x070 0x2D8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD3_GPIO1_IO18
+> 0x070 0x2D8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2
+> 0x074 0x2DC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD2_ENET1_TX_CLK
+> 0x074 0x2DC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD2_GPIO1_IO19
+> 0x074 0x2DC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1
+> 0x078 0x2E0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD1_GPIO1_IO20
+> 0x078 0x2E0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0
+> 0x07C 0x2E4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_TD0_GPIO1_IO21
+> 0x07C 0x2E4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL
+> 0x080 0x2E8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_TX_CTL_GPIO1_IO22
+> 0x080 0x2E8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC
+> 0x084 0x2EC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_TXC_ENET1_TX_ER
+> 0x084 0x2EC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ENET_TXC_GPIO1_IO23
+> 0x084 0x2EC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL
+> 0x088 0x2F0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_RX_CTL_GPIO1_IO24
+> 0x088 0x2F0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC
+> 0x08C 0x2F4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_RXC_ENET1_RX_ER
+> 0x08C 0x2F4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ENET_RXC_GPIO1_IO25
+> 0x08C 0x2F4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0
+> 0x090 0x2F8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD0_GPIO1_IO26
+> 0x090 0x2F8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1
+> 0x094 0x2FC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD1_GPIO1_IO27
+> 0x094 0x2FC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2
+> 0x098 0x300 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD2_GPIO1_IO28
+> 0x098 0x300 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3
+> 0x09C 0x304 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ENET_RD3_GPIO1_IO29
+> 0x09C 0x304 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK
+> 0x0A0 0x308 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_CLK_GPIO2_IO0
+> 0x0A0 0x308 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD
+> 0x0A4 0x30C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_CMD_GPIO2_IO1
+> 0x0A4 0x30C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0
+> 0x0A8 0x310 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA0_GPIO2_IO2
+> 0x0A8 0x31  0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1
+> 0x0AC 0x314 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA1_GPIO2_IO3
+> 0x0AC 0x314 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2
+> 0x0B0 0x318 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA2_GPIO2_IO4
+> 0x0B0 0x318 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3
+> 0x0B4 0x31C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA3_GPIO2_IO5
+> 0x0B4 0x31C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4
+> 0x0B8 0x320 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA4_GPIO2_IO6
+> 0x0B8 0x320 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5
+> 0x0BC 0x324 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA5_GPIO2_IO7
+> 0x0BC 0x324 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6
+> 0x0C0 0x328 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA6_GPIO2_IO8
+> 0x0C0 0x328 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7
+> 0x0C4 0x32C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA7_GPIO2_IO9
+> 0x0C4 0x32C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B
+> 0x0C8 0x330 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_RESET_B_GPIO2_IO10
+> 0x0C8 0x330 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE
+> 0x0CC 0x334 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_STROBE_GPIO2_IO11
+> 0x0CC 0x334 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_CD_B_USDHC2_CD_B
+> 0x0D0 0x338 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12
+> 0x0D0 0x338 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK
+> 0x0D4 0x33C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_CLK_GPIO2_IO13
+> 0x0D4 0x33C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_CLK_CCMSRCGPCMIX_OBSERVE0
+> 0x0D4 0x33C 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_CLK_OBSERVE_MUX_OUT0
+> 0x0D4 0x33C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD
+> 0x0D8 0x340 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_CMD_GPIO2_IO14
+> 0x0D8 0x340 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_CMD_CCMSRCGPCMIX_OBSERVE1
+> 0x0D8 0x340 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_CMD_OBSERVE_MUX_OUT1
+> 0x0D8 0x340 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0
+> 0x0DC 0x344 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA0_GPIO2_IO15
+> 0x0DC 0x344 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA0_CCMSRCGPCMIX_OBSERVE2
+> 0x0DC 0x344 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA0_OBSERVE_MUX_OUT2
+> 0x0DC 0x344 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1
+> 0x0E0 0x348 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA1_GPIO2_IO16
+> 0x0E0 0x348 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA1_CCMSRCGPCMIX_WAIT
+> 0x0E0 0x348 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA1_OBSERVE_MUX_OUT3
+> 0x0E0 0x348 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2
+> 0x0E4 0x34C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA2_GPIO2_IO17
+> 0x0E4 0x34C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA2_CCMSRCGPCMIX_STOP
+> 0x0E4 0x34C 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA2_OBSERVE_MUX_OUT4
+> 0x0E4 0x34C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3
+> 0x0E8 0x350 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA3_GPIO2_IO18
+> 0x0E8 0x350 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_DATA3_CCMSRCGPCMIX_EARLY_RESET
+> 0x0E8 0x350 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_RESET_B_USDHC2_RESET_B
+> 0x0EC 0x354 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19
+> 0x0EC 0x354 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_RESET_B_CCMSRCGPCMIX_SYSTEM_RESET
+> 0x0EC 0x354 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SD2_WP_USDHC2_WP
+> 0x0F0 0x358 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD2_WP_GPIO2_IO20
+> 0x0F0 0x358 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SD2_WP_SIM_M_HMASTLOCK
+> 0x0F0 0x358 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_ALE_RAWNAND_ALE
+> 0x0F4 0x35C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_ALE_QSPI_A_SCLK
+> 0x0F4 0x35C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_ALE_GPIO3_IO0
+> 0x0F4 0x35C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_ALE_SIM_M_HPROT0
+> 0x0F4 0x35C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE0_B_RAWNAND_CE0_B
+> 0x0F8 0x360 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE0_B_QSPI_A_SS0_B
+> 0x0F8 0x360 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE0_B_GPIO3_IO1
+> 0x0F8 0x360 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE0_B_SIM_M_HPROT1
+> 0x0F8 0x360 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE1_B_RAWNAND_CE1_B
+> 0x0FC 0x364 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE1_B_QSPI_A_SS1_B
+> 0x0FC 0x364 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE1_B_GPIO3_IO2
+> 0x0FC 0x364 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE1_B_SIM_M_HPROT2
+> 0x0FC 0x364 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE2_B_RAWNAND_CE2_B
+> 0x100 0x368 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE2_B_QSPI_B_SS0_B
+> 0x100 0x368 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE2_B_GPIO3_IO3
+> 0x100 0x368 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE2_B_SIM_M_HPROT3
+> 0x100 0x368 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE3_B_RAWNAND_CE3_B
+> 0x104 0x36C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE3_B_QSPI_B_SS1_B
+> 0x104 0x36C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4
+> 0x104 0x36C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_CE3_B_SIM_M_HADDR0
+> 0x104 0x36C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_CLE_RAWNAND_CLE
+> 0x108 0x370 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_CLE_QSPI_B_SCLK
+> 0x108 0x370 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_CLE_GPIO3_IO5
+> 0x108 0x370 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_CLE_SIM_M_HADDR1
+> 0x108 0x370 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA00_RAWNAND_DATA00
+> 0x10C 0x374 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA00_QSPI_A_DATA0
+> 0x10C 0x374 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA00_GPIO3_IO6
+> 0x10C 0x374 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA00_SIM_M_HADDR2
+> 0x10C 0x374 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA01_RAWNAND_DATA01
+> 0x110 0x378 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA01_QSPI_A_DATA1
+> 0x110 0x378 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA01_GPIO3_IO7
+> 0x110 0x378 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA01_SIM_M_HADDR3
+> 0x110 0x378 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA02_RAWNAND_DATA02
+> 0x114 0x37C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA02_QSPI_A_DATA2
+> 0x114 0x37C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA02_GPIO3_IO8
+> 0x114 0x37C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA02_SIM_M_HADDR4
+> 0x114 0x37C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA03_RAWNAND_DATA03
+> 0x118 0x380 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA03_QSPI_A_DATA3
+> 0x118 0x380 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA03_GPIO3_IO9
+> 0x118 0x380 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA03_SIM_M_HADDR5
+> 0x118 0x380 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA04_RAWNAND_DATA04
+> 0x11C 0x384 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA04_QSPI_B_DATA0
+> 0x11C 0x384 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10
+> 0x11C 0x384 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA04_SIM_M_HADDR6
+> 0x11C 0x384 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA05_RAWNAND_DATA05
+> 0x120 0x388 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA05_QSPI_B_DATA1
+> 0x120 0x388 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA05_GPIO3_IO11
+> 0x120 0x388 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA05_SIM_M_HADDR7
+> 0x120 0x388 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA06_RAWNAND_DATA06
+> 0x124 0x38C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA06_QSPI_B_DATA2
+> 0x124 0x38C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA06_GPIO3_IO12
+> 0x124 0x38C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA06_SIM_M_HADDR8
+> 0x124 0x38C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA07_RAWNAND_DATA07
+> 0x128 0x390 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA07_QSPI_B_DATA3
+> 0x128 0x390 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA07_GPIO3_IO13
+> 0x128 0x390 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DATA07_SIM_M_HADDR9
+> 0x128 0x390 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_DQS_RAWNAND_DQS
+> 0x12C 0x394 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_DQS_QSPI_A_DQS
+> 0x12C 0x394 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_DQS_GPIO3_IO14
+> 0x12C 0x394 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_DQS_SIM_M_HADDR10
+> 0x12C 0x394 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_RE_B_RAWNAND_RE_B
+> 0x130 0x398 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_RE_B_QSPI_B_DQS
+> 0x130 0x398 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15
+> 0x130 0x398 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_RE_B_SIM_M_HADDR11
+> 0x130 0x398 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_READY_B_RAWNAND_READY_B
+> 0x134 0x39C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16
+> 0x134 0x39C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_READY_B_SIM_M_HADDR12
+> 0x134 0x39C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_WE_B_RAWNAND_WE_B
+> 0x138 0x3A0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_WE_B_GPIO3_IO17
+> 0x138 0x3A0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_WE_B_SIM_M_HADDR13
+> 0x138 0x3A0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_NAND_WP_B_RAWNAND_WP_B
+> 0x13C 0x3A4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_NAND_WP_B_GPIO3_IO18
+> 0x13C 0x3A4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_NAND_WP_B_SIM_M_HADDR14
+> 0x13C 0x3A4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXFS_SAI5_RX_SYNC
+> 0x140 0x3A8 0x4E4 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXFS_SAI1_TX_DATA0
+> 0x140 0x3A8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXFS_GPIO3_IO19
+> 0x140 0x3A8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXC_SAI5_RX_BCLK
+> 0x144 0x3AC 0x4D0 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXC_SAI1_TX_DATA1
+> 0x144 0x3AC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXC_GPIO3_IO20
+> 0x144 0x3AC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD0_SAI5_RX_DATA0
+> 0x148 0x3B0 0x4D4 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD0_SAI1_TX_DATA2
+> 0x148 0x3B0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD0_GPIO3_IO21
+> 0x148 0x3B0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD1_SAI5_RX_DATA1
+> 0x14C 0x3B4 0x4D8 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD1_SAI1_TX_DATA3
+> 0x14C 0x3B4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD1_SAI1_TX_SYNC
+> 0x14C 0x3B4 0x4CC 0x2 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD1_SAI5_TX_SYNC
+> 0x14C 0x3B4 0x4EC 0x3 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD1_GPIO3_IO22
+> 0x14C 0x3B4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD2_SAI5_RX_DATA2
+> 0x150 0x3B8 0x4DC 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD2_SAI1_TX_DATA4
+> 0x150 0x3B8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD2_SAI1_TX_SYNC
+> 0x150 0x3B8 0x4CC 0x2 0x1
+> +#define MX8MQ_IOMUXC_SAI5_RXD2_SAI5_TX_BCLK
+> 0x150 0x3B8 0x4E8 0x3 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD2_GPIO3_IO23
+> 0x150 0x3B8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD3_SAI5_RX_DATA3
+> 0x154 0x3BC 0x4E0 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD3_SAI1_TX_DATA5
+> 0x154 0x3BC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD3_SAI1_TX_SYNC
+> 0x154 0x3BC 0x4CC 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI5_RXD3_SAI5_TX_DATA0
+> 0x154 0x3BC 0x000 0x3 0x0
+> +#define MX8MQ_IOMUXC_SAI5_RXD3_GPIO3_IO24
+> 0x154 0x3BC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_MCLK_SAI5_MCLK
+> 0x158 0x3C0 0x52C 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI5_MCLK_SAI1_TX_BCLK
+> 0x158 0x3C0 0x4C8 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI5_MCLK_SAI4_MCLK
+> 0x158 0x3C0 0x000 0x2 0x0
+> +#define MX8MQ_IOMUXC_SAI5_MCLK_GPIO3_IO25
+> 0x158 0x3C0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI5_MCLK_CCMSRCGPCMIX_TESTER_ACK
+> 0x158 0x3C0 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXFS_SAI1_RX_SYNC
+> 0x15C 0x3C4 0x4C4 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXFS_SAI5_RX_SYNC
+> 0x15C 0x3C4 0x4E4 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXFS_CORESIGHT_TRACE_CLK
+> 0x15C 0x3C4 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXFS_GPIO4_IO0
+> 0x15C 0x3C4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXFS_SIM_M_HADDR15
+> 0x15C 0x3C4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXC_SAI1_RX_BCLK
+> 0x160 0x3C8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXC_SAI5_RX_BCLK
+> 0x160 0x3C8 0x4D0 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXC_CORESIGHT_TRACE_CTL
+> 0x160 0x3C8 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXC_GPIO4_IO1
+> 0x160 0x3C8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXC_SIM_M_HADDR16
+> 0x160 0x3C8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD0_SAI1_RX_DATA0
+> 0x164 0x3CC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD0_SAI5_RX_DATA0
+> 0x164 0x3CC 0x4D4 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXD0_CORESIGHT_TRACE0
+> 0x164 0x3CC 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD0_GPIO4_IO2
+> 0x164 0x3CC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD0_CCMSRCGPCMIX_BOOT_CFG0
+> 0x164 0x3CC 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD0_SIM_M_HADDR17
+> 0x164 0x3CC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD1_SAI1_RX_DATA1
+> 0x168 0x3D0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD1_SAI5_RX_DATA1
+> 0x168 0x3D0 0x4D8 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXD1_CORESIGHT_TRACE1
+> 0x168 0x3D0 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD1_GPIO4_IO3
+> 0x168 0x3D0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD1_CCMSRCGPCMIX_BOOT_CFG1
+> 0x168 0x3D0 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD1_SIM_M_HADDR18
+> 0x168 0x3D0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD2_SAI1_RX_DATA2
+> 0x16C 0x3D4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD2_SAI5_RX_DATA2
+> 0x16C 0x3D4 0x4DC 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXD2_CORESIGHT_TRACE2
+> 0x16C 0x3D4 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD2_GPIO4_IO4
+> 0x16C 0x3D4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD2_CCMSRCGPCMIX_BOOT_CFG2
+> 0x16C 0x3D4 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD2_SIM_M_HADDR19
+> 0x16C 0x3D4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD3_SAI1_RX_DATA3
+> 0x170 0x3D8 0x4E0 0x0 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXD3_SAI5_RX_DATA3
+> 0x170 0x3D8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD3_CORESIGHT_TRACE3
+> 0x170 0x3D8 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD3_GPIO4_IO5
+> 0x170 0x3D8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD3_CCMSRCGPCMIX_BOOT_CFG3
+> 0x170 0x3D8 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD3_SIM_M_HADDR20
+> 0x170 0x3D8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_SAI1_RX_DATA4
+> 0x174 0x3DC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_SAI6_TX_BCLK
+> 0x174 0x3DC 0x51C 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_SAI6_RX_BCLK
+> 0x174 0x3DC 0x510 0x2 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_CORESIGHT_TRACE4
+> 0x174 0x3DC 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_GPIO4_IO6
+> 0x174 0x3DC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_CCMSRCGPCMIX_BOOT_CFG4
+> 0x174 0x3DC 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD4_SIM_M_HADDR21
+> 0x174 0x3DC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_SAI1_RX_DATA5
+> 0x178 0x3E0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_SAI6_TX_DATA0
+> 0x178 0x3E0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_SAI6_RX_DATA0
+> 0x178 0x3E0 0x514 0x2 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_SAI1_RX_SYNC
+> 0x178 0x3E0 0x4C4 0x3 0x1
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_CORESIGHT_TRACE5
+> 0x178 0x3E0 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_GPIO4_IO7
+> 0x178 0x3E0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_CCMSRCGPCMIX_BOOT_CFG5
+> 0x178 0x3E0 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD5_SIM_M_HADDR22
+> 0x178 0x3E0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_SAI1_RX_DATA6
+> 0x17C 0x3E4 0x520 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_SAI6_TX_SYNC
+> 0x17C 0x3E4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_SAI6_RX_SYNC
+> 0x17C 0x3E4 0x518 0x2 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_CORESIGHT_TRACE6
+> 0x17C 0x3E4 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_GPIO4_IO8
+> 0x17C 0x3E4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_CCMSRCGPCMIX_BOOT_CFG6
+> 0x17C 0x3E4 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD6_SIM_M_HADDR23
+> 0x17C 0x3E4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_SAI1_RX_DATA7
+> 0x180 0x3E8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_SAI6_MCLK
+> 0x180 0x3E8 0x530 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_SAI1_TX_SYNC
+> 0x180 0x3E8 0x4CC 0x2 0x4
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_SAI1_TX_DATA4
+> 0x180 0x3E8 0x000 0x3 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_CORESIGHT_TRACE7
+> 0x180 0x3E8 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_GPIO4_IO9
+> 0x180 0x3E8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_CCMSRCGPCMIX_BOOT_CFG7
+> 0x180 0x3E8 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_RXD7_SIM_M_HADDR24
+> 0x180 0x3E8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXFS_SAI1_TX_SYNC
+> 0x184 0x3EC 0x4CC 0x0 0x3
+> +#define MX8MQ_IOMUXC_SAI1_TXFS_SAI5_TX_SYNC
+> 0x184 0x3EC 0x4EC 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXFS_CORESIGHT_EVENTO
+> 0x184 0x3EC 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXFS_GPIO4_IO10
+> 0x184 0x3EC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXFS_SIM_M_HADDR25
+> 0x184 0x3EC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXC_SAI1_TX_BCLK
+> 0x188 0x3F0 0x4C8 0x0 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXC_SAI5_TX_BCLK
+> 0x188 0x3F0 0x4E8 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXC_CORESIGHT_EVENTI
+> 0x188 0x3F0 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11
+> 0x188 0x3F0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXC_SIM_M_HADDR26
+> 0x188 0x3F0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD0_SAI1_TX_DATA0
+> 0x18C 0x3F4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD0_SAI5_TX_DATA0
+> 0x18C 0x3F4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD0_CORESIGHT_TRACE8
+> 0x18C 0x3F4 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD0_GPIO4_IO12
+> 0x18C 0x3F4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD0_CCMSRCGPCMIX_BOOT_CFG8
+> 0x18C 0x3F4 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD0_SIM_M_HADDR27
+> 0x18C 0x3F4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD1_SAI1_TX_DATA1
+> 0x190 0x3F8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD1_SAI5_TX_DATA1
+> 0x190 0x3F8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD1_CORESIGHT_TRACE9
+> 0x190 0x3F8 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD1_GPIO4_IO13
+> 0x190 0x3F8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD1_CCMSRCGPCMIX_BOOT_CFG9
+> 0x190 0x3F8 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD1_SIM_M_HADDR28
+> 0x190 0x3F8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD2_SAI1_TX_DATA2
+> 0x194 0x3FC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD2_SAI5_TX_DATA2
+> 0x194 0x3FC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD2_CORESIGHT_TRACE10
+> 0x194 0x3FC 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD2_GPIO4_IO14
+> 0x194 0x3FC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD2_CCMSRCGPCMIX_BOOT_CFG10
+> 0x194 0x3FC 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD2_SIM_M_HADDR29
+> 0x194 0x3FC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD3_SAI1_TX_DATA3
+> 0x198 0x400 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD3_SAI5_TX_DATA3
+> 0x198 0x400 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD3_CORESIGHT_TRACE11
+> 0x198 0x400 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD3_GPIO4_IO15
+> 0x198 0x400 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD3_CCMSRCGPCMIX_BOOT_CFG11
+> 0x198 0x400 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD3_SIM_M_HADDR30
+> 0x198 0x400 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_SAI1_TX_DATA4
+> 0x19C 0x404 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_SAI6_RX_BCLK
+> 0x19C 0x404 0x510 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_SAI6_TX_BCLK
+> 0x19C 0x404 0x51C 0x2 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_CORESIGHT_TRACE12
+> 0x19C 0x404 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_GPIO4_IO16
+> 0x19C 0x404 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_CCMSRCGPCMIX_BOOT_CFG12
+> 0x19C 0x404 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD4_SIM_M_HADDR31
+> 0x19C 0x404 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_SAI1_TX_DATA5
+> 0x1A0 0x408 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_SAI6_RX_DATA0
+> 0x1A0 0x408 0x514 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_SAI6_TX_DATA0
+> 0x1A0 0x408 0x000 0x2 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_CORESIGHT_TRACE13
+> 0x1A0 0x408 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_GPIO4_IO17
+> 0x1A0 0x408 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_CCMSRCGPCMIX_BOOT_CFG13
+> 0x1A0 0x408 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD5_SIM_M_HBURST0
+> 0x1A0 0x408 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_SAI1_TX_DATA6
+> 0x1A4 0x40C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_SAI6_RX_SYNC
+> 0x1A4 0x40C 0x518 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_SAI6_TX_SYNC
+> 0x1A4 0x40C 0x520 0x2 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_CORESIGHT_TRACE14
+> 0x1A4 0x40C 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_GPIO4_IO18
+> 0x1A4 0x40C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_CCMSRCGPCMIX_BOOT_CFG14
+> 0x1A4 0x40C 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD6_SIM_M_HBURST1
+> 0x1A4 0x40C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD7_SAI1_TX_DATA7
+> 0x1A8 0x410 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD7_SAI6_MCLK
+> 0x1A8 0x410 0x530 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_TXD7_CORESIGHT_TRACE15
+> 0x1A8 0x410 0x000 0x4 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD7_GPIO4_IO19
+> 0x1A8 0x410 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD7_CCMSRCGPCMIX_BOOT_CFG15
+> 0x1A8 0x410 0x000 0x6 0x0
+> +#define MX8MQ_IOMUXC_SAI1_TXD7_SIM_M_HBURST2
+> 0x1A8 0x410 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI1_MCLK_SAI1_MCLK
+> 0x1AC 0x414 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI1_MCLK_SAI5_MCLK
+> 0x1AC 0x414 0x52C 0x1 0x1
+> +#define MX8MQ_IOMUXC_SAI1_MCLK_SAI1_TX_BCLK
+> 0x1AC 0x414 0x4C8 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI1_MCLK_GPIO4_IO20
+> 0x1AC 0x414 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI1_MCLK_SIM_M_HRESP
+> 0x1AC 0x414 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXFS_SAI2_RX_SYNC
+> 0x1B0 0x418 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXFS_SAI5_TX_SYNC
+> 0x1B0 0x418 0x4EC 0x1 0x2
+> +#define MX8MQ_IOMUXC_SAI2_RXFS_GPIO4_IO21
+> 0x1B0 0x418 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXFS_SIM_M_HSIZE0
+> 0x1B0 0x418 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXC_SAI2_RX_BCLK
+> 0x1B4 0x41C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXC_SAI5_TX_BCLK
+> 0x1B4 0x41C 0x4E8 0x1 0x2
+> +#define MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22
+> 0x1B4 0x41C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXC_SIM_M_HSIZE1
+> 0x1B4 0x41C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXD0_SAI2_RX_DATA0
+> 0x1B8 0x420 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXD0_SAI5_TX_DATA0
+> 0x1B8 0x420 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXD0_GPIO4_IO23
+> 0x1B8 0x420 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_RXD0_SIM_M_HSIZE2
+> 0x1B8 0x420 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXFS_SAI2_TX_SYNC
+> 0x1BC 0x424 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXFS_SAI5_TX_DATA1
+> 0x1BC 0x424 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXFS_GPIO4_IO24
+> 0x1BC 0x424 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXFS_SIM_M_HWRITE
+> 0x1BC 0x424 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXC_SAI2_TX_BCLK
+> 0x1C0 0x428 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXC_SAI5_TX_DATA2
+> 0x1C0 0x428 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXC_GPIO4_IO25
+> 0x1C0 0x428 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXC_SIM_M_HREADYOUT
+> 0x1C0 0x428 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXD0_SAI2_TX_DATA0
+> 0x1C4 0x42C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXD0_SAI5_TX_DATA3
+> 0x1C4 0x42C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXD0_GPIO4_IO26
+> 0x1C4 0x42C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_TXD0_TPSMP_CLK
+> 0x1C4 0x42C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI2_MCLK_SAI2_MCLK
+> 0x1C8 0x430 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI2_MCLK_SAI5_MCLK
+> 0x1C8 0x430 0x52C 0x1 0x2
+> +#define MX8MQ_IOMUXC_SAI2_MCLK_GPIO4_IO27
+> 0x1C8 0x430 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI2_MCLK_TPSMP_HDATA_DIR
+> 0x1C8 0x430 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXFS_SAI3_RX_SYNC
+> 0x1CC 0x434 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXFS_GPT1_CAPTURE1
+> 0x1CC 0x434 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXFS_SAI5_RX_SYNC
+> 0x1CC 0x434 0x4E4 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI3_RXFS_GPIO4_IO28
+> 0x1CC 0x434 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXFS_TPSMP_HTRANS0
+> 0x1CC 0x434 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXC_SAI3_RX_BCLK
+> 0x1D0 0x438 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXC_GPT1_CAPTURE2
+> 0x1D0 0x438 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXC_SAI5_RX_BCLK
+> 0x1D0 0x438 0x4D0 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI3_RXC_GPIO4_IO29
+> 0x1D0 0x438 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXC_TPSMP_HTRANS1
+> 0x1D0 0x438 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXD_SAI3_RX_DATA0
+> 0x1D4 0x43C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXD_GPT1_COMPARE1
+> 0x1D4 0x43C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXD_SAI5_RX_DATA0
+> 0x1D4 0x43C 0x4D4 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI3_RXD_GPIO4_IO30
+> 0x1D4 0x43C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_RXD_TPSMP_HDATA0
+> 0x1D4 0x43C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXFS_SAI3_TX_SYNC
+> 0x1D8 0x440 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXFS_GPT1_CLK
+> 0x1D8 0x440 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXFS_SAI5_RX_DATA1
+> 0x1D8 0x440 0x4D8 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI3_TXFS_GPIO4_IO31
+> 0x1D8 0x440 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXFS_TPSMP_HDATA1
+> 0x1D8 0x440 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXC_SAI3_TX_BCLK
+> 0x1DC 0x444 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXC_GPT1_COMPARE2
+> 0x1DC 0x444 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXC_SAI5_RX_DATA2
+> 0x1DC 0x444 0x4DC 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI3_TXC_GPIO5_IO0
+> 0x1DC 0x444 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXC_TPSMP_HDATA2
+> 0x1DC 0x444 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXD_SAI3_TX_DATA0
+> 0x1E0 0x448 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXD_GPT1_COMPARE3
+> 0x1E0 0x448 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXD_SAI5_RX_DATA3
+> 0x1E0 0x448 0x4E0 0x2 0x2
+> +#define MX8MQ_IOMUXC_SAI3_TXD_GPIO5_IO1
+> 0x1E0 0x448 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_TXD_TPSMP_HDATA3
+> 0x1E0 0x448 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SAI3_MCLK_SAI3_MCLK
+> 0x1E4 0x44C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SAI3_MCLK_PWM4_OUT
+> 0x1E4 0x44C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SAI3_MCLK_SAI5_MCLK
+> 0x1E4 0x44C 0x52C 0x2 0x3
+> +#define MX8MQ_IOMUXC_SAI3_MCLK_GPIO5_IO2
+> 0x1E4 0x44C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SAI3_MCLK_TPSMP_HDATA4
+> 0x1E4 0x44C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_TX_SPDIF1_OUT
+> 0x1E8 0x450 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_TX_PWM3_OUT
+> 0x1E8 0x450 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_TX_GPIO5_IO3
+> 0x1E8 0x450 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_TX_TPSMP_HDATA5
+> 0x1E8 0x450 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_RX_SPDIF1_IN
+> 0x1EC 0x454 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_RX_PWM2_OUT
+> 0x1EC 0x454 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_RX_GPIO5_IO4
+> 0x1EC 0x454 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_RX_TPSMP_HDATA6
+> 0x1EC 0x454 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_EXT_CLK_SPDIF1_EXT_CLK
+> 0x1F0 0x458 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_EXT_CLK_PWM1_OUT
+> 0x1F0 0x458 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_EXT_CLK_GPIO5_IO5
+> 0x1F0 0x458 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_SPDIF_EXT_CLK_TPSMP_HDATA7
+> 0x1F0 0x458 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SCLK_ECSPI1_SCLK
+> 0x1F4 0x45C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SCLK_UART3_DCE_RX
+> 0x1F4 0x45C 0x504 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SCLK_UART3_DTE_TX
+> 0x1F4 0x45C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SCLK_GPIO5_IO6
+> 0x1F4 0x45C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SCLK_TPSMP_HDATA8
+> 0x1F4 0x45C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI
+> 0x1F8 0x460 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MOSI_UART3_DCE_TX
+> 0x1F8 0x460 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MOSI_UART3_DTE_RX
+> 0x1F8 0x460 0x504 0x1 0x1
+> +#define MX8MQ_IOMUXC_ECSPI1_MOSI_GPIO5_IO7
+> 0x1F8 0x460 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MOSI_TPSMP_HDATA9
+> 0x1F8 0x460 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MISO_ECSPI1_MISO
+> 0x1FC 0x464 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MISO_UART3_DCE_CTS_B
+> 0x1FC 0x464 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MISO_UART3_DTE_RTS_B
+> 0x1FC 0x464 0x500 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MISO_GPIO5_IO8
+> 0x1FC 0x464 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_MISO_TPSMP_HDATA10
+> 0x1FC 0x464 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SS0_ECSPI1_SS0
+> 0x200 0x468 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SS0_UART3_DCE_RTS_B
+> 0x200 0x468 0x500 0x1 0x1
+> +#define MX8MQ_IOMUXC_ECSPI1_SS0_UART3_DTE_CTS_B
+> 0x200 0x468 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SS0_GPIO5_IO9
+> 0x200 0x468 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI1_SS0_TPSMP_HDATA11
+> 0x200 0x468 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK
+> 0x204 0x46C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SCLK_UART4_DCE_RX
+> 0x204 0x46C 0x50C 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SCLK_UART4_DTE_TX
+> 0x204 0x46C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SCLK_GPIO5_IO10
+> 0x204 0x46C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SCLK_TPSMP_HDATA12
+> 0x204 0x46C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MOSI_ECSPI2_MOSI
+> 0x208 0x470 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MOSI_UART4_DCE_TX
+> 0x208 0x470 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MOSI_UART4_DTE_RX
+> 0x208 0x470 0x50C 0x1 0x1
+> +#define MX8MQ_IOMUXC_ECSPI2_MOSI_GPIO5_IO11
+> 0x208 0x470 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MOSI_TPSMP_HDATA13
+> 0x208 0x470 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MISO_ECSPI2_MISO
+> 0x20C 0x474 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MISO_UART4_DCE_CTS_B
+> 0x20C 0x474 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MISO_UART4_DTE_RTS_B
+> 0x20C 0x474 0x508 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MISO_GPIO5_IO12
+> 0x20C 0x474 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_MISO_TPSMP_HDATA14
+> 0x20C 0x474 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SS0_ECSPI2_SS0
+> 0x210 0x478 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SS0_UART4_DCE_RTS_B
+> 0x210 0x478 0x508 0x1 0x1
+> +#define MX8MQ_IOMUXC_ECSPI2_SS0_UART4_DTE_CTS_B
+> 0x210 0x478 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SS0_GPIO5_IO13
+> 0x210 0x478 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_ECSPI2_SS0_TPSMP_HDATA15
+> 0x210 0x478 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL
+> 0x214 0x47C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SCL_ENET1_MDC
+> 0x214 0x47C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SCL_GPIO5_IO14
+> 0x214 0x47C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SCL_TPSMP_HDATA16
+> 0x214 0x47C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA
+> 0x218 0x480 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SDA_ENET1_MDIO
+> 0x218 0x480 0x4C0 0x1 0x2
+> +#define MX8MQ_IOMUXC_I2C1_SDA_GPIO5_IO15
+> 0x218 0x480 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C1_SDA_TPSMP_HDATA17
+> 0x218 0x480 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SCL_I2C2_SCL
+> 0x21C 0x484 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SCL_ENET1_1588_EVENT1_IN
+> 0x21C 0x484 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SCL_GPIO5_IO16
+> 0x21C 0x484 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SCL_TPSMP_HDATA18
+> 0x21C 0x484 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SDA_I2C2_SDA
+> 0x220 0x488 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SDA_ENET1_1588_EVENT1_OUT
+> 0x220 0x488 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SDA_GPIO5_IO17
+> 0x220 0x488 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C2_SDA_TPSMP_HDATA19
+> 0x220 0x488 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SCL_I2C3_SCL
+> 0x224 0x48C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SCL_PWM4_OUT
+> 0x224 0x48C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SCL_GPT2_CLK
+> 0x224 0x48C 0x000 0x2 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SCL_GPIO5_IO18
+> 0x224 0x48C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SCL_TPSMP_HDATA20
+> 0x224 0x48C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SDA_I2C3_SDA
+> 0x228 0x490 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SDA_PWM3_OUT
+> 0x228 0x490 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SDA_GPT3_CLK
+> 0x228 0x490 0x000 0x2 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SDA_GPIO5_IO19
+> 0x228 0x490 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C3_SDA_TPSMP_HDATA21
+> 0x228 0x490 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SCL_I2C4_SCL
+> 0x22C 0x494 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SCL_PWM2_OUT
+> 0x22C 0x494 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SCL_PCIE1_CLKREQ_B
+> 0x22C 0x494 0x524 0x2 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SCL_GPIO5_IO20
+> 0x22C 0x494 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SCL_TPSMP_HDATA22
+> 0x22C 0x494 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SDA_I2C4_SDA
+> 0x230 0x498 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SDA_PWM1_OUT
+> 0x230 0x498 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SDA_PCIE2_CLKREQ_B
+> 0x230 0x498 0x528 0x2 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SDA_GPIO5_IO21
+> 0x230 0x498 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_I2C4_SDA_TPSMP_HDATA23
+> 0x230 0x498 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX
+> 0x234 0x49C 0x4F4 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART1_RXD_UART1_DTE_TX
+> 0x234 0x49C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART1_RXD_ECSPI3_SCLK
+> 0x234 0x49C 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART1_RXD_GPIO5_IO22
+> 0x234 0x49C 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART1_RXD_TPSMP_HDATA24
+> 0x234 0x49C 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX
+> 0x238 0x4A0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART1_TXD_UART1_DTE_RX
+> 0x238 0x4A0 0x4F4 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART1_TXD_ECSPI3_MOSI
+> 0x238 0x4A0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART1_TXD_GPIO5_IO23
+> 0x238 0x4A0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART1_TXD_TPSMP_HDATA25
+> 0x238 0x4A0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART2_RXD_UART2_DCE_RX
+> 0x23C 0x4A4 0x4FC 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART2_RXD_UART2_DTE_TX
+> 0x23C 0x4A4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART2_RXD_ECSPI3_MISO
+> 0x23C 0x4A4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART2_RXD_GPIO5_IO24
+> 0x23C 0x4A4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART2_RXD_TPSMP_HDATA26
+> 0x23C 0x4A4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART2_TXD_UART2_DCE_TX
+> 0x240 0x4A8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART2_TXD_UART2_DTE_RX
+> 0x240 0x4A8 0x4FC 0x0 0x1
+> +#define MX8MQ_IOMUXC_UART2_TXD_ECSPI3_SS0
+> 0x240 0x4A8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART2_TXD_GPIO5_IO25
+> 0x240 0x4A8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART2_TXD_TPSMP_HDATA27
+> 0x240 0x4A8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART3_RXD_UART3_DCE_RX
+> 0x244 0x4AC 0x504 0x0 0x2
+> +#define MX8MQ_IOMUXC_UART3_RXD_UART3_DTE_TX
+> 0x244 0x4AC 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART3_RXD_UART1_DCE_CTS_B
+> 0x244 0x4AC 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART3_RXD_UART1_DTE_RTS_B
+> 0x244 0x4AC 0x4F0 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART3_RXD_GPIO5_IO26
+> 0x244 0x4AC 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART3_RXD_TPSMP_HDATA28
+> 0x244 0x4AC 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART3_TXD_UART3_DCE_TX
+> 0x248 0x4B0 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART3_TXD_UART3_DTE_RX
+> 0x248 0x4B0 0x504 0x0 0x3
+> +#define MX8MQ_IOMUXC_UART3_TXD_UART1_DCE_RTS_B
+> 0x248 0x4B0 0x4F0 0x1 0x1
+> +#define MX8MQ_IOMUXC_UART3_TXD_UART1_DTE_CTS_B
+> 0x248 0x4B0 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART3_TXD_GPIO5_IO27
+> 0x248 0x4B0 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART3_TXD_TPSMP_HDATA29
+> 0x248 0x4B0 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART4_RXD_UART4_DCE_RX
+> 0x24C 0x4B4 0x50C 0x0 0x2
+> +#define MX8MQ_IOMUXC_UART4_RXD_UART4_DTE_TX
+> 0x24C 0x4B4 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART4_RXD_UART2_DCE_CTS_B
+> 0x24C 0x4B4 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART4_RXD_UART2_DTE_RTS_B
+> 0x24C 0x4B4 0x4F8 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART4_RXD_PCIE1_CLKREQ_B
+> 0x24C 0x4B4 0x524 0x2 0x1
+> +#define MX8MQ_IOMUXC_UART4_RXD_GPIO5_IO28
+> 0x24C 0x4B4 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART4_RXD_TPSMP_HDATA30
+> 0x24C 0x4B4 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_UART4_TXD_UART4_DCE_TX
+> 0x250 0x4B8 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_UART4_TXD_UART4_DTE_RX
+> 0x250 0x4B8 0x50C 0x0 0x3
+> +#define MX8MQ_IOMUXC_UART4_TXD_UART2_DCE_RTS_B
+> 0x250 0x4B8 0x4F8 0x1 0x1
+> +#define MX8MQ_IOMUXC_UART4_TXD_UART2_DTE_CTS_B
+> 0x250 0x4B8 0x000 0x1 0x0
+> +#define MX8MQ_IOMUXC_UART4_TXD_PCIE2_CLKREQ_B
+> 0x250 0x4B8 0x528 0x2 0x1
+> +#define MX8MQ_IOMUXC_UART4_TXD_GPIO5_IO29
+> 0x250 0x4B8 0x000 0x5 0x0
+> +#define MX8MQ_IOMUXC_UART4_TXD_TPSMP_HDATA31
+> 0x250 0x4B8 0x000 0x7 0x0
+> +#define MX8MQ_IOMUXC_TEST_MODE
+> 0x000 0x254 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_BOOT_MODE0
+> 0x000 0x258 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_BOOT_MODE1
+> 0x000 0x25C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_JTAG_MOD
+> 0x000 0x260 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_JTAG_TRST_B
+> 0x000 0x264 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_JTAG_TDI
+> 0x000 0x268 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_JTAG_TMS
+> 0x000 0x26C 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_JTAG_TCK
+> 0x000 0x270 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_JTAG_TDO
+> 0x000 0x274 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_RTC
+> 0x000 0x278 0x000 0x0 0x0
+> +
+> +#endif /* __DTS_IMX8MQ_PINFUNC_H */
+> diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> new file mode 100644
+> index 000000000000..50ed302d299a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> @@ -0,0 +1,411 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright 2017 NXP
+> + * Copyright (C) 2017 Pengutronix, Lucas Stach <kernel@pengutronix.de>
+> + */
+> +
+> +#include <dt-bindings/clock/imx8mq-clock.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "imx8mq-pinfunc.h"
+> +
+> +/* first 128 KiB of memory are owned by ATF */
+> +/memreserve/ 0x40000000 0x00020000;
+> +
+> +/ {
+> +	/* This should really be the GPC, but we need a driver for this first */
+> +	interrupt-parent = <&gic>;
+> +
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	aliases {
+> +		i2c0 = &i2c1;
+> +		i2c1 = &i2c2;
+> +		i2c2 = &i2c3;
+> +		i2c3 = &i2c4;
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +		serial3 = &uart4;
+> +	};
+> +
+> +	ckil: clk-ckil {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32768>;
+> +		clock-output-names = "ckil";
+> +	};
+> +
+> +	osc_25m: clk-osc-25m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <25000000>;
+> +		clock-output-names = "osc_25m";
+> +	};
+> +
+> +	osc_27m: clk-osc-27m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <27000000>;
+> +		clock-output-names = "osc_27m";
+> +	};
+> +
+> +	clk_ext1: clk-ext1 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <133000000>;
+> +		clock-output-names = "clk_ext1";
+> +	};
+> +
+> +	clk_ext2: clk-ext2 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <133000000>;
+> +		clock-output-names = "clk_ext2";
+> +	};
+> +
+> +	clk_ext3: clk-ext3 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <133000000>;
+> +		clock-output-names = "clk_ext3";
+> +	};
+> +
+> +	clk_ext4: clk-ext4 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency= <133000000>;
+> +		clock-output-names = "clk_ext4";
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		idle-states {
+> +			entry-method = "psci";
+> +
+> +			CPU_SLEEP: cpu-sleep {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010033>;
+> +				local-timer-stop;
+> +				entry-latency-us = <1000>;
+> +				exit-latency-us = <700>;
+> +				min-residency-us = <2700>;
+> +				wakeup-latency-us = <1500>;
+> +			};
+> +		};
+> +
+> +		A53_0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x0>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x1>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x2>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x3>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_L2: l2-cache0 {
+> +			compatible = "cache";
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci-1.0";
+> +		method = "smc";
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) |
+> IRQ_TYPE_LEVEL_LOW)>, /* Physical Secure */
+> +		             <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) |
+> IRQ_TYPE_LEVEL_LOW)>, /* Physical Non-Secure */
+> +		             <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) |
+> IRQ_TYPE_LEVEL_LOW)>, /* Virtual */
+> +		             <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) |
+> IRQ_TYPE_LEVEL_LOW)>; /* Hypervisor */
+> +		clock-frequency = <8333333>;
+> +		interrupt-parent = <&gic>;
+> +		arm,no-tick-in-suspend;
+> +	};
+> +
+> +	peripherals at 0 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0x0 0x0 0x0 0x3e000000>;
+> +
+> +		bus at 30000000 { /* AIPS1 */
+> +			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x30000000 0x30000000 0x400000>;
+> +
+> +			gpio1: gpio at 30200000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30200000 0x10000>;
+> +				interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio2: gpio at 30210000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30210000 0x10000>;
+> +				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
+> +				        <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio3: gpio at 30220000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30220000 0x10000>;
+> +				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
+> +				        <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio4: gpio at 30230000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30230000 0x10000>;
+> +				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
+> +				                <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio5: gpio at 30240000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30240000 0x10000>;
+> +				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +				        <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			iomuxc: iomuxc at 30330000 {
+> +				compatible = "fsl,imx8mq-iomuxc";
+> +				reg = <0x30330000 0x10000>;
+> +			};
+> +
+> +			gpr: iomuxc-gpr at 30340000 {
+> +				compatible = "fsl,imx8mq-iomuxc-gpr", "syscon";
+> +				reg = <0x30340000 0x10000>;
+> +			};
+> +
+> +			anatop: anatop at 30360000 {
+> +				compatible = "fsl,imx8mq-anatop", "syscon";
+> +				reg = <0x30360000 0x10000>;
+> +				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			clk: clock-controller at 30380000 {
+> +				compatible = "fsl,imx8mq-ccm";
+> +				reg = <0x30380000 0x10000>;
+> +				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> +				#clock-cells = <1>;
+> +				clocks = <&ckil>, <&osc_25m>, <&osc_27m>,
+> +				         <&clk_ext1>, <&clk_ext2>,
+> +				         <&clk_ext3>, <&clk_ext4>;
+> +				clock-names = "ckil", "osc_25m", "osc_27m",
+> +				              "clk_ext1", "clk_ext2",
+> +				              "clk_ext3", "clk_ext4";
+> +			};
+> +		};
+> +
+> +		bus at 30400000 { /* AIPS2 */
+> +			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x30400000 0x30400000 0x400000>;
+> +		};
+> +
+> +		bus at 30800000 { /* AIPS3 */
+> +			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x30800000 0x30800000 0x400000>;
+> +
+> +			uart1: serial at 30860000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30860000 0x10000>;
+> +				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART1_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART1_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart3: serial at 30880000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30880000 0x10000>;
+> +				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART3_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART3_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart2: serial at 30890000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30890000 0x10000>;
+> +				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART2_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART2_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c1: i2c at 30a20000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a20000 0x10000>;
+> +				interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C1_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c2: i2c at 30a30000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a30000 0x10000>;
+> +				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C2_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c3: i2c at 30a40000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a40000 0x10000>;
+> +				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C3_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c4: i2c at 30a50000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a50000 0x10000>;
+> +				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C4_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart4: serial at 30a60000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30a60000 0x10000>;
+> +				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART4_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART4_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			usdhc1: usdhc at 30b40000 {
+> +				compatible = "fsl,imx8mq-usdhc",
+> +				             "fsl,imx7d-usdhc";
+> +				reg = <0x30b40000 0x10000>;
+> +				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_DUMMY>,
+> +				         <&clk IMX8MQ_CLK_NAND_USDHC_BUS_DIV>,
+> +				         <&clk IMX8MQ_CLK_USDHC1_ROOT>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				fsl,tuning-start-tap = <20>;
+> +				fsl,tuning-step = <2>;
+> +				bus-width = <4>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usdhc2: usdhc at 30b50000 {
+> +				compatible = "fsl,imx8mq-usdhc",
+> +				             "fsl,imx7d-usdhc";
+> +				reg = <0x30b50000 0x10000>;
+> +				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_DUMMY>,
+> +				         <&clk IMX8MQ_CLK_NAND_USDHC_BUS_DIV>,
+> +				         <&clk IMX8MQ_CLK_USDHC2_ROOT>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				fsl,tuning-start-tap = <20>;
+> +				fsl,tuning-step = <2>;
+> +				bus-width = <4>;
+> +				status = "disabled";
+> +			};
+> +
+> +			fec1: ethernet at 30be0000 {
+> +				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
+> +				reg = <0x30be0000 0x10000>;
+> +				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_ENET1_ROOT>,
+> +				         <&clk IMX8MQ_CLK_ENET1_ROOT>,
+> +				         <&clk IMX8MQ_CLK_ENET_TIMER_DIV>,
+> +				         <&clk IMX8MQ_CLK_ENET_REF_DIV>,
+> +				         <&clk IMX8MQ_CLK_ENET_PHY_REF_DIV>;
+> +				clock-names = "ipg", "ahb", "ptp",
+> +				              "enet_clk_ref", "enet_out";
+> +				fsl,num-tx-queues = <3>;
+> +				fsl,num-rx-queues = <3>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		gic: interrupt-controller at 38800000 {
+> +			compatible = "arm,gic-v3";
+> +			reg = <0x38800000 0x10000>, /* GIC Dist */
+> +			      <0x38880000 0xc0000>; /* GICR (RD_base + SGI_base)
+> */
+> +			#interrupt-cells = <3>;
+> +			interrupt-controller;
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-parent = <&gic>;
+> +		};
+> +	};
+> +};
+> --
+> 2.15.1
