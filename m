@@ -1,69 +1,91 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 2 Feb 2018 16:24:49 +0100
-Subject: [PATCH v2 07/16] iio: adc: sun4i-gpadc-iio: rework: support nvmem
- calibration data
-In-Reply-To: <20180130083642.cdpd7jnthkdrrk5r@flea.lan>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-8-embed3d@gmail.com>
- <20180129094045.sagz2dnzvdadd4yx@flea.lan>
- <e319fde5-9ede-8be0-03ae-f0a22d50250c@gmail.com>
- <20180130083642.cdpd7jnthkdrrk5r@flea.lan>
-Message-ID: <aacb720f-2337-a016-e4e2-d99bd8da420b@gmail.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Fri, 2 Feb 2018 16:38:13 +0100
+Subject: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali changing dclk
+ frequency
+In-Reply-To: <20180202133516.uoy7ppuozd6cnldm@flea.lan>
+References: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180131084349.du2ijvhh5rxa5vvt@flea.lan>
+ <7be1e297-4fac-a7a2-a8cc-54061d4e2fde@micronovasrl.com>
+ <20180201124551.kfyz6frx4lcx4wbz@flea.lan>
+ <8c2fef37-8eb6-38c6-de3d-547edafac8b7@micronovasrl.com>
+ <20180202105304.gow2znzgxqmuxgol@flea.lan>
+ <1b3d96ae-c6e6-4f58-b140-7b1738c12adc@micronovasrl.com>
+ <20180202133516.uoy7ppuozd6cnldm@flea.lan>
+Message-ID: <aa43a02a-3ea9-2f61-eaf6-ddc7980f78a5@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
->>
->>>>    	/* prevents concurrent reads of temperature and ADC */
->>>>    	struct mutex			mutex;
->>>>    	struct thermal_zone_device	*tzd;
->>>> @@ -561,6 +569,9 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->>>>    	struct resource *mem;
->>>>    	void __iomem *base;
->>>>    	int ret;
->>>> +	struct nvmem_cell *cell;
->>>> +	ssize_t cell_size;
->>>> +	u64 *cell_data;
->>>>    	info->data = of_device_get_match_data(&pdev->dev);
->>>>    	if (!info->data)
->>>> @@ -575,6 +586,39 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->>>>    	if (IS_ERR(base))
->>>>    		return PTR_ERR(base);
->>>> +	info->has_calibration_data[0] = false;
->>>> +	info->has_calibration_data[1] = false;
->>>> +
->>>> +	if (!info->data->supports_nvmem)
->>>> +		goto no_nvmem;
->>>> +
->>>> +	cell = nvmem_cell_get(&pdev->dev, "calibration");
->>>> +	if (IS_ERR(cell)) {
->>>> +		if (PTR_ERR(cell) == -EPROBE_DEFER)
->>>> +			return PTR_ERR(cell);
->>>> +		goto no_nvmem;
+Il 02/02/2018 14:35, Maxime Ripard ha scritto:
+> On Fri, Feb 02, 2018 at 11:57:20AM +0100, Giulio Benetti wrote:
+>> Il 02/02/2018 11:53, Maxime Ripard ha scritto:
+>>> Hi,
 >>>
->>> goto considered evil ? :)
+>>> On Thu, Feb 01, 2018 at 05:17:11PM +0100, Giulio Benetti wrote:
+>>>>>>> What kernel version did you use?
+>>>>>>
+>>>>>> Latest mainline.
+>>>>>
+>>>>> I guess this patch could fix it:
+>>>>> http://code.bulix.org/1kitrq-268936?raw
+>>>>
+>>>> This should prevent from modifying parent clock. But my problem was
+>>>> different.
+>>>>
+>>>> On A20, gpu_clk can have different PLL, not I've found out the way
+>>>> to choose right one with assigned-parent-clocks.
+>>>>
+>>>> I have patchset ready for adding A20 mali node, but I need some more
+>>>> time to complete with OPP, then I will submit entire patchset.
+>>>>
+>>>> Now it works correctly, using right pll(dedicated PLL8), setting
+>>>> right frequency.
+>>>
+>>> The point is that we really don't care about which PLL is actually
+>>> being used, as long as the rate is correct and we don't break anything
+>>> else. If the GPU rate is accessible through one of the other PLL, it
+>>> makes even more sense to not use the GPU PLL and keep it disabled,
+>>> since it will result in some power savings.
 >>
->> this was a suggestion from Jonatan in version one, to make the code better
->> readable.
+>> Ah! I see the point now, very clever system for power saving.
+>> I'm going to check if it's resolutive,
+>> but it sounds good.
+>>
+>>>
+>>>> Btw, do I need to add a board using it, or can I add only Mali node
+>>>> to sun7i-a20.dtsi(plus other little patches)?
+>>>
+>>> You can add it to the DTSI without a board using it (and actually,
+>>> nothing should be in the board DTS, everything in the DT for the Mali
+>>> applies to all boards).
+>>
+>> Sure. So I would also add the patch you've addressed me:
+>> http://code.bulix.org/1kitrq-268936?raw
+>> as a commit. Can I submit it in patchset to complete the whole job?
 > 
-> Isn't
-> 
-> if (info->data->supports_nvmem && IS_ERR(cell = nvmem_cell_get()))
-> 
-> pretty much the same thing?
+> I already sent that patch quite some time ago, I'll just apply it. You
+> can send the DT patch :)
+
+Thanks. Sorry for my ignorance, but where are you applying patches?
+Because I've tried to check sunxi-next and a lot of other Repo but I 
+can't find this and neither "Re: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: 
+Fix mali changing dclk frequency"
+
 > 
 > Maxime
 > 
-I would say :
 
-if (info->data->supports_nvmem && !IS_ERR(cell = nvmem_cell_get())) is
 
-the same.
-This would require an else if statement like this:
+-- 
+Giulio Benetti
+R&D Manager &
+Advanced Research
 
-else if (info->data->supports_nvmem && PTR_ERR(cell) == -EPROBE_DEFER)
-		return PTR_ERR(cell);
-
-to avoid errors if the thermal sensor is probed before the sid driver.
-
-Philipp
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
