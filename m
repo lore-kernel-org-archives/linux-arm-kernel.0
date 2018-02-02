@@ -1,54 +1,30 @@
-From: s.riedmueller@phytec.de (Stefan Riedmueller)
-Date: Fri, 2 Feb 2018 10:34:04 +0100
-Subject: [PATCH v6 6/6] ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor
- DA9062 driver
-Message-ID: <1517564044-8706-1-git-send-email-s.riedmueller@phytec.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  2 Feb 2018 10:36:02 +0100
+Subject: [PATCH] arm64: defconfig: enable R8A77970 SoC
+Message-ID: <20180202093602.19256-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phyCORE-i.MX 6 uses the DA9062/63 PMIC, RTC and Watchdog driver.
+Enable the Renesas R-Car V3H (R8A77970) SoC in the ARM64 defconfig.
 
-Enable these options by default.
-
-Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-Changes in v6:
- - Rebased against imx/defconfig
----
- arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 98c0691..79d63b4 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -222,8 +222,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
- CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
- CONFIG_WATCHDOG=y
-+CONFIG_DA9062_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
-+CONFIG_MFD_DA9062=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_MFD_STMPE=y
-@@ -231,6 +233,7 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
-+CONFIG_REGULATOR_DA9062=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
-@@ -356,6 +359,7 @@ CONFIG_RTC_DRV_ISL1208=y
- CONFIG_RTC_DRV_PCF8523=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_M41T80=y
-+CONFIG_RTC_DRV_DA9063=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
- CONFIG_RTC_DRV_MXC_V2=y
+ Based on renesas-devel-20180130v2-v4.15
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6356c6da34ea..45a423f845c7 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -52,6 +52,7 @@ CONFIG_ARCH_RENESAS=y
+ CONFIG_ARCH_R8A7795=y
+ CONFIG_ARCH_R8A7796=y
+ CONFIG_ARCH_R8A77970=y
++CONFIG_ARCH_R8A77980=y
+ CONFIG_ARCH_R8A77995=y
+ CONFIG_ARCH_STRATIX10=y
+ CONFIG_ARCH_TEGRA=y
 -- 
-2.7.4
+2.11.0
