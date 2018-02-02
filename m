@@ -1,208 +1,159 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 2 Feb 2018 15:03:34 +0100
-Subject: [PATCH 06/14] clk: stm32mp1: add PLL clocks
+Date: Fri, 2 Feb 2018 15:03:37 +0100
+Subject: [PATCH 09/14] clk: stm32mp1: add Kernel timers
 In-Reply-To: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
 References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1517580222-23301-7-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1517580222-23301-10-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-STMP32MP1 has 4 PLLs.
-PLL supports integer and fractional mode.
-Each PLL has 3 output dividers (p, q, r)
+This patch adds Kernel timers.
+This patch adds timers kernel clock.
+Timers are gather into two groups corresponding to the APB bus
+they are attached to.
+Each group has its own prescaler, managed in this patch.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32mp1.c | 209 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 209 insertions(+)
+ drivers/clk/clk-stm32mp1.c | 185 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 185 insertions(+)
 
 diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index 1c9a84a..33f0d09 100644
+index d85c619..13d74f3 100644
 --- a/drivers/clk/clk-stm32mp1.c
 +++ b/drivers/clk/clk-stm32mp1.c
-@@ -7,6 +7,7 @@
- 
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of.h>
-@@ -506,6 +507,181 @@ static struct clk_hw *clk_register_mp1_gate(struct device *dev,
+@@ -854,6 +854,138 @@ static struct clk_hw *clk_register_pll(struct device *dev, const char *name,
  	return hw;
  }
  
-+/* STM32 PLL */
-+
-+struct stm32_pll_obj {
-+	/* lock pll enable/disable registers */
++/* Kernel Timer */
++struct timer_cker {
++	/* lock the kernel output divider register */
 +	spinlock_t *lock;
-+	void __iomem *reg;
++	void __iomem *apbdiv;
++	void __iomem *timpre;
 +	struct clk_hw hw;
 +};
 +
-+#define to_pll(_hw) container_of(_hw, struct stm32_pll_obj, hw)
++#define to_timer_cker(_hw) container_of(_hw, struct timer_cker, hw)
 +
-+#define PLL_ON		BIT(0)
-+#define PLL_RDY		BIT(1)
-+#define DIVN_MASK	0x1FF
-+#define DIVM_MASK	0x3F
-+#define DIVM_SHIFT	16
-+#define DIVN_SHIFT	0
-+#define FRAC_OFFSET	0xC
-+#define FRAC_MASK	0x1FFF
-+#define FRAC_SHIFT	3
-+#define FRACLE		BIT(16)
++#define APB_DIV_MASK 0x07
++#define TIM_PRE_MASK 0x01
 +
-+static int __pll_is_enabled(struct clk_hw *hw)
++static unsigned long __bestmult(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
 +{
-+	struct stm32_pll_obj *clk_elem = to_pll(hw);
++	struct timer_cker *tim_ker = to_timer_cker(hw);
++	u32 prescaler;
++	unsigned int mult = 0;
 +
-+	return readl_relaxed(clk_elem->reg) & PLL_ON;
++	prescaler = readl_relaxed(tim_ker->apbdiv) & APB_DIV_MASK;
++	if (prescaler < 2)
++		return 1;
++
++	mult = 2;
++
++	if (rate / parent_rate >= 4)
++		mult = 4;
++
++	return mult;
 +}
 +
-+#define TIMEOUT 5
-+
-+static int pll_enable(struct clk_hw *hw)
++static long timer_ker_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *parent_rate)
 +{
-+	struct stm32_pll_obj *clk_elem = to_pll(hw);
-+	u32 reg;
++	unsigned long factor = __bestmult(hw, rate, *parent_rate);
++
++	return *parent_rate * factor;
++}
++
++static int timer_ker_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct timer_cker *tim_ker = to_timer_cker(hw);
 +	unsigned long flags = 0;
-+	unsigned int timeout = TIMEOUT;
-+	int bit_status = 0;
++	unsigned long factor = __bestmult(hw, rate, parent_rate);
++	int ret = 0;
 +
-+	spin_lock_irqsave(clk_elem->lock, flags);
++	spin_lock_irqsave(tim_ker->lock, flags);
 +
-+	if (__pll_is_enabled(hw))
-+		goto unlock;
-+
-+	reg = readl_relaxed(clk_elem->reg);
-+	reg |= PLL_ON;
-+	writel_relaxed(reg, clk_elem->reg);
-+
-+	/* We can't use readl_poll_timeout() because we can be blocked if
-+	 * someone enables this clock before clocksource changes.
-+	 * Only jiffies counter is available. Jiffies are incremented by
-+	 * interruptions and enable op does not allow to be interrupted.
-+	 */
-+	do {
-+		bit_status = !(readl_relaxed(clk_elem->reg) & PLL_RDY);
-+
-+		if (bit_status)
-+			udelay(120);
-+
-+	} while (bit_status && --timeout);
-+
-+unlock:
-+	spin_unlock_irqrestore(clk_elem->lock, flags);
-+
-+	return bit_status;
-+}
-+
-+static void pll_disable(struct clk_hw *hw)
-+{
-+	struct stm32_pll_obj *clk_elem = to_pll(hw);
-+	u32 reg;
-+	unsigned long flags = 0;
-+
-+	spin_lock_irqsave(clk_elem->lock, flags);
-+
-+	reg = readl_relaxed(clk_elem->reg);
-+	reg &= ~PLL_ON;
-+	writel_relaxed(reg, clk_elem->reg);
-+
-+	spin_unlock_irqrestore(clk_elem->lock, flags);
-+}
-+
-+static u32 pll_frac_val(struct clk_hw *hw)
-+{
-+	struct stm32_pll_obj *clk_elem = to_pll(hw);
-+	u32 reg, frac = 0;
-+
-+	reg = readl_relaxed(clk_elem->reg + FRAC_OFFSET);
-+	if (reg & FRACLE)
-+		frac = (reg >> FRAC_SHIFT) & FRAC_MASK;
-+
-+	return frac;
-+}
-+
-+static unsigned long pll_recalc_rate(struct clk_hw *hw,
-+				     unsigned long parent_rate)
-+{
-+	struct stm32_pll_obj *clk_elem = to_pll(hw);
-+	u32 reg;
-+	u32 frac, divm, divn;
-+	u64 rate, rate_frac = 0;
-+
-+	reg = readl_relaxed(clk_elem->reg + 4);
-+
-+	divm = ((reg >> DIVM_SHIFT) & DIVM_MASK) + 1;
-+	divn = ((reg >> DIVN_SHIFT) & DIVN_MASK) + 1;
-+	rate = (u64)parent_rate * divn;
-+
-+	do_div(rate, divm);
-+
-+	frac = pll_frac_val(hw);
-+	if (frac) {
-+		rate_frac = (u64)parent_rate * (u64)frac;
-+		do_div(rate_frac, (divm * 8192));
++	switch (factor) {
++	case 1:
++		break;
++	case 2:
++		writel_relaxed(0, tim_ker->timpre);
++		break;
++	case 4:
++		writel_relaxed(1, tim_ker->timpre);
++		break;
++	default:
++		ret = -EINVAL;
 +	}
-+
-+	return rate + rate_frac;
-+}
-+
-+static int pll_is_enabled(struct clk_hw *hw)
-+{
-+	struct stm32_pll_obj *clk_elem = to_pll(hw);
-+	unsigned long flags = 0;
-+	int ret;
-+
-+	spin_lock_irqsave(clk_elem->lock, flags);
-+	ret = __pll_is_enabled(hw);
-+	spin_unlock_irqrestore(clk_elem->lock, flags);
++	spin_unlock_irqrestore(tim_ker->lock, flags);
 +
 +	return ret;
 +}
 +
-+static const struct clk_ops pll_ops = {
-+	.enable = pll_enable,
-+	.disable = pll_disable,
-+	.recalc_rate = pll_recalc_rate,
-+	.is_enabled = pll_is_enabled,
++static unsigned long timer_ker_recalc_rate(struct clk_hw *hw,
++					   unsigned long parent_rate)
++{
++	struct timer_cker *tim_ker = to_timer_cker(hw);
++	u32 prescaler, timpre;
++	u32 mul;
++
++	prescaler = readl_relaxed(tim_ker->apbdiv) & APB_DIV_MASK;
++
++	timpre = readl_relaxed(tim_ker->timpre) & TIM_PRE_MASK;
++
++	if (!prescaler)
++		return parent_rate;
++
++	mul = (timpre + 1) * 2;
++
++	return parent_rate * mul;
++}
++
++static const struct clk_ops timer_ker_ops = {
++	.recalc_rate	= timer_ker_recalc_rate,
++	.round_rate	= timer_ker_round_rate,
++	.set_rate	= timer_ker_set_rate,
++
 +};
 +
-+static struct clk_hw *clk_register_pll(struct device *dev, const char *name,
-+				       const char *parent_name,
-+				       void __iomem *reg,
-+				       unsigned long flags,
-+				       spinlock_t *lock)
++static struct clk_hw *clk_register_cktim(struct device *dev, const char *name,
++					 const char *parent_name,
++					 unsigned long flags,
++					 void __iomem *apbdiv,
++					 void __iomem *timpre,
++					 spinlock_t *lock)
 +{
-+	struct stm32_pll_obj *element;
++	struct timer_cker *tim_ker;
 +	struct clk_init_data init;
 +	struct clk_hw *hw;
 +	int err;
 +
-+	element = kzalloc(sizeof(*element), GFP_KERNEL);
-+	if (!element)
++	tim_ker = kzalloc(sizeof(*tim_ker), GFP_KERNEL);
++	if (!tim_ker)
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &pll_ops;
++	init.ops = &timer_ker_ops;
 +	init.flags = flags;
 +	init.parent_names = &parent_name;
 +	init.num_parents = 1;
 +
-+	element->hw.init = &init;
-+	element->reg = reg;
-+	element->lock = lock;
++	tim_ker->hw.init = &init;
++	tim_ker->lock = lock;
++	tim_ker->apbdiv = apbdiv;
++	tim_ker->timpre = timpre;
 +
-+	hw = &element->hw;
++	hw = &tim_ker->hw;
 +	err = clk_hw_register(dev, hw);
 +
 +	if (err) {
-+		kfree(element);
++		kfree(tim_ker);
 +		return ERR_PTR(err);
 +	}
 +
@@ -212,57 +163,77 @@ index 1c9a84a..33f0d09 100644
  static struct clk_hw *
  _clk_register_mp1_gate(struct device *dev,
  		       struct clk_hw_onecell_data *clk_data,
-@@ -524,6 +700,21 @@ static struct clk_hw *clk_register_mp1_gate(struct device *dev,
- 				     lock);
+@@ -887,6 +1019,23 @@ struct clk_hw *_clk_register_pll(struct device *dev,
+ 				base + stm_pll_cfg->offset, cfg->flags, lock);
  }
  
-+struct stm32_pll_cfg {
-+	u32 offset;
++struct stm32_cktim_cfg {
++	u32 offset_apbdiv;
++	u32 offset_timpre;
 +};
 +
-+struct clk_hw *_clk_register_pll(struct device *dev,
-+				 struct clk_hw_onecell_data *clk_data,
-+				 void __iomem *base, spinlock_t *lock,
-+				 const struct clock_config *cfg)
++static struct clk_hw *_clk_register_cktim(struct device *dev,
++					  struct clk_hw_onecell_data *clk_data,
++					  void __iomem *base, spinlock_t *lock,
++					  const struct clock_config *cfg)
 +{
-+	struct stm32_pll_cfg *stm_pll_cfg = cfg->cfg;
++	struct stm32_cktim_cfg *cktim_cfg = cfg->cfg;
 +
-+	return clk_register_pll(dev, cfg->name, cfg->parent_name,
-+				base + stm_pll_cfg->offset, cfg->flags, lock);
++	return clk_register_cktim(dev, cfg->name, cfg->parent_name, cfg->flags,
++				  cktim_cfg->offset_apbdiv + base,
++				  cktim_cfg->offset_timpre + base, lock);
 +}
 +
  #define GATE(_id, _name, _parent, _flags, _offset, _bit_idx, _gate_flags)\
  {\
  	.id		= _id,\
-@@ -602,6 +793,18 @@ static struct clk_hw *clk_register_mp1_gate(struct device *dev,
- 	.func		= _clk_register_mp1_gate,\
+@@ -1056,6 +1205,23 @@ struct clk_hw *_clk_register_pll(struct device *dev,
+ 	.func		= _clk_register_pll,\
  }
  
-+#define PLL(_id, _name, _parent, _flags, _offset)\
++#define STM32_CKTIM(_name, _parent, _flags, _offset_apbdiv, _offset_timpre)\
 +{\
-+	.id		= _id,\
++	.id		= NO_ID,\
 +	.name		= _name,\
 +	.parent_name	= _parent,\
 +	.flags		= _flags,\
-+	.cfg		=  &(struct stm32_pll_cfg) {\
-+		.offset = _offset,\
++	.cfg		=  &(struct stm32_cktim_cfg) {\
++		.offset_apbdiv = _offset_apbdiv,\
++		.offset_timpre = _offset_timpre,\
 +	},\
-+	.func		= _clk_register_pll,\
++	.func		= _clk_register_cktim,\
 +}
++
++#define STM32_TIM(_id, _name, _parent, _offset_set, _bit_idx)\
++		  MP1_GATE(_id, _name, _parent, CLK_SET_RATE_PARENT,\
++			   _offset_set, _bit_idx, 0)
 +
  static const struct clock_config stm32mp1_clock_cfg[] = {
  	/* Oscillator divider */
  	DIV(NO_ID, "clk-hsi-div", "clk-hsi", 0, RCC_HSICFGR, 0, 2,
-@@ -625,6 +828,12 @@ static struct clk_hw *clk_register_mp1_gate(struct device *dev,
+@@ -1152,6 +1318,25 @@ struct clk_hw *_clk_register_pll(struct device *dev,
  
- 	MUX(NO_ID, "ref4", ref4_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK4SELR,
- 	    0, 2, CLK_MUX_READ_ONLY),
+ 	DIV_TABLE(NO_ID, "pclk5", "ck_axi", CLK_IGNORE_UNUSED, RCC_APB5DIVR, 0,
+ 		  3, CLK_DIVIDER_READ_ONLY, apb_div_table),
 +
-+	/* PLLs */
-+	PLL(PLL1, "pll1", "ref1", CLK_IGNORE_UNUSED, RCC_PLL1CR),
-+	PLL(PLL2, "pll2", "ref1", CLK_IGNORE_UNUSED, RCC_PLL2CR),
-+	PLL(PLL3, "pll3", "ref3", CLK_IGNORE_UNUSED, RCC_PLL3CR),
-+	PLL(PLL4, "pll4", "ref4", CLK_IGNORE_UNUSED, RCC_PLL4CR),
++	/* Kernel Timers */
++	STM32_CKTIM("ck1_tim", "pclk1", 0, RCC_APB1DIVR, RCC_TIMG1PRER),
++	STM32_CKTIM("ck2_tim", "pclk2", 0, RCC_APB2DIVR, RCC_TIMG2PRER),
++
++	STM32_TIM(TIM2_K, "tim2_k", "ck1_tim", RCC_APB1ENSETR, 0),
++	STM32_TIM(TIM3_K, "tim3_k", "ck1_tim", RCC_APB1ENSETR, 1),
++	STM32_TIM(TIM4_K, "tim4_k", "ck1_tim", RCC_APB1ENSETR, 2),
++	STM32_TIM(TIM5_K, "tim5_k", "ck1_tim", RCC_APB1ENSETR, 3),
++	STM32_TIM(TIM6_K, "tim6_k", "ck1_tim", RCC_APB1ENSETR, 4),
++	STM32_TIM(TIM7_K, "tim7_k", "ck1_tim", RCC_APB1ENSETR, 5),
++	STM32_TIM(TIM12_K, "tim12_k", "ck1_tim", RCC_APB1ENSETR, 6),
++	STM32_TIM(TIM13_K, "tim13_k", "ck1_tim", RCC_APB1ENSETR, 7),
++	STM32_TIM(TIM14_K, "tim14_k", "ck1_tim", RCC_APB1ENSETR, 8),
++	STM32_TIM(TIM1_K, "tim1_k", "ck2_tim", RCC_APB2ENSETR, 0),
++	STM32_TIM(TIM8_K, "tim8_k", "ck2_tim", RCC_APB2ENSETR, 1),
++	STM32_TIM(TIM15_K, "tim15_k", "ck2_tim", RCC_APB2ENSETR, 2),
++	STM32_TIM(TIM16_K, "tim16_k", "ck2_tim", RCC_APB2ENSETR, 3),
++	STM32_TIM(TIM17_K, "tim17_k", "ck2_tim", RCC_APB2ENSETR, 4),
  };
  
  struct stm32_clock_match_data {
