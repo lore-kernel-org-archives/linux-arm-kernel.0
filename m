@@ -1,91 +1,94 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 2 Feb 2018 16:52:52 +0100
-Subject: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali changing dclk
- frequency
-In-Reply-To: <aa43a02a-3ea9-2f61-eaf6-ddc7980f78a5@micronovasrl.com>
-References: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180131084349.du2ijvhh5rxa5vvt@flea.lan>
- <7be1e297-4fac-a7a2-a8cc-54061d4e2fde@micronovasrl.com>
- <20180201124551.kfyz6frx4lcx4wbz@flea.lan>
- <8c2fef37-8eb6-38c6-de3d-547edafac8b7@micronovasrl.com>
- <20180202105304.gow2znzgxqmuxgol@flea.lan>
- <1b3d96ae-c6e6-4f58-b140-7b1738c12adc@micronovasrl.com>
- <20180202133516.uoy7ppuozd6cnldm@flea.lan>
- <aa43a02a-3ea9-2f61-eaf6-ddc7980f78a5@micronovasrl.com>
-Message-ID: <20180202155252.vhlih33ju6zh26oh@flea.lan>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 2 Feb 2018 15:55:36 +0000
+Subject: [PATCH 1/2] ARM: kvm: fix building with gcc-8
+In-Reply-To: <20180202150756.420422-1-arnd@arndb.de>
+References: <20180202150756.420422-1-arnd@arndb.de>
+Message-ID: <2cff070a-357d-c5f5-9ec6-036d93112ce4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 02, 2018 at 04:38:13PM +0100, Giulio Benetti wrote:
-> Hi,
+On 02/02/18 15:07, Arnd Bergmann wrote:
+> In banked-sr.c, we use a top-level '__asm__(".arch_extension virt")'
+> statement to allow compilation of a multi-CPU kernel for ARMv6
+> and older ARMv7-A that don't normally support access to the banked
+> registers.
 > 
-> Il 02/02/2018 14:35, Maxime Ripard ha scritto:
-> > On Fri, Feb 02, 2018 at 11:57:20AM +0100, Giulio Benetti wrote:
-> > > Il 02/02/2018 11:53, Maxime Ripard ha scritto:
-> > > > Hi,
-> > > > 
-> > > > On Thu, Feb 01, 2018 at 05:17:11PM +0100, Giulio Benetti wrote:
-> > > > > > > > What kernel version did you use?
-> > > > > > > 
-> > > > > > > Latest mainline.
-> > > > > > 
-> > > > > > I guess this patch could fix it:
-> > > > > > http://code.bulix.org/1kitrq-268936?raw
-> > > > > 
-> > > > > This should prevent from modifying parent clock. But my problem was
-> > > > > different.
-> > > > > 
-> > > > > On A20, gpu_clk can have different PLL, not I've found out the way
-> > > > > to choose right one with assigned-parent-clocks.
-> > > > > 
-> > > > > I have patchset ready for adding A20 mali node, but I need some more
-> > > > > time to complete with OPP, then I will submit entire patchset.
-> > > > > 
-> > > > > Now it works correctly, using right pll(dedicated PLL8), setting
-> > > > > right frequency.
-> > > > 
-> > > > The point is that we really don't care about which PLL is actually
-> > > > being used, as long as the rate is correct and we don't break anything
-> > > > else. If the GPU rate is accessible through one of the other PLL, it
-> > > > makes even more sense to not use the GPU PLL and keep it disabled,
-> > > > since it will result in some power savings.
-> > > 
-> > > Ah! I see the point now, very clever system for power saving.
-> > > I'm going to check if it's resolutive,
-> > > but it sounds good.
-> > > 
-> > > > 
-> > > > > Btw, do I need to add a board using it, or can I add only Mali node
-> > > > > to sun7i-a20.dtsi(plus other little patches)?
-> > > > 
-> > > > You can add it to the DTSI without a board using it (and actually,
-> > > > nothing should be in the board DTS, everything in the DT for the Mali
-> > > > applies to all boards).
-> > > 
-> > > Sure. So I would also add the patch you've addressed me:
-> > > http://code.bulix.org/1kitrq-268936?raw
-> > > as a commit. Can I submit it in patchset to complete the whole job?
-> > 
-> > I already sent that patch quite some time ago, I'll just apply it. You
-> > can send the DT patch :)
+> This is considered to be a programming error by the gcc developers
+> and will no longer work in gcc-8, where we now get a build error:
 > 
-> Thanks. Sorry for my ignorance, but where are you applying patches?
-> Because I've tried to check sunxi-next and a lot of other Repo but I can't
-> find this and neither "Re: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali
-> changing dclk frequency"
+> /tmp/cc4Qy7GR.s:34: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_usr'
+> /tmp/cc4Qy7GR.s:41: Error: Banked registers are not available with this architecture. -- `mrs r3,ELR_hyp'
+> /tmp/cc4Qy7GR.s:55: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_svc'
+> /tmp/cc4Qy7GR.s:62: Error: Banked registers are not available with this architecture. -- `mrs r3,LR_svc'
+> /tmp/cc4Qy7GR.s:69: Error: Banked registers are not available with this architecture. -- `mrs r3,SPSR_svc'
+> /tmp/cc4Qy7GR.s:76: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_abt'
+> 
+> Passign the '-march-armv7ve' flag to gcc works, and is ok here, because
+> we know the functions won't ever be called on pre-ARMv7VE machines.
+> Unfortunately, older compiler versions (4.8 and earlier) do not understand
+> that flag, so we still need to keep the asm around.
+> 
+> Backporting to stable kernels (4.6+) is needed to allow those to be built
+> with future compilers as well.
 
-Usually, in the git tree listed in MAINTAINERS :)
+Is "-Wa,arch=armv7-a+virt" (as we appear to do for a couple of files 
+already) viable as a possibly cleaner alternative, or is GCC itself now 
+policing the contents of inline asms?
 
-Maxime
+> Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84129
+> Fixes: 33280b4cd1dc ("ARM: KVM: Add banked registers save/restore")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   arch/arm/kvm/hyp/Makefile    | 5 +++++
+>   arch/arm/kvm/hyp/banked-sr.c | 4 ++++
+>   2 files changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+> index 5638ce0c9524..63d6b404d88e 100644
+> --- a/arch/arm/kvm/hyp/Makefile
+> +++ b/arch/arm/kvm/hyp/Makefile
+> @@ -7,6 +7,8 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+>   
+>   KVM=../../../../virt/kvm
+>   
+> +CFLAGS_ARMV7VE		   :=$(call cc-option, -march=armv7ve)
+> +
+>   obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+> @@ -15,7 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
+> +CFLAGS_banked-sr.o	   += $(CFLAGS_ARMV7VE)
+> +
+>   obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+>   obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+> +CFLAGS_switch.o		   += $(CFLAGS_ARMV7VE)
+>   obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
+> diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
+> index 111bda8cdebd..be4b8b0a40ad 100644
+> --- a/arch/arm/kvm/hyp/banked-sr.c
+> +++ b/arch/arm/kvm/hyp/banked-sr.c
+> @@ -20,6 +20,10 @@
+>   
+>   #include <asm/kvm_hyp.h>
+>   
+> +/*
+> + * gcc before 4.9 doesn't understand -march=armv7ve, so we have to
+> + * trick the assembler.
+> + */
+>   __asm__(".arch_extension     virt");
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180202/5e2378dc/attachment.sig>
+Would it be worth wrapping this in a preprocessor check for compilers 
+that won't understand the command-line flag? I believe LLVM tends to 
+choke on these global asm statements entirely, so minimising exposure 
+might be a good thing to do in general.
+
+Robin.
+
+>   
+>   void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
+> 
