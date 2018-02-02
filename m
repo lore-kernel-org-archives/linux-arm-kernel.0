@@ -1,31 +1,78 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 2 Feb 2018 09:26:36 +0800
-Subject: [PATCH v4 0/6] ARM: dts: Add PHYTEC phyCORE-i.MX 6 and
- phyBOARD-Mira carrier board support
-In-Reply-To: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
-References: <1515421758-4240-1-git-send-email-s.riedmueller@phytec.de>
-Message-ID: <20180202012634.GE20833@dragon>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 1 Feb 2018 18:56:16 -0800
+Subject: [RFC v4 12/26] watchdog: renesas_wdt: Add R-Car Gen2 support
+In-Reply-To: <1517423070-24236-13-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1517423070-24236-13-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <2dd9f76d-b3e9-31f2-11eb-272d327f3b01@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 08, 2018 at 03:29:12PM +0100, Stefan Riedmueller wrote:
-> Christian Hemp (2):
->   ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6Quad/Dual RDK
->   ARM: dts: imx6: Add support for phyBOARD-Mira i.MX 6 DualLight/Solo
->     RDK
+On 01/31/2018 10:24 AM, Fabrizio Castro wrote:
+> Due to commits:
+> * "ARM: shmobile: Add watchdog support",
+> * "ARM: shmobile: rcar-gen2: Add watchdog support", and
+> * "soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2",
+> we now have everything we needed for the watchdog to work on Gen2 and
+> RZ/G1.
 > 
-> Enrico Scholz (1):
->   ARM: dts: imx6: Add support for phyBOARD-Mira with i.MX 6QuadPlus
+> This commit adds "renesas,rcar-gen2-wdt" as compatible string for R-Car
+> Gen2 and RZ/G1, and since on those platforms the rwdt clock needs to be
+> always ON, when suspending to RAM we need to explicitly disable the
+> counting by clearing TME from RWTCSRA.
 > 
-> Stefan Riedmueller (3):
->   ARM: dts: imx6: Add initial support for phyCORE-i.MX 6 SOM
->   ARM: dts: imx6: Add initial support for phyBOARD-Mira
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> ---
+> v3->4:
+> * in this new version the changes to the driver have been splitted into
+>    two commits, this patch takes care of the basic Gen2 support, patch 13/26
+>    takes care of the restart handler.
+> 
+>   drivers/watchdog/renesas_wdt.c | 42 +++++++++++++++++++++++++++++++++++++-----
+>   1 file changed, 37 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/watchdog/renesas_wdt.c b/drivers/watchdog/renesas_wdt.c
+> index 831ef83..0a1a402 100644
+> --- a/drivers/watchdog/renesas_wdt.c
+> +++ b/drivers/watchdog/renesas_wdt.c
+> @@ -203,13 +203,42 @@ static int rwdt_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>   
+> -/*
+> - * This driver does also fit for R-Car Gen2 (r8a779[0-4]) WDT. However, for SMP
+> - * to work there, one also needs a RESET (RST) driver which does not exist yet
+> - * due to HW issues. This needs to be solved before adding compatibles here.
+> - */
+> +#ifdef CONFIG_PM
+> +static int rwdt_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev;
+> +	struct rwdt_priv *priv;
+> +
+> +	pdev = to_platform_device(dev);
+> +	priv = platform_get_drvdata(pdev);
+> +	if (watchdog_active(&priv->wdev)) {
+> +		rwdt_write(priv, priv->cks, RWTCSRA);
+> +	}
 
-Applied above 5 patches.
+Unnecessary { }
 
->   ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor DA9062 driver
+> +	return 0;
+> +}
+> +
+> +static int rwdt_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev;
+> +	struct rwdt_priv *priv;
+> +
+> +	pdev = to_platform_device(dev);
+> +	priv = platform_get_drvdata(pdev);
+> +	if (watchdog_active(&priv->wdev)) {
+> +		rwdt_write(priv, priv->cks | RWTCSRA_TME, RWTCSRA);
+> +	}
 
-This one doesn't apply to my imx/defconfig branch.  Can you please
-rebase?  Thanks.
+Same here. FWIW, checkpatch does complain about that.
 
-Shawn
+Guenter
