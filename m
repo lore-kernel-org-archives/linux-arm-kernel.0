@@ -1,101 +1,72 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 2 Feb 2018 15:03:33 +0100
-Subject: [PATCH 05/14] clk: stm32mp1: add Source Clocks for PLLs
-In-Reply-To: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
-References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1517580222-23301-6-git-send-email-gabriel.fernandez@st.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 2 Feb 2018 15:09:19 +0100
+Subject: [Patch v8 11/12] [media] s5p-mfc: Add support for HEVC encoder
+In-Reply-To: <1517574348-22111-12-git-send-email-smitha.t@samsung.com>
+References: <1517574348-22111-1-git-send-email-smitha.t@samsung.com>
+ <CGME20180202125018epcas1p31771ade936e0290e579b8e0805f3f0a1@epcas1p3.samsung.com>
+ <1517574348-22111-12-git-send-email-smitha.t@samsung.com>
+Message-ID: <37e3531b-b677-9d3c-e954-25d8f989e774@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 02/02/18 13:25, Smitha T Murthy wrote:
+> Add HEVC encoder support and necessary registers, V4L2 CIDs,
+> and hevc encoder parameters
+> 
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-This patch adds source clocks for PLLs
-This patch also introduces MUX clock API.
+Not quite, one last comment:
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32mp1.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+> ---
+>  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  28 +-
+>  drivers/media/platform/s5p-mfc/s5p_mfc.c        |   1 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |   3 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  54 ++-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    | 536 ++++++++++++++++++++++++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |   8 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 182 ++++++++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |   8 +
+>  8 files changed, 818 insertions(+), 2 deletions(-)
+> 
 
-diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index be5a4e5..1c9a84a 100644
---- a/drivers/clk/clk-stm32mp1.c
-+++ b/drivers/clk/clk-stm32mp1.c
-@@ -368,6 +368,14 @@ struct div_cfg {
- 	const struct clk_div_table *table;
- };
- 
-+struct mux_cfg {
-+	u32 reg_off;
-+	u8 shift;
-+	u8 width;
-+	u8 mux_flags;
-+	u32 *table;
-+};
-+
- static struct clk_hw *
- _clk_hw_register_gate(struct device *dev,
- 		      struct clk_hw_onecell_data *clk_data,
-@@ -419,6 +427,20 @@ struct div_cfg {
- 					     lock);
- }
- 
-+static struct clk_hw *
-+_clk_hw_register_mux(struct device *dev,
-+		     struct clk_hw_onecell_data *clk_data,
-+		     void __iomem *base, spinlock_t *lock,
-+		     const struct clock_config *cfg)
-+{
-+	struct mux_cfg *mux_cfg = cfg->cfg;
-+
-+	return clk_hw_register_mux(dev, cfg->name, cfg->parent_names,
-+				   cfg->num_parents, cfg->flags,
-+				   mux_cfg->reg_off + base, mux_cfg->shift,
-+				   mux_cfg->width, mux_cfg->mux_flags, lock);
-+}
-+
- /* MP1 Gate clock with set & clear registers */
- 
- static int mp1_gate_clk_enable(struct clk_hw *hw)
-@@ -550,6 +572,22 @@ static struct clk_hw *clk_register_mp1_gate(struct device *dev,
- 	DIV_TABLE(_id, _name, _parent, _flags, _offset, _shift, _width,\
- 		  _div_flags, NULL)
- 
-+#define MUX(_id, _name, _parents, _flags, _offset, _shift, _width, _mux_flags)\
-+{\
-+	.id		= _id,\
-+	.name		= _name,\
-+	.parent_names	= _parents,\
-+	.num_parents	= ARRAY_SIZE(_parents),\
-+	.flags		= _flags,\
-+	.cfg		=  &(struct mux_cfg) {\
-+		.reg_off	= _offset,\
-+		.shift		= _shift,\
-+		.width		= _width,\
-+		.mux_flags	= _mux_flags,\
-+	},\
-+	.func		= _clk_hw_register_mux,\
-+}
-+
- #define MP1_GATE(_id, _name, _parent, _flags, _offset, _bit_idx, _gate_flags)\
- {\
- 	.id		= _id,\
-@@ -577,6 +615,16 @@ static struct clk_hw *clk_register_mp1_gate(struct device *dev,
- 	GATE(CK_LSE, "ck_lse", "clk-lse", 0, RCC_BDCR, 0, 0),
- 
- 	FIXED_FACTOR(CK_HSE_DIV2, "clk-hse-div2", "ck_hse", 0, 1, 2),
-+
-+	/* ref clock pll */
-+	MUX(NO_ID, "ref1", ref12_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK12SELR,
-+	    0, 2, CLK_MUX_READ_ONLY),
-+
-+	MUX(NO_ID, "ref3", ref3_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK3SELR,
-+	    0, 2, CLK_MUX_READ_ONLY),
-+
-+	MUX(NO_ID, "ref4", ref4_parents, CLK_OPS_PARENT_ENABLE, RCC_RCK4SELR,
-+	    0, 2, CLK_MUX_READ_ONLY),
- };
- 
- struct stm32_clock_match_data {
--- 
-1.9.1
+<snip>
+
+>  static inline int vui_sar_idc(enum v4l2_mpeg_video_h264_vui_sar_idc sar)
+>  {
+>  	static unsigned int t[V4L2_MPEG_VIDEO_H264_VUI_SAR_IDC_EXTENDED + 1] = {
+> @@ -1635,6 +2024,153 @@ static int s5p_mfc_enc_s_ctrl(struct v4l2_ctrl *ctrl)
+>  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:
+>  		p->codec.vp8.profile = ctrl->val;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:
+> +		p->codec.hevc.rc_frame_qp = ctrl->val;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:
+> +		p->codec.hevc.rc_p_frame_qp = ctrl->val;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:
+> +		p->codec.hevc.rc_b_frame_qp = ctrl->val;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION:
+> +		p->codec.hevc.rc_framerate = ctrl->val;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:
+> +		p->codec.hevc.rc_min_qp = ctrl->val;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:
+> +		p->codec.hevc.rc_max_qp = ctrl->val;
+> +		break;
+
+When you change this, you should call __v4l2_ctrl_modify_range to modify the
+range of the controls that depend on this.
+
+You can make a patch '13/12' for this or post a v9 for this patch. I would like to
+see this implemented. It's one of those things that never gets implemented if you
+don't address this now.
+
+It shouldn't be difficult to do.
+
+Regards,
+
+	Hans
