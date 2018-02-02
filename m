@@ -1,72 +1,137 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 2 Feb 2018 15:09:19 +0100
-Subject: [Patch v8 11/12] [media] s5p-mfc: Add support for HEVC encoder
-In-Reply-To: <1517574348-22111-12-git-send-email-smitha.t@samsung.com>
-References: <1517574348-22111-1-git-send-email-smitha.t@samsung.com>
- <CGME20180202125018epcas1p31771ade936e0290e579b8e0805f3f0a1@epcas1p3.samsung.com>
- <1517574348-22111-12-git-send-email-smitha.t@samsung.com>
-Message-ID: <37e3531b-b677-9d3c-e954-25d8f989e774@xs4all.nl>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Fri, 2 Feb 2018 15:13:28 +0100
+Subject: [PATCH v2 06/16] iio: adc: sun4i-gpadc-iio: rework: support
+ multiple sensors
+In-Reply-To: <20180131184236.4yhp732l5kenhmp2@qschulz>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-7-embed3d@gmail.com>
+ <20180131184236.4yhp732l5kenhmp2@qschulz>
+Message-ID: <42632deb-077a-ad73-58e1-92d92dbd0963@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/18 13:25, Smitha T Murthy wrote:
-> Add HEVC encoder support and necessary registers, V4L2 CIDs,
-> and hevc encoder parameters
+
+
+On 31.01.2018 19:42, Quentin Schulz wrote:
+> Hi Philipp,
 > 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-
-Not quite, one last comment:
-
-> ---
->  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  28 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc.c        |   1 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |   3 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  54 ++-
->  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    | 536 ++++++++++++++++++++++++
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |   8 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 182 ++++++++
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |   8 +
->  8 files changed, 818 insertions(+), 2 deletions(-)
+> On Mon, Jan 29, 2018 at 12:29:09AM +0100, Philipp Rossak wrote:
+>> For adding newer sensor some basic rework of the code is necessary.
+>>
+>> This patch reworks the driver to be able to handle more than one
+>> thermal sensor. Newer SoC like the A80 have 4 thermal sensors.
+>> Because of this the maximal sensor count value was set to 4.
+>>
+>> The sensor_id value is set during sensor registration and is for each
+>> registered sensor indiviual. This makes it able to differntiate the
+>> sensors when the value is read from the register.
+>>
+>> In function sun4i_gpadc_read_raw(), the sensor number of the ths sensor
+>> was directly set to 0 (sun4i_gpadc_temp_read(x,x,0)). This selects
+>> in the temp_read function automatically sensor 0. A check for the
+>> sensor_id is here not required since the old sensors only have one
+>> thermal sensor. In addition to that is the sun4i_gpadc_read_raw()
+>> function only used by the "older" sensors (before A33) where the
+>> thermal sensor was a cobination of an adc and a thermal sensor.
+>>
+>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>> ---
+>>   drivers/iio/adc/sun4i-gpadc-iio.c | 36 +++++++++++++++++++++++-------------
+>>   include/linux/mfd/sun4i-gpadc.h   |  3 +++
+>>   2 files changed, 26 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> index 51ec0104d678..ac9ad2f8232f 100644
+>> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+>> @@ -67,12 +67,13 @@ struct gpadc_data {
+>>   	unsigned int	tp_adc_select;
+>>   	unsigned int	(*adc_chan_select)(unsigned int chan);
+>>   	unsigned int	adc_chan_mask;
+>> -	unsigned int	temp_data;
+>> +	unsigned int	temp_data[MAX_SENSOR_COUNT];
+>>   	int		(*sample_start)(struct sun4i_gpadc_iio *info);
+>>   	int		(*sample_end)(struct sun4i_gpadc_iio *info);
+>>   	bool		has_bus_clk;
+>>   	bool		has_bus_rst;
+>>   	bool		has_mod_clk;
+>> +	int		sensor_count;
+>>   };
+>>   
+> 
+> I've noticed that for H3, A83T, A64 (at least), if DATA reg of sensor 0
+> is e.g. 0x80, DATA reg of sensor N is at 0x80 + 0x04 * N.
+> 
+> Is that verified for other SoCs? Does anyone have some input on this?
+> 
+> We could then just use temp_data as the DATA reg "base" and increment by
+> 0x4 depending on the sensor id instead of using a fixed-size array.
 > 
 
-<snip>
+This sounds like a good idea! I will add this to the next version.
 
->  static inline int vui_sar_idc(enum v4l2_mpeg_video_h264_vui_sar_idc sar)
->  {
->  	static unsigned int t[V4L2_MPEG_VIDEO_H264_VUI_SAR_IDC_EXTENDED + 1] = {
-> @@ -1635,6 +2024,153 @@ static int s5p_mfc_enc_s_ctrl(struct v4l2_ctrl *ctrl)
->  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:
->  		p->codec.vp8.profile = ctrl->val;
->  		break;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:
-> +		p->codec.hevc.rc_frame_qp = ctrl->val;
-> +		break;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:
-> +		p->codec.hevc.rc_p_frame_qp = ctrl->val;
-> +		break;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:
-> +		p->codec.hevc.rc_b_frame_qp = ctrl->val;
-> +		break;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION:
-> +		p->codec.hevc.rc_framerate = ctrl->val;
-> +		break;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:
-> +		p->codec.hevc.rc_min_qp = ctrl->val;
-> +		break;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:
-> +		p->codec.hevc.rc_max_qp = ctrl->val;
-> +		break;
+I can verify this with a table, I created during development. I will 
+upload it during the weekend here: [1]
 
-When you change this, you should call __v4l2_ctrl_modify_range to modify the
-range of the controls that depend on this.
 
-You can make a patch '13/12' for this or post a v9 for this patch. I would like to
-see this implemented. It's one of those things that never gets implemented if you
-don't address this now.
+>>   static const struct gpadc_data sun4i_gpadc_data = {
+>> @@ -82,9 +83,10 @@ static const struct gpadc_data sun4i_gpadc_data = {
+>>   	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>>   	.adc_chan_select = &sun4i_gpadc_chan_select,
+>>   	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+>> -	.temp_data = SUN4I_GPADC_TEMP_DATA,
+>> +	.temp_data = {SUN4I_GPADC_TEMP_DATA, 0, 0, 0},
+>>   	.sample_start = sun4i_gpadc_sample_start,
+>>   	.sample_end = sun4i_gpadc_sample_end,
+>> +	.sensor_count = 1,
+> 
+> If the solution above is not desirable/possible, could we use something
+> like:
+> 
+> unsigned int sun4i_temp_data[] = {SUN4I_GPADC_TEMP_DATA,};
+> 
+> static const struct gpadc_data sun4i_gpadc_data = {
+> 	.temp_data = &sun4i_temp_data,
+> 	.sensor_count = ARRAY_SIZE(sun4i_temp_data),
+> };
+> 
+> That avoids 1) inconsistencies between the array size and the array
+> itself, 2) does not require to pad the array with zeroes.
+> 
+> [...]
+> 
+>> @@ -745,9 +752,12 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>>   	pm_runtime_enable(&pdev->dev);
+>>   
+>>   	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>> -		info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+>> -							    0, info,
+>> -							    &sun4i_ts_tz_ops);
+>> +		for (i = 0; i < info->data->sensor_count; i++) {
+>> +			info->sensor_id = i;
+>> +			info->tzd = thermal_zone_of_sensor_register(
+>> +					info->sensor_device,
+>> +					i, info, &sun4i_ts_tz_ops);
+>> +		}
+> 
+> As Maxime said, this does not work.
+> 
+> One way would be to have a new structure being:
+> struct sun4i_sensor_info {
+> 	struct sun4i_gpadc_iio	*info;
+> 	unsigned int		sensor_id;
+> };
+> 
+> Or since we only use the iio_dev within the sun4i_gpadc_iio in the
+> .get_temp function, we may replace info by struct iio_dev *indio_dev
+> above.
+> 
+> Quentin
+> 
+I will have a closer look on this next week, when I start to work on the 
+next version..
 
-It shouldn't be difficult to do.
+Thanks,
+Philipp
 
-Regards,
-
-	Hans
+[1]: http://linux-sunxi.org/Thermal_Sensor
