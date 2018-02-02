@@ -1,114 +1,160 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 2 Feb 2018 15:03:29 +0100
-Subject: [PATCH 01/14] dt-bindings: Document STM32MP1 Reset Clock Controller
- (RCC) bindings
-In-Reply-To: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
-References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1517580222-23301-2-git-send-email-gabriel.fernandez@st.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri,  2 Feb 2018 09:20:29 -0500
+Subject: [PATCH] irqchip/gic-v3: change pr_debug message to pr_devel
+Message-ID: <20180202142029.12568-1-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+The pr_debug() in gic-v3 gic_send_sgi() can trigger a circular locking
+warning:
 
-The RCC block is responsible of the management of the clock and reset
-generation for the complete circuit.
+ GICv3: CPU10: ICC_SGI1R_EL1 5000400
+ ======================================================
+ WARNING: possible circular locking dependency detected
+ 4.15.0+ #1 Tainted: G        W
+ ------------------------------------------------------
+ dynamic_debug01/1873 is trying to acquire lock:
+  ((console_sem).lock){-...}, at: [<0000000099c891ec>] down_trylock+0x20/0x4c
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+ but task is already holding lock:
+  (&rq->lock){-.-.}, at: [<00000000842e1587>] __task_rq_lock+0x54/0xdc
+
+ which lock already depends on the new lock.
+
+ the existing dependency chain (in reverse order) is:
+
+ -> #2 (&rq->lock){-.-.}:
+        __lock_acquire+0x3b4/0x6e0
+        lock_acquire+0xf4/0x2a8
+        _raw_spin_lock+0x4c/0x60
+        task_fork_fair+0x3c/0x148
+        sched_fork+0x10c/0x214
+        copy_process.isra.32.part.33+0x4e8/0x14f0
+        _do_fork+0xe8/0x78c
+        kernel_thread+0x48/0x54
+        rest_init+0x34/0x2a4
+        start_kernel+0x45c/0x488
+
+ -> #1 (&p->pi_lock){-.-.}:
+        __lock_acquire+0x3b4/0x6e0
+        lock_acquire+0xf4/0x2a8
+        _raw_spin_lock_irqsave+0x58/0x70
+        try_to_wake_up+0x48/0x600
+        wake_up_process+0x28/0x34
+        __up.isra.0+0x60/0x6c
+        up+0x60/0x68
+        __up_console_sem+0x4c/0x7c
+        console_unlock+0x328/0x634
+        vprintk_emit+0x25c/0x390
+        dev_vprintk_emit+0xc4/0x1fc
+        dev_printk_emit+0x88/0xa8
+        __dev_printk+0x58/0x9c
+        _dev_info+0x84/0xa8
+        usb_new_device+0x100/0x474
+        hub_port_connect+0x280/0x92c
+        hub_event+0x740/0xa84
+        process_one_work+0x240/0x70c
+        worker_thread+0x60/0x400
+        kthread+0x110/0x13c
+        ret_from_fork+0x10/0x18
+
+ -> #0 ((console_sem).lock){-...}:
+        validate_chain.isra.34+0x6e4/0xa20
+        __lock_acquire+0x3b4/0x6e0
+        lock_acquire+0xf4/0x2a8
+        _raw_spin_lock_irqsave+0x58/0x70
+        down_trylock+0x20/0x4c
+        __down_trylock_console_sem+0x3c/0x9c
+        console_trylock+0x20/0xb0
+        vprintk_emit+0x254/0x390
+        vprintk_default+0x58/0x90
+        vprintk_func+0xbc/0x164
+        printk+0x80/0xa0
+        __dynamic_pr_debug+0x84/0xac
+        gic_raise_softirq+0x184/0x18c
+        smp_cross_call+0xac/0x218
+        smp_send_reschedule+0x3c/0x48
+        resched_curr+0x60/0x9c
+        check_preempt_curr+0x70/0xdc
+        wake_up_new_task+0x310/0x470
+        _do_fork+0x188/0x78c
+        SyS_clone+0x44/0x50
+        __sys_trace_return+0x0/0x4
+
+ other info that might help us debug this:
+
+ Chain exists of:
+   (console_sem).lock --> &p->pi_lock --> &rq->lock
+
+  Possible unsafe locking scenario:
+
+        CPU0                    CPU1
+        ----                    ----
+   lock(&rq->lock);
+                                lock(&p->pi_lock);
+                                lock(&rq->lock);
+   lock((console_sem).lock);
+
+  *** DEADLOCK ***
+
+ 2 locks held by dynamic_debug01/1873:
+  #0:  (&p->pi_lock){-.-.}, at: [<000000001366df53>] wake_up_new_task+0x40/0x470
+  #1:  (&rq->lock){-.-.}, at: [<00000000842e1587>] __task_rq_lock+0x54/0xdc
+
+ stack backtrace:
+ CPU: 10 PID: 1873 Comm: dynamic_debug01 Tainted: G        W        4.15.0+ #1
+ Hardware name: GIGABYTE R120-T34-00/MT30-GS2-00, BIOS T48 10/02/2017
+ Call trace:
+  dump_backtrace+0x0/0x188
+  show_stack+0x24/0x2c
+  dump_stack+0xa4/0xe0
+  print_circular_bug.isra.31+0x29c/0x2b8
+  check_prev_add.constprop.39+0x6c8/0x6dc
+  validate_chain.isra.34+0x6e4/0xa20
+  __lock_acquire+0x3b4/0x6e0
+  lock_acquire+0xf4/0x2a8
+  _raw_spin_lock_irqsave+0x58/0x70
+  down_trylock+0x20/0x4c
+  __down_trylock_console_sem+0x3c/0x9c
+  console_trylock+0x20/0xb0
+  vprintk_emit+0x254/0x390
+  vprintk_default+0x58/0x90
+  vprintk_func+0xbc/0x164
+  printk+0x80/0xa0
+  __dynamic_pr_debug+0x84/0xac
+  gic_raise_softirq+0x184/0x18c
+  smp_cross_call+0xac/0x218
+  smp_send_reschedule+0x3c/0x48
+  resched_curr+0x60/0x9c
+  check_preempt_curr+0x70/0xdc
+  wake_up_new_task+0x310/0x470
+  _do_fork+0x188/0x78c
+  SyS_clone+0x44/0x50
+  __sys_trace_return+0x0/0x4
+ GICv3: CPU0: ICC_SGI1R_EL1 12000
+
+This could be fixed with printk_deferred() but that might lessen its
+usefulness for debugging. So change it to pr_devel to keep it out of
+production kernels. Developers working on gic-v3 can enable it as
+needed in their kernels.
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- .../devicetree/bindings/mfd/st,stm32-rcc.txt       | 85 ++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
+ drivers/irqchip/irq-gic-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
-new file mode 100644
-index 0000000..28017a1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
-@@ -0,0 +1,85 @@
-+STMicroelectronics STM32 Peripheral Reset Clock Controller
-+==========================================================
-+
-+The RCC IP is both a reset and a clock controller.
-+
-+Please also refer to reset.txt for common reset controller binding usage.
-+
-+Please also refer to clock-bindings.txt for common clock controller
-+binding usage.
-+
-+
-+Required properties:
-+- compatible: "simple-mfd", "syscon"
-+- reg: should be register base and length as documented in the datasheet
-+
-+- Sub-nodes:
-+  - compatible: "st,stm32mp1-rcc-clk"
-+	- #clock-cells: 1, device nodes should specify the clock in their
-+	  "clocks" property, containing a phandle to the clock device node,
-+	  an index specifying the clock to use.
-+
-+  - compatible: "st,stm32mp1-rcc-rst"
-+	- #reset-cells: Shall be 1
-+
-+Example:
-+	rcc: rcc at 50000000 {
-+		compatible = "syscon", "simple-mfd";
-+		reg = <0x50000000 0x1000>;
-+
-+		rcc_clk: rcc-clk at 50000000 {
-+			#clock-cells = <1>;
-+			compatible = "st,stm32mp1-rcc-clk";
-+		};
-+
-+		rcc_rst: rcc-reset at 50000000 {
-+			#reset-cells = <1>;
-+			compatible = "st,stm32mp1-rcc-rst";
-+		};
-+	};
-+
-+Specifying clocks
-+=================
-+
-+All available clocks are defined as preprocessor macros in
-+dt-bindings/clock/stm32mp1-clks.h header and can be used in device
-+tree sources.
-+
-+Example:
-+
-+	/* Accessing DMA1 clock */
-+	... {
-+		clocks = <&rcc_clk DMA1>
-+	};
-+
-+	/* Accessing SPI6 kernel clock */
-+	... {
-+		clocks = <&rcc_clk SPI6_K>
-+	};
-+
-+Specifying softreset control of devices
-+=======================================
-+
-+Device nodes should specify the reset channel required in their "resets"
-+property, containing a phandle to the reset device node and an index specifying
-+which channel to use.
-+The index is the bit number within the RCC registers bank, starting from RCC
-+base address.
-+It is calculated as: index = register_offset / 4 * 32 + bit_offset.
-+Where bit_offset is the bit offset within the register.
-+
-+For example on STM32MP1, for LTDC reset:
-+ ltdc = APB4_RSTSETR_offset / 4 * 32 + LTDC_bit_offset
-+      = 0x180 / 4 * 32 + 0 = 3072
-+
-+The list of valid indices for STM32MP1 is available in:
-+include/dt-bindings/reset-controller/stm32mp1-resets.h
-+
-+This file implements defines like:
-+#define LTDC_R	3072
-+
-+example:
-+
-+	ltdc {
-+		resets = <&rcc_rst LTDC_R>;
-+	};
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index a57c0fbbd34a..d71be9a1f9d2 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -673,7 +673,7 @@ static void gic_send_sgi(u64 cluster_id, u16 tlist, unsigned int irq)
+ 	       MPIDR_TO_SGI_RS(cluster_id)		|
+ 	       tlist << ICC_SGI1R_TARGET_LIST_SHIFT);
+ 
+-	pr_debug("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
++	pr_devel("CPU%d: ICC_SGI1R_EL1 %llx\n", smp_processor_id(), val);
+ 	gic_write_sgi1r(val);
+ }
+ 
 -- 
-1.9.1
+2.14.3
