@@ -1,62 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 2 Feb 2018 20:49:35 +0100
-Subject: [PATCH 2/3] ARM: dts: sun8i: add audio codec support into V3s DTSI
-In-Reply-To: <20180202140153.21549-3-icenowy@aosc.io>
-References: <20180202140153.21549-1-icenowy@aosc.io>
- <20180202140153.21549-3-icenowy@aosc.io>
-Message-ID: <20180202194935.vdqkgch6mowqi2px@flea.lan>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Fri, 2 Feb 2018 19:50:05 +0000
+Subject: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
+In-Reply-To: <20180201102730.33q4xrjw3vhrgk4i@lakrids.cambridge.arm.com>
+References: <1516836074-4149-1-git-send-email-jollys@xilinx.com>
+ <1516836074-4149-2-git-send-email-jollys@xilinx.com>
+ <20180131180354.mqf4gvvprdtycbn5@lakrids.cambridge.arm.com>
+ <CY1PR0201MB076454E915A6E6947A39F04BB8FA0@CY1PR0201MB0764.namprd02.prod.outlook.com>
+ <20180201102730.33q4xrjw3vhrgk4i@lakrids.cambridge.arm.com>
+Message-ID: <DM2PR0201MB0767C06A1B7A47DB79723C96B8F90@DM2PR0201MB0767.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 02, 2018 at 10:01:52PM +0800, Icenowy Zheng wrote:
-> Allwinner V3s SoC features an internal audio codec like the one in H3,
-> and a analog codec like the one in H3/A23 (but much simpler).
-> 
-> Add them in the DTSI file.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm/boot/dts/sun8i-v3s.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-> index 20edebd983f0..f6c534efaef9 100644
-> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-> @@ -354,6 +354,25 @@
->  			status = "disabled";
->  		};
->  
-> +		codec: codec at 01c22c00 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "allwinner,sun8i-v3s-codec";
-> +			reg = <0x01c22c00 0x400>;
-> +			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-> +			clock-names = "apb", "codec";
-> +			resets = <&ccu RST_BUS_CODEC>;
-> +			dmas = <&dma 15>, <&dma 15>;
-> +			dma-names = "rx", "tx";
-> +			allwinner,codec-analog-controls = <&codec_analog>;
-> +			status = "disabled";
-> +		};
-> +
-> +		codec_analog: codec-analog at 01c23000 {
-> +			compatible = "allwinner,sun8i-v3s-codec-analog";
-> +			reg = <0x01c23000 0x4>;
+Hi Mark,
 
-This should be the whole size of the memory region.
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Thursday, February 01, 2018 2:28 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: ard.biesheuvel at linaro.org; mingo at kernel.org;
+> gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
+> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
+> dmitry.torokhov at gmail.com; michal.simek at xilinx.com; robh+dt at kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; Rajan Vaja <RAJANV@xilinx.com>
+> Subject: Re: [PATCH v3 1/4] dt-bindings: firmware: Add bindings for ZynqMP
+> firmware
+> 
+> On Thu, Feb 01, 2018 at 01:04:45AM +0000, Jolly Shah wrote:
+> > > > +Xilinx Zynq MPSoC Firmware Device Tree Bindings
+> > > > +
+> > > > +The zynqmp-firmware node describes the interface to platform firmware.
+> > >
+> > > Is there any documentation for this that can be referred to?
+> > >
+> >
+> > Will add more information about supported APIs in next version patch.
+> > Below document describes interface APIs though it is not latest.
+> > https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-a
+> > pi.pdf
+> 
+> Thanks for the link.
+> 
+> It might be better for the compatible string to be "xlnx,zynqmp-eemi", to make it
+> clear which firmware interfaces are being described, assuming that this being is
+> only intended to cover EEMI.
+> 
+> Thanks,
+> Mark.
 
-Maxime
+It is interface to firmware be it ATF/PMU. EEMI is part of it. 
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180202/f42707f9/attachment.sig>
+Thanks,
+Jolly Shah
