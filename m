@@ -1,45 +1,34 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri,  2 Feb 2018 13:35:10 +0100
-Subject: [PATCH] MAINTAINERS: update email address for Maxime Ripard
-Message-ID: <20180202123510.8699-1-maxime.ripard@bootlin.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Fri, 02 Feb 2018 17:55:41 +0530
+Subject: [Patch v8 05/12] [media] videodev2.h: Add v4l2 definition for HEVC
+In-Reply-To: <1517574348-22111-1-git-send-email-smitha.t@samsung.com>
+References: <1517574348-22111-1-git-send-email-smitha.t@samsung.com>
+ <CGME20180202125003epcas1p46bd17cbd13b0431d7680e72f4c2be057@epcas1p4.samsung.com>
+Message-ID: <1517574348-22111-6-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free Electrons is now Bootlin, change my email address accordingly.
+Add V4L2 definition for HEVC compressed format
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Reviewed-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 ---
-Hi Arnd, Olof,
+ include/uapi/linux/videodev2.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Could you merge that patch directly to an arm-soc fix branch?
-
-Thanks!
-Maxime
-
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 845fc25812f1..40bedac417e6 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1138,7 +1138,7 @@ S:	Maintained
- F:	drivers/clk/sunxi/
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 1c095b5..ba937f5 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -635,6 +635,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
+ #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+ #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
++#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC aka H.265 */
  
- ARM/Allwinner sunXi SoC support
--M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+M:	Maxime Ripard <maxime.ripard@bootlin.com>
- M:	Chen-Yu Tsai <wens@csie.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-@@ -4606,7 +4606,7 @@ F:	include/uapi/drm/drm*
- F:	include/linux/vga*
- 
- DRM DRIVERS FOR ALLWINNER A10
--M:	Maxime Ripard  <maxime.ripard@free-electrons.com>
-+M:	Maxime Ripard  <maxime.ripard@bootlin.com>
- L:	dri-devel at lists.freedesktop.org
- S:	Supported
- F:	drivers/gpu/drm/sun4i/
+ /*  Vendor-specific formats   */
+ #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
 -- 
-2.14.3
+2.7.4
