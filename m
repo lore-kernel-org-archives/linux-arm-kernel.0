@@ -1,97 +1,54 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 2 Feb 2018 17:32:50 +0800
-Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
- device tree parsing
-In-Reply-To: <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
-References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
- <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
-Message-ID: <1517563970.24622.9.camel@mtkswgap22>
+From: s.riedmueller@phytec.de (Stefan Riedmueller)
+Date: Fri, 2 Feb 2018 10:34:04 +0100
+Subject: [PATCH v6 6/6] ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor
+ DA9062 driver
+Message-ID: <1517564044-8706-1-git-send-email-s.riedmueller@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-01-31 at 10:02 -0600, Rob Herring wrote:
-> On Wed, Jan 31, 2018 at 1:41 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> > A root complex usually consist of a host bridge and multiple P2P bridges,
-> > and someone may express that in the form of a root node with many subnodes
-> > and list all four interrupts for each slot (child node) in the root node
-> > like this:
-> >
-> >         pcie-controller {
-> >                 ...
-> >                 interrupt-map-mask = <0xf800 0 0 7>;
-> >                 interrupt-map = <0x0000 0 0 {INTx} &{interrupt parent} ...>
-> >                                  0x0800 0 0 {INTx} &{interrupt parent} ...>;
-> >
-> >                 pcie at 0,0 {
-> >                         reg = <0x0000 0 0 0 0>;
-> >                         ...
-> >                 };
-> >
-> >                 pcie at 1,0 {
-> >                         reg = <0x0800 0 0 0 0>;
-> >                         ...
-> >                 };
-> >         };
-> >
-> > As shown above, we'd like to propagate IRQs from a root port to the devices
-> > in the hierarchy below it in this way.  However, it seems that the current
-> > parser couldn't handle such cases and will get something unexpected below:
-> >
-> >         pcieport 0000:00:01.0: assign IRQ: got 213
-> >         igb 0000:01:00.0: assign IRQ: got 212
-> >
-> > There is a device which is connected to 2nd slot, but the port doesn't share
-> > the same IRQ with its downstream devices.  The problem here is that, if the
-> > loop found a P2P bridge, it wouldn't check whether the reg property exists
-> > in ppnode or not but just pass the subordinate devfn to of_irq_parse_raw(),
-> > thus the subsequent flow couldn't correctly resolve them.
-> >
-> > Fix this by adding a check to fallback to standard device tree parsing.
-> >
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> > Please refer to the previous discussion thread: https://patchwork.ozlabs.org/patch/829108/
-> > ---
-> >  drivers/of/of_pci_irq.c | 14 ++++++++++++--
-> >  1 file changed, 12 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
-> > index 3a05568..e445866 100644
-> > --- a/drivers/of/of_pci_irq.c
-> > +++ b/drivers/of/of_pci_irq.c
-> > @@ -86,8 +86,18 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
-> >         out_irq->np = ppnode;
-> >         out_irq->args_count = 1;
-> >         out_irq->args[0] = pin;
-> > -       laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
-> > -       laddr[1] = laddr[2] = cpu_to_be32(0);
-> > +
-> > +       if (!dn && ppnode) {
-> 
-> I would think whether you have a child device in DT or not is
-> irrelevant. If it's the bridge address you need to look at for
-> resolving interrupts, that would be true regardless.
-> 
-> > +               const __be32 *addr;
-> > +
-> > +               addr = of_get_property(ppnode, "reg", NULL);
-> > +               if (addr)
-> > +                       memcpy(laddr, addr, 3);
-> 
-> Can't you just adjust pdev to be ppdev in this case and then use the
-> existing code to set laddr?
+The phyCORE-i.MX 6 uses the DA9062/63 PMIC, RTC and Watchdog driver.
 
-Okay, I will try it out and and see if the code gets better or worse.
- 
-> Please copy the powerpc list on this. I worry that touching this
-> function will break something.
-> BTW, this code is moving to drivers/pci/ in 4.16.
+Enable these options by default.
 
-Sure. I will loop more people in next version.
+Signed-off-by: Stefan Riedmueller <s.riedmueller@phytec.de>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes in v6:
+ - Rebased against imx/defconfig
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks
-
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 98c0691..79d63b4 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -222,8 +222,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_DA9062_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
++CONFIG_MFD_DA9062=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_MFD_MC13XXX_I2C=y
+ CONFIG_MFD_STMPE=y
+@@ -231,6 +233,7 @@ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_ANATOP=y
+ CONFIG_REGULATOR_DA9052=y
++CONFIG_REGULATOR_DA9062=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+@@ -356,6 +359,7 @@ CONFIG_RTC_DRV_ISL1208=y
+ CONFIG_RTC_DRV_PCF8523=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_M41T80=y
++CONFIG_RTC_DRV_DA9063=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
+ CONFIG_RTC_DRV_MXC_V2=y
+-- 
+2.7.4
