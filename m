@@ -1,49 +1,110 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 2 Feb 2018 21:48:12 +0300
-Subject: [PATCH 11/11] arm64: dts: renesas: condor: add EtherAVB support
-In-Reply-To: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
-References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
-Message-ID: <605dfcae-6866-e57f-1bae-d052cfcbd2f6@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Feb 2018 19:27:04 +0000
+Subject: Runqueue spinlock recursion on arm64 v4.15
+Message-ID: <20180202192704.nqwjsthl3agszhzt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Condor board dependent part of the EtherAVB device node.
+Hi all,
 
-Based  on the original (and large) patch by Vladimir Barinov.
+While fuzzing arm64 v4.15 with Syzkaller, I intermittently hit spinlock
+recursion splats, around one or two a day. This looks like the same
+issue Sasha hit on x86 a number of months back [1].
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+I've been seeing this for a few releases, but haven't had any luck
+tracking it down, or generating a minimized reproducer.
 
----
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+I've dumped my kernel config, Syzkaller logs and reports to my
+kernel.org webspace [2].
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -15,6 +15,7 @@
- 
- 	aliases {
- 		serial0 = &scif0;
-+		ethernet0 = &avb;
- 	};
- 
- 	chosen {
-@@ -28,6 +29,16 @@
- 	};
- };
- 
-+&avb {
-+	phy-handle = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <1500>;
-+		reg = <0>;
-+	};
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
+The most common case looks like:
+
+--------
+BUG: spinlock recursion on CPU#1, syz-executor1/1521
+ lock: 0xffff80001a764080, .magic: dead4ead, .owner: syz-executor1/1521, .owner_cpu: 0
+CPU: 1 PID: 1521 Comm: syz-executor1 Not tainted 4.15.0 #3
+Hardware name: linux,dummy-virt (DT)
+Call trace:
+ dump_backtrace+0x0/0x330 arch/arm64/kernel/time.c:52
+ show_stack+0x20/0x30 arch/arm64/kernel/traps.c:151
+ __dump_stack lib/dump_stack.c:17 [inline]
+ dump_stack+0xd0/0x120 lib/dump_stack.c:53
+ spin_dump+0x150/0x1f0 kernel/locking/spinlock_debug.c:67
+ spin_bug kernel/locking/spinlock_debug.c:75 [inline]
+ debug_spin_lock_before kernel/locking/spinlock_debug.c:84 [inline]
+ do_raw_spin_lock+0x1e4/0x250 kernel/locking/spinlock_debug.c:112
+ __raw_spin_lock include/linux/spinlock_api_smp.h:143 [inline]
+ _raw_spin_lock+0x44/0x50 kernel/locking/spinlock.c:144
+ __task_rq_lock+0xc0/0x288 kernel/sched/core.c:103
+ wake_up_new_task+0x384/0x798 kernel/sched/core.c:2465
+ _do_fork+0x1b4/0xa78 kernel/fork.c:2069
+ SYSC_clone kernel/fork.c:2154 [inline]
+ SyS_clone+0x48/0x60 kernel/fork.c:2132
+ el0_svc_naked+0x20/0x24
+--------
+
+... though I see this in other paths, e.g. one identical to Sasha's
+report:
+
+--------
+BUG: spinlock recursion on CPU#0, kworker/u9:4/7741
+ lock: 0xffff80001a783080, .magic: dead4ead, .owner: kworker/u9:4/7741, .owner_cpu: 1
+CPU: 0 PID: 7741 Comm: kworker/u9:4 Not tainted 4.15.0 #3
+Hardware name: linux,dummy-virt (DT)
+Workqueue: events_unbound call_usermodehelper_exec_work
+Call trace:
+ dump_backtrace+0x0/0x330 arch/arm64/kernel/time.c:52
+ show_stack+0x20/0x30 arch/arm64/kernel/traps.c:151
+ __dump_stack lib/dump_stack.c:17 [inline]
+ dump_stack+0xd0/0x120 lib/dump_stack.c:53
+ spin_dump+0x150/0x1f0 kernel/locking/spinlock_debug.c:67
+ spin_bug kernel/locking/spinlock_debug.c:75 [inline]
+ debug_spin_lock_before kernel/locking/spinlock_debug.c:84 [inline]
+ do_raw_spin_lock+0x1e4/0x250 kernel/locking/spinlock_debug.c:112
+ __raw_spin_lock include/linux/spinlock_api_smp.h:143 [inline]
+ _raw_spin_lock+0x44/0x50 kernel/locking/spinlock.c:144
+ rq_lock kernel/sched/sched.h:1766 [inline]
+ ttwu_queue kernel/sched/core.c:1863 [inline]
+ try_to_wake_up+0x6c0/0xa58 kernel/sched/core.c:2078
+ default_wake_function+0x30/0x50 kernel/sched/core.c:3628
+ __wake_up_common+0x128/0x470 kernel/sched/wait.c:97
+ __wake_up_locked+0x18/0x20 kernel/sched/wait.c:158
+ complete+0x68/0x90 kernel/sched/completion.c:39
+ umh_complete+0x40/0xa8 kernel/umh.c:55
+ call_usermodehelper_exec_sync kernel/umh.c:152 [inline]
+ call_usermodehelper_exec_work+0x160/0x240 kernel/umh.c:175
+ process_one_work+0x590/0xe90 kernel/workqueue.c:2113
+ worker_thread+0x3b0/0xd30 kernel/workqueue.c:2247
+ kthread+0x2a4/0x378 kernel/kthread.c:238
+ ret_from_fork+0x10/0x18 arch/arm64/kernel/entry.S:994
+--------
+
+... in some cases, owner_cpu is -1, so I guess we're racing with an
+unlock. I only ever see this on the runqueue locks in wake up functions.
+
+I'm at a loss as to how we can see a stale owner value that matches
+current. If current held the lock in the past, it would have stored -1
+to owner first, and at least this should be visible.
+
+Any ideas?
+
+My best guess so far is that this is happening when a task_struct gets
+freed and reallocated, and we're somehow missing a release-acquire
+relationship. i.e. task A releases the lock on cpu X, dies, then A's
+task_struct gets reallocated for task B cpu Y, without all of A's stores
+on cpu X having been made visible to B on cpu Y.
+
+>From a scan of the kmem_cache code, that seems unlikely, though. AFAICT
+free and allocation have to occur on the same CPU, so that ordering
+should be given by the combination of local CPU order and whatever
+barriers switch_to() has...
+
+Maybe it's possible to detect that by hacking a task generation number
+into each task struct, and embedding this into the lock's owner field. I
+can try hacking that up next week.
+
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/20170604070911.5sx66m5xnoh2amyd at sasha-lappy
+[2] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20180202-rq-spinlock-recursion/
