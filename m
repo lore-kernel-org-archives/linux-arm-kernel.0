@@ -1,59 +1,30 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  2 Feb 2018 17:31:40 +0000
-Subject: [PATCH 2/2] arm64: entry: Apply BP hardening for suspicious
- interrupts from EL0
-In-Reply-To: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
-References: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517592700-26497-3-git-send-email-will.deacon@arm.com>
+Date: Fri,  2 Feb 2018 17:31:38 +0000
+Subject: [PATCH 0/2] Apply BP hardening for IRQs, PC alignment and Debug faults
+Message-ID: <1517592700-26497-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible to take an IRQ from EL0 following a branch to a kernel
-address in such a way that the IRQ is prioritised over the instruction
-abort. Whilst an attacker would need to get the starts to align here,
-it might be sufficient with enough calibration so perform BP hardening
-in the rare case that we see a kernel address in the ELR when handling
-an IRQ from EL0.
+Hi Marc,
 
-Reported-by: Dan Hettena <dhettena@nvidia.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S | 5 +++++
- arch/arm64/mm/fault.c     | 6 ++++++
- 2 files changed, 11 insertions(+)
+Please can you include these two in your BP hardening series? Dan pointed
+out that there are a few exception types that could come in before the
+instruction abort, so we need to make sure we catch them too.
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 394b149825b6..9bba6990e9b5 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -827,6 +827,11 @@ el0_irq_naked:
- #endif
- 
- 	ct_user_exit
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+	tbz	x22, #55, 1f
-+	bl	do_el0_irq_bp_hardening
-+1:
-+#endif
- 	irq_handler
- 
- #ifdef CONFIG_TRACE_IRQFLAGS
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 445aa4475c67..3d2bcbfdb90b 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -708,6 +708,12 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	arm64_notify_die("", regs, &info, esr);
- }
- 
-+asmlinkage void __exception do_el0_irq_bp_hardening(void)
-+{
-+	/* PC has already been checked in entry.S */
-+	arm64_apply_bp_hardening();
-+}
-+
- asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
- 						   unsigned int esr,
- 						   struct pt_regs *regs)
+Cheers,
+
+Will
+
+--->8
+
+Will Deacon (2):
+  arm64: entry: Apply BP hardening for high-priority synchronous
+    exceptions
+  arm64: entry: Apply BP hardening for suspicious interrupts from EL0
+
+ arch/arm64/kernel/entry.S | 10 +++++++++-
+ arch/arm64/mm/fault.c     | 15 +++++++++++++++
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+
 -- 
 2.1.4
