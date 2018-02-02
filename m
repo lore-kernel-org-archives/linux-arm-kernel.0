@@ -1,77 +1,158 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Fri, 2 Feb 2018 11:57:20 +0100
-Subject: [PATCH] clk: sunxi-ng: ccu-sun4i-a10: Fix mali changing dclk
- frequency
-In-Reply-To: <20180202105304.gow2znzgxqmuxgol@flea.lan>
-References: <1517354639-92978-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180131084349.du2ijvhh5rxa5vvt@flea.lan>
- <7be1e297-4fac-a7a2-a8cc-54061d4e2fde@micronovasrl.com>
- <20180201124551.kfyz6frx4lcx4wbz@flea.lan>
- <8c2fef37-8eb6-38c6-de3d-547edafac8b7@micronovasrl.com>
- <20180202105304.gow2znzgxqmuxgol@flea.lan>
-Message-ID: <1b3d96ae-c6e6-4f58-b140-7b1738c12adc@micronovasrl.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 2 Feb 2018 11:05:32 +0000
+Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
+In-Reply-To: <d2751939f5813c296cdcb7a92d5698bf@codeaurora.org>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+ <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
+ <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
+ <d2751939f5813c296cdcb7a92d5698bf@codeaurora.org>
+Message-ID: <20180202110532.n2eez3zqbmf2jelr@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 02/02/2018 11:53, Maxime Ripard ha scritto:
-> Hi,
+On Thu, Feb 01, 2018 at 12:39:09PM -0800, Channa wrote:
+> On 2018-02-01 02:44, Mark Rutland wrote:
+> > On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
+> > > Documentation for last level cache controller device tree bindings,
+> > > client bindings usage examples.
+> > > 
+> > > Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+> > > ---
+> > >  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 93
+> > > ++++++++++++++++++++++
+> > >  1 file changed, 93 insertions(+)
+> > >  create mode 100644
+> > > Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> > > b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> > > new file mode 100644
+> > > index 0000000..d433b0c
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+> > > @@ -0,0 +1,93 @@
+> > > +* LLCC (Last Level Cache Controller)
+> > > +
+> > > +Properties:
+> > > +- compatible:
+> > > +	Usage: required
+> > > +	Value type: <string>
+> > > +	Definition: must be "qcom,llcc-core"
+> > > +
+> > > +- reg:
+> > > +	Usage: required
+> > > +	Value Type: <prop-encoded-array>
+> > > +	Definition: must be addresses and sizes of the LLCC registers
+> > > +
+> > > +- llcc-bank-off:
+> > > +	Usage: required
+> > > +	Value Type: <u32 array>
+> > > +	Definition: Offsets of llcc banks from llcc base address starting
+> > > from
+> > > +		    LLCC bank0.
+> > > +
+> > > +- llcc-broadcast-off:
+> > > +	Usage: required
+> > > +	Value Type: <u32>
+> > > +	Definition: Offset of broadcast register from LLCC bank0 address.
+> > 
+> > Please could we use "offset" rather than "off" for both of these? That
+> > way it's obvious these aren't properties for disabling some feature.
+> > 
+> > How variable are these offsets in practice? Is the memory map not fixed?
 > 
-> On Thu, Feb 01, 2018 at 05:17:11PM +0100, Giulio Benetti wrote:
->>>>> What kernel version did you use?
->>>>
->>>> Latest mainline.
->>>
->>> I guess this patch could fix it:
->>> http://code.bulix.org/1kitrq-268936?raw
->>
->> This should prevent from modifying parent clock. But my problem was
->> different.
->>
->> On A20, gpu_clk can have different PLL, not I've found out the way
->> to choose right one with assigned-parent-clocks.
->>
->> I have patchset ready for adding A20 mali node, but I need some more
->> time to complete with OPP, then I will submit entire patchset.
->>
->> Now it works correctly, using right pll(dedicated PLL8), setting
->> right frequency.
+> The offsets depends on the number of LLCC HW blocks. These number of HW
+> blocks vary from
+> chipset to chipset and new registers could be added that changes the offset.
+
+Surely if new registers are added, we need a new compatible string?
+
+Can't we encode the number of LLCC HW blocks, instead? Presumably that
+would give enough information to cover both llcc-bank-off and
+llcc-broadcast-off.
+
+[...]
+
+> > > +
+> > > +compatible devices:
+> > > +		qcom,sdm845-llcc
+> > 
+> > Huh? The "qcom,sdm845-llcc" bindings wasn't described above, and it's
+> > not clear what this means.
+> > 
+> > > +
+> > > +Example:
+> > > +
+> > > +	qcom,system-cache at 1300000 {
+> > > +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
+> > 
+> > This looks very wrong. Why do you need syscon and simple-mfd?
 > 
-> The point is that we really don't care about which PLL is actually
-> being used, as long as the rate is correct and we don't break anything
-> else. If the GPU rate is accessible through one of the other PLL, it
-> makes even more sense to not use the GPU PLL and keep it disabled,
-> since it will result in some power savings.
+> LLCC HW block has 3 functionalities:
+> System cache core, ECC & AMON drivers for debugging.
+> All three drivers use the same register space for configuration, status etc.
+> In order to avoid remapping the same address region across multiple drivers,
+> I have implemented this driver as a syncon and simple-mfd.
 
-Ah! I see the point now, very clever system for power saving.
-I'm going to check if it's resolutive,
-but it sounds good.
+Please don't do that; that's completely dependent on Linux
+implementation details.
 
+Have one top level driver for the whole LLCC block, which maps the
+registers, and provides an API for accessing them. When that probes, it
+can cause the other drivers to be probed (e.g. with a platform device),
+and those can access the LLCC registers via that API.
+
+> > > +		reg = <0x1300000 0x50000>;
+> > > +		reg-names = "llcc_base";
+> > > +
+> > > +		llcc: qcom,sdm845-llcc {
+> > > +			compatible = "qcom,sdm845-llcc";
+> > 
+> > Why is this a sub-node?
+> qcom,sdm845-llcc: This core driver as mentioned in the list above.
+> > 
+> > Why isn't the top-level node just "qcom,sdm845-llcc" ?
+> > 
+> > > +			#cache-cells = <1>;
+> > > +			max-slices = <32>;
+> > > +		};
+> > > +
+> > > +		qcom,llcc-ecc {
+> > > +			compatible = "qcom,llcc-ecc";
+> > > +		};
 > 
->> Btw, do I need to add a board using it, or can I add only Mali node
->> to sun7i-a20.dtsi(plus other little patches)?
+> qcom,llcc-ecc: Driver #2 for ECC
 > 
-> You can add it to the DTSI without a board using it (and actually,
-> nothing should be in the board DTS, everything in the DT for the Mali
-> applies to all boards).
-
-Sure. So I would also add the patch you've addressed me:
-http://code.bulix.org/1kitrq-268936?raw
-as a commit. Can I submit it in patchset to complete the whole job?
-
+> > > +
+> > > +		qcom,llcc-amon {
+> > > +			compatible = "qcom,llcc-amon";
+> > > +			qcom,fg-cnt = <0x7>;
+> > > +		};
+> > > +
 > 
-> Maxime
+> qcom,llcc-amon: Driver #3 for AMON
+
+Please describe the HW, not the drivers.
+
+As above, I don't believe you need multiple nodes here. Linux can
+instantiate the drivers as necessary.
+
+[...]
+
+> > > +- cache-slices:
+> > > +	Usage: required
+> > > +	Value type: <prop-encoded-array>
+> > > +	Definition: The tuple has phandle to llcc device as the first
+> > > argument and the
+> > > +		    second argument is the usecase id of the client.
+> > 
+> > What is a "usecase id" ?
 > 
+> Usecase id for use case that wants to use system cache for eg: video-encode
+> and video-decode
 
+Sure, but how is the value used? Is it the index of a slice? Or
+something more abstract?
 
--- 
-Giulio Benetti
-R&D Manager &
-Advanced Research
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+Thanks,
+Mark.
