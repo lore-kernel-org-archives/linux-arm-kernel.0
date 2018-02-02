@@ -1,51 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  2 Feb 2018 22:01:52 +0800
-Subject: [PATCH 2/3] ARM: dts: sun8i: add audio codec support into V3s DTSI
-In-Reply-To: <20180202140153.21549-1-icenowy@aosc.io>
-References: <20180202140153.21549-1-icenowy@aosc.io>
-Message-ID: <20180202140153.21549-3-icenowy@aosc.io>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Fri, 2 Feb 2018 15:03:42 +0100
+Subject: [PATCH 14/14] clk: stm32mp1: add Debug clocks
+In-Reply-To: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
+References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1517580222-23301-15-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features an internal audio codec like the one in H3,
-and a analog codec like the one in H3/A23 (but much simpler).
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Add them in the DTSI file.
+RCC manages clock for debug and trace.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/sun8i-v3s.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/clk/clk-stm32mp1.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index 20edebd983f0..f6c534efaef9 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -354,6 +354,25 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
+index 0402a0e..eafc95a 100644
+--- a/drivers/clk/clk-stm32mp1.c
++++ b/drivers/clk/clk-stm32mp1.c
+@@ -352,6 +352,12 @@
+ 	{ 0 },
+ };
  
-+		codec: codec at 01c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-v3s-codec";
-+			reg = <0x01c22c00 0x400>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "codec";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			allwinner,codec-analog-controls = <&codec_analog>;
-+			status = "disabled";
-+		};
++static const struct clk_div_table ck_trace_div_table[] = {
++	{ 0, 1 }, { 1, 2 }, { 2, 4 }, { 3, 8 },
++	{ 4, 16 }, { 5, 16 }, { 6, 16 }, { 7, 16 },
++	{ 0 },
++};
 +
-+		codec_analog: codec-analog at 01c23000 {
-+			compatible = "allwinner,sun8i-v3s-codec-analog";
-+			reg = <0x01c23000 0x4>;
-+		};
+ struct clock_config {
+ 	u32 id;
+ 	const char *name;
+@@ -1566,6 +1572,17 @@ static struct clk_hw *_clk_register_cktim(struct device *dev,
+ 		  _GATEMUXDIV(RCC_MCO2CFGR, 12,
+ 			      RCC_MCO2CFGR, 0, 3,
+ 			      RCC_MCO2CFGR, 4, 4)),
 +
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
++	/* Debug clocks */
++	FIXED_FACTOR(NO_ID, "ck_axi_div2", "ck_axi", 0, 1, 2),
++
++	GATE(DBG, "ck_apb_dbg", "ck_axi_div2", 0, RCC_DBGCFGR, 8, 0),
++
++	GATE(CK_DBG, "ck_sys_dbg", "ck_axi", 0, RCC_DBGCFGR, 8, 0),
++
++	COMPOSITE(CK_TRACE, "ck_trace", ck_trace_src, CLK_OPS_PARENT_ENABLE,
++		  _GATEDIV(RCC_DBGCFGR, 9,
++			   RCC_DBGCFGR, 0, 3, ck_trace_div_table)),
+ };
+ 
+ struct stm32_clock_match_data {
 -- 
-2.15.1
+1.9.1
