@@ -1,48 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Feb 2018 14:56:30 +0100
-Subject: [PATCH] drm/fb-helper: Scale back depth to supported maximum
-In-Reply-To: <20180201131907.GO5453@intel.com>
-References: <20180201130446.6165-1-linus.walleij@linaro.org>
- <20180201131907.GO5453@intel.com>
-Message-ID: <CACRpkdaFyKYxnVB-QuUiT+G9QcrpyPkzd2KXUm1sWNSgzyF9AA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 2 Feb 2018 19:29:58 +0530
+Subject: [PATCH v6 19/41] clk: davinci: New driver for TI DA8XX USB PHY
+ clocks
+In-Reply-To: <1516468460-4908-20-git-send-email-david@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-20-git-send-email-david@lechnology.com>
+Message-ID: <abb566ad-e5fd-a09c-e8b7-695ca7c126fa@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 1, 2018 at 2:19 PM, Ville Syrj?l?
-<ville.syrjala@linux.intel.com> wrote:
-> [Me]
->> +     /*
->> +      * If we run into a situation where, for example, the primary plane
->> +      * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
->> +      * 16) we need to scale down the depth of the sizes we request.
->> +      */
->> +     drm_for_each_plane(plane, fb_helper->dev) {
->> +             /* Only check the primary plane */
->> +             if (plane->type != DRM_PLANE_TYPE_PRIMARY)
->> +                     continue;
->
-> I think this should look at crtc->primary for each of the crtcs managed
-> by the fb_helper.
->
-> Also this probably shouldn't look at YUV formats at all?
+On Saturday 20 January 2018 10:43 PM, David Lechner wrote:
+> diff --git a/include/linux/clk/davinci.h b/include/linux/clk/davinci.h
+> index 54ea3ff..04b48b3 100644
+> --- a/include/linux/clk/davinci.h
+> +++ b/include/linux/clk/davinci.h
+> @@ -9,6 +9,9 @@
+>  
+>  #include <linux/types.h>
+>  
+> +struct clk;
+> +struct regmap;
 
-I guess I can look into doing it this way, sorry for not knowing how to
-properly inspect DRM objects, I'm lost sometimes...
+Its probably better to include clk-provider.h and regmap.h?
 
-> I do wonder if instead we should just have the driver specify the
-> pixel format explicitly instead of trying to guess based on bpp?
-
-That makes a lot more sense to me actually. It would
-give a better sense of control so the driver feel it knows
-what is actually going on.
-
-So I would just update
-drm_fb_cma_fbdev_init() and drm_fb_helper_initial_config()
-to pass a reasonable pixel format instead and refactor all the
-way down?
-
-It does hit a lot of code on the way, but if everyone thinks this
-is a good idea I can very well take a stab at it.
-
-Yours,
-Linus Walleij
+Thanks,
+Sekhar
