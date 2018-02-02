@@ -1,13 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 2 Feb 2018 21:36:16 +0300
-Subject: [PATCH 06/11] arm64: dts: renesas: r8a77980: add SYS-DMAC support
+Date: Fri, 2 Feb 2018 21:39:08 +0300
+Subject: [PATCH 07/11] arm64: dts: renesas: r8a77980: add [H]SCIF support
 In-Reply-To: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
 References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
-Message-ID: <70132f3d-0f37-ae7e-a44b-d65920620936@cogentembedded.com>
+Message-ID: <169ed4ac-1b8b-cf8c-45c4-957ebbdf3f5e@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe SYS-DMAC1/2 in the R8A77980 device tree.
+Describe [H]SCIF ports in the R8A77980 device tree.
 
 Based on the original (and large) patch by Vladimir Barinov.
 
@@ -15,85 +15,175 @@ Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi |   68 ++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi |  151 ++++++++++++++++++++++++++++++
+ 1 file changed, 151 insertions(+)
 
 Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
 ===================================================================
 --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
 +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -85,6 +85,74 @@
+@@ -56,6 +56,13 @@
+ 		method = "smc";
+ 	};
+ 
++	/* External SCIF clock - to be overridden by boards that provide it */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
+@@ -85,6 +92,150 @@
  			#power-domain-cells = <1>;
  		};
  
-+		dmac1: dma-controller at e7300000 {
-+			compatible = "renesas,dmac-r8a77980",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe7300000 0 0x10000>;
-+			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					  "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 218>;
-+			clock-names = "fck";
++		hscif0: serial at e6540000 {
++			compatible = "renesas,hscif-r8a77980",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6540000 0 0x60>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 520>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
++			       <&dmac2 0x31>, <&dmac2 0x30>;
++			dma-names = "tx", "rx", "tx", "rx";
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 218>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
++			resets = <&cpg 520>;
++			status = "disabled";
 +		};
 +
-+		dmac2: dma-controller at e7310000 {
-+			compatible = "renesas,dmac-r8a77980",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe7310000 0 0x10000>;
-+			interrupts = <GIC_SPI 307 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 319 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 362 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 363 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 364 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 365 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 366 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 367 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 368 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					  "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 217>;
-+			clock-names = "fck";
++		hscif1: serial at e6550000 {
++			compatible = "renesas,hscif-r8a77980",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6550000 0 0x60>;
++			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 519>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
++			       <&dmac2 0x33>, <&dmac2 0x32>;
++			dma-names = "tx", "rx", "tx", "rx";
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 217>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
++			resets = <&cpg 519>;
++			status = "disabled";
 +		};
 +
- 		gic: interrupt-controller at f1010000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
++		hscif2: serial at e6560000 {
++			compatible = "renesas,hscif-r8a77980",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6560000 0 0x60>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 518>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
++			       <&dmac2 0x35>, <&dmac2 0x34>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 518>;
++			status = "disabled";
++		};
++
++		hscif3: serial at e66a0000 {
++			compatible = "renesas,hscif-r8a77980",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66a0000 0 0x60>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 517>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x37>, <&dmac1 0x36>,
++			       <&dmac2 0x37>, <&dmac2 0x36>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 517>;
++			status = "disabled";
++		};
++
++		scif0: serial at e6e60000 {
++			compatible = "renesas,scif-r8a77980",
++				     "renesas,rcar-gen3-scif",
++				     "renesas,scif";
++			reg = <0 0xe6e60000 0 0x40>;
++			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 207>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
++			       <&dmac2 0x51>, <&dmac2 0x50>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 207>;
++			status = "disabled";
++		};
++
++		scif1: serial at e6e68000 {
++			compatible = "renesas,scif-r8a77980",
++				     "renesas,rcar-gen3-scif",
++				     "renesas,scif";
++			reg = <0 0xe6e68000 0 0x40>;
++			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 206>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
++			       <&dmac2 0x53>, <&dmac2 0x52>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 206>;
++			status = "disabled";
++		};
++
++		scif3: serial at e6c50000 {
++			compatible = "renesas,scif-r8a77980",
++				     "renesas,rcar-gen3-scif",
++				     "renesas,scif";
++			reg = <0 0xe6c50000 0 0x40>;
++			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 204>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x57>, <&dmac1 0x56>,
++			       <&dmac2 0x57>, <&dmac2 0x56>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 204>;
++			status = "disabled";
++		};
++
++		scif4: serial at e6c40000 {
++			compatible = "renesas,scif-r8a77980",
++				     "renesas,rcar-gen3-scif",
++				     "renesas,scif";
++			reg = <0 0xe6c40000 0 0x40>;
++			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 203>,
++				 <&cpg CPG_CORE 16>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x59>, <&dmac1 0x58>,
++			       <&dmac2 0x59>, <&dmac2 0x58>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 203>;
++			status = "disabled";
++		};
++
+ 		dmac1: dma-controller at e7300000 {
+ 			compatible = "renesas,dmac-r8a77980",
+ 				     "renesas,rcar-dmac";
