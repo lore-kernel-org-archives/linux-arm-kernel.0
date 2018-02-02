@@ -1,67 +1,77 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 2 Feb 2018 16:30:49 +0000
-Subject: [PATCH 1/2] ARM: kvm: fix building with gcc-8
-In-Reply-To: <CAK8P3a0s_muecNBYTn5EvOPrg11Kuc9NKn0Hiqu4PAE2mTQ+-A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 2 Feb 2018 11:39:26 -0500 (EST)
+Subject: [PATCH 2/2] ARM: xscale: fix gcc-8 build
+In-Reply-To: <20180202150756.420422-2-arnd@arndb.de>
 References: <20180202150756.420422-1-arnd@arndb.de>
- <2cff070a-357d-c5f5-9ec6-036d93112ce4@arm.com>
- <e5afa875-56a5-fca4-1fdd-2c0968b35790@arm.com>
- <CAK8P3a0s_muecNBYTn5EvOPrg11Kuc9NKn0Hiqu4PAE2mTQ+-A@mail.gmail.com>
-Message-ID: <276d0fe2-c742-7c95-f549-f2e49f13baac@arm.com>
+ <20180202150756.420422-2-arnd@arndb.de>
+Message-ID: <nycvar.YSQ.7.76.1802021138460.1842@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/18 16:29, Arnd Bergmann wrote:
-> On Fri, Feb 2, 2018 at 5:23 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 02/02/18 15:55, Robin Murphy wrote:
->>>
->>> On 02/02/18 15:07, Arnd Bergmann wrote:
->>>>
->>>> In banked-sr.c, we use a top-level '__asm__(".arch_extension virt")'
->>>> statement to allow compilation of a multi-CPU kernel for ARMv6
->>>> and older ARMv7-A that don't normally support access to the banked
->>>> registers.
->>>>
->>>> This is considered to be a programming error by the gcc developers
->>>> and will no longer work in gcc-8, where we now get a build error:
->>>>
->>>> /tmp/cc4Qy7GR.s:34: Error: Banked registers are not available with this
->>>> architecture. -- `mrs r3,SP_usr'
->>>> /tmp/cc4Qy7GR.s:41: Error: Banked registers are not available with this
->>>> architecture. -- `mrs r3,ELR_hyp'
->>>> /tmp/cc4Qy7GR.s:55: Error: Banked registers are not available with this
->>>> architecture. -- `mrs r3,SP_svc'
->>>> /tmp/cc4Qy7GR.s:62: Error: Banked registers are not available with this
->>>> architecture. -- `mrs r3,LR_svc'
->>>> /tmp/cc4Qy7GR.s:69: Error: Banked registers are not available with this
->>>> architecture. -- `mrs r3,SPSR_svc'
->>>> /tmp/cc4Qy7GR.s:76: Error: Banked registers are not available with this
->>>> architecture. -- `mrs r3,SP_abt'
->>>>
->>>> Passign the '-march-armv7ve' flag to gcc works, and is ok here, because
->>>> we know the functions won't ever be called on pre-ARMv7VE machines.
->>>> Unfortunately, older compiler versions (4.8 and earlier) do not
->>>> understand
->>>> that flag, so we still need to keep the asm around.
->>>>
->>>> Backporting to stable kernels (4.6+) is needed to allow those to be built
->>>> with future compilers as well.
->>>
->>>
->>> Is "-Wa,arch=armv7-a+virt" (as we appear to do for a couple of files
->>> already) viable as a possibly cleaner alternative, or is GCC itself now
->>> policing the contents of inline asms?
->>
->>
->> In fact, looking at the binutils history, any version capable of assembling
->> this file should understand that (modulo my typo), so hopefully it ought to
->> be feasible to replace these global asms with assembler flags entirely.
+On Fri, 2 Feb 2018, Arnd Bergmann wrote:
+
+> We use a hack in xscale-cp0.c to allow building it for ARMv4 while
+> also using ARMv5TE and iWMMXt specific inline assembly, by
+> adding a top-level asm statement.
 > 
-> No, this only works for .S files, not .c, since gcc starts the output with
-> an explicit .arch setting that overrides the command line. I think this
-> was done intentionally to prevent such a hack from working, and have
-> more reliable checks on the validity of the assembler instruction in
-> inline asm statements (which we try to circumvent here).
+> Unfortunately that hack no longer works with gcc-8, since it will
+> revert back to the normal architecture. The recommended way of
+> handling this is to use __attribute__((target("armv5te"))) on the
+> functions that need it, or #pragma GCC target("arch=armv5te").
+> Either of those work with gcc-8, but not earlier versions, and
+> it seems worse to combine that with the old hack.
+> 
+> Instead, this adds the .arch statement to each inline assembler
+> statement that needs it individually. That is also slightly uglier
+> than the previous hack, but it works with all compiler versions
+> and documents better why we need the override in the first place.
+> 
+> Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84129
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Ah, I see, that is unfortunate. Thanks for clarifying.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Robin.
+
+> ---
+>  arch/arm/kernel/xscale-cp0.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/xscale-cp0.c b/arch/arm/kernel/xscale-cp0.c
+> index 77a2eef72115..e06a2f6dac4f 100644
+> --- a/arch/arm/kernel/xscale-cp0.c
+> +++ b/arch/arm/kernel/xscale-cp0.c
+> @@ -17,11 +17,10 @@
+>  #include <asm/thread_notify.h>
+>  #include <asm/cputype.h>
+>  
+> -asm("	.arch armv5te\n");
+> -
+>  static inline void dsp_save_state(u32 *state)
+>  {
+>  	__asm__ __volatile__ (
+> +		".arch	armv5te\n\t"
+>  		"mrrc	p0, 0, %0, %1, c0\n"
+>  		: "=r" (state[0]), "=r" (state[1]));
+>  }
+> @@ -29,6 +28,7 @@ static inline void dsp_save_state(u32 *state)
+>  static inline void dsp_load_state(u32 *state)
+>  {
+>  	__asm__ __volatile__ (
+> +		".arch	armv5te\n\t"
+>  		"mcrr	p0, 0, %0, %1, c0\n"
+>  		: : "r" (state[0]), "r" (state[1]));
+>  }
+> @@ -134,7 +134,8 @@ static int __init cpu_has_iwmmxt(void)
+>  	 *	tmrrc	%0, %1, wR0
+>  	 */
+>  	__asm__ __volatile__ (
+> -		"mcrr	p0, 0, %2, %3, c0\n"
+> +		".arch	armv5te\n\t"
+> +		"mcrr	p0, 0, %2, %3, c0\n\t"
+>  		"mrrc	p0, 0, %0, %1, c0\n"
+>  		: "=r" (lo), "=r" (hi)
+>  		: "r" (0), "r" (0x100));
+> -- 
+> 2.9.0
+> 
+> 
