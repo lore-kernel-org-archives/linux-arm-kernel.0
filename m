@@ -1,32 +1,48 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 3 Feb 2018 23:10:44 +0800
-Subject: [RFC PATCH] dmaengine: mediatek: mtk_hsdma_find_active_desc() can be
- static
-In-Reply-To: <3d5c7933c83ec456bdbcc70623fd460eb66eba1c.1517454174.git.sean.wang@mediatek.com>
-References: <3d5c7933c83ec456bdbcc70623fd460eb66eba1c.1517454174.git.sean.wang@mediatek.com>
-Message-ID: <20180203151044.GA44748@lkp-hsx03>
+From: T.E.Baldwin99@members.leeds.ac.uk (Timothy E Baldwin)
+Date: Sat,  3 Feb 2018 15:21:12 +0000
+Subject: [PATCH] ARM: Call syscall_trace_exit even when system call skipped
+Message-ID: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On at least x86 and ARM64, and as documented in the ptrace man page
+a skipped system call will still cause a syscall exit ptrace stop.
 
-Fixes: 73006a033ef0 ("dmaengine: mediatek: Add MediaTek High-Speed DMA controller for MT7622 and MT7623 SoC")
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+Previous to this commit 32-bit ARM did not, resulting in strace
+being confused when seccomp skips system calls.
+
+This change also impacts programs that use ptrace to skip system calls.
+
+Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
+Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
 ---
- mtk-hsdma.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/entry-common.S | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/dma/mediatek/mtk-hsdma.c b/drivers/dma/mediatek/mtk-hsdma.c
-index cd3af5c..c1523b4 100644
---- a/drivers/dma/mediatek/mtk-hsdma.c
-+++ b/drivers/dma/mediatek/mtk-hsdma.c
-@@ -643,8 +643,8 @@ static irqreturn_t mtk_hsdma_irq(int irq, void *devid)
- 	return IRQ_HANDLED;
- }
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 99c908226065..88a65157307d 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -288,16 +288,15 @@ __sys_trace:
+ 	cmp	scno, #-1			@ skip the syscall?
+ 	bne	2b
+ 	add	sp, sp, #S_OFF			@ restore stack
+-	b	ret_slow_syscall
  
--struct virt_dma_desc *mtk_hsdma_find_active_desc(struct dma_chan *c,
--						 dma_cookie_t cookie)
-+static struct virt_dma_desc *mtk_hsdma_find_active_desc(struct dma_chan *c,
-+							dma_cookie_t cookie)
- {
- 	struct mtk_hsdma_vchan *hvc = to_hsdma_vchan(c);
- 	struct virt_dma_desc *vd;
+-__sys_trace_return:
+-	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
++__sys_trace_return_nosave:
++	enable_irq_notrace
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
+ 
+-__sys_trace_return_nosave:
+-	enable_irq_notrace
++__sys_trace_return:
++	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
+-- 
+2.14.2
