@@ -1,97 +1,213 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  3 Feb 2018 23:49:39 +0800
-Subject: [PATCH v2 3/6] clk: sunxi-ng: Support fixed post-dividers on NKMP
- style clocks
+Date: Sat,  3 Feb 2018 23:49:41 +0800
+Subject: [PATCH v2 5/6] arm64: allwinner: h6: add the basical Allwinner H6
+ DTSI file
 In-Reply-To: <20180203154942.63566-1-icenowy@aosc.io>
 References: <20180203154942.63566-1-icenowy@aosc.io>
-Message-ID: <20180203154942.63566-4-icenowy@aosc.io>
+Message-ID: <20180203154942.63566-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the new Allwinner H6 SoC, multiple PLL's are NMP style clocks
-(modelled as NKMP with no K) and have fixed post-dividers.
+Allwinner H6 is a new SoC with Cortex-A53 cores from Allwinner, with its
+memory map fully reworked and some high-speed peripherals (PCIe, USB
+3.0) introduced.
 
-Add fixed post divider support to the NKMP style clocks.
+This commit adds the basical DTSI file of it, including the clock
+support and UART support.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-No changes in v2.
+Changes in v2:
+- Add APB1 clock as PIO's APB clock.
+- Switched to SPDX license identifier.
 
- drivers/clk/sunxi-ng/ccu_nkmp.c | 20 +++++++++++++++++---
- drivers/clk/sunxi-ng/ccu_nkmp.h |  2 ++
- 2 files changed, 19 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 178 +++++++++++++++++++++++++++
+ 1 file changed, 178 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index e58c95787f94..497ac20deb19 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 					unsigned long parent_rate)
- {
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
--	unsigned long n, m, k, p;
-+	unsigned long n, m, k, p, rate;
- 	u32 reg;
- 
- 	reg = readl(nkmp->common.base + nkmp->common.reg);
-@@ -107,7 +107,11 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 	p = reg >> nkmp->p.shift;
- 	p &= (1 << nkmp->p.width) - 1;
- 
--	return (parent_rate * n * k >> p) / m;
-+	rate = (parent_rate * n * k >> p) / m;
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate /= nkmp->fixed_post_div;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+new file mode 100644
+index 000000000000..d4697bb42496
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -0,0 +1,178 @@
++/*
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ or MIT)
++ */
 +
-+	return rate;
- }
- 
- static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
-@@ -116,6 +120,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
- 	struct _ccu_nkmp _nkmp;
- 
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate *= nkmp->fixed_post_div;
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/sun50i-h6-ccu.h>
++#include <dt-bindings/reset/sun50i-h6-ccu.h>
 +
- 	_nkmp.min_n = nkmp->n.min ?: 1;
- 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
- 	_nkmp.min_k = nkmp->k.min ?: 1;
-@@ -127,7 +134,11 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
- 
--	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
-+	rate = *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate / nkmp->fixed_post_div;
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
 +
-+	return rate;
- }
- 
- static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
-@@ -138,6 +149,9 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags;
- 	u32 reg;
- 
-+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate = rate * nkmp->fixed_post_div;
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
- 	_nkmp.min_n = nkmp->n.min ?: 1;
- 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
- 	_nkmp.min_k = nkmp->k.min ?: 1;
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.h b/drivers/clk/sunxi-ng/ccu_nkmp.h
-index a82facbc6144..6940503e7fc4 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.h
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.h
-@@ -34,6 +34,8 @@ struct ccu_nkmp {
- 	struct ccu_div_internal		m;
- 	struct ccu_div_internal		p;
- 
-+	unsigned int		fixed_post_div;
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <0>;
++			enable-method = "psci";
++		};
 +
- 	struct ccu_common	common;
- };
- 
++		cpu1: cpu at 1 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <1>;
++			enable-method = "psci";
++		};
++
++		cpu2: cpu at 2 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <2>;
++			enable-method = "psci";
++		};
++
++		cpu3: cpu at 3 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <3>;
++			enable-method = "psci";
++		};
++	};
++
++	iosc: internal-osc-clk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <16000000>;
++		clock-accuracy = <300000000>;
++		clock-output-names = "iosc";
++	};
++
++	osc24M: osc24M_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "osc24M";
++	};
++
++	osc32k: osc32k_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <32768>;
++		clock-output-names = "osc32k";
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		ccu: clock at 3001000 {
++			compatible = "allwinner,sun50i-h6-ccu";
++			reg = <0x03001000 0x1000>;
++			clocks = <&osc24M>, <&osc32k>;
++			clock-names = "hosc", "losc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		gic: interrupt-controller at 3021000 {
++			compatible = "arm,gic-400";
++			reg = <0x03021000 0x1000>,
++			      <0x03022000 0x2000>,
++			      <0x03024000 0x2000>,
++			      <0x03026000 0x2000>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
++
++		pio: pinctrl at 300b000 {
++			compatible = "allwinner,sun50i-h6-pinctrl";
++			reg = <0x0300b000 0x400>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_APB1>, <&osc24M>, <&osc32k>;
++			clock-names = "apb", "hosc", "losc";
++			gpio-controller;
++			#gpio-cells = <3>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++
++			uart0_ph_pins: uart0-ph {
++				pins = "PH0", "PH1";
++				function = "uart0";
++			};
++		};
++
++		uart0: serial at 5000000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x05000000 0x400>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART0>;
++			resets = <&ccu RST_BUS_UART0>;
++			status = "disabled";
++		};
++
++		uart1: serial at 5000400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x05000400 0x400>;
++			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART1>;
++			resets = <&ccu RST_BUS_UART1>;
++			status = "disabled";
++		};
++
++		uart2: serial at 5000800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x05000800 0x400>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART2>;
++			resets = <&ccu RST_BUS_UART2>;
++			status = "disabled";
++		};
++
++		uart3: serial at 5000c00 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x05000c00 0x400>;
++			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART3>;
++			resets = <&ccu RST_BUS_UART3>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 2.15.1
