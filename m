@@ -1,136 +1,78 @@
-From: absahu@codeaurora.org (Abhishek Sahu)
-Date: Sat, 03 Feb 2018 17:43:38 +0530
-Subject: [PATCH 12/15] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
- board file
-In-Reply-To: <1517202689-14212-13-git-send-email-sricharan@codeaurora.org>
-References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
- <1517202689-14212-13-git-send-email-sricharan@codeaurora.org>
-Message-ID: <033a420e14f090258e4c8f14b7ba89a7@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 3 Feb 2018 22:21:35 +0800
+Subject: [PATCH v3 2/3] dmaengine: mediatek: Add MediaTek High-Speed DMA
+ controller for MT7622 and MT7623 SoC
+In-Reply-To: <3d5c7933c83ec456bdbcc70623fd460eb66eba1c.1517454174.git.sean.wang@mediatek.com>
+References: <3d5c7933c83ec456bdbcc70623fd460eb66eba1c.1517454174.git.sean.wang@mediatek.com>
+Message-ID: <201802032244.xa6YmxOG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-29 10:41, Sricharan R wrote:
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  arch/arm/boot/dts/Makefile                      |  1 +
->  arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts | 78
-> +++++++++++++++++++++++++
->  2 files changed, 79 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ef5b133..b4339ae 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -729,6 +729,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-ipq4019-ap.dk04.1-c5.dtb \
->  	qcom-ipq4019-ap.dk04.1-c3.dtb \
->  	qcom-ipq4019-ap.dk07.1-c1.dtb \
-> +	qcom-ipq4019-ap.dk07.1-c2.dtb \
->  	qcom-ipq8064-ap148.dtb \
->  	qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> new file mode 100644
-> index 0000000..d4ee52d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> @@ -0,0 +1,78 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
-> +
-> +#include "qcom-ipq4019-ap.dk07.1.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK07.1-C2";
+Hi Sean,
 
-  s/IPQ40xx/IPQ4019
+I love your patch! Yet something to improve:
 
-> +
-> +	soc {
-> +		pcie0: pci at 40000000 {
-> +			status = "disabled";
-> +		};
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.15 next-20180202]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-  We can disable in base dtsi itself.
+url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/dt-bindings-dmaengine-Add-MediaTek-High-Speed-DMA-controller-bindings/20180203-203814
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-> +
-> +		pinctrl at 1000000 {
-> +			serial_1_pins: serial1_pinmux {
-> +				mux {
-> +					pins = "gpio8", "gpio9";
-> +					function = "blsp_uart1";
-> +					bias-disable;
-> +				};
-> +			};
-> +
-> +			spi_0_pins: spi_0_pinmux {
-> +				mux {
-> +					pins = "gpio13", "gpio14",
-> "gpio15";
-> +					function = "blsp_spi0";
-> +					bias-disable;
-> +				};
-> +				cs1 {
-> +					pins = "gpio12";
-> +					function = "gpio";
-> +				};
-> +				host_int1 {
-> +					pins = "gpio10";
-> +					function = "gpio";
-> +					input;
-> +				};
-> +				cs2 {
-> +					pins = "gpio45";
-> +					function = "gpio";
-> +				};
-> +				host_int2 {
-> +					pins = "gpio61";
-> +					function = "gpio";
-> +					input;
-> +				};
-> +				rst {
-> +					pins = "gpio36";
-> +					function = "gpio";
-> +					output-high;
-> +				};
+All error/warnings (new ones prefixed by >>):
 
-  Normally spi pins should contains spi protocol related pins
-  could you please explain what is the role of host_pin and rst
-  pins and which driver will use these.
+   In file included from drivers/dma/mediatek/mtk-hsdma.c:19:0:
+>> drivers/dma/mediatek/mtk-hsdma.c:880:25: error: 'mtk_dma_match' undeclared here (not in a function); did you mean 'mtk_hsdma_match'?
+    MODULE_DEVICE_TABLE(of, mtk_dma_match);
+                            ^
+   include/linux/module.h:213:15: note: in definition of macro 'MODULE_DEVICE_TABLE'
+    extern typeof(name) __mod_##type##__##name##_device_table  \
+                  ^~~~
+>> include/linux/module.h:213:21: error: '__mod_of__mtk_dma_match_device_table' aliased to undefined symbol 'mtk_dma_match'
+    extern typeof(name) __mod_##type##__##name##_device_table  \
+                        ^
+>> drivers/dma/mediatek/mtk-hsdma.c:880:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
+    MODULE_DEVICE_TABLE(of, mtk_dma_match);
+    ^~~~~~~~~~~~~~~~~~~
+--
+   In file included from drivers/dma//mediatek/mtk-hsdma.c:19:0:
+   drivers/dma//mediatek/mtk-hsdma.c:880:25: error: 'mtk_dma_match' undeclared here (not in a function); did you mean 'mtk_hsdma_match'?
+    MODULE_DEVICE_TABLE(of, mtk_dma_match);
+                            ^
+   include/linux/module.h:213:15: note: in definition of macro 'MODULE_DEVICE_TABLE'
+    extern typeof(name) __mod_##type##__##name##_device_table  \
+                  ^~~~
+>> include/linux/module.h:213:21: error: '__mod_of__mtk_dma_match_device_table' aliased to undefined symbol 'mtk_dma_match'
+    extern typeof(name) __mod_##type##__##name##_device_table  \
+                        ^
+   drivers/dma//mediatek/mtk-hsdma.c:880:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
+    MODULE_DEVICE_TABLE(of, mtk_dma_match);
+    ^~~~~~~~~~~~~~~~~~~
 
-> +			};
-> +		};
-> +
-> +		serial at 78b0000 {
-> +			pinctrl-0 = <&serial_1_pins>;
-> +			pinctrl-names = "default";
-> +			status = "ok";
-> +		};
-> +
-> +		spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
-> +			pinctrl-0 = <&spi_0_pins>;
-> +			pinctrl-names = "default";
-> +			status = "ok";
+vim +880 drivers/dma/mediatek/mtk-hsdma.c
 
-  From pinmux, it looks like multiple gpio based cs are being
-  used so do we need to specify cs-gpios like dk01-c2.
+   874	
+   875	static const struct of_device_id mtk_hsdma_match[] = {
+   876		{ .compatible = "mediatek,mt7623-hsdma", .data = &mt7623_soc},
+   877		{ .compatible = "mediatek,mt7622-hsdma", .data = &mt7622_soc},
+   878		{ /* sentinel */ }
+   879	};
+ > 880	MODULE_DEVICE_TABLE(of, mtk_dma_match);
+   881	
 
-  Thanks,
-  Abhishek
-
-> +
-> +			spidev0_0 {
-> +				compatible = "spidev";
-> +				reg = <0>;
-> +				spi-max-frequency = <24000000>;
-> +			};
-> +			spidev0_1 {
-> +				compatible = "spidev";
-> +				reg = <1>;
-> +				spi-max-frequency = <24000000>;
-> +			};
-> +		};
-> +	};
-> +};
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 47952 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180203/0508ace0/attachment-0001.gz>
