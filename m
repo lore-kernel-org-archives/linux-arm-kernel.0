@@ -1,75 +1,30 @@
-From: absahu@codeaurora.org (Abhishek Sahu)
-Date: Sat, 03 Feb 2018 16:25:53 +0530
-Subject: [PATCH 05/15] ARM: dts: ipq4019: Add ipq4019-ap-dk01-c2 board file
-In-Reply-To: <1517202689-14212-6-git-send-email-sricharan@codeaurora.org>
-References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
- <1517202689-14212-6-git-send-email-sricharan@codeaurora.org>
-Message-ID: <9afb20e560a7ebbcefcb801e7447a983@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 3 Feb 2018 11:57:31 +0100 (CET)
+Subject: [PATCH] staging: vc04_services: remove unused files
+In-Reply-To: <1517517543-34957-1-git-send-email-clabbe@baylibre.com>
+References: <1517517543-34957-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <131618745.47691.1517655451980@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-01-29 10:41, Sricharan R wrote:
-> The board has a spi-nand interface on spi0 bus chipselect1.
+
+> Corentin Labbe <clabbe@baylibre.com> hat am 1. Februar 2018 um 21:39 geschrieben:
 > 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> 
+> All thoses files are not used by anybody.
+> Lets just remove them.
+> 
+> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
 > ---
->  arch/arm/boot/dts/Makefile                      |  1 +
->  arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts | 25
-> +++++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
+>  .../interface/vchiq_arm/vchiq_build_info.h         | 37 --------------
+>  .../interface/vchiq_arm/vchiq_memdrv.h             | 59 ----------------------
+>  .../interface/vchiq_arm/vchiq_version.c            | 59 ----------------------
+>  3 files changed, 155 deletions(-)
+>  delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
+>  delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
+>  delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d0381e9..21ed56d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -724,6 +724,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-apq8084-ifc6540.dtb \
->  	qcom-apq8084-mtp.dtb \
->  	qcom-ipq4019-ap.dk01.1-c1.dtb \
-> +	qcom-ipq4019-ap.dk01.1-c2.dtb \
->  	qcom-ipq8064-ap148.dtb \
->  	qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
-> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
-> new file mode 100644
-> index 0000000..e3442da
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
-> @@ -0,0 +1,25 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
-> +
-> +#include "qcom-ipq4019-ap.dk01.1.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK01.1-C2";
 
-  s/IPQ40xx/IPQ4019
+The memdrv interface is possibly used by a driver in the RPi Foundation tree, but i don't see any need to upstream it.
 
-> +
-> +	soc {
-> +		spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
-> +			status = "ok";
-> +			cs-gpios = <&tlmm 54 0>, <&tlmm 59 0>;
-
-  the base dk01 file has pinmux for 54 only.
-  for 59 pin, we need to add pinmux entry also.
-
-  Thanks,
-  Abhishek
-
-> +			num-cs = <2>;
-> +
-> +			mt29f at 1 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				compatible = "spinand,mt29f";
-> +				reg = <1>;
-> +				spi-max-frequency = <24000000>;
-> +			};
-> +
-> +		};
-> +	};
-> +};
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
