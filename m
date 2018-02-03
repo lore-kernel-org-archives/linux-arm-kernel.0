@@ -1,30 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 3 Feb 2018 11:57:31 +0100 (CET)
-Subject: [PATCH] staging: vc04_services: remove unused files
-In-Reply-To: <1517517543-34957-1-git-send-email-clabbe@baylibre.com>
-References: <1517517543-34957-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <131618745.47691.1517655451980@email.1und1.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 3 Feb 2018 11:15:59 +0000
+Subject: [PATCH v2 7/9] arm64: entry: Reword comment about
+ post_ttbr_update_workaround
+In-Reply-To: <1517227200-20412-8-git-send-email-will.deacon@arm.com>
+References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+ <1517227200-20412-8-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu9pfMkJtMrWdiOcVQ5Uy4RfJUsW5KbsnAz23BLvq8BRUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Corentin Labbe <clabbe@baylibre.com> hat am 1. Februar 2018 um 21:39 geschrieben:
-> 
-> 
-> All thoses files are not used by anybody.
-> Lets just remove them.
-> 
-> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+On 29 January 2018 at 11:59, Will Deacon <will.deacon@arm.com> wrote:
+> We don't fully understand the Cavium ThunderX erratum, but it appears
+> that mapping the kernel as nG can lead to horrible consequences such as
+> attempting to execute userspace from kernel context. Since kpti isn't
+> enabled for these CPUs anyway, simplify the comment justifying the lack
+> of post_ttbr_update_workaround in the exception trampoline.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  .../interface/vchiq_arm/vchiq_build_info.h         | 37 --------------
->  .../interface/vchiq_arm/vchiq_memdrv.h             | 59 ----------------------
->  .../interface/vchiq_arm/vchiq_version.c            | 59 ----------------------
->  3 files changed, 155 deletions(-)
->  delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_build_info.h
->  delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_memdrv.h
->  delete mode 100644 drivers/staging/vc04_services/interface/vchiq_arm/vchiq_version.c
-> 
+>  arch/arm64/kernel/entry.S | 12 ++----------
+>  1 file changed, 2 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index b34e717d7597..fbe1444324b3 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -1013,16 +1013,8 @@ alternative_else_nop_endif
+>         orr     \tmp, \tmp, #USER_ASID_FLAG
+>         msr     ttbr1_el1, \tmp
+>         /*
+> -        * We avoid running the post_ttbr_update_workaround here because the
+> -        * user and kernel ASIDs don't have conflicting mappings, so any
+> -        * "blessing" as described in:
+> -        *
+> -        *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
+> -        *
+> -        * will not hurt correctness. Whilst this may partially defeat the
+> -        * point of using split ASIDs in the first place, it avoids
+> -        * the hit of invalidating the entire I-cache on every return to
+> -        * userspace.
+> +        * We avoid running the post_ttbr_update_workaround here because
+> +        * it's only needed by Cavium ThunderX, which doesn't require kpti.
 
-The memdrv interface is possibly used by a driver in the RPi Foundation tree, but i don't see any need to upstream it.
-
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+'requires KPTI to be disabled' sounds more accurate to me
