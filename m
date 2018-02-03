@@ -1,48 +1,56 @@
-From: T.E.Baldwin99@members.leeds.ac.uk (Timothy E Baldwin)
-Date: Sat,  3 Feb 2018 15:21:12 +0000
-Subject: [PATCH] ARM: Call syscall_trace_exit even when system call skipped
-Message-ID: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat,  3 Feb 2018 23:49:36 +0800
+Subject: [PATCH v2 0/6] Initial Allwinner H6 support
+Message-ID: <20180203154942.63566-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On at least x86 and ARM64, and as documented in the ptrace man page
-a skipped system call will still cause a syscall exit ptrace stop.
+This patchset adds initial support for the Allwinner H6 SoC.
 
-Previous to this commit 32-bit ARM did not, resulting in strace
-being confused when seccomp skips system calls.
+It's quite different from earlier Allwinner SoCs. For example, the
+memory map is refactored, and the CCU is rearranged. It's also the first
+Allwinner SoC with PCI Express interface, and the second one with USB
+3.0 (the first one is A80).
 
-This change also impacts programs that use ptrace to skip system calls.
+This patchset adds the most basical support for it, including the main pin
+controller, the main CCU and the basical device tree.
 
-Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
-Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
----
- arch/arm/kernel/entry-common.S | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Icenowy Zheng (6):
+  pinctrl: sunxi: support pin controllers with holes among IRQ banks
+  pinctrl: sunxi: add support for the Allwinner H6 main pin controller
+  clk: sunxi-ng: Support fixed post-dividers on NKMP style clocks
+  clk: sunxi-ng: add support for the Allwinner H6 CCU
+  arm64: allwinner: h6: add the basical Allwinner H6 DTSI file
+  arm64: allwinner: h6: add support for Pine H64 board
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 99c908226065..88a65157307d 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -288,16 +288,15 @@ __sys_trace:
- 	cmp	scno, #-1			@ skip the syscall?
- 	bne	2b
- 	add	sp, sp, #S_OFF			@ restore stack
--	b	ret_slow_syscall
- 
--__sys_trace_return:
--	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-+__sys_trace_return_nosave:
-+	enable_irq_notrace
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
- 
--__sys_trace_return_nosave:
--	enable_irq_notrace
-+__sys_trace_return:
-+	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |    1 +
+ arch/arm64/boot/dts/allwinner/Makefile             |    1 +
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      |   30 +
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  178 +++
+ drivers/clk/sunxi-ng/Kconfig                       |    5 +
+ drivers/clk/sunxi-ng/Makefile                      |    1 +
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c               | 1199 ++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.h               |   57 +
+ drivers/clk/sunxi-ng/ccu_nkmp.c                    |   20 +-
+ drivers/clk/sunxi-ng/ccu_nkmp.h                    |    2 +
+ drivers/pinctrl/sunxi/Kconfig                      |    4 +
+ drivers/pinctrl/sunxi/Makefile                     |    1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c          |  676 +++++++++++
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c          |    4 +-
+ drivers/pinctrl/sunxi/pinctrl-sun8i-v3s.c          |    4 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c              |   16 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h              |   41 +-
+ include/dt-bindings/clock/sun50i-h6-ccu.h          |  125 ++
+ include/dt-bindings/reset/sun50i-h6-ccu.h          |   74 ++
+ 20 files changed, 2414 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-h6.h
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
+ create mode 100644 include/dt-bindings/clock/sun50i-h6-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun50i-h6-ccu.h
+
 -- 
-2.14.2
+2.15.1
