@@ -1,45 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 3 Feb 2018 11:15:59 +0000
-Subject: [PATCH v2 7/9] arm64: entry: Reword comment about
- post_ttbr_update_workaround
-In-Reply-To: <1517227200-20412-8-git-send-email-will.deacon@arm.com>
-References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
- <1517227200-20412-8-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu9pfMkJtMrWdiOcVQ5Uy4RfJUsW5KbsnAz23BLvq8BRUg@mail.gmail.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Sat, 03 Feb 2018 16:47:39 +0530
+Subject: [PATCH 06/15] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+In-Reply-To: <1517202689-14212-7-git-send-email-sricharan@codeaurora.org>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <a32d3a776c7a3f5c88a9a26200bff915@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2018 at 11:59, Will Deacon <will.deacon@arm.com> wrote:
-> We don't fully understand the Cavium ThunderX erratum, but it appears
-> that mapping the kernel as nG can lead to horrible consequences such as
-> attempting to execute userspace from kernel context. Since kpti isn't
-> enabled for these CPUs anyway, simplify the comment justifying the lack
-> of post_ttbr_update_workaround in the exception trampoline.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On 2018-01-29 10:41, Sricharan R wrote:
+> Add the common parts for the dk04 boards.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  arch/arm64/kernel/entry.S | 12 ++----------
->  1 file changed, 2 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index b34e717d7597..fbe1444324b3 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -1013,16 +1013,8 @@ alternative_else_nop_endif
->         orr     \tmp, \tmp, #USER_ASID_FLAG
->         msr     ttbr1_el1, \tmp
->         /*
-> -        * We avoid running the post_ttbr_update_workaround here because the
-> -        * user and kernel ASIDs don't have conflicting mappings, so any
-> -        * "blessing" as described in:
-> -        *
-> -        *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
-> -        *
-> -        * will not hurt correctness. Whilst this may partially defeat the
-> -        * point of using split ASIDs in the first place, it avoids
-> -        * the hit of invalidating the entire I-cache on every return to
-> -        * userspace.
-> +        * We avoid running the post_ttbr_update_workaround here because
-> +        * it's only needed by Cavium ThunderX, which doesn't require kpti.
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi | 147
 
-'requires KPTI to be disabled' sounds more accurate to me
+  <snip>
+> +
+> +			nand_pins: nand_pins {
+> +				pullups {
+> +					pins = "gpio52", "gpio53",
+> "gpio58",
+> +						"gpio59";
+> +					function = "qpic";
+> +					bias-pull-up;
+> +				};
+> +
+> +				pulldowns {
+> +					pins = "gpio54", "gpio55",
+> "gpio56",
+> +						"gpio57", "gpio60",
+> "gpio61",
+> +						"gpio62", "gpio63",
+> "gpio64",
+> +						"gpio65", "gpio66",
+> "gpio67",
+> +						"gpio68", "gpio69";
+> +					function = "qpic";
+> +					bias-pull-down;
+> +				};
+> +			};
+
+  Can you please check once why do we need pull-up and
+  pull-down for NAND pins. The NAND chip will be mounted
+  over board itself so board design should take care of
+  required pull up and pull downs.
+
+  Also, some of the above pins like gpio52 will be only used
+  for LCD so we can remove those pins. Later on, when LCD
+  support will be added, we can add those pins.
+
+  Thanks,
+  Abhishek
