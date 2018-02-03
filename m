@@ -1,46 +1,32 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 3 Feb 2018 15:26:10 +0100
-Subject: [PATCH v2 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD
- device
-In-Reply-To: <d6669277f5232446b4798a6b724074b18d5c21aa.1515639336.git.ryder.lee@mediatek.com>
-References: <cover.1515639336.git.ryder.lee@mediatek.com>
- <d6669277f5232446b4798a6b724074b18d5c21aa.1515639336.git.ryder.lee@mediatek.com>
-Message-ID: <72058f8d-c83d-d0e6-dc07-83c9f5fc2710@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 3 Feb 2018 23:10:44 +0800
+Subject: [RFC PATCH] dmaengine: mediatek: mtk_hsdma_find_active_desc() can be
+ static
+In-Reply-To: <3d5c7933c83ec456bdbcc70623fd460eb66eba1c.1517454174.git.sean.wang@mediatek.com>
+References: <3d5c7933c83ec456bdbcc70623fd460eb66eba1c.1517454174.git.sean.wang@mediatek.com>
+Message-ID: <20180203151044.GA44748@lkp-hsx03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Fixes: 73006a033ef0 ("dmaengine: mediatek: Add MediaTek High-Speed DMA controller for MT7622 and MT7623 SoC")
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+---
+ mtk-hsdma.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On 01/31/2018 08:42 AM, Ryder Lee wrote:
-> As the new MFD parent is in place, switch probing method to adapt it.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/clk/mediatek/clk-mt7622-aud.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
-> index 13f752d..8c18536 100644
-> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
-> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
-> @@ -142,11 +142,12 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
->  {
->  	struct clk_onecell_data *clk_data;
->  	struct device_node *node = pdev->dev.of_node;
-> +	struct device_node *pnode = pdev->dev.parent->of_node;
->  	int r;
->  
->  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
->  
-> -	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
-> +	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
-
-We will need a fallback here for older device tree bindings.
-
-Regards,
-Matthias
-
->  			       clk_data);
->  
->  	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> 
+diff --git a/drivers/dma/mediatek/mtk-hsdma.c b/drivers/dma/mediatek/mtk-hsdma.c
+index cd3af5c..c1523b4 100644
+--- a/drivers/dma/mediatek/mtk-hsdma.c
++++ b/drivers/dma/mediatek/mtk-hsdma.c
+@@ -643,8 +643,8 @@ static irqreturn_t mtk_hsdma_irq(int irq, void *devid)
+ 	return IRQ_HANDLED;
+ }
+ 
+-struct virt_dma_desc *mtk_hsdma_find_active_desc(struct dma_chan *c,
+-						 dma_cookie_t cookie)
++static struct virt_dma_desc *mtk_hsdma_find_active_desc(struct dma_chan *c,
++							dma_cookie_t cookie)
+ {
+ 	struct mtk_hsdma_vchan *hvc = to_hsdma_vchan(c);
+ 	struct virt_dma_desc *vd;
