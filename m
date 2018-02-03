@@ -1,278 +1,227 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 02 Feb 2018 12:51:41 -0800
-Subject: [PATCH 1/5 v2] drm/pl111: Properly detect the ARM PL110 variants
-In-Reply-To: <20180201125513.5482-2-linus.walleij@linaro.org>
-References: <20180201125513.5482-1-linus.walleij@linaro.org>
- <20180201125513.5482-2-linus.walleij@linaro.org>
-Message-ID: <87r2q3p12a.fsf@anholt.net>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Sat, 3 Feb 2018 11:01:57 +0800
+Subject: [PATCH v2 5/6] arm64: Detect current view of GIC priorities
+In-Reply-To: <1516190084-18978-6-git-send-email-julien.thierry@arm.com>
+References: <1516190084-18978-1-git-send-email-julien.thierry@arm.com>
+ <1516190084-18978-6-git-send-email-julien.thierry@arm.com>
+Message-ID: <5A752625.7030903@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi, Julien
 
-> With a bit of refactoring we can contain the variant data for
-> the strange PL110 versions that is feature-incomplete PL110 for
-> the ARM Integrator/CP and somewhere inbetween PL110 and PL111
-> for the ARM Versatile AB and Versatile PB.
+On 2018/1/17 19:54, Julien Thierry wrote:
+> The values non secure EL1 needs to use for priority registers depends on
+> the value of SCR_EL3.FIQ.
 >
-> We also accomodate for the custom duct-taped RGB565/BGR565 support
-> in the Versatile variant.
+> Since we don't have access to SCR_EL3, we fake an interrupt and compare the
+> GIC priority with the one present in the [re]distributor.
 >
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Also, add firmware requirements related to SCR_EL3.
+>
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> ChangeLog v1->v2:
-> - Push more logic into the pl111_versatile file and keep the
->   driver core neutral.
-> - Pave the way better for the Integrator/CP variant as well.
-> ---
->  drivers/gpu/drm/pl111/pl111_drm.h       |  3 ++
->  drivers/gpu/drm/pl111/pl111_drv.c       | 37 ++++----------
->  drivers/gpu/drm/pl111/pl111_versatile.c | 85 +++++++++++++++++++++++++--------
->  3 files changed, 79 insertions(+), 46 deletions(-)
+>   Documentation/arm64/booting.txt     |  5 +++
+>   arch/arm64/include/asm/arch_gicv3.h |  5 +++
+>   arch/arm64/include/asm/irqflags.h   |  6 +++
+>   arch/arm64/include/asm/sysreg.h     |  1 +
+>   drivers/irqchip/irq-gic-v3.c        | 86 +++++++++++++++++++++++++++++++++++++
+>   5 files changed, 103 insertions(+)
 >
-> diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-> index 440f53ebee8c..c2f410f0b12e 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drm.h
-> +++ b/drivers/gpu/drm/pl111/pl111_drm.h
-> @@ -36,12 +36,15 @@ struct drm_minor;
->   * struct pl111_variant_data - encodes IP differences
->   * @name: the name of this variant
->   * @is_pl110: this is the early PL110 variant
-> + * @external_bgr: this is the Versatile Pl110 variant with external
-> + *	BGR/RGB routing
->   * @formats: array of supported pixel formats on this variant
->   * @nformats: the length of the array of supported pixel formats
->   */
->  struct pl111_variant_data {
->  	const char *name;
->  	bool is_pl110;
-> +	bool external_bgr;
->  	const u32 *formats;
->  	unsigned int nformats;
->  };
-> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-> index 31a0c4268cc6..6967cd5428b2 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drv.c
-> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-> @@ -205,7 +205,7 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  {
->  	struct device *dev = &amba_dev->dev;
->  	struct pl111_drm_dev_private *priv;
-> -	struct pl111_variant_data *variant = id->data;
-> +	const struct pl111_variant_data *variant = id->data;
->  	struct drm_device *drm;
->  	int ret;
->  
-> @@ -221,27 +221,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  	drm->dev_private = priv;
->  	priv->variant = variant;
->  
-> -	/*
-> -	 * The PL110 and PL111 variants have two registers
-> -	 * swapped: interrupt enable and control. For this reason
-> -	 * we use offsets that we can change per variant.
-> -	 */
-> +	/* The two variants swap this register */
->  	if (variant->is_pl110) {
-> -		/*
-> -		 * The ARM Versatile boards are even more special:
-> -		 * their PrimeCell ID say they are PL110 but the
-> -		 * control and interrupt enable registers are anyway
-> -		 * swapped to the PL111 order so they are not following
-> -		 * the PL110 datasheet.
-> -		 */
-> -		if (of_machine_is_compatible("arm,versatile-ab") ||
-> -		    of_machine_is_compatible("arm,versatile-pb")) {
-> -			priv->ienb = CLCD_PL111_IENB;
-> -			priv->ctrl = CLCD_PL111_CNTL;
-> -		} else {
-> -			priv->ienb = CLCD_PL110_IENB;
-> -			priv->ctrl = CLCD_PL110_CNTL;
-> -		}
-> +		priv->ienb = CLCD_PL110_IENB;
-> +		priv->ctrl = CLCD_PL110_CNTL;
->  	} else {
->  		priv->ienb = CLCD_PL111_IENB;
->  		priv->ctrl = CLCD_PL111_CNTL;
-> @@ -253,6 +236,11 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  		return PTR_ERR(priv->regs);
->  	}
->  
-> +	/* This may override some variant settings */
-> +	ret = pl111_versatile_init(dev, priv);
-> +	if (ret)
-> +		goto dev_unref;
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index 8d0df62..e387938 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
+>     the kernel image will be entered must be initialised by software at a
+>     higher exception level to prevent execution in an UNKNOWN state.
+>
+> +  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
+> +    executing on.
+> +  - The value of SCR_EL3.FIQ must be the same as the one present at boot
+> +    time whenever the kernel is executing.
 > +
->  	/* turn off interrupts before requesting the irq */
->  	writel(0, priv->regs + priv->ienb);
->  
-> @@ -263,10 +251,6 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  		return ret;
->  	}
->  
-> -	ret = pl111_versatile_init(dev, priv);
-> -	if (ret)
-> -		goto dev_unref;
-> -
->  	ret = pl111_modeset_init(drm);
->  	if (ret != 0)
->  		goto dev_unref;
-> @@ -299,8 +283,7 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
->  }
->  
->  /*
-> - * This variant exist in early versions like the ARM Integrator
-> - * and this version lacks the 565 and 444 pixel formats.
-> + * This early variant lacks the 565 and 444 pixel formats.
->   */
->  static const u32 pl110_pixel_formats[] = {
->  	DRM_FORMAT_ABGR8888,
-> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-> index 97d4af6925a3..893d527fb42f 100644
-> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
-> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-> @@ -1,3 +1,4 @@
-> +#include <linux/amba/clcd-regs.h>
->  #include <linux/device.h>
->  #include <linux/of.h>
->  #include <linux/regmap.h>
-> @@ -64,10 +65,8 @@ static const struct of_device_id versatile_clcd_of_match[] = {
->  #define INTEGRATOR_CLCD_LCDBIASEN	BIT(8)
->  #define INTEGRATOR_CLCD_LCDBIASUP	BIT(9)
->  #define INTEGRATOR_CLCD_LCDBIASDN	BIT(10)
-> -/* Bits 11,12,13 controls the LCD type */
-> -#define INTEGRATOR_CLCD_LCDMUX_MASK	(BIT(11)|BIT(12)|BIT(13))
-> +/* Bits 11,12,13 controls the LCD or VGA bridge type */
->  #define INTEGRATOR_CLCD_LCDMUX_LCD24	BIT(11)
-> -#define INTEGRATOR_CLCD_LCDMUX_VGA565	BIT(12)
->  #define INTEGRATOR_CLCD_LCDMUX_SHARP	(BIT(11)|BIT(12))
->  #define INTEGRATOR_CLCD_LCDMUX_VGA555	BIT(13)
->  #define INTEGRATOR_CLCD_LCDMUX_VGA24	(BIT(11)|BIT(12)|BIT(13))
-> @@ -82,16 +81,7 @@ static const struct of_device_id versatile_clcd_of_match[] = {
->  /* 0 = 24bit VGA, 1 = 18bit VGA */
->  #define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
->  
-> -#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDBIASEN | \
-> -					 INTEGRATOR_CLCD_LCDBIASUP | \
-> -					 INTEGRATOR_CLCD_LCDBIASDN | \
-> -					 INTEGRATOR_CLCD_LCDMUX_MASK | \
-> -					 INTEGRATOR_CLCD_LCD0_EN | \
-> -					 INTEGRATOR_CLCD_LCD1_EN | \
-> -					 INTEGRATOR_CLCD_LCD_STATIC1 | \
-> -					 INTEGRATOR_CLCD_LCD_STATIC2 | \
-> -					 INTEGRATOR_CLCD_LCD_STATIC | \
-> -					 INTEGRATOR_CLCD_LCD_N24BITEN)
-> +#define INTEGRATOR_CLCD_MASK		GENMASK(19,8)
->  
->  static void pl111_integrator_enable(struct drm_device *drm, u32 format)
->  {
-> @@ -106,11 +96,8 @@ static void pl111_integrator_enable(struct drm_device *drm, u32 format)
->  	switch (format) {
->  	case DRM_FORMAT_XBGR8888:
->  	case DRM_FORMAT_XRGB8888:
-> -		break;
-> -	case DRM_FORMAT_BGR565:
-> -	case DRM_FORMAT_RGB565:
-> -		/* truecolor RGB565 */
-> -		val |= INTEGRATOR_CLCD_LCDMUX_VGA565;
-> +		/* 24bit formats */
-> +		val |= INTEGRATOR_CLCD_LCDMUX_VGA24;
->  		break;
->  	case DRM_FORMAT_XBGR1555:
->  	case DRM_FORMAT_XRGB1555:
-> @@ -217,6 +204,55 @@ static void pl111_realview_clcd_enable(struct drm_device *drm, u32 format)
->  			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
->  }
->  
-> +/* PL110 pixel formats for Integrator, vanilla PL110 */
-> +static const u32 pl110_integrator_pixel_formats[] = {
-> +	DRM_FORMAT_ABGR8888,
-> +	DRM_FORMAT_XBGR8888,
-> +	DRM_FORMAT_ARGB8888,
-> +	DRM_FORMAT_XRGB8888,
-> +	DRM_FORMAT_ABGR1555,
-> +	DRM_FORMAT_XBGR1555,
-> +	DRM_FORMAT_ARGB1555,
-> +	DRM_FORMAT_XRGB1555,
-> +};
+>     For systems with a GICv3 interrupt controller to be used in v3 mode:
+>     - If EL3 is present:
+>       ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
+> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> index 490bb3a..ac7b7f6 100644
+> --- a/arch/arm64/include/asm/arch_gicv3.h
+> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> @@ -124,6 +124,11 @@ static inline void gic_write_bpr1(u32 val)
+>   	write_sysreg_s(val, SYS_ICC_BPR1_EL1);
+>   }
+>
+> +static inline u32 gic_read_rpr(void)
+> +{
+> +	return read_sysreg_s(SYS_ICC_RPR_EL1);
+> +}
 > +
-> +/* Extended PL110 pixel formats for Integrator and Versatile */
-> +static const u32 pl110_versatile_pixel_formats[] = {
-> +	DRM_FORMAT_ABGR8888,
-> +	DRM_FORMAT_XBGR8888,
-> +	DRM_FORMAT_ARGB8888,
-> +	DRM_FORMAT_XRGB8888,
-> +	DRM_FORMAT_BGR565, /* Uses external PLD */
-> +	DRM_FORMAT_RGB565, /* Uses external PLD */
-> +	DRM_FORMAT_ABGR1555,
-> +	DRM_FORMAT_XBGR1555,
-> +	DRM_FORMAT_ARGB1555,
-> +	DRM_FORMAT_XRGB1555,
-> +};
+>   #define gic_read_typer(c)		readq_relaxed(c)
+>   #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
+>   #define gic_read_lpir(c)		readq_relaxed(c)
+> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> index 3d5d443..d25e7ee 100644
+> --- a/arch/arm64/include/asm/irqflags.h
+> +++ b/arch/arm64/include/asm/irqflags.h
+> @@ -217,6 +217,12 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+>   		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
+>   }
+>
+> +/* Mask IRQs at CPU level instead of GIC level */
+> +static inline void arch_irqs_daif_disable(void)
+> +{
+> +	asm volatile ("msr daifset, #2" : : : "memory");
+> +}
 > +
+>   void maybe_switch_to_sysreg_gic_cpuif(void);
+>
+>   #endif /* CONFIG_IRQFLAGS_GIC_MASKING */
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 08cc885..46fa869 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -304,6 +304,7 @@
+>   #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
+>   #define SYS_ICC_IGRPEN0_EL1		sys_reg(3, 0, 12, 12, 6)
+>   #define SYS_ICC_IGRPEN1_EL1		sys_reg(3, 0, 12, 12, 7)
+> +#define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
+>
+>   #define SYS_CONTEXTIDR_EL1		sys_reg(3, 0, 13, 0, 1)
+>   #define SYS_TPIDR_EL1			sys_reg(3, 0, 13, 0, 4)
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index df51d96..58b5e89 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -63,6 +63,10 @@ struct gic_chip_data {
+>   static struct gic_chip_data gic_data __read_mostly;
+>   static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
+>
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +DEFINE_STATIC_KEY_FALSE(have_non_secure_prio_view);
+> +#endif
+> +
+>   static struct gic_kvm_info gic_v3_kvm_info;
+>   static DEFINE_PER_CPU(bool, has_rss);
+>
+> @@ -997,6 +1001,84 @@ static int partition_domain_translate(struct irq_domain *d,
+>   	.select = gic_irq_domain_select,
+>   };
+>
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
 > +/*
-> + * The Integrator variant is a PL110 with a bunch of broken, or not
-> + * yet implemented features
+> + * The behaviours of RPR and PMR registers differ depending on the value of
+> + * SCR_EL3.FIQ, while the behaviour of priority registers of the distributor
+> + * and redistributors is always the same.
+> + *
+> + * If SCR_EL3.FIQ == 1, the values used for RPR and PMR are the same as the ones
+> + * programmed in the distributor and redistributors registers.
+> + *
+> + * Otherwise, the value presented by RPR as well as the value which will be
+> + * compared against PMR is: (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
+> + *
+> + * see GICv3/GICv4 Architecture Specification (IHI0069D):
+> + * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
+> + *   priorities.
+> + * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
+> + *   interrupt.
 > + */
-> +static const struct pl111_variant_data pl110_integrator = {
-> +	.name = "PL110 Integrator",
-> +	.is_pl110 = true,
-> +	.formats = pl110_integrator_pixel_formats,
-> +	.nformats = ARRAY_SIZE(pl110_integrator_pixel_formats),
-> +};
-> +
-> +/*
-> + * This is the in-between PL110 variant found in the ARM Versatile,
-> + * supporting RGB565/BGR565
-> + */
-> +static const struct pl111_variant_data pl110_versatile = {
-> +	.name = "PL110 Versatile",
-> +	.is_pl110 = true,
-> +	.external_bgr = true,
-> +	.formats = pl110_versatile_pixel_formats,
-> +	.nformats = ARRAY_SIZE(pl110_versatile_pixel_formats),
-> +};
-> +
->  int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  {
->  	const struct of_device_id *clcd_id;
-> @@ -241,14 +277,25 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  	switch (versatile_clcd_type) {
->  	case INTEGRATOR_CLCD_CM:
->  		versatile_syscon_map = map;
-> +		/* This can do RGB565 with external PLD */
+I think we can use write/read PMR to check if SCR_EL3.FIQ == 1.
+Like this:
 
-I don't think you meant to have this comment here, since RGB565 isn't in
-integrator's format lits.  Other than that, the patch gets my r-b.
+gic_write_pmr(0xf0);
+if (gic_read_pmr() == 0xf0)    // if SCR_EL3.FIQ == 0, the read value is 
+0xf8 here
+     static_branch_enable(&have_non_secure_prio_view);
 
-> +		priv->variant = &pl110_integrator;
->  		priv->variant_display_enable = pl111_integrator_enable;
->  		dev_info(dev, "set up callbacks for Integrator PL110\n");
->  		break;
->  	case VERSATILE_CLCD:
->  		versatile_syscon_map = map;
-> +		/* This can do RGB565 with external PLD */
-> +		priv->variant = &pl110_versatile;
->  		priv->variant_display_enable = pl111_versatile_enable;
->  		priv->variant_display_disable = pl111_versatile_disable;
-> -		dev_info(dev, "set up callbacks for Versatile PL110+\n");
-> +		/*
-> +		 * The Versatile has a variant halfway between PL110
-> +		 * and PL111 where these two registers have already been
-> +		 * swapped.
-> +		 */
-> +		priv->ienb = CLCD_PL111_IENB;
-> +		priv->ctrl = CLCD_PL111_CNTL;
-> +		dev_info(dev, "set up callbacks for Versatile PL110\n");
->  		break;
->  	case REALVIEW_CLCD_EB:
->  	case REALVIEW_CLCD_PB1176:
-> -- 
-> 2.14.3
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180202/9704ba2e/attachment.sig>
+Thanks,
+Yang
+> +static void __init gic_detect_prio_view(void)
+> +{
+> +	/*
+> +	 * Randomly picked SGI, must be <= 8 as other SGIs might be
+> +	 * used by the firmware.
+> +	 */
+> +	const u32 fake_irqnr = 7;
+> +	const u32 fake_irqmask = BIT(fake_irqnr);
+> +	void __iomem * const rdist_base = gic_data_rdist_sgi_base();
+> +	unsigned long irq_flags;
+> +	u32 acked_irqnr;
+> +	bool was_enabled;
+> +
+> +	irq_flags = arch_local_save_flags();
+> +
+> +	arch_irqs_daif_disable();
+> +
+> +	was_enabled = (readl_relaxed(rdist_base + GICD_ISENABLER) &
+> +		       fake_irqmask);
+> +
+> +	if (!was_enabled)
+> +		writel_relaxed(fake_irqmask, rdist_base + GICD_ISENABLER);
+> +
+> +	/* Need to unmask to acknowledge the IRQ */
+> +	gic_write_pmr(ICC_PMR_EL1_UNMASKED);
+> +	dsb(sy);
+> +
+> +	/* Fake a pending SGI */
+> +	writel_relaxed(fake_irqmask, rdist_base + GICD_ISPENDR);
+> +	dsb(sy);
+> +
+> +	do {
+> +		acked_irqnr = gic_read_iar();
+> +
+> +		if (acked_irqnr == fake_irqnr) {
+> +			if (gic_read_rpr() == gic_get_irq_prio(acked_irqnr,
+> +							       rdist_base))
+> +				static_branch_enable(&have_non_secure_prio_view);
+> +		} else {
+> +			pr_warn("Unexpected IRQ for priority detection: %u\n",
+> +				acked_irqnr);
+> +		}
+> +
+> +		if (acked_irqnr < 1020) {
+> +			gic_write_eoir(acked_irqnr);
+> +			if (static_key_true(&supports_deactivate))
+> +				gic_write_dir(acked_irqnr);
+> +		}
+> +	} while (acked_irqnr == ICC_IAR1_EL1_SPURIOUS);
+> +
+> +	/* Restore enabled state */
+> +	if (!was_enabled) {
+> +		writel_relaxed(fake_irqmask, rdist_base + GICD_ICENABLER);
+> +		gic_redist_wait_for_rwp();
+> +	}
+> +
+> +	arch_local_irq_restore(irq_flags);
+> +}
+> +#endif
+> +
+>   static int __init gic_init_bases(void __iomem *dist_base,
+>   				 struct redist_region *rdist_regs,
+>   				 u32 nr_redist_regions,
+> @@ -1057,6 +1139,10 @@ static int __init gic_init_bases(void __iomem *dist_base,
+>   	gic_cpu_init();
+>   	gic_cpu_pm_init();
+>
+> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+> +	gic_detect_prio_view();
+> +#endif
+> +
+>   	return 0;
+>
+>   out_free:
+> --
+> 1.9.1
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> .
+>
