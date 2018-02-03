@@ -1,107 +1,54 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  3 Feb 2018 19:23:53 +0800
-Subject: [PATCH] Revert "ARM: dts: sunxi: Add regulators for Sinovoip BPI-M2"
-Message-ID: <20180203112353.13497-1-icenowy@aosc.io>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Sat, 03 Feb 2018 17:00:30 +0530
+Subject: [PATCH 07/15] ARM: dts: ipq4019: Add ipq4019-ap.dk04.1-c1 board
+ file
+In-Reply-To: <1517202689-14212-8-git-send-email-sricharan@codeaurora.org>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <6821d93c282c8337b2a58c5c9337a008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 7daa213700758b5b08fc0daab09bb139dd334165.
+On 2018-01-29 10:41, Sricharan R wrote:
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/Makefile                      | 1 +
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts | 8 ++++++++
+>  2 files changed, 9 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 21ed56d..1a8ab050 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -725,6 +725,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>  	qcom-apq8084-mtp.dtb \
+>  	qcom-ipq4019-ap.dk01.1-c1.dtb \
+>  	qcom-ipq4019-ap.dk01.1-c2.dtb \
+> +	qcom-ipq4019-ap.dk04.1-c1.dtb \
+>  	qcom-ipq8064-ap148.dtb \
+>  	qcom-msm8660-surf.dtb \
+>  	qcom-msm8960-cdp.dtb \
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+> new file mode 100644
+> index 0000000..41123be
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+> @@ -0,0 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
+> +
+> +#include "qcom-ipq4019-ap.dk04.1.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C1";
+> +};
 
-The original commit has several problems:
+  It seems major diff between DK01 C1 and other variants is
+  qpic nand. qpic nand is only available in C1 so do we need
+  to disable the nand is base dk04 dtsi and enable it in this
+  C1 dts only. same for qpic bam.
 
-- vdd-cpus and aldo3 (AVCC of the SoC) are not set to always-on, which
-leads to system hang when disabling unused regulators.
-- GMAC (which uses dldo1 and aldo2) and Wi-Fi (which uses aldo1) are not
-considered, and will fail to work after adding this commit.
-
-This indicates that this patch should be not tested at all.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 57 ------------------------
- 1 file changed, 57 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-index 51e6f1d21c32..a565316eb340 100644
---- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-@@ -86,10 +86,6 @@
- 	};
- };
- 
--&cpu0 {
--	cpu-supply = <&reg_dcdc3>;
--};
--
- &ehci0 {
- 	status = "okay";
- };
-@@ -155,17 +151,6 @@
- 	status = "okay";
- };
- 
--&p2wi {
--	status = "okay";
--
--	axp22x: pmic at 68 {
--		compatible = "x-powers,axp221";
--		reg = <0x68>;
--		interrupt-parent = <&nmi_intc>;
--		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--	};
--};
--
- &pio {
- 	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
- 		pins = "PA21";
-@@ -191,48 +176,6 @@
- 	};
- };
- 
--#include "axp22x.dtsi"
--
--&reg_dc5ldo {
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-cpus";
--};
--
--&reg_dcdc1 {
--	regulator-always-on;
--	regulator-min-microvolt = <3000000>;
--	regulator-max-microvolt = <3000000>;
--	regulator-name = "vdd-3v0";
--};
--
--&reg_dcdc2 {
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-gpu";
--};
--
--&reg_dcdc3 {
--	regulator-always-on;
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-cpu";
--};
--
--&reg_dcdc4 {
--	regulator-always-on;
--	regulator-min-microvolt = <700000>;
--	regulator-max-microvolt = <1320000>;
--	regulator-name = "vdd-sys-dll";
--};
--
--&reg_dcdc5 {
--	regulator-always-on;
--	regulator-min-microvolt = <1500000>;
--	regulator-max-microvolt = <1500000>;
--	regulator-name = "vcc-dram";
--};
--
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--- 
-2.15.1
+  Thanks,
+  Abhishek
