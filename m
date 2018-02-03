@@ -1,87 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 3 Feb 2018 11:36:04 +0000
-Subject: [PATCH v2 0/9] Fix kpti-enabled kernels for Cavium ThunderX
-In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu-VvsjSG7Lno9e+qm5VzA9OJhN4DbqxPw0D1+FEwrFK_A@mail.gmail.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Sat, 03 Feb 2018 17:07:19 +0530
+Subject: [PATCH 09/15] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk04.1-c3
+ board file
+In-Reply-To: <1517202689-14212-10-git-send-email-sricharan@codeaurora.org>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-10-git-send-email-sricharan@codeaurora.org>
+Message-ID: <4a173ff2a74ed7d1555d52674cf64ddd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 January 2018 at 11:59, Will Deacon <will.deacon@arm.com> wrote:
-> Hi all,
->
-> This is version two of the patches I posted on Friday:
->
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556304.html
->
-> Changes since v1 include:
->
->   * Use SCTLR_ELx_M instead of open-coded #1
->   * Changed section attributes for .idmap.text to reflect actual mappings
->   * Rejigged phys_to_pte for consistency with pte_to_phys
->   * Added reviewer tags
->
+On 2018-01-29 10:41, Sricharan R wrote:
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/Makefile                      |  1 +
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts | 14 ++++++++++++++
+>  2 files changed, 15 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 68e4b15..0104ba2 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -727,6 +727,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>  	qcom-ipq4019-ap.dk01.1-c2.dtb \
+>  	qcom-ipq4019-ap.dk04.1-c1.dtb \
+>  	qcom-ipq4019-ap.dk04.1-c5.dtb \
+> +	qcom-ipq4019-ap.dk04.1-c3.dtb \
+>  	qcom-ipq8064-ap148.dtb \
+>  	qcom-msm8660-surf.dtb \
+>  	qcom-msm8960-cdp.dtb \
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+> new file mode 100644
+> index 0000000..7a93fc4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+> @@ -0,0 +1,14 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
+> +
+> +#include "qcom-ipq4019-ap.dk04.1.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C3";
+> +
+> +	soc {
+> +		nand: qpic-nand at 79b0000 {
+> +			status = "disabled";
+> +		};
 
-Any chance we could base this on the arm64/kpti branch rather than
-for-next/core? Any backports of kpti will need to include this series
-as well, or we break ThunderX, and I'd rather have you merge it into
-for-next/core rather than the various backporters (whose level of
-familiarity with this code is invariably lower than yours) into the
-stable trees.
+  Normally we need to disable in base dtsi and enable in
+  board dtsi so that base dtsi will always work in all the
+  boards. Now If We load the base dtsi in any DK04 board
+  other than C1, then nand failure will come.
 
-For reference, my v4.14 backport of KPTI is here:
-
-https://git.linaro.org/kernel/speculation-fixes-staging.git/log/?h=v4.14-kpti-only
-
-containing just the KPTI pieces that were covered by the arm64 PR for v4.16
-
-Once Marc's recent Spectre variant 2 stuff hits mainline as well, I
-will pull that into a separate branch (which may just be based on this
-one if they are too difficult to disentangle)
-
-
-
-> --->8
->
-> Marc Zyngier (1):
->   arm64: Force KPTI to be disabled on Cavium ThunderX
->
-> Shanker Donthineni (1):
->   arm64: Add software workaround for Falkor erratum 1041
->
-> Will Deacon (7):
->   arm64: kpti: Make use of nG dependent on
->     arm64_kernel_unmapped_at_el0()
->   arm64: mm: Permit transitioning from Global to Non-Global without BBM
->   arm64: kpti: Add ->enable callback to remap swapper using nG mappings
->   arm64: assembler: Change order of macro arguments in phys_to_ttbr
->   arm64: entry: Reword comment about post_ttbr_update_workaround
->   arm64: assembler: Align phys_to_pte with pte_to_phys
->   arm64: idmap: Use "awx" flags for .idmap.text .pushsection directives
->
->  Documentation/arm64/silicon-errata.txt  |   1 +
->  arch/arm64/Kconfig                      |  12 +-
->  arch/arm64/include/asm/assembler.h      |  36 +++++-
->  arch/arm64/include/asm/kernel-pgtable.h |  12 +-
->  arch/arm64/include/asm/pgtable-prot.h   |  30 +++--
->  arch/arm64/kernel/cpu-reset.S           |   3 +-
->  arch/arm64/kernel/cpufeature.c          |  42 ++++++-
->  arch/arm64/kernel/efi-entry.S           |   2 +
->  arch/arm64/kernel/entry.S               |  12 +-
->  arch/arm64/kernel/head.S                |  31 +----
->  arch/arm64/kernel/hibernate-asm.S       |   4 +-
->  arch/arm64/kernel/relocate_kernel.S     |   1 +
->  arch/arm64/kernel/sleep.S               |   2 +-
->  arch/arm64/kvm/hyp-init.S               |   3 +-
->  arch/arm64/mm/mmu.c                     |   4 +
->  arch/arm64/mm/proc.S                    | 212 ++++++++++++++++++++++++++++++--
->  16 files changed, 324 insertions(+), 83 deletions(-)
->
-> --
-> 2.1.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  Thanks,
+  Abhishek
