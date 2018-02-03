@@ -1,204 +1,136 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 3 Feb 2018 11:59:32 +0000
-Subject: [PATCH v3 08/18] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <20180202201706.dj6jmff7lh7bleze@kamzik.brq.redhat.com>
-References: <20180201114657.7323-1-marc.zyngier@arm.com>
- <20180201114657.7323-9-marc.zyngier@arm.com>
- <20180202201706.dj6jmff7lh7bleze@kamzik.brq.redhat.com>
-Message-ID: <20180203115932.24c4bcfb@why.wild-wind.fr.eu.org>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Sat, 03 Feb 2018 17:43:38 +0530
+Subject: [PATCH 12/15] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
+ board file
+In-Reply-To: <1517202689-14212-13-git-send-email-sricharan@codeaurora.org>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-13-git-send-email-sricharan@codeaurora.org>
+Message-ID: <033a420e14f090258e4c8f14b7ba89a7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Feb 2018 21:17:06 +0100
-Andrew Jones <drjones@redhat.com> wrote:
-
-> On Thu, Feb 01, 2018 at 11:46:47AM +0000, Marc Zyngier wrote:
-> > Although we've implemented PSCI 1.0 and 1.1, nothing can select them
-> > Since all the new PSCI versions are backward compatible, we decide to
-> > default to the latest version of the PSCI implementation. This is no
-> > different from doing a firmware upgrade on KVM.
-> > 
-> > But in order to give a chance to hypothetical badly implemented guests
-> > that would have a fit by discovering something other than PSCI 0.2,
-> > let's provide a new API that allows userspace to pick one particular
-> > version of the API.
-> > 
-> > This is implemented as a new class of "firmware" registers, where
-> > we expose the PSCI version. This allows the PSCI version to be
-> > save/restored as part of a guest migration, and also set to
-> > any supported version if the guest requires it.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  Documentation/virtual/kvm/api.txt      |  3 +-
-> >  Documentation/virtual/kvm/arm/psci.txt | 30 +++++++++++++++
-> >  arch/arm/include/asm/kvm_host.h        |  3 ++
-> >  arch/arm/include/uapi/asm/kvm.h        |  6 +++
-> >  arch/arm/kvm/guest.c                   | 13 +++++++
-> >  arch/arm64/include/asm/kvm_host.h      |  3 ++
-> >  arch/arm64/include/uapi/asm/kvm.h      |  6 +++
-> >  arch/arm64/kvm/guest.c                 | 14 ++++++-
-> >  include/kvm/arm_psci.h                 |  9 +++++
-> >  virt/kvm/arm/psci.c                    | 68 +++++++++++++++++++++++++++++++++-
-> >  10 files changed, 151 insertions(+), 4 deletions(-)
-> >  create mode 100644 Documentation/virtual/kvm/arm/psci.txt
-> > 
-> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> > index 57d3ee9e4bde..334905202141 100644
-> > --- a/Documentation/virtual/kvm/api.txt
-> > +++ b/Documentation/virtual/kvm/api.txt
-> > @@ -2493,7 +2493,8 @@ Possible features:
-> >  	  and execute guest code when KVM_RUN is called.
-> >  	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
-> >  	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
-> > -	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-> > +	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 (or a future revision
-> > +          backward compatible with v0.2) for the CPU.
-> >  	  Depends on KVM_CAP_ARM_PSCI_0_2.
-> >  	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
-> >  	  Depends on KVM_CAP_ARM_PMU_V3.
-> > diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
-> > new file mode 100644
-> > index 000000000000..aafdab887b04
-> > --- /dev/null
-> > +++ b/Documentation/virtual/kvm/arm/psci.txt
-> > @@ -0,0 +1,30 @@
-> > +KVM implements the PSCI (Power State Coordination Interface)
-> > +specification in order to provide services such as CPU on/off, reset
-> > +and power-off to the guest.
-> > +
-> > +The PSCI specification is regularly updated to provide new features,
-> > +and KVM implements these updates if they make sense from a virtualization
-> > +point of view.
-> > +
-> > +This means that a guest booted on two different versions of KVM can
-> > +observe two different "firmware" revisions. This could cause issues if
-> > +a given guest is tied to a particular PSCI revision (unlikely), or if
-> > +a migration causes a different PSCI version to be exposed out of the
-> > +blue to an unsuspecting guest.
-> > +
-> > +In order to remedy this situation, KVM exposes a set of "firmware
-> > +pseudo-registers" that can be manipulated using the GET/SET_ONE_REG
-> > +interface. These registers can be saved/restored by userspace, and set
-> > +to a convenient value if required.
-> > +
-> > +The following register is defined:
-> > +
-> > +* KVM_REG_ARM_PSCI_VERSION:
-> > +
-> > +  - Only valid if the vcpu has the KVM_ARM_VCPU_PSCI_0_2 feature set
-> > +    (and thus has already been initialized)
-> > +  - Returns the current PSCI version on GET_ONE_REG (defaulting to the
-> > +    highest PSCI version implemented by KVM and compatible with v0.2)
-> > +  - Allows any PSCI version implemented by KVM and compatible with
-> > +    v0.2 to be set with SET_ONE_REG
-> > +  - Affects the whole VM (even if the register view is per-vcpu)  
+On 2018-01-29 10:41, Sricharan R wrote:
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/Makefile                      |  1 +
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts | 78
+> +++++++++++++++++++++++++
+>  2 files changed, 79 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
 > 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index ef5b133..b4339ae 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -729,6 +729,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>  	qcom-ipq4019-ap.dk04.1-c5.dtb \
+>  	qcom-ipq4019-ap.dk04.1-c3.dtb \
+>  	qcom-ipq4019-ap.dk07.1-c1.dtb \
+> +	qcom-ipq4019-ap.dk07.1-c2.dtb \
+>  	qcom-ipq8064-ap148.dtb \
+>  	qcom-msm8660-surf.dtb \
+>  	qcom-msm8960-cdp.dtb \
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+> new file mode 100644
+> index 0000000..d4ee52d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+> @@ -0,0 +1,78 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
+> +
+> +#include "qcom-ipq4019-ap.dk07.1.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK07.1-C2";
 
-Hi Drew,
+  s/IPQ40xx/IPQ4019
 
-Thanks for looking into this, and for the exhaustive data.
+> +
+> +	soc {
+> +		pcie0: pci at 40000000 {
+> +			status = "disabled";
+> +		};
 
-> 
-> I've put some more thought and experimentation into this. I think we
-> should change to a vcpu feature bit. The feature bit would be used to
-> force compat mode, v0.2, so KVM would still enable the new PSCI
-> version by default. Below are two tables describing why I think we
-> should switch to something other than a new sysreg, and below those
-> tables are notes as to why I think we should use a vcpu feature. The
-> asterisks in the tables point out behaviors that aren't what we want.
-> While both tables have an asterisk, the sysreg approach's issue is
-> bug. The vcpu feature approach's issue is risk incurred from an
-> unsupported migration, albeit one that is hard to detect without a
-> new machine type.
-> 
->  +-----------------------------------------------------------------------+
->  |                          sysreg approach                              |
->  +------------------+-----------+-------+--------------------------------+
->  | migration        | userspace | works |             notes              |
->  |                  |  change   |       |                                |
->  +------------------+-----------+-------+--------------------------------+
->  | new    -> new    |   NO      |  YES  | Expected                       |
->  +------------------+-----------+-------+--------------------------------+
->  | old    -> new    |   NO      |  YES  | PSCI 1.0 is backward compatible|
->  +------------------+-----------+-------+--------------------------------+
->  | new    -> old    |   NO      |  NO   | Migration fails due to the new |
->  |                  |           |       | sysreg. Migration shouldn't    |
->  |                  |           |       | have been attempted, but no    |
->  |                  |           |       | way to know without a new      |
->  |                  |           |       | machine type.                  |
->  +------------------+-----------+-------+--------------------------------+
->  | compat -> old    |   YES     |  NO*  | Even when setting PSCI version |
->  |                  |           |       | to 0.2, we add a new sysreg,   |
->  |                  |           |       | so migration will still fail.  |
->  +------------------+-----------+-------+--------------------------------+
->  | old    -> compat |   YES     |  YES  | It's OK for the destination to |
->  |                  |           |       | support more sysregs than the  |
->  |                  |           |       | source sends.                  |
->  +------------------+-----------+-------+--------------------------------+
->  
->  
->  +-----------------------------------------------------------------------+
->  |                        vcpu feature approach                          |
->  +------------------+-----------+-------+--------------------------------+
->  | migration        | userspace | works |             notes              |
->  |                  |  change   |       |                                |
->  +------------------+-----------+-------+--------------------------------+
->  | new    -> new    |   NO      |  YES  | Expected                       |
->  +------------------+-----------+-------+--------------------------------+
->  | old    -> new    |   NO      |  YES  | PSCI 1.0 is backward compatible|
->  +------------------+-----------+-------+--------------------------------+
->  | new    -> old    |   NO      |  YES* | Migrates, but it's not safe    |
->  |                  |           |       | for the guest kernel, and no   |
->  |                  |           |       | way to know without a new      |
->  |                  |           |       | machine type.                  |
->  +------------------+-----------+-------+--------------------------------+
->  | compat -> old    |   YES     |  YES  | Expected                       |
->  +------------------+-----------+-------+--------------------------------+
->  | old    -> compat |   YES     |  YES  | Expected                       |
->  +------------------+-----------+-------+--------------------------------+
-> 
-> 
-> Notes as to why the vcpu feature approach was selected:
-> 
-> 1) While this is VM state, and thus a VM control would be a more natural
->    fit, a new vcpu feature bit would be much less new code. We also
->    already have a PSCI vcpu feature bit, so a new one will actually fit
->    quite well.
-> 
-> 2) No new state needs to be migrated, as we already migrate the feature
->    bitmap. Unlike, KVM, QEMU doesn't track the max number of features,
->    so bumping it one more in KVM doesn't require a QEMU change.
-> 
-> 
-> If we switch to a vcpu feature bit, then I think this patch can be
-> replaced with something like this
+  We can disable in base dtsi itself.
 
-A couple of remarks:
+> +
+> +		pinctrl at 1000000 {
+> +			serial_1_pins: serial1_pinmux {
+> +				mux {
+> +					pins = "gpio8", "gpio9";
+> +					function = "blsp_uart1";
+> +					bias-disable;
+> +				};
+> +			};
+> +
+> +			spi_0_pins: spi_0_pinmux {
+> +				mux {
+> +					pins = "gpio13", "gpio14",
+> "gpio15";
+> +					function = "blsp_spi0";
+> +					bias-disable;
+> +				};
+> +				cs1 {
+> +					pins = "gpio12";
+> +					function = "gpio";
+> +				};
+> +				host_int1 {
+> +					pins = "gpio10";
+> +					function = "gpio";
+> +					input;
+> +				};
+> +				cs2 {
+> +					pins = "gpio45";
+> +					function = "gpio";
+> +				};
+> +				host_int2 {
+> +					pins = "gpio61";
+> +					function = "gpio";
+> +					input;
+> +				};
+> +				rst {
+> +					pins = "gpio36";
+> +					function = "gpio";
+> +					output-high;
+> +				};
 
-- My worry with this feature bit  is that it is a point fix, and it
-  doesn't scale. Come PSCI 1.2 and WORKAROUND_2, what do we do? Add
-  another feature bit that says "force to 1.0"? I'd really like
-  something we can live with in the long run, and "KVM as firmware"
-  needs to be able to evolve without requiring a new userspace
-  interface each time we rev it.
+  Normally spi pins should contains spi protocol related pins
+  could you please explain what is the role of host_pin and rst
+  pins and which driver will use these.
 
-- The "compat->old" entry in your sysreg table is not quite fair. In
-  the feature table, you teach userspace about the new feature bit. You
-  could just as well teach userspace about the new sysreg. Yes, things
-  may be different in QEMU, but that's not what we're talking about
-  here.
+> +			};
+> +		};
+> +
+> +		serial at 78b0000 {
+> +			pinctrl-0 = <&serial_1_pins>;
+> +			pinctrl-names = "default";
+> +			status = "ok";
+> +		};
+> +
+> +		spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
+> +			pinctrl-0 = <&spi_0_pins>;
+> +			pinctrl-names = "default";
+> +			status = "ok";
 
-- Allowing a guest to migrate in an unsafe way seems worse than failing
-  a migration unexpectedly. Or at least not any better.
+  From pinmux, it looks like multiple gpio based cs are being
+  used so do we need to specify cs-gpios like dk01-c2.
 
-To be clear: I'm not dismissing the idea at all, but I want to make sure
-we're not cornering ourselves into an uncomfortable place.
+  Thanks,
+  Abhishek
 
-Christoffer, Peter, what are your thoughts on this?
-
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+> +
+> +			spidev0_0 {
+> +				compatible = "spidev";
+> +				reg = <0>;
+> +				spi-max-frequency = <24000000>;
+> +			};
+> +			spidev0_1 {
+> +				compatible = "spidev";
+> +				reg = <1>;
+> +				spi-max-frequency = <24000000>;
+> +			};
+> +		};
+> +	};
+> +};
