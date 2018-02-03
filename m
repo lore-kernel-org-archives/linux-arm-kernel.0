@@ -1,38 +1,36 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 03 Feb 2018 15:21:42 +0800
-Subject: [linux-sunxi] [PATCH 1/3] net: stmmac: dwmac-sun8i: drop V3s
- compatible and add V3 one
-In-Reply-To: <CAGRGNgXy5ZUdCj34jG5kJ8yLZLbcZie5tkvYP08sFpMmAjwPNg@mail.gmail.com>
+Date: Sat, 03 Feb 2018 15:23:28 +0800
+Subject: [PATCH 1/3] net: stmmac: dwmac-sun8i: drop V3s compatible and add
+ V3 one
+In-Reply-To: <20180202221301.judzaafcu67h4c2v@flea.lan>
 References: <20180202180456.60378-1-icenowy@aosc.io>
  <20180202180456.60378-2-icenowy@aosc.io>
- <CAGRGNgXy5ZUdCj34jG5kJ8yLZLbcZie5tkvYP08sFpMmAjwPNg@mail.gmail.com>
-Message-ID: <10F6ADAB-1E1E-4C14-8809-9471ABABBB8A@aosc.io>
+ <20180202221301.judzaafcu67h4c2v@flea.lan>
+Message-ID: <73B89FC1-9A58-4B08-80C0-971E1254CFD9@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2018?2?3? GMT+08:00 ??2:00:33, Julian Calaby <julian.calaby@gmail.com> ??:
->Hi Icenowy,
->
->On Sat, Feb 3, 2018 at 5:04 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+? 2018?2?3? GMT+08:00 ??6:13:01, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Sat, Feb 03, 2018 at 02:04:54AM +0800, Icenowy Zheng wrote:
 >> The V3s is just a differently packaged version of the V3 chip, which
 >has
 >> a MAC with the same capability with H3. The V3s just doesn't wire out
 >> the external MII/RMII/RGMII bus. (V3 wired out it).
->>
+>> 
 >> Drop the compatible string of V3s in the dwmac-sun8i driver, and add
 >a
 >> V3 compatible string, which has all capabilities.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 >
->Aren't compatible strings technically API, so don't we need to support
->those that are out in the wild "forever"?
->
->Therefore shouldn't we leave the v3s variant around for compatibility
->with existing device trees?
+>This breaks the DT ABI, so NAK.
 
-You can run grep at arch/arm/boot/dts, this compatible
-string is not used at all.
+I have asked this at IRC.
+
+The V3s compatible string is never used in any mainline
+kernel, even not in any RC version.
 
 >
->Thanks,
+>Maxime
