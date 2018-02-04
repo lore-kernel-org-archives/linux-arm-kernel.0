@@ -1,62 +1,197 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 4 Feb 2018 20:22:46 +0100
-Subject: [PATCH] ARM: dts: imx: Add support for Advantech DMS-BA16
-In-Reply-To: <20180204184514.2396-1-yungching0725@gmail.com>
-References: <20180204184514.2396-1-yungching0725@gmail.com>
-Message-ID: <20180204192246.GC24569@lunn.ch>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Sun, 4 Feb 2018 20:34:21 +0000
+Subject: [PATCH] drm/bridge/synopsys: dsi: Add 1.31 version support
+In-Reply-To: <917ebadc-d5f0-ef98-eb50-5e9bf25d722b@codeaurora.org>
+References: <20180122150819.22066-1-philippe.cornu@st.com>
+ <37f38992-0ad3-317f-5337-fbe018bf5f45@st.com>
+ <917ebadc-d5f0-ef98-eb50-5e9bf25d722b@codeaurora.org>
+Message-ID: <ca785ebd-6646-a3e0-14eb-2902116fa85c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 05, 2018 at 02:45:14AM +0800, Ken Lin wrote:
-> Add support for Advantech DMS-BA16 board, which use
-> the Advantech BA-16 module.
+Hi Archit,
+
+and many thanks for your comments
+
+On 02/04/2018 04:13 PM, Archit wrote:
+> Hi Phillipe,
 > 
-> Signed-off-by: Ken Lin <yungching0725@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile           |   1 +
->  arch/arm/boot/dts/imx6q-dms-ba16.dts | 154 +++++++++++++++++++++++++++++++++++
->  2 files changed, 155 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-dms-ba16.dts
+> On Saturday 03 February 2018 03:49 AM, Philippe CORNU wrote:
+>> Hi Archit, Andrzej, Laurent & Brian,
+>>
+>> What is your opinion regarding this patch? Do you have any advice for
+>> handling hw versions?
+>>
+>> Do not hesitate to comment.
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ade7a38543dc..d97511273f30 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -428,6 +428,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-b450v3.dtb \
->  	imx6q-b650v3.dtb \
->  	imx6q-b850v3.dtb \
-> +	imx6q-dms-ba16.dtb \
->  	imx6q-cm-fx6.dtb \
->  	imx6q-cubox-i.dtb \
->  	imx6q-cubox-i-emmc-som-v15.dtb \
+> The patch looks mostly good to me. One query below.
+> 
+>>
+>> Many thanks,
+>> Philippe :-)
+>>
+>>
+>> On 01/22/2018 04:08 PM, Philippe Cornu wrote:
+>>> From: Philippe CORNU <philippe.cornu@st.com>
+>>>
+>>> Add support for the Synopsys DesignWare MIPI DSI version 1.31
+>>> Two registers need to be updated/added for supporting 1.31:
+>>> * PHY_TMR_CFG 0x9c (updated)
+>>> ??? 1.30 [31:24] phy_hs2lp_time
+>>> ???????? [23:16] phy_lp2hs_time
+>>> ???????? [14: 0] max_rd_time
+>>>
+>>> ??? 1.31 [25:16] phy_hs2lp_time
+>>> ???????? [ 9: 0] phy_lp2hs_time
+>>>
+>>> * PHY_TMR_RD_CFG 0xf4 (new)
+>>> ??? 1.31 [14: 0] max_rd_time
+>>>
+>>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>>> ---
+>>> ?? drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 52 
+>>> +++++++++++++++++++++++----
+>>> ?? 1 file changed, 46 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c 
+>>> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>> index 735f38429c06..20a2ca14a7ad 100644
+>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>>> @@ -25,7 +25,13 @@
+>>> ?? #include <drm/bridge/dw_mipi_dsi.h>
+>>> ?? #include <video/mipi_display.h>
+>>> +#define HWVER_130??????????? 0x31333000??? /* IP version 1.30 */
+>>> +#define HWVER_131??????????? 0x31333100??? /* IP version 1.31 */
+>>> +#define HWVER_OLDEST??????????? HWVER_130
+>>> +#define HWVER_NEWEST??????????? HWVER_131
+>>> +
+>>> ?? #define DSI_VERSION??????????? 0x00
+>>> +#define VERSION??????????????? GENMASK(31, 8)
+>>> ?? #define DSI_PWR_UP??????????? 0x04
+>>> ?? #define RESET??????????????? 0
+>>> @@ -161,11 +167,12 @@
+>>> ?? #define PHY_CLKHS2LP_TIME(lbcc)??????? (((lbcc) & 0x3ff) << 16)
+>>> ?? #define PHY_CLKLP2HS_TIME(lbcc)??????? ((lbcc) & 0x3ff)
+>>> -/* TODO Next register is slightly different between 1.30 & 1.31 IP 
+>>> version */
+>>> ?? #define DSI_PHY_TMR_CFG??????????? 0x9c
+>>> -#define PHY_HS2LP_TIME(lbcc)??????? (((lbcc) & 0xff) << 24)
+>>> -#define PHY_LP2HS_TIME(lbcc)??????? (((lbcc) & 0xff) << 16)
+>>> -#define MAX_RD_TIME(lbcc)??????? ((lbcc) & 0x7fff)
+>>> +#define PHY_HS2LP_TIME_V130(lbcc)??? (((lbcc) & 0xff) << 24)
+>>> +#define PHY_LP2HS_TIME_V130(lbcc)??? (((lbcc) & 0xff) << 16)
+>>> +#define MAX_RD_TIME_V130(lbcc)??????? ((lbcc) & 0x7fff)
+>>> +#define PHY_HS2LP_TIME_V131(lbcc)??? (((lbcc) & 0x3ff) << 16)
+>>> +#define PHY_LP2HS_TIME_V131(lbcc)??? ((lbcc) & 0x3ff)
+>>> ?? #define DSI_PHY_RSTZ??????????? 0xa0
+>>> ?? #define PHY_DISFORCEPLL??????????? 0
+>>> @@ -204,7 +211,9 @@
+>>> ?? #define DSI_INT_ST1??????????? 0xc0
+>>> ?? #define DSI_INT_MSK0??????????? 0xc4
+>>> ?? #define DSI_INT_MSK1??????????? 0xc8
+>>> +
+>>> ?? #define DSI_PHY_TMR_RD_CFG??????? 0xf4
+>>> +#define MAX_RD_TIME_V131(lbcc)??????? ((lbcc) & 0x7fff)
+>>> ?? #define PHY_STATUS_TIMEOUT_US??????? 10000
+>>> ?? #define CMD_PKT_STATUS_TIMEOUT_US??? 20000
+>>> @@ -215,6 +224,7 @@ struct dw_mipi_dsi {
+>>> ?????? struct drm_bridge *panel_bridge;
+>>> ?????? struct device *dev;
+>>> ?????? void __iomem *base;
+>>> +??? u32 hw_version;
+>>> ?????? struct clk *pclk;
+>>> ?????? struct clk *px_clk;
+>>> @@ -616,8 +626,14 @@ static void 
+>>> dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
+>>> ??????? * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
+>>> ??????? * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
+>>> ??????? */
+>>> -??? dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
+>>> -????????? | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
+>>> +??? if (dsi->hw_version == HWVER_131) {
+>>> +??????? dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V131(0x40) |
+>>> +????????????? PHY_LP2HS_TIME_V131(0x40));
+>>> +??????? dsi_write(dsi, DSI_PHY_TMR_RD_CFG, MAX_RD_TIME_V131(10000));
+>>> +??? } else {
+>>> +??????? dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V130(0x40) |
+>>> +????????????? PHY_LP2HS_TIME_V130(0x40) | MAX_RD_TIME_V130(10000));
+>>> +??? }
+>>> ?????? dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
+>>> ???????????? | PHY_CLKLP2HS_TIME(0x40));
+>>> @@ -791,6 +807,28 @@ static const struct drm_bridge_funcs 
+>>> dw_mipi_dsi_bridge_funcs = {
+>>> ?????? .attach????????? = dw_mipi_dsi_bridge_attach,
+>>> ?? };
+>>> +static void dsi_get_version(struct dw_mipi_dsi *dsi)
+>>> +{
+>>> +??? u32 hw_version;
+>>> +
+>>> +??? clk_prepare_enable(dsi->pclk);
+>>> +??? hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
+>>> +??? clk_disable_unprepare(dsi->pclk);
+>>> +
+>>> +??? if (hw_version > HWVER_NEWEST) {
+>>> +??????? DRM_DEBUG("hw version: use 0x%08x for this recent 0x%08x\n",
+>>> +????????????? HWVER_NEWEST, hw_version);
+>>> +??????? hw_version = HWVER_NEWEST;
+>>> +
+>>> +??? } else if (hw_version < HWVER_OLDEST) {
+>>> +??????? DRM_DEBUG("hw version: use 0x%08x for this old 0x%08x\n",
+>>> +????????????? HWVER_OLDEST, hw_version);
+>>> +??????? hw_version = HWVER_OLDEST;
+> 
+> I didn't understand the point of HWVER_NEWEST and HWVWER_OLDEST. We're
+> not going to have a huge number of hw versions that we need to check if
+> our version lies within a range. We should rather have a switch case
+> which explicitly sets the hw_version vale based on what we read from
+> the DSI_VERSION register.
+> 
 
-Hi Ken
+I totally understand your comment : )
 
-I think the intention is to keep this list sorted. So dms puts it
-later, after cubox.
+My first implementation used a switch case with the 1.30 and 1.31 
+versions (the 2 versions use by stm32). But default case was difficult 
+to choose... Moreover, this patch with switch cases may be not 
+compatible with rockchip if rockchip chipsets have older version than 
+1.30 and I really did not want to push a patch that could break rockchip 
+driver!
+I do not know the dw dsi versions of rockchip, neither those of 
+hisilicon nor those of imx... Anyway, I put the 1.30 version into the 
+default case... But then I did not know how to manage newer versions 
+(after 1.31)...
+At the end, I pushed this patch with version number comparisons and 
+oldest/newest stuffs because I am sure Rockchip driver will continue to 
+work with it : )
 
-> @@ -0,0 +1,154 @@
-> +/*
-> + * Copyright 2018 Advantech Corporation
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include "imx6q-ba16.dtsi"
-> +
-> +/ {
-> +	model = "Advantech DMS-BA16";
-> +	compatible = "fsl,imx6q-dms-ba16", "fsl,imx6q";
+If you prefer and as you suggested, I can push a patch with switch cases 
+using 1.30 as the default version, it will work with actual rockchip 
+driver too.
 
-This looks wrong. I would expect "advantech,imx6q-dms-ba16".
+I will wait for more feedbacks (especially from Brian & Rockchip team) 
+and do not hesitate to comment my comments.
 
-     Andrew
+Many thanks,
+Philippe :-)
+
+
+> The patch looks fine otherwise.
+> 
+> Thanks,
+> Archit
+> 
+>>> +??? }
+>>> +
+>>> +??? dsi->hw_version = hw_version;
+>>> +}
+>>> +
+>>> ?? static struct dw_mipi_dsi *
+>>> ?? __dw_mipi_dsi_probe(struct platform_device *pdev,
+>>> ?????????????? const struct dw_mipi_dsi_plat_data *plat_data)
+>>> @@ -870,6 +908,8 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
+>>> ?????????? clk_disable_unprepare(dsi->pclk);
+>>> ?????? }
+>>> +??? dsi_get_version(dsi);
+>>> +
+>>> ?????? pm_runtime_enable(dev);
+>>> ?????? dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
