@@ -1,90 +1,160 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 4 Feb 2018 17:26:55 +0100
-Subject: [PATCH v3] ARM: dts: exynos-artik5: add support for wlan
-In-Reply-To: <20180201211656.11829-1-mlyle@lyle.org>
-References: <20180201211656.11829-1-mlyle@lyle.org>
-Message-ID: <20180204162655.xjv2m6f6vo7bu2lq@kozik-lap>
+Date: Sun,  4 Feb 2018 17:46:45 +0100
+Subject: [PATCH v2] ARM: dts: exynos: Add SPDX license identifiers
+Message-ID: <20180204164645.27865-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 01, 2018 at 01:16:56PM -0800, Michael Lyle wrote:
-> On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
-> it, and turn on the regulator used for it, so that both wifi & bluetooth
-> work.
-> 
-> Verified to work on the Artik 520 evaluation board.
-> 
-> v2: accidentally sent out v1
-> v3: non-removable instead of broken-cd, alphabetical order, formatting
+Few files missed recent conversion of GPL v2.0 license statements to
+SPDX identifiers
 
-Changelog should go after --- separator so it would not end in commit.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-I'll fix it during applying. Looks good to me. I'll take it after merge
-window.
+---
 
-Best regards,
-Krzysztof
+Changes since v1:
+1. Update also exynos4412-tmu-sensor-conf.dtsi, exynos4412-tiny4412.dts
+   and exynos4412-trats2.dts.
+---
+ arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi | 5 +----
+ arch/arm/boot/dts/exynos-syscon-restart.dtsi      | 5 +----
+ arch/arm/boot/dts/exynos4412-tiny4412.dts         | 7 ++-----
+ arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi | 6 +-----
+ arch/arm/boot/dts/exynos4412-trats2.dts           | 7 ++-----
+ arch/arm/boot/dts/exynos5800-peach-pi.dts         | 5 +----
+ arch/arm/boot/dts/exynos5800.dtsi                 | 5 +----
+ 7 files changed, 9 insertions(+), 31 deletions(-)
 
-> 
-> Signed-off-by: Michael Lyle <mlyle@lyle.org>
-> ---
->  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> index 0aa577fe9f95..620b50c19ead 100644
-> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-> @@ -245,6 +245,7 @@
->  				regulator-name = "VLDO23_1.8V";
->  				regulator-min-microvolt = <1800000>;
->  				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
->  			};
->  
->  			ldo24_reg: LDO24 {
-> @@ -316,6 +317,41 @@
->  	status = "okay";
->  };
->  
-> +&mshc_1 {
-> +	cap-sd-highspeed;
-> +	cap-sdio-irq;
-> +	disable-wp;
-> +	non-removable;
-> +	keep-power-in-suspend;
-> +	fifo-depth = <0x40>;
-> +	vqmmc-supply = <&ldo11_reg>;
-> +	/*
-> +	 * Voltage negotiation is broken for the SDIO periph so we
-> +	 * can't actually set the voltage here.
-> +	 * vmmc-supply = <&ldo23_reg>;
-> +	 */
-> +	card-detect-delay = <500>;
-> +	clock-frequency = <100000000>;
-> +	max-frequency = <100000000>;
-> +	samsung,dw-mshc-ciu-div = <3>;
-> +	samsung,dw-mshc-sdr-timing = <0 1>;
-> +	samsung,dw-mshc-ddr-timing = <1 2>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
-> +	bus-width = <4>;
-> +	status = "okay";
-> +};
-> +
-> +&pinctrl_1 {
-> +	wlanen: wlanen {
-> +		samsung,pins = "gpx2-3";
-> +		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-> +		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
-> +		samsung,pin-val = <1>;
-> +	};
-> +};
-> +
->  &rtc {
->  	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
->  	clock-names = "rtc", "rtc_src";
-> -- 
-> 2.14.1
-> 
+diff --git a/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi b/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
+index 25186ac4188d..1dbf3bbff8d3 100644
+--- a/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
++++ b/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
+@@ -1,11 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Samsung's Exynos SoC MFC (Video Codec) reserved memory common definition.
+  *
+  * Copyright (c) 2016 Samsung Electronics Co., Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ / {
+diff --git a/arch/arm/boot/dts/exynos-syscon-restart.dtsi b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+index 09a2040054ed..4b3dd0549a54 100644
+--- a/arch/arm/boot/dts/exynos-syscon-restart.dtsi
++++ b/arch/arm/boot/dts/exynos-syscon-restart.dtsi
+@@ -1,9 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Samsung's Exynos SoC syscon reboot/poweroff nodes common definition.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ / {
+diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+index 5504398e6e37..01f37b5ac9c4 100644
+--- a/arch/arm/boot/dts/exynos4412-tiny4412.dts
++++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * FriendlyARM's Exynos4412 based TINY4412 board device tree source
+  *
+@@ -5,11 +6,7 @@
+  *
+  * Device tree source file for FriendlyARM's TINY4412 board which is based on
+  * Samsung's Exynos4412 SoC.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
++ */
+ 
+ /dts-v1/;
+ #include "exynos4412.dtsi"
+diff --git a/arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi b/arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
+index e3f7934d19d0..489b58c619ee 100644
+--- a/arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
++++ b/arch/arm/boot/dts/exynos4412-tmu-sensor-conf.dtsi
+@@ -1,12 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Device tree sources for Exynos4412 TMU sensor configuration
+  *
+  * Copyright (c) 2014 Lukasz Majewski <l.majewski@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  */
+ 
+ #include <dt-bindings/thermal/thermal_exynos.h>
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index f285790e8e04..7da66003a3e3 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Samsung's Exynos4412 based Trats 2 board device tree source
+  *
+@@ -6,11 +7,7 @@
+  *
+  * Device tree source file for Samsung's Trats 2 board which is based on
+  * Samsung's Exynos4412 SoC.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
++ */
+ 
+ /dts-v1/;
+ #include "exynos4412.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 0029ec27819c..c8a66a12dbeb 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -1,11 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Google Peach Pi Rev 10+ board device tree source
+  *
+  * Copyright (c) 2014 Google, Inc
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/exynos5800.dtsi b/arch/arm/boot/dts/exynos5800.dtsi
+index 9ddb6bacac5a..57d3b319fd65 100644
+--- a/arch/arm/boot/dts/exynos5800.dtsi
++++ b/arch/arm/boot/dts/exynos5800.dtsi
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * SAMSUNG EXYNOS5800 SoC device tree source
+  *
+@@ -7,10 +8,6 @@
+  * SAMSUNG EXYNOS5800 SoC device nodes are listed in this file.
+  * EXYNOS5800 based board files can include this file and provide
+  * values for board specfic bindings.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #include "exynos5420.dtsi"
+-- 
+2.11.0
