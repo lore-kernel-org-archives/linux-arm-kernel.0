@@ -1,55 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 4 Feb 2018 21:57:49 +0100
-Subject: [PATCH 1/2] ARM: kvm: fix building with gcc-8
-In-Reply-To: <20180204184517.GQ21802@cbox>
-References: <20180202150756.420422-1-arnd@arndb.de>
- <20180204184517.GQ21802@cbox>
-Message-ID: <CAK8P3a2EFdTcM6U4TU6EZz9vzGKK=hE=8yQ-1eTTxjGMRs5SKQ@mail.gmail.com>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Sun, 4 Feb 2018 22:31:04 +0100
+Subject: [PATCH] drm/bridge/synopsys: dsi: Add read feature
+Message-ID: <20180204213104.17834-1-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 4, 2018 at 7:45 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> Hi Arnd,
->
-> On Fri, Feb 02, 2018 at 04:07:34PM +0100, Arnd Bergmann wrote:
->> In banked-sr.c, we use a top-level '__asm__(".arch_extension virt")'
->> statement to allow compilation of a multi-CPU kernel for ARMv6
->> and older ARMv7-A that don't normally support access to the banked
->> registers.
->>
->> This is considered to be a programming error by the gcc developers
->> and will no longer work in gcc-8, where we now get a build error:
->>
->> /tmp/cc4Qy7GR.s:34: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_usr'
->> /tmp/cc4Qy7GR.s:41: Error: Banked registers are not available with this architecture. -- `mrs r3,ELR_hyp'
->> /tmp/cc4Qy7GR.s:55: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_svc'
->> /tmp/cc4Qy7GR.s:62: Error: Banked registers are not available with this architecture. -- `mrs r3,LR_svc'
->> /tmp/cc4Qy7GR.s:69: Error: Banked registers are not available with this architecture. -- `mrs r3,SPSR_svc'
->> /tmp/cc4Qy7GR.s:76: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_abt'
->>
->> Passign the '-march-armv7ve' flag to gcc works, and is ok here, because
->> we know the functions won't ever be called on pre-ARMv7VE machines.
->> Unfortunately, older compiler versions (4.8 and earlier) do not understand
->> that flag, so we still need to keep the asm around.
->
-> Does "not understand" mean "ignores" or do we get an error?
+This patch adds the DCS/GENERIC DSI read feature.
 
-We get an error, which is why I used the $(call cc-option) Makefile
-helper to check if the compiler supports it.
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+---
+Extra notes:
+DSI read tests have been performed with DCS & GENERIC, short & long
+commands, on two different panels.
+The maximum fifo size (32*32-bit = 128 bytes on stm32) has been
+verified too.
 
->> Backporting to stable kernels (4.6+) is needed to allow those to be built
->> with future compilers as well.
->
-> This builds on the toolchains I have on my machine, so:
->
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->
-> Are you applying this via a tree with other fixes or would you like me
-> to carry it in the kvmarm tree?
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 58 +++++++++++++++++++++------
+ 1 file changed, 45 insertions(+), 13 deletions(-)
 
-Please pick it up in your tree.
-
-Thanks,
-
-       Arnd
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index e9422d05e897..65aeb3f78b48 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -397,18 +397,46 @@ static int dw_mipi_dsi_write(struct dw_mipi_dsi *dsi,
+ 	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, le32_to_cpu(word));
+ }
+ 
++static int dw_mipi_dsi_read(struct dw_mipi_dsi *dsi,
++			    const struct mipi_dsi_msg *msg)
++{
++	int i, j, ret, len = msg->rx_len;
++	u8 *buf = msg->rx_buf;
++	u32 val;
++
++	/* Wait end of the read operation */
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++				 val, !(val & GEN_RD_CMD_BUSY),
++				 1000, CMD_PKT_STATUS_TIMEOUT_US);
++	if (ret) {
++		dev_err(dsi->dev, "Timeout during read operation\n");
++		return ret;
++	}
++
++	for (i = 0; i < len; i += 4) {
++		/* Read fifo must not be empty before all bytes are read */
++		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++					 val, !(val & GEN_PLD_R_EMPTY),
++					 1000, CMD_PKT_STATUS_TIMEOUT_US);
++		if (ret) {
++			dev_err(dsi->dev, "Read payload FIFO is empty\n");
++			return ret;
++		}
++
++		val = dsi_read(dsi, DSI_GEN_PLD_DATA);
++		for (j = 0; j < 4 && j + i < len; j++)
++			buf[i + j] = val >> (8 * j);
++	}
++
++	return ret;
++}
++
+ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 					 const struct mipi_dsi_msg *msg)
+ {
+ 	struct dw_mipi_dsi *dsi = host_to_dsi(host);
+ 	struct mipi_dsi_packet packet;
+-	int ret;
+-
+-	if (msg->rx_buf || msg->rx_len) {
+-		/* TODO dw drv improvements: implement read feature */
+-		dev_warn(dsi->dev, "read operations not yet implemented\n");
+-		return -EINVAL;
+-	}
++	int ret, nb_bytes;
+ 
+ 	ret = mipi_dsi_create_packet(&packet, msg);
+ 	if (ret) {
+@@ -422,12 +450,16 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	if (ret)
+ 		return ret;
+ 
+-	/*
+-	 * TODO Only transmitted size is returned as actual driver does
+-	 * not support dcs/generic reads. Please update return value when
+-	 * delivering the read feature.
+-	 */
+-	return packet.size;
++	if (msg->rx_buf && msg->rx_len) {
++		ret = dw_mipi_dsi_read(dsi, msg);
++		if (ret)
++			return ret;
++		nb_bytes = msg->rx_len;
++	} else {
++		nb_bytes = packet.size;
++	}
++
++	return nb_bytes;
+ }
+ 
+ static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
+-- 
+2.15.1
