@@ -1,38 +1,61 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sun, 4 Feb 2018 10:03:33 +0100
-Subject: [PATCH] ACPI/PCI: pci_link: reduce verbosity when IRQ is enabled
-In-Reply-To: <CAJZ5v0jNVENRq-3QjF6nY9_5-0ff=6j_qneLqCQ57h6t1R4Fow@mail.gmail.com>
-References: <1516128664-23634-1-git-send-email-okaya@codeaurora.org>
- <f508e749-2976-ec6f-681a-553b79c4ab76@codeaurora.org>
- <20180116214939.GC10860@bhelgaas-glaptop.roam.corp.google.com>
- <fde756f4-eb74-4002-6ac4-a44405bad2da@codeaurora.org>
- <CAJZ5v0jNVENRq-3QjF6nY9_5-0ff=6j_qneLqCQ57h6t1R4Fow@mail.gmail.com>
-Message-ID: <CAJZ5v0gW7hHAAisSemyvgTyMxpqxmUTADLZTmpyERB+qSMoA=w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 4 Feb 2018 10:39:33 +0000
+Subject: [PATCH v4 0/6] 32bit ARM branch predictor hardening
+In-Reply-To: <47d908e3-dc59-cc83-bf29-b97301fe0fb0@gmail.com>
+References: <20180201110738.5421-1-marc.zyngier@arm.com>
+ <47d908e3-dc59-cc83-bf29-b97301fe0fb0@gmail.com>
+Message-ID: <20180204103933.2f29383b@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 1, 2018 at 8:32 AM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Mon, Jan 29, 2018 at 8:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> Rafael,
->>
->> On 1/16/2018 4:49 PM, Bjorn Helgaas wrote:
->>> On Tue, Jan 16, 2018 at 01:53:00PM -0500, Sinan Kaya wrote:
->>>> Correcting linux-pci email.
->>>>
->>>> On 1/16/2018 1:51 PM, Sinan Kaya wrote:
->>>>> When ACPI Link object is enabled, the message is printed with a warning
->>>>> prefix. Some test tools are capturing warning and test error types as
->>>>> errors. Let's reduce the verbosity of success case.
->>>>>
->>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
->>>
->>> Looks like this was a result of 4d9391557b68 ("ACPI: add missing KERN_*
->>> constants to printks"), which I think added the wrong level in this case.
->>>
->>
->> Any chance of merging this for 4.16?
->
-> There is.
+On Sat, 3 Feb 2018 18:51:49 -0800
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-This one is already there in the Linus' tree AFAICS.
+Hi Florian,
+
+> Hi Marc,
+> 
+> On 02/01/2018 03:07 AM, Marc Zyngier wrote:
+> > This small series implements some basic BP hardening by invalidating
+> > the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
+> > attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
+> > 32bit kernels that run on 64bit capable CPUs. This series doesn't
+> > mitigate Spectre variant 1 either.
+> > 
+> > These patches are closely modelled against what we do on arm64,
+> > although simpler as we can rely on an architected instruction to
+> > perform the invalidation. The notable exception is Cortex-A15, where
+> > BTB invalidation behaves like a NOP, and the only way to shoot the
+> > predictor down is to invalidate the icache *and* to have ACTLR[0] set
+> > to 1 (which is a secure-only operation).
+> > 
+> > The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
+> > generalises it to be used on all affected CPUs. The second perform the
+> > same invalidation on prefetch abort outside of the userspace
+> > range. The third one nukes it on guest exit, and results in some major
+> > surgery as we cannot take a branch from the vectors (that, and Thumb2
+> > being a massive pain).
+> > 
+> > Patches 4 to 6 are doing a similar thing for Cortex-A15, with the
+> > aforementioned ICIALLU.  
+> 
+> I have not had a chance to integrate those patches into the different
+> downstream branches that we maintain, including upstream, but that's the
+> plan for next week, because there is nothing else besides spectre &
+> meltdown anyway right now :)
+> 
+> I would still like to pursue the RFC patch posted to your v3 where the
+> kernel, if running in secure PL1 tries to set ACTLR[0], except maybe, I
+> won't try to be too smart and detect the 3 states (firmware set, kernel
+> set, not set) and just check whether it is set, and if not *and*
+> HARDEN_BRANCH_PREDICTOR is enabled, then issue a warning?
+
+Sure. That's pretty much orthogonal to this series, so feel free to go
+ahead. Please also consider Cortex-A8 when it comes to checking the
+ACTLR configuration.
+
+Thanks,
+
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
