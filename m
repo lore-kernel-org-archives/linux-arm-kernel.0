@@ -1,100 +1,191 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 4 Feb 2018 19:45:17 +0100
-Subject: [PATCH 1/2] ARM: kvm: fix building with gcc-8
-In-Reply-To: <20180202150756.420422-1-arnd@arndb.de>
-References: <20180202150756.420422-1-arnd@arndb.de>
-Message-ID: <20180204184517.GQ21802@cbox>
+From: yungching0725@gmail.com (Ken Lin)
+Date: Mon,  5 Feb 2018 02:45:14 +0800
+Subject: [PATCH] ARM: dts: imx: Add support for Advantech DMS-BA16
+Message-ID: <20180204184514.2396-1-yungching0725@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Add support for Advantech DMS-BA16 board, which use
+the Advantech BA-16 module.
 
-On Fri, Feb 02, 2018 at 04:07:34PM +0100, Arnd Bergmann wrote:
-> In banked-sr.c, we use a top-level '__asm__(".arch_extension virt")'
-> statement to allow compilation of a multi-CPU kernel for ARMv6
-> and older ARMv7-A that don't normally support access to the banked
-> registers.
-> 
-> This is considered to be a programming error by the gcc developers
-> and will no longer work in gcc-8, where we now get a build error:
-> 
-> /tmp/cc4Qy7GR.s:34: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_usr'
-> /tmp/cc4Qy7GR.s:41: Error: Banked registers are not available with this architecture. -- `mrs r3,ELR_hyp'
-> /tmp/cc4Qy7GR.s:55: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_svc'
-> /tmp/cc4Qy7GR.s:62: Error: Banked registers are not available with this architecture. -- `mrs r3,LR_svc'
-> /tmp/cc4Qy7GR.s:69: Error: Banked registers are not available with this architecture. -- `mrs r3,SPSR_svc'
-> /tmp/cc4Qy7GR.s:76: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_abt'
-> 
-> Passign the '-march-armv7ve' flag to gcc works, and is ok here, because
-> we know the functions won't ever be called on pre-ARMv7VE machines.
-> Unfortunately, older compiler versions (4.8 and earlier) do not understand
-> that flag, so we still need to keep the asm around.
+Signed-off-by: Ken Lin <yungching0725@gmail.com>
+---
+ arch/arm/boot/dts/Makefile           |   1 +
+ arch/arm/boot/dts/imx6q-dms-ba16.dts | 154 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 155 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-dms-ba16.dts
 
-Does "not understand" mean "ignores" or do we get an error?
-
-> 
-> Backporting to stable kernels (4.6+) is needed to allow those to be built
-> with future compilers as well.
-
-This builds on the toolchains I have on my machine, so:
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Are you applying this via a tree with other fixes or would you like me
-to carry it in the kvmarm tree?
-
-Thanks,
--Christoffer
-
-> 
-> Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84129
-> Fixes: 33280b4cd1dc ("ARM: KVM: Add banked registers save/restore")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/kvm/hyp/Makefile    | 5 +++++
->  arch/arm/kvm/hyp/banked-sr.c | 4 ++++
->  2 files changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> index 5638ce0c9524..63d6b404d88e 100644
-> --- a/arch/arm/kvm/hyp/Makefile
-> +++ b/arch/arm/kvm/hyp/Makefile
-> @@ -7,6 +7,8 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
->  
->  KVM=../../../../virt/kvm
->  
-> +CFLAGS_ARMV7VE		   :=$(call cc-option, -march=armv7ve)
-> +
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
-> @@ -15,7 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
->  obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
->  obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
-> +CFLAGS_banked-sr.o	   += $(CFLAGS_ARMV7VE)
-> +
->  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
->  obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
->  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-> +CFLAGS_switch.o		   += $(CFLAGS_ARMV7VE)
->  obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
-> diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
-> index 111bda8cdebd..be4b8b0a40ad 100644
-> --- a/arch/arm/kvm/hyp/banked-sr.c
-> +++ b/arch/arm/kvm/hyp/banked-sr.c
-> @@ -20,6 +20,10 @@
->  
->  #include <asm/kvm_hyp.h>
->  
-> +/*
-> + * gcc before 4.9 doesn't understand -march=armv7ve, so we have to
-> + * trick the assembler.
-> + */
->  __asm__(".arch_extension     virt");
->  
->  void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
-> -- 
-> 2.9.0
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ade7a38543dc..d97511273f30 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -428,6 +428,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-b450v3.dtb \
+ 	imx6q-b650v3.dtb \
+ 	imx6q-b850v3.dtb \
++	imx6q-dms-ba16.dtb \
+ 	imx6q-cm-fx6.dtb \
+ 	imx6q-cubox-i.dtb \
+ 	imx6q-cubox-i-emmc-som-v15.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-dms-ba16.dts b/arch/arm/boot/dts/imx6q-dms-ba16.dts
+new file mode 100644
+index 000000000000..4c5e17a17cbd
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-dms-ba16.dts
+@@ -0,0 +1,154 @@
++/*
++ * Copyright 2018 Advantech Corporation
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include "imx6q-ba16.dtsi"
++
++/ {
++	model = "Advantech DMS-BA16";
++	compatible = "fsl,imx6q-dms-ba16", "fsl,imx6q";
++
++	clocks {
++		mclk: clock at 0 {
++			compatible = "fixed-clock";
++			reg = <0>;
++			#clock-cells = <0>;
++			clock-frequency = <22000000>;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx6q-ba16-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6q-ba16-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&sgtl5000>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <4>;
++	};
++
++	reg_usb_otg_vbus: regulator-usbotgvbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbotgvbus>;
++		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&iomuxc {
++
++	pinctrl_usbotgvbus: usbotgvbusgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15 0x000b0
++			MX6QDL_PAD_GPIO_1__USB_OTG_ID   0x17059
++		>;
++	};
++
++	pinctrl_i2c1_gpio: i2c1gpiogrp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26        0x1b0b0
++			MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27        0x1b0b0
++		>;
++	};
++
++	pinctrl_i2c2_gpio: i2c2gpiogrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL3__GPIO4_IO12 0x1b0b0
++			MX6QDL_PAD_KEY_ROW3__GPIO4_IO13 0x1b0b0
++		>;
++	};
++
++	pinctrl_i2c3_gpio: i2c3gpiogrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_3__GPIO1_IO03   0x1b0b0
++			MX6QDL_PAD_GPIO_6__GPIO1_IO06   0x1b0b0
++		>;
++	};
++};
++
++&ecspi5 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio1 17 0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi5>;
++	status = "okay";
++
++	m25_eeprom: m25p80 at 0 {
++		compatible = "atmel,at25";
++		spi-max-frequency = <20000000>;
++		size = <0x8000>;
++		pagesize = <64>;
++		reg = <0>;
++		address-width = <16>;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	sgtl5000: codec at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&mclk>;
++		lrclk-strength = <0x3>;
++		VDDA-supply = <&reg_1p8v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	dr_mode = "otg";
++	disable-over-current;
++	status = "okay";
++};
++
++&sata {
++	fsl,no-spread-spectrum;
++	fsl,transmit-atten-16ths = <12>;
++	fsl,transmit-boost-mdB = <3330>;
++	fsl,transmit-level-mV = <1133>;
++	fsl,receive-dpll-mode = <1>;
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <8>;
++	cd-gpios = <&gpio6 11 1>;
++	no-1-8-v;
++	keep-power-in-suspend;
++	enable-sdio-wakeup;
++	status = "okay";
++};
++
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>;
++	status = "okay";
++};
++
+-- 
+2.11.0
