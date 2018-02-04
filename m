@@ -1,118 +1,98 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Sun,  4 Feb 2018 23:19:31 +0530
-Subject: [PATCH v3 7/7] ARM: dts: imx6q: Add Engicam i.CoreM6 1.5 Quad/Dual
- MIPI starter kit support
-In-Reply-To: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
-References: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1517766571-409-8-git-send-email-jagan@amarulasolutions.com>
+From: mlyle@lyle.org (Michael Lyle)
+Date: Sun, 4 Feb 2018 10:18:52 -0800
+Subject: [PATCH v3] ARM: dts: exynos-artik5: add support for wlan
+In-Reply-To: <20180204162655.xjv2m6f6vo7bu2lq@kozik-lap>
+References: <20180201211656.11829-1-mlyle@lyle.org>
+ <20180204162655.xjv2m6f6vo7bu2lq@kozik-lap>
+Message-ID: <CAJ+L6qdR4i_VAOY_uchoODrZyH5reRzDGQoGPN2HGH2hGyKDdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.CoreM6 1.5 is an another i.CoreM6 QDL cpu modules which can be connected
-to EDIMM starter kit design with eMMC and MIPI-CSI interfaces suitable for
-Android and video capture application.
+Hi Krzysztof ---
 
-notable features:
-CPU			NXP i.MX6 S/DL/D/Q, Up to 4 x Cortex-A9 at 800MHz
-Memory  		Up to 2 GB DDR3-1066
-Video Interfaces	Up to 1 Parallel Up to 2 LVDS HDMI 1.4
-			port 8 bit CSI INPUT MIPI-CSI INPUT
-1 x 10/100 Ethernet interface, 2 x USB, 1 x PCIe, 1 x I2S etc
+Excellent, thank you for all your help.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v3:
-- none
-Changes for v2:
-- new patch
+Mike
 
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/imx6q-icore-mipi.dts | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-icore.dtsi   | 23 +++++++++++++++++++++++
- 3 files changed, 49 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-icore-mipi.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index aa60320..a0e46f3 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -456,6 +456,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-hummingboard2-emmc-som-v15.dtb \
- 	imx6q-hummingboard2-som-v15.dtb \
- 	imx6q-icore.dtb \
-+	imx6q-icore-mipi.dtb \
- 	imx6q-icore-ofcap10.dtb \
- 	imx6q-icore-ofcap12.dtb \
- 	imx6q-icore-ofcap7.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-icore-mipi.dts b/arch/arm/boot/dts/imx6q-icore-mipi.dts
-new file mode 100644
-index 0000000..acd3d33
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-icore-mipi.dts
-@@ -0,0 +1,25 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2017 Engicam S.r.l.
-+ * Copyright (C) 2017 Amarula Solutions B.V.
-+ * Author: Jagan Teki <jagan@amarulasolutions.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-icore.dtsi"
-+
-+/ {
-+	model = "Engicam i.CoreM6 Quad/Dual MIPI Starter Kit";
-+	compatible = "engicam,imx6-icore", "fsl,imx6q";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index 5fd9e00..d696447 100644
---- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -265,6 +265,14 @@
- 	status = "okay";
- };
- 
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	no-1-8-v;
-+	non-removable;
-+	status = "disabled";
-+};
-+
- &iomuxc {
- 	pinctrl_audmux: audmux {
- 		fsl,pins = <
-@@ -378,4 +386,19 @@
- 			MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17070
- 		>;
- 	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
-+			MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
-+			MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
-+			MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
-+			MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
-+		>;
-+	};
- };
--- 
-2.7.4
+On Sun, Feb 4, 2018 at 8:26 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Thu, Feb 01, 2018 at 01:16:56PM -0800, Michael Lyle wrote:
+>> On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
+>> it, and turn on the regulator used for it, so that both wifi & bluetooth
+>> work.
+>>
+>> Verified to work on the Artik 520 evaluation board.
+>>
+>> v2: accidentally sent out v1
+>> v3: non-removable instead of broken-cd, alphabetical order, formatting
+>
+> Changelog should go after --- separator so it would not end in commit.
+>
+> I'll fix it during applying. Looks good to me. I'll take it after merge
+> window.
+>
+> Best regards,
+> Krzysztof
+>
+>>
+>> Signed-off-by: Michael Lyle <mlyle@lyle.org>
+>> ---
+>>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 36 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+>> index 0aa577fe9f95..620b50c19ead 100644
+>> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+>> @@ -245,6 +245,7 @@
+>>                               regulator-name = "VLDO23_1.8V";
+>>                               regulator-min-microvolt = <1800000>;
+>>                               regulator-max-microvolt = <1800000>;
+>> +                             regulator-always-on;
+>>                       };
+>>
+>>                       ldo24_reg: LDO24 {
+>> @@ -316,6 +317,41 @@
+>>       status = "okay";
+>>  };
+>>
+>> +&mshc_1 {
+>> +     cap-sd-highspeed;
+>> +     cap-sdio-irq;
+>> +     disable-wp;
+>> +     non-removable;
+>> +     keep-power-in-suspend;
+>> +     fifo-depth = <0x40>;
+>> +     vqmmc-supply = <&ldo11_reg>;
+>> +     /*
+>> +      * Voltage negotiation is broken for the SDIO periph so we
+>> +      * can't actually set the voltage here.
+>> +      * vmmc-supply = <&ldo23_reg>;
+>> +      */
+>> +     card-detect-delay = <500>;
+>> +     clock-frequency = <100000000>;
+>> +     max-frequency = <100000000>;
+>> +     samsung,dw-mshc-ciu-div = <3>;
+>> +     samsung,dw-mshc-sdr-timing = <0 1>;
+>> +     samsung,dw-mshc-ddr-timing = <1 2>;
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
+>> +     bus-width = <4>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&pinctrl_1 {
+>> +     wlanen: wlanen {
+>> +             samsung,pins = "gpx2-3";
+>> +             samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+>> +             samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+>> +             samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
+>> +             samsung,pin-val = <1>;
+>> +     };
+>> +};
+>> +
+>>  &rtc {
+>>       clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
+>>       clock-names = "rtc", "rtc_src";
+>> --
+>> 2.14.1
+>>
