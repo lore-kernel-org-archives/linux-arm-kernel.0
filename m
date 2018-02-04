@@ -1,45 +1,90 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sun, 4 Feb 2018 21:08:16 +0530
-Subject: [GIT PULL] Mailbox changes for v4.16
-Message-ID: <CABb+yY02DWB4eb9efeb3MF+hVcV3P65PiALUMd9Rde-X8t5Vxg@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 4 Feb 2018 17:26:55 +0100
+Subject: [PATCH v3] ARM: dts: exynos-artik5: add support for wlan
+In-Reply-To: <20180201211656.11829-1-mlyle@lyle.org>
+References: <20180201211656.11829-1-mlyle@lyle.org>
+Message-ID: <20180204162655.xjv2m6f6vo7bu2lq@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, Feb 01, 2018 at 01:16:56PM -0800, Michael Lyle wrote:
+> On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
+> it, and turn on the regulator used for it, so that both wifi & bluetooth
+> work.
+> 
+> Verified to work on the Artik 520 evaluation board.
+> 
+> v2: accidentally sent out v1
+> v3: non-removable instead of broken-cd, alphabetical order, formatting
 
-The following changes since commit ef7f8cec80a0ba7bd00ece46844c8994117dc910:
+Changelog should go after --- separator so it would not end in commit.
 
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
-(2018-01-08 20:21:39 -0800)
+I'll fix it during applying. Looks good to me. I'll take it after merge
+window.
 
-are available in the git repository at:
+Best regards,
+Krzysztof
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-tags/mailbox-v4.16
-
-for you to fetch changes up to 0ae7d327a64b262443b7d3ebee5831e4dde47b89:
-
-  dt-bindings: mailbox: qcom: Document the APCS clock binding
-(2018-02-04 12:16:34 +0530)
-
-----------------------------------------------------------------
-Misc driver changes only :
-- TI-MsgMgr: Fix print format for a printk
-- TI-MSgMgr: SPDX license switch for the driver
-- QCOM-IPC: Convert driver to use regmap
-- QCOM-IPC: Spawn sibling clock device from mailbox driver
-
-----------------------------------------------------------------
-Georgi Djakov (3):
-      mailbox: qcom: Convert APCS IPC driver to use regmap
-      mailbox: qcom: Create APCS child device for clock controller
-      dt-bindings: mailbox: qcom: Document the APCS clock binding
-
-Nishanth Menon (2):
-      mailbox: ti-msgmgr: Switch to SPDX Licensing
-      mailbox: ti-msgmgr: Use %zu for size_t print format
-
- .../bindings/mailbox/qcom,apcs-kpss-global.txt     | 18 +++++++++++
- drivers/mailbox/qcom-apcs-ipc-mailbox.c            | 35 ++++++++++++++++++----
- drivers/mailbox/ti-msgmgr.c                        | 14 ++-------
- 3 files changed, 51 insertions(+), 16 deletions(-)
+> 
+> Signed-off-by: Michael Lyle <mlyle@lyle.org>
+> ---
+>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> index 0aa577fe9f95..620b50c19ead 100644
+> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+> @@ -245,6 +245,7 @@
+>  				regulator-name = "VLDO23_1.8V";
+>  				regulator-min-microvolt = <1800000>;
+>  				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+>  			};
+>  
+>  			ldo24_reg: LDO24 {
+> @@ -316,6 +317,41 @@
+>  	status = "okay";
+>  };
+>  
+> +&mshc_1 {
+> +	cap-sd-highspeed;
+> +	cap-sdio-irq;
+> +	disable-wp;
+> +	non-removable;
+> +	keep-power-in-suspend;
+> +	fifo-depth = <0x40>;
+> +	vqmmc-supply = <&ldo11_reg>;
+> +	/*
+> +	 * Voltage negotiation is broken for the SDIO periph so we
+> +	 * can't actually set the voltage here.
+> +	 * vmmc-supply = <&ldo23_reg>;
+> +	 */
+> +	card-detect-delay = <500>;
+> +	clock-frequency = <100000000>;
+> +	max-frequency = <100000000>;
+> +	samsung,dw-mshc-ciu-div = <3>;
+> +	samsung,dw-mshc-sdr-timing = <0 1>;
+> +	samsung,dw-mshc-ddr-timing = <1 2>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
+> +
+> +&pinctrl_1 {
+> +	wlanen: wlanen {
+> +		samsung,pins = "gpx2-3";
+> +		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
+> +		samsung,pin-val = <1>;
+> +	};
+> +};
+> +
+>  &rtc {
+>  	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
+>  	clock-names = "rtc", "rtc_src";
+> -- 
+> 2.14.1
+> 
