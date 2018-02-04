@@ -1,36 +1,52 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Sun,  4 Feb 2018 23:19:26 +0530
-Subject: [PATCH v3 2/7] ARM: dts: imx6q-icore: Switch LVDS timings from
- panel-simple
+Date: Sun,  4 Feb 2018 23:19:28 +0530
+Subject: [PATCH v3 4/7] drm/panel: simple: Add support for KEO TX31D200VM0BAA
 In-Reply-To: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
 References: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1517766571-409-3-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1517766571-409-5-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to use ampire,am-800480aytzqw-00h LVDS timings from
-panel-simple instead hard coding the same in dts.
+This adds support for the Kaohsiung Opto-Electronics.,
+TX31D200VM0BAA 12.3" HSXGA LVDS panel, which can be
+supported by the simple panel driver.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes for v3, v2:
-- none
+Changes for v3:
+- collect Rob reiew tag 
+Changes for v2:
+- Updated binding info about optional properties, node and example
 
- arch/arm/boot/dts/imx6q-icore.dts    | 31 +++++++++++++++++--------------
- arch/arm/boot/dts/imx6qdl-icore.dtsi |  2 +-
- 2 files changed, 18 insertions(+), 15 deletions(-)
+ .../bindings/display/panel/koe,tx31d200vm0baa.txt  | 25 ++++++++++++++++++++
+ drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/koe,tx31d200vm0baa.txt
 
-diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
-index 5613dd9..c8e464e 100644
---- a/arch/arm/boot/dts/imx6q-icore.dts
-+++ b/arch/arm/boot/dts/imx6q-icore.dts
-@@ -48,6 +48,17 @@
- / {
- 	model = "Engicam i.CoreM6 Quad/Dual Starter Kit";
- 	compatible = "engicam,imx6-icore", "fsl,imx6q";
+diff --git a/Documentation/devicetree/bindings/display/panel/koe,tx31d200vm0baa.txt b/Documentation/devicetree/bindings/display/panel/koe,tx31d200vm0baa.txt
+new file mode 100644
+index 0000000..6a036ed
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/koe,tx31d200vm0baa.txt
+@@ -0,0 +1,25 @@
++Kaohsiung Opto-Electronics. TX31D200VM0BAA 12.3" HSXGA LVDS panel
 +
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
++
++Required properties:
++- compatible: should be "koe,tx31d200vm0baa"
++
++Optional properties:
++- backlight: phandle of the backlight device attached to the panel
++
++Optional nodes:
++- Video port for LVDS panel input.
++
++Example:
 +	panel {
-+		compatible = "ampire,am-800480aytzqw-00h";
++		compatible = "koe,tx31d200vm0baa";
 +		backlight = <&backlight_lvds>;
 +
 +		port {
@@ -39,50 +55,50 @@ index 5613dd9..c8e464e 100644
 +			};
 +		};
 +	};
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 2ecc14b..8a0e4a8 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -1241,6 +1241,30 @@ static const struct panel_desc innolux_zj070na_01p = {
+ 	},
  };
  
- &can1 {
-@@ -71,22 +82,14 @@
- 	status = "okay";
- 
- 	lvds-channel at 0 {
--		fsl,data-mapping = "spwg";
--		fsl,data-width = <18>;
-+		reg = <0>;
- 		status = "okay";
- 
--		display-timings {
--			native-mode = <&timing0>;
--			timing0: timing0 {
--				clock-frequency = <60000000>;
--				hactive = <800>;
--				vactive = <480>;
--				hback-porch = <30>;
--				hfront-porch = <30>;
--				vback-porch = <5>;
--				vfront-porch = <5>;
--				hsync-len = <64>;
--				vsync-len = <20>;
-+		port at 4 {
-+			reg = <4>;
++static const struct display_timing koe_tx31d200vm0baa_timing = {
++	.pixelclock = { 39600000, 43200000, 48000000 },
++	.hactive = { 1280, 1280, 1280 },
++	.hfront_porch = { 16, 36, 56 },
++	.hback_porch = { 16, 36, 56 },
++	.hsync_len = { 8, 8, 8 },
++	.vactive = { 480, 480, 480 },
++	.vfront_porch = { 6, 21, 33.5 },
++	.vback_porch = { 6, 21, 33.5 },
++	.vsync_len = { 8, 8, 8 },
++	.flags = DISPLAY_FLAGS_DE_HIGH,
++};
 +
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index a1b469c..5fd9e00 100644
---- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -49,7 +49,7 @@
- 		reg = <0x10000000 0x80000000>;
- 	};
- 
--	backlight {
-+	backlight_lvds: backlight-lvds {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm3 0 100000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
++static const struct panel_desc koe_tx31d200vm0baa = {
++	.timings = &koe_tx31d200vm0baa_timing,
++	.num_timings = 1,
++	.bpc = 6,
++	.size = {
++		.width = 292,
++		.height = 109,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
++};
++
+ static const struct display_timing kyo_tcg121xglp_timing = {
+ 	.pixelclock = { 52000000, 65000000, 71000000 },
+ 	.hactive = { 1024, 1024, 1024 },
+@@ -2151,6 +2175,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "innolux,zj070na-01p",
+ 		.data = &innolux_zj070na_01p,
+ 	}, {
++		.compatible = "koe,tx31d200vm0baa",
++		.data = &koe_tx31d200vm0baa,
++	}, {
+ 		.compatible = "kyo,tcg121xglp",
+ 		.data = &kyo_tcg121xglp,
+ 	}, {
 -- 
 2.7.4
