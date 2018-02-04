@@ -1,98 +1,168 @@
-From: mlyle@lyle.org (Michael Lyle)
-Date: Sun, 4 Feb 2018 10:18:52 -0800
-Subject: [PATCH v3] ARM: dts: exynos-artik5: add support for wlan
-In-Reply-To: <20180204162655.xjv2m6f6vo7bu2lq@kozik-lap>
-References: <20180201211656.11829-1-mlyle@lyle.org>
- <20180204162655.xjv2m6f6vo7bu2lq@kozik-lap>
-Message-ID: <CAJ+L6qdR4i_VAOY_uchoODrZyH5reRzDGQoGPN2HGH2hGyKDdw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 4 Feb 2018 19:38:54 +0100
+Subject: [PATCH v3 10/18] arm/arm64: KVM: Turn kvm_psci_version into a
+ static inline
+In-Reply-To: <20180201114657.7323-11-marc.zyngier@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-11-marc.zyngier@arm.com>
+Message-ID: <20180204183854.GN21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof ---
+On Thu, Feb 01, 2018 at 11:46:49AM +0000, Marc Zyngier wrote:
+> We're about to need kvm_psci_version in HYP too. So let's turn it
+> into a static inline, and pass the kvm structure as a second
+> parameter (so that HYP can do a kern_hyp_va on it).
+> 
 
-Excellent, thank you for all your help.
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Mike
-
-On Sun, Feb 4, 2018 at 8:26 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Thu, Feb 01, 2018 at 01:16:56PM -0800, Michael Lyle wrote:
->> On the Artik520 module, there's a bcm4354 attached to mshc_1.  Enable
->> it, and turn on the regulator used for it, so that both wifi & bluetooth
->> work.
->>
->> Verified to work on the Artik 520 evaluation board.
->>
->> v2: accidentally sent out v1
->> v3: non-removable instead of broken-cd, alphabetical order, formatting
->
-> Changelog should go after --- separator so it would not end in commit.
->
-> I'll fix it during applying. Looks good to me. I'll take it after merge
-> window.
->
-> Best regards,
-> Krzysztof
->
->>
->> Signed-off-by: Michael Lyle <mlyle@lyle.org>
->> ---
->>  arch/arm/boot/dts/exynos3250-artik5.dtsi | 36 ++++++++++++++++++++++++++++++++
->>  1 file changed, 36 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> index 0aa577fe9f95..620b50c19ead 100644
->> --- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
->> @@ -245,6 +245,7 @@
->>                               regulator-name = "VLDO23_1.8V";
->>                               regulator-min-microvolt = <1800000>;
->>                               regulator-max-microvolt = <1800000>;
->> +                             regulator-always-on;
->>                       };
->>
->>                       ldo24_reg: LDO24 {
->> @@ -316,6 +317,41 @@
->>       status = "okay";
->>  };
->>
->> +&mshc_1 {
->> +     cap-sd-highspeed;
->> +     cap-sdio-irq;
->> +     disable-wp;
->> +     non-removable;
->> +     keep-power-in-suspend;
->> +     fifo-depth = <0x40>;
->> +     vqmmc-supply = <&ldo11_reg>;
->> +     /*
->> +      * Voltage negotiation is broken for the SDIO periph so we
->> +      * can't actually set the voltage here.
->> +      * vmmc-supply = <&ldo23_reg>;
->> +      */
->> +     card-detect-delay = <500>;
->> +     clock-frequency = <100000000>;
->> +     max-frequency = <100000000>;
->> +     samsung,dw-mshc-ciu-div = <3>;
->> +     samsung,dw-mshc-sdr-timing = <0 1>;
->> +     samsung,dw-mshc-ddr-timing = <1 2>;
->> +     pinctrl-names = "default";
->> +     pinctrl-0 = <&sd1_cmd &sd1_clk &sd1_bus1 &sd1_bus4 &wlanen>;
->> +     bus-width = <4>;
->> +     status = "okay";
->> +};
->> +
->> +&pinctrl_1 {
->> +     wlanen: wlanen {
->> +             samsung,pins = "gpx2-3";
->> +             samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
->> +             samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
->> +             samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
->> +             samsung,pin-val = <1>;
->> +     };
->> +};
->> +
->>  &rtc {
->>       clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
->>       clock-names = "rtc", "rtc_src";
->> --
->> 2.14.1
->>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 20 ++++++++++++--------
+>  include/kvm/arm_psci.h      | 26 +++++++++++++++++++++++++-
+>  virt/kvm/arm/psci.c         | 25 +++----------------------
+>  3 files changed, 40 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 036e1f3d77a6..408c04d789a5 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -19,6 +19,8 @@
+>  #include <linux/jump_label.h>
+>  #include <uapi/linux/psci.h>
+>  
+> +#include <kvm/arm_psci.h>
+> +
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_hyp.h>
+> @@ -350,14 +352,16 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  
+>  	if (exit_code == ARM_EXCEPTION_TRAP &&
+>  	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
+> -	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32) &&
+> -	    vcpu_get_reg(vcpu, 0) == PSCI_0_2_FN_PSCI_VERSION) {
+> -		u64 val = PSCI_RET_NOT_SUPPORTED;
+> -		if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+> -			val = 2;
+> -
+> -		vcpu_set_reg(vcpu, 0, val);
+> -		goto again;
+> +	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32)) {
+> +		u32 val = vcpu_get_reg(vcpu, 0);
+> +
+> +		if (val == PSCI_0_2_FN_PSCI_VERSION) {
+> +			val = kvm_psci_version(vcpu, kern_hyp_va(vcpu->kvm));
+> +			if (unlikely(val == KVM_ARM_PSCI_0_1))
+> +				val = PSCI_RET_NOT_SUPPORTED;
+> +			vcpu_set_reg(vcpu, 0, val);
+> +			goto again;
+> +		}
+>  	}
+>  
+>  	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
+> diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+> index 7b2e12697d4f..9b699f91171f 100644
+> --- a/include/kvm/arm_psci.h
+> +++ b/include/kvm/arm_psci.h
+> @@ -18,6 +18,7 @@
+>  #ifndef __KVM_ARM_PSCI_H__
+>  #define __KVM_ARM_PSCI_H__
+>  
+> +#include <linux/kvm_host.h>
+>  #include <uapi/linux/psci.h>
+>  
+>  #define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
+> @@ -26,7 +27,30 @@
+>  
+>  #define KVM_ARM_PSCI_LATEST	KVM_ARM_PSCI_1_0
+>  
+> -int kvm_psci_version(struct kvm_vcpu *vcpu);
+> +/*
+> + * We need the KVM pointer independently from the vcpu as we can call
+> + * this from HYP, and need to apply kern_hyp_va on it...
+> + */
+> +static inline int kvm_psci_version(struct kvm_vcpu *vcpu, struct kvm *kvm)
+> +{
+> +	/*
+> +	 * Our PSCI implementation stays the same across versions from
+> +	 * v0.2 onward, only adding the few mandatory functions (such
+> +	 * as FEATURES with 1.0) that are required by newer
+> +	 * revisions. It is thus safe to return the latest, unless
+> +	 * userspace has instructed us otherwise.
+> +	 */
+> +	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features)) {
+> +		if (kvm->arch.psci_version)
+> +			return kvm->arch.psci_version;
+> +
+> +		return KVM_ARM_PSCI_LATEST;
+> +	}
+> +
+> +	return KVM_ARM_PSCI_0_1;
+> +}
+> +
+> +
+>  int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
+>  
+>  struct kvm_one_reg;
+> diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+> index 53272e8e0d37..2efacbe7b1a2 100644
+> --- a/virt/kvm/arm/psci.c
+> +++ b/virt/kvm/arm/psci.c
+> @@ -124,7 +124,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	if (!vcpu)
+>  		return PSCI_RET_INVALID_PARAMS;
+>  	if (!vcpu->arch.power_off) {
+> -		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
+> +		if (kvm_psci_version(source_vcpu, kvm) != KVM_ARM_PSCI_0_1)
+>  			return PSCI_RET_ALREADY_ON;
+>  		else
+>  			return PSCI_RET_INVALID_PARAMS;
+> @@ -233,25 +233,6 @@ static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
+>  	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
+>  }
+>  
+> -int kvm_psci_version(struct kvm_vcpu *vcpu)
+> -{
+> -	/*
+> -	 * Our PSCI implementation stays the same across versions from
+> -	 * v0.2 onward, only adding the few mandatory functions (such
+> -	 * as FEATURES with 1.0) that are required by newer
+> -	 * revisions. It is thus safe to return the latest, unless
+> -	 * userspace has instructed us otherwise.
+> -	 */
+> -	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features)) {
+> -		if (vcpu->kvm->arch.psci_version)
+> -			return vcpu->kvm->arch.psci_version;
+> -
+> -		return KVM_ARM_PSCI_LATEST;
+> -	}
+> -
+> -	return KVM_ARM_PSCI_0_1;
+> -}
+> -
+>  static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm *kvm = vcpu->kvm;
+> @@ -409,7 +390,7 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>   */
+>  static int kvm_psci_call(struct kvm_vcpu *vcpu)
+>  {
+> -	switch (kvm_psci_version(vcpu)) {
+> +	switch (kvm_psci_version(vcpu, vcpu->kvm)) {
+>  	case KVM_ARM_PSCI_1_0:
+>  		return kvm_psci_1_0_call(vcpu);
+>  	case KVM_ARM_PSCI_0_2:
+> @@ -460,7 +441,7 @@ int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  		void __user *uaddr = (void __user *)(long)reg->addr;
+>  		u64 val;
+>  
+> -		val = kvm_psci_version(vcpu);
+> +		val = kvm_psci_version(vcpu, vcpu->kvm);
+>  		if (val == KVM_ARM_PSCI_0_1)
+>  			return -EINVAL;
+>  		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
+> -- 
+> 2.14.2
+> 
