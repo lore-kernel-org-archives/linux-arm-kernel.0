@@ -1,47 +1,52 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  5 Feb 2018 15:34:31 +0100
-Subject: [PATCH 5/9] drm/rockchip: dw_hdmi: Allow outputs that don't need
- output switching
-In-Reply-To: <20180205143435.4723-1-heiko@sntech.de>
-References: <20180205143435.4723-1-heiko@sntech.de>
-Message-ID: <20180205143435.4723-6-heiko@sntech.de>
+Date: Mon,  5 Feb 2018 15:34:26 +0100
+Subject: [PATCH 0/9] drm/rockchip: hdmi support for rk3328
+Message-ID: <20180205143435.4723-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we always encountered socs with 2 output crtcs needing the driver
-to tell the hdmi block which output to connect to. But there also exist
-socs with only one crtc like the rk3228, rk3328 and rk3368.
+The rk3228/rk3229 and rk3328 socs started using a new type of hdmi-phy
+from Innosilicon that resides completely separate from the dw-hdmi block
+and gets accessed via mmio.
 
-So adapt the register field to simply carry a negative value to signal
-that now output-switching is necessary.
+Additionally the rk3328 dw-hdmi does not report the vendor-phy type
+but a different one instead, so add the possibility to override the
+phy type when the glue driver knows better than the ip block itself.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 1eb02a82fd91..304f61bd2eec 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -36,7 +36,7 @@
-  * @lcdsel_lit: reg value of selecting vop little for HDMI
-  */
- struct rockchip_hdmi_chip_data {
--	u32	lcdsel_grf_reg;
-+	int	lcdsel_grf_reg;
- 	u32	lcdsel_big;
- 	u32	lcdsel_lit;
- };
-@@ -252,6 +252,9 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	u32 val;
- 	int ret;
- 
-+	if (hdmi->chip_data->lcdsel_grf_reg < 0)
-+		return;
-+
- 	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
- 	if (ret)
- 		val = hdmi->chip_data->lcdsel_lit;
+I've put both the phy driver and dw-hdmi changes into one series just
+to showcase how everything comes together, but would of course still
+expect things to go through the separate phy and drm trees once deemed
+ready.
+
+
+Algea Cao (1):
+  drm/bridge: dw-hdmi: export hotplug functions
+
+Heiko Stuebner (6):
+  drm/bridge: dw-hdmi: allow overriding of phy-type reading
+  drm/rockchip: dw_hdmi: Allow outputs that don't need output switching
+  dt-bindings: allow optional phys in Rockchip dw_hdmi binding
+  drm/rockchip: dw_hdmi: allow including external phys
+  drm/rockchip: dw_hdmi: store rockchip_hdmi reference in phy_data
+    object
+  drm/rockchip: dw_hdmi: add dw-hdmi support for the rk3328
+
+Zheng Yang (2):
+  dt-bindings: add binding for Rockchip hdmi phy using an Innosilicon IP
+  phy: add Rockchip Innosilicon hdmi phy
+
+ .../bindings/display/rockchip/dw_hdmi-rockchip.txt |    3 +
+ .../bindings/phy/phy-rockchip-inno-hdmi.txt        |   42 +
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |   15 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |  130 ++-
+ drivers/phy/rockchip/Kconfig                       |    7 +
+ drivers/phy/rockchip/Makefile                      |    1 +
+ drivers/phy/rockchip/phy-rockchip-inno-hdmi.c      | 1221 ++++++++++++++++++++
+ include/drm/bridge/dw_hdmi.h                       |    7 +-
+ 8 files changed, 1417 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+ create mode 100644 drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+
 -- 
 2.15.1
