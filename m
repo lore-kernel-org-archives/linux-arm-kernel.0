@@ -1,32 +1,36 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon,  5 Feb 2018 16:46:48 +0200
-Subject: [PATCH 1/4] arm64: dts: qcom: msm8916: Add msm8916 A53 PLL DT node
-Message-ID: <20180205144651.5934-1-georgi.djakov@linaro.org>
+Date: Mon,  5 Feb 2018 16:46:49 +0200
+Subject: [PATCH 2/4] arm64: dts: qcom: msm8916: Probe the APCS mailbox driver
+In-Reply-To: <20180205144651.5934-1-georgi.djakov@linaro.org>
+References: <20180205144651.5934-1-georgi.djakov@linaro.org>
+Message-ID: <20180205144651.5934-2-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree node for the A53 PLL, which exists on msm8916
-platforms.
+The APCS block was exposed until now as a syscon, but now we have a
+proper driver for this block. Add the compatible string of the new
+driver to probe and register the mailbox functionality.
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index e51b04900726..d3592b19cfc9 100644
+index d3592b19cfc9..5414f53a0fa1 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -326,6 +326,12 @@
- 			status = "disabled";
+@@ -332,9 +332,10 @@
+ 			#clock-cells = <0>;
  		};
  
-+		a53pll: clock at b016000 {
-+			compatible = "qcom,msm8916-a53pll";
-+			reg = <0xb016000 0x40>;
-+			#clock-cells = <0>;
-+		};
-+
- 		apcs: syscon at b011000 {
- 			compatible = "syscon";
- 			reg = <0x0b011000 0x1000>;
+-		apcs: syscon at b011000 {
+-			compatible = "syscon";
+-			reg = <0x0b011000 0x1000>;
++		apcs: mailbox at b011000 {
++			compatible = "qcom,msm8916-apcs-kpss-global", "syscon";
++			reg = <0xb011000 0x1000>;
++			#mbox-cells = <1>;
+ 		};
+ 
+ 		blsp1_uart2: serial at 78b0000 {
