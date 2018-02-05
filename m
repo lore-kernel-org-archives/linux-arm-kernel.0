@@ -1,110 +1,108 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 5 Feb 2018 17:11:32 +0800
-Subject: [PATCH v2 4/5] dt-bindings: clock: mediatek: update audsys
- documentation to adapt MFD device
-In-Reply-To: <20180205060833.p56dun5i4bvs3jye@rob-hp-laptop>
-References: <cover.1515639336.git.ryder.lee@mediatek.com>
- <8651585c91ee40f6ab3e30b893bcfb90fe5c2c25.1515639336.git.ryder.lee@mediatek.com>
- <20180205060833.p56dun5i4bvs3jye@rob-hp-laptop>
-Message-ID: <1517821892.12510.32.camel@mtkswgap22>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 5 Feb 2018 10:15:21 +0100
+Subject: [PATCH] video: fbdev: convert to use GPIO descriptors
+In-Reply-To: <20180205082335.5727-1-ludovic.desroches@microchip.com>
+References: <20180205082335.5727-1-ludovic.desroches@microchip.com>
+Message-ID: <ac7174c4-e213-1f14-4cf7-1701c0f8b452@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-02-05 at 00:08 -0600, Rob Herring wrote:
-> On Wed, Jan 31, 2018 at 03:42:44PM +0800, Ryder Lee wrote:
-> > As the MediaTek audio hardware block that expose functionalities that are
-> > handled by separate subsystems in the kernel, and there are registers that
-> > are shared between related drivers.
-> > 
-> > Switch the current device to an MFD device, add more descriptions about the
-> > subsystem and modify example accordingly.
-> > 
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> >  .../bindings/arm/mediatek/mediatek,audsys.txt      | 37 ++++++++++++++++++----
-> >  1 file changed, 30 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-> > index 9b8f578..677af40 100644
-> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-> > @@ -1,22 +1,45 @@
-> > -MediaTek AUDSYS controller
-> > +MediaTek Audio Subsystem
-> >  ============================
-> > +The audio subsystem is one of the multi-function blocks of MediaTek SoCs.
-> > +It contains a system controller, which provides a number registers giving
-> > +access to two features: AUDSYS clocks and Audio Front End (AFE) components.
-> >  
-> > +For the top level node:
-> > +- compatible: must be: "syscon", "simple-mfd";
+On 05/02/2018 at 09:23, Ludovic Desroches wrote:
+> Use GPIO descriptors instead of relying on the old method.
 > 
-> This should have some SoC specific compatible.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-As we don't have a specific driver (compatible string) for it and if we
-need to add that I think the term '*-audsys' is very suitable here, but
-unfortunately, it has already picked for clock driver (see child node).
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-I also took ../../marvell/*-system-controller.txt as examples for my
-case. Thus, I'm not sure should we still need a new one here?
+Thanks!
 
-> > +- reg: register area of the Audio Subsystem
-> > +
-> > +Required sub-nodes:
-> > +
-> > +AUDSYS clocks:
-> > +-------
-> >  The MediaTek AUDSYS controller provides various clocks to the system.
-> >  
-> >  Required Properties:
-> >  
-> >  - compatible: Should be one of:
-> > -	- "mediatek,mt7622-audsys", "syscon"
-> > +	- "mediatek,mt2701-audsys";
-> > +	- "mediatek,mt7622-audsys";
-> >  - #clock-cells: Must be 1
-> >  
-> >  The AUDSYS controller uses the common clk binding from
-> >  Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >  The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+> ---
+>  drivers/video/fbdev/atmel_lcdfb.c | 30 ++++++++++++------------------
+>  1 file changed, 12 insertions(+), 18 deletions(-)
 > 
-> There's no register range associated with the clocks? If there is, add a 
-> reg property.
-
-No, we don't need reg property here, as the two sub-drivers will obtain
-the regmap  which is propagated from the parent.
-
-Thanks
-
-> >  
-> > +AFE components:
-> > +-------
-> > +For common binding part and usage, refer to
-> > +../sonud/mt2701-afe-pcm.txt.
-> > +
-> >  Example:
-> >  
-> > -audsys: audsys at 11220000 {
-> > -	compatible = "mediatek,mt7622-audsys", "syscon";
-> > -	reg = <0 0x11220000 0 0x1000>;
-> > -	#clock-cells = <1>;
-> > -};
-> > +	audio-subsystem at 11220000 {
-> > +		compatible = "syscon", "simple-mfd";
-> > +		reg = <0 0x11220000 0 0x2000>;
-> > +
-> > +		audsys: clock {
-> > +			compatible = "mediatek,mt2701-audsys";
-> > +			#clock-cells = <1>;
-> > +		};
-> > +
-> > +		...
-> > +	};
-> > -- 
-> > 1.9.1
-> > 
+> diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+> index 3dee267d7c75..ef3d4198014f 100644
+> --- a/drivers/video/fbdev/atmel_lcdfb.c
+> +++ b/drivers/video/fbdev/atmel_lcdfb.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/backlight.h>
+>  #include <linux/gfp.h>
+> +#include <linux/gpio/consumer.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> @@ -61,8 +62,7 @@ struct atmel_lcdfb_info {
+>  };
+>  
+>  struct atmel_lcdfb_power_ctrl_gpio {
+> -	int gpio;
+> -	int active_low;
+> +	struct gpio_desc *gpiod;
+>  
+>  	struct list_head list;
+>  };
+> @@ -1018,7 +1018,7 @@ static void atmel_lcdfb_power_control_gpio(struct atmel_lcdfb_pdata *pdata, int
+>  	struct atmel_lcdfb_power_ctrl_gpio *og;
+>  
+>  	list_for_each_entry(og, &pdata->pwr_gpios, list)
+> -		gpio_set_value(og->gpio, on);
+> +		gpiod_set_value(og->gpiod, on);
+>  }
+>  
+>  static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+> @@ -1031,11 +1031,11 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+>  	struct device_node *display_np;
+>  	struct device_node *timings_np;
+>  	struct display_timings *timings;
+> -	enum of_gpio_flags flags;
+>  	struct atmel_lcdfb_power_ctrl_gpio *og;
+>  	bool is_gpio_power = false;
+>  	int ret = -ENOENT;
+> -	int i, gpio;
+> +	int i;
+> +	struct gpio_desc *gpiod;
+>  
+>  	sinfo->config = (struct atmel_lcdfb_config*)
+>  		of_match_device(atmel_lcdfb_dt_ids, dev)->data;
+> @@ -1072,28 +1072,22 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+>  
+>  	INIT_LIST_HEAD(&pdata->pwr_gpios);
+>  	ret = -ENOMEM;
+> -	for (i = 0; i < of_gpio_named_count(display_np, "atmel,power-control-gpio"); i++) {
+> -		gpio = of_get_named_gpio_flags(display_np, "atmel,power-control-gpio",
+> -					       i, &flags);
+> -		if (gpio < 0)
+> +	for (i = 0; i < gpiod_count(dev, "atmel,power-control"); i++) {
+> +		gpiod = devm_gpiod_get_index_optional(dev,
+> +				"atmel,power-control", i, GPIOD_ASIS);
+> +		if (!gpiod)
+>  			continue;
+>  
+>  		og = devm_kzalloc(dev, sizeof(*og), GFP_KERNEL);
+>  		if (!og)
+>  			goto put_display_node;
+>  
+> -		og->gpio = gpio;
+> -		og->active_low = flags & OF_GPIO_ACTIVE_LOW;
+> +		og->gpiod = gpiod;
+>  		is_gpio_power = true;
+> -		ret = devm_gpio_request(dev, gpio, "lcd-power-control-gpio");
+> -		if (ret) {
+> -			dev_err(dev, "request gpio %d failed\n", gpio);
+> -			goto put_display_node;
+> -		}
+>  
+> -		ret = gpio_direction_output(gpio, og->active_low);
+> +		ret = gpiod_direction_output(gpiod, gpiod_is_active_low(gpiod));
+>  		if (ret) {
+> -			dev_err(dev, "set direction output gpio %d failed\n", gpio);
+> +			dev_err(dev, "set direction output gpio atmel,power-control[%d] failed\n", i);
+>  			goto put_display_node;
+>  		}
+>  		list_add(&og->list, &pdata->pwr_gpios);
 > 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+
+-- 
+Nicolas Ferre
