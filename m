@@ -1,46 +1,72 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 5 Feb 2018 13:36:02 +0100
-Subject: [PATCH] [PATCH] tty/serial: atmel: add new version check for usart
-In-Reply-To: <20180129113954.12011-1-jonas@orbital-systems.com>
-References: <20180129113954.12011-1-jonas@orbital-systems.com>
-Message-ID: <e20ced24-666b-32b7-92cd-d30e1a10b42e@microchip.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 5 Feb 2018 18:20:16 +0530
+Subject: [PATCH v2 03/16] mmc: sdhci-omap: Add custom set_uhs_signaling
+ sdhci_host ops
+In-Reply-To: <20180205125029.21570-1-kishon@ti.com>
+References: <20180205125029.21570-1-kishon@ti.com>
+Message-ID: <20180205125029.21570-4-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/2018 at 12:39, Jonas Danielsson wrote:
-> On our at91sam9260 based board the usart0 and usart1 ports report
-> their versions (ATMEL_US_VERSION) as 0x10302. This version is not
-> included in the current checks in the driver.
-> 
-> Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
+UHS-1 DDR50 and MMC DDR52 mode require DDR bit to be
+set in the configuration register (MMCHS_CON). Add
+sdhci-omap specific set_uhs_signaling ops to set
+this bit. Also while setting the UHSMS bit, clock should be
+disabled.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+---
+ drivers/mmc/host/sdhci-omap.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-It must be the AT91SAM9260 rev. B SoC, isn't it?
-
-Thanks for your patch.
-
-Best regards,
-  Nicolas
-
-> ---
->  drivers/tty/serial/atmel_serial.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index efa25611ca0c..ae9f1dcbf3fc 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -1734,6 +1734,7 @@ static void atmel_get_ip_name(struct uart_port *port)
->  		switch (version) {
->  		case 0x302:
->  		case 0x10213:
-> +		case 0x10302:
->  			dev_dbg(port->dev, "This version is usart\n");
->  			atmel_port->has_frac_baudrate = true;
->  			atmel_port->has_hw_timer = true;
-> 
-
-
+diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+index df927f3faaf6..86b6cc0a5380 100644
+--- a/drivers/mmc/host/sdhci-omap.c
++++ b/drivers/mmc/host/sdhci-omap.c
+@@ -31,6 +31,7 @@
+ #define SDHCI_OMAP_CON		0x12c
+ #define CON_DW8			BIT(5)
+ #define CON_DMA_MASTER		BIT(20)
++#define CON_DDR			BIT(19)
+ #define CON_CLKEXTFREE		BIT(16)
+ #define CON_PADEN		BIT(15)
+ #define CON_INIT		BIT(1)
+@@ -461,6 +462,26 @@ static void sdhci_omap_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+ 	enable_irq(host->irq);
+ }
+ 
++static void sdhci_omap_set_uhs_signaling(struct sdhci_host *host,
++					 unsigned int timing)
++{
++	u32 reg;
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_omap_host *omap_host = sdhci_pltfm_priv(pltfm_host);
++
++	sdhci_omap_stop_clock(omap_host);
++
++	reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_CON);
++	if (timing == MMC_TIMING_UHS_DDR50 || timing == MMC_TIMING_MMC_DDR52)
++		reg |= CON_DDR;
++	else
++		reg &= ~CON_DDR;
++	sdhci_omap_writel(omap_host, SDHCI_OMAP_CON, reg);
++
++	sdhci_set_uhs_signaling(host, timing);
++	sdhci_omap_start_clock(omap_host);
++}
++
+ static struct sdhci_ops sdhci_omap_ops = {
+ 	.set_clock = sdhci_omap_set_clock,
+ 	.set_power = sdhci_omap_set_power,
+@@ -470,7 +491,7 @@ static struct sdhci_ops sdhci_omap_ops = {
+ 	.set_bus_width = sdhci_omap_set_bus_width,
+ 	.platform_send_init_74_clocks = sdhci_omap_init_74_clocks,
+ 	.reset = sdhci_reset,
+-	.set_uhs_signaling = sdhci_set_uhs_signaling,
++	.set_uhs_signaling = sdhci_omap_set_uhs_signaling,
+ };
+ 
+ static int sdhci_omap_set_capabilities(struct sdhci_omap_host *omap_host)
 -- 
-Nicolas Ferre
+2.11.0
