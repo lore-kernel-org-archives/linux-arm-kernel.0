@@ -1,55 +1,146 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 05 Feb 2018 18:42:12 +0100
-Subject: [PATCH] drm: exynos: Use proper macro definition for
- HDMI_I2S_PIN_SEL_1
-References: <CGME20180205174229epcas1p1e15e6f8ef5248ee28fa2e649faa8a866@epcas1p1.samsung.com>
-Message-ID: <20180205174212.10791-1-s.nawrocki@samsung.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon,  5 Feb 2018 23:29:19 +0530
+Subject: [PATCH 1/1] iommu/io-pgtable: use size_t return type for all foo_unmap
+Message-ID: <1517853559-5869-1-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bit field [2:0] of HDMI_I2S_PIN_SEL_1 corresponds to SDATA_0,
-not SDATA_2. This patch removes redefinition of HDMI_I2S_SEL_DATA2
-constant and adds missing HDMI_I2S_SEL_DATA0. There is no functional
-change.
+Unmap returns a size_t all throughout the IOMMU framework.
+Make io-pgtable match this convention.
+Moreover, there isn't a need to have a signed int return type
+as we return 0 in case of failures.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c | 7 +++++--
- drivers/gpu/drm/exynos/regs-hdmi.h   | 2 +-
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ drivers/iommu/io-pgtable-arm-v7s.c | 21 +++++++++++----------
+ drivers/iommu/io-pgtable-arm.c     | 24 ++++++++++++------------
+ drivers/iommu/io-pgtable.h         |  4 ++--
+ 3 files changed, 25 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index a4b75a46f946..abd84cbcf1c2 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1068,10 +1068,13 @@ static void hdmi_audio_config(struct hdmi_context *hdata)
- 	/* Configuration I2S input ports. Configure I2S_PIN_SEL_0~4 */
- 	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_0, HDMI_I2S_SEL_SCLK(5)
- 			| HDMI_I2S_SEL_LRCK(6));
--	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(1)
--			| HDMI_I2S_SEL_SDATA2(4));
-+
-+	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(3)
-+			| HDMI_I2S_SEL_SDATA0(4));
-+
- 	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_2, HDMI_I2S_SEL_SDATA3(1)
- 			| HDMI_I2S_SEL_SDATA2(2));
-+
- 	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_3, HDMI_I2S_SEL_DSD(0));
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 2ca08dc9331c..10e4a3d11c02 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -357,8 +357,8 @@ static bool arm_v7s_pte_is_cont(arm_v7s_iopte pte, int lvl)
+ 	return false;
+ }
  
- 	/* I2S_CON_1 & 2 */
-diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
-index 04be0f7e8193..4420c203ac85 100644
---- a/drivers/gpu/drm/exynos/regs-hdmi.h
-+++ b/drivers/gpu/drm/exynos/regs-hdmi.h
-@@ -464,7 +464,7 @@
+-static int __arm_v7s_unmap(struct arm_v7s_io_pgtable *, unsigned long,
+-			   size_t, int, arm_v7s_iopte *);
++static size_t __arm_v7s_unmap(struct arm_v7s_io_pgtable *, unsigned long,
++			      size_t, int, arm_v7s_iopte *);
  
- /* I2S_PIN_SEL_1 */
- #define HDMI_I2S_SEL_SDATA1(x)		(((x) & 0x7) << 4)
--#define HDMI_I2S_SEL_SDATA2(x)		((x) & 0x7)
-+#define HDMI_I2S_SEL_SDATA0(x)		((x) & 0x7)
+ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
+ 			    unsigned long iova, phys_addr_t paddr, int prot,
+@@ -541,9 +541,10 @@ static arm_v7s_iopte arm_v7s_split_cont(struct arm_v7s_io_pgtable *data,
+ 	return pte;
+ }
  
- /* I2S_PIN_SEL_2 */
- #define HDMI_I2S_SEL_SDATA3(x)		(((x) & 0x7) << 4)
+-static int arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
+-				   unsigned long iova, size_t size,
+-				   arm_v7s_iopte blk_pte, arm_v7s_iopte *ptep)
++static size_t arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
++				      unsigned long iova, size_t size,
++				      arm_v7s_iopte blk_pte,
++				      arm_v7s_iopte *ptep)
+ {
+ 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+ 	arm_v7s_iopte pte, *tablep;
+@@ -584,9 +585,9 @@ static int arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
+ 	return size;
+ }
+ 
+-static int __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
+-			    unsigned long iova, size_t size, int lvl,
+-			    arm_v7s_iopte *ptep)
++static size_t __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
++			      unsigned long iova, size_t size, int lvl,
++			      arm_v7s_iopte *ptep)
+ {
+ 	arm_v7s_iopte pte[ARM_V7S_CONT_PAGES];
+ 	struct io_pgtable *iop = &data->iop;
+@@ -656,8 +657,8 @@ static int __arm_v7s_unmap(struct arm_v7s_io_pgtable *data,
+ 	return __arm_v7s_unmap(data, iova, size, lvl + 1, ptep);
+ }
+ 
+-static int arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+-			 size_t size)
++static size_t arm_v7s_unmap(struct io_pgtable_ops *ops, unsigned long iova,
++			    size_t size)
+ {
+ 	struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);
+ 
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 51e5c43caed1..8faaaa04d7a7 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -268,9 +268,9 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+ 		__arm_lpae_sync_pte(ptep, cfg);
+ }
+ 
+-static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+-			    unsigned long iova, size_t size, int lvl,
+-			    arm_lpae_iopte *ptep);
++static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
++			       unsigned long iova, size_t size, int lvl,
++			       arm_lpae_iopte *ptep);
+ 
+ static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+ 				phys_addr_t paddr, arm_lpae_iopte prot,
+@@ -506,10 +506,10 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
+ 	kfree(data);
+ }
+ 
+-static int arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+-				    unsigned long iova, size_t size,
+-				    arm_lpae_iopte blk_pte, int lvl,
+-				    arm_lpae_iopte *ptep)
++static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
++				       unsigned long iova, size_t size,
++				       arm_lpae_iopte blk_pte, int lvl,
++				       arm_lpae_iopte *ptep)
+ {
+ 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+ 	arm_lpae_iopte pte, *tablep;
+@@ -560,9 +560,9 @@ static int arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+ 	return size;
+ }
+ 
+-static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+-			    unsigned long iova, size_t size, int lvl,
+-			    arm_lpae_iopte *ptep)
++static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
++			       unsigned long iova, size_t size, int lvl,
++			       arm_lpae_iopte *ptep)
+ {
+ 	arm_lpae_iopte pte;
+ 	struct io_pgtable *iop = &data->iop;
+@@ -606,8 +606,8 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+ 	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
+ }
+ 
+-static int arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+-			  size_t size)
++static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
++			     size_t size)
+ {
+ 	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+ 	arm_lpae_iopte *ptep = data->pgd;
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index cd2e1eafffe6..2df79093cad9 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -119,8 +119,8 @@ struct io_pgtable_cfg {
+ struct io_pgtable_ops {
+ 	int (*map)(struct io_pgtable_ops *ops, unsigned long iova,
+ 		   phys_addr_t paddr, size_t size, int prot);
+-	int (*unmap)(struct io_pgtable_ops *ops, unsigned long iova,
+-		     size_t size);
++	size_t (*unmap)(struct io_pgtable_ops *ops, unsigned long iova,
++			size_t size);
+ 	phys_addr_t (*iova_to_phys)(struct io_pgtable_ops *ops,
+ 				    unsigned long iova);
+ };
 -- 
-2.14.2
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
