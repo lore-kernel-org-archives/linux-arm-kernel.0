@@ -1,184 +1,490 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Mon, 5 Feb 2018 14:59:30 +0000
-Subject: [PATCH] drm/bridge/synopsys: dsi: Add 1.31 version support
-In-Reply-To: <61f522e7-bdb7-7eba-ffb2-7dbb77ffa09e@samsung.com>
-References: <CGME20180122150916epcas5p14fc276bc3320d82685b3c19dd62f5273@epcas5p1.samsung.com>
- <20180122150819.22066-1-philippe.cornu@st.com>
- <61f522e7-bdb7-7eba-ffb2-7dbb77ffa09e@samsung.com>
-Message-ID: <4c69e41e-4f80-41ec-94f9-556baadfe8a8@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Feb 2018 15:00:10 +0000
+Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180201183126.32384-2-l.stach@pengutronix.de>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-2-l.stach@pengutronix.de>
+Message-ID: <6d93d3cb-5078-3cc3-29de-1280d686fa46@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
-
-And many thanks for your good comments
-
-On 02/05/2018 02:03 PM, Andrzej Hajda wrote:
-> On 22.01.2018 16:08, Philippe Cornu wrote:
->> From: Philippe CORNU <philippe.cornu@st.com>
->>
->> Add support for the Synopsys DesignWare MIPI DSI version 1.31
->> Two registers need to be updated/added for supporting 1.31:
->> * PHY_TMR_CFG 0x9c (updated)
->>    1.30 [31:24] phy_hs2lp_time
->>         [23:16] phy_lp2hs_time
->>         [14: 0] max_rd_time
->>
->>    1.31 [25:16] phy_hs2lp_time
->>         [ 9: 0] phy_lp2hs_time
->>
->> * PHY_TMR_RD_CFG 0xf4 (new)
->>    1.31 [14: 0] max_rd_time
->>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
->> ---
->>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 52 +++++++++++++++++++++++----
->>   1 file changed, 46 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> index 735f38429c06..20a2ca14a7ad 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> @@ -25,7 +25,13 @@
->>   #include <drm/bridge/dw_mipi_dsi.h>
->>   #include <video/mipi_display.h>
->>   
->> +#define HWVER_130			0x31333000	/* IP version 1.30 */
->> +#define HWVER_131			0x31333100	/* IP version 1.31 */
->> +#define HWVER_OLDEST			HWVER_130
->> +#define HWVER_NEWEST			HWVER_131
->> +
->>   #define DSI_VERSION			0x00
->> +#define VERSION				GENMASK(31, 8)
->>   
->>   #define DSI_PWR_UP			0x04
->>   #define RESET				0
->> @@ -161,11 +167,12 @@
->>   #define PHY_CLKHS2LP_TIME(lbcc)		(((lbcc) & 0x3ff) << 16)
->>   #define PHY_CLKLP2HS_TIME(lbcc)		((lbcc) & 0x3ff)
->>   
->> -/* TODO Next register is slightly different between 1.30 & 1.31 IP version */
->>   #define DSI_PHY_TMR_CFG			0x9c
->> -#define PHY_HS2LP_TIME(lbcc)		(((lbcc) & 0xff) << 24)
->> -#define PHY_LP2HS_TIME(lbcc)		(((lbcc) & 0xff) << 16)
->> -#define MAX_RD_TIME(lbcc)		((lbcc) & 0x7fff)
->> +#define PHY_HS2LP_TIME_V130(lbcc)	(((lbcc) & 0xff) << 24)
->> +#define PHY_LP2HS_TIME_V130(lbcc)	(((lbcc) & 0xff) << 16)
->> +#define MAX_RD_TIME_V130(lbcc)		((lbcc) & 0x7fff)
->> +#define PHY_HS2LP_TIME_V131(lbcc)	(((lbcc) & 0x3ff) << 16)
->> +#define PHY_LP2HS_TIME_V131(lbcc)	((lbcc) & 0x3ff)
->>   
->>   #define DSI_PHY_RSTZ			0xa0
->>   #define PHY_DISFORCEPLL			0
->> @@ -204,7 +211,9 @@
->>   #define DSI_INT_ST1			0xc0
->>   #define DSI_INT_MSK0			0xc4
->>   #define DSI_INT_MSK1			0xc8
->> +
->>   #define DSI_PHY_TMR_RD_CFG		0xf4
->> +#define MAX_RD_TIME_V131(lbcc)		((lbcc) & 0x7fff)
->>   
->>   #define PHY_STATUS_TIMEOUT_US		10000
->>   #define CMD_PKT_STATUS_TIMEOUT_US	20000
->> @@ -215,6 +224,7 @@ struct dw_mipi_dsi {
->>   	struct drm_bridge *panel_bridge;
->>   	struct device *dev;
->>   	void __iomem *base;
->> +	u32 hw_version;
->>   
->>   	struct clk *pclk;
->>   	struct clk *px_clk;
->> @@ -616,8 +626,14 @@ static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
->>   	 * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
->>   	 * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
->>   	 */
->> -	dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
->> -		  | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
->> +	if (dsi->hw_version == HWVER_131) {
->> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V131(0x40) |
->> +			  PHY_LP2HS_TIME_V131(0x40));
->> +		dsi_write(dsi, DSI_PHY_TMR_RD_CFG, MAX_RD_TIME_V131(10000));
->> +	} else {
->> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V130(0x40) |
->> +			  PHY_LP2HS_TIME_V130(0x40) | MAX_RD_TIME_V130(10000));
->> +	}
->>   
->>   	dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
->>   		  | PHY_CLKLP2HS_TIME(0x40));
->> @@ -791,6 +807,28 @@ static const struct drm_bridge_funcs dw_mipi_dsi_bridge_funcs = {
->>   	.attach	      = dw_mipi_dsi_bridge_attach,
->>   };
->>   
->> +static void dsi_get_version(struct dw_mipi_dsi *dsi)
->> +{
->> +	u32 hw_version;
->> +
->> +	clk_prepare_enable(dsi->pclk);
->> +	hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
->> +	clk_disable_unprepare(dsi->pclk);
->> +
->> +	if (hw_version > HWVER_NEWEST) {
->> +		DRM_DEBUG("hw version: use 0x%08x for this recent 0x%08x\n",
->> +			  HWVER_NEWEST, hw_version);
->> +		hw_version = HWVER_NEWEST;
->> +
->> +	} else if (hw_version < HWVER_OLDEST) {
->> +		DRM_DEBUG("hw version: use 0x%08x for this old 0x%08x\n",
->> +			  HWVER_OLDEST, hw_version);
->> +		hw_version = HWVER_OLDEST;
->> +	}
->> +
->> +	dsi->hw_version = hw_version;
->> +}
->> +
->>   static struct dw_mipi_dsi *
->>   __dw_mipi_dsi_probe(struct platform_device *pdev,
->>   		    const struct dw_mipi_dsi_plat_data *plat_data)
->> @@ -870,6 +908,8 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
->>   		clk_disable_unprepare(dsi->pclk);
->>   	}
->>   
->> +	dsi_get_version(dsi);
->> +
->>   	pm_runtime_enable(dev);
+On 01/02/18 18:31, Lucas Stach wrote:
+> This adds the basic DTS for the i.MX8MQ.
+> For now only the following peripherals are supported:
+> - IOMUXC (pin controller)
+> - CCM (clock controller)
+> - GPIO
+> - UART
+> - uSDHC (SD/eMMC controller)
+> - FEC (ethernet controller)
+> - i2c
 > 
-> Two questions:
-> 1. You have generally two variants:
-> - older than 131,
-> - not older than 131.
-> Wouldn't be better to just assume that since 131 registers slightly differ?
-> So you just stores:
->  ??? dsi->hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
-> And if neccessary performs comparison:
->  ??? if (dsi->hw_version >= HWVER_131)
->  ??? ??? ...
->  ??? else
->  ??? ??? ...
+> This is enough to get a very basic board support up and running.
 > 
-> This way you can remove these HWVER_(NEWEST|OLDEST).
+> One known limitation is that the driver for the GPC interrupt
+> controller is still missing, rendering the CPU sleep states unusable
+> as there is nothing waking them up anymore. This will be fixed in
+> due course.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+> v2:
+>  - move to freescale folder
+>  - change compatibles to "fsl" vendor prefix
+>  - remove unnecessary newlines
+>  - move status property to be the last in all node
+>  - remove imx21 compatibles from UART nodes
+>  - document compatible
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt  |   4 +
+>  arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h | 623 +++++++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/imx8mq.dtsi      | 411 ++++++++++++++++
+>  3 files changed, 1038 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-pinfunc.h
+>  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq.dtsi
 > 
 
-Archit & you are right, my code is too complex for at the end only 2 
-different reg writes for the 1.31 version :)
+[...]
 
-I will follow all your good tips to simplify the code.
+> diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> new file mode 100644
+> index 000000000000..50ed302d299a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> @@ -0,0 +1,411 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright 2017 NXP
+> + * Copyright (C) 2017 Pengutronix, Lucas Stach <kernel@pengutronix.de>
+> + */
+> +
+> +#include <dt-bindings/clock/imx8mq-clock.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "imx8mq-pinfunc.h"
+> +
+> +/* first 128 KiB of memory are owned by ATF */
+> +/memreserve/ 0x40000000 0x00020000;
+> +
+> +/ {
+> +	/* This should really be the GPC, but we need a driver for this first */
+> +	interrupt-parent = <&gic>;
+> +
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	aliases {
+> +		i2c0 = &i2c1;
+> +		i2c1 = &i2c2;
+> +		i2c2 = &i2c3;
+> +		i2c3 = &i2c4;
+> +		serial0 = &uart1;
+> +		serial1 = &uart2;
+> +		serial2 = &uart3;
+> +		serial3 = &uart4;
+> +	};
+> +
+> +	ckil: clk-ckil {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32768>;
+> +		clock-output-names = "ckil";
+> +	};
+> +
+> +	osc_25m: clk-osc-25m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <25000000>;
+> +		clock-output-names = "osc_25m";
+> +	};
+> +
+> +	osc_27m: clk-osc-27m {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <27000000>;
+> +		clock-output-names = "osc_27m";
+> +	};
+> +
+> +	clk_ext1: clk-ext1 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <133000000>;
+> +		clock-output-names = "clk_ext1";
+> +	};
+> +
+> +	clk_ext2: clk-ext2 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <133000000>;
+> +		clock-output-names = "clk_ext2";
+> +	};
+> +
+> +	clk_ext3: clk-ext3 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <133000000>;
+> +		clock-output-names = "clk_ext3";
+> +	};
+> +
+> +	clk_ext4: clk-ext4 {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency= <133000000>;
+> +		clock-output-names = "clk_ext4";
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		idle-states {
+> +			entry-method = "psci";
+> +
+> +			CPU_SLEEP: cpu-sleep {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010033>;
+> +				local-timer-stop;
+> +				entry-latency-us = <1000>;
+> +				exit-latency-us = <700>;
+> +				min-residency-us = <2700>;
+> +				wakeup-latency-us = <1500>;
+> +			};
+> +		};
+> +
+> +		A53_0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x0>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x1>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x2>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x3>;
+> +			enable-method = "psci";
+> +			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+> +		};
+> +
+> +		A53_L2: l2-cache0 {
+> +			compatible = "cache";
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci-1.0";
+> +		method = "smc";
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Secure */
+> +		             <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Physical Non-Secure */
+> +		             <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>, /* Virtual */
+> +		             <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>; /* Hypervisor */
 
-> 2. You are using pm_runtime, but not in dsi_get_version. I guess it is
-> SoC dependant? but I suppose performing registry read should be safer
-> after runtime_get.
+GICv3 doesn't have express PPI affinity this way (and 6 feels slightly
+wrong anyway).
+
+> +		clock-frequency = <8333333>;
+
+Really? Can't firmware be fixed, and/or the property overridden for
+boards that are known to ship with a broken firmware?
+
+> +		interrupt-parent = <&gic>;
+> +		arm,no-tick-in-suspend;
+
+/me very sad.
+
+> +	};
+> +
+> +	peripherals at 0 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0x0 0x0 0x0 0x3e000000>;
+> +
+> +		bus at 30000000 { /* AIPS1 */
+> +			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x30000000 0x30000000 0x400000>;
+> +
+> +			gpio1: gpio at 30200000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30200000 0x10000>;
+> +				interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio2: gpio at 30210000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30210000 0x10000>;
+> +				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
+> +				        <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio3: gpio at 30220000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30220000 0x10000>;
+> +				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
+> +				        <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio4: gpio at 30230000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30230000 0x10000>;
+> +				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
+> +				                <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			gpio5: gpio at 30240000 {
+> +				compatible = "fsl,imx8mq-gpio", "fsl,imx35-gpio";
+> +				reg = <0x30240000 0x10000>;
+> +				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +				        <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +			};
+> +
+> +			iomuxc: iomuxc at 30330000 {
+> +				compatible = "fsl,imx8mq-iomuxc";
+> +				reg = <0x30330000 0x10000>;
+> +			};
+> +
+> +			gpr: iomuxc-gpr at 30340000 {
+> +				compatible = "fsl,imx8mq-iomuxc-gpr", "syscon";
+> +				reg = <0x30340000 0x10000>;
+> +			};
+> +
+> +			anatop: anatop at 30360000 {
+> +				compatible = "fsl,imx8mq-anatop", "syscon";
+> +				reg = <0x30360000 0x10000>;
+> +				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			clk: clock-controller at 30380000 {
+> +				compatible = "fsl,imx8mq-ccm";
+> +				reg = <0x30380000 0x10000>;
+> +				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> +				#clock-cells = <1>;
+> +				clocks = <&ckil>, <&osc_25m>, <&osc_27m>,
+> +				         <&clk_ext1>, <&clk_ext2>,
+> +				         <&clk_ext3>, <&clk_ext4>;
+> +				clock-names = "ckil", "osc_25m", "osc_27m",
+> +				              "clk_ext1", "clk_ext2",
+> +				              "clk_ext3", "clk_ext4";
+> +			};
+> +		};
+> +
+> +		bus at 30400000 { /* AIPS2 */
+> +			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x30400000 0x30400000 0x400000>;
+> +		};
+> +
+> +		bus at 30800000 { /* AIPS3 */
+> +			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0x30800000 0x30800000 0x400000>;
+> +
+> +			uart1: serial at 30860000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30860000 0x10000>;
+> +				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART1_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART1_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart3: serial at 30880000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30880000 0x10000>;
+> +				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART3_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART3_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			uart2: serial at 30890000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30890000 0x10000>;
+> +				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART2_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART2_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c1: i2c at 30a20000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a20000 0x10000>;
+> +				interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C1_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c2: i2c at 30a30000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a30000 0x10000>;
+> +				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C2_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c3: i2c at 30a40000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a40000 0x10000>;
+> +				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C3_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c4: i2c at 30a50000 {
+> +				compatible = "fsl,imx8mq-i2c", "fsl,imx21-i2c";
+> +				reg = <0x30a50000 0x10000>;
+> +				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_I2C4_ROOT>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			uart4: serial at 30a60000 {
+> +				compatible = "fsl,imx8mq-uart",
+> +				             "fsl,imx6q-uart";
+> +				reg = <0x30a60000 0x10000>;
+> +				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_UART4_ROOT>,
+> +				         <&clk IMX8MQ_CLK_UART4_ROOT>;
+> +				clock-names = "ipg", "per";
+> +				status = "disabled";
+> +			};
+> +
+> +			usdhc1: usdhc at 30b40000 {
+> +				compatible = "fsl,imx8mq-usdhc",
+> +				             "fsl,imx7d-usdhc";
+> +				reg = <0x30b40000 0x10000>;
+> +				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_DUMMY>,
+> +				         <&clk IMX8MQ_CLK_NAND_USDHC_BUS_DIV>,
+> +				         <&clk IMX8MQ_CLK_USDHC1_ROOT>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				fsl,tuning-start-tap = <20>;
+> +				fsl,tuning-step = <2>;
+> +				bus-width = <4>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usdhc2: usdhc at 30b50000 {
+> +				compatible = "fsl,imx8mq-usdhc",
+> +				             "fsl,imx7d-usdhc";
+> +				reg = <0x30b50000 0x10000>;
+> +				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_DUMMY>,
+> +				         <&clk IMX8MQ_CLK_NAND_USDHC_BUS_DIV>,
+> +				         <&clk IMX8MQ_CLK_USDHC2_ROOT>;
+> +				clock-names = "ipg", "ahb", "per";
+> +				fsl,tuning-start-tap = <20>;
+> +				fsl,tuning-step = <2>;
+> +				bus-width = <4>;
+> +				status = "disabled";
+> +			};
+> +
+> +			fec1: ethernet at 30be0000 {
+> +				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
+> +				reg = <0x30be0000 0x10000>;
+> +				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
+> +				             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk IMX8MQ_CLK_ENET1_ROOT>,
+> +				         <&clk IMX8MQ_CLK_ENET1_ROOT>,
+> +				         <&clk IMX8MQ_CLK_ENET_TIMER_DIV>,
+> +				         <&clk IMX8MQ_CLK_ENET_REF_DIV>,
+> +				         <&clk IMX8MQ_CLK_ENET_PHY_REF_DIV>;
+> +				clock-names = "ipg", "ahb", "ptp",
+> +				              "enet_clk_ref", "enet_out";
+> +				fsl,num-tx-queues = <3>;
+> +				fsl,num-rx-queues = <3>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		gic: interrupt-controller at 38800000 {
+> +			compatible = "arm,gic-v3";
+> +			reg = <0x38800000 0x10000>, /* GIC Dist */
+> +			      <0x38880000 0xc0000>; /* GICR (RD_base + SGI_base) */
+
+You are missing the memory-mapped version of the CPU interface (GICC,
+GICH, GICV), which Cortex-A53 implements (see [1] for details).
+
+> +			#interrupt-cells = <3>;
+> +			interrupt-controller;
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-parent = <&gic>;
+> +		};
+> +	};
+> +};
 > 
-> Regards
-> Andrzej
-> 
 
-dsi_get_version() is called only once and just before pm_runtime_enable().
-Anyway, I think this function is not required anymore as there is only 
-one place where we need to take care of the 1.31 version.
+Thanks,
 
-Many thanks,
-Philippe :-)
+	M.
 
->>   
->>   	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
-> 
-> 
+[1]
+http://arminfo.emea.arm.com/help/topic/com.arm.doc.ddi0500g/ch09s02s01.html
+-- 
+Jazz is not dead. It just smells funny...
