@@ -1,112 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 5 Feb 2018 13:36:00 +0000
-Subject: Runqueue spinlock recursion on arm64 v4.15
-In-Reply-To: <20180202220726.23d4ljxxdysafbxd@salmiak>
-References: <20180202192704.nqwjsthl3agszhzt@lakrids.cambridge.arm.com>
- <20180202195506.GP2269@hirez.programming.kicks-ass.net>
- <20180202220726.23d4ljxxdysafbxd@salmiak>
-Message-ID: <20180205133600.etr32unq6amsa6af@lakrids.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 5 Feb 2018 14:36:25 +0100
+Subject: [linux-sunxi] [PATCH v3] ARM: sun8i: h2+: add support for Banana
+ Pi M2 Zero board
+In-Reply-To: <CAGRGNgXRhphuO8+85t8vfQb2CxDekMXe2BoPo_57pc6SR3QQzA@mail.gmail.com>
+References: <20171224054029.12278-1-icenowy@aosc.io>
+ <CAGRGNgXRhphuO8+85t8vfQb2CxDekMXe2BoPo_57pc6SR3QQzA@mail.gmail.com>
+Message-ID: <20180205133625.vcz73qck5kfihalv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 02, 2018 at 10:07:26PM +0000, Mark Rutland wrote:
-> On Fri, Feb 02, 2018 at 08:55:06PM +0100, Peter Zijlstra wrote:
-> > On Fri, Feb 02, 2018 at 07:27:04PM +0000, Mark Rutland wrote:
-> > > ... in some cases, owner_cpu is -1, so I guess we're racing with an
-> > > unlock. I only ever see this on the runqueue locks in wake up functions.
-> > 
-> > So runqueue locks are special in that the owner changes over a contex
-> > switch, maybe something goes funny there?
+On Sat, Feb 03, 2018 at 05:45:52PM +1100, Julian Calaby wrote:
+> Hi all,
 > 
-> Aha! I think that's it!
+> On Sun, Dec 24, 2017 at 4:40 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> > Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a form
+> > factor and GPIO holes similar to Raspberry Pi Zero.
+> >
+> > It features:
+> > - Allwinner H2+ SoC
+> > - Single-chip (16-bit) 512MiB DDR3 DRAM
+> > - Ampak AP6212 Wi-Fi/Bluetooth module
+> > - MicroSD slot
+> > - Two MicroUSB Type-B ports (one can only be used to power the board and
+> >   the other features OTG functionality)
+> > - Two keys, a reset and a GPIO-connected key.
+> > - HDMI Type-C (miniHDMI) connector connected to the HDMI part of H2+.
+> > - CSI connector to connect the camera sensor provided by Sinovoip.
+> >
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > 
-> In finish_lock_switch() we do:
+> [Trimmed lots of non-sunxi-specific mailing lists]
 > 
-> 	smp_store_release(&prev->on_cpu, 0);
-> 	...
-> 	rq->lock.owner = current;
-> 
-> As soon as we update prev->on_cpu, prev can be scheduled on another CPU, and
-> can thus see a stale value for rq->lock.owner (e.g. if it tries to wake up
-> another task on that rq).
+> Did support for this board ever get merged?
 
-I hacked in a forced vCPU preemption between the two using a sled of WFE
-instructions, and now I can trigger the problem in seconds rather than
-hours.
+It doesn't look like it did.
 
-With the patch below applied, things seem to fine so far.
+> (I have two of them now, so if it didn't, I'll try to shepherd this
+> and it's corresponding u-boot patch upstream.)
 
-So I'm pretty sure this is it. I'll clean up the patch text and resend
-that in a bit.
+That sounds great :)
 
-Thanks,
-Mark.
+Maxime
 
-> I guess the below (completely untested) would fix that. I'll try to give it a
-> go next week.
-> 
-> Thanks,
-> Mark.
-> 
-> ---->8----
-> From 3ef7e7466d09d2270d2a353d032ff0f9bc0488a7 Mon Sep 17 00:00:00 2001
-> From: Mark Rutland <mark.rutland@arm.com>
-> Date: Fri, 2 Feb 2018 21:56:17 +0000
-> Subject: [PATCH] sched/core: avoid spurious spinlock recursion splats
-> 
-> The runqueue locks are special in that the owner changes over a context switch.
-> To ensure that this is account for in CONFIG_DEBUG_SPINLOCK builds,
-> finish_lock_switch updates rq->lock.owner while the lock is held.
-> 
-> However, this happens *after* prev->on_cpu is cleared, which allows prev to be
-> scheduled on another CPU. If prev then attempts to acquire the same rq lock, it
-> will see itself as the owner.
-> 
-> This can be seen in virtual environments, where the vCPU can be preempted for
-> an arbitrarily long period between updating prev->on_cpu and rq->lock.owner.
-> 
-> We can avoid this issue by updating rq->lock.owner first. The release of
-> prev->on_cpu will ensure that the new owner is visible to prev if it is
-> scheduled on another CPU.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> ---
->  kernel/sched/sched.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-> index b19552a212de..4f0d2e3701c3 100644
-> --- a/kernel/sched/sched.h
-> +++ b/kernel/sched/sched.h
-> @@ -1342,6 +1342,10 @@ static inline void prepare_lock_switch(struct rq *rq, struct task_struct *next)
->  
->  static inline void finish_lock_switch(struct rq *rq, struct task_struct *prev)
->  {
-> +#ifdef CONFIG_DEBUG_SPINLOCK
-> +	/* this is a valid case when another task releases the spinlock */
-> +	rq->lock.owner = current;
-> +#endif
->  #ifdef CONFIG_SMP
->  	/*
->  	 * After ->on_cpu is cleared, the task can be moved to a different CPU.
-> @@ -1355,10 +1359,6 @@ static inline void finish_lock_switch(struct rq *rq, struct task_struct *prev)
->  	 */
->  	smp_store_release(&prev->on_cpu, 0);
->  #endif
-> -#ifdef CONFIG_DEBUG_SPINLOCK
-> -	/* this is a valid case when another task releases the spinlock */
-> -	rq->lock.owner = current;
-> -#endif
->  	/*
->  	 * If we are tracking spinlock dependencies then we have to
->  	 * fix up the runqueue lock - which gets 'carried over' from
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180205/3779c95c/attachment.sig>
