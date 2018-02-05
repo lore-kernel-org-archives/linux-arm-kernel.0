@@ -1,141 +1,381 @@
-From: jmarchan@redhat.com (Jerome Marchand)
-Date: Mon,  5 Feb 2018 14:28:01 +0100
-Subject: [PATCH v4] arm64: fix unwind_frame() for filtered out fn for function
- graph tracing
-In-Reply-To: <20180112104832.9417-1-jmarchan@redhat.com>
-References: <20180112104832.9417-1-jmarchan@redhat.com>
-Message-ID: <20180205132801.7442-1-jmarchan@redhat.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Mon, 5 Feb 2018 14:29:50 +0100
+Subject: [PATCH v3 41/41] KVM: arm/arm64: Avoid VGICv3 save/restore on VHE
+ with no IRQs
+In-Reply-To: <20180112120747.27999-42-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-42-christoffer.dall@linaro.org>
+Message-ID: <325f048a-7fd8-3542-5eda-c391d44f308a@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <panand@redhat.com>
+Hi Christoffer,
 
-Change since v3:
- - Exit unwind_frame() if frame->graph != -1
+On 12.01.2018 13:07, Christoffer Dall wrote:
+> We can finally get completely rid of any calls to the VGICv3
+> save/restore functions when the AP lists are empty on VHE systems.  This
+> requires carefully factoring out trap configuration from saving and
+> restoring state, and carefully choosing what to do on the VHE and
+> non-VHE path.
+> 
+> One of the challenges is that we cannot save/restore the VMCR lazily
+> because we can only write the VMCR when ICC_SRE_EL1.SRE is cleared when
+> emulating a GICv2-on-GICv3, since otherwise all Group-0 interrupts end
+> up being delivered as FIQ.
+> 
+> To solve this problem, and still provide fast performance in the fast
+> path of exiting a VM when no interrupts are pending (which also
+> optimized the latency for actually delivering virtual interrupts coming
+> from physical interrupts), we orchestrate a dance of only doing the
+> activate/deactivate traps in vgic load/put for VHE systems (which can
+> have ICC_SRE_EL1.SRE cleared when running in the host), and doing the
+> configuration on every round-trip on non-VHE systems.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm/include/asm/kvm_hyp.h   |   2 +
+>   arch/arm/kvm/hyp/switch.c        |   8 ++-
+>   arch/arm64/include/asm/kvm_hyp.h |   2 +
+>   arch/arm64/kvm/hyp/switch.c      |   8 ++-
+>   virt/kvm/arm/hyp/vgic-v3-sr.c    | 121 +++++++++++++++++++++++++--------------
+>   virt/kvm/arm/vgic/vgic-v3.c      |   6 ++
+>   virt/kvm/arm/vgic/vgic.c         |   7 +--
+>   7 files changed, 103 insertions(+), 51 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+> index b3dd4f4304f5..d01676e5b816 100644
+> --- a/arch/arm/include/asm/kvm_hyp.h
+> +++ b/arch/arm/include/asm/kvm_hyp.h
+> @@ -109,6 +109,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
+>   
+>   void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>   void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+> +void __vgic_v3_activate_traps(struct kvm_vcpu *vcpu);
+> +void __vgic_v3_deactivate_traps(struct kvm_vcpu *vcpu);
+>   void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
+>   void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
+>   
+> diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+> index 214187446e63..337c76230885 100644
+> --- a/arch/arm/kvm/hyp/switch.c
+> +++ b/arch/arm/kvm/hyp/switch.c
+> @@ -89,14 +89,18 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+>   
+>   static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+>   {
+> -	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
+>   		__vgic_v3_save_state(vcpu);
+> +		__vgic_v3_deactivate_traps(vcpu);
+> +	}
+>   }
+>   
+>   static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+>   {
+> -	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
+> +		__vgic_v3_activate_traps(vcpu);
+>   		__vgic_v3_restore_state(vcpu);
+> +	}
+>   }
+>   
+>   static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index 693d29f0036d..af7cf0faf58f 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -125,6 +125,8 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+>   
+>   void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>   void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+> +void __vgic_v3_activate_traps(struct kvm_vcpu *vcpu);
+> +void __vgic_v3_deactivate_traps(struct kvm_vcpu *vcpu);
+>   void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
+>   void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
+>   int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 9187afca181a..901a111fb509 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -194,14 +194,18 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+>   
+>   static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+>   {
+> -	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
+>   		__vgic_v3_save_state(vcpu);
+> +		__vgic_v3_deactivate_traps(vcpu);
+> +	}
+>   }
+>   
+>   static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+>   {
+> -	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
+> +		__vgic_v3_activate_traps(vcpu);
+>   		__vgic_v3_restore_state(vcpu);
+> +	}
+>   }
+>   
+>   static bool __hyp_text __true_value(void)
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 811b42c8441d..e5f3bc7582b6 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -208,15 +208,15 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>   {
+>   	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>   	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> -	u64 val;
+>   
+>   	/*
+>   	 * Make sure stores to the GIC via the memory mapped interface
+> -	 * are now visible to the system register interface.
+> +	 * are now visible to the system register interface when reading the
+> +	 * LRs, and when reading back the VMCR on non-VHE systems.
+>   	 */
+> -	if (!cpu_if->vgic_sre) {
+> -		dsb(st);
+> -		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+> +	if (used_lrs || !has_vhe()) {
+> +		if (!cpu_if->vgic_sre)
+> +			dsb(st);
+>   	}
+>   
+>   	if (used_lrs) {
+> @@ -225,7 +225,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>   
+>   		elrsr = read_gicreg(ICH_ELSR_EL2);
+>   
+> -		write_gicreg(0, ICH_HCR_EL2);
+> +		write_gicreg(cpu_if->vgic_hcr & ~ICH_HCR_EN, ICH_HCR_EL2);
+>   
+>   		for (i = 0; i < used_lrs; i++) {
+>   			if (elrsr & (1 << i))
+> @@ -235,19 +235,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>   
+>   			__gic_v3_set_lr(0, i);
+>   		}
+> -	} else {
+> -		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+> -		    cpu_if->its_vpe.its_vm)
+> -			write_gicreg(0, ICH_HCR_EL2);
+> -	}
+> -
+> -	val = read_gicreg(ICC_SRE_EL2);
+> -	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+> -
+> -	if (!cpu_if->vgic_sre) {
+> -		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+> -		isb();
+> -		write_gicreg(1, ICC_SRE_EL1);
+>   	}
+>   }
+>   
+> @@ -257,6 +244,31 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>   	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+>   	int i;
+>   
+> +	if (used_lrs) {
+> +		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+> +
+> +		for (i = 0; i < used_lrs; i++)
+> +			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+> +	}
+> +
+> +	/*
+> +	 * Ensure that writes to the LRs, and on non-VHE systems ensure that
+> +	 * the write to the VMCR in __vgic_v3_activate_traps(), will have
+> +	 * reached the (re)distributors. This ensure the guest will read the
+> +	 * correct values from the memory-mapped interface.
+> +	 */
+> +	if (used_lrs || !has_vhe()) {
+> +		if (!cpu_if->vgic_sre) {
+> +			isb();
+> +			dsb(sy);
+> +		}
+> +	}
+> +}
+> +
+> +void __hyp_text __vgic_v3_activate_traps(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+> +
+>   	/*
+>   	 * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a
+>   	 * Group0 interrupt (as generated in GICv2 mode) to be
+> @@ -264,47 +276,70 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>   	 * consequences. So we must make sure that ICC_SRE_EL1 has
+>   	 * been actually programmed with the value we want before
+>   	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
+> -	 * particular.
+> +	 * particular.  This logic must be called before
+> +	 * __vgic_v3_restore_state().
+>   	 */
+>   	if (!cpu_if->vgic_sre) {
+>   		write_gicreg(0, ICC_SRE_EL1);
+>   		isb();
+>   		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+> -	}
+>   
+> -	if (used_lrs) {
+> -		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+>   
+> -		for (i = 0; i < used_lrs; i++)
+> -			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+> -	} else {
+> -		/*
+> -		 * If we need to trap system registers, we must write
+> -		 * ICH_HCR_EL2 anyway, even if no interrupts are being
+> -		 * injected. Same thing if GICv4 is used, as VLPI
+> -		 * delivery is gated by ICH_HCR_EL2.En.
+> -		 */
+> -		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+> -		    cpu_if->its_vpe.its_vm)
+> -			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+> +		if (has_vhe()) {
+> +			/*
+> +			 * Ensure that the write to the VMCR will have reached
+> +			 * the (re)distributors. This ensure the guest will
+> +			 * read the correct values from the memory-mapped
+> +			 * interface.
+> +			 */
+> +			isb();
+> +			dsb(sy);
+> +		}
+>   	}
+>   
+>   	/*
+> -	 * Ensures that the above will have reached the
+> -	 * (re)distributors. This ensure the guest will read the
+> -	 * correct values from the memory-mapped interface.
+> +	 * Prevent the guest from touching the GIC system registers if
+> +	 * SRE isn't enabled for GICv3 emulation.
+> +	 */
+> +	write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
+> +		     ICC_SRE_EL2);
+> +
+> +	/*
+> +	 * If we need to trap system registers, we must write
+> +	 * ICH_HCR_EL2 anyway, even if no interrupts are being
+> +	 * injected,
+>   	 */
+> +	if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+> +	    cpu_if->its_vpe.its_vm)
+> +		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+> +}
+> +
+> +void __hyp_text __vgic_v3_deactivate_traps(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+> +	u64 val;
+> +
+>   	if (!cpu_if->vgic_sre) {
+> +		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+> +	}
+> +
+> +
 
-Change since v2:
-- Set frame.graph = current->curr_ret_stack in profile_pc
-- Check that frame->graph != -1 in unwind_frame
+Nit: Please remove one space.
 
-do_task_stat() calls get_wchan(), which further does unwind_frame().
-unwind_frame() restores frame->pc to original value in case function
-graph tracer has modified a return address (LR) in a stack frame to hook
-a function return. However, if function graph tracer has hit a filtered
-function, then we can't unwind it as ftrace_push_return_trace() has
-biased the index(frame->graph) with a 'huge negative'
-offset(-FTRACE_NOTRACE_DEPTH).
+> +	val = read_gicreg(ICC_SRE_EL2);
+> +	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+> +
+> +	if (!cpu_if->vgic_sre) {
+> +		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+>   		isb();
+> -		dsb(sy);
+> +		write_gicreg(1, ICC_SRE_EL1);
+>   	}
+>   
+>   	/*
+> -	 * Prevent the guest from touching the GIC system registers if
+> -	 * SRE isn't enabled for GICv3 emulation.
+> +	 * If we were trapping system registers, we enabled the VGIC even if
+> +	 * no interrupts were being injected, and we disable it again here.
+>   	 */
+> -	write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
+> -		     ICC_SRE_EL2);
+> +	if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+> +	    cpu_if->its_vpe.its_vm)
+> +		write_gicreg(0, ICH_HCR_EL2);
+>   }
+>   
+>   void __hyp_text __vgic_v3_save_aprs(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 4bafcd1e6bb8..4200657694f0 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -590,6 +590,9 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
+>   		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
+>   
+>   	kvm_call_hyp(__vgic_v3_restore_aprs, vcpu);
+> +
+> +	if (has_vhe())
+> +		__vgic_v3_activate_traps(vcpu);
+>   }
+>   
+>   void vgic_v3_put(struct kvm_vcpu *vcpu)
+> @@ -600,4 +603,7 @@ void vgic_v3_put(struct kvm_vcpu *vcpu)
+>   		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
+>   
+>   	kvm_call_hyp(__vgic_v3_save_aprs, vcpu);
+> +
+> +	if (has_vhe())
+> +		__vgic_v3_deactivate_traps(vcpu);
+>   }
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index d0a19a8c196a..0d95d7b55567 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -763,14 +763,14 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>   {
+>   	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>   
+> -	vgic_save_state(vcpu);
+> -
+>   	WARN_ON(vgic_v4_sync_hwstate(vcpu));
+>   
+>   	/* An empty ap_list_head implies used_lrs == 0 */
+>   	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+>   		return;
+>   
+> +	vgic_save_state(vcpu);
+> +
+>   	if (vgic_cpu->used_lrs)
+>   		vgic_fold_lr_state(vcpu);
+>   	vgic_prune_ap_list(vcpu);
+> @@ -799,7 +799,7 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>   	 * this.
+>   	 */
+>   	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+> -		goto out;
+> +		return;
+>   
+>   	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+>   
+> @@ -807,7 +807,6 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>   	vgic_flush_lr_state(vcpu);
+>   	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+>   
+> -out:
+>   	vgic_restore_state(vcpu);
+>   }
+>   
+> 
 
-Moreover, arm64 stack walker defines index(frame->graph) as unsigned
-int, which can not compare a -ve number.
+The idea makes a lot of sense to me.
 
-Similar problem we can have with calling of walk_stackframe() from
-save_stack_trace_tsk() or dump_backtrace().
+However, function __vgic_v3_save_state() depends on 
+__vgic_v3_deactivate_traps() indirectly while doing dsb(st) for nvhe and 
+!cpu_if->vgic_sre case. That's fine since we have good explanation in 
+comment but we have to be careful for any potential future changes. The 
+only alternative I see now is having separate function set for nvhe and 
+vhe cases but this means massive code duplication... So I think we need 
+to live with that, performance is top priority.
 
-This patch fixes unwind_frame() to test the index for -ve value and
-restore index accordingly before we can restore frame->pc.
+For the whole series:
+Reviewed-by: Tomasz Nowicki <Tomasz.Nowicki@caviumnetworks.com>
 
-Reproducer:
-
-cd /sys/kernel/debug/tracing/
-echo schedule > set_graph_notrace
-echo 1 > options/display-graph
-echo wakeup > current_tracer
-ps -ef | grep -i agent
-
-Above commands result in:
-Unable to handle kernel paging request at virtual address ffff801bd3d1e000
-pgd = ffff8003cbe97c00
-[ffff801bd3d1e000] *pgd=0000000000000000, *pud=0000000000000000
-Internal error: Oops: 96000006 [#1] SMP
-[...]
-CPU: 5 PID: 11696 Comm: ps Not tainted 4.11.0+ #33
-[...]
-task: ffff8003c21ba000 task.stack: ffff8003cc6c0000
-PC is at unwind_frame+0x12c/0x180
-LR is at get_wchan+0xd4/0x134
-pc : [<ffff00000808892c>] lr : [<ffff0000080860b8>] pstate: 60000145
-sp : ffff8003cc6c3ab0
-x29: ffff8003cc6c3ab0 x28: 0000000000000001
-x27: 0000000000000026 x26: 0000000000000026
-x25: 00000000000012d8 x24: 0000000000000000
-x23: ffff8003c1c04000 x22: ffff000008c83000
-x21: ffff8003c1c00000 x20: 000000000000000f
-x19: ffff8003c1bc0000 x18: 0000fffffc593690
-x17: 0000000000000000 x16: 0000000000000001
-x15: 0000b855670e2b60 x14: 0003e97f22cf1d0f
-x13: 0000000000000001 x12: 0000000000000000
-x11: 00000000e8f4883e x10: 0000000154f47ec8
-x9 : 0000000070f367c0 x8 : 0000000000000000
-x7 : 00008003f7290000 x6 : 0000000000000018
-x5 : 0000000000000000 x4 : ffff8003c1c03cb0
-x3 : ffff8003c1c03ca0 x2 : 00000017ffe80000
-x1 : ffff8003cc6c3af8 x0 : ffff8003d3e9e000
-
-Process ps (pid: 11696, stack limit = 0xffff8003cc6c0000)
-Stack: (0xffff8003cc6c3ab0 to 0xffff8003cc6c4000)
-[...]
-[<ffff00000808892c>] unwind_frame+0x12c/0x180
-[<ffff000008305008>] do_task_stat+0x864/0x870
-[<ffff000008305c44>] proc_tgid_stat+0x3c/0x48
-[<ffff0000082fde0c>] proc_single_show+0x5c/0xb8
-[<ffff0000082b27e0>] seq_read+0x160/0x414
-[<ffff000008289e6c>] __vfs_read+0x58/0x164
-[<ffff00000828b164>] vfs_read+0x88/0x144
-[<ffff00000828c2e8>] SyS_read+0x60/0xc0
-[<ffff0000080834a0>] __sys_trace_return+0x0/0x4
-
-fixes: 20380bb390a4 (arm64: ftrace: fix a stack tracer's output under function graph tracer)
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Jerome Marchand <jmarchan@redhat.com>
----
- arch/arm64/include/asm/stacktrace.h | 2 +-
- arch/arm64/kernel/stacktrace.c      | 7 +++++++
- arch/arm64/kernel/time.c            | 2 +-
- 3 files changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 6ad30776e984..99390755c0c4 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -27,7 +27,7 @@ struct stackframe {
- 	unsigned long fp;
- 	unsigned long pc;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	unsigned int graph;
-+	int graph;
- #endif
- };
- 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 76809ccd309c..2c74ff76b0cd 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -59,6 +59,13 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk->ret_stack &&
- 			(frame->pc == (unsigned long)return_to_handler)) {
-+		if (frame->graph == -1) {
-+			WARN_ON(1);
-+			return -EINVAL;
-+		}
-+		if (frame->graph < -1)
-+			frame->graph += FTRACE_NOTRACE_DEPTH;
-+
- 		/*
- 		 * This is a case where function graph tracer has
- 		 * modified a return address (LR) in a stack frame
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index a4391280fba9..f258636273c9 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -52,7 +52,7 @@ unsigned long profile_pc(struct pt_regs *regs)
- 	frame.fp = regs->regs[29];
- 	frame.pc = regs->pc;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
--	frame.graph = -1; /* no task info */
-+	frame.graph = current->curr_ret_stack;
- #endif
- 	do {
- 		int ret = unwind_frame(NULL, &frame);
--- 
-2.13.6
+Thanks,
+Tomasz
