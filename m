@@ -1,46 +1,49 @@
-From: clingutla@codeaurora.org (Chandra Sekhar Lingutla)
-Date: Mon, 5 Feb 2018 13:36:12 +0530
-Subject: [PATCH v1] arm64: setup: Check for overlapping dtb and Image load
- addresses
-In-Reply-To: <20180129154812.GA25061@arm.com>
-References: <20180124092345.5072-1-clingutla@codeaurora.org>
- <20180129154812.GA25061@arm.com>
-Message-ID: <6fd2b4e9-ff54-61be-4031-facea28ba34e@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Feb 2018 16:10:20 +0800
+Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
+In-Reply-To: <CA+sos78H1_ihvVghJcpZQZmB6rE2nfgXF8gq8kqK=cQE9Qs0mw@mail.gmail.com>
+References: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
+ <20180127153733.7ziaq6frli3jemc7@pengutronix.de>
+ <CA+sos78H1_ihvVghJcpZQZmB6rE2nfgXF8gq8kqK=cQE9Qs0mw@mail.gmail.com>
+Message-ID: <20180205081018.GQ31354@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Sat, Jan 27, 2018 at 09:37:11PM +0100, Beno?t Th?baudeau wrote:
+> On Sat, Jan 27, 2018 at 4:37 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > On Sat, Jan 27, 2018 at 01:07:52AM +0100, Beno?t Th?baudeau wrote:
+> >> The eSDHC does not work properly if the SION bit is not set for the
+> >> bidirectional CMD signal, whatever the eSDHC instance and the selected
+> >> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
+> >> this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
+> >> behavior for all boards.
+> >>
+> >> This had already been done for eSDHC1, but not for eSDHC2. Also, define
+> >> MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
+> >> from now on.
+> >
+> > There is an inconsistency in the naming. The eSDHC1 CMD constants are
+> > named:
+> >
+> >         MX25_PAD_SD1_CMD__SD1_CMD
+> >
+> > The reference calls this:
+> >
+> >         CMD of instance: esdhc1.
+> >
+> > The register name is correct though. Not sure it's worth to fix this to
+> > use consistent naming (which would result in:
+> >
+> >         MX25_PAD_SD1_CMD__ESDHC1_CMD
+> >
+> > which looks ugly, too).
+> 
+> Indeed. I had also noticed this. I can send a patch to apply before
+> this one. But that would break the out-of-tree DT files using these
+> definitions. Would that be OK?
 
-On 1/29/2018 9:18 PM, Will Deacon wrote:
-> On Wed, Jan 24, 2018 at 02:53:45PM +0530, Lingutla Chandrasekhar wrote:
->> Sometime kernel image and dtb load offsets can overlap due to
->> dynamically increased Image or dtb size if both load addresses
->> are near to each other, which leads to bootup failures.
->>
->> So validate dtb load address and kernel image, if they overlap
->> do not proceed to boot.
->>
->> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
->> ---
->>
->> Changes since v0:
->> - Print overlap bytes.
->> - Simplify ovelap checks.
-> This all feels a bit fragile to me, since we're relying on some portion of
-> the Image and .dtb working in order to run this code successfully.  I'd
-> rather not pretend to detect this exact scenario, particularly as I can't
-> see it being useful for anybody other than firmware developers (who are in a
-> better position to check whether or not this is happening).
+That's OK, I would say.  It could be a reminder of that they should
+upstream their files.
 
-Yes, it is useful for boot loaders, adding one more condition to current checks
-for bootloader failures, so that boot loader developers can easily identify the
-real issue(Image size increased dynamically).
-
-> More generally, is there not some .dtb checksum failure that detects
-> corruption there? Perhaps we could do something like that for the Image
-> too?
-
-In boot loader, first we load Image and then dtb to corresponding DDR offset right,
-so not sure checksum would help here.
-
-> Will
+Shawn
