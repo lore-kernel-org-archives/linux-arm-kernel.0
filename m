@@ -1,157 +1,103 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  5 Feb 2018 18:39:44 +0000
-Subject: [PATCH 3/5] perf/arm-cci: Simplify CPU hotplug
+Date: Mon,  5 Feb 2018 18:39:42 +0000
+Subject: [PATCH 1/5] drivers/bus: Move Arm CCN PMU driver
 In-Reply-To: <cover.1517855839.git.robin.murphy@arm.com>
 References: <cover.1517855839.git.robin.murphy@arm.com>
-Message-ID: <821cf9f3081c508dee62e98c00db10122c0469a6.1517855839.git.robin.murphy@arm.com>
+Message-ID: <b85ba78d3058cedfab43fa035d5a326b2e70baeb.1517855839.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Realistically, systems with multiple CCIs are unlikely to ever exist,
-and since the driver only actually supports a single instance anyway
-there's really no need to do the multi-instance hotplug state dance.
+The arm-ccn driver is purely a perf driver for the CCN PMU, not a bus
+driver in the sense of the other residents of drivers/bus/, so let's
+move it to the appropriate place for SoC PMU drivers. Not to mention
+moving the documentation accordingly as well.
 
-Take the opportunity to simplify the hotplug-related code all over,
-addressing the context-migration TODO in the process for good measure.
-
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/perf/arm-cci.c | 56 +++++++++++++++++---------------------------------
- 1 file changed, 19 insertions(+), 37 deletions(-)
+ .../devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt}         | 0
+ Documentation/{arm/CCN.txt => perf/arm-ccn.txt}                   | 0
+ drivers/bus/Kconfig                                               | 8 --------
+ drivers/bus/Makefile                                              | 2 --
+ drivers/perf/Kconfig                                              | 7 +++++++
+ drivers/perf/Makefile                                             | 1 +
+ drivers/{bus => perf}/arm-ccn.c                                   | 0
+ 7 files changed, 8 insertions(+), 10 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt} (100%)
+ rename Documentation/{arm/CCN.txt => perf/arm-ccn.txt} (100%)
+ rename drivers/{bus => perf}/arm-ccn.c (100%)
 
-diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-index d5f8c750fd41..242623fbce1f 100644
---- a/drivers/perf/arm-cci.c
-+++ b/drivers/perf/arm-cci.c
-@@ -90,6 +90,7 @@ static struct cci_pmu_model cci_pmu_models[];
- struct cci_pmu {
- 	void __iomem *base;
- 	struct pmu pmu;
-+	int cpu;
- 	int nr_irqs;
- 	int *irqs;
- 	unsigned long active_irqs;
-@@ -99,12 +100,12 @@ struct cci_pmu {
- 	int num_cntrs;
- 	atomic_t active_events;
- 	struct mutex reserve_mutex;
--	struct hlist_node node;
--	cpumask_t cpus;
- };
+diff --git a/Documentation/devicetree/bindings/arm/ccn.txt b/Documentation/devicetree/bindings/perf/arm-ccn.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/ccn.txt
+rename to Documentation/devicetree/bindings/perf/arm-ccn.txt
+diff --git a/Documentation/arm/CCN.txt b/Documentation/perf/arm-ccn.txt
+similarity index 100%
+rename from Documentation/arm/CCN.txt
+rename to Documentation/perf/arm-ccn.txt
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 57e011d36a79..116446c42c6b 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -48,14 +48,6 @@ config ARM_CCI5xx_PMU
  
- #define to_cci_pmu(c)	(container_of(c, struct cci_pmu, pmu))
+ 	  If unsure, say Y
  
-+static struct cci_pmu *g_cci_pmu;
-+
- enum cci_models {
- #ifdef CONFIG_ARM_CCI400_PMU
- 	CCI400_R0,
-@@ -1325,7 +1326,6 @@ static int cci_pmu_event_init(struct perf_event *event)
- 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
- 	atomic_t *active_events = &cci_pmu->active_events;
- 	int err = 0;
--	int cpu;
- 
- 	if (event->attr.type != event->pmu->type)
- 		return -ENOENT;
-@@ -1352,10 +1352,9 @@ static int cci_pmu_event_init(struct perf_event *event)
- 	 * the event being installed into its context, so the PMU's CPU can't
- 	 * change under our feet.
- 	 */
--	cpu = cpumask_first(&cci_pmu->cpus);
--	if (event->cpu < 0 || cpu < 0)
-+	if (event->cpu < 0)
- 		return -EINVAL;
--	event->cpu = cpu;
-+	event->cpu = cci_pmu->cpu;
- 
- 	event->destroy = hw_perf_event_destroy;
- 	if (!atomic_inc_not_zero(active_events)) {
-@@ -1382,11 +1381,7 @@ static ssize_t pmu_cpumask_attr_show(struct device *dev,
- 	struct pmu *pmu = dev_get_drvdata(dev);
- 	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
- 
--	int n = scnprintf(buf, PAGE_SIZE - 1, "%*pbl",
--			  cpumask_pr_args(&cci_pmu->cpus));
--	buf[n++] = '\n';
--	buf[n] = '\0';
--	return n;
-+	return cpumap_print_to_pagebuf(true, buf, cpumask_of(cci_pmu->cpu));
- }
- 
- static struct device_attribute pmu_cpumask_attr =
-@@ -1455,21 +1450,19 @@ static int cci_pmu_init(struct cci_pmu *cci_pmu, struct platform_device *pdev)
- 	return perf_pmu_register(&cci_pmu->pmu, name, -1);
- }
- 
--static int cci_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
-+static int cci_pmu_offline_cpu(unsigned int cpu)
- {
--	struct cci_pmu *cci_pmu = hlist_entry_safe(node, struct cci_pmu, node);
--	unsigned int target;
-+	int target;
- 
--	if (!cpumask_test_and_clear_cpu(cpu, &cci_pmu->cpus))
-+	if (!g_cci_pmu || cpu != g_cci_pmu->cpu)
- 		return 0;
-+
- 	target = cpumask_any_but(cpu_online_mask, cpu);
- 	if (target >= nr_cpu_ids)
- 		return 0;
--	/*
--	 * TODO: migrate context once core races on event->ctx have
--	 * been fixed.
--	 */
--	cpumask_set_cpu(target, &cci_pmu->cpus);
-+
-+	perf_pmu_migrate_context(&g_cci_pmu->pmu, cpu, target);
-+	g_cci_pmu->cpu = target;
- 	return 0;
- }
- 
-@@ -1706,7 +1699,7 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 	raw_spin_lock_init(&cci_pmu->hw_events.pmu_lock);
- 	mutex_init(&cci_pmu->reserve_mutex);
- 	atomic_set(&cci_pmu->active_events, 0);
--	cpumask_set_cpu(get_cpu(), &cci_pmu->cpus);
-+	cci_pmu->cpu = get_cpu();
- 
- 	ret = cci_pmu_init(cci_pmu, pdev);
- 	if (ret) {
-@@ -1714,9 +1707,11 @@ static int cci_pmu_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_CCI_ONLINE,
--					 &cci_pmu->node);
-+	cpuhp_setup_state_nocalls(CPUHP_AP_PERF_ARM_CCI_ONLINE,
-+				  "perf/arm/cci:online", NULL,
-+				  cci_pmu_offline_cpu);
- 	put_cpu();
-+	g_cci_pmu = cci_pmu;
- 	pr_info("ARM %s PMU driver probed", cci_pmu->model->name);
- 	return 0;
- }
-@@ -1729,19 +1724,6 @@ static struct platform_driver cci_pmu_driver = {
- 	.probe = cci_pmu_probe,
- };
- 
--static int __init cci_platform_init(void)
--{
--	int ret;
+-config ARM_CCN
+-	tristate "ARM CCN driver support"
+-	depends on ARM || ARM64
+-	depends on PERF_EVENTS
+-	help
+-	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+-	  interconnect.
 -
--	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_CCI_ONLINE,
--				      "perf/arm/cci:online", NULL,
--				      cci_pmu_offline_cpu);
--	if (ret)
--		return ret;
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+ 	depends on ARM || ARM64 || MIPS
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 9bcd0bf3954b..19733afddd0a 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -5,8 +5,6 @@
+ 
+ # Interconnect bus drivers for ARM platforms
+ obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+-obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
 -
--	return platform_driver_register(&cci_pmu_driver);
--}
--
--device_initcall(cci_platform_init);
-+builtin_platform_driver(cci_pmu_driver);
- MODULE_LICENSE("GPL");
- MODULE_DESCRIPTION("ARM CCI PMU support");
+ obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+ obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
+ obj-$(CONFIG_MIPS_CDMM)		+= mips_cdmm.o
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index da5724cd89cf..331b6d992b5a 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -5,6 +5,13 @@
+ menu "Performance monitor support"
+ 	depends on PERF_EVENTS
+ 
++config ARM_CCN
++	tristate "ARM CCN driver support"
++	depends on ARM || ARM64
++	help
++	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
++	  interconnect.
++
+ config ARM_PMU
+ 	depends on ARM || ARM64
+ 	bool "ARM PMU framework"
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index c2f27419bdf0..5004abee0f3a 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_ARM_CCN) += arm-ccn.o
+ obj-$(CONFIG_ARM_DSU_PMU) += arm_dsu_pmu.o
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
+ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+diff --git a/drivers/bus/arm-ccn.c b/drivers/perf/arm-ccn.c
+similarity index 100%
+rename from drivers/bus/arm-ccn.c
+rename to drivers/perf/arm-ccn.c
 -- 
 2.16.1.dirty
