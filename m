@@ -1,34 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  5 Feb 2018 16:45:38 -0200
-Subject: [PATCH 7/7] arm64: ls208xa-qds: Fix the 'reg' property
-In-Reply-To: <1517856338-28289-1-git-send-email-festevam@gmail.com>
-References: <1517856338-28289-1-git-send-email-festevam@gmail.com>
-Message-ID: <1517856338-28289-7-git-send-email-festevam@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Feb 2018 20:05:53 +0100
+Subject: [PATCHv2 1/8] ARM: ux500: remove PMU IRQ bouncer
+In-Reply-To: <20180205164202.26502-2-mark.rutland@arm.com>
+References: <20180205164202.26502-1-mark.rutland@arm.com>
+ <20180205164202.26502-2-mark.rutland@arm.com>
+Message-ID: <CACRpkdZmgO3L2=WAciYE23aLcO5ovN9TB7TMi8SPfu90UpiFjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Feb 5, 2018 at 5:41 PM, Mark Rutland <mark.rutland@arm.com> wrote:
 
-The 'reg' property should match the corresponding @ address, so
-fix it accordingly.
+> The ux500 PMU IRQ bouncer is getting in the way of some fundametnal
+> changes to the ARM PMU driver, and it's the only special case that
+> exists today. Let's remove it.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It's OK this silicon design was especially strange it seems.
+We are done with the days of performance optimization for
+the platform anyways.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
-index a1a5ccb..1de6188 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
-@@ -177,7 +177,7 @@
- 		#size-cells = <1>;
- 		compatible = "st,m25p80";
- 		spi-max-frequency = <20000000>;
--		reg = <0>;
-+		reg = <2>;
- 	};
- };
- 
--- 
-2.7.4
+Yours,
+Linus Walleij
