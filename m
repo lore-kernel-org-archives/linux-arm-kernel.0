@@ -1,36 +1,71 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Feb 2018 00:09:13 -0600
-Subject: [PATCH 2/2] soc: mediatek: add SCPSYS power domain driver for
- MediaTek MT7623A SoC
-In-Reply-To: <de07c071f968ae9da84543bb33cc5658ed184801.1517479588.git.sean.wang@mediatek.com>
-References: <975fb80e1cdbe7f6d4a1d04fd3a2a21b619a193d.1517479588.git.sean.wang@mediatek.com>
- <de07c071f968ae9da84543bb33cc5658ed184801.1517479588.git.sean.wang@mediatek.com>
-Message-ID: <20180205060913.ak62ammdposybdsf@rob-hp-laptop>
+Date: Mon, 5 Feb 2018 00:09:10 -0600
+Subject: [PATCH v3 1/3] dt-bindings: dmaengine: Add MediaTek High-Speed
+ DMA controller bindings
+In-Reply-To: <698453fba5198168829a596ec8d58d1f730aaf45.1517454174.git.sean.wang@mediatek.com>
+References: <cover.1517454174.git.sean.wang@mediatek.com>
+ <698453fba5198168829a596ec8d58d1f730aaf45.1517454174.git.sean.wang@mediatek.com>
+Message-ID: <20180205035244.zrltzoxwe4owe4dw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 01, 2018 at 06:12:48PM +0800, sean.wang at mediatek.com wrote:
+On Thu, Feb 01, 2018 at 11:45:23AM +0800, sean.wang at mediatek.com wrote:
 > From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Add SCPSYS power domain driver for MT7623A SoC. The MT7623A's power
-> domains are the subset of MT7623 SoC's ones. As MT7623 SoC has full
-> features whereas MT7623A is being designed just for router applications.
-> Thus, MT7623A doesn't include those power domains multimedia function
-> belongs to. In order to avoid certain errors undoubtedly happening at
-> registering those power domains on MT7623A SoC using the existing MT7623
-> SCPSYS driver, it's required to define another setup specifically for
-> MT7623A SoC. Also, use a meaningful definition for bus_prot_mask instead
-> of just hardcoded for it.
+> Document the devicetree bindings for MediaTek High-Speed DMA controller
+> which could be found on MT7623 SoC or other similar Mediatek SoCs.
 > 
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
->  drivers/soc/mediatek/mtk-scpsys.c         | 60 +++++++++++++++++++++++++++++--
+>  .../devicetree/bindings/dma/mtk-hsdma.txt          | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/mtk-hsdma.txt b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+> new file mode 100644
+> index 0000000..c07c03e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+> @@ -0,0 +1,33 @@
+> +MediaTek High-Speed DMA Controller
+> +==================================
+> +
+> +This driver follows the generic DMA bindings defined in dma/dma.txt.
 
->  include/dt-bindings/power/mt7623a-power.h | 10 ++++++
+Bindings describe h/w, not drivers.
 
-This belongs in the binding patch.
+> +
+> +Required properties:
+> +
+> +- compatible:	Must be one of
+> +		  "mediatek,mt7622-hsdma": for MT7622 SoC
+> +		  "mediatek,mt7623-hsdma": for MT7623 SoC
+> +- reg:		Should contain the register's base address and length.
+> +- interrupts:	Should contain a reference to the interrupt used by this
+> +		device.
+> +- clocks:	Should be the clock specifiers corresponding to the entry in
+> +		clock-names property.
+> +- clock-names:	Should contain "hsdma" entries.
+> +- power-domains: Phandle to the power domain that the device is part of
+> +- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
+> +		in dmas property of a client device represents the channel
+> +		number.
+> +Example:
+> +
+> +        hsdma: hsdma at 1b007000 {
 
->  include/linux/soc/mediatek/infracfg.h     |  4 +++
->  3 files changed, 72 insertions(+), 2 deletions(-)
->  create mode 100644 include/dt-bindings/power/mt7623a-power.h
+dma-controller at ...
+
+> +		compatible = "mediatek,mt7623-hsdma";
+> +		reg = <0 0x1b007000 0 0x1000>;
+> +		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&ethsys CLK_ETHSYS_HSDMA>;
+> +		clock-names = "hsdma";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+> +		#dma-cells = <1>;
+> +	};
+> +
+> +DMA clients must use the format described in dma/dma.txt file.
+> -- 
+> 2.7.4
 > 
