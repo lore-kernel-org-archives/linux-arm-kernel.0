@@ -1,120 +1,106 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Feb 2018 16:41:56 +0000
-Subject: [PATCHv2 2/8] arm_pmu: kill arm_pmu_platdata
+Date: Mon,  5 Feb 2018 16:41:57 +0000
+Subject: [PATCHv2 3/8] arm_pmu: fold platform helpers into platform code
 In-Reply-To: <20180205164202.26502-1-mark.rutland@arm.com>
 References: <20180205164202.26502-1-mark.rutland@arm.com>
-Message-ID: <20180205164202.26502-3-mark.rutland@arm.com>
+Message-ID: <20180205164202.26502-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have no platforms passing platform data to the arm_pmu code,
-we can get rid of the platdata and associated hooks, paving the way for
-rework of our IRQ handling.
+The armpmu_{request,free}_irqs() helpers are only used by
+arm_pmu_platform.c, so let's fold them in and make them static.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c       | 27 ++++-----------------------
- include/linux/perf/arm_pmu.h | 17 -----------------
- 2 files changed, 4 insertions(+), 40 deletions(-)
+ drivers/perf/arm_pmu.c          | 21 ---------------------
+ drivers/perf/arm_pmu_platform.c | 21 +++++++++++++++++++++
+ include/linux/perf/arm_pmu.h    |  2 --
+ 3 files changed, 21 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 7bc5eee96b31..82b09d1cb42c 100644
+index 82b09d1cb42c..373dfd7d8a1d 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -17,7 +17,6 @@
- #include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/perf/arm_pmu.h>
--#include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/sched/clock.h>
- #include <linux/spinlock.h>
-@@ -320,17 +319,9 @@ validate_group(struct perf_event *event)
+@@ -534,14 +534,6 @@ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ 	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+ }
+ 
+-void armpmu_free_irqs(struct arm_pmu *armpmu)
+-{
+-	int cpu;
+-
+-	for_each_cpu(cpu, &armpmu->supported_cpus)
+-		armpmu_free_irq(armpmu, cpu);
+-}
+-
+ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ {
+ 	int err = 0;
+@@ -593,19 +585,6 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 	return err;
+ }
+ 
+-int armpmu_request_irqs(struct arm_pmu *armpmu)
+-{
+-	int cpu, err;
+-
+-	for_each_cpu(cpu, &armpmu->supported_cpus) {
+-		err = armpmu_request_irq(armpmu, cpu);
+-		if (err)
+-			break;
+-	}
+-
+-	return err;
+-}
+-
+ static int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
+ {
+ 	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+index 46501cc79fd7..244558cfdbce 100644
+--- a/drivers/perf/arm_pmu_platform.c
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -164,6 +164,27 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
  	return 0;
  }
  
--static struct arm_pmu_platdata *armpmu_get_platdata(struct arm_pmu *armpmu)
--{
--	struct platform_device *pdev = armpmu->plat_device;
--
--	return pdev ? dev_get_platdata(&pdev->dev) : NULL;
--}
--
- static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- {
- 	struct arm_pmu *armpmu;
--	struct arm_pmu_platdata *plat;
- 	int ret;
- 	u64 start_clock, finish_clock;
- 
-@@ -342,13 +333,8 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- 	 */
- 	armpmu = *(void **)dev;
- 
--	plat = armpmu_get_platdata(armpmu);
--
- 	start_clock = sched_clock();
--	if (plat && plat->handle_irq)
--		ret = plat->handle_irq(irq, armpmu, armpmu->handle_irq);
--	else
--		ret = armpmu->handle_irq(irq, armpmu);
-+	ret = armpmu->handle_irq(irq, armpmu);
- 	finish_clock = sched_clock();
- 
- 	perf_sample_event_took(finish_clock - start_clock);
-@@ -578,7 +564,6 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
- 			goto err_out;
- 		}
- 	} else {
--		struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
- 		unsigned long irq_flags;
- 
- 		err = irq_force_affinity(irq, cpumask_of(cpu));
-@@ -589,13 +574,9 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
- 			goto err_out;
- 		}
- 
--		if (platdata && platdata->irq_flags) {
--			irq_flags = platdata->irq_flags;
--		} else {
--			irq_flags = IRQF_PERCPU |
--				    IRQF_NOBALANCING |
--				    IRQF_NO_THREAD;
--		}
-+		irq_flags = IRQF_PERCPU |
-+			    IRQF_NOBALANCING |
-+			    IRQF_NO_THREAD;
- 
- 		err = request_irq(irq, handler, irq_flags, "arm-pmu",
- 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++static int armpmu_request_irqs(struct arm_pmu *armpmu)
++{
++	int cpu, err;
++
++	for_each_cpu(cpu, &armpmu->supported_cpus) {
++		err = armpmu_request_irq(armpmu, cpu);
++		if (err)
++			break;
++	}
++
++	return err;
++}
++
++static void armpmu_free_irqs(struct arm_pmu *armpmu)
++{
++	int cpu;
++
++	for_each_cpu(cpu, &armpmu->supported_cpus)
++		armpmu_free_irq(armpmu, cpu);
++}
++
+ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table)
 diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index af0f44effd44..712764b35c6a 100644
+index 712764b35c6a..899bc7ef0881 100644
 --- a/include/linux/perf/arm_pmu.h
 +++ b/include/linux/perf/arm_pmu.h
-@@ -17,23 +17,6 @@
- #include <linux/sysfs.h>
- #include <asm/cputype.h>
+@@ -159,8 +159,6 @@ static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
+ struct arm_pmu *armpmu_alloc(void);
+ void armpmu_free(struct arm_pmu *pmu);
+ int armpmu_register(struct arm_pmu *pmu);
+-int armpmu_request_irqs(struct arm_pmu *armpmu);
+-void armpmu_free_irqs(struct arm_pmu *armpmu);
+ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
+ void armpmu_free_irq(struct arm_pmu *armpmu, int cpu);
  
--/*
-- * struct arm_pmu_platdata - ARM PMU platform data
-- *
-- * @handle_irq: an optional handler which will be called from the
-- *	interrupt and passed the address of the low level handler,
-- *	and can be used to implement any platform specific handling
-- *	before or after calling it.
-- *
-- * @irq_flags: if non-zero, these flags will be passed to request_irq
-- *             when requesting interrupts for this PMU device.
-- */
--struct arm_pmu_platdata {
--	irqreturn_t (*handle_irq)(int irq, void *dev,
--				  irq_handler_t pmu_handler);
--	unsigned long irq_flags;
--};
--
- #ifdef CONFIG_ARM_PMU
- 
- /*
 -- 
 2.11.0
