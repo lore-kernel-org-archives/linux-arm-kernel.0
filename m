@@ -1,65 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 5 Feb 2018 14:51:43 +0100
-Subject: [PATCH 05/11] arm64: dts: renesas: initial R8A77980 SoC device
- tree
-In-Reply-To: <ad83625d-c166-cacb-eae2-a6d64f7d2b26@cogentembedded.com>
-References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
- <32142684-d5cf-035f-8401-86a36dcbafd6@cogentembedded.com>
- <CAMuHMdWad2OJ33Hu0KbYS3nLWhgmj81_wRbtwApw-N81q3+nsA@mail.gmail.com>
- <ad83625d-c166-cacb-eae2-a6d64f7d2b26@cogentembedded.com>
-Message-ID: <CAMuHMdVfuruK36OUVdOcHaJogoM8oee_+b+4UzjBfUBoMiEbOQ@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 5 Feb 2018 15:02:01 +0100
+Subject: Runqueue spinlock recursion on arm64 v4.15
+In-Reply-To: <20180205133600.etr32unq6amsa6af@lakrids.cambridge.arm.com>
+References: <20180202192704.nqwjsthl3agszhzt@lakrids.cambridge.arm.com>
+ <20180202195506.GP2269@hirez.programming.kicks-ass.net>
+ <20180202220726.23d4ljxxdysafbxd@salmiak>
+ <20180205133600.etr32unq6amsa6af@lakrids.cambridge.arm.com>
+Message-ID: <20180205140201.GY2269@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Mon, Feb 05, 2018 at 01:36:00PM +0000, Mark Rutland wrote:
+> On Fri, Feb 02, 2018 at 10:07:26PM +0000, Mark Rutland wrote:
+> > On Fri, Feb 02, 2018 at 08:55:06PM +0100, Peter Zijlstra wrote:
+> > > On Fri, Feb 02, 2018 at 07:27:04PM +0000, Mark Rutland wrote:
+> > > > ... in some cases, owner_cpu is -1, so I guess we're racing with an
+> > > > unlock. I only ever see this on the runqueue locks in wake up functions.
+> > > 
+> > > So runqueue locks are special in that the owner changes over a contex
+> > > switch, maybe something goes funny there?
+> > 
+> > Aha! I think that's it!
+> > 
+> > In finish_lock_switch() we do:
+> > 
+> > 	smp_store_release(&prev->on_cpu, 0);
+> > 	...
+> > 	rq->lock.owner = current;
+> > 
+> > As soon as we update prev->on_cpu, prev can be scheduled on another CPU, and
+> > can thus see a stale value for rq->lock.owner (e.g. if it tries to wake up
+> > another task on that rq).
+> 
+> I hacked in a forced vCPU preemption between the two using a sled of WFE
+> instructions, and now I can trigger the problem in seconds rather than
+> hours.
+> 
+> With the patch below applied, things seem to fine so far.
+> 
+> So I'm pretty sure this is it. I'll clean up the patch text and resend
+> that in a bit.
 
-On Mon, Feb 5, 2018 at 2:48 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 2/5/2018 4:32 PM, Geert Uytterhoeven wrote:
->>> The initial R8A77980 SoC device tree including Cortex-A53 CPU, GIC,
->>> timer,
->>> CPG, RST, and SYSC.
->>>
->>> Based on the original (and large) patch by Vladimir Barinov.
->>>
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->>
->> Thanks for your patch!
->>
->>> --- /dev/null
->>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->>> @@ -0,0 +1,122 @@
->>> +// SPDX-License-Identifier: GPL-2.0
->>> +/*
->>> + * Device Tree Source for the r8a77980 SoC
->>> + *
->>> + * Copyright (C) 2018 Renesas Electronics Corp.
->>> + * Copyright (C) 2018 Cogent Embedded, Inc.
->>> + */
->>> +
->>> +#include <dt-bindings/interrupt-controller/irq.h>
->>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->>> +#include <dt-bindings/clock/renesas-cpg-mssr.h>
->>
->> I think you want to leave out the above #include, as it will go upstream
->> through a different path (you're already using hardcoded clock numbers,
->> assuming the same).
->
->    I still need CPG_{CORE|MOD}.
-
-You're right. Please ignore my comment.
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Also try and send it against an up-to-date scheduler tree, we just
+moved some stuff around just about there.
