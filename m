@@ -1,47 +1,84 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 5 Feb 2018 15:37:49 +0100
-Subject: [PATCH] [PATCH] tty/serial: atmel: add new version check for usart
-In-Reply-To: <CALDOjziu=FBck-VSi=g=i8tcYWi_DQ_azzDnwKTkTuTrh54AkA@mail.gmail.com>
-References: <20180129113954.12011-1-jonas@orbital-systems.com>
- <e20ced24-666b-32b7-92cd-d30e1a10b42e@microchip.com>
- <CALDOjziu=FBck-VSi=g=i8tcYWi_DQ_azzDnwKTkTuTrh54AkA@mail.gmail.com>
-Message-ID: <501be260-6a07-4334-4f97-fc2a4e1ed1fc@microchip.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 05 Feb 2018 15:20:02 +0000
+Subject: Applied "ASoC: stm32: add of dependency for stm32 drivers" to the
+ asoc tree
+In-Reply-To: <1517827785-6275-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1eiiYs-0007FQ-II@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2018 at 15:04, Jonas Danielsson wrote:
-> On Mon, Feb 5, 2018 at 1:36 PM, Nicolas Ferre
-> <nicolas.ferre@microchip.com> wrote:
->> On 29/01/2018 at 12:39, Jonas Danielsson wrote:
->>> On our at91sam9260 based board the usart0 and usart1 ports report
->>> their versions (ATMEL_US_VERSION) as 0x10302. This version is not
->>> included in the current checks in the driver.
->>>
->>> Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->>
->> It must be the AT91SAM9260 rev. B SoC, isn't it?
->>
->> Thanks for your patch.
->>
->> Best regards,
->>   Nicolas
->>
-> 
-> Hi Nicolas!
-> 
-> Thank you for the review!
-> 
-> Yes that is right, we have the rev B SoC :) I Tried to find some
-> documentation online
-> regarding the US_VERSION register, but fell short.
+The patch
 
-It's actually a non-documented register ;-)
-In short, bits [0-11] Hardware module version
-bits [16-18] Metal fix number.
-So your at91sam9260 revB benefit from the metal fix #1.
+   ASoC: stm32: add of dependency for stm32 drivers
 
-Best regards,
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 748bce8e6c7ebae2d89314a42e0c4b65232a0ce9 Mon Sep 17 00:00:00 2001
+From: Olivier Moysan <olivier.moysan@st.com>
+Date: Mon, 5 Feb 2018 11:49:45 +0100
+Subject: [PATCH] ASoC: stm32: add of dependency for stm32 drivers
+
+Add of dependency for STM32 ASoC drivers.
+DFSDM of dependency is already inherited
+from STM32_DFSDM_ADC dependency.
+
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/stm/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
+index 3ad881fc40a1..48f9ddd94016 100644
+--- a/sound/soc/stm/Kconfig
++++ b/sound/soc/stm/Kconfig
+@@ -2,7 +2,7 @@ menu "STMicroelectronics STM32 SOC audio support"
+ 
+ config SND_SOC_STM32_SAI
+ 	tristate "STM32 SAI interface (Serial Audio Interface) support"
+-	depends on ARCH_STM32 || COMPILE_TEST
++	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+ 	depends on SND_SOC
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+@@ -11,7 +11,7 @@ config SND_SOC_STM32_SAI
+ 
+ config SND_SOC_STM32_I2S
+ 	tristate "STM32 I2S interface (SPI/I2S block) support"
+-	depends on ARCH_STM32 || COMPILE_TEST
++	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+ 	depends on SND_SOC
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
+@@ -20,7 +20,7 @@ config SND_SOC_STM32_I2S
+ 
+ config SND_SOC_STM32_SPDIFRX
+ 	tristate "STM32 S/PDIF receiver (SPDIFRX) support"
+-	depends on ARCH_STM32 || COMPILE_TEST
++	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+ 	depends on SND_SOC
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select REGMAP_MMIO
 -- 
-Nicolas Ferre
+2.15.1
