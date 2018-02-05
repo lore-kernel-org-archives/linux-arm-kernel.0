@@ -1,53 +1,82 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Feb 2018 16:41:54 +0000
-Subject: [PATCHv2 0/8] arm_pmu: fix lockdep issues with ACPI systems
-Message-ID: <20180205164202.26502-1-mark.rutland@arm.com>
+Date: Mon,  5 Feb 2018 16:41:55 +0000
+Subject: [PATCHv2 1/8] ARM: ux500: remove PMU IRQ bouncer
+In-Reply-To: <20180205164202.26502-1-mark.rutland@arm.com>
+References: <20180205164202.26502-1-mark.rutland@arm.com>
+Message-ID: <20180205164202.26502-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the arm_pmu ACPI code is somewhat dubious. It attempts to
-allocate memory and manipulate IRQs in a hotplug callback, which is an
-atomic context.
+The ux500 PMU IRQ bouncer is getting in the way of some fundametnal
+changes to the ARM PMU driver, and it's the only special case that
+exists today. Let's remove it.
 
-These patches (based on the arm64 for-next/core branch [1]) attempt to
-address this by moving work out of hotplug callback, requiring a
-reorganisation of the common arm_pmu code.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-ux500/cpu-db8500.c | 35 -----------------------------------
+ 1 file changed, 35 deletions(-)
 
-I've given these a boot-test on a Juno R1 system, both with DT and ACPI.
-In either case the PMU works as expected, and lockdep seems happy.
-
-I've pushed the series out to my arm64/acpi-pmu-lockdep branch [2].
-
-Since v1 [3]:
-* Kill arm_pmu_platdata (and ux500 IRQ bouncer)
-* Make PMU/CPU binding implicit in hotplug notifier
-* Explicitly enable/disable SPIs at hogplug
-* Add armpmu_alloc_atomic
-* Cleanup per Will's comments
-
-Thanks,
-Mark.
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
-[2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
-[3] https://lkml.kernel.org/r/20171101141239.45340-1-mark.rutland at arm.com
-
-Mark Rutland (8):
-  ARM: ux500: remove PMU IRQ bouncer
-  arm_pmu: kill arm_pmu_platdata
-  arm_pmu: fold platform helpers into platform code
-  arm_pmu: add armpmu_alloc_atomic()
-  arm_pmu: acpi: check for mismatched PPIs
-  arm_pmu: explicitly enable/disable SPIs at hotplug
-  arm_pmu: note IRQs and PMUs per-cpu
-  arm_pmu: acpi: request IRQs up-front
-
- arch/arm/mach-ux500/cpu-db8500.c |  35 ---------
- drivers/perf/arm_pmu.c           | 149 +++++++++++++++++----------------------
- drivers/perf/arm_pmu_acpi.c      |  61 +++++++++++-----
- drivers/perf/arm_pmu_platform.c  |  37 ++++++++--
- include/linux/perf/arm_pmu.h     |  26 ++-----
- 5 files changed, 142 insertions(+), 166 deletions(-)
-
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 57058ac46f49..7e5d7a083707 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -23,7 +23,6 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+-#include <linux/perf/arm_pmu.h>
+ #include <linux/regulator/machine.h>
+ 
+ #include <asm/outercache.h>
+@@ -112,37 +111,6 @@ static void ux500_restart(enum reboot_mode mode, const char *cmd)
+ 	prcmu_system_reset(0);
+ }
+ 
+-/*
+- * The PMU IRQ lines of two cores are wired together into a single interrupt.
+- * Bounce the interrupt to the other core if it's not ours.
+- */
+-static irqreturn_t db8500_pmu_handler(int irq, void *dev, irq_handler_t handler)
+-{
+-	irqreturn_t ret = handler(irq, dev);
+-	int other = !smp_processor_id();
+-
+-	if (ret == IRQ_NONE && cpu_online(other))
+-		irq_set_affinity(irq, cpumask_of(other));
+-
+-	/*
+-	 * We should be able to get away with the amount of IRQ_NONEs we give,
+-	 * while still having the spurious IRQ detection code kick in if the
+-	 * interrupt really starts hitting spuriously.
+-	 */
+-	return ret;
+-}
+-
+-static struct arm_pmu_platdata db8500_pmu_platdata = {
+-	.handle_irq		= db8500_pmu_handler,
+-	.irq_flags		= IRQF_NOBALANCING | IRQF_NO_THREAD,
+-};
+-
+-static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+-	/* Requires call-back bindings. */
+-	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+-	{},
+-};
+-
+ static struct of_dev_auxdata u8540_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu", NULL),
+ 	{},
+@@ -165,9 +133,6 @@ static void __init u8500_init_machine(void)
+ 	if (of_machine_is_compatible("st-ericsson,u8540"))
+ 		of_platform_populate(NULL, u8500_local_bus_nodes,
+ 				     u8540_auxdata_lookup, NULL);
+-	else
+-		of_platform_populate(NULL, u8500_local_bus_nodes,
+-				     u8500_auxdata_lookup, NULL);
+ }
+ 
+ static const char * stericsson_dt_platform_compat[] = {
 -- 
 2.11.0
