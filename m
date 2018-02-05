@@ -1,26 +1,14 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 05 Feb 2018 13:50:53 -0800
-Subject: [PATCH v2 15/16] mmc: sdhci-omap: Add SPDX identifier
-In-Reply-To: <20180205125029.21570-16-kishon@ti.com>
-References: <20180205125029.21570-1-kishon@ti.com>
- <20180205125029.21570-16-kishon@ti.com>
-Message-ID: <1517867453.7489.261.camel@perches.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Mon,  5 Feb 2018 15:57:54 -0800
+Subject: [PATCH v9 0/3] arm: npcm: add basic support for Nuvoton BMCs
+Message-ID: <20180205235757.246758-1-brendanhiggins@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Adding Kate Stewart)
+Addressed comments from:
+ - Philippe: https://www.spinics.net/lists/arm-kernel/msg621710.html
 
-On Mon, 2018-02-05 at 18:20 +0530, Kishon Vijay Abraham I wrote:
-> The SPDX identifier is a legally binding shorthand,
-
-As far as I know that "legally binding" bit is unproven.
-So maybe, maybe not.
-
-I don't doubt that it should be added, but I would be
-hesitant to state in a commit message that it is
-legally binding.
-
-> which can be used
-> instead of the full boiler plate text.
-
-I would also be hesitant to remove existing license text.
+Summary of changes since previous update:
+ - Now use SPDX ids instead of traditional license boilerplate. Top of file
+   comments are now C++ style comments.
+ - Changed reviewers listed in MAINTAINERS.
