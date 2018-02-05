@@ -1,55 +1,71 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  5 Feb 2018 15:34:33 +0100
-Subject: [PATCH 7/9] drm/rockchip: dw_hdmi: allow including external phys
+Date: Mon,  5 Feb 2018 15:34:27 +0100
+Subject: [PATCH 1/9] dt-bindings: add binding for Rockchip hdmi phy using an
+ Innosilicon IP
 In-Reply-To: <20180205143435.4723-1-heiko@sntech.de>
 References: <20180205143435.4723-1-heiko@sntech.de>
-Message-ID: <20180205143435.4723-8-heiko@sntech.de>
+Message-ID: <20180205143435.4723-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some variants of the dw-hdmi on Rockchip socs use a separate phy block
-accessed via the generic phy framework, so allow them to be included
-if such a phy reference is found.
+From: Zheng Yang <zhengyang@rock-chips.com>
 
+The phy is used so far in two Rockchip socs the rk3228 and the rk3328.
+
+Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../bindings/phy/phy-rockchip-inno-hdmi.txt        | 42 ++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
 
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 304f61bd2eec..512f8556e7c0 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -11,6 +11,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/phy/phy.h>
- #include <linux/regmap.h>
- 
- #include <drm/drm_of.h>
-@@ -48,6 +49,7 @@ struct rockchip_hdmi {
- 	const struct rockchip_hdmi_chip_data *chip_data;
- 	struct clk *vpll_clk;
- 	struct clk *grf_clk;
-+	struct phy *phy;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -376,6 +378,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
-+	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
-+	if (IS_ERR(hdmi->phy)) {
-+		ret = PTR_ERR(hdmi->phy);
-+		if (ret != -EPROBE_DEFER)
-+			DRM_DEV_ERROR(hdmi->dev, "failed to get phy\n");
-+		return ret;
-+	}
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+new file mode 100644
+index 000000000000..7d36fd8d5d94
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+@@ -0,0 +1,42 @@
++ROCKCHIP HDMI PHY WITH INNO IP BLOCK
 +
- 	drm_encoder_helper_add(encoder, &dw_hdmi_rockchip_encoder_helper_funcs);
- 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
++Required properties:
++ - compatible : should be one of the listed compatibles:
++	* "rockchip,rk3228-hdmi-phy",
++	* "rockchip,rk3328-hdmi-phy";
++ - reg : Address and length of the hdmi phy control register set
++ - clocks : phandle + clock specifier for the phy clocks
++ - clock-names : string, clock name, must contain "sysclk" for system
++	  control and register configuration and "refclk" for reference
++	  crystal oscillator clock input to PLL
++ - #clock-cells: should be 0.
++ - clock-output-names : shall be the name for the output clock.
++ - interrupts : phandle + interrupt specified for the hdmiphy interrupt
++ - #phy-cells : must be 0. See ./phy-bindings.txt for details.
++
++Optional properties for rk3328-hdmi-phy:
++ - nvmem-cells = phandle + nvmem specifier for the cpu-version efuse
++ - nvmem-cell-names : "cpu-version" to read the chip version, required
++	  for adjustment to some frequency settings
++
++Example:
++	hdmi_phy: hdmi-phy at 12030000 {
++		compatible = "rockchip,rk3228-hdmi-phy";
++		reg = <0x12030000 0x10000>;
++		#phy-cells = <0>;
++		clocks = <&cru PCLK_HDMI_PHY>, <&xin24m>;
++		clock-names = "sysclk", "refclk";
++		#clock-cells = <0>;
++		clock-output-names = "hdmi_phy";
++		status = "disabled";
++	};
++
++Then the PHY can be used in other nodes such as:
++
++	hdmi: hdmi at 200a0000 {
++		compatible = "rockchip,rk3228-dw-hdmi";
++		...
++		phys = <&hdmi_phy>;
++		phy-names = "hdmi";
++		...
++	};
 -- 
 2.15.1
