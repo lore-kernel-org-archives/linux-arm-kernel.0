@@ -1,54 +1,41 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 5 Feb 2018 18:20:23 +0530
-Subject: [PATCH v2 10/16] mmc: sdhci: Fix to use data_timer only for data line
- commands
+Date: Mon, 5 Feb 2018 18:20:25 +0530
+Subject: [PATCH v2 12/16] mmc: sdhci-omap: Workaround for Errata i834
 In-Reply-To: <20180205125029.21570-1-kishon@ti.com>
 References: <20180205125029.21570-1-kishon@ti.com>
-Message-ID: <20180205125029.21570-11-kishon@ti.com>
+Message-ID: <20180205125029.21570-13-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit d7422fb489eee5587d3eec ("mmc: sdhci: Separate timer timeout for
-command and data requests") while separating timer timeout for
-command and data requests, passed cmd->mrq to sdhci_mod_timer (cmd is an
-argument to sdhci_send_command) and in sdhci_mod_timer used mrq->cmd
-to check if it is a data line command. This results in using
-data timer for commands like MMC_SET_BLOCK_COUNT (CMD23) though it is
-not a data line command. Fix it here.
+Errata i834 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
+(SPRZ429K July 2014?Revised March 2017 [1]) mentions the maximum
+obtainable timeout through MMC host controller is 700ms. And for
+commands taking longer than 700ms, hardware timeout should be
+disabled and software timeout should be used.
 
-Fixes: commit d7422fb489eee5587d3eec ("mmc: sdhci: Separate timer timeout for
-command and data requests")
+The workaround for Errata i834 can be achieved by adding
+SDHCI_QUIRK2_DISABLE_HW_TIMEOUT quirk in sdhci-omap.
+
+[1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/sdhci.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/mmc/host/sdhci-omap.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1aa74b4682f3..0489572d1892 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1073,10 +1073,10 @@ static void sdhci_finish_data(struct sdhci_host *host)
- 	}
- }
+diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+index c2570db3f7a2..db487b77fbcc 100644
+--- a/drivers/mmc/host/sdhci-omap.c
++++ b/drivers/mmc/host/sdhci-omap.c
+@@ -714,7 +714,8 @@ static const struct sdhci_pltfm_data sdhci_omap_pdata = {
+ 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
+ 	.quirks2 = SDHCI_QUIRK2_ACMD23_BROKEN |
+ 		   SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+-		   SDHCI_QUIRK2_RSP_136_HAS_CRC,
++		   SDHCI_QUIRK2_RSP_136_HAS_CRC |
++		   SDHCI_QUIRK2_DISABLE_HW_TIMEOUT,
+ 	.ops = &sdhci_omap_ops,
+ };
  
--static void sdhci_mod_timer(struct sdhci_host *host, struct mmc_request *mrq,
-+static void sdhci_mod_timer(struct sdhci_host *host, struct mmc_command *cmd,
- 			    unsigned long timeout)
- {
--	if (sdhci_data_line_cmd(mrq->cmd))
-+	if (sdhci_data_line_cmd(cmd))
- 		mod_timer(&host->data_timer, timeout);
- 	else
- 		mod_timer(&host->timer, timeout);
-@@ -1135,7 +1135,7 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
- 		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
- 	else
- 		timeout += 10 * HZ;
--	sdhci_mod_timer(host, cmd->mrq, timeout);
-+	sdhci_mod_timer(host, cmd, timeout);
- 
- 	host->cmd = cmd;
- 	if (sdhci_data_line_cmd(cmd)) {
 -- 
 2.11.0
