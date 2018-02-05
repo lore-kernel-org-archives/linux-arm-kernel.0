@@ -1,74 +1,94 @@
-From: yungching0725@gmail.com (Yung-Ching LIN)
-Date: Sun, 4 Feb 2018 20:23:16 -0800
-Subject: [PATCH] ARM: dts: imx: Add support for Advantech DMS-BA16
-In-Reply-To: <20180204192246.GC24569@lunn.ch>
-References: <20180204184514.2396-1-yungching0725@gmail.com>
- <20180204192246.GC24569@lunn.ch>
-Message-ID: <CACGtqyyriQ7hdUWO8HLn=KC1+vkD=kPAMVZEixqByjdw0Dxf5g@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Feb 2018 13:38:04 +0800
+Subject: [PATCH RESEND] ARM: dts: imx6ul: add missing OSC32K_32K_OUT mux
+ mode
+In-Reply-To: <1516267665.3727.4.camel@embedded.rocks>
+References: <20180117232347.24513-1-joerg.krause@embedded.rocks>
+ <1516263957.13152.2.camel@embedded.rocks>
+ <1516265435.7607.1.camel@pengutronix.de>
+ <1516267665.3727.4.camel@embedded.rocks>
+Message-ID: <20180205053802.GB31354@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Thu, Jan 18, 2018 at 10:27:45AM +0100, J?rg Krause wrote:
+> Hi Philipp,
+> 
+> On Thu, 2018-01-18 at 09:50 +0100, Philipp Zabel wrote:
+> > On Thu, 2018-01-18 at 09:25 +0100, J?rg Krause wrote:
+> > > Hi,
+> > > 
+> > > On Thu, 2018-01-18 at 00:23 +0100, J?rg Krause wrote:
+> > > > RESEND because of missing Ccs. Original patch is [0].
+> > > > 
+> > > > The 32 kHz reference clock on the i.MX6UL(L) can be output by
+> > > > setting the external signal XTALOSC_REF_CLK_32K in one of the
+> > > > following ways [1]:
+> > > > 
+> > > > > ----------------------------------------------------------|
+> > > > > Signal              | Pad             | Mode | Direction |
+> > > > > ----------------------------------------------------------|
+> > > > > XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
+> > > > >                     | GPIO1_IO03      | ALT3 |           |
+> > > > >                     | JTAG_TCK        | ALT6 |           |
+> > > > > ----------------------------------------------------------|
+> > > > 
+> > > > [0] https://patchwork.ozlabs.org/patch/816108/
+> > > > [1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1
+> > > > 
+> > > > Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+> > > > ---
+> > > >  arch/arm/boot/dts/imx6ul-pinfunc.h | 3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > > > index 0034eeb84542..e12654018c23 100644
+> > > > --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > > > +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> > > > @@ -63,6 +63,7 @@
+> > > >  #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
+> > > >  #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
+> > > >  #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
+> > > > +#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT		0x0054 0x02e0 0x0000 6 0
+> > > >  #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
+> > > >  #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
+> > > >  #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
+> > > > @@ -101,6 +102,7 @@
+> > > >  #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
+> > > >  #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
+> > > >  #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
+> > > > +#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
+> > > >  #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
+> > > >  #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
+> > > >  #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_eXT_CLK		0x0068 0x02f4 0x0000 6 0
+> > > > @@ -316,6 +318,7 @@
+> > > >  #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
+> > > >  #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
+> > > >  #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
+> > > > +#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
+> > > >  #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x0000 3 0
+> > > >  #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
+> > > >  #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
+> > > 
+> > > Just noticed the pin is named REF_CLK_32K instead of OSC32K_32K_OUT in
+> > > the vendor Linux kernel. So better use their pin naming, right?
+> > 
+> > The i.MX 6UltraLite Applications Processor Reference Manual, Rev. 1
+> > (Chapters 30.5.17, SW_MUX_CTL_PAD_JTAG_TCK SW MUX Control Register, and
+> > 30.5.47, SW_MUX_CTL_PAD_ENET1_RX_EN SW MUX Control Register) calls this
+> > OSC32K_32K_OUT.
+> 
+> Thanks for the reference! I guess this is why I named it this way in
+> the first place.
 
-Will provide the v2 for all the fixes.
-Thank you for the comments.
+I tried to apply the patch and found that I had already applied one from
+Fugang and Stefan [1].  That patch adds the OSC32K_32K_OUT mux mode in name
+of REF_CLK_32K.
 
-On Sun, Feb 4, 2018 at 11:22 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Mon, Feb 05, 2018 at 02:45:14AM +0800, Ken Lin wrote:
->> Add support for Advantech DMS-BA16 board, which use
->> the Advantech BA-16 module.
->>
->> Signed-off-by: Ken Lin <yungching0725@gmail.com>
->> ---
->>  arch/arm/boot/dts/Makefile           |   1 +
->>  arch/arm/boot/dts/imx6q-dms-ba16.dts | 154 +++++++++++++++++++++++++++++++++++
->>  2 files changed, 155 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6q-dms-ba16.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index ade7a38543dc..d97511273f30 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -428,6 +428,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->>       imx6q-b450v3.dtb \
->>       imx6q-b650v3.dtb \
->>       imx6q-b850v3.dtb \
->> +     imx6q-dms-ba16.dtb \
->>       imx6q-cm-fx6.dtb \
->>       imx6q-cubox-i.dtb \
->>       imx6q-cubox-i-emmc-som-v15.dtb \
->
-> Hi Ken
->
-> I think the intention is to keep this list sorted. So dms puts it
-> later, after cubox.
->
+I agree OSC32K_32K_OUT from Reference Manual should be used instead.
+Can you please resend your patch by rebasing it on imx/dt branch?
+Thanks.
 
-Thanks. will fix the order issue in the v2.
+Shawn
 
->> @@ -0,0 +1,154 @@
->> +/*
->> + * Copyright 2018 Advantech Corporation
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include "imx6q-ba16.dtsi"
->> +
->> +/ {
->> +     model = "Advantech DMS-BA16";
->> +     compatible = "fsl,imx6q-dms-ba16", "fsl,imx6q";
->
-> This looks wrong. I would expect "advantech,imx6q-dms-ba16".
->
->      Andrew
-
-Thanks. will fix the board comptability issue in the v2.
+[1] https://patchwork.kernel.org/patch/10156121/
