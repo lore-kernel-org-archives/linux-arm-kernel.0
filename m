@@ -1,16 +1,17 @@
 From: ulfalizer@gmail.com (Ulf Magnusson)
-Date: Mon,  5 Feb 2018 02:21:21 +0100
-Subject: [PATCH 09/20] clk: sunxi-ng: Remove SUNXI_CCU_* selects
+Date: Mon,  5 Feb 2018 02:21:24 +0100
+Subject: [PATCH 12/20] ARM: debug: Remove ARCH_MSM dep. from UNCOMPRESS_INCLUDE
 In-Reply-To: <20180205012146.23981-1-ulfalizer@gmail.com>
 References: <20180205012146.23981-1-ulfalizer@gmail.com>
-Message-ID: <20180205012146.23981-10-ulfalizer@gmail.com>
+Message-ID: <20180205012146.23981-13-ulfalizer@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The selected symbols were removed in commit 06e226c7fb23 ("clk:
-sunxi-ng: Move all clock types to a library").
+The ARCH_MSM symbol was removed in commit c0c89fafa289 ("ARM: Remove
+mach-msm and associated ARM architecture code"), but a default in
+UNCOMPRESS_INCLUDE still depends on it.
 
-Remove the selects from SUN4I_A10_CCU.
+Remove the ARCH_MSM dependency from the default in UNCOMPRESS_INCLUDE.
 
 Discovered with the
 https://github.com/ulfalizer/Kconfiglib/blob/master/examples/list_undefined.py
@@ -18,26 +19,21 @@ script.
 
 Signed-off-by: Ulf Magnusson <ulfalizer@gmail.com>
 ---
- drivers/clk/sunxi-ng/Kconfig | 7 -------
- 1 file changed, 7 deletions(-)
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 6427d0ebe2de..33168f94ee39 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -13,13 +13,6 @@ config SUN50I_A64_CCU
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 78a647080ebc..20c601a045d2 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1825,7 +1825,7 @@ config DEBUG_UNCOMPRESS
  
- config SUN4I_A10_CCU
- 	bool "Support for the Allwinner A10/A20 CCU"
--	select SUNXI_CCU_DIV
--	select SUNXI_CCU_MULT
--	select SUNXI_CCU_NK
--	select SUNXI_CCU_NKM
--	select SUNXI_CCU_NM
--	select SUNXI_CCU_MP
--	select SUNXI_CCU_PHASE
- 	default MACH_SUN4I
- 	default MACH_SUN7I
- 	depends on MACH_SUN4I || MACH_SUN7I || COMPILE_TEST
+ config UNCOMPRESS_INCLUDE
+ 	string
+-	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
++	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || \
+ 					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
+ 	default "mach/uncompress.h"
+ 
 -- 
 2.14.1
