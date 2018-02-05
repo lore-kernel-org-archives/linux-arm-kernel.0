@@ -1,41 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Feb 2018 16:41:54 +0000
-Subject: [PATCH v2 0/9] Fix kpti-enabled kernels for Cavium ThunderX
-In-Reply-To: <CAKv+Gu-VvsjSG7Lno9e+qm5VzA9OJhN4DbqxPw0D1+FEwrFK_A@mail.gmail.com>
-References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu-VvsjSG7Lno9e+qm5VzA9OJhN4DbqxPw0D1+FEwrFK_A@mail.gmail.com>
-Message-ID: <20180205164153.GF10172@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  5 Feb 2018 16:41:54 +0000
+Subject: [PATCHv2 0/8] arm_pmu: fix lockdep issues with ACPI systems
+Message-ID: <20180205164202.26502-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Currently the arm_pmu ACPI code is somewhat dubious. It attempts to
+allocate memory and manipulate IRQs in a hotplug callback, which is an
+atomic context.
 
-On Sat, Feb 03, 2018 at 11:36:04AM +0000, Ard Biesheuvel wrote:
-> On 29 January 2018 at 11:59, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi all,
-> >
-> > This is version two of the patches I posted on Friday:
-> >
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556304.html
-> >
-> > Changes since v1 include:
-> >
-> >   * Use SCTLR_ELx_M instead of open-coded #1
-> >   * Changed section attributes for .idmap.text to reflect actual mappings
-> >   * Rejigged phys_to_pte for consistency with pte_to_phys
-> >   * Added reviewer tags
-> >
-> 
-> Any chance we could base this on the arm64/kpti branch rather than
-> for-next/core? Any backports of kpti will need to include this series
-> as well, or we break ThunderX, and I'd rather have you merge it into
-> for-next/core rather than the various backporters (whose level of
-> familiarity with this code is invariably lower than yours) into the
-> stable trees.
+These patches (based on the arm64 for-next/core branch [1]) attempt to
+address this by moving work out of hotplug callback, requiring a
+reorganisation of the common arm_pmu code.
 
-I'd prefer to have this based on for-next/core for ease of merging, but I'll
-do a version for the kpti branch too (probably at -rc1). Once mainline has
-settled down, I plan to rebuild kpti with references to upstream commits
-etc.
+I've given these a boot-test on a Juno R1 system, both with DT and ACPI.
+In either case the PMU works as expected, and lockdep seems happy.
 
-Will
+I've pushed the series out to my arm64/acpi-pmu-lockdep branch [2].
+
+Since v1 [3]:
+* Kill arm_pmu_platdata (and ux500 IRQ bouncer)
+* Make PMU/CPU binding implicit in hotplug notifier
+* Explicitly enable/disable SPIs at hogplug
+* Add armpmu_alloc_atomic
+* Cleanup per Will's comments
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
+[3] https://lkml.kernel.org/r/20171101141239.45340-1-mark.rutland at arm.com
+
+Mark Rutland (8):
+  ARM: ux500: remove PMU IRQ bouncer
+  arm_pmu: kill arm_pmu_platdata
+  arm_pmu: fold platform helpers into platform code
+  arm_pmu: add armpmu_alloc_atomic()
+  arm_pmu: acpi: check for mismatched PPIs
+  arm_pmu: explicitly enable/disable SPIs at hotplug
+  arm_pmu: note IRQs and PMUs per-cpu
+  arm_pmu: acpi: request IRQs up-front
+
+ arch/arm/mach-ux500/cpu-db8500.c |  35 ---------
+ drivers/perf/arm_pmu.c           | 149 +++++++++++++++++----------------------
+ drivers/perf/arm_pmu_acpi.c      |  61 +++++++++++-----
+ drivers/perf/arm_pmu_platform.c  |  37 ++++++++--
+ include/linux/perf/arm_pmu.h     |  26 ++-----
+ 5 files changed, 142 insertions(+), 166 deletions(-)
+
+-- 
+2.11.0
