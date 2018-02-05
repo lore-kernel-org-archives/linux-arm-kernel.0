@@ -1,22 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Feb 2018 00:09:33 -0600
-Subject: [PATCH 02/14] dt-bindings: clock: add STM32MP1 clocks
-In-Reply-To: <1517580222-23301-3-git-send-email-gabriel.fernandez@st.com>
-References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
- <1517580222-23301-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20180205042348.2f7ssmzkajeky5l7@rob-hp-laptop>
+Date: Mon, 5 Feb 2018 00:09:21 -0600
+Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20180201183126.32384-3-l.stach@pengutronix.de>
+References: <20180201183126.32384-1-l.stach@pengutronix.de>
+ <20180201183126.32384-3-l.stach@pengutronix.de>
+Message-ID: <20180205041136.6kns6dfw2njnl4wz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 02, 2018 at 03:03:30PM +0100, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Thu, Feb 01, 2018 at 07:31:25PM +0100, Lucas Stach wrote:
+> This is the evaluation kit board for the i.MX8M. The current level of
+> support yields a working console and is able to boot userspace from
+> SD card or Network.
 > 
-> This patch adds the clock binding entry for STM32MP1
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com> (v1)
+> Tested-by: Tested-by: Baruch Siach <baruch@tkos.co.il> (v1)
 > ---
->  include/dt-bindings/clock/stm32mp1-clks.h | 248 ++++++++++++++++++++++++++++++
->  1 file changed, 248 insertions(+)
->  create mode 100644 include/dt-bindings/clock/stm32mp1-clks.h
+> v2:
+> - move to freescale folder
+> - fix indentation
+> - fix typo in Makefile
+> - document compatible
+> - switch to generic pinconf
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
+>  arch/arm64/boot/dts/freescale/Makefile        |   2 +
+>  arch/arm64/boot/dts/freescale/imx8mq-evk.dts  | 405 ++++++++++++++++++++++++++
+>  3 files changed, 411 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-evk.dts
 
-You can squash this into the previous patch.
+Reviewed-by: Rob Herring <robh@kernel.org>
