@@ -1,100 +1,70 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Mon, 5 Feb 2018 17:14:02 +0000
-Subject: [PATCH v3 03/41] KVM: arm64: Avoid storing the vcpu pointer on
- the stack
-In-Reply-To: <20180112120747.27999-4-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-4-christoffer.dall@linaro.org>
-Message-ID: <04c3b1a1-56dc-1f2b-6312-4d99178dd8eb@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 05 Feb 2018 18:21:09 +0100
+Subject: [PATCH 1/2] ARM: dts: exynos: Add I2S1 device node to exynos5433.dtsi
+References: <CGME20180205172146epcas1p1cd7a5027e673fc17fb64d8841c47175a@epcas1p1.samsung.com>
+Message-ID: <20180205172110.9897-1-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Add DT node for the second I2S controller available on Exynos 5433
+SoC. While at it the i2s0 node name is changed to a more generic
+"i2s" and missing properties are added to that node.
 
-On 12/01/18 12:07, Christoffer Dall wrote:
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 048f5db120f3..6ce0b428a4db 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -350,10 +350,15 @@ int kvm_perf_teardown(void);
->   
->   struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->   
-> +extern void __kvm_set_tpidr_el2(u64 tpidr_el2);
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-NIT: The rest of the file seem to declare prototype without extern.
-
-[...]
-
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 71bf088f1e4b..612021dce84f 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -135,6 +135,7 @@ int main(void)
->     DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
->     DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
->     DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-> +  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
->   #endif
->   #ifdef CONFIG_CPU_PM
->     DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
-> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> index 9a8ab5dddd9e..a360ac6e89e9 100644
-> --- a/arch/arm64/kvm/hyp/entry.S
-> +++ b/arch/arm64/kvm/hyp/entry.S
-> @@ -62,9 +62,6 @@ ENTRY(__guest_enter)
->   	// Store the host regs
->   	save_callee_saved_regs x1
->   
-> -	// Store host_ctxt and vcpu for use at exit time
-> -	stp	x1, x0, [sp, #-16]!
-> -
->   	add	x18, x0, #VCPU_CONTEXT
->   
->   	// Restore guest regs x0-x17
-> @@ -118,8 +115,7 @@ ENTRY(__guest_exit)
->   	// Store the guest regs x19-x29, lr
->   	save_callee_saved_regs x1
->   
-> -	// Restore the host_ctxt from the stack
-> -	ldr	x2, [sp], #16
-> +	get_host_ctxt	x2, x3
->   
->   	// Now restore the host regs
->   	restore_callee_saved_regs x2
-> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> index e4f37b9dd47c..71b4cc92895e 100644
-> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> @@ -56,18 +56,15 @@ ENDPROC(__vhe_hyp_call)
->   el1_sync:				// Guest trapped into EL2
->   	stp	x0, x1, [sp, #-16]!
->   
-> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-> -	mrs	x1, esr_el2
-> -alternative_else
-> -	mrs	x1, esr_el1
-> -alternative_endif
-> -	lsr	x0, x1, #ESR_ELx_EC_SHIFT
-> +	mrs	x1, vttbr_el2		// If vttbr is valid, this is a trap
-> +	cbnz	x1, el1_trap		// from the guest
->   
-> -	cmp	x0, #ESR_ELx_EC_HVC64
-> -	b.ne	el1_trap
-> -
-> -	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
-> -	cbnz	x1, el1_trap		// called HVC
-> +#ifdef CONFIG_DEBUG
-> +	mrs	x0, esr_el2
-> +	lsr	x0, x0, #ESR_ELx_EC_SHIFT
-> +	cmp     x0, #ESR_ELx_EC_HVC64
-> +	b.ne    __hyp_panic
-> +#endif
-
-FWIW, I noticed that Mark's series about Spectre is also touching this 
-code (see https://patchwork.kernel.org/patch/10190297/).
-
-Cheers,
-
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 62f276970174..2b73bd86bc56 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -1311,6 +1311,25 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2s1: i2s at 14d60000 {
++			compatible = "samsung,exynos7-i2s";
++			reg = <0x14d60000 0x100>;
++			dmas = <&pdma0 31 &pdma0 30>;
++			dma-names = "tx", "rx";
++			interrupts = <GIC_SPI 435 IRQ_TYPE_NONE>;
++			clocks = <&cmu_peric CLK_PCLK_I2S1>,
++				 <&cmu_peric CLK_PCLK_I2S1>,
++				 <&cmu_peric CLK_SCLK_I2S1>;
++			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
++			#clock-cells = <1>;
++			samsung,supports-6ch;
++			samsung,supports-rstclr;
++			samsung,supports-tdm;
++			samsung,supports-low-rfs;
++			#sound-dai-cells = <1>;
++			status = "disabled";
++		};
++
+ 		pwm: pwm at 14dd0000 {
+ 			compatible = "samsung,exynos4210-pwm";
+ 			reg = <0x14dd0000 0x100>;
+@@ -1639,7 +1658,7 @@
+ 				power-domains = <&pd_aud>;
+ 			};
+ 
+-			i2s0: i2s0 at 11440000 {
++			i2s0: i2s at 11440000 {
+ 				compatible = "samsung,exynos7-i2s";
+ 				reg = <0x11440000 0x100>;
+ 				dmas = <&adma 0 &adma 2>;
+@@ -1651,9 +1670,11 @@
+ 					<&cmu_aud CLK_SCLK_AUD_I2S>,
+ 					<&cmu_aud CLK_SCLK_I2S_BCLK>;
+ 				clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
++				#clock-cells = <1>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&i2s0_bus>;
+ 				power-domains = <&pd_aud>;
++				#sound-dai-cells = <1>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
-Julien Grall
+2.14.2
