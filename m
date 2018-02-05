@@ -1,67 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Feb 2018 15:34:20 +0000
-Subject: [PATCH 5/9] arm64: entry: Ensure branch through syscall table is
- bounded under speculation
+Date: Mon,  5 Feb 2018 15:34:24 +0000
+Subject: [PATCH 9/9] arm64: futex: Mask __user pointers prior to dereference
 In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
 References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517844864-15887-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1517844864-15887-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a similar manner to array_index_mask_nospec, this patch introduces an
-assembly macro (mask_nospec64) which can be used to bound a value under
-speculation. This macro is then used to ensure that the indirect branch
-through the syscall table is bounded under speculation, with out-of-range
-addresses speculating as calls to sys_io_setup (0).
+The arm64 futex code has some explicit dereferencing of user pointers
+where performing atomic operations in response to a futex command. This
+patch uses masking to limit any speculative futex operations to within
+the user address space.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 11 +++++++++++
- arch/arm64/kernel/entry.S          |  2 ++
- 2 files changed, 13 insertions(+)
+ arch/arm64/include/asm/futex.h | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 709adde9e80f..b709f6aa5d0f 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -123,6 +123,17 @@
- 	.endm
+diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+index 5bb2fd4674e7..07fe2479d310 100644
+--- a/arch/arm64/include/asm/futex.h
++++ b/arch/arm64/include/asm/futex.h
+@@ -48,9 +48,10 @@ do {									\
+ } while (0)
  
- /*
-+ * Sanitise a 64-bit bounded index wrt speculation, returning zero if out
-+ * of bounds.
-+ */
-+	.macro	mask_nospec64, idx, limit, tmp
-+	sub	\tmp, \idx, \limit
-+	bic	\tmp, \tmp, \idx
-+	and	\idx, \idx, \tmp, asr #63
-+	csdb
-+	.endm
-+
-+/*
-  * NOP sequence
-  */
- 	.macro	nops, num
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 4e2eae8c442e..f4276fa81e02 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -378,6 +378,7 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
-  * x7 is reserved for the system call number in 32-bit mode.
-  */
- wsc_nr	.req	w25		// number of system calls
-+xsc_nr	.req	x25		// number of system calls (zero-extended)
- wscno	.req	w26		// syscall number
- xscno	.req	x26		// syscall number (zero-extended)
- stbl	.req	x27		// syscall table pointer
-@@ -935,6 +936,7 @@ el0_svc_naked:					// compat entry point
- 	b.ne	__sys_trace
- 	cmp     wscno, wsc_nr			// check upper syscall limit
- 	b.hs	ni_sys
-+	mask_nospec64 xscno, xsc_nr, x19	// enforce bounds for syscall number
- 	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
- 	blr	x16				// call sys_* routine
- 	b	ret_fast_syscall
+ static inline int
+-arch_futex_atomic_op_inuser(int op, int oparg, int *oval, u32 __user *uaddr)
++arch_futex_atomic_op_inuser(int op, int oparg, int *oval, u32 __user *_uaddr)
+ {
+ 	int oldval = 0, ret, tmp;
++	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
+ 
+ 	pagefault_disable();
+ 
+@@ -88,15 +89,17 @@ arch_futex_atomic_op_inuser(int op, int oparg, int *oval, u32 __user *uaddr)
+ }
+ 
+ static inline int
+-futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
++futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
+ 			      u32 oldval, u32 newval)
+ {
+ 	int ret = 0;
+ 	u32 val, tmp;
++	u32 __user *uaddr;
+ 
+-	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
++	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
+ 		return -EFAULT;
+ 
++	uaddr = __uaccess_mask_ptr(_uaddr);
+ 	uaccess_enable();
+ 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
+ "	prfm	pstl1strm, %2\n"
 -- 
 2.1.4
