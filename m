@@ -1,26 +1,65 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 5 Feb 2018 10:14:54 +0000
-Subject: [PATCH v4 0/6] 32bit ARM branch predictor hardening
-In-Reply-To: <20180201110738.5421-1-marc.zyngier@arm.com>
-References: <20180201110738.5421-1-marc.zyngier@arm.com>
-Message-ID: <cc28e6aa-e02d-cbc2-3ecb-b696bef4ce36@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 5 Feb 2018 11:18:22 +0100
+Subject: [PATCH v3 12/18] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast
+ handling
+In-Reply-To: <1d30fe51-22dd-6938-2f8f-c823858a3bbd@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-13-marc.zyngier@arm.com>
+ <20180204183907.GP21802@cbox>
+ <1d30fe51-22dd-6938-2f8f-c823858a3bbd@arm.com>
+Message-ID: <20180205101822.GA16136@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 05, 2018 at 09:08:31AM +0000, Marc Zyngier wrote:
+> On 04/02/18 18:39, Christoffer Dall wrote:
+> > On Thu, Feb 01, 2018 at 11:46:51AM +0000, Marc Zyngier wrote:
+> >> We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+> >> So let's intercept it as early as we can by testing for the
+> >> function call number as soon as we've identified a HVC call
+> >> coming from the guest.
+> > 
+> > Hmmm.  How often is this expected to happen and what is the expected
+> > extra cost of doing the early-exit handling in the C code vs. here?
+> 
+> Pretty often. On each context switch of a Linux guest, for example. It
+> is almost as bad as if we were trapping all VM ops. Moving it to C is
+> definitely visible on something like hackbench (I remember something
+> like a 10-12% degradation on Seattle, but I'd need to rerun the tests to
+> give you something accurate). 
 
-On 01/02/18 11:07, Marc Zyngier wrote:
-> This small series implements some basic BP hardening by invalidating
-> the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
-> attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
-> 32bit kernels that run on 64bit capable CPUs. This series doesn't
-> mitigate Spectre variant 1 either.
+If it's that easily visible (although hackbench is clearly the
+pathological case here), then we should try to optimize it.  Let's hope
+we don't have to add too many of these workarounds in the future.
 
-I gave this a test with running both native workloads and some tests in
-a KVM guest, both with an unpatched and a patched firmware on a Calxeda
-Midway (Cortex-A15 cores).
+> It is the whole GPR save/restore dance
+> that costs us a lot (31 registers for the guest, 12 for the host), plus
+> some the extra SError synchronization that doesn't come for free either.
+> 
 
-Tested-by: Andre Przywara <andre.przywara@arm.com>
+Fair enough.
 
-Thanks!
-Andre.
+> > I think we'd be better off if we only had a single early-exit path (and
+> > we should move the FP/SIMD trap to that path as well), but if there's a
+> > measurable benefit of having this logic in assembly as opposed to in the
+> > C code, then I'm ok with this as well.
+> 
+> I agree that the multiplication of "earlier than early" paths is
+> becoming annoying. Moving the FP/SIMD stuff to C would be less
+> problematic, as we have patches to move some of that to load/put, and
+> we'd only take the trap once per time slice (as opposed to once per
+> entry at the moment).
+
+Yes, and we can even improve on that (see separate discussions around
+KVM support for SVE with Dave).
+
+> 
+> Here, we're trying hard to do exactly nothing, because each instruction
+> is just an extra overhead (we've already nuked the BP). I even
+> considered inserting that code as part of the per-CPU-type vectors (and
+> leave the rest of the KVM code alone), but it felt like a step too far.
+> 
+
+We can always look at adjusting this more in the future if we want.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
