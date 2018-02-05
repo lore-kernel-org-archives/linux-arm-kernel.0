@@ -1,50 +1,52 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Mon, 5 Feb 2018 09:07:24 +0000
-Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <20180205084505.GV31354@dragon>
-References: <20180201183126.32384-1-l.stach@pengutronix.de>
- <20180201183126.32384-2-l.stach@pengutronix.de>
- <HE1PR04MB3113FF72B02D642392D625DF87F90@HE1PR04MB3113.eurprd04.prod.outlook.com>
- <20180205084505.GV31354@dragon>
-Message-ID: <HE1PR04MB31135BD7833FD443CD6BAD6B87FE0@HE1PR04MB3113.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Feb 2018 09:08:31 +0000
+Subject: [PATCH v3 12/18] arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast
+ handling
+In-Reply-To: <20180204183907.GP21802@cbox>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-13-marc.zyngier@arm.com> <20180204183907.GP21802@cbox>
+Message-ID: <1d30fe51-22dd-6938-2f8f-c823858a3bbd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
+On 04/02/18 18:39, Christoffer Dall wrote:
+> On Thu, Feb 01, 2018 at 11:46:51AM +0000, Marc Zyngier wrote:
+>> We want SMCCC_ARCH_WORKAROUND_1 to be fast. As fast as possible.
+>> So let's intercept it as early as we can by testing for the
+>> function call number as soon as we've identified a HVC call
+>> coming from the guest.
 > 
-> On Fri, Feb 02, 2018 at 08:13:56AM +0000, Jacky Bai wrote:
-> > > Subject: [PATCH v2 2/4] arm64: add basic DTS for i.MX8MQ
-> > >
-> > > This adds the basic DTS for the i.MX8MQ.
-> > > For now only the following peripherals are supported:
-> > > - IOMUXC (pin controller)
-> > > - CCM (clock controller)
-> > > - GPIO
-> > > - UART
-> > > - uSDHC (SD/eMMC controller)
-> > > - FEC (ethernet controller)
-> > > - i2c
-> > >
-> > > This is enough to get a very basic board support up and running.
-> > >
-> > > One known limitation is that the driver for the GPC interrupt
-> > > controller is still missing, rendering the CPU sleep states unusable
-> > > as there is nothing waking them up anymore. This will be fixed in
-> > > due course.
-> > >
-> >
-> > The cpu sleep states can NOT be supported in community kernel due to
-> hardware limitation.
-> 
-> Jacky,
-> 
-> Can you elaborate your comment a bit?  If it's a hardware limitation, I guess
-> not only community but also vendor kernel has no way to support sleep states,
-> right?
-> 
-> Shawn
+> Hmmm.  How often is this expected to happen and what is the expected
+> extra cost of doing the early-exit handling in the C code vs. here?
 
-It need to add a workaround in GIC common code, maybe it can NOT be accepted by community.
+Pretty often. On each context switch of a Linux guest, for example. It
+is almost as bad as if we were trapping all VM ops. Moving it to C is
+definitely visible on something like hackbench (I remember something
+like a 10-12% degradation on Seattle, but I'd need to rerun the tests to
+give you something accurate). It is the whole GPR save/restore dance
+that costs us a lot (31 registers for the guest, 12 for the host), plus
+some the extra SError synchronization that doesn't come for free either.
 
-BR
-Jacky bai
+> I think we'd be better off if we only had a single early-exit path (and
+> we should move the FP/SIMD trap to that path as well), but if there's a
+> measurable benefit of having this logic in assembly as opposed to in the
+> C code, then I'm ok with this as well.
+
+I agree that the multiplication of "earlier than early" paths is
+becoming annoying. Moving the FP/SIMD stuff to C would be less
+problematic, as we have patches to move some of that to load/put, and
+we'd only take the trap once per time slice (as opposed to once per
+entry at the moment).
+
+Here, we're trying hard to do exactly nothing, because each instruction
+is just an extra overhead (we've already nuked the BP). I even
+considered inserting that code as part of the per-CPU-type vectors (and
+leave the rest of the KVM code alone), but it felt like a step too far.
+
+> The code in this patch looks fine otherwise.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
