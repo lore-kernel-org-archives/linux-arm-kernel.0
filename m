@@ -1,84 +1,102 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 05 Feb 2018 15:20:02 +0000
-Subject: Applied "ASoC: stm32: add of dependency for stm32 drivers" to the
- asoc tree
-In-Reply-To: <1517827785-6275-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1eiiYs-0007FQ-II@debutante>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 5 Feb 2018 16:31:37 +0100
+Subject: [RESEND][PATCH] video: fbdev: atmel_lcdfb: convert to use GPIO
+ descriptors
+In-Reply-To: <CAHp75Vc1npdmhrs80Cdj0t6RWpTtuXFkpXUQwxKDe=6vrZxkFA@mail.gmail.com>
+References: <20180205084755.6011-1-ludovic.desroches@microchip.com>
+ <CAHp75Vc1npdmhrs80Cdj0t6RWpTtuXFkpXUQwxKDe=6vrZxkFA@mail.gmail.com>
+Message-ID: <20180205153137.GF2580@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Mon, Feb 05, 2018 at 03:06:33PM +0200, Andy Shevchenko wrote:
+> On Mon, Feb 5, 2018 at 10:47 AM, Ludovic Desroches
+> <ludovic.desroches@microchip.com> wrote:
+> > Use GPIO descriptors instead of relying on the old method.
+> 
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> 
+> Though few nitpicks below.
+> 
+> 
+> > --- a/drivers/video/fbdev/atmel_lcdfb.c
+> > +++ b/drivers/video/fbdev/atmel_lcdfb.c
+> > @@ -18,6 +18,7 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/backlight.h>
+> >  #include <linux/gfp.h>
+> 
+> > +#include <linux/gpio/consumer.h>
+> 
+> I think you forgot to remove of_gpio.h.
 
-   ASoC: stm32: add of dependency for stm32 drivers
+Right. I'll remove it.
 
-has been applied to the asoc tree at
+> 
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> 
+> >         struct device_node *display_np;
+> >         struct device_node *timings_np;
+> >         struct display_timings *timings;
+> > -       enum of_gpio_flags flags;
+> >         struct atmel_lcdfb_power_ctrl_gpio *og;
+> >         bool is_gpio_power = false;
+> >         int ret = -ENOENT;
+> > -       int i, gpio;
+> > +       int i;
+> > +       struct gpio_desc *gpiod;
+> 
+> I would rather preserve reversed tree style, i.e. put longer line upper.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Ok.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> 
+> 
+> > +       for (i = 0; i < gpiod_count(dev, "atmel,power-control"); i++) {
+> > +               gpiod = devm_gpiod_get_index_optional(dev,
+> > +                               "atmel,power-control", i, GPIOD_ASIS);
+> > +               if (!gpiod)
+> >                         continue;
+> 
+> What about IS_ERR() case?
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+if (!gpiod || IS_ERR(gpiod))
+	continue;
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Thanks.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> 
+> >
+> >                 og = devm_kzalloc(dev, sizeof(*og), GFP_KERNEL);
+> >                 if (!og)
+> >                         goto put_display_node;
+> >
+> > +               og->gpiod = gpiod;
+> >                 is_gpio_power = true;
+> >
+> > +               ret = gpiod_direction_output(gpiod, gpiod_is_active_low(gpiod));
+> >                 if (ret) {
+> 
+> I'm not sure this will be needed if you check IS_ERR() above.
+> 
 
-Thanks,
-Mark
+When in doubt, I keep it.
 
->From 748bce8e6c7ebae2d89314a42e0c4b65232a0ce9 Mon Sep 17 00:00:00 2001
-From: Olivier Moysan <olivier.moysan@st.com>
-Date: Mon, 5 Feb 2018 11:49:45 +0100
-Subject: [PATCH] ASoC: stm32: add of dependency for stm32 drivers
+Regards
 
-Add of dependency for STM32 ASoC drivers.
-DFSDM of dependency is already inherited
-from STM32_DFSDM_ADC dependency.
+Ludovic
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
-index 3ad881fc40a1..48f9ddd94016 100644
---- a/sound/soc/stm/Kconfig
-+++ b/sound/soc/stm/Kconfig
-@@ -2,7 +2,7 @@ menu "STMicroelectronics STM32 SOC audio support"
- 
- config SND_SOC_STM32_SAI
- 	tristate "STM32 SAI interface (Serial Audio Interface) support"
--	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-@@ -11,7 +11,7 @@ config SND_SOC_STM32_SAI
- 
- config SND_SOC_STM32_I2S
- 	tristate "STM32 I2S interface (SPI/I2S block) support"
--	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-@@ -20,7 +20,7 @@ config SND_SOC_STM32_I2S
- 
- config SND_SOC_STM32_SPDIFRX
- 	tristate "STM32 S/PDIF receiver (SPDIFRX) support"
--	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
--- 
-2.15.1
+> > +                       dev_err(dev, "set direction output gpio atmel,power-control[%d] failed\n", i);
+> >                         goto put_display_node;
+> >                 }
+> 
+> 
+> -- 
+> With Best Regards,
+> Andy Shevchenko
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
