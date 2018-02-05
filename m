@@ -1,39 +1,46 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Mon, 5 Feb 2018 12:32:33 +0000
-Subject: [PATCH v3 01/41] KVM: arm/arm64: Avoid vcpu_load for other vcpu
- ioctls than KVM_RUN
-In-Reply-To: <20180112120747.27999-2-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-2-christoffer.dall@linaro.org>
-Message-ID: <f4e5f966-24bb-630d-9d3f-907850d7e29d@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 5 Feb 2018 13:36:02 +0100
+Subject: [PATCH] [PATCH] tty/serial: atmel: add new version check for usart
+In-Reply-To: <20180129113954.12011-1-jonas@orbital-systems.com>
+References: <20180129113954.12011-1-jonas@orbital-systems.com>
+Message-ID: <e20ced24-666b-32b7-92cd-d30e1a10b42e@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 12/01/18 12:07, Christoffer Dall wrote:
-> Calling vcpu_load() registers preempt notifiers for this vcpu and calls
-> kvm_arch_vcpu_load().  The latter will soon be doing a lot of heavy
-> lifting on arm/arm64 and will try to do things such as enabling the
-> virtual timer and setting us up to handle interrupts from the timer
-> hardware.
+On 29/01/2018 at 12:39, Jonas Danielsson wrote:
+> On our at91sam9260 based board the usart0 and usart1 ports report
+> their versions (ATMEL_US_VERSION) as 0x10302. This version is not
+> included in the current checks in the driver.
 > 
-> Loading state onto hardware registers and enabling hardware to signal
-> interrupts can be problematic when we're not actually about to run the
-> VCPU, because it makes it difficult to establish the right context when
-> handling interrupts from the timer, and it makes the register access
-> code difficult to reason about.
-> 
-> Luckily, now when we call vcpu_load in each ioctl implementation, we can
-> simply remove the call from the non-KVM_RUN vcpu ioctls, and our
-> kvm_arch_vcpu_load() is only used for loading vcpu content to the
-> physical CPU when we're actually going to run the vcpu.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Cheers,
+It must be the AT91SAM9260 rev. B SoC, isn't it?
+
+Thanks for your patch.
+
+Best regards,
+  Nicolas
+
+> ---
+>  drivers/tty/serial/atmel_serial.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index efa25611ca0c..ae9f1dcbf3fc 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1734,6 +1734,7 @@ static void atmel_get_ip_name(struct uart_port *port)
+>  		switch (version) {
+>  		case 0x302:
+>  		case 0x10213:
+> +		case 0x10302:
+>  			dev_dbg(port->dev, "This version is usart\n");
+>  			atmel_port->has_frac_baudrate = true;
+>  			atmel_port->has_hw_timer = true;
+> 
+
 
 -- 
-Julien Grall
+Nicolas Ferre
