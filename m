@@ -1,20 +1,21 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 5 Feb 2018 10:15:21 +0100
-Subject: [PATCH] video: fbdev: convert to use GPIO descriptors
-In-Reply-To: <20180205082335.5727-1-ludovic.desroches@microchip.com>
-References: <20180205082335.5727-1-ludovic.desroches@microchip.com>
-Message-ID: <ac7174c4-e213-1f14-4cf7-1701c0f8b452@microchip.com>
+Date: Mon, 5 Feb 2018 10:16:44 +0100
+Subject: [RESEND][PATCH] video: fbdev: atmel_lcdfb: convert to use GPIO
+ descriptors
+In-Reply-To: <20180205084755.6011-1-ludovic.desroches@microchip.com>
+References: <20180205084755.6011-1-ludovic.desroches@microchip.com>
+Message-ID: <eb7bfe44-b197-bc02-a3fc-f91f040d97ec@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2018 at 09:23, Ludovic Desroches wrote:
+On 05/02/2018 at 09:47, Ludovic Desroches wrote:
 > Use GPIO descriptors instead of relying on the old method.
 > 
 > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Thanks!
+On this resent patch as well ;-)
 
 > ---
 >  drivers/video/fbdev/atmel_lcdfb.c | 30 ++++++++++++------------------
