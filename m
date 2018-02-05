@@ -1,48 +1,57 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 05 Feb 2018 12:10:46 +0100
-Subject: [PATCH v2 3/4] arm64: add support for i.MX8M EVK board
-In-Reply-To: <20180205072438.nxvhlqk54d7firbz@sapphire.tkos.co.il>
-References: <20180201183126.32384-1-l.stach@pengutronix.de>
- <20180201183126.32384-3-l.stach@pengutronix.de>
- <20180205072438.nxvhlqk54d7firbz@sapphire.tkos.co.il>
-Message-ID: <1517829046.3175.9.camel@pengutronix.de>
+Date: Mon, 05 Feb 2018 12:12:53 +0100
+Subject: [PATCH 2/2] arm64: dts: fsl: imx8mq-evk: enable watchdog
+In-Reply-To: <78318e96c952c5f84644e7035cdefe76f27a9e3c.1517816731.git.baruch@tkos.co.il>
+References: <4c7c9104ca95419d22b8df19a69819e194dd3488.1517816731.git.baruch@tkos.co.il>
+ <78318e96c952c5f84644e7035cdefe76f27a9e3c.1517816731.git.baruch@tkos.co.il>
+Message-ID: <1517829173.3175.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-Am Montag, den 05.02.2018, 09:24 +0200 schrieb Baruch Siach:
-> Hi Lucas,
+Am Montag, den 05.02.2018, 09:45 +0200 schrieb Baruch Siach:
+> The external nWDOG signal connects to the EVK board reset circuit.
 > 
-> On Thu, Feb 01, 2018 at 07:31:25PM +0100, Lucas Stach wrote:
-> > This is the evaluation kit board for the i.MX8M. The current level
-> > of
-> > support yields a working console and is able to boot userspace from
-> > SD card or Network.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com> (v1)
-> > Tested-by: Tested-by: Baruch Siach <baruch@tkos.co.il> (v1)
+> Tested on the i.MX8MQ EVK rev B3.
 > 
-> I only tested once.
-
-Hehe, seems I was a little tired after reworking all those patches. ;)
-
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+> ?arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 15 +++++++++++++++
+> ?1 file changed, 15 insertions(+)
 > 
-> Tested v2 as well, on top of clk v2 and the pinctrl v2 patches.
-> 
-> Tested-by: Baruch Siach <baruch@tkos.co.il>
+> diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+> b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+> index c0e5ee5d6243..757ba226a2fc 100644
+> --- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+> +++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+> @@ -170,6 +170,13 @@
+> ?	status = "okay";
+> ?};
+> ?
+> +&wdog1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_wdog>;
+> +	fsl,ext-reset-output;
+> +	status = "okay";
+> +};
+> +
+> ?&iomuxc {
+> ?	pinctrl_fec1_mdc: fec1mdcgrp {
+> ?		pinmux = <MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC>;
+> @@ -402,4 +409,12 @@
+> ?		bias-pull-up;
+> ?		input-schmitt-enable;
+> ?	};
+> +
+> +	pinctrl_wdog: wdoggrp {
+> +		fsl,pins = <MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B>;
+> +		drive-strength = <6>;
+> +		slew-rate = <0>;
+> +		bias-pull-up;
+> +		input-schmitt-enable;
 
-Thanks.
-
-> Would have been nice to have all these series in a single branch
-> somewhere.
-
-I've pushed a branch with all the MX8M work to:
-https://git.pengutronix.de/git/lst/linux mx8-work
-
-I'll update this branch if I need to do another revision of this
-patchset.
+This might be a plain copy of the downstream pinctrl, but the watchdog
+pin being an output, does it really make sense to enable the schmitt-
+trigger?
 
 Regards,
 Lucas
