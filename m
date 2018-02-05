@@ -1,110 +1,114 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 5 Feb 2018 11:06:21 +0100
-Subject: [PATCH v3 33/41] KVM: arm64: Configure FPSIMD traps on vcpu
- load/put
-In-Reply-To: <a182d82e-73e0-8bfa-1d10-166b73ac1fdf@semihalf.com>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-34-christoffer.dall@linaro.org>
- <a182d82e-73e0-8bfa-1d10-166b73ac1fdf@semihalf.com>
-Message-ID: <20180205100621.GU21802@cbox>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 05 Feb 2018 11:07:23 +0100
+Subject: [PATCH] drm/bridge/synopsys: dsi: Add read feature
+In-Reply-To: <20180204213104.17834-1-philippe.cornu@st.com>
+References: <CGME20180204213219epcas2p429434ba0c87a0544dc5294facd80529b@epcas2p4.samsung.com>
+ <20180204213104.17834-1-philippe.cornu@st.com>
+Message-ID: <81cb1f26-96f0-bdc6-28bc-4a7bda5a9459@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On 04.02.2018 22:31, Philippe Cornu wrote:
+> This patch adds the DCS/GENERIC DSI read feature.
+>
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
 
-On Wed, Jan 31, 2018 at 01:17:36PM +0100, Tomasz Nowicki wrote:
-> On 12.01.2018 13:07, Christoffer Dall wrote:
-> >There is no need to enable/disable traps to FP registers on every switch
-> >to/from the VM, because the host kernel does not use this resource
-> >without calling vcpu_put.  We can therefore move things around enough
-> >that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
-> >only program these during vcpu load/put.
-> >
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >---
-> >  arch/arm64/include/asm/kvm_hyp.h |  6 +++++
-> >  arch/arm64/kvm/hyp/switch.c      | 51 +++++++++++++++++++++++++++++-----------
-> >  arch/arm64/kvm/hyp/sysreg-sr.c   | 12 ++++++++--
-> >  3 files changed, 53 insertions(+), 16 deletions(-)
-> >
-> >diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> >index 3f54c55f77a1..ffd62e31f134 100644
-> >--- a/arch/arm64/include/asm/kvm_hyp.h
-> >+++ b/arch/arm64/include/asm/kvm_hyp.h
-> >@@ -148,6 +148,12 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
-> >  void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
-> >  bool __fpsimd_enabled(void);
-> >+void __activate_traps_nvhe_load(struct kvm_vcpu *vcpu);
-> >+void __deactivate_traps_nvhe_put(void);
-> >+
-> >+void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
-> >+void deactivate_traps_vhe_put(void);
-> >+
-> >  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
-> >  void __noreturn __hyp_do_panic(unsigned long, ...);
-> >diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> >index c01bcfc3fb52..d14ab9650f81 100644
-> >--- a/arch/arm64/kvm/hyp/switch.c
-> >+++ b/arch/arm64/kvm/hyp/switch.c
-> >@@ -24,22 +24,25 @@
-> >  #include <asm/fpsimd.h>
-> >  #include <asm/debug-monitors.h>
-> >-static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
-> >+static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
-> >  {
-> >  	/*
-> >-	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> >-	 * register accesses to EL2, however, the ARM ARM clearly states that
-> >-	 * traps are only taken to EL2 if the operation would not otherwise
-> >-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> >-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> >-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
-> >-	 * it will cause an exception.
-> >+	 * We are about to trap all floating point register accesses to EL2,
-> >+	 * however, traps are only taken to EL2 if the operation would not
-> >+	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
-> >+	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
-> >+	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
-> >+	 * any access to it will cause an exception.
-> >  	 */
-> >  	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
-> >  	    !vcpu->arch.guest_vfp_loaded) {
-> >  		write_sysreg(1 << 30, fpexc32_el2);
-> >  		isb();
-> >  	}
-> >+}
-> >+
-> >+static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
-> >+{
-> >  	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
-> >  	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
-> >@@ -61,10 +64,12 @@ static void __hyp_text __deactivate_traps_common(void)
-> >  	write_sysreg(0, pmuserenr_el0);
-> >  }
-> >-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
-> >+void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
-> >  {
-> >  	u64 val;
-> >+	__activate_traps_fpsimd32(vcpu);
-> >+
-> >  	val = read_sysreg(cpacr_el1);
-> >  	val |= CPACR_EL1_TTA;
-> >  	val &= ~CPACR_EL1_ZEN;
-> >@@ -73,14 +78,26 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
-> >  	else
-> >  		val &= ~CPACR_EL1_FPEN;
-> >  	write_sysreg(val, cpacr_el1);
-> 
-> Giving that you move this code to kvm_vcpu_load_sysregs() I am wondering if
-> we have to deactivate FPEN trap here. IIUC, we call
-> kvm_vcpu_load_sysregs()->activate_traps_vhe_load() and then
-> kvm_vcpu_put_sysregs() by design. So vcpu->arch.guest_vfp_loaded should be
-> always 0 here since it is zeroed in kvm_vcpu_put_sysregs(). The same for
-> nvhe case below.
-> 
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-You're absolutely right, we can enable the trapping unconditionally on
-this path.
+If there will be no objections I will merge it at the end of the week.
 
-Thanks,
--Christoffer
+?--
+Regards
+Andrzej
+
+> ---
+> Extra notes:
+> DSI read tests have been performed with DCS & GENERIC, short & long
+> commands, on two different panels.
+> The maximum fifo size (32*32-bit = 128 bytes on stm32) has been
+> verified too.
+>
+>  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 58 +++++++++++++++++++++------
+>  1 file changed, 45 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> index e9422d05e897..65aeb3f78b48 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> @@ -397,18 +397,46 @@ static int dw_mipi_dsi_write(struct dw_mipi_dsi *dsi,
+>  	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, le32_to_cpu(word));
+>  }
+>  
+> +static int dw_mipi_dsi_read(struct dw_mipi_dsi *dsi,
+> +			    const struct mipi_dsi_msg *msg)
+> +{
+> +	int i, j, ret, len = msg->rx_len;
+> +	u8 *buf = msg->rx_buf;
+> +	u32 val;
+> +
+> +	/* Wait end of the read operation */
+> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+> +				 val, !(val & GEN_RD_CMD_BUSY),
+> +				 1000, CMD_PKT_STATUS_TIMEOUT_US);
+> +	if (ret) {
+> +		dev_err(dsi->dev, "Timeout during read operation\n");
+> +		return ret;
+> +	}
+> +
+> +	for (i = 0; i < len; i += 4) {
+> +		/* Read fifo must not be empty before all bytes are read */
+> +		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+> +					 val, !(val & GEN_PLD_R_EMPTY),
+> +					 1000, CMD_PKT_STATUS_TIMEOUT_US);
+> +		if (ret) {
+> +			dev_err(dsi->dev, "Read payload FIFO is empty\n");
+> +			return ret;
+> +		}
+> +
+> +		val = dsi_read(dsi, DSI_GEN_PLD_DATA);
+> +		for (j = 0; j < 4 && j + i < len; j++)
+> +			buf[i + j] = val >> (8 * j);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>  					 const struct mipi_dsi_msg *msg)
+>  {
+>  	struct dw_mipi_dsi *dsi = host_to_dsi(host);
+>  	struct mipi_dsi_packet packet;
+> -	int ret;
+> -
+> -	if (msg->rx_buf || msg->rx_len) {
+> -		/* TODO dw drv improvements: implement read feature */
+> -		dev_warn(dsi->dev, "read operations not yet implemented\n");
+> -		return -EINVAL;
+> -	}
+> +	int ret, nb_bytes;
+>  
+>  	ret = mipi_dsi_create_packet(&packet, msg);
+>  	if (ret) {
+> @@ -422,12 +450,16 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>  	if (ret)
+>  		return ret;
+>  
+> -	/*
+> -	 * TODO Only transmitted size is returned as actual driver does
+> -	 * not support dcs/generic reads. Please update return value when
+> -	 * delivering the read feature.
+> -	 */
+> -	return packet.size;
+> +	if (msg->rx_buf && msg->rx_len) {
+> +		ret = dw_mipi_dsi_read(dsi, msg);
+> +		if (ret)
+> +			return ret;
+> +		nb_bytes = msg->rx_len;
+> +	} else {
+> +		nb_bytes = packet.size;
+> +	}
+> +
+> +	return nb_bytes;
+>  }
+>  
+>  static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
