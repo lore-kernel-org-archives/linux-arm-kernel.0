@@ -1,25 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Feb 2018 00:06:45 -0600
-Subject: [PATCH 1/2] dt-bindings: nvmem: imx-ocotp: update the binding to
- reflect data cells
-In-Reply-To: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
-References: <1516865849-26191-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180205060546.qmifjvovungdomnr@rob-hp-laptop>
+Date: Mon, 5 Feb 2018 00:07:20 -0600
+Subject: [PATCH v2 3/8] dt-bindings: mfd: stm32-timers: add support for
+ dmas
+In-Reply-To: <1516979499-3665-4-git-send-email-fabrice.gasnier@st.com>
+References: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
+ <1516979499-3665-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180205060720.v3sfw44orngsyltq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 03:37:28PM +0800, Dong Aisheng wrote:
-> imx-ocotp is implemented based on nvmem which can have data cells
-> as child node. Update the binding doc to reflect it to be more easily
-> understood by users.
+On Fri, Jan 26, 2018 at 04:11:34PM +0100, Fabrice Gasnier wrote:
+> Add support for DMAs to STM32 timers. STM32 Timers can support up to 7
+> dma requests: up to 4 channels, update, compare and trigger.
+> DMAs may be used to transfer data from pwm capture for instance.
+> DMA support is made optional, PWM capture support is also an option.
+> This is much more wise system-wide to avoid shortage on DMA request
+> lines as there's significant amount of timer instances that can
+> request up to 7 channels.
 > 
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 > ---
->  .../devicetree/bindings/nvmem/imx-ocotp.txt        | 23 ++++++++++++++++++----
->  1 file changed, 19 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/mfd/stm32-timers.txt         | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
