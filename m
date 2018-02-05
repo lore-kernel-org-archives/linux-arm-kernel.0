@@ -1,52 +1,55 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  5 Feb 2018 15:34:26 +0100
-Subject: [PATCH 0/9] drm/rockchip: hdmi support for rk3328
-Message-ID: <20180205143435.4723-1-heiko@sntech.de>
+Date: Mon,  5 Feb 2018 15:34:33 +0100
+Subject: [PATCH 7/9] drm/rockchip: dw_hdmi: allow including external phys
+In-Reply-To: <20180205143435.4723-1-heiko@sntech.de>
+References: <20180205143435.4723-1-heiko@sntech.de>
+Message-ID: <20180205143435.4723-8-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3228/rk3229 and rk3328 socs started using a new type of hdmi-phy
-from Innosilicon that resides completely separate from the dw-hdmi block
-and gets accessed via mmio.
+Some variants of the dw-hdmi on Rockchip socs use a separate phy block
+accessed via the generic phy framework, so allow them to be included
+if such a phy reference is found.
 
-Additionally the rk3328 dw-hdmi does not report the vendor-phy type
-but a different one instead, so add the possibility to override the
-phy type when the glue driver knows better than the ip block itself.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-
-I've put both the phy driver and dw-hdmi changes into one series just
-to showcase how everything comes together, but would of course still
-expect things to go through the separate phy and drm trees once deemed
-ready.
-
-
-Algea Cao (1):
-  drm/bridge: dw-hdmi: export hotplug functions
-
-Heiko Stuebner (6):
-  drm/bridge: dw-hdmi: allow overriding of phy-type reading
-  drm/rockchip: dw_hdmi: Allow outputs that don't need output switching
-  dt-bindings: allow optional phys in Rockchip dw_hdmi binding
-  drm/rockchip: dw_hdmi: allow including external phys
-  drm/rockchip: dw_hdmi: store rockchip_hdmi reference in phy_data
-    object
-  drm/rockchip: dw_hdmi: add dw-hdmi support for the rk3328
-
-Zheng Yang (2):
-  dt-bindings: add binding for Rockchip hdmi phy using an Innosilicon IP
-  phy: add Rockchip Innosilicon hdmi phy
-
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt |    3 +
- .../bindings/phy/phy-rockchip-inno-hdmi.txt        |   42 +
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |   15 +-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |  130 ++-
- drivers/phy/rockchip/Kconfig                       |    7 +
- drivers/phy/rockchip/Makefile                      |    1 +
- drivers/phy/rockchip/phy-rockchip-inno-hdmi.c      | 1221 ++++++++++++++++++++
- include/drm/bridge/dw_hdmi.h                       |    7 +-
- 8 files changed, 1417 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
- create mode 100644 drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
-
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 304f61bd2eec..512f8556e7c0 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -11,6 +11,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/phy/phy.h>
+ #include <linux/regmap.h>
+ 
+ #include <drm/drm_of.h>
+@@ -48,6 +49,7 @@ struct rockchip_hdmi {
+ 	const struct rockchip_hdmi_chip_data *chip_data;
+ 	struct clk *vpll_clk;
+ 	struct clk *grf_clk;
++	struct phy *phy;
+ };
+ 
+ #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
+@@ -376,6 +378,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		return ret;
+ 	}
+ 
++	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
++	if (IS_ERR(hdmi->phy)) {
++		ret = PTR_ERR(hdmi->phy);
++		if (ret != -EPROBE_DEFER)
++			DRM_DEV_ERROR(hdmi->dev, "failed to get phy\n");
++		return ret;
++	}
++
+ 	drm_encoder_helper_add(encoder, &dw_hdmi_rockchip_encoder_helper_funcs);
+ 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
+ 			 DRM_MODE_ENCODER_TMDS, NULL);
 -- 
 2.15.1
