@@ -1,25 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Feb 2018 15:56:22 +0800
-Subject: [PATCH v2 BUGFIX] ARM: dts: imx6ull: fix the imx6ull-14x14-evk
- configuration
-In-Reply-To: <1516956738-24673-1-git-send-email-LW@KARO-electronics.de>
-References: <1516955159-21626-1-git-send-email-LW@KARO-electronics.de>
- <1516956738-24673-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20180205075620.GO31354@dragon>
+Date: Mon, 5 Feb 2018 16:03:25 +0800
+Subject: [PATCH] ARM: dts: ls1021a: add quadspi node
+In-Reply-To: <20180126142014.13819-1-rasmus.villemoes@prevas.dk>
+References: <20180126142014.13819-1-rasmus.villemoes@prevas.dk>
+Message-ID: <20180205080323.GP31354@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 09:52:18AM +0100, Lothar Wa?mann wrote:
-> imx6ull-14x14-evk.dts currently includes the imx6ul.dtsi file for an
-> i.MX6ULL SoC which is plain wrong.
+On Fri, Jan 26, 2018 at 03:20:14PM +0100, Rasmus Villemoes wrote:
+> Add a node to device tree repesenting the QuadSPI controller present on
+> LS1021a. Driver support has been present since e8c034b2fbe5 (mtd:
+> spi-nor: fsl-quadspi: add support for ls1021a).
 > 
-> Rename the current imx6ul-14x14-evk.dts to .dtsi and include it from
-> imx6ul-14x14-evk.dts and imx6ull-14x14-evk.dts, so that both can
-> include the appropriate SoC specific (imx6ul.dtsi/imx6ull.dtsi) file.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
 
-Which base is the patch generated against?  I cannot apply it to any
-branch in my tree.
-
-Shawn
+Applied, thanks.
