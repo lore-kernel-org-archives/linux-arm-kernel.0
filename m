@@ -1,159 +1,60 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Feb 2018 15:34:18 +0000
-Subject: [PATCH 3/9] arm64: Make USER_DS an inclusive limit
+Date: Mon,  5 Feb 2018 15:34:17 +0000
+Subject: [PATCH 2/9] arm64: Implement array_index_mask_nospec()
 In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
 References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517844864-15887-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1517844864-15887-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robin Murphy <robin.murphy@arm.com>
 
-Currently, USER_DS represents an exclusive limit while KERNEL_DS is
-inclusive. In order to do some clever trickery for speculation-safe
-masking, we need them both to behave equivalently - there aren't enough
-bits to make KERNEL_DS exclusive, so we have precisely one option. This
-also happens to correct a longstanding false negative for a range
-ending on the very top byte of kernel memory.
+Provide an optimised, assembly implementation of array_index_mask_nospec()
+for arm64 so that the compiler is not in a position to transform the code
+in ways which affect its ability to inhibit speculation (e.g. by introducing
+conditional branches).
 
-Mark Rutland points out that we've actually got the semantics of
-addresses vs. segments muddled up in most of the places we need to
-amend, so shuffle the {USER,KERNEL}_DS definitions around such that we
-can correct those properly instead of just pasting "-1"s everywhere.
+This is similar to the sequence used by x86, modulo architectural differences
+in the carry/borrow flags.
 
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/processor.h |  3 +++
- arch/arm64/include/asm/uaccess.h   | 45 ++++++++++++++++++++++----------------
- arch/arm64/kernel/entry.S          |  4 ++--
- arch/arm64/mm/fault.c              |  4 ++--
- 4 files changed, 33 insertions(+), 23 deletions(-)
+ arch/arm64/include/asm/barrier.h | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index cee4ae25a5d1..dfefbf3fd9e3 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -21,6 +21,9 @@
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index c0a846d2c602..f11518af96a9 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -41,6 +41,27 @@
+ #define dma_rmb()	dmb(oshld)
+ #define dma_wmb()	dmb(oshst)
  
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
- 
-+#define KERNEL_DS	UL(-1)
-+#define USER_DS		(TASK_SIZE_64 - 1)
-+
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 59fda5292936..f2fc026cffb4 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -35,10 +35,7 @@
- #include <asm/compiler.h>
- #include <asm/extable.h>
- 
--#define KERNEL_DS	(-1UL)
- #define get_ds()	(KERNEL_DS)
--
--#define USER_DS		TASK_SIZE_64
- #define get_fs()	(current_thread_info()->addr_limit)
- 
- static inline void set_fs(mm_segment_t fs)
-@@ -66,22 +63,32 @@ static inline void set_fs(mm_segment_t fs)
-  * Returns 1 if the range is valid, 0 otherwise.
-  *
-  * This is equivalent to the following test:
-- * (u65)addr + (u65)size <= current->addr_limit
-- *
-- * This needs 65-bit arithmetic.
-+ * (u65)addr + (u65)size <= (u65)current->addr_limit + 1
-  */
--#define __range_ok(addr, size)						\
--({									\
--	unsigned long __addr = (unsigned long)(addr);			\
--	unsigned long flag, roksum;					\
--	__chk_user_ptr(addr);						\
--	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
--		: "=&r" (flag), "=&r" (roksum)				\
--		: "1" (__addr), "Ir" (size),				\
--		  "r" (current_thread_info()->addr_limit)		\
--		: "cc");						\
--	flag;								\
--})
-+static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
++/*
++ * Generate a mask for array_index__nospec() that is ~0UL when 0 <= idx < sz
++ * and 0 otherwise.
++ */
++#define array_index_mask_nospec array_index_mask_nospec
++static inline unsigned long array_index_mask_nospec(unsigned long idx,
++						    unsigned long sz)
 +{
-+	unsigned long limit = current_thread_info()->addr_limit;
++	unsigned long mask;
 +
-+	__chk_user_ptr(addr);
 +	asm volatile(
-+	// A + B <= C + 1 for all A,B,C, in four easy steps:
-+	// 1: X = A + B; X' = X % 2^64
-+	"	adds	%0, %0, %2\n"
-+	// 2: Set C = 0 if X > 2^64, to guarantee X' > C in step 4
-+	"	csel	%1, xzr, %1, hi\n"
-+	// 3: Set X' = ~0 if X >= 2^64. For X == 2^64, this decrements X'
-+	//    to compensate for the carry flag being set in step 4. For
-+	//    X > 2^64, X' merely has to remain nonzero, which it does.
-+	"	csinv	%0, %0, xzr, cc\n"
-+	// 4: For X < 2^64, this gives us X' - C - 1 <= 0, where the -1
-+	//    comes from the carry in being clear. Otherwise, we are
-+	//    testing X' - C == 0, subject to the previous adjustments.
-+	"	sbcs	xzr, %0, %1\n"
-+	"	cset	%0, ls\n"
-+	: "+r" (addr), "+r" (limit) : "Ir" (size) : "cc");
++	"	cmp	%1, %2\n"
++	"	sbc	%0, xzr, xzr\n"
++	: "=r" (mask)
++	: "r" (idx), "Ir" (sz)
++	: "cc");
 +
-+	return addr;
++	csdb();
++	return mask;
 +}
- 
- /*
-  * When dealing with data aborts, watchpoints, or instruction traps we may end
-@@ -90,7 +97,7 @@ static inline void set_fs(mm_segment_t fs)
-  */
- #define untagged_addr(addr)		sign_extend64(addr, 55)
- 
--#define access_ok(type, addr, size)	__range_ok(addr, size)
-+#define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
- #define user_addr_max			get_fs
- 
- #define _ASM_EXTABLE(from, to)						\
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b34e717d7597..4e2eae8c442e 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -167,10 +167,10 @@ alternative_else_nop_endif
- 	.else
- 	add	x21, sp, #S_FRAME_SIZE
- 	get_thread_info tsk
--	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
-+	/* Save the task's original addr_limit and set USER_DS */
- 	ldr	x20, [tsk, #TSK_TI_ADDR_LIMIT]
- 	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
--	mov	x20, #TASK_SIZE_64
-+	mov	x20, #USER_DS
- 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
- 	/* No need to reset PSTATE.UAO, hardware's already set it to 0 for us */
- 	.endif /* \el == 0 */
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 0e671ddf4855..af530eb9f2ed 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -240,7 +240,7 @@ static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs,
- 	if (fsc_type == ESR_ELx_FSC_PERM)
- 		return true;
- 
--	if (addr < USER_DS && system_uses_ttbr0_pan())
-+	if (addr < TASK_SIZE && system_uses_ttbr0_pan())
- 		return fsc_type == ESR_ELx_FSC_FAULT &&
- 			(regs->pstate & PSR_PAN_BIT);
- 
-@@ -414,7 +414,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		mm_flags |= FAULT_FLAG_WRITE;
- 	}
- 
--	if (addr < USER_DS && is_permission_fault(esr, regs, addr)) {
-+	if (addr < TASK_SIZE && is_permission_fault(esr, regs, addr)) {
- 		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
- 		if (regs->orig_addr_limit == KERNEL_DS)
- 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
++
+ #define __smp_mb()	dmb(ish)
+ #define __smp_rmb()	dmb(ishld)
+ #define __smp_wmb()	dmb(ishst)
 -- 
 2.1.4
