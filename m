@@ -1,35 +1,35 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Mon,  5 Feb 2018 21:09:59 +0100
-Subject: [PATCH 2/4] drm/exynos: fix comparison to bitshift when dealing with
- a mask
-In-Reply-To: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
-References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180205201002.23621-3-wsa+renesas@sang-engineering.com>
+Date: Mon,  5 Feb 2018 21:09:57 +0100
+Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing with a
+ mask
+Message-ID: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to a typo, the mask was destroyed by a comparison instead of a bit
-shift.
+In one Renesas driver, I found a typo which turned an intended bit shift ('<<')
+into a comparison ('<'). Because this is a subtle issue, I looked tree wide for
+similar patterns. This small patch series is the outcome.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
-Only build tested. To be applied individually per subsystem.
+Buildbot and checkpatch are happy. Only compile-tested. To be applied
+individually per sub-system, I think. I'd think only the net: amd: patch needs
+to be conisdered for stable, but I leave this to people who actually know this
+driver.
 
- drivers/gpu/drm/exynos/regs-fimc.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+CCing Dan. Maybe he has an idea how to add a test to smatch? In my setup, only
+cppcheck reported a 'coding style' issue with a low prio.
 
-diff --git a/drivers/gpu/drm/exynos/regs-fimc.h b/drivers/gpu/drm/exynos/regs-fimc.h
-index 30496134a3d072..d7cbe53c4c01f4 100644
---- a/drivers/gpu/drm/exynos/regs-fimc.h
-+++ b/drivers/gpu/drm/exynos/regs-fimc.h
-@@ -569,7 +569,7 @@
- #define EXYNOS_CIIMGEFF_FIN_EMBOSSING		(4 << 26)
- #define EXYNOS_CIIMGEFF_FIN_SILHOUETTE		(5 << 26)
- #define EXYNOS_CIIMGEFF_FIN_MASK			(7 << 26)
--#define EXYNOS_CIIMGEFF_PAT_CBCR_MASK		((0xff < 13) | (0xff < 0))
-+#define EXYNOS_CIIMGEFF_PAT_CBCR_MASK		((0xff << 13) | (0xff << 0))
- 
- /* Real input DMA size register */
- #define EXYNOS_CIREAL_ISIZE_AUTOLOAD_ENABLE	(1 << 31)
+Wolfram Sang (4):
+  v4l: vsp1: fix mask creation for MULT_ALPHA_RATIO
+  drm/exynos: fix comparison to bitshift when dealing with a mask
+  v4l: dvb-frontends: stb0899: fix comparison to bitshift when dealing
+    with a mask
+  net: amd-xgbe: fix comparison to bitshift when dealing with a mask
+
+ drivers/gpu/drm/exynos/regs-fimc.h        | 2 +-
+ drivers/media/dvb-frontends/stb0899_reg.h | 8 ++++----
+ drivers/media/platform/vsp1/vsp1_regs.h   | 2 +-
+ drivers/net/ethernet/amd/xgbe/xgbe-drv.c  | 2 +-
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
 -- 
 2.11.0
