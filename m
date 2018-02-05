@@ -1,44 +1,147 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Feb 2018 15:34:21 +0000
-Subject: [PATCH 6/9] arm64: uaccess: Prevent speculative use of the current
- addr_limit
+Date: Mon,  5 Feb 2018 15:34:23 +0000
+Subject: [PATCH 8/9] arm64: uaccess: Mask __user pointers for __arch_{clear,
+ copy_*}_user
 In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
 References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517844864-15887-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1517844864-15887-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A mispredicted conditional call to set_fs could result in the wrong
-addr_limit being forwarded under speculation to a subsequent access_ok
-check, potentially forming part of a spectre-v1 attack using uaccess
-routines.
+Like we've done for get_user and put_user, ensure that user pointers
+are masked before invoking the underlying __arch_{clear,copy_*}_user
+operations.
 
-This patch prevents this forwarding from taking place, but putting heavy
-barriers in set_fs after writing the addr_limit.
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/uaccess.h | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/include/asm/uaccess.h | 29 ++++++++++++++++++++++-------
+ arch/arm64/kernel/arm64ksyms.c   |  4 ++--
+ arch/arm64/lib/clear_user.S      |  6 +++---
+ arch/arm64/lib/copy_in_user.S    |  5 +++--
+ 4 files changed, 30 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index e49fe723d72d..2057deed7697 100644
+index e5002bc7130d..543e11f0f657 100644
 --- a/arch/arm64/include/asm/uaccess.h
 +++ b/arch/arm64/include/asm/uaccess.h
-@@ -42,6 +42,13 @@ static inline void set_fs(mm_segment_t fs)
- {
- 	current_thread_info()->addr_limit = fs;
+@@ -403,20 +403,35 @@ do {									\
+ #define put_user	__put_user
  
-+	/*
-+	 * Prevent a mispredicted conditional call to set_fs from forwarding
-+	 * the wrong address limit to access_ok under speculation.
-+	 */
-+	dsb(nsh);
-+	isb();
+ extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
+-#define raw_copy_from_user __arch_copy_from_user
++#define raw_copy_from_user(to, from, n)					\
++({									\
++	__arch_copy_from_user((to), __uaccess_mask_ptr(from), (n));	\
++})
 +
- 	/* On user-mode return, check fs is correct */
- 	set_thread_flag(TIF_FSCHECK);
+ extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
+-#define raw_copy_to_user __arch_copy_to_user
+-extern unsigned long __must_check raw_copy_in_user(void __user *to, const void __user *from, unsigned long n);
+-extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
++#define raw_copy_to_user(to, from, n)					\
++({									\
++	__arch_copy_to_user(__uaccess_mask_ptr(to), (from), (n));	\
++})
++
++extern unsigned long __must_check __arch_copy_in_user(void __user *to, const void __user *from, unsigned long n);
++#define raw_copy_in_user(to, from, n)					\
++({									\
++	__arch_copy_in_user(__uaccess_mask_ptr(to),			\
++			    __uaccess_mask_ptr(from), (n));		\
++})
++
+ #define INLINE_COPY_TO_USER
+ #define INLINE_COPY_FROM_USER
  
+-static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
++extern unsigned long __must_check __arch_clear_user(void __user *to, unsigned long n);
++static inline unsigned long __must_check __clear_user(void __user *to, unsigned long n)
+ {
+ 	if (access_ok(VERIFY_WRITE, to, n))
+-		n = __clear_user(__uaccess_mask_ptr(to), n);
++		n = __arch_clear_user(__uaccess_mask_ptr(to), n);
+ 	return n;
+ }
++#define clear_user	__clear_user
+ 
+ extern long strncpy_from_user(char *dest, const char __user *src, long count);
+ 
+@@ -430,7 +445,7 @@ extern unsigned long __must_check __copy_user_flushcache(void *to, const void __
+ static inline int __copy_from_user_flushcache(void *dst, const void __user *src, unsigned size)
+ {
+ 	kasan_check_write(dst, size);
+-	return __copy_user_flushcache(dst, src, size);
++	return __copy_user_flushcache(dst, __uaccess_mask_ptr(src), size);
+ }
+ #endif
+ 
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index 67368c7329c0..66be504edb6c 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -37,8 +37,8 @@ EXPORT_SYMBOL(clear_page);
+ 	/* user mem (segment) */
+ EXPORT_SYMBOL(__arch_copy_from_user);
+ EXPORT_SYMBOL(__arch_copy_to_user);
+-EXPORT_SYMBOL(__clear_user);
+-EXPORT_SYMBOL(raw_copy_in_user);
++EXPORT_SYMBOL(__arch_clear_user);
++EXPORT_SYMBOL(__arch_copy_in_user);
+ 
+ 	/* physical memory */
+ EXPORT_SYMBOL(memstart_addr);
+diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
+index 3d69a8d41fa5..21ba0b29621b 100644
+--- a/arch/arm64/lib/clear_user.S
++++ b/arch/arm64/lib/clear_user.S
+@@ -21,7 +21,7 @@
+ 
+ 	.text
+ 
+-/* Prototype: int __clear_user(void *addr, size_t sz)
++/* Prototype: int __arch_clear_user(void *addr, size_t sz)
+  * Purpose  : clear some user memory
+  * Params   : addr - user memory address to clear
+  *          : sz   - number of bytes to clear
+@@ -29,7 +29,7 @@
+  *
+  * Alignment fixed up by hardware.
+  */
+-ENTRY(__clear_user)
++ENTRY(__arch_clear_user)
+ 	uaccess_enable_not_uao x2, x3, x4
+ 	mov	x2, x1			// save the size for fixup return
+ 	subs	x1, x1, #8
+@@ -52,7 +52,7 @@ uao_user_alternative 9f, strb, sttrb, wzr, x0, 0
+ 5:	mov	x0, #0
+ 	uaccess_disable_not_uao x2, x3
+ 	ret
+-ENDPROC(__clear_user)
++ENDPROC(__arch_clear_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
+diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+index fbb090f431a5..54b75deb1d16 100644
+--- a/arch/arm64/lib/copy_in_user.S
++++ b/arch/arm64/lib/copy_in_user.S
+@@ -64,14 +64,15 @@
+ 	.endm
+ 
+ end	.req	x5
+-ENTRY(raw_copy_in_user)
++
++ENTRY(__arch_copy_in_user)
+ 	uaccess_enable_not_uao x3, x4, x5
+ 	add	end, x0, x2
+ #include "copy_template.S"
+ 	uaccess_disable_not_uao x3, x4
+ 	mov	x0, #0
+ 	ret
+-ENDPROC(raw_copy_in_user)
++ENDPROC(__arch_copy_in_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
 -- 
 2.1.4
