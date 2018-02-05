@@ -1,65 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 5 Feb 2018 09:24:45 +0100
-Subject: [PATCHv3] tlv320dac33: Add device tree bindings
-In-Reply-To: <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com>
-References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
- <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com>
-Message-ID: <20180205082445.GA18274@amd>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 5 Feb 2018 09:23:35 +0100
+Subject: [PATCH] video: fbdev: convert to use GPIO descriptors
+Message-ID: <20180205082335.5727-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use GPIO descriptors instead of relying on the old method.
 
-This adds device tree bindings for tlv320dac33.c.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+ drivers/video/fbdev/atmel_lcdfb.c | 30 ++++++++++++------------------
+ 1 file changed, 12 insertions(+), 18 deletions(-)
 
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/Documentation/devicetree/bindings/sound/tlv320dac33.txt b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-new file mode 100644
-index 0000000..aee0a87
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/tlv320dac33.txt
-@@ -0,0 +1,32 @@
-+Texas Instruments - tlv320dac33 Codec module
-+
-+The tlv320dac33 serial control bus communicates through I2C protocols.
-+
-+Required properties:
-+
-+- compatible - "ti,tlv320dac33"
-+- reg - I2C slave address
-+- ti,burst-bclkdiv - BCLK divider value in burst mode. Valid range is 1..255.
-+
-+Optional properties:
-+
-+- reset-gpios      - gpio pin to power the device, active high.
-+
-+- interrupts       - The interrupt output from the device.
-+- interrupt-parent - The parent interrupt controller.
-+
-+- ti,keep-bclk     - Keep the BCLK running in FIFO modes.
-+
-+Example:
-+
-+tlv320dac33: audio-codec at 19 {
-+	compatible = "ti,tlv320dac33";
-+	reg = <0x19>;
-+
-+	interrupt-parent = <&gpio2>;
-+	interrupts = <21 1>; /* gpio_53, IRQF_TRIGGER_RISING */
-+	reset-gpios = <&gpio2 28 0>; /* gpio_60 */
-+
-+	ti,keep-bclk;
-+	ti,burst-bclkdiv = <3>;
-+};
-
+diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+index 3dee267d7c75..ef3d4198014f 100644
+--- a/drivers/video/fbdev/atmel_lcdfb.c
++++ b/drivers/video/fbdev/atmel_lcdfb.c
+@@ -18,6 +18,7 @@
+ #include <linux/delay.h>
+ #include <linux/backlight.h>
+ #include <linux/gfp.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -61,8 +62,7 @@ struct atmel_lcdfb_info {
+ };
+ 
+ struct atmel_lcdfb_power_ctrl_gpio {
+-	int gpio;
+-	int active_low;
++	struct gpio_desc *gpiod;
+ 
+ 	struct list_head list;
+ };
+@@ -1018,7 +1018,7 @@ static void atmel_lcdfb_power_control_gpio(struct atmel_lcdfb_pdata *pdata, int
+ 	struct atmel_lcdfb_power_ctrl_gpio *og;
+ 
+ 	list_for_each_entry(og, &pdata->pwr_gpios, list)
+-		gpio_set_value(og->gpio, on);
++		gpiod_set_value(og->gpiod, on);
+ }
+ 
+ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+@@ -1031,11 +1031,11 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+ 	struct device_node *display_np;
+ 	struct device_node *timings_np;
+ 	struct display_timings *timings;
+-	enum of_gpio_flags flags;
+ 	struct atmel_lcdfb_power_ctrl_gpio *og;
+ 	bool is_gpio_power = false;
+ 	int ret = -ENOENT;
+-	int i, gpio;
++	int i;
++	struct gpio_desc *gpiod;
+ 
+ 	sinfo->config = (struct atmel_lcdfb_config*)
+ 		of_match_device(atmel_lcdfb_dt_ids, dev)->data;
+@@ -1072,28 +1072,22 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+ 
+ 	INIT_LIST_HEAD(&pdata->pwr_gpios);
+ 	ret = -ENOMEM;
+-	for (i = 0; i < of_gpio_named_count(display_np, "atmel,power-control-gpio"); i++) {
+-		gpio = of_get_named_gpio_flags(display_np, "atmel,power-control-gpio",
+-					       i, &flags);
+-		if (gpio < 0)
++	for (i = 0; i < gpiod_count(dev, "atmel,power-control"); i++) {
++		gpiod = devm_gpiod_get_index_optional(dev,
++				"atmel,power-control", i, GPIOD_ASIS);
++		if (!gpiod)
+ 			continue;
+ 
+ 		og = devm_kzalloc(dev, sizeof(*og), GFP_KERNEL);
+ 		if (!og)
+ 			goto put_display_node;
+ 
+-		og->gpio = gpio;
+-		og->active_low = flags & OF_GPIO_ACTIVE_LOW;
++		og->gpiod = gpiod;
+ 		is_gpio_power = true;
+-		ret = devm_gpio_request(dev, gpio, "lcd-power-control-gpio");
+-		if (ret) {
+-			dev_err(dev, "request gpio %d failed\n", gpio);
+-			goto put_display_node;
+-		}
+ 
+-		ret = gpio_direction_output(gpio, og->active_low);
++		ret = gpiod_direction_output(gpiod, gpiod_is_active_low(gpiod));
+ 		if (ret) {
+-			dev_err(dev, "set direction output gpio %d failed\n", gpio);
++			dev_err(dev, "set direction output gpio atmel,power-control[%d] failed\n", i);
+ 			goto put_display_node;
+ 		}
+ 		list_add(&og->list, &pdata->pwr_gpios);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180205/95ca6f88/attachment.sig>
+2.12.2
