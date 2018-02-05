@@ -1,45 +1,47 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 5 Feb 2018 16:03:19 +0100
-Subject: [PATCH v2 BUGFIX] ARM: dts: imx6ull: fix the imx6ull-14x14-evk
- configuration
-In-Reply-To: <20180205103716.GY31354@dragon>
-References: <1516955159-21626-1-git-send-email-LW@KARO-electronics.de>
- <1516956738-24673-1-git-send-email-LW@KARO-electronics.de>
- <20180205075620.GO31354@dragon>
- <20180205105543.1711274c@karo-electronics.de>
- <20180205103716.GY31354@dragon>
-Message-ID: <20180205160319.297a74f8@karo-electronics.de>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 5 Feb 2018 15:37:49 +0100
+Subject: [PATCH] [PATCH] tty/serial: atmel: add new version check for usart
+In-Reply-To: <CALDOjziu=FBck-VSi=g=i8tcYWi_DQ_azzDnwKTkTuTrh54AkA@mail.gmail.com>
+References: <20180129113954.12011-1-jonas@orbital-systems.com>
+ <e20ced24-666b-32b7-92cd-d30e1a10b42e@microchip.com>
+ <CALDOjziu=FBck-VSi=g=i8tcYWi_DQ_azzDnwKTkTuTrh54AkA@mail.gmail.com>
+Message-ID: <501be260-6a07-4334-4f97-fc2a4e1ed1fc@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, 5 Feb 2018 18:37:20 +0800 Shawn Guo wrote:
-> On Mon, Feb 05, 2018 at 10:55:43AM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > On Mon, 5 Feb 2018 15:56:22 +0800 Shawn Guo wrote:
-> > > On Fri, Jan 26, 2018 at 09:52:18AM +0100, Lothar Wa?mann wrote:
-> > > > imx6ull-14x14-evk.dts currently includes the imx6ul.dtsi file for an
-> > > > i.MX6ULL SoC which is plain wrong.
-> > > > 
-> > > > Rename the current imx6ul-14x14-evk.dts to .dtsi and include it from
-> > > > imx6ul-14x14-evk.dts and imx6ull-14x14-evk.dts, so that both can
-> > > > include the appropriate SoC specific (imx6ul.dtsi/imx6ull.dtsi) file.
-> > > > 
-> > > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > > 
-> > > Which base is the patch generated against?  I cannot apply it to any
-> > > branch in my tree.
-> > >
-> > The patch was generated against next-20180118 but also applies to
-> > next-20180205.
+On 05/02/2018 at 15:04, Jonas Danielsson wrote:
+> On Mon, Feb 5, 2018 at 1:36 PM, Nicolas Ferre
+> <nicolas.ferre@microchip.com> wrote:
+>> On 29/01/2018 at 12:39, Jonas Danielsson wrote:
+>>> On our at91sam9260 based board the usart0 and usart1 ports report
+>>> their versions (ATMEL_US_VERSION) as 0x10302. This version is not
+>>> included in the current checks in the driver.
+>>>
+>>> Signed-off-by: Jonas Danielsson <jonas@orbital-systems.com>
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>
+>> It must be the AT91SAM9260 rev. B SoC, isn't it?
+>>
+>> Thanks for your patch.
+>>
+>> Best regards,
+>>   Nicolas
+>>
 > 
-> It looks like you would really want this go into 4.16 as a fix?  In that
-> case, I will need to wait for v4.16-rc1 to apply it.
+> Hi Nicolas!
 > 
-I don't care much when and how it will be applied.
-I'm not using those files myself.
+> Thank you for the review!
+> 
+> Yes that is right, we have the rev B SoC :) I Tried to find some
+> documentation online
+> regarding the US_VERSION register, but fell short.
 
+It's actually a non-documented register ;-)
+In short, bits [0-11] Hardware module version
+bits [16-18] Metal fix number.
+So your at91sam9260 revB benefit from the metal fix #1.
 
-Lothar Wa?mann
+Best regards,
+-- 
+Nicolas Ferre
