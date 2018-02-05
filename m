@@ -1,123 +1,162 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Mon, 5 Feb 2018 12:52:19 +0000
-Subject: [PATCH] drm/bridge/synopsys: dsi: Add read feature
-In-Reply-To: <81cb1f26-96f0-bdc6-28bc-4a7bda5a9459@samsung.com>
-References: <CGME20180204213219epcas2p429434ba0c87a0544dc5294facd80529b@epcas2p4.samsung.com>
- <20180204213104.17834-1-philippe.cornu@st.com>
- <81cb1f26-96f0-bdc6-28bc-4a7bda5a9459@samsung.com>
-Message-ID: <1fce104e-7cab-86a1-db49-5306e04d10b7@st.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 05 Feb 2018 14:03:34 +0100
+Subject: [PATCH] drm/bridge/synopsys: dsi: Add 1.31 version support
+In-Reply-To: <20180122150819.22066-1-philippe.cornu@st.com>
+References: <CGME20180122150916epcas5p14fc276bc3320d82685b3c19dd62f5273@epcas5p1.samsung.com>
+ <20180122150819.22066-1-philippe.cornu@st.com>
+Message-ID: <61f522e7-bdb7-7eba-ffb2-7dbb77ffa09e@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
+On 22.01.2018 16:08, Philippe Cornu wrote:
+> From: Philippe CORNU <philippe.cornu@st.com>
+>
+> Add support for the Synopsys DesignWare MIPI DSI version 1.31
+> Two registers need to be updated/added for supporting 1.31:
+> * PHY_TMR_CFG 0x9c (updated)
+>   1.30 [31:24] phy_hs2lp_time
+>        [23:16] phy_lp2hs_time
+>        [14: 0] max_rd_time
+>
+>   1.31 [25:16] phy_hs2lp_time
+>        [ 9: 0] phy_lp2hs_time
+>
+> * PHY_TMR_RD_CFG 0xf4 (new)
+>   1.31 [14: 0] max_rd_time
+>
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 52 +++++++++++++++++++++++----
+>  1 file changed, 46 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> index 735f38429c06..20a2ca14a7ad 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> @@ -25,7 +25,13 @@
+>  #include <drm/bridge/dw_mipi_dsi.h>
+>  #include <video/mipi_display.h>
+>  
+> +#define HWVER_130			0x31333000	/* IP version 1.30 */
+> +#define HWVER_131			0x31333100	/* IP version 1.31 */
+> +#define HWVER_OLDEST			HWVER_130
+> +#define HWVER_NEWEST			HWVER_131
+> +
+>  #define DSI_VERSION			0x00
+> +#define VERSION				GENMASK(31, 8)
+>  
+>  #define DSI_PWR_UP			0x04
+>  #define RESET				0
+> @@ -161,11 +167,12 @@
+>  #define PHY_CLKHS2LP_TIME(lbcc)		(((lbcc) & 0x3ff) << 16)
+>  #define PHY_CLKLP2HS_TIME(lbcc)		((lbcc) & 0x3ff)
+>  
+> -/* TODO Next register is slightly different between 1.30 & 1.31 IP version */
+>  #define DSI_PHY_TMR_CFG			0x9c
+> -#define PHY_HS2LP_TIME(lbcc)		(((lbcc) & 0xff) << 24)
+> -#define PHY_LP2HS_TIME(lbcc)		(((lbcc) & 0xff) << 16)
+> -#define MAX_RD_TIME(lbcc)		((lbcc) & 0x7fff)
+> +#define PHY_HS2LP_TIME_V130(lbcc)	(((lbcc) & 0xff) << 24)
+> +#define PHY_LP2HS_TIME_V130(lbcc)	(((lbcc) & 0xff) << 16)
+> +#define MAX_RD_TIME_V130(lbcc)		((lbcc) & 0x7fff)
+> +#define PHY_HS2LP_TIME_V131(lbcc)	(((lbcc) & 0x3ff) << 16)
+> +#define PHY_LP2HS_TIME_V131(lbcc)	((lbcc) & 0x3ff)
+>  
+>  #define DSI_PHY_RSTZ			0xa0
+>  #define PHY_DISFORCEPLL			0
+> @@ -204,7 +211,9 @@
+>  #define DSI_INT_ST1			0xc0
+>  #define DSI_INT_MSK0			0xc4
+>  #define DSI_INT_MSK1			0xc8
+> +
+>  #define DSI_PHY_TMR_RD_CFG		0xf4
+> +#define MAX_RD_TIME_V131(lbcc)		((lbcc) & 0x7fff)
+>  
+>  #define PHY_STATUS_TIMEOUT_US		10000
+>  #define CMD_PKT_STATUS_TIMEOUT_US	20000
+> @@ -215,6 +224,7 @@ struct dw_mipi_dsi {
+>  	struct drm_bridge *panel_bridge;
+>  	struct device *dev;
+>  	void __iomem *base;
+> +	u32 hw_version;
+>  
+>  	struct clk *pclk;
+>  	struct clk *px_clk;
+> @@ -616,8 +626,14 @@ static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
+>  	 * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
+>  	 * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
+>  	 */
+> -	dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
+> -		  | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
+> +	if (dsi->hw_version == HWVER_131) {
+> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V131(0x40) |
+> +			  PHY_LP2HS_TIME_V131(0x40));
+> +		dsi_write(dsi, DSI_PHY_TMR_RD_CFG, MAX_RD_TIME_V131(10000));
+> +	} else {
+> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V130(0x40) |
+> +			  PHY_LP2HS_TIME_V130(0x40) | MAX_RD_TIME_V130(10000));
+> +	}
+>  
+>  	dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
+>  		  | PHY_CLKLP2HS_TIME(0x40));
+> @@ -791,6 +807,28 @@ static const struct drm_bridge_funcs dw_mipi_dsi_bridge_funcs = {
+>  	.attach	      = dw_mipi_dsi_bridge_attach,
+>  };
+>  
+> +static void dsi_get_version(struct dw_mipi_dsi *dsi)
+> +{
+> +	u32 hw_version;
+> +
+> +	clk_prepare_enable(dsi->pclk);
+> +	hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
+> +	clk_disable_unprepare(dsi->pclk);
+> +
+> +	if (hw_version > HWVER_NEWEST) {
+> +		DRM_DEBUG("hw version: use 0x%08x for this recent 0x%08x\n",
+> +			  HWVER_NEWEST, hw_version);
+> +		hw_version = HWVER_NEWEST;
+> +
+> +	} else if (hw_version < HWVER_OLDEST) {
+> +		DRM_DEBUG("hw version: use 0x%08x for this old 0x%08x\n",
+> +			  HWVER_OLDEST, hw_version);
+> +		hw_version = HWVER_OLDEST;
+> +	}
+> +
+> +	dsi->hw_version = hw_version;
+> +}
+> +
+>  static struct dw_mipi_dsi *
+>  __dw_mipi_dsi_probe(struct platform_device *pdev,
+>  		    const struct dw_mipi_dsi_plat_data *plat_data)
+> @@ -870,6 +908,8 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
+>  		clk_disable_unprepare(dsi->pclk);
+>  	}
+>  
+> +	dsi_get_version(dsi);
+> +
+>  	pm_runtime_enable(dev);
 
-And many thanks
-Philippe :-)
+Two questions:
+1. You have generally two variants:
+- older than 131,
+- not older than 131.
+Wouldn't be better to just assume that since 131 registers slightly differ?
+So you just stores:
+??? dsi->hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
+And if neccessary performs comparison:
+??? if (dsi->hw_version >= HWVER_131)
+??? ??? ...
+??? else
+??? ??? ...
 
-On 02/05/2018 11:07 AM, Andrzej Hajda wrote:
-> On 04.02.2018 22:31, Philippe Cornu wrote:
->> This patch adds the DCS/GENERIC DSI read feature.
->>
->> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> 
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> 
-> If there will be no objections I will merge it at the end of the week.
-> 
->  ?--
-> Regards
-> Andrzej
-> 
->> ---
->> Extra notes:
->> DSI read tests have been performed with DCS & GENERIC, short & long
->> commands, on two different panels.
->> The maximum fifo size (32*32-bit = 128 bytes on stm32) has been
->> verified too.
->>
->>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 58 +++++++++++++++++++++------
->>   1 file changed, 45 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> index e9422d05e897..65aeb3f78b48 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
->> @@ -397,18 +397,46 @@ static int dw_mipi_dsi_write(struct dw_mipi_dsi *dsi,
->>   	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, le32_to_cpu(word));
->>   }
->>   
->> +static int dw_mipi_dsi_read(struct dw_mipi_dsi *dsi,
->> +			    const struct mipi_dsi_msg *msg)
->> +{
->> +	int i, j, ret, len = msg->rx_len;
->> +	u8 *buf = msg->rx_buf;
->> +	u32 val;
->> +
->> +	/* Wait end of the read operation */
->> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->> +				 val, !(val & GEN_RD_CMD_BUSY),
->> +				 1000, CMD_PKT_STATUS_TIMEOUT_US);
->> +	if (ret) {
->> +		dev_err(dsi->dev, "Timeout during read operation\n");
->> +		return ret;
->> +	}
->> +
->> +	for (i = 0; i < len; i += 4) {
->> +		/* Read fifo must not be empty before all bytes are read */
->> +		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->> +					 val, !(val & GEN_PLD_R_EMPTY),
->> +					 1000, CMD_PKT_STATUS_TIMEOUT_US);
->> +		if (ret) {
->> +			dev_err(dsi->dev, "Read payload FIFO is empty\n");
->> +			return ret;
->> +		}
->> +
->> +		val = dsi_read(dsi, DSI_GEN_PLD_DATA);
->> +		for (j = 0; j < 4 && j + i < len; j++)
->> +			buf[i + j] = val >> (8 * j);
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->>   static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->>   					 const struct mipi_dsi_msg *msg)
->>   {
->>   	struct dw_mipi_dsi *dsi = host_to_dsi(host);
->>   	struct mipi_dsi_packet packet;
->> -	int ret;
->> -
->> -	if (msg->rx_buf || msg->rx_len) {
->> -		/* TODO dw drv improvements: implement read feature */
->> -		dev_warn(dsi->dev, "read operations not yet implemented\n");
->> -		return -EINVAL;
->> -	}
->> +	int ret, nb_bytes;
->>   
->>   	ret = mipi_dsi_create_packet(&packet, msg);
->>   	if (ret) {
->> @@ -422,12 +450,16 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->>   	if (ret)
->>   		return ret;
->>   
->> -	/*
->> -	 * TODO Only transmitted size is returned as actual driver does
->> -	 * not support dcs/generic reads. Please update return value when
->> -	 * delivering the read feature.
->> -	 */
->> -	return packet.size;
->> +	if (msg->rx_buf && msg->rx_len) {
->> +		ret = dw_mipi_dsi_read(dsi, msg);
->> +		if (ret)
->> +			return ret;
->> +		nb_bytes = msg->rx_len;
->> +	} else {
->> +		nb_bytes = packet.size;
->> +	}
->> +
->> +	return nb_bytes;
->>   }
->>   
->>   static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
-> 
-> 
+This way you can remove these HWVER_(NEWEST|OLDEST).
+
+2. You are using pm_runtime, but not in dsi_get_version. I guess it is
+SoC dependant? but I suppose performing registry read should be safer
+after runtime_get.
+
+Regards
+Andrzej
+
+>  
+>  	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
