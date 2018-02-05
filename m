@@ -1,56 +1,110 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 5 Feb 2018 11:01:44 +0100
-Subject: [PATCH v4 0/6] 32bit ARM branch predictor hardening
-In-Reply-To: <20180201110738.5421-1-marc.zyngier@arm.com>
-References: <20180201110738.5421-1-marc.zyngier@arm.com>
-Message-ID: <20180205100144.GT21802@cbox>
+Date: Mon, 5 Feb 2018 11:06:21 +0100
+Subject: [PATCH v3 33/41] KVM: arm64: Configure FPSIMD traps on vcpu
+ load/put
+In-Reply-To: <a182d82e-73e0-8bfa-1d10-166b73ac1fdf@semihalf.com>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-34-christoffer.dall@linaro.org>
+ <a182d82e-73e0-8bfa-1d10-166b73ac1fdf@semihalf.com>
+Message-ID: <20180205100621.GU21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 01, 2018 at 11:07:32AM +0000, Marc Zyngier wrote:
-> This small series implements some basic BP hardening by invalidating
-> the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
-> attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
-> 32bit kernels that run on 64bit capable CPUs. This series doesn't
-> mitigate Spectre variant 1 either.
-> 
-> These patches are closely modelled against what we do on arm64,
-> although simpler as we can rely on an architected instruction to
-> perform the invalidation. The notable exception is Cortex-A15, where
-> BTB invalidation behaves like a NOP, and the only way to shoot the
-> predictor down is to invalidate the icache *and* to have ACTLR[0] set
-> to 1 (which is a secure-only operation).
-> 
-> The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
-> generalises it to be used on all affected CPUs. The second perform the
-> same invalidation on prefetch abort outside of the userspace
-> range. The third one nukes it on guest exit, and results in some major
-> surgery as we cannot take a branch from the vectors (that, and Thumb2
-> being a massive pain).
-> 
-> Patches 4 to 6 are doing a similar thing for Cortex-A15, with the
-> aforementioned ICIALLU.
-> 
-> To sum up the requirements:
-> 
-> - Cortex-A15 need to have ACTLR.IBE (bit 0) set to 1 from secure
->   mode. Cortex-A8 also needs to have ACTLR.IBE (bit 6) set, overlaping
->   with ARM_ERRATA_430973 which also requires it.
-> - Cortex-A9, A12 and A17 do not require any extra configuration.
-> 
-> Note 1: Contrary to the initial version, this new series relies on
-> the arm64/kpti branch (I reuse the per-CPU vector hook for KVM).
-> 
-> Note 2: M-class CPUs are not affected and for R-class cores, the
-> mitigation doesn't make much sense since we do not enforce user/kernel
-> isolation.
-> 
-> [Christoffer: since the patches have significantly changed since v3,
-> I've dropped your RB tags]
+Hi Tomasz,
 
-Except for the question on patch 4, you can add my tag back to the
-series.
+On Wed, Jan 31, 2018 at 01:17:36PM +0100, Tomasz Nowicki wrote:
+> On 12.01.2018 13:07, Christoffer Dall wrote:
+> >There is no need to enable/disable traps to FP registers on every switch
+> >to/from the VM, because the host kernel does not use this resource
+> >without calling vcpu_put.  We can therefore move things around enough
+> >that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
+> >only program these during vcpu load/put.
+> >
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >  arch/arm64/include/asm/kvm_hyp.h |  6 +++++
+> >  arch/arm64/kvm/hyp/switch.c      | 51 +++++++++++++++++++++++++++++-----------
+> >  arch/arm64/kvm/hyp/sysreg-sr.c   | 12 ++++++++--
+> >  3 files changed, 53 insertions(+), 16 deletions(-)
+> >
+> >diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> >index 3f54c55f77a1..ffd62e31f134 100644
+> >--- a/arch/arm64/include/asm/kvm_hyp.h
+> >+++ b/arch/arm64/include/asm/kvm_hyp.h
+> >@@ -148,6 +148,12 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+> >  void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+> >  bool __fpsimd_enabled(void);
+> >+void __activate_traps_nvhe_load(struct kvm_vcpu *vcpu);
+> >+void __deactivate_traps_nvhe_put(void);
+> >+
+> >+void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
+> >+void deactivate_traps_vhe_put(void);
+> >+
+> >  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+> >  void __noreturn __hyp_do_panic(unsigned long, ...);
+> >diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> >index c01bcfc3fb52..d14ab9650f81 100644
+> >--- a/arch/arm64/kvm/hyp/switch.c
+> >+++ b/arch/arm64/kvm/hyp/switch.c
+> >@@ -24,22 +24,25 @@
+> >  #include <asm/fpsimd.h>
+> >  #include <asm/debug-monitors.h>
+> >-static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
+> >+static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
+> >  {
+> >  	/*
+> >-	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> >-	 * register accesses to EL2, however, the ARM ARM clearly states that
+> >-	 * traps are only taken to EL2 if the operation would not otherwise
+> >-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> >-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> >-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+> >-	 * it will cause an exception.
+> >+	 * We are about to trap all floating point register accesses to EL2,
+> >+	 * however, traps are only taken to EL2 if the operation would not
+> >+	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
+> >+	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
+> >+	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
+> >+	 * any access to it will cause an exception.
+> >  	 */
+> >  	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
+> >  	    !vcpu->arch.guest_vfp_loaded) {
+> >  		write_sysreg(1 << 30, fpexc32_el2);
+> >  		isb();
+> >  	}
+> >+}
+> >+
+> >+static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
+> >+{
+> >  	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+> >  	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+> >@@ -61,10 +64,12 @@ static void __hyp_text __deactivate_traps_common(void)
+> >  	write_sysreg(0, pmuserenr_el0);
+> >  }
+> >-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+> >+void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
+> >  {
+> >  	u64 val;
+> >+	__activate_traps_fpsimd32(vcpu);
+> >+
+> >  	val = read_sysreg(cpacr_el1);
+> >  	val |= CPACR_EL1_TTA;
+> >  	val &= ~CPACR_EL1_ZEN;
+> >@@ -73,14 +78,26 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+> >  	else
+> >  		val &= ~CPACR_EL1_FPEN;
+> >  	write_sysreg(val, cpacr_el1);
+> 
+> Giving that you move this code to kvm_vcpu_load_sysregs() I am wondering if
+> we have to deactivate FPEN trap here. IIUC, we call
+> kvm_vcpu_load_sysregs()->activate_traps_vhe_load() and then
+> kvm_vcpu_put_sysregs() by design. So vcpu->arch.guest_vfp_loaded should be
+> always 0 here since it is zeroed in kvm_vcpu_put_sysregs(). The same for
+> nvhe case below.
+> 
 
-I particularly enjoyed the cute xor hack in patch 3.
+You're absolutely right, we can enable the trapping unconditionally on
+this path.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Thanks,
+-Christoffer
