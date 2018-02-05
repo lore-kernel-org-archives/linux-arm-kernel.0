@@ -1,35 +1,65 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Feb 2018 16:28:11 +0800
-Subject: [PATCH v3 1/2] ARM: dts: imx25-pinfunc: Use consistent naming
- for eSDHC
-In-Reply-To: <20180131213544.4508-1-benoit.thebaudeau.dev@gmail.com>
-References: <20180131213544.4508-1-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <20180205082809.GT31354@dragon>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 5 Feb 2018 09:32:35 +0100
+Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
+In-Reply-To: <20180205081018.GQ31354@dragon>
+References: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
+ <20180127153733.7ziaq6frli3jemc7@pengutronix.de>
+ <CA+sos78H1_ihvVghJcpZQZmB6rE2nfgXF8gq8kqK=cQE9Qs0mw@mail.gmail.com>
+ <20180205081018.GQ31354@dragon>
+Message-ID: <20180205083235.okfm2rjk3uskdbrh@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 10:35:43PM +0100, Beno?t Th?baudeau wrote:
-> This file had several naming inconsistencies for eSDHC:
->  - the instances were named sometimes SDn, sometimes SDHCn, whereas they
->    are named ESDHCn in the reference manual, e.g.:
->      MX25_PAD_SD1_CMD__SD1_CMD
->      MX25_PAD_D15__SDHC1_DAT7
->  - the data ports were named sometimes DATAn, sometimes DATn like in the
->    reference manual, e.g.:
->      MX25_PAD_SD1_DATA0__SD1_DATA0
->      MX25_PAD_D15__SDHC1_DAT7
->  - in one case, the clock port was named DAT_CLK instead of CLK:
->      MX25_PAD_CSI_D7__SDHC2_DAT_CLK
+On Mon, Feb 05, 2018 at 04:10:20PM +0800, Shawn Guo wrote:
+> On Sat, Jan 27, 2018 at 09:37:11PM +0100, Beno?t Th?baudeau wrote:
+> > On Sat, Jan 27, 2018 at 4:37 PM, Uwe Kleine-K?nig
+> > <u.kleine-koenig@pengutronix.de> wrote:
+> > > On Sat, Jan 27, 2018 at 01:07:52AM +0100, Beno?t Th?baudeau wrote:
+> > >> The eSDHC does not work properly if the SION bit is not set for the
+> > >> bidirectional CMD signal, whatever the eSDHC instance and the selected
+> > >> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
+> > >> this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
+> > >> behavior for all boards.
+> > >>
+> > >> This had already been done for eSDHC1, but not for eSDHC2. Also, define
+> > >> MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
+> > >> from now on.
+> > >
+> > > There is an inconsistency in the naming. The eSDHC1 CMD constants are
+> > > named:
+> > >
+> > >         MX25_PAD_SD1_CMD__SD1_CMD
+> > >
+> > > The reference calls this:
+> > >
+> > >         CMD of instance: esdhc1.
+> > >
+> > > The register name is correct though. Not sure it's worth to fix this to
+> > > use consistent naming (which would result in:
+> > >
+> > >         MX25_PAD_SD1_CMD__ESDHC1_CMD
+> > >
+> > > which looks ugly, too).
+> > 
+> > Indeed. I had also noticed this. I can send a patch to apply before
+> > this one. But that would break the out-of-tree DT files using these
+> > definitions. Would that be OK?
 > 
-> This change:
->  - introduces new definitions using the naming from the reference
->    manual,
->  - keeps definitions using the legacy naming in order not to break
->    compatibility for out-of-tree users (they can be removed later),
->  - updates the in-tree files that were using the legacy naming.
-> 
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> That's OK, I would say.  It could be a reminder of that they should
+> upstream their files.
 
-Applied both, thanks.
+I assume you saw v2 which introduced some defines to give those guys a
+bit of time, which IMHO is still better. Then we can remove these compat
+defines in (say) a year and so trigger this reminder.
+
+Also one of the advantages of dt that was advertised when ARM was
+converted to dt was, that upstreaming the dt isn't necessary any more. I
+personally like this and still consider not upstreaming the dtb part of
+a machine a sane approach.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
