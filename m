@@ -1,63 +1,50 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 5 Feb 2018 18:20:18 +0530
-Subject: [PATCH v2 05/16] mmc: sdhci-omap: Workaround for Errata i802
+Date: Mon, 5 Feb 2018 18:20:28 +0530
+Subject: [PATCH v2 15/16] mmc: sdhci-omap: Add SPDX identifier
 In-Reply-To: <20180205125029.21570-1-kishon@ti.com>
 References: <20180205125029.21570-1-kishon@ti.com>
-Message-ID: <20180205125029.21570-6-kishon@ti.com>
+Message-ID: <20180205125029.21570-16-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i802 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
-(SPRZ429K July 2014?Revised March 2017 [1]) mentions
-DCRC error interrupts (MMCHS_STAT[21] DCRC=0x1) can occur
-during the tuning procedure and it has to be disabled during the
-tuning procedure Implement workaround for Errata i802 here..
-
-[1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
+The SPDX identifier is a legally binding shorthand, which can be used
+instead of the full boiler plate text. Update sdhci-omap driver with the
+correct SPDX license identifier.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- drivers/mmc/host/sdhci-omap.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/mmc/host/sdhci-omap.c | 22 ++++------------------
+ 1 file changed, 4 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-index 36e0626d3de2..e24ae903f7ba 100644
+index 863f6736c2fe..d44918172197 100644
 --- a/drivers/mmc/host/sdhci-omap.c
 +++ b/drivers/mmc/host/sdhci-omap.c
-@@ -257,6 +257,7 @@ static int sdhci_omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	u32 start_window = 0, max_window = 0;
- 	u8 cur_match, prev_match = 0;
- 	u32 length = 0, max_len = 0;
-+	u32 ier = host->ier;
- 	u32 phase_delay = 0;
- 	int ret = 0;
- 	u32 reg;
-@@ -277,6 +278,16 @@ static int sdhci_omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	reg |= DLL_SWT;
- 	sdhci_omap_writel(omap_host, SDHCI_OMAP_DLL, reg);
+@@ -1,21 +1,7 @@
+-/**
+- * SDHCI Controller driver for TI's OMAP SoCs
+- *
+- * Copyright (C) 2017 Texas Instruments
+- * Author: Kishon Vijay Abraham I <kishon@ti.com>
+- *
+- * This program is free software: you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 of
+- * the License as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018 Texas Instruments
++// SDHCI Controller driver for TI's OMAP SoCs
++// Author: Kishon Vijay Abraham I <kishon@ti.com>
  
-+	/*
-+	 * OMAP5/DRA74X/DRA72x Errata i802:
-+	 * DCRC error interrupts (MMCHS_STAT[21] DCRC=0x1) can occur
-+	 * during the tuning procedure. So disable it during the
-+	 * tuning procedure.
-+	 */
-+	ier &= ~SDHCI_INT_DATA_CRC;
-+	sdhci_writel(host, ier, SDHCI_INT_ENABLE);
-+	sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
-+
- 	while (phase_delay <= MAX_PHASE_DELAY) {
- 		sdhci_omap_set_dll(omap_host, phase_delay);
- 
-@@ -322,6 +333,8 @@ static int sdhci_omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 
- ret:
- 	sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
-+	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-+	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
- 	return ret;
- }
- 
+ #include <linux/delay.h>
+ #include <linux/mmc/slot-gpio.h>
 -- 
 2.11.0
