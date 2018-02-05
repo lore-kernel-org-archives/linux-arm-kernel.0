@@ -1,41 +1,63 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 5 Feb 2018 18:20:25 +0530
-Subject: [PATCH v2 12/16] mmc: sdhci-omap: Workaround for Errata i834
+Date: Mon, 5 Feb 2018 18:20:18 +0530
+Subject: [PATCH v2 05/16] mmc: sdhci-omap: Workaround for Errata i802
 In-Reply-To: <20180205125029.21570-1-kishon@ti.com>
 References: <20180205125029.21570-1-kishon@ti.com>
-Message-ID: <20180205125029.21570-13-kishon@ti.com>
+Message-ID: <20180205125029.21570-6-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i834 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
-(SPRZ429K July 2014?Revised March 2017 [1]) mentions the maximum
-obtainable timeout through MMC host controller is 700ms. And for
-commands taking longer than 700ms, hardware timeout should be
-disabled and software timeout should be used.
-
-The workaround for Errata i834 can be achieved by adding
-SDHCI_QUIRK2_DISABLE_HW_TIMEOUT quirk in sdhci-omap.
+Errata i802 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
+(SPRZ429K July 2014?Revised March 2017 [1]) mentions
+DCRC error interrupts (MMCHS_STAT[21] DCRC=0x1) can occur
+during the tuning procedure and it has to be disabled during the
+tuning procedure Implement workaround for Errata i802 here..
 
 [1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- drivers/mmc/host/sdhci-omap.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sdhci-omap.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-index c2570db3f7a2..db487b77fbcc 100644
+index 36e0626d3de2..e24ae903f7ba 100644
 --- a/drivers/mmc/host/sdhci-omap.c
 +++ b/drivers/mmc/host/sdhci-omap.c
-@@ -714,7 +714,8 @@ static const struct sdhci_pltfm_data sdhci_omap_pdata = {
- 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
- 	.quirks2 = SDHCI_QUIRK2_ACMD23_BROKEN |
- 		   SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
--		   SDHCI_QUIRK2_RSP_136_HAS_CRC,
-+		   SDHCI_QUIRK2_RSP_136_HAS_CRC |
-+		   SDHCI_QUIRK2_DISABLE_HW_TIMEOUT,
- 	.ops = &sdhci_omap_ops,
- };
+@@ -257,6 +257,7 @@ static int sdhci_omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	u32 start_window = 0, max_window = 0;
+ 	u8 cur_match, prev_match = 0;
+ 	u32 length = 0, max_len = 0;
++	u32 ier = host->ier;
+ 	u32 phase_delay = 0;
+ 	int ret = 0;
+ 	u32 reg;
+@@ -277,6 +278,16 @@ static int sdhci_omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	reg |= DLL_SWT;
+ 	sdhci_omap_writel(omap_host, SDHCI_OMAP_DLL, reg);
+ 
++	/*
++	 * OMAP5/DRA74X/DRA72x Errata i802:
++	 * DCRC error interrupts (MMCHS_STAT[21] DCRC=0x1) can occur
++	 * during the tuning procedure. So disable it during the
++	 * tuning procedure.
++	 */
++	ier &= ~SDHCI_INT_DATA_CRC;
++	sdhci_writel(host, ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
++
+ 	while (phase_delay <= MAX_PHASE_DELAY) {
+ 		sdhci_omap_set_dll(omap_host, phase_delay);
+ 
+@@ -322,6 +333,8 @@ static int sdhci_omap_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 
+ ret:
+ 	sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ 	return ret;
+ }
  
 -- 
 2.11.0
