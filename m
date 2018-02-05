@@ -1,71 +1,85 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  5 Feb 2018 15:34:27 +0100
-Subject: [PATCH 1/9] dt-bindings: add binding for Rockchip hdmi phy using an
- Innosilicon IP
+Date: Mon,  5 Feb 2018 15:34:30 +0100
+Subject: [PATCH 4/9] drm/bridge: dw-hdmi: export hotplug functions
 In-Reply-To: <20180205143435.4723-1-heiko@sntech.de>
 References: <20180205143435.4723-1-heiko@sntech.de>
-Message-ID: <20180205143435.4723-2-heiko@sntech.de>
+Message-ID: <20180205143435.4723-5-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zheng Yang <zhengyang@rock-chips.com>
+From: Algea Cao <algea.cao@rock-chips.com>
 
-The phy is used so far in two Rockchip socs the rk3228 and the rk3328.
+External phys may not provide their own hotplug-related
+routines but instead rely on the dw-hdmi ones.
+Export these functions so that external hdmi-phys can
+use them if necessary.
 
-Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+Signed-off-by: Algea Cao <algea.cao@rock-chips.com>
+[export all 3 hotplug-related functions]
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../bindings/phy/phy-rockchip-inno-hdmi.txt        | 42 ++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 11 +++++++----
+ include/drm/bridge/dw_hdmi.h              |  6 +++++-
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
-new file mode 100644
-index 000000000000..7d36fd8d5d94
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
-@@ -0,0 +1,42 @@
-+ROCKCHIP HDMI PHY WITH INNO IP BLOCK
-+
-+Required properties:
-+ - compatible : should be one of the listed compatibles:
-+	* "rockchip,rk3228-hdmi-phy",
-+	* "rockchip,rk3328-hdmi-phy";
-+ - reg : Address and length of the hdmi phy control register set
-+ - clocks : phandle + clock specifier for the phy clocks
-+ - clock-names : string, clock name, must contain "sysclk" for system
-+	  control and register configuration and "refclk" for reference
-+	  crystal oscillator clock input to PLL
-+ - #clock-cells: should be 0.
-+ - clock-output-names : shall be the name for the output clock.
-+ - interrupts : phandle + interrupt specified for the hdmiphy interrupt
-+ - #phy-cells : must be 0. See ./phy-bindings.txt for details.
-+
-+Optional properties for rk3328-hdmi-phy:
-+ - nvmem-cells = phandle + nvmem specifier for the cpu-version efuse
-+ - nvmem-cell-names : "cpu-version" to read the chip version, required
-+	  for adjustment to some frequency settings
-+
-+Example:
-+	hdmi_phy: hdmi-phy at 12030000 {
-+		compatible = "rockchip,rk3228-hdmi-phy";
-+		reg = <0x12030000 0x10000>;
-+		#phy-cells = <0>;
-+		clocks = <&cru PCLK_HDMI_PHY>, <&xin24m>;
-+		clock-names = "sysclk", "refclk";
-+		#clock-cells = <0>;
-+		clock-output-names = "hdmi_phy";
-+		status = "disabled";
-+	};
-+
-+Then the PHY can be used in other nodes such as:
-+
-+	hdmi: hdmi at 200a0000 {
-+		compatible = "rockchip,rk3228-dw-hdmi";
-+		...
-+		phys = <&hdmi_phy>;
-+		phy-names = "hdmi";
-+		...
-+	};
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index 7255fafce089..2760e1b51422 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1251,14 +1251,15 @@ static void dw_hdmi_phy_disable(struct dw_hdmi *hdmi, void *data)
+ 	dw_hdmi_phy_power_off(hdmi);
+ }
+ 
+-static enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
+-						      void *data)
++enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
++					       void *data)
+ {
+ 	return hdmi_readb(hdmi, HDMI_PHY_STAT0) & HDMI_PHY_HPD ?
+ 		connector_status_connected : connector_status_disconnected;
+ }
++EXPORT_SYMBOL_GPL(dw_hdmi_phy_read_hpd);
+ 
+-static void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
++void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
+ 				   bool force, bool disabled, bool rxsense)
+ {
+ 	u8 old_mask = hdmi->phy_mask;
+@@ -1271,8 +1272,9 @@ static void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
+ 	if (old_mask != hdmi->phy_mask)
+ 		hdmi_writeb(hdmi, hdmi->phy_mask, HDMI_PHY_MASK0);
+ }
++EXPORT_SYMBOL_GPL(dw_hdmi_phy_update_hpd);
+ 
+-static void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
++void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
+ {
+ 	/*
+ 	 * Configure the PHY RX SENSE and HPD interrupts polarities and clear
+@@ -1291,6 +1293,7 @@ static void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data)
+ 	hdmi_writeb(hdmi, ~(HDMI_IH_PHY_STAT0_HPD | HDMI_IH_PHY_STAT0_RX_SENSE),
+ 		    HDMI_IH_MUTE_PHY_STAT0);
+ }
++EXPORT_SYMBOL_GPL(dw_hdmi_phy_setup_hpd);
+ 
+ static const struct dw_hdmi_phy_ops dw_hdmi_synopsys_phy_ops = {
+ 	.init = dw_hdmi_phy_init,
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index c5bc2804b29e..d9d7c75b3bfb 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -152,7 +152,11 @@ int dw_hdmi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
+ 		 const struct dw_hdmi_plat_data *plat_data);
+ 
+ void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
+-
++enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
++					       void *data);
++void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
++				   bool force, bool disabled, bool rxsense);
++void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data);
+ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
+ void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
+ void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
 -- 
 2.15.1
