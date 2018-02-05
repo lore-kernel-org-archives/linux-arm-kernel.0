@@ -1,77 +1,141 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 5 Feb 2018 15:06:33 +0200
-Subject: [RESEND][PATCH] video: fbdev: atmel_lcdfb: convert to use GPIO
- descriptors
-In-Reply-To: <20180205084755.6011-1-ludovic.desroches@microchip.com>
-References: <20180205084755.6011-1-ludovic.desroches@microchip.com>
-Message-ID: <CAHp75Vc1npdmhrs80Cdj0t6RWpTtuXFkpXUQwxKDe=6vrZxkFA@mail.gmail.com>
+From: jmarchan@redhat.com (Jerome Marchand)
+Date: Mon,  5 Feb 2018 14:28:01 +0100
+Subject: [PATCH v4] arm64: fix unwind_frame() for filtered out fn for function
+ graph tracing
+In-Reply-To: <20180112104832.9417-1-jmarchan@redhat.com>
+References: <20180112104832.9417-1-jmarchan@redhat.com>
+Message-ID: <20180205132801.7442-1-jmarchan@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 5, 2018 at 10:47 AM, Ludovic Desroches
-<ludovic.desroches@microchip.com> wrote:
-> Use GPIO descriptors instead of relying on the old method.
+From: Pratyush Anand <panand@redhat.com>
 
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Change since v3:
+ - Exit unwind_frame() if frame->graph != -1
 
-Though few nitpicks below.
+Change since v2:
+- Set frame.graph = current->curr_ret_stack in profile_pc
+- Check that frame->graph != -1 in unwind_frame
 
+do_task_stat() calls get_wchan(), which further does unwind_frame().
+unwind_frame() restores frame->pc to original value in case function
+graph tracer has modified a return address (LR) in a stack frame to hook
+a function return. However, if function graph tracer has hit a filtered
+function, then we can't unwind it as ftrace_push_return_trace() has
+biased the index(frame->graph) with a 'huge negative'
+offset(-FTRACE_NOTRACE_DEPTH).
 
-> --- a/drivers/video/fbdev/atmel_lcdfb.c
-> +++ b/drivers/video/fbdev/atmel_lcdfb.c
-> @@ -18,6 +18,7 @@
->  #include <linux/delay.h>
->  #include <linux/backlight.h>
->  #include <linux/gfp.h>
+Moreover, arm64 stack walker defines index(frame->graph) as unsigned
+int, which can not compare a -ve number.
 
-> +#include <linux/gpio/consumer.h>
+Similar problem we can have with calling of walk_stackframe() from
+save_stack_trace_tsk() or dump_backtrace().
 
-I think you forgot to remove of_gpio.h.
+This patch fixes unwind_frame() to test the index for -ve value and
+restore index accordingly before we can restore frame->pc.
 
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
+Reproducer:
 
->         struct device_node *display_np;
->         struct device_node *timings_np;
->         struct display_timings *timings;
-> -       enum of_gpio_flags flags;
->         struct atmel_lcdfb_power_ctrl_gpio *og;
->         bool is_gpio_power = false;
->         int ret = -ENOENT;
-> -       int i, gpio;
-> +       int i;
-> +       struct gpio_desc *gpiod;
+cd /sys/kernel/debug/tracing/
+echo schedule > set_graph_notrace
+echo 1 > options/display-graph
+echo wakeup > current_tracer
+ps -ef | grep -i agent
 
-I would rather preserve reversed tree style, i.e. put longer line upper.
+Above commands result in:
+Unable to handle kernel paging request at virtual address ffff801bd3d1e000
+pgd = ffff8003cbe97c00
+[ffff801bd3d1e000] *pgd=0000000000000000, *pud=0000000000000000
+Internal error: Oops: 96000006 [#1] SMP
+[...]
+CPU: 5 PID: 11696 Comm: ps Not tainted 4.11.0+ #33
+[...]
+task: ffff8003c21ba000 task.stack: ffff8003cc6c0000
+PC is at unwind_frame+0x12c/0x180
+LR is at get_wchan+0xd4/0x134
+pc : [<ffff00000808892c>] lr : [<ffff0000080860b8>] pstate: 60000145
+sp : ffff8003cc6c3ab0
+x29: ffff8003cc6c3ab0 x28: 0000000000000001
+x27: 0000000000000026 x26: 0000000000000026
+x25: 00000000000012d8 x24: 0000000000000000
+x23: ffff8003c1c04000 x22: ffff000008c83000
+x21: ffff8003c1c00000 x20: 000000000000000f
+x19: ffff8003c1bc0000 x18: 0000fffffc593690
+x17: 0000000000000000 x16: 0000000000000001
+x15: 0000b855670e2b60 x14: 0003e97f22cf1d0f
+x13: 0000000000000001 x12: 0000000000000000
+x11: 00000000e8f4883e x10: 0000000154f47ec8
+x9 : 0000000070f367c0 x8 : 0000000000000000
+x7 : 00008003f7290000 x6 : 0000000000000018
+x5 : 0000000000000000 x4 : ffff8003c1c03cb0
+x3 : ffff8003c1c03ca0 x2 : 00000017ffe80000
+x1 : ffff8003cc6c3af8 x0 : ffff8003d3e9e000
 
+Process ps (pid: 11696, stack limit = 0xffff8003cc6c0000)
+Stack: (0xffff8003cc6c3ab0 to 0xffff8003cc6c4000)
+[...]
+[<ffff00000808892c>] unwind_frame+0x12c/0x180
+[<ffff000008305008>] do_task_stat+0x864/0x870
+[<ffff000008305c44>] proc_tgid_stat+0x3c/0x48
+[<ffff0000082fde0c>] proc_single_show+0x5c/0xb8
+[<ffff0000082b27e0>] seq_read+0x160/0x414
+[<ffff000008289e6c>] __vfs_read+0x58/0x164
+[<ffff00000828b164>] vfs_read+0x88/0x144
+[<ffff00000828c2e8>] SyS_read+0x60/0xc0
+[<ffff0000080834a0>] __sys_trace_return+0x0/0x4
 
-> +       for (i = 0; i < gpiod_count(dev, "atmel,power-control"); i++) {
-> +               gpiod = devm_gpiod_get_index_optional(dev,
-> +                               "atmel,power-control", i, GPIOD_ASIS);
-> +               if (!gpiod)
->                         continue;
+fixes: 20380bb390a4 (arm64: ftrace: fix a stack tracer's output under function graph tracer)
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Jerome Marchand <jmarchan@redhat.com>
+---
+ arch/arm64/include/asm/stacktrace.h | 2 +-
+ arch/arm64/kernel/stacktrace.c      | 7 +++++++
+ arch/arm64/kernel/time.c            | 2 +-
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
-What about IS_ERR() case?
-
->
->                 og = devm_kzalloc(dev, sizeof(*og), GFP_KERNEL);
->                 if (!og)
->                         goto put_display_node;
->
-> +               og->gpiod = gpiod;
->                 is_gpio_power = true;
->
-> +               ret = gpiod_direction_output(gpiod, gpiod_is_active_low(gpiod));
->                 if (ret) {
-
-I'm not sure this will be needed if you check IS_ERR() above.
-
-> +                       dev_err(dev, "set direction output gpio atmel,power-control[%d] failed\n", i);
->                         goto put_display_node;
->                 }
-
-
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 6ad30776e984..99390755c0c4 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -27,7 +27,7 @@ struct stackframe {
+ 	unsigned long fp;
+ 	unsigned long pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	unsigned int graph;
++	int graph;
+ #endif
+ };
+ 
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 76809ccd309c..2c74ff76b0cd 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -59,6 +59,13 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	if (tsk->ret_stack &&
+ 			(frame->pc == (unsigned long)return_to_handler)) {
++		if (frame->graph == -1) {
++			WARN_ON(1);
++			return -EINVAL;
++		}
++		if (frame->graph < -1)
++			frame->graph += FTRACE_NOTRACE_DEPTH;
++
+ 		/*
+ 		 * This is a case where function graph tracer has
+ 		 * modified a return address (LR) in a stack frame
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index a4391280fba9..f258636273c9 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -52,7 +52,7 @@ unsigned long profile_pc(struct pt_regs *regs)
+ 	frame.fp = regs->regs[29];
+ 	frame.pc = regs->pc;
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = -1; /* no task info */
++	frame.graph = current->curr_ret_stack;
+ #endif
+ 	do {
+ 		int ret = unwind_frame(NULL, &frame);
 -- 
-With Best Regards,
-Andy Shevchenko
+2.13.6
