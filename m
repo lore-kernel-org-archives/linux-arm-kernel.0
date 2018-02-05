@@ -1,85 +1,159 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Feb 2018 15:34:19 +0000
-Subject: [PATCH 4/9] arm64: Use pointer masking to limit uaccess speculation
+Date: Mon,  5 Feb 2018 15:34:18 +0000
+Subject: [PATCH 3/9] arm64: Make USER_DS an inclusive limit
 In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
 References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517844864-15887-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1517844864-15887-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robin Murphy <robin.murphy@arm.com>
 
-Similarly to x86, mitigate speculation past an access_ok() check by
-masking the pointer against the address limit before use.
+Currently, USER_DS represents an exclusive limit while KERNEL_DS is
+inclusive. In order to do some clever trickery for speculation-safe
+masking, we need them both to behave equivalently - there aren't enough
+bits to make KERNEL_DS exclusive, so we have precisely one option. This
+also happens to correct a longstanding false negative for a range
+ending on the very top byte of kernel memory.
 
-Even if we don't expect speculative writes per se, it is plausible that
-a CPU may still speculate at least as far as fetching a cache line for
-writing, hence we also harden put_user() and clear_user() for peace of
-mind.
+Mark Rutland points out that we've actually got the semantics of
+addresses vs. segments muddled up in most of the places we need to
+amend, so shuffle the {USER,KERNEL}_DS definitions around such that we
+can correct those properly instead of just pasting "-1"s everywhere.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/uaccess.h | 26 +++++++++++++++++++++++---
- 1 file changed, 23 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/processor.h |  3 +++
+ arch/arm64/include/asm/uaccess.h   | 45 ++++++++++++++++++++++----------------
+ arch/arm64/kernel/entry.S          |  4 ++--
+ arch/arm64/mm/fault.c              |  4 ++--
+ 4 files changed, 33 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index f2fc026cffb4..e49fe723d72d 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -228,6 +228,26 @@ static inline void uaccess_enable_not_uao(void)
- }
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index cee4ae25a5d1..dfefbf3fd9e3 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -21,6 +21,9 @@
+ 
+ #define TASK_SIZE_64		(UL(1) << VA_BITS)
+ 
++#define KERNEL_DS	UL(-1)
++#define USER_DS		(TASK_SIZE_64 - 1)
++
+ #ifndef __ASSEMBLY__
  
  /*
-+ * Sanitise a uaccess pointer such that it becomes NULL if above the
-+ * current addr_limit.
-+ */
-+#define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
-+static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 59fda5292936..f2fc026cffb4 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -35,10 +35,7 @@
+ #include <asm/compiler.h>
+ #include <asm/extable.h>
+ 
+-#define KERNEL_DS	(-1UL)
+ #define get_ds()	(KERNEL_DS)
+-
+-#define USER_DS		TASK_SIZE_64
+ #define get_fs()	(current_thread_info()->addr_limit)
+ 
+ static inline void set_fs(mm_segment_t fs)
+@@ -66,22 +63,32 @@ static inline void set_fs(mm_segment_t fs)
+  * Returns 1 if the range is valid, 0 otherwise.
+  *
+  * This is equivalent to the following test:
+- * (u65)addr + (u65)size <= current->addr_limit
+- *
+- * This needs 65-bit arithmetic.
++ * (u65)addr + (u65)size <= (u65)current->addr_limit + 1
+  */
+-#define __range_ok(addr, size)						\
+-({									\
+-	unsigned long __addr = (unsigned long)(addr);			\
+-	unsigned long flag, roksum;					\
+-	__chk_user_ptr(addr);						\
+-	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, ls"		\
+-		: "=&r" (flag), "=&r" (roksum)				\
+-		: "1" (__addr), "Ir" (size),				\
+-		  "r" (current_thread_info()->addr_limit)		\
+-		: "cc");						\
+-	flag;								\
+-})
++static inline unsigned long __range_ok(unsigned long addr, unsigned long size)
 +{
-+	void __user *safe_ptr;
++	unsigned long limit = current_thread_info()->addr_limit;
 +
++	__chk_user_ptr(addr);
 +	asm volatile(
-+	"	bics	xzr, %1, %2\n"
-+	"	csel	%0, %1, xzr, eq\n"
-+	: "=&r" (safe_ptr)
-+	: "r" (ptr), "r" (current_thread_info()->addr_limit)
-+	: "cc");
++	// A + B <= C + 1 for all A,B,C, in four easy steps:
++	// 1: X = A + B; X' = X % 2^64
++	"	adds	%0, %0, %2\n"
++	// 2: Set C = 0 if X > 2^64, to guarantee X' > C in step 4
++	"	csel	%1, xzr, %1, hi\n"
++	// 3: Set X' = ~0 if X >= 2^64. For X == 2^64, this decrements X'
++	//    to compensate for the carry flag being set in step 4. For
++	//    X > 2^64, X' merely has to remain nonzero, which it does.
++	"	csinv	%0, %0, xzr, cc\n"
++	// 4: For X < 2^64, this gives us X' - C - 1 <= 0, where the -1
++	//    comes from the carry in being clear. Otherwise, we are
++	//    testing X' - C == 0, subject to the previous adjustments.
++	"	sbcs	xzr, %0, %1\n"
++	"	cset	%0, ls\n"
++	: "+r" (addr), "+r" (limit) : "Ir" (size) : "cc");
 +
-+	csdb();
-+	return safe_ptr;
++	return addr;
 +}
-+
-+/*
-  * The "__xxx" versions of the user access functions do not verify the address
-  * space - it must have been done previously with a separate "access_ok()"
-  * call.
-@@ -297,7 +317,7 @@ do {									\
- 	__typeof__(*(ptr)) __user *__p = (ptr);				\
- 	might_fault();							\
- 	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
--		__get_user((x), __p) :					\
-+		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
- 		((x) = 0, -EFAULT);					\
- })
  
-@@ -361,7 +381,7 @@ do {									\
- 	__typeof__(*(ptr)) __user *__p = (ptr);				\
- 	might_fault();							\
- 	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
--		__put_user((x), __p) :					\
-+		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
- 		-EFAULT;						\
- })
+ /*
+  * When dealing with data aborts, watchpoints, or instruction traps we may end
+@@ -90,7 +97,7 @@ static inline void set_fs(mm_segment_t fs)
+  */
+ #define untagged_addr(addr)		sign_extend64(addr, 55)
  
-@@ -377,7 +397,7 @@ extern unsigned long __must_check __clear_user(void __user *addr, unsigned long
- static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
- {
- 	if (access_ok(VERIFY_WRITE, to, n))
--		n = __clear_user(to, n);
-+		n = __clear_user(__uaccess_mask_ptr(to), n);
- 	return n;
- }
+-#define access_ok(type, addr, size)	__range_ok(addr, size)
++#define access_ok(type, addr, size)	__range_ok((unsigned long)(addr), size)
+ #define user_addr_max			get_fs
  
+ #define _ASM_EXTABLE(from, to)						\
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b34e717d7597..4e2eae8c442e 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -167,10 +167,10 @@ alternative_else_nop_endif
+ 	.else
+ 	add	x21, sp, #S_FRAME_SIZE
+ 	get_thread_info tsk
+-	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
++	/* Save the task's original addr_limit and set USER_DS */
+ 	ldr	x20, [tsk, #TSK_TI_ADDR_LIMIT]
+ 	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
+-	mov	x20, #TASK_SIZE_64
++	mov	x20, #USER_DS
+ 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
+ 	/* No need to reset PSTATE.UAO, hardware's already set it to 0 for us */
+ 	.endif /* \el == 0 */
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 0e671ddf4855..af530eb9f2ed 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -240,7 +240,7 @@ static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs,
+ 	if (fsc_type == ESR_ELx_FSC_PERM)
+ 		return true;
+ 
+-	if (addr < USER_DS && system_uses_ttbr0_pan())
++	if (addr < TASK_SIZE && system_uses_ttbr0_pan())
+ 		return fsc_type == ESR_ELx_FSC_FAULT &&
+ 			(regs->pstate & PSR_PAN_BIT);
+ 
+@@ -414,7 +414,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 		mm_flags |= FAULT_FLAG_WRITE;
+ 	}
+ 
+-	if (addr < USER_DS && is_permission_fault(esr, regs, addr)) {
++	if (addr < TASK_SIZE && is_permission_fault(esr, regs, addr)) {
+ 		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
+ 		if (regs->orig_addr_limit == KERNEL_DS)
+ 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
 -- 
 2.1.4
