@@ -1,49 +1,25 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  5 Feb 2018 09:45:31 +0200
-Subject: [PATCH 1/2] arm64: dts: fsl: imx8mq: add watchdog devices
-Message-ID: <4c7c9104ca95419d22b8df19a69819e194dd3488.1517816731.git.baruch@tkos.co.il>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Feb 2018 15:56:22 +0800
+Subject: [PATCH v2 BUGFIX] ARM: dts: imx6ull: fix the imx6ull-14x14-evk
+ configuration
+In-Reply-To: <1516956738-24673-1-git-send-email-LW@KARO-electronics.de>
+References: <1516955159-21626-1-git-send-email-LW@KARO-electronics.de>
+ <1516956738-24673-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20180205075620.GO31354@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+On Fri, Jan 26, 2018 at 09:52:18AM +0100, Lothar Wa?mann wrote:
+> imx6ull-14x14-evk.dts currently includes the imx6ul.dtsi file for an
+> i.MX6ULL SoC which is plain wrong.
+> 
+> Rename the current imx6ul-14x14-evk.dts to .dtsi and include it from
+> imx6ul-14x14-evk.dts and imx6ull-14x14-evk.dts, so that both can
+> include the appropriate SoC specific (imx6ul.dtsi/imx6ull.dtsi) file.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index 50ed302d299a..740457e2a0bf 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -250,6 +250,30 @@
- 				              "clk_ext1", "clk_ext2",
- 				              "clk_ext3", "clk_ext4";
- 			};
-+
-+			wdog1: wdog at 30280000 {
-+				compatible = "fsl,imx21-wdt";
-+				reg = <0x30280000 0x10000>;
-+				interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clk IMX8MQ_CLK_WDOG1_ROOT>;
-+				status = "disabled";
-+			};
-+
-+			wdog2: wdog at 30290000 {
-+				compatible = "fsl,imx21-wdt";
-+				reg = <0x30290000 0x10000>;
-+				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clk IMX8MQ_CLK_WDOG2_ROOT>;
-+				status = "disabled";
-+			};
-+
-+			wdog3: wdog at 302a0000 {
-+				compatible = "fsl,imx21-wdt";
-+				reg = <0x302a0000 0x10000>;
-+				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clk IMX8MQ_CLK_WDOG3_ROOT>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		bus at 30400000 { /* AIPS2 */
--- 
-2.15.1
+Which base is the patch generated against?  I cannot apply it to any
+branch in my tree.
+
+Shawn
