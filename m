@@ -1,35 +1,37 @@
-From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Mon,  5 Feb 2018 21:09:57 +0100
-Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing with a
- mask
-Message-ID: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon,  5 Feb 2018 14:11:28 -0600
+Subject: [PATCH 0/2][for 4.14] Add work-around for Falkor erratum E1041
+Message-ID: <1517861490-19395-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In one Renesas driver, I found a typo which turned an intended bit shift ('<<')
-into a comparison ('<'). Because this is a subtle issue, I looked tree wide for
-similar patterns. This small patch series is the outcome.
+These two patches (back-ported from 4.15) implement a work-around for a
+rare but serious erratum in Qualcomm Datacenter Technologies Falkor
+cores.
 
-Buildbot and checkpatch are happy. Only compile-tested. To be applied
-individually per sub-system, I think. I'd think only the net: amd: patch needs
-to be conisdered for stable, but I leave this to people who actually know this
-driver.
+One small merge conflict in arch/arm64/Kconfig was resolved when
+back-porting patch #2.
 
-CCing Dan. Maybe he has an idea how to add a test to smatch? In my setup, only
-cppcheck reported a 'coding style' issue with a low prio.
+P.S. I couldn't find any good examples of submitting a back-ported
+patch with resolved merge conflicts to stable at vger.kernel.org, so I
+hope I'm not forgetting anything.
 
-Wolfram Sang (4):
-  v4l: vsp1: fix mask creation for MULT_ALPHA_RATIO
-  drm/exynos: fix comparison to bitshift when dealing with a mask
-  v4l: dvb-frontends: stb0899: fix comparison to bitshift when dealing
-    with a mask
-  net: amd-xgbe: fix comparison to bitshift when dealing with a mask
+Shanker Donthineni (2):
+  [for 4.14] arm64: Define cputype macros for Falkor CPU
+  [for 4.14] arm64: Add software workaround for Falkor erratum 1041
 
- drivers/gpu/drm/exynos/regs-fimc.h        | 2 +-
- drivers/media/dvb-frontends/stb0899_reg.h | 8 ++++----
- drivers/media/platform/vsp1/vsp1_regs.h   | 2 +-
- drivers/net/ethernet/amd/xgbe/xgbe-drv.c  | 2 +-
- 4 files changed, 7 insertions(+), 7 deletions(-)
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 10 ++++++++++
+ arch/arm64/include/asm/assembler.h     | 10 ++++++++++
+ arch/arm64/include/asm/cputype.h       |  2 ++
+ arch/arm64/kernel/cpu-reset.S          |  1 +
+ arch/arm64/kernel/efi-entry.S          |  2 ++
+ arch/arm64/kernel/head.S               |  1 +
+ arch/arm64/kernel/relocate_kernel.S    |  1 +
+ arch/arm64/kvm/hyp-init.S              |  1 +
+ 9 files changed, 29 insertions(+)
 
 -- 
-2.11.0
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
