@@ -1,57 +1,121 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Feb 2018 15:34:24 +0000
-Subject: [PATCH 9/9] arm64: futex: Mask __user pointers prior to dereference
+Date: Mon,  5 Feb 2018 15:34:22 +0000
+Subject: [PATCH 7/9] arm64: uaccess: Don't bother eliding access_ok checks in
+ __{get, put}_user
 In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
 References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1517844864-15887-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1517844864-15887-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 futex code has some explicit dereferencing of user pointers
-where performing atomic operations in response to a futex command. This
-patch uses masking to limit any speculative futex operations to within
-the user address space.
+access_ok isn't an expensive operation once the addr_limit for the current
+thread has been loaded into the cache. Given that the initial access_ok
+check preceding a sequence of __{get,put}_user operations will take
+the brunt of the miss, we can make the __* variants identical to the
+full-fat versions, which brings with it the benefits of address masking.
 
+The likely cost in these sequences will be from toggling PAN/UAO, which
+we can address later by implementing the *_unsafe versions.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/futex.h | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/uaccess.h | 54 ++++++++++++++++++++++++----------------
+ 1 file changed, 32 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 5bb2fd4674e7..07fe2479d310 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -48,9 +48,10 @@ do {									\
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 2057deed7697..e5002bc7130d 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -306,28 +306,33 @@ do {									\
+ 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
  } while (0)
  
- static inline int
--arch_futex_atomic_op_inuser(int op, int oparg, int *oval, u32 __user *uaddr)
-+arch_futex_atomic_op_inuser(int op, int oparg, int *oval, u32 __user *_uaddr)
- {
- 	int oldval = 0, ret, tmp;
-+	u32 __user *uaddr = __uaccess_mask_ptr(_uaddr);
+-#define __get_user(x, ptr)						\
++#define __get_user_check(x, ptr, err)					\
+ ({									\
+-	int __gu_err = 0;						\
+-	__get_user_err((x), (ptr), __gu_err);				\
+-	__gu_err;							\
++	__typeof__(*(ptr)) __user *__p = (ptr);				\
++	might_fault();							\
++	if (access_ok(VERIFY_READ, __p, sizeof(*__p))) {		\
++		__p = uaccess_mask_ptr(__p);				\
++		__get_user_err((x), __p, (err));			\
++	} else {							\
++		(x) = 0; (err) = -EFAULT;				\
++	}								\
+ })
  
- 	pagefault_disable();
+ #define __get_user_error(x, ptr, err)					\
+ ({									\
+-	__get_user_err((x), (ptr), (err));				\
++	__get_user_check((x), (ptr), (err));				\
+ 	(void)0;							\
+ })
  
-@@ -88,15 +89,17 @@ arch_futex_atomic_op_inuser(int op, int oparg, int *oval, u32 __user *uaddr)
- }
+-#define get_user(x, ptr)						\
++#define __get_user(x, ptr)						\
+ ({									\
+-	__typeof__(*(ptr)) __user *__p = (ptr);				\
+-	might_fault();							\
+-	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
+-		__p = uaccess_mask_ptr(__p), __get_user((x), __p) :	\
+-		((x) = 0, -EFAULT);					\
++	int __gu_err = 0;						\
++	__get_user_check((x), (ptr), __gu_err);				\
++	__gu_err;							\
+ })
  
- static inline int
--futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
-+futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *_uaddr,
- 			      u32 oldval, u32 newval)
- {
- 	int ret = 0;
- 	u32 val, tmp;
-+	u32 __user *uaddr;
++#define get_user	__get_user
++
+ #define __put_user_asm(instr, alt_instr, reg, x, addr, err, feature)	\
+ 	asm volatile(							\
+ 	"1:"ALTERNATIVE(instr "     " reg "1, [%2]\n",			\
+@@ -370,28 +375,33 @@ do {									\
+ 	uaccess_disable_not_uao();					\
+ } while (0)
  
--	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-+	if (!access_ok(VERIFY_WRITE, _uaddr, sizeof(u32)))
- 		return -EFAULT;
+-#define __put_user(x, ptr)						\
++#define __put_user_check(x, ptr, err)					\
+ ({									\
+-	int __pu_err = 0;						\
+-	__put_user_err((x), (ptr), __pu_err);				\
+-	__pu_err;							\
++	__typeof__(*(ptr)) __user *__p = (ptr);				\
++	might_fault();							\
++	if (access_ok(VERIFY_WRITE, __p, sizeof(*__p))) {		\
++		__p = uaccess_mask_ptr(__p);				\
++		__put_user_err((x), __p, (err));			\
++	} else	{							\
++		(err) = -EFAULT;					\
++	}								\
+ })
  
-+	uaddr = __uaccess_mask_ptr(_uaddr);
- 	uaccess_enable();
- 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
- "	prfm	pstl1strm, %2\n"
+ #define __put_user_error(x, ptr, err)					\
+ ({									\
+-	__put_user_err((x), (ptr), (err));				\
++	__put_user_check((x), (ptr), (err));				\
+ 	(void)0;							\
+ })
+ 
+-#define put_user(x, ptr)						\
++#define __put_user(x, ptr)						\
+ ({									\
+-	__typeof__(*(ptr)) __user *__p = (ptr);				\
+-	might_fault();							\
+-	access_ok(VERIFY_WRITE, __p, sizeof(*__p)) ?			\
+-		__p = uaccess_mask_ptr(__p), __put_user((x), __p) :	\
+-		-EFAULT;						\
++	int __pu_err = 0;						\
++	__put_user_check((x), (ptr), __pu_err);				\
++	__pu_err;							\
+ })
+ 
++#define put_user	__put_user
++
+ extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
+ #define raw_copy_from_user __arch_copy_from_user
+ extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
 -- 
 2.1.4
