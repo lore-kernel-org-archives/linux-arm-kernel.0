@@ -1,71 +1,157 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Feb 2018 00:09:10 -0600
-Subject: [PATCH v3 1/3] dt-bindings: dmaengine: Add MediaTek High-Speed
- DMA controller bindings
-In-Reply-To: <698453fba5198168829a596ec8d58d1f730aaf45.1517454174.git.sean.wang@mediatek.com>
-References: <cover.1517454174.git.sean.wang@mediatek.com>
- <698453fba5198168829a596ec8d58d1f730aaf45.1517454174.git.sean.wang@mediatek.com>
-Message-ID: <20180205035244.zrltzoxwe4owe4dw@rob-hp-laptop>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Mon, 5 Feb 2018 07:15:28 +0000
+Subject: [PATCH 01/14] dt-bindings: Document STM32MP1 Reset Clock
+ Controller (RCC) bindings
+In-Reply-To: <20180205042238.64xjrrguls2drtrg@rob-hp-laptop>
+References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
+ <1517580222-23301-2-git-send-email-gabriel.fernandez@st.com>
+ <20180205042238.64xjrrguls2drtrg@rob-hp-laptop>
+Message-ID: <1f0de7b8-6607-e0f0-0f77-59be53328f7a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 01, 2018 at 11:45:23AM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Document the devicetree bindings for MediaTek High-Speed DMA controller
-> which could be found on MT7623 SoC or other similar Mediatek SoCs.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  .../devicetree/bindings/dma/mtk-hsdma.txt          | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/mtk-hsdma.txt b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
-> new file mode 100644
-> index 0000000..c07c03e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
-> @@ -0,0 +1,33 @@
-> +MediaTek High-Speed DMA Controller
-> +==================================
-> +
-> +This driver follows the generic DMA bindings defined in dma/dma.txt.
 
-Bindings describe h/w, not drivers.
 
-> +
-> +Required properties:
-> +
-> +- compatible:	Must be one of
-> +		  "mediatek,mt7622-hsdma": for MT7622 SoC
-> +		  "mediatek,mt7623-hsdma": for MT7623 SoC
-> +- reg:		Should contain the register's base address and length.
-> +- interrupts:	Should contain a reference to the interrupt used by this
-> +		device.
-> +- clocks:	Should be the clock specifiers corresponding to the entry in
-> +		clock-names property.
-> +- clock-names:	Should contain "hsdma" entries.
-> +- power-domains: Phandle to the power domain that the device is part of
-> +- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
-> +		in dmas property of a client device represents the channel
-> +		number.
-> +Example:
-> +
-> +        hsdma: hsdma at 1b007000 {
+On 02/05/2018 07:09 AM, Rob Herring wrote:
+> On Fri, Feb 02, 2018 at 03:03:29PM +0100, gabriel.fernandez at st.com wrote:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> The RCC block is responsible of the management of the clock and reset
+>> generation for the complete circuit.
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>> ---
+>>   .../devicetree/bindings/mfd/st,stm32-rcc.txt       | 85 ++++++++++++++++++++++
+>>   1 file changed, 85 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
+>> new file mode 100644
+>> index 0000000..28017a1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
+>> @@ -0,0 +1,85 @@
+>> +STMicroelectronics STM32 Peripheral Reset Clock Controller
+>> +==========================================================
+>> +
+>> +The RCC IP is both a reset and a clock controller.
+>> +
+>> +Please also refer to reset.txt for common reset controller binding usage.
+>> +
+>> +Please also refer to clock-bindings.txt for common clock controller
+>> +binding usage.
+>> +
+>> +
+>> +Required properties:
+>> +- compatible: "simple-mfd", "syscon"
+>
+>> +- reg: should be register base and length as documented in the datasheet
+>> +
+>> +- Sub-nodes:
+>> +  - compatible: "st,stm32mp1-rcc-clk"
+>> +	- #clock-cells: 1, device nodes should specify the clock in their
+>> +	  "clocks" property, containing a phandle to the clock device node,
+>> +	  an index specifying the clock to use.
+>> +
+>> +  - compatible: "st,stm32mp1-rcc-rst"
+>> +	- #reset-cells: Shall be 1
+>> +
+>> +Example:
+>> +	rcc: rcc at 50000000 {
+>> +		compatible = "syscon", "simple-mfd";
+>> +		reg = <0x50000000 0x1000>;
+>> +
+>> +		rcc_clk: rcc-clk at 50000000 {
+>> +			#clock-cells = <1>;
+>> +			compatible = "st,stm32mp1-rcc-clk";
+>> +		};
+>> +
+>> +		rcc_rst: rcc-reset at 50000000 {
+> You should not have the same unit-address twice.
+i can change if you want into:
 
-dma-controller at ...
+ ??? ??? rcc: rcc at 50000000 {
+ ??? ??? ??? compatible = "syscon", "simple-mfd";
 
-> +		compatible = "mediatek,mt7623-hsdma";
-> +		reg = <0 0x1b007000 0 0x1000>;
-> +		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&ethsys CLK_ETHSYS_HSDMA>;
-> +		clock-names = "hsdma";
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-> +		#dma-cells = <1>;
-> +	};
-> +
-> +DMA clients must use the format described in dma/dma.txt file.
-> -- 
-> 2.7.4
-> 
+ ??? ??? ??? reg = <0x50000000 0x1000>;
+
+ ??? ??? ??? rcc_clk: rcc-clk {
+ ??? ??? ??? ??? #clock-cells = <1>;
+ ??? ??? ??? ??? compatible = "st,stm32mp1-rcc-clk";
+ ??? ??? ??? };
+
+ ??? ??? ??? rcc_rst: rcc-reset {
+ ??? ??? ??? ??? #reset-cells = <1>;
+ ??? ??? ??? ??? compatible = "st,stm32mp1-rcc-rst";
+ ??? ??? ??? };
+BR
+Gabriel
+
+> IMO, this should just be:
+>
+> 	rcc: rcc at 50000000 {
+> 		compatible = "st-stm32mp1-rcc";
+> 		reg = <0x50000000 0x1000>;
+> 		#clock-cells = <1>;
+> 		#reset-cells = <1>;
+> 	};
+>
+> There's no reason a node can't provide more than 1 function.
+>
+>
+>> +			#reset-cells = <1>;
+>> +			compatible = "st,stm32mp1-rcc-rst";
+>> +		};
+>> +	};
+>> +
+>> +Specifying clocks
+>> +=================
+>> +
+>> +All available clocks are defined as preprocessor macros in
+>> +dt-bindings/clock/stm32mp1-clks.h header and can be used in device
+>> +tree sources.
+>> +
+>> +Example:
+>> +
+>> +	/* Accessing DMA1 clock */
+>> +	... {
+>> +		clocks = <&rcc_clk DMA1>
+>> +	};
+>> +
+>> +	/* Accessing SPI6 kernel clock */
+>> +	... {
+>> +		clocks = <&rcc_clk SPI6_K>
+>> +	};
+> Other than the path to header, the clock binding explains all this. No
+> need to duplicate here.
+>
+>> +
+>> +Specifying softreset control of devices
+>> +=======================================
+>> +
+>> +Device nodes should specify the reset channel required in their "resets"
+>> +property, containing a phandle to the reset device node and an index specifying
+>> +which channel to use.
+>> +The index is the bit number within the RCC registers bank, starting from RCC
+>> +base address.
+>> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
+>> +Where bit_offset is the bit offset within the register.
+>> +
+>> +For example on STM32MP1, for LTDC reset:
+>> + ltdc = APB4_RSTSETR_offset / 4 * 32 + LTDC_bit_offset
+>> +      = 0x180 / 4 * 32 + 0 = 3072
+>> +
+>> +The list of valid indices for STM32MP1 is available in:
+>> +include/dt-bindings/reset-controller/stm32mp1-resets.h
+>> +
+>> +This file implements defines like:
+>> +#define LTDC_R	3072
+>> +
+>> +example:
+>> +
+>> +	ltdc {
+>> +		resets = <&rcc_rst LTDC_R>;
+>> +	};
+>> -- 
+>> 1.9.1
+>>
