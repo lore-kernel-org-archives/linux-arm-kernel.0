@@ -1,56 +1,56 @@
-From: martin@c-home.cz (Martin Cerveny)
-Date: Mon, 5 Feb 2018 22:32:08 +0100 (CET)
-Subject: [2/9] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <20180205143435.4723-3-heiko@sntech.de>
-References: <20180205143435.4723-3-heiko@sntech.de>
-Message-ID: <alpine.GSO.2.00.1802052159530.23549@dmz.c-home.cz>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 06 Feb 2018 08:36:24 +1100
+Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
+ device tree parsing
+In-Reply-To: <1517563970.24622.9.camel@mtkswgap22>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+ <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
+ <1517563970.24622.9.camel@mtkswgap22>
+Message-ID: <1517866584.2312.140.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, 2018-02-02 at 17:32 +0800, Ryder Lee wrote:
+> On Wed, 2018-01-31 at 10:02 -0600, Rob Herring wrote:
+> > On Wed, Jan 31, 2018 at 1:41 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> > > A root complex usually consist of a host bridge and multiple P2P bridges,
+> > > and someone may express that in the form of a root node with many subnodes
+> > > and list all four interrupts for each slot (child node) in the root node
+> > > like this:
+> > > 
+> > >          pcie-controller {
+> > >                  ...
+> > >                  interrupt-map-mask = <0xf800 0 0 7>;
+> > >                  interrupt-map = <0x0000 0 0 {INTx} &{interrupt parent} ...>
+> > >                                   0x0800 0 0 {INTx} &{interrupt parent} ...>;
+> > > 
+> > >                  pcie at 0,0 {
+> > >                          reg = <0x0000 0 0 0 0>;
+> > >                          ...
+> > >                  };
+> > > 
+> > >                  pcie at 1,0 {
+> > >                          reg = <0x0800 0 0 0 0>;
+> > >                          ...
+> > >                  };
+> > >          };
+> > > 
+> > > As shown above, we'd like to propagate IRQs from a root port to the devices
+> > > in the hierarchy below it in this way.  However, it seems that the current
+> > > parser couldn't handle such cases and will get something unexpected below:
+> > > 
+> > >          pcieport 0000:00:01.0: assign IRQ: got 213
+> > >          igb 0000:01:00.0: assign IRQ: got 212
+> > > 
+> > > There is a device which is connected to 2nd slot, but the port doesn't share
+> > > the same IRQ with its downstream devices.  The problem here is that, if the
+> > > loop found a P2P bridge, it wouldn't check whether the reg property exists
+> > > in ppnode or not but just pass the subordinate devfn to of_irq_parse_raw(),
+> > > thus the subsequent flow couldn't correctly resolve them.
 
-On Mon, 5 Feb 2018, Heiko Stuebner wrote:
-> From: Zheng Yang <zhengyang@rock-chips.com>
->
-> Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
-> and rk3328 socs from Rockchip.
->
-> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> +++ b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
-> +static u32 inno_hdmi_phy_get_tmdsclk(struct inno_hdmi_phy *inno, int rate)
-> +{
-> +	int bus_width = phy_get_bus_width(inno->phy);
-> +	u32 tmdsclk;
-> +
-> +	switch (bus_width) {
-> +	case 4:
-> +		tmdsclk = rate / 2;
-> +		break;
-> +	case 5:
-> +		tmdsclk = rate * 5 / 8;
-> +		break;
-> +	case 6:
-> +		tmdsclk = rate * 3 / 4;
-> +		break;
-> +	case 10:
-> +		tmdsclk = rate * 5 / 4;
-> +		break;
-> +	case 12:
-> +		tmdsclk = rate * 3 / 2;
-> +		break;
-> +	case 16:
-> +		tmdsclk = rate * 2;
-> +		break;
-> +	default:
-> +		tmdsclk = rate;
-> +	}
-> +
-> +	return tmdsclk;
-> +}
+I don't really understand the problem explanation here. Something
+doesn't look right as you shouldn't have to change that function, but I
+just don't get what you a
 
-Please corrects integer overflow 
-like https://github.com/mcerveny/rockchip-linux/commit/b4bc703f2dca4e5115b22155920d2277671a9f00
-
-M.C>
+Cheers,
+Ben.
