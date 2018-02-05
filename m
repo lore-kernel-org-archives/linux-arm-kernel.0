@@ -1,84 +1,124 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 05 Feb 2018 15:22:29 +0100
-Subject: [PATCH 2/3] clk: exynos5433: Allow audio subsystem clock rate
- propagation
-In-Reply-To: <20180205142230.9755-1-s.nawrocki@samsung.com>
-References: <20180205142230.9755-1-s.nawrocki@samsung.com>
- <CGME20180205142308epcas2p376f8656f7e421f8474938de788cea8db@epcas2p3.samsung.com>
-Message-ID: <20180205142230.9755-2-s.nawrocki@samsung.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon, 5 Feb 2018 14:34:19 +0000
+Subject: [PATCH v3 02/41] KVM: arm/arm64: Move vcpu_load call after
+ kvm_vcpu_first_run_init
+In-Reply-To: <20180112120747.27999-3-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-3-christoffer.dall@linaro.org>
+Message-ID: <0801d21f-a115-6ae5-13d3-f154cb070a50@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_SET_RATE_PARENT flag is added to definitions of clocks on a path
-starting from CLK_SCLK_I2S1 up to AUD_PLL in order to allow setting
-required audio root clock frequency for the I2S1 block. This is now
-only done for the I2S1 block, related CMU_TOP, CMU_PERIC clock
-definitions are changed.
+Hi Christoffer,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/clk/samsung/clk-exynos5433.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+On 12/01/18 12:07, Christoffer Dall wrote:
+> Moving the call to vcpu_load() in kvm_arch_vcpu_ioctl_run() to after
+> we've called kvm_vcpu_first_run_init() simplifies some of the vgic and
+> there is also no need to do vcpu_load() for things such as handling the
+> immediate_exit flag.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index 74b70ddab4d6..d74361736e64 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -246,14 +246,14 @@ static const struct samsung_fixed_rate_clock top_fixed_clks[] __initconst = {
- 
- static const struct samsung_mux_clock top_mux_clks[] __initconst = {
- 	/* MUX_SEL_TOP0 */
--	MUX(CLK_MOUT_AUD_PLL, "mout_aud_pll", mout_aud_pll_p, MUX_SEL_TOP0,
--			4, 1),
-+	MUX_F(CLK_MOUT_AUD_PLL, "mout_aud_pll", mout_aud_pll_p, MUX_SEL_TOP0,
-+	      4, 1, CLK_SET_RATE_PARENT, 0),
- 	MUX(CLK_MOUT_ISP_PLL, "mout_isp_pll", mout_isp_pll_p, MUX_SEL_TOP0,
- 			0, 1),
- 
- 	/* MUX_SEL_TOP1 */
--	MUX(CLK_MOUT_AUD_PLL_USER_T, "mout_aud_pll_user_t",
--			mout_aud_pll_user_p, MUX_SEL_TOP1, 12, 1),
-+	MUX_F(CLK_MOUT_AUD_PLL_USER_T, "mout_aud_pll_user_t",
-+	      mout_aud_pll_user_p, MUX_SEL_TOP1, 12, 1, CLK_SET_RATE_PARENT, 0),
- 	MUX(CLK_MOUT_MPHY_PLL_USER, "mout_mphy_pll_user", mout_mphy_pll_user_p,
- 			MUX_SEL_TOP1, 8, 1),
- 	MUX(CLK_MOUT_MFC_PLL_USER, "mout_mfc_pll_user", mout_mfc_pll_user_p,
-@@ -370,8 +370,8 @@ static const struct samsung_mux_clock top_mux_clks[] __initconst = {
- 			MUX_SEL_TOP_PERIC1, 16, 1),
- 	MUX(CLK_MOUT_SCLK_SPDIF, "mout_sclk_spdif", mout_sclk_spdif_p,
- 			MUX_SEL_TOP_PERIC1, 12, 2),
--	MUX(CLK_MOUT_SCLK_AUDIO1, "mout_sclk_audio1", mout_sclk_audio1_p,
--			MUX_SEL_TOP_PERIC1, 4, 2),
-+	MUX_F(CLK_MOUT_SCLK_AUDIO1, "mout_sclk_audio1", mout_sclk_audio1_p,
-+			MUX_SEL_TOP_PERIC1, 4, 2, CLK_SET_RATE_PARENT, 0),
- 	MUX(CLK_MOUT_SCLK_AUDIO0, "mout_sclk_audio0", mout_sclk_audio0_p,
- 			MUX_SEL_TOP_PERIC1, 0, 2),
- 
-@@ -524,12 +524,12 @@ static const struct samsung_div_clock top_div_clks[] __initconst = {
- 			DIV_TOP_PERIC2, 0, 4),
- 
- 	/* DIV_TOP_PERIC3 */
--	DIV(CLK_DIV_SCLK_I2S1, "div_sclk_i2s1", "sclk_audio1",
--			DIV_TOP_PERIC3, 16, 6),
-+	DIV_F(CLK_DIV_SCLK_I2S1, "div_sclk_i2s1", "sclk_audio1",
-+			DIV_TOP_PERIC3, 16, 6, CLK_SET_RATE_PARENT, 0),
- 	DIV(CLK_DIV_SCLK_PCM1, "div_sclk_pcm1", "sclk_audio1",
- 			DIV_TOP_PERIC3, 8, 8),
--	DIV(CLK_DIV_SCLK_AUDIO1, "div_sclk_audio1", "mout_sclk_audio1",
--			DIV_TOP_PERIC3, 4, 4),
-+	DIV_F(CLK_DIV_SCLK_AUDIO1, "div_sclk_audio1", "mout_sclk_audio1",
-+			DIV_TOP_PERIC3, 4, 4, CLK_SET_RATE_PARENT, 0),
- 	DIV(CLK_DIV_SCLK_AUDIO0, "div_sclk_audio0", "mout_sclk_audio0",
- 			DIV_TOP_PERIC3, 0, 4),
- 
-@@ -693,7 +693,7 @@ static const struct samsung_gate_clock top_gate_clks[] __initconst = {
- 	GATE(CLK_SCLK_SLIMBUS, "sclk_slimbus", "mout_sclk_slimbus",
- 			MUX_ENABLE_TOP_PERIC1, 16, 0, 0),
- 	GATE(CLK_SCLK_AUDIO1, "sclk_audio1", "div_sclk_audio1",
--			MUX_ENABLE_TOP_PERIC1, 4, 0, 0),
-+			MUX_ENABLE_TOP_PERIC1, 4, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_AUDIO0, "sclk_audio0", "div_sclk_audio0",
- 			MUX_ENABLE_TOP_PERIC1, 0, 0, 0),
- };
+Reviewed-by: Julien Grall <julien.grall@arm.com>
+
+Cheers,
+
+> ---
+>   virt/kvm/arm/arch_timer.c     |  7 -------
+>   virt/kvm/arm/arm.c            | 22 ++++++++--------------
+>   virt/kvm/arm/vgic/vgic-init.c | 11 -----------
+>   3 files changed, 8 insertions(+), 32 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index cfcd0323deab..c09c701fd68e 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -834,14 +834,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>   		return ret;
+>   
+>   no_vgic:
+> -	preempt_disable();
+>   	timer->enabled = 1;
+> -	if (!irqchip_in_kernel(vcpu->kvm))
+> -		kvm_timer_vcpu_load_user(vcpu);
+> -	else
+> -		kvm_timer_vcpu_load_vgic(vcpu);
+> -	preempt_enable();
+> -
+>   	return 0;
+>   }
+>   
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 5e3c149a6e28..360df72692ee 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -631,27 +631,22 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>   	if (unlikely(!kvm_vcpu_initialized(vcpu)))
+>   		return -ENOEXEC;
+>   
+> -	vcpu_load(vcpu);
+> -
+>   	ret = kvm_vcpu_first_run_init(vcpu);
+>   	if (ret)
+> -		goto out;
+> +		return ret;
+>   
+>   	if (run->exit_reason == KVM_EXIT_MMIO) {
+>   		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
+>   		if (ret)
+> -			goto out;
+> -		if (kvm_arm_handle_step_debug(vcpu, vcpu->run)) {
+> -			ret = 0;
+> -			goto out;
+> -		}
+> -
+> +			return ret;
+> +		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
+> +			return 0;
+>   	}
+>   
+> -	if (run->immediate_exit) {
+> -		ret = -EINTR;
+> -		goto out;
+> -	}
+> +	if (run->immediate_exit)
+> +		return -EINTR;
+> +
+> +	vcpu_load(vcpu);
+>   
+>   	kvm_sigset_activate(vcpu);
+>   
+> @@ -803,7 +798,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>   
+>   	kvm_sigset_deactivate(vcpu);
+>   
+> -out:
+>   	vcpu_put(vcpu);
+>   	return ret;
+>   }
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 62310122ee78..a0688ef52ad7 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -300,17 +300,6 @@ int vgic_init(struct kvm *kvm)
+>   
+>   	dist->initialized = true;
+>   
+> -	/*
+> -	 * If we're initializing GICv2 on-demand when first running the VCPU
+> -	 * then we need to load the VGIC state onto the CPU.  We can detect
+> -	 * this easily by checking if we are in between vcpu_load and vcpu_put
+> -	 * when we just initialized the VGIC.
+> -	 */
+> -	preempt_disable();
+> -	vcpu = kvm_arm_get_running_vcpu();
+> -	if (vcpu)
+> -		kvm_vgic_load(vcpu);
+> -	preempt_enable();
+>   out:
+>   	return ret;
+>   }
+> 
+
 -- 
-2.14.2
+Julien Grall
