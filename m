@@ -1,75 +1,127 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 5 Feb 2018 18:20:22 +0530
-Subject: [PATCH v2 09/16] mmc: sdhci: Add quirk to disable HW timeout
+Date: Mon, 5 Feb 2018 18:20:21 +0530
+Subject: [PATCH v2 08/16] mmc: sdhci-omap: Add support to override f_max and
+ iodelay from pdata
 In-Reply-To: <20180205125029.21570-1-kishon@ti.com>
 References: <20180205125029.21570-1-kishon@ti.com>
-Message-ID: <20180205125029.21570-10-kishon@ti.com>
+Message-ID: <20180205125029.21570-9-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add quirk to disable HW timeout if the requested timeout is more than
-the maximum obtainable timeout.
+DRA74x EVM Rev H EVM comes with revision 2.0 silicon. However, earlier
+versions of EVM can come with either revision 1.1 or revision 1.0 of
+silicon.
+
+The device-tree file is written to support rev 2.0 of silicon.
+pdata-quirks are used to then override the settings needed for
+PG 1.1 silicon.
+
+PG 1.1 silicon has limitations w.r.t frequencies at which MMC1/2/3
+can operate as well as different IOdelay numbers.
+
+Add support in sdhci-omap driver to get platform data if available
+(added using pdata quirks) and override the data (max-frequency and
+iodelay data) obtained from device tree.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/sdhci.c | 12 ++++++++++++
- drivers/mmc/host/sdhci.h |  7 +++++++
- 2 files changed, 19 insertions(+)
+ drivers/mmc/host/sdhci-omap.c            | 21 ++++++++++++++++++++-
+ include/linux/platform_data/sdhci-omap.h | 22 ++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/platform_data/sdhci-omap.h
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 070aff9c108f..1aa74b4682f3 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -735,6 +735,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- 		DBG("Too large timeout 0x%x requested for CMD%d!\n",
- 		    count, cmd->opcode);
- 		count = 0xE;
-+		if (host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
-+			host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
-+			sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-+			sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
-+			host->hw_timeout_disabled = true;
-+		}
- 	}
+diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+index d5a9e688dc1b..c2570db3f7a2 100644
+--- a/drivers/mmc/host/sdhci-omap.c
++++ b/drivers/mmc/host/sdhci-omap.c
+@@ -22,6 +22,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/platform_data/sdhci-omap.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regulator/consumer.h>
+@@ -99,6 +100,7 @@ struct sdhci_omap_data {
+ };
  
- 	return count;
-@@ -2349,6 +2355,12 @@ static bool sdhci_request_done(struct sdhci_host *host)
- 	}
+ struct sdhci_omap_host {
++	char			*version;
+ 	void __iomem		*base;
+ 	struct device		*dev;
+ 	struct	regulator	*pbias;
+@@ -732,12 +734,21 @@ static struct pinctrl_state
+ 				  u32 *caps, u32 capmask)
+ {
+ 	struct device *dev = omap_host->dev;
++	char *version = omap_host->version;
+ 	struct pinctrl_state *pinctrl_state = ERR_PTR(-ENODEV);
++	char str[20];
  
- 	sdhci_del_timer(host, mrq);
-+	if (sdhci_data_line_cmd(mrq->cmd) && host->hw_timeout_disabled) {
-+		host->ier |= SDHCI_INT_DATA_TIMEOUT;
-+		sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-+		sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
-+		host->hw_timeout_disabled = false;
+ 	if (!(*caps & capmask))
+ 		goto ret;
+ 
+-	pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
++	if (version) {
++		snprintf(str, 20, "%s-%s", mode, version);
++		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, str);
 +	}
- 
- 	/*
- 	 * Always unmap the data buffers if they were mapped by
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index afab26fd70e6..3a967a56fcc3 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -437,6 +437,11 @@ struct sdhci_host {
- #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
- /* Controller has CRC in 136 bit Command Response */
- #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
-+/*
-+ * Disable HW timeout if the requested timeout is more than the maximum
-+ * obtainable timeout
-+ */
-+#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
- 
- 	int irq;		/* Device IRQ */
- 	void __iomem *ioaddr;	/* Mapped address */
-@@ -522,6 +527,8 @@ struct sdhci_host {
- 	unsigned int            ocr_avail_mmc;
- 	u32 ocr_mask;		/* available voltages */
- 
-+	bool			hw_timeout_disabled;
 +
- 	unsigned		timing;		/* Current timing */
++	if (IS_ERR(pinctrl_state))
++		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
++
+ 	if (IS_ERR(pinctrl_state)) {
+ 		dev_err(dev, "no pinctrl state for %s mode", mode);
+ 		*caps &= ~capmask;
+@@ -840,6 +851,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+ 	struct mmc_host *mmc;
+ 	const struct of_device_id *match;
+ 	struct sdhci_omap_data *data;
++	struct sdhci_omap_platform_data *platform_data;
  
- 	u32			thread_isr;
+ 	match = of_match_device(omap_sdhci_match, dev);
+ 	if (!match)
+@@ -874,6 +886,13 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_pltfm_free;
+ 
++	platform_data = dev_get_platdata(dev);
++	if (platform_data) {
++		omap_host->version = platform_data->version;
++		if (platform_data->max_freq)
++			mmc->f_max = platform_data->max_freq;
++	}
++
+ 	pltfm_host->clk = devm_clk_get(dev, "fck");
+ 	if (IS_ERR(pltfm_host->clk)) {
+ 		ret = PTR_ERR(pltfm_host->clk);
+diff --git a/include/linux/platform_data/sdhci-omap.h b/include/linux/platform_data/sdhci-omap.h
+new file mode 100644
+index 000000000000..92abd53dcd00
+--- /dev/null
++++ b/include/linux/platform_data/sdhci-omap.h
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018 Texas Instruments
++// SDHCI Controller Platform Data for TI's OMAP SoCs
++// Author: Kishon Vijay Abraham I <kishon@ti.com>
++
++#ifndef __SDHCI_OMAP_PDATA_H__
++#define __SDHCI_OMAP_PDATA_H__
++
++struct sdhci_omap_platform_data {
++	const char *name;
++
++	/*
++	 * set if your board has components or wiring that limits the
++	 * maximum frequency on the MMC bus
++	 */
++	unsigned int max_freq;
++
++	/* string specifying a particular variant of hardware */
++	char *version;
++};
++
++#endif
 -- 
 2.11.0
