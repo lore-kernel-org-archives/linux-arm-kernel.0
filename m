@@ -1,7 +1,9 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  5 Feb 2018 16:45:32 -0200
-Subject: [PATCH 1/7] arm64: dts: ls1012a: Move cpu_thermal out of bus node
-Message-ID: <1517856338-28289-1-git-send-email-festevam@gmail.com>
+Date: Mon,  5 Feb 2018 16:45:33 -0200
+Subject: [PATCH 2/7] arm64: dts: ls1043a: Move cpu_thermal out of bus node
+In-Reply-To: <1517856338-28289-1-git-send-email-festevam@gmail.com>
+References: <1517856338-28289-1-git-send-email-festevam@gmail.com>
+Message-ID: <1517856338-28289-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,18 +16,18 @@ shouldn't be placed on the bus.
 
 This fixes the following build warnings with W=1:
 
-arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 62 +++++++++++++-------------
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 62 +++++++++++++-------------
  1 file changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index 82b272f..4e98d05 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -118,6 +118,37 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 380e7c7..4d15e11 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -159,6 +159,37 @@
  		mask = <0x02>;
  	};
  
@@ -33,7 +35,8 @@ index 82b272f..4e98d05 100644
 +		cpu_thermal: cpu-thermal {
 +			polling-delay-passive = <1000>;
 +			polling-delay = <5000>;
-+			thermal-sensors = <&tmu 0>;
++
++			thermal-sensors = <&tmu 3>;
 +
 +			trips {
 +				cpu_alert: cpu-alert {
@@ -41,7 +44,6 @@ index 82b272f..4e98d05 100644
 +					hysteresis = <2000>;
 +					type = "passive";
 +				};
-+
 +				cpu_crit: cpu-crit {
 +					temperature = <95000>;
 +					hysteresis = <2000>;
@@ -60,10 +62,10 @@ index 82b272f..4e98d05 100644
 +		};
 +	};
 +
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
-@@ -304,37 +335,6 @@
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <1 13 0xf08>, /* Physical Secure PPI */
+@@ -342,37 +373,6 @@
  			#thermal-sensor-cells = <1>;
  		};
  
@@ -71,7 +73,8 @@ index 82b272f..4e98d05 100644
 -			cpu_thermal: cpu-thermal {
 -				polling-delay-passive = <1000>;
 -				polling-delay = <5000>;
--				thermal-sensors = <&tmu 0>;
+-
+-				thermal-sensors = <&tmu 3>;
 -
 -				trips {
 -					cpu_alert: cpu-alert {
@@ -79,7 +82,6 @@ index 82b272f..4e98d05 100644
 -						hysteresis = <2000>;
 -						type = "passive";
 -					};
--
 -					cpu_crit: cpu-crit {
 -						temperature = <95000>;
 -						hysteresis = <2000>;
@@ -98,8 +100,8 @@ index 82b272f..4e98d05 100644
 -			};
 -		};
 -
- 		i2c0: i2c at 2180000 {
- 			compatible = "fsl,vf610-i2c";
- 			#address-cells = <1>;
+ 		qman: qman at 1880000 {
+ 			compatible = "fsl,qman";
+ 			reg = <0x0 0x1880000 0x0 0x10000>;
 -- 
 2.7.4
