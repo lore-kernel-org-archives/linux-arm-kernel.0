@@ -1,164 +1,173 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 5 Feb 2018 17:13:08 +0100
-Subject: [RFC v2 REPOST] arm64: KVM: KVM API extensions for SVE
-In-Reply-To: <20180126172849.GX5862@e103592.cambridge.arm.com>
-References: <20180126172849.GX5862@e103592.cambridge.arm.com>
-Message-ID: <20180205161308.GW21802@cbox>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon,  5 Feb 2018 10:22:45 -0600
+Subject: [PATCHv3 1/3] dt-bindings: documentation: add clock bindings
+ information for Stratix10
+Message-ID: <1517847767-16053-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Document that Stratix10 clock bindings, and add the clock header file. The
+clock header is an enumeration of all the different clocks on the Stratix10
+platform.
 
-On Fri, Jan 26, 2018 at 05:28:49PM +0000, Dave Martin wrote:
-> New feature KVM_ARM_VCPU_SVE:
-> 
->  * enables exposure of SVE to the guest
-> 
->  * enables visibility of / access to KVM_REG_ARM_SVE_*() via KVM reg
->    ioctls.  The main purposes of this are a) is to allow userspace to hide
->    weird-sized registers that it doesn't understand how to deal with,
->    and b) allow SVE to be hidden from the VM so that it can migrate to
->    nodes that don't support SVE.
-> 
->    ZCR_EL1 is not specifically hidden, since it is "just a system register"
->    and does not have a weird size or semantics etc.
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+v3:
+- s/intc/intel for correct vendor prefix
+- fixup node name to "intel,stratix10-clkmgr"
+- document the required fixed-clock for oscillators
+v2:
+- use a single binding for the clock controller
+---
+ .../devicetree/bindings/clock/intc_stratix10.txt   | 47 ++++++++++++
+ include/dt-bindings/clock/stratix10-clock.h        | 85 ++++++++++++++++++++++
+ 2 files changed, 132 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/intc_stratix10.txt
+ create mode 100644 include/dt-bindings/clock/stratix10-clock.h
 
-I think you want to hide ZCR_EL1 if SVE is not enabled, since presenting
-it to a legacy userspace will prevent migration onto a non-SVE enabled
-kernel/machine.
-
-> 
-> 
-> Registers:
-> 
->  * A new register size is defined KVM_REG_SIZE_U2048 (which can be
->    encoded sensibly using the next unused value for the reg size field
->    in the reg ID) (grep KVM_REG_SIZE_).
-> 
->  * Reg IDs for the SVE regs will be defined as "coproc" 0x14
->    (i.e., 0x14 << KVM_REG_ARM_COPROC_SHIFT)
-> 
->    KVM_REG_ARM_SVE_Z(n, i) is slice i of Zn (each slice is 2048 bits)
->    KVM_REG_ARM_SVE_P(n, i) is slice i of Pn (each slice is 256 bits)
->    KVM_REG_ARM_FFR(i) is slice i of FFR (each slice is 256 bits)
-> 
-
-Just so I understand; slice 0 covers all the SVE state as the SVE spec
-is today.  Additional slices is something we can use in the future in
-case the SVE spec is expanded to allow even larger vector lengths?  In
-which case, for a hypothetical 4096 bits register, slice 0 of Zn will be
-the lower 2048 bits and slice 1 will be the upper 2048 bits?
-
->    The slice sizes allow each register to be read/written in exactly
->    one slice for SVE.
-> 
->    Surplus bits (beyond the maximum VL supported by the vcpu) will
->    be read-as-zero write-ignore.
-
-This implies that there are some ordering fun to be had between
-accessing SVE registers and changing the maximum vector length for the
-vcpu.  Why not loosen the API slightly and say that anything written to
-the surplus bits is not guaranteed to be preserved when read back?  (In
-other words, we make no guarantees).
-
-> 
->    Reading/writing surplus slices will probably be forbidden, and the
->    surplus slices would not be reported via KVM_GET_REG_LIST.
->    (We could make these RAZ/WI too, but I'm not sure if it's worth it,
->    or why it would be useful.)
-> 
->    Future extensions to the architecture might grow the registers up
->    to 32 slices: this may or may not actually happen, but SVE keeps the
->    possibilty open.  I've tried to design for it.
-> 
->  * KVM_REG_ARM_SVE_Z(n, 0) bits [127:0] alias Vn in
->    KVM_REG_ARM_CORE(fp_regs.v[n]) .. KVM_REG_ARM_CORE(fp_regs.v[n])+3.
-
-nit: KVM_REG_ARM_CORE_REG doesn't specify the size, so I think this
-would be more clearly stated as
-"aliases KVM_REG_SIZE_U128 | KVM_REG_ARM_CORE(fp_regs.vregs[n])" or as
-"aliases kvm_regs.regs.fp_regs.vregs[n]".
-
-> 
->    It's simplest for userspace if the two views always appear to be
->    in sync, but it's unclear whether this is really useful.  Perhaps
->    this can be relaxed if it's a big deal for the KVM implementation;
->    I don't know yet.
-
-It's not going to be a big deal, and it's the only sensible thing to do;
-otherwise we'll have no clear semantics of where the values are.  If KVM
-chooses to duplicate the 128 bits of state in memory, then it must also
-know how to syncrhonize that duplicated state when running the guest,
-and therefore can also do this in software on SET/GET.
-
-> 
-> 
-> Vector length control:
-> 
-> Some means is needed to determine the set of vector lengths visible
-> to guest software running on a vcpu.
-> 
-> When a vcpu is created, the set would be defaulted to the maximal set
-> that can be supported while permitting each vcpu to run on any host
-> CPU.  SVE has some virtualisation quirks which mean that this set may
-> exclude some vector lengths that are available for host userspace
-> applications.  The common case should be that the sets are the same
-> however.
-> 
->  * New ioctl KVM_ARM_VCPU_{SET,GET}_SVE_VLS to set or retrieve the set of
->    vector lengths available to the guest.
-> 
->    Adding random vcpu ioctls
-> 
->    To configure a non-default set of vector lengths,
->    KVM_ARM_VCPU_SET_SVE_VLS can be called: this would only be permitted
->    before the vcpu is first run.
-> 
->    This is primarily intended for supporting migration, by providing a
->    robust check that the destination node will run the vcpu correctly.
->    In a cluster with non-uniform SVE implementation across nodes, this
->    also allows a specific set of VLs to be requested that the caller
->    knows is usable across the whole cluster.
-> 
->    For migration purposes, userspace would need to do
->    KVM_ARM_VCPU_GET_SVE_VLS at the origin node and store the returned
->    set as VM metadata: on the destination node,
->    KVM_ARM_VCPU_SET_SVE_VLS should be used to request that exact set of
->    VLs: if the destination node can't support that set of VLs, the call
->    will fail.
-> 
->    The interface would look something like:
-> 
->    ioctl(vcpu_fd, KVM_ARM_SVE_SET_VLS, __u64 vqs[SVE_VQ_MAX / 64]);
-
-I don't understand the proposed semantics here.  What is the vqs array
-and how should the values be set?
-
-> 
->    How to expose this to the user in an intelligible way would be a
->    problem for userspace to solve.
-> 
-
-That's fine.
-
-> 
->    At present, other than initialising each vcpu to the maximum
->    supportable set of VLs, I don't propose having a way to probe for
->    what sets of VLs are supportable: the above call either succeeds or
->    fails.
-> 
-
-I think we should have such a way.  Libvirt can do things like figure
-out compatible features across nodes, and trying to set all possible
-vector lengths doesn't seem like a great approach.
-
-How about creating the interface based on a bitmap of all the possible
-lengths, and setting the bits for all lengths, and reading back the
-value returns the actual supported lengths?
-
-My comments above are really in the details so I think you can safely
-start putting together a full implementation, assuming this is still
-your plan.
-
-Thanks,
--Christoffer
+diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+new file mode 100644
+index 0000000..8d218f4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+@@ -0,0 +1,47 @@
++Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be
++	"intel,stratix10-clkmgr"
++
++- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
++
++- #clock-cells : from common clock binding, shall be set to 1.
++
++- clocks : Should contain fixed-clock sources, such as oscillators.
++
++Example:
++	clkmgr: clock-controller at ffd10000 {
++		compatible = "intel,stratix10-clkmgr";
++		reg = <0xffd10000 0x1000>;
++		#clock-cells = <1>;
++
++		clocks {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			cb_intosc_hs_div2_clk: cb_intosc_hs_div2_clk {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
++
++			cb_intosc_ls_clk: cb_intosc_ls_clk {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
++
++			f2s_free_clk: f2s_free_clk {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
++
++			osc1: osc1 {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
++		};
++	};
+diff --git a/include/dt-bindings/clock/stratix10-clock.h b/include/dt-bindings/clock/stratix10-clock.h
+new file mode 100644
+index 0000000..bbbd9fd
+--- /dev/null
++++ b/include/dt-bindings/clock/stratix10-clock.h
+@@ -0,0 +1,85 @@
++/*
++ * SPDX-License-Identifier:	GPL-2.0
++ *
++ * Copyright (C) 2017, Intel Corporation
++ */
++
++#ifndef __STRATIX10_CLOCK_H
++#define __STRATIX10_CLOCK_H
++
++/* fixed rate clocks */
++#define STRATIX10_OSC1			0
++#define STRATIX10_CB_INTOSC_HS_DIV2_CLK	1
++#define STRATIX10_CB_INTOSC_LS_CLK	2
++#define STRATIX10_F2S_FREE_CLK		3
++
++/* fixed factor clocks */
++#define STRATIX10_L4_SYS_FREE_CLK	4
++#define STRATIX10_MPU_PERIPH_CLK	5
++#define STRATIX10_MPU_L2RAM_CLK		6
++#define STRATIX10_SDMMC_CIU_CLK		7
++
++/* PLL clocks */
++#define STRATIX10_MAIN_PLL_CLK		8
++#define STRATIX10_PERIPH_PLL_CLK	9
++#define STRATIX10_BOOT_CLK		10
++
++/* Periph clocks */
++#define STRATIX10_MAIN_MPU_BASE_CLK	11
++#define STRATIX10_MAIN_NOC_BASE_CLK	12
++#define STRATIX10_MAIN_EMACA_CLK	13
++#define STRATIX10_MAIN_EMACB_CLK	14
++#define STRATIX10_MAIN_EMAC_PTP_CLK	15
++#define STRATIX10_MAIN_GPIO_DB_CLK	16
++#define STRATIX10_MAIN_SDMMC_CLK	17
++#define STRATIX10_MAIN_S2F_USR0_CLK	18
++#define STRATIX10_MAIN_S2F_USR1_CLK	19
++#define STRATIX10_MAIN_PSI_REF_CLK	20
++
++#define STRATIX10_PERI_MPU_BASE_CLK	21
++#define STRATIX10_PERI_NOC_BASE_CLK	22
++#define STRATIX10_PERI_EMACA_CLK	23
++#define STRATIX10_PERI_EMACB_CLK	24
++#define STRATIX10_PERI_EMAC_PTP_CLK	25
++#define STRATIX10_PERI_GPIO_DB_CLK	26
++#define STRATIX10_PERI_SDMMC_CLK	27
++#define STRATIX10_PERI_S2F_USR0_CLK	28
++#define STRATIX10_PERI_S2F_USR1_CLK	29
++#define STRATIX10_PERI_PSI_REF_CLK	30
++
++#define STRATIX10_MPU_FREE_CLK		31
++#define STRATIX10_NOC_FREE_CLK		32
++#define STRATIX10_S2F_USR0_CLK		33
++#define STRATIX10_NOC_CLK		34
++#define STRATIX10_EMAC_A_FREE_CLK	35
++#define STRATIX10_EMAC_B_FREE_CLK	36
++#define STRATIX10_EMAC_PTP_FREE_CLK	37
++#define STRATIX10_GPIO_DB_FREE_CLK	38
++#define STRATIX10_SDMMC_FREE_CLK	39
++#define STRATIX10_S2F_USER1_FREE_CLK	40
++#define STRATIX10_PSI_REF_FREE_CLK	41
++
++/* Gate clocks */
++#define STRATIX10_MPU_CLK		42
++#define STRATIX10_L4_MAIN_CLK		43
++#define	STRATIX10_L4_MP_CLK		44
++#define STRATIX10_L4_SP_CLK		45
++#define STRATIX10_CS_AT_CLK		46
++#define STRATIX10_CS_TRACE_CLK		47
++#define STRATIX10_CS_PDBG_CLK		48
++#define STRATIX10_CS_TIMER_CLK		49
++#define STRATIX10_S2F_USER0_CLK		50
++#define STRATIX10_S2F_USER1_CLK		51
++#define STRATIX10_EMAC0_CLK		52
++#define STRATIX10_EMAC1_CLK		53
++#define STRATIX10_EMAC2_CLK		54
++#define STRATIX10_EMAC_PTP_CLK		55
++#define STRATIX10_GPIO_DB_CLK		56
++#define STRATIX10_SDMMC_CLK		57
++#define STRATIX10_PSI_REF_CLK		58
++#define STRATIX10_USB_CLK		59
++#define STRATIX10_SPI_M_CLK		60
++#define STRATIX10_NAND_CLK		61
++#define STRATIX10_NUM_CLKS		62
++
++#endif	/* __STRATIX10_CLOCK_H */
+-- 
+2.7.4
