@@ -1,162 +1,77 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 05 Feb 2018 14:03:34 +0100
-Subject: [PATCH] drm/bridge/synopsys: dsi: Add 1.31 version support
-In-Reply-To: <20180122150819.22066-1-philippe.cornu@st.com>
-References: <CGME20180122150916epcas5p14fc276bc3320d82685b3c19dd62f5273@epcas5p1.samsung.com>
- <20180122150819.22066-1-philippe.cornu@st.com>
-Message-ID: <61f522e7-bdb7-7eba-ffb2-7dbb77ffa09e@samsung.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 5 Feb 2018 15:06:33 +0200
+Subject: [RESEND][PATCH] video: fbdev: atmel_lcdfb: convert to use GPIO
+ descriptors
+In-Reply-To: <20180205084755.6011-1-ludovic.desroches@microchip.com>
+References: <20180205084755.6011-1-ludovic.desroches@microchip.com>
+Message-ID: <CAHp75Vc1npdmhrs80Cdj0t6RWpTtuXFkpXUQwxKDe=6vrZxkFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.01.2018 16:08, Philippe Cornu wrote:
-> From: Philippe CORNU <philippe.cornu@st.com>
->
-> Add support for the Synopsys DesignWare MIPI DSI version 1.31
-> Two registers need to be updated/added for supporting 1.31:
-> * PHY_TMR_CFG 0x9c (updated)
->   1.30 [31:24] phy_hs2lp_time
->        [23:16] phy_lp2hs_time
->        [14: 0] max_rd_time
->
->   1.31 [25:16] phy_hs2lp_time
->        [ 9: 0] phy_lp2hs_time
->
-> * PHY_TMR_RD_CFG 0xf4 (new)
->   1.31 [14: 0] max_rd_time
->
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 52 +++++++++++++++++++++++----
->  1 file changed, 46 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index 735f38429c06..20a2ca14a7ad 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -25,7 +25,13 @@
->  #include <drm/bridge/dw_mipi_dsi.h>
->  #include <video/mipi_display.h>
->  
-> +#define HWVER_130			0x31333000	/* IP version 1.30 */
-> +#define HWVER_131			0x31333100	/* IP version 1.31 */
-> +#define HWVER_OLDEST			HWVER_130
-> +#define HWVER_NEWEST			HWVER_131
-> +
->  #define DSI_VERSION			0x00
-> +#define VERSION				GENMASK(31, 8)
->  
->  #define DSI_PWR_UP			0x04
->  #define RESET				0
-> @@ -161,11 +167,12 @@
->  #define PHY_CLKHS2LP_TIME(lbcc)		(((lbcc) & 0x3ff) << 16)
->  #define PHY_CLKLP2HS_TIME(lbcc)		((lbcc) & 0x3ff)
->  
-> -/* TODO Next register is slightly different between 1.30 & 1.31 IP version */
->  #define DSI_PHY_TMR_CFG			0x9c
-> -#define PHY_HS2LP_TIME(lbcc)		(((lbcc) & 0xff) << 24)
-> -#define PHY_LP2HS_TIME(lbcc)		(((lbcc) & 0xff) << 16)
-> -#define MAX_RD_TIME(lbcc)		((lbcc) & 0x7fff)
-> +#define PHY_HS2LP_TIME_V130(lbcc)	(((lbcc) & 0xff) << 24)
-> +#define PHY_LP2HS_TIME_V130(lbcc)	(((lbcc) & 0xff) << 16)
-> +#define MAX_RD_TIME_V130(lbcc)		((lbcc) & 0x7fff)
-> +#define PHY_HS2LP_TIME_V131(lbcc)	(((lbcc) & 0x3ff) << 16)
-> +#define PHY_LP2HS_TIME_V131(lbcc)	((lbcc) & 0x3ff)
->  
->  #define DSI_PHY_RSTZ			0xa0
->  #define PHY_DISFORCEPLL			0
-> @@ -204,7 +211,9 @@
->  #define DSI_INT_ST1			0xc0
->  #define DSI_INT_MSK0			0xc4
->  #define DSI_INT_MSK1			0xc8
-> +
->  #define DSI_PHY_TMR_RD_CFG		0xf4
-> +#define MAX_RD_TIME_V131(lbcc)		((lbcc) & 0x7fff)
->  
->  #define PHY_STATUS_TIMEOUT_US		10000
->  #define CMD_PKT_STATUS_TIMEOUT_US	20000
-> @@ -215,6 +224,7 @@ struct dw_mipi_dsi {
->  	struct drm_bridge *panel_bridge;
->  	struct device *dev;
->  	void __iomem *base;
-> +	u32 hw_version;
->  
->  	struct clk *pclk;
->  	struct clk *px_clk;
-> @@ -616,8 +626,14 @@ static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
->  	 * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
->  	 * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
->  	 */
-> -	dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
-> -		  | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
-> +	if (dsi->hw_version == HWVER_131) {
-> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V131(0x40) |
-> +			  PHY_LP2HS_TIME_V131(0x40));
-> +		dsi_write(dsi, DSI_PHY_TMR_RD_CFG, MAX_RD_TIME_V131(10000));
-> +	} else {
-> +		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V130(0x40) |
-> +			  PHY_LP2HS_TIME_V130(0x40) | MAX_RD_TIME_V130(10000));
-> +	}
->  
->  	dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
->  		  | PHY_CLKLP2HS_TIME(0x40));
-> @@ -791,6 +807,28 @@ static const struct drm_bridge_funcs dw_mipi_dsi_bridge_funcs = {
->  	.attach	      = dw_mipi_dsi_bridge_attach,
->  };
->  
-> +static void dsi_get_version(struct dw_mipi_dsi *dsi)
-> +{
-> +	u32 hw_version;
-> +
-> +	clk_prepare_enable(dsi->pclk);
-> +	hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
-> +	clk_disable_unprepare(dsi->pclk);
-> +
-> +	if (hw_version > HWVER_NEWEST) {
-> +		DRM_DEBUG("hw version: use 0x%08x for this recent 0x%08x\n",
-> +			  HWVER_NEWEST, hw_version);
-> +		hw_version = HWVER_NEWEST;
-> +
-> +	} else if (hw_version < HWVER_OLDEST) {
-> +		DRM_DEBUG("hw version: use 0x%08x for this old 0x%08x\n",
-> +			  HWVER_OLDEST, hw_version);
-> +		hw_version = HWVER_OLDEST;
-> +	}
-> +
-> +	dsi->hw_version = hw_version;
-> +}
-> +
->  static struct dw_mipi_dsi *
->  __dw_mipi_dsi_probe(struct platform_device *pdev,
->  		    const struct dw_mipi_dsi_plat_data *plat_data)
-> @@ -870,6 +908,8 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
->  		clk_disable_unprepare(dsi->pclk);
->  	}
->  
-> +	dsi_get_version(dsi);
-> +
->  	pm_runtime_enable(dev);
+On Mon, Feb 5, 2018 at 10:47 AM, Ludovic Desroches
+<ludovic.desroches@microchip.com> wrote:
+> Use GPIO descriptors instead of relying on the old method.
 
-Two questions:
-1. You have generally two variants:
-- older than 131,
-- not older than 131.
-Wouldn't be better to just assume that since 131 registers slightly differ?
-So you just stores:
-??? dsi->hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
-And if neccessary performs comparison:
-??? if (dsi->hw_version >= HWVER_131)
-??? ??? ...
-??? else
-??? ??? ...
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-This way you can remove these HWVER_(NEWEST|OLDEST).
+Though few nitpicks below.
 
-2. You are using pm_runtime, but not in dsi_get_version. I guess it is
-SoC dependant? but I suppose performing registry read should be safer
-after runtime_get.
 
-Regards
-Andrzej
+> --- a/drivers/video/fbdev/atmel_lcdfb.c
+> +++ b/drivers/video/fbdev/atmel_lcdfb.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/backlight.h>
+>  #include <linux/gfp.h>
 
->  
->  	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+> +#include <linux/gpio/consumer.h>
+
+I think you forgot to remove of_gpio.h.
+
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+
+>         struct device_node *display_np;
+>         struct device_node *timings_np;
+>         struct display_timings *timings;
+> -       enum of_gpio_flags flags;
+>         struct atmel_lcdfb_power_ctrl_gpio *og;
+>         bool is_gpio_power = false;
+>         int ret = -ENOENT;
+> -       int i, gpio;
+> +       int i;
+> +       struct gpio_desc *gpiod;
+
+I would rather preserve reversed tree style, i.e. put longer line upper.
+
+
+> +       for (i = 0; i < gpiod_count(dev, "atmel,power-control"); i++) {
+> +               gpiod = devm_gpiod_get_index_optional(dev,
+> +                               "atmel,power-control", i, GPIOD_ASIS);
+> +               if (!gpiod)
+>                         continue;
+
+What about IS_ERR() case?
+
+>
+>                 og = devm_kzalloc(dev, sizeof(*og), GFP_KERNEL);
+>                 if (!og)
+>                         goto put_display_node;
+>
+> +               og->gpiod = gpiod;
+>                 is_gpio_power = true;
+>
+> +               ret = gpiod_direction_output(gpiod, gpiod_is_active_low(gpiod));
+>                 if (ret) {
+
+I'm not sure this will be needed if you check IS_ERR() above.
+
+> +                       dev_err(dev, "set direction output gpio atmel,power-control[%d] failed\n", i);
+>                         goto put_display_node;
+>                 }
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
