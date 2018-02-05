@@ -1,68 +1,64 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 5 Feb 2018 18:20:14 +0530
-Subject: [PATCH v2 01/16] mmc: sdhci-omap: Update 'power_mode' outside
- sdhci_omap_init_74_clocks
-In-Reply-To: <20180205125029.21570-1-kishon@ti.com>
-References: <20180205125029.21570-1-kishon@ti.com>
-Message-ID: <20180205125029.21570-2-kishon@ti.com>
+Date: Mon, 5 Feb 2018 18:20:13 +0530
+Subject: [PATCH v2 00/16] mmc: sdhci-omap: Add UHS/HS200 mode support
+Message-ID: <20180205125029.21570-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updating 'power_mode' in sdhci_omap_init_74_clocks results in
-'power_mode' never updated to MMC_POWER_OFF during card
-removal. This results in initialization sequence not sent to the
-card during re-insertion.
-Fix it here by adding sdhci_omap_set_power_mode to update power_mode.
-This function can also be used later to perform operations that
-are specific to a power mode (e.g, disable tuning during power off).
+Add UHS/HS200 mode support in sdhci-omap. The programming sequence
+for voltage switching, tuning is followed from AM572x TRM
+http://www.ti.com/lit/ug/spruhz6i/spruhz6i.pdf
+(Similar to all AM57x/DRA7x SoCs). The patch series also implements
+workaround for errata published in
+http://www.ti.com/lit/er/sprz429k/sprz429k.pdf.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
----
- drivers/mmc/host/sdhci-omap.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+It also includes a pdata-quirk patch since both pdata-quirks and
+sdhci-omap uses struct sdhci_omap_platform_data.
 
-diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-index 628bfe9a3d17..96985786cadf 100644
---- a/drivers/mmc/host/sdhci-omap.c
-+++ b/drivers/mmc/host/sdhci-omap.c
-@@ -244,6 +244,12 @@ static int sdhci_omap_start_signal_voltage_switch(struct mmc_host *mmc,
- 	return 0;
- }
- 
-+static void sdhci_omap_set_power_mode(struct sdhci_omap_host *omap_host,
-+				      u8 power_mode)
-+{
-+	omap_host->power_mode = power_mode;
-+}
-+
- static void sdhci_omap_set_bus_mode(struct sdhci_omap_host *omap_host,
- 				    unsigned int mode)
- {
-@@ -273,6 +279,7 @@ static void sdhci_omap_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	sdhci_omap_set_bus_mode(omap_host, ios->bus_mode);
- 	sdhci_set_ios(mmc, ios);
-+	sdhci_omap_set_power_mode(omap_host, ios->power_mode);
- }
- 
- static u16 sdhci_omap_calc_divisor(struct sdhci_pltfm_host *host,
-@@ -401,8 +408,6 @@ static void sdhci_omap_init_74_clocks(struct sdhci_host *host, u8 power_mode)
- 	sdhci_omap_writel(omap_host, SDHCI_OMAP_STAT, INT_CC_EN);
- 
- 	enable_irq(host->irq);
--
--	omap_host->power_mode = power_mode;
- }
- 
- static struct sdhci_ops sdhci_omap_ops = {
-@@ -504,6 +509,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
- 	omap_host->host = host;
- 	omap_host->base = host->ioaddr;
- 	omap_host->dev = dev;
-+	omap_host->power_mode = MMC_POWER_UNDEFINED;
- 	host->ioaddr += offset;
- 
- 	mmc = host->mmc;
+The dt patches enabling UHS/HS200 will follow this series.
+
+Changes from v1:
+*) Only poll on DAT0 and DATI for card_busy status
+*) Cleanup iodelay patch as suggested by Tony.
+*) Added quirk to disable HW timeout
+*) Use the existing data timer but program a relatively accurate
+   SW timeout value (Impacts all platforms)
+*) Fix a bug in sdhci which was using data_timer for non data line
+   commands
+
+I've tested on dra72-evm, dra7xx-evm, dra71-evm, am572x-idk, am571x-idk
+dra76-evm, am57xx-evm and k2g-evm.
+
+I've also pushed the series (along with dt) to
+https://github.com/kishon/linux-wip.git sdhci_uhs_v2
+
+Kishon Vijay Abraham I (16):
+  mmc: sdhci-omap: Update 'power_mode' outside sdhci_omap_init_74_clocks
+  mmc: sdhci-omap: Add card_busy host ops
+  mmc: sdhci-omap: Add custom set_uhs_signaling sdhci_host ops
+  mmc: sdhci-omap: Add tuning support
+  mmc: sdhci-omap: Workaround for Errata i802
+  mmc: sdhci_omap: Add support to set IODELAY values
+  mmc: sdhci_omap: Fix sdhci-omap quirks
+  mmc: sdhci-omap: Add support to override f_max and iodelay from pdata
+  mmc: sdhci: Add quirk to disable HW timeout
+  mmc: sdhci: Fix to use data_timer only for data line commands
+  mmc: sdhci: Program a relatively accurate SW timeout value
+  mmc: sdhci-omap: Workaround for Errata i834
+  dt-bindings: sdhci-omap: Add K2G specific binding
+  mmc: sdhci-omap: Add support for MMC/SD controller in k2g SoC
+  mmc: sdhci-omap: Add SPDX identifier
+  ARM: OMAP2+: Use sdhci-omap specific pdata-quirks for MMC/SD on DRA74x
+    EVM
+
+ .../devicetree/bindings/mmc/sdhci-omap.txt         |   2 +
+ arch/arm/mach-omap2/pdata-quirks.c                 |  34 +-
+ drivers/mmc/host/sdhci-omap.c                      | 430 +++++++++++++++++++--
+ drivers/mmc/host/sdhci.c                           |  62 ++-
+ drivers/mmc/host/sdhci.h                           |  17 +
+ include/linux/platform_data/sdhci-omap.h           |  22 ++
+ 6 files changed, 518 insertions(+), 49 deletions(-)
+ create mode 100644 include/linux/platform_data/sdhci-omap.h
+
 -- 
 2.11.0
