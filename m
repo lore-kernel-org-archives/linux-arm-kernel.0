@@ -1,49 +1,40 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  5 Feb 2018 18:39:45 +0000
-Subject: [PATCH 4/5] bus/arm-cci: Streamline devicetree handling a bit
-In-Reply-To: <cover.1517855839.git.robin.murphy@arm.com>
-References: <cover.1517855839.git.robin.murphy@arm.com>
-Message-ID: <1f61837990c42120112501602b6a87766b80c347.1517855839.git.robin.murphy@arm.com>
+Date: Mon,  5 Feb 2018 18:39:41 +0000
+Subject: [PATCH 0/5] Arm interconnect PMU driver tidyup
+Message-ID: <cover.1517855839.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than iterating over child nodes explicitly testing for
-availability, we can just use the other helper which already subsumes
-that check. Also, the availability check is already NULL-safe, so get
-rid of a redundant check in cci_probe(), too.
+Since system PMUs now have a proper home in drivers/perf/, let's
+collect together the Arm interconnect PMU drivers currently squatting
+in drivers/bus/. Whilst elbow-deep in the CCI driver I spotted some
+further opportunity for cleanup, so a few bonus patches are included
+at the end. 
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/bus/arm-cci.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+Robin.
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index bbc5bc5f172a..e9995e6a1b29 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -447,13 +447,10 @@ static int cci_probe_ports(struct device_node *np)
- 	if (!ports)
- 		return -ENOMEM;
- 
--	for_each_child_of_node(np, cp) {
-+	for_each_available_child_of_node(np, cp) {
- 		if (!of_match_node(arm_cci_ctrl_if_matches, cp))
- 			continue;
- 
--		if (!of_device_is_available(cp))
--			continue;
--
- 		i = nb_ace + nb_ace_lite;
- 
- 		if (i >= nb_cci_ports)
-@@ -533,7 +530,7 @@ static int cci_probe(void)
- 	struct resource res;
- 
- 	np = of_find_matching_node(NULL, arm_cci_matches);
--	if(!np || !of_device_is_available(np))
-+	if (!of_device_is_available(np))
- 		return -ENODEV;
- 
- 	ret = of_address_to_resource(np, 0, &res);
+
+Robin Murphy (5):
+  drivers/bus: Move Arm CCN PMU driver
+  drivers/bus: Split Arm CCI driver
+  perf/arm-cci: Simplify CPU hotplug
+  bus/arm-cci: Streamline devicetree handling a bit
+  perf/arm-cci: Clean up model discovery
+
+ .../bindings/{arm/ccn.txt => perf/arm-ccn.txt}     |    0
+ Documentation/{arm/CCN.txt => perf/arm-ccn.txt}    |    0
+ drivers/bus/Kconfig                                |   36 -
+ drivers/bus/Makefile                               |    2 -
+ drivers/bus/arm-cci.c                              | 1751 +-------------------
+ drivers/perf/Kconfig                               |   33 +
+ drivers/perf/Makefile                              |    2 +
+ drivers/{bus => perf}/arm-cci.c                    |  699 +-------
+ drivers/{bus => perf}/arm-ccn.c                    |    0
+ 9 files changed, 86 insertions(+), 2437 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt} (100%)
+ rename Documentation/{arm/CCN.txt => perf/arm-ccn.txt} (100%)
+ copy drivers/{bus => perf}/arm-cci.c (72%)
+ rename drivers/{bus => perf}/arm-ccn.c (100%)
+
 -- 
 2.16.1.dirty
