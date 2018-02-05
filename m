@@ -1,51 +1,35 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 5 Feb 2018 14:06:18 -0600
-Subject: [PATCH v2 0/8] use 64-bit arithmetic instead of 32-bit
-Message-ID: <cover.1517856716.git.gustavo@embeddedor.com>
+From: wsa+renesas@sang-engineering.com (Wolfram Sang)
+Date: Mon,  5 Feb 2018 21:09:59 +0100
+Subject: [PATCH 2/4] drm/exynos: fix comparison to bitshift when dealing with
+ a mask
+In-Reply-To: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20180205201002.23621-3-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suffix LL and ULL to various constants in order to give the compiler
-complete information about the proper arithmetic to use. Such constants
-are used in contexts that expect expressions of type u64 (64 bits, unsigned)
-and s64 (64 bits, signed).
+Due to a typo, the mask was destroyed by a comparison instead of a bit
+shift.
 
-The mentioned expressions are currently being evaluated using 32-bit
-arithmetic, wich is some cases can lead to unintentional integer
-overflows.
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
+Only build tested. To be applied individually per subsystem.
 
-This patchset addresses the following Coverity IDs:
-CIDs: 200604, 1056807, 1056808, 1271223, 1324146
-CIDs: 1392628, 1392630, 1446589, 1454996, 1458347
+ drivers/gpu/drm/exynos/regs-fimc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thank you
-
-Changes in v2:
- - Update subject and changelog to better reflect the proposed code changes.
- - Add suffix ULL and LL to constants instead of casting variables.
- - Extend the proposed code changes to other similar cases that had not
-   previously been considered in v1 of this patchset.
-
-Gustavo A. R. Silva (8):
-  rtl2832: use 64-bit arithmetic instead of 32-bit in
-    rtl2832_set_frontend
-  dvb-frontends: ves1820: use 64-bit arithmetic instead of 32-bit
-  i2c: max2175: use 64-bit arithmetic instead of 32-bit
-  i2c: ov9650: use 64-bit arithmetic instead of 32-bit
-  pci: cx88-input: use 64-bit arithmetic instead of 32-bit
-  rockchip/rga: use 64-bit arithmetic instead of 32-bit
-  platform: sh_veu: use 64-bit arithmetic instead of 32-bit
-  platform: vivid-cec: use 64-bit arithmetic instead of 32-bit
-
- drivers/media/dvb-frontends/rtl2832.c         |  4 ++--
- drivers/media/dvb-frontends/ves1820.c         |  2 +-
- drivers/media/i2c/max2175.c                   |  2 +-
- drivers/media/i2c/ov9650.c                    |  9 +++++----
- drivers/media/pci/cx88/cx88-input.c           |  4 ++--
- drivers/media/platform/rockchip/rga/rga-buf.c |  3 ++-
- drivers/media/platform/sh_veu.c               |  4 ++--
- drivers/media/platform/vivid/vivid-cec.c      | 11 +++++++++--
- 8 files changed, 24 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/gpu/drm/exynos/regs-fimc.h b/drivers/gpu/drm/exynos/regs-fimc.h
+index 30496134a3d072..d7cbe53c4c01f4 100644
+--- a/drivers/gpu/drm/exynos/regs-fimc.h
++++ b/drivers/gpu/drm/exynos/regs-fimc.h
+@@ -569,7 +569,7 @@
+ #define EXYNOS_CIIMGEFF_FIN_EMBOSSING		(4 << 26)
+ #define EXYNOS_CIIMGEFF_FIN_SILHOUETTE		(5 << 26)
+ #define EXYNOS_CIIMGEFF_FIN_MASK			(7 << 26)
+-#define EXYNOS_CIIMGEFF_PAT_CBCR_MASK		((0xff < 13) | (0xff < 0))
++#define EXYNOS_CIIMGEFF_PAT_CBCR_MASK		((0xff << 13) | (0xff << 0))
+ 
+ /* Real input DMA size register */
+ #define EXYNOS_CIREAL_ISIZE_AUTOLOAD_ENABLE	(1 << 31)
 -- 
-2.7.4
+2.11.0
