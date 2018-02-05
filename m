@@ -1,45 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Feb 2018 00:08:53 -0600
-Subject: [PATCH v3 1/2] ARM: dts: imx25-pinfunc: Use consistent naming
- for eSDHC
-In-Reply-To: <20180131213544.4508-1-benoit.thebaudeau.dev@gmail.com>
+Date: Mon, 5 Feb 2018 00:08:59 -0600
+Subject: [PATCH v3 2/2] ARM: dts: imx25-pinfunc: Always set SION for
+ eSDHC CMD
+In-Reply-To: <20180131213544.4508-2-benoit.thebaudeau.dev@gmail.com>
 References: <20180131213544.4508-1-benoit.thebaudeau.dev@gmail.com>
-Message-ID: <20180205060853.ebqs3sqakpxm22uk@rob-hp-laptop>
+ <20180131213544.4508-2-benoit.thebaudeau.dev@gmail.com>
+Message-ID: <20180205034929.tdd22buxaigufo6y@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 10:35:43PM +0100, Beno?t Th?baudeau wrote:
-> This file had several naming inconsistencies for eSDHC:
->  - the instances were named sometimes SDn, sometimes SDHCn, whereas they
->    are named ESDHCn in the reference manual, e.g.:
->      MX25_PAD_SD1_CMD__SD1_CMD
->      MX25_PAD_D15__SDHC1_DAT7
->  - the data ports were named sometimes DATAn, sometimes DATn like in the
->    reference manual, e.g.:
->      MX25_PAD_SD1_DATA0__SD1_DATA0
->      MX25_PAD_D15__SDHC1_DAT7
->  - in one case, the clock port was named DAT_CLK instead of CLK:
->      MX25_PAD_CSI_D7__SDHC2_DAT_CLK
+On Wed, Jan 31, 2018 at 10:35:44PM +0100, Beno?t Th?baudeau wrote:
+> The eSDHC does not work properly if the SION bit is not set for the
+> bidirectional CMD signal, whatever the eSDHC instance and the selected
+> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
+> this for MX25_PAD_*__ESDHCn_CMD in imx25-pinfunc.h in order to enforce
+> this behavior for all boards.
 > 
-> This change:
->  - introduces new definitions using the naming from the reference
->    manual,
->  - keeps definitions using the legacy naming in order not to break
->    compatibility for out-of-tree users (they can be removed later),
->  - updates the in-tree files that were using the legacy naming.
+> This had already been done for eSDHC1, but not for eSDHC2. Also, define
+> MX25_PAD_FEC_MDC__ESDHC2_CMD so that all the possible cases are covered
+> from now on.
 > 
 > Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 > ---
 > Changes v2 -> v3:
->  - None.
+>  - Quickly mention SION in each comment, besides the reference to the
+>    verbose comment (suggested by Uwe).
 > Changes v1 -> v2:
->  - New patch (suggested by Uwe).
+>  - Update eSDHC instance and port naming following the addition of "ARM:
+>    dts: imx25-pinfunc: Use consistent naming for eSDHC".
+>  - Reference the more verbose comment for MX25_PAD_SD1_CMD__ESDHC1_CMD
+>    instead of copying the same less detailed comment everywhere
+>    (suggested by Uwe).
 > ---
->  .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  | 12 ++--
->  arch/arm/boot/dts/imx25-pdk.dts                    | 12 ++--
->  arch/arm/boot/dts/imx25-pinfunc.h                  | 72 ++++++++++++++--------
->  3 files changed, 60 insertions(+), 36 deletions(-)
+>  arch/arm/boot/dts/imx25-pinfunc.h | 18 +++++++++++-------
+>  1 file changed, 11 insertions(+), 7 deletions(-)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
