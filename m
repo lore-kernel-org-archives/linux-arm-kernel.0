@@ -1,94 +1,185 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Feb 2018 16:41:58 +0000
-Subject: [PATCHv2 4/8] arm_pmu: add armpmu_alloc_atomic()
+Date: Mon,  5 Feb 2018 16:42:01 +0000
+Subject: [PATCHv2 7/8] arm_pmu: note IRQs and PMUs per-cpu
 In-Reply-To: <20180205164202.26502-1-mark.rutland@arm.com>
 References: <20180205164202.26502-1-mark.rutland@arm.com>
-Message-ID: <20180205164202.26502-5-mark.rutland@arm.com>
+Message-ID: <20180205164202.26502-8-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ACPI systems, we don't know the makeup of CPUs until we hotplug them
-on, and thus have to allocate the PMU datastructures at hotplug time.
-Thus, we must use GFP_ATOMIC allocations.
+To support ACPI systems, we need to request IRQs before we know the
+associated PMU, and thus we need some percpu variable that the IRQ
+handler can find the PMU from.
 
-Let's add an armpmu_alloc_atomic() that we can use in this case.
+As we're going to request IRQs without the PMU, we can't rely on the
+arm_pmu::active_irqs mask, and similarly need to track requested IRQs
+with a percpu variable.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c       | 17 ++++++++++++++---
- drivers/perf/arm_pmu_acpi.c  |  2 +-
- include/linux/perf/arm_pmu.h |  1 +
- 3 files changed, 16 insertions(+), 4 deletions(-)
+ drivers/perf/arm_pmu.c       | 76 +++++++++++++++++++++++++++++++-------------
+ include/linux/perf/arm_pmu.h |  1 -
+ 2 files changed, 54 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 373dfd7d8a1d..4f73c5e8d623 100644
+index 72118e6f9122..023a8ebdace6 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -760,18 +760,18 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
- 					    &cpu_pmu->node);
- }
+@@ -25,6 +25,9 @@
  
--struct arm_pmu *armpmu_alloc(void)
-+static struct arm_pmu *__armpmu_alloc(gfp_t flags)
+ #include <asm/irq_regs.h>
+ 
++static DEFINE_PER_CPU(struct arm_pmu *, cpu_armpmu);
++static DEFINE_PER_CPU(int, cpu_irq);
++
+ static int
+ armpmu_map_cache_event(const unsigned (*cache_map)
+ 				      [PERF_COUNT_HW_CACHE_MAX]
+@@ -325,13 +328,9 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ 	int ret;
+ 	u64 start_clock, finish_clock;
+ 
+-	/*
+-	 * we request the IRQ with a (possibly percpu) struct arm_pmu**, but
+-	 * the handlers expect a struct arm_pmu*. The percpu_irq framework will
+-	 * do any necessary shifting, we just need to perform the first
+-	 * dereference.
+-	 */
+-	armpmu = *(void **)dev;
++	armpmu = this_cpu_read(cpu_armpmu);
++	if (WARN_ON_ONCE(!armpmu))
++		return IRQ_NONE;
+ 
+ 	start_clock = sched_clock();
+ 	ret = armpmu->handle_irq(irq, armpmu);
+@@ -517,29 +516,47 @@ int perf_num_counters(void)
+ }
+ EXPORT_SYMBOL_GPL(perf_num_counters);
+ 
+-void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
++int armpmu_count_irq_users(const int irq)
  {
- 	struct arm_pmu *pmu;
- 	int cpu;
+-	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+-	int irq = per_cpu(hw_events->irq, cpu);
++	int cpu, count = 0;
++
++	for_each_possible_cpu(cpu) {
++		if (per_cpu(cpu_irq, cpu) == irq)
++			count++;
++	}
  
--	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
-+	pmu = kzalloc(sizeof(*pmu), flags);
- 	if (!pmu) {
- 		pr_info("failed to allocate PMU device!\n");
- 		goto out;
- 	}
- 
--	pmu->hw_events = alloc_percpu(struct pmu_hw_events);
-+	pmu->hw_events = alloc_percpu_gfp(struct pmu_hw_events, flags);
- 	if (!pmu->hw_events) {
- 		pr_info("failed to allocate per-cpu PMU data.\n");
- 		goto out_free_pmu;
-@@ -817,6 +817,17 @@ struct arm_pmu *armpmu_alloc(void)
- 	return NULL;
- }
- 
-+struct arm_pmu *armpmu_alloc(void)
-+{
-+	return __armpmu_alloc(GFP_KERNEL);
+-	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
++	return count;
 +}
 +
-+struct arm_pmu *armpmu_alloc_atomic(void)
++void armpmu_free_cpu_irq(int irq, int cpu)
 +{
-+	return __armpmu_alloc(GFP_ATOMIC);
-+}
-+
-+
- void armpmu_free(struct arm_pmu *pmu)
- {
- 	free_percpu(pmu->hw_events);
-diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-index 705f1a390e31..30c5f2bbce59 100644
---- a/drivers/perf/arm_pmu_acpi.c
-+++ b/drivers/perf/arm_pmu_acpi.c
-@@ -127,7 +127,7 @@ static struct arm_pmu *arm_pmu_acpi_find_alloc_pmu(void)
- 		return pmu;
++	if (per_cpu(cpu_irq, cpu) == 0)
++		return;
++	if (WARN_ON(irq != per_cpu(cpu_irq, cpu)))
+ 		return;
+ 
+ 	if (irq_is_percpu_devid(irq)) {
+-		free_percpu_irq(irq, &hw_events->percpu_pmu);
+-		cpumask_clear(&armpmu->active_irqs);
+-		return;
++		if (armpmu_count_irq_users(irq) == 1)
++			free_percpu_irq(irq, &cpu_armpmu);
++	} else {
++		free_irq(irq, NULL);
  	}
  
--	pmu = armpmu_alloc();
-+	pmu = armpmu_alloc_atomic();
- 	if (!pmu) {
- 		pr_warn("Unable to allocate PMU for CPU%d\n",
- 			smp_processor_id());
+-	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++	per_cpu(cpu_irq, cpu) = 0;
+ }
+ 
+-int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
++void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ {
+-	int err = 0;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+-	const irq_handler_t handler = armpmu_dispatch_irq;
+ 	int irq = per_cpu(hw_events->irq, cpu);
++
++	armpmu_free_cpu_irq(irq, cpu);
++}
++
++int armpmu_request_cpu_irq(int irq, int cpu)
++{
++	int err = 0;
++	const irq_handler_t handler = armpmu_dispatch_irq;
+ 	if (!irq)
+ 		return 0;
+ 
+@@ -560,16 +577,16 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 
+ 		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+ 		err = request_irq(irq, handler, irq_flags, "arm-pmu",
+-				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+-	} else if (cpumask_empty(&armpmu->active_irqs)) {
++				  NULL);
++	} else if (armpmu_count_irq_users(irq) == 0) {
+ 		err = request_percpu_irq(irq, handler, "arm-pmu",
+-					 &hw_events->percpu_pmu);
++					 cpu_armpmu);
+ 	}
+ 
+ 	if (err)
+ 		goto err_out;
+ 
+-	cpumask_set_cpu(cpu, &armpmu->active_irqs);
++	per_cpu(cpu_irq, cpu) = irq;
+ 	return 0;
+ 
+ err_out:
+@@ -577,6 +594,17 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 	return err;
+ }
+ 
++int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
++{
++	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
++	int irq = per_cpu(hw_events->irq, cpu);
++	if (!irq)
++		return 0;
++
++
++	return armpmu_request_cpu_irq(irq, cpu);
++}
++
+ static int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
+ {
+ 	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
+@@ -599,6 +627,8 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+ 	if (pmu->reset)
+ 		pmu->reset(pmu);
+ 
++	per_cpu(cpu_armpmu, cpu) = pmu;
++
+ 	irq = armpmu_get_cpu_irq(pmu, cpu);
+ 	if (irq) {
+ 		if (irq_is_percpu_devid(irq))
+@@ -626,6 +656,8 @@ static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
+ 			disable_irq(irq);
+ 	}
+ 
++	per_cpu(cpu_armpmu, cpu) = NULL;
++
+ 	return 0;
+ }
+ 
 diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 899bc7ef0881..1f8bb83ef42f 100644
+index 1f8bb83ef42f..feec9e7e85db 100644
 --- a/include/linux/perf/arm_pmu.h
 +++ b/include/linux/perf/arm_pmu.h
-@@ -157,6 +157,7 @@ static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
+@@ -75,7 +75,6 @@ enum armpmu_attr_groups {
  
- /* Internal functions only for core arm_pmu code */
- struct arm_pmu *armpmu_alloc(void);
-+struct arm_pmu *armpmu_alloc_atomic(void);
- void armpmu_free(struct arm_pmu *pmu);
- int armpmu_register(struct arm_pmu *pmu);
- int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
+ struct arm_pmu {
+ 	struct pmu	pmu;
+-	cpumask_t	active_irqs;
+ 	cpumask_t	supported_cpus;
+ 	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
 -- 
 2.11.0
