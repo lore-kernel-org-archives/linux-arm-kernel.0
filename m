@@ -1,114 +1,65 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 05 Feb 2018 11:07:23 +0100
-Subject: [PATCH] drm/bridge/synopsys: dsi: Add read feature
-In-Reply-To: <20180204213104.17834-1-philippe.cornu@st.com>
-References: <CGME20180204213219epcas2p429434ba0c87a0544dc5294facd80529b@epcas2p4.samsung.com>
- <20180204213104.17834-1-philippe.cornu@st.com>
-Message-ID: <81cb1f26-96f0-bdc6-28bc-4a7bda5a9459@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 5 Feb 2018 10:09:04 +0000
+Subject: [PATCH v4 4/6] arm: Add icache invalidation on switch_mm for
+ Cortex-A15
+In-Reply-To: <20180205100034.GS21802@cbox>
+References: <20180201110738.5421-1-marc.zyngier@arm.com>
+ <20180201110738.5421-5-marc.zyngier@arm.com> <20180205100034.GS21802@cbox>
+Message-ID: <4d5bc4a5-484e-4176-8eff-3ac26e9e150a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.02.2018 22:31, Philippe Cornu wrote:
-> This patch adds the DCS/GENERIC DSI read feature.
->
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+On 05/02/18 10:00, Christoffer Dall wrote:
+> On Thu, Feb 01, 2018 at 11:07:36AM +0000, Marc Zyngier wrote:
+>> In order to avoid aliasing attacks against the branch predictor,
+>> Cortex-A15 require to invalidate the BTB when switching
+>> from one user context to another. The only way to do so on this
+>> CPU is to perform an ICIALLU, having set ACTLR[0] to 1 from secure
+>> mode.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/mm/proc-v7-2level.S | 10 ++++++++++
+>>  arch/arm/mm/proc-v7-3level.S | 10 ++++++++++
+>>  arch/arm/mm/proc-v7.S        | 23 ++++++++++++++++++++++-
+>>  3 files changed, 42 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+>> index 0422e58b74e8..6d81ed7b2cb0 100644
+>> --- a/arch/arm/mm/proc-v7-2level.S
+>> +++ b/arch/arm/mm/proc-v7-2level.S
+>> @@ -40,7 +40,16 @@
+>>   *	Note that we always need to flush BTAC/BTB if IBE is set
+>>   *	even on Cortex-A8 revisions not affected by 430973.
+>>   *	If IBE is not set, the flush BTAC/BTB won't do anything.
+>> + *
+>> + *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+>> + *	for the icache invalidation to also invalidate the BTB.
+>>   */
+>> +ENTRY(cpu_v7_icinv_switch_mm)
+>> +#ifdef CONFIG_MMU
+>> +	mcr	p15, 0, r0, c7, c5, 0		@ ICIALLU
+>> +	/* Fall through to switch_mm... */
+>> +#endif
+> 
+> aren't we falling through to cpu_v7_btbinv_switch_mm including the 
+> btb invalidation used for ca8 et al. here?  Maybe we just don't care?
 
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+The trick is that on A15 (which is the only CPU using the ICIALLU code),
+the BTB invalidation is a NOP, so executing it doesn't really hurt.
 
-If there will be no objections I will merge it at the end of the week.
+>> +
+>>  ENTRY(cpu_v7_btbinv_switch_mm)
+>>  #ifdef CONFIG_MMU
+>>  	mov	r2, #0
+>> @@ -67,6 +76,7 @@ ENTRY(cpu_v7_switch_mm)
+>>  	bx	lr
+>>  ENDPROC(cpu_v7_switch_mm)
+>>  ENDPROC(cpu_v7_btbinv_switch_mm)
+>> +ENDPROC(cpu_v7_icinv_switch_mm)
 
-?--
-Regards
-Andrzej
+Thanks,
 
-> ---
-> Extra notes:
-> DSI read tests have been performed with DCS & GENERIC, short & long
-> commands, on two different panels.
-> The maximum fifo size (32*32-bit = 128 bytes on stm32) has been
-> verified too.
->
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 58 +++++++++++++++++++++------
->  1 file changed, 45 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index e9422d05e897..65aeb3f78b48 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -397,18 +397,46 @@ static int dw_mipi_dsi_write(struct dw_mipi_dsi *dsi,
->  	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, le32_to_cpu(word));
->  }
->  
-> +static int dw_mipi_dsi_read(struct dw_mipi_dsi *dsi,
-> +			    const struct mipi_dsi_msg *msg)
-> +{
-> +	int i, j, ret, len = msg->rx_len;
-> +	u8 *buf = msg->rx_buf;
-> +	u32 val;
-> +
-> +	/* Wait end of the read operation */
-> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
-> +				 val, !(val & GEN_RD_CMD_BUSY),
-> +				 1000, CMD_PKT_STATUS_TIMEOUT_US);
-> +	if (ret) {
-> +		dev_err(dsi->dev, "Timeout during read operation\n");
-> +		return ret;
-> +	}
-> +
-> +	for (i = 0; i < len; i += 4) {
-> +		/* Read fifo must not be empty before all bytes are read */
-> +		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
-> +					 val, !(val & GEN_PLD_R_EMPTY),
-> +					 1000, CMD_PKT_STATUS_TIMEOUT_US);
-> +		if (ret) {
-> +			dev_err(dsi->dev, "Read payload FIFO is empty\n");
-> +			return ret;
-> +		}
-> +
-> +		val = dsi_read(dsi, DSI_GEN_PLD_DATA);
-> +		for (j = 0; j < 4 && j + i < len; j++)
-> +			buf[i + j] = val >> (8 * j);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->  					 const struct mipi_dsi_msg *msg)
->  {
->  	struct dw_mipi_dsi *dsi = host_to_dsi(host);
->  	struct mipi_dsi_packet packet;
-> -	int ret;
-> -
-> -	if (msg->rx_buf || msg->rx_len) {
-> -		/* TODO dw drv improvements: implement read feature */
-> -		dev_warn(dsi->dev, "read operations not yet implemented\n");
-> -		return -EINVAL;
-> -	}
-> +	int ret, nb_bytes;
->  
->  	ret = mipi_dsi_create_packet(&packet, msg);
->  	if (ret) {
-> @@ -422,12 +450,16 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->  	if (ret)
->  		return ret;
->  
-> -	/*
-> -	 * TODO Only transmitted size is returned as actual driver does
-> -	 * not support dcs/generic reads. Please update return value when
-> -	 * delivering the read feature.
-> -	 */
-> -	return packet.size;
-> +	if (msg->rx_buf && msg->rx_len) {
-> +		ret = dw_mipi_dsi_read(dsi, msg);
-> +		if (ret)
-> +			return ret;
-> +		nb_bytes = msg->rx_len;
-> +	} else {
-> +		nb_bytes = packet.size;
-> +	}
-> +
-> +	return nb_bytes;
->  }
->  
->  static const struct mipi_dsi_host_ops dw_mipi_dsi_host_ops = {
+	M.
+-- 
+Jazz is not dead. It just smells funny...
