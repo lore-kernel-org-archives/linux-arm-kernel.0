@@ -1,70 +1,134 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 05 Feb 2018 18:21:09 +0100
-Subject: [PATCH 1/2] ARM: dts: exynos: Add I2S1 device node to exynos5433.dtsi
-References: <CGME20180205172146epcas1p1cd7a5027e673fc17fb64d8841c47175a@epcas1p1.samsung.com>
-Message-ID: <20180205172110.9897-1-s.nawrocki@samsung.com>
+Date: Mon, 05 Feb 2018 18:21:10 +0100
+Subject: [PATCH 2/2] ARM: dts: exynos: Add support for HDMI audio on
+ exynos5433-tm2
+In-Reply-To: <20180205172110.9897-1-s.nawrocki@samsung.com>
+References: <20180205172110.9897-1-s.nawrocki@samsung.com>
+ <CGME20180205172216epcas2p3be603e84df81b28ee4c04c9b1c1c551f@epcas2p3.samsung.com>
+Message-ID: <20180205172110.9897-2-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT node for the second I2S controller available on Exynos 5433
-SoC. While at it the i2s0 node name is changed to a more generic
-"i2s" and missing properties are added to that node.
+This patch updates the sound node of the exynos5433-tm2 board
+and adds clock tree configuration in order to support HDMI sound.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+ .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 67 ++++++++++++++++++++--
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  1 +
+ 2 files changed, 64 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index a77462da4a36..37fb477a2d23 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/sound/samsung-i2s.h>
+ 
+ / {
+ 	aliases {
+@@ -112,8 +113,8 @@
+ 
+ 	sound {
+ 		compatible = "samsung,tm2-audio";
+-		audio-codec = <&wm5110>;
+-		i2s-controller = <&i2s0>;
++		audio-codec = <&wm5110>, <&hdmi>;
++		i2s-controller = <&i2s0 0>, <&i2s1 0>;
+ 		audio-amplifier = <&max98504>;
+ 		mic-bias-gpios = <&gpr3 2 GPIO_ACTIVE_HIGH>;
+ 		model = "wm5110";
+@@ -216,9 +217,63 @@
+ 	status = "okay";
+ };
+ 
++&cmu_top {
++	assigned-clocks = <&cmu_top CLK_FOUT_AUD_PLL>;
++	assigned-clock-rates = <(196608009 + 1)>;
++};
++
+ &cmu_aud {
+-	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
+-	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
++	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>,
++			  <&cmu_aud CLK_MOUT_SCLK_AUD_I2S>,
++			  <&cmu_aud CLK_MOUT_SCLK_AUD_PCM>,
++			  <&cmu_top CLK_MOUT_AUD_PLL>,
++
++			  <&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
++			  <&cmu_top CLK_MOUT_SCLK_AUDIO0>,
++			  <&cmu_top CLK_MOUT_SCLK_AUDIO1>,
++			  <&cmu_top CLK_MOUT_SCLK_SPDIF>,
++
++			  <&cmu_aud CLK_DIV_AUD_CA5>,
++			  <&cmu_aud CLK_DIV_ACLK_AUD>,
++			  <&cmu_aud CLK_DIV_PCLK_DBG_AUD>,
++			  <&cmu_aud CLK_DIV_SCLK_AUD_I2S>,
++			  <&cmu_aud CLK_DIV_SCLK_AUD_PCM>,
++			  <&cmu_aud CLK_DIV_SCLK_AUD_SLIMBUS>,
++			  <&cmu_aud CLK_DIV_SCLK_AUD_UART>,
++
++			  <&cmu_top CLK_DIV_SCLK_AUDIO0>,
++			  <&cmu_top CLK_DIV_SCLK_AUDIO1>,
++			  <&cmu_top CLK_DIV_SCLK_PCM1>,
++			  <&cmu_top CLK_DIV_SCLK_I2S1>;
++
++	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>,
++				<&cmu_aud CLK_MOUT_AUD_PLL_USER>,
++				<&cmu_aud CLK_MOUT_AUD_PLL_USER>,
++				<&cmu_top CLK_FOUT_AUD_PLL>,
++
++				<&cmu_top CLK_MOUT_AUD_PLL>,
++				<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
++				<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
++				<&cmu_top CLK_SCLK_AUDIO0>;
++
++	assigned-clock-rates = <0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>,
++				<(196608009 + 1)>,
++				<((196608009 / 3) + 1)>,
++				<((196608009 / 6) + 1)>,
++				<((196608009 / 4) + 1)>,
++				<((196608009 / 96) + 1)>,
++				<((196608009 / 8) + 1)>,
++				<(196608010 + 1)>,
++
++				<((196608009 / 8) + 1)>,
++				<((196608009 / 2) + 1)>,
++				<((196608009 / 96) + 1)>,
++				<((196608009 / 4) + 1)>;
++};
++
++&i2s1 {
++	assigned-clocks = <&i2s1 CLK_I2S_RCLK_SRC>;
++	assigned-clock-parents = <&cmu_peric CLK_SCLK_I2S1>;
+ };
+ 
+ &cmu_fsys {
+@@ -838,6 +893,10 @@
+ 	status = "okay";
+ };
+ 
++&i2s1 {
++	status = "okay";
++};
++
+ &mshc_0 {
+ 	status = "okay";
+ 	mmc-hs200-1_8v;
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 62f276970174..2b73bd86bc56 100644
+index 2b73bd86bc56..c0231d077fa6 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -1311,6 +1311,25 @@
+@@ -969,6 +969,7 @@
+ 			ddc = <&hsi2c_11>;
+ 			samsung,syscon-phandle = <&pmu_system_controller>;
+ 			samsung,sysreg-phandle = <&syscon_disp>;
++			#sound-dai-cells = <0>;
  			status = "disabled";
  		};
- 
-+		i2s1: i2s at 14d60000 {
-+			compatible = "samsung,exynos7-i2s";
-+			reg = <0x14d60000 0x100>;
-+			dmas = <&pdma0 31 &pdma0 30>;
-+			dma-names = "tx", "rx";
-+			interrupts = <GIC_SPI 435 IRQ_TYPE_NONE>;
-+			clocks = <&cmu_peric CLK_PCLK_I2S1>,
-+				 <&cmu_peric CLK_PCLK_I2S1>,
-+				 <&cmu_peric CLK_SCLK_I2S1>;
-+			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+			#clock-cells = <1>;
-+			samsung,supports-6ch;
-+			samsung,supports-rstclr;
-+			samsung,supports-tdm;
-+			samsung,supports-low-rfs;
-+			#sound-dai-cells = <1>;
-+			status = "disabled";
-+		};
-+
- 		pwm: pwm at 14dd0000 {
- 			compatible = "samsung,exynos4210-pwm";
- 			reg = <0x14dd0000 0x100>;
-@@ -1639,7 +1658,7 @@
- 				power-domains = <&pd_aud>;
- 			};
- 
--			i2s0: i2s0 at 11440000 {
-+			i2s0: i2s at 11440000 {
- 				compatible = "samsung,exynos7-i2s";
- 				reg = <0x11440000 0x100>;
- 				dmas = <&adma 0 &adma 2>;
-@@ -1651,9 +1670,11 @@
- 					<&cmu_aud CLK_SCLK_AUD_I2S>,
- 					<&cmu_aud CLK_SCLK_I2S_BCLK>;
- 				clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+				#clock-cells = <1>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&i2s0_bus>;
- 				power-domains = <&pd_aud>;
-+				#sound-dai-cells = <1>;
- 				status = "disabled";
- 			};
  
 -- 
 2.14.2
