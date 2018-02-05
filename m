@@ -1,51 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Feb 2018 16:41:30 +0000
-Subject: [PATCH v2 7/9] arm64: entry: Reword comment about
- post_ttbr_update_workaround
-In-Reply-To: <CAKv+Gu9pfMkJtMrWdiOcVQ5Uy4RfJUsW5KbsnAz23BLvq8BRUg@mail.gmail.com>
+Date: Mon, 5 Feb 2018 16:41:54 +0000
+Subject: [PATCH v2 0/9] Fix kpti-enabled kernels for Cavium ThunderX
+In-Reply-To: <CAKv+Gu-VvsjSG7Lno9e+qm5VzA9OJhN4DbqxPw0D1+FEwrFK_A@mail.gmail.com>
 References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
- <1517227200-20412-8-git-send-email-will.deacon@arm.com>
- <CAKv+Gu9pfMkJtMrWdiOcVQ5Uy4RfJUsW5KbsnAz23BLvq8BRUg@mail.gmail.com>
-Message-ID: <20180205164129.GE10172@arm.com>
+ <CAKv+Gu-VvsjSG7Lno9e+qm5VzA9OJhN4DbqxPw0D1+FEwrFK_A@mail.gmail.com>
+Message-ID: <20180205164153.GF10172@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 03, 2018 at 11:15:59AM +0000, Ard Biesheuvel wrote:
-> On 29 January 2018 at 11:59, Will Deacon <will.deacon@arm.com> wrote:
-> > We don't fully understand the Cavium ThunderX erratum, but it appears
-> > that mapping the kernel as nG can lead to horrible consequences such as
-> > attempting to execute userspace from kernel context. Since kpti isn't
-> > enabled for these CPUs anyway, simplify the comment justifying the lack
-> > of post_ttbr_update_workaround in the exception trampoline.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/entry.S | 12 ++----------
-> >  1 file changed, 2 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index b34e717d7597..fbe1444324b3 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -1013,16 +1013,8 @@ alternative_else_nop_endif
-> >         orr     \tmp, \tmp, #USER_ASID_FLAG
-> >         msr     ttbr1_el1, \tmp
-> >         /*
-> > -        * We avoid running the post_ttbr_update_workaround here because the
-> > -        * user and kernel ASIDs don't have conflicting mappings, so any
-> > -        * "blessing" as described in:
-> > -        *
-> > -        *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
-> > -        *
-> > -        * will not hurt correctness. Whilst this may partially defeat the
-> > -        * point of using split ASIDs in the first place, it avoids
-> > -        * the hit of invalidating the entire I-cache on every return to
-> > -        * userspace.
-> > +        * We avoid running the post_ttbr_update_workaround here because
-> > +        * it's only needed by Cavium ThunderX, which doesn't require kpti.
-> 
-> 'requires KPTI to be disabled' sounds more accurate to me
+Hi Ard,
 
-Fair enough. I'll leave this for Catalin to merge in.
+On Sat, Feb 03, 2018 at 11:36:04AM +0000, Ard Biesheuvel wrote:
+> On 29 January 2018 at 11:59, Will Deacon <will.deacon@arm.com> wrote:
+> > Hi all,
+> >
+> > This is version two of the patches I posted on Friday:
+> >
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556304.html
+> >
+> > Changes since v1 include:
+> >
+> >   * Use SCTLR_ELx_M instead of open-coded #1
+> >   * Changed section attributes for .idmap.text to reflect actual mappings
+> >   * Rejigged phys_to_pte for consistency with pte_to_phys
+> >   * Added reviewer tags
+> >
+> 
+> Any chance we could base this on the arm64/kpti branch rather than
+> for-next/core? Any backports of kpti will need to include this series
+> as well, or we break ThunderX, and I'd rather have you merge it into
+> for-next/core rather than the various backporters (whose level of
+> familiarity with this code is invariably lower than yours) into the
+> stable trees.
+
+I'd prefer to have this based on for-next/core for ease of merging, but I'll
+do a version for the kpti branch too (probably at -rc1). Once mainline has
+settled down, I plan to rebuild kpti with references to upstream commits
+etc.
 
 Will
