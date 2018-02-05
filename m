@@ -1,82 +1,120 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  5 Feb 2018 16:41:55 +0000
-Subject: [PATCHv2 1/8] ARM: ux500: remove PMU IRQ bouncer
+Date: Mon,  5 Feb 2018 16:41:56 +0000
+Subject: [PATCHv2 2/8] arm_pmu: kill arm_pmu_platdata
 In-Reply-To: <20180205164202.26502-1-mark.rutland@arm.com>
 References: <20180205164202.26502-1-mark.rutland@arm.com>
-Message-ID: <20180205164202.26502-2-mark.rutland@arm.com>
+Message-ID: <20180205164202.26502-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ux500 PMU IRQ bouncer is getting in the way of some fundametnal
-changes to the ARM PMU driver, and it's the only special case that
-exists today. Let's remove it.
+Now that we have no platforms passing platform data to the arm_pmu code,
+we can get rid of the platdata and associated hooks, paving the way for
+rework of our IRQ handling.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-ux500/cpu-db8500.c | 35 -----------------------------------
- 1 file changed, 35 deletions(-)
+ drivers/perf/arm_pmu.c       | 27 ++++-----------------------
+ include/linux/perf/arm_pmu.h | 17 -----------------
+ 2 files changed, 4 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 57058ac46f49..7e5d7a083707 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -23,7 +23,6 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
--#include <linux/perf/arm_pmu.h>
- #include <linux/regulator/machine.h>
- 
- #include <asm/outercache.h>
-@@ -112,37 +111,6 @@ static void ux500_restart(enum reboot_mode mode, const char *cmd)
- 	prcmu_system_reset(0);
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 7bc5eee96b31..82b09d1cb42c 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -17,7 +17,6 @@
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/perf/arm_pmu.h>
+-#include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/sched/clock.h>
+ #include <linux/spinlock.h>
+@@ -320,17 +319,9 @@ validate_group(struct perf_event *event)
+ 	return 0;
  }
  
--/*
-- * The PMU IRQ lines of two cores are wired together into a single interrupt.
-- * Bounce the interrupt to the other core if it's not ours.
-- */
--static irqreturn_t db8500_pmu_handler(int irq, void *dev, irq_handler_t handler)
+-static struct arm_pmu_platdata *armpmu_get_platdata(struct arm_pmu *armpmu)
 -{
--	irqreturn_t ret = handler(irq, dev);
--	int other = !smp_processor_id();
+-	struct platform_device *pdev = armpmu->plat_device;
 -
--	if (ret == IRQ_NONE && cpu_online(other))
--		irq_set_affinity(irq, cpumask_of(other));
--
--	/*
--	 * We should be able to get away with the amount of IRQ_NONEs we give,
--	 * while still having the spurious IRQ detection code kick in if the
--	 * interrupt really starts hitting spuriously.
--	 */
--	return ret;
+-	return pdev ? dev_get_platdata(&pdev->dev) : NULL;
 -}
 -
--static struct arm_pmu_platdata db8500_pmu_platdata = {
--	.handle_irq		= db8500_pmu_handler,
--	.irq_flags		= IRQF_NOBALANCING | IRQF_NO_THREAD,
--};
--
--static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
--	/* Requires call-back bindings. */
--	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
--	{},
--};
--
- static struct of_dev_auxdata u8540_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu", NULL),
- 	{},
-@@ -165,9 +133,6 @@ static void __init u8500_init_machine(void)
- 	if (of_machine_is_compatible("st-ericsson,u8540"))
- 		of_platform_populate(NULL, u8500_local_bus_nodes,
- 				     u8540_auxdata_lookup, NULL);
--	else
--		of_platform_populate(NULL, u8500_local_bus_nodes,
--				     u8500_auxdata_lookup, NULL);
- }
+ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ {
+ 	struct arm_pmu *armpmu;
+-	struct arm_pmu_platdata *plat;
+ 	int ret;
+ 	u64 start_clock, finish_clock;
  
- static const char * stericsson_dt_platform_compat[] = {
+@@ -342,13 +333,8 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ 	 */
+ 	armpmu = *(void **)dev;
+ 
+-	plat = armpmu_get_platdata(armpmu);
+-
+ 	start_clock = sched_clock();
+-	if (plat && plat->handle_irq)
+-		ret = plat->handle_irq(irq, armpmu, armpmu->handle_irq);
+-	else
+-		ret = armpmu->handle_irq(irq, armpmu);
++	ret = armpmu->handle_irq(irq, armpmu);
+ 	finish_clock = sched_clock();
+ 
+ 	perf_sample_event_took(finish_clock - start_clock);
+@@ -578,7 +564,6 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 			goto err_out;
+ 		}
+ 	} else {
+-		struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
+ 		unsigned long irq_flags;
+ 
+ 		err = irq_force_affinity(irq, cpumask_of(cpu));
+@@ -589,13 +574,9 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 			goto err_out;
+ 		}
+ 
+-		if (platdata && platdata->irq_flags) {
+-			irq_flags = platdata->irq_flags;
+-		} else {
+-			irq_flags = IRQF_PERCPU |
+-				    IRQF_NOBALANCING |
+-				    IRQF_NO_THREAD;
+-		}
++		irq_flags = IRQF_PERCPU |
++			    IRQF_NOBALANCING |
++			    IRQF_NO_THREAD;
+ 
+ 		err = request_irq(irq, handler, irq_flags, "arm-pmu",
+ 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index af0f44effd44..712764b35c6a 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -17,23 +17,6 @@
+ #include <linux/sysfs.h>
+ #include <asm/cputype.h>
+ 
+-/*
+- * struct arm_pmu_platdata - ARM PMU platform data
+- *
+- * @handle_irq: an optional handler which will be called from the
+- *	interrupt and passed the address of the low level handler,
+- *	and can be used to implement any platform specific handling
+- *	before or after calling it.
+- *
+- * @irq_flags: if non-zero, these flags will be passed to request_irq
+- *             when requesting interrupts for this PMU device.
+- */
+-struct arm_pmu_platdata {
+-	irqreturn_t (*handle_irq)(int irq, void *dev,
+-				  irq_handler_t pmu_handler);
+-	unsigned long irq_flags;
+-};
+-
+ #ifdef CONFIG_ARM_PMU
+ 
+ /*
 -- 
 2.11.0
