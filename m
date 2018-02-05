@@ -1,103 +1,130 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  5 Feb 2018 18:39:42 +0000
-Subject: [PATCH 1/5] drivers/bus: Move Arm CCN PMU driver
+Date: Mon,  5 Feb 2018 18:39:46 +0000
+Subject: [PATCH 5/5] perf/arm-cci: Clean up model discovery
 In-Reply-To: <cover.1517855839.git.robin.murphy@arm.com>
 References: <cover.1517855839.git.robin.murphy@arm.com>
-Message-ID: <b85ba78d3058cedfab43fa035d5a326b2e70baeb.1517855839.git.robin.murphy@arm.com>
+Message-ID: <ba80cd671ba5b53fa8e5a2230bb0ac7e2de969b8.1517855839.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm-ccn driver is purely a perf driver for the CCN PMU, not a bus
-driver in the sense of the other residents of drivers/bus/, so let's
-move it to the appropriate place for SoC PMU drivers. Not to mention
-moving the documentation accordingly as well.
+Since I am the self-appointed of_device_get_match_data() police, it's
+only right that I should clean up this driver while I'm otherwise
+touching it. This also reveals that we're passing around a struct
+platform_device in places where we only ever care about its regular
+device, so straighten that out in the process.
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- .../devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt}         | 0
- Documentation/{arm/CCN.txt => perf/arm-ccn.txt}                   | 0
- drivers/bus/Kconfig                                               | 8 --------
- drivers/bus/Makefile                                              | 2 --
- drivers/perf/Kconfig                                              | 7 +++++++
- drivers/perf/Makefile                                             | 1 +
- drivers/{bus => perf}/arm-ccn.c                                   | 0
- 7 files changed, 8 insertions(+), 10 deletions(-)
- rename Documentation/devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt} (100%)
- rename Documentation/{arm/CCN.txt => perf/arm-ccn.txt} (100%)
- rename drivers/{bus => perf}/arm-ccn.c (100%)
+ drivers/perf/arm-cci.c | 40 ++++++++++++++++------------------------
+ 1 file changed, 16 insertions(+), 24 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/ccn.txt b/Documentation/devicetree/bindings/perf/arm-ccn.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/ccn.txt
-rename to Documentation/devicetree/bindings/perf/arm-ccn.txt
-diff --git a/Documentation/arm/CCN.txt b/Documentation/perf/arm-ccn.txt
-similarity index 100%
-rename from Documentation/arm/CCN.txt
-rename to Documentation/perf/arm-ccn.txt
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 57e011d36a79..116446c42c6b 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -48,14 +48,6 @@ config ARM_CCI5xx_PMU
+diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+index 242623fbce1f..336f1455cf96 100644
+--- a/drivers/perf/arm-cci.c
++++ b/drivers/perf/arm-cci.c
+@@ -8,6 +8,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/perf_event.h>
+@@ -371,14 +372,14 @@ static int probe_cci400_revision(void)
+ 		return CCI400_R1;
+ }
  
- 	  If unsure, say Y
+-static const struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
++static const struct cci_pmu_model *probe_cci_model(void)
+ {
+ 	if (platform_has_secure_cci_access())
+ 		return &cci_pmu_models[probe_cci400_revision()];
+ 	return NULL;
+ }
+ #else	/* !CONFIG_ARM_CCI400_PMU */
+-static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
++static inline struct cci_pmu_model *probe_cci_model(void)
+ {
+ 	return NULL;
+ }
+@@ -1589,20 +1590,6 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
+ 	{},
+ };
  
--config ARM_CCN
--	tristate "ARM CCN driver support"
--	depends on ARM || ARM64
--	depends on PERF_EVENTS
--	help
--	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
--	  interconnect.
+-static inline const struct cci_pmu_model *get_cci_model(struct platform_device *pdev)
+-{
+-	const struct of_device_id *match = of_match_node(arm_cci_pmu_matches,
+-							pdev->dev.of_node);
+-	if (!match)
+-		return NULL;
+-	if (match->data)
+-		return match->data;
 -
- config BRCMSTB_GISB_ARB
- 	bool "Broadcom STB GISB bus arbiter"
- 	depends on ARM || ARM64 || MIPS
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 9bcd0bf3954b..19733afddd0a 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -5,8 +5,6 @@
- 
- # Interconnect bus drivers for ARM platforms
- obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
--obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
+-	dev_warn(&pdev->dev, "DEPRECATED compatible property,"
+-			 "requires secure access to CCI registers");
+-	return probe_cci_model(pdev);
+-}
 -
- obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
- obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
- obj-$(CONFIG_MIPS_CDMM)		+= mips_cdmm.o
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index da5724cd89cf..331b6d992b5a 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -5,6 +5,13 @@
- menu "Performance monitor support"
- 	depends on PERF_EVENTS
+ static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
+ {
+ 	int i;
+@@ -1614,7 +1601,7 @@ static bool is_duplicate_irq(int irq, int *irqs, int nr_irqs)
+ 	return false;
+ }
  
-+config ARM_CCN
-+	tristate "ARM CCN driver support"
-+	depends on ARM || ARM64
-+	help
-+	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
-+	  interconnect.
-+
- config ARM_PMU
- 	depends on ARM || ARM64
- 	bool "ARM PMU framework"
-diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index c2f27419bdf0..5004abee0f3a 100644
---- a/drivers/perf/Makefile
-+++ b/drivers/perf/Makefile
-@@ -1,4 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
-+obj-$(CONFIG_ARM_CCN) += arm-ccn.o
- obj-$(CONFIG_ARM_DSU_PMU) += arm_dsu_pmu.o
- obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
- obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
-diff --git a/drivers/bus/arm-ccn.c b/drivers/perf/arm-ccn.c
-similarity index 100%
-rename from drivers/bus/arm-ccn.c
-rename to drivers/perf/arm-ccn.c
+-static struct cci_pmu *cci_pmu_alloc(struct platform_device *pdev)
++static struct cci_pmu *cci_pmu_alloc(struct device *dev)
+ {
+ 	struct cci_pmu *cci_pmu;
+ 	const struct cci_pmu_model *model;
+@@ -1624,28 +1611,33 @@ static struct cci_pmu *cci_pmu_alloc(struct platform_device *pdev)
+ 	 * them explicitly on an error, as it would end up in driver
+ 	 * detach.
+ 	 */
+-	model = get_cci_model(pdev);
++	model = of_device_get_match_data(dev);
+ 	if (!model) {
+-		dev_warn(&pdev->dev, "CCI PMU version not supported\n");
++		dev_warn(dev,
++			 "DEPRECATED compatible property, requires secure access to CCI registers");
++		model = probe_cci_model();
++	}
++	if (!model) {
++		dev_warn(dev, "CCI PMU version not supported\n");
+ 		return ERR_PTR(-ENODEV);
+ 	}
+ 
+-	cci_pmu = devm_kzalloc(&pdev->dev, sizeof(*cci_pmu), GFP_KERNEL);
++	cci_pmu = devm_kzalloc(dev, sizeof(*cci_pmu), GFP_KERNEL);
+ 	if (!cci_pmu)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	cci_pmu->model = model;
+-	cci_pmu->irqs = devm_kcalloc(&pdev->dev, CCI_PMU_MAX_HW_CNTRS(model),
++	cci_pmu->irqs = devm_kcalloc(dev, CCI_PMU_MAX_HW_CNTRS(model),
+ 					sizeof(*cci_pmu->irqs), GFP_KERNEL);
+ 	if (!cci_pmu->irqs)
+ 		return ERR_PTR(-ENOMEM);
+-	cci_pmu->hw_events.events = devm_kcalloc(&pdev->dev,
++	cci_pmu->hw_events.events = devm_kcalloc(dev,
+ 					     CCI_PMU_MAX_HW_CNTRS(model),
+ 					     sizeof(*cci_pmu->hw_events.events),
+ 					     GFP_KERNEL);
+ 	if (!cci_pmu->hw_events.events)
+ 		return ERR_PTR(-ENOMEM);
+-	cci_pmu->hw_events.used_mask = devm_kcalloc(&pdev->dev,
++	cci_pmu->hw_events.used_mask = devm_kcalloc(dev,
+ 						BITS_TO_LONGS(CCI_PMU_MAX_HW_CNTRS(model)),
+ 						sizeof(*cci_pmu->hw_events.used_mask),
+ 						GFP_KERNEL);
+@@ -1661,7 +1653,7 @@ static int cci_pmu_probe(struct platform_device *pdev)
+ 	struct cci_pmu *cci_pmu;
+ 	int i, ret, irq;
+ 
+-	cci_pmu = cci_pmu_alloc(pdev);
++	cci_pmu = cci_pmu_alloc(&pdev->dev);
+ 	if (IS_ERR(cci_pmu))
+ 		return PTR_ERR(cci_pmu);
+ 
 -- 
 2.16.1.dirty
