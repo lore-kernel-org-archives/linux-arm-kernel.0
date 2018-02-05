@@ -1,49 +1,57 @@
-From: olivier.moysan@st.com (Olivier Moysan)
-Date: Mon, 5 Feb 2018 11:49:45 +0100
-Subject: [PATCH v2 1/1] ASoC: stm32: add of dependency for stm32 drivers
-Message-ID: <1517827785-6275-1-git-send-email-olivier.moysan@st.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 5 Feb 2018 11:50:31 +0100
+Subject: [PATCH v3 08/18] arm/arm64: KVM: Add PSCI version selection API
+In-Reply-To: <7eb71dd4-c06b-9680-0280-03569925283b@arm.com>
+References: <20180201114657.7323-1-marc.zyngier@arm.com>
+ <20180201114657.7323-9-marc.zyngier@arm.com>
+ <20180202201706.dj6jmff7lh7bleze@kamzik.brq.redhat.com>
+ <20180203115932.24c4bcfb@why.wild-wind.fr.eu.org>
+ <20180204123701.GK21802@cbox>
+ <6b0d5f23-950c-b2a6-3cc8-63c3145893b4@arm.com>
+ <20180205095823.r5vlfkovrgksykxh@hawk.localdomain>
+ <7eb71dd4-c06b-9680-0280-03569925283b@arm.com>
+Message-ID: <20180205105031.GV21802@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of dependency for STM32 ASoC drivers.
-DFSDM of dependency is already inherited
-from STM32_DFSDM_ADC dependency.
+On Mon, Feb 05, 2018 at 10:42:44AM +0000, Marc Zyngier wrote:
+> On 05/02/18 09:58, Andrew Jones wrote:
+> > On Mon, Feb 05, 2018 at 09:24:33AM +0000, Marc Zyngier wrote:
+> >> On 04/02/18 12:37, Christoffer Dall wrote:
+> 
+> [...]
+> 
+> >>> Given the urgency of adding mitigation towards variant 2 which is the
+> >>> driver for this work, I think we should drop the compat functionality in
+> >>> this series and work this out later on if needed.  I think we can just
+> >>> tweak the previous patch to enable PSCI 1.0 by default and drop this
+> >>> patch for the current merge window.
+> >>
+> >> I'd be fine with that, as long as we have a clear agreement on the
+> >> impact of such a move.
+> > 
+> > Yeah, that's what I was trying to figure out with my fancy tables. I might
+> > be coming around more to your approach now, though. Ensuring the new->old
+> > migration fails is a nice feature of this series. It would be good if
+> > we could preserve that behavior without committing to a new userspace
+> > interface, but I'm not sure how. Maybe I should just apologize for the
+> > noise, and this patch be left as is...
+> 
+> How about we don't decide now?
+> 
+> I can remove this patch from the series so that the core stuff can make
+> it into the arm64 tree ASAP (I think Catalin wants to queue something
+> early this week so that it can hit Linus' tree before the end of the
+> merge window), and then repost this single patch on its own (with fixes
+> for the things that Christoffer found in his review) after -rc1.
+> 
+> It leaves us time to haggle over the userspace ABI (which is
+> realistically not going to affect anyone), and we get the core stuff in
+> place for SoC vendors to start updating their firmware.
+> 
+I agree, that's what I tried to suggest in my e-mail as well.  Just
+remember to tweak the previous patch to actually enable PSCI 1.0 by
+default.
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
----
- sound/soc/stm/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/stm/Kconfig b/sound/soc/stm/Kconfig
-index 3ad881f..48f9ddd 100644
---- a/sound/soc/stm/Kconfig
-+++ b/sound/soc/stm/Kconfig
-@@ -2,7 +2,7 @@ menu "STMicroelectronics STM32 SOC audio support"
- 
- config SND_SOC_STM32_SAI
- 	tristate "STM32 SAI interface (Serial Audio Interface) support"
--	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-@@ -11,7 +11,7 @@ config SND_SOC_STM32_SAI
- 
- config SND_SOC_STM32_I2S
- 	tristate "STM32 I2S interface (SPI/I2S block) support"
--	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
-@@ -20,7 +20,7 @@ config SND_SOC_STM32_I2S
- 
- config SND_SOC_STM32_SPDIFRX
- 	tristate "STM32 S/PDIF receiver (SPDIFRX) support"
--	depends on ARCH_STM32 || COMPILE_TEST
-+	depends on (ARCH_STM32 && OF) || COMPILE_TEST
- 	depends on SND_SOC
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select REGMAP_MMIO
--- 
-1.9.1
+Thanks,
+-Christoffer
