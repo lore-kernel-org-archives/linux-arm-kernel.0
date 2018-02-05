@@ -1,49 +1,89 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Feb 2018 16:10:20 +0800
-Subject: [PATCH] ARM: dts: imx25-pinfunc: Always set SION for SD CMD
-In-Reply-To: <CA+sos78H1_ihvVghJcpZQZmB6rE2nfgXF8gq8kqK=cQE9Qs0mw@mail.gmail.com>
-References: <20180127000752.2879-1-benoit.thebaudeau.dev@gmail.com>
- <20180127153733.7ziaq6frli3jemc7@pengutronix.de>
- <CA+sos78H1_ihvVghJcpZQZmB6rE2nfgXF8gq8kqK=cQE9Qs0mw@mail.gmail.com>
-Message-ID: <20180205081018.GQ31354@dragon>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 5 Feb 2018 16:11:52 +0800
+Subject: [PATCH 2/2] thermal: mediatek: add support for MT7622 SoC
+In-Reply-To: <0b7dabc3b2c7ed93b88ec0923c2cce2f84fba5b1.1517817887.git.sean.wang@mediatek.com>
+References: <0b7dabc3b2c7ed93b88ec0923c2cce2f84fba5b1.1517817887.git.sean.wang@mediatek.com>
+Message-ID: <796b53ce7fc5e81a04c5ab9cfa4cee67015b355f.1517817887.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 27, 2018 at 09:37:11PM +0100, Beno?t Th?baudeau wrote:
-> On Sat, Jan 27, 2018 at 4:37 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Sat, Jan 27, 2018 at 01:07:52AM +0100, Beno?t Th?baudeau wrote:
-> >> The eSDHC does not work properly if the SION bit is not set for the
-> >> bidirectional CMD signal, whatever the eSDHC instance and the selected
-> >> pad. Therefore, setting SION is mandatory for all eSDHC CMD ports. Do
-> >> this for MX25_PAD_*__SD*_CMD in imx25-pinfunc.h in order to enforce this
-> >> behavior for all boards.
-> >>
-> >> This had already been done for eSDHC1, but not for eSDHC2. Also, define
-> >> MX25_PAD_FEC_MDC__SDHC2_CMD so that all the possible cases are covered
-> >> from now on.
-> >
-> > There is an inconsistency in the naming. The eSDHC1 CMD constants are
-> > named:
-> >
-> >         MX25_PAD_SD1_CMD__SD1_CMD
-> >
-> > The reference calls this:
-> >
-> >         CMD of instance: esdhc1.
-> >
-> > The register name is correct though. Not sure it's worth to fix this to
-> > use consistent naming (which would result in:
-> >
-> >         MX25_PAD_SD1_CMD__ESDHC1_CMD
-> >
-> > which looks ugly, too).
-> 
-> Indeed. I had also noticed this. I can send a patch to apply before
-> this one. But that would break the out-of-tree DT files using these
-> definitions. Would that be OK?
+From: Sean Wang <sean.wang@mediatek.com>
 
-That's OK, I would say.  It could be a reminder of that they should
-upstream their files.
+MT7622 SoC has built-in thermal controller with one sensing point, the
+patch just is to extend the functionality of the existing logic.
 
-Shawn
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+---
+ drivers/thermal/mtk_thermal.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
+index 1e61c09..8a53151 100644
+--- a/drivers/thermal/mtk_thermal.c
++++ b/drivers/thermal/mtk_thermal.c
+@@ -158,6 +158,12 @@
+ /* The number of sensing points per bank */
+ #define MT2712_NUM_SENSORS_PER_ZONE	4
+ 
++#define MT7622_TEMP_AUXADC_CHANNEL	11
++#define MT7622_NUM_SENSORS		1
++#define MT7622_NUM_ZONES		1
++#define MT7622_NUM_SENSORS_PER_ZONE	1
++#define MT7622_TS1	0
++
+ #define THERMAL_NAME    "mtk-thermal"
+ 
+ struct mtk_thermal;
+@@ -249,6 +255,12 @@ static const int mt2712_adcpnp[MT2712_NUM_SENSORS_PER_ZONE] = {
+ 
+ static const int mt2712_mux_values[MT2712_NUM_SENSORS] = { 0, 1, 2, 3 };
+ 
++/* MT7622 thermal sensor data */
++static const int mt7622_bank_data[MT7622_NUM_SENSORS] = { MT7622_TS1, };
++static const int mt7622_msr[MT7622_NUM_SENSORS_PER_ZONE] = { TEMP_MSR0, };
++static const int mt7622_adcpnp[MT7622_NUM_SENSORS_PER_ZONE] = { TEMP_ADCPNP0, };
++static const int mt7622_mux_values[MT7622_NUM_SENSORS] = { 0, };
++
+ /**
+  * The MT8173 thermal controller has four banks. Each bank can read up to
+  * four temperature sensors simultaneously. The MT8173 has a total of 5
+@@ -336,6 +348,25 @@ static const struct mtk_thermal_data mt2712_thermal_data = {
+ 	.sensor_mux_values = mt2712_mux_values,
+ };
+ 
++/*
++ * MT7622 have only one sensing point which uses AUXADC Channel 11 for raw data
++ * access.
++ */
++static const struct mtk_thermal_data mt7622_thermal_data = {
++	.auxadc_channel = MT7622_TEMP_AUXADC_CHANNEL,
++	.num_banks = MT7622_NUM_ZONES,
++	.num_sensors = MT7622_NUM_SENSORS,
++	.bank_data = {
++		{
++			.num_sensors = 1,
++			.sensors = mt7622_bank_data,
++		},
++	},
++	.msr = mt7622_msr,
++	.adcpnp = mt7622_adcpnp,
++	.sensor_mux_values = mt7622_mux_values,
++};
++
+ /**
+  * raw_to_mcelsius - convert a raw ADC value to mcelsius
+  * @mt:		The thermal controller
+@@ -638,6 +669,10 @@ static const struct of_device_id mtk_thermal_of_match[] = {
+ 	{
+ 		.compatible = "mediatek,mt2712-thermal",
+ 		.data = (void *)&mt2712_thermal_data,
++	},
++	{
++		.compatible = "mediatek,mt7622-thermal",
++		.data = (void *)&mt7622_thermal_data,
+ 	}, {
+ 	},
+ };
+-- 
+2.7.4
