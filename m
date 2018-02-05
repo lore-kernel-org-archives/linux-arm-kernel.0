@@ -1,66 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Feb 2018 10:22:34 +0000
-Subject: [PATCH v4 0/6] 32bit ARM branch predictor hardening
-In-Reply-To: <20180205100144.GT21802@cbox>
-References: <20180201110738.5421-1-marc.zyngier@arm.com>
- <20180205100144.GT21802@cbox>
-Message-ID: <69440dc1-346f-f5d7-946d-b976ddcb957f@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 5 Feb 2018 08:27:44 -0200
+Subject: [PATCH 1/2] arm64: dts: fsl: imx8mq: add watchdog devices
+In-Reply-To: <4c7c9104ca95419d22b8df19a69819e194dd3488.1517816731.git.baruch@tkos.co.il>
+References: <4c7c9104ca95419d22b8df19a69819e194dd3488.1517816731.git.baruch@tkos.co.il>
+Message-ID: <CAOMZO5DgP_piWC3Q4dOs58eMJrW6XVZZ+dA583KkKLeGmWPZsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/18 10:01, Christoffer Dall wrote:
-> On Thu, Feb 01, 2018 at 11:07:32AM +0000, Marc Zyngier wrote:
->> This small series implements some basic BP hardening by invalidating
->> the BTB on 32bit ARM CPUs that are known to be susceptible to aliasing
->> attacks (Spectre variant 2). It doesn't help non-ARM 32bit CPUs, nor
->> 32bit kernels that run on 64bit capable CPUs. This series doesn't
->> mitigate Spectre variant 1 either.
->>
->> These patches are closely modelled against what we do on arm64,
->> although simpler as we can rely on an architected instruction to
->> perform the invalidation. The notable exception is Cortex-A15, where
->> BTB invalidation behaves like a NOP, and the only way to shoot the
->> predictor down is to invalidate the icache *and* to have ACTLR[0] set
->> to 1 (which is a secure-only operation).
->>
->> The first patch reuses the Cortex-A8 BTB invalidation in switch_mm and
->> generalises it to be used on all affected CPUs. The second perform the
->> same invalidation on prefetch abort outside of the userspace
->> range. The third one nukes it on guest exit, and results in some major
->> surgery as we cannot take a branch from the vectors (that, and Thumb2
->> being a massive pain).
->>
->> Patches 4 to 6 are doing a similar thing for Cortex-A15, with the
->> aforementioned ICIALLU.
->>
->> To sum up the requirements:
->>
->> - Cortex-A15 need to have ACTLR.IBE (bit 0) set to 1 from secure
->>   mode. Cortex-A8 also needs to have ACTLR.IBE (bit 6) set, overlaping
->>   with ARM_ERRATA_430973 which also requires it.
->> - Cortex-A9, A12 and A17 do not require any extra configuration.
->>
->> Note 1: Contrary to the initial version, this new series relies on
->> the arm64/kpti branch (I reuse the per-CPU vector hook for KVM).
->>
->> Note 2: M-class CPUs are not affected and for R-class cores, the
->> mitigation doesn't make much sense since we do not enforce user/kernel
->> isolation.
->>
->> [Christoffer: since the patches have significantly changed since v3,
->> I've dropped your RB tags]
-> 
-> Except for the question on patch 4, you can add my tag back to the
-> series.
-> 
-> I particularly enjoyed the cute xor hack in patch 3.
+Hi Baruch,
 
-I feel that I've written too much of that kind of hacks lately...
+On Mon, Feb 5, 2018 at 5:45 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  arch/arm64/boot/dts/freescale/imx8mq.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> index 50ed302d299a..740457e2a0bf 100644
+> --- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> @@ -250,6 +250,30 @@
+>                                               "clk_ext1", "clk_ext2",
+>                                               "clk_ext3", "clk_ext4";
+>                         };
+> +
+> +                       wdog1: wdog at 30280000 {
+> +                               compatible = "fsl,imx21-wdt";
 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Please use:
 
-Thanks!
+compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt"; instead.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This is the preferred way as it allows us to apply specific mx8qm
+fixes if needed.
+
+Thanks
