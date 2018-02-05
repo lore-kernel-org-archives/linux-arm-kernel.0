@@ -1,26 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 5 Feb 2018 00:07:20 -0600
-Subject: [PATCH v2 3/8] dt-bindings: mfd: stm32-timers: add support for
- dmas
-In-Reply-To: <1516979499-3665-4-git-send-email-fabrice.gasnier@st.com>
-References: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
- <1516979499-3665-4-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180205060720.v3sfw44orngsyltq@rob-hp-laptop>
+Date: Mon, 5 Feb 2018 00:07:27 -0600
+Subject: [PATCH 01/15] firmware: qcom: scm: Add ipq4019 soc compatible
+In-Reply-To: <1517202689-14212-2-git-send-email-sricharan@codeaurora.org>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180205022530.xf64gqeijicewdla@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 04:11:34PM +0100, Fabrice Gasnier wrote:
-> Add support for DMAs to STM32 timers. STM32 Timers can support up to 7
-> dma requests: up to 4 channels, update, compare and trigger.
-> DMAs may be used to transfer data from pwm capture for instance.
-> DMA support is made optional, PWM capture support is also an option.
-> This is much more wise system-wide to avoid shortage on DMA request
-> lines as there's significant amount of timer instances that can
-> request up to 7 channels.
+On Mon, Jan 29, 2018 at 10:41:15AM +0530, Sricharan R wrote:
+> Add the compatible for ipq4019.
+> This does not need clocks to do scm calls.
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  .../devicetree/bindings/mfd/stm32-timers.txt         | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  Documentation/devicetree/bindings/firmware/qcom,scm.txt | 3 ++-
+>  drivers/firmware/qcom_scm.c                             | 3 +++
+>  2 files changed, 5 insertions(+), 1 deletion(-)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
