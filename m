@@ -1,37 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 5 Feb 2018 08:27:44 -0200
-Subject: [PATCH 1/2] arm64: dts: fsl: imx8mq: add watchdog devices
-In-Reply-To: <4c7c9104ca95419d22b8df19a69819e194dd3488.1517816731.git.baruch@tkos.co.il>
-References: <4c7c9104ca95419d22b8df19a69819e194dd3488.1517816731.git.baruch@tkos.co.il>
-Message-ID: <CAOMZO5DgP_piWC3Q4dOs58eMJrW6XVZZ+dA583KkKLeGmWPZsA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Feb 2018 18:37:20 +0800
+Subject: [PATCH v2 BUGFIX] ARM: dts: imx6ull: fix the imx6ull-14x14-evk
+ configuration
+In-Reply-To: <20180205105543.1711274c@karo-electronics.de>
+References: <1516955159-21626-1-git-send-email-LW@KARO-electronics.de>
+ <1516956738-24673-1-git-send-email-LW@KARO-electronics.de>
+ <20180205075620.GO31354@dragon>
+ <20180205105543.1711274c@karo-electronics.de>
+Message-ID: <20180205103716.GY31354@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+On Mon, Feb 05, 2018 at 10:55:43AM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> On Mon, 5 Feb 2018 15:56:22 +0800 Shawn Guo wrote:
+> > On Fri, Jan 26, 2018 at 09:52:18AM +0100, Lothar Wa?mann wrote:
+> > > imx6ull-14x14-evk.dts currently includes the imx6ul.dtsi file for an
+> > > i.MX6ULL SoC which is plain wrong.
+> > > 
+> > > Rename the current imx6ul-14x14-evk.dts to .dtsi and include it from
+> > > imx6ul-14x14-evk.dts and imx6ull-14x14-evk.dts, so that both can
+> > > include the appropriate SoC specific (imx6ul.dtsi/imx6ull.dtsi) file.
+> > > 
+> > > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > 
+> > Which base is the patch generated against?  I cannot apply it to any
+> > branch in my tree.
+> >
+> The patch was generated against next-20180118 but also applies to
+> next-20180205.
 
-On Mon, Feb 5, 2018 at 5:45 AM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  arch/arm64/boot/dts/freescale/imx8mq.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-> index 50ed302d299a..740457e2a0bf 100644
-> --- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-> @@ -250,6 +250,30 @@
->                                               "clk_ext1", "clk_ext2",
->                                               "clk_ext3", "clk_ext4";
->                         };
-> +
-> +                       wdog1: wdog at 30280000 {
-> +                               compatible = "fsl,imx21-wdt";
+It looks like you would really want this go into 4.16 as a fix?  In that
+case, I will need to wait for v4.16-rc1 to apply it.
 
-Please use:
-
-compatible = "fsl,imx8mq-wdt", "fsl,imx21-wdt"; instead.
-
-This is the preferred way as it allows us to apply specific mx8qm
-fixes if needed.
-
-Thanks
+Shawn
