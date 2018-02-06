@@ -1,52 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 6 Feb 2018 19:41:07 +0300
-Subject: [PATCH 07/11] arm64: dts: renesas: r8a77980: add [H]SCIF support
-In-Reply-To: <CAMuHMdWXc=1s5rMU5Tc_=tH4jrH+5P6z52J3ihiyYfseTpQ-kw@mail.gmail.com>
-References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
- <169ed4ac-1b8b-cf8c-45c4-957ebbdf3f5e@cogentembedded.com>
- <CAMuHMdWXc=1s5rMU5Tc_=tH4jrH+5P6z52J3ihiyYfseTpQ-kw@mail.gmail.com>
-Message-ID: <f440c853-d955-bba9-dc58-d7670f521a73@cogentembedded.com>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Tue, 6 Feb 2018 10:46:49 -0600
+Subject: [PATCH v3 0/8] use 64-bit arithmetic instead of 32-bit
+Message-ID: <cover.1517929336.git.gustavo@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2018 02:58 PM, Geert Uytterhoeven wrote:
+Add suffix LL and ULL to various constants in order to give the compiler
+complete information about the proper arithmetic to use. Such constants
+are used in contexts that expect expressions of type u64 (64 bits, unsigned)
+and s64 (64 bits, signed).
 
->> Describe [H]SCIF ports in the R8A77980 device tree.
->>
->> Based on the original (and large) patch by Vladimir Barinov.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Thanks for your patch!
-> 
->> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> 
->> @@ -85,6 +92,150 @@
->>                         #power-domain-cells = <1>;
->>                 };
->>
->> +               hscif0: serial at e6540000 {
->> +                       compatible = "renesas,hscif-r8a77980",
->> +                                    "renesas,rcar-gen3-hscif",
->> +                                    "renesas,hscif";
->> +                       reg = <0 0xe6540000 0 0x60>;
->> +                       interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&cpg CPG_MOD 520>,
->> +                                <&cpg CPG_CORE 16>,
-> 
-> Shouldn't this be 19 (S3D1) instead of 16 (S2D1)?
+The mentioned expressions are currently being evaluated using 32-bit
+arithmetic, wich in some cases can lead to unintentional integer
+overflows.
 
-   Seems like that... at least after out chat. :-)
+This patchset addresses the following "Unintentional integer overflow"
+Coverity reports:
+CIDs: 200604, 1056807, 1056808, 1271223, 1324146
+CIDs: 1392628, 1392630, 1446589, 1454996, 1458347
 
-> With that fixed (for all (H)SCIF ports);
+Thank you
 
-   The manual tells me SCKi for the SCIF ports should be the same S3D1.
+Changes in v2:
+ - Update subject and changelog to better reflect the proposed code changes.
+ - Add suffix ULL and LL to constants instead of casting variables.
+ - Extend the proposed code changes to other similar cases that had not
+   previously been considered in v1 of this patchset.
 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Gr{oetje,eeting}s,
-> 
+Changes in v3:
+ - Mention the specific Coverity report in all commit messages.
 
-MBR, Sergei
+Gustavo A. R. Silva (8):
+  rtl2832: use 64-bit arithmetic instead of 32-bit in
+    rtl2832_set_frontend
+  dvb-frontends: ves1820: use 64-bit arithmetic instead of 32-bit
+  i2c: max2175: use 64-bit arithmetic instead of 32-bit
+  i2c: ov9650: use 64-bit arithmetic instead of 32-bit
+  pci: cx88-input: use 64-bit arithmetic instead of 32-bit
+  rockchip/rga: use 64-bit arithmetic instead of 32-bit
+  platform: sh_veu: use 64-bit arithmetic instead of 32-bit
+  platform: vivid-cec: use 64-bit arithmetic instead of 32-bit
+
+ drivers/media/dvb-frontends/rtl2832.c         |  4 ++--
+ drivers/media/dvb-frontends/ves1820.c         |  2 +-
+ drivers/media/i2c/max2175.c                   |  2 +-
+ drivers/media/i2c/ov9650.c                    |  9 +++++----
+ drivers/media/pci/cx88/cx88-input.c           |  4 ++--
+ drivers/media/platform/rockchip/rga/rga-buf.c |  3 ++-
+ drivers/media/platform/sh_veu.c               |  4 ++--
+ drivers/media/platform/vivid/vivid-cec.c      | 11 +++++++++--
+ 8 files changed, 24 insertions(+), 15 deletions(-)
+
+-- 
+2.7.4
