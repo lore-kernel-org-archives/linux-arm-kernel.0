@@ -1,107 +1,35 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  6 Feb 2018 12:49:00 +0800
-Subject: [PATCH v2 05/10] ARM: sun8i: h3: add operating-points-v2 table for CPU
-In-Reply-To: <20180206044905.30508-1-icenowy@aosc.io>
-References: <20180206044905.30508-1-icenowy@aosc.io>
-Message-ID: <20180206044905.30508-6-icenowy@aosc.io>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Tue, 6 Feb 2018 10:55:20 +0530
+Subject: [PATCH v3 0/7] ARM: dts: imx6q: engicam LVDS panel changes
+In-Reply-To: <20180205105838.GZ31354@dragon>
+References: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
+ <20180205105838.GZ31354@dragon>
+Message-ID: <CAD6G_RSp_8xWWRfvu_58rdvkE-V16otnE9ifxQkiNry76-TMXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU on Allwinner H3 can do dynamic frequency scaling.
+On Mon, Feb 5, 2018 at 4:28 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Sun, Feb 04, 2018 at 11:19:24PM +0530, Jagan Teki wrote:
+>> Series adda LVDS panel attributes on panel drivers instead of defining
+>> them in dts nodes, and also added new icorem6 engicam boards.
+>>
+>> Jagan Teki (7):
+>>   drm/panel: simple: add support for Ampire AM-800480AYTZQW-00H
+>>   ARM: dts: imx6q-icore: Switch LVDS timings from panel-simple
+>>   ARM: dts: imx6dl-icore: Add LVDS node
+>>   drm/panel: simple: Add support for KEO TX31D200VM0BAA
+>>   ARM: dts: imx6q-icore-ofcap12: Switch LVDS timings from panel-simple
+>>   ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual OpenFrame Cap 7
+>>     initial support
+>>   ARM: dts: imx6q: Add Engicam i.CoreM6 1.5 Quad/Dual MIPI starter kit
+>>     support
+>>
+>>  .../display/panel/ampire,am-800480aytzqw-00h.txt   | 25 +++++++++
+>>  .../bindings/display/panel/koe,tx31d200vm0baa.txt  | 25 +++++++++
+> ...
+>>  drivers/gpu/drm/panel/panel-simple.c               | 54 ++++++++++++++++++
+>
+> The dts files should really be sent only after above bindings doc and
+> driver changes get merged first.
 
-Add a DVFS table based on the one shipped with Allwinner's H3 SDK. The
-voltage-frequency relationship seems to be conservative, and Armbian has
-another DVFS table which uses lower voltage at a certain frequency.
-However, the official one is chosen for safety.
-
-Frequencies higher than 1008MHz are temporarily dropped in the table, as
-they may lead to over voltage on boards without proper regulator
-settings or over temperature on boards with proper regulator settings.
-They will be added back once regulator settings are ready and thermal
-sensor driver is merged.
-
-In order to satisfy all different regulators (SY8106A which is 50mV per
-level, SY8113B which have two states: 1.1V and 1.3V, and some board with
-non-tweakable regulators), all the OPPs are defined with a range which has
-the target value as the minimum allowed value, and 1.3V (the highest
-VDD-CPUX voltage suggested by the datasheet) as the maximum allowed value.
-It's proven to work well with a board with SY8113B.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-Changes in v2:
-- Switch to BSP OPP table, which is more conservative.
-
- arch/arm/boot/dts/sun8i-h3.dtsi | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 8495deecedad..36608c03f02b 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -43,32 +43,62 @@
- #include "sunxi-h3-h5.dtsi"
- 
- / {
-+	cpu0_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 648000000 {
-+			opp-hz = /bits/ 64 <648000000>;
-+			opp-microvolt = <1040000 1040000 1300000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 816000000 {
-+			opp-hz = /bits/ 64 <816000000>;
-+			opp-microvolt = <1100000 1100000 1300000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 1008000000 {
-+			opp-hz = /bits/ 64 <1008000000>;
-+			opp-microvolt = <1200000 1200000 1300000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <0>;
-+			clocks = <&ccu CLK_CPUX>;
-+			clock-names = "cpu";
-+			operating-points-v2 = <&cpu0_opp_table>;
-+			#cooling-cells = <0x2>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <1>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <2>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <3>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
- 	};
- 
--- 
-2.15.1
+OK, I will send drm/panel changes first.
