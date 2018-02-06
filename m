@@ -1,103 +1,111 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Feb 2018 17:56:14 +0000
-Subject: [PATCH v4 10/17] arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP
- hardening support
+Date: Tue,  6 Feb 2018 17:56:16 +0000
+Subject: [PATCH v4 12/17] firmware/psci: Expose PSCI conduit
 In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
 References: <20180206175621.929-1-marc.zyngier@arm.com>
-Message-ID: <20180206175621.929-11-marc.zyngier@arm.com>
+Message-ID: <20180206175621.929-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new feature of SMCCC 1.1 is that it offers firmware-based CPU
-workarounds. In particular, SMCCC_ARCH_WORKAROUND_1 provides
-BP hardening for CVE-2017-5715.
+In order to call into the firmware to apply workarounds, it is
+useful to find out whether we're using HVC or SMC. Let's expose
+this through the psci_ops.
 
-If the host has some mitigation for this issue, report that
-we deal with it using SMCCC_ARCH_WORKAROUND_1, as we apply the
-host workaround on every guest exit.
-
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   | 7 +++++++
- arch/arm64/include/asm/kvm_host.h | 6 ++++++
- include/linux/arm-smccc.h         | 5 +++++
- virt/kvm/arm/psci.c               | 9 ++++++++-
- 4 files changed, 26 insertions(+), 1 deletion(-)
+ drivers/firmware/psci.c | 28 +++++++++++++++++++++++-----
+ include/linux/psci.h    |  7 +++++++
+ 2 files changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index acbf9ec7b396..ef54013b5b9f 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -306,4 +306,11 @@ static inline void kvm_fpsimd_flush_cpu_state(void) {}
- 
- static inline void kvm_arm_vhe_guest_enter(void) {}
- static inline void kvm_arm_vhe_guest_exit(void) {}
-+
-+static inline bool kvm_arm_harden_branch_predictor(void)
-+{
-+	/* No way to detect it yet, pretend it is not there. */
-+	return false;
-+}
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 4485ae8e98de..a73f63aca68e 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -415,4 +415,10 @@ static inline void kvm_arm_vhe_guest_exit(void)
- {
- 	local_daif_restore(DAIF_PROCCTX_NOIRQ);
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 8b25d31e8401..e9493da2b111 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -59,7 +59,9 @@ bool psci_tos_resident_on(int cpu)
+ 	return cpu == resident_cpu;
  }
-+
-+static inline bool kvm_arm_harden_branch_predictor(void)
+ 
+-struct psci_operations psci_ops;
++struct psci_operations psci_ops = {
++	.conduit = PSCI_CONDUIT_NONE,
++};
+ 
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+@@ -210,6 +212,22 @@ static unsigned long psci_migrate_info_up_cpu(void)
+ 			      0, 0, 0);
+ }
+ 
++static void set_conduit(enum psci_conduit conduit)
 +{
-+	return cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR);
++	switch (conduit) {
++	case PSCI_CONDUIT_HVC:
++		invoke_psci_fn = __invoke_psci_fn_hvc;
++		break;
++	case PSCI_CONDUIT_SMC:
++		invoke_psci_fn = __invoke_psci_fn_smc;
++		break;
++	default:
++		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
++	}
++
++	psci_ops.conduit = conduit;
 +}
 +
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index dc68aa5a7261..e1ef944ef1da 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -73,6 +73,11 @@
- 			   ARM_SMCCC_SMC_32,				\
- 			   0, 1)
- 
-+#define ARM_SMCCC_ARCH_WORKAROUND_1					\
-+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
-+			   ARM_SMCCC_SMC_32,				\
-+			   0, 0x8000)
-+
- #ifndef __ASSEMBLY__
- 
- #include <linux/linkage.h>
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index e105c1153794..6919352cbf15 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -405,13 +405,20 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ static int get_set_conduit_method(struct device_node *np)
  {
- 	u32 func_id = smccc_get_function(vcpu);
- 	u32 val = PSCI_RET_NOT_SUPPORTED;
-+	u32 feature;
+ 	const char *method;
+@@ -222,9 +240,9 @@ static int get_set_conduit_method(struct device_node *np)
+ 	}
  
- 	switch (func_id) {
- 	case ARM_SMCCC_VERSION_FUNC_ID:
- 		val = ARM_SMCCC_VERSION_1_1;
- 		break;
- 	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
--		/* Nothing supported yet */
-+		feature = smccc_get_arg1(vcpu);
-+		switch(feature) {
-+		case ARM_SMCCC_ARCH_WORKAROUND_1:
-+			if (kvm_arm_harden_branch_predictor())
-+				val = 0;
-+			break;
-+		}
- 		break;
- 	default:
- 		return kvm_psci_call(vcpu);
+ 	if (!strcmp("hvc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	} else if (!strcmp("smc", method)) {
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 	} else {
+ 		pr_warn("invalid \"method\" property: %s\n", method);
+ 		return -EINVAL;
+@@ -654,9 +672,9 @@ int __init psci_acpi_init(void)
+ 	pr_info("probing for conduit method from ACPI.\n");
+ 
+ 	if (acpi_psci_use_hvc())
+-		invoke_psci_fn = __invoke_psci_fn_hvc;
++		set_conduit(PSCI_CONDUIT_HVC);
+ 	else
+-		invoke_psci_fn = __invoke_psci_fn_smc;
++		set_conduit(PSCI_CONDUIT_SMC);
+ 
+ 	return psci_probe();
+ }
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index f724fd8c78e8..f2679e5faa4f 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -25,6 +25,12 @@ bool psci_tos_resident_on(int cpu);
+ int psci_cpu_init_idle(unsigned int cpu);
+ int psci_cpu_suspend_enter(unsigned long index);
+ 
++enum psci_conduit {
++	PSCI_CONDUIT_NONE,
++	PSCI_CONDUIT_SMC,
++	PSCI_CONDUIT_HVC,
++};
++
+ struct psci_operations {
+ 	u32 (*get_version)(void);
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+@@ -34,6 +40,7 @@ struct psci_operations {
+ 	int (*affinity_info)(unsigned long target_affinity,
+ 			unsigned long lowest_affinity_level);
+ 	int (*migrate_info_type)(void);
++	enum psci_conduit conduit;
+ };
+ 
+ extern struct psci_operations psci_ops;
 -- 
 2.14.2
