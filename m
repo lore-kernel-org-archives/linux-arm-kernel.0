@@ -1,49 +1,114 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 6 Feb 2018 16:10:44 +0300
-Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing
- with a mask
-In-Reply-To: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
-References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180206131044.oso33fvv553trrd7@mwanda>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 6 Feb 2018 14:14:45 +0100
+Subject: [PATCH 2/2] ARM: dts: exynos: Add support for HDMI audio on
+ exynos5433-tm2
+In-Reply-To: <20180205172110.9897-2-s.nawrocki@samsung.com>
+References: <CGME20180205172216epcas2p3be603e84df81b28ee4c04c9b1c1c551f@epcas2p3.samsung.com>
+ <20180205172110.9897-1-s.nawrocki@samsung.com>
+ <20180205172110.9897-2-s.nawrocki@samsung.com>
+Message-ID: <CAJKOXPef+8UvinoK-9j6tPMgNavMw1K1BhLuibD5FomjRC9Sbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 05, 2018 at 09:09:57PM +0100, Wolfram Sang wrote:
-> In one Renesas driver, I found a typo which turned an intended bit shift ('<<')
-> into a comparison ('<'). Because this is a subtle issue, I looked tree wide for
-> similar patterns. This small patch series is the outcome.
-> 
-> Buildbot and checkpatch are happy. Only compile-tested. To be applied
-> individually per sub-system, I think. I'd think only the net: amd: patch needs
-> to be conisdered for stable, but I leave this to people who actually know this
-> driver.
-> 
-> CCing Dan. Maybe he has an idea how to add a test to smatch? In my setup, only
-> cppcheck reported a 'coding style' issue with a low prio.
-> 
+On Mon, Feb 5, 2018 at 6:21 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> This patch updates the sound node of the exynos5433-tm2 board
+> and adds clock tree configuration in order to support HDMI sound.
+>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 67 ++++++++++++++++++++--
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  1 +
+>  2 files changed, 64 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> index a77462da4a36..37fb477a2d23 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> @@ -14,6 +14,7 @@
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/sound/samsung-i2s.h>
+>
+>  / {
+>         aliases {
+> @@ -112,8 +113,8 @@
+>
+>         sound {
+>                 compatible = "samsung,tm2-audio";
+> -               audio-codec = <&wm5110>;
+> -               i2s-controller = <&i2s0>;
+> +               audio-codec = <&wm5110>, <&hdmi>;
+> +               i2s-controller = <&i2s0 0>, <&i2s1 0>;
+>                 audio-amplifier = <&max98504>;
+>                 mic-bias-gpios = <&gpr3 2 GPIO_ACTIVE_HIGH>;
+>                 model = "wm5110";
+> @@ -216,9 +217,63 @@
+>         status = "okay";
+>  };
+>
+> +&cmu_top {
+> +       assigned-clocks = <&cmu_top CLK_FOUT_AUD_PLL>;
+> +       assigned-clock-rates = <(196608009 + 1)>;
+> +};
+> +
+>  &cmu_aud {
+> -       assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
+> -       assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
+> +       assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>,
+> +                         <&cmu_aud CLK_MOUT_SCLK_AUD_I2S>,
+> +                         <&cmu_aud CLK_MOUT_SCLK_AUD_PCM>,
+> +                         <&cmu_top CLK_MOUT_AUD_PLL>,
+> +
+> +                         <&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
+> +                         <&cmu_top CLK_MOUT_SCLK_AUDIO0>,
+> +                         <&cmu_top CLK_MOUT_SCLK_AUDIO1>,
+> +                         <&cmu_top CLK_MOUT_SCLK_SPDIF>,
+> +
+> +                         <&cmu_aud CLK_DIV_AUD_CA5>,
+> +                         <&cmu_aud CLK_DIV_ACLK_AUD>,
+> +                         <&cmu_aud CLK_DIV_PCLK_DBG_AUD>,
+> +                         <&cmu_aud CLK_DIV_SCLK_AUD_I2S>,
+> +                         <&cmu_aud CLK_DIV_SCLK_AUD_PCM>,
+> +                         <&cmu_aud CLK_DIV_SCLK_AUD_SLIMBUS>,
+> +                         <&cmu_aud CLK_DIV_SCLK_AUD_UART>,
+> +
+> +                         <&cmu_top CLK_DIV_SCLK_AUDIO0>,
+> +                         <&cmu_top CLK_DIV_SCLK_AUDIO1>,
+> +                         <&cmu_top CLK_DIV_SCLK_PCM1>,
+> +                         <&cmu_top CLK_DIV_SCLK_I2S1>;
+> +
+> +       assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>,
+> +                               <&cmu_aud CLK_MOUT_AUD_PLL_USER>,
+> +                               <&cmu_aud CLK_MOUT_AUD_PLL_USER>,
+> +                               <&cmu_top CLK_FOUT_AUD_PLL>,
+> +
+> +                               <&cmu_top CLK_MOUT_AUD_PLL>,
+> +                               <&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
+> +                               <&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
+> +                               <&cmu_top CLK_SCLK_AUDIO0>;
+> +
+> +       assigned-clock-rates = <0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>,
+> +                               <(196608009 + 1)>,
+> +                               <((196608009 / 3) + 1)>,
+> +                               <((196608009 / 6) + 1)>,
+> +                               <((196608009 / 4) + 1)>,
+> +                               <((196608009 / 96) + 1)>,
+> +                               <((196608009 / 8) + 1)>,
+> +                               <(196608010 + 1)>,
+> +
+> +                               <((196608009 / 8) + 1)>,
+> +                               <((196608009 / 2) + 1)>,
+> +                               <((196608009 / 96) + 1)>,
+> +                               <((196608009 / 4) + 1)>;
+> +};
+> +
+> +&i2s1 {
 
-Most of these are inside macros so it makes it complicated for Smatch
-to warn about them.  It might be easier in Coccinelle.  Julia the bugs
-look like this:
+Please move it further to i2s1 so all the nodes/labels will be ordered
+alphabetically. As with #1 I understand that there is no explicit
+dependency so please correct me if I am wrong.
 
--			reissue_mask |= 0xffff < 4;
-+			reissue_mask |= 0xffff << 4;
-
-regards,
-dan carpenter
-
-> Wolfram Sang (4):
->   v4l: vsp1: fix mask creation for MULT_ALPHA_RATIO
->   drm/exynos: fix comparison to bitshift when dealing with a mask
->   v4l: dvb-frontends: stb0899: fix comparison to bitshift when dealing
->     with a mask
->   net: amd-xgbe: fix comparison to bitshift when dealing with a mask
-> 
->  drivers/gpu/drm/exynos/regs-fimc.h        | 2 +-
->  drivers/media/dvb-frontends/stb0899_reg.h | 8 ++++----
->  drivers/media/platform/vsp1/vsp1_regs.h   | 2 +-
->  drivers/net/ethernet/amd/xgbe/xgbe-drv.c  | 2 +-
->  4 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> -- 
-> 2.11.0
+Best regards,
+Krzysztof
