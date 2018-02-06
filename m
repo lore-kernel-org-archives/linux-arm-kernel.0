@@ -1,99 +1,53 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 6 Feb 2018 15:27:10 +0100
-Subject: [PATCH v5 02/16] media: doc: add document for rkisp1 meta buffer
- format
-In-Reply-To: <1514533978-20408-3-git-send-email-zhengsq@rock-chips.com>
-References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
- <1514533978-20408-3-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <917c22c0-773e-5fe5-5625-86678f7c8521@xs4all.nl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Feb 2018 14:36:17 +0000
+Subject: [PATCH 1/2] arm64: kprobes: Remove unneeded address sanity check
+In-Reply-To: <20180201093459.20477-2-takahiro.akashi@linaro.org>
+References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
+ <20180201093459.20477-2-takahiro.akashi@linaro.org>
+Message-ID: <20180206143617.GF22740@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/17 08:52, Shunqian Zheng wrote:
-> From: Jacob Chen <jacob2.chen@rock-chips.com>
+On Thu, Feb 01, 2018 at 06:34:58PM +0900, AKASHI Takahiro wrote:
+> From: Masami Hiramatsu <mhiramat@kernel.org>
 > 
-> This commit add docuemnt for rkisp1 meta buffer format
+> Remove unneeded address sanity check in arch_prepare_kprobe().
+> Since do_debug_exception() is already blacklisted for kprobes, no need
+> to reject all __exception functions. Also, since generic kprobe
+> framework already ensures the address is in kernel text, no need to
+> check it is in rodata again.
 > 
-> Signed-off-by: Jacob Chen <jacob-chen@rock-chips.com>
+> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
->  Documentation/media/uapi/v4l/meta-formats.rst          |  2 ++
->  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst       | 17 +++++++++++++++++
->  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst         | 18 ++++++++++++++++++
->  3 files changed, 37 insertions(+)
->  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
->  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+>  arch/arm64/kernel/probes/kprobes.c | 8 --------
+>  1 file changed, 8 deletions(-)
 > 
-> diff --git a/Documentation/media/uapi/v4l/meta-formats.rst b/Documentation/media/uapi/v4l/meta-formats.rst
-> index 01e24e3..1b82814 100644
-> --- a/Documentation/media/uapi/v4l/meta-formats.rst
-> +++ b/Documentation/media/uapi/v4l/meta-formats.rst
-> @@ -14,3 +14,5 @@ These formats are used for the :ref:`metadata` interface only.
+> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+> index d849d9804011..3c487a389252 100644
+> --- a/arch/arm64/kernel/probes/kprobes.c
+> +++ b/arch/arm64/kernel/probes/kprobes.c
+> @@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
+>  int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  {
+>  	unsigned long probe_addr = (unsigned long)p->addr;
+> -	extern char __start_rodata[];
+> -	extern char __end_rodata[];
 >  
->      pixfmt-meta-vsp1-hgo
->      pixfmt-meta-vsp1-hgt
-> +    pixfmt-meta-rkisp1-params
-> +    pixfmt-meta-rkisp1-stat
-> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
-> new file mode 100644
-> index 0000000..ed344d4
-> --- /dev/null
-> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
-> @@ -0,0 +1,17 @@
-> +.. -*- coding: utf-8; mode: rst -*-
-> +
-> +.. _v4l2-meta-fmt-rkisp1-params:
-> +
-> +*******************************
-> +V4L2_META_FMT_RK_ISP1_PARAMS
-> +*******************************
-> +
-> +Rockchip ISP1 Parameters Data
-> +
-> +Description
-> +===========
-> +
-> +This format describes input parameters for the Rockchip ISP1.
-> +
-> +The data use c-struct :c:type:`rkisp1_isp_params_cfg`, which is defined in
-> +the ``linux/rkisp1-config.h`` header file, See it for details.
+>  	if (probe_addr & 0x3)
+>  		return -EINVAL;
+> @@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  	/* copy instruction */
+>  	p->opcode = le32_to_cpu(*p->addr);
+>  
+> -	if (in_exception_text(probe_addr))
+> -		return -EINVAL;
+> -	if (probe_addr >= (unsigned long) __start_rodata &&
+> -	    probe_addr <= (unsigned long) __end_rodata)
+> -		return -EINVAL;
+> -
 
-One more question: does the ISP produce a reasonable picture if it doesn't
-receive these params? If not (i.e. you always need to provide params), then
-I think you should provide a default rkisp1_isp_params_cfg struct that
-can be used as a template for application writers.
+Does this mean we can remove in_exception_text and the corresponding
+__exception annotations from arm64?
 
-Perhaps it can be part of the driver as the initial params config.
-
-I think even if the ISP does work without params it is still worthwhile
-doing this. The params are complex and having an example on how to initialize
-it would be helpful.
-
-Regards,
-
-	Hans
-
-> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
-> new file mode 100644
-> index 0000000..5ecc403
-> --- /dev/null
-> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
-> @@ -0,0 +1,18 @@
-> +.. -*- coding: utf-8; mode: rst -*-
-> +
-> +.. _v4l2-meta-fmt-rkisp1-stat:
-> +
-> +*******************************
-> +V4L2_META_FMT_RK_ISP1_STAT_3A
-> +*******************************
-> +
-> +Rockchip ISP1 Statistics Data
-> +
-> +Description
-> +===========
-> +
-> +This format describes image color statistics information generated by the Rockchip
-> +ISP1.
-> +
-> +The data use c-struct :c:type:`rkisp1_stat_buffer`, which is defined in
-> +the ``linux/cifisp_stat.h`` header file, See it for details.
-> 
+Will
