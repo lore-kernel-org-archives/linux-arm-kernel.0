@@ -1,212 +1,69 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 6 Feb 2018 17:53:05 +0800
-Subject: [PATCH v2 16/16] arm64: dts: mt7622: add mmc related device nodes
-In-Reply-To: <cover.1517910489.git.sean.wang@mediatek.com>
-References: <cover.1517910489.git.sean.wang@mediatek.com>
-Message-ID: <abc7373b08150326faecc984b4e1a16c7589502a.1517910489.git.sean.wang@mediatek.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Tue, 6 Feb 2018 21:08:03 +1100
+Subject: [linux-sunxi] [PATCH v3] ARM: sun8i: h2+: add support for Banana
+ Pi M2 Zero board
+In-Reply-To: <20180206082908.jlmnsicnhpgankwf@flea>
+References: <20171224054029.12278-1-icenowy@aosc.io>
+ <CAGRGNgXRhphuO8+85t8vfQb2CxDekMXe2BoPo_57pc6SR3QQzA@mail.gmail.com>
+ <20180205133625.vcz73qck5kfihalv@flea>
+ <A0E61415-4A64-41E5-94F2-3161D2B7A191@aosc.io>
+ <20180206082908.jlmnsicnhpgankwf@flea>
+Message-ID: <CAGRGNgX_GooPYt6Mra4ZRodxpmsxfvDpCkhDwF89x7stLOE8KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi Maxime,
 
-add mmc device nodes and proper setup for used pins
+On Tue, Feb 6, 2018 at 7:29 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Tue, Feb 06, 2018 at 10:51:04AM +0800, Icenowy Zheng wrote:
+>> ? 2018?2?5? GMT+08:00 ??9:36:25, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>> >On Sat, Feb 03, 2018 at 05:45:52PM +1100, Julian Calaby wrote:
+>> >> Hi all,
+>> >>
+>> >> On Sun, Dec 24, 2017 at 4:40 PM, Icenowy Zheng <icenowy@aosc.io>
+>> >wrote:
+>> >> > Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a
+>> >form
+>> >> > factor and GPIO holes similar to Raspberry Pi Zero.
+>> >> >
+>> >> > It features:
+>> >> > - Allwinner H2+ SoC
+>> >> > - Single-chip (16-bit) 512MiB DDR3 DRAM
+>> >> > - Ampak AP6212 Wi-Fi/Bluetooth module
+>> >> > - MicroSD slot
+>> >> > - Two MicroUSB Type-B ports (one can only be used to power the
+>> >board and
+>> >> >   the other features OTG functionality)
+>> >> > - Two keys, a reset and a GPIO-connected key.
+>> >> > - HDMI Type-C (miniHDMI) connector connected to the HDMI part of
+>> >H2+.
+>> >> > - CSI connector to connect the camera sensor provided by Sinovoip.
+>> >> >
+>> >> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> >>
+>> >> [Trimmed lots of non-sunxi-specific mailing lists]
+>> >>
+>> >> Did support for this board ever get merged?
+>> >
+>> >It doesn't look like it did.
+>>
+>> Is there any problem in this patch now except the
+>> absense of SPDX license usage?
+>
+> Doesn't look like it.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Signed-off-by: Jimin Wang <jimin.wang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 106 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     |  20 +++++
- 2 files changed, 126 insertions(+)
+Awesome, I'll get it booting, fix the licence block and re-submit.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index 5746cb3..b858df6 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -8,6 +8,7 @@
- 
- /dts-v1/;
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- #include "mt7622.dtsi"
- #include "mt6380.dtsi"
-@@ -53,6 +54,14 @@
- 		reg = <0 0x40000000 0 0x3F000000>;
- 	};
- 
-+	reg_1p8v: regulator-1p8v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+
- 	reg_3p3v: regulator-3p3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "fixed-3.3V";
-@@ -89,6 +98,23 @@
- 			function = "emmc", "emmc_rst";
- 			groups = "emmc";
- 		};
-+
-+		/* "NDL0","NDL1","NDL2","NDL3","NDL4","NDL5","NDL6","NDL7",
-+		 * "NRB","NCLE" pins are used as DAT0,DAT1,DAT2,DAT3,DAT4,
-+		 * DAT5,DAT6,DAT7,CMD,CLK for eMMC respectively
-+		 */
-+		conf-cmd-dat {
-+			pins = "NDL0", "NDL1", "NDL2",
-+			       "NDL3", "NDL4", "NDL5",
-+			       "NDL6", "NDL7", "NRB";
-+			input-enable;
-+			bias-pull-up;
-+		};
-+
-+		conf-clk {
-+			pins = "NCLE";
-+			bias-pull-down;
-+		};
- 	};
- 
- 	emmc_pins_uhs: emmc-pins-uhs {
-@@ -96,6 +122,21 @@
- 			function = "emmc";
- 			groups = "emmc";
- 		};
-+
-+		conf-cmd-dat {
-+			pins = "NDL0", "NDL1", "NDL2",
-+			       "NDL3", "NDL4", "NDL5",
-+			       "NDL6", "NDL7", "NRB";
-+			input-enable;
-+			drive-strength = <4>;
-+			bias-pull-up;
-+		};
-+
-+		conf-clk {
-+			pins = "NCLE";
-+			drive-strength = <4>;
-+			bias-pull-down;
-+		};
- 	};
- 
- 	eth_pins: eth-pins {
-@@ -194,6 +235,27 @@
- 			function = "sd";
- 			groups = "sd_0";
- 		};
-+
-+		/* "I2S2_OUT, "I2S4_IN"", "I2S3_IN", "I2S2_IN",
-+		 *  "I2S4_OUT", "I2S3_OUT" are used as DAT0, DAT1,
-+		 *  DAT2, DAT3, CMD, CLK for SD respectively.
-+		 */
-+		conf-cmd-data {
-+			pins = "I2S2_OUT", "I2S4_IN", "I2S3_IN",
-+			       "I2S2_IN","I2S4_OUT";
-+			input-enable;
-+			drive-strength = <8>;
-+			bias-pull-up;
-+		};
-+		conf-clk {
-+			pins = "I2S3_OUT";
-+			drive-strength = <12>;
-+			bias-pull-down;
-+		};
-+		conf-cd {
-+			pins = "TXD3";
-+			bias-pull-up;
-+		};
- 	};
- 
- 	sd0_pins_uhs: sd0-pins-uhs {
-@@ -201,6 +263,18 @@
- 			function = "sd";
- 			groups = "sd_0";
- 		};
-+
-+		conf-cmd-data {
-+			pins = "I2S2_OUT", "I2S4_IN", "I2S3_IN",
-+			       "I2S2_IN","I2S4_OUT";
-+			input-enable;
-+			bias-pull-up;
-+		};
-+
-+		conf-clk {
-+			pins = "I2S3_OUT";
-+			bias-pull-down;
-+		};
- 	};
- 
- 	/* Serial NAND is shared pin with SPI-NOR */
-@@ -311,6 +385,38 @@
- 	status = "okay";
- };
- 
-+&mmc0 {
-+	pinctrl-names = "default", "state_uhs";
-+	pinctrl-0 = <&emmc_pins_default>;
-+	pinctrl-1 = <&emmc_pins_uhs>;
-+	status = "okay";
-+	bus-width = <8>;
-+	max-frequency = <50000000>;
-+	cap-mmc-highspeed;
-+	mmc-hs200-1_8v;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_1p8v>;
-+	assigned-clocks = <&topckgen CLK_TOP_MSDC30_0_SEL>;
-+	assigned-clock-parents = <&topckgen CLK_TOP_UNIV48M>;
-+	non-removable;
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default", "state_uhs";
-+	pinctrl-0 = <&sd0_pins_default>;
-+	pinctrl-1 = <&sd0_pins_uhs>;
-+	status = "okay";
-+	bus-width = <4>;
-+	max-frequency = <50000000>;
-+	cap-sd-highspeed;
-+	r_smpl = <1>;
-+	cd-gpios = <&pio 81 GPIO_ACTIVE_LOW>;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_3p3v>;
-+	assigned-clocks = <&topckgen CLK_TOP_MSDC30_1_SEL>;
-+	assigned-clock-parents = <&topckgen CLK_TOP_UNIV48M>;
-+};
-+
- &nandc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&parallel_nand_pins>;
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index ed7ee78..177a651 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -524,6 +524,26 @@
- 		status = "disabled";
- 	};
- 
-+	mmc0: mmc at 11230000 {
-+		compatible = "mediatek,mt7622-mmc";
-+		reg = <0 0x11230000 0 0x1000>;
-+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_MSDC30_0_PD>,
-+			 <&topckgen CLK_TOP_MSDC50_0_SEL>;
-+		clock-names = "source", "hclk";
-+		status = "disabled";
-+	};
-+
-+	mmc1: mmc at 11240000 {
-+		compatible = "mediatek,mt7622-mmc";
-+		reg = <0 0x11240000 0 0x1000>;
-+		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_MSDC30_1_PD>,
-+			 <&topckgen CLK_TOP_AXI_SEL>;
-+		clock-names = "source", "hclk";
-+		status = "disabled";
-+	};
-+
- 	ssusbsys: ssusbsys at 1a000000 {
- 		compatible = "mediatek,mt7622-ssusbsys",
- 			     "syscon";
+I'll also put together patches to add the HDMI and DVFS bits and send
+them as those features make it upstream.
+
+I was worried that I'd have to figure out the WiFi stuff, however
+Icenowy has already done that. Thanks!
+
+Thanks,
+
 -- 
-2.7.4
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
