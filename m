@@ -1,52 +1,59 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  6 Feb 2018 12:48:59 +0800
-Subject: [PATCH v2 04/10] ARM: sunxi: h3/h5: Add r_i2c I2C controller
+Date: Tue,  6 Feb 2018 12:49:01 +0800
+Subject: [PATCH v2 06/10] ARM: sun8i: h2+: add SY8113B regulator used by
+ Orange Pi Zero board
 In-Reply-To: <20180206044905.30508-1-icenowy@aosc.io>
 References: <20180206044905.30508-1-icenowy@aosc.io>
-Message-ID: <20180206044905.30508-5-icenowy@aosc.io>
+Message-ID: <20180206044905.30508-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ondrej Jirman <megous@megous.com>
+Orange Pi Zero board has a SY8113B regulator, which is controlled via
+GPIO and capable of outputing 1.1V when the PL6 GPIO is set to output 0
+or 1.3V when the PL6 GPIO is set to input or output 1, and the output is
+the power supply of the ARM cores in H2+ SoC.
 
-Allwinner H3/H5 SoCs have an I2C controller at PL GPIO bank.
+Add the device tree node of this regulator and set the cpu's cpu-supply
+property to it.
 
-Add support for it in the device tree.
-
-Signed-off-by: Ondrej Jirman <megous@megous.com>
-[Icenowy: Change to use r_ccu and change pinmux node name]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
-Changes in v2:
-- Added Chen-Yu's Review tag.
+No changes in v2.
 
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index fc602aed60a6..57606900a949 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -716,6 +716,19 @@
- 			status = "disabled";
- 		};
- 
-+		r_i2c: i2c at 1f02400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01f02400 0x400>;
-+			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_i2c_pins>;
-+			clocks = <&r_ccu CLK_APB0_I2C>;
-+			resets = <&r_ccu RST_APB0_I2C>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+index 6713d0f2b3f4..34fc35737090 100644
+--- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
++++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+@@ -94,6 +94,27 @@
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
+ 		post-power-on-delay-ms = <200>;
+ 	};
 +
- 		r_pio: pinctrl at 1f02c00 {
- 			compatible = "allwinner,sun8i-h3-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
++	reg_sy8113b: gpio-regulator {
++		compatible = "regulator-gpio";
++		regulator-name = "vdd-cpux";
++		regulator-type = "voltage";
++		regulator-boot-on;
++		regulator-always-on;
++		regulator-min-microvolt = <1100000>;
++		regulator-max-microvolt = <1300000>;
++		regulator-ramp-delay = <50>; /* 4ms */
++
++		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
++		enable-active-high;
++		gpios-states = <0x1>;
++		states = <1100000 0x0
++			  1300000 0x1>;
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&reg_sy8113b>;
+ };
+ 
+ &ehci0 {
 -- 
 2.15.1
