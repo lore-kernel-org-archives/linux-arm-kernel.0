@@ -1,155 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Feb 2018 17:56:08 +0000
-Subject: [PATCH v4 04/17] arm/arm64: KVM: Consolidate the PSCI include files
-In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
-References: <20180206175621.929-1-marc.zyngier@arm.com>
-Message-ID: <20180206175621.929-5-marc.zyngier@arm.com>
+Date: Tue,  6 Feb 2018 17:56:04 +0000
+Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
+ (Spectre variant 2) mitigation
+Message-ID: <20180206175621.929-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to update the PSCI support, and because I'm lazy,
-let's move the PSCI include file to include/kvm so that both
-ARM architectures can find it.
+ARM has recently published a SMC Calling Convention (SMCCC)
+specification update[1] that provides an optimised calling convention
+and optional, discoverable support for mitigating CVE-2017-5715. ARM
+Trusted Firmware (ATF) has already gained such an implementation[2].
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_psci.h                    | 27 ----------------------
- arch/arm/kvm/handle_exit.c                         |  2 +-
- arch/arm64/kvm/handle_exit.c                       |  3 ++-
- .../asm/kvm_psci.h => include/kvm/arm_psci.h       |  6 ++---
- virt/kvm/arm/arm.c                                 |  2 +-
- virt/kvm/arm/psci.c                                |  3 ++-
- 6 files changed, 9 insertions(+), 34 deletions(-)
+This series addresses a few things:
+
+- It provides a KVM implementation of PSCI v1.0, which is a
+  prerequisite for being able to discover SMCCC v1.1.
+
+- It allows KVM to advertise SMCCC v1.1, which is de-facto supported
+  already (it never corrupts any of the guest registers).
+
+- It implements KVM support for the ARCH_WORKAROUND_1 function that is
+  used to mitigate CVE-2017-5715 in a guest (if such mitigation is
+  available on the host).
+
+- It implements SMCCC v1.1 and ARCH_WORKAROUND_1 discovery support in
+  the kernel itself.
+
+- It finally provides firmware callbacks for CVE-2017-5715 for both
+  kernel and KVM and drop the initial PSCI_GET_VERSION based
+  mitigation.
+
+Patch 1 is already merged, and included here for reference. Patches on
+top of arm64/for-next/core. Tested on Seattle and Juno, the latter
+with ATF implementing SMCCC v1.1.
+
+[1]: https://developer.arm.com/support/security-update/downloads/
+
+[2]: https://github.com/ARM-software/arm-trusted-firmware/pull/1240
+
+* From v3:
+  - Dropped KVM PSCI version selection API for the time being, planning
+  to resend it after -rc1
+  - Some minor cleanups
+  - Collected Acks, TBs and RBs.
+
+* From v2:
+  - Fixed SMC handling in KVM
+  - PSCI fixes and tidying up
+  - SMCCC primitive rework for better code generation (both efficiency
+  and correctness)
+  - Remove PSCI_GET_VERSION as a mitigation vector
+
+* From v1:
+  - Fixed 32bit build
+  - Fix function number sign extension (Ard)
+  - Inline SMCCC v1.1 primitives (cpp soup)
+  - Prevent SMCCC spamming on feature probing
+  - Random fixes and tidying up
+
+Marc Zyngier (17):
+  arm64: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls
+  arm: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls
+  arm64: KVM: Increment PC after handling an SMC trap
+  arm/arm64: KVM: Consolidate the PSCI include files
+  arm/arm64: KVM: Add PSCI_VERSION helper
+  arm/arm64: KVM: Add smccc accessors to PSCI code
+  arm/arm64: KVM: Implement PSCI 1.0 support
+  arm/arm64: KVM: Advertise SMCCC v1.1
+  arm/arm64: KVM: Turn kvm_psci_version into a static inline
+  arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP hardening support
+  arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
+  firmware/psci: Expose PSCI conduit
+  firmware/psci: Expose SMCCC version through psci_ops
+  arm/arm64: smccc: Make function identifiers an unsigned quantity
+  arm/arm64: smccc: Implement SMCCC v1.1 inline primitive
+  arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support
+  arm64: Kill PSCI_GET_VERSION as a variant-2 workaround
+
+ arch/arm/include/asm/kvm_host.h   |   7 ++
+ arch/arm/include/asm/kvm_psci.h   |  27 -------
+ arch/arm/kvm/handle_exit.c        |  17 +++-
+ arch/arm64/include/asm/kvm_host.h |   6 ++
+ arch/arm64/include/asm/kvm_psci.h |  27 -------
+ arch/arm64/kernel/bpi.S           |  44 +++++-----
+ arch/arm64/kernel/cpu_errata.c    |  77 ++++++++++++++----
+ arch/arm64/kvm/handle_exit.c      |  18 ++++-
+ arch/arm64/kvm/hyp/hyp-entry.S    |  20 ++++-
+ arch/arm64/kvm/hyp/switch.c       |  14 +---
+ drivers/firmware/psci.c           |  55 +++++++++++--
+ include/kvm/arm_psci.h            |  51 ++++++++++++
+ include/linux/arm-smccc.h         | 165 +++++++++++++++++++++++++++++++++++++-
+ include/linux/psci.h              |  13 +++
+ include/uapi/linux/psci.h         |   3 +
+ virt/kvm/arm/arm.c                |   2 +-
+ virt/kvm/arm/psci.c               | 143 +++++++++++++++++++++++++++------
+ 17 files changed, 542 insertions(+), 147 deletions(-)
  delete mode 100644 arch/arm/include/asm/kvm_psci.h
- rename arch/arm64/include/asm/kvm_psci.h => include/kvm/arm_psci.h (89%)
+ delete mode 100644 arch/arm64/include/asm/kvm_psci.h
+ create mode 100644 include/kvm/arm_psci.h
 
-diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
-deleted file mode 100644
-index 6bda945d31fa..000000000000
---- a/arch/arm/include/asm/kvm_psci.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * Copyright (C) 2012 - ARM Ltd
-- * Author: Marc Zyngier <marc.zyngier@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __ARM_KVM_PSCI_H__
--#define __ARM_KVM_PSCI_H__
--
--#define KVM_ARM_PSCI_0_1	1
--#define KVM_ARM_PSCI_0_2	2
--
--int kvm_psci_version(struct kvm_vcpu *vcpu);
--int kvm_psci_call(struct kvm_vcpu *vcpu);
--
--#endif /* __ARM_KVM_PSCI_H__ */
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index a4bf0f6f024a..230ae4079108 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -21,7 +21,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_mmu.h>
--#include <asm/kvm_psci.h>
-+#include <kvm/arm_psci.h>
- #include <trace/events/kvm.h>
- 
- #include "trace.h"
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 5493bbefbd0d..588f910632a7 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -22,13 +22,14 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- 
-+#include <kvm/arm_psci.h>
-+
- #include <asm/esr.h>
- #include <asm/exception.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_mmu.h>
--#include <asm/kvm_psci.h>
- #include <asm/debug-monitors.h>
- #include <asm/traps.h>
- 
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/include/kvm/arm_psci.h
-similarity index 89%
-rename from arch/arm64/include/asm/kvm_psci.h
-rename to include/kvm/arm_psci.h
-index bc39e557c56c..2042bb909474 100644
---- a/arch/arm64/include/asm/kvm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -15,8 +15,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--#ifndef __ARM64_KVM_PSCI_H__
--#define __ARM64_KVM_PSCI_H__
-+#ifndef __KVM_ARM_PSCI_H__
-+#define __KVM_ARM_PSCI_H__
- 
- #define KVM_ARM_PSCI_0_1	1
- #define KVM_ARM_PSCI_0_2	2
-@@ -24,4 +24,4 @@
- int kvm_psci_version(struct kvm_vcpu *vcpu);
- int kvm_psci_call(struct kvm_vcpu *vcpu);
- 
--#endif /* __ARM64_KVM_PSCI_H__ */
-+#endif /* __KVM_ARM_PSCI_H__ */
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 15bf026eb182..af3e98fc377e 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -31,6 +31,7 @@
- #include <linux/irqbypass.h>
- #include <trace/events/kvm.h>
- #include <kvm/arm_pmu.h>
-+#include <kvm/arm_psci.h>
- 
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -46,7 +47,6 @@
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
--#include <asm/kvm_psci.h>
- #include <asm/sections.h>
- 
- #ifdef REQUIRES_VIRT
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index f1e363bab5e8..b322e46fd142 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -21,9 +21,10 @@
- 
- #include <asm/cputype.h>
- #include <asm/kvm_emulate.h>
--#include <asm/kvm_psci.h>
- #include <asm/kvm_host.h>
- 
-+#include <kvm/arm_psci.h>
-+
- #include <uapi/linux/psci.h>
- 
- /*
 -- 
 2.14.2
