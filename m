@@ -1,54 +1,52 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 6 Feb 2018 10:10:57 +0100
-Subject: [PATCH v2 07/10] ARM: sun8i: h3: add SY8113B regulator used by
- Orange Pi One board
-In-Reply-To: <20180206044905.30508-8-icenowy@aosc.io>
-References: <20180206044905.30508-1-icenowy@aosc.io>
- <20180206044905.30508-8-icenowy@aosc.io>
-Message-ID: <20180206091057.6uy4fdcfztgmjjlz@flea>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Tue,  6 Feb 2018 17:28:20 +0800
+Subject: [PATCH 1/7] arm64: dts: Add hwspinlock node for Spreadtrum SC9860
+Message-ID: <410b2f2d3f3f019c96ec31213647c41cd7f1174d.1517908478.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 12:49:02PM +0800, Icenowy Zheng wrote:
-> Orange Pi One board has a SY8113B regulator, which is controlled via
-> GPIO and capable of outputing 1.1V when the PL6 GPIO is set to output 0
-> or 1.3V when the PL6 GPIO is set to input or output 1, and the output is
-> the power supply of the ARM cores in H3 SoC.
-> 
-> Add the device tree node of this regulator and set the cpu's cpu-supply
-> property to it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> New patch in v2.
-> 
->  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> index 82e5d28cd698..d8250aacfda1 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-> @@ -88,6 +88,27 @@
->  			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
->  		};
->  	};
-> +
-> +	reg_sy8113b: gpio-regulator {
+The Spreadtrum SC9860 platform only has one hardware spinlock device,
+which is located on AON system of Spreadtrum SC9860 platform.
 
-There's multiple of them on those boards, so the name and label should
-avoid conflicting names (this also applies to your other patches).
+Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+---
+ arch/arm64/boot/dts/sprd/whale2.dtsi |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Maxime
-
+diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
+index 328009c..b9cc0fb 100644
+--- a/arch/arm64/boot/dts/sprd/whale2.dtsi
++++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
+@@ -6,6 +6,8 @@
+  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
++#include <dt-bindings/clock/sprd,sc9860-clk.h>
++
+ / {
+ 	interrupt-parent = <&gic>;
+ 	#address-cells = <2>;
+@@ -104,6 +106,21 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		aon {
++			compatible = "simple-bus";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++
++			hwlock: hwspinlock at 40500000 {
++				compatible = "sprd,hwspinlock-r3p0";
++				reg = <0 0x40500000 0 0x1000>;
++				#hwlock-cells = <1>;
++				clock-names = "enable";
++				clocks = <&aon_gate CLK_SPLK_EB>;
++			};
++		};
+ 	};
+ 
+ 	ext_32k: ext_32k {
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180206/928be13a/attachment.sig>
+1.7.9.5
