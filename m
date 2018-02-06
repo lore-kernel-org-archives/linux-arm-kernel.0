@@ -1,121 +1,55 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 6 Feb 2018 17:52:55 +0800
-Subject: [PATCH v2 06/16] arm64: dts: mt7622: add cpufreq related device nodes
+Date: Tue, 6 Feb 2018 17:52:56 +0800
+Subject: [PATCH v2 07/16] arm64: dts: mt7622: turn uart0 clock to real ones
 In-Reply-To: <cover.1517910489.git.sean.wang@mediatek.com>
 References: <cover.1517910489.git.sean.wang@mediatek.com>
-Message-ID: <fc5bdf53b92bd7a96e94b714d8d13deebca95c28.1517910489.git.sean.wang@mediatek.com>
+Message-ID: <e0646e211fa947a34d1cfff1cc98f00efd42f2a0.1517910489.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add clocks, regulators and opp information into cpu nodes.
-In addition, the power supply for cpu nodes is deployed on
-mt7622-rfb1 board.
+This patch also cleans up two oscillators that provide clocks for MT7623.
+Switch the uart clocks to the real ones while at it.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 12 +++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 49 ++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-index 4615af6..bbf4d03 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
-@@ -20,6 +20,18 @@
- 		bootargs = "console=ttyS0,115200n1";
- 	};
- 
-+	cpus {
-+		cpu at 0 {
-+			proc-supply = <&mt6380_vcpu_reg>;
-+			sram-supply = <&mt6380_vm_reg>;
-+		};
-+
-+		cpu at 1 {
-+			proc-supply = <&mt6380_vcpu_reg>;
-+			sram-supply = <&mt6380_vm_reg>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys-polled";
- 		poll-interval = <100>;
 diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index c387c4c..65eb417 100644
+index 65eb417..845fc11 100644
 --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -18,6 +18,50 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+@@ -88,18 +88,6 @@
+ 		};
+ 	};
  
-+	cpu_opp_table: opp-table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp-300000000 {
-+			opp-hz = /bits/ 64 <30000000>;
-+			opp-microvolt = <950000>;
-+		};
-+
-+		opp-437500000 {
-+			opp-hz = /bits/ 64 <437500000>;
-+			opp-microvolt = <1000000>;
-+		};
-+
-+		opp-600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <1050000>;
-+		};
-+
-+		opp-812500000 {
-+			opp-hz = /bits/ 64 <812500000>;
-+			opp-microvolt = <1100000>;
-+		};
-+
-+		opp-1025000000 {
-+			opp-hz = /bits/ 64 <1025000000>;
-+			opp-microvolt = <1150000>;
-+		};
-+
-+		opp-1137500000 {
-+			opp-hz = /bits/ 64 <1137500000>;
-+			opp-microvolt = <1200000>;
-+		};
-+
-+		opp-1262500000 {
-+			opp-hz = /bits/ 64 <1262500000>;
-+			opp-microvolt = <1250000>;
-+		};
-+
-+		opp-1350000000 {
-+			opp-hz = /bits/ 64 <1350000000>;
-+			opp-microvolt = <1310000>;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <2>;
- 		#size-cells = <0>;
-@@ -26,6 +70,10 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x0>;
-+			clocks = <&infracfg CLK_INFRA_MUX1_SEL>,
-+				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
-+			clock-names = "cpu", "intermediate";
-+			operating-points-v2 = <&cpu_opp_table>;
- 			enable-method = "psci";
- 			clock-frequency = <1300000000>;
- 		};
-@@ -34,6 +82,7 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x1>;
-+			operating-points-v2 = <&cpu_opp_table>;
- 			enable-method = "psci";
- 			clock-frequency = <1300000000>;
- 		};
+-	uart_clk: dummy25m {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <25000000>;
+-	};
+-
+-	bus_clk: dummy280m {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <280000000>;
+-	};
+-
+ 	pwrap_clk: dummy40m {
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <40000000>;
+@@ -231,7 +219,8 @@
+ 			     "mediatek,mt6577-uart";
+ 		reg = <0 0x11002000 0 0x400>;
+ 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
+-		clocks = <&uart_clk>, <&bus_clk>;
++		clocks = <&topckgen CLK_TOP_UART_SEL>,
++			 <&pericfg CLK_PERI_UART1_PD>;
+ 		clock-names = "baud", "bus";
+ 		status = "disabled";
+ 	};
 -- 
 2.7.4
