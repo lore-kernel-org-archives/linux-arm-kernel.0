@@ -1,650 +1,439 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Tue, 6 Feb 2018 14:54:23 -0800
-Subject: [PATCH v4 4/4] drivers: firmware: xilinx: Add debugfs interface
+Date: Tue, 6 Feb 2018 14:54:22 -0800
+Subject: [PATCH v4 3/4] drivers: firmware: xilinx: Add sysfs interface
 In-Reply-To: <1517957663-16668-1-git-send-email-jollys@xilinx.com>
 References: <1517957663-16668-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1517957663-16668-5-git-send-email-jollys@xilinx.com>
+Message-ID: <1517957663-16668-4-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Firmware-debug provides debugfs interface to all APIs.
-Debugfs can be used to call firmware APIs with required
-parameters.
-
-Usage:
-* Calling firmware API through debugfs:
-  # echo "<api-name> <arg1> .. <argn>" > /sys/kernel/debug/zynqmp-firmware/pm
-
-* Read output of last called firmware API:
-  # cat /sys/kernel/debug/zynqmp-firmware/pm
-
-Refer ug1200 for more information on these APIs:
-  * https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
-
-Below are supported debugfs APIs:
-    * PM_REQUEST_SUSPEND
-    * PM_SELF_SUSPEND
-    * PM_FORCE_POWERDOWN
-    * PM_ABORT_SUSPEND
-    * PM_REQUEST_WAKEUP
-    * PM_SET_WAKEUP_SOURCE
-    * PM_SYSTEM_SHUTDOWN
-    * PM_REQUEST_NODE
-    * PM_RELEASE_NODE
-    * PM_SET_REQUIREMENT
-    * PM_SET_MAX_LATENCY
-    * PM_GET_API_VERSION
-    * PM_SET_CONFIGURATION
-    * PM_GET_NODE_STATUS
-    * PM_GET_OPERATING_CHARACTERISTIC
-    * PM_REGISTER_NOTIFIER
-    * PM_RESET_ASSERT
-    * PM_RESET_GET_STATUS
-    * PM_GET_CHIPID
-    * PM_PINCTRL_GET_FUNCTION
-    * PM_PINCTRL_SET_FUNCTION
-    * PM_PINCTRL_CONFIG_PARAM_GET
-    * PM_PINCTRL_CONFIG_PARAM_SET
-    * PM_IOCTL
-    * PM_CLOCK_ENABLE
-    * PM_CLOCK_DISABLE
-    * PM_CLOCK_GETSTATE
-    * PM_CLOCK_SETDIVIDER
-    * PM_CLOCK_GETDIVIDER
-    * PM_CLOCK_SETRATE
-    * PM_CLOCK_GETRATE
-    * PM_CLOCK_SETPARENT
-    * PM_CLOCK_GETPARENT
-    * PM_QUERY_DATA
+Add Firmware-ggs sysfs interface which provides read/write
+interface to global storage registers.
 
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 ---
- drivers/firmware/xilinx/zynqmp/Kconfig             |   7 +
- drivers/firmware/xilinx/zynqmp/Makefile            |   1 +
- drivers/firmware/xilinx/zynqmp/firmware-debug.c    | 482 +++++++++++++++++++++
- drivers/firmware/xilinx/zynqmp/firmware.c          |   7 +-
- .../linux/firmware/xilinx/zynqmp/firmware-debug.h  |  31 ++
- 5 files changed, 527 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-debug.c
- create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware-debug.h
+ Documentation/ABI/stable/sysfs-firmware-zynqmp  |  50 ++++
+ drivers/firmware/xilinx/zynqmp/Makefile         |   2 +-
+ drivers/firmware/xilinx/zynqmp/firmware-ggs.c   | 297 ++++++++++++++++++++++++
+ drivers/firmware/xilinx/zynqmp/firmware.c       |  15 +-
+ include/linux/firmware/xilinx/zynqmp/firmware.h |   2 +
+ 5 files changed, 364 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/ABI/stable/sysfs-firmware-zynqmp
+ create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-ggs.c
 
-diff --git a/drivers/firmware/xilinx/zynqmp/Kconfig b/drivers/firmware/xilinx/zynqmp/Kconfig
-index 5054b80..3c12f1f 100644
---- a/drivers/firmware/xilinx/zynqmp/Kconfig
-+++ b/drivers/firmware/xilinx/zynqmp/Kconfig
-@@ -13,4 +13,11 @@ config ZYNQMP_FIRMWARE
- 	  Say yes to enable ZynqMP firmware interface driver.
- 	  In doubt, say N
- 
-+config ZYNQMP_FIRMWARE_DEBUG
-+	bool "Enable Xilinx Zynq MPSoC firmware debug APIs"
-+	depends on ARCH_ZYNQMP && ZYNQMP_FIRMWARE && DEBUG_FS
-+	help
-+	  Say yes to enable ZynqMP firmware interface debug APIs.
-+	  In doubt, say N
+diff --git a/Documentation/ABI/stable/sysfs-firmware-zynqmp b/Documentation/ABI/stable/sysfs-firmware-zynqmp
+new file mode 100644
+index 0000000..0a75812
+--- /dev/null
++++ b/Documentation/ABI/stable/sysfs-firmware-zynqmp
+@@ -0,0 +1,50 @@
++What:		/sys/firmware/zynqmp/ggs*
++Date:		January 2018
++KernelVersion:	4.15.0
++Contact:	"Jolly Shah" <jollys@xilinx.com>
++Description:
++		Read/Write PMU global general storage register value,
++		GLOBAL_GEN_STORAGE{0:3}.
++		Global general storage register that can be used
++		by system to pass information between masters.
 +
- endmenu
++		The register is reset during system or power-on
++		resets. Three registers are used by the FSBL and
++		other Xilinx software products: GLOBAL_GEN_STORAGE{4:6}.
++
++		Usage:
++		# cat /sys/firmware/zynqmp/ggs0
++		# echo <mask> <value> > /sys/firmware/zynqmp/ggs0
++
++		Example:
++		# cat /sys/firmware/zynqmp/ggs0
++		# echo 0xFFFFFFFF 0x1234ABCD > /sys/firmware/zynqmp/ggs0
++
++Users:		Xilinx
++
++What:		/sys/firmware/zynqmp/pggs*
++Date:		January 2018
++KernelVersion:	4.15.0
++Contact:	"Jolly Shah" <jollys@xilinx.com>
++Description:
++		Read/Write PMU persistent global general storage register
++		value, PERS_GLOB_GEN_STORAGE{0:3}.
++		Persistent global general storage register that
++		can be used by system to pass information between
++		masters.
++
++		This register is only reset by the power-on reset
++		and maintains its value through a system reset.
++		Four registers are used by the FSBL and other Xilinx
++		software products: PERS_GLOB_GEN_STORAGE{4:7}.
++		Register is reset only by a POR reset.
++
++		Usage:
++		# cat /sys/firmware/zynqmp/pggs0
++		# echo <mask> <value> > /sys/firmware/zynqmp/pggs0
++
++		Example:
++		# cat /sys/firmware/zynqmp/pggs0
++		# echo 0xFFFFFFFF 0x1234ABCD > /sys/firmware/zynqmp/pggs0
++
++Users:		Xilinx
 diff --git a/drivers/firmware/xilinx/zynqmp/Makefile b/drivers/firmware/xilinx/zynqmp/Makefile
-index 6629781..02f0c9a 100644
+index c3ec669..6629781 100644
 --- a/drivers/firmware/xilinx/zynqmp/Makefile
 +++ b/drivers/firmware/xilinx/zynqmp/Makefile
-@@ -2,3 +2,4 @@
+@@ -1,4 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0+
  # Makefile for Xilinx firmwares
  
- obj-$(CONFIG_ZYNQMP_FIRMWARE) += firmware.o firmware-ggs.o
-+obj-$(CONFIG_ZYNQMP_FIRMWARE_DEBUG) += firmware-debug.o
-diff --git a/drivers/firmware/xilinx/zynqmp/firmware-debug.c b/drivers/firmware/xilinx/zynqmp/firmware-debug.c
+-obj-$(CONFIG_ZYNQMP_FIRMWARE) += firmware.o
++obj-$(CONFIG_ZYNQMP_FIRMWARE) += firmware.o firmware-ggs.o
+diff --git a/drivers/firmware/xilinx/zynqmp/firmware-ggs.c b/drivers/firmware/xilinx/zynqmp/firmware-ggs.c
 new file mode 100644
-index 0000000..6d5cd12
+index 0000000..27e71c7
 --- /dev/null
-+++ b/drivers/firmware/xilinx/zynqmp/firmware-debug.c
-@@ -0,0 +1,482 @@
++++ b/drivers/firmware/xilinx/zynqmp/firmware-ggs.c
+@@ -0,0 +1,297 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
-+ * Xilinx Zynq MPSoC Firmware layer for debugfs APIs
++ * Xilinx Zynq MPSoC Firmware layer
 + *
 + *  Copyright (C) 2014-2018 Xilinx, Inc.
 + *
-+ *  Michal Simek <michal.simek@xilinx.com>
-+ *  Davorin Mista <davorin.mista@aggios.com>
 + *  Jolly Shah <jollys@xilinx.com>
 + *  Rajan Vaja <rajanv@xilinx.com>
 + */
 +
 +#include <linux/compiler.h>
++#include <linux/of.h>
++#include <linux/init.h>
 +#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/debugfs.h>
 +#include <linux/uaccess.h>
++#include <linux/slab.h>
 +#include <linux/firmware/xilinx/zynqmp/firmware.h>
-+#include <linux/firmware/xilinx/zynqmp/firmware-debug.h>
 +
-+#define PM_API_NAME_LEN			50
-+
-+struct pm_api_info {
-+	u32 api_id;
-+	char api_name[PM_API_NAME_LEN];
-+	char api_name_len;
-+};
-+
-+static char debugfs_buf[PAGE_SIZE];
-+
-+#define PM_API(id)		 {id, #id, strlen(#id)}
-+static struct pm_api_info pm_api_list[] = {
-+	PM_API(PM_REQUEST_SUSPEND),
-+	PM_API(PM_SELF_SUSPEND),
-+	PM_API(PM_FORCE_POWERDOWN),
-+	PM_API(PM_ABORT_SUSPEND),
-+	PM_API(PM_REQUEST_WAKEUP),
-+	PM_API(PM_SET_WAKEUP_SOURCE),
-+	PM_API(PM_SYSTEM_SHUTDOWN),
-+	PM_API(PM_REQUEST_NODE),
-+	PM_API(PM_RELEASE_NODE),
-+	PM_API(PM_SET_REQUIREMENT),
-+	PM_API(PM_SET_MAX_LATENCY),
-+	PM_API(PM_GET_API_VERSION),
-+	PM_API(PM_SET_CONFIGURATION),
-+	PM_API(PM_GET_NODE_STATUS),
-+	PM_API(PM_GET_OPERATING_CHARACTERISTIC),
-+	PM_API(PM_REGISTER_NOTIFIER),
-+	PM_API(PM_RESET_ASSERT),
-+	PM_API(PM_RESET_GET_STATUS),
-+	PM_API(PM_GET_CHIPID),
-+	PM_API(PM_PINCTRL_GET_FUNCTION),
-+	PM_API(PM_PINCTRL_SET_FUNCTION),
-+	PM_API(PM_PINCTRL_CONFIG_PARAM_GET),
-+	PM_API(PM_PINCTRL_CONFIG_PARAM_SET),
-+	PM_API(PM_IOCTL),
-+	PM_API(PM_CLOCK_ENABLE),
-+	PM_API(PM_CLOCK_DISABLE),
-+	PM_API(PM_CLOCK_GETSTATE),
-+	PM_API(PM_CLOCK_SETDIVIDER),
-+	PM_API(PM_CLOCK_GETDIVIDER),
-+	PM_API(PM_CLOCK_SETRATE),
-+	PM_API(PM_CLOCK_GETRATE),
-+	PM_API(PM_CLOCK_SETPARENT),
-+	PM_API(PM_CLOCK_GETPARENT),
-+	PM_API(PM_QUERY_DATA),
-+};
-+
-+/**
-+ * zynqmp_pm_self_suspend - PM call for master to suspend itself
-+ * @node:	Node ID of the master or subsystem
-+ * @latency:	Requested maximum wakeup latency (not supported)
-+ * @state:	Requested state (not supported)
-+ *
-+ * Return:	Returns status, either success or error+reason
-+ */
-+int zynqmp_pm_self_suspend(const u32 node,
-+			   const u32 latency,
-+			   const u32 state)
++static ssize_t read_register(char *buf, u32 ioctl_id, u32 reg)
 +{
-+	return invoke_pm_fn(PM_SELF_SUSPEND, node, latency, state, 0, NULL);
-+}
-+
-+/**
-+ * zynqmp_pm_abort_suspend - PM call to announce that a prior suspend request
-+ *				is to be aborted.
-+ * @reason:	Reason for the abort
-+ *
-+ * Return:	Returns status, either success or error+reason
-+ */
-+int zynqmp_pm_abort_suspend(const enum zynqmp_pm_abort_reason reason)
-+{
-+	return invoke_pm_fn(PM_ABORT_SUSPEND, reason, 0, 0, 0, NULL);
-+}
-+
-+/**
-+ * zynqmp_pm_register_notifier - Register the PU to be notified of PM events
-+ * @node:	Node ID of the slave
-+ * @event:	The event to be notified about
-+ * @wake:	Wake up on event
-+ * @enable:	Enable or disable the notifier
-+ *
-+ * Return:	Returns status, either success or error+reason
-+ */
-+int zynqmp_pm_register_notifier(const u32 node, const u32 event,
-+				const u32 wake, const u32 enable)
-+{
-+	return invoke_pm_fn(PM_REGISTER_NOTIFIER, node, event,
-+			    wake, enable, NULL);
-+}
-+
-+/**
-+ * zynqmp_pm_argument_value - Extract argument value from a PM-API request
-+ * @arg:	Entered PM-API argument in string format
-+ *
-+ * Return:	Argument value in unsigned integer format on success
-+ *		0 otherwise
-+ */
-+static u64 zynqmp_pm_argument_value(char *arg)
-+{
-+	u64 value;
-+
-+	if (!arg)
-+		return 0;
-+
-+	if (!kstrtou64(arg, 0, &value))
-+		return value;
-+
-+	return 0;
-+}
-+
-+static int get_pm_api_id(char *pm_api_req, u32 *pm_id)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pm_api_list) ; i++) {
-+		if (!strncasecmp(pm_api_req, pm_api_list[i].api_name,
-+				 pm_api_list[i].api_name_len)) {
-+			*pm_id = pm_api_list[i].api_id;
-+			break;
-+		}
-+	}
-+
-+	/* If no name was entered look for PM-API ID instead */
-+	if (i == ARRAY_SIZE(pm_api_list) && kstrtouint(pm_api_req, 10, pm_id))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
-+{
++	int ret;
++	u32 ret_payload[PAYLOAD_ARG_CNT];
 +	const struct zynqmp_eemi_ops *eemi_ops = get_eemi_ops();
-+	u32 pm_api_version;
-+	u64 rate;
-+	int ret;
 +
-+	if (!eemi_ops)
-+		return -ENXIO;
++	if (!eemi_ops || !eemi_ops->ioctl)
++		return -EFAULT;
 +
-+	switch (pm_id) {
-+	case PM_GET_API_VERSION:
-+		ret = eemi_ops->get_api_version(&pm_api_version);
-+		sprintf(debugfs_buf, "PM-API Version = %d.%d\n",
-+			pm_api_version >> 16, pm_api_version & 0xffff);
-+		break;
-+	case PM_REQUEST_SUSPEND:
-+		ret = eemi_ops->request_suspend(pm_api_arg[0],
-+						pm_api_arg[1] ? pm_api_arg[1] :
-+						ZYNQMP_PM_REQUEST_ACK_NO,
-+						pm_api_arg[2] ? pm_api_arg[2] :
-+						ZYNQMP_PM_MAX_LATENCY, 0);
-+		break;
-+	case PM_SELF_SUSPEND:
-+		ret = zynqmp_pm_self_suspend(pm_api_arg[0],
-+					     pm_api_arg[1] ? pm_api_arg[1] :
-+					     ZYNQMP_PM_MAX_LATENCY, 0);
-+		break;
-+	case PM_FORCE_POWERDOWN:
-+		ret = eemi_ops->force_powerdown(pm_api_arg[0],
-+						pm_api_arg[1] ? pm_api_arg[1] :
-+						ZYNQMP_PM_REQUEST_ACK_NO);
-+		break;
-+	case PM_ABORT_SUSPEND:
-+		ret = zynqmp_pm_abort_suspend(pm_api_arg[0] ? pm_api_arg[0] :
-+					      ZYNQMP_PM_ABORT_REASON_UNKNOWN);
-+		break;
-+	case PM_REQUEST_WAKEUP:
-+		ret = eemi_ops->request_wakeup(pm_api_arg[0],
-+					       pm_api_arg[1], pm_api_arg[2],
-+					       pm_api_arg[3] ? pm_api_arg[3] :
-+					       ZYNQMP_PM_REQUEST_ACK_NO);
-+		break;
-+	case PM_SET_WAKEUP_SOURCE:
-+		ret = eemi_ops->set_wakeup_source(pm_api_arg[0], pm_api_arg[1],
-+						  pm_api_arg[2]);
-+		break;
-+	case PM_SYSTEM_SHUTDOWN:
-+		ret = eemi_ops->system_shutdown(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_REQUEST_NODE:
-+		ret = eemi_ops->request_node(pm_api_arg[0],
-+					     pm_api_arg[1] ? pm_api_arg[1] :
-+					     ZYNQMP_PM_CAPABILITY_ACCESS,
-+					     pm_api_arg[2] ? pm_api_arg[2] : 0,
-+					     pm_api_arg[3] ? pm_api_arg[3] :
-+					     ZYNQMP_PM_REQUEST_ACK_BLOCKING);
-+		break;
-+	case PM_RELEASE_NODE:
-+		ret = eemi_ops->release_node(pm_api_arg[0]);
-+		break;
-+	case PM_SET_REQUIREMENT:
-+		ret = eemi_ops->set_requirement(pm_api_arg[0],
-+						pm_api_arg[1] ? pm_api_arg[1] :
-+						ZYNQMP_PM_CAPABILITY_CONTEXT,
-+						pm_api_arg[2] ?
-+						pm_api_arg[2] : 0,
-+						pm_api_arg[3] ? pm_api_arg[3] :
-+						ZYNQMP_PM_REQUEST_ACK_BLOCKING);
-+		break;
-+	case PM_SET_MAX_LATENCY:
-+		ret = eemi_ops->set_max_latency(pm_api_arg[0],
-+						pm_api_arg[1] ? pm_api_arg[1] :
-+						ZYNQMP_PM_MAX_LATENCY);
-+		break;
-+	case PM_SET_CONFIGURATION:
-+		ret = eemi_ops->set_configuration(pm_api_arg[0]);
-+		break;
-+	case PM_GET_NODE_STATUS:
-+		ret = eemi_ops->get_node_status(pm_api_arg[0],
-+						&pm_api_ret[0],
-+						&pm_api_ret[1],
-+						&pm_api_ret[2]);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"GET_NODE_STATUS:\n\tNodeId: %llu\n\tStatus: %u\n\tRequirements: %u\n\tUsage: %u\n",
-+				pm_api_arg[0], pm_api_ret[0],
-+				pm_api_ret[1], pm_api_ret[2]);
-+		break;
-+	case PM_GET_OPERATING_CHARACTERISTIC:
-+		ret = eemi_ops->get_operating_characteristic(pm_api_arg[0],
-+				pm_api_arg[1] ? pm_api_arg[1] :
-+				ZYNQMP_PM_OPERATING_CHARACTERISTIC_POWER,
-+				&pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"GET_OPERATING_CHARACTERISTIC:\n\tNodeId: %llu\n\tType: %llu\n\tResult: %u\n",
-+				pm_api_arg[0], pm_api_arg[1],
-+				pm_api_ret[0]);
-+		break;
-+	case PM_REGISTER_NOTIFIER:
-+		ret = zynqmp_pm_register_notifier(pm_api_arg[0],
-+						  pm_api_arg[1] ?
-+						  pm_api_arg[1] : 0,
-+						  pm_api_arg[2] ?
-+						  pm_api_arg[2] : 0,
-+						  pm_api_arg[3] ?
-+						  pm_api_arg[3] : 0);
-+		break;
-+	case PM_RESET_ASSERT:
-+		ret = eemi_ops->reset_assert(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_RESET_GET_STATUS:
-+		ret = eemi_ops->reset_get_status(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Reset status: %u\n",
-+				pm_api_ret[0]);
-+		break;
-+	case PM_GET_CHIPID:
-+		ret = eemi_ops->get_chipid(&pm_api_ret[0], &pm_api_ret[1]);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Idcode: %#x, Version:%#x\n",
-+				pm_api_ret[0], pm_api_ret[1]);
-+		break;
-+	case PM_PINCTRL_GET_FUNCTION:
-+		ret = eemi_ops->pinctrl_get_function(pm_api_arg[0],
-+						     &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"Current set function for the pin: %u\n",
-+				pm_api_ret[0]);
-+		break;
-+	case PM_PINCTRL_SET_FUNCTION:
-+		ret = eemi_ops->pinctrl_set_function(pm_api_arg[0],
-+						     pm_api_arg[1]);
-+		break;
-+	case PM_PINCTRL_CONFIG_PARAM_GET:
-+		ret = eemi_ops->pinctrl_get_config(pm_api_arg[0], pm_api_arg[1],
-+						   &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"Pin: %llu, Param: %llu, Value: %u\n",
-+				pm_api_arg[0], pm_api_arg[1],
-+				pm_api_ret[0]);
-+		break;
-+	case PM_PINCTRL_CONFIG_PARAM_SET:
-+		ret = eemi_ops->pinctrl_set_config(pm_api_arg[0],
-+						   pm_api_arg[1],
-+						   pm_api_arg[2]);
-+		break;
-+	case PM_IOCTL:
-+		ret = eemi_ops->ioctl(pm_api_arg[0], pm_api_arg[1],
-+				      pm_api_arg[2], pm_api_arg[3],
-+				      &pm_api_ret[0]);
-+		if (!ret && (pm_api_arg[1] == IOCTL_GET_RPU_OPER_MODE ||
-+			     pm_api_arg[1] == IOCTL_GET_PLL_FRAC_MODE ||
-+			     pm_api_arg[1] == IOCTL_GET_PLL_FRAC_DATA ||
-+			     pm_api_arg[1] == IOCTL_READ_GGS ||
-+			     pm_api_arg[1] == IOCTL_READ_PGGS))
-+			sprintf(debugfs_buf, "IOCTL return value: %u\n",
-+				pm_api_ret[1]);
-+		break;
-+	case PM_CLOCK_ENABLE:
-+		ret = eemi_ops->clock_enable(pm_api_arg[0]);
-+		break;
-+	case PM_CLOCK_DISABLE:
-+		ret = eemi_ops->clock_disable(pm_api_arg[0]);
-+		break;
-+	case PM_CLOCK_GETSTATE:
-+		ret = eemi_ops->clock_getstate(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Clock state: %u\n",
-+				pm_api_ret[0]);
-+		break;
-+	case PM_CLOCK_SETDIVIDER:
-+		ret = eemi_ops->clock_setdivider(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_CLOCK_GETDIVIDER:
-+		ret = eemi_ops->clock_getdivider(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Divider Value: %d\n",
-+				pm_api_ret[0]);
-+		break;
-+	case PM_CLOCK_SETRATE:
-+		ret = eemi_ops->clock_setrate(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_CLOCK_GETRATE:
-+		ret = eemi_ops->clock_getrate(pm_api_arg[0], &rate);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Clock rate :%llu\n", rate);
-+		break;
-+	case PM_CLOCK_SETPARENT:
-+		ret = eemi_ops->clock_setparent(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_CLOCK_GETPARENT:
-+		ret = eemi_ops->clock_getparent(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"Clock parent Index: %u\n", pm_api_ret[0]);
-+		break;
-+	case PM_QUERY_DATA:
-+	{
-+		struct zynqmp_pm_query_data qdata = {0};
++	ret = eemi_ops->ioctl(0, ioctl_id, reg, 0, ret_payload);
++	if (ret)
++		return ret;
 +
-+		qdata.qid = pm_api_arg[0];
-+		qdata.arg1 = pm_api_arg[1];
-+		qdata.arg2 = pm_api_arg[2];
-+		qdata.arg3 = pm_api_arg[3];
-+
-+		ret = eemi_ops->query_data(qdata, pm_api_ret);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"data[0] = 0x%08x\ndata[1] = 0x%08x\n data[2] = 0x%08x\ndata[3] = 0x%08x\n",
-+				pm_api_ret[0], pm_api_ret[1],
-+				pm_api_ret[2], pm_api_ret[3]);
-+		break;
-+	}
-+	default:
-+		sprintf(debugfs_buf, "Unsupported PM-API request\n");
-+		ret = -EINVAL;
-+	}
-+
-+	return ret;
++	return sprintf(buf, "0x%x\n", ret_payload[1]);
 +}
 +
-+/**
-+ * zynqmp_pm_debugfs_api_write - debugfs write function
-+ * @file:	User file structure
-+ * @ptr:	User entered PM-API string
-+ * @len:	Length of the userspace buffer
-+ * @off:	Offset within the file
-+ *
-+ * Return:	Number of bytes copied if PM-API request succeeds,
-+ *		the corresponding error code otherwise
-+ *
-+ * Used for triggering pm api functions by writing
-+ * echo <pm_api_id>    > /sys/kernel/debug/zynqmp_pm/power or
-+ * echo <pm_api_name>  > /sys/kernel/debug/zynqmp_pm/power
-+ */
-+static ssize_t zynqmp_pm_debugfs_api_write(struct file *file,
-+					   const char __user *ptr, size_t len,
-+					   loff_t *off)
++static ssize_t write_register(const char *buf, size_t count, u32 read_ioctl,
++			      u32 write_ioctl, u32 reg)
 +{
-+	char *kern_buff, *tmp_buff;
-+	char *pm_api_req;
-+	u32 pm_id = 0;
-+	u64 pm_api_arg[4] = {0, 0, 0, 0};
-+	/* Return values from PM APIs calls */
-+	u32 pm_api_ret[4] = {0, 0, 0, 0};
-+
++	char *kern_buff, *inbuf, *tok;
++	long mask, value;
 +	int ret;
-+	int i = 0;
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	const struct zynqmp_eemi_ops *eemi_ops = get_eemi_ops();
 +
-+	strcpy(debugfs_buf, "");
++	if (!eemi_ops || !eemi_ops->ioctl)
++		return -EFAULT;
 +
-+	if (*off != 0 || len == 0)
-+		return -EINVAL;
-+
-+	kern_buff = kzalloc(len, GFP_KERNEL);
++	kern_buff = kzalloc(count, GFP_KERNEL);
 +	if (!kern_buff)
 +		return -ENOMEM;
 +
-+	tmp_buff = kern_buff;
-+
-+	ret = strncpy_from_user(kern_buff, ptr, len);
++	ret = strlcpy(kern_buff, buf, count);
 +	if (ret < 0) {
 +		ret = -EFAULT;
 +		goto err;
 +	}
 +
-+	/* Read the API name from a user request */
-+	pm_api_req = strsep(&kern_buff, " ");
++	inbuf = kern_buff;
 +
-+	ret = get_pm_api_id(pm_api_req, &pm_id);
-+	if (ret < 0)
++	/* Read the write mask */
++	tok = strsep(&inbuf, " ");
++	if (!tok) {
++		ret = -EFAULT;
 +		goto err;
-+
-+	/* Read node_id and arguments from the PM-API request */
-+	pm_api_req = strsep(&kern_buff, " ");
-+	while ((i < ARRAY_SIZE(pm_api_arg)) && pm_api_req) {
-+		pm_api_arg[i++] = zynqmp_pm_argument_value(pm_api_req);
-+		pm_api_req = strsep(&kern_buff, " ");
 +	}
 +
-+	ret = process_api_request(pm_id, pm_api_arg, pm_api_ret);
++	ret = kstrtol(tok, 16, &mask);
++	if (ret) {
++		ret = -EFAULT;
++		goto err;
++	}
++
++	/* Read the write value */
++	tok = strsep(&inbuf, " ");
++	if (!tok) {
++		ret = -EFAULT;
++		goto err;
++	}
++
++	ret = kstrtol(tok, 16, &value);
++	if (ret) {
++		ret = -EFAULT;
++		goto err;
++	}
++
++	ret = eemi_ops->ioctl(0, read_ioctl, reg, 0, ret_payload);
++	if (ret) {
++		ret = -EFAULT;
++		goto err;
++	}
++	ret_payload[1] &= ~mask;
++	value &= mask;
++	value |= ret_payload[1];
++
++	ret = eemi_ops->ioctl(0, write_ioctl, reg, value, NULL);
++	if (ret)
++		ret = -EFAULT;
 +
 +err:
-+	kfree(tmp_buff);
++	kfree(kern_buff);
 +	if (ret)
 +		return ret;
-+	else
-+		return len;
++
++	return count;
 +}
 +
 +/**
-+ * zynqmp_pm_debugfs_api_read - debugfs read function
-+ * @file:      User file structure
-+ * @ptr:       Requested pm_api_version string
-+ * @len:       Length of the userspace buffer
-+ * @off:       Offset within the file
++ * ggs_show - Show global general storage (ggs) sysfs attribute
++ * @kobj: Kobject structure
++ * @attr: Kobject attribute structure
++ * @buf: Requested available shutdown_scope attributes string
++ * @reg: Register number
 + *
-+ * Return:     Length of the version string on success
-+ *             else error code.
++ * Return:Number of bytes printed into the buffer.
++ *
++ * Helper function for viewing a ggs register value.
++ *
++ * User-space interface for viewing the content of the ggs0 register.
++ * cat /sys/firmware/zynqmp/ggs0
 + */
-+static ssize_t zynqmp_pm_debugfs_api_read(struct file *file, char __user *ptr,
-+					  size_t len, loff_t *off)
++static ssize_t ggs_show(struct kobject *kobj,
++			struct kobj_attribute *attr,
++			char *buf,
++			u32 reg)
 +{
-+	return simple_read_from_buffer(ptr, len, off, debugfs_buf,
-+				       strlen(debugfs_buf));
++	return read_register(buf, IOCTL_READ_GGS, reg);
 +}
-+
-+/* Setup debugfs fops */
-+static const struct file_operations fops_zynqmp_pm_dbgfs = {
-+	.owner  =	THIS_MODULE,
-+	.write  =	zynqmp_pm_debugfs_api_write,
-+	.read   =	zynqmp_pm_debugfs_api_read,
-+};
 +
 +/**
-+ * zynqmp_pm_api_debugfs_init - Initialize debugfs interface
++ * ggs_store - Store global general storage (ggs) sysfs attribute
++ * @kobj: Kobject structure
++ * @attr: Kobject attribute structure
++ * @buf: User entered shutdown_scope attribute string
++ * @count: Size of buf
++ * @reg: Register number
 + *
-+ * Return:      None
++ * Return: count argument if request succeeds, the corresponding
++ * error code otherwise
++ *
++ * Helper function for storing a ggs register value.
++ *
++ * For example, the user-space interface for storing a value to the
++ * ggs0 register:
++ * echo 0xFFFFFFFF 0x1234ABCD > /sys/firmware/zynqmp/ggs0
 + */
-+void zynqmp_pm_api_debugfs_init(void)
++static ssize_t ggs_store(struct kobject *kobj,
++			 struct kobj_attribute *attr,
++			 const char *buf,
++			 size_t count,
++			 u32 reg)
 +{
-+	struct dentry *root_dir;
++	if (!kobj || !attr || !buf || !count || reg >= GSS_NUM_REGS)
++		return -EINVAL;
 +
-+	/* Initialize debugfs interface */
-+	root_dir = debugfs_create_dir("zynqmp-firmware", NULL);
-+	debugfs_create_file("pm", 0660, root_dir, NULL,
-+			    &fops_zynqmp_pm_dbgfs);
++	return write_register(buf, count, IOCTL_READ_GGS, IOCTL_WRITE_GGS, reg);
 +}
-diff --git a/drivers/firmware/xilinx/zynqmp/firmware.c b/drivers/firmware/xilinx/zynqmp/firmware.c
-index dc33e96..8bf8f2e83 100644
---- a/drivers/firmware/xilinx/zynqmp/firmware.c
-+++ b/drivers/firmware/xilinx/zynqmp/firmware.c
-@@ -20,6 +20,7 @@
- #include <linux/uaccess.h>
- 
- #include <linux/firmware/xilinx/zynqmp/firmware.h>
-+#include <linux/firmware/xilinx/zynqmp/firmware-debug.h>
- 
- /**
-  * zynqmp_pm_ret_code - Convert PMU-FW error codes to Linux error codes
-@@ -1011,9 +1012,13 @@ static int zynqmp_firmware_init(void)
- 	int ret;
- 
- 	ret = zynqmp_pm_ggs_init();
--	if (ret)
-+	if (ret) {
- 		pr_err("%s() GGS init fail with error %d\n",
- 		       __func__, ret);
-+		return ret;
++
++/* GGS register show functions */
++#define GGS0_SHOW(N)						\
++	ssize_t ggs##N##_show(struct kobject *kobj,		\
++				struct kobj_attribute *attr,	\
++				char *buf)			\
++	{							\
++		return ggs_show(kobj, attr, buf, N);		\
 +	}
 +
-+	zynqmp_pm_api_debugfs_init();
++static GGS0_SHOW(0);
++static GGS0_SHOW(1);
++static GGS0_SHOW(2);
++static GGS0_SHOW(3);
++
++/* GGS register store function */
++#define GGS0_STORE(N)						\
++	ssize_t ggs##N##_store(struct kobject *kobj,		\
++				struct kobj_attribute *attr,	\
++				const char *buf,		\
++				size_t count)			\
++	{							\
++		return ggs_store(kobj, attr, buf, count, N);	\
++	}
++
++static GGS0_STORE(0);
++static GGS0_STORE(1);
++static GGS0_STORE(2);
++static GGS0_STORE(3);
++
++/**
++ * pggs_show - Show persistent global general storage (pggs) sysfs attribute
++ * @kobj: Kobject structure
++ * @attr: Kobject attribute structure
++ * @buf: Requested available shutdown_scope attributes string
++ * @reg: Register number
++ *
++ * Return:Number of bytes printed into the buffer.
++ *
++ * Helper function for viewing a pggs register value.
++ */
++static ssize_t pggs_show(struct kobject *kobj,
++			 struct kobj_attribute *attr,
++			 char *buf,
++			 u32 reg)
++{
++	return read_register(buf, IOCTL_READ_PGGS, reg);
++}
++
++/**
++ * pggs_store - Store persistent global general storage (pggs) sysfs attribute
++ * @kobj: Kobject structure
++ * @attr: Kobject attribute structure
++ * @buf: User entered shutdown_scope attribute string
++ * @count: Size of buf
++ * @reg: Register number
++ *
++ * Return: count argument if request succeeds, the corresponding
++ * error code otherwise
++ *
++ * Helper function for storing a pggs register value.
++ */
++static ssize_t pggs_store(struct kobject *kobj,
++			  struct kobj_attribute *attr,
++			  const char *buf,
++			  size_t count,
++			  u32 reg)
++{
++	return write_register(buf, count, IOCTL_READ_PGGS,
++			      IOCTL_WRITE_PGGS, reg);
++}
++
++#define PGGS0_SHOW(N)						\
++	ssize_t pggs##N##_show(struct kobject *kobj,		\
++				struct kobj_attribute *attr,	\
++				char *buf)			\
++	{							\
++		return pggs_show(kobj, attr, buf, N);		\
++	}
++
++#define PGGS0_STORE(N)						\
++	ssize_t pggs##N##_store(struct kobject *kobj,		\
++				   struct kobj_attribute *attr,	\
++				   const char *buf,		\
++				   size_t count)		\
++	{							\
++		return pggs_store(kobj, attr, buf, count, N);	\
++	}
++
++/* PGGS register show functions */
++static PGGS0_SHOW(0);
++static PGGS0_SHOW(1);
++static PGGS0_SHOW(2);
++static PGGS0_SHOW(3);
++
++/* PGGS register store functions */
++static PGGS0_STORE(0);
++static PGGS0_STORE(1);
++static PGGS0_STORE(2);
++static PGGS0_STORE(3);
++
++/* GGS register attributes */
++static struct kobj_attribute zynqmp_attr_ggs0 = __ATTR_RW(ggs0);
++static struct kobj_attribute zynqmp_attr_ggs1 = __ATTR_RW(ggs1);
++static struct kobj_attribute zynqmp_attr_ggs2 = __ATTR_RW(ggs2);
++static struct kobj_attribute zynqmp_attr_ggs3 = __ATTR_RW(ggs3);
++
++/* PGGS register attributes */
++static struct kobj_attribute zynqmp_attr_pggs0 = __ATTR_RW(pggs0);
++static struct kobj_attribute zynqmp_attr_pggs1 = __ATTR_RW(pggs1);
++static struct kobj_attribute zynqmp_attr_pggs2 = __ATTR_RW(pggs2);
++static struct kobj_attribute zynqmp_attr_pggs3 = __ATTR_RW(pggs3);
++
++static struct attribute *attrs[] = {
++	&zynqmp_attr_ggs0.attr,
++	&zynqmp_attr_ggs1.attr,
++	&zynqmp_attr_ggs2.attr,
++	&zynqmp_attr_ggs3.attr,
++	&zynqmp_attr_pggs0.attr,
++	&zynqmp_attr_pggs1.attr,
++	&zynqmp_attr_pggs2.attr,
++	&zynqmp_attr_pggs3.attr,
++	NULL,
++};
++
++static const struct attribute_group attr_group = {
++	.attrs = attrs,
++	NULL,
++};
++
++int zynqmp_pm_ggs_init(void)
++{
++	struct kobject *zynqmp_kobj;
++
++	zynqmp_kobj = kobject_create_and_add("zynqmp", firmware_kobj);
++	if (!zynqmp_kobj) {
++		pr_err("zynqmp: Firmware kobj add failed.\n");
++		return -ENOMEM;
++	}
++
++	return sysfs_create_group(zynqmp_kobj, &attr_group);
++}
+diff --git a/drivers/firmware/xilinx/zynqmp/firmware.c b/drivers/firmware/xilinx/zynqmp/firmware.c
+index 809ce50..dc33e96 100644
+--- a/drivers/firmware/xilinx/zynqmp/firmware.c
++++ b/drivers/firmware/xilinx/zynqmp/firmware.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/uaccess.h>
+ 
+@@ -1003,5 +1004,17 @@ static int __init zynqmp_plat_init(void)
  
  	return ret;
  }
-diff --git a/include/linux/firmware/xilinx/zynqmp/firmware-debug.h b/include/linux/firmware/xilinx/zynqmp/firmware-debug.h
-new file mode 100644
-index 0000000..a298dce
---- /dev/null
-+++ b/include/linux/firmware/xilinx/zynqmp/firmware-debug.h
-@@ -0,0 +1,31 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * Xilinx Zynq MPSoC Firmware layer
-+ *
-+ *  Copyright (C) 2014-2018 Xilinx
-+ *
-+ *  Michal Simek <michal.simek@xilinx.com>
-+ *  Davorin Mista <davorin.mista@aggios.com>
-+ *  Jolly Shah <jollys@xilinx.com>
-+ *  Rajan Vaja <rajanv@xilinx.com>
-+ */
+-
+ early_initcall(zynqmp_plat_init);
 +
-+#ifndef __SOC_ZYNQMP_FIRMWARE_DEBUG_H__
-+#define __SOC_ZYNQMP_FIRMWARE_DEBUG_H__
++static int zynqmp_firmware_init(void)
++{
++	int ret;
 +
-+#include <linux/firmware/xilinx/zynqmp/firmware.h>
++	ret = zynqmp_pm_ggs_init();
++	if (ret)
++		pr_err("%s() GGS init fail with error %d\n",
++		       __func__, ret);
 +
-+int zynqmp_pm_self_suspend(const u32 node,
-+			   const u32 latency,
-+			   const u32 state);
-+int zynqmp_pm_abort_suspend(const enum zynqmp_pm_abort_reason reason);
-+int zynqmp_pm_register_notifier(const u32 node, const u32 event,
-+				const u32 wake, const u32 enable);
++	return ret;
++}
++device_initcall(zynqmp_firmware_init);
+diff --git a/include/linux/firmware/xilinx/zynqmp/firmware.h b/include/linux/firmware/xilinx/zynqmp/firmware.h
+index d435615..45d02b7 100644
+--- a/include/linux/firmware/xilinx/zynqmp/firmware.h
++++ b/include/linux/firmware/xilinx/zynqmp/firmware.h
+@@ -574,6 +574,8 @@ int invoke_pm_fn(u32 pm_api_id, u32 arg0, u32 arg1, u32 arg2, u32 arg3,
+ 		 u32 *ret_payload);
+ int zynqmp_pm_ret_code(u32 ret_status);
+ 
++int zynqmp_pm_ggs_init(void);
 +
-+#if IS_REACHABLE(CONFIG_ZYNQMP_FIRMWARE_DEBUG)
-+void zynqmp_pm_api_debugfs_init(void);
-+#else
-+static inline void zynqmp_pm_api_debugfs_init(void) { return; }
-+#endif
-+
-+#endif /* __SOC_ZYNQMP_FIRMWARE_DEBUG_H__ */
+ #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
+ const struct zynqmp_eemi_ops *get_eemi_ops(void);
+ #else
 -- 
 2.7.4
