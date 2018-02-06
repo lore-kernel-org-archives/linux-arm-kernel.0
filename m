@@ -1,46 +1,32 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Tue, 6 Feb 2018 16:59:22 -0500 (EST)
-Subject: Device tree bug in armada-8040-mcbin.dts
-Message-ID: <alpine.LRH.2.02.1802061650060.4974@file01.intranet.prod.int.rdu2.redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 6 Feb 2018 22:17:13 +0000
+Subject: [PATCH 0/9] Mitigations against spectre-v1 in the arm64 Linux
+ kernel
+In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
+References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20180206221712.4sln72qnuqqko3yr@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, Feb 05, 2018 at 03:34:15PM +0000, Will Deacon wrote:
+> Hi all,
+> 
+> This series implements some mitigations against spectre-v1 for arm64. It
+> broadly follows the work that has been done for x86, by implementing:
+> 
+>   * A back-end version of array_index_mask_nospec() to suppress any
+>     compiler optimisations that could introduce unwanted speculative
+>     paths
+> 
+>   * Masking of the syscall number to restrict speculation through the
+>     syscall table
+> 
+>   * Masking of __user pointers prior to deference in uaccess routines
+> 
+> The latter introduces complications in access_ok and set_fs which are
+> also handled in this series.
 
-When the MacchiatoBIN kernel is compiled with CONFIG_PM=y, it is 
-frequently reporing this error (the error happens every time some I/O on 
-built-in eMMC happens):
+Queued for 4.16. Thanks.
 
-"mmc0: Switching to 3.3V signalling voltage failed"
-
-The problem is that the "&ap_sdhci0" device tree node asserts that the 
-controller doesn't support 1.8v, but it attaches it to the fixed voltage 
-regulator "v_vddo_h" that only supplies 1.8V.
-
-Should it be attached to the 3.3V regulator instead? Or should the 
-"vqmmc-supply" statemet be deleted? Or should the statement "no-1-8-v" be 
-deleted?
-
-Mikulas
-
-
-
-This patch silences the error (though I don't know if it should be 
-attached to a different regulator instead).
-
----
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |    1 -
- 1 file changed, 1 deletion(-)
-
-Index: linux-4.14.13/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-===================================================================
---- linux-4.14.13.orig/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts	2017-11-29 02:52:18.000000000 +0100
-+++ linux-4.14.13/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts	2018-01-14 14:54:59.000000000 +0100
-@@ -115,7 +115,6 @@
- 	no-sdio;
- 	non-removable;
- 	status = "okay";
--	vqmmc-supply = <&v_vddo_h>;
- };
- 
- &cpm_i2c0 {
+-- 
+Catalin
