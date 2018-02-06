@@ -1,121 +1,73 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 6 Feb 2018 13:42:12 +0800
-Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
- device tree parsing
-In-Reply-To: <1517892624.2312.167.camel@kernel.crashing.org>
-References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
- <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
- <1517563970.24622.9.camel@mtkswgap22>
- <1517866584.2312.140.camel@kernel.crashing.org>
- <1517884738.16010.27.camel@mtkswgap22>
- <1517889903.2312.151.camel@kernel.crashing.org>
- <1517891471.20869.6.camel@mtkswgap22>
- <1517892624.2312.167.camel@kernel.crashing.org>
-Message-ID: <1517895732.23319.21.camel@mtkswgap22>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 6 Feb 2018 11:25:43 +0530
+Subject: [PATCH 05/15] ARM: dts: ipq4019: Add ipq4019-ap-dk01-c2 board file
+In-Reply-To: <9afb20e560a7ebbcefcb801e7447a983@codeaurora.org>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-6-git-send-email-sricharan@codeaurora.org>
+ <9afb20e560a7ebbcefcb801e7447a983@codeaurora.org>
+Message-ID: <508a5777-a009-15d9-6d5a-bed1b1bfa1e7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-02-06 at 15:50 +1100, Benjamin Herrenschmidt wrote:
-> On Tue, 2018-02-06 at 12:31 +0800, Ryder Lee wrote:
-> > On Tue, 2018-02-06 at 15:05 +1100, Benjamin Herrenschmidt wrote:
-> > > On Tue, 2018-02-06 at 10:38 +0800, Ryder Lee wrote:
-> > > > 
-> > > > I think the code should look at the bridge address <0x0800 ...> we list
-> > > > in bindings for resolving interrupts in this case, but it seems like it
-> > > > use the 'pdev->defvn << 8' which is not really we want and will lead to
-> > > > mismatch.
-> > > > 
-> > > > 		interrupt-map-mask = <0xf800 0 0 7>;
-> > > > 		interrupt-map = <0x0000 0 0 1 ...>,
-> > > > 				<0x0000 0 0 2 ...>,
-> > > > 				<0x0000 0 0 3 ...>,
-> > > > 				<0x0000 0 0 4 ...>,
-> > > > 
-> > > > 				 0x0800 0 0 1 ...>,
-> > > > 				 0x0800 0 0 2 ...>,
-> > > > 				 0x0800 0 0 3 ...>,
-> > > > 				 0x0800 0 0 4 ...>;
-> > > > 		...
-> > > > 		pcie at 1,0 {
-> > > > 			reg = <0x0800 0 0 0 0>;
-> > > > 			...
-> > > > 		};
-> > > > 
-> > > > 
-> > > > Or, alternatively, we could add a interrupt-map property in both child
-> > > > and root node to solve this. The below example is my original version as
-> > > > I don't want to change that function either.
-> > > 
-> > > The code looks at devfn because it's meant to work for PCI including
-> > > when the devices dont have a device node in the DT.
-> > > 
-> > > What I'm trying to figure out is what is it that your parent and
-> > > children are representing here. Which is/are the root complex ?
-> > 
-> > This is a single root complex with 2 root port (children in DT).
-> > 
-> > > What is the actual topology as visible on the PCIe bus (is lspci output
-> > > basically) and how does that map to your representation ?
-> > 
-> > # lspci
-> > 00:00.0 Class 0604: 14c3:0801 //1st slot - pcie at 0,0
-> > 00:01.0 Class 0604: 14c3:0801 //2nd slot - pcie at 1,0
-> > 
-> > 01:00.0 Class 0280: 14c3:7603 //A device which is connected to 1st slot
-> > 02:00.0 Class 0200: 8086:1521 //A 4 func device which is connected to
-> > 2nd slot
-> > 02:00.1 Class 0200: 8086:1521
-> > 02:00.2 Class 0200: 8086:1521
-> > 02:00.3 Class 0200: 8086:1521
+Hi Abhishek,
+
+On 2/3/2018 4:25 PM, Abhishek Sahu wrote:
+> On 2018-01-29 10:41, Sricharan R wrote:
+>> The board has a spi-nand interface on spi0 bus chipselect1.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>> ?arch/arm/boot/dts/Makefile????????????????????? |? 1 +
+>> ?arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts | 25
+>> +++++++++++++++++++++++++
+>> ?2 files changed, 26 insertions(+)
+>> ?create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index d0381e9..21ed56d 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -724,6 +724,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>> ???? qcom-apq8084-ifc6540.dtb \
+>> ???? qcom-apq8084-mtp.dtb \
+>> ???? qcom-ipq4019-ap.dk01.1-c1.dtb \
+>> +??? qcom-ipq4019-ap.dk01.1-c2.dtb \
+>> ???? qcom-ipq8064-ap148.dtb \
+>> ???? qcom-msm8660-surf.dtb \
+>> ???? qcom-msm8960-cdp.dtb \
+>> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
+>> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
+>> new file mode 100644
+>> index 0000000..e3442da
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c2.dts
+>> @@ -0,0 +1,25 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
+>> +
+>> +#include "qcom-ipq4019-ap.dk01.1.dtsi"
+>> +
+>> +/ {
+>> +??? model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK01.1-C2";
 > 
-> Ok so that's a rather standard setup. The "devfn << 8" of your root
-> ports should be the exact same thing as their first reg property entry,
-> I'm not sure why you have a mismatch here.
-
-I've added some log after 'for loop':
-
-pr_err("busn=0x%x, devfn=0x%x, reg=0x%x\n", pdev->bus->number, pdev->devfn, of_pci_get_devfn(ppnode));
-
-and got these:
-
-[    5.651836] busn=0x0, devfn=0x0, reg=0x0
-[    5.651936] pcieport 0000:00:00.0: assign IRQ: got 213
-...
-[    5.652398] busn=0x0, devfn=0x8, reg=0x0
-[    5.652487] pcieport 0000:00:01.0: assign IRQ: got 214
-
-...
-[    5.653025] busn=0x2, devfn=0x0, reg=0x8
-[    5.653058] igb 0000:02:00.0: assign IRQ: got 213
-
-[    5.724582] busn=0x2, devfn=0x1, reg=0x8
-[    5.724634] igb 0000:02:00.1: assign IRQ: got 213
-
-> However, that map only represents the INTA..D lines going to the root
-> ports, not how these get mapped to children of the root ports.
+> ?s/IPQ40xx/IPQ4019
 > 
-> of_irq_parse_pci() will implement standard swizzling if you don't have
-> nodes for your devices at all. If you do, however, the code assumes
-> you have a correct and complete interrupt tree in the device-tree.
+ ok
+
+>> +
+>> +??? soc {
+>> +??????? spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
+>> +??????????? status = "ok";
+>> +??????????? cs-gpios = <&tlmm 54 0>, <&tlmm 59 0>;
 > 
-> That means that you need in each "p2p bridge", including your root
-> ports, an interrupt-map that will map the children INTA...D of that
-> bridge to the parent INTA...D of that bridge.
-> 
-> Alternatively, you can make the maps in the root ports point directly
-> to the parent PIC. If you chose to do that, then the interrupt-map in
-> your root complex becomes only useful to represent the root ports own
-> interrutps (hotplug, AER,...) and could be replaced by just having
-> interrupt-parent & interrupts in those root port nodes.
+> ?the base dk01 file has pinmux for 54 only.
+> ?for 59 pin, we need to add pinmux entry also.
 > 
 
-Thanks for explanation.
+ ok. btw, infact think that 59 should be removed.
 
-So I guess the better way to achieve my aim - one IRQ per slot that is
-connected to all INTx and get propagated through the bridges (and for
-those root ports own interrupts (PME ..)} is to add interrupt-map
-properties in both parent and root port nodes.
+Regards,
+ Sricharan
 
-Something like this: https://patchwork.kernel.org/patch/9970923/ ,right?
-
-Ryder
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
