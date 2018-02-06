@@ -1,10 +1,10 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Feb 2018 17:56:05 +0000
-Subject: [PATCH v4 01/17] arm64: KVM: Fix SMCCC handling of unimplemented
+Date: Tue,  6 Feb 2018 17:56:06 +0000
+Subject: [PATCH v4 02/17] arm: KVM: Fix SMCCC handling of unimplemented
  SMC/HVC calls
 In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
 References: <20180206175621.929-1-marc.zyngier@arm.com>
-Message-ID: <20180206175621.929-2-marc.zyngier@arm.com>
+Message-ID: <20180206175621.929-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,17 +17,17 @@ Instead, let's follow the SMCCC which states that -1 must be returned
 to the caller when getting an unknown function number.
 
 Cc: <stable@vger.kernel.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/handle_exit.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kvm/handle_exit.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index c09fc5a576c7..520b0dad3c62 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -53,7 +53,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+index cf8bf6bf87c4..a4bf0f6f024a 100644
+--- a/arch/arm/kvm/handle_exit.c
++++ b/arch/arm/kvm/handle_exit.c
+@@ -38,7 +38,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
  	ret = kvm_psci_call(vcpu);
  	if (ret < 0) {
@@ -36,12 +36,21 @@ index c09fc5a576c7..520b0dad3c62 100644
  		return 1;
  	}
  
-@@ -62,7 +62,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+@@ -47,7 +47,16 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
  {
 -	kvm_inject_undefined(vcpu);
++	/*
++	 * "If an SMC instruction executed@Non-secure EL1 is
++	 * trapped to EL2 because HCR_EL2.TSC is 1, the exception is a
++	 * Trap exception, not a Secure Monitor Call exception [...]"
++	 *
++	 * We need to advance the PC after the trap, as it would
++	 * otherwise return to the same address...
++	 */
 +	vcpu_set_reg(vcpu, 0, ~0UL);
++	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
  	return 1;
  }
  
