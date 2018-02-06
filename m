@@ -1,44 +1,61 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 6 Feb 2018 18:28:02 +0530
-Subject: [PATCH v2 11/15] ARM: dts: dra71-evm: Correct evm_sd regulator max
- voltage
-In-Reply-To: <20180206125806.19350-1-kishon@ti.com>
-References: <20180206125806.19350-1-kishon@ti.com>
-Message-ID: <20180206125806.19350-12-kishon@ti.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 6 Feb 2018 14:15:51 +0100 (CET)
+Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing
+ with a mask
+In-Reply-To: <20180206131044.oso33fvv553trrd7@mwanda>
+References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+ <20180206131044.oso33fvv553trrd7@mwanda>
+Message-ID: <alpine.DEB.2.20.1802061414340.3306@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ravikumar Kattekola <rk@ti.com>
 
-Correct vpo_sd_1v8_3v3 regulator max voltage to 3.3V
 
-Fixes: 9868bc585ae2 ("ARM: dts: Add support for dra718-evm")
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra71-evm.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Tue, 6 Feb 2018, Dan Carpenter wrote:
 
-diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
-index 41c9132eb550..64363f75c01a 100644
---- a/arch/arm/boot/dts/dra71-evm.dts
-+++ b/arch/arm/boot/dts/dra71-evm.dts
-@@ -24,13 +24,13 @@
- 
- 		regulator-name = "vddshv8";
- 		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <3000000>;
-+		regulator-max-microvolt = <3300000>;
- 		regulator-boot-on;
- 		vin-supply = <&evm_5v0>;
- 
- 		gpios = <&gpio7 11 GPIO_ACTIVE_HIGH>;
- 		states = <1800000 0x0
--			  3000000 0x1>;
-+			  3300000 0x1>;
- 	};
- 
- 	evm_1v8_sw: fixedregulator-evm_1v8 {
--- 
-2.11.0
+> On Mon, Feb 05, 2018 at 09:09:57PM +0100, Wolfram Sang wrote:
+> > In one Renesas driver, I found a typo which turned an intended bit shift ('<<')
+> > into a comparison ('<'). Because this is a subtle issue, I looked tree wide for
+> > similar patterns. This small patch series is the outcome.
+> >
+> > Buildbot and checkpatch are happy. Only compile-tested. To be applied
+> > individually per sub-system, I think. I'd think only the net: amd: patch needs
+> > to be conisdered for stable, but I leave this to people who actually know this
+> > driver.
+> >
+> > CCing Dan. Maybe he has an idea how to add a test to smatch? In my setup, only
+> > cppcheck reported a 'coding style' issue with a low prio.
+> >
+>
+> Most of these are inside macros so it makes it complicated for Smatch
+> to warn about them.  It might be easier in Coccinelle.  Julia the bugs
+> look like this:
+>
+> -			reissue_mask |= 0xffff < 4;
+> +			reissue_mask |= 0xffff << 4;
+
+Thanks.  I'll take a look.  Do you have an example of the macro issue
+handy?
+
+julia
+
+>
+> regards,
+> dan carpenter
+>
+> > Wolfram Sang (4):
+> >   v4l: vsp1: fix mask creation for MULT_ALPHA_RATIO
+> >   drm/exynos: fix comparison to bitshift when dealing with a mask
+> >   v4l: dvb-frontends: stb0899: fix comparison to bitshift when dealing
+> >     with a mask
+> >   net: amd-xgbe: fix comparison to bitshift when dealing with a mask
+> >
+> >  drivers/gpu/drm/exynos/regs-fimc.h        | 2 +-
+> >  drivers/media/dvb-frontends/stb0899_reg.h | 8 ++++----
+> >  drivers/media/platform/vsp1/vsp1_regs.h   | 2 +-
+> >  drivers/net/ethernet/amd/xgbe/xgbe-drv.c  | 2 +-
+> >  4 files changed, 7 insertions(+), 7 deletions(-)
+> >
+> > --
+> > 2.11.0
+>
