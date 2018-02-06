@@ -1,55 +1,66 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 06 Feb 2018 10:51:04 +0800
-Subject: [linux-sunxi] [PATCH v3] ARM: sun8i: h2+: add support for Banana
- Pi M2 Zero board
-In-Reply-To: <20180205133625.vcz73qck5kfihalv@flea>
-References: <20171224054029.12278-1-icenowy@aosc.io>
- <CAGRGNgXRhphuO8+85t8vfQb2CxDekMXe2BoPo_57pc6SR3QQzA@mail.gmail.com>
- <20180205133625.vcz73qck5kfihalv@flea>
-Message-ID: <A0E61415-4A64-41E5-94F2-3161D2B7A191@aosc.io>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 06 Feb 2018 15:05:03 +1100
+Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
+ device tree parsing
+In-Reply-To: <1517884738.16010.27.camel@mtkswgap22>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+ <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
+ <1517563970.24622.9.camel@mtkswgap22>
+ <1517866584.2312.140.camel@kernel.crashing.org>
+ <1517884738.16010.27.camel@mtkswgap22>
+Message-ID: <1517889903.2312.151.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2018-02-06 at 10:38 +0800, Ryder Lee wrote:
+> 
+> I think the code should look at the bridge address <0x0800 ...> we list
+> in bindings for resolving interrupts in this case, but it seems like it
+> use the 'pdev->defvn << 8' which is not really we want and will lead to
+> mismatch.
+> 
+> 		interrupt-map-mask = <0xf800 0 0 7>;
+> 		interrupt-map = <0x0000 0 0 1 ...>,
+> 				<0x0000 0 0 2 ...>,
+> 				<0x0000 0 0 3 ...>,
+> 				<0x0000 0 0 4 ...>,
+> 
+> 				 0x0800 0 0 1 ...>,
+> 				 0x0800 0 0 2 ...>,
+> 				 0x0800 0 0 3 ...>,
+> 				 0x0800 0 0 4 ...>;
+> 		...
+> 		pcie at 1,0 {
+> 			reg = <0x0800 0 0 0 0>;
+> 			...
+> 		};
+> 
+> 
+> Or, alternatively, we could add a interrupt-map property in both child
+> and root node to solve this. The below example is my original version as
+> I don't want to change that function either.
 
+The code looks at devfn because it's meant to work for PCI including
+when the devices dont have a device node in the DT.
 
-? 2018?2?5? GMT+08:00 ??9:36:25, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Sat, Feb 03, 2018 at 05:45:52PM +1100, Julian Calaby wrote:
->> Hi all,
->> 
->> On Sun, Dec 24, 2017 at 4:40 PM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->> > Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a
->form
->> > factor and GPIO holes similar to Raspberry Pi Zero.
->> >
->> > It features:
->> > - Allwinner H2+ SoC
->> > - Single-chip (16-bit) 512MiB DDR3 DRAM
->> > - Ampak AP6212 Wi-Fi/Bluetooth module
->> > - MicroSD slot
->> > - Two MicroUSB Type-B ports (one can only be used to power the
->board and
->> >   the other features OTG functionality)
->> > - Two keys, a reset and a GPIO-connected key.
->> > - HDMI Type-C (miniHDMI) connector connected to the HDMI part of
->H2+.
->> > - CSI connector to connect the camera sensor provided by Sinovoip.
->> >
->> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> 
->> [Trimmed lots of non-sunxi-specific mailing lists]
->> 
->> Did support for this board ever get merged?
->
->It doesn't look like it did.
+What I'm trying to figure out is what is it that your parent and
+children are representing here. Which is/are the root complex ?
 
-Is there any problem in this patch now except the
-absense of SPDX license usage?
+What is the actual topology as visible on the PCIe bus (is lspci output
+basically) and how does that map to your representation ?
 
->
->> (I have two of them now, so if it didn't, I'll try to shepherd this
->> and it's corresponding u-boot patch upstream.)
->
->That sounds great :)
->
->Maxime
+> 		interrupt-map-mask = <0xf800 0 0 0>;
+> 		interrupt-map = <0x0000 0 0 0 ...>,
+> 				 0x0800 0 0 0 ...>;
+> 		...
+> 		pcie at 1,0 {
+> 			reg = <0x0800 0 0 0 0>;
+> 			#interrupt-cells = <1>;
+> 			interrupt-map-mask = <0 0 0 0>;
+> 			interrupt-map = <0 0 0 0 ...>;
+> 			...
+> 		};
+> 
+> However, I can't find any other similar case in documentation.
+> 
+> Thanks.
