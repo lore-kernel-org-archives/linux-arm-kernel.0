@@ -1,71 +1,113 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Tue,  6 Feb 2018 17:28:25 +0800
-Subject: [PATCH 6/7] arm64: dts: Add DMA device node for Spreadtrum SC9860
-In-Reply-To: <410b2f2d3f3f019c96ec31213647c41cd7f1174d.1517908478.git.baolin.wang@linaro.org>
-References: <410b2f2d3f3f019c96ec31213647c41cd7f1174d.1517908478.git.baolin.wang@linaro.org>
-Message-ID: <ec74e9b83ec9b1c83f7ad54d0a80be68ce7bb2e0.1517908478.git.baolin.wang@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 06 Feb 2018 10:35:28 +0100
+Subject: [PATCH v3 1/7] drm/panel: simple: add support for Ampire
+ AM-800480AYTZQW-00H
+In-Reply-To: <1517766571-409-2-git-send-email-jagan@amarulasolutions.com>
+References: <1517766571-409-1-git-send-email-jagan@amarulasolutions.com>
+ <1517766571-409-2-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1517909728.3346.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Spreadtrum SC9860 platform has two DMA controllers, one is located
-on the ap-ahb system, and another one is located on the agcp system.
+Hi Jagan,
 
-Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
----
- arch/arm64/boot/dts/sprd/whale2.dtsi |   34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+On Sun, 2018-02-04 at 23:19 +0530, Jagan Teki wrote:
+> This adds support for the Ampire AM-800480AYTZQW-00H 7.0" WGA LCD,
+> which can be supported by the simple panel driver.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes for v3:
+> - collect Rob reiew tag 
+> Changes for v2:
+> - Updated binding info about optional properties, node and example
+> 
+>  .../display/panel/ampire,am-800480aytzqw-00h.txt   | 25 ++++++++++++++++++++
+>  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+>  2 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
+> new file mode 100644
+> index 0000000..abb5eee
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-800480aytzqw-00h.txt
+> @@ -0,0 +1,25 @@
+> +Ampire AM-800480AYTZQW-00H 7.0" WVGA TFT LCD panel
+> +
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
+> +
+> +Required properties:
+> +- compatible: should be "ampire,am-800480aytzqw-00h"
+> +
+> +Optional properties:
+> +- backlight: phandle of the backlight device attached to the panel
+> +
+> +Optional nodes:
+> +- Video port for LVDS panel input.
+> +
+> +Example:
+> +	panel {
+> +		compatible = "ampire,am-800480aytzqw-00h";
+> +		backlight = <&backlight_lvds>;
+> +
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&lvds0_out>;
+> +			};
+> +		};
+> +	};
+> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> index 5591984..2ecc14b 100644
+> --- a/drivers/gpu/drm/panel/panel-simple.c
+> +++ b/drivers/gpu/drm/panel/panel-simple.c
+> @@ -412,6 +412,30 @@ static const struct panel_desc ampire_am_480272h3tmqw_t01h = {
+>  	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+>  };
+>  
+> +static const struct display_timing ampire_am_800480aytzqw_00h_timing = {
+> +	.pixelclock = { 27700000, 29200000, 39600000 },
+> +	.hactive = { 800, 800, 800 },
+> +	.hfront_porch = { 12, 40, 212 },
+> +	.hback_porch = { 88, 88, 88 },
+> +	.hsync_len = { 1, 2, 40 },
+> +	.vactive = { 480, 480, 480 },
+> +	.vfront_porch = { 1, 13, 88 },
+> +	.vback_porch = { 32, 32, 32 },
+> +	.vsync_len = { 1, 2, 3 },
+> +	.flags = DISPLAY_FLAGS_DE_HIGH,
+> +};
+> +
+> +static const struct panel_desc ampire_am_800480aytzqw_00h = {
+> +	.timings = &ampire_am_800480aytzqw_00h_timing,
+> +	.num_timings = 1,
+> +	.bpc = 6,
+> +	.size = {
+> +		.width = 154,
+> +		.height = 86,
+> +	},
 
-diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index f2cdf4d..66a881e 100644
---- a/arch/arm64/boot/dts/sprd/whale2.dtsi
-+++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -107,6 +107,23 @@
- 			};
- 		};
- 
-+		ap-ahb {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			ap_dma: dma-controller at 20100000 {
-+				compatible = "sprd,sc9860-dma";
-+				reg = <0 0x20100000 0 0x4000>;
-+				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+				#dma-cells = <1>;
-+				#dma-channels = <32>;
-+				clock-names = "enable";
-+				clocks = <&apahb_gate CLK_DMA_EB>;
-+			};
-+		};
-+
- 		aon {
- 			compatible = "simple-bus";
- 			#address-cells = <2>;
-@@ -151,6 +168,23 @@
- 				clocks = <&aon_gate CLK_APCPU_WDG_EB>;
- 			};
- 		};
-+
-+		agcp {
-+			compatible = "simple-bus";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			agcp_dma: dma-controller at 41580000 {
-+				compatible = "sprd,sc9860-dma";
-+				reg = <0 0x41580000 0 0x4000>;
-+				#dma-cells = <1>;
-+				#dma-channels = <32>;
-+				clock-names = "enable", "ashb_eb";
-+				clocks = <&agcp_gate CLK_AGCP_DMAAP_EB>,
-+				       <&agcp_gate CLK_AGCP_AP_ASHB_EB>;
-+			};
-+		};
- 	};
- 
- 	ext_32k: ext_32k {
--- 
-1.7.9.5
+If the panel datasheet specifies minimal prepare, enable, disable, and
+unprepare delays, it would be good to add them to the panel descriptor.
+
+> +	.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
+> +};
+> +
+>  static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
+>  	.clock = 33333,
+>  	.hdisplay = 800,
+> @@ -2028,6 +2052,9 @@ static const struct of_device_id platform_of_match[] = {
+>  		.compatible = "ampire,am-480272h3tmqw-t01h",
+>  		.data = &ampire_am_480272h3tmqw_t01h,
+>  	}, {
+> +		.compatible = "ampire,am-800480aytzqw-00h",
+> +		.data = &ampire_am_800480aytzqw_00h,
+> +	}, {
+>  		.compatible = "ampire,am800480r3tmqwa1h",
+>  		.data = &ampire_am800480r3tmqwa1h,
+>  	}, {
+
+regards
+Philipp
