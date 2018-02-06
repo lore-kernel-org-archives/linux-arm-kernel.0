@@ -1,273 +1,112 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Feb 2018 15:55:01 +0100
-Subject: [RFC 4/4] KVM: arm64: Add support for PUD hugepages at stage 2
-In-Reply-To: <20180110190729.18383-5-punit.agrawal@arm.com>
-References: <20180110190729.18383-1-punit.agrawal@arm.com>
- <20180110190729.18383-5-punit.agrawal@arm.com>
-Message-ID: <20180206145501.GB23160@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Feb 2018 16:08:49 +0100
+Subject: stable-rc/linux-4.15.y build: 185 builds: 0 failed, 185 passed,
+ 46 warnings (v4.15.1-61-g7ab5513e4cbc)
+In-Reply-To: <5a78c368.5896df0a.8f293.fd41@mx.google.com>
+References: <5a78c368.5896df0a.8f293.fd41@mx.google.com>
+Message-ID: <CAK8P3a1n2ELL56MHqEgffzNg2B8gdpwHpMnp_vgN4ftAAiwW8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 10, 2018 at 07:07:29PM +0000, Punit Agrawal wrote:
-> KVM only supports PMD hugepages at stage 2. Extend the stage 2 fault
-> handling to add support for PUD hugepages.
-> 
-> Addition of PUD hugpage support enables additional hugepage sizes (1G
+On Mon, Feb 5, 2018 at 9:49 PM, kernelci.org bot <bot@kernelci.org> wrote:
+>
+> stable-rc/linux-4.15.y build: 185 builds: 0 failed, 185 passed, 46 warnings (v4.15.1-61-g7ab5513e4cbc)
 
-                 *hugepage
+Hi Greg,
 
-> with 4K granule and 4TB with 64k granule) which can be useful on cores
-> that have support for mapping larger block sizes in the TLB entries.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h         | 10 +++++
->  arch/arm/include/asm/pgtable-3level.h  |  2 +
->  arch/arm64/include/asm/kvm_mmu.h       | 19 +++++++++
->  arch/arm64/include/asm/pgtable-hwdef.h |  2 +
->  arch/arm64/include/asm/pgtable.h       |  4 ++
->  virt/kvm/arm/mmu.c                     | 72 +++++++++++++++++++++++++++++-----
->  6 files changed, 99 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 3fbe919b9181..6e2e34348cb3 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -59,6 +59,10 @@ phys_addr_t kvm_get_idmap_vector(void);
->  int kvm_mmu_init(void);
->  void kvm_clear_hyp_idmap(void);
->  
-> +static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
-> +{
-> +}
-> +
->  static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
->  {
->  	*pmd = new_pmd;
-> @@ -230,6 +234,12 @@ static inline unsigned int kvm_get_vmid_bits(void)
->  	return 8;
->  }
->  
-> +static inline pud_t stage2_build_pud(kvm_pfn_t pfn, pgprot_t mem_type,
-> +				     bool writable)
-> +{
-> +	return __pud(0);
-> +}
-> +
->  #endif	/* !__ASSEMBLY__ */
->  
->  #endif /* __ARM_KVM_MMU_H__ */
-> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> index 1a7a17b2a1ba..97e04fdbfa85 100644
-> --- a/arch/arm/include/asm/pgtable-3level.h
-> +++ b/arch/arm/include/asm/pgtable-3level.h
-> @@ -249,6 +249,8 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
->  #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
->  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
->  
-> +#define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-> +
+FYI, the device tree compiler warnings are all fixed in
+linux-4.16-rc1. These are basically fixes
+that we ended up not submitting last minute for the release after one
+of them (the USB PHY
+one, if you remember) had blown up.
 
-does this make sense on 32-bit arm?  Is this ever going to get called
-and return something meaningful in that case?
+Anyway, I think the risk is rather low for any of them (they are
+mostly platforms that
+are not widely used, and the fixes make things work that didn't), so
+to get a clean
+build, feel free to pick up the remaining patches from mainline now or
+after -rc1:
 
->  /* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
->  static inline pmd_t pmd_mknotpresent(pmd_t pmd)
->  {
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index dbfd18e08cfb..89eac3dbe123 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -160,6 +160,7 @@ void kvm_clear_hyp_idmap(void);
->  
->  #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
->  #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
-> +#define kvm_set_pud(pudp, pud)		set_pud(pudp, pud)
->  
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
->  {
-> @@ -173,6 +174,12 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
->  	return pmd;
->  }
->  
-> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-> +{
-> +	pud_val(pud) |= PUD_S2_RDWR;
-> +	return pud;
-> +}
-> +
->  static inline void kvm_set_s2pte_readonly(pte_t *pte)
->  {
->  	pteval_t old_pteval, pteval;
-> @@ -319,5 +326,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
->  	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
->  }
->  
-> +static inline pud_t stage2_build_pud(kvm_pfn_t pfn, pgprot_t mem_type,
-> +				     bool writable)
-> +{
-> +	pud_t pud = pfn_pud(pfn, mem_type);
-> +
-> +	pud = pud_mkhuge(pud);
-> +	if (writable)
-> +		pud = kvm_s2pud_mkwrite(pud);
-> +
-> +	return pud;
-> +}
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ARM64_KVM_MMU_H__ */
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 40a998cdd399..a091a6192eee 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -181,6 +181,8 @@
->  #define PMD_S2_RDONLY		(_AT(pmdval_t, 1) << 6)   /* HAP[2:1] */
->  #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->  
-> +#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
-> +
->  /*
->   * Memory Attribute override for Stage-2 (MemAttr[3:0])
->   */
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index bdcc7f1c9d06..d5ffff4369d2 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -362,7 +362,11 @@ static inline int pmd_protnone(pmd_t pmd)
->  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
->  
->  #define pud_write(pud)		pte_write(pud_pte(pud))
-> +
-> +#define pud_mkhuge(pud)		(__pud(pud_val(pud) & ~PUD_TABLE_BIT))
-> +
->  #define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-> +#define pfn_pud(pfn, prot)	(__pud(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
->  
->  #define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
->  
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index f02219a91b19..5362de098768 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -872,6 +872,32 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
->  	return stage2_pud_offset(pgd, addr);
->  }
->  
-> +static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
-> +			       *cache, phys_addr_t addr, const pud_t *new_pud)
-> +{
-> +	pud_t *pud, old_pud;
-> +
-> +	pud = stage2_get_pud(kvm, cache, addr);
-> +	VM_BUG_ON(!pud);
-> +
-> +	/*
-> +	 * Mapping in huge pages should only happen through a fault.
-> +	 */
-> +	VM_BUG_ON(stage2_pud_present(*pud) &&
-> +		  pud_pfn(*pud) != pud_pfn(*new_pud));
-> +
-> +	old_pud = *pud;
-> +	if (stage2_pud_present(old_pud)) {
-> +		stage2_pud_clear(pud);
-> +		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> +	} else {
-> +		get_page(virt_to_page(pud));
-> +	}
-> +
-> +	kvm_set_pud(pud, *new_pud);
-> +	return 0;
-> +}
-> +
->  static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->  			     phys_addr_t addr)
->  {
-> @@ -1307,6 +1333,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	kvm_pfn_t pfn;
->  	pgprot_t mem_type = PAGE_S2;
->  	bool logging_active = memslot_is_logging(memslot);
-> +	unsigned long vma_pagesize;
->  	unsigned long flags = 0;
->  
->  	write_fault = kvm_is_write_fault(vcpu);
-> @@ -1324,9 +1351,13 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		return -EFAULT;
->  	}
->  
-> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-> +	vma_pagesize = vma_kernel_pagesize(vma);
-> +	if ((vma_pagesize == PMD_SIZE || vma_pagesize == PUD_SIZE) &&
-> +	    !logging_active) {
-> +		struct hstate *h = hstate_vma(vma);
-> +
->  		hugetlb = true;
-> -		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-> +		gfn = (fault_ipa & huge_page_mask(h)) >> PAGE_SHIFT;
->  	} else {
->  		/*
->  		 * Pages belonging to memslots that don't have the same
-> @@ -1393,17 +1424,38 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	if (mmu_notifier_retry(kvm, mmu_seq))
->  		goto out_unlock;
->  
-> -	if (!hugetlb && !force_pte)
-> +	if (!hugetlb && !force_pte) {
-> +		/*
-> +		 * We only support PMD_SIZE transparent
-> +		 * hugepages. This code will need updates if we enable
-> +		 * other page sizes for THP.
-> +		 */
->  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
-> +		vma_pagesize = PMD_SIZE;
-> +	}
->  
->  	if (hugetlb) {
-> -		pmd_t new_pmd = stage2_build_pmd(pfn, mem_type, writable);
-> -
-> -		if (writable)
-> -			kvm_set_pfn_dirty(pfn);
-> -
-> -		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
-> -		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
-> +		if (vma_pagesize == PUD_SIZE) {
-> +			pud_t new_pud;
-> +
-> +			new_pud = stage2_build_pud(pfn, mem_type, writable);
-> +			if (writable)
-> +				kvm_set_pfn_dirty(pfn);
-> +
-> +			coherent_cache_guest_page(vcpu, pfn, PUD_SIZE);
-> +			ret = stage2_set_pud_huge(kvm, memcache,
-> +						  fault_ipa, &new_pud);
-> +		} else {
-> +			pmd_t new_pmd;
-> +
-> +			new_pmd = stage2_build_pmd(pfn, mem_type, writable);
-> +			if (writable)
-> +				kvm_set_pfn_dirty(pfn);
-> +
-> +			coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
-> +			ret = stage2_set_pmd_huge(kvm, memcache,
-> +						  fault_ipa, &new_pmd);
-> +		}
+> Warnings Detected:
+>
+> Warnings summary:
+> 2 arch/arm/boot/dts/spear1340-evb.dtb: Warning (dmas_property): Property 'dmas', cell 4 is not a phandle reference in /ahb/apb/serial at b4100000
+> 2 arch/arm/boot/dts/spear1340-evb.dtb: Warning (dmas_property): Missing property '#dma-cells' in node /interrupt-controller at ec801000 or bad phandle (referred from /ahb/apb/serial at b4100000:dmas[4])
 
-This stuff needs rebasing onto v4.16-rc1 when we get there, and it will
-clash with Marc's icache optimizations.
+cdd104099141 ("arm: spear13xx: Fix dmas cells")
 
-But, you should be able to move kvm_set_pfn_dirty() out of the
-size-conditional section and also call the cache maintenance functions
-using vma_pagesize as parameter.
+> 2 arch/arm/boot/dts/spear1310-evb.dtb: Warning (gpios_property): Property 'cs-gpios', cell 6 is not a phandle reference in /ahb/apb/spi at e0100000
+> 2 arch/arm/boot/dts/spear1310-evb.dtb: Warning (gpios_property): Missing property '#gpio-cells' in node /interrupt-controller at ec801000 or bad phandle (referred from /ahb/apb/spi at e0100000:cs-gpios[6])
 
->  	} else {
->  		pte_t new_pte = pfn_pte(pfn, mem_type);
->  
-> -- 
-> 2.15.1
-> 
+f8975cb1b8a3 ("arm: spear13xx: Fix spics gpio controller's warning")
 
-Thanks,
--Christoffer
+> 2 arch/arm/boot/dts/exynos5410-smdk5410.dtb: Warning (interrupts_property): Missing interrupt-controller or interrupt-map property in /soc/system-controller at 10040000
+> 2 arch/arm/boot/dts/exynos5410-smdk5410.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/system-controller at 10040000
+> 2 arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property): Missing interrupt-controller or interrupt-map property in /soc/system-controller at 10040000
+> 2 arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/system-controller at 10040000
+
+5628a8ca1414 ("ARM: dts: exynos: fix RTC interrupt for exynos5410")
+
+> 2 WARNING: modpost: missing MODULE_LICENSE() in arch/arm/mach-pxa/tosa-bt.o
+
+3343647813fd ("ARM: pxa/tosa-bt: add MODULE_LICENSE tag")
+
+> 1 arch/arm64/boot/dts/qcom/msm8916-mtp.dtb: Warning (phys_property): Missing property '#phy-cells' in node /soc/mdss at 1a00000/dsi-phy at 1a98300 or bad phandle (referred from /soc/mdss at 1a00000/dsi at 1a98000:phys[0])
+> 1 arch/arm64/boot/dts/qcom/apq8016-sbc.dtb: Warning (phys_property): Missing property '#phy-cells' in node /soc/mdss at 1a00000/dsi-phy at 1a98300 or bad phandle (referred from /soc/mdss at 1a00000/dsi at 1a98000:phys[0])
+
+b0ab681285aa ("arm64: dts: msm8916: Add missing #phy-cells")
+
+> 1 arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 100 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 1:cooling-device[0])
+> 1 arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (cooling_device_property): Missing property '#cooling-cells' in node /cpus/cpu at 0 or bad phandle (referred from /thermal-zones/cpu_thermal/cooling-maps/map at 0:cooling-device[0])
+
+acbf76ee0506 ("arm64: dts: add #cooling-cells to CPU nodes")
+
+> 1 arch/arm/boot/dts/stih410-b2260.dtb: Warning (gpios_property): hdmi,hpd-gpio property size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
+> 1 arch/arm/boot/dts/stih410-b2120.dtb: Warning (gpios_property): hdmi,hpd-gpio property size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
+> 1 arch/arm/boot/dts/stih407-b2120.dtb: Warning (gpios_property): hdmi,hpd-gpio property size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
+
+7ac1f59c09a6 ("ARM: dts: STi: Add gpio polarity for "hdmi,hpd-gpio" property")
+
+> 1 arch/arm/boot/dts/ste-nomadik-s8815.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
+> 1 arch/arm/boot/dts/ste-nomadik-nhk15.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
+
+e8bfa0422469 ("ARM: dts: nomadik: add interrupt-parent for clcd")
+
+> 1 arch/arm/boot/dts/spear600-evb.dtb: Warning (interrupts_property): Missing interrupt-parent for /ahb/apb/rtc at fc900000
+
+6ffb5b4f248f ("arm: spear600: Add missing interrupt-parent of rtc")
+
+> 1 arch/arm/boot/dts/s5pv210-torbreck.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> 1 arch/arm/boot/dts/s5pv210-smdkv210.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> 1 arch/arm/boot/dts/s5pv210-smdkc110.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> 1 arch/arm/boot/dts/s5pv210-goni.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+> 1 arch/arm/boot/dts/s5pv210-aquila.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
+
+5c1037196b9e ("ARM: dts: s5pv210: add interrupt-parent for ohci")
+
+> 1 arch/arm/boot/dts/mt7623n-rfb-nand.dtb: Warning (resets_property): Missing property '#reset-cells' in node /syscon at 1b000000 or bad phandle (referred from /ethernet at 1b100000:resets[0])
+> 1 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning (resets_property): Missing property '#reset-cells' in node /syscon at 1b000000 or bad phandle (referred from /ethernet at 1b100000:resets[0])
+
+76a09ce214ad ("arm: dts: mt7623: Update ethsys binding")
+
+> 1 arch/arm/boot/dts/mt2701-evb.dtb: Warning (resets_property): Missing property '#reset-cells' in node /syscon at 1b000000 or bad phandle (referred from /ethernet at 1b100000:resets[0])
+
+ae72e95b5e4d ("arm: dts: mt2701: Add reset-cells")
+
+> 1 arch/arm/boot/dts/lpc3250-phy3250.dtb: Warning (gpios_property): reset-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
+> 1 arch/arm/boot/dts/lpc3250-phy3250.dtb: Warning (gpios_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
+> 1 arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpios_property): reset-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
+> 1 arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpios_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
+
+ca32e0c4bf9c ("ARM: lpc3250: fix uda1380 gpio numbers")
+
+> 1 arch/arm/boot/dts/arm-realview-eb-a9mp.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
+> 1 arch/arm/boot/dts/arm-realview-eb-a9mp-bbrevd.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
+> 1 arch/arm/boot/dts/arm-realview-eb-11mp.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
+> 1 arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
+> 1 arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
+> 1 arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd-ctrevb.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
+
+586b2a4befad ("ARM: dts: Delete bogus reference to the charlcd")
+
+         Arnd
