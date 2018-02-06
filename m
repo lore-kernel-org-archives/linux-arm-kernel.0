@@ -1,181 +1,172 @@
-From: yungching0725@gmail.com (Ken Lin)
-Date: Wed,  7 Feb 2018 03:17:04 +0800
-Subject: [v3] ARM: dts: imx: Add support for Advantech DMS-BA16
-Message-ID: <20180206191704.7933-1-yungching0725@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 6 Feb 2018 11:35:32 -0800
+Subject: [PATCH v2 3/3] arm64: dts: sdm845: Add serial console support
+In-Reply-To: <20180131161941.29865-4-rnayak@codeaurora.org>
+References: <20180131161941.29865-1-rnayak@codeaurora.org>
+ <20180131161941.29865-4-rnayak@codeaurora.org>
+Message-ID: <CAD=FV=VwTZo2YOxw0W7JbuF_Dic8YHmQZ6_FAxiZG3BXiS_VEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech DMS-BA16 board, which uses
-the Advantech BA-16 module.
+Hi,
 
-Signed-off-by: Ken Lin <yungching0725@gmail.com>
----
-Changes in v3:
-- Fix the SPDX lines issue
-- Fix the eeprom setting issue
+On Wed, Jan 31, 2018 at 8:19 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> Add the qup uart node and geni se instance needed to
+> support the serial console on the MTP.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 42 +++++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 21 +++++++++++++++++
+>  2 files changed, 63 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> index 617c7bb25fb1..42fbf2ab9a2d 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> @@ -10,4 +10,46 @@
+>  / {
+>         model = "Qualcomm Technologies, Inc. SDM845 MTP";
+>         compatible = "qcom,sdm845-mtp";
+> +
+> +       aliases {
+> +               serial0 = &qup_uart2;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0";
+> +       };
+> +
+> +       soc {
 
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/imx6q-dms-ba16.dts | 140 +++++++++++++++++++++++++++++++++++
- 2 files changed, 141 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-dms-ba16.dts
+I don't know if there's an official position, but in general I'm seen
+people use the actual "soc" alias here.  AKA at the top level of this
+dts, just do:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..585c3da4a47a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -435,6 +435,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-dfi-fs700-m60.dtb \
- 	imx6q-display5-tianma-tm070-1280x768.dtb \
- 	imx6q-dmo-edmqmx6.dtb \
-+	imx6q-dms-ba16.dtb \
- 	imx6q-evi.dtb \
- 	imx6q-gk802.dtb \
- 	imx6q-gw51xx.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-dms-ba16.dts b/arch/arm/boot/dts/imx6q-dms-ba16.dts
-new file mode 100644
-index 000000000000..b5047fd88290
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-dms-ba16.dts
-@@ -0,0 +1,140 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include "imx6q-ba16.dtsi"
-+
-+/ {
-+	model = "Advantech DMS-BA16";
-+	compatible = "advantech,imx6q-dms-ba16", "advantech,imx6q-ba16", "fsl,imx6q";
-+
-+	reg_usb_otg_vbus: regulator-usbotgvbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbotgvbus>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	sys_mclk: clock-sys-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <22000000>;
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx6q-ba16-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx6q-ba16-sgtl5000";
-+		ssi-controller = <&ssi1>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
-+	};
-+};
-+
-+&ecspi5 {
-+	cs-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi5>;
-+	status = "okay";
-+
-+	m25_eeprom: m25p80 at 0 {
-+		compatible = "atmel,at25256B", "atmel,at25";
-+		spi-max-frequency = <20000000>;
-+		size = <0x8000>;
-+		pagesize = <64>;
-+		reg = <0>;
-+		address-width = <16>;
-+	};
-+};
-+
-+&iomuxc {
-+
-+	pinctrl_usbotgvbus: usbotgvbusgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15 0x000b0
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID   0x17059
-+		>;
-+	};
-+
-+	pinctrl_i2c1_gpio: i2c1gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26        0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27        0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c2_gpio: i2c2gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__GPIO4_IO12 0x1b0b0
-+			MX6QDL_PAD_KEY_ROW3__GPIO4_IO13 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c3_gpio: i2c3gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_3__GPIO1_IO03   0x1b0b0
-+			MX6QDL_PAD_GPIO_6__GPIO1_IO06   0x1b0b0
-+		>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&sys_mclk>;
-+		lrclk-strength = <0x3>;
-+		VDDA-supply = <&reg_1p8v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+	};
-+};
-+
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>;
-+	status = "okay";
-+};
-+
-+&sata {
-+	fsl,no-spread-spectrum;
-+	fsl,transmit-atten-16ths = <12>;
-+	fsl,transmit-boost-mdB = <3330>;
-+	fsl,transmit-level-mV = <1133>;
-+	fsl,receive-dpll-mode = <1>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	dr_mode = "otg";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	bus-width = <8>;
-+	cd-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "okay";
-+};
--- 
-2.11.0
+&soc {
+  ...
+};
+
+Normally doing stuff like that is useful so you don't need to
+replicate the whole hierarchy.  In this case that's not a huge
+savings, but it can be nice to be consistent.  In the very least it
+saves you a level of indentation.
+
+
+> +               serial at a84000 {
+> +                       status = "okay";
+> +               };
+
+Similarly here you can use the alias from the sdm845.dtsi file to
+avoid replicating the hierarchy.  AKA at the top level do:
+
+&qup_uart2 {
+  status = "okay";
+};
+
+In this case it saves you 2 levels of indentation.
+
+> +
+> +               pinctrl at 3400000 {
+> +                       qup_uart2_default: qup_uart2_default {
+
+I'm not sure how persnickety I should be, but according to
+<https://elinux.org/Device_Tree_Linux>:
+
+  node names use dash "-" instead of underscore "_"
+
+...but, of course, labels can't use dashes (and the same page says to
+use underscore for labels).  This is why, in rk3288 for instance, you
+see:
+
+i2c2_xfer: i2c2-xfer {
+  rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_none>,
+  <6 10 RK_FUNC_1 &pcfg_pull_none>;
+};
+
+AKA the label and the node name are the same but the label uses "_"
+and the node names use "-".
+
+
+> +                               pinmux {
+> +                                       function = "qup9";
+> +                                       pins = "gpio4", "gpio5";
+> +                               };
+> +
+> +                               pinconf {
+> +                                       pins = "gpio4", "gpio5";
+> +                                       drive-strength = <2>;
+> +                                       bias-disable;
+> +                               };
+> +                       };
+> +
+> +                       qup_uart2_sleep: qup_uart2_sleep {
+> +                               pinmux {
+> +                                       function = "gpio";
+> +                                       pins = "gpio4", "gpio5";
+> +                               };
+> +
+> +                               pinconf {
+> +                                       pins = "gpio4", "gpio5";
+> +                                       drive-strength = <2>;
+> +                                       bias-disable;
+> +                               };
+> +                       };
+> +               };
+
+As per my (admittedly tardy) response to v1, these shouldn't be in the
+board file because every board that happens to need uart2 will need to
+duplicate these definitions.
+
+
+> +       };
+>  };
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index 02520f19e4ca..c4ce70840acf 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -4,6 +4,7 @@
+>   */
+>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/qcom,gcc-sdm845.h>
+>
+>  / {
+>         model = "Qualcomm Technologies, Inc. SDM845";
+> @@ -273,5 +274,25 @@
+>                         cell-index = <0>;
+>                 };
+>
+> +               qup_1: qcom,geni_se at ac0000 {
+> +                       compatible = "qcom,geni-se-qup";
+> +                       reg = <0xac0000 0x6000>;
+
+I think you may have mentioned this in another context, but this
+doesn't match the current bindings.  Some clocks should be here.
+...and it looks like the uart should be a subnode.
+
+
+> +               };
+> +
+> +               qup_uart2: serial at a84000 {
+> +                       compatible = "qcom,geni-console", "qcom,geni-uart";
+> +                       reg = <0xa84000 0x4000>;
+> +                       reg-names = "se_phys";
+> +                       clock-names = "se-clk", "m-ahb", "s-ahb";
+> +                       clocks = <&gcc GCC_QUPV3_WRAP1_S1_CLK>,
+> +                                <&gcc GCC_QUPV3_WRAP_1_M_AHB_CLK>,
+> +                                <&gcc GCC_QUPV3_WRAP_1_S_AHB_CLK>;
+> +                       pinctrl-names = "default", "sleep";
+> +                       pinctrl-0 = <&qup_uart2_default>;
+> +                       pinctrl-1 = <&qup_uart2_sleep>;
+
+In general the "SoC" dtsi file shouldn't be relying on definitions
+that are made in the board "dts" file.
+
+...if everyone disagrees with me and we really decide to duplicate all
+the pinctrl in all board files, we'll need to move the
+"pinctrl-names", "pinctrl-0", and "pinctrl-1" to the board files too.
+;)
+
+
+-Doug
