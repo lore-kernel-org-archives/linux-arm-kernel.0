@@ -1,37 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 6 Feb 2018 15:27:22 +0000
-Subject: [PATCHv3] tlv320dac33: Add device tree bindings
-In-Reply-To: <20180206134906.GA7842@amd>
-References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
- <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com>
- <20180205082445.GA18274@amd> <20180206121122.GG5681@sirena.org.uk>
- <20180206134906.GA7842@amd>
-Message-ID: <20180206152722.GH5681@sirena.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 6 Feb 2018 16:44:28 +0100
+Subject: [RFC v4 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
+In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdX0EBhc20G1eaN-LXyMpamyjW1otja3YV10kR1PNEprXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 02:49:06PM +0100, Pavel Machek wrote:
-> On Tue 2018-02-06 12:11:22, Mark Brown wrote:
+Hi Fabrizio,
 
-> > Please submit patches using subject lines reflecting the style for the
-> > subsystem.  This makes it easier for people to identify relevant
-> > patches.  Look at what existing commits in the area you're changing are
-> > doing and make sure your subject lines visually resemble what they're
-> > doing.
+On Wed, Jan 31, 2018 at 7:24 PM, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> the forth version of this series aims at consolidating the watchdog fix.
+> There is a discussion still in progress about the changes to the
+> watchdog driver, please see the following for more information:
+> https://patchwork.kernel.org/patch/10192435/
+>
+> It doesn't look like leaving the restart handler in for Gen3 is going
+> to do any harm (but it may be unwelcome), perhaps esplicitly setting
+> its priority to a medium level (128) will help its adoption on Gen3
+> as well? This is what this particular version is proposing.
+>
+> Also, although the latest implmentation of the reset vector hasn't
+> raised any problem so far, it hasn't received any feedback either.
+> Please do look into it to espose problems and weaknesses (if any).
+>
+> Finally, it would be great if someone could test this patch set on his
+> Gen2/Gen3/RZ/G1 board, and it would be awesome if that board was a
+> Lager with all of the cores enabled and working at the same time ;-)
 
-> AFAICT this goes to Documentation, not sound.
+I applied your series, made the following change:
 
-Even if that were the case you're not following the commonly accepted
-practice there either.
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -499,6 +499,11 @@
+        status = "okay";
+ };
 
-> If you have any comments on V1 of this patch, that would be nice, I'd
-> like to get that merged once we are finished with the bindings.
++&rwdt {
++       timeout-sec = <5>;
++       status = "okay";
++};
++
+ &sata0 {
+        status = "okay";
+ };
 
-It is the middle of the merge window, please be a bit more patient.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180206/2d5c509b/attachment.sig>
+and tried it on koelsch. Unfortunately it hangs:
+
+    # cat > /dev/watchdog
+    [wait 5s]
+    [hang]
+
+However, it does work when booted with maxcpus=1, or when built with
+CONFIG_SMP=n.
+
+It also works when offlining CPU1 first:
+
+    # echo 0 > /sys/devices/system/cpu/cpu1/online
+    #cat > /dev/watchdog
+    [wait 5s]
+    [reboot]
+
+It does not work when offlining CPU0 first.
+
+This is on r8a7791 ES1.0.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
