@@ -1,68 +1,181 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 6 Feb 2018 11:06:14 -0800
-Subject: [PATCH 2/2] arm64: dts: sdm845: Add serial console support
-In-Reply-To: <CAD=FV=WcCnQJc25=sKWtOi=ZWi=ium6DVsexuQnsLDL=aJE6-Q@mail.gmail.com>
-References: <20180125163216.29018-1-rnayak@codeaurora.org>
- <20180125163216.29018-3-rnayak@codeaurora.org>
- <20180126221808.GE28313@codeaurora.org>
- <CAD=FV=WcCnQJc25=sKWtOi=ZWi=ium6DVsexuQnsLDL=aJE6-Q@mail.gmail.com>
-Message-ID: <20180206190614.GL9465@builder>
+From: yungching0725@gmail.com (Ken Lin)
+Date: Wed,  7 Feb 2018 03:17:04 +0800
+Subject: [v3] ARM: dts: imx: Add support for Advantech DMS-BA16
+Message-ID: <20180206191704.7933-1-yungching0725@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 06 Feb 10:37 PST 2018, Doug Anderson wrote:
+Add support for Advantech DMS-BA16 board, which uses
+the Advantech BA-16 module.
 
-> Hi,
-> 
-> On Fri, Jan 26, 2018 at 2:18 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 01/25, Rajendra Nayak wrote:
-> >> diff --git a/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
-> >> new file mode 100644
-> >> index 000000000000..b97f99e6f4b4
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
-> >> @@ -0,0 +1,32 @@
-> >> +// SPDX-License-Identifier: GPL-2.0
-> >> +/*
-> >> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> >> + */
-> >> +
-> >> +&tlmm {
-> >
-> > I'm not the maintainer, but I find this approach to the pins
-> > really annoying. I have to flip to another file to figure out how
-> > a board has configured the pins. And we may bring in a bunch of
-> > settings that we don't ever use on some board too. Why can't we
-> > put the settings in the board file directly?
-> 
-> I'm not so familiar with how things work with Qualcomm, but in general
-> I think putting this in the "board" file is a bad idea.  I'd be OK
-> with putting this directly in the SoC file (though it might get
-> unwieldy?), but not moving things to the board file as was done with
-> v2 of this patch.
-> 
-> Said another way: nearly board that uses SDM845 that uses UART2 will
-> have the same definitions for these pins so we shouldn't be
-> duplicating it across every board, right?
-> 
+Signed-off-by: Ken Lin <yungching0725@gmail.com>
+---
+Changes in v3:
+- Fix the SPDX lines issue
+- Fix the eeprom setting issue
 
-We've run into several cases where different boards uses the same
-function but requires board specific electrical configuration.
+ arch/arm/boot/dts/Makefile           |   1 +
+ arch/arm/boot/dts/imx6q-dms-ba16.dts | 140 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 141 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-dms-ba16.dts
 
-So what we decided was to keep the pinmux in the soc-file (where e.g.
-the uart definition is) and then extend it with the board specific
-electrical properties (the pinconf), in the board files.
-
-This does come with the complexity of having the pinctrl nodes split in
-two places, but the responsibilities of the two parts is clear and we
-remove the need for all board files to ensure the appropriate pinmux is
-in place.
-
-
-NB. We did discuss adding "sane defaults" for the pinconf in the soc
-dtsi, but we end up spending considerable time debugging issues stemming
-from not having the right pinconf; so better make this explicit and say
-that the board has to specify it's config.
-
-Regards,
-Bjorn
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index ade7a38543dc..585c3da4a47a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -435,6 +435,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-dfi-fs700-m60.dtb \
+ 	imx6q-display5-tianma-tm070-1280x768.dtb \
+ 	imx6q-dmo-edmqmx6.dtb \
++	imx6q-dms-ba16.dtb \
+ 	imx6q-evi.dtb \
+ 	imx6q-gk802.dtb \
+ 	imx6q-gw51xx.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-dms-ba16.dts b/arch/arm/boot/dts/imx6q-dms-ba16.dts
+new file mode 100644
+index 000000000000..b5047fd88290
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-dms-ba16.dts
+@@ -0,0 +1,140 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include "imx6q-ba16.dtsi"
++
++/ {
++	model = "Advantech DMS-BA16";
++	compatible = "advantech,imx6q-dms-ba16", "advantech,imx6q-ba16", "fsl,imx6q";
++
++	reg_usb_otg_vbus: regulator-usbotgvbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbotgvbus>;
++		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	sys_mclk: clock-sys-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <22000000>;
++	};
++
++	sound {
++		compatible = "fsl,imx6q-ba16-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6q-ba16-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&sgtl5000>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <4>;
++	};
++};
++
++&ecspi5 {
++	cs-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi5>;
++	status = "okay";
++
++	m25_eeprom: m25p80 at 0 {
++		compatible = "atmel,at25256B", "atmel,at25";
++		spi-max-frequency = <20000000>;
++		size = <0x8000>;
++		pagesize = <64>;
++		reg = <0>;
++		address-width = <16>;
++	};
++};
++
++&iomuxc {
++
++	pinctrl_usbotgvbus: usbotgvbusgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15 0x000b0
++			MX6QDL_PAD_GPIO_1__USB_OTG_ID   0x17059
++		>;
++	};
++
++	pinctrl_i2c1_gpio: i2c1gpiogrp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26        0x1b0b0
++			MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27        0x1b0b0
++		>;
++	};
++
++	pinctrl_i2c2_gpio: i2c2gpiogrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL3__GPIO4_IO12 0x1b0b0
++			MX6QDL_PAD_KEY_ROW3__GPIO4_IO13 0x1b0b0
++		>;
++	};
++
++	pinctrl_i2c3_gpio: i2c3gpiogrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_3__GPIO1_IO03   0x1b0b0
++			MX6QDL_PAD_GPIO_6__GPIO1_IO06   0x1b0b0
++		>;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	sgtl5000: codec at a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&sys_mclk>;
++		lrclk-strength = <0x3>;
++		VDDA-supply = <&reg_1p8v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++};
++
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>;
++	status = "okay";
++};
++
++&sata {
++	fsl,no-spread-spectrum;
++	fsl,transmit-atten-16ths = <12>;
++	fsl,transmit-boost-mdB = <3330>;
++	fsl,transmit-level-mV = <1133>;
++	fsl,receive-dpll-mode = <1>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	dr_mode = "otg";
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <8>;
++	cd-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	keep-power-in-suspend;
++	wakeup-source;
++	status = "okay";
++};
+-- 
+2.11.0
