@@ -1,57 +1,46 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 6 Feb 2018 13:55:14 -0800
-Subject: [PATCH v2 2/3] arm64: dts: sdm845: Add minimal dts/dtsi files for
- sdm845 SoC and MTP
-In-Reply-To: <20180131161941.29865-3-rnayak@codeaurora.org>
-References: <20180131161941.29865-1-rnayak@codeaurora.org>
- <20180131161941.29865-3-rnayak@codeaurora.org>
-Message-ID: <CAD=FV=W3SfQ05_jRdCOZj=sQ9POGFb5NVvpsBYRnuak8zLFBWg@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Tue, 6 Feb 2018 16:59:22 -0500 (EST)
+Subject: Device tree bug in armada-8040-mcbin.dts
+Message-ID: <alpine.LRH.2.02.1802061650060.4974@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-On Wed, Jan 31, 2018 at 8:19 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> new file mode 100644
-> index 000000000000..02520f19e4ca
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -0,0 +1,277 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +       model = "Qualcomm Technologies, Inc. SDM845";
+When the MacchiatoBIN kernel is compiled with CONFIG_PM=y, it is 
+frequently reporing this error (the error happens every time some I/O on 
+built-in eMMC happens):
 
-I'm fairly certain that "model" doesn't belong in the SoC .dtsi file.
-Only in the board .dts file.
+"mmc0: Switching to 3.3V signalling voltage failed"
+
+The problem is that the "&ap_sdhci0" device tree node asserts that the 
+controller doesn't support 1.8v, but it attaches it to the fixed voltage 
+regulator "v_vddo_h" that only supplies 1.8V.
+
+Should it be attached to the 3.3V regulator instead? Or should the 
+"vqmmc-supply" statemet be deleted? Or should the statement "no-1-8-v" be 
+deleted?
+
+Mikulas
 
 
-> +       clocks {
-> +               xo_board: xo_board {
 
-Just to make it explicit: see my comments in patch 3/3 in this series
-about using "_" in node names.  I believe this should be:
+This patch silences the error (though I don't know if it should be 
+attached to a different regulator instead).
 
-  xo_board: xo-board {
+---
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |    1 -
+ 1 file changed, 1 deletion(-)
 
-
-> +               spmi_bus: qcom,spmi at c440000 {
-
-Drop the qcom in the node name.  AKA, I believe this should be:
-
-spmi_bus: spmi at c440000 {
-
-Specifically the node name is supposed to be a generic component name
-then with an address.  I see that Rob Herring said the same thing when
-he reviewed v1 of this patch just now (it seems like people are still
-commenting there, so make sure you collect the latest feedback from
-there when re-spinning).
-
-
--Doug
+Index: linux-4.14.13/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+===================================================================
+--- linux-4.14.13.orig/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts	2017-11-29 02:52:18.000000000 +0100
++++ linux-4.14.13/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts	2018-01-14 14:54:59.000000000 +0100
+@@ -115,7 +115,6 @@
+ 	no-sdio;
+ 	non-removable;
+ 	status = "okay";
+-	vqmmc-supply = <&v_vddo_h>;
+ };
+ 
+ &cpm_i2c0 {
