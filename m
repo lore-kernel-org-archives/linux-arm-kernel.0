@@ -1,122 +1,79 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 06 Feb 2018 18:13:50 +0000
-Subject: [RFC 2/4] KVM: arm64: Support dirty page tracking for PUD
- hugepages
-In-Reply-To: <20180206145508.GC23160@cbox> (Christoffer Dall's message of
- "Tue, 6 Feb 2018 15:55:08 +0100")
-References: <20180110190729.18383-1-punit.agrawal@arm.com>
- <20180110190729.18383-3-punit.agrawal@arm.com>
- <20180206145508.GC23160@cbox>
-Message-ID: <87a7wmhtpd.fsf@e105922-lin.cambridge.arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 6 Feb 2018 12:16:48 -0600
+Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
+In-Reply-To: <54dbdb98-e0e4-c8c9-fec4-2f050745d9be@ti.com>
+References: <20180205155222.22189-1-brgl@bgdev.pl>
+ <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
+ <CAMpxmJUDbwkcJt_kx9GX+qY10xiGAp-j3+kXM-q3WP1VGwr0UQ@mail.gmail.com>
+ <54dbdb98-e0e4-c8c9-fec4-2f050745d9be@ti.com>
+Message-ID: <794024f3-f87a-58ed-2722-a4a2d09df3ce@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+On 02/06/2018 07:51 AM, Sekhar Nori wrote:
+> On Tuesday 06 February 2018 06:38 PM, Bartosz Golaszewski wrote:
+>> 2018-02-06 12:07 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>>> On Monday 05 February 2018 09:22 PM, Bartosz Golaszewski wrote:
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> Make nand work with the common clock framework by specifying which
+>>>> clock should be used and what name to look up.
+>>>>
+>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/da850-evm.dts | 3 +++
+>>>>   1 file changed, 3 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+>>>> index a86a8a1816f2..2602ad8e99ee 100644
+>>>> --- a/arch/arm/boot/dts/da850-evm.dts
+>>>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>>>> @@ -296,6 +296,9 @@
+>>>>                        reg = <0 0x02000000 0x02000000
+>>>>                               1 0x00000000 0x00008000>;
+>>>>
+>>>> +                     clocks = <&psc0 3>;
+>>>> +                     clock-names = "aemif";
+>>>
+>>> Looks like this is being added only to satisfy the devm_clk_get() call
+>>> in nand_davinci_probe() which I think is superfluous since we also
+>>> enable the same clock in aemif_probe().
+>>>
+>>> Perhaps the better solution is to drip the clk code in
+>>> drivers/mtd/nand/davinci_nand.c and shift legacy code to start using
+>>> drivers/memory/aemif.c as well? This way we can also drop
+>>> arch/arm/mach-davinci/aemif.c
+>>>
+>>> Thanks,
+>>> Sekhar
+>>
+>> Yes, this sounds good, but I think we should leave it for later as an
+>> additional improvement, once everything else is in place. I think
+>> these patches should be applied together with David's series in order
+>> to not break the support on davinci boards and the aemif work would go
+>> in later as a follow-up. How about that?
+> 
+> No, I dont think we should add temporary hacks to DT to work around
+> driver issues (I do think its a hack since the clock belongs to aemif
+> module not NAND flash).
+> 
+> An easier driver hack might be to not treat devm_clk_get() failure in
+> davinci_nand.c as catastrophic. It will safely fail in DT case and we
+> should get the clock in legacy boot case.
+> 
+> I think we are looking at a driver update dependency anyway.
 
-> On Wed, Jan 10, 2018 at 07:07:27PM +0000, Punit Agrawal wrote:
->> In preparation for creating PUD hugepages at stage 2, add support for
->> write protecting PUD hugepages when they are encountered. Write
->> protecting guest tables is used to track dirty pages when migrating VMs.
->> 
->> Also, provide trivial implementations of required kvm_s2pud_* helpers to
->> allow code to compile on arm32.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
->>  arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
->>  virt/kvm/arm/mmu.c               |  9 ++++++---
->>  3 files changed, 25 insertions(+), 3 deletions(-)
->> 
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index fa6f2174276b..3fbe919b9181 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -103,6 +103,15 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->>  	return (pmd_val(*pmd) & L_PMD_S2_RDWR) == L_PMD_S2_RDONLY;
->>  }
->>  
->> +static inline void kvm_set_s2pud_readonly(pud_t *pud)
->> +{
->> +}
->> +
->> +static inline bool kvm_s2pud_readonly(pud_t *pud)
->> +{
->> +	return true;
->
-> why true?  Shouldn't this return the pgd's readonly value, strictly
-> speaking, or if we rely on this never being called, have  VM_BUG_ON() ?
+It looks like keystone.dtsi is using the clock-ranges property in the
+aemif node to pass the clock to child nodes. Could we not do the same
+in da850.dtsi?
 
-It returns true as it prevents a call to kvm_set_s2pud_readonly() but
-both of the above functions should never be called on ARM due to
-stage2_pud_huge() returning 0.
-
-I'll add a VM_BUG_ON(pud) to indicate that these functions should never
-be called and...
-
->
-> In any case, a comment explaining why we unconditionally return true
-> would be nice.
-
-... add a comment to explain what's going on.
-
->
->> +}
->> +
->>  static inline bool kvm_page_empty(void *ptr)
->>  {
->>  	struct page *ptr_page = virt_to_page(ptr);
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index 672c8684d5c2..dbfd18e08cfb 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -201,6 +201,16 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
->>  	return kvm_s2pte_readonly((pte_t *)pmd);
->>  }
->>  
->> +static inline void kvm_set_s2pud_readonly(pud_t *pud)
->> +{
->> +	kvm_set_s2pte_readonly((pte_t *)pud);
->> +}
->> +
->> +static inline bool kvm_s2pud_readonly(pud_t *pud)
->> +{
->> +	return kvm_s2pte_readonly((pte_t *)pud);
->> +}
->> +
->>  static inline bool kvm_page_empty(void *ptr)
->>  {
->>  	struct page *ptr_page = virt_to_page(ptr);
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 9dea96380339..02eefda5d71e 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1155,9 +1155,12 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
->>  	do {
->>  		next = stage2_pud_addr_end(addr, end);
->>  		if (!stage2_pud_none(*pud)) {
->> -			/* TODO:PUD not supported, revisit later if supported */
->> -			BUG_ON(stage2_pud_huge(*pud));
->> -			stage2_wp_pmds(pud, addr, next);
->> +			if (stage2_pud_huge(*pud)) {
->> +				if (!kvm_s2pud_readonly(pud))
->> +					kvm_set_s2pud_readonly(pud);
->> +			} else {
->> +				stage2_wp_pmds(pud, addr, next);
->> +			}
->>  		}
->>  	} while (pud++, addr = next, addr != end);
->>  }
->> -- 
->> 2.15.1
->> 
->
-> Otherwise:
->
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Thanks for taking a look.
-
-Punit
+> 
+>>
+>> Also: I don't have any keystone board to test whether such changes
+>> don't break the nand support there. Would you be able to test this?
+> 
+> Yes, I have access to those boards.
+> 
+> Thanks,
+> Sekhar
+> 
