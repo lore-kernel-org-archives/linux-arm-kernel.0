@@ -1,62 +1,82 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 6 Feb 2018 17:52:49 +0800
-Subject: [PATCH v2 00/16] add dts nodes to MT7622 SoC
-Message-ID: <cover.1517910489.git.sean.wang@mediatek.com>
+Date: Tue, 6 Feb 2018 17:52:50 +0800
+Subject: [PATCH v2 01/16] dt-bindings: clock: mediatek: add missing required
+ #reset-cells
+In-Reply-To: <cover.1517910489.git.sean.wang@mediatek.com>
+References: <cover.1517910489.git.sean.wang@mediatek.com>
+Message-ID: <d58fcf36319254d6de4c7fe100cbdca1bbec27a5.1517910489.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Changes since v1:
-- add usb, thermal, HSDMA, mmc related nodes
-- fix Warning (unit_address_vs_reg): Node /oscillator at 0 has
-  a unit name, but no reg property in patch 2
-- fix Warning (pci_bridge): Node /pcie at 1a140000/pcie at 0,0 missing
-  bus-range for PCI bridge
-- fix Warning (pci_bridge): Node /pcie at 1a140000/pcie at 1,0 missing
-  bus-range for PCI bridge
-- fix Warning (unit_address_format): Failed prerequisite 'pci_bridge'
-- fix Warning (pci_device_reg): Failed prerequisite 'pci_bridge'
-- fix Warning (pci_device_bus_num): Failed prerequisite 'pci_bridge'
-- enhance commit log in patch 4
-- use - instead of _ in DT node name in patch 4 and 6
-- use SPDX-License-Identifier for newly added files in patch 5
-- use proper #size-cells for spi nor nodes in patch 9
-- remove currently no needed #address-cells and #size-cells in
-children nodes of spi nor in patch 9.
+All ethsys, pciesys and ssusbsys internally include reset controller, so
+explicitly add back these missing cell definitions to related bindings
+and examples.
 
-add dts nodes to MT7622 SoC and related rfb1 board
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt   | 2 ++
+ Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt  | 2 ++
+ Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt | 2 ++
+ 3 files changed, 6 insertions(+)
 
-Chunfeng Yun (1):
-  arm64: dts: mt7622: add usb device nodes
-
-Ryder Lee (2):
-  arm64: dts: mt7622: add PCIe device nodes
-  arm64: dts: mt7622: add SATA device nodes
-
-Sean Wang (13):
-  dt-bindings: clock: mediatek: add missing required #reset-cells
-  arm64: dts: mt7622: add clock controller device nodes
-  arm64: dts: mt7622: add power domain controller device nodes
-  arm64: dts: mt7622: add pinctrl related device nodes
-  arm64: dts: mt7622: add PMIC MT6380 related nodes
-  arm64: dts: mt7622: add cpufreq related device nodes
-  arm64: dts: mt7622: turn uart0 clock to real ones
-  arm64: dts: mt7622: add SoC and peripheral related device nodes
-  arm64: dts: mt7622: add flash related device nodes
-  arm64: dts: mt7622: add ethernet device nodes
-  arm64: dts: mt7622: add thermal and related nodes
-  arm64: dts: mt7622: add High-Speed DMA device nodes
-  arm64: dts: mt7622: add mmc related device nodes
-
- .../bindings/arm/mediatek/mediatek,ethsys.txt      |   2 +
- .../bindings/arm/mediatek/mediatek,pciesys.txt     |   2 +
- .../bindings/arm/mediatek/mediatek,ssusbsys.txt    |   2 +
- arch/arm64/boot/dts/mediatek/mt6380.dtsi           |  86 +++
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       | 469 ++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 682 ++++++++++++++++++++-
- 6 files changed, 1238 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+index 7aa3fa1..8f5335b 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+@@ -9,6 +9,7 @@ Required Properties:
+ 	- "mediatek,mt2701-ethsys", "syscon"
+ 	- "mediatek,mt7622-ethsys", "syscon"
+ - #clock-cells: Must be 1
++- #reset-cells: Must be 1
+ 
+ The ethsys controller uses the common clk binding from
+ Documentation/devicetree/bindings/clock/clock-bindings.txt
+@@ -20,4 +21,5 @@ ethsys: clock-controller at 1b000000 {
+ 	compatible = "mediatek,mt2701-ethsys", "syscon";
+ 	reg = <0 0x1b000000 0 0x1000>;
+ 	#clock-cells = <1>;
++	#reset-cells = <1>;
+ };
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt
+index d5d5f12..7fe5dc6 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pciesys.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ - compatible: Should be:
+ 	- "mediatek,mt7622-pciesys", "syscon"
+ - #clock-cells: Must be 1
++- #reset-cells: Must be 1
+ 
+ The PCIESYS controller uses the common clk binding from
+ Documentation/devicetree/bindings/clock/clock-bindings.txt
+@@ -19,4 +20,5 @@ pciesys: pciesys at 1a100800 {
+ 	compatible = "mediatek,mt7622-pciesys", "syscon";
+ 	reg = <0 0x1a100800 0 0x1000>;
+ 	#clock-cells = <1>;
++	#reset-cells = <1>;
+ };
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt
+index 00760019..b8184da 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ssusbsys.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ - compatible: Should be:
+ 	- "mediatek,mt7622-ssusbsys", "syscon"
+ - #clock-cells: Must be 1
++- #reset-cells: Must be 1
+ 
+ The SSUSBSYS controller uses the common clk binding from
+ Documentation/devicetree/bindings/clock/clock-bindings.txt
+@@ -19,4 +20,5 @@ ssusbsys: ssusbsys at 1a000000 {
+ 	compatible = "mediatek,mt7622-ssusbsys", "syscon";
+ 	reg = <0 0x1a000000 0 0x1000>;
+ 	#clock-cells = <1>;
++	#reset-cells = <1>;
+ };
 -- 
 2.7.4
