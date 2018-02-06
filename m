@@ -1,130 +1,86 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  6 Feb 2018 10:35:40 +0100
-Subject: [PATCH 5/5 v3] drm/pl111: Support multiple endpoints on the CLCD
+Date: Tue,  6 Feb 2018 10:35:38 +0100
+Subject: [PATCH 3/5 v3] drm/pl111: Support variants with broken clock divider
 In-Reply-To: <20180206093540.8147-1-linus.walleij@linaro.org>
 References: <20180206093540.8147-1-linus.walleij@linaro.org>
-Message-ID: <20180206093540.8147-5-linus.walleij@linaro.org>
+Message-ID: <20180206093540.8147-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile PL110 implementations use multiple endpoints:
-from the PL111 port, the lines are routed through a PLD,
-and from there forked so the same lines go to a VGA DAC and
-an external TFT panel connector. This is discrete wireing
-so there is no way to turn of one output, i.e. this is
-really two endpoints, not two ports.
-
-We model this with multiple endpoints, so we need to loop
-over the available endpoints, check for panel or bridge on
-each and accumulate the result before continuing.
-
-The code already will give the panel preference over the
-bridge, if present, so the output will be sent to the panel
-if both a panel and a bridge is present on two endpoints
-of the same port.
-
-If they all return -EPROBE_DEFER we return -EPROBE_DEFER
-as well.
-
-If just one endpoint is present on the port, the behaviour
-is the same as before.
+The early Integrator CLCD synthesized in the Integrator CP and
+IM-PD1 FPGAs are broken: their clock dividers do not work
+properly. Support disabling the clock divider and drive the
+clock directly from the parent under these circumstances.
 
 Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v2->v3:
+ChangeLog ->v3:
 - Collect Eric's Review tag.
 ---
- drivers/gpu/drm/pl111/pl111_drv.c | 62 +++++++++++++++++++++++++++++++++++----
- 1 file changed, 56 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/pl111/pl111_display.c   | 8 ++++++++
+ drivers/gpu/drm/pl111/pl111_drm.h       | 3 +++
+ drivers/gpu/drm/pl111/pl111_versatile.c | 1 +
+ 3 files changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index e6fa897c740c..221f3af02fb4 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -58,6 +58,8 @@
- #include <linux/dma-buf.h>
- #include <linux/module.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_graph.h>
+diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+index 55ada00ec974..4d4e38b4c9d5 100644
+--- a/drivers/gpu/drm/pl111/pl111_display.c
++++ b/drivers/gpu/drm/pl111/pl111_display.c
+@@ -138,6 +138,9 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 	tim2 = readl(priv->regs + CLCD_TIM2);
+ 	tim2 &= (TIM2_BCD | TIM2_PCD_LO_MASK | TIM2_PCD_HI_MASK);
  
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
-@@ -84,9 +86,13 @@ static int pl111_modeset_init(struct drm_device *dev)
- {
- 	struct drm_mode_config *mode_config;
- 	struct pl111_drm_dev_private *priv = dev->dev_private;
--	struct drm_panel *panel;
--	struct drm_bridge *bridge;
-+	struct device_node *np = dev->dev->of_node;
-+	struct device_node *remote;
-+	struct drm_panel *panel = NULL;
-+	struct drm_bridge *bridge = NULL;
-+	bool defer = false;
- 	int ret = 0;
-+	int i;
++	if (priv->variant->broken_clockdivider)
++		tim2 |= TIM2_BCD;
++
+ 	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+ 		tim2 |= TIM2_IHS;
  
- 	drm_mode_config_init(dev);
- 	mode_config = &dev->mode_config;
-@@ -96,10 +102,54 @@ static int pl111_modeset_init(struct drm_device *dev)
- 	mode_config->min_height = 1;
- 	mode_config->max_height = 768;
- 
--	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
--					  0, 0, &panel, &bridge);
--	if (ret && ret != -ENODEV)
--		return ret;
-+	i = 0;
-+	for_each_endpoint_of_node(np, remote) {
-+		struct drm_panel *tmp_panel;
-+		struct drm_bridge *tmp_bridge;
-+
-+		dev_dbg(dev->dev, "checking endpoint %d\n", i);
-+
-+		ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
-+						  0, i,
-+						  &tmp_panel,
-+						  &tmp_bridge);
-+		if (ret) {
-+			if (ret == -EPROBE_DEFER) {
-+				/*
-+				 * Something deferred, but that is often just
-+				 * another way of saying -ENODEV, but let's
-+				 * cast a vote for later deferral.
-+				 */
-+				defer = true;
-+			} else if (ret != -ENODEV) {
-+				/* Continue, maybe something else is working */
-+				dev_err(dev->dev,
-+					"endpoint %d returns %d\n", i, ret);
-+			}
-+		}
-+
-+		if (tmp_panel) {
-+			dev_info(dev->dev,
-+				 "found panel on endpoint %d\n", i);
-+			panel = tmp_panel;
-+		}
-+		if (tmp_bridge) {
-+			dev_info(dev->dev,
-+				 "found bridge on endpoint %d\n", i);
-+			bridge = tmp_bridge;
-+		}
-+
-+		i++;
+@@ -455,6 +458,11 @@ pl111_init_clock_divider(struct drm_device *drm)
+ 		dev_err(drm->dev, "CLCD: unable to get clcdclk.\n");
+ 		return PTR_ERR(parent);
+ 	}
++	/* If the clock divider is broken, use the parent directly */
++	if (priv->variant->broken_clockdivider) {
++		priv->clk = parent;
++		return 0;
 +	}
-+
-+	/*
-+	 * If we can't find neither panel nor bridge on any of the
-+	 * endpoints, and any of them retured -EPROBE_DEFER, then
-+	 * let's defer this driver too.
-+	 */
-+	if ((!panel && !bridge) && defer)
-+		return -EPROBE_DEFER;
-+
- 	if (panel) {
- 		bridge = drm_panel_bridge_add(panel,
- 					      DRM_MODE_CONNECTOR_Unknown);
+ 	parent_name = __clk_get_name(parent);
+ 
+ 	spin_lock_init(&priv->tim2_lock);
+diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+index c2f410f0b12e..f75c5d4645b2 100644
+--- a/drivers/gpu/drm/pl111/pl111_drm.h
++++ b/drivers/gpu/drm/pl111/pl111_drm.h
+@@ -38,6 +38,8 @@ struct drm_minor;
+  * @is_pl110: this is the early PL110 variant
+  * @external_bgr: this is the Versatile Pl110 variant with external
+  *	BGR/RGB routing
++ * @broken_clockdivider: the clock divider is broken and we need to
++ *	use the supplied clock directly
+  * @formats: array of supported pixel formats on this variant
+  * @nformats: the length of the array of supported pixel formats
+  */
+@@ -45,6 +47,7 @@ struct pl111_variant_data {
+ 	const char *name;
+ 	bool is_pl110;
+ 	bool external_bgr;
++	bool broken_clockdivider;
+ 	const u32 *formats;
+ 	unsigned int nformats;
+ };
+diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
+index ec05c7e5319b..93cf2d82074b 100644
+--- a/drivers/gpu/drm/pl111/pl111_versatile.c
++++ b/drivers/gpu/drm/pl111/pl111_versatile.c
+@@ -237,6 +237,7 @@ static const u32 pl110_versatile_pixel_formats[] = {
+ static const struct pl111_variant_data pl110_integrator = {
+ 	.name = "PL110 Integrator",
+ 	.is_pl110 = true,
++	.broken_clockdivider = true,
+ 	.formats = pl110_integrator_pixel_formats,
+ 	.nformats = ARRAY_SIZE(pl110_integrator_pixel_formats),
+ };
 -- 
 2.14.3
