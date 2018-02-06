@@ -1,185 +1,368 @@
 From: john.garry@huawei.com (John Garry)
-Date: Wed, 7 Feb 2018 01:44:57 +0800
-Subject: [PATCH 2/9] perf utils: add support for pmu events vendor
- sub-directory
+Date: Wed, 7 Feb 2018 01:45:00 +0800
+Subject: [PATCH 5/9] perf utils: add support for arch standard events
 In-Reply-To: <1517939104-230881-1-git-send-email-john.garry@huawei.com>
 References: <1517939104-230881-1-git-send-email-john.garry@huawei.com>
-Message-ID: <1517939104-230881-3-git-send-email-john.garry@huawei.com>
+Message-ID: <1517939104-230881-6-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some architectures (like arm), it is required to support
-a vendor sub-directory and not locate all the JSONs for a
-specific vendor in the same folder.
+For some architectures (like arm), there are architecture-
+defined events. Sometimes these events may be "recommended"
+according to the architecture standard, in that the
+implementer is free ignore the "recommendation" and create
+its custom event.
 
-This is because all the events for the same vendor will be
-placed in the same pmu events table, which may cause conflict.
-This conflict would be in the instance that a vendor's custom
-implemented events do have the same meaning on different platforms,
-so events in the pmu table would conflict. In addition, per list
-command may show events which are not even supported for a given
-platform.
+This patch adds support for parsing standard events from
+arch-defined JSONs, and fixing up vendor events when they
+have implemented these events as standard.
 
-This patch adds support for a arch/vendor/platform directory
-hierarchy, while maintaining backwards-compatibility for existing
-arch/platform structure. In this, each platform would always have
-its own pmu events table.
+Support is also ensured that the vendor may implement their
+own custom events.
 
-In generated file pmu_events.c, each platform table name is in
-the format pme{_vendor}_platform, like this:
+A new step is added to the pmu events parsing to fix up the
+vendor events with the arch-standard events.
 
-struct pmu_events_map pmu_events_map[] = {
-{
-	.cpuid = "0x00000000420f5160",
-	.version = "v1",
-	.type = "core",
-	.table = pme_cavium_thunderx2
-},
-{
-	.cpuid = 0,
-	.version = 0,
-	.type = 0,
-	.table = 0,
-},
-};
+The arch-defined JSONs must be placed in the arch root
+folder for preprocessing prior to tree JSON processing.
+
+In the vendor JSON, to specify that the arch event is
+supported, the keyword "ArchStdEvent" should be used,
+like this:
+[
+    {
+        "ArchStdEvent": "0x41",
+	"BriefDescription": "L1D cache access, write"
+    },
+]
+
+No other JSON objects are strictly required. However,
+for other objects added, these take precedence over
+architecture defined standard events, thus supporting
+separate events which have the same event code.
 
 Signed-off-by: John Garry <john.garry@huawei.com>
 ---
- tools/perf/pmu-events/README    |  4 +++
- tools/perf/pmu-events/jevents.c | 70 ++++++++++++++++++++++++++++++++++++++---
- 2 files changed, 70 insertions(+), 4 deletions(-)
+ tools/perf/pmu-events/Build     |   1 +
+ tools/perf/pmu-events/README    |   6 ++
+ tools/perf/pmu-events/jevents.c | 185 +++++++++++++++++++++++++++++++++++++---
+ 3 files changed, 182 insertions(+), 10 deletions(-)
 
+diff --git a/tools/perf/pmu-events/Build b/tools/perf/pmu-events/Build
+index 999a4e8..f9e8466 100644
+--- a/tools/perf/pmu-events/Build
++++ b/tools/perf/pmu-events/Build
+@@ -1,5 +1,6 @@
+ hostprogs := jevents
+ 
++CHOSTFLAGS	= -I$(srctree)/tools/include
+ jevents-y	+= json.o jsmn.o jevents.o
+ pmu-events-y	+= pmu-events.o
+ JDIR		=  pmu-events/arch/$(SRCARCH)
 diff --git a/tools/perf/pmu-events/README b/tools/perf/pmu-events/README
-index 2407abc..655286f 100644
+index 655286f..cff4c91 100644
 --- a/tools/perf/pmu-events/README
 +++ b/tools/perf/pmu-events/README
-@@ -28,6 +28,10 @@ sub directory. Thus for the Silvermont X86 CPU:
- 	Cache.json 	Memory.json 	Virtual-Memory.json
- 	Frontend.json 	Pipeline.json
+@@ -16,6 +16,12 @@ tree tools/perf/pmu-events/arch/foo.
  
-+The JSONs folder for a CPU model/family may be placed in the root arch
-+folder, or may be placed in a vendor sub-folder under the arch folder
-+for instances where the arch and vendor are not the same.
+ 	- Directories are traversed, but all other files are ignored.
+ 
++	- To reduce JSON event duplication per architecture, platform JSONs may
++	  use "ArchStdEvent" keyword to dereference an "Architecture standard
++	  events", defined in architecture standard JSONs.
++	  Architecture standard JSONs must be located in the architecture root
++	  folder.
 +
- Using the JSON files and the mapfile, 'jevents' generates the C source file,
- 'pmu-events.c', which encodes the two sets of tables:
- 
+ The PMU events supported by a CPU model are expected to grouped into topics
+ such as Pipelining, Cache, Memory, Floating-point etc. All events for a topic
+ should be placed in a separate JSON file - where the file name identifies
 diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
-index 9e0a21e..eb183b1 100644
+index eb183b1..19e30cd 100644
 --- a/tools/perf/pmu-events/jevents.c
 +++ b/tools/perf/pmu-events/jevents.c
-@@ -588,7 +588,7 @@ static char *file_name_to_table_name(char *fname)
- 	 * Derive rest of table name from basename of the JSON file,
- 	 * replacing hyphens and stripping out .json suffix.
- 	 */
--	n = asprintf(&tblname, "pme_%s", basename(fname));
-+	n = asprintf(&tblname, "pme_%s", fname);
- 	if (n < 0) {
- 		pr_info("%s: asprintf() error %s for file %s\n", prog,
- 				strerror(errno), fname);
-@@ -598,7 +598,7 @@ static char *file_name_to_table_name(char *fname)
- 	for (i = 0; i < strlen(tblname); i++) {
- 		c = tblname[i];
+@@ -44,6 +44,7 @@
+ #include <sys/resource.h>		/* getrlimit */
+ #include <ftw.h>
+ #include <sys/stat.h>
++#include <linux/list.h>
+ #include "jsmn.h"
+ #include "json.h"
+ #include "jevents.h"
+@@ -366,6 +367,67 @@ static int print_events_table_entry(void *data, char *name, char *event,
+ 	return 0;
+ }
  
--		if (c == '-')
-+		if (c == '-' || c == '/')
- 			tblname[i] = '_';
- 		else if (c == '.') {
- 			tblname[i] = '\0';
-@@ -755,15 +755,65 @@ static int get_maxfds(void)
- static FILE *eventsfp;
- static char *mapfile;
- 
-+static int is_leaf_dir(const char *fpath)
++struct event_struct {
++	char *name;
++	char *event;
++	char *desc;
++	char *long_desc;
++	char *pmu;
++	char *filter;
++	char *perpkg;
++	char *unit;
++	char *metric_expr;
++	char *metric_name;
++	char *metric_group;
++	struct list_head list;
++	char strings[];
++};
++
++static LIST_HEAD(arch_std_events);
++
++#define ADD_EVENT_STRING(string) do { if (string) {		\
++	es->string = strings;					\
++	strings += snprintf(strings, len, "%s", string) + 1;	\
++} } while (0)
++
++static int save_arch_std_events(void *data, char *name, char *event,
++				char *desc, char *long_desc, char *pmu,
++				char *unit, char *perpkg, char *metric_expr,
++				char *metric_name, char *metric_group)
 +{
-+	DIR *d;
-+	struct dirent *dir;
-+	int res = 1;
++	struct event_struct *es;
++	struct stat *sb = data;
++	int len;
++	char *strings;
 +
-+	d = opendir(fpath);
-+	if (!d)
-+		return 0;
++	/*
++	 * Lazily allocate size of the json file to hold the
++	 * strings, which would be more than large enough.
++	 */
++	len = sb->st_size;
 +
-+	while ((dir = readdir(d)) != NULL) {
-+		if (dir->d_type == DT_DIR && dir->d_name[0] != '.') {
-+			res = 0;
-+			break;
-+		} else if (dir->d_type == DT_UNKNOWN) {
-+			char path[PATH_MAX];
-+			struct stat st;
++	es = malloc(sizeof(*es) + len);
++	if (!es)
++		return -ENOMEM;
++	memset(es, 0, sizeof(*es));
++	list_add_tail(&es->list, &arch_std_events);
 +
-+			sprintf(path, "%s/%s", fpath, dir->d_name);
-+			if (stat(path, &st))
-+				break;
++	strings = &es->strings[0];
 +
-+			if (S_ISDIR(st.st_mode)) {
-+				res = 0;
-+				break;
-+			}
++	ADD_EVENT_STRING(name);
++	ADD_EVENT_STRING(event);
++	ADD_EVENT_STRING(desc);
++	ADD_EVENT_STRING(long_desc);
++	ADD_EVENT_STRING(pmu);
++	ADD_EVENT_STRING(unit);
++	ADD_EVENT_STRING(perpkg);
++	ADD_EVENT_STRING(metric_expr);
++	ADD_EVENT_STRING(metric_name);
++	ADD_EVENT_STRING(metric_group);
++
++	return 0;
++}
++
+ static void print_events_table_suffix(FILE *outfp)
+ {
+ 	fprintf(outfp, "{\n");
+@@ -407,6 +469,52 @@ static char *real_event(const char *name, char *event)
+ 	return event;
+ }
+ 
++static void fixup_field(char *from, char **to)
++{
++	*to = malloc(strlen(from));
++
++	strcpy(*to, from);
++}
++
++#define EVENT_PREFIX "event="
++
++#define TRY_FIXUP_FIELD(string)	do { if (es->string && !*string)\
++			fixup_field(es->string, string);	\
++} while (0)
++
++static int
++try_fixup(const char *fn, char *arch_std, char **event, char **desc,
++	  char **name, char **long_desc, char **pmu, char **filter,
++	  char **perpkg, char **unit, char **metric_expr, char **metric_name,
++	  char **metric_group)
++{
++	/* try to find matching event from arch standard values */
++	struct event_struct *es;
++
++	list_for_each_entry(es, &arch_std_events, list) {
++		if (!strcmp(arch_std, es->event+strlen(EVENT_PREFIX))) {
++			/* now fixup */
++			fixup_field(es->event, event);
++			TRY_FIXUP_FIELD(desc);
++			TRY_FIXUP_FIELD(name);
++			TRY_FIXUP_FIELD(long_desc);
++			TRY_FIXUP_FIELD(pmu);
++			TRY_FIXUP_FIELD(filter);
++			TRY_FIXUP_FIELD(perpkg);
++			TRY_FIXUP_FIELD(unit);
++			TRY_FIXUP_FIELD(metric_expr);
++			TRY_FIXUP_FIELD(metric_name);
++			TRY_FIXUP_FIELD(metric_group);
++
++			return 0;
 +		}
 +	}
 +
-+	closedir(d);
++	pr_err("%s: could not find matching %s for %s\n",
++					prog, arch_std, fn);
++	return -1;
++}
 +
-+	return res;
+ /* Call func with each event in the json file */
+ int json_events(const char *fn,
+ 	  int (*func)(void *data, char *name, char *event, char *desc,
+@@ -442,6 +550,7 @@ int json_events(const char *fn,
+ 		char *metric_expr = NULL;
+ 		char *metric_name = NULL;
+ 		char *metric_group = NULL;
++		char *arch_std = NULL;
+ 		unsigned long long eventcode = 0;
+ 		struct msrmap *msr = NULL;
+ 		jsmntok_t *msrval = NULL;
+@@ -527,6 +636,10 @@ int json_events(const char *fn,
+ 				addfield(map, &metric_expr, "", "", val);
+ 				for (s = metric_expr; *s; s++)
+ 					*s = tolower(*s);
++			} else if (json_streq(map, field, "ArchStdEvent")) {
++				addfield(map, &arch_std, "", "", val);
++				for (s = arch_std; *s; s++)
++					*s = tolower(*s);
+ 			}
+ 			/* ignore unknown fields */
+ 		}
+@@ -538,7 +651,7 @@ int json_events(const char *fn,
+ 				addfield(map, &extra_desc, " ",
+ 						"(Precise event)", NULL);
+ 		}
+-		snprintf(buf, sizeof buf, "event=%#llx", eventcode);
++		snprintf(buf, sizeof(buf), "%s%#llx", EVENT_PREFIX, eventcode);
+ 		addfield(map, &event, ",", buf, NULL);
+ 		if (desc && extra_desc)
+ 			addfield(map, &desc, " ", extra_desc, NULL);
+@@ -550,9 +663,21 @@ int json_events(const char *fn,
+ 			addfield(map, &event, ",", msr->pname, msrval);
+ 		if (name)
+ 			fixname(name);
+-
+-		err = func(data, name, real_event(name, event), desc, long_desc,
+-			   pmu, unit, perpkg, metric_expr, metric_name, metric_group);
++		err = 0;
++		if (arch_std) {
++			/*
++			 * An arch standard event is referenced, so try to
++			 * fixup any unassigned values.
++			 */
++			err = try_fixup(fn, arch_std, &event, &desc, &name,
++					&long_desc, &pmu, &filter, &perpkg,
++					&unit, &metric_expr, &metric_name,
++					&metric_group);
++		}
++		if (!err)
++			err = func(data, name, real_event(name, event), desc,
++				   long_desc, pmu, unit, perpkg, metric_expr,
++				   metric_name, metric_group);
+ 		free(event);
+ 		free(desc);
+ 		free(name);
+@@ -565,6 +690,7 @@ int json_events(const char *fn,
+ 		free(metric_expr);
+ 		free(metric_name);
+ 		free(metric_group);
++
+ 		if (err)
+ 			break;
+ 		tok += j;
+@@ -789,6 +915,32 @@ static int is_leaf_dir(const char *fpath)
+ 	return res;
+ }
+ 
++static int is_json_file(const char *name)
++{
++	const char *suffix;
++
++	if (strlen(name) < 5)
++		return 0;
++
++	suffix = name + strlen(name) - 5;
++
++	if (strncmp(suffix, ".json", 5) == 0)
++		return 1;
++	return 0;
++}
++
++static int preprocess_arch_std_files(const char *fpath, const struct stat *sb,
++				int typeflag, struct FTW *ftwbuf)
++{
++	int level = ftwbuf->level;
++	int is_file = typeflag == FTW_F;
++
++	if (level == 1 && is_file && is_json_file(fpath))
++		return json_events(fpath, save_arch_std_events, (void *)sb);
++
++	return 0;
 +}
 +
  static int process_one_file(const char *fpath, const struct stat *sb,
  			    int typeflag, struct FTW *ftwbuf)
  {
--	char *tblname, *bname  = (char *) fpath + ftwbuf->base;
-+	char *tblname, *bname;
- 	int is_dir  = typeflag == FTW_D;
- 	int is_file = typeflag == FTW_F;
- 	int level   = ftwbuf->level;
- 	int err = 0;
+@@ -876,9 +1028,7 @@ static int process_one_file(const char *fpath, const struct stat *sb,
+ 	 * ignore it. It could be a readme.txt for instance.
+ 	 */
+ 	if (is_file) {
+-		char *suffix = bname + strlen(bname) - 5;
+-
+-		if (strncmp(suffix, ".json", 5)) {
++		if (!is_json_file(bname)) {
+ 			pr_info("%s: Ignoring file without .json suffix %s\n", prog,
+ 				fpath);
+ 			return 0;
+@@ -940,6 +1090,7 @@ int main(int argc, char *argv[])
+ 	const char *output_file;
+ 	const char *start_dirname;
+ 	struct stat stbuf;
++	struct event_struct *es1, *es2;
  
-+	if (level == 2 && is_dir) {
-+		/*
-+		 * For level 2 directory, bname will include parent name,
-+		 * like vendor/platform. So search back from platform dir
-+		 * to find this.
-+		 */
-+		bname = (char *) fpath + ftwbuf->base - 2;
-+		for (;;) {
-+			if (*bname == '/')
-+				break;
-+			bname--;
-+		}
-+		bname++;
-+	} else
-+		bname = (char *) fpath + ftwbuf->base;
-+
- 	pr_debug("%s %d %7jd %-20s %s\n",
- 		 is_file ? "f" : is_dir ? "d" : "x",
- 		 level, sb->st_size, bname, fpath);
-@@ -773,7 +823,7 @@ static int process_one_file(const char *fpath, const struct stat *sb,
- 		return 0;
+ 	prog = basename(argv[0]);
+ 	if (argc < 4) {
+@@ -984,17 +1135,28 @@ int main(int argc, char *argv[])
  
- 	/* model directory, reset topic */
--	if (level == 1 && is_dir) {
-+	if (level == 1 && is_dir && is_leaf_dir(fpath)) {
- 		if (close_table)
- 			print_events_table_suffix(eventsfp);
- 
-@@ -791,6 +841,18 @@ static int process_one_file(const char *fpath, const struct stat *sb,
- 
- 		print_events_table_prefix(eventsfp, tblname);
- 		return 0;
-+	} else if (level == 2 && is_dir) {
-+		if (close_table)
-+			print_events_table_suffix(eventsfp);
-+
-+		tblname = file_name_to_table_name(bname);
-+		if (!tblname) {
-+			pr_info("%s: Error determining table name for %s, exiting\n",
-+				prog, bname);
-+			return -1;
-+		}
-+
-+		print_events_table_prefix(eventsfp, tblname);
+ 	maxfds = get_maxfds();
+ 	mapfile = NULL;
++	rc = nftw(ldirname, preprocess_arch_std_files, get_maxfds(), 0);
++	if (rc && verbose) {
++		pr_info("%s: Error preprocessing arch standard files %s\n",
++			prog, ldirname);
++		goto empty_map;
++	} else if (rc < 0) {
++		/* Make build fail */
++		return 1;
++	}
+ 	rc = nftw(ldirname, process_one_file, maxfds, 0);
+ 	if (rc && verbose) {
+ 		pr_info("%s: Error walking file tree %s\n", prog, ldirname);
+-		goto empty_map;
++		goto free_standard_arch_events;
+ 	} else if (rc < 0) {
+ 		/* Make build fail */
+ 		return 1;
+-	} else if (rc) {
+-		goto empty_map;
  	}
  
- 	/*
++	/* Free memories for architecture standard events */
++	list_for_each_entry_safe(es1, es2, &arch_std_events, list)
++		free(es1);
++
+ 	if (close_table)
+ 		print_events_table_suffix(eventsfp);
+ 
+@@ -1011,6 +1173,9 @@ int main(int argc, char *argv[])
+ 
+ 	return 0;
+ 
++free_standard_arch_events:
++	list_for_each_entry_safe(es1, es2, &arch_std_events, list)
++		free(es1);
+ empty_map:
+ 	fclose(eventsfp);
+ 	create_empty_mapping(output_file);
 -- 
 1.9.1
