@@ -1,34 +1,42 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 6 Feb 2018 08:37:29 +0100
-Subject: [RESEND][PATCH] video: fbdev: atmel_lcdfb: convert to use GPIO
- descriptors
-In-Reply-To: <CACRpkdajUDNkODAGU=6SHRJz-q5-+sFRy7Qi9=QLc-HF1NEHWQ@mail.gmail.com>
-References: <20180205084755.6011-1-ludovic.desroches@microchip.com>
- <CACRpkdajUDNkODAGU=6SHRJz-q5-+sFRy7Qi9=QLc-HF1NEHWQ@mail.gmail.com>
-Message-ID: <20180206073729.GI2580@rfolt0960.corp.atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 6 Feb 2018 09:20:43 +0100
+Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing
+ with a mask
+In-Reply-To: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+Message-ID: <CAMuHMdWnV17DCxr71k6n3w+5jPtQmeuPugr58xadq9U_qchJnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 05, 2018 at 12:56:04PM +0100, Linus Walleij wrote:
-> On Mon, Feb 5, 2018 at 9:47 AM, Ludovic Desroches
-> <ludovic.desroches@microchip.com> wrote:
-> 
-> > Use GPIO descriptors instead of relying on the old method.
-> >
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> 
-> Ah there it is :D
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> PS: why not move it all over to use DRI/DRM/KMS? It's becoming
-> easier and easier.
+Hi Wolfram,
 
-It concerns old products, that's why it's not converted yet.
+On Mon, Feb 5, 2018 at 9:09 PM, Wolfram Sang
+<wsa+renesas@sang-engineering.com> wrote:
+> In one Renesas driver, I found a typo which turned an intended bit shift ('<<')
+> into a comparison ('<'). Because this is a subtle issue, I looked tree wide for
+> similar patterns. This small patch series is the outcome.
+>
+> Buildbot and checkpatch are happy. Only compile-tested. To be applied
+> individually per sub-system, I think. I'd think only the net: amd: patch needs
+> to be conisdered for stable, but I leave this to people who actually know this
+> driver.
+>
+> CCing Dan. Maybe he has an idea how to add a test to smatch? In my setup, only
+> cppcheck reported a 'coding style' issue with a low prio.
 
-Regards
+I found two more using "git grep 'define.*0x[0-9a-f]* < '":
 
-Ludovic
+drivers/net/can/m_can/m_can.c:#define RXFC_FWM_MASK     (0x7f < RXFC_FWM_SHIFT)
+drivers/usb/gadget/udc/goku_udc.h:#define INT_EPnNAK(n)
+(0x00100 < (n))         /* 0 < n < 4 */
 
-> 
-> Yours,
-> Linus Walleij
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
