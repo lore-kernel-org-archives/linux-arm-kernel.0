@@ -1,197 +1,75 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  6 Feb 2018 09:38:15 +0530
-Subject: [PATCH v6 02/15] clk: mux: Split out register accessors for reuse
+Date: Tue,  6 Feb 2018 09:38:18 +0530
+Subject: [PATCH v6 05/15] dt-bindings: clock: Document qcom,hfpll
 In-Reply-To: <1517890108-8140-1-git-send-email-sricharan@codeaurora.org>
 References: <1517890108-8140-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517890108-8140-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1517890108-8140-6-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Boyd <sboyd@codeaurora.org>
 
-We want to reuse the logic in clk-mux.c for other clock drivers
-that don't use readl as register accessors. Fortunately, there
-really isn't much to the mux code besides the table indirection
-and quirk flags if you assume any bit shifting and masking has
-been done already. Pull that logic out into reusable functions
-that operate on an optional table and some flags so that other
-drivers can use the same logic.
+Adds bindings document for qcom,hfpll instantiated within
+the Krait processor subsystem as separate register region.
 
-[Sricharan: Rebased for mainline]
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-mux.c        | 75 +++++++++++++++++++++++++++-----------------
- include/linux/clk-provider.h |  9 ++++--
- 2 files changed, 54 insertions(+), 30 deletions(-)
+ .../devicetree/bindings/clock/qcom,hfpll.txt       | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 39cabe1..22ebf99 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -26,35 +26,24 @@
-  * parent - parent is adjustable through clk_set_parent
-  */
- 
--static u8 clk_mux_get_parent(struct clk_hw *hw)
-+unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
-+				unsigned int *table, unsigned long flags)
- {
--	struct clk_mux *mux = to_clk_mux(hw);
- 	int num_parents = clk_hw_get_num_parents(hw);
--	u32 val;
--
--	/*
--	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
--	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
--	 * to 0x7 (index starts at one)
--	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
--	 * val = 0x4 really means "bit 2, index starts at bit 0"
--	 */
--	val = clk_readl(mux->reg) >> mux->shift;
--	val &= mux->mask;
- 
--	if (mux->table) {
-+	if (table) {
- 		int i;
- 
- 		for (i = 0; i < num_parents; i++)
--			if (mux->table[i] == val)
-+			if (table[i] == val)
- 				return i;
- 		return -EINVAL;
- 	}
- 
--	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
-+	if (val && (flags & CLK_MUX_INDEX_BIT))
- 		val = ffs(val) - 1;
- 
--	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
-+	if (val && (flags & CLK_MUX_INDEX_ONE))
- 		val--;
- 
- 	if (val >= num_parents)
-@@ -62,23 +51,53 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
- 
- 	return val;
- }
-+EXPORT_SYMBOL_GPL(clk_mux_get_parent);
- 
--static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-+static u8 _clk_mux_get_parent(struct clk_hw *hw)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	u32 val;
--	unsigned long flags = 0;
- 
--	if (mux->table) {
--		index = mux->table[index];
-+	/*
-+	 * FIXME need a mux-specific flag to determine if val is bitwise or
-+	 * numeric e.g. sys_clkin_ck's clksel field is 3 bits wide,
-+	 * but ranges from 0x1 to 0x7 (index starts at one)
-+	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
-+	 * val = 0x4 really means "bit 2, index starts at bit 0"
-+	 */
-+	val = clk_readl(mux->reg) >> mux->shift;
-+	val &= mux->mask;
+diff --git a/Documentation/devicetree/bindings/clock/qcom,hfpll.txt b/Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+new file mode 100644
+index 0000000..771cb0a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+@@ -0,0 +1,46 @@
++High-Frequency PLL (HFPLL)
 +
-+	return clk_mux_get_parent(hw, val, mux->table, mux->flags);
-+}
++PROPERTIES
 +
-+unsigned int clk_mux_reindex(u8 index, unsigned int *table,
-+			     unsigned long flags)
-+{
-+	unsigned int val = index;
++- compatible:
++	Usage: required
++	Value type: <string>:
++		shall contain only one of the following. The generic
++		compatible "qcom,hfpll" should be also included.
 +
-+	if (table) {
-+		val = table[val];
- 	} else {
--		if (mux->flags & CLK_MUX_INDEX_BIT)
--			index = 1 << index;
-+		if (flags & CLK_MUX_INDEX_BIT)
-+			val = 1 << index;
- 
--		if (mux->flags & CLK_MUX_INDEX_ONE)
--			index++;
-+		if (flags & CLK_MUX_INDEX_ONE)
-+			val++;
- 	}
- 
-+	return val;
-+}
-+EXPORT_SYMBOL_GPL(clk_mux_reindex);
++                        "qcom,hfpll-ipq8064", "qcom,hfpll"
++                        "qcom,hfpll-apq8064", "qcom,hfpll"
++                        "qcom,hfpll-msm8974", "qcom,hfpll"
++                        "qcom,hfpll-msm8960", "qcom,hfpll"
 +
-+static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_mux *mux = to_clk_mux(hw);
-+	u32 val;
-+	unsigned long flags = 0;
++- reg:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: address and size of HPLL registers. An optional second
++		    element specifies the address and size of the alias
++		    register region.
 +
-+	index = clk_mux_reindex(index, mux->table, mux->flags);
++- clock-output-names:
++	Usage: required
++	Value type: <string>
++	Definition: Name of the PLL. Typically hfpllX where X is a CPU number
++		    starting at 0. Otherwise hfpll_Y where Y is more specific
++		    such as "l2".
 +
- 	if (mux->lock)
- 		spin_lock_irqsave(mux->lock, flags);
- 	else
-@@ -102,14 +121,14 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- }
- 
- const struct clk_ops clk_mux_ops = {
--	.get_parent = clk_mux_get_parent,
-+	.get_parent = _clk_mux_get_parent,
- 	.set_parent = clk_mux_set_parent,
- 	.determine_rate = __clk_mux_determine_rate,
- };
- EXPORT_SYMBOL_GPL(clk_mux_ops);
- 
- const struct clk_ops clk_mux_ro_ops = {
--	.get_parent = clk_mux_get_parent,
-+	.get_parent = _clk_mux_get_parent,
- };
- EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
- 
-@@ -117,7 +136,7 @@ struct clk_hw *clk_hw_register_mux_table(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents,
- 		unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
--		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
-+		u8 clk_mux_flags, unsigned int *table, spinlock_t *lock)
- {
- 	struct clk_mux *mux;
- 	struct clk_hw *hw;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index f711be6..4cd6728 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -470,7 +470,7 @@ struct clk_hw *clk_hw_register_divider_table(struct device *dev,
- struct clk_mux {
- 	struct clk_hw	hw;
- 	void __iomem	*reg;
--	u32		*table;
-+	unsigned int	*table;
- 	u32		mask;
- 	u8		shift;
- 	u8		flags;
-@@ -488,6 +488,11 @@ struct clk_mux {
- extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
- 
-+unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
-+				unsigned int *table, unsigned long flags);
-+unsigned int clk_mux_reindex(u8 index, unsigned int *table,
-+			     unsigned long flags);
++Example:
 +
- struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents,
- 		unsigned long flags,
-@@ -508,7 +513,7 @@ struct clk_hw *clk_hw_register_mux_table(struct device *dev, const char *name,
- 		const char * const *parent_names, u8 num_parents,
- 		unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
--		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
-+		u8 clk_mux_flags, unsigned int *table, spinlock_t *lock);
- 
- void clk_unregister_mux(struct clk *clk);
- void clk_hw_unregister_mux(struct clk_hw *hw);
++1) An HFPLL for the L2 cache.
++
++	clock-controller at f9016000 {
++		compatible = "qcom,hfpll-ipq8064", "qcom,hfpll";
++		reg = <0xf9016000 0x30>;
++		clock-output-names = "hfpll_l2";
++	};
++
++2) An HFPLL for CPU0. This HFPLL has the alias register region.
++
++	clock-controller at f908a000 {
++		compatible = "qcom,hfpll-ipq8064", "qcom,hfpll";
++		reg = <0xf908a000 0x30>, <0xf900a000 0x30>;
++		clock-output-names = "hfpll0";
++	};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
