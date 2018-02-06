@@ -1,30 +1,25 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Feb 2018 22:17:13 +0000
-Subject: [PATCH 0/9] Mitigations against spectre-v1 in the arm64 Linux
- kernel
-In-Reply-To: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-References: <1517844864-15887-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180206221712.4sln72qnuqqko3yr@armageddon.cambridge.arm.com>
+Date: Tue, 6 Feb 2018 22:31:28 +0000
+Subject: [PATCH v2 0/9] Fix kpti-enabled kernels for Cavium ThunderX
+In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20180206223128.sfb3aodqc6bcbu2m@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 05, 2018 at 03:34:15PM +0000, Will Deacon wrote:
+On Mon, Jan 29, 2018 at 11:59:51AM +0000, Will Deacon wrote:
 > Hi all,
 > 
-> This series implements some mitigations against spectre-v1 for arm64. It
-> broadly follows the work that has been done for x86, by implementing:
+> This is version two of the patches I posted on Friday:
 > 
->   * A back-end version of array_index_mask_nospec() to suppress any
->     compiler optimisations that could introduce unwanted speculative
->     paths
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556304.html
 > 
->   * Masking of the syscall number to restrict speculation through the
->     syscall table
+> Changes since v1 include:
 > 
->   * Masking of __user pointers prior to deference in uaccess routines
-> 
-> The latter introduces complications in access_ok and set_fs which are
-> also handled in this series.
+>   * Use SCTLR_ELx_M instead of open-coded #1
+>   * Changed section attributes for .idmap.text to reflect actual mappings
+>   * Rejigged phys_to_pte for consistency with pte_to_phys
+>   * Added reviewer tags
 
 Queued for 4.16. Thanks.
 
