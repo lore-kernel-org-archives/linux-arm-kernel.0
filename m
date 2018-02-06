@@ -1,114 +1,99 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue,  6 Feb 2018 15:26:28 +0100
-Subject: [PATCHv2 2/3] ARM: imx53: add SoC specific PMU setup
-In-Reply-To: <20180206142629.534-1-sebastian.reichel@collabora.co.uk>
-References: <20180206142629.534-1-sebastian.reichel@collabora.co.uk>
-Message-ID: <20180206142629.534-3-sebastian.reichel@collabora.co.uk>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 6 Feb 2018 15:27:10 +0100
+Subject: [PATCH v5 02/16] media: doc: add document for rkisp1 meta buffer
+ format
+In-Reply-To: <1514533978-20408-3-git-send-email-zhengsq@rock-chips.com>
+References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
+ <1514533978-20408-3-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <917c22c0-773e-5fe5-5625-86678f7c8521@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Senna Tschudin <peter.senna@collabora.com>
+On 12/29/17 08:52, Shunqian Zheng wrote:
+> From: Jacob Chen <jacob2.chen@rock-chips.com>
+> 
+> This commit add docuemnt for rkisp1 meta buffer format
+> 
+> Signed-off-by: Jacob Chen <jacob-chen@rock-chips.com>
+> ---
+>  Documentation/media/uapi/v4l/meta-formats.rst          |  2 ++
+>  .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst       | 17 +++++++++++++++++
+>  .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst         | 18 ++++++++++++++++++
+>  3 files changed, 37 insertions(+)
+>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+>  create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+> 
+> diff --git a/Documentation/media/uapi/v4l/meta-formats.rst b/Documentation/media/uapi/v4l/meta-formats.rst
+> index 01e24e3..1b82814 100644
+> --- a/Documentation/media/uapi/v4l/meta-formats.rst
+> +++ b/Documentation/media/uapi/v4l/meta-formats.rst
+> @@ -14,3 +14,5 @@ These formats are used for the :ref:`metadata` interface only.
+>  
+>      pixfmt-meta-vsp1-hgo
+>      pixfmt-meta-vsp1-hgt
+> +    pixfmt-meta-rkisp1-params
+> +    pixfmt-meta-rkisp1-stat
+> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+> new file mode 100644
+> index 0000000..ed344d4
+> --- /dev/null
+> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+> @@ -0,0 +1,17 @@
+> +.. -*- coding: utf-8; mode: rst -*-
+> +
+> +.. _v4l2-meta-fmt-rkisp1-params:
+> +
+> +*******************************
+> +V4L2_META_FMT_RK_ISP1_PARAMS
+> +*******************************
+> +
+> +Rockchip ISP1 Parameters Data
+> +
+> +Description
+> +===========
+> +
+> +This format describes input parameters for the Rockchip ISP1.
+> +
+> +The data use c-struct :c:type:`rkisp1_isp_params_cfg`, which is defined in
+> +the ``linux/rkisp1-config.h`` header file, See it for details.
 
-On i.MX53 it is necessary to set the DBG_EN bit in the
-platform GPC register to enable access to PMU counters
-other than the cycle counter.
+One more question: does the ISP produce a reasonable picture if it doesn't
+receive these params? If not (i.e. you always need to provide params), then
+I think you should provide a default rkisp1_isp_params_cfg struct that
+can be used as a template for application writers.
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
----
- arch/arm/mach-imx/mach-imx53.c | 68 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+Perhaps it can be part of the driver as the initial params config.
 
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index 07c2e8dca494..da7c80371f32 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -17,6 +17,7 @@
- #include <linux/irq.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/perf/arm_pmu.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- 
-@@ -28,10 +29,77 @@ static void __init imx53_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX53);
- }
- 
-+/* Hard code as this is i.Mx53 only file */
-+#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
-+#define GPC_DBG_EN (1 << 16)
-+
-+static void __iomem *imx53_pmu_get_gpc(void)
-+{
-+	static void __iomem *gpc;
-+
-+	if (!gpc) {
-+		gpc = ioremap(MXC_CORTEXA8_PLAT_GPC, 4);
-+		if (!gpc)
-+			printk_once(KERN_INFO "unable to map GPC to enable perf\n");
-+	}
-+
-+	return gpc;
-+}
-+
-+static int imx53_pmu_reserve(struct arm_pmu *arm_pmu)
-+{
-+	void __iomem *gpc_reg;
-+	u32 gpc;
-+
-+	gpc_reg = imx53_pmu_get_gpc();
-+	if (!gpc_reg)
-+		return 0;
-+
-+	gpc = __raw_readl(gpc_reg);
-+	if (gpc & GPC_DBG_EN) {
-+		arm_pmu->reserved_hardware = false;
-+	} else {
-+		gpc |= GPC_DBG_EN;
-+		__raw_writel(gpc, gpc_reg);
-+		arm_pmu->reserved_hardware = true;
-+	}
-+
-+	return 0;
-+}
-+
-+static void imx53_pmu_release(struct arm_pmu *arm_pmu)
-+{
-+	void __iomem *gpc_reg;
-+	u32 gpc;
-+
-+	gpc_reg = imx53_pmu_get_gpc();
-+	if (!gpc_reg)
-+		return;
-+
-+	if (arm_pmu->reserved_hardware) {
-+		gpc = __raw_readl(gpc_reg);
-+		gpc &= ~GPC_DBG_EN;
-+		__raw_writel(gpc, gpc_reg);
-+		arm_pmu->reserved_hardware = false;
-+	}
-+}
-+
-+static struct arm_pmu_platdata imx53_pmu_platdata = {
-+	.reserve_hardware = imx53_pmu_reserve,
-+	.release_hardware = imx53_pmu_release,
-+};
-+
-+static struct of_dev_auxdata imx53_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("arm,cortex-a8-pmu", 0, "arm-pmu", &imx53_pmu_platdata),
-+	{}
-+};
-+
- static void __init imx53_dt_init(void)
- {
- 	imx_src_init();
- 
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+					imx53_auxdata_lookup, NULL);
- 	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
- }
- 
--- 
-2.15.1
+I think even if the ISP does work without params it is still worthwhile
+doing this. The params are complex and having an example on how to initialize
+it would be helpful.
+
+Regards,
+
+	Hans
+
+> diff --git a/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+> new file mode 100644
+> index 0000000..5ecc403
+> --- /dev/null
+> +++ b/Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+> @@ -0,0 +1,18 @@
+> +.. -*- coding: utf-8; mode: rst -*-
+> +
+> +.. _v4l2-meta-fmt-rkisp1-stat:
+> +
+> +*******************************
+> +V4L2_META_FMT_RK_ISP1_STAT_3A
+> +*******************************
+> +
+> +Rockchip ISP1 Statistics Data
+> +
+> +Description
+> +===========
+> +
+> +This format describes image color statistics information generated by the Rockchip
+> +ISP1.
+> +
+> +The data use c-struct :c:type:`rkisp1_stat_buffer`, which is defined in
+> +the ``linux/cifisp_stat.h`` header file, See it for details.
+> 
