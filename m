@@ -1,51 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 6 Feb 2018 18:19:34 +0300
-Subject: [PATCH 08/11] arm64: dts: renesas: r8a77980: add EtherAVB support
-In-Reply-To: <CAMuHMdU1Xfc3u90TLQc0g6COuRa+hf5fukr+XAkSxgjSBV6vhg@mail.gmail.com>
-References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
- <99e9e3a5-a626-282a-3e8b-9c74945d55bc@cogentembedded.com>
- <CAMuHMdU1Xfc3u90TLQc0g6COuRa+hf5fukr+XAkSxgjSBV6vhg@mail.gmail.com>
-Message-ID: <bdc34fdf-26af-0e2d-2d7f-44ab52a7c245@cogentembedded.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 6 Feb 2018 15:27:22 +0000
+Subject: [PATCHv3] tlv320dac33: Add device tree bindings
+In-Reply-To: <20180206134906.GA7842@amd>
+References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
+ <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com>
+ <20180205082445.GA18274@amd> <20180206121122.GG5681@sirena.org.uk>
+ <20180206134906.GA7842@amd>
+Message-ID: <20180206152722.GH5681@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2018 03:04 PM, Geert Uytterhoeven wrote:
+On Tue, Feb 06, 2018 at 02:49:06PM +0100, Pavel Machek wrote:
+> On Tue 2018-02-06 12:11:22, Mark Brown wrote:
 
->> Define the generic R8A77980 part of the EtherAVB device node.
->>
->> Based on the original (and large) patch by Vladimir Barinov.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Thanks for your patch!
-> 
->> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->> @@ -164,6 +164,50 @@
->>                         status = "disabled";
->>                 };
->>
->> +               avb: ethernet at e6800000 {
->> +                       compatible = "renesas,etheravb-r8a77980",
->> +                                    "renesas,etheravb-rcar-gen3";
->> +                       reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
-> 
-> According to the Hardware User Manual 0.80, V3H does not have the Stream
-> Buffer (second region).
+> > Please submit patches using subject lines reflecting the style for the
+> > subsystem.  This makes it easier for people to identify relevant
+> > patches.  Look at what existing commits in the area you're changing are
+> > doing and make sure your subject lines visually resemble what they're
+> > doing.
 
-   Indeed, I forgot to check the manual. TY for noticing!
+> AFAICT this goes to Documentation, not sound.
 
->> +                       phy-mode = "rgmii-id";
-> 
-> This is different from H3, M3-W, and D3. Care to elaborate for the layman
-> in me?
+Even if that were the case you're not following the commonly accepted
+practice there either.
 
-   See Documentation/devicetree/bindings/net/ethernet.txt, I don't know anything beyond that anyway. :-)
-   Based on the manual, I'd think we should use "rgmii" here and override it in the board DT if needed...
+> If you have any comments on V1 of this patch, that would be nice, I'd
+> like to get that merged once we are finished with the bindings.
 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-
-MBR, Sergei
+It is the middle of the merge window, please be a bit more patient.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180206/2d5c509b/attachment.sig>
