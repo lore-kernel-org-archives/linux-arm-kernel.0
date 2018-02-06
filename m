@@ -1,79 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 06 Feb 2018 18:10:19 +0800
-Subject: [linux-sunxi] [PATCH v3] ARM: sun8i: h2+: add support for Banana
- Pi M2 Zero board
-In-Reply-To: <CAGRGNgX_GooPYt6Mra4ZRodxpmsxfvDpCkhDwF89x7stLOE8KQ@mail.gmail.com>
-References: <20171224054029.12278-1-icenowy@aosc.io>
- <CAGRGNgXRhphuO8+85t8vfQb2CxDekMXe2BoPo_57pc6SR3QQzA@mail.gmail.com>
- <20180205133625.vcz73qck5kfihalv@flea>
- <A0E61415-4A64-41E5-94F2-3161D2B7A191@aosc.io>
- <20180206082908.jlmnsicnhpgankwf@flea>
- <CAGRGNgX_GooPYt6Mra4ZRodxpmsxfvDpCkhDwF89x7stLOE8KQ@mail.gmail.com>
-Message-ID: <171C0283-3844-402E-8B34-783AC0EA0E90@aosc.io>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Tue,  6 Feb 2018 15:46:53 +0530
+Subject: [PATCH RFC 1/1] iommu/arm-smmu: Fix context fault message considering
+ non-NTS
+Message-ID: <1517912213-3962-1-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+SMMU_CBn_FSYNR0 definition from SMMU v2 architecture document
+says that, the S1CBNDX[23:16] field is only valid if SMMU_IDR0.NTS==1.
+So, update the fsynr in context bank fault handler, so that the
+fault message displays cbndx only when we have nested translations
+enabled.
+Otherwise, it is confusing when 'cb' gives the actual context
+bank, while the 'fsynr' gives a different value.
 
+Example, on a sdm845 system:
+Before this patch -
+arm-smmu 15000000.apps-smmu: Unhandled context fault:
+                          fsr=0x402, iova=0x9e0fb600, fsynr=0x3c0020, cb=0
+After this patch -
+arm-smmu 15000000.apps-smmu: Unhandled context fault:
+                          fsr=0x402, iova=0x9e0aa000, fsynr=0x20, cb=0
 
-? 2018?2?6? GMT+08:00 ??6:08:03, Julian Calaby <julian.calaby@gmail.com> ??:
->Hi Maxime,
->
->On Tue, Feb 6, 2018 at 7:29 PM, Maxime Ripard
-><maxime.ripard@bootlin.com> wrote:
->> On Tue, Feb 06, 2018 at 10:51:04AM +0800, Icenowy Zheng wrote:
->>> ? 2018?2?5? GMT+08:00 ??9:36:25, Maxime Ripard
-><maxime.ripard@bootlin.com> ??:
->>> >On Sat, Feb 03, 2018 at 05:45:52PM +1100, Julian Calaby wrote:
->>> >> Hi all,
->>> >>
->>> >> On Sun, Dec 24, 2017 at 4:40 PM, Icenowy Zheng <icenowy@aosc.io>
->>> >wrote:
->>> >> > Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with
->a
->>> >form
->>> >> > factor and GPIO holes similar to Raspberry Pi Zero.
->>> >> >
->>> >> > It features:
->>> >> > - Allwinner H2+ SoC
->>> >> > - Single-chip (16-bit) 512MiB DDR3 DRAM
->>> >> > - Ampak AP6212 Wi-Fi/Bluetooth module
->>> >> > - MicroSD slot
->>> >> > - Two MicroUSB Type-B ports (one can only be used to power the
->>> >board and
->>> >> >   the other features OTG functionality)
->>> >> > - Two keys, a reset and a GPIO-connected key.
->>> >> > - HDMI Type-C (miniHDMI) connector connected to the HDMI part
->of
->>> >H2+.
->>> >> > - CSI connector to connect the camera sensor provided by
->Sinovoip.
->>> >> >
->>> >> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> >>
->>> >> [Trimmed lots of non-sunxi-specific mailing lists]
->>> >>
->>> >> Did support for this board ever get merged?
->>> >
->>> >It doesn't look like it did.
->>>
->>> Is there any problem in this patch now except the
->>> absense of SPDX license usage?
->>
->> Doesn't look like it.
->
->Awesome, I'll get it booting, fix the licence block and re-submit.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Cc: Robin Murphy <robin.murphy@arm.com>
+---
 
-I will do it, don't worry.
+Hi Robin,
+Does it make sense to mask fsynr like this?
+Would it still be confusing for CB==0?
+Tagging the patch as RFC to get your comments. If looks good,
+then i will send the patch for your ack.
+Thanks.
 
->
->I'll also put together patches to add the HDMI and DVFS bits and send
->them as those features make it upstream.
+ drivers/iommu/arm-smmu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-They should come in these features' patchset. For
-HDMI I think Jernej will manage it and for DVFS I'll do it.
-
->
->I was worried that I'd have to figure out the WiFi stuff, however
->Icenowy has already done that. Thanks!
->
->Thanks,
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 69e7c60792a8..827659515b22 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -550,6 +550,9 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ 	fsynr = readl_relaxed(cb_base + ARM_SMMU_CB_FSYNR0);
+ 	iova = readq_relaxed(cb_base + ARM_SMMU_CB_FAR);
+ 
++	if (!smmu->features & ARM_SMMU_FEAT_TRANS_NESTED)
++		fsynr &= 0xffff;
++
+ 	dev_err_ratelimited(smmu->dev,
+ 	"Unhandled context fault: fsr=0x%x, iova=0x%08lx, fsynr=0x%x, cb=%d\n",
+ 			    fsr, iova, fsynr, cfg->cbndx);
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
