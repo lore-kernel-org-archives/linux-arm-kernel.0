@@ -1,37 +1,28 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 6 Feb 2018 10:14:29 +0530
-Subject: [PATCH v6 15/15] dt-bindings: cpufreq: Document
- operating-points-v2-krait-cpu
-In-Reply-To: <20180206042729.GH28462@vireshk-i7>
-References: <1517890108-8140-1-git-send-email-sricharan@codeaurora.org>
- <1517890108-8140-16-git-send-email-sricharan@codeaurora.org>
- <20180206042729.GH28462@vireshk-i7>
-Message-ID: <d21cf85e-def9-66d8-aed1-cd1407c36fdb@codeaurora.org>
+Date: Tue, 6 Feb 2018 10:16:44 +0530
+Subject: [PATCH 01/15] firmware: qcom: scm: Add ipq4019 soc compatible
+In-Reply-To: <20180205022530.xf64gqeijicewdla@rob-hp-laptop>
+References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
+ <1517202689-14212-2-git-send-email-sricharan@codeaurora.org>
+ <20180205022530.xf64gqeijicewdla@rob-hp-laptop>
+Message-ID: <23641ff4-59c9-cf14-8fef-12614e265512@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Rob,
 
-On 2/6/2018 9:57 AM, Viresh Kumar wrote:
-> On 06-02-18, 09:38, Sricharan R wrote:
->> In Certain QCOM SoCs like ipq8064, apq8064, msm8960, msm8974
->> that has KRAIT processors the voltage/current value of each OPP
->> varies based on the silicon variant in use.
->> operating-points-v2-krait-cpu specifies the phandle to nvmem efuse cells
->> and the operating-points-v2 table for each opp. The qcom-cpufreq driver
->> reads the efuse value from the SoC to provide the required information
->> that is used to determine the voltage and current value for each OPP of
->> operating-points-v2 table when it is parsed by the OPP framework.
+On 2/5/2018 11:37 AM, Rob Herring wrote:
+> On Mon, Jan 29, 2018 at 10:41:15AM +0530, Sricharan R wrote:
+>> Add the compatible for ipq4019.
+>> This does not need clocks to do scm calls.
 >>
 >> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 >> ---
->>  .../devicetree/bindings/cpufreq/krait-cpufreq.txt  | 363 +++++++++++++++++++++
->>  1 file changed, 363 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/cpufreq/krait-cpufreq.txt
+>>  Documentation/devicetree/bindings/firmware/qcom,scm.txt | 3 ++-
+>>  drivers/firmware/qcom_scm.c                             | 3 +++
+>>  2 files changed, 5 insertions(+), 1 deletion(-)
 > 
-> You can add my Ack if Rob also finds everything to be fine here.
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
  Thanks !!
 
