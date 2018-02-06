@@ -1,30 +1,98 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 6 Feb 2018 09:28:56 +0100
-Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing
- with a mask
-In-Reply-To: <CAMuHMdWnV17DCxr71k6n3w+5jPtQmeuPugr58xadq9U_qchJnQ@mail.gmail.com>
-References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
- <CAMuHMdWnV17DCxr71k6n3w+5jPtQmeuPugr58xadq9U_qchJnQ@mail.gmail.com>
-Message-ID: <20180206082856.qx4pj7of36yytetc@ninjato>
+From: philippe.cornu@st.com (Philippe Cornu)
+Date: Tue, 6 Feb 2018 09:42:51 +0100
+Subject: [PATCH v2] drm/bridge/synopsys: dsi: Add 1.31 version support
+Message-ID: <20180206084251.303-1-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for the Synopsys DesignWare MIPI DSI version 1.31
+Two registers need to be updated/added for supporting 1.31:
+* PHY_TMR_CFG 0x9c (updated)
+  1.30 [31:24] phy_hs2lp_time
+       [23:16] phy_lp2hs_time
+       [14: 0] max_rd_time
 
-> I found two more using "git grep 'define.*0x[0-9a-f]* < '":
+  1.31 [25:16] phy_hs2lp_time
+       [ 9: 0] phy_lp2hs_time
 
-I added '[0-9]\+'@the end of the regex to reduce the number of false
-positives...
+* PHY_TMR_RD_CFG 0xf4 (new)
+  1.31 [14: 0] max_rd_time
 
-> drivers/net/can/m_can/m_can.c:#define RXFC_FWM_MASK     (0x7f < RXFC_FWM_SHIFT)
-> drivers/usb/gadget/udc/goku_udc.h:#define INT_EPnNAK(n)
-> (0x00100 < (n))         /* 0 < n < 4 */
+Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+---
+Modified in v2: Simplify the code thanks to comments from Andrzej Hajda &
+Archit Taneja.
 
-... but you found those two true positives in there. Nice, thanks!
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 23 ++++++++++++++++++++---
+ 1 file changed, 20 insertions(+), 3 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180206/17969e2b/attachment.sig>
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index d2e5c026cd8c..4496687e6e67 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -25,7 +25,10 @@
+ #include <drm/bridge/dw_mipi_dsi.h>
+ #include <video/mipi_display.h>
+ 
++#define HWVER_131			0x31333100	/* IP version 1.31 */
++
+ #define DSI_VERSION			0x00
++#define VERSION				GENMASK(31, 8)
+ 
+ #define DSI_PWR_UP			0x04
+ #define RESET				0
+@@ -161,11 +164,12 @@
+ #define PHY_CLKHS2LP_TIME(lbcc)		(((lbcc) & 0x3ff) << 16)
+ #define PHY_CLKLP2HS_TIME(lbcc)		((lbcc) & 0x3ff)
+ 
+-/* TODO Next register is slightly different between 1.30 & 1.31 IP version */
+ #define DSI_PHY_TMR_CFG			0x9c
+ #define PHY_HS2LP_TIME(lbcc)		(((lbcc) & 0xff) << 24)
+ #define PHY_LP2HS_TIME(lbcc)		(((lbcc) & 0xff) << 16)
+ #define MAX_RD_TIME(lbcc)		((lbcc) & 0x7fff)
++#define PHY_HS2LP_TIME_V131(lbcc)	(((lbcc) & 0x3ff) << 16)
++#define PHY_LP2HS_TIME_V131(lbcc)	((lbcc) & 0x3ff)
+ 
+ #define DSI_PHY_RSTZ			0xa0
+ #define PHY_DISFORCEPLL			0
+@@ -204,7 +208,9 @@
+ #define DSI_INT_ST1			0xc0
+ #define DSI_INT_MSK0			0xc4
+ #define DSI_INT_MSK1			0xc8
++
+ #define DSI_PHY_TMR_RD_CFG		0xf4
++#define MAX_RD_TIME_V131(lbcc)		((lbcc) & 0x7fff)
+ 
+ #define PHY_STATUS_TIMEOUT_US		10000
+ #define CMD_PKT_STATUS_TIMEOUT_US	20000
+@@ -623,6 +629,8 @@ static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi,
+ 
+ static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
+ {
++	u32 hw_version;
++
+ 	/*
+ 	 * TODO dw drv improvements
+ 	 * data & clock lane timers should be computed according to panel
+@@ -630,8 +638,17 @@ static void dw_mipi_dsi_dphy_timing_config(struct dw_mipi_dsi *dsi)
+ 	 * note: DSI_PHY_TMR_CFG.MAX_RD_TIME should be in line with
+ 	 * DSI_CMD_MODE_CFG.MAX_RD_PKT_SIZE_LP (see CMD_MODE_ALL_LP)
+ 	 */
+-	dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40)
+-		  | PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
++
++	hw_version = dsi_read(dsi, DSI_VERSION) & VERSION;
++
++	if (hw_version >= HWVER_131) {
++		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME_V131(0x40) |
++			  PHY_LP2HS_TIME_V131(0x40));
++		dsi_write(dsi, DSI_PHY_TMR_RD_CFG, MAX_RD_TIME_V131(10000));
++	} else {
++		dsi_write(dsi, DSI_PHY_TMR_CFG, PHY_HS2LP_TIME(0x40) |
++			  PHY_LP2HS_TIME(0x40) | MAX_RD_TIME(10000));
++	}
+ 
+ 	dsi_write(dsi, DSI_PHY_TMR_LPCLK_CFG, PHY_CLKHS2LP_TIME(0x40)
+ 		  | PHY_CLKLP2HS_TIME(0x40));
+-- 
+2.15.1
