@@ -1,72 +1,31 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 6 Feb 2018 11:57:16 +0530
-Subject: [PATCH 09/15] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk04.1-c3
- board file
-In-Reply-To: <4a173ff2a74ed7d1555d52674cf64ddd@codeaurora.org>
-References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
- <1517202689-14212-10-git-send-email-sricharan@codeaurora.org>
- <4a173ff2a74ed7d1555d52674cf64ddd@codeaurora.org>
-Message-ID: <a9f6233b-0dc2-d729-b7e7-09e228794529@codeaurora.org>
+From: horia.geanta@nxp.com (=?iso-8859-2?Q?Horia_Geant=E3?=)
+Date: Tue, 6 Feb 2018 07:18:18 +0000
+Subject: [PATCH v6 1/2] staging: fsl-mc: Move core bus out of staging
+References: <20180205140743.29974-1-bogdan.purcareata@nxp.com>
+ <20180205140743.29974-2-bogdan.purcareata@nxp.com>
+Message-ID: <VI1PR0402MB33427D7D04239420F3FE7D5A98FD0@VI1PR0402MB3342.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhishek,
+On 2/5/2018 4:08 PM, Bogdan Purcareata wrote:
+> Move the source files out of staging into their final locations:
+>   -mc.h include file in drivers/staging/fsl-mc/include go to include/linux/fsl
+>   -source files in drivers/staging/fsl-mc/bus go to drivers/bus/fsl-mc
+>   -overview.rst, providing an overview of DPAA2, goes to
+>    Documentation/networking/dpaa2/overview.rst
+[...]
+>  rename {drivers/staging/fsl-mc => Documentation/networking/dpaa2}/overview.rst (100%)
 
-On 2/3/2018 5:07 PM, Abhishek Sahu wrote:
-> On 2018-01-29 10:41, Sricharan R wrote:
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->> ?arch/arm/boot/dts/Makefile????????????????????? |? 1 +
->> ?arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts | 14 ++++++++++++++
->> ?2 files changed, 15 insertions(+)
->> ?create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 68e4b15..0104ba2 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -727,6 +727,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->> ???? qcom-ipq4019-ap.dk01.1-c2.dtb \
->> ???? qcom-ipq4019-ap.dk04.1-c1.dtb \
->> ???? qcom-ipq4019-ap.dk04.1-c5.dtb \
->> +??? qcom-ipq4019-ap.dk04.1-c3.dtb \
->> ???? qcom-ipq8064-ap148.dtb \
->> ???? qcom-msm8660-surf.dtb \
->> ???? qcom-msm8960-cdp.dtb \
->> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
->> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
->> new file mode 100644
->> index 0000000..7a93fc4
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
->> @@ -0,0 +1,14 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
->> +
->> +#include "qcom-ipq4019-ap.dk04.1.dtsi"
->> +
->> +/ {
->> +??? model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C3";
->> +
->> +??? soc {
->> +??????? nand: qpic-nand at 79b0000 {
->> +??????????? status = "disabled";
->> +??????? };
-> 
-> ?Normally we need to disable in base dtsi and enable in
-> ?board dtsi so that base dtsi will always work in all the
-> ?boards. Now If We load the base dtsi in any DK04 board
-> ?other than C1, then nand failure will come.
+Is this the proper location for documentation?
+The doc focuses on networking, however there's also information about fsl mc
+bus, dpio.
 
- Hmm, qpic nand is not there only on C3 and available in rest
- of dk04-c* variants. So it should work, downstream also
- does it in same way. Anyways, from a readability point, feel that
- better to make these uncommon configurations in each board file
- specifically rather than putting in common file and changing like this.
+In the future, we might want to add doc for other dpaa2 objects sitting on the
+fsl mc bus:
+-dpseci ("Data Path SEC Interface" - abstraction for the crypto engine)
+-dpdcei ("Data Path Decompression and Compression Engine Interface")
 
-Regards,
- Sricharan
+Would these fit under networking doc folder too?
 
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Thanks,
+Horia
