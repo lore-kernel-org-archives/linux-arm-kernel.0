@@ -1,78 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Feb 2018 16:44:28 +0100
-Subject: [RFC v4 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
-In-Reply-To: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdX0EBhc20G1eaN-LXyMpamyjW1otja3YV10kR1PNEprXg@mail.gmail.com>
+From: stefan@agner.ch (stefan at agner.ch)
+Date: Tue, 06 Feb 2018 17:27:15 +0100
+Subject: [PATCH] ARM: dts: imx6ul: rename mux mode name REF_CLK_32K to
+ OSC32K_32K_OUT
+In-Reply-To: <20180205204759.28526-1-joerg.krause@embedded.rocks>
+References: <20180205204759.28526-1-joerg.krause@embedded.rocks>
+Message-ID: <f2dcbad84f9237adf072e005d15d65ef@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+On 05.02.2018 21:47, J?rg Krause wrote:
+> This is a rebased version of patch [0].
+> 
+> The 32 kHz reference clock on the i.MX6UL(L) can be output by
+> setting the external signal XTALOSC_REF_CLK_32K in one of the
+> following ways [1]:
+> 
+> |----------------------------------------------------------|
+> | Signal              | Pad             | Mode | Direction |
+> |----------------------------------------------------------|
+> | XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
+> |                     | GPIO1_IO03      | ALT3 |           |
+> |                     | JTAG_TCK        | ALT6 |           |
+> |----------------------------------------------------------|
+> 
+> Before patch [2] the mux mode for the external reference clock was
+> missing. The patch named the mux mode as used in the NXP Linux
+> 4.9.11_1.0.0 release, but the Reference Manual uses the name
+> OSC32K_32K_OUT, e.g. in [3].
+> 
+> As Philipp and Shawn suggest the name from the RM should be used
+> instead.
+> 
+> [0] https://patchwork.kernel.org/patch/10172187/
+> [1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1, p. 3649
+> [2] https://patchwork.kernel.org/patch/10156121/
+> [3] IMX6ULRM, Rev. 1, 04/2016, 30.5.47 SW_MUX_CTL_PAD_ENET1_RX_EN SW MUX
+>     Control Register (IOMUXC_SW_MUX_CTL_PAD_ENET1_RX_EN), p. 1357
+> 
+> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
 
-On Wed, Jan 31, 2018 at 7:24 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> the forth version of this series aims at consolidating the watchdog fix.
-> There is a discussion still in progress about the changes to the
-> watchdog driver, please see the following for more information:
-> https://patchwork.kernel.org/patch/10192435/
->
-> It doesn't look like leaving the restart handler in for Gen3 is going
-> to do any harm (but it may be unwelcome), perhaps esplicitly setting
-> its priority to a medium level (128) will help its adoption on Gen3
-> as well? This is what this particular version is proposing.
->
-> Also, although the latest implmentation of the reset vector hasn't
-> raised any problem so far, it hasn't received any feedback either.
-> Please do look into it to espose problems and weaknesses (if any).
->
-> Finally, it would be great if someone could test this patch set on his
-> Gen2/Gen3/RZ/G1 board, and it would be awesome if that board was a
-> Lager with all of the cores enabled and working at the same time ;-)
+Looks good to me.
 
-I applied your series, made the following change:
-
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -499,6 +499,11 @@
-        status = "okay";
- };
-
-+&rwdt {
-+       timeout-sec = <5>;
-+       status = "okay";
-+};
-+
- &sata0 {
-        status = "okay";
- };
-
-and tried it on koelsch. Unfortunately it hangs:
-
-    # cat > /dev/watchdog
-    [wait 5s]
-    [hang]
-
-However, it does work when booted with maxcpus=1, or when built with
-CONFIG_SMP=n.
-
-It also works when offlining CPU1 first:
-
-    # echo 0 > /sys/devices/system/cpu/cpu1/online
-    #cat > /dev/watchdog
-    [wait 5s]
-    [reboot]
-
-It does not work when offlining CPU0 first.
-
-This is on r8a7791 ES1.0.
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Stefan
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  arch/arm/boot/dts/imx6ul-pinfunc.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h
+> b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> index 9538b0ed5c11..7b9a4dc38456 100644
+> --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
+> +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
+> @@ -63,7 +63,7 @@
+>  #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
+>  #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
+>  #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
+> -#define MX6UL_PAD_JTAG_TCK__REF_CLK_32K			0x0054 0x02e0 0x0000 6 0
+> +#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT			0x0054 0x02e0 0x0000 6 0
+>  #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
+>  #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
+>  #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
+> @@ -103,7 +103,7 @@
+>  #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
+>  #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
+>  #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
+> -#define MX6UL_PAD_GPIO1_IO03__REF_CLK_32K		0x0068 0x02f4 0x0000 3 0
+> +#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
+>  #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
+>  #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
+>  #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_EXT_CLK		0x0068 0x02f4 0x0000 6 0
+> @@ -320,7 +320,7 @@
+>  #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
+>  #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
+>  #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
+> -#define MX6UL_PAD_ENET1_RX_EN__REF_CLK_32K		0x00cc 0x0358 0x0000 2 0
+> +#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
+>  #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x050c 3 0
+>  #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
+>  #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
