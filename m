@@ -1,48 +1,52 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 6 Feb 2018 18:27:59 +0200
-Subject: [PATCH v3 0/4] gpio: driver for the RPi3 GPIO expander
-In-Reply-To: <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
-References: <cover.1516105893.git.baruch@tkos.co.il>
- <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
-Message-ID: <20180206162759.awghecpv4ihaatz7@tarshish>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 6 Feb 2018 19:41:07 +0300
+Subject: [PATCH 07/11] arm64: dts: renesas: r8a77980: add [H]SCIF support
+In-Reply-To: <CAMuHMdWXc=1s5rMU5Tc_=tH4jrH+5P6z52J3ihiyYfseTpQ-kw@mail.gmail.com>
+References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
+ <169ed4ac-1b8b-cf8c-45c4-957ebbdf3f5e@cogentembedded.com>
+ <CAMuHMdWXc=1s5rMU5Tc_=tH4jrH+5P6z52J3ihiyYfseTpQ-kw@mail.gmail.com>
+Message-ID: <f440c853-d955-bba9-dc58-d7670f521a73@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 02/06/2018 02:58 PM, Geert Uytterhoeven wrote:
 
-On Tue, Feb 06, 2018 at 02:42:48PM +0100, Linus Walleij wrote:
-> On Tue, Jan 16, 2018 at 1:45 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+>> Describe [H]SCIF ports in the R8A77980 device tree.
+>>
+>> Based on the original (and large) patch by Vladimir Barinov.
+>>
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> > The Raspberry Pi 3 has a GPIO expander that controls, among others, the
-> > activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus
-> > that is not directly controlled from the ARM core. The VC4 firmware controls
-> > the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox
-> > interface.
-> >
-> > This series adds support for the RPi3 expander.
-> >
-> > The driver is ported from the downstream kernel at
-> > https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
-> >
-> > Changes in v3:
-> >
-> >   * Kconfig tweaks
-> >   * Check rpi_exp_gpio_get_polarity() return value
-> >   * Redundant header removal
-> >   * Redundant platform_set_drvdata() call removal
-> >   * Small coding style changes
+> Thanks for your patch!
 > 
-> All is looking pretty good. I see Rob had some last minute comments,
-> but please rebase and repost post v4.16-rc1 so we can get this merged,
-> we need to get this upstream.
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> 
+>> @@ -85,6 +92,150 @@
+>>                         #power-domain-cells = <1>;
+>>                 };
+>>
+>> +               hscif0: serial at e6540000 {
+>> +                       compatible = "renesas,hscif-r8a77980",
+>> +                                    "renesas,rcar-gen3-hscif",
+>> +                                    "renesas,hscif";
+>> +                       reg = <0 0xe6540000 0 0x60>;
+>> +                       interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+>> +                       clocks = <&cpg CPG_MOD 520>,
+>> +                                <&cpg CPG_CORE 16>,
+> 
+> Shouldn't this be 19 (S3D1) instead of 16 (S2D1)?
 
-I was about to send v4 when I saw your email. I based v4 on current LinusT's 
-tree as of e237f98a9c. I guess that affected files will not change before 
-v4.16-rc1, but I can wait a few more days for -rc1.
+   Seems like that... at least after out chat. :-)
 
-baruch
+> With that fixed (for all (H)SCIF ports);
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+   The manual tells me SCKi for the SCIF ports should be the same S3D1.
+
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Gr{oetje,eeting}s,
+> 
+
+MBR, Sergei
