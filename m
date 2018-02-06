@@ -1,59 +1,39 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  6 Feb 2018 12:49:01 +0800
-Subject: [PATCH v2 06/10] ARM: sun8i: h2+: add SY8113B regulator used by
- Orange Pi Zero board
+Date: Tue,  6 Feb 2018 12:49:04 +0800
+Subject: [PATCH v2 09/10] ARM: sun8i: h3: fix ALL-H3-CC H3 ver VDD-CPUX voltage
 In-Reply-To: <20180206044905.30508-1-icenowy@aosc.io>
 References: <20180206044905.30508-1-icenowy@aosc.io>
-Message-ID: <20180206044905.30508-7-icenowy@aosc.io>
+Message-ID: <20180206044905.30508-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi Zero board has a SY8113B regulator, which is controlled via
-GPIO and capable of outputing 1.1V when the PL6 GPIO is set to output 0
-or 1.3V when the PL6 GPIO is set to input or output 1, and the output is
-the power supply of the ARM cores in H2+ SoC.
+The VDD-CPUX voltage of ALL-H3-CC H3 ver should be 1.2V, not the 3.3V
+currently defined in the device tree.
 
-Add the device tree node of this regulator and set the cpu's cpu-supply
-property to it.
+Fix the voltage in the device tree.
 
+Fixes: 6ca358645d4d ("ARM: dts: sun8i: h3: Add dts file for Libre Computer Board ALL-H3-CC H3 ver.")
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-No changes in v2.
+New patch in v2.
 
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-index 6713d0f2b3f4..34fc35737090 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-@@ -94,6 +94,27 @@
- 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
- 		post-power-on-delay-ms = <200>;
- 	};
-+
-+	reg_sy8113b: gpio-regulator {
-+		compatible = "regulator-gpio";
-+		regulator-name = "vdd-cpux";
-+		regulator-type = "voltage";
-+		regulator-boot-on;
-+		regulator-always-on;
-+		regulator-min-microvolt = <1100000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-ramp-delay = <50>; /* 4ms */
-+
-+		gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-+		enable-active-high;
-+		gpios-states = <0x1>;
-+		states = <1100000 0x0
-+			  1300000 0x1>;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_sy8113b>;
- };
- 
- &ehci0 {
+diff --git a/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+index d406571a0dd6..ca974d872357 100644
+--- a/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+@@ -102,8 +102,8 @@
+ 	reg_vdd_cpux: vdd-cpux {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vdd-cpux";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <1200000>;
+ 		regulator-always-on;
+ 		regulator-boot-on;
+ 		vin-supply = <&reg_vcc5v0>;
 -- 
 2.15.1
