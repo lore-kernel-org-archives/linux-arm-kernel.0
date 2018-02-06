@@ -1,266 +1,128 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  6 Feb 2018 10:35:36 +0100
-Subject: [PATCH 1/5 v3] drm/pl111: Properly detect the ARM PL110 variants
-Message-ID: <20180206093540.8147-1-linus.walleij@linaro.org>
+Date: Tue,  6 Feb 2018 10:35:39 +0100
+Subject: [PATCH 4/5 v3] drm/pl111: Support variants with broken VBLANK
+In-Reply-To: <20180206093540.8147-1-linus.walleij@linaro.org>
+References: <20180206093540.8147-1-linus.walleij@linaro.org>
+Message-ID: <20180206093540.8147-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With a bit of refactoring we can contain the variant data for
-the strange PL110 versions that is feature-incomplete PL110 for
-the ARM Integrator/CP and somewhere inbetween PL110 and PL111
-for the ARM Versatile AB and Versatile PB.
-
-We also accomodate for the custom duct-taped RGB565/BGR565 support
-in the Versatile variant.
+The early Integrator CLCD synthesized in the Integrator CP and
+IM-PD1 FPGAs are broken: their vertical and next base interrupts
+are not functional. Support these variants by simply disabling
+the use of the vblank interrupt on these variants.
 
 Reviewed-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v2->v3:
-- Drop misplaced leftover comment in the Integrator detection
-  code.
-- Collect Eric's Reviewed-by.
-ChangeLog v1->v2:
-- Push more logic into the pl111_versatile file and keep the
-  driver core neutral.
-- Pave the way better for the Integrator/CP variant as well.
+ChangeLog ->v3:
+- Collect Eric's review tag.
 ---
- drivers/gpu/drm/pl111/pl111_drm.h       |  3 ++
- drivers/gpu/drm/pl111/pl111_drv.c       | 37 ++++-----------
- drivers/gpu/drm/pl111/pl111_versatile.c | 84 +++++++++++++++++++++++++--------
- 3 files changed, 78 insertions(+), 46 deletions(-)
+ drivers/gpu/drm/pl111/pl111_display.c   |  6 ++++--
+ drivers/gpu/drm/pl111/pl111_drm.h       |  2 ++
+ drivers/gpu/drm/pl111/pl111_drv.c       | 19 +++++++++++--------
+ drivers/gpu/drm/pl111/pl111_versatile.c |  1 +
+ 4 files changed, 18 insertions(+), 10 deletions(-)
 
+diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
+index 4d4e38b4c9d5..d75923896609 100644
+--- a/drivers/gpu/drm/pl111/pl111_display.c
++++ b/drivers/gpu/drm/pl111/pl111_display.c
+@@ -256,7 +256,8 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
+ 	cntl |= CNTL_LCDPWR;
+ 	writel(cntl, priv->regs + priv->ctrl);
+ 
+-	drm_crtc_vblank_on(crtc);
++	if (!priv->variant->broken_vblank)
++		drm_crtc_vblank_on(crtc);
+ }
+ 
+ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
+@@ -266,7 +267,8 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
+ 	struct pl111_drm_dev_private *priv = drm->dev_private;
+ 	u32 cntl;
+ 
+-	drm_crtc_vblank_off(crtc);
++	if (!priv->variant->broken_vblank)
++		drm_crtc_vblank_off(crtc);
+ 
+ 	/* Power Down */
+ 	cntl = readl(priv->regs + priv->ctrl);
 diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-index 440f53ebee8c..c2f410f0b12e 100644
+index f75c5d4645b2..d74076c6b7ef 100644
 --- a/drivers/gpu/drm/pl111/pl111_drm.h
 +++ b/drivers/gpu/drm/pl111/pl111_drm.h
-@@ -36,12 +36,15 @@ struct drm_minor;
-  * struct pl111_variant_data - encodes IP differences
-  * @name: the name of this variant
-  * @is_pl110: this is the early PL110 variant
-+ * @external_bgr: this is the Versatile Pl110 variant with external
-+ *	BGR/RGB routing
+@@ -40,6 +40,7 @@ struct drm_minor;
+  *	BGR/RGB routing
+  * @broken_clockdivider: the clock divider is broken and we need to
+  *	use the supplied clock directly
++ * @broken_vblank: the vblank IRQ is broken on this variant
   * @formats: array of supported pixel formats on this variant
   * @nformats: the length of the array of supported pixel formats
   */
- struct pl111_variant_data {
- 	const char *name;
+@@ -48,6 +49,7 @@ struct pl111_variant_data {
  	bool is_pl110;
-+	bool external_bgr;
+ 	bool external_bgr;
+ 	bool broken_clockdivider;
++	bool broken_vblank;
  	const u32 *formats;
  	unsigned int nformats;
  };
 diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 31a0c4268cc6..6967cd5428b2 100644
+index 6967cd5428b2..e6fa897c740c 100644
 --- a/drivers/gpu/drm/pl111/pl111_drv.c
 +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -205,7 +205,7 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- {
- 	struct device *dev = &amba_dev->dev;
- 	struct pl111_drm_dev_private *priv;
--	struct pl111_variant_data *variant = id->data;
-+	const struct pl111_variant_data *variant = id->data;
- 	struct drm_device *drm;
- 	int ret;
- 
-@@ -221,27 +221,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
- 
--	/*
--	 * The PL110 and PL111 variants have two registers
--	 * swapped: interrupt enable and control. For this reason
--	 * we use offsets that we can change per variant.
--	 */
-+	/* The two variants swap this register */
- 	if (variant->is_pl110) {
--		/*
--		 * The ARM Versatile boards are even more special:
--		 * their PrimeCell ID say they are PL110 but the
--		 * control and interrupt enable registers are anyway
--		 * swapped to the PL111 order so they are not following
--		 * the PL110 datasheet.
--		 */
--		if (of_machine_is_compatible("arm,versatile-ab") ||
--		    of_machine_is_compatible("arm,versatile-pb")) {
--			priv->ienb = CLCD_PL111_IENB;
--			priv->ctrl = CLCD_PL111_CNTL;
--		} else {
--			priv->ienb = CLCD_PL110_IENB;
--			priv->ctrl = CLCD_PL110_CNTL;
--		}
-+		priv->ienb = CLCD_PL110_IENB;
-+		priv->ctrl = CLCD_PL110_CNTL;
- 	} else {
- 		priv->ienb = CLCD_PL111_IENB;
- 		priv->ctrl = CLCD_PL111_CNTL;
-@@ -253,6 +236,11 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 		return PTR_ERR(priv->regs);
- 	}
- 
-+	/* This may override some variant settings */
-+	ret = pl111_versatile_init(dev, priv);
-+	if (ret)
-+		goto dev_unref;
-+
- 	/* turn off interrupts before requesting the irq */
- 	writel(0, priv->regs + priv->ienb);
- 
-@@ -263,10 +251,6 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
+@@ -131,10 +131,12 @@ static int pl111_modeset_init(struct drm_device *dev)
+ 	if (ret)
  		return ret;
+ 
+-	ret = drm_vblank_init(dev, 1);
+-	if (ret != 0) {
+-		dev_err(dev->dev, "Failed to init vblank\n");
+-		goto out_bridge;
++	if (!priv->variant->broken_vblank) {
++		ret = drm_vblank_init(dev, 1);
++		if (ret != 0) {
++			dev_err(dev->dev, "Failed to init vblank\n");
++			goto out_bridge;
++		}
  	}
  
--	ret = pl111_versatile_init(dev, priv);
--	if (ret)
--		goto dev_unref;
+ 	drm_mode_config_reset(dev);
+@@ -184,10 +186,6 @@ static struct drm_driver pl111_drm_driver = {
+ 	.dumb_create = drm_gem_cma_dumb_create,
+ 	.gem_free_object_unlocked = drm_gem_cma_free_object,
+ 	.gem_vm_ops = &drm_gem_cma_vm_ops,
 -
- 	ret = pl111_modeset_init(drm);
- 	if (ret != 0)
- 		goto dev_unref;
-@@ -299,8 +283,7 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
- }
+-	.enable_vblank = pl111_enable_vblank,
+-	.disable_vblank = pl111_disable_vblank,
+-
+ 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+ 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+ 	.gem_prime_import = drm_gem_prime_import,
+@@ -213,6 +211,11 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
+ 	if (!priv)
+ 		return -ENOMEM;
  
- /*
-- * This variant exist in early versions like the ARM Integrator
-- * and this version lacks the 565 and 444 pixel formats.
-+ * This early variant lacks the 565 and 444 pixel formats.
-  */
- static const u32 pl110_pixel_formats[] = {
- 	DRM_FORMAT_ABGR8888,
++	if (!variant->broken_vblank) {
++		pl111_drm_driver.enable_vblank = pl111_enable_vblank;
++		pl111_drm_driver.disable_vblank = pl111_disable_vblank;
++	}
++
+ 	drm = drm_dev_alloc(&pl111_drm_driver, dev);
+ 	if (IS_ERR(drm))
+ 		return PTR_ERR(drm);
 diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-index 97d4af6925a3..ec05c7e5319b 100644
+index 93cf2d82074b..11024ad64181 100644
 --- a/drivers/gpu/drm/pl111/pl111_versatile.c
 +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-@@ -1,3 +1,4 @@
-+#include <linux/amba/clcd-regs.h>
- #include <linux/device.h>
- #include <linux/of.h>
- #include <linux/regmap.h>
-@@ -64,10 +65,8 @@ static const struct of_device_id versatile_clcd_of_match[] = {
- #define INTEGRATOR_CLCD_LCDBIASEN	BIT(8)
- #define INTEGRATOR_CLCD_LCDBIASUP	BIT(9)
- #define INTEGRATOR_CLCD_LCDBIASDN	BIT(10)
--/* Bits 11,12,13 controls the LCD type */
--#define INTEGRATOR_CLCD_LCDMUX_MASK	(BIT(11)|BIT(12)|BIT(13))
-+/* Bits 11,12,13 controls the LCD or VGA bridge type */
- #define INTEGRATOR_CLCD_LCDMUX_LCD24	BIT(11)
--#define INTEGRATOR_CLCD_LCDMUX_VGA565	BIT(12)
- #define INTEGRATOR_CLCD_LCDMUX_SHARP	(BIT(11)|BIT(12))
- #define INTEGRATOR_CLCD_LCDMUX_VGA555	BIT(13)
- #define INTEGRATOR_CLCD_LCDMUX_VGA24	(BIT(11)|BIT(12)|BIT(13))
-@@ -82,16 +81,7 @@ static const struct of_device_id versatile_clcd_of_match[] = {
- /* 0 = 24bit VGA, 1 = 18bit VGA */
- #define INTEGRATOR_CLCD_LCD_N24BITEN	BIT(19)
- 
--#define INTEGRATOR_CLCD_MASK		(INTEGRATOR_CLCD_LCDBIASEN | \
--					 INTEGRATOR_CLCD_LCDBIASUP | \
--					 INTEGRATOR_CLCD_LCDBIASDN | \
--					 INTEGRATOR_CLCD_LCDMUX_MASK | \
--					 INTEGRATOR_CLCD_LCD0_EN | \
--					 INTEGRATOR_CLCD_LCD1_EN | \
--					 INTEGRATOR_CLCD_LCD_STATIC1 | \
--					 INTEGRATOR_CLCD_LCD_STATIC2 | \
--					 INTEGRATOR_CLCD_LCD_STATIC | \
--					 INTEGRATOR_CLCD_LCD_N24BITEN)
-+#define INTEGRATOR_CLCD_MASK		GENMASK(19,8)
- 
- static void pl111_integrator_enable(struct drm_device *drm, u32 format)
- {
-@@ -106,11 +96,8 @@ static void pl111_integrator_enable(struct drm_device *drm, u32 format)
- 	switch (format) {
- 	case DRM_FORMAT_XBGR8888:
- 	case DRM_FORMAT_XRGB8888:
--		break;
--	case DRM_FORMAT_BGR565:
--	case DRM_FORMAT_RGB565:
--		/* truecolor RGB565 */
--		val |= INTEGRATOR_CLCD_LCDMUX_VGA565;
-+		/* 24bit formats */
-+		val |= INTEGRATOR_CLCD_LCDMUX_VGA24;
- 		break;
- 	case DRM_FORMAT_XBGR1555:
- 	case DRM_FORMAT_XRGB1555:
-@@ -217,6 +204,55 @@ static void pl111_realview_clcd_enable(struct drm_device *drm, u32 format)
- 			   SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH);
- }
- 
-+/* PL110 pixel formats for Integrator, vanilla PL110 */
-+static const u32 pl110_integrator_pixel_formats[] = {
-+	DRM_FORMAT_ABGR8888,
-+	DRM_FORMAT_XBGR8888,
-+	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_ABGR1555,
-+	DRM_FORMAT_XBGR1555,
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_XRGB1555,
-+};
-+
-+/* Extended PL110 pixel formats for Integrator and Versatile */
-+static const u32 pl110_versatile_pixel_formats[] = {
-+	DRM_FORMAT_ABGR8888,
-+	DRM_FORMAT_XBGR8888,
-+	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_BGR565, /* Uses external PLD */
-+	DRM_FORMAT_RGB565, /* Uses external PLD */
-+	DRM_FORMAT_ABGR1555,
-+	DRM_FORMAT_XBGR1555,
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_XRGB1555,
-+};
-+
-+/*
-+ * The Integrator variant is a PL110 with a bunch of broken, or not
-+ * yet implemented features
-+ */
-+static const struct pl111_variant_data pl110_integrator = {
-+	.name = "PL110 Integrator",
-+	.is_pl110 = true,
-+	.formats = pl110_integrator_pixel_formats,
-+	.nformats = ARRAY_SIZE(pl110_integrator_pixel_formats),
-+};
-+
-+/*
-+ * This is the in-between PL110 variant found in the ARM Versatile,
-+ * supporting RGB565/BGR565
-+ */
-+static const struct pl111_variant_data pl110_versatile = {
-+	.name = "PL110 Versatile",
-+	.is_pl110 = true,
-+	.external_bgr = true,
-+	.formats = pl110_versatile_pixel_formats,
-+	.nformats = ARRAY_SIZE(pl110_versatile_pixel_formats),
-+};
-+
- int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
- {
- 	const struct of_device_id *clcd_id;
-@@ -241,14 +277,24 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
- 	switch (versatile_clcd_type) {
- 	case INTEGRATOR_CLCD_CM:
- 		versatile_syscon_map = map;
-+		priv->variant = &pl110_integrator;
- 		priv->variant_display_enable = pl111_integrator_enable;
- 		dev_info(dev, "set up callbacks for Integrator PL110\n");
- 		break;
- 	case VERSATILE_CLCD:
- 		versatile_syscon_map = map;
-+		/* This can do RGB565 with external PLD */
-+		priv->variant = &pl110_versatile;
- 		priv->variant_display_enable = pl111_versatile_enable;
- 		priv->variant_display_disable = pl111_versatile_disable;
--		dev_info(dev, "set up callbacks for Versatile PL110+\n");
-+		/*
-+		 * The Versatile has a variant halfway between PL110
-+		 * and PL111 where these two registers have already been
-+		 * swapped.
-+		 */
-+		priv->ienb = CLCD_PL111_IENB;
-+		priv->ctrl = CLCD_PL111_CNTL;
-+		dev_info(dev, "set up callbacks for Versatile PL110\n");
- 		break;
- 	case REALVIEW_CLCD_EB:
- 	case REALVIEW_CLCD_PB1176:
+@@ -238,6 +238,7 @@ static const struct pl111_variant_data pl110_integrator = {
+ 	.name = "PL110 Integrator",
+ 	.is_pl110 = true,
+ 	.broken_clockdivider = true,
++	.broken_vblank = true,
+ 	.formats = pl110_integrator_pixel_formats,
+ 	.nformats = ARRAY_SIZE(pl110_integrator_pixel_formats),
+ };
 -- 
 2.14.3
