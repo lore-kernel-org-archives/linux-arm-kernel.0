@@ -1,103 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Feb 2018 17:56:04 +0000
-Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
- (Spectre variant 2) mitigation
-Message-ID: <20180206175621.929-1-marc.zyngier@arm.com>
+Date: Tue,  6 Feb 2018 17:56:09 +0000
+Subject: [PATCH v4 05/17] arm/arm64: KVM: Add PSCI_VERSION helper
+In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
+References: <20180206175621.929-1-marc.zyngier@arm.com>
+Message-ID: <20180206175621.929-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM has recently published a SMC Calling Convention (SMCCC)
-specification update[1] that provides an optimised calling convention
-and optional, discoverable support for mitigating CVE-2017-5715. ARM
-Trusted Firmware (ATF) has already gained such an implementation[2].
+As we're about to trigger a PSCI version explosion, it doesn't
+hurt to introduce a PSCI_VERSION helper that is going to be
+used everywhere.
 
-This series addresses a few things:
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_psci.h    | 6 ++++--
+ include/uapi/linux/psci.h | 3 +++
+ virt/kvm/arm/psci.c       | 4 +---
+ 3 files changed, 8 insertions(+), 5 deletions(-)
 
-- It provides a KVM implementation of PSCI v1.0, which is a
-  prerequisite for being able to discover SMCCC v1.1.
-
-- It allows KVM to advertise SMCCC v1.1, which is de-facto supported
-  already (it never corrupts any of the guest registers).
-
-- It implements KVM support for the ARCH_WORKAROUND_1 function that is
-  used to mitigate CVE-2017-5715 in a guest (if such mitigation is
-  available on the host).
-
-- It implements SMCCC v1.1 and ARCH_WORKAROUND_1 discovery support in
-  the kernel itself.
-
-- It finally provides firmware callbacks for CVE-2017-5715 for both
-  kernel and KVM and drop the initial PSCI_GET_VERSION based
-  mitigation.
-
-Patch 1 is already merged, and included here for reference. Patches on
-top of arm64/for-next/core. Tested on Seattle and Juno, the latter
-with ATF implementing SMCCC v1.1.
-
-[1]: https://developer.arm.com/support/security-update/downloads/
-
-[2]: https://github.com/ARM-software/arm-trusted-firmware/pull/1240
-
-* From v3:
-  - Dropped KVM PSCI version selection API for the time being, planning
-  to resend it after -rc1
-  - Some minor cleanups
-  - Collected Acks, TBs and RBs.
-
-* From v2:
-  - Fixed SMC handling in KVM
-  - PSCI fixes and tidying up
-  - SMCCC primitive rework for better code generation (both efficiency
-  and correctness)
-  - Remove PSCI_GET_VERSION as a mitigation vector
-
-* From v1:
-  - Fixed 32bit build
-  - Fix function number sign extension (Ard)
-  - Inline SMCCC v1.1 primitives (cpp soup)
-  - Prevent SMCCC spamming on feature probing
-  - Random fixes and tidying up
-
-Marc Zyngier (17):
-  arm64: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls
-  arm: KVM: Fix SMCCC handling of unimplemented SMC/HVC calls
-  arm64: KVM: Increment PC after handling an SMC trap
-  arm/arm64: KVM: Consolidate the PSCI include files
-  arm/arm64: KVM: Add PSCI_VERSION helper
-  arm/arm64: KVM: Add smccc accessors to PSCI code
-  arm/arm64: KVM: Implement PSCI 1.0 support
-  arm/arm64: KVM: Advertise SMCCC v1.1
-  arm/arm64: KVM: Turn kvm_psci_version into a static inline
-  arm64: KVM: Report SMCCC_ARCH_WORKAROUND_1 BP hardening support
-  arm64: KVM: Add SMCCC_ARCH_WORKAROUND_1 fast handling
-  firmware/psci: Expose PSCI conduit
-  firmware/psci: Expose SMCCC version through psci_ops
-  arm/arm64: smccc: Make function identifiers an unsigned quantity
-  arm/arm64: smccc: Implement SMCCC v1.1 inline primitive
-  arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support
-  arm64: Kill PSCI_GET_VERSION as a variant-2 workaround
-
- arch/arm/include/asm/kvm_host.h   |   7 ++
- arch/arm/include/asm/kvm_psci.h   |  27 -------
- arch/arm/kvm/handle_exit.c        |  17 +++-
- arch/arm64/include/asm/kvm_host.h |   6 ++
- arch/arm64/include/asm/kvm_psci.h |  27 -------
- arch/arm64/kernel/bpi.S           |  44 +++++-----
- arch/arm64/kernel/cpu_errata.c    |  77 ++++++++++++++----
- arch/arm64/kvm/handle_exit.c      |  18 ++++-
- arch/arm64/kvm/hyp/hyp-entry.S    |  20 ++++-
- arch/arm64/kvm/hyp/switch.c       |  14 +---
- drivers/firmware/psci.c           |  55 +++++++++++--
- include/kvm/arm_psci.h            |  51 ++++++++++++
- include/linux/arm-smccc.h         | 165 +++++++++++++++++++++++++++++++++++++-
- include/linux/psci.h              |  13 +++
- include/uapi/linux/psci.h         |   3 +
- virt/kvm/arm/arm.c                |   2 +-
- virt/kvm/arm/psci.c               | 143 +++++++++++++++++++++++++++------
- 17 files changed, 542 insertions(+), 147 deletions(-)
- delete mode 100644 arch/arm/include/asm/kvm_psci.h
- delete mode 100644 arch/arm64/include/asm/kvm_psci.h
- create mode 100644 include/kvm/arm_psci.h
-
+diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
+index 2042bb909474..5659343580a3 100644
+--- a/include/kvm/arm_psci.h
++++ b/include/kvm/arm_psci.h
+@@ -18,8 +18,10 @@
+ #ifndef __KVM_ARM_PSCI_H__
+ #define __KVM_ARM_PSCI_H__
+ 
+-#define KVM_ARM_PSCI_0_1	1
+-#define KVM_ARM_PSCI_0_2	2
++#include <uapi/linux/psci.h>
++
++#define KVM_ARM_PSCI_0_1	PSCI_VERSION(0, 1)
++#define KVM_ARM_PSCI_0_2	PSCI_VERSION(0, 2)
+ 
+ int kvm_psci_version(struct kvm_vcpu *vcpu);
+ int kvm_psci_call(struct kvm_vcpu *vcpu);
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 760e52a9640f..b3bcabe380da 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -88,6 +88,9 @@
+ 		(((ver) & PSCI_VERSION_MAJOR_MASK) >> PSCI_VERSION_MAJOR_SHIFT)
+ #define PSCI_VERSION_MINOR(ver)			\
+ 		((ver) & PSCI_VERSION_MINOR_MASK)
++#define PSCI_VERSION(maj, min)						\
++	((((maj) << PSCI_VERSION_MAJOR_SHIFT) & PSCI_VERSION_MAJOR_MASK) | \
++	 ((min) & PSCI_VERSION_MINOR_MASK))
+ 
+ /* PSCI features decoding (>=1.0) */
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT	1
+diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+index b322e46fd142..999f94d6bb98 100644
+--- a/virt/kvm/arm/psci.c
++++ b/virt/kvm/arm/psci.c
+@@ -25,8 +25,6 @@
+ 
+ #include <kvm/arm_psci.h>
+ 
+-#include <uapi/linux/psci.h>
+-
+ /*
+  * This is an implementation of the Power State Coordination Interface
+  * as described in ARM document number ARM DEN 0022A.
+@@ -222,7 +220,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		 * Bits[31:16] = Major Version = 0
+ 		 * Bits[15:0] = Minor Version = 2
+ 		 */
+-		val = 2;
++		val = KVM_ARM_PSCI_0_2;
+ 		break;
+ 	case PSCI_0_2_FN_CPU_SUSPEND:
+ 	case PSCI_0_2_FN64_CPU_SUSPEND:
 -- 
 2.14.2
