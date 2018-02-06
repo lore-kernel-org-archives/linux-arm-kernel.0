@@ -1,166 +1,272 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 6 Feb 2018 12:05:27 -0800
-Subject: [PATCH 2/2] arm64: dts: sdm845: Add serial console support
-In-Reply-To: <CAD=FV=Whxf1VRJ6qx9mioEEkTeS+uJfJKPbOMcGy-Wigh_NORw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 6 Feb 2018 14:26:13 -0600
+Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <20180126221501.GD28313@codeaurora.org>
 References: <20180125163216.29018-1-rnayak@codeaurora.org>
- <20180125163216.29018-3-rnayak@codeaurora.org>
- <20180126221808.GE28313@codeaurora.org>
- <CAD=FV=WcCnQJc25=sKWtOi=ZWi=ium6DVsexuQnsLDL=aJE6-Q@mail.gmail.com>
- <20180206190614.GL9465@builder>
- <CAD=FV=Whxf1VRJ6qx9mioEEkTeS+uJfJKPbOMcGy-Wigh_NORw@mail.gmail.com>
-Message-ID: <20180206200527.GM9465@builder>
+ <20180125163216.29018-2-rnayak@codeaurora.org>
+ <20180126221501.GD28313@codeaurora.org>
+Message-ID: <CAL_JsqJ1xjQ5ZP-KXeZQ0s=ib8GTfvfYjFqyy+Zcub-akCs7Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 06 Feb 11:49 PST 2018, Doug Anderson wrote:
+On Fri, Jan 26, 2018 at 4:15 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/25, Rajendra Nayak wrote:
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dtsi
+>
+> Do we really need two files? Maybe collapse the two?
+>
+>>  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> new file mode 100644
+>> index 000000000000..a21f4912b3e2
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> @@ -0,0 +1,308 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+>> + */
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +
+>> +/ {
+>> +     model = "Qualcomm Technologies, Inc. SDM845";
+>> +
+>> +     interrupt-parent = <&intc>;
+>> +
+>> +     #address-cells = <2>;
+>> +     #size-cells = <2>;
+>> +
+>> +     chosen { };
+>> +
+>> +     memory {
+>> +             device_type = "memory";
+>> +             /* We expect the bootloader to fill in the reg */
+>> +             reg = <0 0 0 0>;
+>> +     };
+>> +
+>> +     cpus {
+>> +             #address-cells = <2>;
+>> +             #size-cells = <0>;
+>> +
+>> +             CPU0: cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x0>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_0>;
+>> +                     L2_0: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                             L3_0: l3-cache {
+>> +                                   compatible = "cache";
+>> +                             };
+>> +                     };
+>> +             };
+>> +
+>> +             CPU1: cpu at 100 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x100>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_100>;
+>> +                     L2_100: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             CPU2: cpu at 200 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x200>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_200>;
+>> +                     L2_200: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             CPU3: cpu at 300 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x300>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_300>;
+>> +                     L2_300: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             CPU4: cpu at 400 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x400>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_400>;
+>> +                     L2_400: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             CPU5: cpu at 500 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x500>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_500>;
+>> +                     L2_500: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             CPU6: cpu at 600 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x600>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_600>;
+>> +                     L2_600: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             CPU7: cpu at 700 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "qcom,kryo";
+>> +                     reg = <0x0 0x700>;
+>> +                     enable-method = "psci";
+>> +                     next-level-cache = <&L2_700>;
+>> +                     L2_700: l2-cache {
+>> +                             compatible = "cache";
+>> +                             next-level-cache = <&L3_0>;
+>> +                     };
+>> +             };
+>> +
+>> +             cpu-map {
+>> +                     cluster0 {
+>> +                             core0 {
+>> +                                     cpu = <&CPU0>;
+>> +                             };
+>> +
+>> +                             core1 {
+>> +                                     cpu = <&CPU1>;
+>> +                             };
+>> +
+>> +                             core2 {
+>> +                                     cpu = <&CPU2>;
+>> +                             };
+>> +
+>> +                             core3 {
+>> +                                     cpu = <&CPU3>;
+>> +                             };
+>> +                     };
+>> +
+>> +                     cluster1 {
+>> +                             core0 {
+>> +                                     cpu = <&CPU4>;
+>> +                             };
+>> +
+>> +                             core1 {
+>> +                                     cpu = <&CPU5>;
+>> +                             };
+>> +
+>> +                             core2 {
+>> +                                     cpu = <&CPU6>;
+>> +                             };
+>> +
+>> +                             core3 {
+>> +                                     cpu = <&CPU7>;
+>> +                             };
+>> +                     };
+>> +             };
+>
+> From what I recall, this layout causes the kernel to spew
+> warnings? I mean to say this is the power/performance view, but
+> not the architectural view.
+>
+>> +     };
+>> +
+>> +     timer {
+>> +             compatible = "arm,armv8-timer";
+>> +             interrupts = <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>
+> Are we supposed to use the GIC_CPU_MASK_SIMPLE macros still?
+>
+>> +                          <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 3 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 0 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+>> +     };
+>> +
+>> +     clocks {
+>> +             xo_board: xo_board {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <19200000>;
+>> +                     clock-output-names = "xo_board";
+>
+> We can drop clock-output-names on these.
+>
+>> +             };
+>> +
+>> +             sleep_clk: sleep_clk {
+>> +                     compatible = "fixed-clock";
+>> +                     #clock-cells = <0>;
+>> +                     clock-frequency = <32764>;
+>> +                     clock-output-names = "sleep_clk";
+>> +             };
+>> +     };
+>> +
+>> +     psci {
+>> +             compatible = "arm,psci-1.0";
+>> +             method = "smc";
+>> +     };
+>> +
+>> +     soc: soc {
+>
+> Will anyone use this phandle?
+>
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             ranges = <0 0 0 0xffffffff>;
+>> +             compatible = "simple-bus";
+>> +
+>> +             intc: interrupt-controller at 17a00000 {
+>> +                     compatible = "arm,gic-v3";
+>> +                     #interrupt-cells = <3>;
+>> +                     interrupt-controller;
+>> +                     #redistributor-regions = <1>;
+>> +                     redistributor-stride = <0x0 0x20000>;
+>> +                     reg = <0x17a00000 0x10000>,     /* GICD */
+>> +                           <0x17a60000 0x100000>;    /* GICR * 8 */
+>> +                     interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+>
+> Can you also add the ITS node please and mark it as disabled?
+> I'll send a patch to the list to skip status = "disabled" ones.
+> We may want to support ITS on these SoCs if the firmware is
+> different.
+>
+>> +             };
+>> +
+>> +             gcc: clock-controller at 100000 {
+>> +                     compatible = "qcom,gcc-sdm845";
+>> +                     reg = <0x100000 0x1f0000>;
+>> +                     #clock-cells = <1>;
+>> +                     #reset-cells = <1>;
+>> +             };
+>> +
+>> +             tlmm: pinctrl at 03400000 {
+>
+> Drop leading zeroes please.
 
-> Hi,
-> 
-> On Tue, Feb 6, 2018 at 11:06 AM, Bjorn Andersson
-> <bjorn.andersson@linaro.org> wrote:
-> > On Tue 06 Feb 10:37 PST 2018, Doug Anderson wrote:
-> >
-> >> Hi,
-> >>
-> >> On Fri, Jan 26, 2018 at 2:18 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> > On 01/25, Rajendra Nayak wrote:
-> >> >> diff --git a/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
-> >> >> new file mode 100644
-> >> >> index 000000000000..b97f99e6f4b4
-> >> >> --- /dev/null
-> >> >> +++ b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
-> >> >> @@ -0,0 +1,32 @@
-> >> >> +// SPDX-License-Identifier: GPL-2.0
-> >> >> +/*
-> >> >> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> >> >> + */
-> >> >> +
-> >> >> +&tlmm {
-> >> >
-> >> > I'm not the maintainer, but I find this approach to the pins
-> >> > really annoying. I have to flip to another file to figure out how
-> >> > a board has configured the pins. And we may bring in a bunch of
-> >> > settings that we don't ever use on some board too. Why can't we
-> >> > put the settings in the board file directly?
-> >>
-> >> I'm not so familiar with how things work with Qualcomm, but in general
-> >> I think putting this in the "board" file is a bad idea.  I'd be OK
-> >> with putting this directly in the SoC file (though it might get
-> >> unwieldy?), but not moving things to the board file as was done with
-> >> v2 of this patch.
-> >>
-> >> Said another way: nearly board that uses SDM845 that uses UART2 will
-> >> have the same definitions for these pins so we shouldn't be
-> >> duplicating it across every board, right?
-> >>
-> >
-> > We've run into several cases where different boards uses the same
-> > function but requires board specific electrical configuration.
-> >
-> > So what we decided was to keep the pinmux in the soc-file (where e.g.
-> > the uart definition is) and then extend it with the board specific
-> > electrical properties (the pinconf), in the board files.
-> >
-> > This does come with the complexity of having the pinctrl nodes split in
-> > two places, but the responsibilities of the two parts is clear and we
-> > remove the need for all board files to ensure the appropriate pinmux is
-> > in place.
-> >
-> >
-> > NB. We did discuss adding "sane defaults" for the pinconf in the soc
-> > dtsi, but we end up spending considerable time debugging issues stemming
-> > from not having the right pinconf; so better make this explicit and say
-> > that the board has to specify it's config.
-> 
-> Whoops, saw your responses _after_ I sent my response to v2.  In any
-> case this makes sense to me then!  On Rockchip boards I've been
-> involved in we often added "sane defaults", but I can see how that
-> could be confusing in different ways.  I'm happy with your choice and
-> it seems like a happy medium.  The sdm845.dtsi file can have the main
-> definition of the nodes and can thus refer to the nodes.  Then you
-> just add the extra bit in the board file.
-> 
-> What you propose is not what happened in v2 of the series
-> <https://patchwork.kernel.org/patch/10194201/> though.  In v2 _both_
-> the pinconf and the pinmux moved to the board file.  That's wrong.
-> 
-> 
-> To make it concrete, you'd have something like this (this has the
-> wrong bindings from the UART, but folks get the picture hopefully):
-> 
-> 
-> In sdm845.dtsi:
-> 
->     qup_uart2: serial at a84000 {
->       compatible = "qcom,geni-console", "qcom,geni-uart";
->       reg = <0xa84000 0x4000>;
->       reg-names = "se_phys";
->       clock-names = "se-clk", "m-ahb", "s-ahb";
->       clocks = <&gcc GCC_QUPV3_WRAP1_S1_CLK>,
->          <&gcc GCC_QUPV3_WRAP_1_M_AHB_CLK>,
->          <&gcc GCC_QUPV3_WRAP_1_S_AHB_CLK>;
->       pinctrl-names = "default", "sleep";
->       pinctrl-0 = <&qup_uart2_default>;
->       pinctrl-1 = <&qup_uart2_sleep>;
->       interrupts = <GIC_SPI 354 IRQ_TYPE_NONE>;
->       qcom,wrapper-core = <&qup_1>;
->       status = "disabled";
->     };
-> 
->     tlmm: pinctrl at 3400000 {
->       compatible = "qcom,sdm845-pinctrl";
->       reg = <0x03400000 0xc00000>;
->       interrupts = <GIC_SPI 208 IRQ_TYPE_NONE>;
->       gpio-controller;
->       #gpio-cells = <2>;
->       interrupt-controller;
->       #interrupt-cells = <2>;
-> 
->       qup_uart2_default: qup_uart2_default {
->         pinmux {
->           function = "qup9";
->           pins = "gpio4", "gpio5";
->         };
->       };
-> 
->       qup_uart2_sleep: qup_uart2_sleep {
->         pinmux {
->           function = "gpio";
->           pins = "gpio4", "gpio5";
->         };
->       };
->     };
-> 
-> In sdm845-mtp.dts:
-> 
-> &qup_uart2_default {
->   pinconf {
->     pins = "gpio4", "gpio5";
->     drive-strength = <2>;
->     bias-disable;
->   };
-> };
-> 
-> &qup_uart2_sleep {
->   pinconf {
->     pins = "gpio4", "gpio5";
->     drive-strength = <2>;
->     bias-disable;
->   };
-> };
+Build dtbs with W=2 and fix the warnings so reviewers don't have to
+waste their time on these issues.
 
-Correct.
-
-
-This example does however show another thing that I really do not like;
-When you have a lot of nodes I find it very useful to maintain some sort
-of grouping, to know that I can find a node describing properties
-related to some block close to related blocks - e.g. nodes describing
-a pmic block is close to other nodes for that pmic.
-
-Today we seem to have a mixture of bus-based grouping, arbitrary
-grouping and no grouping at all in our upstream dtsi files, so I think
-we should set some guidelines here as well.
-
-Regards,
-Bjorn
+Rob
