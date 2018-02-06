@@ -1,30 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Feb 2018 11:26:12 +0000
-Subject: [PATCHv2 1/8] ARM: ux500: remove PMU IRQ bouncer
-In-Reply-To: <CACRpkdZmgO3L2=WAciYE23aLcO5ovN9TB7TMi8SPfu90UpiFjA@mail.gmail.com>
-References: <20180205164202.26502-1-mark.rutland@arm.com>
- <20180205164202.26502-2-mark.rutland@arm.com>
- <CACRpkdZmgO3L2=WAciYE23aLcO5ovN9TB7TMi8SPfu90UpiFjA@mail.gmail.com>
-Message-ID: <20180206112612.c7ciffpizekx7ax7@lakrids.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 6 Feb 2018 12:40:14 +0100
+Subject: [PATCH 06/11] arm64: dts: renesas: r8a77980: add SYS-DMAC support
+In-Reply-To: <70132f3d-0f37-ae7e-a44b-d65920620936@cogentembedded.com>
+References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
+ <70132f3d-0f37-ae7e-a44b-d65920620936@cogentembedded.com>
+Message-ID: <CAMuHMdWQoa1mTGMGTKYvKHG0DHwZsLN=4kHOiGYYbVxZyZQH_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 05, 2018 at 08:05:53PM +0100, Linus Walleij wrote:
-> On Mon, Feb 5, 2018 at 5:41 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> > The ux500 PMU IRQ bouncer is getting in the way of some fundametnal
-> > changes to the ARM PMU driver, and it's the only special case that
-> > exists today. Let's remove it.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> 
-> It's OK this silicon design was especially strange it seems.
-> We are done with the days of performance optimization for
-> the platform anyways.
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Feb 2, 2018 at 7:36 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe SYS-DMAC1/2 in the R8A77980 device tree.
+>
+> Based on the original (and large) patch by Vladimir Barinov.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Cheers!
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Mark.
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
