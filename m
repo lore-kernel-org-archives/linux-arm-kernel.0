@@ -1,84 +1,48 @@
-From: stefan@agner.ch (stefan at agner.ch)
-Date: Tue, 06 Feb 2018 17:27:15 +0100
-Subject: [PATCH] ARM: dts: imx6ul: rename mux mode name REF_CLK_32K to
- OSC32K_32K_OUT
-In-Reply-To: <20180205204759.28526-1-joerg.krause@embedded.rocks>
-References: <20180205204759.28526-1-joerg.krause@embedded.rocks>
-Message-ID: <f2dcbad84f9237adf072e005d15d65ef@agner.ch>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 6 Feb 2018 18:27:59 +0200
+Subject: [PATCH v3 0/4] gpio: driver for the RPi3 GPIO expander
+In-Reply-To: <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
+References: <cover.1516105893.git.baruch@tkos.co.il>
+ <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
+Message-ID: <20180206162759.awghecpv4ihaatz7@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.02.2018 21:47, J?rg Krause wrote:
-> This is a rebased version of patch [0].
-> 
-> The 32 kHz reference clock on the i.MX6UL(L) can be output by
-> setting the external signal XTALOSC_REF_CLK_32K in one of the
-> following ways [1]:
-> 
-> |----------------------------------------------------------|
-> | Signal              | Pad             | Mode | Direction |
-> |----------------------------------------------------------|
-> | XTALOSC_REF_CLK_32K | ENET1_RX_EN     | ALT2 | O         |
-> |                     | GPIO1_IO03      | ALT3 |           |
-> |                     | JTAG_TCK        | ALT6 |           |
-> |----------------------------------------------------------|
-> 
-> Before patch [2] the mux mode for the external reference clock was
-> missing. The patch named the mux mode as used in the NXP Linux
-> 4.9.11_1.0.0 release, but the Reference Manual uses the name
-> OSC32K_32K_OUT, e.g. in [3].
-> 
-> As Philipp and Shawn suggest the name from the RM should be used
-> instead.
-> 
-> [0] https://patchwork.kernel.org/patch/10172187/
-> [1] IMX6ULRM, Rev. 1, 04/2016, Table 58-1, p. 3649
-> [2] https://patchwork.kernel.org/patch/10156121/
-> [3] IMX6ULRM, Rev. 1, 04/2016, 30.5.47 SW_MUX_CTL_PAD_ENET1_RX_EN SW MUX
->     Control Register (IOMUXC_SW_MUX_CTL_PAD_ENET1_RX_EN), p. 1357
-> 
-> Signed-off-by: J?rg Krause <joerg.krause@embedded.rocks>
+Hi Linus,
 
-Looks good to me.
-
-Reviewed-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
-> ---
->  arch/arm/boot/dts/imx6ul-pinfunc.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+On Tue, Feb 06, 2018 at 02:42:48PM +0100, Linus Walleij wrote:
+> On Tue, Jan 16, 2018 at 1:45 PM, Baruch Siach <baruch@tkos.co.il> wrote:
 > 
-> diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h
-> b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> index 9538b0ed5c11..7b9a4dc38456 100644
-> --- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-> @@ -63,7 +63,7 @@
->  #define MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA		0x0054 0x02e0 0x05f4 2 0
->  #define MX6UL_PAD_JTAG_TCK__PWM7_OUT			0x0054 0x02e0 0x0000 4 0
->  #define MX6UL_PAD_JTAG_TCK__GPIO1_IO14			0x0054 0x02e0 0x0000 5 0
-> -#define MX6UL_PAD_JTAG_TCK__REF_CLK_32K			0x0054 0x02e0 0x0000 6 0
-> +#define MX6UL_PAD_JTAG_TCK__OSC32K_32K_OUT			0x0054 0x02e0 0x0000 6 0
->  #define MX6UL_PAD_JTAG_TCK__SIM2_POWER_FAIL		0x0054 0x02e0 0x0000 8 0
->  #define MX6UL_PAD_JTAG_TRST_B__SJC_TRSTB		0x0058 0x02e4 0x0000 0 0
->  #define MX6UL_PAD_JTAG_TRST_B__GPT2_COMPARE3		0x0058 0x02e4 0x0000 1 0
-> @@ -103,7 +103,7 @@
->  #define MX6UL_PAD_GPIO1_IO03__I2C1_SDA			0x0068 0x02f4 0x05a8 0 1
->  #define MX6UL_PAD_GPIO1_IO03__GPT1_COMPARE3		0x0068 0x02f4 0x0000 1 0
->  #define MX6UL_PAD_GPIO1_IO03__USB_OTG2_OC		0x0068 0x02f4 0x0660 2 0
-> -#define MX6UL_PAD_GPIO1_IO03__REF_CLK_32K		0x0068 0x02f4 0x0000 3 0
-> +#define MX6UL_PAD_GPIO1_IO03__OSC32K_32K_OUT		0x0068 0x02f4 0x0000 3 0
->  #define MX6UL_PAD_GPIO1_IO03__USDHC1_CD_B		0x0068 0x02f4 0x0668 4 0
->  #define MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0x0068 0x02f4 0x0000 5 0
->  #define MX6UL_PAD_GPIO1_IO03__CCM_DI0_EXT_CLK		0x0068 0x02f4 0x0000 6 0
-> @@ -320,7 +320,7 @@
->  #define MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN		0x00cc 0x0358 0x0000 0 0
->  #define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS		0x00cc 0x0358 0x0640 1 3
->  #define MX6UL_PAD_ENET1_RX_EN__UART5_DTE_CTS		0x00cc 0x0358 0x0000 1 0
-> -#define MX6UL_PAD_ENET1_RX_EN__REF_CLK_32K		0x00cc 0x0358 0x0000 2 0
-> +#define MX6UL_PAD_ENET1_RX_EN__OSC32K_32K_OUT		0x00cc 0x0358 0x0000 2 0
->  #define MX6UL_PAD_ENET1_RX_EN__CSI_DATA18		0x00cc 0x0358 0x050c 3 0
->  #define MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX		0x00cc 0x0358 0x0000 4 0
->  #define MX6UL_PAD_ENET1_RX_EN__GPIO2_IO02		0x00cc 0x0358 0x0000 5 0
+> > The Raspberry Pi 3 has a GPIO expander that controls, among others, the
+> > activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus
+> > that is not directly controlled from the ARM core. The VC4 firmware controls
+> > the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox
+> > interface.
+> >
+> > This series adds support for the RPi3 expander.
+> >
+> > The driver is ported from the downstream kernel at
+> > https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
+> >
+> > Changes in v3:
+> >
+> >   * Kconfig tweaks
+> >   * Check rpi_exp_gpio_get_polarity() return value
+> >   * Redundant header removal
+> >   * Redundant platform_set_drvdata() call removal
+> >   * Small coding style changes
+> 
+> All is looking pretty good. I see Rob had some last minute comments,
+> but please rebase and repost post v4.16-rc1 so we can get this merged,
+> we need to get this upstream.
+
+I was about to send v4 when I saw your email. I based v4 on current LinusT's 
+tree as of e237f98a9c. I guess that affected files will not change before 
+v4.16-rc1, but I can wait a few more days for -rc1.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
