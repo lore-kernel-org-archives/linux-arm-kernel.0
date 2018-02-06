@@ -1,60 +1,60 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 06 Feb 2018 10:43:48 +0800
-Subject: [PATCH 2/3] ARM: dts: sun8i: add audio codec support into V3s DTSI
-In-Reply-To: <20180202194935.vdqkgch6mowqi2px@flea.lan>
-References: <20180202140153.21549-1-icenowy@aosc.io>
- <20180202140153.21549-3-icenowy@aosc.io>
- <20180202194935.vdqkgch6mowqi2px@flea.lan>
-Message-ID: <8F4EA09E-F5DC-4F7A-951B-25DA36848FD1@aosc.io>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 06 Feb 2018 11:44:50 +0900
+Subject: [PATCH 1/3] clk: exynos5433: Extend list of available AUD_PLL
+ output frequencies
+In-Reply-To: <20180205142230.9755-1-s.nawrocki@samsung.com>
+References: <CGME20180205142252epcas1p4471e32e2b513806420c64b323af2ffa6@epcas1p4.samsung.com>
+ <20180205142230.9755-1-s.nawrocki@samsung.com>
+Message-ID: <5A7916A2.7010307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sylwester,
 
+When I developed the clk-exynos5433.c I referred to the following description.
+TRM specified that "Samsung recommends only the values
+between 252MH ~ 400MHz in the PMS2460X PMS value" for aud_pll.
 
-? 2018?2?3? GMT+08:00 ??3:49:35, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Fri, Feb 02, 2018 at 10:01:52PM +0800, Icenowy Zheng wrote:
->> Allwinner V3s SoC features an internal audio codec like the one in
->H3,
->> and a analog codec like the one in H3/A23 (but much simpler).
->> 
->> Add them in the DTSI file.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  arch/arm/boot/dts/sun8i-v3s.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi
->b/arch/arm/boot/dts/sun8i-v3s.dtsi
->> index 20edebd983f0..f6c534efaef9 100644
->> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
->> @@ -354,6 +354,25 @@
->>  			status = "disabled";
->>  		};
->>  
->> +		codec: codec at 01c22c00 {
->> +			#sound-dai-cells = <0>;
->> +			compatible = "allwinner,sun8i-v3s-codec";
->> +			reg = <0x01c22c00 0x400>;
->> +			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
->> +			clock-names = "apb", "codec";
->> +			resets = <&ccu RST_BUS_CODEC>;
->> +			dmas = <&dma 15>, <&dma 15>;
->> +			dma-names = "rx", "tx";
->> +			allwinner,codec-analog-controls = <&codec_analog>;
->> +			status = "disabled";
->> +		};
->> +
->> +		codec_analog: codec-analog at 01c23000 {
->> +			compatible = "allwinner,sun8i-v3s-codec-analog";
->> +			reg = <0x01c23000 0x4>;
->
->This should be the whole size of the memory region.
+It looks like that you refer to clk-exynos5420.c driver.
+But, I'm wondering exynos5433 might not guarantee the additional clock
+of this patch as the stable clock.
 
-OK. (Although on the datasheet digital part and analog
-part is listed as one region.)
+On 2018? 02? 05? 23:22, Sylwester Nawrocki wrote:
+> Add more definitions to the exynos5433_aud_pll_rates table so the
+> AUD_PLL can be used as a root clock source for the I2S1 and the HDMI
+> interface.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5433.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+> index db270908037a..74b70ddab4d6 100644
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -765,6 +765,14 @@ static const struct samsung_pll_rate_table exynos5433_aud_pll_rates[] __initcons
+>  	PLL_36XX_RATE(294912000U,  98, 1, 3,  19923),
+>  	PLL_36XX_RATE(288000000U,  96, 1, 3,      0),
+>  	PLL_36XX_RATE(252000000U,  84, 1, 3,      0),
+> +	PLL_36XX_RATE(200000000U, 200, 3, 3,      0),
+> +	PLL_36XX_RATE(196608001U, 197, 3, 3, -25690),
+> +	PLL_36XX_RATE(180633609U, 301, 5, 3,   3671),
+> +	PLL_36XX_RATE(131072006U, 131, 3, 3,   4719),
+> +	PLL_36XX_RATE(100000000U, 200, 3, 4,      0),
+> +	PLL_36XX_RATE(65536003U,  131, 3, 4,   4719),
+> +	PLL_36XX_RATE(49152000U,  197, 3, 5, -25690),
+> +	PLL_36XX_RATE(32768001U,  131, 3, 5,   4719),
+>  	{ /* sentinel */ }
+>  };
+> 
+> --
+> 2.14.2
+> 
+> 
+> 
 
->
->Maxime
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
