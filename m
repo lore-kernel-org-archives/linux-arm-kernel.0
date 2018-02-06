@@ -1,145 +1,101 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Feb 2018 13:39:15 +0100
-Subject: [PATCHv2 09/12] arm64/kvm: preserve host HCR_EL2 value
-In-Reply-To: <20171127163806.31435-10-mark.rutland@arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-10-mark.rutland@arm.com>
-Message-ID: <20180206123915.GA21802@cbox>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Tue, 6 Feb 2018 18:17:43 +0530
+Subject: [PATCH RFC 1/1] iommu/arm-smmu: Fix context fault message
+ considering non-NTS
+In-Reply-To: <fb3c1797-118f-500b-002b-5ecb9172af1c@arm.com>
+References: <1517912213-3962-1-git-send-email-vivek.gautam@codeaurora.org>
+ <fb3c1797-118f-500b-002b-5ecb9172af1c@arm.com>
+Message-ID: <CAFp+6iENb9rf5-Mz5m41roo9DHasb6=TtWDPxjv2qHGSez1E+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 04:38:03PM +0000, Mark Rutland wrote:
-> When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
-> is a constant value. This works today, as the host HCR_EL2 value is
-> always the same, but this will get in the way of supporting extensions
-> that require HCR_EL2 bits to be set conditionally for the host.
-> 
-> To allow such features to work without KVM having to explicitly handle
-> every possible host feature combination, this patch has KVM save/restore
-> the host HCR when switching to/from a guest HCR.
-> 
-> For __{activate,deactivate}_traps(), the HCR save/restore is made common
-> across the !VHE and VHE paths. As the host and guest HCR values must
-> have E2H set when VHE is in use, register redirection should always be
-> in effect at EL2, and this change should not adversely affect the VHE
-> code.
-> 
-> For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
-> to toggle the TGE bit with a RMW sequence, as we already do in
-> __tlb_switch_to_guest_vhe().
-> 
-> The now unused HCR_HOST_VHE_FLAGS definition is removed.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Christoffer Dall <cdall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
-> ---
->  arch/arm64/include/asm/kvm_arm.h  | 1 -
->  arch/arm64/include/asm/kvm_host.h | 5 ++++-
->  arch/arm64/kvm/hyp/switch.c       | 5 +++--
->  arch/arm64/kvm/hyp/tlb.c          | 6 +++++-
->  4 files changed, 12 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 62854d5d1d3b..aa02b05430e8 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -84,7 +84,6 @@
->  			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
->  #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
->  #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
-> -#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
->  
->  /* TCR_EL2 Registers bits */
->  #define TCR_EL2_RES1		((1 << 31) | (1 << 23))
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 674912d7a571..39184aa3e2f2 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -199,10 +199,13 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
->  struct kvm_vcpu_arch {
->  	struct kvm_cpu_context ctxt;
->  
-> -	/* HYP configuration */
-> +	/* Guest HYP configuration */
->  	u64 hcr_el2;
->  	u32 mdcr_el2;
->  
-> +	/* Host HYP configuration */
-> +	u64 host_hcr_el2;
-> +
->  	/* Exception Information */
->  	struct kvm_vcpu_fault_info fault;
->  
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 525c01f48867..2205f0be3ced 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->  {
->  	u64 val;
->  
-> +	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
-> +
+Hi Robin,
 
-Looking back at this, it seems excessive to switch this at every
-round-trip.  I think it should be possible to have this as a single
-global (or per-CPU) variable that gets restored directly when returning
-from the VM.
 
-Thanks,
--Christoffer
+On Tue, Feb 6, 2018 at 5:22 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Hi Vivek,
+>
+> On 06/02/18 10:16, Vivek Gautam wrote:
+>>
+>> SMMU_CBn_FSYNR0 definition from SMMU v2 architecture document
+>> says that, the S1CBNDX[23:16] field is only valid if SMMU_IDR0.NTS==1.
+>> So, update the fsynr in context bank fault handler, so that the
+>> fault message displays cbndx only when we have nested translations
+>> enabled.
+>> Otherwise, it is confusing when 'cb' gives the actual context
+>> bank, while the 'fsynr' gives a different value.
+>>
+>> Example, on a sdm845 system:
+>> Before this patch -
+>> arm-smmu 15000000.apps-smmu: Unhandled context fault:
+>>                            fsr=0x402, iova=0x9e0fb600, fsynr=0x3c0020,
+>> cb=0
+>> After this patch -
+>> arm-smmu 15000000.apps-smmu: Unhandled context fault:
+>>                            fsr=0x402, iova=0x9e0aa000, fsynr=0x20, cb=0
+>>
+>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> Hi Robin,
+>> Does it make sense to mask fsynr like this?
+>> Would it still be confusing for CB==0?
+>> Tagging the patch as RFC to get your comments. If looks good,
+>> then i will send the patch for your ack.
+>> Thanks.
+>
+>
+> I would expect that anyone who knows how to decode a raw FSYNR0 value should
+> also be aware of when various fields are valid or not. I have page 302 of
+> IHI0062D.c open next to this email, and to me it seems virtually impossible
+> to read the definition of S1CBNDX without inherently seeing all the
+> conditions under which it is UNKNOWN (which incidentally are more than this
+> patch would cover).
 
->  	/*
->  	 * We are about to set CPTR_EL2.TFP to trap all floating point
->  	 * register accesses to EL2, however, the ARM ARM clearly states that
-> @@ -116,7 +118,6 @@ static void __hyp_text __deactivate_traps_vhe(void)
->  		    MDCR_EL2_TPMS;
->  
->  	write_sysreg(mdcr_el2, mdcr_el2);
-> -	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
->  	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
->  	write_sysreg(vectors, vbar_el1);
->  }
-> @@ -129,7 +130,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
->  	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
->  
->  	write_sysreg(mdcr_el2, mdcr_el2);
-> -	write_sysreg(HCR_RW, hcr_el2);
->  	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
->  }
->  
-> @@ -151,6 +151,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->  	__deactivate_traps_arch()();
->  	write_sysreg(0, hstr_el2);
->  	write_sysreg(0, pmuserenr_el0);
-> +	write_sysreg(vcpu->arch.host_hcr_el2, hcr_el2);
->  }
->  
->  static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index 73464a96c365..c2b0680efa2c 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -49,12 +49,16 @@ static hyp_alternate_select(__tlb_switch_to_guest,
->  
->  static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
->  {
-> +	u64 val;
-> +
->  	/*
->  	 * We're done with the TLB operation, let's restore the host's
->  	 * view of HCR_EL2.
->  	 */
->  	write_sysreg(0, vttbr_el2);
-> -	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-> +	val = read_sysreg(hcr_el2);
-> +	val |= HCR_TGE;
-> +	write_sysreg(val, hcr_el2);
->  }
->  
->  static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
-> -- 
-> 2.11.0
-> 
+Yea, I agree with you. To fully decode the S1CBNDX, one has to refer the spec,
+and once one has the knowledge of the smmu implementation on the one's
+target platform, it becomes unimportant to look at the cbndx again.
+
+>
+> In general, I don't agree with this - we're dumping the raw state of a
+> register, and it's already a cryptic hex value that you have to refer to the
+> architecture spec to decode. There is perhaps some argument for
+> pretty-printing faults with everything fully decoded, but given that they
+> should never be seen under normal operation (especially global faults), I
+> really don't think that's worth the bother either.
+
+Sure. We can drop this patch. Thanks.
+
+>
+> Robin.
+>
+>>   drivers/iommu/arm-smmu.c | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 69e7c60792a8..827659515b22 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -550,6 +550,9 @@ static irqreturn_t arm_smmu_context_fault(int irq,
+>> void *dev)
+>>         fsynr = readl_relaxed(cb_base + ARM_SMMU_CB_FSYNR0);
+>>         iova = readq_relaxed(cb_base + ARM_SMMU_CB_FAR);
+>>   +     if (!smmu->features & ARM_SMMU_FEAT_TRANS_NESTED)
+>> +               fsynr &= 0xffff;
+>> +
+>>         dev_err_ratelimited(smmu->dev,
+>>         "Unhandled context fault: fsr=0x%x, iova=0x%08lx, fsynr=0x%x,
+>> cb=%d\n",
+>>                             fsr, iova, fsynr, cfg->cbndx);
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
