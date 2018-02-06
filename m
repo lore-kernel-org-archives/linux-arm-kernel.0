@@ -1,149 +1,86 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  6 Feb 2018 09:38:22 +0530
-Subject: [PATCH v6 09/15] clk: qcom: Add KPSS ACC/GCC driver
-In-Reply-To: <1517890108-8140-1-git-send-email-sricharan@codeaurora.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 6 Feb 2018 09:56:42 +0530
+Subject: [PATCH v6 14/15] cpufreq: Add module to register cpufreq on
+ Krait CPUs
+In-Reply-To: <1517890108-8140-15-git-send-email-sricharan@codeaurora.org>
 References: <1517890108-8140-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1517890108-8140-10-git-send-email-sricharan@codeaurora.org>
+ <1517890108-8140-15-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180206042642.GG28462@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+On 06-02-18, 09:38, Sricharan R wrote:
+> diff --git a/drivers/cpufreq/qcom-cpufreq.c b/drivers/cpufreq/qcom-cpufreq.c
+> new file mode 100644
+> index 0000000..5b988d4
+> --- /dev/null
+> +++ b/drivers/cpufreq/qcom-cpufreq.c
+> @@ -0,0 +1,161 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/slab.h>
+> +#include "cpufreq-dt.h"
+> +#include <linux/nvmem-consumer.h>
 
-The ACC and GCC regions present in KPSSv1 contain registers to
-control clocks and power to each Krait CPU and L2. For CPUfreq
-purposes probe these devices and expose a mux clock that chooses
-between PXO and PLL8.
+I don't think you need all of these anymore, isn't it ? Can you cross check
+which ones are really required? For example, cpufreq-dt.h isn't required for
+sure.
 
-Cc: <devicetree@vger.kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/qcom/Kconfig    |  8 +++++
- drivers/clk/qcom/Makefile   |  1 +
- drivers/clk/qcom/kpss-xcc.c | 87 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+)
- create mode 100644 drivers/clk/qcom/kpss-xcc.c
+> +static int __init qcom_cpufreq_driver_init(void)
+> +{
+> +	struct device *cpu_dev;
+> +	struct device_node *np;
+> +	struct nvmem_cell *pvs_nvmem;
+> +	int ret;
+> +
+> +	cpu_dev = get_cpu_device(0);
+> +	if (!cpu_dev)
+> +		return -ENODEV;
+> +
+> +	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev);
+> +	if (!np)
+> +		return -ENOENT;
+> +
+> +	if (!of_device_is_compatible(np, "operating-points-v2-krait-cpu")) {
+> +		of_node_put(np);
+> +		return -ENODEV;
+> +	}
+> +
+> +	pvs_nvmem = of_nvmem_cell_get(np, NULL);
+> +	if (IS_ERR(pvs_nvmem)) {
+> +		dev_err(cpu_dev, "Could not get nvmem cell\n");
+> +		return PTR_ERR(pvs_nvmem);
+> +	}
+> +
+> +	of_node_put(np);
+> +
+> +	ret = qcom_cpufreq_populate_opps(pvs_nvmem);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return PTR_ERR(platform_device_register_simple("cpufreq-dt",
+> +						       -1, NULL, 0));
 
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index bf14f56..8fca65d 100644
---- a/drivers/clk/qcom/Kconfig
-+++ b/drivers/clk/qcom/Kconfig
-@@ -235,6 +235,14 @@ config QCOM_HFPLL
- 	  Say Y if you want to support CPU frequency scaling on devices
- 	  such as MSM8974, APQ8084, etc.
- 
-+config KPSS_XCC
-+	tristate "KPSS Clock Controller"
-+	depends on COMMON_CLK_QCOM
-+	help
-+	  Support for the Krait ACC and GCC clock controllers. Say Y
-+	  if you want to support CPU frequency scaling on devices such
-+	  as MSM8960, APQ8064, etc.
-+
- config KRAIT_CLOCKS
- 	bool
- 	select KRAIT_L2_ACCESSORS
-diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index e1e96f6..24e598a 100644
---- a/drivers/clk/qcom/Makefile
-+++ b/drivers/clk/qcom/Makefile
-@@ -40,4 +40,5 @@ obj-$(CONFIG_QCOM_CLK_APCS_MSM8916) += apcs-msm8916.o
- obj-$(CONFIG_QCOM_CLK_RPM) += clk-rpm.o
- obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o
- obj-$(CONFIG_SPMI_PMIC_CLKDIV) += clk-spmi-pmic-div.o
-+obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
- obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
-diff --git a/drivers/clk/qcom/kpss-xcc.c b/drivers/clk/qcom/kpss-xcc.c
-new file mode 100644
-index 0000000..8590b5e
---- /dev/null
-+++ b/drivers/clk/qcom/kpss-xcc.c
-@@ -0,0 +1,87 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+
-+static const char *aux_parents[] = {
-+	"pll8_vote",
-+	"pxo",
-+};
-+
-+static unsigned int aux_parent_map[] = {
-+	3,
-+	0,
-+};
-+
-+static const struct of_device_id kpss_xcc_match_table[] = {
-+	{ .compatible = "qcom,kpss-acc-v1", .data = (void *)1UL },
-+	{ .compatible = "qcom,kpss-gcc" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, kpss_xcc_match_table);
-+
-+static int kpss_xcc_driver_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *id;
-+	struct clk *clk;
-+	struct resource *res;
-+	void __iomem *base;
-+	const char *name;
-+
-+	id = of_match_device(kpss_xcc_match_table, &pdev->dev);
-+	if (!id)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	if (id->data) {
-+		if (of_property_read_string_index(pdev->dev.of_node,
-+						  "clock-output-names",
-+						  0, &name))
-+			return -ENODEV;
-+		base += 0x14;
-+	} else {
-+		name = "acpu_l2_aux";
-+		base += 0x28;
-+	}
-+
-+	clk = clk_register_mux_table(&pdev->dev, name, aux_parents,
-+				     ARRAY_SIZE(aux_parents), 0, base, 0, 0x3,
-+				     0, aux_parent_map, NULL);
-+
-+	platform_set_drvdata(pdev, clk);
-+
-+	return PTR_ERR_OR_ZERO(clk);
-+}
-+
-+static int kpss_xcc_driver_remove(struct platform_device *pdev)
-+{
-+	clk_unregister_mux(platform_get_drvdata(pdev));
-+	return 0;
-+}
-+
-+static struct platform_driver kpss_xcc_driver = {
-+	.probe = kpss_xcc_driver_probe,
-+	.remove = kpss_xcc_driver_remove,
-+	.driver = {
-+		.name = "kpss-xcc",
-+		.of_match_table = kpss_xcc_match_table,
-+	},
-+};
-+module_platform_driver(kpss_xcc_driver);
-+
-+MODULE_DESCRIPTION("Krait Processor Sub System (KPSS) Clock Driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:kpss-xcc");
+Wanna do proper error handling here? For example, unset OPP name on failure here
+so that resources get freed ?
+
+> +}
+> +module_init(qcom_cpufreq_driver_init);
+> +
+> +MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+viresh
