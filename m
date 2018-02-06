@@ -1,42 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 6 Feb 2018 16:37:19 +0530
-Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
-In-Reply-To: <20180205155222.22189-1-brgl@bgdev.pl>
-References: <20180205155222.22189-1-brgl@bgdev.pl>
-Message-ID: <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 6 Feb 2018 11:26:12 +0000
+Subject: [PATCHv2 1/8] ARM: ux500: remove PMU IRQ bouncer
+In-Reply-To: <CACRpkdZmgO3L2=WAciYE23aLcO5ovN9TB7TMi8SPfu90UpiFjA@mail.gmail.com>
+References: <20180205164202.26502-1-mark.rutland@arm.com>
+ <20180205164202.26502-2-mark.rutland@arm.com>
+ <CACRpkdZmgO3L2=WAciYE23aLcO5ovN9TB7TMi8SPfu90UpiFjA@mail.gmail.com>
+Message-ID: <20180206112612.c7ciffpizekx7ax7@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 February 2018 09:22 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Mon, Feb 05, 2018 at 08:05:53PM +0100, Linus Walleij wrote:
+> On Mon, Feb 5, 2018 at 5:41 PM, Mark Rutland <mark.rutland@arm.com> wrote:
 > 
-> Make nand work with the common clock framework by specifying which
-> clock should be used and what name to look up.
+> > The ux500 PMU IRQ bouncer is getting in the way of some fundametnal
+> > changes to the ARM PMU driver, and it's the only special case that
+> > exists today. Let's remove it.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-evm.dts | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-> index a86a8a1816f2..2602ad8e99ee 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -296,6 +296,9 @@
->  			reg = <0 0x02000000 0x02000000
->  			       1 0x00000000 0x00008000>;
->  
-> +			clocks = <&psc0 3>;
-> +			clock-names = "aemif";
+> It's OK this silicon design was especially strange it seems.
+> We are done with the days of performance optimization for
+> the platform anyways.
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Looks like this is being added only to satisfy the devm_clk_get() call
-in nand_davinci_probe() which I think is superfluous since we also
-enable the same clock in aemif_probe().
+Cheers!
 
-Perhaps the better solution is to drip the clk code in
-drivers/mtd/nand/davinci_nand.c and shift legacy code to start using
-drivers/memory/aemif.c as well? This way we can also drop
-arch/arm/mach-davinci/aemif.c
-
-Thanks,
-Sekhar
+Mark.
