@@ -1,53 +1,60 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Tue, 6 Feb 2018 09:22:32 +0200
-Subject: [PATCH v2 2/7] soc/tegra: Add Tegra194 SoC configuration option
+Date: Tue, 6 Feb 2018 09:22:34 +0200
+Subject: [PATCH v2 4/7] dt-bindings: tegra: Add missing chips and NVIDIA boards
 In-Reply-To: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
 References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1517901757-15353-3-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1517901757-15353-5-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the configuration option to enable support for the Tegra194
-system-on-chip, and enable it by default in the arm64 defconfig.
+Add compatibility strings for supported but undocumented Tegra chips
+(Tegra114/124/132/210/186/194) and reference boards.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- arch/arm64/configs/defconfig |  1 +
- drivers/soc/tegra/Kconfig    | 10 ++++++++++
- 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 78f669a21a9b..5a8f15baa850 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -537,6 +537,7 @@ CONFIG_ROCKCHIP_PM_DOMAINS=y
- CONFIG_ARCH_TEGRA_132_SOC=y
- CONFIG_ARCH_TEGRA_210_SOC=y
- CONFIG_ARCH_TEGRA_186_SOC=y
-+CONFIG_ARCH_TEGRA_194_SOC=y
- CONFIG_EXTCON_USB_GPIO=y
- CONFIG_IIO=y
- CONFIG_EXYNOS_ADC=y
-diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
-index 89ebe22a3e27..fe4481676da6 100644
---- a/drivers/soc/tegra/Kconfig
-+++ b/drivers/soc/tegra/Kconfig
-@@ -104,6 +104,16 @@ config ARCH_TEGRA_186_SOC
- 	  multi-format support, ISP for image capture processing and BPMP for
- 	  power management.
+Notes:
+    v2:
+    - add patch
+
+ Documentation/devicetree/bindings/arm/tegra.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index 7f1411bbabf7..32f62bb7006d 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -9,6 +9,12 @@ following compatible values:
  
-+config ARCH_TEGRA_194_SOC
-+	bool "NVIDIA Tegra194 SoC"
-+	select MAILBOX
-+	select TEGRA_BPMP
-+	select TEGRA_HSP_MBOX
-+	select TEGRA_IVC
-+	select SOC_TEGRA_PMC
-+	help
-+	  Enable support for the NVIDIA Tegra194 SoC.
-+
- endif
- endif
+   nvidia,tegra20
+   nvidia,tegra30
++  nvidia,tegra114
++  nvidia,tegra124
++  nvidia,tegra132
++  nvidia,tegra210
++  nvidia,tegra186
++  nvidia,tegra194
  
+ Boards
+ -------------------------------------------
+@@ -26,8 +32,18 @@ board-specific compatible values:
+   nvidia,cardhu
+   nvidia,cardhu-a02
+   nvidia,cardhu-a04
++  nvidia,dalmore
+   nvidia,harmony
++  nvidia,jetson-tk1
++  nvidia,norrin
++  nvidia,p2371-0000
++  nvidia,p2371-2180
++  nvidia,p2571
++  nvidia,p2771-0000
++  nvidia,p2972-0000
++  nvidia,roth
+   nvidia,seaboard
++  nvidia,tn7
+   nvidia,ventana
+   toradex,apalis_t30
+   toradex,apalis_t30-eval
 -- 
 2.1.4
