@@ -1,47 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Feb 2018 22:42:53 +0000
-Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
- (Spectre variant 2) mitigation
-In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
-References: <20180206175621.929-1-marc.zyngier@arm.com>
-Message-ID: <20180206224253.5rsus3u3wt6eluxv@armageddon.cambridge.arm.com>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Tue, 6 Feb 2018 14:54:19 -0800
+Subject: [PATCH v4 0/4] drivers: firmware: xilinx: Add firmware driver support
+Message-ID: <1517957663-16668-1-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 05:56:04PM +0000, Marc Zyngier wrote:
-> ARM has recently published a SMC Calling Convention (SMCCC)
-> specification update[1] that provides an optimised calling convention
-> and optional, discoverable support for mitigating CVE-2017-5715. ARM
-> Trusted Firmware (ATF) has already gained such an implementation[2].
-> 
-> This series addresses a few things:
-> 
-> - It provides a KVM implementation of PSCI v1.0, which is a
->   prerequisite for being able to discover SMCCC v1.1.
-> 
-> - It allows KVM to advertise SMCCC v1.1, which is de-facto supported
->   already (it never corrupts any of the guest registers).
-> 
-> - It implements KVM support for the ARCH_WORKAROUND_1 function that is
->   used to mitigate CVE-2017-5715 in a guest (if such mitigation is
->   available on the host).
-> 
-> - It implements SMCCC v1.1 and ARCH_WORKAROUND_1 discovery support in
->   the kernel itself.
-> 
-> - It finally provides firmware callbacks for CVE-2017-5715 for both
->   kernel and KVM and drop the initial PSCI_GET_VERSION based
->   mitigation.
-> 
-> Patch 1 is already merged, and included here for reference. Patches on
-> top of arm64/for-next/core. Tested on Seattle and Juno, the latter
-> with ATF implementing SMCCC v1.1.
+Introduce firmware driver for ZynqMP core.
+This patchset is adding communication layer with firmware.
+Firmware driver provides an interface to firmware APIs.
+Interface APIs can be used by any driver to communicate to
+PMUFW(Platform Management Unit). All requests go through ATF.
 
-Queued for 4.16. I merged the first patch as well since for-next/core is
-based on -rc3 and the patch went in afterwards (I dropped cc stable
-since there is a version with this tag already).
+v4:
+ - Changed clock setrate/getrate API prototype to support 64 bit rate
+ - Defined macros for get_node_status return values
+ - Moved DT node as a child of firmware
+ - Changed debugfs APIs to return data to debugfs buffer instead of dumping to kernel log
+ - Minor changes to incorporate other review comments from v3 patch series
 
-Thanks.
+v3:
+ - added some fixes to firmware-ggs.c
+ - updated pinmux get/set function argument names to specify function id instead of node id
+ - added new pinctrl query macros
+ - incorporated review comments from v2 patch series
+
+v2:
+ - change SPDX-License-Identifier license text style
+ - split patch into multiple patches
+ - Updated copyrights
+ - Added ABI documentation
+ - incorporated logical review comments from previuos patch. Discussed below:
+	https://patchwork.kernel.org/patch/10150665/
+
+Jolly Shah (4):
+  dt-bindings: firmware: Add bindings for ZynqMP firmware
+  drivers: firmware: xilinx: Add ZynqMP firmware driver
+  drivers: firmware: xilinx: Add sysfs interface
+  drivers: firmware: xilinx: Add debugfs interface
+
+ Documentation/ABI/stable/sysfs-firmware-zynqmp     |   50 +
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |   24 +
+ arch/arm64/Kconfig.platforms                       |    1 +
+ drivers/firmware/Kconfig                           |    1 +
+ drivers/firmware/Makefile                          |    1 +
+ drivers/firmware/xilinx/Kconfig                    |    4 +
+ drivers/firmware/xilinx/Makefile                   |    4 +
+ drivers/firmware/xilinx/zynqmp/Kconfig             |   23 +
+ drivers/firmware/xilinx/zynqmp/Makefile            |    5 +
+ drivers/firmware/xilinx/zynqmp/firmware-debug.c    |  482 +++++++++
+ drivers/firmware/xilinx/zynqmp/firmware-ggs.c      |  297 ++++++
+ drivers/firmware/xilinx/zynqmp/firmware.c          | 1025 ++++++++++++++++++++
+ .../linux/firmware/xilinx/zynqmp/firmware-debug.h  |   31 +
+ include/linux/firmware/xilinx/zynqmp/firmware.h    |  585 +++++++++++
+ 14 files changed, 2533 insertions(+)
+ create mode 100644 Documentation/ABI/stable/sysfs-firmware-zynqmp
+ create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+ create mode 100644 drivers/firmware/xilinx/Kconfig
+ create mode 100644 drivers/firmware/xilinx/Makefile
+ create mode 100644 drivers/firmware/xilinx/zynqmp/Kconfig
+ create mode 100644 drivers/firmware/xilinx/zynqmp/Makefile
+ create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-debug.c
+ create mode 100644 drivers/firmware/xilinx/zynqmp/firmware-ggs.c
+ create mode 100644 drivers/firmware/xilinx/zynqmp/firmware.c
+ create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware-debug.h
+ create mode 100644 include/linux/firmware/xilinx/zynqmp/firmware.h
 
 -- 
-Catalin
+2.7.4
