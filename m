@@ -1,75 +1,107 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  6 Feb 2018 12:49:03 +0800
-Subject: [PATCH v2 08/10] ARM: sun8i: h3: Add SY8106A regulator to Orange Pi PC
+Date: Tue,  6 Feb 2018 12:49:00 +0800
+Subject: [PATCH v2 05/10] ARM: sun8i: h3: add operating-points-v2 table for CPU
 In-Reply-To: <20180206044905.30508-1-icenowy@aosc.io>
 References: <20180206044905.30508-1-icenowy@aosc.io>
-Message-ID: <20180206044905.30508-9-icenowy@aosc.io>
+Message-ID: <20180206044905.30508-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ondrej Jirman <megous@megous.com>
+The CPU on Allwinner H3 can do dynamic frequency scaling.
 
-Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
-Orange Pi PC, then set the power supply of the ARM cores to this
-regulator, in order to enable DVFS.
+Add a DVFS table based on the one shipped with Allwinner's H3 SDK. The
+voltage-frequency relationship seems to be conservative, and Armbian has
+another DVFS table which uses lower voltage at a certain frequency.
+However, the official one is chosen for safety.
 
-Signed-off-by: Ondrej Jirman <megous@megous.com>
-[Icenowy: Enable DVFS in this patch, slight changes and change commit
- message]
+Frequencies higher than 1008MHz are temporarily dropped in the table, as
+they may lead to over voltage on boards without proper regulator
+settings or over temperature on boards with proper regulator settings.
+They will be added back once regulator settings are ready and thermal
+sensor driver is merged.
+
+In order to satisfy all different regulators (SY8106A which is 50mV per
+level, SY8113B which have two states: 1.1V and 1.3V, and some board with
+non-tweakable regulators), all the OPPs are defined with a range which has
+the target value as the minimum allowed value, and 1.3V (the highest
+VDD-CPUX voltage suggested by the datasheet) as the maximum allowed value.
+It's proven to work well with a board with SY8113B.
+
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes in v2:
-- Reduce maximum voltage to 1.3V.
-- Slightly changed the comment at 1.0V minimum voltage for taking BSP
-  DVFS table instead of Armbian one.
+- Switch to BSP OPP table, which is more conservative.
 
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index d22546df1b82..ded9d8d6d008 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -98,6 +98,10 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 8495deecedad..36608c03f02b 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -43,32 +43,62 @@
+ #include "sunxi-h3-h5.dtsi"
  
-+&cpu0 {
-+	cpu-supply = <&reg_sy8106a>;
-+};
+ / {
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
 +
- &ehci0 {
- 	status = "okay";
- };
-@@ -160,6 +164,29 @@
- 	};
- };
- 
-+&r_i2c {
-+	status = "okay";
++		opp at 648000000 {
++			opp-hz = /bits/ 64 <648000000>;
++			opp-microvolt = <1040000 1040000 1300000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
 +
-+	reg_sy8106a: regulator at 65 {
-+		compatible = "silergy,sy8106a";
-+		reg = <0x65>;
-+		regulator-name = "vdd-cpux";
-+		/*
-+		 * The datasheet uses 1.1V as the minimum value of VDD-CPUX,
-+		 * however both the Armbian DVFS table and the official one
-+		 * have operating points with voltage under 1.1V, and both
-+		 * DVFS table are known to work properly at the lowest
-+		 * operating point.
-+		 *
-+		 * Use 1.0V as the minimum voltage instead.
-+		 */
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
++		opp at 816000000 {
++			opp-hz = /bits/ 64 <816000000>;
++			opp-microvolt = <1100000 1100000 1300000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp at 1008000000 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <1200000 1200000 1300000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
 +	};
-+};
 +
- &r_pio {
- 	leds_r_opc: led_pins {
- 		pins = "PL10";
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0>;
++			clocks = <&ccu CLK_CPUX>;
++			clock-names = "cpu";
++			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <0x2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <1>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu at 2 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <2>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu at 3 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <3>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 	};
+ 
 -- 
 2.15.1
