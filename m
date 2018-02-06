@@ -1,56 +1,49 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 6 Feb 2018 14:08:58 +0100
-Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
-In-Reply-To: <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
-References: <20180205155222.22189-1-brgl@bgdev.pl>
- <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
-Message-ID: <CAMpxmJUDbwkcJt_kx9GX+qY10xiGAp-j3+kXM-q3WP1VGwr0UQ@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 6 Feb 2018 16:10:44 +0300
+Subject: [PATCH 0/4] tree-wide: fix comparison to bitshift when dealing
+ with a mask
+In-Reply-To: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+References: <20180205201002.23621-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20180206131044.oso33fvv553trrd7@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-06 12:07 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Monday 05 February 2018 09:22 PM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> Make nand work with the common clock framework by specifying which
->> clock should be used and what name to look up.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/boot/dts/da850-evm.dts | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
->> index a86a8a1816f2..2602ad8e99ee 100644
->> --- a/arch/arm/boot/dts/da850-evm.dts
->> +++ b/arch/arm/boot/dts/da850-evm.dts
->> @@ -296,6 +296,9 @@
->>                       reg = <0 0x02000000 0x02000000
->>                              1 0x00000000 0x00008000>;
->>
->> +                     clocks = <&psc0 3>;
->> +                     clock-names = "aemif";
->
-> Looks like this is being added only to satisfy the devm_clk_get() call
-> in nand_davinci_probe() which I think is superfluous since we also
-> enable the same clock in aemif_probe().
->
-> Perhaps the better solution is to drip the clk code in
-> drivers/mtd/nand/davinci_nand.c and shift legacy code to start using
-> drivers/memory/aemif.c as well? This way we can also drop
-> arch/arm/mach-davinci/aemif.c
->
-> Thanks,
-> Sekhar
+On Mon, Feb 05, 2018 at 09:09:57PM +0100, Wolfram Sang wrote:
+> In one Renesas driver, I found a typo which turned an intended bit shift ('<<')
+> into a comparison ('<'). Because this is a subtle issue, I looked tree wide for
+> similar patterns. This small patch series is the outcome.
+> 
+> Buildbot and checkpatch are happy. Only compile-tested. To be applied
+> individually per sub-system, I think. I'd think only the net: amd: patch needs
+> to be conisdered for stable, but I leave this to people who actually know this
+> driver.
+> 
+> CCing Dan. Maybe he has an idea how to add a test to smatch? In my setup, only
+> cppcheck reported a 'coding style' issue with a low prio.
+> 
 
-Yes, this sounds good, but I think we should leave it for later as an
-additional improvement, once everything else is in place. I think
-these patches should be applied together with David's series in order
-to not break the support on davinci boards and the aemif work would go
-in later as a follow-up. How about that?
+Most of these are inside macros so it makes it complicated for Smatch
+to warn about them.  It might be easier in Coccinelle.  Julia the bugs
+look like this:
 
-Also: I don't have any keystone board to test whether such changes
-don't break the nand support there. Would you be able to test this?
+-			reissue_mask |= 0xffff < 4;
++			reissue_mask |= 0xffff << 4;
 
-Thanks,
-Bartosz
+regards,
+dan carpenter
+
+> Wolfram Sang (4):
+>   v4l: vsp1: fix mask creation for MULT_ALPHA_RATIO
+>   drm/exynos: fix comparison to bitshift when dealing with a mask
+>   v4l: dvb-frontends: stb0899: fix comparison to bitshift when dealing
+>     with a mask
+>   net: amd-xgbe: fix comparison to bitshift when dealing with a mask
+> 
+>  drivers/gpu/drm/exynos/regs-fimc.h        | 2 +-
+>  drivers/media/dvb-frontends/stb0899_reg.h | 8 ++++----
+>  drivers/media/platform/vsp1/vsp1_regs.h   | 2 +-
+>  drivers/net/ethernet/amd/xgbe/xgbe-drv.c  | 2 +-
+>  4 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> -- 
+> 2.11.0
