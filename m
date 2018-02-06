@@ -1,41 +1,212 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 6 Feb 2018 17:53:04 +0800
-Subject: [PATCH v2 15/16] arm64: dts: mt7622: add High-Speed DMA device nodes
+Date: Tue, 6 Feb 2018 17:53:05 +0800
+Subject: [PATCH v2 16/16] arm64: dts: mt7622: add mmc related device nodes
 In-Reply-To: <cover.1517910489.git.sean.wang@mediatek.com>
 References: <cover.1517910489.git.sean.wang@mediatek.com>
-Message-ID: <40c5f7cdd094166d4a3eb1f36f89cdb8edf6d243.1517910489.git.sean.wang@mediatek.com>
+Message-ID: <abc7373b08150326faecc984b4e1a16c7589502a.1517910489.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-add High-Speed DMA (HSDMA) nodes
+add mmc device nodes and proper setup for used pins
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Jimin Wang <jimin.wang@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt7622.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 106 +++++++++++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi     |  20 +++++
+ 2 files changed, 126 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index 6cf67dd..ed7ee78 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -712,6 +712,16 @@
- 		#reset-cells = <1>;
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+index 5746cb3..b858df6 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+@@ -8,6 +8,7 @@
+ 
+ /dts-v1/;
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ #include "mt7622.dtsi"
+ #include "mt6380.dtsi"
+@@ -53,6 +54,14 @@
+ 		reg = <0 0x40000000 0 0x3F000000>;
  	};
  
-+	hsdma: dma-controller at 1b007000 {
-+		compatible = "mediatek,mt7622-hsdma";
-+		reg = <0 0x1b007000 0 0x1000>;
-+		interrupts = <GIC_SPI 219 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&ethsys CLK_ETH_HSDMA_EN>;
-+		clock-names = "hsdma";
-+		power-domains = <&scpsys MT7622_POWER_DOMAIN_ETHSYS>;
-+		#dma-cells = <1>;
++	reg_1p8v: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
 +	};
 +
- 	eth: ethernet at 1b100000 {
- 		compatible = "mediatek,mt7622-eth",
- 			     "mediatek,mt2701-eth",
+ 	reg_3p3v: regulator-3p3v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-3.3V";
+@@ -89,6 +98,23 @@
+ 			function = "emmc", "emmc_rst";
+ 			groups = "emmc";
+ 		};
++
++		/* "NDL0","NDL1","NDL2","NDL3","NDL4","NDL5","NDL6","NDL7",
++		 * "NRB","NCLE" pins are used as DAT0,DAT1,DAT2,DAT3,DAT4,
++		 * DAT5,DAT6,DAT7,CMD,CLK for eMMC respectively
++		 */
++		conf-cmd-dat {
++			pins = "NDL0", "NDL1", "NDL2",
++			       "NDL3", "NDL4", "NDL5",
++			       "NDL6", "NDL7", "NRB";
++			input-enable;
++			bias-pull-up;
++		};
++
++		conf-clk {
++			pins = "NCLE";
++			bias-pull-down;
++		};
+ 	};
+ 
+ 	emmc_pins_uhs: emmc-pins-uhs {
+@@ -96,6 +122,21 @@
+ 			function = "emmc";
+ 			groups = "emmc";
+ 		};
++
++		conf-cmd-dat {
++			pins = "NDL0", "NDL1", "NDL2",
++			       "NDL3", "NDL4", "NDL5",
++			       "NDL6", "NDL7", "NRB";
++			input-enable;
++			drive-strength = <4>;
++			bias-pull-up;
++		};
++
++		conf-clk {
++			pins = "NCLE";
++			drive-strength = <4>;
++			bias-pull-down;
++		};
+ 	};
+ 
+ 	eth_pins: eth-pins {
+@@ -194,6 +235,27 @@
+ 			function = "sd";
+ 			groups = "sd_0";
+ 		};
++
++		/* "I2S2_OUT, "I2S4_IN"", "I2S3_IN", "I2S2_IN",
++		 *  "I2S4_OUT", "I2S3_OUT" are used as DAT0, DAT1,
++		 *  DAT2, DAT3, CMD, CLK for SD respectively.
++		 */
++		conf-cmd-data {
++			pins = "I2S2_OUT", "I2S4_IN", "I2S3_IN",
++			       "I2S2_IN","I2S4_OUT";
++			input-enable;
++			drive-strength = <8>;
++			bias-pull-up;
++		};
++		conf-clk {
++			pins = "I2S3_OUT";
++			drive-strength = <12>;
++			bias-pull-down;
++		};
++		conf-cd {
++			pins = "TXD3";
++			bias-pull-up;
++		};
+ 	};
+ 
+ 	sd0_pins_uhs: sd0-pins-uhs {
+@@ -201,6 +263,18 @@
+ 			function = "sd";
+ 			groups = "sd_0";
+ 		};
++
++		conf-cmd-data {
++			pins = "I2S2_OUT", "I2S4_IN", "I2S3_IN",
++			       "I2S2_IN","I2S4_OUT";
++			input-enable;
++			bias-pull-up;
++		};
++
++		conf-clk {
++			pins = "I2S3_OUT";
++			bias-pull-down;
++		};
+ 	};
+ 
+ 	/* Serial NAND is shared pin with SPI-NOR */
+@@ -311,6 +385,38 @@
+ 	status = "okay";
+ };
+ 
++&mmc0 {
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&emmc_pins_default>;
++	pinctrl-1 = <&emmc_pins_uhs>;
++	status = "okay";
++	bus-width = <8>;
++	max-frequency = <50000000>;
++	cap-mmc-highspeed;
++	mmc-hs200-1_8v;
++	vmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_1p8v>;
++	assigned-clocks = <&topckgen CLK_TOP_MSDC30_0_SEL>;
++	assigned-clock-parents = <&topckgen CLK_TOP_UNIV48M>;
++	non-removable;
++};
++
++&mmc1 {
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&sd0_pins_default>;
++	pinctrl-1 = <&sd0_pins_uhs>;
++	status = "okay";
++	bus-width = <4>;
++	max-frequency = <50000000>;
++	cap-sd-highspeed;
++	r_smpl = <1>;
++	cd-gpios = <&pio 81 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_3p3v>;
++	assigned-clocks = <&topckgen CLK_TOP_MSDC30_1_SEL>;
++	assigned-clock-parents = <&topckgen CLK_TOP_UNIV48M>;
++};
++
+ &nandc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&parallel_nand_pins>;
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+index ed7ee78..177a651 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+@@ -524,6 +524,26 @@
+ 		status = "disabled";
+ 	};
+ 
++	mmc0: mmc at 11230000 {
++		compatible = "mediatek,mt7622-mmc";
++		reg = <0 0x11230000 0 0x1000>;
++		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_MSDC30_0_PD>,
++			 <&topckgen CLK_TOP_MSDC50_0_SEL>;
++		clock-names = "source", "hclk";
++		status = "disabled";
++	};
++
++	mmc1: mmc at 11240000 {
++		compatible = "mediatek,mt7622-mmc";
++		reg = <0 0x11240000 0 0x1000>;
++		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_MSDC30_1_PD>,
++			 <&topckgen CLK_TOP_AXI_SEL>;
++		clock-names = "source", "hclk";
++		status = "disabled";
++	};
++
+ 	ssusbsys: ssusbsys at 1a000000 {
+ 		compatible = "mediatek,mt7622-ssusbsys",
+ 			     "syscon";
 -- 
 2.7.4
