@@ -1,27 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 6 Feb 2018 22:31:28 +0000
-Subject: [PATCH v2 0/9] Fix kpti-enabled kernels for Cavium ThunderX
-In-Reply-To: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-References: <1517227200-20412-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180206223128.sfb3aodqc6bcbu2m@armageddon.cambridge.arm.com>
+Date: Tue, 6 Feb 2018 22:42:53 +0000
+Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
+ (Spectre variant 2) mitigation
+In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
+References: <20180206175621.929-1-marc.zyngier@arm.com>
+Message-ID: <20180206224253.5rsus3u3wt6eluxv@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 11:59:51AM +0000, Will Deacon wrote:
-> Hi all,
+On Tue, Feb 06, 2018 at 05:56:04PM +0000, Marc Zyngier wrote:
+> ARM has recently published a SMC Calling Convention (SMCCC)
+> specification update[1] that provides an optimised calling convention
+> and optional, discoverable support for mitigating CVE-2017-5715. ARM
+> Trusted Firmware (ATF) has already gained such an implementation[2].
 > 
-> This is version two of the patches I posted on Friday:
+> This series addresses a few things:
 > 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/556304.html
+> - It provides a KVM implementation of PSCI v1.0, which is a
+>   prerequisite for being able to discover SMCCC v1.1.
 > 
-> Changes since v1 include:
+> - It allows KVM to advertise SMCCC v1.1, which is de-facto supported
+>   already (it never corrupts any of the guest registers).
 > 
->   * Use SCTLR_ELx_M instead of open-coded #1
->   * Changed section attributes for .idmap.text to reflect actual mappings
->   * Rejigged phys_to_pte for consistency with pte_to_phys
->   * Added reviewer tags
+> - It implements KVM support for the ARCH_WORKAROUND_1 function that is
+>   used to mitigate CVE-2017-5715 in a guest (if such mitigation is
+>   available on the host).
+> 
+> - It implements SMCCC v1.1 and ARCH_WORKAROUND_1 discovery support in
+>   the kernel itself.
+> 
+> - It finally provides firmware callbacks for CVE-2017-5715 for both
+>   kernel and KVM and drop the initial PSCI_GET_VERSION based
+>   mitigation.
+> 
+> Patch 1 is already merged, and included here for reference. Patches on
+> top of arm64/for-next/core. Tested on Seattle and Juno, the latter
+> with ATF implementing SMCCC v1.1.
 
-Queued for 4.16. Thanks.
+Queued for 4.16. I merged the first patch as well since for-next/core is
+based on -rc3 and the patch went in afterwards (I dropped cc stable
+since there is a version with this tag already).
+
+Thanks.
 
 -- 
 Catalin
