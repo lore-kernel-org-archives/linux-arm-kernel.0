@@ -1,28 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Feb 2018 15:08:01 -0200
-Subject: [PATCHv2 2/3] ARM: imx53: add SoC specific PMU setup
-In-Reply-To: <20180206142629.534-3-sebastian.reichel@collabora.co.uk>
-References: <20180206142629.534-1-sebastian.reichel@collabora.co.uk>
- <20180206142629.534-3-sebastian.reichel@collabora.co.uk>
-Message-ID: <CAOMZO5DYiFg0T9Byd5cbJKXbFHmO7d1-T0KnMVKhn03nqRm0Ag@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  6 Feb 2018 17:56:05 +0000
+Subject: [PATCH v4 01/17] arm64: KVM: Fix SMCCC handling of unimplemented
+ SMC/HVC calls
+In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
+References: <20180206175621.929-1-marc.zyngier@arm.com>
+Message-ID: <20180206175621.929-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 6, 2018 at 12:26 PM, Sebastian Reichel
-<sebastian.reichel@collabora.co.uk> wrote:
-> From: Peter Senna Tschudin <peter.senna@collabora.com>
+KVM doesn't follow the SMCCC when it comes to unimplemented calls,
+and inject an UNDEF instead of returning an error. Since firmware
+calls are now used for security mitigation, they are becoming more
+common, and the undef is counter productive.
 
-Looking at http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/277931.html
-this patch seems to be originally from Martin Fuzzey.
+Instead, let's follow the SMCCC which states that -1 must be returned
+to the caller when getting an unknown function number.
 
-In this case I would expect to see his name in the From field.
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/handle_exit.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Please check the same on the other patches.
-
-> On i.MX53 it is necessary to set the DBG_EN bit in the
-> platform GPC register to enable access to PMU counters
-> other than the cycle counter.
->
-> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index c09fc5a576c7..520b0dad3c62 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -53,7 +53,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	ret = kvm_psci_call(vcpu);
+ 	if (ret < 0) {
+-		kvm_inject_undefined(vcpu);
++		vcpu_set_reg(vcpu, 0, ~0UL);
+ 		return 1;
+ 	}
+ 
+@@ -62,7 +62,7 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	kvm_inject_undefined(vcpu);
++	vcpu_set_reg(vcpu, 0, ~0UL);
+ 	return 1;
+ }
+ 
+-- 
+2.14.2
