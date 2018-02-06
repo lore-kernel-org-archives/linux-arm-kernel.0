@@ -1,216 +1,129 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Feb 2018 17:56:21 +0000
-Subject: [PATCH v4 17/17] arm64: Kill PSCI_GET_VERSION as a variant-2
- workaround
-In-Reply-To: <20180206175621.929-1-marc.zyngier@arm.com>
-References: <20180206175621.929-1-marc.zyngier@arm.com>
-Message-ID: <20180206175621.929-18-marc.zyngier@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 06 Feb 2018 18:13:38 +0000
+Subject: [RFC 4/4] KVM: arm64: Add support for PUD hugepages at stage 2
+In-Reply-To: <20180206145501.GB23160@cbox> (Christoffer Dall's message of
+ "Tue, 6 Feb 2018 15:55:01 +0100")
+References: <20180110190729.18383-1-punit.agrawal@arm.com>
+ <20180110190729.18383-5-punit.agrawal@arm.com>
+ <20180206145501.GB23160@cbox>
+Message-ID: <87bmh2htpp.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we've standardised on SMCCC v1.1 to perform the branch
-prediction invalidation, let's drop the previous band-aid.
-If vendors haven't updated their firmware to do SMCCC 1.1, they
-haven't updated PSCI either, so we don't loose anything.
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/bpi.S        | 24 ----------------------
- arch/arm64/kernel/cpu_errata.c | 45 ++++++++++++------------------------------
- arch/arm64/kvm/hyp/switch.c    | 14 -------------
- 3 files changed, 13 insertions(+), 70 deletions(-)
+> On Wed, Jan 10, 2018 at 07:07:29PM +0000, Punit Agrawal wrote:
+>> KVM only supports PMD hugepages at stage 2. Extend the stage 2 fault
+>> handling to add support for PUD hugepages.
+>> 
+>> Addition of PUD hugpage support enables additional hugepage sizes (1G
+>
+>                  *hugepage
+>
+>> with 4K granule and 4TB with 64k granule) which can be useful on cores
+>> that have support for mapping larger block sizes in the TLB entries.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>>  arch/arm/include/asm/kvm_mmu.h         | 10 +++++
+>>  arch/arm/include/asm/pgtable-3level.h  |  2 +
+>>  arch/arm64/include/asm/kvm_mmu.h       | 19 +++++++++
+>>  arch/arm64/include/asm/pgtable-hwdef.h |  2 +
+>>  arch/arm64/include/asm/pgtable.h       |  4 ++
+>>  virt/kvm/arm/mmu.c                     | 72 +++++++++++++++++++++++++++++-----
+>>  6 files changed, 99 insertions(+), 10 deletions(-)
+>> 
 
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index fdeed629f2c6..e5de33513b5d 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -54,30 +54,6 @@ ENTRY(__bp_harden_hyp_vecs_start)
- 	vectors __kvm_hyp_vector
- 	.endr
- ENTRY(__bp_harden_hyp_vecs_end)
--ENTRY(__psci_hyp_bp_inval_start)
--	sub	sp, sp, #(8 * 18)
--	stp	x16, x17, [sp, #(16 * 0)]
--	stp	x14, x15, [sp, #(16 * 1)]
--	stp	x12, x13, [sp, #(16 * 2)]
--	stp	x10, x11, [sp, #(16 * 3)]
--	stp	x8, x9, [sp, #(16 * 4)]
--	stp	x6, x7, [sp, #(16 * 5)]
--	stp	x4, x5, [sp, #(16 * 6)]
--	stp	x2, x3, [sp, #(16 * 7)]
--	stp	x0, x1, [sp, #(16 * 8)]
--	mov	x0, #0x84000000
--	smc	#0
--	ldp	x16, x17, [sp, #(16 * 0)]
--	ldp	x14, x15, [sp, #(16 * 1)]
--	ldp	x12, x13, [sp, #(16 * 2)]
--	ldp	x10, x11, [sp, #(16 * 3)]
--	ldp	x8, x9, [sp, #(16 * 4)]
--	ldp	x6, x7, [sp, #(16 * 5)]
--	ldp	x4, x5, [sp, #(16 * 6)]
--	ldp	x2, x3, [sp, #(16 * 7)]
--	ldp	x0, x1, [sp, #(16 * 8)]
--	add	sp, sp, #(8 * 18)
--ENTRY(__psci_hyp_bp_inval_end)
- 
- ENTRY(__qcom_hyp_sanitize_link_stack_start)
- 	stp     x29, x30, [sp, #-16]!
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 9e77809a3b23..07823595b7f0 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -67,7 +67,6 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- 
- #ifdef CONFIG_KVM
--extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
- extern char __qcom_hyp_sanitize_link_stack_start[];
- extern char __qcom_hyp_sanitize_link_stack_end[];
- extern char __smccc_workaround_1_smc_start[];
-@@ -116,8 +115,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
- }
- #else
--#define __psci_hyp_bp_inval_start		NULL
--#define __psci_hyp_bp_inval_end			NULL
- #define __qcom_hyp_sanitize_link_stack_start	NULL
- #define __qcom_hyp_sanitize_link_stack_end	NULL
- #define __smccc_workaround_1_smc_start		NULL
-@@ -164,24 +161,25 @@ static void call_hvc_arch_workaround_1(void)
- 	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
- }
- 
--static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
-+static int enable_smccc_arch_workaround_1(void *data)
- {
-+	const struct arm64_cpu_capabilities *entry = data;
- 	bp_hardening_cb_t cb;
- 	void *smccc_start, *smccc_end;
- 	struct arm_smccc_res res;
- 
- 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
--		return false;
-+		return 0;
- 
- 	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
--		return false;
-+		return 0;
- 
- 	switch (psci_ops.conduit) {
- 	case PSCI_CONDUIT_HVC:
- 		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 		if (res.a0)
--			return false;
-+			return 0;
- 		cb = call_hvc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_hvc_start;
- 		smccc_end = __smccc_workaround_1_hvc_end;
-@@ -191,35 +189,18 @@ static bool check_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *e
- 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
- 				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 		if (res.a0)
--			return false;
-+			return 0;
- 		cb = call_smc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_smc_start;
- 		smccc_end = __smccc_workaround_1_smc_end;
- 		break;
- 
- 	default:
--		return false;
-+		return 0;
- 	}
- 
- 	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
- 
--	return true;
--}
--
--static int enable_psci_bp_hardening(void *data)
--{
--	const struct arm64_cpu_capabilities *entry = data;
--
--	if (psci_ops.get_version) {
--		if (check_smccc_arch_workaround_1(entry))
--			return 0;
--
--		install_bp_hardening_cb(entry,
--				       (bp_hardening_cb_t)psci_ops.get_version,
--				       __psci_hyp_bp_inval_start,
--				       __psci_hyp_bp_inval_end);
--	}
--
- 	return 0;
- }
- 
-@@ -399,22 +380,22 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-@@ -428,12 +409,12 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
--		.enable = enable_psci_bp_hardening,
-+		.enable = enable_smccc_arch_workaround_1,
- 	},
- #endif
- 	{
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 408c04d789a5..cac6a0500162 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -350,20 +350,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
- 
--	if (exit_code == ARM_EXCEPTION_TRAP &&
--	    (kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC64 ||
--	     kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_HVC32)) {
--		u32 val = vcpu_get_reg(vcpu, 0);
--
--		if (val == PSCI_0_2_FN_PSCI_VERSION) {
--			val = kvm_psci_version(vcpu, kern_hyp_va(vcpu->kvm));
--			if (unlikely(val == KVM_ARM_PSCI_0_1))
--				val = PSCI_RET_NOT_SUPPORTED;
--			vcpu_set_reg(vcpu, 0, val);
--			goto again;
--		}
--	}
--
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
- 		bool valid;
--- 
-2.14.2
+[...]
+
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index 1a7a17b2a1ba..97e04fdbfa85 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -249,6 +249,8 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+>>  #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+>>  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+>>  
+>> +#define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+>> +
+>
+> does this make sense on 32-bit arm?  Is this ever going to get called
+> and return something meaningful in that case?
+
+This macro should never get called as there are no PUD_SIZE hugepages on
+arm.
+
+Ideally we want to fold the pud to fallback to pgd like in the rest of
+the code. I'll have another go at this.
+
+>
+>>  /* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
+>>  static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+>>  {
+
+[...]
+
+
+>> @@ -1393,17 +1424,38 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	if (mmu_notifier_retry(kvm, mmu_seq))
+>>  		goto out_unlock;
+>>  
+>> -	if (!hugetlb && !force_pte)
+>> +	if (!hugetlb && !force_pte) {
+>> +		/*
+>> +		 * We only support PMD_SIZE transparent
+>> +		 * hugepages. This code will need updates if we enable
+>> +		 * other page sizes for THP.
+>> +		 */
+>>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>> +		vma_pagesize = PMD_SIZE;
+>> +	}
+>>  
+>>  	if (hugetlb) {
+>> -		pmd_t new_pmd = stage2_build_pmd(pfn, mem_type, writable);
+>> -
+>> -		if (writable)
+>> -			kvm_set_pfn_dirty(pfn);
+>> -
+>> -		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
+>> -		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+>> +		if (vma_pagesize == PUD_SIZE) {
+>> +			pud_t new_pud;
+>> +
+>> +			new_pud = stage2_build_pud(pfn, mem_type, writable);
+>> +			if (writable)
+>> +				kvm_set_pfn_dirty(pfn);
+>> +
+>> +			coherent_cache_guest_page(vcpu, pfn, PUD_SIZE);
+>> +			ret = stage2_set_pud_huge(kvm, memcache,
+>> +						  fault_ipa, &new_pud);
+>> +		} else {
+>> +			pmd_t new_pmd;
+>> +
+>> +			new_pmd = stage2_build_pmd(pfn, mem_type, writable);
+>> +			if (writable)
+>> +				kvm_set_pfn_dirty(pfn);
+>> +
+>> +			coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
+>> +			ret = stage2_set_pmd_huge(kvm, memcache,
+>> +						  fault_ipa, &new_pmd);
+>> +		}
+>
+> This stuff needs rebasing onto v4.16-rc1 when we get there, and it will
+> clash with Marc's icache optimizations.
+
+Thanks for the heads up.
+
+>
+> But, you should be able to move kvm_set_pfn_dirty() out of the
+> size-conditional section and also call the cache maintenance functions
+> using vma_pagesize as parameter.
+
+Agreed - I'll roll these suggestions into the next version.
+
+Thanks a lot for the review.
+
+Punit
