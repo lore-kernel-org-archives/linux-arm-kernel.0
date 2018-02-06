@@ -1,99 +1,114 @@
 From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue,  6 Feb 2018 15:26:27 +0100
-Subject: [PATCHv2 1/3] drivers/perf: arm_pmu: Add platform hardware setup
- hooks.
+Date: Tue,  6 Feb 2018 15:26:28 +0100
+Subject: [PATCHv2 2/3] ARM: imx53: add SoC specific PMU setup
 In-Reply-To: <20180206142629.534-1-sebastian.reichel@collabora.co.uk>
 References: <20180206142629.534-1-sebastian.reichel@collabora.co.uk>
-Message-ID: <20180206142629.534-2-sebastian.reichel@collabora.co.uk>
+Message-ID: <20180206142629.534-3-sebastian.reichel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow platform specific code to be called when enabling or
-disabling the hardware.
+From: Peter Senna Tschudin <peter.senna@collabora.com>
+
+On i.MX53 it is necessary to set the DBG_EN bit in the
+platform GPC register to enable access to PMU counters
+other than the cycle counter.
 
 Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
 Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-[rebased to v4.12]
-Signed-off-by: Nandor Han <nandor.han@ge.com>
-[Simplify and cleanup for upstreaming]
 Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 ---
- drivers/perf/arm_pmu.c       | 12 ++++++++++++
- include/linux/perf/arm_pmu.h |  5 +++++
- 2 files changed, 17 insertions(+)
+ arch/arm/mach-imx/mach-imx53.c | 68 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 7bc5eee96b31..9c282914ee67 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -452,8 +452,10 @@ static int armpmu_event_init(struct perf_event *event)
- static void armpmu_enable(struct pmu *pmu)
- {
- 	struct arm_pmu *armpmu = to_arm_pmu(pmu);
-+	struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
- 	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
- 	int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
-+	int err;
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 07c2e8dca494..da7c80371f32 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -17,6 +17,7 @@
+ #include <linux/irq.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/perf/arm_pmu.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
  
- 	/* For task-bound events we may be called on other CPUs */
- 	if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
-@@ -461,17 +463,27 @@ static void armpmu_enable(struct pmu *pmu)
+@@ -28,10 +29,77 @@ static void __init imx53_init_early(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX53);
+ }
  
- 	if (enabled)
- 		armpmu->start(armpmu);
++/* Hard code as this is i.Mx53 only file */
++#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
++#define GPC_DBG_EN (1 << 16)
 +
-+	if (platdata && platdata->reserve_hardware) {
-+		err = platdata->reserve_hardware(armpmu);
-+		if (err)
-+			dev_warn(&armpmu->plat_device->dev, "Could not reserve PMU hardware!\n");
++static void __iomem *imx53_pmu_get_gpc(void)
++{
++	static void __iomem *gpc;
++
++	if (!gpc) {
++		gpc = ioremap(MXC_CORTEXA8_PLAT_GPC, 4);
++		if (!gpc)
++			printk_once(KERN_INFO "unable to map GPC to enable perf\n");
 +	}
- }
- 
- static void armpmu_disable(struct pmu *pmu)
++
++	return gpc;
++}
++
++static int imx53_pmu_reserve(struct arm_pmu *arm_pmu)
++{
++	void __iomem *gpc_reg;
++	u32 gpc;
++
++	gpc_reg = imx53_pmu_get_gpc();
++	if (!gpc_reg)
++		return 0;
++
++	gpc = __raw_readl(gpc_reg);
++	if (gpc & GPC_DBG_EN) {
++		arm_pmu->reserved_hardware = false;
++	} else {
++		gpc |= GPC_DBG_EN;
++		__raw_writel(gpc, gpc_reg);
++		arm_pmu->reserved_hardware = true;
++	}
++
++	return 0;
++}
++
++static void imx53_pmu_release(struct arm_pmu *arm_pmu)
++{
++	void __iomem *gpc_reg;
++	u32 gpc;
++
++	gpc_reg = imx53_pmu_get_gpc();
++	if (!gpc_reg)
++		return;
++
++	if (arm_pmu->reserved_hardware) {
++		gpc = __raw_readl(gpc_reg);
++		gpc &= ~GPC_DBG_EN;
++		__raw_writel(gpc, gpc_reg);
++		arm_pmu->reserved_hardware = false;
++	}
++}
++
++static struct arm_pmu_platdata imx53_pmu_platdata = {
++	.reserve_hardware = imx53_pmu_reserve,
++	.release_hardware = imx53_pmu_release,
++};
++
++static struct of_dev_auxdata imx53_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,cortex-a8-pmu", 0, "arm-pmu", &imx53_pmu_platdata),
++	{}
++};
++
+ static void __init imx53_dt_init(void)
  {
- 	struct arm_pmu *armpmu = to_arm_pmu(pmu);
-+	struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
+ 	imx_src_init();
  
- 	/* For task-bound events we may be called on other CPUs */
- 	if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
- 		return;
- 
- 	armpmu->stop(armpmu);
-+
-+	if (platdata && platdata->release_hardware)
-+		platdata->release_hardware(armpmu);
++	of_platform_populate(NULL, of_default_bus_match_table,
++					imx53_auxdata_lookup, NULL);
+ 	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
  }
  
- /*
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index af0f44effd44..942ae9bfe971 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -17,6 +17,8 @@
- #include <linux/sysfs.h>
- #include <asm/cputype.h>
- 
-+struct arm_pmu;
-+
- /*
-  * struct arm_pmu_platdata - ARM PMU platform data
-  *
-@@ -31,6 +33,8 @@
- struct arm_pmu_platdata {
- 	irqreturn_t (*handle_irq)(int irq, void *dev,
- 				  irq_handler_t pmu_handler);
-+	int (*reserve_hardware)(struct arm_pmu *arm_pmu);
-+	void (*release_hardware)(struct arm_pmu *arm_pmu);
- 	unsigned long irq_flags;
- };
- 
-@@ -112,6 +116,7 @@ struct arm_pmu {
- 	int		(*map_event)(struct perf_event *event);
- 	int		num_events;
- 	u64		max_period;
-+	bool		reserved_hardware;
- 	bool		secure_access; /* 32-bit ARM only */
- #define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
- 	DECLARE_BITMAP(pmceid_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
 -- 
 2.15.1
