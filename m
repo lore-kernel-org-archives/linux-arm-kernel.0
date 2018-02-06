@@ -1,189 +1,81 @@
-From: yungching0725@gmail.com (Ken Lin)
-Date: Tue,  6 Feb 2018 08:05:01 +0800
-Subject: [v2] ARM: dts: imx: Add support for Advantech DMS-BA16
-Message-ID: <20180206000501.14641-1-yungching0725@gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 06 Feb 2018 09:05:47 +0900
+Subject: [PATCH] [v2] drm/exynos: g2d: use monotonic timestamps
+In-Reply-To: <20180117170131.2677586-1-arnd@arndb.de>
+References: <CGME20180117170211epcas5p12a9b274b2b0d0b0522c909be3644eebb@epcas5p1.samsung.com>
+ <20180117170131.2677586-1-arnd@arndb.de>
+Message-ID: <5A78F15B.30707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech DMS-BA16 board, which uses
-the Advantech BA-16 module.
 
-Signed-off-by: Ken Lin <yungching0725@gmail.com>
----
-Change in v2:
-- Fix the order issue in Makefile
-- Sort out the nodes alphabetically
-- Use SPDX tag
-- Fix some property issues
 
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/imx6q-dms-ba16.dts | 146 +++++++++++++++++++++++++++++++++++
- 2 files changed, 147 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-dms-ba16.dts
+2018? 01? 18? 02:01? Arnd Bergmann ?(?) ? ?:
+> The exynos DRM driver uses real-time 'struct timeval' values
+> for exporting its timestamps to user space. This has multiple
+> problems:
+> 
+> 1. signed seconds overflow in y2038
+> 2. the 'struct timeval' definition is deprecated in the kernel
+> 3. time may jump or go backwards after a 'settimeofday()' syscall
+> 4. other DRM timestamps are in CLOCK_MONOTONIC domain, so they
+>    can't be compared
+> 5. exporting microseconds requires a division by 1000, which may
+>    be slow on some architectures.
+> 
+> The code existed in two places before, but the IPP portion was
+> removed in 8ded59413ccc ("drm/exynos: ipp: Remove Exynos DRM
+> IPP subsystem"), so we no longer need to worry about it.
+> 
+> Ideally timestamps should just use 64-bit nanoseconds instead, but
+> of course we can't change that now. Instead, this tries to address
+> the first four points above by using monotonic 'timespec' values.
+> 
+> According to Tobias Jakobi, user space doesn't care about the
+> timestamp at the moment, so we can change the format. Even if
+> there is something looking at them, it will work just fine with
+> monotonic times as long as the application only looks at the
+> relative values between two events.
+> 
+> Link: https://patchwork.kernel.org/patch/10038593/
+> Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..585c3da4a47a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -435,6 +435,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-dfi-fs700-m60.dtb \
- 	imx6q-display5-tianma-tm070-1280x768.dtb \
- 	imx6q-dmo-edmqmx6.dtb \
-+	imx6q-dms-ba16.dtb \
- 	imx6q-evi.dtb \
- 	imx6q-gk802.dtb \
- 	imx6q-gw51xx.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-dms-ba16.dts b/arch/arm/boot/dts/imx6q-dms-ba16.dts
-new file mode 100644
-index 000000000000..055b88a6096d
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-dms-ba16.dts
-@@ -0,0 +1,146 @@
-+/*
-+ * Copyright 2018 Advantech Corporation
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include "imx6q-ba16.dtsi"
-+
-+/ {
-+	model = "Advantech DMS-BA16";
-+	compatible = "advantech,imx6q-dms-ba16", "advantech,imx6q-ba16", "fsl,imx6q";
-+
-+	reg_usb_otg_vbus: regulator-usbotgvbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbotgvbus>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	sys_mclk: clock-sys-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <22000000>;
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx6q-ba16-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx6q-ba16-sgtl5000";
-+		ssi-controller = <&ssi1>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
-+	};
-+};
-+
-+&ecspi5 {
-+	num-cs = <1>;
-+	cs-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi5>;
-+	status = "okay";
-+
-+	m25_eeprom: m25p80 at 0 {
-+		compatible = "atmel,at25";
-+		spi-max-frequency = <20000000>;
-+		size = <0x8000>;
-+		pagesize = <64>;
-+		reg = <0>;
-+		address-width = <16>;
-+	};
-+};
-+
-+&iomuxc {
-+
-+	pinctrl_usbotgvbus: usbotgvbusgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15 0x000b0
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID   0x17059
-+		>;
-+	};
-+
-+	pinctrl_i2c1_gpio: i2c1gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26        0x1b0b0
-+			MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27        0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c2_gpio: i2c2gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__GPIO4_IO12 0x1b0b0
-+			MX6QDL_PAD_KEY_ROW3__GPIO4_IO13 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c3_gpio: i2c3gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_3__GPIO1_IO03   0x1b0b0
-+			MX6QDL_PAD_GPIO_6__GPIO1_IO06   0x1b0b0
-+		>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&sys_mclk>;
-+		lrclk-strength = <0x3>;
-+		VDDA-supply = <&reg_1p8v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+	};
-+};
-+
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>;
-+	status = "okay";
-+};
-+
-+&sata {
-+	fsl,no-spread-spectrum;
-+	fsl,transmit-atten-16ths = <12>;
-+	fsl,transmit-boost-mdB = <3330>;
-+	fsl,transmit-level-mV = <1133>;
-+	fsl,receive-dpll-mode = <1>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	dr_mode = "otg";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	bus-width = <8>;
-+	cd-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "okay";
-+};
--- 
-2.11.0
+Picked it up.
+
+Thanks,
+Inki Dae
+
+> ---
+> v2: rebased to what will be in 4.15, now that ipp is gone,
+>     updated changelog text based on input from Tobias.
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> index 2b8bf2dd6387..9effe40f5fa5 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+> @@ -926,7 +926,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+>  	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
+>  	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
+>  	struct drm_exynos_pending_g2d_event *e;
+> -	struct timeval now;
+> +	struct timespec64 now;
+>  
+>  	if (list_empty(&runqueue_node->event_list))
+>  		return;
+> @@ -934,9 +934,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+>  	e = list_first_entry(&runqueue_node->event_list,
+>  			     struct drm_exynos_pending_g2d_event, base.link);
+>  
+> -	do_gettimeofday(&now);
+> +	ktime_get_ts64(&now);
+>  	e->event.tv_sec = now.tv_sec;
+> -	e->event.tv_usec = now.tv_usec;
+> +	e->event.tv_usec = now.tv_nsec / NSEC_PER_USEC;
+>  	e->event.cmdlist_no = cmdlist_no;
+>  
+>  	drm_send_event(drm_dev, &e->base);
+> 
