@@ -1,86 +1,56 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 6 Feb 2018 14:07:24 +0100
-Subject: [PATCH 1/2] ARM: dts: exynos: Add I2S1 device node to
- exynos5433.dtsi
-In-Reply-To: <20180205172110.9897-1-s.nawrocki@samsung.com>
-References: <CGME20180205172146epcas1p1cd7a5027e673fc17fb64d8841c47175a@epcas1p1.samsung.com>
- <20180205172110.9897-1-s.nawrocki@samsung.com>
-Message-ID: <CAJKOXPdxND9Rf4p6stkdhBNY0AzdMqfDtopiBfYttex77+tjnA@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 6 Feb 2018 14:08:58 +0100
+Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
+In-Reply-To: <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
+References: <20180205155222.22189-1-brgl@bgdev.pl>
+ <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
+Message-ID: <CAMpxmJUDbwkcJt_kx9GX+qY10xiGAp-j3+kXM-q3WP1VGwr0UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 5, 2018 at 6:21 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Add DT node for the second I2S controller available on Exynos 5433
-> SoC. While at it the i2s0 node name is changed to a more generic
-> "i2s" and missing properties are added to that node.
-
-Please split it - one patch for adding new I2S and second minor
-cleanup in i2s0 and adding of required properties.
-
-I think there are no dependencies on driver code changes... but let me
-know if I am wrong.
-
-Best regards,
-Krzysztof
-
-
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
+2018-02-06 12:07 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Monday 05 February 2018 09:22 PM, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> Make nand work with the common clock framework by specifying which
+>> clock should be used and what name to look up.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  arch/arm/boot/dts/da850-evm.dts | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+>> index a86a8a1816f2..2602ad8e99ee 100644
+>> --- a/arch/arm/boot/dts/da850-evm.dts
+>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>> @@ -296,6 +296,9 @@
+>>                       reg = <0 0x02000000 0x02000000
+>>                              1 0x00000000 0x00008000>;
+>>
+>> +                     clocks = <&psc0 3>;
+>> +                     clock-names = "aemif";
 >
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> index 62f276970174..2b73bd86bc56 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -1311,6 +1311,25 @@
->                         status = "disabled";
->                 };
+> Looks like this is being added only to satisfy the devm_clk_get() call
+> in nand_davinci_probe() which I think is superfluous since we also
+> enable the same clock in aemif_probe().
 >
-> +               i2s1: i2s at 14d60000 {
-> +                       compatible = "samsung,exynos7-i2s";
-> +                       reg = <0x14d60000 0x100>;
-> +                       dmas = <&pdma0 31 &pdma0 30>;
-> +                       dma-names = "tx", "rx";
-> +                       interrupts = <GIC_SPI 435 IRQ_TYPE_NONE>;
-> +                       clocks = <&cmu_peric CLK_PCLK_I2S1>,
-> +                                <&cmu_peric CLK_PCLK_I2S1>,
-> +                                <&cmu_peric CLK_SCLK_I2S1>;
-> +                       clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-> +                       #clock-cells = <1>;
-> +                       samsung,supports-6ch;
-> +                       samsung,supports-rstclr;
-> +                       samsung,supports-tdm;
-> +                       samsung,supports-low-rfs;
-> +                       #sound-dai-cells = <1>;
-> +                       status = "disabled";
-> +               };
-> +
->                 pwm: pwm at 14dd0000 {
->                         compatible = "samsung,exynos4210-pwm";
->                         reg = <0x14dd0000 0x100>;
-> @@ -1639,7 +1658,7 @@
->                                 power-domains = <&pd_aud>;
->                         };
+> Perhaps the better solution is to drip the clk code in
+> drivers/mtd/nand/davinci_nand.c and shift legacy code to start using
+> drivers/memory/aemif.c as well? This way we can also drop
+> arch/arm/mach-davinci/aemif.c
 >
-> -                       i2s0: i2s0 at 11440000 {
-> +                       i2s0: i2s at 11440000 {
->                                 compatible = "samsung,exynos7-i2s";
->                                 reg = <0x11440000 0x100>;
->                                 dmas = <&adma 0 &adma 2>;
-> @@ -1651,9 +1670,11 @@
->                                         <&cmu_aud CLK_SCLK_AUD_I2S>,
->                                         <&cmu_aud CLK_SCLK_I2S_BCLK>;
->                                 clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-> +                               #clock-cells = <1>;
->                                 pinctrl-names = "default";
->                                 pinctrl-0 = <&i2s0_bus>;
->                                 power-domains = <&pd_aud>;
-> +                               #sound-dai-cells = <1>;
->                                 status = "disabled";
->                         };
->
-> --
-> 2.14.2
->
+> Thanks,
+> Sekhar
+
+Yes, this sounds good, but I think we should leave it for later as an
+additional improvement, once everything else is in place. I think
+these patches should be applied together with David's series in order
+to not break the support on davinci boards and the aemif work would go
+in later as a follow-up. How about that?
+
+Also: I don't have any keystone board to test whether such changes
+don't break the nand support there. Would you be able to test this?
+
+Thanks,
+Bartosz
