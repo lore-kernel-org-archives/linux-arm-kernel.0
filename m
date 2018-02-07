@@ -1,501 +1,834 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Wed,  7 Feb 2018 10:07:06 +0800
-Subject: [PATCH v3 2/2] driver: pinctrl: imx: Add pinctrl driver support for
- imx6sll
-In-Reply-To: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
-References: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1517969226-13076-2-git-send-email-ping.bai@nxp.com>
+Date: Wed,  7 Feb 2018 10:11:20 +0800
+Subject: [PATCH v3 1/2] ARM: dts: imx: Add basic dtsi file for imx6sll
+Message-ID: <1517969481-13411-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl driver support for imx6sll.
+Add dtsi file for imx6sll.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
- changes v2->v3
- - switch the pinctrl driver to use generic pinconfig based on imx7ulp
----
- arch/arm/mach-imx/Kconfig                   |   1 +
- drivers/pinctrl/freescale/Kconfig           |   7 +
- drivers/pinctrl/freescale/Makefile          |   1 +
- drivers/pinctrl/freescale/pinctrl-imx6sll.c | 427 ++++++++++++++++++++++++++++
- 4 files changed, 436 insertions(+)
- create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6sll.c
+ arch/arm/boot/dts/imx6sll.dtsi | 811 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 811 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6sll.dtsi
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 8e3a618..cb010a0 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -514,6 +514,7 @@ config SOC_IMX6SL
- 
- config SOC_IMX6SLL
- 	bool "i.MX6 SoloLiteLite support"
-+	select PINCTRL_IMX6SLL
- 	select SOC_IMX6
- 
- 	help
-diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
-index 4dbc576..b4886ee 100644
---- a/drivers/pinctrl/freescale/Kconfig
-+++ b/drivers/pinctrl/freescale/Kconfig
-@@ -82,6 +82,13 @@ config PINCTRL_IMX6SL
- 	help
- 	  Say Y here to enable the imx6sl pinctrl driver
- 
-+config PINCTRL_IMX6SLL
-+	bool "IMX6SL pinctrl driver"
-+	depends on SOC_IMX6SLL
-+	select PINCTRL_IMX
-+	help
-+	  Say Y here to enable the imx6sl pinctrl driver
-+
- config PINCTRL_IMX6SX
- 	bool "IMX6SX pinctrl driver"
- 	depends on SOC_IMX6SX
-diff --git a/drivers/pinctrl/freescale/Makefile b/drivers/pinctrl/freescale/Makefile
-index 19bb9a5..368be8c 100644
---- a/drivers/pinctrl/freescale/Makefile
-+++ b/drivers/pinctrl/freescale/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_PINCTRL_IMX53)	+= pinctrl-imx53.o
- obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6q.o
- obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6dl.o
- obj-$(CONFIG_PINCTRL_IMX6SL)	+= pinctrl-imx6sl.o
-+obj-$(CONFIG_PINCTRL_IMX6SLL)	+= pinctrl-imx6sll.o
- obj-$(CONFIG_PINCTRL_IMX6SX)	+= pinctrl-imx6sx.o
- obj-$(CONFIG_PINCTRL_IMX6UL)	+= pinctrl-imx6ul.o
- obj-$(CONFIG_PINCTRL_IMX7D)	+= pinctrl-imx7d.o
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx6sll.c b/drivers/pinctrl/freescale/pinctrl-imx6sll.c
+diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
 new file mode 100644
-index 0000000..7ff0436
+index 0000000..b87ee2b
 --- /dev/null
-+++ b/drivers/pinctrl/freescale/pinctrl-imx6sll.c
-@@ -0,0 +1,427 @@
++++ b/arch/arm/boot/dts/imx6sll.dtsi
+@@ -0,0 +1,811 @@
 +/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017-2018 NXP.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
 + */
 +
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinconf-generic.h>
-+#include <linux/pinctrl/pinctrl.h>
++#include <dt-bindings/clock/imx6sll-clock.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "imx6sll-pinfunc.h"
++#include "skeleton.dtsi"
 +
-+#include "pinctrl-imx.h"
++/ {
++	aliases {
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
++		gpio4 = &gpio5;
++		gpio5 = &gpio6;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
++		mmc0 = &usdhc1;
++		mmc1 = &usdhc2;
++		mmc2 = &usdhc3;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++		serial4 = &uart5;
++		spi0 = &ecspi1;
++		spi1 = &ecspi2;
++		spi3 = &ecspi3;
++		spi4 = &ecspi4;
++		usbphy0 = &usbphy1;
++		usbphy1 = &usbphy2;
++	};
 +
-+#define BM_PKE		BIT(12)
-+#define BM_PUE		BIT(13)
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+enum imx6sll_pads {
-+	MX6SLL_PAD_RESERVE0 = 0,
-+	MX6SLL_PAD_RESERVE1 = 1,
-+	MX6SLL_PAD_RESERVE2 = 2,
-+	MX6SLL_PAD_RESERVE3 = 3,
-+	MX6SLL_PAD_RESERVE4 = 4,
-+	MX6SLL_PAD_WDOG_B = 5,
-+	MX6SLL_PAD_REF_CLK_24M = 6,
-+	MX6SLL_PAD_REF_CLK_32K = 7,
-+	MX6SLL_PAD_PWM1 = 8,
-+	MX6SLL_PAD_KEY_COL0 = 9,
-+	MX6SLL_PAD_KEY_ROW0 = 10,
-+	MX6SLL_PAD_KEY_COL1 = 11,
-+	MX6SLL_PAD_KEY_ROW1 = 12,
-+	MX6SLL_PAD_KEY_COL2 = 13,
-+	MX6SLL_PAD_KEY_ROW2 = 14,
-+	MX6SLL_PAD_KEY_COL3 = 15,
-+	MX6SLL_PAD_KEY_ROW3 = 16,
-+	MX6SLL_PAD_KEY_COL4 = 17,
-+	MX6SLL_PAD_KEY_ROW4 = 18,
-+	MX6SLL_PAD_KEY_COL5 = 19,
-+	MX6SLL_PAD_KEY_ROW5 = 20,
-+	MX6SLL_PAD_KEY_COL6 = 21,
-+	MX6SLL_PAD_KEY_ROW6 = 22,
-+	MX6SLL_PAD_KEY_COL7 = 23,
-+	MX6SLL_PAD_KEY_ROW7 = 24,
-+	MX6SLL_PAD_EPDC_DATA00 = 25,
-+	MX6SLL_PAD_EPDC_DATA01 = 26,
-+	MX6SLL_PAD_EPDC_DATA02 = 27,
-+	MX6SLL_PAD_EPDC_DATA03 = 28,
-+	MX6SLL_PAD_EPDC_DATA04 = 29,
-+	MX6SLL_PAD_EPDC_DATA05 = 30,
-+	MX6SLL_PAD_EPDC_DATA06 = 31,
-+	MX6SLL_PAD_EPDC_DATA07 = 32,
-+	MX6SLL_PAD_EPDC_DATA08 = 33,
-+	MX6SLL_PAD_EPDC_DATA09 = 34,
-+	MX6SLL_PAD_EPDC_DATA10 = 35,
-+	MX6SLL_PAD_EPDC_DATA11 = 36,
-+	MX6SLL_PAD_EPDC_DATA12 = 37,
-+	MX6SLL_PAD_EPDC_DATA13 = 38,
-+	MX6SLL_PAD_EPDC_DATA14 = 39,
-+	MX6SLL_PAD_EPDC_DATA15 = 40,
-+	MX6SLL_PAD_EPDC_SDCLK = 41,
-+	MX6SLL_PAD_EPDC_SDLE = 42,
-+	MX6SLL_PAD_EPDC_SDOE = 43,
-+	MX6SLL_PAD_EPDC_SDSHR = 44,
-+	MX6SLL_PAD_EPDC_SDCE0 = 45,
-+	MX6SLL_PAD_EPDC_SDCE1 = 46,
-+	MX6SLL_PAD_EPDC_SDCE2 = 47,
-+	MX6SLL_PAD_EPDC_SDCE3 = 48,
-+	MX6SLL_PAD_EPDC_GDCLK = 49,
-+	MX6SLL_PAD_EPDC_GDOE = 50,
-+	MX6SLL_PAD_EPDC_GDRL = 51,
-+	MX6SLL_PAD_EPDC_GDSP = 52,
-+	MX6SLL_PAD_EPDC_VCOM0 = 53,
-+	MX6SLL_PAD_EPDC_VCOM1 = 54,
-+	MX6SLL_PAD_EPDC_BDR0 = 55,
-+	MX6SLL_PAD_EPDC_BDR1 = 56,
-+	MX6SLL_PAD_EPDC_PWR_CTRL0 = 57,
-+	MX6SLL_PAD_EPDC_PWR_CTRL1 = 58,
-+	MX6SLL_PAD_EPDC_PWR_CTRL2 = 59,
-+	MX6SLL_PAD_EPDC_PWR_CTRL3 = 60,
-+	MX6SLL_PAD_EPDC_PWR_COM = 61,
-+	MX6SLL_PAD_EPDC_PWR_INT = 62,
-+	MX6SLL_PAD_EPDC_PWR_STAT = 63,
-+	MX6SLL_PAD_EPDC_PWR_WAKE = 64,
-+	MX6SLL_PAD_LCD_CLK = 65,
-+	MX6SLL_PAD_LCD_ENABLE = 66,
-+	MX6SLL_PAD_LCD_HSYNC = 67,
-+	MX6SLL_PAD_LCD_VSYNC = 68,
-+	MX6SLL_PAD_LCD_RESET = 69,
-+	MX6SLL_PAD_LCD_DATA00 = 70,
-+	MX6SLL_PAD_LCD_DATA01 = 71,
-+	MX6SLL_PAD_LCD_DATA02 = 72,
-+	MX6SLL_PAD_LCD_DATA03 = 73,
-+	MX6SLL_PAD_LCD_DATA04 = 74,
-+	MX6SLL_PAD_LCD_DATA05 = 75,
-+	MX6SLL_PAD_LCD_DATA06 = 76,
-+	MX6SLL_PAD_LCD_DATA07 = 77,
-+	MX6SLL_PAD_LCD_DATA08 = 78,
-+	MX6SLL_PAD_LCD_DATA09 = 79,
-+	MX6SLL_PAD_LCD_DATA10 = 80,
-+	MX6SLL_PAD_LCD_DATA11 = 81,
-+	MX6SLL_PAD_LCD_DATA12 = 82,
-+	MX6SLL_PAD_LCD_DATA13 = 83,
-+	MX6SLL_PAD_LCD_DATA14 = 84,
-+	MX6SLL_PAD_LCD_DATA15 = 85,
-+	MX6SLL_PAD_LCD_DATA16 = 86,
-+	MX6SLL_PAD_LCD_DATA17 = 87,
-+	MX6SLL_PAD_LCD_DATA18 = 88,
-+	MX6SLL_PAD_LCD_DATA19 = 89,
-+	MX6SLL_PAD_LCD_DATA20 = 90,
-+	MX6SLL_PAD_LCD_DATA21 = 91,
-+	MX6SLL_PAD_LCD_DATA22 = 92,
-+	MX6SLL_PAD_LCD_DATA23 = 93,
-+	MX6SLL_PAD_AUD_RXFS = 94,
-+	MX6SLL_PAD_AUD_RXC = 95,
-+	MX6SLL_PAD_AUD_RXD = 96,
-+	MX6SLL_PAD_AUD_TXC = 97,
-+	MX6SLL_PAD_AUD_TXFS = 98,
-+	MX6SLL_PAD_AUD_TXD = 99,
-+	MX6SLL_PAD_AUD_MCLK = 100,
-+	MX6SLL_PAD_UART1_RXD = 101,
-+	MX6SLL_PAD_UART1_TXD = 102,
-+	MX6SLL_PAD_I2C1_SCL = 103,
-+	MX6SLL_PAD_I2C1_SDA = 104,
-+	MX6SLL_PAD_I2C2_SCL = 105,
-+	MX6SLL_PAD_I2C2_SDA = 106,
-+	MX6SLL_PAD_ECSPI1_SCLK = 107,
-+	MX6SLL_PAD_ECSPI1_MOSI = 108,
-+	MX6SLL_PAD_ECSPI1_MISO = 109,
-+	MX6SLL_PAD_ECSPI1_SS0 = 110,
-+	MX6SLL_PAD_ECSPI2_SCLK = 111,
-+	MX6SLL_PAD_ECSPI2_MOSI = 112,
-+	MX6SLL_PAD_ECSPI2_MISO = 113,
-+	MX6SLL_PAD_ECSPI2_SS0 = 114,
-+	MX6SLL_PAD_SD1_CLK = 115,
-+	MX6SLL_PAD_SD1_CMD = 116,
-+	MX6SLL_PAD_SD1_DATA0 = 117,
-+	MX6SLL_PAD_SD1_DATA1 = 118,
-+	MX6SLL_PAD_SD1_DATA2 = 119,
-+	MX6SLL_PAD_SD1_DATA3 = 120,
-+	MX6SLL_PAD_SD1_DATA4 = 121,
-+	MX6SLL_PAD_SD1_DATA5 = 122,
-+	MX6SLL_PAD_SD1_DATA6 = 123,
-+	MX6SLL_PAD_SD1_DATA7 = 124,
-+	MX6SLL_PAD_SD2_RESET = 125,
-+	MX6SLL_PAD_SD2_CLK = 126,
-+	MX6SLL_PAD_SD2_CMD = 127,
-+	MX6SLL_PAD_SD2_DATA0 = 128,
-+	MX6SLL_PAD_SD2_DATA1 = 129,
-+	MX6SLL_PAD_SD2_DATA2 = 130,
-+	MX6SLL_PAD_SD2_DATA3 = 131,
-+	MX6SLL_PAD_SD2_DATA4 = 132,
-+	MX6SLL_PAD_SD2_DATA5 = 133,
-+	MX6SLL_PAD_SD2_DATA6 = 134,
-+	MX6SLL_PAD_SD2_DATA7 = 135,
-+	MX6SLL_PAD_SD3_CLK = 136,
-+	MX6SLL_PAD_SD3_CMD = 137,
-+	MX6SLL_PAD_SD3_DATA0 = 138,
-+	MX6SLL_PAD_SD3_DATA1 = 139,
-+	MX6SLL_PAD_SD3_DATA2 = 140,
-+	MX6SLL_PAD_SD3_DATA3 = 141,
-+	MX6SLL_PAD_GPIO4_IO20 = 142,
-+	MX6SLL_PAD_GPIO4_IO21 = 143,
-+	MX6SLL_PAD_GPIO4_IO19 = 144,
-+	MX6SLL_PAD_GPIO4_IO25 = 145,
-+	MX6SLL_PAD_GPIO4_IO18 = 146,
-+	MX6SLL_PAD_GPIO4_IO24 = 147,
-+	MX6SLL_PAD_GPIO4_IO23 = 148,
-+	MX6SLL_PAD_GPIO4_IO17 = 149,
-+	MX6SLL_PAD_GPIO4_IO22 = 150,
-+	MX6SLL_PAD_GPIO4_IO16 = 151,
-+	MX6SLL_PAD_GPIO4_IO26 = 152,
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			operating-points = <
++				/* kHz    uV */
++				996000  1225000
++				792000  1175000
++				396000  1075000
++				198000	975000
++			>;
++			fsl,soc-operating-points = <
++				/* ARM kHz      SOC-PU uV */
++				996000          1225000
++				792000          1175000
++				396000          1175000
++				198000		1175000
++			>;
++			clock-latency = <61036>; /* two CLK32 periods */
++			fsl,low-power-run;
++			clocks = <&clks IMX6SLL_CLK_ARM>,
++				 <&clks IMX6SLL_CLK_PLL2_PFD2>,
++				 <&clks IMX6SLL_CLK_STEP>,
++				 <&clks IMX6SLL_CLK_PLL1_SW>,
++				 <&clks IMX6SLL_CLK_PLL1_SYS>,
++				 <&clks IMX6SLL_CLK_PLL1>,
++				 <&clks IMX6SLL_PLL1_BYPASS>,
++				 <&clks IMX6SLL_PLL1_BYPASS_SRC>;
++			clock-names = "arm", "pll2_pfd2_396m", "step",
++				      "pll1_sw", "pll1_sys", "pll1", "pll1_bypass",
++				      "pll1_bypass_src";
++		};
++	};
++
++	intc: interrupt-controller at 00a01000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0x00a01000 0x1000>,
++		      <0x00a00100 0x100>;
++		interrupt-parent = <&intc>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ckil: clock at 0 {
++			compatible = "fixed-clock";
++			reg = <0>;
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "ckil";
++		};
++
++		osc: clock at 1 {
++			compatible = "fixed-clock";
++			reg = <1>;
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++			clock-output-names = "osc";
++		};
++
++		ipp_di0: clock at 2 {
++			compatible = "fixed-clock";
++			reg = <2>;
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "ipp_di0";
++		};
++
++		ipp_di1: clock at 3 {
++			compatible = "fixed-clock";
++			reg = <3>;
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "ipp_di1";
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&gpc>;
++		ranges;
++
++		ocram: sram at 00900000 {
++			compatible = "mmio-sram";
++			reg = <0x00905000 0x20000>;
++		};
++
++		L2: l2-cache at 00a02000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x00a02000 0x1000>;
++			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
++			cache-unified;
++			cache-level = <2>;
++			arm,tag-latency = <4 2 3>;
++			arm,data-latency = <4 2 3>;
++		};
++
++		aips1: aips-bus at 02000000 {
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x02000000 0x100000>;
++			ranges;
++
++			spba: spba-bus at 02000000 {
++				compatible = "fsl,spba-bus", "simple-bus";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x02000000 0x40000>;
++				ranges;
++
++				spdif: spdif at 02004000 {
++					compatible = "fsl,imx6sl-spdif", "fsl,imx35-spdif";
++					reg = <0x02004000 0x4000>;
++					interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 14 18 0>, <&sdma 15 18 0>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_SPDIF_GCLK>,
++						 <&clks IMX6SLL_CLK_OSC>,
++						 <&clks IMX6SLL_CLK_SPDIF>,
++						 <&clks IMX6SLL_CLK_DUMMY>,
++						 <&clks IMX6SLL_CLK_DUMMY>,
++						 <&clks IMX6SLL_CLK_DUMMY>,
++						 <&clks IMX6SLL_CLK_IPG>,
++						 <&clks IMX6SLL_CLK_DUMMY>,
++						 <&clks IMX6SLL_CLK_DUMMY>,
++						 <&clks IMX6SLL_CLK_SPBA>;
++					clock-names = "core", "rxtx0",
++						      "rxtx1", "rxtx2",
++						      "rxtx3", "rxtx4",
++						      "rxtx5", "rxtx6",
++						      "rxtx7", "dma";
++					status = "disabled";
++				};
++
++				ecspi1: ecspi at 02008000 {
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					reg = <0x02008000 0x4000>;
++					interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_ECSPI1>,
++						 <&clks IMX6SLL_CLK_ECSPI1>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				ecspi2: ecspi at 0200c000 {
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					reg = <0x0200c000 0x4000>;
++					interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_ECSPI2>,
++						 <&clks IMX6SLL_CLK_ECSPI2>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				ecspi3: ecspi at 02010000 {
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					reg = <0x02010000 0x4000>;
++					interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_ECSPI3>,
++						 <&clks IMX6SLL_CLK_ECSPI3>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				ecspi4: ecspi at 02014000 {
++					compatible = "fsl,imx6ul-ecspi", "fsl,imx51-ecspi";
++					reg = <0x02014000 0x4000>;
++					interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_ECSPI4>,
++						 <&clks IMX6SLL_CLK_ECSPI4>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				uart4: serial at 02018000 {
++					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
++					reg = <0x02018000 0x4000>;
++					interrupts =<GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 31 4 0>, <&sdma 32 4 0>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_UART4_IPG>,
++						 <&clks IMX6SLL_CLK_UART4_SERIAL>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				uart1: serial at 02020000 {
++					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
++					reg = <0x02020000 0x4000>;
++					interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 25 4 0>, <&sdma 26 4 0>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_UART1_IPG>,
++						 <&clks IMX6SLL_CLK_UART1_SERIAL>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				uart2: serial at 02024000 {
++					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
++					reg = <0x02024000 0x4000>;
++					interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
++					dma-names = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_UART2_IPG>,
++						 <&clks IMX6SLL_CLK_UART2_SERIAL>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++
++				ssi1: ssi at 02028000 {
++					compatible = "fsl,imx6sl-ssi", "fsl,imx51-ssi";
++					reg = <0x02028000 0x4000>;
++					interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 37 22 0>, <&sdma 38 22 0>;
++					dma-names = "rx", "tx";
++					fsl,fifo-depth = <15>;
++					clocks = <&clks IMX6SLL_CLK_SSI1_IPG>,
++						 <&clks IMX6SLL_CLK_SSI1>;
++					clock-names = "ipg", "baud";
++					status = "disabled";
++				};
++
++				ssi2: ssi2 at 0202c000 {
++					compatible = "fsl,imx6sl-ssi", "fsl,imx51-ssi";
++					reg = <0x0202c000 0x4000>;
++					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 41 22 0>, <&sdma 42 22 0>;
++					dma-names = "rx", "tx";
++					fsl,fifo-depth = <15>;
++					clocks = <&clks IMX6SLL_CLK_SSI2_IPG>,
++						 <&clks IMX6SLL_CLK_SSI2>;
++					clock-names = "ipg", "baud";
++					status = "disabled";
++				};
++
++				ssi3: ssi at 02030000 {
++					compatible = "fsl,imx6sl-ssi", "fsl,imx51-ssi";
++					reg = <0x02030000 0x4000>;
++					interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 45 22 0>, <&sdma 46 22 0>;
++					dma-names = "rx", "tx";
++					fsl,fifo-depth = <15>;
++					clocks = <&clks IMX6SLL_CLK_SSI3_IPG>,
++						 <&clks IMX6SLL_CLK_SSI3>;
++					clock-names = "ipg", "baud";
++					status = "disabled";
++				};
++
++				uart3: serial at 02034000 {
++					compatible = "fsl,imx6sl-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
++					reg = <0x02034000 0x4000>;
++					interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&sdma 29 4 0>, <&sdma 30 4 0>;
++					dma-name = "rx", "tx";
++					clocks = <&clks IMX6SLL_CLK_UART3_IPG>,
++						 <&clks IMX6SLL_CLK_UART3_SERIAL>;
++					clock-names = "ipg", "per";
++					status = "disabled";
++				};
++			};
++
++			pwm1: pwm at 02080000 {
++				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
++				reg = <0x02080000 0x4000>;
++				interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_PWM1>,
++					 <&clks IMX6SLL_CLK_PWM1>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++			};
++
++			pwm2: pwm at 02084000 {
++				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
++				reg = <0x02084000 0x4000>;
++				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_PWM2>,
++					 <&clks IMX6SLL_CLK_PWM2>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++			};
++
++			pwm3: pwm at 02088000 {
++				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
++				reg = <0x02088000 0x4000>;
++				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_PWM3>,
++					 <&clks IMX6SLL_CLK_PWM3>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++			};
++
++			pwm4: pwm at 0208c000 {
++				compatible = "fsl,imx6sll-pwm", "fsl,imx27-pwm";
++				reg = <0x0208c000 0x4000>;
++				interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_PWM4>,
++					 <&clks IMX6SLL_CLK_PWM4>;
++				clock-names = "ipg", "per";
++				#pwm-cells = <2>;
++			};
++
++			gpt1: gpt at 02098000 {
++				compatible = "fsl,imx6sll-gpt";
++				reg = <0x02098000 0x4000>;
++				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_GPT_BUS>,
++					 <&clks IMX6SLL_CLK_GPT_SERIAL>;
++				clock-names = "ipg", "per";
++			};
++
++			gpio1: gpio at 0209c000 {
++				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
++				reg = <0x0209c000 0x4000>;
++				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio2: gpio at 020a0000 {
++				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
++				reg = <0x020a0000 0x4000>;
++				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio3: gpio at 020a4000 {
++				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
++				reg = <0x020a4000 0x4000>;
++				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio4: gpio at 020a8000 {
++				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
++				reg = <0x020a8000 0x4000>;
++				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio5: gpio at 020ac000 {
++				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
++				reg = <0x020ac000 0x4000>;
++				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio6: gpio at 020b0000 {
++				compatible = "fsl,imx6sll-gpio", "fsl,imx35-gpio";
++				reg = <0x020b0000 0x4000>;
++				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			kpp: kpp at 020b8000 {
++				compatible = "fsl,imx6sll-kpp", "fsl,imx21-kpp";
++				reg = <0x020b8000 0x4000>;
++				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_KPP>;
++				status = "disabled";
++			};
++
++			wdog1: wdog at 020bc000 {
++				compatible = "fsl,imx6sll-wdt", "fsl,imx21-wdt";
++				reg = <0x020bc000 0x4000>;
++				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_WDOG1>;
++			};
++
++			wdog2: wdog at 020c0000 {
++				compatible = "fsl,imx6sll-wdt", "fsl,imx21-wdt";
++				reg = <0x020c0000 0x4000>;
++				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_WDOG2>;
++				status = "disabled";
++			};
++
++			clks: ccm at 020c4000 {
++				compatible = "fsl,imx6sll-ccm";
++				reg = <0x020c4000 0x4000>;
++				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++				#clock-cells = <1>;
++				clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>;
++				clock-names = "ckil", "osc", "ipp_di0", "ipp_di1";
++
++				assigned-clocks = <&clks IMX6SLL_CLK_PERCLK_SEL>;
++				assigned-clock-parents = <&clks IMX6SLL_CLK_OSC>;
++			};
++
++			anatop: anatop at 020c8000 {
++				compatible = "fsl,imx6sll-anatop",
++					     "fsl,imx6q-anatop",
++					     "syscon", "simple-bus";
++				reg = <0x020c8000 0x4000>;
++				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++
++				reg_3p0: regulator-3p0 at 120 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vdd3p0";
++					regulator-min-microvolt = <2625000>;
++					regulator-max-microvolt = <3400000>;
++					anatop-reg-offset = <0x120>;
++					anatop-vol-bit-shift = <8>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <0>;
++					anatop-min-voltage = <2625000>;
++					anatop-max-voltage = <3400000>;
++					anatop-enable-bit = <0>;
++				};
++			};
++
++			tempmon: tempmon {
++				compatible = "fsl,imx6sll-tempmon", "fsl,imx6sx-tempmon";
++				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++				fsl,tempmon = <&anatop>;
++				fsl,tempmon-data = <&ocotp>;
++				clocks = <&clks IMX6SLL_CLK_PLL3_USB_OTG>;
++				status = "disabled";
++			};
++
++			usbphy1: usbphy at 020c9000 {
++				compatible = "fsl,imx6sll-usbphy", "fsl,imx6ul-usbphy",
++						"fsl,imx23-usbphy";
++				reg = <0x020c9000 0x1000>;
++				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USBPHY1>;
++				phy-3p0-supply = <&reg_3p0>;
++				fsl,anatop = <&anatop>;
++			};
++
++			usbphy2: usbphy at 020ca000 {
++				compatible = "fsl,imx6sll-usbphy", "fsl,imx6ul-usbphy",
++						"fsl,imx23-usbphy";
++				reg = <0x020ca000 0x1000>;
++				interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USBPHY2>;
++				phy-reg_3p0-supply = <&reg_3p0>;
++				fsl,anatop = <&anatop>;
++			};
++
++			snvs: snvs at 020cc000 {
++				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
++				reg = <0x020cc000 0x4000>;
++
++				snvs_rtc: snvs-rtc-lp {
++					compatible = "fsl,sec-v4.0-mon-rtc-lp";
++					regmap = <&snvs>;
++					offset = <0x34>;
++					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++				};
++
++				snvs_poweroff: snvs-poweroff {
++					compatible = "syscon-poweroff";
++					regmap = <&snvs>;
++					offset = <0x38>;
++					mask = <0x61>;
++				};
++
++				snvs_pwrkey: snvs-powerkey {
++					compatible = "fsl,sec-v4.0-pwrkey";
++					regmap = <&snvs>;
++					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++					linux,keycode = <KEY_POWER>;
++					wakeup-source;
++				};
++			};
++
++			epit1: epit at 020d0000 {
++				reg = <0x020d0000 0x4000>;
++				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			epit2: epit at 020d4000 {
++				reg = <0x020d4000 0x4000>;
++				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			src: src at 020d8000 {
++				compatible = "fsl,imx6sll-src", "fsl,imx51-src";
++				reg = <0x020d8000 0x4000>;
++				interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++				#reset-cells = <1>;
++			};
++
++			gpc: gpc at 020dc000 {
++				compatible = "fsl,imx6sll-gpc", "fsl,imx6q-gpc";
++				reg = <0x020dc000 0x4000>;
++				interrupt-controller;
++				#interrupt-cells = <3>;
++				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-parent = <&intc>;
++				fsl,mf-mix-wakeup-irq = <0x7c00000 0x7d00 0x0 0x1400640>;
++			};
++
++			iomuxc: iomuxc at 020e0000 {
++				compatible = "fsl,imx6sll-iomuxc";
++				reg = <0x020e0000 0x4000>;
++			};
++
++			gpr: iomuxc-gpr at 020e4000 {
++				compatible = "fsl,imx6sll-iomuxc-gpr",
++					     "fsl,imx6q-iomuxc-gpr", "syscon";
++				reg = <0x020e4000 0x4000>;
++			};
++
++			csi: csi at 020e8000 {
++				compatible = "fsl,imx6sll-csi", "fsl,imx6s-csi";
++				reg = <0x020e8000 0x4000>;
++				interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_DUMMY>,
++					 <&clks IMX6SLL_CLK_CSI>,
++					 <&clks IMX6SLL_CLK_DUMMY>;
++				clock-names = "disp-axi", "csi_mclk", "disp_dcic";
++				status = "disabled";
++			};
++
++			sdma: sdma at 020ec000 {
++				compatible = "fsl,imx6sll-sdma", "fsl,imx35-sdma";
++				reg = <0x020ec000 0x4000>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_SDMA>,
++					 <&clks IMX6SLL_CLK_SDMA>;
++				clock-names = "ipg", "ahb";
++				#dma-cells = <3>;
++				iram = <&ocram>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
++			};
++
++			lcdif: lcdif at 020f8000 {
++				compatible = "fsl,imx6sll-lcdif", "fsl,imx28-lcdif";
++				reg = <0x020f8000 0x4000>;
++				interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_LCDIF_PIX>,
++					 <&clks IMX6SLL_CLK_LCDIF_APB>,
++					 <&clks IMX6SLL_CLK_DUMMY>;
++				clock-names = "pix", "axi", "disp_axi";
++				status = "disabled";
++			};
++
++			dcp: dcp at 020fc000 {
++				compatible = "fsl,imx6sl-dcp";
++				reg = <0x020fc000 0x4000>;
++				interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_DCP>;
++				clock-names = "dcp";
++			};
++		};
++
++		aips2: aips-bus at 02100000 {
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x02100000 0x100000>;
++			ranges;
++
++			usbotg1: usb at 02184000 {
++				compatible = "fsl,imx6sll-usb", "fsl,imx6ul-usb",
++						"fsl,imx27-usb";
++				reg = <0x02184000 0x200>;
++				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USBOH3>;
++				fsl,usbphy = <&usbphy1>;
++				fsl,usbmisc = <&usbmisc 0>;
++				fsl,anatop = <&anatop>;
++				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
++				status = "disabled";
++			};
++
++			usbotg2: usb at 02184200 {
++				compatible = "fsl,imx6sll-usb", "fsl,imx6ul-usb",
++						"fsl,imx27-usb";
++				reg = <0x02184200 0x200>;
++				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USBOH3>;
++				fsl,usbphy = <&usbphy2>;
++				fsl,usbmisc = <&usbmisc 1>;
++				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
++				status = "disabled";
++			};
++
++			usbmisc: usbmisc at 02184800 {
++				#index-cells = <1>;
++				compatible = "fsl,imx6sll-usbmisc", "fsl,imx6ul-usbmisc",
++						"fsl,imx6q-usbmisc";
++				reg = <0x02184800 0x200>;
++			};
++
++			usdhc1: usdhc at 02190000 {
++				compatible = "fsl,imx6sll-usdhc", "fsl,imx6sx-usdhc";
++				reg = <0x02190000 0x4000>;
++				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USDHC1>,
++					 <&clks IMX6SLL_CLK_USDHC1>,
++					 <&clks IMX6SLL_CLK_USDHC1>;
++				clock-names = "ipg", "ahb", "per";
++				bus-width = <4>;
++				fsl,tuning-step = <2>;
++				fsl,tuning-start-tap = <20>;
++				status = "disabled";
++			};
++
++			usdhc2: usdhc at 02194000 {
++				compatible = "fsl,imx6sll-usdhc", "fsl,imx6sx-usdhc";
++				reg = <0x02194000 0x4000>;
++				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USDHC2>,
++					 <&clks IMX6SLL_CLK_USDHC2>,
++					 <&clks IMX6SLL_CLK_USDHC2>;
++				clock-names = "ipg", "ahb", "per";
++				bus-width = <4>;
++				fsl,tuning-step = <2>;
++				fsl,tuning-start-tap = <20>;
++				status = "disabled";
++			};
++
++			usdhc3: usdhc at 02198000 {
++				compatible = "fsl,imx6sll-usdhc", "fsl,imx6sx-usdhc";
++				reg = <0x02198000 0x4000>;
++				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_USDHC3>,
++					 <&clks IMX6SLL_CLK_USDHC3>,
++					 <&clks IMX6SLL_CLK_USDHC3>;
++				clock-names = "ipg", "ahb", "per";
++				bus-width = <4>;
++				fsl,tuning-step = <2>;
++				fsl,tuning-start-tap = <20>;
++				status = "disabled";
++			};
++
++			i2c1: i2c at 021a0000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fs,imx6sll-i2c", "fsl,imx21-i2c";
++				reg = <0x021a0000 0x4000>;
++				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_I2C1>;
++				status = "disabled";
++			};
++
++			i2c2: i2c at 021a4000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx6sll-i2c", "fsl,imx21-i2c";
++				reg = <0x021a4000 0x4000>;
++				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_I2C2>;
++				status = "disabled";
++			};
++
++			i2c3: i2c at 021a8000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx6sll-i2c", "fsl,imx21-i2c";
++				reg = <0x021a8000 0x4000>;
++				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6SLL_CLK_I2C3>;
++				status = "disabled";
++			};
++
++			romcp at 021ac000 {
++				compatible = "fsl,imx6sll-romcp", "syscon";
++				reg = <0x021ac000 0x4000>;
++			};
++
++			mmdc: mmdc at 021b0000 {
++				compatible = "fsl,imx6sll-mmdc", "fsl,imx6q-mmdc";
++				reg = <0x021b0000 0x4000>;
++			};
++
++			rngb: rngb at 021b4000 {
++				compatible = "fsl,imx6sl-rng", "fsl,imx-rng", "imx-rng";
++				reg = <0x021b4000 0x4000>;
++				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++				clocks =  <&clks IMX6SLL_CLK_DUMMY>;
++			};
++
++			ocotp: ocotp-ctrl at 021bc000 {
++				compatible = "fsl,imx6sll-ocotp", "syscon";
++				reg = <0x021bc000 0x4000>;
++				clocks = <&clks IMX6SLL_CLK_OCOTP>;
++			};
++
++			csu: csu at 021c0000 {
++				compatible = "fsl,imx6sll-csu";
++				reg = <0x021c0000 0x4000>;
++				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++			};
++
++			snvs_gpr: snvs-gpr at 0x021c4000 {
++				compatible = "fsl, imx6sll-snvs-gpr";
++				reg = <0x021c4000 0x10000>;
++			};
++
++			iomuxc_snvs: iomuxc-snvs at 021c8000 {
++				compatible = "fsl,imx6sll-iomuxc-snvs";
++				reg = <0x021c80000 0x10000>;
++			};
++
++			audmux: audmux at 021d8000 {
++				compatible = "fsl,imx6sll-audmux", "fsl,imx31-audmux";
++				reg = <0x021d8000 0x4000>;
++				status = "disabled";
++			};
++
++			uart5: serial at 021f4000 {
++				compatible = "fsl,imx6sll-uart", "fsl,imx6q-uart", "fsl,imx21-uart";
++				reg = <0x021f4000 0x4000>;
++				interrupts =<GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&sdma 33 4 0>, <&sdma 34 4 0>;
++				dma-names = "rx", "tx";
++				clocks = <&clks IMX6SLL_CLK_UART5_IPG>,
++					 <&clks IMX6SLL_CLK_UART5_SERIAL>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++		};
++	};
 +};
-+
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx6sll_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_RESERVE4),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_WDOG_B),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_REF_CLK_24M),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_REF_CLK_32K),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_PWM1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL4),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW4),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL5),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW5),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL6),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW6),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_COL7),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_KEY_ROW7),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA00),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA01),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA02),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA03),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA04),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA05),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA06),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA07),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA08),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA09),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA10),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA11),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA12),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA13),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA14),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_DATA15),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDLE),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDOE),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDSHR),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_SDCE3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDCLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDOE),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDRL),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_GDSP),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_VCOM0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_VCOM1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_BDR0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_BDR1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_CTRL3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_COM),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_INT),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_STAT),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_EPDC_PWR_WAKE),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_CLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_ENABLE),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_HSYNC),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_VSYNC),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_RESET),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA00),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA01),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA02),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA03),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA04),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA05),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA06),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA07),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA08),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA09),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA10),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA11),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA12),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA13),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA14),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA15),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA16),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA17),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA18),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA19),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA20),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA21),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA22),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_LCD_DATA23),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_RXFS),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_RXC),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_RXD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_TXC),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_TXFS),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_TXD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_AUD_MCLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_UART1_RXD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_UART1_TXD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C1_SCL),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C1_SDA),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C2_SCL),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_I2C2_SDA),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_SCLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_MOSI),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_MISO),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI1_SS0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_SCLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_MOSI),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_MISO),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_ECSPI2_SS0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_CLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_CMD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA4),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA5),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA6),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD1_DATA7),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_RESET),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_CLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_CMD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA4),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA5),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA6),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD2_DATA7),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_CLK),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_CMD),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA0),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA1),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA2),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_SD3_DATA3),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO20),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO21),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO19),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO25),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO18),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO24),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO23),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO17),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO22),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO16),
-+	IMX_PINCTRL_PIN(MX6SLL_PAD_GPIO4_IO26),
-+};
-+
-+enum imx6sll_pinconf_param {
-+	IMX6SLL_PIN_CONFIG_SPEED = PIN_CONFIG_END + 1,
-+	IMX6SLL_PIN_CONFIG_LOW_VOLTAGE_ENABLE,
-+};
-+
-+static const struct pinconf_generic_params imx6sll_cfg_params[] = {
-+	{
-+		.property = "fsl,pin-speed",
-+		.param = IMX6SLL_PIN_CONFIG_SPEED,
-+	}, {
-+		.property = "fsl,low-voltage-enable",
-+		.param = IMX6SLL_PIN_CONFIG_LOW_VOLTAGE_ENABLE,
-+	},
-+};
-+
-+static const struct imx_cfg_params_decode imx6sll_cfg_decodes[] = {
-+	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_SLEW_RATE,			0x1, 0),
-+	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_STRENGTH,		0x38, 3),
-+	IMX_CFG_PARAMS_DECODE(IMX6SLL_PIN_CONFIG_SPEED,			0xc0, 6),
-+	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_DRIVE_OPEN_DRAIN,		0x800, 11),
-+	IMX_CFG_PARAMS_DECODE_INVERT(PIN_CONFIG_BIAS_BUS_HOLD,		0x2000, 13),
-+	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_PULL_UP,			0xc000, 14),
-+	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_BIAS_PULL_DOWN,		0xc000, 14),
-+	IMX_CFG_PARAMS_DECODE(PIN_CONFIG_INPUT_SCHMITT_ENABLE,		0x10000, 16),
-+	IMX_CFG_PARAMS_DECODE(IMX6SLL_PIN_CONFIG_LOW_VOLTAGE_ENABLE,	0x400000, 22),
-+};
-+
-+static void imx6sll_cfg_params_fixup(unsigned long *configs,
-+				     unsigned int num_configs,
-+				     u32 *raw_config)
-+{
-+	enum pin_config_param param;
-+	u32 param_val;
-+	int i;
-+
-+	for (i = 0; i < num_configs; i++) {
-+		param = pinconf_to_config_param(configs[i]);
-+		param_val = pinconf_to_config_argument(configs[i]);
-+
-+		if ((param == PIN_CONFIG_BIAS_BUS_HOLD) ||
-+		    (param == PIN_CONFIG_BIAS_PULL_UP) ||
-+		    (param == PIN_CONFIG_BIAS_PULL_DOWN)) {
-+			/* enable the pull/keeper */
-+			*raw_config |= BM_PKE;
-+
-+			/* enable pull, disable keeper */
-+			if ((param == PIN_CONFIG_BIAS_PULL_UP) ||
-+			    (param == PIN_CONFIG_BIAS_PULL_DOWN))
-+				*raw_config |= BM_PUE;
-+
-+			return;
-+		}
-+	}
-+}
-+
-+static const struct imx_pinctrl_soc_info imx6sll_pinctrl_info = {
-+	.pins = imx6sll_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx6sll_pinctrl_pads),
-+	.gpr_compatible = "fsl,imx6sll-iomuxc-gpr",
-+	.generic_pinconf = true,
-+	.custom_params = imx6sll_cfg_params,
-+	.num_custom_params = ARRAY_SIZE(imx6sll_cfg_params),
-+	.decodes = imx6sll_cfg_decodes,
-+	.num_decodes = ARRAY_SIZE(imx6sll_cfg_decodes),
-+	.fixup = imx6sll_cfg_params_fixup,
-+};
-+
-+static const struct of_device_id imx6sll_pinctrl_of_match[] = {
-+	{ .compatible = "fsl,imx6sll-iomuxc", .data = &imx6sll_pinctrl_info, },
-+	{ /* sentinel */ }
-+};
-+
-+static int imx6sll_pinctrl_probe(struct platform_device *pdev)
-+{
-+	pr_info("imx6sll pinctrl probe\n\n\n");
-+	return imx_pinctrl_probe(pdev, &imx6sll_pinctrl_info);
-+}
-+
-+static struct platform_driver imx6sll_pinctrl_driver = {
-+	.driver = {
-+		.name = "imx6sll-pinctrl",
-+		.of_match_table = of_match_ptr(imx6sll_pinctrl_of_match),
-+	},
-+	.probe = imx6sll_pinctrl_probe,
-+};
-+
-+static int __init imx6sll_pinctrl_init(void)
-+{
-+	return platform_driver_register(&imx6sll_pinctrl_driver);
-+}
-+arch_initcall(imx6sll_pinctrl_init);
 -- 
 1.9.1
