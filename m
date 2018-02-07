@@ -1,35 +1,27 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 7 Feb 2018 09:44:28 +0530
+Date: Wed, 7 Feb 2018 09:45:29 +0530
 Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
  sdm845 SoC and MTP
-In-Reply-To: <CAL_JsqJ1xjQ5ZP-KXeZQ0s=ib8GTfvfYjFqyy+Zcub-akCs7Bw@mail.gmail.com>
+In-Reply-To: <20180206185440.GJ9465@builder>
 References: <20180125163216.29018-1-rnayak@codeaurora.org>
  <20180125163216.29018-2-rnayak@codeaurora.org>
- <20180126221501.GD28313@codeaurora.org>
- <CAL_JsqJ1xjQ5ZP-KXeZQ0s=ib8GTfvfYjFqyy+Zcub-akCs7Bw@mail.gmail.com>
-Message-ID: <cf69e160-4f03-f13c-aa39-bd12ed3d9d15@codeaurora.org>
+ <20180206185440.GJ9465@builder>
+Message-ID: <53642249-89c1-3fc0-8ad8-7a954b138bb2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]..
 
->>> +             };
->>> +
->>> +             gcc: clock-controller at 100000 {
->>> +                     compatible = "qcom,gcc-sdm845";
->>> +                     reg = <0x100000 0x1f0000>;
->>> +                     #clock-cells = <1>;
->>> +                     #reset-cells = <1>;
->>> +             };
->>> +
->>> +             tlmm: pinctrl at 03400000 {
->>
->> Drop leading zeroes please.
+
+On 02/07/2018 12:24 AM, Bjorn Andersson wrote:
+> On Thu 25 Jan 08:32 PST 2018, Rajendra Nayak wrote:
+>> +		spmi_bus: qcom,spmi at c440000 {
+> [..]
+>> +		};
+>> +
 > 
-> Build dtbs with W=2 and fix the warnings so reviewers don't have to
-> waste their time on these issues.
+> While we have the chance, please remove this empty line.
 
-Noted. Thanks Rob.
+Will do. Thanks for the review.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
