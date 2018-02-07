@@ -1,37 +1,34 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Wed, 7 Feb 2018 16:34:38 +0100
-Subject: [PATCH] i2c: i2c-stm32f7: fix no check on returned setup
-Message-ID: <1518017678-10283-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Wed, 7 Feb 2018 16:35:11 +0100
+Subject: [PATCH 0/6] Add different features for I2C
+Message-ID: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before assigning returned setup structure check if not null
+Append new I2C STM32F7 feature set. This includes 10 bit support, slave
+support, SMBBus protocols support, DMA Support and eventually an I2C recovery
+mechanism
 
-Fixes: 463a9215f3ca7600b5ff ("i2c: stm32f7: fix setup structure")
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
   Version history:
-     v1:
-         * Initial
+    v1:
+        * Initial
 ---
----
- drivers/i2c/busses/i2c-stm32f7.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Pierre-Yves MORDRET (6):
+  i2c: i2c-stm32f7: Add 10-bit address support
+  i2c: i2c-stm32f7: Add slave support
+  i2c: i2c-stm32f7: Add initial SMBus protocols support
+  i2c: i2c-stm32: Add generic DMA API
+  i2c: i2c-stm32f7: Add DMA support
+  i2c: i2c-stm32f7: Implement I2C recovery mechanism
 
-diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index b445b3b..16c7d77 100644
---- a/drivers/i2c/busses/i2c-stm32f7.c
-+++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -888,6 +888,10 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	setup = of_device_get_match_data(&pdev->dev);
-+	if (!setup) {
-+		dev_err(&pdev->dev, "Can't get device data\n");
-+		goto clk_free;
-+	}
- 	i2c_dev->setup = *setup;
- 
- 	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-rising-time-ns",
+ drivers/i2c/busses/Kconfig       |    1 +
+ drivers/i2c/busses/Makefile      |    3 +-
+ drivers/i2c/busses/i2c-stm32.c   |  153 ++++++
+ drivers/i2c/busses/i2c-stm32.h   |   37 ++
+ drivers/i2c/busses/i2c-stm32f7.c | 1047 +++++++++++++++++++++++++++++++++++++-
+ 5 files changed, 1214 insertions(+), 27 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-stm32.c
+
 -- 
 2.7.4
