@@ -1,115 +1,60 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 7 Feb 2018 12:43:56 +0100
-Subject: [PATCH v2 14/16] arm64: dts: mt7622: add thermal and related nodes
-In-Reply-To: <687a7c43e3e3260ebdf004a96d2cde143f563250.1517910489.git.sean.wang@mediatek.com>
-References: <cover.1517910489.git.sean.wang@mediatek.com>
- <687a7c43e3e3260ebdf004a96d2cde143f563250.1517910489.git.sean.wang@mediatek.com>
-Message-ID: <4db5c81b-0e55-3676-d7c8-d1b6aefb99c4@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 7 Feb 2018 11:55:21 +0000
+Subject: [PATCH 2/2] arm64: Expose Arm v8.4 features
+In-Reply-To: <336948e9-62c4-1ca0-c832-045095eda229@arm.com>
+References: <20180201103838.14702-1-suzuki.poulose@arm.com>
+ <20180201103838.14702-2-suzuki.poulose@arm.com>
+ <20180207104320.GM5862@e103592.cambridge.arm.com>
+ <336948e9-62c4-1ca0-c832-045095eda229@arm.com>
+Message-ID: <20180207115521.GO5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/06/2018 10:53 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Wed, Feb 07, 2018 at 10:51:55AM +0000, Suzuki K Poulose wrote:
+> On 07/02/18 10:43, Dave Martin wrote:
+> >On Thu, Feb 01, 2018 at 10:38:38AM +0000, Suzuki K Poulose wrote:
+> >>Expose the new features introduced by Arm v8.4 extensions to
+> >>Arm v8-A profile.
+> >>
+> >>These include :
+> >>
+> >>  1) Data indpendent timing of instructions. (DIT, exposed as HWCAP_DIT)
+> >>  2) Unaligned atomic instructions and Single-copy atomicity of loads
+> >>     and stores. (AT, expose as HWCAP_USCAT)
+> >>  3) LDAPR and STLR instructions with immediate offsets (extension to
+> >>     LRCPC, exposed as HWCAP_ILRCPC)
+> >>  4) Flag manipulation instructions (TS, exposed as HWCAP_FLAGM).
+> >>
+> >>While at it get rid of the RES0 entries in the cpu-feature-registers.txt
+> >>documentation.
+> >
+> >Should we write somewhere than fields that are not described here are
+> >implicitly RES0, or would that be too strong a statement?
 > 
-> add nodes for the thermal controller and associated thermal zone using
-> CPU as the cooling device for each trip point. In addition, add a fixup
-> for thermal_calibration on nvmem should be 12 bytes as the minimal
-> requirement.
+> Dave,
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 72 +++++++++++++++++++++++++++++++-
->  1 file changed, 71 insertions(+), 1 deletion(-)
+> We already have the following description in the file :
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> index e6dd4f6..6cf67dd 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> @@ -12,6 +12,7 @@
->  #include <dt-bindings/phy/phy.h>
->  #include <dt-bindings/power/mt7622-power.h>
->  #include <dt-bindings/reset/mt7622-reset.h>
-> +#include <dt-bindings/thermal/thermal.h>
->  
->  / {
->  	compatible = "mediatek,mt7622";
-> @@ -75,6 +76,7 @@
->  				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
->  			clock-names = "cpu", "intermediate";
->  			operating-points-v2 = <&cpu_opp_table>;
-> +			#cooling-cells = <2>;
->  			enable-method = "psci";
->  			clock-frequency = <1300000000>;
->  		};
-> @@ -119,6 +121,58 @@
->  		};
->  	};
->  
-> +	thermal-zones {
-> +		cpu_thermal: cpu-thermal {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <1000>;
-> +
-> +			thermal-sensors = <&thermal 0>;
-> +
-> +			trips {
-> +				cpu_passive: cpu-passive {
-> +					temperature = <47000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				cpu_active: cpu-active {
-> +					temperature = <67000>;
-> +					hysteresis = <2000>;
-> +					type = "active";
-> +				};
-> +
-> +				cpu_hot: cpu-hot {
-> +					temperature = <87000>;
-> +					hysteresis = <2000>;
-> +					type = "hot";
-> +				};
-> +
-> +				cpu-crit {
-> +					temperature = <107000>;
-> +					hysteresis = <2000>;
-> +					type = "critical";
-> +				};
-> +			};
-> +
-> +			cooling-maps {
-> +				map0 {
-> +					trip = <&cpu_passive>;
-> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +				};
-> +
-> +				map1 {
-> +					trip = <&cpu_active>;
-> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +				};
-> +
-> +				map2 {
-> +					trip = <&cpu_hot>;
-> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv8-timer";
->  		interrupt-parent = <&gic>;
-> @@ -201,7 +255,7 @@
->  		#size-cells = <1>;
->  
->  		thermal_calibration: calib at 198 {
-> -			reg = <0x198 0x8>;
-> +			reg = <0x198 0xc>;
+> "The following rules are applied to the value returned by the
+> infrastructure:
+> 
+>  a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
+>  b) The value of a reserved field is populated with the reserved
+>     value as defined by the architecture.
+>  c) The value of a 'visible' field holds the system wide safe value
+>     for the particular feature (except for MIDR_EL1, see section 4).
+>  d) All other fields (i.e, invisible fields) are set to indicate
+>     the feature is missing (as defined by the architecture).
+> "
+> 
+> So we don't have to bother if the fields are RES0 or they get
+> some definitions in the future, as long as we don't expose them.
 
-Any reason why this is not part of patch 8/16?
+Agreed, that does seem sufficient:
 
-Regards,
-Matthias
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+[...]
+
+Cheers
+---Dave
