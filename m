@@ -1,106 +1,121 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 7 Feb 2018 12:03:15 -0600
-Subject: [PATCH 01/14] dt-bindings: Document STM32MP1 Reset Clock
- Controller (RCC) bindings
-In-Reply-To: <19273eb9-0c8c-cd2a-d100-f25f25e93234@st.com>
-References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
- <1517580222-23301-2-git-send-email-gabriel.fernandez@st.com>
- <20180205042238.64xjrrguls2drtrg@rob-hp-laptop>
- <19273eb9-0c8c-cd2a-d100-f25f25e93234@st.com>
-Message-ID: <CAL_JsqJFD5g46mkyEWo2uH_ogYLhnvBLQ0f6mU9DG_bdh9n7sA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 7 Feb 2018 18:15:58 +0000
+Subject: [PATCH v2 10/20] arm64: capabilities: Restrict KPTI detection to
+ boot-time CPUs
+In-Reply-To: <20180207103845.GA5862@e103592.cambridge.arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-11-suzuki.poulose@arm.com>
+ <20180207103845.GA5862@e103592.cambridge.arm.com>
+Message-ID: <ec712e11-baa5-aa2c-1b70-be221ea36f9f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 5, 2018 at 1:01 AM, Gabriel FERNANDEZ
-<gabriel.fernandez@st.com> wrote:
-> Hi Rob,
->
-> Thanks for reviewing.
->
->
-> On 02/05/2018 07:09 AM, Rob Herring wrote:
->> On Fri, Feb 02, 2018 at 03:03:29PM +0100, gabriel.fernandez at st.com wrote:
->>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>
->>> The RCC block is responsible of the management of the clock and reset
->>> generation for the complete circuit.
->>>
->>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->>> ---
->>>   .../devicetree/bindings/mfd/st,stm32-rcc.txt       | 85 ++++++++++++++++++++++
->>>   1 file changed, 85 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
->>> new file mode 100644
->>> index 0000000..28017a1
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
->>> @@ -0,0 +1,85 @@
->>> +STMicroelectronics STM32 Peripheral Reset Clock Controller
->>> +==========================================================
->>> +
->>> +The RCC IP is both a reset and a clock controller.
->>> +
->>> +Please also refer to reset.txt for common reset controller binding usage.
->>> +
->>> +Please also refer to clock-bindings.txt for common clock controller
->>> +binding usage.
->>> +
->>> +
->>> +Required properties:
->>> +- compatible: "simple-mfd", "syscon"
+On 07/02/18 10:38, Dave Martin wrote:
+> On Wed, Jan 31, 2018 at 06:27:57PM +0000, Suzuki K Poulose wrote:
+>> KPTI is treated as a system wide feature, where we enable the feature
+>> when all the CPUs on the system suffers from the security vulnerability,
+> 
+> Should that be "when any CPU"?
+> 
+
+Without this patch, we need all the CPUs to mandate the defense (as this
+is a system feature). This patch changes it. I will change it to :
+
+"KPTI is treated as a system wide feature and is only "detected" if all
+the CPUs on the system needs the defense. This is not sufficient, as the
+KPTI is turned off on a system with a mix of CPUs, where some CPUs can
+defend and others can't,
+
+>> unless it is forced via kernel command line. Also, if a late CPU needs
+>> KPTI but KPTI was not enabled at boot time, the CPU is currently allowed
+>> to boot, which is a potential security vulnerability.  This patch ensures
+
+" This patch ensures that KPTI is turned on if at least one CPU requires the
+defense and any late CPUs are rejected..."
+.
+>> that late CPUs are rejected as appropriate if they need KPTI but it wasn't
+>> enabled.
 >>
->>> +- reg: should be register base and length as documented in the datasheet
->>> +
->>> +- Sub-nodes:
->>> +  - compatible: "st,stm32mp1-rcc-clk"
->>> +    - #clock-cells: 1, device nodes should specify the clock in their
->>> +      "clocks" property, containing a phandle to the clock device node,
->>> +      an index specifying the clock to use.
->>> +
->>> +  - compatible: "st,stm32mp1-rcc-rst"
->>> +    - #reset-cells: Shall be 1
->>> +
->>> +Example:
->>> +    rcc: rcc at 50000000 {
->>> +            compatible = "syscon", "simple-mfd";
->>> +            reg = <0x50000000 0x1000>;
->>> +
->>> +            rcc_clk: rcc-clk at 50000000 {
->>> +                    #clock-cells = <1>;
->>> +                    compatible = "st,stm32mp1-rcc-clk";
->>> +            };
->>> +
->>> +            rcc_rst: rcc-reset at 50000000 {
->> You should not have the same unit-address twice.
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/include/asm/cpufeature.h |  9 +++++++++
+>>   arch/arm64/kernel/cpufeature.c      | 11 ++++++-----
+>>   2 files changed, 15 insertions(+), 5 deletions(-)
 >>
->> IMO, this should just be:
->>
->>       rcc: rcc at 50000000 {
->>               compatible = "st-stm32mp1-rcc";
->>               reg = <0x50000000 0x1000>;
->>               #clock-cells = <1>;
->>               #reset-cells = <1>;
->>       };
->>
->> There's no reason a node can't provide more than 1 function.
-> RCC is an dedicated IP for clocks and resets, but also for power
-> management (patches will be sent later)
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index 7bb3fdec827e..71993dd4afae 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -223,6 +223,15 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>   	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
+>>   	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
+>>   
+>> +/*
+>> + * CPU feature detected at boot time, on one or more CPUs. A late CPU
+>> + * is not allowed to have the capability when the system doesn't have it.
+>> + * It is Ok for a late CPU to miss the feature.
+>> + */
+>> +#define ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE	\
+>> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
+>> +	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
+>> +
+>>   struct arm64_cpu_capabilities {
+>>   	const char *desc;
+>>   	u16 capability;
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index ecc87aa74c64..4a55492784b7 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -862,9 +862,8 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+>>   static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+>>   
+>>   static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>> -				int __unused)
+>> +				int scope)
+>>   {
+>> -	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+>>   
+>>   	/* Forced on command line? */
+>>   	if (__kpti_forced) {
+>> @@ -885,8 +884,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+>>   	}
+>>   
+>>   	/* Defer to CPU feature registers */
+>> -	return !cpuid_feature_extract_unsigned_field(pfr0,
+>> -						     ID_AA64PFR0_CSV3_SHIFT);
+>> +	return !has_cpuid_feature(entry, scope);
+>>   }
+>>   
+>>   static int __init parse_kpti(char *str)
+>> @@ -1008,7 +1006,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>>   	{
+>>   		.desc = "Kernel page table isolation (KPTI)",
+>>   		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+>> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+>> +		.type = ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE,
+>> +		.sys_reg = SYS_ID_AA64PFR0_EL1,
+>> +		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
+>> +		.min_field_value = 1,
+>>   		.matches = unmap_kernel_at_el0,
+> 
+> Minor nit, but:
+> 
+> Can we have a comment here to explain that .min_field_value is the
+> minimum value that indicates that KPTI is _not_ required by this cpu?
+> This is the opposite of the usual semantics for this field.
 
-If there's additional functions, they should be part of the binding
-now, not later. bindings should not unnecessarily evolve.
+Sure, will add it.
 
-> Then i need to probe 3 drivers with same IP.
+> 
+> Otherwise, this inversion of meaning is not obvious without digging into
+> unmap_kernel_at_el0() and spotting the ! in !has_cpuid_feature().
+> 
+> With that, or if this usage of !has_cpuid_feature() is already well-
+> established so that a comment is deemed unnecessary:
 
-Drivers and DT nodes don't have to be 1-1. A parent driver can create
-additional child devices.
+This is the first time we have used it.
 
-Also, looking at your existing bindings for RCC IP, it is done as I suggested.
-
-> It's also a way to avoid use of 'CLK_OF_DECLARE_DRIVER' and i need it to
-> probe the 3th driver.
-
-Sounds like a Linux problem, not a DT issue.
-
-Rob
+Cheers
+Suzuki
