@@ -1,50 +1,42 @@
-From: ping.bai@nxp.com (Bai Ping)
-Date: Wed,  7 Feb 2018 10:00:17 +0800
-Subject: [PATCH v3 2/4] driver: clk: imx: add new gate/gate2 wrapper funtion
-In-Reply-To: <1517968819-12869-1-git-send-email-ping.bai@nxp.com>
-References: <1517968819-12869-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1517968819-12869-2-git-send-email-ping.bai@nxp.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 7 Feb 2018 09:58:08 +0800
+Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
+ device tree parsing
+In-Reply-To: <1517956309.2312.172.camel@kernel.crashing.org>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+ <CAL_JsqLZqrxxpuEnoWEGkT2WCuyjqn0bM1DP8PdAwnQsso8kOA@mail.gmail.com>
+ <1517563970.24622.9.camel@mtkswgap22>
+ <1517866584.2312.140.camel@kernel.crashing.org>
+ <1517884738.16010.27.camel@mtkswgap22>
+ <1517889903.2312.151.camel@kernel.crashing.org>
+ <1517891471.20869.6.camel@mtkswgap22>
+ <1517892624.2312.167.camel@kernel.crashing.org>
+ <1517895732.23319.21.camel@mtkswgap22>
+ <1517956309.2312.172.camel@kernel.crashing.org>
+Message-ID: <1517968688.31641.12.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new gate/gate2 wrapper function to register clocks with optional flags.
+Hi, Arnd
 
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
----
- drivers/clk/imx/clk.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Wed, 2018-02-07 at 09:31 +1100, Benjamin Herrenschmidt wrote:
+> On Tue, 2018-02-06 at 13:42 +0800, Ryder Lee wrote:
+> > Thanks for explanation.
+> > 
+> > So I guess the better way to achieve my aim - one IRQ per slot that is
+> > connected to all INTx and get propagated through the bridges (and for
+> > those root ports own interrupts (PME ..)} is to add interrupt-map
+> > properties in both parent and root port nodes.
+> > 
+> > Something like this: https://patchwork.kernel.org/patch/9970923// ,right?
+> 
+> Yup.
+> 
+> Cheers,
+> Ben.
+> 
 
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index d69c4bb..8076ec0 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -123,6 +123,13 @@ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
- 			shift, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk *imx_clk_gate_flags(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, unsigned long flags)
-+{
-+	return clk_register_gate(NULL, name, parent, flags | CLK_SET_RATE_PARENT, reg,
-+			shift, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
-@@ -137,6 +144,13 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 			shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
-+static inline struct clk *imx_clk_gate2_flags(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, unsigned long flags)
-+{
-+	return clk_register_gate2(NULL, name, parent, flags | CLK_SET_RATE_PARENT, reg,
-+			shift, 0x3, 0, &imx_ccm_lock, NULL);
-+}
-+
- static inline struct clk *imx_clk_gate2_shared(const char *name,
- 		const char *parent, void __iomem *reg, u8 shift,
- 		unsigned int *share_count)
--- 
-1.9.1
+Do you have any thoughts on the original approach? If you are okay with
+it, I will resend the DT patch.
+
+Thanks.
