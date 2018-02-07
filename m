@@ -1,49 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  7 Feb 2018 14:45:49 +0100
-Subject: [PATCH 3/7] ARM: davinci: don't setup pm_clk if we're using genpd
+Date: Wed,  7 Feb 2018 14:45:50 +0100
+Subject: [PATCH 4/7] ARM: dts: da850: add power controller nodes
 In-Reply-To: <20180207134553.13510-1-brgl@bgdev.pl>
 References: <20180207134553.13510-1-brgl@bgdev.pl>
-Message-ID: <20180207134553.13510-4-brgl@bgdev.pl>
+Message-ID: <20180207134553.13510-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-As the first step in switching to using the genpd driver in DT mode,
-check if a relevant genpd node exists and don't setup the clock pm in
-this case.
+Add two power controller nodes corresponding with the two PSC modules
+present on the da850 SoC.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/pm_domain.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/da850.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
-index 78eac2c0c146..98a4f3fcba50 100644
---- a/arch/arm/mach-davinci/pm_domain.c
-+++ b/arch/arm/mach-davinci/pm_domain.c
-@@ -13,6 +13,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/pm_clock.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 3a1f2ced05ca..ac2eef4e6b7c 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -24,6 +24,11 @@
+ 		};
+ 	};
  
- static struct dev_pm_domain davinci_pm_domain = {
- 	.ops = {
-@@ -28,7 +29,13 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
- 
- static int __init davinci_pm_runtime_init(void)
- {
--	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
-+	struct device_node *np;
++	aliases {
++		pwc0 = &pwc0;
++		pwc1 = &pwc1;
++	};
 +
-+	/* Use pm_clk as fallback if we're not using genpd. */
-+	np = of_find_compatible_node(NULL, NULL, "ti,davinci-pm-domains");
-+	if (!np)
-+		pm_clk_add_notifier(&platform_bus_type,
-+				    &platform_bus_notifier);
+ 	opp_table: opp-table {
+ 		compatible = "operating-points-v2";
  
- 	return 0;
- }
+@@ -141,6 +146,10 @@
+ 				      "pll0_sysclk4", "pll0_sysclk6",
+ 				      "async1";
+ 		};
++		pwc0: power-controller at 10000 {
++			compatible = "ti,davinci-pm-domains";
++			#power-domain-cells = <0>;
++		};
+ 		pll0: clock-controller at 11000 {
+ 			compatible = "ti,da850-pll0";
+ 			reg = <0x11000 0x1000>;
+@@ -757,6 +766,10 @@
+ 				 <&async3_clk>;
+ 			clock-names = "pll0_sysclk2", "pll0_sysclk4", "async3";
+ 		};
++		pwc1: power-controller at 227000 {
++			compatible = "ti,davinci-pm-domains";
++			#power-domain-cells = <0>;
++		};
+ 		pinconf: pin-controller at 22c00c {
+ 			compatible = "ti,da850-pupd";
+ 			reg = <0x22c00c 0x8>;
 -- 
 2.16.1
