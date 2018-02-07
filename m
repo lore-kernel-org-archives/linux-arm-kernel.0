@@ -1,121 +1,200 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 7 Feb 2018 18:15:58 +0000
-Subject: [PATCH v2 10/20] arm64: capabilities: Restrict KPTI detection to
- boot-time CPUs
-In-Reply-To: <20180207103845.GA5862@e103592.cambridge.arm.com>
+Date: Wed, 7 Feb 2018 18:34:37 +0000
+Subject: [PATCH v2 11/20] arm64: capabilities: Add support for features
+ enabled early
+In-Reply-To: <20180207103855.GB5862@e103592.cambridge.arm.com>
 References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-11-suzuki.poulose@arm.com>
- <20180207103845.GA5862@e103592.cambridge.arm.com>
-Message-ID: <ec712e11-baa5-aa2c-1b70-be221ea36f9f@arm.com>
+ <20180131182807.32134-12-suzuki.poulose@arm.com>
+ <20180207103855.GB5862@e103592.cambridge.arm.com>
+Message-ID: <a1275474-fbf0-91b2-befb-cbd59d5ccf1e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/02/18 10:38, Dave Martin wrote:
-> On Wed, Jan 31, 2018 at 06:27:57PM +0000, Suzuki K Poulose wrote:
->> KPTI is treated as a system wide feature, where we enable the feature
->> when all the CPUs on the system suffers from the security vulnerability,
-> 
-> Should that be "when any CPU"?
-> 
-
-Without this patch, we need all the CPUs to mandate the defense (as this
-is a system feature). This patch changes it. I will change it to :
-
-"KPTI is treated as a system wide feature and is only "detected" if all
-the CPUs on the system needs the defense. This is not sufficient, as the
-KPTI is turned off on a system with a mix of CPUs, where some CPUs can
-defend and others can't,
-
->> unless it is forced via kernel command line. Also, if a late CPU needs
->> KPTI but KPTI was not enabled at boot time, the CPU is currently allowed
->> to boot, which is a potential security vulnerability.  This patch ensures
-
-" This patch ensures that KPTI is turned on if at least one CPU requires the
-defense and any late CPUs are rejected..."
-.
->> that late CPUs are rejected as appropriate if they need KPTI but it wasn't
->> enabled.
+> On Wed, Jan 31, 2018 at 06:27:58PM +0000, Suzuki K Poulose wrote:
+>> The kernel detects and uses some of the features based on the boot
+>> CPU and expects that all the following CPUs conform to it. e.g,
+>> with VHE and the boot CPU running at EL2, the kernel decides to
+>> keep the kernel running at EL2. If another CPU is brought up without
+>> this capability, we use custom hooks (via check_early_cpu_features())
+>> to handle it. To handle such capabilities add support for detecting
+>> and enabling capabilities based on the boot CPU.
 >>
->> Cc: Will Deacon <will.deacon@arm.com>
+>> A bit is added to indicate if the capability should be detected
+>> early on the boot CPU. The infrastructure then ensures that such
+>> capabilities are probed and "enabled" early on in the boot CPU
+>> and, enabled on the subsequent CPUs.
+>>
+>> Cc: Julien Thierry <julien.thierry@arm.com>
 >> Cc: Dave Martin <dave.martin@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
 >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >> ---
->>   arch/arm64/include/asm/cpufeature.h |  9 +++++++++
->>   arch/arm64/kernel/cpufeature.c      | 11 ++++++-----
->>   2 files changed, 15 insertions(+), 5 deletions(-)
+>>   arch/arm64/include/asm/cpufeature.h | 48 +++++++++++++++++++++++++++++--------
+>>   arch/arm64/kernel/cpufeature.c      | 48 +++++++++++++++++++++++++++----------
+>>   2 files changed, 74 insertions(+), 22 deletions(-)
 >>
 >> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index 7bb3fdec827e..71993dd4afae 100644
+>> index 71993dd4afae..04161aac0f06 100644
 >> --- a/arch/arm64/include/asm/cpufeature.h
 >> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -223,6 +223,15 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->>   	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
->>   	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
+>> @@ -104,7 +104,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    *    some checks at runtime. This could be, e.g, checking the value of a field
+>>    *    in CPU ID feature register or checking the cpu model. The capability
+>>    *    provides a call back ( @matches() ) to perform the check.
+>> - *    Scope defines how the checks should be performed. There are two cases:
+>> + *    Scope defines how the checks should be performed. There are three cases:
+>>    *
+>>    *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
+>>    *        matches. This implies, we have to run the check on all the booting
+>> @@ -117,6 +117,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    *        field in one of the CPU ID feature registers, we use the sanitised
+>>    *        value of the register from the CPU feature infrastructure to make
+>>    *        the decision.
+>> + *		Or
+>> + *     c) SCOPE_BOOT_CPU: Check only on the primary boot CPU to detect the feature.
+>> + *        This category is for features that are "finalised" (or used) by the kernel
+>> + *        very early even before the SMP cpus are brought up.
+>> + *
+>>    *    The process of detection is usually denoted by "update" capability state
+>>    *    in the code.
+>>    *
+>> @@ -129,6 +134,10 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    *    EL2 with Virtualisation Host Extensions). The kernel usually disallows
+>>    *    any changes to the state of a capability once it finalises the capability
+>>    *    and takes any action, as it may be impossible to execute the actions safely.
+>> + *    At the moment there are two passes of finalising the capabilities.
+>> + *      a) Boot CPU scope capabilities - Finalised by primary boot CPU via
+>> + *         setup_boot_cpu_capabilities().
+>> + *      b) Everything except (a) - Run via setup_system_capabilities().
+>>    *
+>>    * 3) Verification: When a CPU is brought online (e.g, by user or by the kernel),
+>>    *    the kernel should make sure that it is safe to use the CPU, by verifying
+>> @@ -139,11 +148,22 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    *
+>>    *    As explained in (2) above, capabilities could be finalised at different
+>>    *    points in the execution. Each CPU is verified against the "finalised"
+>> - *    capabilities and if there is a conflict, the kernel takes an action, based
+>> - *    on the severity (e.g, a CPU could be prevented from booting or cause a
+>> - *    kernel panic). The CPU is allowed to "affect" the state of the capability,
+>> - *    if it has not been finalised already. See section 5 for more details on
+>> - *    conflicts.
+>> + *    capabilities.
+>> + *
+>> + *	x------------------------------------------------------------------- x
+>> + *	| Verification:       | Boot CPU | SMP CPUs by kernel | CPUs by user |
+>> + *	|--------------------------------------------------------------------|
+>> + *	| Primary boot CPU    |          |                    |              |
+>> + *	|  capability         |   n      |      y             |       y      |
+>> + *	|--------------------------------------------------------------------|
+>> + *	| All others          |   n      |      n             |       y      |
+>> + *	x--------------------------------------------------------------------x
+> 
+> Minor clarify nit: it's not obvious that "n" means "no conflict" and "y"
+> means "conflict".
+> 
+> Could we have blank cell versus "X" (with a note saying what that
+> means), or "ok" versus "CONFLICT"?
+
+This is not strictly about conflicts, but about what each CPU get verified against.
+Since there are multiple stages of "finalisation" for the capabilities, the table
+shows how the CPUs get verified.
+
+Would it help if I changed the description above the table to :
+
+  *    As explained in (2) above, capabilities could be finalised at different
+  *    points in the execution. Each CPU is verified against the "finalised"
+  *    capabilities. The following table shows, the capabilities verified
+  *    against each CPU in the system.
+  *
+  *      x------------------------------------------------------------------- x
+  *      | Verified against:   | Boot CPU | SMP CPUs by kernel | CPUs by user |
+
+.....
+
+
+> 
+>> + *
+>> + *
+>> + *    If there is a conflict, the kernel takes an action, based on the severity
+>> + *    (e.g, a CPU could be prevented from booting or cause a kernel panic).
+>> + *    The CPU is allowed to "affect" the state of the capability, if it has not
+>> + *    been finalised already. See section 5 for more details on conflicts.
+>>    *
+>>    * 4) Action: As mentioned in (2), the kernel can take an action for each detected
+>>    *    capability, on all CPUs on the system. This is always initiated only after
+>> @@ -186,20 +206,28 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>>    */
 >>   
+>>   
+>> -/* Decide how the capability is detected. On a local CPU vs System wide */
+>> -#define ARM64_CPUCAP_SCOPE_MASK			0x3
 >> +/*
->> + * CPU feature detected at boot time, on one or more CPUs. A late CPU
->> + * is not allowed to have the capability when the system doesn't have it.
->> + * It is Ok for a late CPU to miss the feature.
+>> + * Decide how the capability is detected.
+>> + * On any local CPU vs System wide vs the primary boot CPU
 >> + */
->> +#define ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE	\
->> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
->> +	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
->> +
->>   struct arm64_cpu_capabilities {
->>   	const char *desc;
->>   	u16 capability;
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index ecc87aa74c64..4a55492784b7 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -862,9 +862,8 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
->>   static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
->>   
->>   static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->> -				int __unused)
->> +				int scope)
+>> +#define ARM64_CPUCAP_SCOPE_MASK			0x7
+> 
+> Minor nit: magic number.  Could we do
+> 
+> #define ARM64_CPUCAP_SCOPE_MASK		\
+> 	(ARM64_CPUCAP_SCOPE_LOCAL_CPU |	\
+> 	 ARM64_CPUCAP_SCOPE_SYSTEM |	\
+> 	 ARM64_CPUCAP_SCOPE_BOOT_CPU)
+> 
+> below?
+
+Sure, I will move it.
+
+>>   static void verify_local_cpu_capabilities(void)
 >>   {
->> -	u64 pfr0 = read_sanitised_ftr_reg(SYS_ID_AA64PFR0_EL1);
+>> -	if (!verify_local_cpu_caps(ARM64_CPUCAP_SCOPE_ALL))
+>> +	if (!verify_local_cpu_caps(~ARM64_CPUCAP_SCOPE_BOOT_CPU))
+> 
+> [1] This is neat, but would it be clearer to say _ALL & ~_BOOT_CPU?
+> 
+> Otherwise, this is passing (u16)0xfffb, which feels invalid,
+> particularly since it includes _{PERMITTED,OPTIONAL}_FOR_LATE_CPU which
+> don't make sense here, even if we know they get masked off.
+> 
+> There could be future pitfalls here if ~_BOOT_CPU by itself is pasted
+> in other places where the *_FOR_LATE_CPU bits are significant.
+
+Sure, I chose it for keeping the lines shorter ;-). I will switch it.
+
+> 
+>>   		cpu_die_early();
+>>   	verify_local_elf_hwcaps(arm64_elf_hwcaps);
 >>   
->>   	/* Forced on command line? */
->>   	if (__kpti_forced) {
->> @@ -885,8 +884,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->>   	}
->>   
->>   	/* Defer to CPU feature registers */
->> -	return !cpuid_feature_extract_unsigned_field(pfr0,
->> -						     ID_AA64PFR0_CSV3_SHIFT);
->> +	return !has_cpuid_feature(entry, scope);
+>> @@ -1415,6 +1430,15 @@ void check_local_cpu_capabilities(void)
+>>   		verify_local_cpu_capabilities();
 >>   }
 >>   
->>   static int __init parse_kpti(char *str)
->> @@ -1008,7 +1006,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->>   	{
->>   		.desc = "Kernel page table isolation (KPTI)",
->>   		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
->> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->> +		.type = ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE,
->> +		.sys_reg = SYS_ID_AA64PFR0_EL1,
->> +		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
->> +		.min_field_value = 1,
->>   		.matches = unmap_kernel_at_el0,
+>> +static void __init setup_boot_cpu_capabilities(void)
+>> +{
+>> +	/* Detect capabilities with either SCOPE_BOOT_CPU or SCOPE_LOCAL_CPU */
+>> +	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_BOOT_CPU |
+>> +				 ARM64_CPUCAP_SCOPE_LOCAL_CPU);
+>> +	/* Enable the SCOPE_BOOT_CPU capabilities alone right away */
+>> +	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_BOOT_CPU);
+>> +}
+>> +
+>>   static void __init setup_system_capabilities(void)
+>>   {
+>>   	/*
+>> @@ -1422,8 +1446,8 @@ static void __init setup_system_capabilities(void)
+>>   	 * finalise the capabilities that depend on it.
+>>   	 */
+>>   	update_system_capabilities();
+>> -	/* Enable all the available capabilities */
+>> -	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_ALL);
+>> +	/* Enable all the available capabilities, which are not already enabled. */
+>> +	enable_cpu_capabilities(~ARM64_CPUCAP_SCOPE_BOOT_CPU);
 > 
-> Minor nit, but:
+> As [1] above.
 > 
-> Can we have a comment here to explain that .min_field_value is the
-> minimum value that indicates that KPTI is _not_ required by this cpu?
-> This is the opposite of the usual semantics for this field.
-
-Sure, will add it.
-
-> 
-> Otherwise, this inversion of meaning is not obvious without digging into
-> unmap_kernel_at_el0() and spotting the ! in !has_cpuid_feature().
-> 
-> With that, or if this usage of !has_cpuid_feature() is already well-
-> established so that a comment is deemed unnecessary:
-
-This is the first time we have used it.
 
 Cheers
 Suzuki
