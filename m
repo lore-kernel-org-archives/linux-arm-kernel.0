@@ -1,177 +1,321 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed,  7 Feb 2018 22:17:12 +0100
-Subject: [PATCH v4 11/12] ARM: dts: sun8i: a83t: Add HDMI display pipeline
-In-Reply-To: <20180207211713.3638-1-jernej.skrabec@siol.net>
-References: <20180207211713.3638-1-jernej.skrabec@siol.net>
-Message-ID: <20180207211713.3638-12-jernej.skrabec@siol.net>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 7 Feb 2018 16:21:58 -0600
+Subject: [PATCH 5/7] ARM: dts: da850: add power-domains properties to
+ device nodes
+In-Reply-To: <20180207134553.13510-6-brgl@bgdev.pl>
+References: <20180207134553.13510-1-brgl@bgdev.pl>
+ <20180207134553.13510-6-brgl@bgdev.pl>
+Message-ID: <25c285d4-4348-8bca-ba12-26464e13ed30@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds all bits necessary for HDMI on A83T - mixer1, tcon1,
-hdmi, hdmi phy and hdmi pinctrl entries.
+On 02/07/2018 07:45 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Make all devices managed by PSCs use the genpd driver.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>   arch/arm/boot/dts/da850.dtsi | 33 +++++++++++++++++++++++++++++++++
+>   1 file changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index ac2eef4e6b7c..a2a1a3b7de3c 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -83,6 +83,7 @@
+>   			ti,intc-size = <101>;
+>   			reg = <0xfffee000 0x2000>;
+>   			clocks = <&psc0 6>;
+> +			power-domains = <&pwc0>;
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 119 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 118 insertions(+), 1 deletion(-)
+If we are making this a power domain consumer, we can probably drop the
+clock property.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 7f4955a5fab7..b8e629e5dbf3 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -155,7 +155,7 @@
- 
- 	de: display-engine {
- 		compatible = "allwinner,sun8i-a83t-display-engine";
--		allwinner,pipelines = <&mixer0>;
-+		allwinner,pipelines = <&mixer0>, <&mixer1>;
- 		status = "disabled";
- 	};
- 
-@@ -208,6 +208,32 @@
- 			};
- 		};
- 
-+		mixer1: mixer at 1200000 {
-+			compatible = "allwinner,sun8i-a83t-de2-mixer-1";
-+			reg = <0x01200000 0x100000>;
-+			clocks = <&display_clocks CLK_BUS_MIXER1>,
-+				 <&display_clocks CLK_MIXER1>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks RST_WB>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer1_out_tcon1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon1_in_mixer1>;
-+					};
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-a83t-system-controller",
- 				"syscon";
-@@ -256,6 +282,43 @@
- 			};
- 		};
- 
-+		tcon1: lcd-controller at 1c0d000 {
-+			compatible = "allwinner,sun8i-a83t-tcon-tv";
-+			reg = <0x01c0d000 0x1000>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON1>, <&ccu CLK_TCON1>;
-+			clock-names = "ahb", "tcon-ch1";
-+			resets = <&ccu RST_BUS_TCON1>;
-+			reset-names = "lcd";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon1_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon1_in_mixer1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer1_out_tcon1>;
-+					};
-+				};
-+
-+				tcon1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon1_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon1>;
-+					};
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun8i-a83t-mmc",
- 				     "allwinner,sun7i-a20-mmc";
-@@ -427,6 +490,11 @@
- 				drive-strength = <40>;
- 			};
- 
-+			hdmi_pins: hdmi-pins {
-+				pins = "PH6", "PH7", "PH8";
-+				function = "hdmi";
-+			};
-+
- 			i2c0_pins: i2c0-pins {
- 				pins = "PH0", "PH1";
- 				function = "i2c0";
-@@ -685,6 +753,55 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		hdmi: hdmi at 1ee0000 {
-+			compatible = "allwinner,sun8i-a83t-dw-hdmi";
-+			reg = <0x01ee0000 0x10000>;
-+			reg-io-width = <1>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_SLOW>,
-+				 <&ccu CLK_HDMI>;
-+			clock-names = "iahb", "isfr", "tmds";
-+			resets = <&ccu RST_BUS_HDMI1>;
-+			reset-names = "ctrl";
-+			phys = <&hdmi_phy>;
-+			phy-names = "hdmi-phy";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hdmi_pins>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				hdmi_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					hdmi_in_tcon1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon1_out_hdmi>;
-+					};
-+				};
-+
-+				hdmi_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		hdmi_phy: hdmi-phy at 1ef0000 {
-+			compatible = "allwinner,sun8i-a83t-hdmi-phy";
-+			reg = <0x01ef0000 0x10000>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_SLOW>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_HDMI0>;
-+			reset-names = "phy";
-+			#phy-cells = <0>;
-+		};
-+
- 		r_intc: interrupt-controller at 1f00c00 {
- 			compatible = "allwinner,sun8i-a83t-r-intc",
- 				     "allwinner,sun6i-a31-r-intc";
--- 
-2.16.1
+>   		};
+>   	};
+>   	clocks: clocks {
+> @@ -125,6 +126,7 @@
+>   		interrupt-parent = <&intc>;
+>   		interrupts = <28>;
+>   		clocks = <&psc0 15>;
+> +		power-domains = <&pwc0>;
+>   		status = "disabled";
+>   	};
+>   	soc at 1c00000 {
+> @@ -400,12 +402,14 @@
+>   				clocks = <&psc1 1>, <&usb_refclkin>,
+>   					 <&pll0_auxclk>;
+>   				clock-names = "fck", "usb_refclkin", "auxclk";
+> +				power-domains = <&pwc1>;
+
+If we are going to use a power domain here, this driver will need to be re-written.
+
+>   			};
+>   			ehrpwm_tbclk: ehrpwm_tbclk {
+>   				compatible = "ti,da830-tbclksync";
+>   				#clock-cells = <0>;
+>   				clocks = <&psc1 17>;
+>   				clock-names = "fck";
+> +				power-domains = <&pwc1>;
+
+This is a clock node, not a (platform) device node, so I am not sure having
+a power domain here makes sense.
+
+>   			};
+>   			div4p5_clk: div4.5 {
+>   				compatible = "ti,da830-div4p5ena";
+> @@ -439,6 +443,7 @@
+>   
+>   			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
+>   			clocks = <&psc0 0>;
+> +			power-domains = <&pwc0>;
+
+We really just need power-domains here, not clocks. Same applies to
+the rest of the edma* nodes below.
+
+>   		};
+>   		edma0_tptc0: tptc at 8000 {
+>   			compatible = "ti,edma3-tptc";
+> @@ -446,6 +451,7 @@
+>   			interrupts = <13>;
+>   			interrupt-names = "edm3_tcerrint";
+>   			clocks = <&psc0 1>;
+> +			power-domains = <&pwc0>;
+>   		};
+>   		edma0_tptc1: tptc at 8400 {
+>   			compatible = "ti,edma3-tptc";
+> @@ -453,6 +459,7 @@
+>   			interrupts = <32>;
+>   			interrupt-names = "edm3_tcerrint";
+>   			clocks = <&psc0 2>;
+> +			power-domains = <&pwc0>;
+>   		};
+>   		edma1: edma at 230000 {
+>   			compatible = "ti,edma3-tpcc";
+> @@ -465,6 +472,7 @@
+>   
+>   			ti,tptcs = <&edma1_tptc0 7>;
+>   			clocks = <&psc1 0>;
+> +			power-domains = <&pwc1>;
+>   		};
+>   		edma1_tptc0: tptc at 238000 {
+>   			compatible = "ti,edma3-tptc";
+> @@ -472,6 +480,7 @@
+>   			interrupts = <95>;
+>   			interrupt-names = "edm3_tcerrint";
+>   			clocks = <&psc1 21>;
+> +			power-domains = <&pwc1>;
+>   		};
+>   		serial0: serial at 42000 {
+>   			compatible = "ti,da830-uart", "ns16550a";
+> @@ -480,6 +489,7 @@
+>   			reg-shift = <2>;
+>   			interrupts = <25>;
+>   			clocks = <&psc0 9>;
+> +			power-domains = <&pwc0>;
+>   			status = "disabled";
+>   		};
+>   		serial1: serial at 10c000 {
+> @@ -489,6 +499,7 @@
+>   			reg-shift = <2>;
+>   			interrupts = <53>;
+>   			clocks = <&psc1 12>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		serial2: serial at 10d000 {
+> @@ -498,6 +509,7 @@
+>   			reg-shift = <2>;
+>   			interrupts = <61>;
+>   			clocks = <&psc1 13>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		rtc0: rtc at 23000 {
+> @@ -523,6 +535,7 @@
+>   			#address-cells = <1>;
+>   			#size-cells = <0>;
+>   			clocks = <&psc1 11>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		clocksource: timer at 20000 {
+> @@ -545,6 +558,7 @@
+>   			dmas = <&edma0 16 0>, <&edma0 17 0>;
+>   			dma-names = "rx", "tx";
+>   			clocks = <&psc0 5>;
+> +			power-domains = <&pwc0>;
+>   			status = "disabled";
+>   		};
+>   		vpif: video at 217000 {
+> @@ -552,6 +566,7 @@
+>   			reg = <0x217000 0x1000>;
+>   			interrupts = <92>;
+>   			clocks = <&psc1 9>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   
+>   			/* VPIF capture port */
+> @@ -575,6 +590,7 @@
+>   			dmas = <&edma1 28 0>, <&edma1 29 0>;
+>   			dma-names = "rx", "tx";
+>   			clocks = <&psc1 18>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		ehrpwm0: pwm at 300000 {
+> @@ -585,6 +601,7 @@
+>   			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
+>   			clock-names = "fck", "tbclk";
+>   			status = "disabled";
+> +			power-domains = <&pwc1>;
+
+nit picking: it would be nice to have power-domains before status just
+to be consistent in the order.
+
+>   		};
+>   		ehrpwm1: pwm at 302000 {
+>   			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
+> @@ -592,6 +609,7 @@
+>   			#pwm-cells = <3>;
+>   			reg = <0x302000 0x2000>;
+>   			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
+> +			power-domains = <&pwc1>;
+>   			clock-names = "fck", "tbclk";
+
+nit picking: it would be nice to keep clocks and clock-names next to each
+other. Also several places below.
+
+>   			status = "disabled";
+>   		};
+> @@ -601,6 +619,7 @@
+>   			#pwm-cells = <3>;
+>   			reg = <0x306000 0x80>;
+>   			clocks = <&psc1 20>;
+> +			power-domains = <&pwc1>;
+>   			clock-names = "fck";
+>   			status = "disabled";
+>   		};
+> @@ -610,6 +629,7 @@
+>   			#pwm-cells = <3>;
+>   			reg = <0x307000 0x80>;
+>   			clocks = <&psc1 20>;
+> +			power-domains = <&pwc1>;
+>   			clock-names = "fck";
+>   			status = "disabled";
+>   		};
+> @@ -619,6 +639,7 @@
+>   			#pwm-cells = <3>;
+>   			reg = <0x308000 0x80>;
+>   			clocks = <&psc1 20>;
+> +			power-domains = <&pwc1>;
+>   			clock-names = "fck";
+>   			status = "disabled";
+>   		};
+> @@ -633,6 +654,7 @@
+>   			dmas = <&edma0 14 0>, <&edma0 15 0>;
+>   			dma-names = "rx", "tx";
+>   			clocks = <&psc0 4>;
+> +			power-domains = <&pwc0>;
+>   			status = "disabled";
+>   		};
+>   		spi1: spi at 30e000 {
+> @@ -646,6 +668,7 @@
+>   			dmas = <&edma0 18 0>, <&edma0 19 0>;
+>   			dma-names = "rx", "tx";
+>   			clocks = <&psc1 10>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		usb0: usb at 200000 {
+> @@ -658,6 +681,7 @@
+>   			phys = <&usb_phy 0>;
+>   			phy-names = "usb-phy";
+>   			clocks = <&psc1 1>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   
+>   			#address-cells = <1>;
+> @@ -682,6 +706,7 @@
+>   				#dma-cells = <2>;
+>   				#dma-channels = <4>;
+>   				clocks = <&psc1 1>;
+> +				power-domains = <&pwc1>;
+
+This node should not have clocks or power-domains since it is
+a child node. Instead, the parent node should have clock-ranges.
+I have already fixed this in my v7 branch.
+
+>   				status = "okay";
+>   			};
+>   		};
+> @@ -690,6 +715,7 @@
+>   			reg = <0x218000 0x2000>, <0x22c018 0x4>;
+>   			interrupts = <67>;
+>   			clocks = <&psc1 8>, <&sata_refclk>;
+> +			power-domains = <&pwc1>;
+>   			clock-names = "fck", "refclk";
+>   			status = "disabled";
+>   		};
+> @@ -713,6 +739,7 @@
+>   			reg = <0x224000 0x1000>;
+>   			clocks = <&psc1 5>;
+>   			clock-names = "fck";
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		eth0: ethernet at 220000 {
+> @@ -729,6 +756,7 @@
+>   					36
+>   					>;
+>   			clocks = <&psc1 5>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		usb1: usb at 225000 {
+> @@ -738,6 +766,7 @@
+>   			phys = <&usb_phy 1>;
+>   			phy-names = "usb-phy";
+>   			clocks = <&psc1 2>;
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   		gpio: gpio at 226000 {
+> @@ -756,6 +785,7 @@
+>   			interrupt-controller;
+>   			#interrupt-cells = <2>;
+>   			clocks = <&psc1 3>;
+> +			power-domains = <&pwc1>;
+>   			clock-names = "gpio";
+>   		};
+>   		psc1: clock-controller at 227000 {
+> @@ -788,6 +818,7 @@
+>   				<&edma0 0 1>;
+>   			dma-names = "tx", "rx";
+>   			clocks = <&psc1 7>;
+> +			power-domains = <&pwc1>;
+>   		};
+>   
+>   		lcdc: display at 213000 {
+> @@ -797,6 +828,7 @@
+>   			max-pixelclock = <37500>;
+>   			clocks = <&psc1 16>;
+>   			clock-names = "fck";
+> +			power-domains = <&pwc1>;
+>   			status = "disabled";
+>   		};
+>   	};
+> @@ -809,6 +841,7 @@
+>   		ranges = <0 0 0x60000000 0x08000000
+>   			  1 0 0x68000000 0x00008000>;
+>   		clocks = <&psc0 3>;
+> +		power-domains = <&pwc0>;
+>   		status = "disabled";
+>   	};
+>   	memctrl: memory-controller at b0000000 {
+> 
+
+Bigger picture question: what is the benefit of adding
+power-domain nodes to all of these devices if they are
+already working?
