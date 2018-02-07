@@ -1,15 +1,15 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 8 Feb 2018 00:20:25 +0100
-Subject: [RFC v4 20/26] ARM: dts: r8a7743: Add watchdog support to SoC dtsi
-In-Reply-To: <1517423070-24236-21-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Thu, 8 Feb 2018 00:20:30 +0100
+Subject: [RFC v4 21/26] ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+In-Reply-To: <1517423070-24236-22-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517423070-24236-21-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20180207232025.cm4mdr4l65lwej2j@katana>
+ <1517423070-24236-22-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180207232030.s2x5hp46p4p2zj67@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 06:24:24PM +0000, Fabrizio Castro wrote:
-> This patch adds watchdog support to the r8a7743 SoC dtsi.
+On Wed, Jan 31, 2018 at 06:24:25PM +0000, Fabrizio Castro wrote:
+> This patch adds watchdog support to the r8a7745 SoC dtsi.
 > 
 > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
@@ -23,4 +23,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/c228ab72/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/82769a3d/attachment.sig>
