@@ -1,101 +1,104 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 7 Feb 2018 18:52:20 +0100
-Subject: [PATCH] media: stm32-dcmi: add g/s_parm framerate support
-In-Reply-To: <1518025389-3677-1-git-send-email-hugues.fruchet@st.com>
-References: <1518025389-3677-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <727ee222-20f1-23d3-fdff-4b985e24593d@xs4all.nl>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed,  7 Feb 2018 18:53:09 +0100
+Subject: [PATCH v5] drm/rockchip: Add device links for master and components
+Message-ID: <20180207175309.21095-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2018 06:43 PM, Hugues Fruchet wrote:
-> Add g/s_parm framerate support by calling subdev
-> g/s_frame_interval ops.
-> This allows user to control sensor framerate by
-> calling ioctl G/S_PARM.
-> 
-> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
-> ---
->  drivers/media/platform/stm32/stm32-dcmi.c | 49 +++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
-> 
-> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-> index ab555d4..8197554 100644
-> --- a/drivers/media/platform/stm32/stm32-dcmi.c
-> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
-> @@ -1151,6 +1151,52 @@ static int dcmi_enum_framesizes(struct file *file, void *fh,
->  	return 0;
->  }
->  
-> +static int dcmi_g_parm(struct file *file, void *priv,
-> +		       struct v4l2_streamparm *p)
-> +{
-> +	struct stm32_dcmi *dcmi = video_drvdata(file);
-> +	struct v4l2_subdev_frame_interval ival = { 0 };
-> +	int ret;
-> +
-> +	if (p->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-> +		return -EINVAL;
-> +
-> +	p->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
-> +	ret = v4l2_subdev_call(dcmi->entity.subdev, video,
-> +			       g_frame_interval, &ival);
-> +	if (ret)
-> +		return ret;
-> +
-> +	p->parm.capture.timeperframe = ival.interval;
-> +
-> +	return ret;
-> +}
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-This function and the next can be simplified by using the help functions
-introduced here:
+Since we are trying to access components' resources in the master's
+suspend/resume PM callbacks(e.g. panel), add device links to correct
+the suspend/resume and shutdown ordering.
 
-https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=parm
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+Hi,
 
-I'll make a pull request for this later this week, so it's probably a good
-idea to base your code on this as well.
+This is an attempt to revive a patch [1] that was sent last October. Sean
+Paul requested some changes but I think that never was send a v5 version.
+The patch fixes and issue where backlight panel is not correctly recoved
+after a resume. This was tested on top of current linux-next plus the
+latest series of Thierry's patches [2]
 
-Regards,
+[1] https://patchwork.kernel.org/patch/10011595/
+[2] https://lkml.org/lkml/2018/1/30/621
 
-	Hans
+Changes in v5:
+Address the comments from Sean.
+- Create a helper to do the cleanup.
+- Call the helper in rockchip_drm_match_add and where needed.
+Changes in v4: None
+Changes in v3: None
+Changes in v2:
+Use device link to correct the suspend/resume and shutdown ordering,
+instead of converting rockchip spi's suspend/resume PM callbacks to
+late suspend/resume PM callbacks.
 
-> +
-> +static int dcmi_s_parm(struct file *file, void *priv,
-> +		       struct v4l2_streamparm *p)
-> +{
-> +	struct stm32_dcmi *dcmi = video_drvdata(file);
-> +	struct v4l2_subdev_frame_interval ival = {
-> +		0,
-> +		p->parm.capture.timeperframe
-> +	};
-> +	int ret;
-> +
-> +	if (p->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-> +		return -EINVAL;
-> +
-> +	memset(&p->parm, 0, sizeof(p->parm));
-> +	p->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
-> +	ret = v4l2_subdev_call(dcmi->entity.subdev, video,
-> +			       s_frame_interval, &ival);
-> +	if (ret)
-> +		return ret;
-> +
-> +	p->parm.capture.timeperframe = ival.interval;
-> +
-> +	return ret;
-> +}
-> +
->  static int dcmi_enum_frameintervals(struct file *file, void *fh,
->  				    struct v4l2_frmivalenum *fival)
->  {
-> @@ -1253,6 +1299,9 @@ static int dcmi_release(struct file *file)
->  	.vidioc_g_input			= dcmi_g_input,
->  	.vidioc_s_input			= dcmi_s_input,
->  
-> +	.vidioc_g_parm			= dcmi_g_parm,
-> +	.vidioc_s_parm			= dcmi_s_parm,
-> +
->  	.vidioc_enum_framesizes		= dcmi_enum_framesizes,
->  	.vidioc_enum_frameintervals	= dcmi_enum_frameintervals,
->  
-> 
+Thanks,
+ Enric
+
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index 0609113d6a71..f814d37b1db2 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -314,6 +314,14 @@ static int compare_dev(struct device *dev, void *data)
+ 	return dev == (struct device *)data;
+ }
+ 
++static void rockchip_drm_match_remove(struct device *dev)
++{
++	struct device_link *link;
++
++	list_for_each_entry(link, &dev->links.consumers, s_node)
++		device_link_del(link);
++}
++
+ static struct component_match *rockchip_drm_match_add(struct device *dev)
+ {
+ 	struct component_match *match = NULL;
+@@ -331,10 +339,15 @@ static struct component_match *rockchip_drm_match_add(struct device *dev)
+ 
+ 			if (!d)
+ 				break;
++
++			device_link_add(dev, d, DL_FLAG_STATELESS);
+ 			component_match_add(dev, &match, compare_dev, d);
+ 		} while (true);
+ 	}
+ 
++	if (IS_ERR(match))
++		rockchip_drm_match_remove(dev);
++
+ 	return match ?: ERR_PTR(-ENODEV);
+ }
+ 
+@@ -411,13 +424,21 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ 	if (IS_ERR(match))
+ 		return PTR_ERR(match);
+ 
+-	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	ret = component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	if (ret < 0) {
++		rockchip_drm_match_remove(dev);
++		return ret;
++	}
++
++	return 0;
+ }
+ 
+ static int rockchip_drm_platform_remove(struct platform_device *pdev)
+ {
+ 	component_master_del(&pdev->dev, &rockchip_drm_ops);
+ 
++	rockchip_drm_match_remove(&pdev->dev);
++
+ 	return 0;
+ }
+ 
+-- 
+2.15.1
