@@ -1,59 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Feb 2018 10:21:48 +0100
-Subject: [PATCH v3 1/2] Document: dt: binding: imx: update pinctrl doc for
- imx6sll
-In-Reply-To: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
-References: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <CACRpkdZn+A9Pv0ACQkjvq-2At39Ni9oB5Od=6+-5zk9b2qgNtA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 7 Feb 2018 14:51:57 +0530
+Subject: [PATCH v2 15/15] ARM: dts: dra7: Add high speed modes capability
+ to MMC1/MMC2 dt node
+In-Reply-To: <210939ed-67fc-fa37-b4f2-c1faefcc4642@ti.com>
+References: <20180206125806.19350-1-kishon@ti.com>
+ <20180206125806.19350-16-kishon@ti.com>
+ <210939ed-67fc-fa37-b4f2-c1faefcc4642@ti.com>
+Message-ID: <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 7, 2018 at 3:07 AM, Bai Ping <ping.bai@nxp.com> wrote:
+Hi,
 
-> Add pinctrl binding doc update for imx6sll.
->
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> ---
-> changes v2-v3:
->  - add generic config binding
+On Wednesday 07 February 2018 02:41 PM, Sekhar Nori wrote:
+> Kishon,
+> 
+> On Tuesday 06 February 2018 06:28 PM, Kishon Vijay Abraham I wrote:
+>> Add UHS/HS200/DDR speed mode capability to MMC1 and MMC2 dt nodes.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> Along with this, dont we need to have
+> 
+> 	/delete-property/ mmc-hs200-1_8v;
+> 
+> for eMMC on Beagle x15 which does not support HS200?
+> 
+> Or are you planning to depend on lack of pinctrl entries for HS200 to
+> take care of that?
 
-> +Optional Properties:
-> +- drive-strength               Integer. Controls Drive Strength
-> +                                       0: HI-Z
-> +                                       1: 260 ohm at 3.3v, 150 ohm at 1.8v
-> +                                       2: 130 ohm at 3.3v, 75 ohm at 1.8v
-> +                                       3: 86 ohm at 3.3v, 50 ohm at 1.8v
-> +                                       4: 65 ohm at 3.3v, 37 ohm at 1.8v
-> +                                       5: 52 ohm at 3.3v, 30 ohm at 1.8v
-> +                                       6: 43 ohm at 3.3v, 25 ohm at 1.8v
-> +                                       7: 37 ohm at 3.3v, 21 ohm at 1.8v
+right now it relies on lack of pinctrl entries but I think adding delete
+property is appropriate. Actually I missed porting the patch that adds
+/delete-property/.
 
-HOW INTERESTING.
+Thanks
+Kishon
 
-I am discussing this a lot with Lucas Stach right now, and in his
-SoC i.MX8MQ that first resistance is said to be 255 Ohm etc.
-
-Plus it seems he's missing the figures for 1.8V.
-
-We're discussing whether this is used for impedance matching
-and what not. We really need someone inside NXP to show
-us the way.
-
-Anyways, I really need the two of you to discuss this, and I
-will forward my conversation with Lucas to you.
-
-If you can fish around a bit and tell us what this is used for
-and how:
-
-- Is the intended usage for impedance matching?
-- Does it control how many totem-poles are activated on the
-  output pad?
-
-would all be very grateful.
-
-> +- drive-open-drain             Bool. Enable Pin Open-drian
-
-Open-drain?
-
-Yours,
-Linus Walleij
+> 
+> Thanks,
+> Sekhar
+> 
+> 
+>> ---
+>>  arch/arm/boot/dts/dra7.dtsi | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+>> index 7bf33d522b14..feb496e7c5ef 100644
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -1073,7 +1073,13 @@
+>>  			status = "disabled";
+>>  			pbias-supply = <&pbias_mmc_reg>;
+>>  			max-frequency = <192000000>;
+>> +			sd-uhs-sdr104;
+>> +			sd-uhs-sdr50;
+>> +			sd-uhs-ddr50;
+>> +			sd-uhs-sdr25;
+>> +			sd-uhs-sdr12;
+>>  			cap-sd-highspeed;
+>> +			mmc-ddr-1_8v;
+>>  			cap-mmc-highspeed;
+>>  		};
+>>  
+>> @@ -1092,6 +1098,10 @@
+>>  			status = "disabled";
+>>  			max-frequency = <192000000>;
+>>  			cap-sd-highspeed;
+>> +			sd-uhs-sdr25;
+>> +			sd-uhs-sdr12;
+>> +			mmc-hs200-1_8v;
+>> +			mmc-ddr-1_8v;
+>>  			cap-mmc-highspeed;
+>>  		};
+>>  
+>> -- 
+>> 2.11.0
+>>
+> 
