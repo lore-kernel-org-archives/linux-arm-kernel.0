@@ -1,30 +1,59 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  7 Feb 2018 14:32:53 +0000
-Subject: [PATCH 0/2] irqchip: GICv2m Multi-MSI support
-Message-ID: <20180207143255.17003-1-marc.zyngier@arm.com>
+Date: Wed,  7 Feb 2018 14:32:55 +0000
+Subject: [PATCH 2/2] arm64: dts: juno: Describe the full GICv2m region
+In-Reply-To: <20180207143255.17003-1-marc.zyngier@arm.com>
+References: <20180207143255.17003-1-marc.zyngier@arm.com>
+Message-ID: <20180207143255.17003-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's been recently reported that GICv2m doesn't handle the Multi-MSI
-variant (it only deals with a single MSI, or the full blown
-MSI-X). For better or worse, Multi-MSI is still a thing, and it'd be
-better if we dealt with it.
+From: Robin Murphy <robin.murphy@arm.com>
 
-This tiny series aims at teaching this old trick to GICv2m, together
-with an extra patch that enables all the v2m regions on Juno. if
-nobody objects to this, I plan to take at least the initial patch
-through the irqchip tree, and potentially the DT as well if people
-want me to.
+Juno's GICv2m implementation consists of four frames providing 32
+interrupts each. Since it is possible to plug in enough PCIe endpoints
+to consume more than 32 MSIs, and the driver already has a bodge to
+handle multiple frames, let's expose the other three as well.
 
-Marc Zyngier (1):
-  irqchip/gic-v2m: Add PCI Multi-MSI support
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-Robin Murphy (1):
-  arm64: dts: juno: Describe the full GICv2m region
-
- arch/arm64/boot/dts/arm/juno-base.dtsi | 19 ++++++++++++++
- drivers/irqchip/irq-gic-v2m.c          | 46 ++++++++++++++++------------------
- 2 files changed, 41 insertions(+), 24 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index f165f04db0c9..f8088c45b060 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -68,11 +68,30 @@
+ 		interrupt-controller;
+ 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		ranges = <0 0 0 0x2c1c0000 0 0x40000>;
++
+ 		v2m_0: v2m at 0 {
+ 			compatible = "arm,gic-v2m-frame";
+ 			msi-controller;
+ 			reg = <0 0 0 0x1000>;
+ 		};
++
++		v2m at 10000 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			reg = <0 0x10000 0 0x1000>;
++		};
++
++		v2m at 20000 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			reg = <0 0x20000 0 0x1000>;
++		};
++
++		v2m at 30000 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			reg = <0 0x30000 0 0x1000>;
++		};
+ 	};
+ 
+ 	timer {
 -- 
 2.14.2
