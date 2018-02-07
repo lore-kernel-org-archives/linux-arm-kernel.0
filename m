@@ -1,47 +1,114 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Feb 2018 10:13:10 +0100
-Subject: [PATCH v3 0/4] gpio: driver for the RPi3 GPIO expander
-In-Reply-To: <20180206162759.awghecpv4ihaatz7@tarshish>
-References: <cover.1516105893.git.baruch@tkos.co.il>
- <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
- <20180206162759.awghecpv4ihaatz7@tarshish>
-Message-ID: <CACRpkdYGYtF5iw=ZDF9O5LdwfvktEfDORjYXZDmFNihVSP+c3w@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Wed, 7 Feb 2018 17:14:17 +0800
+Subject: [PATCH v2] pwm: mediatek: fix up PWM4 and PWM5 malfunction on MT7623
+Message-ID: <f94b2d4146ebe0f8eaae02b0dd951f39af0972d4.1517994540.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 6, 2018 at 5:27 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> On Tue, Feb 06, 2018 at 02:42:48PM +0100, Linus Walleij wrote:
->> On Tue, Jan 16, 2018 at 1:45 PM, Baruch Siach <baruch@tkos.co.il> wrote:
->>
->> > The Raspberry Pi 3 has a GPIO expander that controls, among others, the
->> > activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus
->> > that is not directly controlled from the ARM core. The VC4 firmware controls
->> > the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox
->> > interface.
->> >
->> > This series adds support for the RPi3 expander.
->> >
->> > The driver is ported from the downstream kernel at
->> > https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
->> >
->> > Changes in v3:
->> >
->> >   * Kconfig tweaks
->> >   * Check rpi_exp_gpio_get_polarity() return value
->> >   * Redundant header removal
->> >   * Redundant platform_set_drvdata() call removal
->> >   * Small coding style changes
->>
->> All is looking pretty good. I see Rob had some last minute comments,
->> but please rebase and repost post v4.16-rc1 so we can get this merged,
->> we need to get this upstream.
->
-> I was about to send v4 when I saw your email. I based v4 on current LinusT's
-> tree as of e237f98a9c. I guess that affected files will not change before
-> v4.16-rc1, but I can wait a few more days for -rc1.
+From: Sean Wang <sean.wang@mediatek.com>
 
-It's fine to send if you feel it is ready. I am already queueing
-stuff for v4.17.
+Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+programming on PWM hardware causes waveform cannot be output as expected.
+Thus, the patch adds the extra condition for fixing up the weird case to
+let PWM4 or PWM5 able to work on MT7623.
 
-Yours,
-Linus Walleij
+v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
+
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Cc: Zhi Mao <zhi.mao@mediatek.com>
+Cc: John Crispin <john@phrozen.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+index f5d97e0..796baea 100644
+--- a/drivers/pwm/pwm-mediatek.c
++++ b/drivers/pwm/pwm-mediatek.c
+@@ -29,7 +29,9 @@
+ #define PWMGDUR			0x0c
+ #define PWMWAVENUM		0x28
+ #define PWMDWIDTH		0x2c
++#define PWM45DWIDTH_FIXUP	0x30
+ #define PWMTHRES		0x30
++#define PWM45THRES_FIXUP	0x34
+ 
+ #define PWM_CLK_DIV_MAX		7
+ 
+@@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
+ 
+ struct mtk_pwm_platform_data {
+ 	unsigned int num_pwms;
++	bool pwm45_fixup;
+ };
+ 
+ /**
+@@ -66,6 +69,7 @@ struct mtk_pwm_chip {
+ 	struct pwm_chip chip;
+ 	void __iomem *regs;
+ 	struct clk *clks[MTK_CLK_MAX];
++	const struct mtk_pwm_platform_data *soc;
+ };
+ 
+ static const unsigned int mtk_pwm_reg_offset[] = {
+@@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ {
+ 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+ 	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
+-	u32 resolution, clkdiv = 0;
++	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
++	    reg_thres = PWMTHRES;
+ 	int ret;
+ 
+ 	ret = mtk_pwm_clk_enable(chip, pwm);
+@@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		return -EINVAL;
+ 	}
+ 
++	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
++		/*
++		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
++		 * from the other PWMs on MT7623.
++		 */
++		reg_width = PWM45DWIDTH_FIXUP;
++		reg_thres = PWM45THRES_FIXUP;
++	}
++
+ 	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+-	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+-	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
++	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
++	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
+ 
+ 	mtk_pwm_clk_disable(chip, pwm);
+ 
+@@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+ 	data = of_device_get_match_data(&pdev->dev);
+ 	if (data == NULL)
+ 		return -EINVAL;
++	pc->soc = data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
+@@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+ 
+ static const struct mtk_pwm_platform_data mt2712_pwm_data = {
+ 	.num_pwms = 8,
++	.pwm45_fixup = false,
+ };
+ 
+ static const struct mtk_pwm_platform_data mt7622_pwm_data = {
+ 	.num_pwms = 6,
++	.pwm45_fixup = false,
+ };
+ 
+ static const struct mtk_pwm_platform_data mt7623_pwm_data = {
+ 	.num_pwms = 5,
++	.pwm45_fixup = true,
+ };
+ 
+ static const struct of_device_id mtk_pwm_of_match[] = {
+-- 
+2.7.4
