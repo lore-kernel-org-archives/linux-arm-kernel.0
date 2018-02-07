@@ -1,63 +1,45 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 7 Feb 2018 14:12:14 +0100
-Subject: [PATCH 1/2] sun4i_ss_prng: fix return value of
- sun4i_ss_prng_generate
-In-Reply-To: <20180207105201.pnn2s57wdk5zuda2@shodan.usersys.redhat.com>
-References: <20180206212022.1309-1-artem.savkov@gmail.com>
- <20180206212022.1309-2-artem.savkov@gmail.com>
- <20180207095659.GA19249@Red>
- <20180207105201.pnn2s57wdk5zuda2@shodan.usersys.redhat.com>
-Message-ID: <20180207131214.GC19249@Red>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 7 Feb 2018 14:19:50 +0100
+Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
+In-Reply-To: <20180129005129.GB12728@builder>
+References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
+ <20180128232310.GA12728@builder>
+ <042b6cea-38f7-a660-0059-5f24fc7db9eb@codeaurora.org>
+ <20180129005129.GB12728@builder>
+Message-ID: <CACRpkdaa0Ovb0kbE6J0vy4UJYv5fn6X2289pkX3b+HBze5FRJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 11:52:01AM +0100, Artem Savkov wrote:
-> On Wed, Feb 07, 2018 at 10:56:59AM +0100, Corentin Labbe wrote:
-> > On Tue, Feb 06, 2018 at 10:20:21PM +0100, Artem Savkov wrote:
-> > > According to crypto/rng.h generate function should return 0 on success
-> > > and < 0 on error.
-> > > 
-> > > Fixes: b8ae5c7387ad ("crypto: sun4i-ss - support the Security System PRNG")
-> > > Signed-off-by: Artem Savkov <artem.savkov@gmail.com>
-> > > ---
-> > >  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> > > index 0d01d1624252..5754e0b92fb0 100644
-> > > --- a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> > > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> > > @@ -52,5 +52,5 @@ int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
-> > >  
-> > >  	writel(0, ss->base + SS_CTL);
-> > >  	spin_unlock(&ss->slock);
-> > > -	return dlen;
-> > > +	return 0;
-> > >  }
-> > > -- 
-> > > 2.15.1
-> > > 
-> > 
-> > According to Documentation/crypto/api-samples.rst ("Code Example For Random Number Generator Usage")
-> > you must return the length of data generated.
-> 
-> I don't think that example is the same as rng_alg.generate, it has a
-> different protottype.
+On Mon, Jan 29, 2018 at 1:51 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
 
-crypto_rng_get_bytes() use crypto_rng_generate() which work on crypto_rng
+>> > My bad, this should have been -1.
+>>
+>> Perhaps, but it's been 0 for a very long time, so I don't want to break any
+>> existing platforms by suddenly relocating all GPIOs across all Qualcomm
+>> platforms.
+>>
+>
+> Yeah, I see that I got this wrong when I wrote the driver 4 years ago...
+>
+> There should be no in-kernel users depending on these numbers being hard
+> coded, so anyone depending on these numbers starting at 0 would be user
+> space - doing so incorrectly.
 
-> 
-> > So crypto_rng_generate/crypto_rng_get_bytes documentation in crypto/rng.h must be fixed.
-> 
-> It's not just documentation, every other rng driver returns it this way
-> and it gets aead_init_geniv() (and subsequently crypto_create_tfm())
-> really confused because they expect the return value to be 0 or < 0.
-> 
+There is a good point in what Tmur is saying here. We never break
+userspace, if we can avoid it.
 
-Perhaps the example is wrong because "copied from/inspirated by" hwrng API which have this behavior.
+If there is a real problem with setting this base to -1 then I suggest
 
-After checking, other crypto_rng driver, you are probably right, so you can add:
-Acked-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+if (tlmm_has_only_one_instance)
+   base = 0;
+else
+   base = -1;
 
-Thanks
-Regards
+Especially for an upcoming platform we can start with a clean slate,
+it certainly does not have any legacy userspace.
+
+If no problems are detected, let's just use -1.
+
+Yours,
+Linus Walleij
