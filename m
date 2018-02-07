@@ -1,49 +1,42 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed,  7 Feb 2018 22:17:04 +0100
-Subject: [PATCH v4 03/12] drm/bridge/synopsys: dw-hdmi: Enable workaround for
- v1.32a
+Date: Wed,  7 Feb 2018 22:17:09 +0100
+Subject: [PATCH v4 08/12] drm/sun4i: Add support for A83T second TCON
 In-Reply-To: <20180207211713.3638-1-jernej.skrabec@siol.net>
 References: <20180207211713.3638-1-jernej.skrabec@siol.net>
-Message-ID: <20180207211713.3638-4-jernej.skrabec@siol.net>
+Message-ID: <20180207211713.3638-9-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner SoCs have dw hdmi controller v1.32a which exhibits same
-magenta line issue as i.MX6Q and i.MX6DL. Enable workaround for it.
+This TCON is connected to HDMI encoder.
 
-Tests show that one iteration is enough.
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index a38db40ce990..7ca14d7325b5 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -1634,9 +1634,10 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
- 	 * then write one of the FC registers several times.
- 	 *
- 	 * The number of iterations matters and depends on the HDMI TX revision
--	 * (and possibly on the platform). So far only i.MX6Q (v1.30a) and
--	 * i.MX6DL (v1.31a) have been identified as needing the workaround, with
--	 * 4 and 1 iterations respectively.
-+	 * (and possibly on the platform). So far i.MX6Q (v1.30a), i.MX6DL
-+	 * (v1.31a) and multiple Allwinner SoCs (v1.32a) have been identified
-+	 * as needing the workaround, with 4 iterations for v1.30a and 1
-+	 * iteration for others.
- 	 */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 32d9a5eb9e25..48678705ef43 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1154,6 +1154,10 @@ static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
+ 	.has_channel_0		= true,
+ };
  
- 	switch (hdmi->version) {
-@@ -1644,6 +1645,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
- 		count = 4;
- 		break;
- 	case 0x131a:
-+	case 0x132a:
- 		count = 1;
- 		break;
- 	default:
++static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
++	.has_channel_1		= true,
++};
++
+ static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
+ 	.has_channel_0		= true,
+ };
+@@ -1167,6 +1171,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
+ 	{ .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks },
+ 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
++	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
+ 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
+ 	{ }
+ };
 -- 
 2.16.1
