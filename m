@@ -1,28 +1,33 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 7 Feb 2018 12:38:50 +0000
-Subject: [PATCH v5 03/16] media: rkisp1: Add user space ABI definitions
-In-Reply-To: <5b29d890-8c6b-18ff-ade1-1923c25143a0@xs4all.nl>
-References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
- <1514533978-20408-4-git-send-email-zhengsq@rock-chips.com>
- <5b29d890-8c6b-18ff-ade1-1923c25143a0@xs4all.nl>
-Message-ID: <d29bc615-2359-86c6-db5a-27cc111bc275@arm.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 7 Feb 2018 20:43:06 +0800
+Subject: [PATCH 2/2] dt-bindings: PCI: MediaTek: Correct the
+ interrupt-map properties
+In-Reply-To: <20180205060830.svkrwnn6wzuig7ns@rob-hp-laptop>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+ <9d247a4fba54ba90d07df32fd89a8bb2c8bdb0f9.1516961656.git.ryder.lee@mediatek.com>
+ <20180205060830.svkrwnn6wzuig7ns@rob-hp-laptop>
+Message-ID: <1518007386.23115.6.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/18 13:14, Hans Verkuil wrote:
-[...]
-> The one thing that I worry about is if these structs are the same for
-> 32 and 64 bit arm.
+Hi Bjorn,
 
-I see some enums and bools in there - in general the storage size of 
-those isn't even guaranteed to be consistent between different compiler 
-implementations on the same platform, let alone across multiple 
-platforms (especially WRT things like GCC's -fshort-enums).
+On Mon, 2018-02-05 at 00:08 -0600, Rob Herring wrote:
+> On Wed, Jan 31, 2018 at 03:41:50PM +0800, Ryder Lee wrote:
+> > Move the interrupt-map properties from the child nodes to the root node
+> > and update each entry accordingly.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/pci/mediatek-pcie.txt      | 28 ++++++++++++----------
+> >  1 file changed, 15 insertions(+), 13 deletions(-)
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-In practice, under the standard ABIs for 32-bit and 64-bit Arm[1], I'd 
-expect basic types other than longs and pointers to be pretty much the 
-same; it's the imp-def C stuff I'd be a lot less confident about.
+Please ignore this patch as we think the original version is better than
+this.  Sorry for the inconvenience.
 
-Robin.
-
-[1]:http://infocenter.arm.com/help/topic/com.arm.doc.subset.swdev.abi/index.html
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
