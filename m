@@ -1,19 +1,91 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 7 Feb 2018 20:54:57 +0530
-Subject: [PATCH v6 38/41] ARM: davinci: remove legacy clocks
-In-Reply-To: <1516468460-4908-39-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-39-git-send-email-david@lechnology.com>
-Message-ID: <aab67882-1fa2-4e7f-6580-3913ecfe42de@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 7 Feb 2018 15:34:03 +0000
+Subject: [RFC v2 REPOST] arm64: KVM: KVM API extensions for SVE
+In-Reply-To: <20180207145831.GC29286@cbox>
+References: <20180126172849.GX5862@e103592.cambridge.arm.com>
+ <20180205161308.GW21802@cbox>
+ <20180206114313.GQ5862@e103592.cambridge.arm.com>
+ <20180206131757.GA23160@cbox>
+ <20180207113327.GN5862@e103592.cambridge.arm.com>
+ <20180207145831.GC29286@cbox>
+Message-ID: <20180207153402.GR5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 January 2018 10:44 PM, David Lechner wrote:
-> This removes the unused legacy clock code from arch/arm/mach-davinci/.
+On Wed, Feb 07, 2018 at 03:58:31PM +0100, Christoffer Dall wrote:
+> On Wed, Feb 07, 2018 at 11:33:28AM +0000, Dave Martin wrote:
+
+[...]
+
+> > What if KVM_ARM_SVE_SET_VLS() were to yield 0 if the exact requested set
+> > of VLs was configured, -ERANGE if some subset was configured successfully
+> > (but not exactly the set requested), and the usual -EINVAL/-EIO/whatever
+> > if the set of VLs couldn't be configured at all?
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> Sounds good to me.
+> 
+> > 
+> > Then the probe would go like this:
+> > 
+> > 	__u64 vqs[SVE_VQ_MAX / 64] = { [0 ... SVE_VQ_MAX / 64 - 1] = ~(u64)0 };
+> > 	if (ioctl(vcpu_fd, KVM_ARM_SVE_SET_VLS, vqs) && errno != ERANGE))
+> > 		goto error;
+> > 
+> > 	ioctl(vcpu_fd, KVM_ARM_SVE_GET_VLS, vqs);
+> > 
+> > 	/* ... */
+> > 
+> > Another option would be for SVE_ARM_SVE_SET_VLS to write the resulting
+> > set back to its argument, possibly with the same 0/ERANGE/EINVAL semantics.
+> > 
+> > 
+> > Alternatively, userspace would be require to do a KVM_ARM_SVE_GET_VLS,
+> > and check the resulting set:
+> > 
+> > 	/* ... */
+> > 	
+> > 	__u64 newvqs[SVE_VQ_MAX / 64];
+> > 	ioctl(vcpu_fd, KVM_ARM_SVE_GET_VLS, newvqs);
+> > 
+> > 	if (memcmp(vqs, newvqs, sizeof vqs))
+> > 		goto mismatch;
+> > 
+> > vcpu restore would need to treat any mismatch as an error:
+> > the exact requested set but be configurable, or the VM may go wrong.
+> 
+> I'm not sure I can parse this sentence or extract the meaning?
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+That was lazy language on my part.  I'll try to explain it better:
 
-Thanks,
-Sekhar
+When the saved state of a migrating vcpu is being loaded into a
+newly-created vcpu on the target node, userspace needs a way to
+ensure that the set of VLs that vcpu will see when it runs is
+_exactly_ the same set it could see before migration.
+
+I called this out separately because it's different from the
+case of creating a brand-new VM: in the latter case, we can't the
+kernel to provide the best set of VLs possible, but it is not an
+error not to get every VL we asked for.
+
+> > Any opinion on which approach is best?
+> 
+> I think I prefer letting KVM_ARM_SVE_SET_VLS change the supplied vqs,
+> since having it be two separate ioctls always potentially leaves room
+> for some other thread having modified the set in the meantime (or making
+> a programmer doubt if this can be the case) where a single ioctl() will
+> look atomic.
+> 
+> The user can always call KVM_ARM_SVE_GET_VLS afterwards and should get
+> the same result.
+
+OK, I'll go with changing the supplied vqs for KVM_ARM_SVE_SET_VLS,
+but I'll retain the -ERANGE semantics (even if technically redundant)
+since that's harder to forget to check.
+
+> I think it's worth trying to write this up as patches to the KVM
+> documentation and to the kernel and see what people say on that.
+
+OK.  Thanks for the input.
+
+Cheers
+---Dave
