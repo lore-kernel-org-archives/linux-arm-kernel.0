@@ -1,64 +1,49 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 7 Feb 2018 15:58:32 -0600
-Subject: [PATCH 4/7] ARM: dts: da850: add power controller nodes
-In-Reply-To: <20180207134553.13510-5-brgl@bgdev.pl>
-References: <20180207134553.13510-1-brgl@bgdev.pl>
- <20180207134553.13510-5-brgl@bgdev.pl>
-Message-ID: <41f32de3-5daa-75fd-51e9-e6dc1f7142a3@lechnology.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Wed,  7 Feb 2018 22:17:04 +0100
+Subject: [PATCH v4 03/12] drm/bridge/synopsys: dw-hdmi: Enable workaround for
+ v1.32a
+In-Reply-To: <20180207211713.3638-1-jernej.skrabec@siol.net>
+References: <20180207211713.3638-1-jernej.skrabec@siol.net>
+Message-ID: <20180207211713.3638-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2018 07:45 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> Add two power controller nodes corresponding with the two PSC modules
-> present on the da850 SoC.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->   arch/arm/boot/dts/da850.dtsi | 13 +++++++++++++
->   1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 3a1f2ced05ca..ac2eef4e6b7c 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -24,6 +24,11 @@
->   		};
->   	};
->   
-> +	aliases {
-> +		pwc0 = &pwc0;
-> +		pwc1 = &pwc1;
-> +	};
+Allwinner SoCs have dw hdmi controller v1.32a which exhibits same
+magenta line issue as i.MX6Q and i.MX6DL. Enable workaround for it.
 
-Why do we need aliases? (would be nice to have the reason in the commit
-message if there is a good reason)
+Tests show that one iteration is enough.
 
-> +
->   	opp_table: opp-table {
->   		compatible = "operating-points-v2";
->   
-> @@ -141,6 +146,10 @@
->   				      "pll0_sysclk4", "pll0_sysclk6",
->   				      "async1";
->   		};
-> +		pwc0: power-controller at 10000 {
-> +			compatible = "ti,davinci-pm-domains";
-> +			#power-domain-cells = <0>;
-> +		};
->   		pll0: clock-controller at 11000 {
->   			compatible = "ti,da850-pll0";
->   			reg = <0x11000 0x1000>;
-> @@ -757,6 +766,10 @@
->   				 <&async3_clk>;
->   			clock-names = "pll0_sysclk2", "pll0_sysclk4", "async3";
->   		};
-> +		pwc1: power-controller at 227000 {
-> +			compatible = "ti,davinci-pm-domains";
-> +			#power-domain-cells = <0>;
-> +		};
->   		pinconf: pin-controller at 22c00c {
->   			compatible = "ti,da850-pupd";
->   			reg = <0x22c00c 0x8>;
-> 
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index a38db40ce990..7ca14d7325b5 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1634,9 +1634,10 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 	 * then write one of the FC registers several times.
+ 	 *
+ 	 * The number of iterations matters and depends on the HDMI TX revision
+-	 * (and possibly on the platform). So far only i.MX6Q (v1.30a) and
+-	 * i.MX6DL (v1.31a) have been identified as needing the workaround, with
+-	 * 4 and 1 iterations respectively.
++	 * (and possibly on the platform). So far i.MX6Q (v1.30a), i.MX6DL
++	 * (v1.31a) and multiple Allwinner SoCs (v1.32a) have been identified
++	 * as needing the workaround, with 4 iterations for v1.30a and 1
++	 * iteration for others.
+ 	 */
+ 
+ 	switch (hdmi->version) {
+@@ -1644,6 +1645,7 @@ static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+ 		count = 4;
+ 		break;
+ 	case 0x131a:
++	case 0x132a:
+ 		count = 1;
+ 		break;
+ 	default:
+-- 
+2.16.1
