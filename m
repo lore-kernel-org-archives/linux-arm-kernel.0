@@ -1,43 +1,34 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 7 Feb 2018 17:43:15 +0100
-Subject: [PATCH 2/2] usb: gadget: udc: atmel: convert to use GPIO
- descriptors
-In-Reply-To: <CACRpkdYe-caycymfzosGTgnQUgf2jrLU9vfJEsT+bupqexCAxQ@mail.gmail.com>
-References: <20180201093432.21919-1-ludovic.desroches@microchip.com>
- <20180201093432.21919-2-ludovic.desroches@microchip.com>
- <CACRpkdYe-caycymfzosGTgnQUgf2jrLU9vfJEsT+bupqexCAxQ@mail.gmail.com>
-Message-ID: <20180207164315.GJ2580@rfolt0960.corp.atmel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 07 Feb 2018 17:44:31 +0100
+Subject: [PATCH 1/2] ARM: dts: exynos: Add I2S1 device node to
+ exynos5433.dtsi
+In-Reply-To: <CAJKOXPdxND9Rf4p6stkdhBNY0AzdMqfDtopiBfYttex77+tjnA@mail.gmail.com>
+References: <CGME20180205172146epcas1p1cd7a5027e673fc17fb64d8841c47175a@epcas1p1.samsung.com>
+ <20180205172110.9897-1-s.nawrocki@samsung.com>
+ <CAJKOXPdxND9Rf4p6stkdhBNY0AzdMqfDtopiBfYttex77+tjnA@mail.gmail.com>
+Message-ID: <04ddb780-ae65-1967-d75f-844a675cd3da@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 02:55:35PM +0100, Linus Walleij wrote:
-> On Thu, Feb 1, 2018 at 10:34 AM, Ludovic Desroches
-> <ludovic.desroches@microchip.com> wrote:
-> 
-> > Use GPIO descriptors instead of relying on the old method.
-> > Include irq.h header since it is needed and was indirectly
-> > included through of_gpio.h.
-> >
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Thank you for doing gpiod conversions. Making the world
-> a better place!
+On 02/06/2018 02:07 PM, Krzysztof Kozlowski wrote:
+> On Mon, Feb 5, 2018 at 6:21 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> Add DT node for the second I2S controller available on Exynos 5433
+>> SoC. While at it the i2s0 node name is changed to a more generic
+>> "i2s" and missing properties are added to that node.
+>
+> Please split it - one patch for adding new I2S and second minor
+> cleanup in i2s0 and adding of required properties.
 
-Thanks, I wish it would be so easy!
+OK, will split it in next iteration.
+ 
+> I think there are no dependencies on driver code changes... but let me
+> know if I am wrong.
 
-I will send a v2 because I have the same issue that the one pointed by
-Andy about the gpiod conversion for the lcd driver.
+Yes, the dts and driver changes are independent, it should work
+in all combinations: old dts/new driver, new dts/new driver,
+new dts/old driver.
 
-- udc->vbus_pin = devm_gpiod_get_optional(&pdev->dev, "atmel,vbus", GPIOD_IN);
-+ udc->vbus_pin = devm_gpiod_get(&pdev->dev, "atmel,vbus", GPIOD_IN);
-+ if (IS_ERR(udc->vbus_pin))
-+ 	udc->vbus_pin = NULL;
-
-I am not sure if I should prefer devm_gpiod_get_optional or
-devm_gpiod_get.
-
-Regards
-
-Ludovic
+--
+Regards,
+Sylwester
