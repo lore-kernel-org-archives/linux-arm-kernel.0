@@ -1,23 +1,122 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 7 Feb 2018 10:44:02 +0100
-Subject: [PATCH] arm64: renesas_defconfig: enable R8A77980 SoC
-In-Reply-To: <CAMuHMdUq92E8dcyBjkM0A_eoFhp_F6zA1pb5WvR2n_CSdUVFmg@mail.gmail.com>
-References: <20180206132039.23437-1-horms+renesas@verge.net.au>
- <CAMuHMdUq92E8dcyBjkM0A_eoFhp_F6zA1pb5WvR2n_CSdUVFmg@mail.gmail.com>
-Message-ID: <20180207094401.gxflheamr7l3jdih@verge.net.au>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 7 Feb 2018 10:54:28 +0100
+Subject: [PATCH v2] pwm: mediatek: fix up PWM4 and PWM5 malfunction on
+ MT7623
+In-Reply-To: <f94b2d4146ebe0f8eaae02b0dd951f39af0972d4.1517994540.git.sean.wang@mediatek.com>
+References: <f94b2d4146ebe0f8eaae02b0dd951f39af0972d4.1517994540.git.sean.wang@mediatek.com>
+Message-ID: <45d75d8d-d1ed-fe69-e936-c369ccb2fd6b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 03:44:13PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Feb 6, 2018 at 2:20 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > Enable the Renesas R-Car V3H (R8A77980) SoC in the ARM64 renesas_defconfig.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+
+On 02/07/2018 10:14 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+> control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+> programming on PWM hardware causes waveform cannot be output as expected.
+> Thus, the patch adds the extra condition for fixing up the weird case to
+> let PWM4 or PWM5 able to work on MT7623.
+> 
+> v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Zhi Mao <zhi.mao@mediatek.com>
+> Cc: John Crispin <john@phrozen.org>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+>  1 file changed, 21 insertions(+), 3 deletions(-)
+> 
 
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-I have applied this to the topic/renesas-defconfig branch which is included
-in the devel branch and tags of the Renesas tree as a convenience to
-developers.  The branch is not, however, included in the next branch or
-tags nor is it targeted at upstream.
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index f5d97e0..796baea 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -29,7 +29,9 @@
+>  #define PWMGDUR			0x0c
+>  #define PWMWAVENUM		0x28
+>  #define PWMDWIDTH		0x2c
+> +#define PWM45DWIDTH_FIXUP	0x30
+>  #define PWMTHRES		0x30
+> +#define PWM45THRES_FIXUP	0x34
+>  
+>  #define PWM_CLK_DIV_MAX		7
+>  
+> @@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
+>  
+>  struct mtk_pwm_platform_data {
+>  	unsigned int num_pwms;
+> +	bool pwm45_fixup;
+>  };
+>  
+>  /**
+> @@ -66,6 +69,7 @@ struct mtk_pwm_chip {
+>  	struct pwm_chip chip;
+>  	void __iomem *regs;
+>  	struct clk *clks[MTK_CLK_MAX];
+> +	const struct mtk_pwm_platform_data *soc;
+>  };
+>  
+>  static const unsigned int mtk_pwm_reg_offset[] = {
+> @@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  {
+>  	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+>  	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
+> -	u32 resolution, clkdiv = 0;
+> +	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
+> +	    reg_thres = PWMTHRES;
+>  	int ret;
+>  
+>  	ret = mtk_pwm_clk_enable(chip, pwm);
+> @@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		return -EINVAL;
+>  	}
+>  
+> +	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
+> +		/*
+> +		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
+> +		 * from the other PWMs on MT7623.
+> +		 */
+> +		reg_width = PWM45DWIDTH_FIXUP;
+> +		reg_thres = PWM45THRES_FIXUP;
+> +	}
+> +
+>  	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
+> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
+> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
+> +	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
+> +	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
+>  
+>  	mtk_pwm_clk_disable(chip, pwm);
+>  
+> @@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	data = of_device_get_match_data(&pdev->dev);
+>  	if (data == NULL)
+>  		return -EINVAL;
+> +	pc->soc = data;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
+> @@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
+>  
+>  static const struct mtk_pwm_platform_data mt2712_pwm_data = {
+>  	.num_pwms = 8,
+> +	.pwm45_fixup = false,
+>  };
+>  
+>  static const struct mtk_pwm_platform_data mt7622_pwm_data = {
+>  	.num_pwms = 6,
+> +	.pwm45_fixup = false,
+>  };
+>  
+>  static const struct mtk_pwm_platform_data mt7623_pwm_data = {
+>  	.num_pwms = 5,
+> +	.pwm45_fixup = true,
+>  };
+>  
+>  static const struct of_device_id mtk_pwm_of_match[] = {
+> 
