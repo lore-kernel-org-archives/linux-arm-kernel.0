@@ -1,73 +1,42 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 7 Feb 2018 17:01:53 +0000
-Subject: [PATCH v2 07/20] arm64: capabilities: Filter the entries based on
- a given mask
-In-Reply-To: <20180207103821.GX5862@e103592.cambridge.arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-8-suzuki.poulose@arm.com>
- <20180207103821.GX5862@e103592.cambridge.arm.com>
-Message-ID: <ca7b79b2-f275-7413-a8f0-01925935a692@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Feb 2018 01:09:24 +0800
+Subject: [PATCH] ARM: dts: da850-lcdk: add clock properties to the nand
+ node
+In-Reply-To: <20180205153204.20317-1-brgl@bgdev.pl>
+References: <20180205153204.20317-1-brgl@bgdev.pl>
+Message-ID: <201802080139.xpbqL9TL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/18 10:38, Dave Martin wrote:
-> On Wed, Jan 31, 2018 at 06:27:54PM +0000, Suzuki K Poulose wrote:
->> While processing the list of capabilities, it is useful to
->> filter out some of the entries based on the given mask for the
->> scope of the capabilities to allow better control. This can be
->> used later for handling LOCAL vs SYSTEM wide capabilities and more.
->> All capabilities should have their scope set to either LOCAL_CPU or
->> SYSTEM. No functional/flow change.
->>
->> Cc: Dave Martin <dave.martin@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/include/asm/cpufeature.h |  2 ++
->>   arch/arm64/kernel/cpufeature.c      | 35 ++++++++++++++++++++++++-----------
->>   2 files changed, 26 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index 69b5ce366598..cda62b70d338 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -198,6 +198,8 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->>   /* Is it safe for a late CPU to miss this capability when system has it */
->>   #define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
->>   
->> +#define ARM64_CPUCAP_SCOPE_ALL			 \
->> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_SCOPE_SYSTEM)
-> 
-> Perhaps we could just use _MASK rather than having a separate #define,
-> but it's good either way.
-> 
-> Is there a situation in which _ALL and _MASK would need to be
-> different?
+Hi Bartosz,
 
-No, it just makes it easier to read the code. I have switched to:
+I love your patch! Yet something to improve:
 
->> -static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
->> +static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list,
->> +				    u16 scope_mask)
->>   {
->>   	bool cpu_has_cap, system_has_cap;
->>   	const struct arm64_cpu_capabilities *caps = caps_list;
->>   
->> +	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
->>   	for (; caps->matches; caps++) {
->> +
-> 
-> Nit: extra blank line?
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.15 next-20180207]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Fixed.
+url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/ARM-dts-da850-lcdk-add-clock-properties-to-the-nand-node/20180207-221912
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
-> [...]
-> 
-> With that fixed,
-> 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+All errors (new ones prefixed by >>):
 
-Thanks
-Suzuki
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23404 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/03f55142/attachment-0001.gz>
