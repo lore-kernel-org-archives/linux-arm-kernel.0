@@ -1,66 +1,69 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 7 Feb 2018 16:34:58 +0800
-Subject: [PATCH v2 06/16] arm64: dts: mt7622: add cpufreq related device
- nodes
-In-Reply-To: <20180207061837.GM28462@vireshk-i7>
-References: <cover.1517910489.git.sean.wang@mediatek.com>
- <fc5bdf53b92bd7a96e94b714d8d13deebca95c28.1517910489.git.sean.wang@mediatek.com>
- <20180207033331.GK28462@vireshk-i7> <1517984178.9025.2.camel@mtkswgap22>
- <20180207061837.GM28462@vireshk-i7>
-Message-ID: <1517992498.9025.8.camel@mtkswgap22>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 7 Feb 2018 09:51:46 +0100
+Subject: [PATCH v2 1/6] pinctrl: sunxi: support pin controllers with
+ holes among IRQ banks
+In-Reply-To: <20180203154942.63566-2-icenowy@aosc.io>
+References: <20180203154942.63566-1-icenowy@aosc.io>
+ <20180203154942.63566-2-icenowy@aosc.io>
+Message-ID: <20180207085146.dvgwkdjq7ybhohwh@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-07 at 11:48 +0530, Viresh Kumar wrote:
-> On 07-02-18, 14:16, Sean Wang wrote:
-> > On Wed, 2018-02-07 at 09:03 +0530, Viresh Kumar wrote:
-> > > On 06-02-18, 17:52, sean.wang at mediatek.com wrote:
-> > > >  	cpus {
-> > > >  		#address-cells = <2>;
-> > > >  		#size-cells = <0>;
-> > > > @@ -26,6 +70,10 @@
-> > > >  			device_type = "cpu";
-> > > >  			compatible = "arm,cortex-a53", "arm,armv8";
-> > > >  			reg = <0x0 0x0>;
-> > > > +			clocks = <&infracfg CLK_INFRA_MUX1_SEL>,
-> > > > +				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
-> > > > +			clock-names = "cpu", "intermediate";
-> > > > +			operating-points-v2 = <&cpu_opp_table>;
-> > > >  			enable-method = "psci";
-> > > >  			clock-frequency = <1300000000>;
-> > > >  		};
-> > > > @@ -34,6 +82,7 @@
-> > > >  			device_type = "cpu";
-> > > >  			compatible = "arm,cortex-a53", "arm,armv8";
-> > > >  			reg = <0x0 0x1>;
-> > > > +			operating-points-v2 = <&cpu_opp_table>;
-> > > >  			enable-method = "psci";
-> > > >  			clock-frequency = <1300000000>;
-> > > >  		};
-> > > 
-> > > Sorry for not picking this earlier, but you should probably add the same clock
-> > > related properties for both cpu nodes here. Things will break if CPU1 is used by
-> > > the cpufreq core to bring the cpufreq policy online.
-> > > 
-> > > This can happen if cpufreq driver is a module, CPU0 is hotplugged out and then
-> > > the cpufreq driver is inserted.
-> > > 
-> > 
-> > mt7622 cpu0 does not support hotplug. do I still need to add same clock
-> > related properties for both cpu nodes here?
-> 
-> Normally we should always add these properties to all the CPUs, as that's the
-> real scenario hardware configuration wise.
-> 
+Hi,
 
-Agree on, I will add these missing clock properties also into the cpu1
-node to reflect the hardware actually should have. 
+On Sat, Feb 03, 2018 at 11:49:37PM +0800, Icenowy Zheng wrote:
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> index 11b128f54ed2..fae732c8c548 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+> @@ -110,7 +110,7 @@ struct sunxi_pinctrl_desc {
+>  	int				npins;
+>  	unsigned			pin_base;
+>  	unsigned			irq_banks;
+> -	unsigned			irq_bank_base;
+> +	const unsigned int		*irq_bank_map;
+>  	bool				irq_read_needs_mux;
+>  	bool				disable_strict_mode;
+>  };
+> @@ -263,12 +263,21 @@ static inline u32 sunxi_pull_offset(u16 pin)
+>  	return pin_num * PULL_PINS_BITS;
+>  }
+>  
+> -static inline u32 sunxi_irq_cfg_reg(u16 irq, unsigned bank_base)
+> +static inline u32 sunxi_irq_hw_bank_num(u8 bank, const unsigned int *bank_map)
+> +{
+> +	if (!bank_map)
+> +		return bank;
+> +	else
+> +		return bank_map[bank];
+> +}
 
-That also is devicetree wants us to do to describe the device more
-closely.
+>From a function API PoV, I guess it would make more sense and be
+cleaner to simply pass the sunxi_pinctrl_desc structure (as the first
+argument) and have the function there read that structure and act upon
+it.
 
-> But I am not sure if something else will break if you don't provide clocks in
-> CPU1.
-> 
-> @Rob @Mark: What do you suggest ?
-> 
+Giving it just a blank pointer, without any size indication, and
+either dereferencing it without any boundary check, or changing the
+behaviour based on whether it's null or not seems pretty fragile.
+
+I guess you could do it in two patches. One to change the function
+prototypes to call the sunxi_irq_cfg_reg function (and all its caller)
+to have the prototype (struct sunxi_pinctrl_desc *desc, u16 irq).
+
+And then in a later patch change the behaviour to introduce the map.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180207/56686890/attachment.sig>
