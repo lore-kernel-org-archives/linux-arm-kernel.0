@@ -1,42 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 8 Feb 2018 01:09:24 +0800
-Subject: [PATCH] ARM: dts: da850-lcdk: add clock properties to the nand
- node
-In-Reply-To: <20180205153204.20317-1-brgl@bgdev.pl>
-References: <20180205153204.20317-1-brgl@bgdev.pl>
-Message-ID: <201802080139.xpbqL9TL%fengguang.wu@intel.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed,  7 Feb 2018 12:23:59 -0500
+Subject: [PATCH v2 5/5] arm64: dts: rockchip: Specify override mode for kevin
+ panel
+In-Reply-To: <20180207172404.107358-1-seanpaul@chromium.org>
+References: <20180207172404.107358-1-seanpaul@chromium.org>
+Message-ID: <20180207172404.107358-6-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+This patch adds an override mode for kevin devices. The mode increases
+both back porches to allow a pixel clock of 26666kHz as opposed to the
+'typical' value of 252750kHz. This is needed to avoid interference with
+the touch digitizer on these laptops.
 
-I love your patch! Yet something to improve:
+Changes in v2:
+ - Wrap the timing in display-timings node to match binding (Rob/Thierry)
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.15 next-20180207]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/ARM-dts-da850-lcdk-add-clock-properties-to-the-nand-node/20180207-221912
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> ERROR: Input tree has errors, aborting (use -f to force output)
-
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: devicetree at vger.kernel.org
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-rockchip at lists.infradead.org
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23404 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/03f55142/attachment-0001.gz>
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index 191a6bcb1704..800eabd39076 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -98,6 +98,22 @@
+ 		backlight = <&backlight>;
+ 		power-supply = <&pp3300_disp>;
+ 
++		display-timings {
++			timing0: override {
++				clock-frequency = <266604720>;
++				hactive = <2400>;
++				hfront-porch = <48>;
++				hback-porch = <84>;
++				hsync-len = <32>;
++				hsync-active = <0>;
++				vactive = <1600>;
++				vfront-porch = <3>;
++				vback-porch = <120>;
++				vsync-len = <10>;
++				vsync-active = <0>;
++			};
++		};
++
+ 		ports {
+ 			panel_in_edp: endpoint {
+ 				remote-endpoint = <&edp_out_panel>;
+-- 
+2.16.0.rc1.238.g530d649a79-goog
