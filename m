@@ -1,34 +1,29 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 7 Feb 2018 14:47:12 +0000
-Subject: [PATCH v2 02/20] arm64: capabilities: Move errata work around
- check on boot CPU
-In-Reply-To: <20180207103737.GS5862@e103592.cambridge.arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-3-suzuki.poulose@arm.com>
- <20180207103737.GS5862@e103592.cambridge.arm.com>
-Message-ID: <9e21e22a-b41c-ced0-48aa-6738f3b062d9@arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 7 Feb 2018 08:50:35 -0600
+Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
+In-Reply-To: <CACRpkdaa0Ovb0kbE6J0vy4UJYv5fn6X2289pkX3b+HBze5FRJg@mail.gmail.com>
+References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
+ <20180128232310.GA12728@builder>
+ <042b6cea-38f7-a660-0059-5f24fc7db9eb@codeaurora.org>
+ <20180129005129.GB12728@builder>
+ <CACRpkdaa0Ovb0kbE6J0vy4UJYv5fn6X2289pkX3b+HBze5FRJg@mail.gmail.com>
+Message-ID: <38f2a1d3-7736-6100-0fd1-4b7bcb648de8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/18 10:37, Dave Martin wrote:
-> On Wed, Jan 31, 2018 at 06:27:49PM +0000, Suzuki K Poulose wrote:
->> We trigger CPU errata work around check on the boot CPU from
->> smp_prepare_boot_cpu() to make sure that we run the checks only
->> after the CPU feature infrastructure is initialised. While this
->> is correct, we can also do this from init_cpu_features() which
->> initilisation of the infrastructure, and is called only on the
-> 
-> Typo or missing words here?
-> 
-> Should this be "which initialises the infrastructure" or "which is
-> called to initialise the infrastructure"?
-> 
-> With that (or any suitable rewording):
+On 2/7/18 7:19 AM, Linus Walleij wrote:
+> if (tlmm_has_only_one_instance)
+>     base = 0;
+> else
+>     base = -1;
 
-Correct. Will fix it.
+This is effectively what my patch does.  The first instance gets 0.  The 
+second instance, if it exists, gets -1.
 
-> 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+When the first instance is registered, there's no way to know whether 
+there will be a second instance.
 
-Thanks
-Suzuki
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
