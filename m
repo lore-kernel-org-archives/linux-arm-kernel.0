@@ -1,36 +1,67 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed,  7 Feb 2018 20:35:25 +0200
-Subject: [PATCH v4 4/5] ARM: dts: bcm2835: make the firmware node into a bus
+Date: Wed,  7 Feb 2018 20:35:23 +0200
+Subject: [PATCH v4 2/5] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
 In-Reply-To: <cover.1517923836.git.baruch@tkos.co.il>
 References: <cover.1517923836.git.baruch@tkos.co.il>
-Message-ID: <eb4fc74047a6b2ed7a7c0aef687f7440eae056f5.1517923836.git.baruch@tkos.co.il>
+Message-ID: <214ff3856c430b8045b63b25d83733b77054dfab.1517923836.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows adding devices for which the firmware exposes control interface
-via the mailbox. An example of such device is the GPIO expander.
+The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+I2C. The firmware mailbox interface allows the ARM core to control the
+GPIO lines.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
-v4: New patch in this series
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+v4:
+  * Move the example gpio node under the firmware node
+  * Rename gpio node name to plain 'gpio'
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index e36c392a2b8f..0198bd46ef7c 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -18,7 +18,9 @@
- 
- 	soc {
- 		firmware: firmware {
--			compatible = "raspberrypi,bcm2835-firmware";
-+			compatible = "raspberrypi,bcm2835-firmware", "simple-bus";
-+			#address-cells = <0>;
-+			#size-cells = <0>;
- 			mboxes = <&mailbox>;
- 		};
- 
+v3:
+  * Rename node name.
+
+v2:
+  * Rename compatible string to raspberrypi,firmware-gpio
+---
+ .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+
+diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+new file mode 100644
+index 000000000000..30326528faa9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+@@ -0,0 +1,29 @@
++Raspberry Pi GPIO expander
++
++The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
++firmware exposes a mailbox interface that allows the ARM core to control the
++GPIO lines on the expander.
++
++Required properties:
++
++- compatible : Should be "raspberrypi,firmware-gpio"
++- gpio-controller : Marks the device node as a gpio controller
++- #gpio-cells : Should be two.  The first cell is the pin number, and
++  the second cell is used to specify the gpio polarity:
++  0 = active high
++  1 = active low
++- firmware : Reference to the RPi firmware device node
++
++Example:
++
++firmware: firmware {
++	compatible = "raspberrypi,bcm2835-firmware";
++	mboxes = <&mailbox>;
++
++	expgpio: gpio {
++		 compatible = "raspberrypi,firmware-gpio";
++		 gpio-controller;
++		 #gpio-cells = <2>;
++		 firmware = <&firmware>;
++	 };
++};
 -- 
 2.15.1
