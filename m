@@ -1,41 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 7 Feb 2018 14:57:50 +0530
-Subject: [PATCH v2 15/15] ARM: dts: dra7: Add high speed modes capability
- to MMC1/MMC2 dt node
-In-Reply-To: <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
-References: <20180206125806.19350-1-kishon@ti.com>
- <20180206125806.19350-16-kishon@ti.com>
- <210939ed-67fc-fa37-b4f2-c1faefcc4642@ti.com>
- <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
-Message-ID: <f57e9275-ee32-7f4b-3dee-7312d27e4e1f@ti.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 7 Feb 2018 10:33:24 +0100
+Subject: [PATCH v3 0/4] gpio: driver for the RPi3 GPIO expander
+In-Reply-To: <20180206162759.awghecpv4ihaatz7@tarshish>
+References: <cover.1516105893.git.baruch@tkos.co.il>
+ <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
+ <20180206162759.awghecpv4ihaatz7@tarshish>
+Message-ID: <a3e4ba9a-60bf-5038-7385-8cb3d2667ed2@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 February 2018 02:51 PM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Wednesday 07 February 2018 02:41 PM, Sekhar Nori wrote:
->> Kishon,
+Hi Baruch,
+
+Am 06.02.2018 um 17:27 schrieb Baruch Siach:
+> Hi Linus,
+>
+> On Tue, Feb 06, 2018 at 02:42:48PM +0100, Linus Walleij wrote:
+>> On Tue, Jan 16, 2018 at 1:45 PM, Baruch Siach <baruch@tkos.co.il> wrote:
 >>
->> On Tuesday 06 February 2018 06:28 PM, Kishon Vijay Abraham I wrote:
->>> Add UHS/HS200/DDR speed mode capability to MMC1 and MMC2 dt nodes.
+>>> The Raspberry Pi 3 has a GPIO expander that controls, among others, the
+>>> activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus
+>>> that is not directly controlled from the ARM core. The VC4 firmware controls
+>>> the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox
+>>> interface.
 >>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>
->> Along with this, dont we need to have
->>
->> 	/delete-property/ mmc-hs200-1_8v;
->>
->> for eMMC on Beagle x15 which does not support HS200?
->>
->> Or are you planning to depend on lack of pinctrl entries for HS200 to
->> take care of that?
-> 
-> right now it relies on lack of pinctrl entries but I think adding delete
-> property is appropriate. Actually I missed porting the patch that adds
-> /delete-property/.
+>>> This series adds support for the RPi3 expander.
+>>>
+>>> The driver is ported from the downstream kernel at
+>>> https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
+>>>
+>>> Changes in v3:
+>>>
+>>>   * Kconfig tweaks
+>>>   * Check rpi_exp_gpio_get_polarity() return value
+>>>   * Redundant header removal
+>>>   * Redundant platform_set_drvdata() call removal
+>>>   * Small coding style changes
+>> All is looking pretty good. I see Rob had some last minute comments,
+>> but please rebase and repost post v4.16-rc1 so we can get this merged,
+>> we need to get this upstream.
+> I was about to send v4 when I saw your email. I based v4 on current LinusT's 
+> tree as of e237f98a9c. I guess that affected files will not change before 
+> v4.16-rc1, but I can wait a few more days for -rc1.
+>
+> baruch
+>
+please also address the owner issue in the driver, which was reported by
+kbuild test robot.
 
-Alright, thanks!
+Thanks
 
-Regards,
-Sekhar
+Stefan
