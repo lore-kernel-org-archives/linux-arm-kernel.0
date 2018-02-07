@@ -1,32 +1,117 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 07 Feb 2018 14:04:18 +0100
-Subject: [PATCH 1/3] clk: exynos5433: Extend list of available AUD_PLL
- output frequencies
-In-Reply-To: <5A7AE1E0.8000509@samsung.com>
-References: <CGME20180205142252epcas1p4471e32e2b513806420c64b323af2ffa6@epcas1p4.samsung.com>
- <20180205142230.9755-1-s.nawrocki@samsung.com>
- <5A7916A2.7010307@samsung.com>
- <75cac4e7-9bbb-e591-36a1-dcacc3f94ace@samsung.com>
- <5A7AE1E0.8000509@samsung.com>
-Message-ID: <086b44d2-6556-fa7c-1a5b-01c243bf0682@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 7 Feb 2018 18:36:30 +0530
+Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
+In-Reply-To: <CAMRc=Mcf0aEQvieNaZ3cMHJTE23Gf1jUNf0=vuO9-PA=9ObDvQ@mail.gmail.com>
+References: <20180205155222.22189-1-brgl@bgdev.pl>
+ <3f171f6a-bcea-65ec-d56d-f6ae24660f34@ti.com>
+ <CAMpxmJUDbwkcJt_kx9GX+qY10xiGAp-j3+kXM-q3WP1VGwr0UQ@mail.gmail.com>
+ <54dbdb98-e0e4-c8c9-fec4-2f050745d9be@ti.com>
+ <794024f3-f87a-58ed-2722-a4a2d09df3ce@lechnology.com>
+ <4aa2ab13-7890-6904-86b3-e2dbcb6d6daa@lechnology.com>
+ <CAMRc=Mcf0aEQvieNaZ3cMHJTE23Gf1jUNf0=vuO9-PA=9ObDvQ@mail.gmail.com>
+Message-ID: <37e034fe-5951-9a58-8698-d34226e8279e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2018 12:24 PM, Chanwoo Choi wrote:
-> Could you share your equation?
-> because your result is a little bit different of my result.
-> - my equation : ((mdiv + kdiv/65535) x 24MHz) / (pdiv x POWER(2,sdiv))
+On Wednesday 07 February 2018 12:15 AM, Bartosz Golaszewski wrote:
+> 2018-02-06 19:25 GMT+01:00 David Lechner <david@lechnology.com>:
+>> On 02/06/2018 12:16 PM, David Lechner wrote:
+>>>
+>>> On 02/06/2018 07:51 AM, Sekhar Nori wrote:
+>>>>
+>>>> On Tuesday 06 February 2018 06:38 PM, Bartosz Golaszewski wrote:
+>>>>>
+>>>>> 2018-02-06 12:07 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>>>>>>
+>>>>>> On Monday 05 February 2018 09:22 PM, Bartosz Golaszewski wrote:
+>>>>>>>
+>>>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>>>
+>>>>>>> Make nand work with the common clock framework by specifying which
+>>>>>>> clock should be used and what name to look up.
+>>>>>>>
+>>>>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>>> ---
+>>>>>>>   arch/arm/boot/dts/da850-evm.dts | 3 +++
+>>>>>>>   1 file changed, 3 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/da850-evm.dts
+>>>>>>> b/arch/arm/boot/dts/da850-evm.dts
+>>>>>>> index a86a8a1816f2..2602ad8e99ee 100644
+>>>>>>> --- a/arch/arm/boot/dts/da850-evm.dts
+>>>>>>> +++ b/arch/arm/boot/dts/da850-evm.dts
+>>>>>>> @@ -296,6 +296,9 @@
+>>>>>>>                        reg = <0 0x02000000 0x02000000
+>>>>>>>                               1 0x00000000 0x00008000>;
+>>>>>>>
+>>>>>>> +                     clocks = <&psc0 3>;
+>>>>>>> +                     clock-names = "aemif";
+>>>>>>
+>>>>>>
+>>>>>> Looks like this is being added only to satisfy the devm_clk_get() call
+>>>>>> in nand_davinci_probe() which I think is superfluous since we also
+>>>>>> enable the same clock in aemif_probe().
+>>>>>>
+>>>>>> Perhaps the better solution is to drip the clk code in
+>>>>>> drivers/mtd/nand/davinci_nand.c and shift legacy code to start using
+>>>>>> drivers/memory/aemif.c as well? This way we can also drop
+>>>>>> arch/arm/mach-davinci/aemif.c
+>>>>>>
+>>>>>> Thanks,
+>>>>>> Sekhar
+>>>>>
+>>>>>
+>>>>> Yes, this sounds good, but I think we should leave it for later as an
+>>>>> additional improvement, once everything else is in place. I think
+>>>>> these patches should be applied together with David's series in order
+>>>>> to not break the support on davinci boards and the aemif work would go
+>>>>> in later as a follow-up. How about that?
+>>>>
+>>>>
+>>>> No, I dont think we should add temporary hacks to DT to work around
+>>>> driver issues (I do think its a hack since the clock belongs to aemif
+>>>> module not NAND flash).
+>>>>
+>>>> An easier driver hack might be to not treat devm_clk_get() failure in
+>>>> davinci_nand.c as catastrophic. It will safely fail in DT case and we
+>>>> should get the clock in legacy boot case.
+>>>>
+>>>> I think we are looking at a driver update dependency anyway.
+>>>
+>>>
+>>> It looks like keystone.dtsi is using the clock-ranges property in the
+>>> aemif node to pass the clock to child nodes. Could we not do the same
+>>> in da850.dtsi?
+>>
+>>
+>> Bartosz, please try this instead of your patch.
+>>
+>> FYI, this is just following the existing memory-controllers/ti-aemif.txt
+>> device tree bindings, so not a "hack".
+>>
+>> ---
+>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>> index 3a1f2ce..ff9d807 100644
+>> --- a/arch/arm/boot/dts/da850.dtsi
+>> +++ b/arch/arm/boot/dts/da850.dtsi
+>> @@ -796,6 +796,8 @@
+>>                 ranges = <0 0 0x60000000 0x08000000
+>>                           1 0 0x68000000 0x00008000>;
+>>                 clocks = <&psc0 3>;
+>> +               clock-names = "aemif";
+>> +               clock-ranges;
+>>                 status = "disabled";
+>>         };
+>>         memctrl: memory-controller at b0000000 {
+>> ---
+> 
+> Yes, this works. Sekhar: can we include it in David's series, while
+> still keeping the plan to move legacy boards to using the aemif
+> driver?
 
-It resembles the code from samsung_pll36xx_recalc_rate():
+Okay. Fine with me. Actually the chipselect node already has
+clock-ranges defined, but that doesn't have any meaning unless its also
+included in aemif node.
 
-(24 * 10^6 * (M * 2^16 + K)) / (P * 2^S) / 2^16
-
-and a more accurate one
-
-ROUNDDOWN(ROUNDDOWN(24 * 10^6 * (M * 2^16 + K), 0) / ROUNDDOWN(P * 2^S, 0) / 2^16, 0)
-
-Shouldn't you substitute 65535 with 65536?
-
--- 
-Regards,
-Sylwester
+Thanks,
+Sekhar
