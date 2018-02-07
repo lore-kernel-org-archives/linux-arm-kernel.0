@@ -1,32 +1,46 @@
-From: tuomas@tuxera.com (Tuomas Tynkkynen)
-Date: Wed, 7 Feb 2018 02:53:09 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable serial console on RPi 3
-Message-ID: <20180207005309.14365-1-tuomas@tuxera.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Feb 2018 01:15:44 +0000
+Subject: Device tree bug in armada-8040-mcbin.dts
+In-Reply-To: <alpine.LRH.2.02.1802061650060.4974@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1802061650060.4974@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <20180207011544.GK9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi 3 uses the 8250-based auxilary UART of the BCM2837 SoC
-as the primary serial console of the board, so enable it in the
-multiplatform defconfig.
+On Tue, Feb 06, 2018 at 04:59:22PM -0500, Mikulas Patocka wrote:
+> Hi
+> 
+> When the MacchiatoBIN kernel is compiled with CONFIG_PM=y, it is 
+> frequently reporing this error (the error happens every time some I/O on 
+> built-in eMMC happens):
+> 
+> "mmc0: Switching to 3.3V signalling voltage failed"
 
-Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
----
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Yep, it's annoying.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index da7387689b88..f77bd01c7927 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -312,6 +312,9 @@ CONFIG_INPUT_ADXL34X=m
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_8250_BCM2835AUX=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_8250_MT6577=y
+> The problem is that the "&ap_sdhci0" device tree node asserts that the 
+> controller doesn't support 1.8v, but it attaches it to the fixed voltage 
+> regulator "v_vddo_h" that only supplies 1.8V.
+> 
+> Should it be attached to the 3.3V regulator instead? Or should the 
+> "vqmmc-supply" statemet be deleted? Or should the statement "no-1-8-v" be 
+> deleted?
+
+Removing the "no-1-8-v" statement breaks it, and the reality is that the
+signalling voltage is fixed at 1.8V, so the "vqmmc-supply" is correct.
+The problem here is that the MMC layer doesn't understand that, and
+always wants to do the initial probe at vqmmc=3.3V.  Hence the above
+message.
+
+It would be nice if MMC understood the concept of a bus operating at a
+fixed voltage, then the "no-1-8-v" hack could be removed.
+
+Which-ever way is chosen, the result is that we end up _not_ describing
+the hardware, but we end up describing something suitable for the
+implementation, which is not how DT is supposed to work.  MMC really
+needs to be fixed.
+
 -- 
-2.16.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
