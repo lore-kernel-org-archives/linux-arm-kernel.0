@@ -1,189 +1,72 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 7 Feb 2018 10:02:10 +0100
-Subject: [PATCH v2 4/6] clk: sunxi-ng: add support for the Allwinner H6 CCU
-In-Reply-To: <20180203154942.63566-5-icenowy@aosc.io>
-References: <20180203154942.63566-1-icenowy@aosc.io>
- <20180203154942.63566-5-icenowy@aosc.io>
-Message-ID: <20180207090210.jlxleeh32tojvzp5@flea>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed,  7 Feb 2018 18:10:40 +0900
+Subject: [RESEND PATCH v2 0/9] add UniPhier audio system support
+Message-ID: <20180207091049.24700-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Mark,
 
-On Sat, Feb 03, 2018 at 11:49:40PM +0800, Icenowy Zheng wrote:
-> +	/* Force the output divider of video PLLs to 0 */
-> +	for (i = 0; i < ARRAY_SIZE(pll_video_regs); i++) {
-> +		val = readl(reg + pll_video_regs[i]);
-> +		val &= ~BIT(0);
-> +		writel(val, reg + pll_video_regs[i]);
-> +	}
+This is the resend of patchset passed 3 weeks.
+https://lkml.org/lkml/2018/1/19/122
 
-Why?
 
-> +	/* Force OHCI 12M clock sources to 00 (12MHz divided from 48MHz) */
-> +	for (i = 0; i < ARRAY_SIZE(usb2_clk_regs); i++) {
-> +		val = readl(reg + usb2_clk_regs[i]);
-> +		val &= ~GENMASK(25, 24);
-> +		writel (val, reg + usb2_clk_regs[i]);
-> +	}
+This series adds support for Socionext audio system for
+UniPhier LD11/LD20 SoCs. This driver supports I2S output
+for Line-In, Line-Out and S/PDIF output.
 
-Why?
+UniPhier AIO DAI driver provides sound devices such as I2S, S/PDIF.
+Since the AIO has mixed register map for those I/Os, it is hard to
+split register areas for each sound devices.
 
-> +	/*
-> +	 * Force the post-divider of pll-video to 8 and the output divider
-> +	 * of it to 1.
-> +	 */
-> +	val = readl(reg + SUN50I_H6_PLL_AUDIO_REG);
-> +	val &= ~(GENMASK(21, 16) | BIT(0));
-> +	writel(val | (7 << 16), reg + SUN50I_H6_PLL_AUDIO_REG);
+---
 
-Why?
-> diff --git a/include/dt-bindings/clock/sun50i-h6-ccu.h b/include/dt-bindings/clock/sun50i-h6-ccu.h
-> new file mode 100644
-> index 000000000000..f7ddb241012c
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/sun50i-h6-ccu.h
-> @@ -0,0 +1,125 @@
-> +/*
-> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ or MIT)
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_SUN50I_H6_H_
-> +#define _DT_BINDINGS_CLK_SUN50I_H6_H_
-> +
-> +#define CLK_PLL_PERIPH0		3
+Changes in v2:
+  - Add comments to aiodma_irq()
+  - Add members to struct uniphier_aio_sub and add methods
+    for compress audio
+  - Expose clocking to userspace
+  - Fix bad name 'srcport' to 'src'
+  - Split DMA, DAI patches from large one
+  - Validate parameters in hw_params()
+  - Add error checks
+  - Fix typo in error messages
+  - Change license comment style to C++ from C
 
-Why is that needed?
+Katsuhiro Suzuki (9):
+  ASoC: uniphier: add DT bindings documentation for UniPhier AIO
+  ASoC: uniphier: add support for UniPhier AIO common driver
+  ASoC: uniphier: add support for UniPhier AIO DMA driver
+  ASoC: uniphier: add support for UniPhier AIO CPU DAI driver
+  ASoC: uniphier: add support for UniPhier AIO compress audio
+  ASoC: uniphier: add support for UniPhier LD11/LD20 AIO driver
+  arm64: dts: uniphier: add sound node for UniPhier
+  arm64: dts: uniphier: add speaker out for UniPhier LD11/LD20 boards
+  arm64: dts: uniphier: add compress audio out for UniPhier LD11/LD20
 
-> +
-> +#define CLK_CPUX		21
-> +
-> +#define CLK_APB1		26
-
-Same thing here
-
-> +
-> +#define CLK_DE			29
-> +#define CLK_BUS_DE		30
-> +#define CLK_DEINTERLACE		31
-> +#define CLK_BUS_DEINTERLACE	32
-> +#define CLK_GPU			33
-> +#define CLK_BUS_GPU		34
-> +#define CLK_CE			35
-> +#define CLK_BUS_CE		36
-> +#define CLK_VE			37
-> +#define CLK_BUS_VE		38
-> +#define CLK_EMCE		39
-> +#define CLK_BUS_EMCE		40
-> +#define CLK_VP9			41
-> +#define CLK_BUS_VP9		42
-> +#define CLK_BUS_DMA		43
-> +#define CLK_BUS_MSGBOX		44
-> +#define CLK_BUS_SPINLOCK	45
-> +#define CLK_BUS_HSTIMER		46
-> +#define CLK_AVS			47
-> +#define CLK_BUS_DBG		48
-> +#define CLK_BUS_PSI		49
-> +#define CLK_BUS_PWM		50
-> +#define CLK_BUS_IOMMU		51
-> +
-> +#define CLK_MBUS_DMA		53
-> +#define CLK_MBUS_VE		54
-> +#define CLK_MBUS_CE		55
-> +#define CLK_MBUS_TS		56
-> +#define CLK_MBUS_NAND		57
-> +#define CLK_MBUS_CSI		58
-> +#define CLK_MBUS_DEINTERLACE	59
-> +
-> +#define CLK_NAND0		61
-> +#define CLK_NAND1		62
-> +#define CLK_BUS_NAND		63
-> +#define CLK_MMC0		64
-> +#define CLK_MMC1		65
-> +#define CLK_MMC2		66
-> +#define CLK_BUS_MMC0		67
-> +#define CLK_BUS_MMC1		68
-> +#define CLK_BUS_MMC2		69
-> +#define CLK_BUS_UART0		70
-> +#define CLK_BUS_UART1		71
-> +#define CLK_BUS_UART2		72
-> +#define CLK_BUS_UART3		73
-> +#define CLK_BUS_I2C0		74
-> +#define CLK_BUS_I2C1		75
-> +#define CLK_BUS_I2C2		76
-> +#define CLK_BUS_I2C3		77
-> +#define CLK_BUS_SCR0		78
-> +#define CLK_BUS_SCR1		79
-> +#define CLK_SPI0		80
-> +#define CLK_SPI1		81
-> +#define CLK_BUS_SPI0		82
-> +#define CLK_BUS_SPI1		83
-> +#define CLK_BUS_EMAC		84
-> +#define CLK_TS			85
-> +#define CLK_BUS_TS		86
-> +#define CLK_IR_TX		87
-> +#define CLK_BUS_IR_TX		88
-> +#define CLK_BUS_THS		89
-> +#define CLK_I2S3		90
-> +#define CLK_I2S0		91
-> +#define CLK_I2S1		92
-> +#define CLK_I2S2		93
-> +#define CLK_BUS_I2S0		94
-> +#define CLK_BUS_I2S1		95
-> +#define CLK_BUS_I2S2		96
-> +#define CLK_BUS_I2S3		97
-> +#define CLK_SPDIF		98
-> +#define CLK_BUS_SPDIF		99
-> +#define CLK_DMIC		100
-> +#define CLK_BUS_DMIC		101
-> +#define CLK_AUDIO_HUB		102
-> +#define CLK_BUS_AUDIO_HUB	103
-> +#define CLK_USB_OHCI0		104
-> +#define CLK_USB_PHY0		105
-> +#define CLK_USB_PHY1		106
-> +#define CLK_USB_OHCI3		107
-> +#define CLK_USB_PHY3		108
-> +#define CLK_USB_HSIC_12M	109
-> +#define CLK_USB_HSIC		110
-> +#define CLK_BUS_OHCI0		111
-> +#define CLK_BUS_OHCI3		112
-> +#define CLK_BUS_EHCI0		113
-> +#define CLK_BUS_XHCI		114
-> +#define CLK_BUS_EHCI3		115
-> +#define CLK_BUS_OTG		116
-> +#define CLK_PCIE_REF_100M	117
-> +#define CLK_PCIE_REF		118
-> +#define CLK_PCIE_REF_OUT	119
-> +#define CLK_PCIE_MAXI		120
-> +#define CLK_PCIE_AUX		121
-
-Dito.
-
-> +#define CLK_BUS_PCIE		122
-> +#define CLK_HDMI		123
-> +#define CLK_HDMI_CEC		124
-> +#define CLK_BUS_HDMI		125
-> +#define CLK_BUS_TCON_TOP	126
-
-Ditto.
-
-Remember, you should only expose here the clocks that devices are
-going to use, and remove as much intermediate clocks as possible.
-
-If you're unsure, keep them out of the dt-binding include, we can
-always move one to the dt-binding header, while the other way isn't
-possible.
+ .../devicetree/bindings/sound/uniphier,aio.txt     |   36 +
+ .../boot/dts/socionext/uniphier-ld11-global.dts    |  120 +++
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   |   31 +
+ .../boot/dts/socionext/uniphier-ld20-global.dts    |  120 +++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |   35 +
+ sound/soc/uniphier/Kconfig                         |   22 +
+ sound/soc/uniphier/Makefile                        |    6 +
+ sound/soc/uniphier/aio-compress.c                  |  440 ++++++++
+ sound/soc/uniphier/aio-core.c                      | 1104 ++++++++++++++++++++
+ sound/soc/uniphier/aio-cpu.c                       |  570 ++++++++++
+ sound/soc/uniphier/aio-dma.c                       |  318 ++++++
+ sound/soc/uniphier/aio-ld11.c                      |  431 ++++++++
+ sound/soc/uniphier/aio-reg.h                       |  462 ++++++++
+ sound/soc/uniphier/aio.h                           |  355 +++++++
+ 14 files changed, 4050 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/uniphier,aio.txt
+ create mode 100644 sound/soc/uniphier/aio-compress.c
+ create mode 100644 sound/soc/uniphier/aio-core.c
+ create mode 100644 sound/soc/uniphier/aio-cpu.c
+ create mode 100644 sound/soc/uniphier/aio-dma.c
+ create mode 100644 sound/soc/uniphier/aio-ld11.c
+ create mode 100644 sound/soc/uniphier/aio-reg.h
+ create mode 100644 sound/soc/uniphier/aio.h
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180207/d25dce68/attachment.sig>
+2.15.0
