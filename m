@@ -1,382 +1,124 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 7 Feb 2018 10:38:04 +0000
-Subject: [PATCH v2 05/20] arm64: capabilities: Add flags to handle the
- conflicts on late CPU
-In-Reply-To: <20180131182807.32134-6-suzuki.poulose@arm.com>
+Date: Wed, 7 Feb 2018 10:39:42 +0000
+Subject: [PATCH v2 17/20] arm64: bp hardening: Allow late CPUs to enable
+ work around
+In-Reply-To: <20180131182807.32134-18-suzuki.poulose@arm.com>
 References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-6-suzuki.poulose@arm.com>
-Message-ID: <20180207103804.GV5862@e103592.cambridge.arm.com>
+ <20180131182807.32134-18-suzuki.poulose@arm.com>
+Message-ID: <20180207103942.GH5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 06:27:52PM +0000, Suzuki K Poulose wrote:
-> When a CPU is brought up, it is checked against the caps that are
-> known to be enabled on the system (via verify_local_cpu_capabilities()).
-> Based on the state of the capability on the CPU vs. that of System we
-> could have the following combinations of conflict.
+On Wed, Jan 31, 2018 at 06:28:04PM +0000, Suzuki K Poulose wrote:
+> We defend against branch predictor training based exploits by
+> taking specific actions (based on the CPU model) to invalidate
+> the Branch predictor buffer (BPB). This is implemented by per-CPU
+> ptr, which installs the specific actions for the CPU model.
 > 
-> 	x-----------------------------x
-> 	| Type  | System   | Late CPU |
-> 	|-----------------------------|
-> 	|  a    |   y      |    n     |
-> 	|-----------------------------|
-> 	|  b    |   n      |    y     |
-> 	x-----------------------------x
+> The core code can handle the following cases where:
+>  1) some CPUs doesn't need any work around
+>  2) a CPU can install the work around, when it is brought up,
+>     irrespective of how late that happens.
 > 
-> Case (a) is not permitted for caps which are system features, which the
-> system expects all the CPUs to have (e.g VHE). While (a) is ignored for
-> all errata work arounds. However, there could be exceptions to the plain
-> filtering approach. e.g, KPTI is an optional feature for a late CPU as
-> long as the system already enables it.
-> 
-> Case (b) is not permitted for errata work arounds which requires some work
-> around, which cannot be delayed. And we ignore (b) for features. Here, yet
+> This concludes that it is safe to bring up a CPU which requires
+> bp hardening defense. However, with the current settings, we
+> reject a late CPU, if none of the active CPUs didn't need it.
 
-Nit, maybe:
+Should this be "[...] reject a late CPU that needs the defense, if none
+of the active CPUs needed it." ?
 
-"Case (b) is not permitted for any errata workaround that cannot be
-activated if the kernel has finished booting and has not already enabled
-it."
-
-> again, KPTI is an exception, where if a late CPU needs KPTI we are too late
-> to enable it (because we change the allocation of ASIDs etc).
 > 
-> Add two different flags to indicate how the conflict should be handled.
+> This patch solves issue by changing the flags for the capability
+> to indicate that it is safe for a late CPU to turn up with the
+> capability. This is not sufficient to get things working, as
+> we cannot change the system wide state of the capability established
+> at the kernel boot. So, we "set" the capability unconditionally
+> and make sure that the call backs are only installed for those
+> CPUs which actually needs them. This is done by adding a dummy
+> entry at the end of the list of shared entries, which :
+>  a) Always returns true for matches, to ensure we turn this on.
+>  b) has an empty "cpu_enable" call back, so that we don't take
+>     any action on the CPUs which weren't matched with the real
+>     entries.
 > 
->  ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU - CPUs may have the capability
->  ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU - CPUs may not have the cappability.
-> 
-> Now that we have the flags to describe the behavior of the errata and
-> the features, as we treat them, define types for ERRATUM and FEATURE.
-> 
-> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-All my suggestions in this patch are rewordings of comments, so they're
-not vital, and anyway you may disagree that they make the meaning
-clearer.  So I don't think they're essential.
-
-For the actual code
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
 > ---
->  arch/arm64/include/asm/cpufeature.h | 61 ++++++++++++++++++++++++++++++++++++-
->  arch/arm64/kernel/cpu_errata.c      |  8 ++---
->  arch/arm64/kernel/cpufeature.c      | 30 +++++++++---------
->  3 files changed, 79 insertions(+), 20 deletions(-)
+>  arch/arm64/include/asm/cpufeature.h | 10 ++++++++++
+>  arch/arm64/kernel/cpu_errata.c      | 19 ++++++++++++++++++-
+>  2 files changed, 28 insertions(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 05da54f1b4c7..7460b1f7e611 100644
+> index b73247c27f00..262fa213b1b1 100644
 > --- a/arch/arm64/include/asm/cpufeature.h
 > +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -142,7 +142,8 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->   *    capabilities and if there is a conflict, the kernel takes an action, based
->   *    on the severity (e.g, a CPU could be prevented from booting or cause a
->   *    kernel panic). The CPU is allowed to "affect" the state of the capability,
-> - *    if it has not been finalised already.
-> + *    if it has not been finalised already. See section 5 for more details on
-> + *    conflicts.
->   *
->   * 4) Action: As mentioned in (2), the kernel can take an action for each detected
->   *    capability, on all CPUs on the system. This is always initiated only after
-> @@ -155,6 +156,32 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->   *	b) Any late CPU, brought up after (1), the action is triggered via:
->   *		check_local_cpu_capabilities() -> verify_local_cpu_capabilities()
->   *
-> + * 5) Conflicts: Based on the state of the capability on a late CPU vs. the system
-> + *    state, we could have the following combinations :
-> + *
-> + *		x-----------------------------x
-> + *		| Type  | System   | Late CPU |
-> + *		|-----------------------------|
-> + *		|  a    |   y      |    n     |
-> + *		|-----------------------------|
-> + *		|  b    |   n      |    y     |
-> + *		x-----------------------------x
+> @@ -252,6 +252,16 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+>  	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
+>  	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
+>  
+> +/*
+> + * CPU errata work around detected at boot time based on one or more CPUs.
+> + * All conflicts are ignored. This implies any work around shouldn't
+> + * depend when a CPU could be brought up.
+> + */
+> +#define ARM64_CPUCAP_WEAK_LOCAL_CPU_ERRATUM		\
+> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
+> +	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
+> +	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
+> +
+>  /*
+>   * CPU feature detected at boot time, on one or more CPUs. A late CPU
+>   * is not allowed to have the capability when the system doesn't have it.
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index b4f1c1c1f8ca..7f714a628480 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -259,6 +259,12 @@ static const struct midr_range arm64_bp_harden_psci_cpus[] = {
+>  	{},
+>  };
+>  
+> +static bool bp_hardening_always_on(const struct arm64_cpu_capabilities *cap,
+> +				   int scope)
+> +{
+> +	return true;
+> +}
+> +
+>  static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
+>  	{
+>  		CAP_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
+> @@ -268,6 +274,17 @@ static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
+>  		CAP_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+>  		.cpu_enable = qcom_enable_link_stack_sanitization,
+>  	},
+> +	/*
+> +	 * Always enable the capability to make sure a late CPU can
+> +	 * safely use the BP hardening call backs. Since we use per-CPU
+> +	 * pointers for the call backs, the work around only affects the
+> +	 * CPUs which have some methods installed by any real matching entries
+> +	 * above. As such we don't have any specific cpu_enable() callback
+> +	 * for this entry, as it is just to make sure we always "detect" it.
+> +	 */
+> +	{
+> +		.matches = bp_hardening_always_on,
 
-Nit: I find this a bit hard to follow.  Maybe reordering things a bit
-would help but putting the rule (the precise bit) first, and the
-rationale (necessarily more vague) afterward:
+This function could simply be called "always_on", since it expresses
+something entirely generic and is static.
 
-"Two capability type flag bits are defined to indicate whether each kind
-of conflict can be tolerated:
+> +	},
 
-		ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU - Case (a) is allowed
-		ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU - Case (b) is allowed."
+This feels like a bit of a hack: really there is no global on/off
+state for a cap like this: it's truly independent for each cpu.
 
-> + *
-> + *     Case (a) is not permitted for capabilities which are usually system
-> + *     features, which the system expects all CPUs to have. While (a) is ignored
-> + *     for capabilities which represents an erratum work around.
+OTOH, your code does achieve that, and the comment gives a good
+explanation.
 
-Similarly "Case (a) is not permitted for a capability that the system
-requires all CPUs to have in order for the capability to be enabled.
-This is typical for capabilities that represent enhanced functionality."
-
-> + *
-> + *     Case (b) is not permitted for erratum capabilities, which might require
-> + *     some work arounds which cannot be applied really late. Meanwhile, most
-> + *     of the features could safely ignore (b), as the system doesn't use it
-> + *     anyway.
-
-and
-
-"Case (b) is not permitted for a capability that the system must enable
-during boot if any CPU in the system requires it in order to run safely.
-This is typical for erratum workarounds that cannot be enabled after the
-corresponding capability is finalised.
-
-In some non-typical cases, either both (a) and (b), or neither, should
-be permitted.  This can be described by including neither or both flags
-in the capability's type field."
+The alternative would be to add a cap type flag to indicate that
+this cap is purely CPU-local, but it may not be worth it at this
+stage.
 
 [...]
 
->  
->  
-> @@ -165,6 +192,26 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->  #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
->  #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
->  
-> +/* Is it permitted for a late CPU to have this capability when system doesn't already have */
-
-"doesn't already have" -> "hasn't already enabled it"?
-
-> +#define ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU	((u16)BIT(4))
-> +/* Is it safe for a late CPU to miss this capability when system has it */
-> +#define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
-> +
-> +/*
-> + * CPU errata detected at boot time based on feature of one or more CPUs.
-> + * It is not safe for a late CPU to have this feature when the system doesn't
-
-Can we around using the word "feature" to describe errata here?
-
-Maybe "CPU errata workarounds that need to be enabled at boot time if
-one or more CPUs in the system requires the workaround.  When one of
-these workaround capabilities has been enabled, it is safe to allow any
-CPU to boot that does not require the workaround."
-
-> + * have it. But it is safe to miss the feature if the system has it.
-> + */
-> +#define ARM64_CPUCAP_LOCAL_CPU_ERRATUM		\
-> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
-> +/*
-> + * CPU feature detected at boot time based on system-wide value of a feature.
-> + * It is safe for a late CPU to have this feature even though the system doesn't
-> + * have it already. But the CPU must have this feature if the system does.
-
-"hasn't enabled it, although the feature will not be used by Linux
-in this case.  If the system has enabled this feature already then every
-late CPU must have it."
-
-> + */
-> +#define ARM64_CPUCAP_SYSTEM_FEATURE	\
-> +	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
-> +
->  struct arm64_cpu_capabilities {
->  	const char *desc;
->  	u16 capability;
-> @@ -198,6 +245,18 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
->  	return cap->type & ARM64_CPUCAP_SCOPE_MASK;
->  }
->  
-> +static inline bool
-> +cpucap_late_cpu_optional(const struct arm64_cpu_capabilities *cap)
-> +{
-> +	return !!(cap->type & ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU);
-> +}
-> +
-> +static inline bool
-> +cpucap_late_cpu_permitted(const struct arm64_cpu_capabilities *cap)
-> +{
-> +	return !!(cap->type & ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU);
-> +}
-> +
->  extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->  extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
->  extern struct static_key_false arm64_const_caps_ready;
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 328c5a031e45..22ec3960a0c5 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -175,14 +175,14 @@ static void qcom_enable_link_stack_sanitization(
->  #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
->  
->  #define MIDR_RANGE(model, min, max) \
-> -	.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU, \
-> +	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM, \
->  	.matches = is_affected_midr_range, \
->  	.midr_model = model, \
->  	.midr_range_min = min, \
->  	.midr_range_max = max
->  
->  #define MIDR_ALL_VERSIONS(model) \
-> -	.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU, \
-> +	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM, \
->  	.matches = is_affected_midr_range, \
->  	.midr_model = model, \
->  	.midr_range_min = 0, \
-> @@ -286,7 +286,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  		.desc = "Mismatched cache line size",
->  		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
->  		.matches = has_mismatched_cache_line_size,
-> -		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
-> +		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
->  		.cpu_enable = cpu_enable_trap_ctr_access,
->  	},
->  #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-> @@ -300,7 +300,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  	{
->  		.desc = "Qualcomm Technologies Kryo erratum 1003",
->  		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
-> -		.type = ARM64_CPUCAP_SCOPE_LOCAL_CPU,
-> +		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
->  		.midr_model = MIDR_QCOM_KRYO,
->  		.matches = is_kryo_midr,
->  	},
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 8d22f0ef0927..1b29b3f0a1bc 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -921,7 +921,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "GIC system register CPU interface",
->  		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_useable_gicv3_cpuif,
->  		.sys_reg = SYS_ID_AA64PFR0_EL1,
->  		.field_pos = ID_AA64PFR0_GIC_SHIFT,
-> @@ -932,7 +932,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "Privileged Access Never",
->  		.capability = ARM64_HAS_PAN,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_cpuid_feature,
->  		.sys_reg = SYS_ID_AA64MMFR1_EL1,
->  		.field_pos = ID_AA64MMFR1_PAN_SHIFT,
-> @@ -945,7 +945,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "LSE atomic instructions",
->  		.capability = ARM64_HAS_LSE_ATOMICS,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_cpuid_feature,
->  		.sys_reg = SYS_ID_AA64ISAR0_EL1,
->  		.field_pos = ID_AA64ISAR0_ATOMICS_SHIFT,
-> @@ -956,14 +956,14 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "Software prefetching using PRFM",
->  		.capability = ARM64_HAS_NO_HW_PREFETCH,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_no_hw_prefetch,
->  	},
->  #ifdef CONFIG_ARM64_UAO
->  	{
->  		.desc = "User Access Override",
->  		.capability = ARM64_HAS_UAO,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_cpuid_feature,
->  		.sys_reg = SYS_ID_AA64MMFR2_EL1,
->  		.field_pos = ID_AA64MMFR2_UAO_SHIFT,
-> @@ -977,21 +977,21 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  #ifdef CONFIG_ARM64_PAN
->  	{
->  		.capability = ARM64_ALT_PAN_NOT_UAO,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = cpufeature_pan_not_uao,
->  	},
->  #endif /* CONFIG_ARM64_PAN */
->  	{
->  		.desc = "Virtualization Host Extensions",
->  		.capability = ARM64_HAS_VIRT_HOST_EXTN,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = runs_at_el2,
->  		.cpu_enable = cpu_copy_el2regs,
->  	},
->  	{
->  		.desc = "32-bit EL0 Support",
->  		.capability = ARM64_HAS_32BIT_EL0,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_cpuid_feature,
->  		.sys_reg = SYS_ID_AA64PFR0_EL1,
->  		.sign = FTR_UNSIGNED,
-> @@ -1001,21 +1001,21 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "Reduced HYP mapping offset",
->  		.capability = ARM64_HYP_OFFSET_LOW,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = hyp_offset_low,
->  	},
->  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
->  	{
->  		.desc = "Kernel page table isolation (KPTI)",
->  		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = unmap_kernel_at_el0,
->  	},
->  #endif
->  	{
->  		/* FP/SIMD is not implemented */
->  		.capability = ARM64_HAS_NO_FPSIMD,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.min_field_value = 0,
->  		.matches = has_no_fpsimd,
->  	},
-> @@ -1023,7 +1023,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "Data cache clean to Point of Persistence",
->  		.capability = ARM64_HAS_DCPOP,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_cpuid_feature,
->  		.sys_reg = SYS_ID_AA64ISAR1_EL1,
->  		.field_pos = ID_AA64ISAR1_DPB_SHIFT,
-> @@ -1033,7 +1033,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  #ifdef CONFIG_ARM64_SVE
->  	{
->  		.desc = "Scalable Vector Extension",
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.capability = ARM64_SVE,
->  		.sys_reg = SYS_ID_AA64PFR0_EL1,
->  		.sign = FTR_UNSIGNED,
-> @@ -1047,7 +1047,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "RAS Extension Support",
->  		.capability = ARM64_HAS_RAS_EXTN,
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->  		.matches = has_cpuid_feature,
->  		.sys_reg = SYS_ID_AA64PFR0_EL1,
->  		.sign = FTR_UNSIGNED,
-> @@ -1062,7 +1062,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  #define HWCAP_CAP(reg, field, s, min_value, cap_type, cap)	\
->  	{							\
->  		.desc = #cap,					\
-> -		.type = ARM64_CPUCAP_SCOPE_SYSTEM,		\
-> +		.type = ARM64_CPUCAP_SYSTEM_FEATURE,		\
->  		.matches = has_cpuid_feature,			\
->  		.sys_reg = reg,					\
->  		.field_pos = field,				\
-> -- 
-> 2.14.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cheers
+---Dave
