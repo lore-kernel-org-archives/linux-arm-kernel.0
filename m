@@ -1,62 +1,83 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed,  7 Feb 2018 12:23:59 -0500
-Subject: [PATCH v2 5/5] arm64: dts: rockchip: Specify override mode for kevin
- panel
-In-Reply-To: <20180207172404.107358-1-seanpaul@chromium.org>
-References: <20180207172404.107358-1-seanpaul@chromium.org>
-Message-ID: <20180207172404.107358-6-seanpaul@chromium.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 7 Feb 2018 17:24:46 +0000
+Subject: [RFC v2 REPOST] arm64: KVM: KVM API extensions for SVE
+In-Reply-To: <20180207161750.GE29286@cbox>
+References: <20180126172849.GX5862@e103592.cambridge.arm.com>
+ <20180205161308.GW21802@cbox>
+ <20180206114313.GQ5862@e103592.cambridge.arm.com>
+ <20180206131757.GA23160@cbox>
+ <20180207113327.GN5862@e103592.cambridge.arm.com>
+ <20180207145831.GC29286@cbox>
+ <20180207153402.GR5862@e103592.cambridge.arm.com>
+ <20180207161750.GE29286@cbox>
+Message-ID: <20180207172446.GU5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an override mode for kevin devices. The mode increases
-both back porches to allow a pixel clock of 26666kHz as opposed to the
-'typical' value of 252750kHz. This is needed to avoid interference with
-the touch digitizer on these laptops.
+On Wed, Feb 07, 2018 at 05:17:50PM +0100, Christoffer Dall wrote:
+> On Wed, Feb 07, 2018 at 03:34:03PM +0000, Dave Martin wrote:
+> > On Wed, Feb 07, 2018 at 03:58:31PM +0100, Christoffer Dall wrote:
+> > > On Wed, Feb 07, 2018 at 11:33:28AM +0000, Dave Martin wrote:
 
-Changes in v2:
- - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+[...]
 
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: St?phane Marchesin <marcheu@chromium.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: devicetree at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-rockchip at lists.infradead.org
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
----
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> > > > Alternatively, userspace would be require to do a KVM_ARM_SVE_GET_VLS,
+> > > > and check the resulting set:
+> > > > 
+> > > > 	/* ... */
+> > > > 	
+> > > > 	__u64 newvqs[SVE_VQ_MAX / 64];
+> > > > 	ioctl(vcpu_fd, KVM_ARM_SVE_GET_VLS, newvqs);
+> > > > 
+> > > > 	if (memcmp(vqs, newvqs, sizeof vqs))
+> > > > 		goto mismatch;
+> > > > 
+> > > > vcpu restore would need to treat any mismatch as an error:
+> > > > the exact requested set but be configurable, or the VM may go wrong.
+> > > 
+> > > I'm not sure I can parse this sentence or extract the meaning?
+> > 
+> > That was lazy language on my part.  I'll try to explain it better:
+> > 
+> > When the saved state of a migrating vcpu is being loaded into a
+> > newly-created vcpu on the target node, userspace needs a way to
+> > ensure that the set of VLs that vcpu will see when it runs is
+> > _exactly_ the same set it could see before migration.
+> 
+> Yes, and that should work fine with the -ERANGE proposal, right?
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index 191a6bcb1704..800eabd39076 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -98,6 +98,22 @@
- 		backlight = <&backlight>;
- 		power-supply = <&pp3300_disp>;
- 
-+		display-timings {
-+			timing0: override {
-+				clock-frequency = <266604720>;
-+				hactive = <2400>;
-+				hfront-porch = <48>;
-+				hback-porch = <84>;
-+				hsync-len = <32>;
-+				hsync-active = <0>;
-+				vactive = <1600>;
-+				vfront-porch = <3>;
-+				vback-porch = <120>;
-+				vsync-len = <10>;
-+				vsync-active = <0>;
-+			};
-+		};
-+
- 		ports {
- 			panel_in_edp: endpoint {
- 				remote-endpoint = <&edp_out_panel>;
--- 
-2.16.0.rc1.238.g530d649a79-goog
+Yes, that's the idea.
+
+> > I called this out separately because it's different from the
+> > case of creating a brand-new VM: in the latter case, we can't the
+> > kernel to provide the best set of VLs possible, but it is not an
+> > error not to get every VL we asked for.
+> 
+> This was another hard one:)
+> 
+> I think what you're saying is that it's technically not an error when
+> setting the VLs on a new VM, but it would be in the case of migration,
+> and therefore we need to tell userspace in both cases what happened, and
+> it can decide.
+> 
+> > > > Any opinion on which approach is best?
+> > > 
+> > > I think I prefer letting KVM_ARM_SVE_SET_VLS change the supplied vqs,
+> > > since having it be two separate ioctls always potentially leaves room
+> > > for some other thread having modified the set in the meantime (or making
+> > > a programmer doubt if this can be the case) where a single ioctl() will
+> > > look atomic.
+> > > 
+> > > The user can always call KVM_ARM_SVE_GET_VLS afterwards and should get
+> > > the same result.
+> > 
+> > OK, I'll go with changing the supplied vqs for KVM_ARM_SVE_SET_VLS,
+> > but I'll retain the -ERANGE semantics (even if technically redundant)
+> > since that's harder to forget to check.
+> 
+> Agree, that should definitely be part of it.
+
+Agreed.
+
+Cheers
+---Dave
