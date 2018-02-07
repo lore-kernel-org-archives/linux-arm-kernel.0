@@ -1,41 +1,79 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 7 Feb 2018 15:30:47 +0530
-Subject: [PATCH 3/4] arm64: dts: qcom: msm8916: Add clock properties to
- the APCS node
-In-Reply-To: <20180205144651.5934-3-georgi.djakov@linaro.org>
-References: <20180205144651.5934-1-georgi.djakov@linaro.org>
- <20180205144651.5934-3-georgi.djakov@linaro.org>
-Message-ID: <CAHLCerOSx+vMMHYj-1cCE8PPGFm=_523Qxeg__AzSjYbtA2FiA@mail.gmail.com>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Wed, 7 Feb 2018 10:01:18 +0000
+Subject: [PATCH v3 1/2] Document: dt: binding: imx: update pinctrl doc for
+ imx6sll
+In-Reply-To: <CACRpkdZn+A9Pv0ACQkjvq-2At39Ni9oB5Od=6+-5zk9b2qgNtA@mail.gmail.com>
+References: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
+ <CACRpkdZn+A9Pv0ACQkjvq-2At39Ni9oB5Od=6+-5zk9b2qgNtA@mail.gmail.com>
+Message-ID: <HE1PR04MB31133FACAF397E2C6A0A1FC387FC0@HE1PR04MB3113.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 5, 2018 at 8:16 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> There are clock controller registers in the APCS block, which purpose
+> On Wed, Feb 7, 2018 at 3:07 AM, Bai Ping <ping.bai@nxp.com> wrote:
+> 
+> > Add pinctrl binding doc update for imx6sll.
+> >
+> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> > ---
+> > changes v2-v3:
+> >  - add generic config binding
+> 
+> > +Optional Properties:
+> > +- drive-strength               Integer. Controls Drive Strength
+> > +                                       0: HI-Z
+> > +                                       1: 260 ohm at 3.3v, 150
+> ohm at 1.8v
+> > +                                       2: 130 ohm at 3.3v, 75
+> ohm at 1.8v
+> > +                                       3: 86 ohm at 3.3v, 50
+> ohm at 1.8v
+> > +                                       4: 65 ohm at 3.3v, 37
+> ohm at 1.8v
+> > +                                       5: 52 ohm at 3.3v, 30
+> ohm at 1.8v
+> > +                                       6: 43 ohm at 3.3v, 25
+> ohm at 1.8v
+> > +                                       7: 37 ohm at 3.3v, 21
+> ohm at 1.8v
+> 
+> HOW INTERESTING.
+> 
+> I am discussing this a lot with Lucas Stach right now, and in his SoC i.MX8MQ
+> that first resistance is said to be 255 Ohm etc.
+> 
+> Plus it seems he's missing the figures for 1.8V.
+> 
+> We're discussing whether this is used for impedance matching and what not.
+> We really need someone inside NXP to show us the way.
+> 
 
-If you respin this, s/which/whose
+>From the application user guide of pin setting:
 
-> is to control the main CPU mux and divider. Add the clock properties as
-> part of the APCS device-tree node.
->
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index 5414f53a0fa1..4539571a36b2 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -336,6 +336,8 @@
->                         compatible = "qcom,msm8916-apcs-kpss-global", "syscon";
->                         reg = <0xb011000 0x1000>;
->                         #mbox-cells = <1>;
-> +                       clocks = <&a53pll>;
-> +                       #clock-cells = <0>;
->                 };
->
->                 blsp1_uart2: serial at 78b0000 {
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The drive strength enable (DSE) can be explained as series resistance between an ideal driver?s output and
+its load. To achieve maximal transferred power, the impedance of the driver has to match the load
+impedance.
+
+
+> Anyways, I really need the two of you to discuss this, and I will forward my
+> conversation with Lucas to you.
+> 
+> If you can fish around a bit and tell us what this is used for and how:
+> 
+> - Is the intended usage for impedance matching?
+> - Does it control how many totem-poles are activated on the
+>   output pad?
+> 
+> would all be very grateful.
+> 
+> > +- drive-open-drain             Bool. Enable Pin Open-drian
+> 
+> Open-drain?
+
+Sorry, it is a typo, will fix it.
+
+BR
+Jacky Bai
+
+> 
+> Yours,
+> Linus Walleij
