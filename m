@@ -1,55 +1,57 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 7 Feb 2018 11:20:23 +0100
-Subject: [PATCH v3 0/4] gpio: driver for the RPi3 GPIO expander
-In-Reply-To: <20180207093807.5au4tlmuoa3iof35@sapphire.tkos.co.il>
-References: <cover.1516105893.git.baruch@tkos.co.il>
- <CACRpkdZAtVfAU-k9EUihH6peY2d1Ntn3jboVMBn9adReNLupow@mail.gmail.com>
- <20180206162759.awghecpv4ihaatz7@tarshish>
- <a3e4ba9a-60bf-5038-7385-8cb3d2667ed2@i2se.com>
- <20180207093807.5au4tlmuoa3iof35@sapphire.tkos.co.il>
-Message-ID: <d2a62d1c-a0b7-1b43-98d6-935fea073b3a@i2se.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 7 Feb 2018 10:21:41 +0000
+Subject: [PATCH v2 6/7] arm64: tegra: Add Tegra194 chip device tree
+In-Reply-To: <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
+References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
+ <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
+Message-ID: <458ba9f9-d703-9edf-8e7b-bc9d0f0ef0cc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.02.2018 um 10:38 schrieb Baruch Siach:
-> Hi Stefan,
->
-> On Wed, Feb 07, 2018 at 10:33:24AM +0100, Stefan Wahren wrote:
->> Am 06.02.2018 um 17:27 schrieb Baruch Siach:
->>> On Tue, Feb 06, 2018 at 02:42:48PM +0100, Linus Walleij wrote:
->>>> On Tue, Jan 16, 2018 at 1:45 PM, Baruch Siach <baruch@tkos.co.il> wrote:
->>>>
->>>>> The Raspberry Pi 3 has a GPIO expander that controls, among others, the
->>>>> activity LED, and the camera connector GPIOs. The GPIO expander on an I2C bus
->>>>> that is not directly controlled from the ARM core. The VC4 firmware controls
->>>>> the I2C bus, and allows the ARM core to set/get GPIO settings over its mailbox
->>>>> interface.
->>>>>
->>>>> This series adds support for the RPi3 expander.
->>>>>
->>>>> The driver is ported from the downstream kernel at
->>>>> https://github.com/raspberrypi/linux/, branch rpi-4.9.y.
->>>>>
->>>>> Changes in v3:
->>>>>
->>>>>    * Kconfig tweaks
->>>>>    * Check rpi_exp_gpio_get_polarity() return value
->>>>>    * Redundant header removal
->>>>>    * Redundant platform_set_drvdata() call removal
->>>>>    * Small coding style changes
->>>> All is looking pretty good. I see Rob had some last minute comments,
->>>> but please rebase and repost post v4.16-rc1 so we can get this merged,
->>>> we need to get this upstream.
->>> I was about to send v4 when I saw your email. I based v4 on current LinusT's
->>> tree as of e237f98a9c. I guess that affected files will not change before
->>> v4.16-rc1, but I can wait a few more days for -rc1.
->> please also address the owner issue in the driver, which was reported by
->> kbuild test robot.
-> I removed the .owner platform_driver field set from v4. The owner field in
-> gpio_chip is still set.
+Hi Mikko,
 
-perfect
+On 06/02/18 07:22, Mikko Perttunen wrote:
+> Add the chip-level device tree, including binding headers, for the
+> NVIDIA Tegra194 "Xavier" system-on-chip. Only a small subset of devices
+> are initially available, enough to boot to UART console.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 342 +++++++++++++
+>  include/dt-bindings/clock/tegra194-clock.h     | 664 +++++++++++++++++++++++++
+>  include/dt-bindings/gpio/tegra194-gpio.h       |  59 +++
+>  include/dt-bindings/power/tegra194-powergate.h |  49 ++
+>  include/dt-bindings/reset/tegra194-reset.h     | 166 +++++++
+>  5 files changed, 1280 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
+>  create mode 100644 include/dt-bindings/clock/tegra194-clock.h
+>  create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
+>  create mode 100644 include/dt-bindings/power/tegra194-powergate.h
+>  create mode 100644 include/dt-bindings/reset/tegra194-reset.h
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+> new file mode 100644
+> index 000000000000..dda28d758cab
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
 
->
-> baruch
->
+[...]
+
+> +		gic: interrupt-controller at 3881000 {
+> +			compatible = "arm,gic-400";
+> +			#interrupt-cells = <3>;
+> +			interrupt-controller;
+> +			reg = <0x03881000 0x1000>,
+> +			      <0x03882000 0x2000>;
+
+You're missing the GICH and GICV regions here.
+
+> +			interrupts = <GIC_PPI 9
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> +			interrupt-parent = <&gic>;
+> +		};
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
