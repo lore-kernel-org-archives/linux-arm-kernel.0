@@ -1,297 +1,153 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed,  7 Feb 2018 22:17:06 +0100
-Subject: [PATCH v4 05/12] drm/bridge/synopsys: dw-hdmi: don't clobber drvdata
-In-Reply-To: <20180207211713.3638-1-jernej.skrabec@siol.net>
-References: <20180207211713.3638-1-jernej.skrabec@siol.net>
-Message-ID: <20180207211713.3638-6-jernej.skrabec@siol.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 7 Feb 2018 15:43:38 -0600
+Subject: [RFC PATCH v2 1/5] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <a9745020-602b-8274-e2d6-63295f5b3caa@samsung.com>
+References: <20180131134435.12216-1-a.hajda@samsung.com>
+ <CGME20180131134457eucas1p128394aef86e0d76cfc6ccb72ee22d4b1@eucas1p1.samsung.com>
+ <20180131134435.12216-2-a.hajda@samsung.com>
+ <20180205060836.pybxzt5e2kdu2wew@rob-hp-laptop>
+ <a9745020-602b-8274-e2d6-63295f5b3caa@samsung.com>
+Message-ID: <20180207214338.7n2somaul2msgf2a@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw_hdmi shouldn't set drvdata since some drivers might need to store
-it's own data there. Rework dw_hdmi in a way to return struct dw_hdmi
-instead to store it in drvdata. This way drivers are responsible to
-store and pass structure when needed.
+On Mon, Feb 05, 2018 at 10:06:35AM +0100, Andrzej Hajda wrote:
+> On 05.02.2018 07:08, Rob Herring wrote:
+> > On Wed, Jan 31, 2018 at 02:44:31PM +0100, Andrzej Hajda wrote:
+> >> These bindings allow to describe most known standard USB connectors
+> >> and it should be possible to extend it if necessary.
+> >> USB connectors, beside USB can be used to route other protocols,
+> >> for example UART, Audio, MHL. In such case every device passing data
+> >> through the connector should have appropriate graph bindings.
+> >>
+> >> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> >> ---
+> >> v2:
+> >> - moved connector type(A,B,C) to compatible string (Rob),
+> >> - renamed size property to type (Rob),
+> >> - changed type description to be less confusing (Laurent),
+> >> - removed vendor specific compatibles (implied by graph port number),
+> > How so? More below...
+> >
+> >> - added requirement of connector being a child of IC (Rob),
+> >> - removed max-mode (subtly suggested by Rob, it should be detected anyway
+> >>   by USB Controller in runtime, downside is that device is not able to
+> >>   report its real capabilities, maybe better would be to make it optional(?)),
+> >> - assigned port numbers to data buses (Rob).
+> >>
+> >> Regards
+> >> Andrzej
+> >>
+> >> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> >> ---
+> >>  .../bindings/connector/usb-connector.txt           | 48 ++++++++++++++++++++++
+> >>  1 file changed, 48 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+> >> new file mode 100644
+> >> index 000000000000..02020f5d760a
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
+> >> @@ -0,0 +1,48 @@
+> >> +USB Connector
+> >> +=============
+> >> +
+> >> +USB connector node represents physical USB connector. It should be
+> >> +a child of USB interface controller.
+> >> +
+> >> +Required properties:
+> >> +- compatible: describes type of the connector, must be one of:
+> >> +    "usb-a-connector", "usb-b-connector", "usb-c-connector",
+> > Nit: one per line.
+> >
+> >> +
+> >> +Optional properties:
+> >> +- label: symbolic name for the connector
+> >> +- type: size of the connector, should be specified in case of USB-A, USB-B
+> >> +  non-standard (large) connector sizes: "mini", "micro"
+> >> +
+> >> +Required nodes:
+> >> +- any data bus to the connector should be modeled using the OF graph bindings
+> >> +  specified in bindings/graph.txt, unless the bus is between parent node and
+> >> +  the connector. Since single connector can have multpile data buses every bus
+> >> +  has assigned OF graph port number as follows:
+> >> +    0: High Speed (HS), present in all connectors,
+> >> +    1: Super Speed (SS), present in SS capable connectors,
+> >> +    2: Sideband use (SBU), present in USB-C,
+> >> +    3: Mobile High-Definition Link (MHL), present in 11-pin Samsung micro-USB
+> > This is un-muxed unlike Type-C where the signals are muxed with USB SS. 
+> > That makes me think the Samsung connector should have its own compatible 
+> > string.
+> 
+> Do you mean, sth like:
+> ??? connector {
+> ??? ??? ??? compatible = "samsung,usb-connector-11pin";
+> ??? ??? ??? label = "micro-USB";
+> ??? ??? ??? ports {
+> ??? ??? ??? ??? ??? #address-cells = <1>;
+> ??? ??? ??? ??? ??? #size-cells = <0>;
+> 
+> ??? ??? ??? ??? ??? port at 3 {
+> ??? ??? ??? ??? ??? ??? ??? reg = <3>;
+> ??? ??? ??? ??? ??? ??? ??? musb_con_mhl_in: endpoint {
+> ??? ??? ??? ??? ??? ??? ??? ??? ??? remote-endpoint = <&mhl_out>;
+> ??? ??? ??? ??? ??? ??? ??? };
+> ??? ??? ??? ??? ??? };
+> ??? };
 
-Idea was taken from the following commit:
-8242ecbd597d ("drm/bridge/synopsys: stop clobbering drvdata")
+Yes, basically.
 
-Cc: p.zabel at pengutronix.de
-Cc: narmstrong at baylibre.com
-Cc: Laurent.pinchart at ideasonboard.com
-Cc: hjc at rock-chips.com
-Cc: heiko at sntech.de
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c   | 31 ++++++++++++-----------------
- drivers/gpu/drm/imx/dw_hdmi-imx.c           | 13 +++++++++---
- drivers/gpu/drm/meson/meson_dw_hdmi.c       | 14 +++++++++----
- drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c      | 12 +++++++++--
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 13 +++++++++---
- include/drm/bridge/dw_hdmi.h                | 13 ++++++------
- 6 files changed, 60 insertions(+), 36 deletions(-)
+> 
+> Or should I add "usb-b-connector" extra compatible and "type" property?
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 7d80f4b56683..f9802399cc0d 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -2543,8 +2543,6 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 	if (hdmi->i2c)
- 		dw_hdmi_i2c_init(hdmi);
- 
--	platform_set_drvdata(pdev, hdmi);
--
- 	return hdmi;
- 
- err_iahb:
-@@ -2594,25 +2592,23 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
- /* -----------------------------------------------------------------------------
-  * Probe/remove API, used from platforms based on the DRM bridge API.
-  */
--int dw_hdmi_probe(struct platform_device *pdev,
--		  const struct dw_hdmi_plat_data *plat_data)
-+struct dw_hdmi *dw_hdmi_probe(struct platform_device *pdev,
-+			      const struct dw_hdmi_plat_data *plat_data)
- {
- 	struct dw_hdmi *hdmi;
- 
- 	hdmi = __dw_hdmi_probe(pdev, plat_data);
- 	if (IS_ERR(hdmi))
--		return PTR_ERR(hdmi);
-+		return hdmi;
- 
- 	drm_bridge_add(&hdmi->bridge);
- 
--	return 0;
-+	return hdmi;
- }
- EXPORT_SYMBOL_GPL(dw_hdmi_probe);
- 
--void dw_hdmi_remove(struct platform_device *pdev)
-+void dw_hdmi_remove(struct dw_hdmi *hdmi)
- {
--	struct dw_hdmi *hdmi = platform_get_drvdata(pdev);
--
- 	drm_bridge_remove(&hdmi->bridge);
- 
- 	__dw_hdmi_remove(hdmi);
-@@ -2622,31 +2618,30 @@ EXPORT_SYMBOL_GPL(dw_hdmi_remove);
- /* -----------------------------------------------------------------------------
-  * Bind/unbind API, used from platforms based on the component framework.
-  */
--int dw_hdmi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
--		 const struct dw_hdmi_plat_data *plat_data)
-+struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
-+			     struct drm_encoder *encoder,
-+			     const struct dw_hdmi_plat_data *plat_data)
- {
- 	struct dw_hdmi *hdmi;
- 	int ret;
- 
- 	hdmi = __dw_hdmi_probe(pdev, plat_data);
- 	if (IS_ERR(hdmi))
--		return PTR_ERR(hdmi);
-+		return hdmi;
- 
- 	ret = drm_bridge_attach(encoder, &hdmi->bridge, NULL);
- 	if (ret) {
--		dw_hdmi_remove(pdev);
-+		dw_hdmi_remove(hdmi);
- 		DRM_ERROR("Failed to initialize bridge with drm\n");
--		return ret;
-+		return ERR_PTR(ret);
- 	}
- 
--	return 0;
-+	return hdmi;
- }
- EXPORT_SYMBOL_GPL(dw_hdmi_bind);
- 
--void dw_hdmi_unbind(struct device *dev)
-+void dw_hdmi_unbind(struct dw_hdmi *hdmi)
- {
--	struct dw_hdmi *hdmi = dev_get_drvdata(dev);
--
- 	__dw_hdmi_remove(hdmi);
- }
- EXPORT_SYMBOL_GPL(dw_hdmi_unbind);
-diff --git a/drivers/gpu/drm/imx/dw_hdmi-imx.c b/drivers/gpu/drm/imx/dw_hdmi-imx.c
-index b62763aa8706..fe6becdcc29e 100644
---- a/drivers/gpu/drm/imx/dw_hdmi-imx.c
-+++ b/drivers/gpu/drm/imx/dw_hdmi-imx.c
-@@ -25,6 +25,7 @@
- struct imx_hdmi {
- 	struct device *dev;
- 	struct drm_encoder encoder;
-+	struct dw_hdmi *hdmi;
- 	struct regmap *regmap;
- };
- 
-@@ -239,14 +240,18 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
- 	drm_encoder_init(drm, encoder, &dw_hdmi_imx_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
- 
--	ret = dw_hdmi_bind(pdev, encoder, plat_data);
-+	platform_set_drvdata(pdev, hdmi);
-+
-+	hdmi->hdmi = dw_hdmi_bind(pdev, encoder, plat_data);
- 
- 	/*
- 	 * If dw_hdmi_bind() fails we'll never call dw_hdmi_unbind(),
- 	 * which would have called the encoder cleanup.  Do it manually.
- 	 */
--	if (ret)
-+	if (IS_ERR(hdmi->hdmi)) {
-+		ret = PTR_ERR(hdmi->hdmi);
- 		drm_encoder_cleanup(encoder);
-+	}
- 
- 	return ret;
- }
-@@ -254,7 +259,9 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
- static void dw_hdmi_imx_unbind(struct device *dev, struct device *master,
- 			       void *data)
- {
--	return dw_hdmi_unbind(dev);
-+	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
-+
-+	dw_hdmi_unbind(hdmi->hdmi);
- }
- 
- static const struct component_ops dw_hdmi_imx_ops = {
-diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-index e8c3ef8a94ce..d49af17310c9 100644
---- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-+++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-@@ -140,6 +140,7 @@ struct meson_dw_hdmi {
- 	struct clk *venci_clk;
- 	struct regulator *hdmi_supply;
- 	u32 irq_stat;
-+	struct dw_hdmi *hdmi;
- };
- #define encoder_to_meson_dw_hdmi(x) \
- 	container_of(x, struct meson_dw_hdmi, encoder)
-@@ -878,9 +879,12 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
- 	dw_plat_data->input_bus_format = MEDIA_BUS_FMT_YUV8_1X24;
- 	dw_plat_data->input_bus_encoding = V4L2_YCBCR_ENC_709;
- 
--	ret = dw_hdmi_bind(pdev, encoder, &meson_dw_hdmi->dw_plat_data);
--	if (ret)
--		return ret;
-+	platform_set_drvdata(pdev, meson_dw_hdmi);
-+
-+	meson_dw_hdmi->hdmi = dw_hdmi_bind(pdev, encoder,
-+					   &meson_dw_hdmi->dw_plat_data);
-+	if (IS_ERR(meson_dw_hdmi->hdmi))
-+		return PTR_ERR(meson_dw_hdmi->hdmi);
- 
- 	DRM_DEBUG_DRIVER("HDMI controller initialized\n");
- 
-@@ -890,7 +894,9 @@ static int meson_dw_hdmi_bind(struct device *dev, struct device *master,
- static void meson_dw_hdmi_unbind(struct device *dev, struct device *master,
- 				   void *data)
- {
--	dw_hdmi_unbind(dev);
-+	struct meson_dw_hdmi *meson_dw_hdmi = dev_get_drvdata(dev);
-+
-+	dw_hdmi_unbind(meson_dw_hdmi->hdmi);
- }
- 
- static const struct component_ops meson_dw_hdmi_ops = {
-diff --git a/drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c b/drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c
-index dc85b53d58ef..3bebc6821e9c 100644
---- a/drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c
-@@ -68,12 +68,20 @@ static const struct dw_hdmi_plat_data rcar_dw_hdmi_plat_data = {
- 
- static int rcar_dw_hdmi_probe(struct platform_device *pdev)
- {
--	return dw_hdmi_probe(pdev, &rcar_dw_hdmi_plat_data);
-+	struct dw_hdmi *hdmi;
-+
-+	hdmi = dw_hdmi_probe(pdev, &rcar_dw_hdmi_plat_data);
-+	if (IS_ERR(hdmi))
-+		return PTR_ERR(hdmi);
-+
-+	platform_set_drvdata(pdev, hdmi);
- }
- 
- static int rcar_dw_hdmi_remove(struct platform_device *pdev)
- {
--	dw_hdmi_remove(pdev);
-+	struct dw_hdmi *hdmi = platform_get_drvdata(dev);
-+
-+	dw_hdmi_remove(hdmi);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 1eb02a82fd91..3574b0ae2ad1 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -48,6 +48,7 @@ struct rockchip_hdmi {
- 	const struct rockchip_hdmi_chip_data *chip_data;
- 	struct clk *vpll_clk;
- 	struct clk *grf_clk;
-+	struct dw_hdmi *hdmi;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -377,14 +378,18 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 	drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
- 			 DRM_MODE_ENCODER_TMDS, NULL);
- 
--	ret = dw_hdmi_bind(pdev, encoder, plat_data);
-+	platform_set_drvdata(pdev, hdmi);
-+
-+	hdmi->hdmi = dw_hdmi_bind(pdev, encoder, plat_data);
- 
- 	/*
- 	 * If dw_hdmi_bind() fails we'll never call dw_hdmi_unbind(),
- 	 * which would have called the encoder cleanup.  Do it manually.
- 	 */
--	if (ret)
-+	if (IS_ERR(hdmi->hdmi)) {
-+		ret = PTR_ERR(hdmi->hdmi);
- 		drm_encoder_cleanup(encoder);
-+	}
- 
- 	return ret;
- }
-@@ -392,7 +397,9 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
- 				    void *data)
- {
--	return dw_hdmi_unbind(dev);
-+	struct rockchip_hdmi *hdmi = dev_get_drvdata(dev);
-+
-+	dw_hdmi_unbind(hdmi->hdmi);
- }
- 
- static const struct component_ops dw_hdmi_rockchip_ops = {
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index f3f3f0e1b2d3..dd2a8cf7d20b 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -143,12 +143,13 @@ struct dw_hdmi_plat_data {
- 			     unsigned long mpixelclock);
- };
- 
--int dw_hdmi_probe(struct platform_device *pdev,
--		  const struct dw_hdmi_plat_data *plat_data);
--void dw_hdmi_remove(struct platform_device *pdev);
--void dw_hdmi_unbind(struct device *dev);
--int dw_hdmi_bind(struct platform_device *pdev, struct drm_encoder *encoder,
--		 const struct dw_hdmi_plat_data *plat_data);
-+struct dw_hdmi *dw_hdmi_probe(struct platform_device *pdev,
-+			      const struct dw_hdmi_plat_data *plat_data);
-+void dw_hdmi_remove(struct dw_hdmi *hdmi);
-+void dw_hdmi_unbind(struct dw_hdmi *hdmi);
-+struct dw_hdmi *dw_hdmi_bind(struct platform_device *pdev,
-+			     struct drm_encoder *encoder,
-+			     const struct dw_hdmi_plat_data *plat_data);
- 
- void dw_hdmi_setup_rx_sense(struct device *dev, bool hpd, bool rx_sense);
- 
--- 
-2.16.1
+type would be micro? I think type and "usb-b-connector" are fine if this 
+is a superset like a USB3 SS micro connector.
+
+> I slightly prefer my approach(less different bindings), but I am also OK
+> with the above.
+
+How do you know it is a Samsung connector then? Just because you have 
+port 3? I think it is better to be explicit.
+
+> 
+> >
+> > Can we go ahead and define the video modes of Type-C? Normally, if 2 
+> > data streams are mutually exclusive, then they are a single port with 2 
+> > endpoints. So we'd either have 2 endpoints on port 1 or we stick with 
+> > port 3 is always video. We can still know what is mutually exclusive 
+> > based on the compatible. 
+> 
+> I am sorry, I do not understand what you mean. Port 3 is present only in
+> 11-pin Samsung micro-USB, USB Type-C has only ports 0, 1, 2.
+
+So video on Type C would be on port 1 (SS), endpoint ? ? That's not 
+defined in the binding and I want to define it.
+
+> Here is list of possible ports depending on connector type:
+> - USB 2.0: HS
+> - 11-pin Samsung micro-USB: HS,MHL
+> - USB 3.x type A,B: HS,SS
+> - USB-C: HS,SS,SBU
+> 
+> All ports have separate lines, so they can work simultaneously.
+> 
+> And regarding MHL on standard micro-USB connector. MHL and MUIC will
+> share HS port, but there will be mux somewhere before connector:
+
+That's another case I hadn't considered. I was mainly thinking just how 
+to handle Type C.
+
+> - in MUIC, in this case MUIC will be the parent of the connector, and
+> there will be graph from MHL to MUIC to describe MHL link,
+> - in MHL, in this case MHL will be the parent of the connector, and
+> graph between MUIC and MHL to describe HS link,
+> - dedicated mux to MUIC and MHL, controlled by gpio pin, it could be
+> handled by MUIC's external-mux gpio property for example, or (probably)
+> less hacky by separate node for mux,
+> or as additional property in the connector (who should be the parent of
+> the connector then? Probably MUIC?).
+> 
+> Regards
+> Andrzej
