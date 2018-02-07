@@ -1,46 +1,63 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Feb 2018 01:15:44 +0000
-Subject: Device tree bug in armada-8040-mcbin.dts
-In-Reply-To: <alpine.LRH.2.02.1802061650060.4974@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1802061650060.4974@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <20180207011544.GK9418@n2100.armlinux.org.uk>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 7 Feb 2018 09:17:44 +0800
+Subject: [PATCH v3 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
+ with rk3399 SoCs
+In-Reply-To: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
+References: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <e67da623-d6fe-92d9-e6b3-79b8290405c9@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 04:59:22PM -0500, Mikulas Patocka wrote:
-> Hi
-> 
-> When the MacchiatoBIN kernel is compiled with CONFIG_PM=y, it is 
-> frequently reporing this error (the error happens every time some I/O on 
-> built-in eMMC happens):
-> 
-> "mmc0: Switching to 3.3V signalling voltage failed"
+Kishon,
 
-Yep, it's annoying.
+Can you help merge this in your? or next tree?? I'm hoping that we can 
+land this somewhere.:-)
 
-> The problem is that the "&ap_sdhci0" device tree node asserts that the 
-> controller doesn't support 1.8v, but it attaches it to the fixed voltage 
-> regulator "v_vddo_h" that only supplies 1.8V.
-> 
-> Should it be attached to the 3.3V regulator instead? Or should the 
-> "vqmmc-supply" statemet be deleted? Or should the statement "no-1-8-v" be 
-> deleted?
 
-Removing the "no-1-8-v" statement breaks it, and the reality is that the
-signalling voltage is fixed at 1.8V, so the "vqmmc-supply" is correct.
-The problem here is that the MMC layer doesn't understand that, and
-always wants to do the initial probe at vqmmc=3.3V.  Hence the above
-message.
-
-It would be nice if MMC understood the concept of a bus operating at a
-fixed voltage, then the "no-1-8-v" hack could be removed.
-
-Which-ever way is chosen, the result is that we end up _not_ describing
-the hardware, but we end up describing something suitable for the
-implementation, which is not how DT is supposed to work.  MMC really
-needs to be fixed.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+-Caesar
+? 2018?01?11? 10:40, Caesar Wang ??:
+> Hi Kishon,
+>
+> Since the Shawn isn't available, I take over this series patches for now.
+>
+> As the original bug had tracked on https://issuetracker.google.com/71561742.
+> In some cases, the mmc phy power on failed during booting up.
+> The log as below:
+> ...
+> [   2.375333] rockchip_emmc_phy_power: caldone timeout.
+> [    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
+> ...
+> [    2.489295] mmc0: mmc_select_hs400es failed, error -110
+> [    2.489302] mmc0: error -110 whilst initialising MMC card
+> ..
+>
+> The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
+> We need give the enough margin for it.
+>
+> Verified on url =
+>          https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
+> This series patches can apply and bring up with kernel-next on rk3399 chromebook.
+>
+> -Caesar
+>
+>
+> Changes in v3:
+> - As Doug commented on both upstream and gerrit.
+>    Change "5, 50" to "0, 50", and the message of print.
+> - As Doug commented on https://patchwork.kernel.org/patch/10154797,
+>    Change "1, 50" to "0, 50".
+>
+> Changes in v2:
+> - print the return valut with regmap_read_poll_timeout failing.
+> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
+>    changed the note and added to print error value with
+>    regmap_read_poll_timeout API.
+>
+> Shawn Lin (2):
+>    phy: rockchip-emmc: retry calpad busy trimming
+>    phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
+>
+>   drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
+>   1 file changed, 28 insertions(+), 32 deletions(-)
+>
