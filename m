@@ -1,20 +1,95 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 7 Feb 2018 20:36:54 +0530
-Subject: [PATCH v6 36/41] ARM: dm646x: Remove legacy clock init
-In-Reply-To: <1516468460-4908-37-git-send-email-david@lechnology.com>
-References: <1516468460-4908-1-git-send-email-david@lechnology.com>
- <1516468460-4908-37-git-send-email-david@lechnology.com>
-Message-ID: <86622680-2a83-0e4a-0114-61d7542a28e2@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 7 Feb 2018 15:09:06 +0000
+Subject: [PATCH v2 1/2] arm64: Relax constraints on ID feature bits
+In-Reply-To: <20180207142106.10716-1-suzuki.poulose@arm.com>
+References: <20180207142106.10716-1-suzuki.poulose@arm.com>
+Message-ID: <20180207150906.GQ5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 January 2018 10:44 PM, David Lechner wrote:
-> This removes the unused legacy clock init code from
-> arch/arm/mach-davinci/dm646x.c.
+On Wed, Feb 07, 2018 at 02:21:05PM +0000, Suzuki K Poulose wrote:
+> We treat most of the feature bits in the ID registers as STRICT,
+> implying that all CPUs should match it the boot CPU state. However,
+> for most of the features, we can handle if there are any mismatches
+> by using the safe value. e.g, HWCAPs and other features used by the
+> kernel. Relax the constraint on the feature bits whose mismatch can
+> be handled by the kernel.
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> For VHE, if there is a mismatch we don't care if the kernel is
+> not using it. If the kernel is indeed running in EL2 mode, then
+> the mismatches results in a panic. Similarly for ASID bits we
+> take care of conflicts.
+> 
+> For other features like, PAN, UAO we only enable it only if we
+> have it on all the CPUs. For IESB, we set the SCTLR bit unconditionally
+> anyways.
+> 
+> For features that aren't currently used by kernel
+>  (e.g ID_AA64MFMR1:{LOR,HPD}, ID_AA64MMFR2:LSM) make them NONSTRICT.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v1:
+>  - Make ID_AA64MMFR1_EL1:LOR/HPD, ID_AA64MMFR1_EL1:LSM non-strict
+>    as they aren't used by the kernel.
+>  - Added comments around different fields.
+>  - Make ID_AA64MMFR2:CNP non-strict, as we could decide to use it
+>    only when it is available on all the CPUs.
+> ---
+>  arch/arm64/kernel/cpufeature.c | 83 ++++++++++++++++++++++++------------------
+>  1 file changed, 48 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+[...]
 
-Thanks,
-Sekhar
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+> +	/*
+> +	 * We handle differing ASID widths by explicit checks to make sure the system is
+> +	 * safe via verify_cpu_asid_bits()
+
+I guess that's sufficient.
+
+Although I had suggested adding a comment to verify_cpu_asid_bits()
+cross-referencing back to here, it now seems superfluous.  It's fairly
+obvious what that function is supported to do.
+
+
+[...]
+
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+
+[...]
+
+> +	/*
+> +	 * When CONFIG_ARM64_VHE is enabled, we ensure that there is no conflict in run
+> +	 * levels via verify_cpu_run_el()
+> +	 */
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+
+Similarly ack.
+
+
+[...]
+
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+
+[...]
+
+> +	/*
+> +	 * Lacking implicit ESB on exception boundaries on a subset of CPUs is no worse than
+> +	 * lacking it on all of them.
+> +	 */
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+
+And again.  Thanks.
+
+[...]
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
