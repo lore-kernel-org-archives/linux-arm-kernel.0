@@ -1,98 +1,78 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Wed, 7 Feb 2018 16:35:17 +0100
-Subject: [PATCH 6/6] i2c: i2c-stm32f7: Implement I2C recovery mechanism
-In-Reply-To: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1518017717-10351-7-git-send-email-pierre-yves.mordret@st.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 7 Feb 2018 15:55:24 +0000
+Subject: [RFC v4 13/26] watchdog: renesas_wdt: Add restart handler
+In-Reply-To: <CAMuHMdVZi0Vyz9+Z6TFeX3yh=rzRHBuNbgy1Nt4LhoLU8qK5KQ@mail.gmail.com>
+References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1517423070-24236-14-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdVZi0Vyz9+Z6TFeX3yh=rzRHBuNbgy1Nt4LhoLU8qK5KQ@mail.gmail.com>
+Message-ID: <TY1PR06MB0895BDC61E7C226E29AC6D11C0FC0@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Feature prevents I2C lock-ups. Mechanism resets I2C state machine
-and releases SCL/SDA signals but preserves I2C registers.
+Hello Geert,
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
-  Version history:
-    v1:
-       * Initial
----
----
- drivers/i2c/busses/i2c-stm32f7.c | 32 +++++++++++++++++++++++++++++---
- 1 file changed, 29 insertions(+), 3 deletions(-)
+> Subject: Re: [RFC v4 13/26] watchdog: renesas_wdt: Add restart handler
+>
+> Hi Fabrizio,
 
-diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index 593efa5..428bf96 100644
---- a/drivers/i2c/busses/i2c-stm32f7.c
-+++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
- 	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
- }
- 
-+static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
-+{
-+	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
-+
-+	dev_info(i2c_dev->dev, "Trying to recover bus\n");
-+
-+	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
-+			     STM32F7_I2C_CR1_PE);
-+
-+	stm32f7_i2c_hw_config(i2c_dev);
-+
-+	return 0;
-+}
-+
- static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
- {
- 	u32 status;
-@@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
- 					 status,
- 					 !(status & STM32F7_I2C_ISR_BUSY),
- 					 10, 1000);
-+	if (!ret)
-+		return 0;
-+
-+	dev_info(i2c_dev->dev, "bus busy\n");
-+
-+	ret = i2c_recover_bus(&i2c_dev->adap);
- 	if (ret) {
--		dev_dbg(i2c_dev->dev, "bus busy\n");
--		ret = -EBUSY;
-+		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
-+		return ret;
- 	}
- 
--	return ret;
-+	return -EBUSY;
- }
- 
- static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
-@@ -1476,6 +1496,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
- 	if (status & STM32F7_I2C_ISR_BERR) {
- 		dev_err(dev, "<%s>: Bus error\n", __func__);
- 		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
-+		i2c_recover_bus(&i2c_dev->adap);
- 		f7_msg->result = -EIO;
- 	}
- 
-@@ -1760,6 +1781,10 @@ static struct i2c_algorithm stm32f7_i2c_algo = {
- 	.unreg_slave = stm32f7_i2c_unreg_slave,
- };
- 
-+static struct i2c_bus_recovery_info stm32f7_i2c_recovery_info = {
-+	.recover_bus = stm32f7_i2c_recover_bus,
-+};
-+
- static int stm32f7_i2c_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -1879,6 +1904,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
- 	adap->algo = &stm32f7_i2c_algo;
- 	adap->dev.parent = &pdev->dev;
- 	adap->dev.of_node = pdev->dev.of_node;
-+	adap->bus_recovery_info = &stm32f7_i2c_recovery_info;
- 
- 	init_completion(&i2c_dev->complete);
- 
--- 
-2.7.4
+Thank you for your feedback!
+
+>
+> On Wed, Jan 31, 2018 at 7:24 PM, Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> > On iWave's boards iwg20d and iwg22d the only way to reboot the system is
+> > by means of the watchdog.
+> > This patch adds a restart handler to rwdt_ops, and also makes sure we
+> > keep its priority to a medium level, in order to not override other more
+> > effective handlers.
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+>
+> > --- a/drivers/watchdog/renesas_wdt.c
+> > +++ b/drivers/watchdog/renesas_wdt.c
+> > @@ -118,6 +136,7 @@ static const struct watchdog_ops rwdt_ops = {
+> >         .stop = rwdt_stop,
+> >         .ping = rwdt_init_timeout,
+> >         .get_timeleft = rwdt_get_timeleft,
+> > +       .restart = rwdt_restart,
+> >  };
+> >
+> >  static int rwdt_probe(struct platform_device *pdev)
+> > @@ -176,6 +195,7 @@ static int rwdt_probe(struct platform_device *pdev)
+> >         platform_set_drvdata(pdev, priv);
+> >         watchdog_set_drvdata(&priv->wdev, priv);
+> >         watchdog_set_nowayout(&priv->wdev, nowayout);
+> > +       watchdog_set_restart_priority(&priv->wdev, 128);
+>
+> Given we want to reboot R-Car Gen2 boards equipped with a suitable PMIC
+> (e.g. DA9063) using that PMIC, I think the priority should be lower (0?),
+> cfr.
+
+Yes, can do, I have no strong opinion about this.
+I'll use priority 0 for the next submission.
+
+Thanks,
+Fab
+
+>
+>  *   0:   use watchdog's restart function as last resort, has limited restart
+>  *        capabilies
+>  *   128: default restart handler, use if no other handler is expected to be
+>  *        available and/or if restart is sufficient to restart the entire system
+>  *   255: preempt all other handlers
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
