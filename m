@@ -1,229 +1,191 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 7 Feb 2018 19:49:59 +0100
-Subject: [PATCH v2 4/6] clk: sunxi-ng: add support for the Allwinner H6 CCU
-In-Reply-To: <3AB5A169-5EA5-4A45-95AF-4CA56F13A1CA@aosc.io>
-References: <20180203154942.63566-1-icenowy@aosc.io>
- <20180203154942.63566-5-icenowy@aosc.io>
- <20180207090210.jlxleeh32tojvzp5@flea>
- <3AB5A169-5EA5-4A45-95AF-4CA56F13A1CA@aosc.io>
-Message-ID: <20180207184959.5h233agyhva352s4@flea>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 07 Feb 2018 19:03:35 +0000
+Subject: [PATCH v5 1/3] arm64/ras: support sea error recovery
+In-Reply-To: <5A70C536.7040208@arm.com>
+References: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
+ <1516969885-150532-2-git-send-email-xiexiuqi@huawei.com>
+ <5A70C536.7040208@arm.com>
+Message-ID: <5A7B4D87.9020207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 05:11:11PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> ? 2018?2?7? GMT+08:00 ??5:02:10, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >Hi,
-> >
-> >On Sat, Feb 03, 2018 at 11:49:40PM +0800, Icenowy Zheng wrote:
-> >> +	/* Force the output divider of video PLLs to 0 */
-> >> +	for (i = 0; i < ARRAY_SIZE(pll_video_regs); i++) {
-> >> +		val = readl(reg + pll_video_regs[i]);
-> >> +		val &= ~BIT(0);
-> >> +		writel(val, reg + pll_video_regs[i]);
-> >> +	}
-> >
-> >Why?
-> 
-> According to the manual the output divider here is
-> test only, and for daily use it should be 0.
-> 
-> >
-> >> +	/* Force OHCI 12M clock sources to 00 (12MHz divided from 48MHz) */
-> >> +	for (i = 0; i < ARRAY_SIZE(usb2_clk_regs); i++) {
-> >> +		val = readl(reg + usb2_clk_regs[i]);
-> >> +		val &= ~GENMASK(25, 24);
-> >> +		writel (val, reg + usb2_clk_regs[i]);
-> >> +	}
-> >
-> >Why?
-> 
-> Just make them have a sure working parent. Why this
-> muxs exist is still mysterious.
-> 
-> >
-> >> +	/*
-> >> +	 * Force the post-divider of pll-video to 8 and the output divider
-> 
-> oh here's a typo -- it's audio, not video.
-> 
-> >> +	 * of it to 1.
-> >> +	 */
-> >> +	val = readl(reg + SUN50I_H6_PLL_AUDIO_REG);
-> >> +	val &= ~(GENMASK(21, 16) | BIT(0));
-> >> +	writel(val | (7 << 16), reg + SUN50I_H6_PLL_AUDIO_REG);
-> >
-> >Why?
-> 
-> See the comments about pll-audio in the former sources :-)
+Hi Xie XiuQi,
 
-You should have a comments for all those :)
-
+On 30/01/18 19:19, James Morse wrote:
+> On 26/01/18 12:31, Xie XiuQi wrote:
+>> With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
+>> are consumed. According to the existing process, errors occurred in the
+>> kernel, leading to direct panic, if it occurred the user-space, we should
+>> just kill process.
+>>
+>> But there is a class of error, in fact, is not necessary to kill
+>> process, you can recover and continue to run the process. Such as
+>> the instruction data corrupted, where the memory page might be
+>> read-only, which is has not been modified, the disk might have the
+>> correct data, so you can directly drop the page, ant reload it when
+>> necessary.
 > 
-> >> diff --git a/include/dt-bindings/clock/sun50i-h6-ccu.h
-> >b/include/dt-bindings/clock/sun50i-h6-ccu.h
-> >> new file mode 100644
-> >> index 000000000000..f7ddb241012c
-> >> --- /dev/null
-> >> +++ b/include/dt-bindings/clock/sun50i-h6-ccu.h
-> >> @@ -0,0 +1,125 @@
-> >> +/*
-> >> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-> >> + *
-> >> + * SPDX-License-Identifier: (GPL-2.0+ or MIT)
-> >> + */
-> >> +
-> >> +#ifndef _DT_BINDINGS_CLK_SUN50I_H6_H_
-> >> +#define _DT_BINDINGS_CLK_SUN50I_H6_H_
-> >> +
-> >> +#define CLK_PLL_PERIPH0		3
-> >
-> >Why is that needed?
+> With firmware-first support, we do all this...
 > 
-> Parent of AR100 clock in PRCM.
-
-ACK.
-
-> >
-> >> +
-> >> +#define CLK_CPUX		21
-> >> +
-> >> +#define CLK_APB1		26
-> >
-> >Same thing here
 > 
-> As discussed in v1, the APB bus clock is used for PIO.
-
-ACK
-
-> >
-> >> +
-> >> +#define CLK_DE			29
-> >> +#define CLK_BUS_DE		30
-> >> +#define CLK_DEINTERLACE		31
-> >> +#define CLK_BUS_DEINTERLACE	32
-> >> +#define CLK_GPU			33
-> >> +#define CLK_BUS_GPU		34
-> >> +#define CLK_CE			35
-> >> +#define CLK_BUS_CE		36
-> >> +#define CLK_VE			37
-> >> +#define CLK_BUS_VE		38
-> >> +#define CLK_EMCE		39
-> >> +#define CLK_BUS_EMCE		40
-> >> +#define CLK_VP9			41
-> >> +#define CLK_BUS_VP9		42
-> >> +#define CLK_BUS_DMA		43
-> >> +#define CLK_BUS_MSGBOX		44
-> >> +#define CLK_BUS_SPINLOCK	45
-> >> +#define CLK_BUS_HSTIMER		46
-> >> +#define CLK_AVS			47
-> >> +#define CLK_BUS_DBG		48
-> >> +#define CLK_BUS_PSI		49
-> >> +#define CLK_BUS_PWM		50
-> >> +#define CLK_BUS_IOMMU		51
-> >> +
-> >> +#define CLK_MBUS_DMA		53
-> >> +#define CLK_MBUS_VE		54
-> >> +#define CLK_MBUS_CE		55
-> >> +#define CLK_MBUS_TS		56
-> >> +#define CLK_MBUS_NAND		57
-> >> +#define CLK_MBUS_CSI		58
-> >> +#define CLK_MBUS_DEINTERLACE	59
-> >> +
-> >> +#define CLK_NAND0		61
-> >> +#define CLK_NAND1		62
-> >> +#define CLK_BUS_NAND		63
-> >> +#define CLK_MMC0		64
-> >> +#define CLK_MMC1		65
-> >> +#define CLK_MMC2		66
-> >> +#define CLK_BUS_MMC0		67
-> >> +#define CLK_BUS_MMC1		68
-> >> +#define CLK_BUS_MMC2		69
-> >> +#define CLK_BUS_UART0		70
-> >> +#define CLK_BUS_UART1		71
-> >> +#define CLK_BUS_UART2		72
-> >> +#define CLK_BUS_UART3		73
-> >> +#define CLK_BUS_I2C0		74
-> >> +#define CLK_BUS_I2C1		75
-> >> +#define CLK_BUS_I2C2		76
-> >> +#define CLK_BUS_I2C3		77
-> >> +#define CLK_BUS_SCR0		78
-> >> +#define CLK_BUS_SCR1		79
-> >> +#define CLK_SPI0		80
-> >> +#define CLK_SPI1		81
-> >> +#define CLK_BUS_SPI0		82
-> >> +#define CLK_BUS_SPI1		83
-> >> +#define CLK_BUS_EMAC		84
-> >> +#define CLK_TS			85
-> >> +#define CLK_BUS_TS		86
-> >> +#define CLK_IR_TX		87
-> >> +#define CLK_BUS_IR_TX		88
-> >> +#define CLK_BUS_THS		89
-> >> +#define CLK_I2S3		90
-> >> +#define CLK_I2S0		91
-> >> +#define CLK_I2S1		92
-> >> +#define CLK_I2S2		93
-> >> +#define CLK_BUS_I2S0		94
-> >> +#define CLK_BUS_I2S1		95
-> >> +#define CLK_BUS_I2S2		96
-> >> +#define CLK_BUS_I2S3		97
-> >> +#define CLK_SPDIF		98
-> >> +#define CLK_BUS_SPDIF		99
-> >> +#define CLK_DMIC		100
-> >> +#define CLK_BUS_DMIC		101
-> >> +#define CLK_AUDIO_HUB		102
-> >> +#define CLK_BUS_AUDIO_HUB	103
-> >> +#define CLK_USB_OHCI0		104
-> >> +#define CLK_USB_PHY0		105
-> >> +#define CLK_USB_PHY1		106
-> >> +#define CLK_USB_OHCI3		107
-> >> +#define CLK_USB_PHY3		108
-> >> +#define CLK_USB_HSIC_12M	109
-> >> +#define CLK_USB_HSIC		110
-> >> +#define CLK_BUS_OHCI0		111
-> >> +#define CLK_BUS_OHCI3		112
-> >> +#define CLK_BUS_EHCI0		113
-> >> +#define CLK_BUS_XHCI		114
-> >> +#define CLK_BUS_EHCI3		115
-> >> +#define CLK_BUS_OTG		116
-> >> +#define CLK_PCIE_REF_100M	117
-> >> +#define CLK_PCIE_REF		118
-> >> +#define CLK_PCIE_REF_OUT	119
-> >> +#define CLK_PCIE_MAXI		120
-> >> +#define CLK_PCIE_AUX		121
-> >
-> >Dito.
+>> So this patchset is just try to solve such problem: if the error is
+>> consumed in user-space and the error occurs on a clean page, you can
+>> directly drop the memory page without killing process.
+>>
+>> If the corrupted page is clean, just dropped it and return to user-space
+>> without side effects. And if corrupted page is dirty, memory_failure()
+>> will send SIGBUS with code=BUS_MCEERR_AR. While without this patchset,
+>> do_sea() will just send SIGBUS, so the process was killed in the same place.
 > 
-> I think AUX clock is used in PCIe code.
+> ... but this happens too. I agree its something we should fix, but I don't think
+> this is the best way to do it.
 > 
-> BTW the REF_100M clock is intermediate, and
-> does't need to be exported. Will fix it in the next version.
+> This series is pulling the memory-failure-queue details back into the arch-code
+> to build a second list, that gets processed as extra work when we return to
+> user-space.
 > 
-> >
-> >> +#define CLK_BUS_PCIE		122
-> >> +#define CLK_HDMI		123
-> >> +#define CLK_HDMI_CEC		124
-> >> +#define CLK_BUS_HDMI		125
-> >> +#define CLK_BUS_TCON_TOP	126
-> >
-> >Ditto.
 > 
-> TCON_TOP is not a clock parent -- it's a dedicated hw
-> part which controlls the connection between
-> DE2/3 mixers and TCONs.
+> The root of the issue is ghes_notify_sea() claims the notification as something
+> APEI has dealt with, ... but it hasn't done it yet. The signals will be
+> generated by something currently stuck in a queue. (Evidently x86 doesn't handle
+> synchronous errors like this using firmware-first).
+> 
+> I think a smaller fix is to give the queues that may be holding the
+> memory_failure() work a kick as part of the code that calls ghes_notify_sea().
+> This means that by the time we return to do_sea() ghes_notify_sea()'s claim that
+> APEI has dealt with it is true as any generated signals are pending. We can then
+> skip the existing SIGBUS generation code.
+> 
+> 
+>> Because memory_failure() may sleep, we can not call it directly in SEA
+> 
+> (this one is more serious, I've attempted to fix it by moving all NMI-like
+> GHES-notifications to use the estatus queue).
+> 
+> 
+>> exception context. So we saved faulting physical address associated with
+>> a process in the ghes handler and set __TIF_SEA_NOTIFY. When we return
+>> from SEA exception context and get into do_notify_resume() before the
+>> process running, we could check it and call memory_failure() to do
+>> recovery.
+> 
+>> It's safe, because we are in process context.
+> 
+> I think this is the trick. When we take a Synchronous-external-abort out of
+> userspace, we're in process context too. We can add helpers to drain the
+> memory_failure_queue which can be called when do_sea() when we know we're
+> preemptible and interrupts-et-al are unmasked.
 
-Ok, great, thanks!
-Maxime
+Something like... base on [0], in arch/arm64/kernel/acpi.c:
+-----------------%<-----------------
+int apei_claim_sea(struct pt_regs *regs)
+{
+        int cpu;
+        int err = -ENOENT;
+        unsigned long current_flags = arch_local_save_flags();
+        unsigned long interrupted_flags = current_flags;
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180207/5c3747d4/attachment-0001.sig>
+        if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+                return err;
+
+        if (regs)
+                interrupted_flags = regs->pstate;
+
+        /*
+         * APEI expects an NMI-like notification to always be called
+         * in NMI context.
+         */
+        local_daif_restore(DAIF_ERRCTX);
+        nmi_enter();
+        err = ghes_notify_sea();
+        cpu = smp_processor_id();
+        nmi_exit();
+
+        /*
+         * APEI NMI-like notifications are deferred to irq_work. Unless
+         * we interrupted irqs-masked code, we can do that now.
+         */
+        if (!err) {
+                if (!arch_irqs_disabled_flags(interrupted_flags)) {
+                        local_daif_restore(DAIF_PROCCTX_NOIRQ);
+                        irq_work_run();
+                } else {
+                        err = -EINPROGRESS;
+                }
+        }
+
+        local_daif_restore(current_flags);
+
+        if (IS_ENABLED(CONFIG_ACPI_APEI_MEMORY_FAILURE) && !err) {
+                /*
+                 * Memory failure work is scheduled on the local CPU.
+                 * If we interrupted userspace, or are in process context
+                 * we can do that now.
+                 */
+                if ((regs && !user_mode(regs)) || !preemptible())
+                        err = -EINPROGRESS;
+                else
+                        memory_failure_queue_kick(cpu);
+        }
+
+        return err;
+}
+-----------------%<-----------------
+
+
+and to mm/memory-failure.c:
+-----------------%<-----------------
+@@ -1355,7 +1355,7 @@ static void memory_failure_work_func(struct work_struct *w
+ork)
+        unsigned long proc_flags;
+        int gotten;
+
+-       mf_cpu = this_cpu_ptr(&memory_failure_cpu);
++       mf_cpu = container_of(work, struct memory_failure_cpu, work);
+        for (;;) {
+                spin_lock_irqsave(&mf_cpu->lock, proc_flags);
+                gotten = kfifo_get(&mf_cpu->fifo, &entry);
+
+@@ -1369,6 +1369,22 @@ static void memory_failure_work_func(struct work_struct *
+work)
+        }
+ }
+
++/*
++ * Process memory_failure work queued on the specified CPU.
++ * Used to avoid return-to-userspace racing with the memory_failure workqueue.
++ */
++void memory_failure_queue_kick(int cpu)
++{
++       unsigned long flags;
++       struct memory_failure_cpu *mf_cpu;
++
++       might_sleep();
++
++       mf_cpu = &per_cpu(memory_failure_cpu, cpu);
++       cancel_work_sync(&mf_cpu->work);
++       memory_failure_work_func(&mf_cpu->work);
++}
++
+ static int __init memory_failure_init(void)
+ {
+        struct memory_failure_cpu *mf_cpu;
+-----------------%<-----------------
+
+I've cooked up some NOTFIY_SEA-ing APEI firmware using kvmtool to test this. I
+haven't yet managed to hit irq-masked code with NOTIFY_SEA. I'll try and tidy
+this up and post a branch to make it easier to test...
+
+I prefer this as it doesn't duplicate the state then come back on a TIF flag.
+I'd like to move the kicking logic into ghes.c, as that is where the queueing
+happened, but the 'do-this, restore these flags, do-that' is somewhat tasteless,
+and it looks like on arm64 has synchronous nmi-like notifications that must be
+handled before returning to user-space...
+
+
+
+Thanks,
+
+James
+
+[0] https://www.spinics.net/lists/linux-acpi/msg80149.html
