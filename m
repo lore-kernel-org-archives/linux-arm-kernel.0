@@ -1,95 +1,123 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 7 Feb 2018 15:09:06 +0000
-Subject: [PATCH v2 1/2] arm64: Relax constraints on ID feature bits
-In-Reply-To: <20180207142106.10716-1-suzuki.poulose@arm.com>
-References: <20180207142106.10716-1-suzuki.poulose@arm.com>
-Message-ID: <20180207150906.GQ5862@e103592.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Feb 2018 16:10:23 +0100
+Subject: [PATCH v1 02/16] irqchip: gicv3-its: Add helpers for handling
+ 52bit address
+In-Reply-To: <20180109190414.4017-3-suzuki.poulose@arm.com>
+References: <20180109190414.4017-1-suzuki.poulose@arm.com>
+ <20180109190414.4017-3-suzuki.poulose@arm.com>
+Message-ID: <20180207151023.GD29286@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 02:21:05PM +0000, Suzuki K Poulose wrote:
-> We treat most of the feature bits in the ID registers as STRICT,
-> implying that all CPUs should match it the boot CPU state. However,
-> for most of the features, we can handle if there are any mismatches
-> by using the safe value. e.g, HWCAPs and other features used by the
-> kernel. Relax the constraint on the feature bits whose mismatch can
-> be handled by the kernel.
+Hi Suzuki,
+
+On Tue, Jan 09, 2018 at 07:03:57PM +0000, Suzuki K Poulose wrote:
+> Add helpers for encoding/decoding 52bit address in GICv3 ITS BASER
+> register. When ITS uses 64K page size, the 52bits of physical address
+> are encoded in BASER[47:12] as follows :
 > 
-> For VHE, if there is a mismatch we don't care if the kernel is
-> not using it. If the kernel is indeed running in EL2 mode, then
-> the mismatches results in a panic. Similarly for ASID bits we
-> take care of conflicts.
+>  Bits[47:16] of the register => bits[47:16] of the physical address
+>  Bits[15:12] of the register => bits[51:48] of the physical address
+>                                 bits[15:0] of the physical address are 0.
 > 
-> For other features like, PAN, UAO we only enable it only if we
-> have it on all the CPUs. For IESB, we set the SCTLR bit unconditionally
-> anyways.
+> Also adds a mask for CBASER address. This will be used for adding 52bit
+> support for VGIC ITS. More importantly ignore the upper bits if 52bit
+> support is not enabled.
 > 
-> For features that aren't currently used by kernel
->  (e.g ID_AA64MFMR1:{LOR,HPD}, ID_AA64MMFR2:LSM) make them NONSTRICT.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Shanker Donthineni <shankerd@codeaurora.org>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
-> Changes since v1:
->  - Make ID_AA64MMFR1_EL1:LOR/HPD, ID_AA64MMFR1_EL1:LSM non-strict
->    as they aren't used by the kernel.
->  - Added comments around different fields.
->  - Make ID_AA64MMFR2:CNP non-strict, as we could decide to use it
->    only when it is available on all the CPUs.
-> ---
->  arch/arm64/kernel/cpufeature.c | 83 ++++++++++++++++++++++++------------------
->  1 file changed, 48 insertions(+), 35 deletions(-)
+>  drivers/irqchip/irq-gic-v3-its.c   |  2 +-
+>  include/linux/irqchip/arm-gic-v3.h | 32 ++++++++++++++++++++++++++++++--
+>  2 files changed, 31 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 4039e64cd342..e6aa84f806f7 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1615,7 +1615,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+>  		}
+>  
+>  		/* Convert 52bit PA to 48bit field */
+> -		baser_phys = GITS_BASER_PHYS_52_to_48(baser_phys);
+> +		baser_phys = GITS_BASER_ADDR64K_FROM_PHYS(baser_phys);
+>  	}
+>  
+>  retry_baser:
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index c00c4c33e432..b880b6682fa6 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -320,6 +320,15 @@
+>  #define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
+>  #define GITS_IIDR_PRODUCTID_SHIFT	24
+>  
+> +#ifdef CONFIG_ARM64_PA_BITS_52
+> +#define GITS_PA_HI_MASK			(0xfULL)
+> +#define GITS_PA_SHIFT			52
+> +#else
+> +/* Do not use the bits [51-48] if we don't support 52bit */
+> +#define GITS_PA_HI_MASK			0
+> +#define GITS_PA_SHIFT			48
+> +#endif
+> +
+>  #define GITS_CBASER_VALID			(1ULL << 63)
+>  #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+>  #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
+> @@ -343,6 +352,7 @@
+>  #define GITS_CBASER_WaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, WaWb)
+>  #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
+>  #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
+> +#define GITS_CBASER_ADDRESS(x)	((x) & GENMASK_ULL(GITS_PA_SHIFT, 12))
+>  
+>  #define GITS_BASER_NR_REGS		8
+>  
+> @@ -373,8 +383,26 @@
+>  #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+>  #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+>  #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
+> -#define GITS_BASER_PHYS_52_to_48(phys)					\
+> -	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
+> +
+> +/*
+> + * With 64K page size, the physical address can be upto 52bit and
+> + * uses the following encoding in the GITS_BASER[47:12]:
+> + *
+> + * Bits[47:16] of the register => bits[47:16] of the base physical address.
+> + * Bits[15:12] of the register => bits[51:48] of the base physical address.
+> + *                                bits[15:0] of the base physical address are 0.
+> + * Clear the upper bits if the kernel doesn't support 52bits.
+> + */
+> +#define GITS_BASER_ADDR64K_LO_MASK	GENMASK_ULL(47, 16)
+> +#define GITS_BASER_ADDR64K_HI_SHIFT	12
+> +#define GITS_BASER_ADDR64K_HI_MOVE	(48 - GITS_BASER_ADDR64K_HI_SHIFT)
+> +#define GITS_BASER_ADDR64K_HI_MASK	(GITS_PA_HI_MASK << GITS_BASER_ADDR64K_HI_SHIFT)
+> +#define GITS_BASER_ADDR64K_TO_PHYS(x)					\
+> +	(((x) & GITS_BASER_ADDR64K_LO_MASK) | 				\
+> +	 (((x) & GITS_BASER_ADDR64K_HI_MASK) << GITS_BASER_ADDR64K_HI_MOVE))
+> +#define GITS_BASER_ADDR64K_FROM_PHYS(p)					\
+> +	(((p) & GITS_BASER_ADDR64K_LO_MASK) | 				\
+> +	 (((p) >> GITS_BASER_ADDR64K_HI_MOVE) & GITS_BASER_ADDR64K_HI_MASK))
 
-[...]
+I don't understand why you need this masking logic embedded in these
+macros?  Isn't it strictly an error if anyone passes a physical address
+with any of bits [51:48] set to the ITS on a system that doesn't support
+52 bit PAs, and just silently masking off those bits could lead to some
+interesting cases.
 
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
-> +	/*
-> +	 * We handle differing ASID widths by explicit checks to make sure the system is
-> +	 * safe via verify_cpu_asid_bits()
+This is also notably more difficult to read than the existing macro.
 
-I guess that's sufficient.
+If anything, I think it would be more useful to have
+GITS_BASER_TO_PHYS(x) and GITS_PHYS_TO_BASER(x) which takes into account
+CONFIG_ARM64_64K_PAGES.
 
-Although I had suggested adding a comment to verify_cpu_asid_bits()
-cross-referencing back to here, it now seems superfluous.  It's fairly
-obvious what that function is supported to do.
+>  #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+>  #define GITS_BASER_InnerShareable					\
+>  	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+> -- 
+> 2.13.6
+> 
 
-
-[...]
-
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
-
-[...]
-
-> +	/*
-> +	 * When CONFIG_ARM64_VHE is enabled, we ensure that there is no conflict in run
-> +	 * levels via verify_cpu_run_el()
-> +	 */
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
-
-Similarly ack.
-
-
-[...]
-
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
-
-[...]
-
-> +	/*
-> +	 * Lacking implicit ESB on exception boundaries on a subset of CPUs is no worse than
-> +	 * lacking it on all of them.
-> +	 */
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
-
-And again.  Thanks.
-
-[...]
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Thanks,
+-Christoffer
