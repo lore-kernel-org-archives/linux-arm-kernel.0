@@ -1,168 +1,223 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 7 Feb 2018 10:40:48 +0000
-Subject: [PATCH 1/2] arm64: Relax constraints on ID feature bits
-In-Reply-To: <20180201103838.14702-1-suzuki.poulose@arm.com>
-References: <20180201103838.14702-1-suzuki.poulose@arm.com>
-Message-ID: <20180207104048.GL5862@e103592.cambridge.arm.com>
+Date: Wed, 7 Feb 2018 10:38:29 +0000
+Subject: [PATCH v2 08/20] arm64: capabilities: Group handling of features
+ and errata
+In-Reply-To: <20180131182807.32134-9-suzuki.poulose@arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-9-suzuki.poulose@arm.com>
+Message-ID: <20180207103829.GY5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 01, 2018 at 10:38:37AM +0000, Suzuki K Poulose wrote:
-> We treat most of the feature bits in the ID registers as STRICT,
-> implying that all CPUs should match it the boot CPU state. However,
-> for most of the features, we can handle if there are any mismatches
-> by using the safe value. e.g, HWCAPs and other features used by the
-> kernel. Relax the constraint on the feature bits whose mismatch can
-> be handled by the kernel.
+On Wed, Jan 31, 2018 at 06:27:55PM +0000, Suzuki K Poulose wrote:
+> So far we have had separate routes for triggering errata and feature
+> capability detection. Also, we never allowed "features" based on local
+> CPU and "errata" based on System wide safe registers. This patch
+> groups the handling of errata and features and also allows them
+> to have all the possible scopes. So we now run through both
+> arm64_features and arm64_errata, in two phases for detection.
 > 
-> For VHE, if there is a mismatch we don't care if the kernel is
-> not using it. If the kernel is indeed running in EL2 mode, then
-> the mismatches results in a panic. Similarly for ASID bits we
-> take care of conflicts.
+>  1) with SCOPE_LOCAL_CPU filter on each boot time enabled CPUs,
+>     via update_cpu_local_capabilities().
 > 
-> For other features like, PAN, UAO we only enable it only if we
-> have it on all the CPUs. For IESB, we set the SCTLR bit unconditionally
-> anyways.
-
-Do the remaining STRICT+LOWER_SAFE / NONSTRICT+EXACT cases still
-make sense?
-
-I've wondered in the past whether there is redundancy between the strict
-and type fields, but when adding entries I just copy-pasted similar ones
-rather than fully understanding what was going on...
-
-Cheers
----Dave
-
+>  2) with SCOPE_SYSTEM filter only once after all boot time enabled
+>     CPUs are active, triggered from setup_cpu_features().
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
+> A late CPU goes through both the tables for verification against
+> established capabilities, as before.
+> 
+> We could ideally merge the two tables into one. But leave it as
+> it is for easy access to the list of particular type.
+> 
 > Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+I don't know if there's a way of splitting or refactoring this patch to
+make it easier to understand the changes, but I think I get what's going
+on here now.
+
+So,
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+(But if you can see a good way to split it, I'll be happy to take
+another look.)
+
 > ---
->  arch/arm64/kernel/cpufeature.c | 66 ++++++++++++++++++++++--------------------
->  1 file changed, 35 insertions(+), 31 deletions(-)
+>  arch/arm64/kernel/cpufeature.c | 77 ++++++++++++++++++++++++------------------
+>  1 file changed, 44 insertions(+), 33 deletions(-)
 > 
 > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 4b6f9051cf0c..1c39a635a71c 100644
+> index 5163dc51b975..c710ef28524e 100644
 > --- a/arch/arm64/kernel/cpufeature.c
 > +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -123,36 +123,36 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
->   * sync with the documentation of the CPU feature register ABI.
+> @@ -504,7 +504,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+>  }
+>  
+>  extern const struct arm64_cpu_capabilities arm64_errata[];
+> -static void update_cpu_errata_workarounds(void);
+> +static void update_cpu_local_capabilities(void);
+>  
+>  void __init init_cpu_features(struct cpuinfo_arm64 *info)
+>  {
+> @@ -553,7 +553,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+>  	 * Run the errata work around checks on the boot CPU, once we have
+>  	 * initialised the cpu feature infrastructure.
+>  	 */
+> -	update_cpu_errata_workarounds();
+> +	update_cpu_local_capabilities();
+>  }
+>  
+>  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+> @@ -1184,8 +1184,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+>  	return false;
+>  }
+>  
+> -static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+> -				    u16 scope_mask, const char *info)
+> +static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+> +				      u16 scope_mask, const char *info)
+>  {
+>  	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+>  	for (; caps->matches; caps++) {
+> @@ -1199,6 +1199,13 @@ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>  	}
+>  }
+>  
+> +static void update_cpu_capabilities(u16 scope_mask)
+> +{
+> +	__update_cpu_capabilities(arm64_features, scope_mask,
+> +				"detected feature:");
+> +	__update_cpu_capabilities(arm64_errata, scope_mask,
+> +				"enabling work around for");
+> +}
+>  
+>  static int __enable_cpu_capability(void *arg)
+>  {
+> @@ -1213,7 +1220,7 @@ static int __enable_cpu_capability(void *arg)
+>   * CPUs
 >   */
->  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
->  	ARM64_FTR_END,
->  };
+>  static void __init
+> -enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
+> +__enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
+>  {
+>  	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
+>  	for (; caps->matches; caps++) {
+> @@ -1293,6 +1300,12 @@ static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_li
+>  	return true;
+>  }
 >  
->  static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
->  	ARM64_FTR_END,
->  };
+> +static bool verify_local_cpu_caps(u16 scope_mask)
+> +{
+> +	return __verify_local_cpu_caps(arm64_features, scope_mask) &&
+> +	       __verify_local_cpu_caps(arm64_errata, scope_mask);
+> +}
+> +
+>  /*
+>   * Check for CPU features that are used in early boot
+>   * based on the Boot CPU value.
+> @@ -1315,12 +1328,6 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+>  		}
+>  }
 >  
->  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV2_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_RAS_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_RAS_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
-> -	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-> -	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
-> +	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
-> +	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
->  	/* Linux doesn't care about the EL3 */
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
-> @@ -169,7 +169,8 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
->  	/* Linux shouldn't care about secure memory */
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
-> +	/* We handle differing ASID widths by explicit checks to make sure the system is safe */
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
->  	/*
->  	 * Differing PARange is fine as long as all peripherals and memory are mapped
->  	 * within the minimum PARange of all CPUs
-> @@ -179,20 +180,23 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
->  };
+> -static void verify_local_cpu_features(void)
+> -{
+> -	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_SCOPE_ALL))
+> -		cpu_die_early();
+> -}
+> -
+>  static void verify_sve_features(void)
+>  {
+>  	u64 safe_zcr = read_sanitised_ftr_reg(SYS_ZCR_EL1);
+> @@ -1339,26 +1346,28 @@ static void verify_sve_features(void)
+>  }
 >  
->  static const struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
-> +	/* When CONFIG_ARM64_VHE is enabled, we ensure that there is no conflict */
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
-> +	/* We can run a mix of CPUs with and without the support for HW management of AF/DBM bits */
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
->  	ARM64_FTR_END,
->  };
+>  /*
+> - * The CPU Errata work arounds are detected and applied at boot time
+> - * and the related information is freed soon after. If the new CPU requires
+> - * an errata not detected at boot, fail this CPU.
+> + * Check for all capablities within the scope of local CPU.
+> + * This is run on all boot time activated CPUs.
+>   */
+> -static void verify_local_cpu_errata_workarounds(void)
+> +static void update_cpu_local_capabilities(void)
+>  {
+> -	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_SCOPE_ALL))
+> -		cpu_die_early();
+> +	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_LOCAL_CPU);
+>  }
 >  
->  static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
-> +	/* While IESB is good to have, it is not fatal if we miss this on some CPUs */
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
->  	ARM64_FTR_END,
->  };
-> @@ -259,12 +263,12 @@ static const struct arm64_ftr_bits ftr_dczid[] = {
+> -static void update_cpu_errata_workarounds(void)
+> +/*
+> + * Check for all capablities with a system wide scope.
+> + * This is run only once after all the boot CPUs are
+> + * brought online.
+> + */
+> +static void update_system_capabilities(void)
+>  {
+> -	update_cpu_capabilities(arm64_errata,
+> -				ARM64_CPUCAP_SCOPE_ALL,
+> -				"enabling workaround for");
+> +	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_SYSTEM);
+>  }
 >  
+> -static void __init enable_errata_workarounds(void)
+> +static void enable_cpu_capabilities(u16 scope_mask)
+>  {
+> -	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_SCOPE_ALL);
+> +	__enable_cpu_capabilities(arm64_errata, scope_mask);
+> +	__enable_cpu_capabilities(arm64_features, scope_mask);
+>  }
 >  
->  static const struct arm64_ftr_bits ftr_id_isar5[] = {
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_RDM_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_CRC32_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA2_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA1_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_AES_SHIFT, 4, 0),
-> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_SEVL_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_RDM_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_CRC32_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA2_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA1_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_AES_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_SEVL_SHIFT, 4, 0),
->  	ARM64_FTR_END,
->  };
+>  /*
+> @@ -1371,8 +1380,8 @@ static void __init enable_errata_workarounds(void)
+>   */
+>  static void verify_local_cpu_capabilities(void)
+>  {
+> -	verify_local_cpu_errata_workarounds();
+> -	verify_local_cpu_features();
+> +	if (!verify_local_cpu_caps(ARM64_CPUCAP_SCOPE_ALL))
+> +		cpu_die_early();
+>  	verify_local_elf_hwcaps(arm64_elf_hwcaps);
+>  
+>  	if (system_supports_32bit_el0())
+> @@ -1400,16 +1409,20 @@ void check_local_cpu_capabilities(void)
+>  	 * advertised capabilities.
+>  	 */
+>  	if (!sys_caps_initialised)
+> -		update_cpu_errata_workarounds();
+> +		update_cpu_local_capabilities();
+>  	else
+>  		verify_local_cpu_capabilities();
+>  }
+>  
+> -static void __init setup_feature_capabilities(void)
+> +static void __init setup_system_capabilities(void)
+>  {
+> -	update_cpu_capabilities(arm64_features,
+> -				ARM64_CPUCAP_SCOPE_ALL, "detected feature:");
+> -	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_SCOPE_ALL);
+> +	/*
+> +	 * We have finalised the system wide safe feature registers,
+> +	 * finalise the capabilities that depend on it.
+> +	 */
+> +	update_system_capabilities();
+> +	/* Enable all the available capabilities */
+> +	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_ALL);
+>  }
+>  
+>  DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+> @@ -1433,9 +1446,7 @@ void __init setup_cpu_features(void)
+>  	u32 cwg;
+>  	int cls;
+>  
+> -	/* Set the CPU feature capabilies */
+> -	setup_feature_capabilities();
+> -	enable_errata_workarounds();
+> +	setup_system_capabilities();
+>  	mark_const_caps_ready();
+>  	setup_elf_hwcaps(arm64_elf_hwcaps);
 >  
 > -- 
 > 2.14.3
