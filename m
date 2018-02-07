@@ -1,125 +1,84 @@
-From: rohitkr@codeaurora.org (Rohit Kumar)
-Date: Wed, 7 Feb 2018 17:45:53 +0530
-Subject: [alsa-devel] [RESEND PATCH v2 09/15] ASoC: qcom: qdsp6: Add
- support to Q6CORE
-In-Reply-To: <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
-References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
- <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
-Message-ID: <39d78468-db2b-05ce-9602-c76b083d7f75@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 7 Feb 2018 10:20:27 -0200
+Subject: [PATCH v3 1/2] Document: dt: binding: imx: update pinctrl doc for
+ imx6sll
+In-Reply-To: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
+References: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <CAOMZO5A1a48jVdimwjhF+L9now2ceYpzt6cfmig_0bV9A245nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bai Ping,
 
-
-On 12/14/2017 11:03 PM, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Wed, Feb 7, 2018 at 12:07 AM, Bai Ping <ping.bai@nxp.com> wrote:
+> Add pinctrl binding doc update for imx6sll.
 >
-> This patch adds support to core apr service, which is used to query
-> status of other static and dynamic services on the dsp.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
 > ---
->   sound/soc/qcom/Kconfig        |   5 +
->   sound/soc/qcom/qdsp6/Makefile |   1 +
->   sound/soc/qcom/qdsp6/q6core.c | 227 ++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 233 insertions(+)
->   create mode 100644 sound/soc/qcom/qdsp6/q6core.c
+> changes v2-v3:
+>  - add generic config binding
+> ---
+>  .../bindings/pinctrl/fsl,imx6sll-pinctrl.txt       |  70 ++
+>  arch/arm/boot/dts/imx6sll-pinfunc.h                | 882 +++++++++++++++++++++
+>  2 files changed, 952 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/imx6sll-pinfunc.h
 >
-> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-> index 7ebdb879a8a3..121b9c957024 100644
-> --- a/sound/soc/qcom/Kconfig
-> +++ b/sound/soc/qcom/Kconfig
-> @@ -56,11 +56,16 @@ config SND_SOC_QDSP6_ASM
->   	tristate
->   	default n
->   
-> +config SND_SOC_QDSP6_CORE
-> +	tristate
-> +	default n
-> +
->   config SND_SOC_QDSP6
->   	tristate "SoC ALSA audio driver for QDSP6"
->   	select SND_SOC_QDSP6_AFE
->   	select SND_SOC_QDSP6_ADM
->   	select SND_SOC_QDSP6_ASM
-> +	select SND_SOC_QDSP6_CORE
->   	help
->   	 To add support for MSM QDSP6 Soc Audio.
->   	 This will enable sound soc platform specific
-> diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-> index 49dd3ccab27b..ad7f10691e54 100644
-> --- a/sound/soc/qcom/qdsp6/Makefile
-> +++ b/sound/soc/qcom/qdsp6/Makefile
-> @@ -1,3 +1,4 @@
->   obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
->   obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
->   obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
-> +obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
-> diff --git a/sound/soc/qcom/qdsp6/q6core.c b/sound/soc/qcom/qdsp6/q6core.c
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
 > new file mode 100644
-> index 000000000000..d4e2dbc62489
+> index 0000000..335f14a
 > --- /dev/null
-> +++ b/sound/soc/qcom/qdsp6/q6core.c
-> @@ -0,0 +1,227 @@
-> +/* SPDX-License-Identifier: GPL-2.0
-> +* Copyright (c) 2017, Linaro Limited
-> +*/
-> +#include <linux/slab.h>
-> +#include <linux/wait.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/sched.h>
-> +#include <linux/jiffies.h>
-[..]
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+> @@ -0,0 +1,70 @@
+> +* Freescale i.MX6 SLL IOMUX Controller
 > +
-> +	dev_set_drvdata(&adev->dev, core);
+> +Please refer to the pinctrl-bindings.txt in this directory for generic pinctrl binding.
 > +
-> +	core->adev = adev;
-> +	init_waitqueue_head(&core->wait);
+> +=== Pin Controller Node ===
 > +
-> +	do {
-> +		if (!q6core_is_adsp_ready(core)) {
-> +			dev_info(&adev->dev, "ADSP Audio isn't ready\n");
-> +		} else {
-> +			dev_info(&adev->dev, "ADSP Audio is ready\n");
+> +Required properties:
+> +- compatible: "fsl,imx6sll-iomuxc"
+> +- reg: Should contain the base physical address and size of the iomuxc registers.
 > +
-If q6core_is_adsp_ready() return failure, then we should not call and 
-ADSP API.
-> +			ret = q6core_get_svc_versions(core);
-> +			if (!ret)
-> +				q6core_add_static_services(core);
 > +
-> +			break;
-> +		}
-> +	} while (time_after(timeout, jiffies));
+> +=== Pin Configuration Node ===
+> +- pinmux: One integers array, represents a group of pins mux setting.
+> +       The format is pinmux = <PIN_FUNC_ID>, PIN_FUNC_ID is a pin working on
+> +       a specific function. which can be found in imx6sll-pinfunc.h under device
+> +       tree source folder. Please also refer to i.MX6SLL Reference Manual for detailed
+> +       CONFIG settings.
 > +
-I think we should defer probe if q6core_is_adsp_ready() returns failure 
-and timeouts.
-> +	return ret;
-> +}
+> +Optional Properties:
+> +- drive-strength               Integer. Controls Drive Strength
+> +                                       0: HI-Z
+> +                                       1: 260 ohm at 3.3v, 150 ohm at 1.8v
+> +                                       2: 130 ohm at 3.3v, 75 ohm at 1.8v
+> +                                       3: 86 ohm at 3.3v, 50 ohm at 1.8v
+> +                                       4: 65 ohm at 3.3v, 37 ohm at 1.8v
+> +                                       5: 52 ohm at 3.3v, 30 ohm at 1.8v
+> +                                       6: 43 ohm at 3.3v, 25 ohm at 1.8v
+> +                                       7: 37 ohm at 3.3v, 21 ohm at 1.8v
+> +- drive-open-drain             Bool. Enable Pin Open-drian
+> +- slew-rate:                   Integer. Controls Slew Rate
+> +                                       0: slow
+> +                                       1: fast
+> +- fsl,pin-speed:               Integer, Controls the pin speed
+> +                                       0: reserverd
+> +                                       1: low(50 MHz)
+> +                                       2: medium(100 MHz)
+> +                                       3: maximum(200 MHz)
 > +
-> +static int q6core_exit(struct apr_device *adev)
-> +{
-> +	return 0;
-> +}
-> +
-> +static const struct apr_device_id core_id[] = {
-> +	{"Q6CORE", APR_DOMAIN_ADSP, APR_SVC_ADSP_CORE, APR_CLIENT_AUDIO},
-> +	{ },
-> +};
-> +
-> +static struct apr_driver qcom_q6core_driver = {
-> +	.probe = q6core_probe,
-> +	.remove = q6core_exit,
-> +	.callback = core_callback,
-> +	.id_table = core_id,
-> +	.driver = {
-> +		   .name = "qcom-q6core",
-> +		   },
-> +};
-> +
-> +module_apr_driver(qcom_q6core_driver);
-> +
-> +MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
-> +MODULE_DESCRIPTION("q6 core");
-> +MODULE_LICENSE("GPL v2");
+> +- bias-pull-down:              Integer. Pull down on pin
+> +                                       0: 100K ohm pull down
+> +- bias-pull-up:                        Integer. Pull up on pin
+> +                                       1: 47K ohm pull up
+> +                                       2: 100K ohm pull up
+> +                                       3: 22K ohm pull up
+> +- input-schmitt-enable:                bool, Schmitt trigger input enable
+> +- fsl,low-voltage-enable:      Integer. low voltage enable
+> +                                       0: High voltage
+> +                                       1: Low voltage
+
+Under this generic pinctrl method: how do we set the SION bit in the board dts?
+
+Thanks
