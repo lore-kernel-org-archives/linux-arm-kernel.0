@@ -1,239 +1,158 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Wed, 7 Feb 2018 16:35:15 +0100
-Subject: [PATCH 4/6] i2c: i2c-stm32: Add generic DMA API
-In-Reply-To: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1518017717-10351-5-git-send-email-pierre-yves.mordret@st.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 7 Feb 2018 15:39:30 +0000
+Subject: [PATCH v2 04/20] arm64: capabilities: Prepare for fine grained
+ capabilities
+In-Reply-To: <970157c2-449d-9cb5-cf63-fb58fddc556a@arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-5-suzuki.poulose@arm.com>
+ <20180207103754.GU5862@e103592.cambridge.arm.com>
+ <970157c2-449d-9cb5-cf63-fb58fddc556a@arm.com>
+Message-ID: <20180207153929.GS5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a generic DMA API to implement DMA support for i2c-stm32fx
-drivers
+On Wed, Feb 07, 2018 at 03:16:39PM +0000, Suzuki K Poulose wrote:
+> On 07/02/18 10:37, Dave Martin wrote:
+> >On Wed, Jan 31, 2018 at 06:27:51PM +0000, Suzuki K Poulose wrote:
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
-  Version history:
-    v1:
-       * Initial
----
----
- drivers/i2c/busses/i2c-stm32.c | 153 +++++++++++++++++++++++++++++++++++++++++
- drivers/i2c/busses/i2c-stm32.h |  37 ++++++++++
- 2 files changed, 190 insertions(+)
- create mode 100644 drivers/i2c/busses/i2c-stm32.c
+[...]
 
-diff --git a/drivers/i2c/busses/i2c-stm32.c b/drivers/i2c/busses/i2c-stm32.c
-new file mode 100644
-index 0000000..d75fbcb
---- /dev/null
-+++ b/drivers/i2c/busses/i2c-stm32.c
-@@ -0,0 +1,153 @@
-+/*
-+ * i2c-stm32.c
-+ *
-+ * Copyright (C) M'boumba Cedric Madianga 2017
-+ * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include "i2c-stm32.h"
-+
-+/* Functions for DMA support */
-+struct stm32_i2c_dma *stm32_i2c_dma_request(struct device *dev,
-+					    dma_addr_t phy_addr,
-+					    u32 txdr_offset,
-+					    u32 rxdr_offset)
-+{
-+	struct stm32_i2c_dma *dma;
-+	struct dma_slave_config dma_sconfig;
-+	int ret;
-+
-+	dma = devm_kzalloc(dev, sizeof(*dma), GFP_KERNEL);
-+	if (!dma)
-+		return NULL;
-+
-+	/* Request and configure I2C TX dma channel */
-+	dma->chan_tx = dma_request_slave_channel(dev, "tx");
-+	if (!dma->chan_tx) {
-+		dev_dbg(dev, "can't request DMA tx channel\n");
-+		ret = -EINVAL;
-+		goto fail_al;
-+	}
-+
-+	memset(&dma_sconfig, 0, sizeof(dma_sconfig));
-+	dma_sconfig.dst_addr = phy_addr + txdr_offset;
-+	dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	dma_sconfig.dst_maxburst = 1;
-+	dma_sconfig.direction = DMA_MEM_TO_DEV;
-+	ret = dmaengine_slave_config(dma->chan_tx, &dma_sconfig);
-+	if (ret < 0) {
-+		dev_err(dev, "can't configure tx channel\n");
-+		goto fail_tx;
-+	}
-+
-+	/* Request and configure I2C RX dma channel */
-+	dma->chan_rx = dma_request_slave_channel(dev, "rx");
-+	if (!dma->chan_rx) {
-+		dev_err(dev, "can't request DMA rx channel\n");
-+		ret = -EINVAL;
-+		goto fail_tx;
-+	}
-+
-+	memset(&dma_sconfig, 0, sizeof(dma_sconfig));
-+	dma_sconfig.src_addr = phy_addr + rxdr_offset;
-+	dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	dma_sconfig.src_maxburst = 1;
-+	dma_sconfig.direction = DMA_DEV_TO_MEM;
-+	ret = dmaengine_slave_config(dma->chan_rx, &dma_sconfig);
-+	if (ret < 0) {
-+		dev_err(dev, "can't configure rx channel\n");
-+		goto fail_rx;
-+	}
-+
-+	init_completion(&dma->dma_complete);
-+
-+	dev_info(dev, "using %s (tx) and %s (rx) for DMA transfers\n",
-+		 dma_chan_name(dma->chan_tx), dma_chan_name(dma->chan_rx));
-+
-+	return dma;
-+
-+fail_rx:
-+	dma_release_channel(dma->chan_rx);
-+fail_tx:
-+	dma_release_channel(dma->chan_tx);
-+fail_al:
-+	devm_kfree(dev, dma);
-+	dev_info(dev, "can't use DMA\n");
-+
-+	return NULL;
-+}
-+
-+void stm32_i2c_dma_free(struct stm32_i2c_dma *dma)
-+{
-+	dma->dma_buf = 0;
-+	dma->dma_len = 0;
-+
-+	dma_release_channel(dma->chan_tx);
-+	dma->chan_tx = NULL;
-+
-+	dma_release_channel(dma->chan_rx);
-+	dma->chan_rx = NULL;
-+
-+	dma->chan_using = NULL;
-+}
-+
-+int stm32_i2c_prep_dma_xfer(struct device *dev, struct stm32_i2c_dma *dma,
-+			    bool rd_wr, u32 len, u8 *buf,
-+			    dma_async_tx_callback callback,
-+			    void *dma_async_param)
-+{
-+	struct dma_async_tx_descriptor *txdesc;
-+	struct device *chan_dev;
-+	int ret;
-+
-+	if (rd_wr) {
-+		dma->chan_using = dma->chan_rx;
-+		dma->dma_transfer_dir = DMA_DEV_TO_MEM;
-+		dma->dma_data_dir = DMA_FROM_DEVICE;
-+	} else {
-+		dma->chan_using = dma->chan_tx;
-+		dma->dma_transfer_dir = DMA_MEM_TO_DEV;
-+		dma->dma_data_dir = DMA_TO_DEVICE;
-+	}
-+
-+	dma->dma_len = len;
-+	chan_dev = dma->chan_using->device->dev;
-+
-+	dma->dma_buf = dma_map_single(chan_dev, buf, dma->dma_len,
-+				      dma->dma_data_dir);
-+	if (dma_mapping_error(chan_dev, dma->dma_buf)) {
-+		dev_err(dev, "DMA mapping failed\n");
-+		return -EINVAL;
-+	}
-+
-+	txdesc = dmaengine_prep_slave_single(dma->chan_using, dma->dma_buf,
-+					     dma->dma_len,
-+					     dma->dma_transfer_dir,
-+					     DMA_PREP_INTERRUPT);
-+	if (!txdesc) {
-+		dev_err(dev, "Not able to get desc for DMA xfer\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	reinit_completion(&dma->dma_complete);
-+
-+	txdesc->callback = callback;
-+	txdesc->callback_param = dma_async_param;
-+	ret = dma_submit_error(dmaengine_submit(txdesc));
-+	if (ret < 0) {
-+		dev_err(dev, "DMA submit failed\n");
-+		goto err;
-+	}
-+
-+	dma_async_issue_pending(dma->chan_using);
-+
-+	return 0;
-+
-+err:
-+	dma_unmap_single(chan_dev, dma->dma_buf, dma->dma_len,
-+			 dma->dma_data_dir);
-+	return ret;
-+}
-diff --git a/drivers/i2c/busses/i2c-stm32.h b/drivers/i2c/busses/i2c-stm32.h
-index d4f9cef..868755f 100644
---- a/drivers/i2c/busses/i2c-stm32.h
-+++ b/drivers/i2c/busses/i2c-stm32.h
-@@ -11,6 +11,10 @@
- #ifndef _I2C_STM32_H
- #define _I2C_STM32_H
- 
-+#include <linux/dma-direction.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+
- enum stm32_i2c_speed {
- 	STM32_I2C_SPEED_STANDARD, /* 100 kHz */
- 	STM32_I2C_SPEED_FAST, /* 400 kHz */
-@@ -18,4 +22,37 @@ enum stm32_i2c_speed {
- 	STM32_I2C_SPEED_END,
- };
- 
-+/**
-+ * struct stm32_i2c_dma - DMA specific data
-+ * @chan_tx: dma channel for TX transfer
-+ * @chan_rx: dma channel for RX transfer
-+ * @chan_using: dma channel used for the current transfer (TX or RX)
-+ * @dma_buf: dma buffer
-+ * @dma_len: dma buffer len
-+ * @dma_transfer_dir: dma transfer direction indicator
-+ * @dma_data_dir: dma transfer mode indicator
-+ * @dma_complete: dma transfer completion
-+ */
-+struct stm32_i2c_dma {
-+	struct dma_chan *chan_tx;
-+	struct dma_chan *chan_rx;
-+	struct dma_chan *chan_using;
-+	dma_addr_t dma_buf;
-+	unsigned int dma_len;
-+	enum dma_transfer_direction dma_transfer_dir;
-+	enum dma_data_direction dma_data_dir;
-+	struct completion dma_complete;
-+};
-+
-+struct stm32_i2c_dma *stm32_i2c_dma_request(struct device *dev,
-+					    dma_addr_t phy_addr,
-+					    u32 txdr_offset, u32 rxdr_offset);
-+
-+void stm32_i2c_dma_free(struct stm32_i2c_dma *dma);
-+
-+int stm32_i2c_prep_dma_xfer(struct device *dev, struct stm32_i2c_dma *dma,
-+			    bool rd_wr, u32 len, u8 *buf,
-+			    dma_async_tx_callback callback,
-+			    void *dma_async_param);
-+
- #endif /* _I2C_STM32_H */
--- 
-2.7.4
+> >>As such there is no change in how the capabilities are treated.
+> >>
+> >>Cc: Dave Martin <dave.martin@arm.com>
+> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >
+> >A few minor nits in the documentation, otherwise
+> >
+> >Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> >
+> >>---
+> >>  arch/arm64/include/asm/cpufeature.h | 90 ++++++++++++++++++++++++++++++++++---
+> >>  arch/arm64/kernel/cpu_errata.c      |  8 ++--
+> >>  arch/arm64/kernel/cpufeature.c      | 38 ++++++++--------
+> >>  3 files changed, 107 insertions(+), 29 deletions(-)
+> >>
+> >>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> >>index 7925e40c6ded..05da54f1b4c7 100644
+> >>--- a/arch/arm64/include/asm/cpufeature.h
+> >>+++ b/arch/arm64/include/asm/cpufeature.h
+> >>@@ -86,16 +86,89 @@ struct arm64_ftr_reg {
+> >>  extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+> >>-/* scope of capability check */
+> >>-enum {
+> >>-	SCOPE_SYSTEM,
+> >>-	SCOPE_LOCAL_CPU,
+> >>-};
+> >>+/*
+> >>+ * CPU capabilities:
+> >>+ *
+> >>+ * We use arm64_cpu_capabilities to represent system features, errata work
+> >>+ * arounds (both used internally by kernel and tracked in cpu_hwcaps) and
+> >>+ * ELF HWCAPs (which are exposed to user).
+> >>+ *
+> >>+ * To support systems with heterogeneous CPUs, we need to make sure that we
+> >>+ * detect the capabilities correctly on the system and take appropriate
+> >>+ * measures to ensure there are not incompatibilities.
+> >>+ *
+> >>+ * This comment tries to explain how we treat the capabilities.
+> >>+ * Each capability has the following list of attributes :
+> >>+ *
+> >>+ * 1) Scope of Detection : The system detects a given capability by performing
+> >>+ *    some checks at runtime. This could be, e.g, checking the value of a field
+> >>+ *    in CPU ID feature register or checking the cpu model. The capability
+> >>+ *    provides a call back ( @matches() ) to perform the check.
+> >>+ *    Scope defines how the checks should be performed. There are two cases:
+> >>+ *
+> >>+ *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
+> >>+ *        matches. This implies, we have to run the check on all the booting
+> >>+ *        CPUs, until the system decides that state of the capability is finalised.
+> >>+ *        (See section 2 below)
+> >>+ *		Or
+> >>+ *     b) SCOPE_SYSTEM: check all the CPUs and "detect" if all the CPUs matches.
+> >>+ *        This implies, we run the check only once, when the system decides to
+> >>+ *        finalise the state of the capability. If the capability relies on a
+> >>+ *        field in one of the CPU ID feature registers, we use the sanitised
+> >>+ *        value of the register from the CPU feature infrastructure to make
+> >>+ *        the decision.
+> >>+ *    The process of detection is usually denoted by "update" capability state
+> >>+ *    in the code.
+> >>+ *
+> >>+ * 2) Finalise the state : The kernel should finalise the state of a capability
+> >>+ *    at some point during its execution and take necessary actions if any. Usually,
+> >>+ *    this is done, after all the boot-time enabled CPUs are brought up by the
+> >>+ *    kernel, so that it can make better decision based on the available set
+> >>+ *    of CPUs. However, there are some special cases, where the action is taken
+> >>+ *    during the early boot by the primary boot CPU. (e.g, running the kernel at
+> >>+ *    EL2 with Virtualisation Host Extensions). The kernel usually disallows
+> >>+ *    any changes to the state of a capability once it finalises the capability
+> >>+ *    and takes any action, as it may be impossible to execute the actions safely.
+> >>+ *
+> >>+ * 3) Verification: When a CPU is brought online (e.g, by user or by the kernel),
+> >>+ *    the kernel should make sure that it is safe to use the CPU, by verifying
+> >>+ *    that the CPU is compliant with the state of the capabilities established
+> >
+> >Nit: can we say "finalised" instead of "established"?
+> >
+> >There could be doubt about precisely what "established" means.
+> >"Finalised" is clearly defined in (2) -- I'm assuming that's the
+> >intended meaning here (?)
+> 
+> You're right. It should be "Finalised".
+> 
+> >
+> >>+ *    already. This happens via :
+> >>+ *    secondary_start_kernel()-> check_local_cpu_capabilities()	->
+> >>+ *      check_early_cpu_features() && verify_local_cpu_capabilities()
+> >
+> >Nit: Maybe just say "via secondart_start_kernel()"?  Too much detail
+> >about the exact code flow may become wrong in the future when someone
+> >refactors the code.
+> 
+> Sure. We could say secondary_start_kernel-> check_local_cpu_capabilities().
+
+Yes, that seems enough.
+
+> >
+> >>+ *
+> >>+ *    As explained in (2) above, capabilities could be finalised at different
+> >>+ *    points in the execution. Each CPU is verified against the "finalised"
+> >>+ *    capabilities and if there is a conflict, the kernel takes an action, based
+> >>+ *    on the severity (e.g, a CPU could be prevented from booting or cause a
+> >>+ *    kernel panic). The CPU is allowed to "affect" the state of the capability,
+> >>+ *    if it has not been finalised already.
+> >>+ *
+> >>+ * 4) Action: As mentioned in (2), the kernel can take an action for each detected
+> >>+ *    capability, on all CPUs on the system. This is always initiated only after
+> >
+> >Nit: maybe clarify what an action is, e.g.
+> >"Appropriate actions include patching in alternatives, turning on an
+> >architectural feature or activating errata workarounds."
+> 
+> See below.
+> 
+> >
+> >Can we can that it is the job of the cpu_enable() method to perform the
+> >appropriate action, or is that not universally true?
+> >
+> 
+> It is not completely true. e.g we don't patch in alternatives from "enable" call back.
+> They are batched and performed after we have "taken actions" (i.e after
+> enable_cpu_capabilites() ). But all CPU control specific changes are performed from
+> cpu_enable().
+> 
+> So we could say:
+> 
+> "Appropriate actions include turning on an architectural feature or
+> changing the CPU control bits (e.g SCTLR or TCR). Patching in
+> alternatives for the capabilities are
+
+are -> is ?
+
+> batched and is performed separately"
+
+Ah, OK.  Yes that seems fine.
+
+Happy to keep my Reviewed-by with those edits.
+
+Cheers
+---Dave
