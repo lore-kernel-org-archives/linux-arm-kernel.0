@@ -1,33 +1,127 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 7 Feb 2018 20:43:06 +0800
-Subject: [PATCH 2/2] dt-bindings: PCI: MediaTek: Correct the
- interrupt-map properties
-In-Reply-To: <20180205060830.svkrwnn6wzuig7ns@rob-hp-laptop>
-References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
- <9d247a4fba54ba90d07df32fd89a8bb2c8bdb0f9.1516961656.git.ryder.lee@mediatek.com>
- <20180205060830.svkrwnn6wzuig7ns@rob-hp-laptop>
-Message-ID: <1518007386.23115.6.camel@mtkswgap22>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 7 Feb 2018 13:49:59 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <20180207103905.mtyzgu73mmifyvvj@flea>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180207103905.mtyzgu73mmifyvvj@flea>
+Message-ID: <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi,
 
-On Mon, 2018-02-05 at 00:08 -0600, Rob Herring wrote:
-> On Wed, Jan 31, 2018 at 03:41:50PM +0800, Ryder Lee wrote:
-> > Move the interrupt-map properties from the child nodes to the root node
-> > and update each entry accordingly.
-> > 
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/pci/mediatek-pcie.txt      | 28 ++++++++++++----------
-> >  1 file changed, 15 insertions(+), 13 deletions(-)
+Il 07/02/2018 11:39, Maxime Ripard ha scritto:
+> On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
+>>>>> Also, how was it tested? This seems quite weird that we haven't caught
+>>>>> that one sooner, and I'm a bit worried about the possible regressions
+>>>>> here.
+>>>>
+>>>> It sounds really strange to me too,
+>>>> because everybody under uboot use "sync:3"(HIGH).
+>>>> I will retry to measure,
+>>>> unfortunately at home I don't have a scope,
+>>>> but I think I'm going to have one soon, because of this. :)
+>>>
+>>> Here I am with scope captures and tcon0 registers dump:
+>>> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+>>> dclk_d0 => https://pasteboard.co/H4r8QRe.png
+>>> dclk_de => https://pasteboard.co/H4r8zh4R.png
+>>> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
+>>>
+>>> As you can see circled in reg on registers,
+>>> TCON0_IO_POL_REG = 0x00000000.
+>>> But on all the waveforms you can see:
+>>> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
+>>> the rising front overlaps dclk rising edge(not good), so to me this is
+>>> falling, then I mean it Negative.
+>>> - dclk_de: de pulse is clearly negative, even if register is 0 and its'
+>>> polarity bit is 0.
+>>> - dclk_vsnc: same as dclk_de
+>>> - dclk_hsync: I didn't take scope screenshot but I can assure you it's
+>>> negative.
+>>>
+>>> You can also check all the other registers about TCON0.
+>>>
+>>> Now I proceed testing it on A33, maybe the peripheral is slightly
+>>> different between Axx SoCs, if I find it that way,
+>>> it should be only a check about SoC or peripheral ID,
+>>> and treat polarity as it should be done.
+>>
+>> Here I am with A33 waveforms:
+>> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
+>> dclk_d0 => https://pasteboard.co/H4rVXwy.png
+>> dclk_de => https://pasteboard.co/H4rWDt8.png
+>> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
+>> dclk_hsync => https://pasteboard.co/H4rWK6I.png
+>>
+>> It behaves the same way as A20, so as I mean IO polarity,
+>> all signals(except D0-D23), are inverted.
+>> For A33 I've used A33-OLinuXino.
+>> For A20 our LiNova1.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> If you have an A33 handy, you probably want to read that mail:
+> https://lists.freedesktop.org/archives/dri-devel/2017-July/147951.html
+> 
+> Especially the 90-phase part.
 
-Please ignore this patch as we think the original version is better than
-this.  Sorry for the inconvenience.
+Here is a summary of different SoCs TCON:
+With DCLK_Sel:
+0x0 => normal phase
+0x1 => 1/3 phase
+0x2 => 2/3 phase
 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+A10, A20
+
+With DCLK_Sel:
+0x0 => normal phase
+0x1 => 1/3 phase
+0x2 => 2/3 phase
+0x5 => DCLK/2 phase 0
+0x4 => DCLK/2 phase 90
+
+A31, A31s, A33, A80, A83T
+
+Also I've found that TCON1 has not this feature,
+nor first, nor second case(at least is not described on user manuals).
+
+So I could handle differently according to SoC.
+Unfortunately there is not TCON register keeping IP version,
+so the only way I see is to create a long if-or statement to understand
+which kind of TCON we're using.
+
+But what sounds not the best to me, is that DCLK is divided by 2 if
+using phase 90. So we need to reconsider also bitclock driver according
+to this.
+I don't know if it make sense.
+
+IMHO, I would keep only:
+- As normal => "0x1 => 1/3 phase"
+- As inverted => "0x0 => normal phase"
+
+According to scope captures above on both A20 and A33.
+Unfortunately I don't have other boards for the other SoCs to take captures.
+
+What do you think?
+
+> 
+> Maxime
+> 
+
+-- 
+Giulio Benetti
+R&D Manager &
+Advanced Research
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
