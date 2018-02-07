@@ -1,65 +1,169 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 7 Feb 2018 10:38:37 +0000
-Subject: [PATCH v2 09/20] arm64: capabilities: Introduce weak features
- based on local CPU
-In-Reply-To: <20180131182807.32134-10-suzuki.poulose@arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-10-suzuki.poulose@arm.com>
-Message-ID: <20180207103837.GZ5862@e103592.cambridge.arm.com>
+Date: Wed, 7 Feb 2018 10:40:48 +0000
+Subject: [PATCH 1/2] arm64: Relax constraints on ID feature bits
+In-Reply-To: <20180201103838.14702-1-suzuki.poulose@arm.com>
+References: <20180201103838.14702-1-suzuki.poulose@arm.com>
+Message-ID: <20180207104048.GL5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 06:27:56PM +0000, Suzuki K Poulose wrote:
-> Now that we have the flexibility of defining system features based
-> on individual CPUs, introduce CPU feature type that can be detected
-> on a local SCOPE and ignores the conflict on late CPUs. This is
-> applicable for ARM64_HAS_NO_HW_PREFETCH, where it is fine for
-> the system to have CPUs without hardware prefetch turning up
-> later. We only suffer a performance penalty, nothing fatal.
+On Thu, Feb 01, 2018 at 10:38:37AM +0000, Suzuki K Poulose wrote:
+> We treat most of the feature bits in the ID registers as STRICT,
+> implying that all CPUs should match it the boot CPU state. However,
+> for most of the features, we can handle if there are any mismatches
+> by using the safe value. e.g, HWCAPs and other features used by the
+> kernel. Relax the constraint on the feature bits whose mismatch can
+> be handled by the kernel.
 > 
+> For VHE, if there is a mismatch we don't care if the kernel is
+> not using it. If the kernel is indeed running in EL2 mode, then
+> the mismatches results in a panic. Similarly for ASID bits we
+> take care of conflicts.
+> 
+> For other features like, PAN, UAO we only enable it only if we
+> have it on all the CPUs. For IESB, we set the SCTLR bit unconditionally
+> anyways.
+
+Do the remaining STRICT+LOWER_SAFE / NONSTRICT+EXACT cases still
+make sense?
+
+I've wondered in the past whether there is redundancy between the strict
+and type fields, but when adding entries I just copy-pasted similar ones
+rather than fully understanding what was going on...
+
+Cheers
+---Dave
+
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
+> Cc: James Morse <james.morse@arm.com>
 > Cc: Dave Martin <dave.martin@arm.com>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
 > ---
->  arch/arm64/include/asm/cpufeature.h | 8 ++++++++
->  arch/arm64/kernel/cpufeature.c      | 2 +-
->  2 files changed, 9 insertions(+), 1 deletion(-)
+>  arch/arm64/kernel/cpufeature.c | 66 ++++++++++++++++++++++--------------------
+>  1 file changed, 35 insertions(+), 31 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index cda62b70d338..7bb3fdec827e 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -214,6 +214,14 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
->   */
->  #define ARM64_CPUCAP_SYSTEM_FEATURE	\
->  	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
-> +/*
-> + * CPU feature detected at boot time based on feature of one or more CPUs.
-> + * All possible conflicts for a late CPU are ignored.
-> + */
-> +#define ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE		\
-> +	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
-> +	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
-> +	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
->  
->  struct arm64_cpu_capabilities {
->  	const char *desc;
 > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index c710ef28524e..ecc87aa74c64 100644
+> index 4b6f9051cf0c..1c39a635a71c 100644
 > --- a/arch/arm64/kernel/cpufeature.c
 > +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -956,7 +956,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "Software prefetching using PRFM",
->  		.capability = ARM64_HAS_NO_HW_PREFETCH,
-> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-> +		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE,
->  		.matches = has_no_hw_prefetch,
->  	},
->  #ifdef CONFIG_ARM64_UAO
+> @@ -123,36 +123,36 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+>   * sync with the documentation of the CPU feature register ABI.
+>   */
+>  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM3_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA3_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+>  	ARM64_FTR_END,
+>  };
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_LRCPC_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
+>  	ARM64_FTR_END,
+>  };
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV2_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_RAS_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_RAS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+> -	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+> -	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+> +	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+> +	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+>  	/* Linux doesn't care about the EL3 */
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
+> @@ -169,7 +169,8 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+>  	/* Linux shouldn't care about secure memory */
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+> +	/* We handle differing ASID widths by explicit checks to make sure the system is safe */
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+>  	/*
+>  	 * Differing PARange is fine as long as all peripherals and memory are mapped
+>  	 * within the minimum PARange of all CPUs
+> @@ -179,20 +180,23 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+>  };
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+> +	/* When CONFIG_ARM64_VHE is enabled, we ensure that there is no conflict */
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_VMIDBITS_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
+> +	/* We can run a mix of CPUs with and without the support for HW management of AF/DBM bits */
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
+>  	ARM64_FTR_END,
+>  };
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+> +	/* While IESB is good to have, it is not fatal if we miss this on some CPUs */
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
+>  	ARM64_FTR_END,
+>  };
+> @@ -259,12 +263,12 @@ static const struct arm64_ftr_bits ftr_dczid[] = {
+>  
+>  
+>  static const struct arm64_ftr_bits ftr_id_isar5[] = {
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_RDM_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_CRC32_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA2_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA1_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_AES_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_ISAR5_SEVL_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_RDM_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_CRC32_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA2_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_SHA1_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_AES_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_ISAR5_SEVL_SHIFT, 4, 0),
+>  	ARM64_FTR_END,
+>  };
+>  
 > -- 
 > 2.14.3
 > 
