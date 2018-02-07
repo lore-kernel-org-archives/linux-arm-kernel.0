@@ -1,117 +1,92 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 7 Feb 2018 09:30:52 +0530
-Subject: [PATCH 12/15] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
- board file
-In-Reply-To: <033a420e14f090258e4c8f14b7ba89a7@codeaurora.org>
-References: <1517202689-14212-1-git-send-email-sricharan@codeaurora.org>
- <1517202689-14212-13-git-send-email-sricharan@codeaurora.org>
- <033a420e14f090258e4c8f14b7ba89a7@codeaurora.org>
-Message-ID: <54429a54-764e-c834-7da7-f78be63d1427@codeaurora.org>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 7 Feb 2018 09:42:59 +0530
+Subject: [PATCH 2/2] arm64: dts: sdm845: Add serial console support
+In-Reply-To: <CAD=FV=Whxf1VRJ6qx9mioEEkTeS+uJfJKPbOMcGy-Wigh_NORw@mail.gmail.com>
+References: <20180125163216.29018-1-rnayak@codeaurora.org>
+ <20180125163216.29018-3-rnayak@codeaurora.org>
+ <20180126221808.GE28313@codeaurora.org>
+ <CAD=FV=WcCnQJc25=sKWtOi=ZWi=ium6DVsexuQnsLDL=aJE6-Q@mail.gmail.com>
+ <20180206190614.GL9465@builder>
+ <CAD=FV=Whxf1VRJ6qx9mioEEkTeS+uJfJKPbOMcGy-Wigh_NORw@mail.gmail.com>
+Message-ID: <ade06d48-2003-026a-2e99-06ff0223efb9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhishek,
 
-<snip ..>
 
->> +// SPDX-License-Identifier: GPL-2.0
->> +// Copyright (c) 2017, The Linux Foundation. All rights reserved.
->> +
->> +#include "qcom-ipq4019-ap.dk07.1.dtsi"
->> +
->> +/ {
->> +??? model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK07.1-C2";
+On 02/07/2018 01:19 AM, Doug Anderson wrote:
+> Hi,
 > 
-> ?s/IPQ40xx/IPQ4019
+> On Tue, Feb 6, 2018 at 11:06 AM, Bjorn Andersson
+> <bjorn.andersson@linaro.org> wrote:
+>> On Tue 06 Feb 10:37 PST 2018, Doug Anderson wrote:
+>>
+>>> Hi,
+>>>
+>>> On Fri, Jan 26, 2018 at 2:18 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>> On 01/25, Rajendra Nayak wrote:
+>>>>> diff --git a/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
+>>>>> new file mode 100644
+>>>>> index 000000000000..b97f99e6f4b4
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm64/boot/dts/qcom/sdm845-pins.dtsi
+>>>>> @@ -0,0 +1,32 @@
+>>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>>> +/*
+>>>>> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+>>>>> + */
+>>>>> +
+>>>>> +&tlmm {
+>>>>
+>>>> I'm not the maintainer, but I find this approach to the pins
+>>>> really annoying. I have to flip to another file to figure out how
+>>>> a board has configured the pins. And we may bring in a bunch of
+>>>> settings that we don't ever use on some board too. Why can't we
+>>>> put the settings in the board file directly?
+>>>
+>>> I'm not so familiar with how things work with Qualcomm, but in general
+>>> I think putting this in the "board" file is a bad idea.  I'd be OK
+>>> with putting this directly in the SoC file (though it might get
+>>> unwieldy?), but not moving things to the board file as was done with
+>>> v2 of this patch.
+>>>
+>>> Said another way: nearly board that uses SDM845 that uses UART2 will
+>>> have the same definitions for these pins so we shouldn't be
+>>> duplicating it across every board, right?
+>>>
+>>
+>> We've run into several cases where different boards uses the same
+>> function but requires board specific electrical configuration.
+>>
+>> So what we decided was to keep the pinmux in the soc-file (where e.g.
+>> the uart definition is) and then extend it with the board specific
+>> electrical properties (the pinconf), in the board files.
+>>
+>> This does come with the complexity of having the pinctrl nodes split in
+>> two places, but the responsibilities of the two parts is clear and we
+>> remove the need for all board files to ensure the appropriate pinmux is
+>> in place.
+>>
+>>
+>> NB. We did discuss adding "sane defaults" for the pinconf in the soc
+>> dtsi, but we end up spending considerable time debugging issues stemming
+>> from not having the right pinconf; so better make this explicit and say
+>> that the board has to specify it's config.
 > 
- ok
-
->> +
->> +??? soc {
->> +??????? pcie0: pci at 40000000 {
->> +??????????? status = "disabled";
->> +??????? };
+> Whoops, saw your responses _after_ I sent my response to v2.  In any
+> case this makes sense to me then!  On Rockchip boards I've been
+> involved in we often added "sane defaults", but I can see how that
+> could be confusing in different ways.  I'm happy with your choice and
+> it seems like a happy medium.  The sdm845.dtsi file can have the main
+> definition of the nodes and can thus refer to the nodes.  Then you
+> just add the extra bit in the board file.
 > 
-> ?We can disable in base dtsi itself.
-> 
+> What you propose is not what happened in v2 of the series
+> <https://patchwork.kernel.org/patch/10194201/> though.  In v2 _both_
+> the pinconf and the pinmux moved to the board file.  That's wrong.
 
- hmm, as mentioned in the previous patch, feels better to enable
- it only in the board file specifically and not to touch this here
- and the common dtsi.
-
->> +
->> +??????? pinctrl at 1000000 {
->> +??????????? serial_1_pins: serial1_pinmux {
->> +??????????????? mux {
->> +??????????????????? pins = "gpio8", "gpio9";
->> +??????????????????? function = "blsp_uart1";
->> +??????????????????? bias-disable;
->> +??????????????? };
->> +??????????? };
->> +
->> +??????????? spi_0_pins: spi_0_pinmux {
->> +??????????????? mux {
->> +??????????????????? pins = "gpio13", "gpio14",
->> "gpio15";
->> +??????????????????? function = "blsp_spi0";
->> +??????????????????? bias-disable;
->> +??????????????? };
->> +??????????????? cs1 {
->> +??????????????????? pins = "gpio12";
->> +??????????????????? function = "gpio";
->> +??????????????? };
->> +??????????????? host_int1 {
->> +??????????????????? pins = "gpio10";
->> +??????????????????? function = "gpio";
->> +??????????????????? input;
->> +??????????????? };
->> +??????????????? cs2 {
->> +??????????????????? pins = "gpio45";
->> +??????????????????? function = "gpio";
->> +??????????????? };
->> +??????????????? host_int2 {
->> +??????????????????? pins = "gpio61";
->> +??????????????????? function = "gpio";
->> +??????????????????? input;
->> +??????????????? };
->> +??????????????? rst {
->> +??????????????????? pins = "gpio36";
->> +??????????????????? function = "gpio";
->> +??????????????????? output-high;
->> +??????????????? };
-> 
-> ?Normally spi pins should contains spi protocol related pins
-> ?could you please explain what is the role of host_pin and rst
-> ?pins and which driver will use these.
-> 
-
- hmm, the additional pins were required for zigbee connected as the
- spidev device. So the right probably is to have the additional
- pins required for the device populated under the spi's child node.
- 
->> +??????????? };
->> +??????? };
->> +
->> +??????? serial at 78b0000 {
->> +??????????? pinctrl-0 = <&serial_1_pins>;
->> +??????????? pinctrl-names = "default";
->> +??????????? status = "ok";
->> +??????? };
->> +
->> +??????? spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
->> +??????????? pinctrl-0 = <&spi_0_pins>;
->> +??????????? pinctrl-names = "default";
->> +??????????? status = "ok";
-> 
-> ?From pinmux, it looks like multiple gpio based cs are being
-> ?used so do we need to specify cs-gpios like dk01-c2.
-> 
-
- ok, let me check.
-
-Regards,
- Sricharan
-
+got it. I'll fix this up in my v3. Thanks for the review.
 
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
