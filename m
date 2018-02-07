@@ -1,100 +1,237 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 7 Feb 2018 10:40:16 +0000
-Subject: [PATCH v2 20/20] arm64: Add work around for Arm Cortex-A55
- Erratum 1024718
-In-Reply-To: <20180131182807.32134-21-suzuki.poulose@arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-21-suzuki.poulose@arm.com>
-Message-ID: <20180207104016.GK5862@e103592.cambridge.arm.com>
+Date: Wed, 7 Feb 2018 10:43:21 +0000
+Subject: [PATCH 2/2] arm64: Expose Arm v8.4 features
+In-Reply-To: <20180201103838.14702-2-suzuki.poulose@arm.com>
+References: <20180201103838.14702-1-suzuki.poulose@arm.com>
+ <20180201103838.14702-2-suzuki.poulose@arm.com>
+Message-ID: <20180207104320.GM5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 06:28:07PM +0000, Suzuki K Poulose wrote:
-> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-> from an erratum 1024718, which causes incorrect updates when DBM/AP
-> bits in a page table entry is modified without a break-before-make
-> sequence. The work around is to skip enabling the hardware DBM feature
-> on the affected cores. The hardware Access Flag management features
-> is not affected. There are some other cores suffering from this
-> errata, which could be added to the midr_list to trigger the work
-> around.
+On Thu, Feb 01, 2018 at 10:38:38AM +0000, Suzuki K Poulose wrote:
+> Expose the new features introduced by Arm v8.4 extensions to
+> Arm v8-A profile.
 > 
+> These include :
+> 
+>  1) Data indpendent timing of instructions. (DIT, exposed as HWCAP_DIT)
+>  2) Unaligned atomic instructions and Single-copy atomicity of loads
+>     and stores. (AT, expose as HWCAP_USCAT)
+>  3) LDAPR and STLR instructions with immediate offsets (extension to
+>     LRCPC, exposed as HWCAP_ILRCPC)
+>  4) Flag manipulation instructions (TS, exposed as HWCAP_FLAGM).
+> 
+> While at it get rid of the RES0 entries in the cpu-feature-registers.txt
+> documentation.
+
+Should we write somewhere than fields that are not described here are
+implicitly RES0, or would that be too strong a statement?
+
+Cheers
+---Dave
+
+> Cc: Dave Martin <dave.martin@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: ckadabi at codeaurora.org
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
 > ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 14 ++++++++++++++
->  arch/arm64/kernel/cpufeature.c         | 14 +++++++++++++-
->  3 files changed, 28 insertions(+), 1 deletion(-)
+>  Documentation/arm64/cpu-feature-registers.txt | 18 ++++++++++--------
+>  Documentation/arm64/elf_hwcaps.txt            | 16 ++++++++++++++++
+>  arch/arm64/include/asm/sysreg.h               |  3 +++
+>  arch/arm64/include/uapi/asm/hwcap.h           |  4 ++++
+>  arch/arm64/kernel/cpufeature.c                |  7 +++++++
+>  arch/arm64/kernel/cpuinfo.c                   |  4 ++++
+>  6 files changed, 44 insertions(+), 8 deletions(-)
 > 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index b9d93e981a05..5203e71c113d 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -55,6 +55,7 @@ stable kernels.
->  | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
->  | ARM            | Cortex-A72      | #853709         | N/A                         |
->  | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
-> +| ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
->  | ARM            | MMU-500         | #841119,#826419 | N/A                         |
->  |                |                 |                 |                             |
->  | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1d51c8edf34b..070efe1f7ec3 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -461,6 +461,20 @@ config ARM64_ERRATUM_843419
+> diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
+> index a70090b28b07..7964f03846b1 100644
+> --- a/Documentation/arm64/cpu-feature-registers.txt
+> +++ b/Documentation/arm64/cpu-feature-registers.txt
+> @@ -110,7 +110,7 @@ infrastructure:
+>       x--------------------------------------------------x
+>       | Name                         |  bits   | visible |
+>       |--------------------------------------------------|
+> -     | RES0                         | [63-52] |    n    |
+> +     | TS                           | [55-52] |    y    |
+>       |--------------------------------------------------|
+>       | FHM                          | [51-48] |    y    |
+>       |--------------------------------------------------|
+> @@ -124,8 +124,6 @@ infrastructure:
+>       |--------------------------------------------------|
+>       | RDM                          | [31-28] |    y    |
+>       |--------------------------------------------------|
+> -     | RES0                         | [27-24] |    n    |
+> -     |--------------------------------------------------|
+>       | ATOMICS                      | [23-20] |    y    |
+>       |--------------------------------------------------|
+>       | CRC32                        | [19-16] |    y    |
+> @@ -135,8 +133,6 @@ infrastructure:
+>       | SHA1                         | [11-8]  |    y    |
+>       |--------------------------------------------------|
+>       | AES                          | [7-4]   |    y    |
+> -     |--------------------------------------------------|
+> -     | RES0                         | [3-0]   |    n    |
+>       x--------------------------------------------------x
 >  
->  	  If unsure, say Y.
 >  
-> +config ARM64_ERRATUM_1024718
-> +	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
-> +	default y
-> +	help
-> +	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
+> @@ -144,12 +140,10 @@ infrastructure:
+>       x--------------------------------------------------x
+>       | Name                         |  bits   | visible |
+>       |--------------------------------------------------|
+> -     | RES0                         | [63-36] |    n    |
+> +     | DIT                          | [51-48] |    y    |
+>       |--------------------------------------------------|
+>       | SVE                          | [35-32] |    y    |
+>       |--------------------------------------------------|
+> -     | RES0                         | [31-28] |    n    |
+> -     |--------------------------------------------------|
+>       | GIC                          | [27-24] |    n    |
+>       |--------------------------------------------------|
+>       | AdvSIMD                      | [23-20] |    y    |
+> @@ -199,6 +193,14 @@ infrastructure:
+>       | DPB                          | [3-0]   |    y    |
+>       x--------------------------------------------------x
+>  
+> +  5) ID_AA64MMFR2_EL1 - Memory model feature register 2
 > +
-> +	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
-> +	  update of the hardware dirty bit when the DBM/AP bits are updated
-> +	  without a break-before-make. The work around is to disable the usage
-> +	  of hardware DBM locally on the affected cores. CPUs not affected by
-> +	  erratum will continue to use the feature.
+> +     x--------------------------------------------------x
+> +     | Name                         |  bits   | visible |
+> +     |--------------------------------------------------|
+> +     | AT                           | [35-32] |    y    |
+> +     x--------------------------------------------------x
 > +
-> +	  If unsure, say Y.
+>  Appendix I: Example
+>  ---------------------------
+>  
+> diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
+> index 57324ee55ecc..d6aff2c5e9e2 100644
+> --- a/Documentation/arm64/elf_hwcaps.txt
+> +++ b/Documentation/arm64/elf_hwcaps.txt
+> @@ -162,3 +162,19 @@ HWCAP_SVE
+>  HWCAP_ASIMDFHM
+>  
+>     Functionality implied by ID_AA64ISAR0_EL1.FHM == 0b0001.
 > +
->  config CAVIUM_ERRATUM_22375
->  	bool "Cavium erratum 22375, 24313"
->  	default y
+> +HWCAP_DIT
+> +
+> +    Functionality implied by ID_AA64PFR0_EL1.DIT == 0b0001.
+> +
+> +HWCAP_USCAT
+> +
+> +    Functionality implied by ID_AA64MMFR2_EL1.AT == 0b0001.
+> +
+> +HWCAP_ILRCPC
+> +
+> +    Functionality implied by ID_AA64ISR1_EL1.LRCPC == 0b0002.
+> +
+> +HWCAP_FLAGM
+> +
+> +    Functionality implied by ID_AA64ISAR0_EL1.TS == 0b0001.
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 0e1960c59197..e7b9f154e476 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -490,6 +490,7 @@
+>  #define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
+>  
+>  /* id_aa64isar0 */
+> +#define ID_AA64ISAR0_TS_SHIFT		52
+>  #define ID_AA64ISAR0_FHM_SHIFT		48
+>  #define ID_AA64ISAR0_DP_SHIFT		44
+>  #define ID_AA64ISAR0_SM4_SHIFT		40
+> @@ -511,6 +512,7 @@
+>  /* id_aa64pfr0 */
+>  #define ID_AA64PFR0_CSV3_SHIFT		60
+>  #define ID_AA64PFR0_CSV2_SHIFT		56
+> +#define ID_AA64PFR0_DIT_SHIFT		48
+>  #define ID_AA64PFR0_SVE_SHIFT		32
+>  #define ID_AA64PFR0_RAS_SHIFT		28
+>  #define ID_AA64PFR0_GIC_SHIFT		24
+> @@ -568,6 +570,7 @@
+>  #define ID_AA64MMFR1_VMIDBITS_16	2
+>  
+>  /* id_aa64mmfr2 */
+> +#define ID_AA64MMFR2_AT_SHIFT		32
+>  #define ID_AA64MMFR2_LVA_SHIFT		16
+>  #define ID_AA64MMFR2_IESB_SHIFT		12
+>  #define ID_AA64MMFR2_LSM_SHIFT		8
+> diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+> index f018c3deea3b..17c65c8f33cb 100644
+> --- a/arch/arm64/include/uapi/asm/hwcap.h
+> +++ b/arch/arm64/include/uapi/asm/hwcap.h
+> @@ -44,5 +44,9 @@
+>  #define HWCAP_SHA512		(1 << 21)
+>  #define HWCAP_SVE		(1 << 22)
+>  #define HWCAP_ASIMDFHM		(1 << 23)
+> +#define HWCAP_DIT		(1 << 24)
+> +#define HWCAP_USCAT		(1 << 25)
+> +#define HWCAP_ILRCPC		(1 << 26)
+> +#define HWCAP_FLAGM		(1 << 27)
+>  
+>  #endif /* _UAPI__ASM_HWCAP_H */
 > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 1f695a998eed..410fbddec129 100644
+> index 1c39a635a71c..796e83dde9fc 100644
 > --- a/arch/arm64/kernel/cpufeature.c
 > +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -923,9 +923,21 @@ static inline void __cpu_enable_hw_dbm(void)
->  	isb();
->  }
+> @@ -123,6 +123,7 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+>   * sync with the documentation of the CPU feature register ABI.
+>   */
+>  static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_TS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_FHM_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_DP_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SM4_SHIFT, 4, 0),
+> @@ -148,6 +149,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+>  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV3_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_CSV2_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_DIT_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_SVE_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64PFR0_RAS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+> @@ -192,6 +194,7 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+>  };
 >  
-> +static bool cpu_has_erratum_1024718(void)
-> +{
-> +	static const struct midr_range cpus[] = {
-> +		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),  // A55 r0p0 -r1p0
-> +		{},
-> +	};
-> +
-> +	return IS_ENABLED(CONFIG_ARM64_ERRATUM_1024718) &&
-> +	       is_midr_in_range_list(read_cpuid_id(), cpus);
-> +}
-> +
->  static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
->  {
-> -	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU))
-> +	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU) &&
-> +	    !cpu_has_erratum_1024718())
->  		__cpu_enable_hw_dbm();
->  }
+>  static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_AT_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
+>  	/* While IESB is good to have, it is not fatal if we miss this on some CPUs */
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+> @@ -1083,14 +1086,18 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+>  	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SM4_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SM4),
+>  	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_DP_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDDP),
+>  	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_FHM_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_ASIMDFHM),
+> +	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_TS_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FLAGM),
+>  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_FP),
+>  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_FPHP),
+>  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
+>  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_ASIMDHP),
+> +	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_DIT_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_DIT),
+>  	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_DPB_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_DCPOP),
+>  	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
+>  	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
+>  	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_LRCPC),
+> +	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_ILRCPC),
+> +	HWCAP_CAP(SYS_ID_AA64MMFR2_EL1, ID_AA64MMFR2_AT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_USCAT),
+>  #ifdef CONFIG_ARM64_SVE
+>  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
 >  #endif
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 7f94623df8a5..e9ab7b3ed317 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -77,6 +77,10 @@ static const char *const hwcap_str[] = {
+>  	"sha512",
+>  	"sve",
+>  	"asimdfhm",
+> +	"dit",
+> +	"uscat",
+> +	"ilrcpc",
+> +	"flagm",
+>  	NULL
+>  };
+>  
 > -- 
 > 2.14.3
 > 
