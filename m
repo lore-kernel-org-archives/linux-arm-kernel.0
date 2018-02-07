@@ -1,27 +1,98 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 07 Feb 2018 16:49:08 +0100
-Subject: [PATCH v2 2/2] arm64: dts: fsl: imx8mq-evk: enable watchdog
-In-Reply-To: <CAOMZO5COoQTo1Lp_B3CFroepnS_CRRtVSUqOenPpqkumfk85SQ@mail.gmail.com>
-References: <57855fb372ae19aad54c39c0e18a54cb12ed6915.1518016370.git.baruch@tkos.co.il>
- <ae093f95bae9f4f92c5bbc6fc06cdeb8cfc1d1e1.1518016370.git.baruch@tkos.co.il>
- <CAOMZO5COoQTo1Lp_B3CFroepnS_CRRtVSUqOenPpqkumfk85SQ@mail.gmail.com>
-Message-ID: <1518018548.3175.38.camel@pengutronix.de>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Wed, 7 Feb 2018 16:35:17 +0100
+Subject: [PATCH 6/6] i2c: i2c-stm32f7: Implement I2C recovery mechanism
+In-Reply-To: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1518017717-10351-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1518017717-10351-7-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 07.02.2018, 13:43 -0200 schrieb Fabio Estevam:
-> On Wed, Feb 7, 2018 at 1:12 PM, Baruch Siach <baruch@tkos.co.il>
-> wrote:
-> > The external nWDOG signal connects to the EVK board reset circuit.
-> > 
-> > Tested on the i.MX8MQ EVK rev B3.
-> > 
-> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> 
-> There is an ongoing discussion whether we are going to adopt this
-> generic pinctrl scheme or the old i.MX pinctrl scheme on i.MX8MQ.
+Feature prevents I2C lock-ups. Mechanism resets I2C state machine
+and releases SCL/SDA signals but preserves I2C registers.
 
-Yep, ignoring this discussion, patch looks good. I've just tested this
-on my MX8_EVK A1 board and it seems to work fine.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+  Version history:
+    v1:
+       * Initial
+---
+---
+ drivers/i2c/busses/i2c-stm32f7.c | 32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
 
-Tested-by: Lucas Stach <l.stach@pengutronix.de>
+diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+index 593efa5..428bf96 100644
+--- a/drivers/i2c/busses/i2c-stm32f7.c
++++ b/drivers/i2c/busses/i2c-stm32f7.c
+@@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
+ 	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
+ }
+ 
++static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
++{
++	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
++
++	dev_info(i2c_dev->dev, "Trying to recover bus\n");
++
++	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
++			     STM32F7_I2C_CR1_PE);
++
++	stm32f7_i2c_hw_config(i2c_dev);
++
++	return 0;
++}
++
+ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
+ {
+ 	u32 status;
+@@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
+ 					 status,
+ 					 !(status & STM32F7_I2C_ISR_BUSY),
+ 					 10, 1000);
++	if (!ret)
++		return 0;
++
++	dev_info(i2c_dev->dev, "bus busy\n");
++
++	ret = i2c_recover_bus(&i2c_dev->adap);
+ 	if (ret) {
+-		dev_dbg(i2c_dev->dev, "bus busy\n");
+-		ret = -EBUSY;
++		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
++		return ret;
+ 	}
+ 
+-	return ret;
++	return -EBUSY;
+ }
+ 
+ static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
+@@ -1476,6 +1496,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
+ 	if (status & STM32F7_I2C_ISR_BERR) {
+ 		dev_err(dev, "<%s>: Bus error\n", __func__);
+ 		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
++		i2c_recover_bus(&i2c_dev->adap);
+ 		f7_msg->result = -EIO;
+ 	}
+ 
+@@ -1760,6 +1781,10 @@ static struct i2c_algorithm stm32f7_i2c_algo = {
+ 	.unreg_slave = stm32f7_i2c_unreg_slave,
+ };
+ 
++static struct i2c_bus_recovery_info stm32f7_i2c_recovery_info = {
++	.recover_bus = stm32f7_i2c_recover_bus,
++};
++
+ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -1879,6 +1904,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ 	adap->algo = &stm32f7_i2c_algo;
+ 	adap->dev.parent = &pdev->dev;
+ 	adap->dev.of_node = pdev->dev.of_node;
++	adap->bus_recovery_info = &stm32f7_i2c_recovery_info;
+ 
+ 	init_completion(&i2c_dev->complete);
+ 
+-- 
+2.7.4
