@@ -1,60 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 7 Feb 2018 21:19:51 +0100
-Subject: [PATCH v2 1/4] dt-bindings: soc: add SCPSYS binding for MT7623
- and MT7623A SoC
-In-Reply-To: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
-References: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
-Message-ID: <CAPDyKFpYLm2vVVsAkE2r5HVF4uzgHS404dUzPcEsxJiawEf7Aw@mail.gmail.com>
+From: joonas.kylmala@iki.fi (=?UTF-8?q?Joonas=20Kylm=C3=A4l=C3=A4?=)
+Date: Wed,  7 Feb 2018 22:48:03 +0200
+Subject: [PATCH v2 0/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 and mmc1
+ to dtsi
+Message-ID: <20180207204805.16884-1-joonas.kylmala@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 February 2018 at 11:22,  <sean.wang@mediatek.com> wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
->
-> document the binding for enabling SCPSYS on MediaTek MT7623 and MT7623A
-> SoC. Where MT7623 SoC has the same definition about power domains with
-> MT2701, so it's fine to using MT2701 ones as MT7623's fallback.
->
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+Hi,
 
-For the series:
+This short patch series moves mmc0 and mmc1 pinctrl in H3 and H2+
+boards' dts files to the dtsi file in order to make it easier to do
+changes in the future to pinctrl attributes if required. This sort of
+cleaning up of the dts files was discussed earlier in the email thread
+with the subject "[linux-sunxi] [PATCH v2 6/8] ARM: dts: sun8i: a83t:
+Move mmc1 pinctrl setting to dtsi file".
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+As this is my first patch submission I urge you to look through the
+patches carefully. I have tested that after applying the patches the
+Orange Pi Zero still boots and MMC0 works and also its detect pin. I
+don't have any of the other devices to test this with.
 
-Kind regards
-Uffe
+These patches are prepared against the branch sunxi/dt-for-4.17.
 
-> ---
->  Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> index 76bf45b..d6fe16f 100644
-> --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> @@ -21,6 +21,8 @@ Required properties:
->         - "mediatek,mt2712-scpsys"
->         - "mediatek,mt6797-scpsys"
->         - "mediatek,mt7622-scpsys"
-> +       - "mediatek,mt7623-scpsys", "mediatek,mt2701-scpsys": For MT7623 SoC
-> +       - "mediatek,mt7623a-scpsys": For MT7623A SoC
->         - "mediatek,mt8173-scpsys"
->  - #power-domain-cells: Must be 1
->  - reg: Address range of the SCPSYS unit
-> @@ -28,10 +30,11 @@ Required properties:
->  - clock, clock-names: clocks according to the common clock binding.
->                        These are clocks which hardware needs to be
->                        enabled before enabling certain power domains.
-> -       Required clocks for MT2701: "mm", "mfg", "ethif"
-> +       Required clocks for MT2701 or MT7623: "mm", "mfg", "ethif"
->         Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
->         Required clocks for MT6797: "mm", "mfg", "vdec"
->         Required clocks for MT7622: "hif_sel"
-> +       Required clocks for MT7622A: "ethif"
->         Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
->
->  Optional properties:
-> --
-> 2.7.4
->
+Changes since v1:
+ - Remove pinctrl from CD pin as noted by Maxime Ripard.
+ - Move pinctrl to dtsi also from those new dts files that were
+   introduced after v1 patch.
+
+Best regards,
+Joonas Kylm?l?
+
+Joonas Kylm?l? (2):
+  ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 from dts to dtsi
+  ARM: dts: sun8i: h3-h5: Move pinctrl of mmc1 from dts to dtsi
+
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |  4 ----
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  4 ----
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  4 ----
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts |  2 --
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts      |  2 --
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts      |  4 ----
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi             |  2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  4 ----
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  4 ----
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |  2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  2 --
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 10 ++++------
+ 13 files changed, 4 insertions(+), 42 deletions(-)
+
+-- 
+2.11.0
