@@ -1,122 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 7 Feb 2018 10:54:28 +0100
-Subject: [PATCH v2] pwm: mediatek: fix up PWM4 and PWM5 malfunction on
- MT7623
-In-Reply-To: <f94b2d4146ebe0f8eaae02b0dd951f39af0972d4.1517994540.git.sean.wang@mediatek.com>
-References: <f94b2d4146ebe0f8eaae02b0dd951f39af0972d4.1517994540.git.sean.wang@mediatek.com>
-Message-ID: <45d75d8d-d1ed-fe69-e936-c369ccb2fd6b@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 7 Feb 2018 10:56:59 +0100
+Subject: [PATCH 1/2] sun4i_ss_prng: fix return value of
+ sun4i_ss_prng_generate
+In-Reply-To: <20180206212022.1309-2-artem.savkov@gmail.com>
+References: <20180206212022.1309-1-artem.savkov@gmail.com>
+ <20180206212022.1309-2-artem.savkov@gmail.com>
+Message-ID: <20180207095659.GA19249@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/07/2018 10:14 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Tue, Feb 06, 2018 at 10:20:21PM +0100, Artem Savkov wrote:
+> According to crypto/rng.h generate function should return 0 on success
+> and < 0 on error.
 > 
-> Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
-> control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
-> programming on PWM hardware causes waveform cannot be output as expected.
-> Thus, the patch adds the extra condition for fixing up the weird case to
-> let PWM4 or PWM5 able to work on MT7623.
-> 
-> v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Zhi Mao <zhi.mao@mediatek.com>
-> Cc: John Crispin <john@phrozen.org>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Fixes: b8ae5c7387ad ("crypto: sun4i-ss - support the Security System PRNG")
+> Signed-off-by: Artem Savkov <artem.savkov@gmail.com>
 > ---
->  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
->  1 file changed, 21 insertions(+), 3 deletions(-)
+>  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
+> index 0d01d1624252..5754e0b92fb0 100644
+> --- a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
+> @@ -52,5 +52,5 @@ int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
+>  
+>  	writel(0, ss->base + SS_CTL);
+>  	spin_unlock(&ss->slock);
+> -	return dlen;
+> +	return 0;
+>  }
+> -- 
+> 2.15.1
 > 
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+According to Documentation/crypto/api-samples.rst ("Code Example For Random Number Generator Usage")
+you must return the length of data generated.
 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index f5d97e0..796baea 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -29,7 +29,9 @@
->  #define PWMGDUR			0x0c
->  #define PWMWAVENUM		0x28
->  #define PWMDWIDTH		0x2c
-> +#define PWM45DWIDTH_FIXUP	0x30
->  #define PWMTHRES		0x30
-> +#define PWM45THRES_FIXUP	0x34
->  
->  #define PWM_CLK_DIV_MAX		7
->  
-> @@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
->  
->  struct mtk_pwm_platform_data {
->  	unsigned int num_pwms;
-> +	bool pwm45_fixup;
->  };
->  
->  /**
-> @@ -66,6 +69,7 @@ struct mtk_pwm_chip {
->  	struct pwm_chip chip;
->  	void __iomem *regs;
->  	struct clk *clks[MTK_CLK_MAX];
-> +	const struct mtk_pwm_platform_data *soc;
->  };
->  
->  static const unsigned int mtk_pwm_reg_offset[] = {
-> @@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  {
->  	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
->  	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
-> -	u32 resolution, clkdiv = 0;
-> +	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
-> +	    reg_thres = PWMTHRES;
->  	int ret;
->  
->  	ret = mtk_pwm_clk_enable(chip, pwm);
-> @@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  		return -EINVAL;
->  	}
->  
-> +	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
-> +		/*
-> +		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
-> +		 * from the other PWMs on MT7623.
-> +		 */
-> +		reg_width = PWM45DWIDTH_FIXUP;
-> +		reg_thres = PWM45THRES_FIXUP;
-> +	}
-> +
->  	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
-> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
-> -	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
-> +	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
-> +	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
->  
->  	mtk_pwm_clk_disable(chip, pwm);
->  
-> @@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
->  	data = of_device_get_match_data(&pdev->dev);
->  	if (data == NULL)
->  		return -EINVAL;
-> +	pc->soc = data;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
-> @@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
->  
->  static const struct mtk_pwm_platform_data mt2712_pwm_data = {
->  	.num_pwms = 8,
-> +	.pwm45_fixup = false,
->  };
->  
->  static const struct mtk_pwm_platform_data mt7622_pwm_data = {
->  	.num_pwms = 6,
-> +	.pwm45_fixup = false,
->  };
->  
->  static const struct mtk_pwm_platform_data mt7623_pwm_data = {
->  	.num_pwms = 5,
-> +	.pwm45_fixup = true,
->  };
->  
->  static const struct of_device_id mtk_pwm_of_match[] = {
-> 
+So crypto_rng_generate/crypto_rng_get_bytes documentation in crypto/rng.h must be fixed.
+
+Herbert could you confirm ?
+
+Regards
