@@ -1,136 +1,58 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Wed, 7 Feb 2018 15:18:26 +0000
-Subject: [PATCH 1/2] irqchip/gic-v2m: Add PCI Multi-MSI support
-In-Reply-To: <20180207143255.17003-2-marc.zyngier@arm.com>
-References: <20180207143255.17003-1-marc.zyngier@arm.com>
- <20180207143255.17003-2-marc.zyngier@arm.com>
-Message-ID: <20180207151826.GA9111@e110455-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 07 Feb 2018 16:18:32 +0100
+Subject: [PATCH 2/3] clk: exynos5433: Allow audio subsystem clock rate
+ propagation
+In-Reply-To: <5A7929C1.8040706@samsung.com>
+References: <20180205142230.9755-1-s.nawrocki@samsung.com>
+ <CGME20180205142308epcas2p376f8656f7e421f8474938de788cea8db@epcas2p3.samsung.com>
+ <20180205142230.9755-2-s.nawrocki@samsung.com>
+ <5A7929C1.8040706@samsung.com>
+Message-ID: <3fcfad37-4c8f-7375-b2c2-5154607aa47a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 02:32:54PM +0000, Marc Zyngier wrote:
-> We'd never implemented Multi-MSI support with GICv2m, because
-> it is weird and clunky, and you'd think people would rather use
-> MSI-X.
-> 
-> Turns out there is still plenty of devices out there that rely
-> on Multi-MSI. Oh well, let's teach that trick to the v2m widget,
-> it is not a big deal anyway.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi Chanwoo,
 
-Looks good to me. Reviewed-by: Liviu Dudau <liviu.dudau@arm.com>
-
-Best regards,
-Liviu
-
-> ---
->  drivers/irqchip/irq-gic-v2m.c | 46 +++++++++++++++++++++----------------------
->  1 file changed, 22 insertions(+), 24 deletions(-)
+On 02/06/2018 05:06 AM, Chanwoo Choi wrote:
+>>  drivers/clk/samsung/clk-exynos5433.c | 22 +++++++++++-----------
+>>  1 file changed, 11 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+>> index 74b70ddab4d6..d74361736e64 100644
+>> --- a/drivers/clk/samsung/clk-exynos5433.c
+>> +++ b/drivers/clk/samsung/clk-exynos5433.c
+>> @@ -246,14 +246,14 @@ static const struct samsung_fixed_rate_clock top_fixed_clks[] __initconst = {
+>>  
+>>  static const struct samsung_mux_clock top_mux_clks[] __initconst = {
+>>  	/* MUX_SEL_TOP0 */
+>> -	MUX(CLK_MOUT_AUD_PLL, "mout_aud_pll", mout_aud_pll_p, MUX_SEL_TOP0,
+>> -			4, 1),
+>> +	MUX_F(CLK_MOUT_AUD_PLL, "mout_aud_pll", mout_aud_pll_p, MUX_SEL_TOP0,
+>> +	      4, 1, CLK_SET_RATE_PARENT, 0),
+>
+> If you add CLK_SET_RATE_PARENT to 'mout_aud_pll' and mout_aud_pll changes the rate,
+> fout_aud_pll's rate will be changed. But, fout_aud_pll is also the parent
+> of 'mout_aud_pll_user'. It might change the rate of children of mout_aud_pll_user.
+> mout_aud_pll_user would not want to change the parent's clock.
 > 
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index 993a8426a453..1ff38aff9f29 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -94,7 +94,7 @@ static struct irq_chip gicv2m_msi_irq_chip = {
->  
->  static struct msi_domain_info gicv2m_msi_domain_info = {
->  	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> -		   MSI_FLAG_PCI_MSIX),
-> +		   MSI_FLAG_PCI_MSIX | MSI_FLAG_MULTI_PCI_MSI),
->  	.chip	= &gicv2m_msi_irq_chip,
->  };
->  
-> @@ -155,18 +155,12 @@ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
->  	return 0;
->  }
->  
-> -static void gicv2m_unalloc_msi(struct v2m_data *v2m, unsigned int hwirq)
-> +static void gicv2m_unalloc_msi(struct v2m_data *v2m, unsigned int hwirq,
-> +			       int nr_irqs)
->  {
-> -	int pos;
-> -
-> -	pos = hwirq - v2m->spi_start;
-> -	if (pos < 0 || pos >= v2m->nr_spis) {
-> -		pr_err("Failed to teardown msi. Invalid hwirq %d\n", hwirq);
-> -		return;
-> -	}
-> -
->  	spin_lock(&v2m_lock);
-> -	__clear_bit(pos, v2m->bm);
-> +	bitmap_release_region(v2m->bm, hwirq - v2m->spi_start,
-> +			      get_count_order(nr_irqs));
->  	spin_unlock(&v2m_lock);
->  }
->  
-> @@ -174,13 +168,13 @@ static int gicv2m_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  				   unsigned int nr_irqs, void *args)
->  {
->  	struct v2m_data *v2m = NULL, *tmp;
-> -	int hwirq, offset, err = 0;
-> +	int hwirq, offset, i, err = 0;
->  
->  	spin_lock(&v2m_lock);
->  	list_for_each_entry(tmp, &v2m_nodes, entry) {
-> -		offset = find_first_zero_bit(tmp->bm, tmp->nr_spis);
-> -		if (offset < tmp->nr_spis) {
-> -			__set_bit(offset, tmp->bm);
-> +		offset = bitmap_find_free_region(tmp->bm, tmp->nr_spis,
-> +						 get_count_order(nr_irqs));
-> +		if (offset >= 0) {
->  			v2m = tmp;
->  			break;
->  		}
-> @@ -192,16 +186,21 @@ static int gicv2m_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  
->  	hwirq = v2m->spi_start + offset;
->  
-> -	err = gicv2m_irq_gic_domain_alloc(domain, virq, hwirq);
-> -	if (err) {
-> -		gicv2m_unalloc_msi(v2m, hwirq);
-> -		return err;
-> -	}
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		err = gicv2m_irq_gic_domain_alloc(domain, virq + i, hwirq + i);
-> +		if (err)
-> +			goto fail;
->  
-> -	irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
-> -				      &gicv2m_irq_chip, v2m);
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-> +					      &gicv2m_irq_chip, v2m);
-> +	}
->  
->  	return 0;
-> +
-> +fail:
-> +	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-> +	gicv2m_unalloc_msi(v2m, hwirq, get_count_order(nr_irqs));
-> +	return err;
->  }
->  
->  static void gicv2m_irq_domain_free(struct irq_domain *domain,
-> @@ -210,8 +209,7 @@ static void gicv2m_irq_domain_free(struct irq_domain *domain,
->  	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
->  	struct v2m_data *v2m = irq_data_get_irq_chip_data(d);
->  
-> -	BUG_ON(nr_irqs != 1);
-> -	gicv2m_unalloc_msi(v2m, d->hwirq);
-> +	gicv2m_unalloc_msi(v2m, d->hwirq, nr_irqs);
->  	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
->  }
->  
-> -- 
-> 2.14.2
-> 
+>     fout_aud_pll                          2            2   196608009          0 0  
+>        mout_aud_pll_user                  1            1   196608009          0 0  
+>        mout_aud_pll                       0            0   196608009          0 0  
+
+I'd say the range of changes is such that the consumers of the affected child 
+clocks can cope and could adjust to the changed frequencies. Those consumer 
+devices are all components/peripherals of the audio subsystem (LPASS) and, 
+for example, in case of TM2 there is no issues at all with varying the AUD PLL
+frequency depending on the HDMI audio sample rate. The other audio path uses
+the audio CODEC's internal PLL as the root clock source. The AUD PLL frequency
+will need to be adjusted somehow anyway, we could also get the PLL clock 
+directly and set it's rate, instead of relying on that rate propagation 
+algorithm.  I think we could also export a function from the exynos-lpass mfd 
+driver for setting the PLL's rate directly, after listing the AUD PLL clock 
+in the lpass DT node. That would be more flexible API, easier to adopt for 
+various use cases/boards, now we have only TM2. I can't list the PLL clock 
+in the sound node, that would not have passed the DT maintainters' review. 
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Regards,
+Sylwester
