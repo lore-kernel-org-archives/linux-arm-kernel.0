@@ -1,64 +1,77 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 7 Feb 2018 10:19:18 +0530
-Subject: [PATCH v2 2/3] arm64: dts: sdm845: Add minimal dts/dtsi files for
- sdm845 SoC and MTP
-In-Reply-To: <CAD=FV=W3SfQ05_jRdCOZj=sQ9POGFb5NVvpsBYRnuak8zLFBWg@mail.gmail.com>
-References: <20180131161941.29865-1-rnayak@codeaurora.org>
- <20180131161941.29865-3-rnayak@codeaurora.org>
- <CAD=FV=W3SfQ05_jRdCOZj=sQ9POGFb5NVvpsBYRnuak8zLFBWg@mail.gmail.com>
-Message-ID: <ebd960da-91b0-9634-329b-7da487953680@codeaurora.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 7 Feb 2018 11:01:12 +0530
+Subject: [PATCH v3 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
+ with rk3399 SoCs
+In-Reply-To: <e67da623-d6fe-92d9-e6b3-79b8290405c9@rock-chips.com>
+References: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
+ <e67da623-d6fe-92d9-e6b3-79b8290405c9@rock-chips.com>
+Message-ID: <64bd750a-16b9-95ca-fa53-b7c1ab727a29@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/07/2018 03:25 AM, Doug Anderson wrote:
-> Hi,
+On Wednesday 07 February 2018 06:47 AM, Caesar Wang wrote:
+> Kishon,
 > 
-> On Wed, Jan 31, 2018 at 8:19 AM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> new file mode 100644
->> index 000000000000..02520f19e4ca
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> @@ -0,0 +1,277 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
->> + */
->> +
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->> +
->> +/ {
->> +       model = "Qualcomm Technologies, Inc. SDM845";
-> 
-> I'm fairly certain that "model" doesn't belong in the SoC .dtsi file.
-> Only in the board .dts file.
-> 
-> 
->> +       clocks {
->> +               xo_board: xo_board {
-> 
-> Just to make it explicit: see my comments in patch 3/3 in this series
-> about using "_" in node names.  I believe this should be:
-> 
->   xo_board: xo-board {
-> 
-> 
->> +               spmi_bus: qcom,spmi at c440000 {
-> 
-> Drop the qcom in the node name.  AKA, I believe this should be:
-> 
-> spmi_bus: spmi at c440000 {
-> 
-> Specifically the node name is supposed to be a generic component name
-> then with an address.  I see that Rob Herring said the same thing when
-> he reviewed v1 of this patch just now (it seems like people are still
-> commenting there, so make sure you collect the latest feedback from
-> there when re-spinning).
+> Can you help merge this in your  or next tree?  I'm hoping that we can land
+> this somewhere.:-)
 
-yes, I'll make sure I fix up based on Robs' review of the v1.
+sure, I'll merge once -rc1 is tagged.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks
+Kishon
+
+> 
+> 
+> Thanks,
+> -Caesar
+> ? 2018?01?11? 10:40, Caesar Wang ??:
+>> Hi Kishon,
+>>
+>> Since the Shawn isn't available, I take over this series patches for now.
+>>
+>> As the original bug had tracked on https://issuetracker.google.com/71561742.
+>> In some cases, the mmc phy power on failed during booting up.
+>> The log as below:
+>> ...
+>> [   2.375333] rockchip_emmc_phy_power: caldone timeout.
+>> [    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
+>> ...
+>> [    2.489295] mmc0: mmc_select_hs400es failed, error -110
+>> [    2.489302] mmc0: error -110 whilst initialising MMC card
+>> ..
+>>
+>> The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
+>> We need give the enough margin for it.
+>>
+>> Verified on url =
+>>         
+>> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
+>> This series patches can apply and bring up with kernel-next on rk3399
+>> chromebook.
+>>
+>> -Caesar
+>>
+>>
+>> Changes in v3:
+>> - As Doug commented on both upstream and gerrit.
+>>    Change "5, 50" to "0, 50", and the message of print.
+>> - As Doug commented on https://patchwork.kernel.org/patch/10154797,
+>>    Change "1, 50" to "0, 50".
+>>
+>> Changes in v2:
+>> - print the return valut with regmap_read_poll_timeout failing.
+>> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
+>>    changed the note and added to print error value with
+>>    regmap_read_poll_timeout API.
+>>
+>> Shawn Lin (2):
+>>    phy: rockchip-emmc: retry calpad busy trimming
+>>    phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
+>>
+>>   drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
+>>   1 file changed, 28 insertions(+), 32 deletions(-)
+>>
+> 
+> 
