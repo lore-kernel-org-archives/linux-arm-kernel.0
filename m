@@ -1,55 +1,43 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 7 Feb 2018 17:31:34 +0100
-Subject: [PATCH v5 03/16] media: rkisp1: Add user space ABI definitions
-In-Reply-To: <1514533978-20408-4-git-send-email-zhengsq@rock-chips.com>
-References: <1514533978-20408-1-git-send-email-zhengsq@rock-chips.com>
- <1514533978-20408-4-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <d98ac356-a482-f26f-fd6b-6142281d99c3@xs4all.nl>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 7 Feb 2018 17:43:15 +0100
+Subject: [PATCH 2/2] usb: gadget: udc: atmel: convert to use GPIO
+ descriptors
+In-Reply-To: <CACRpkdYe-caycymfzosGTgnQUgf2jrLU9vfJEsT+bupqexCAxQ@mail.gmail.com>
+References: <20180201093432.21919-1-ludovic.desroches@microchip.com>
+ <20180201093432.21919-2-ludovic.desroches@microchip.com>
+ <CACRpkdYe-caycymfzosGTgnQUgf2jrLU9vfJEsT+bupqexCAxQ@mail.gmail.com>
+Message-ID: <20180207164315.GJ2580@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/29/2017 08:52 AM, Shunqian Zheng wrote:
-> From: Jeffy Chen <jeffy.chen@rock-chips.com>
+On Wed, Feb 07, 2018 at 02:55:35PM +0100, Linus Walleij wrote:
+> On Thu, Feb 1, 2018 at 10:34 AM, Ludovic Desroches
+> <ludovic.desroches@microchip.com> wrote:
 > 
-> Add the header for userspace
+> > Use GPIO descriptors instead of relying on the old method.
+> > Include irq.h header since it is needed and was indirectly
+> > included through of_gpio.h.
+> >
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
-> ---
->  include/uapi/linux/rkisp1-config.h | 757 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 757 insertions(+)
->  create mode 100644 include/uapi/linux/rkisp1-config.h
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> diff --git a/include/uapi/linux/rkisp1-config.h b/include/uapi/linux/rkisp1-config.h
-> new file mode 100644
-> index 0000000..0f9f4226
-> --- /dev/null
-> +++ b/include/uapi/linux/rkisp1-config.h
-> @@ -0,0 +1,757 @@
+> Thank you for doing gpiod conversions. Making the world
+> a better place!
 
-<snip>
+Thanks, I wish it would be so easy!
 
-> +/**
-> + * enum cifisp_exp_ctrl_auotostop - stop modes
+I will send a v2 because I have the same issue that the one pointed by
+Andy about the gpiod conversion for the lcd driver.
 
-auotostop -> autostop
+- udc->vbus_pin = devm_gpiod_get_optional(&pdev->dev, "atmel,vbus", GPIOD_IN);
++ udc->vbus_pin = devm_gpiod_get(&pdev->dev, "atmel,vbus", GPIOD_IN);
++ if (IS_ERR(udc->vbus_pin))
++ 	udc->vbus_pin = NULL;
 
-> + * @CIFISP_EXP_CTRL_AUTOSTOP_0: continous measurement
+I am not sure if I should prefer devm_gpiod_get_optional or
+devm_gpiod_get.
 
-continous -> continuous
+Regards
 
-> + * @CIFISP_EXP_CTRL_AUTOSTOP_1: stop measuring after a complete frame
-> + */
-> +enum cifisp_exp_ctrl_auotostop {
-
-auotostop -> autostop
-
-> +	CIFISP_EXP_CTRL_AUTOSTOP_0 = 0,
-> +	CIFISP_EXP_CTRL_AUTOSTOP_1 = 1,
-> +};
-
-Just noticed this :-)
-
-Regards,
-
-	Hans
+Ludovic
