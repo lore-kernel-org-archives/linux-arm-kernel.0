@@ -1,45 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Feb 2018 14:19:50 +0100
-Subject: [PATCH] pinctrl: msm: allow the gpio base to be configurable
-In-Reply-To: <20180129005129.GB12728@builder>
-References: <1516915209-28295-1-git-send-email-timur@codeaurora.org>
- <20180128232310.GA12728@builder>
- <042b6cea-38f7-a660-0059-5f24fc7db9eb@codeaurora.org>
- <20180129005129.GB12728@builder>
-Message-ID: <CACRpkdaa0Ovb0kbE6J0vy4UJYv5fn6X2289pkX3b+HBze5FRJg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 7 Feb 2018 18:50:59 +0530
+Subject: [PATCH v6 30/41] ARM: davinci: switch to common clock framework
+In-Reply-To: <1516468460-4908-31-git-send-email-david@lechnology.com>
+References: <1516468460-4908-1-git-send-email-david@lechnology.com>
+ <1516468460-4908-31-git-send-email-david@lechnology.com>
+Message-ID: <4268330e-25a7-e11d-7863-6a6004419b07@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 1:51 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
+On Saturday 20 January 2018 10:44 PM, David Lechner wrote:
+> This switches ARCH_DAVINCI to use the common clock framework. The legacy
+> clock code in arch/arm/mach-davinci/ is no longer used. New drivers in
+> drivers/clk/davinci/ are used instead.
+> 
+> A few macros had to be moved to prevent compile errors.
 
->> > My bad, this should have been -1.
->>
->> Perhaps, but it's been 0 for a very long time, so I don't want to break any
->> existing platforms by suddenly relocating all GPIOs across all Qualcomm
->> platforms.
->>
->
-> Yeah, I see that I got this wrong when I wrote the driver 4 years ago...
->
-> There should be no in-kernel users depending on these numbers being hard
-> coded, so anyone depending on these numbers starting at 0 would be user
-> space - doing so incorrectly.
+s/compile/compilation
 
-There is a good point in what Tmur is saying here. We never break
-userspace, if we can avoid it.
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-If there is a real problem with setting this base to -1 then I suggest
+> --- a/arch/arm/mach-davinci/davinci.h
+> +++ b/arch/arm/mach-davinci/davinci.h
+> @@ -35,6 +35,10 @@
+>  #include <media/davinci/vpbe.h>
+>  #include <media/davinci/vpbe_osd.h>
+>  
+> +#define DAVINCI_PLL1_BASE		0x01c40800
+> +#define DAVINCI_PLL2_BASE		0x01c40c00
+> +#define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01c41000
 
-if (tlmm_has_only_one_instance)
-   base = 0;
-else
-   base = -1;
+Please drop the tab after #define
 
-Especially for an upcoming platform we can start with a clean slate,
-it certainly does not have any legacy userspace.
+With that.
 
-If no problems are detected, let's just use -1.
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 
-Yours,
-Linus Walleij
+Thanks,
+Sekhar
