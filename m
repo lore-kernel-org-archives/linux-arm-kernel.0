@@ -1,89 +1,96 @@
-From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Wed, 7 Feb 2018 18:35:36 +0100
-Subject: [PATCH v1 3/3] media: stm32-dcmi: improve error trace points
-In-Reply-To: <1518024936-2455-1-git-send-email-hugues.fruchet@st.com>
-References: <1518024936-2455-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1518024936-2455-4-git-send-email-hugues.fruchet@st.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 7 Feb 2018 11:37:04 -0600
+Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
+ sdm845 SoC and MTP
+In-Reply-To: <43b34b44-f613-79c6-1fe4-01c9dfe85e62@codeaurora.org>
+References: <20180125163216.29018-1-rnayak@codeaurora.org>
+ <20180125163216.29018-2-rnayak@codeaurora.org>
+ <CAL_JsqLb4PQ+NkA_RBAgB-5MzFKd+6wBvfCjXvoH-i8pGzzdTg@mail.gmail.com>
+ <43b34b44-f613-79c6-1fe4-01c9dfe85e62@codeaurora.org>
+Message-ID: <CAL_JsqKEgwU6YdFTeuQi5im8azUKzNi34XpamCXNZwxhJibUnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix some missing "\n".
-Trace error returned by subdev streamon/streamoff.
-Remove extra "0x" unneeded with %pad formatter.
+On Tue, Feb 6, 2018 at 10:47 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
+> []..
+>
+>>> +
+>>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>>> +
+>>> +/ {
+>>> +       model = "Qualcomm Technologies, Inc. SDM845";
+>>
+>> This should only be in the board level file.
+>
+> thanks, will fix.
+>
+>>
+>>> +
+>>> +       interrupt-parent = <&intc>;
+>>> +
+>>> +       #address-cells = <2>;
+>>> +       #size-cells = <2>;
+>>> +
+>>> +       chosen { };
+>>> +
+>>> +       memory {
+>>> +               device_type = "memory";
+>>> +               /* We expect the bootloader to fill in the reg */
+>>
+>> The start address is variable? If not you should populate the base and
+>> have a unit-address.
+>
+> sure, I'll check and update.
+>
+>>
+>>> +               reg = <0 0 0 0>;
+>>> +       };
+>>> +
+>
+> []..
+>>> +
+>>> +       soc: soc {
+>>> +               #address-cells = <1>;
+>>> +               #size-cells = <1>;
+>>> +               ranges = <0 0 0 0xffffffff>;
+>>> +               compatible = "simple-bus";
+>>> +
+>>> +               intc: interrupt-controller at 17a00000 {
+>>> +                       compatible = "arm,gic-v3";
+>>> +                       #interrupt-cells = <3>;
+>>> +                       interrupt-controller;
+>>> +                       #redistributor-regions = <1>;
+>>> +                       redistributor-stride = <0x0 0x20000>;
+>>> +                       reg = <0x17a00000 0x10000>,     /* GICD */
+>>> +                             <0x17a60000 0x100000>;    /* GICR * 8 */
+>>> +                       interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+>>> +               };
+>>> +
+>>> +               gcc: clock-controller at 100000 {
+>>> +                       compatible = "qcom,gcc-sdm845";
+>>
+>> sdm845-gcc is the preferred order.
+>
+> This is still proposed as part of the GCC patch for sdm845 [1]
+> (which looks like has neither you nor the DT list copied :/ )
+> Also looking at Documentation/devicetree/bindings/clock/qcom,gcc.txt,
+> I see we seem to follow the gcc-<soc> convention for compatible all along :(
+>
+>                         "qcom,gcc-apq8064"
+>                         "qcom,gcc-apq8084"
+>                         "qcom,gcc-ipq8064"
+>                         "qcom,gcc-ipq4019"
+>                         "qcom,gcc-ipq8074"
+>                         "qcom,gcc-msm8660"
+>                         "qcom,gcc-msm8916"
+>                         "qcom,gcc-msm8960"
+>                         "qcom,gcc-msm8974"
+>                         "qcom,gcc-msm8974pro"
+>                         "qcom,gcc-msm8974pro-ac"
+>                         "qcom,gcc-msm8994"
+>                         "qcom,gcc-msm8996"
+>                         "qcom,gcc-mdm9615"
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+Okay, I guess the pattern for this is pretty much established.
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index dfab867..2fd8bed 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -234,7 +234,7 @@ static void dcmi_dma_callback(void *param)
- 		/* Restart a new DMA transfer with next buffer */
- 		if (dcmi->state == RUNNING) {
- 			if (list_empty(&dcmi->buffers)) {
--				dev_err(dcmi->dev, "%s: No more buffer queued, cannot capture buffer",
-+				dev_err(dcmi->dev, "%s: No more buffer queued, cannot capture buffer\n",
- 					__func__);
- 				dcmi->errors_count++;
- 				dcmi->active = NULL;
-@@ -249,7 +249,7 @@ static void dcmi_dma_callback(void *param)
- 			list_del_init(&dcmi->active->list);
- 
- 			if (dcmi_start_capture(dcmi)) {
--				dev_err(dcmi->dev, "%s: Cannot restart capture on DMA complete",
-+				dev_err(dcmi->dev, "%s: Cannot restart capture on DMA complete\n",
- 					__func__);
- 
- 				spin_unlock(&dcmi->irqlock);
-@@ -478,7 +478,7 @@ static int dcmi_buf_prepare(struct vb2_buffer *vb)
- 
- 		vb2_set_plane_payload(&buf->vb.vb2_buf, 0, buf->size);
- 
--		dev_dbg(dcmi->dev, "buffer[%d] phy=0x%pad size=%zu\n",
-+		dev_dbg(dcmi->dev, "buffer[%d] phy=%pad size=%zu\n",
- 			vb->index, &buf->paddr, buf->size);
- 	}
- 
-@@ -524,7 +524,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 
- 	ret = clk_enable(dcmi->mclk);
- 	if (ret) {
--		dev_err(dcmi->dev, "%s: Failed to start streaming, cannot enable clock",
-+		dev_err(dcmi->dev, "%s: Failed to start streaming, cannot enable clock\n",
- 			__func__);
- 		goto err_release_buffers;
- 	}
-@@ -600,7 +600,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 
- 	ret = dcmi_start_capture(dcmi);
- 	if (ret) {
--		dev_err(dcmi->dev, "%s: Start streaming failed, cannot start capture",
-+		dev_err(dcmi->dev, "%s: Start streaming failed, cannot start capture\n",
- 			__func__);
- 
- 		spin_unlock_irq(&dcmi->irqlock);
-@@ -651,7 +651,8 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 	/* Disable stream on the sub device */
- 	ret = v4l2_subdev_call(dcmi->entity.subdev, video, s_stream, 0);
- 	if (ret && ret != -ENOIOCTLCMD)
--		dev_err(dcmi->dev, "stream off failed in subdev\n");
-+		dev_err(dcmi->dev, "%s: Failed to stop streaming, subdev streamoff error (%d)\n",
-+			__func__, ret);
- 
- 	dcmi->state = STOPPING;
- 
-@@ -667,7 +668,8 @@ static void dcmi_stop_streaming(struct vb2_queue *vq)
- 	reg_clear(dcmi->regs, DCMI_CR, CR_ENABLE);
- 
- 	if (!timeout) {
--		dev_err(dcmi->dev, "Timeout during stop streaming\n");
-+		dev_err(dcmi->dev, "%s: Timeout during stop streaming\n",
-+			__func__);
- 		dcmi->state = STOPPED;
- 	}
- 
--- 
-1.9.1
+Rob
