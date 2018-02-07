@@ -1,44 +1,41 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 7 Feb 2018 10:56:59 +0100
-Subject: [PATCH 1/2] sun4i_ss_prng: fix return value of
- sun4i_ss_prng_generate
-In-Reply-To: <20180206212022.1309-2-artem.savkov@gmail.com>
-References: <20180206212022.1309-1-artem.savkov@gmail.com>
- <20180206212022.1309-2-artem.savkov@gmail.com>
-Message-ID: <20180207095659.GA19249@Red>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 7 Feb 2018 15:30:47 +0530
+Subject: [PATCH 3/4] arm64: dts: qcom: msm8916: Add clock properties to
+ the APCS node
+In-Reply-To: <20180205144651.5934-3-georgi.djakov@linaro.org>
+References: <20180205144651.5934-1-georgi.djakov@linaro.org>
+ <20180205144651.5934-3-georgi.djakov@linaro.org>
+Message-ID: <CAHLCerOSx+vMMHYj-1cCE8PPGFm=_523Qxeg__AzSjYbtA2FiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 10:20:21PM +0100, Artem Savkov wrote:
-> According to crypto/rng.h generate function should return 0 on success
-> and < 0 on error.
-> 
-> Fixes: b8ae5c7387ad ("crypto: sun4i-ss - support the Security System PRNG")
-> Signed-off-by: Artem Savkov <artem.savkov@gmail.com>
+On Mon, Feb 5, 2018 at 8:16 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> There are clock controller registers in the APCS block, which purpose
+
+If you respin this, s/which/whose
+
+> is to control the main CPU mux and divider. Add the clock properties as
+> part of the APCS device-tree node.
+>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
->  drivers/crypto/sunxi-ss/sun4i-ss-prng.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> index 0d01d1624252..5754e0b92fb0 100644
-> --- a/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-prng.c
-> @@ -52,5 +52,5 @@ int sun4i_ss_prng_generate(struct crypto_rng *tfm, const u8 *src,
->  
->  	writel(0, ss->base + SS_CTL);
->  	spin_unlock(&ss->slock);
-> -	return dlen;
-> +	return 0;
->  }
-> -- 
-> 2.15.1
-> 
-
-According to Documentation/crypto/api-samples.rst ("Code Example For Random Number Generator Usage")
-you must return the length of data generated.
-
-So crypto_rng_generate/crypto_rng_get_bytes documentation in crypto/rng.h must be fixed.
-
-Herbert could you confirm ?
-
-Regards
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index 5414f53a0fa1..4539571a36b2 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -336,6 +336,8 @@
+>                         compatible = "qcom,msm8916-apcs-kpss-global", "syscon";
+>                         reg = <0xb011000 0x1000>;
+>                         #mbox-cells = <1>;
+> +                       clocks = <&a53pll>;
+> +                       #clock-cells = <0>;
+>                 };
+>
+>                 blsp1_uart2: serial at 78b0000 {
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
