@@ -1,97 +1,229 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 07 Feb 2018 18:37:21 +0000
-Subject: [PATCH v7 00/11] arm64: kexec: add kexec_file_load() support
-In-Reply-To: <20171204025801.12161-1-takahiro.akashi@linaro.org>
-References: <20171204025801.12161-1-takahiro.akashi@linaro.org>
-Message-ID: <5A7B4761.3000808@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 7 Feb 2018 19:49:59 +0100
+Subject: [PATCH v2 4/6] clk: sunxi-ng: add support for the Allwinner H6 CCU
+In-Reply-To: <3AB5A169-5EA5-4A45-95AF-4CA56F13A1CA@aosc.io>
+References: <20180203154942.63566-1-icenowy@aosc.io>
+ <20180203154942.63566-5-icenowy@aosc.io>
+ <20180207090210.jlxleeh32tojvzp5@flea>
+ <3AB5A169-5EA5-4A45-95AF-4CA56F13A1CA@aosc.io>
+Message-ID: <20180207184959.5h233agyhva352s4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-I'm still getting my head round how all this works, so please forgive what may
-be stupid questions!
-
-
-On 04/12/17 02:57, AKASHI Takahiro wrote:
-> This is the seventh round of implementing kexec_file_load() support
-> on arm64.[1]
-> Most of the code is based on kexec-tools (along with some kernel code
-> from x86, which also came from kexec-tools).
+On Wed, Feb 07, 2018 at 05:11:11PM +0800, Icenowy Zheng wrote:
 > 
 > 
-> This patch series enables us to
->   * load the kernel, Image, via kexec_file_load() system call, and
->   * optionally verify its signature at load time for trusted boot.
-
-Is kdump using kexec_file_load() possible? (questions on patch 3)
-I can't work out why additional elf-generating code would be necessary if kdump
-works today without it...
-
-
-> To load the kernel via kexec_file_load() system call, a small change
-> is also required on kexec-tools. See [2]. This enables '-s' option.
-> (Please use v7.2.1+ crash utility for v4.14+ kernel)
-
-(what does the -s option do?)
-
-
-> As we discussed a long time ago, users may not be allowed to specify
-> device-tree file of the 2nd kernel explicitly with kexec-tools, hence
-> re-using the blob of the first kernel.
+> ? 2018?2?7? GMT+08:00 ??5:02:10, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >Hi,
+> >
+> >On Sat, Feb 03, 2018 at 11:49:40PM +0800, Icenowy Zheng wrote:
+> >> +	/* Force the output divider of video PLLs to 0 */
+> >> +	for (i = 0; i < ARRAY_SIZE(pll_video_regs); i++) {
+> >> +		val = readl(reg + pll_video_regs[i]);
+> >> +		val &= ~BIT(0);
+> >> +		writel(val, reg + pll_video_regs[i]);
+> >> +	}
+> >
+> >Why?
 > 
-> Regarding a kernel image verification, a signature must be presented
-> along with the binary itself. A signature is basically a hash value
-> calculated against the whole binary data and encrypted by a key which
-> will be authenticated by the system's trusted certificate.
-> Any attempt to read and load a to-be-kexec-ed kernel image through
-> a system call will be checked and blocked if the binary's hash value
-> doesn't match its associated signature.
+> According to the manual the output divider here is
+> test only, and for daily use it should be 0.
+> 
+> >
+> >> +	/* Force OHCI 12M clock sources to 00 (12MHz divided from 48MHz) */
+> >> +	for (i = 0; i < ARRAY_SIZE(usb2_clk_regs); i++) {
+> >> +		val = readl(reg + usb2_clk_regs[i]);
+> >> +		val &= ~GENMASK(25, 24);
+> >> +		writel (val, reg + usb2_clk_regs[i]);
+> >> +	}
+> >
+> >Why?
+> 
+> Just make them have a sure working parent. Why this
+> muxs exist is still mysterious.
+> 
+> >
+> >> +	/*
+> >> +	 * Force the post-divider of pll-video to 8 and the output divider
+> 
+> oh here's a typo -- it's audio, not video.
+> 
+> >> +	 * of it to 1.
+> >> +	 */
+> >> +	val = readl(reg + SUN50I_H6_PLL_AUDIO_REG);
+> >> +	val &= ~(GENMASK(21, 16) | BIT(0));
+> >> +	writel(val | (7 << 16), reg + SUN50I_H6_PLL_AUDIO_REG);
+> >
+> >Why?
+> 
+> See the comments about pll-audio in the former sources :-)
 
-> Concerns(or future works):
+You should have a comments for all those :)
 
-(lets keep this stuff in the future)
+> 
+> >> diff --git a/include/dt-bindings/clock/sun50i-h6-ccu.h
+> >b/include/dt-bindings/clock/sun50i-h6-ccu.h
+> >> new file mode 100644
+> >> index 000000000000..f7ddb241012c
+> >> --- /dev/null
+> >> +++ b/include/dt-bindings/clock/sun50i-h6-ccu.h
+> >> @@ -0,0 +1,125 @@
+> >> +/*
+> >> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
+> >> + *
+> >> + * SPDX-License-Identifier: (GPL-2.0+ or MIT)
+> >> + */
+> >> +
+> >> +#ifndef _DT_BINDINGS_CLK_SUN50I_H6_H_
+> >> +#define _DT_BINDINGS_CLK_SUN50I_H6_H_
+> >> +
+> >> +#define CLK_PLL_PERIPH0		3
+> >
+> >Why is that needed?
+> 
+> Parent of AR100 clock in PRCM.
 
-> * Even if the kernel is configured with CONFIG_RANDOMIZE_BASE, the 2nd
->   kernel won't be placed at a randomized address. We will have to
->   add some boot code similar to efi-stub to implement the randomization.
+ACK.
 
-I think there are two parts to this. The efistub may copy the kernel to a new
-~random location in physical memory. It also adds a seed used to randomise the
-virtual-addresses the kernel executes from.
+> >
+> >> +
+> >> +#define CLK_CPUX		21
+> >> +
+> >> +#define CLK_APB1		26
+> >
+> >Same thing here
+> 
+> As discussed in v1, the APB bus clock is used for PIO.
 
-For kexec_file_load() the first-kernel could apply some randomness to the
-physical offset when it re-assembles the kexec-kernel. i.e. code in
-arm64_relocate_new_kernel(). I don't think we should do this without some hint
-that the new kernel supports this...
+ACK
 
-For the virtual-addresses it would need to add a new kaslr-seed to the
-DT/chosen, which should be harmless.
+> >
+> >> +
+> >> +#define CLK_DE			29
+> >> +#define CLK_BUS_DE		30
+> >> +#define CLK_DEINTERLACE		31
+> >> +#define CLK_BUS_DEINTERLACE	32
+> >> +#define CLK_GPU			33
+> >> +#define CLK_BUS_GPU		34
+> >> +#define CLK_CE			35
+> >> +#define CLK_BUS_CE		36
+> >> +#define CLK_VE			37
+> >> +#define CLK_BUS_VE		38
+> >> +#define CLK_EMCE		39
+> >> +#define CLK_BUS_EMCE		40
+> >> +#define CLK_VP9			41
+> >> +#define CLK_BUS_VP9		42
+> >> +#define CLK_BUS_DMA		43
+> >> +#define CLK_BUS_MSGBOX		44
+> >> +#define CLK_BUS_SPINLOCK	45
+> >> +#define CLK_BUS_HSTIMER		46
+> >> +#define CLK_AVS			47
+> >> +#define CLK_BUS_DBG		48
+> >> +#define CLK_BUS_PSI		49
+> >> +#define CLK_BUS_PWM		50
+> >> +#define CLK_BUS_IOMMU		51
+> >> +
+> >> +#define CLK_MBUS_DMA		53
+> >> +#define CLK_MBUS_VE		54
+> >> +#define CLK_MBUS_CE		55
+> >> +#define CLK_MBUS_TS		56
+> >> +#define CLK_MBUS_NAND		57
+> >> +#define CLK_MBUS_CSI		58
+> >> +#define CLK_MBUS_DEINTERLACE	59
+> >> +
+> >> +#define CLK_NAND0		61
+> >> +#define CLK_NAND1		62
+> >> +#define CLK_BUS_NAND		63
+> >> +#define CLK_MMC0		64
+> >> +#define CLK_MMC1		65
+> >> +#define CLK_MMC2		66
+> >> +#define CLK_BUS_MMC0		67
+> >> +#define CLK_BUS_MMC1		68
+> >> +#define CLK_BUS_MMC2		69
+> >> +#define CLK_BUS_UART0		70
+> >> +#define CLK_BUS_UART1		71
+> >> +#define CLK_BUS_UART2		72
+> >> +#define CLK_BUS_UART3		73
+> >> +#define CLK_BUS_I2C0		74
+> >> +#define CLK_BUS_I2C1		75
+> >> +#define CLK_BUS_I2C2		76
+> >> +#define CLK_BUS_I2C3		77
+> >> +#define CLK_BUS_SCR0		78
+> >> +#define CLK_BUS_SCR1		79
+> >> +#define CLK_SPI0		80
+> >> +#define CLK_SPI1		81
+> >> +#define CLK_BUS_SPI0		82
+> >> +#define CLK_BUS_SPI1		83
+> >> +#define CLK_BUS_EMAC		84
+> >> +#define CLK_TS			85
+> >> +#define CLK_BUS_TS		86
+> >> +#define CLK_IR_TX		87
+> >> +#define CLK_BUS_IR_TX		88
+> >> +#define CLK_BUS_THS		89
+> >> +#define CLK_I2S3		90
+> >> +#define CLK_I2S0		91
+> >> +#define CLK_I2S1		92
+> >> +#define CLK_I2S2		93
+> >> +#define CLK_BUS_I2S0		94
+> >> +#define CLK_BUS_I2S1		95
+> >> +#define CLK_BUS_I2S2		96
+> >> +#define CLK_BUS_I2S3		97
+> >> +#define CLK_SPDIF		98
+> >> +#define CLK_BUS_SPDIF		99
+> >> +#define CLK_DMIC		100
+> >> +#define CLK_BUS_DMIC		101
+> >> +#define CLK_AUDIO_HUB		102
+> >> +#define CLK_BUS_AUDIO_HUB	103
+> >> +#define CLK_USB_OHCI0		104
+> >> +#define CLK_USB_PHY0		105
+> >> +#define CLK_USB_PHY1		106
+> >> +#define CLK_USB_OHCI3		107
+> >> +#define CLK_USB_PHY3		108
+> >> +#define CLK_USB_HSIC_12M	109
+> >> +#define CLK_USB_HSIC		110
+> >> +#define CLK_BUS_OHCI0		111
+> >> +#define CLK_BUS_OHCI3		112
+> >> +#define CLK_BUS_EHCI0		113
+> >> +#define CLK_BUS_XHCI		114
+> >> +#define CLK_BUS_EHCI3		115
+> >> +#define CLK_BUS_OTG		116
+> >> +#define CLK_PCIE_REF_100M	117
+> >> +#define CLK_PCIE_REF		118
+> >> +#define CLK_PCIE_REF_OUT	119
+> >> +#define CLK_PCIE_MAXI		120
+> >> +#define CLK_PCIE_AUX		121
+> >
+> >Dito.
+> 
+> I think AUX clock is used in PCIe code.
+> 
+> BTW the REF_100M clock is intermediate, and
+> does't need to be exported. Will fix it in the next version.
+> 
+> >
+> >> +#define CLK_BUS_PCIE		122
+> >> +#define CLK_HDMI		123
+> >> +#define CLK_HDMI_CEC		124
+> >> +#define CLK_BUS_HDMI		125
+> >> +#define CLK_BUS_TCON_TOP	126
+> >
+> >Ditto.
+> 
+> TCON_TOP is not a clock parent -- it's a dedicated hw
+> part which controlls the connection between
+> DE2/3 mixers and TCONs.
 
+Ok, great, thanks!
+Maxime
 
-> for approach (1),
-> * While big-endian kernel can support kernel signing, I'm not sure that
->   Image can be recognized as in PE format because x86 standard only
->   defines little-endian-based format.
-
-What does the recognizing? (I don't think we should invent a new format..)
-
-
-> * vmlinux support
-
-(Patch 3 is why I'm here)
-
-I don't think we need to support this. I can't boot a vmlinux file via UEFI. As
-I understand it kexec_file_load() is all about the signature verification for
-UEFI:SecureBoot. The chances of me having a vmlinux signed for SecureBoot use is
-pretty low, chances are its a self-signed image I just built, in which case I
-can use the arm64 Image file that was built at the same time.
-
-Supporting two file formats is going to be a headache. Distributions ship
-separate debug info packages for debugging, I don't think we need to make them
-bootable...
-
-
-Thanks,
-
-James
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180207/5c3747d4/attachment-0001.sig>
