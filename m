@@ -1,27 +1,116 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 7 Feb 2018 09:45:29 +0530
-Subject: [PATCH 1/2] arm64: dts: sdm845: Add minimal dts/dtsi files for
- sdm845 SoC and MTP
-In-Reply-To: <20180206185440.GJ9465@builder>
-References: <20180125163216.29018-1-rnayak@codeaurora.org>
- <20180125163216.29018-2-rnayak@codeaurora.org>
- <20180206185440.GJ9465@builder>
-Message-ID: <53642249-89c1-3fc0-8ad8-7a954b138bb2@codeaurora.org>
+Date: Wed, 7 Feb 2018 09:58:58 +0530
+Subject: [PATCH v2 3/3] arm64: dts: sdm845: Add serial console support
+In-Reply-To: <CAD=FV=VwTZo2YOxw0W7JbuF_Dic8YHmQZ6_FAxiZG3BXiS_VEw@mail.gmail.com>
+References: <20180131161941.29865-1-rnayak@codeaurora.org>
+ <20180131161941.29865-4-rnayak@codeaurora.org>
+ <CAD=FV=VwTZo2YOxw0W7JbuF_Dic8YHmQZ6_FAxiZG3BXiS_VEw@mail.gmail.com>
+Message-ID: <1696cf0f-dccc-3014-1c5f-70a7941bd8ff@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[]..
 
-
-On 02/07/2018 12:24 AM, Bjorn Andersson wrote:
-> On Thu 25 Jan 08:32 PST 2018, Rajendra Nayak wrote:
->> +		spmi_bus: qcom,spmi at c440000 {
-> [..]
->> +		};
+>> @@ -10,4 +10,46 @@
+>>  / {
+>>         model = "Qualcomm Technologies, Inc. SDM845 MTP";
+>>         compatible = "qcom,sdm845-mtp";
 >> +
+>> +       aliases {
+>> +               serial0 = &qup_uart2;
+>> +       };
+>> +
+>> +       chosen {
+>> +               stdout-path = "serial0";
+>> +       };
+>> +
+>> +       soc {
 > 
-> While we have the chance, please remove this empty line.
+> I don't know if there's an official position, but in general I'm seen
+> people use the actual "soc" alias here.  AKA at the top level of this
+> dts, just do:
+> 
+> &soc {
+>   ...
+> };
+> 
+> Normally doing stuff like that is useful so you don't need to
+> replicate the whole hierarchy.  In this case that's not a huge
+> savings, but it can be nice to be consistent.  In the very least it
+> saves you a level of indentation.
+> 
+> 
+>> +               serial at a84000 {
+>> +                       status = "okay";
+>> +               };
+> 
+> Similarly here you can use the alias from the sdm845.dtsi file to
+> avoid replicating the hierarchy.  AKA at the top level do:
+> 
+> &qup_uart2 {
+>   status = "okay";
+> };
+> 
+> In this case it saves you 2 levels of indentation.
 
-Will do. Thanks for the review.
+Right. Andy/Bjorn, are there any preferences here?
+I see we don't do this for the other board files, and I not sure
+theres a specific reasoning for how its currently done and if we
+need to stick to it.
+
+> 
+>> +
+>> +               pinctrl at 3400000 {
+>> +                       qup_uart2_default: qup_uart2_default {
+> 
+> I'm not sure how persnickety I should be, but according to
+> <https://elinux.org/Device_Tree_Linux>:
+> 
+>   node names use dash "-" instead of underscore "_"
+> 
+> ...but, of course, labels can't use dashes (and the same page says to
+> use underscore for labels).  This is why, in rk3288 for instance, you
+> see:
+> 
+> i2c2_xfer: i2c2-xfer {
+>   rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_none>,
+>   <6 10 RK_FUNC_1 &pcfg_pull_none>;
+> };
+> 
+> AKA the label and the node name are the same but the label uses "_"
+> and the node names use "-".
+
+Sure, I'll fix these up.
+
+[]
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> index 02520f19e4ca..c4ce70840acf 100644
+>> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> @@ -4,6 +4,7 @@
+>>   */
+>>
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/clock/qcom,gcc-sdm845.h>
+>>
+>>  / {
+>>         model = "Qualcomm Technologies, Inc. SDM845";
+>> @@ -273,5 +274,25 @@
+>>                         cell-index = <0>;
+>>                 };
+>>
+>> +               qup_1: qcom,geni_se at ac0000 {
+>> +                       compatible = "qcom,geni-se-qup";
+>> +                       reg = <0xac0000 0x6000>;
+> 
+> I think you may have mentioned this in another context, but this
+> doesn't match the current bindings.  Some clocks should be here.
+> ...and it looks like the uart should be a subnode.
+
+right, these were tested with the v1 set for serial. I will update them.
+
+regards
+Rajendra
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
