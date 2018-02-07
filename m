@@ -1,119 +1,101 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 7 Feb 2018 17:01:01 +0100
-Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
- bananapi-r2
-In-Reply-To: <1516697505.12197.30.camel@mtkswgap22>
-References: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
- <dc3c28c7-03c3-f1c6-39c1-b8df8be4fac3@gmail.com>
- <1514043318.30687.10.camel@mtkswgap22> <1516697505.12197.30.camel@mtkswgap22>
-Message-ID: <cd1df7f9-89f4-06d5-5384-9f3b9f7ade48@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 7 Feb 2018 17:17:50 +0100
+Subject: [RFC v2 REPOST] arm64: KVM: KVM API extensions for SVE
+In-Reply-To: <20180207153402.GR5862@e103592.cambridge.arm.com>
+References: <20180126172849.GX5862@e103592.cambridge.arm.com>
+ <20180205161308.GW21802@cbox>
+ <20180206114313.GQ5862@e103592.cambridge.arm.com>
+ <20180206131757.GA23160@cbox>
+ <20180207113327.GN5862@e103592.cambridge.arm.com>
+ <20180207145831.GC29286@cbox>
+ <20180207153402.GR5862@e103592.cambridge.arm.com>
+Message-ID: <20180207161750.GE29286@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 07, 2018 at 03:34:03PM +0000, Dave Martin wrote:
+> On Wed, Feb 07, 2018 at 03:58:31PM +0100, Christoffer Dall wrote:
+> > On Wed, Feb 07, 2018 at 11:33:28AM +0000, Dave Martin wrote:
+> 
+> [...]
+> 
+> > > What if KVM_ARM_SVE_SET_VLS() were to yield 0 if the exact requested set
+> > > of VLs was configured, -ERANGE if some subset was configured successfully
+> > > (but not exactly the set requested), and the usual -EINVAL/-EIO/whatever
+> > > if the set of VLs couldn't be configured at all?
+> > 
+> > Sounds good to me.
+> > 
+> > > 
+> > > Then the probe would go like this:
+> > > 
+> > > 	__u64 vqs[SVE_VQ_MAX / 64] = { [0 ... SVE_VQ_MAX / 64 - 1] = ~(u64)0 };
+> > > 	if (ioctl(vcpu_fd, KVM_ARM_SVE_SET_VLS, vqs) && errno != ERANGE))
+> > > 		goto error;
+> > > 
+> > > 	ioctl(vcpu_fd, KVM_ARM_SVE_GET_VLS, vqs);
+> > > 
+> > > 	/* ... */
+> > > 
+> > > Another option would be for SVE_ARM_SVE_SET_VLS to write the resulting
+> > > set back to its argument, possibly with the same 0/ERANGE/EINVAL semantics.
+> > > 
+> > > 
+> > > Alternatively, userspace would be require to do a KVM_ARM_SVE_GET_VLS,
+> > > and check the resulting set:
+> > > 
+> > > 	/* ... */
+> > > 	
+> > > 	__u64 newvqs[SVE_VQ_MAX / 64];
+> > > 	ioctl(vcpu_fd, KVM_ARM_SVE_GET_VLS, newvqs);
+> > > 
+> > > 	if (memcmp(vqs, newvqs, sizeof vqs))
+> > > 		goto mismatch;
+> > > 
+> > > vcpu restore would need to treat any mismatch as an error:
+> > > the exact requested set but be configurable, or the VM may go wrong.
+> > 
+> > I'm not sure I can parse this sentence or extract the meaning?
+> 
+> That was lazy language on my part.  I'll try to explain it better:
+> 
+> When the saved state of a migrating vcpu is being loaded into a
+> newly-created vcpu on the target node, userspace needs a way to
+> ensure that the set of VLs that vcpu will see when it runs is
+> _exactly_ the same set it could see before migration.
 
+Yes, and that should work fine with the -ERANGE proposal, right?
 
-On 01/23/2018 09:51 AM, Sean Wang wrote:
-> On Sat, 2017-12-23 at 23:35 +0800, Sean Wang wrote:
->> On Sat, 2017-12-23 at 08:52 +0100, Matthias Brugger wrote:
->>>
->>> On 12/22/2017 07:06 AM, sean.wang at mediatek.com wrote:
->>>> From: Sean Wang <sean.wang@mediatek.com>
->>>>
->>>> On bpi-r2 board, totally there're four uarts which we usually called
->>>> uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
->>>> dedicated pin slot which is used to conolse log. uart[0-1] appear at the
->>>> 40-pins connector and uart3 has no pinout, but just has test points (TP47
->>>> for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
->>>> pinctrl is being complemented for those devices.
->>>>
->>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>>> ---
->>>>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
->>>>  1 file changed, 24 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->>>> index 7bf5aa2..64bf5db 100644
->>>> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->>>> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->>>> @@ -409,6 +409,20 @@
->>>>  				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
->>>>  		};do you like it or quite want me to remove the uart3 node?
->>>>  	};
->>>> +
->>>> +	uart2_pins_a: uart at 2 {
->>>> +		pins_dat {
->>>> +			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
->>>> +				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
->>>> +		};
->>>> +	};
->>>> +
->>>> +	uart3_pins_a: uart at 3 {
->>>> +		pins_dat {
->>>> +			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
->>>> +				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
->>>> +		};
->>>> +	};
->>>>  };
->>>>  
->>>>  &pwm {
->>>> @@ -454,16 +468,24 @@
->>>>  &uart0 {
->>>>  	pinctrl-names = "default";
->>>>  	pinctrl-0 = <&uart0_pins_a>;
->>>> -	status = "disabled";
->>>> +	status = "okay";
->>>>  };
->>>>  
->>>>  &uart1 {
->>>>  	pinctrl-names = "default";
->>>>  	pinctrl-0 = <&uart1_pins_a>;
->>>> -	status = "disabled";
->>>> +	status = "okay";
->>>>  };
->>>>  
->>>>  &uart2 {
->>>> +	pinctrl-names = "default";
->>>> +	pinctrl-0 = <&uart2_pins_a>;
->>>> +	status = "okay";
->>>> +};
->>>> +
->>>> +&uart3 {
->>>> +	pinctrl-names = "default";
->>>> +	pinctrl-0 = <&uart3_pins_a>;
->>>>  	status = "okay";
->>>>  };
->>>>  
->>>
->>> Why do we want to enable uart3 when there are only test points?
->>> It is not very useful, or do I oversee something?
->>>
 > 
->> I have been listening to the sound from potential users of bpi-r2 to
->> understand what assistance I have to provide to them. Something could
->> be seen through [1] in the forum to know they had been trying hard to
->> explore all available UARTs from the SoC in the last weeks. The patch
->> should be really useful for these people and for the extra soldering
->> it shouldn't become a problem for these makers.
->>
->> [1] http://forum.banana-pi.org/t/gpio-uart-not-the-debug-port/3748
->>
->> 	Sean 
->>
-> 
-> Hi, Matthias
-> 
-> do you like it or quite want me to remove the uart3 node?
-> 
-> I can take it into account along with other pending dts changes in my
-> queue.
+> I called this out separately because it's different from the
+> case of creating a brand-new VM: in the latter case, we can't the
+> kernel to provide the best set of VLs possible, but it is not an
+> error not to get every VL we asked for.
 > 
 
-Sorry for the late answer.
-Do I understand correctly that uart3 is routed to TP47 and TP48, and these test
-points are accessible through the SATA connector? Doesn't they break SATA then?
+This was another hard one:)
 
-I think as they are only available through a non-documented test point, we
-shouldn't enable it.
+I think what you're saying is that it's technically not an error when
+setting the VLs on a new VM, but it would be in the case of migration,
+and therefore we need to tell userspace in both cases what happened, and
+it can decide.
 
-Regards,
-Matthias
+> > > Any opinion on which approach is best?
+> > 
+> > I think I prefer letting KVM_ARM_SVE_SET_VLS change the supplied vqs,
+> > since having it be two separate ioctls always potentially leaves room
+> > for some other thread having modified the set in the meantime (or making
+> > a programmer doubt if this can be the case) where a single ioctl() will
+> > look atomic.
+> > 
+> > The user can always call KVM_ARM_SVE_GET_VLS afterwards and should get
+> > the same result.
+> 
+> OK, I'll go with changing the supplied vqs for KVM_ARM_SVE_SET_VLS,
+> but I'll retain the -ERANGE semantics (even if technically redundant)
+> since that's harder to forget to check.
+
+Agree, that should definitely be part of it.
+
+Thanks,
+-Christoffer
