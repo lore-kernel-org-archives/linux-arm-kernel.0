@@ -1,56 +1,54 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 7 Feb 2018 16:18:59 +0100
-Subject: [PATCH v2 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD
- device
-In-Reply-To: <1517803655.1173.12.camel@mtkswgap22>
-References: <cover.1515639336.git.ryder.lee@mediatek.com>
- <d6669277f5232446b4798a6b724074b18d5c21aa.1515639336.git.ryder.lee@mediatek.com>
- <72058f8d-c83d-d0e6-dc07-83c9f5fc2710@gmail.com>
- <1517803655.1173.12.camel@mtkswgap22>
-Message-ID: <0e0e703c-0ac9-06ad-91c5-abdf16de1ee9@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed,  7 Feb 2018 17:12:50 +0200
+Subject: [PATCH v2 2/2] arm64: dts: fsl: imx8mq-evk: enable watchdog
+In-Reply-To: <57855fb372ae19aad54c39c0e18a54cb12ed6915.1518016370.git.baruch@tkos.co.il>
+References: <57855fb372ae19aad54c39c0e18a54cb12ed6915.1518016370.git.baruch@tkos.co.il>
+Message-ID: <ae093f95bae9f4f92c5bbc6fc06cdeb8cfc1d1e1.1518016370.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The external nWDOG signal connects to the EVK board reset circuit.
 
+Tested on the i.MX8MQ EVK rev B3.
 
-On 02/05/2018 05:07 AM, Ryder Lee wrote:
-> On Sat, 2018-02-03 at 15:26 +0100, Matthias Brugger wrote:
->>
->> On 01/31/2018 08:42 AM, Ryder Lee wrote:
->>> As the new MFD parent is in place, switch probing method to adapt it.
->>>
->>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->>> ---
->>>  drivers/clk/mediatek/clk-mt7622-aud.c | 3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
->>> index 13f752d..8c18536 100644
->>> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
->>> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
->>> @@ -142,11 +142,12 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
->>>  {
->>>  	struct clk_onecell_data *clk_data;
->>>  	struct device_node *node = pdev->dev.of_node;
->>> +	struct device_node *pnode = pdev->dev.parent->of_node;
->>>  	int r;
->>>  
->>>  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
->>>  
->>> -	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
->>> +	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
->>
->> We will need a fallback here for older device tree bindings.
->>
->> Regards,
->> Matthias
-> 
-> Up to now, I didn't see both driver and bindings are used anywhere.
-> Should I still care about that?
-> 
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v2:
+  * Rename the fsl,pins to pinmux
+  * Drop input-schmitt-enable
+---
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Yes please, we have to ensure that newer kernel work with older bindings and
-vice-versa.
-
-Thanks,
-Matthias
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index c0e5ee5d6243..15be7ee9c9e4 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@ -170,6 +170,13 @@
+ 	status = "okay";
+ };
+ 
++&wdog1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	pinctrl_fec1_mdc: fec1mdcgrp {
+ 		pinmux = <MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC>;
+@@ -402,4 +409,11 @@
+ 		bias-pull-up;
+ 		input-schmitt-enable;
+ 	};
++
++	pinctrl_wdog: wdoggrp {
++		pinmux = <MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B>;
++		drive-strength = <6>;
++		slew-rate = <0>;
++		bias-pull-up;
++	};
+ };
+-- 
+2.15.1
