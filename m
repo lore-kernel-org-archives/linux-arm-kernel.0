@@ -1,63 +1,179 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 7 Feb 2018 09:17:44 +0800
-Subject: [PATCH v3 0/2] phy: rockchip-emmc: fixes emmc-phy power on failed
- with rk3399 SoCs
-In-Reply-To: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
-References: <1515638427-15117-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <e67da623-d6fe-92d9-e6b3-79b8290405c9@rock-chips.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Wed,  7 Feb 2018 09:49:39 +0800
+Subject: [PATCH v3 1/3] ARM: imx: Add basic msl support for imx6sll
+Message-ID: <1517968181-12765-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon,
+Add basic MSL support for i.MX6SLL.
 
-Can you help merge this in your? or next tree?? I'm hoping that we can 
-land this somewhere.:-)
+The i.MX 6SoloLiteLite application processors are NXP's latest
+additions to a growing family of multimedia-focused products
+offering high-performance processing optimized for lowest power
+consumption. The i.MX 6SoloLiteLite processors feature NXP's advanced
+implementation of the ARM Cortex-A9 core, which can be interfaced
+with LPDDR3 and LPDDR2 DRAM memory devices.
 
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+---
+ change from v1->v2
+ - no
+ change from v2->v3
+ - no
+---
+ arch/arm/mach-imx/Kconfig          |  7 +++++++
+ arch/arm/mach-imx/Makefile         |  1 +
+ arch/arm/mach-imx/cpu.c            |  3 +++
+ arch/arm/mach-imx/cpuidle-imx6sl.c |  7 +++++--
+ arch/arm/mach-imx/gpc.c            |  1 +
+ arch/arm/mach-imx/mach-imx6sl.c    | 10 ++++++++--
+ arch/arm/mach-imx/mxc.h            |  6 ++++++
+ 7 files changed, 31 insertions(+), 4 deletions(-)
 
-Thanks,
--Caesar
-? 2018?01?11? 10:40, Caesar Wang ??:
-> Hi Kishon,
->
-> Since the Shawn isn't available, I take over this series patches for now.
->
-> As the original bug had tracked on https://issuetracker.google.com/71561742.
-> In some cases, the mmc phy power on failed during booting up.
-> The log as below:
-> ...
-> [   2.375333] rockchip_emmc_phy_power: caldone timeout.
-> [    2.377815] phy phy-ff770000.syscon:phy at f780.4: phy poweron failed --> -110
-> ...
-> [    2.489295] mmc0: mmc_select_hs400es failed, error -110
-> [    2.489302] mmc0: error -110 whilst initialising MMC card
-> ..
->
-> The actual emulate, the wait 5us for calpad busy trimming, that's no enough.
-> We need give the enough margin for it.
->
-> Verified on url =
->          https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
-> This series patches can apply and bring up with kernel-next on rk3399 chromebook.
->
-> -Caesar
->
->
-> Changes in v3:
-> - As Doug commented on both upstream and gerrit.
->    Change "5, 50" to "0, 50", and the message of print.
-> - As Doug commented on https://patchwork.kernel.org/patch/10154797,
->    Change "1, 50" to "0, 50".
->
-> Changes in v2:
-> - print the return valut with regmap_read_poll_timeout failing.
-> - As Brian commented on https://patchwork.kernel.org/patch/10139891/,
->    changed the note and added to print error value with
->    regmap_read_poll_timeout API.
->
-> Shawn Lin (2):
->    phy: rockchip-emmc: retry calpad busy trimming
->    phy: rockchip-emmc: use regmap_read_poll_timeout to poll dllrdy
->
->   drivers/phy/rockchip/phy-rockchip-emmc.c | 60 +++++++++++++++-----------------
->   1 file changed, 28 insertions(+), 32 deletions(-)
->
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 782699e..8e3a618 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -512,6 +512,13 @@ config SOC_IMX6SL
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloLite processor.
+ 
++config SOC_IMX6SLL
++	bool "i.MX6 SoloLiteLite support"
++	select SOC_IMX6
++
++	help
++	  This enables support for Freescale i.MX6 SoloLiteLite processor.
++
+ config SOC_IMX6SX
+ 	bool "i.MX6 SoloX support"
+ 	select PINCTRL_IMX6SX
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 8ff7105..c5caecb 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -78,6 +78,7 @@ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ endif
+ obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
++obj-$(CONFIG_SOC_IMX6SLL) += mach-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index d4e55f2..32969f3 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -135,6 +135,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6ULL:
+ 		soc_id = "i.MX6ULL";
+ 		break;
++	case MXC_CPU_IMX6SLL:
++		soc_id = "i.MX6SLL";
++		break;
+ 	case MXC_CPU_IMX7D:
+ 		soc_id = "i.MX7D";
+ 		break;
+diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
+index 8d866fb..124f982 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6sl.c
++++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
+@@ -11,6 +11,7 @@
+ #include <asm/cpuidle.h>
+ 
+ #include "common.h"
++#include "hardware.h"
+ #include "cpuidle.h"
+ 
+ static int imx6sl_enter_wait(struct cpuidle_device *dev,
+@@ -21,9 +22,11 @@ static int imx6sl_enter_wait(struct cpuidle_device *dev,
+ 	 * Software workaround for ERR005311, see function
+ 	 * description for details.
+ 	 */
+-	imx6sl_set_wait_clk(true);
++	if (cpu_is_imx6sl())
++		imx6sl_set_wait_clk(true);
+ 	cpu_do_idle();
+-	imx6sl_set_wait_clk(false);
++	if (cpu_is_imx6sl())
++		imx6sl_set_wait_clk(false);
+ 	imx6_set_lpm(WAIT_CLOCKED);
+ 
+ 	return index;
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index de535cb..2479cb1 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -222,6 +222,7 @@ static int __init imx_gpc_init(struct device_node *node,
+ {
+ 	struct irq_domain *parent_domain, *domain;
+ 	int i;
++	u32 val;
+ 
+ 	if (!parent) {
+ 		pr_err("%pOF: no parent, giving up\n", node);
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 0408490..462ed9c 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -17,6 +17,7 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
++#include "hardware.h"
+ #include "cpuidle.h"
+ 
+ static void __init imx6sl_fec_init(void)
+@@ -54,7 +55,8 @@ static void __init imx6sl_init_machine(void)
+ 
+ 	of_platform_default_populate(NULL, NULL, parent);
+ 
+-	imx6sl_fec_init();
++	if (cpu_is_imx6sl())
++		imx6sl_fec_init();
+ 	imx_anatop_init();
+ 	imx6sl_pm_init();
+ }
+@@ -66,11 +68,15 @@ static void __init imx6sl_init_irq(void)
+ 	imx_init_l2cache();
+ 	imx_src_init();
+ 	irqchip_init();
+-	imx6_pm_ccm_init("fsl,imx6sl-ccm");
++	if (cpu_is_imx6sl())
++		imx6_pm_ccm_init("fsl,imx6sl-ccm");
++	else
++		imx6_pm_ccm_init("fsl,imx6sll-ccm");
+ }
+ 
+ static const char * const imx6sl_dt_compat[] __initconst = {
+ 	"fsl,imx6sl",
++	"fsl,imx6sll",
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index e00d626..026e2ca 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -40,6 +40,7 @@
+ #define MXC_CPU_IMX6Q		0x63
+ #define MXC_CPU_IMX6UL		0x64
+ #define MXC_CPU_IMX6ULL		0x65
++#define MXC_CPU_IMX6SLL		0x67
+ #define MXC_CPU_IMX7D		0x72
+ 
+ #define IMX_DDR_TYPE_LPDDR2		1
+@@ -79,6 +80,11 @@ static inline bool cpu_is_imx6ull(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
+ }
+ 
++static inline bool cpu_is_imx6sll(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX6SLL;
++}
++
+ static inline bool cpu_is_imx6q(void)
+ {
+ 	return __mxc_cpu_type == MXC_CPU_IMX6Q;
+-- 
+1.9.1
