@@ -1,177 +1,81 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 7 Feb 2018 10:39:34 +0000
-Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
-In-Reply-To: <20180131182807.32134-17-suzuki.poulose@arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-17-suzuki.poulose@arm.com>
-Message-ID: <20180207103934.GG5862@e103592.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 7 Feb 2018 11:39:05 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+Message-ID: <20180207103905.mtyzgu73mmifyvvj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
-> Some capabilities have different criteria for detection and associated
-> actions based on the matching criteria, even though they all share the
-> same capability bit. So far we have used multiple entries with the same
-> capability bit to handle this. This is prone to errors, as the
-> cpu_enable is invoked for each entry, irrespective of whether the
-> detection rule applies to the CPU or not. And also this complicates
-> other helpers, e.g, __this_cpu_has_cap.
+On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
+> > > > Also, how was it tested? This seems quite weird that we haven't caught
+> > > > that one sooner, and I'm a bit worried about the possible regressions
+> > > > here.
+> > > 
+> > > It sounds really strange to me too,
+> > > because everybody under uboot use "sync:3"(HIGH).
+> > > I will retry to measure,
+> > > unfortunately at home I don't have a scope,
+> > > but I think I'm going to have one soon, because of this. :)
+> > 
+> > Here I am with scope captures and tcon0 registers dump:
+> > tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+> > dclk_d0 => https://pasteboard.co/H4r8QRe.png
+> > dclk_de => https://pasteboard.co/H4r8zh4R.png
+> > dclk_vsnc => https://pasteboard.co/H4r8Hye.png
+> > 
+> > As you can see circled in reg on registers,
+> > TCON0_IO_POL_REG = 0x00000000.
+> > But on all the waveforms you can see:
+> > - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
+> > the rising front overlaps dclk rising edge(not good), so to me this is
+> > falling, then I mean it Negative.
+> > - dclk_de: de pulse is clearly negative, even if register is 0 and its'
+> > polarity bit is 0.
+> > - dclk_vsnc: same as dclk_de
+> > - dclk_hsync: I didn't take scope screenshot but I can assure you it's
+> > negative.
+> > 
+> > You can also check all the other registers about TCON0.
+> > 
+> > Now I proceed testing it on A33, maybe the peripheral is slightly
+> > different between Axx SoCs, if I find it that way,
+> > it should be only a check about SoC or peripheral ID,
+> > and treat polarity as it should be done.
 > 
-> This patch adds a wrapper entry to cover all the possible variations
-> of a capability and ensures :
->  1) The capabilitiy is set when at least one of the entry detects
->  2) Action is only taken for the entries that detects.
-
-I guess this means that where we have a single cpu_enable() method
-but complex match criteria that require multiple entries, then that
-cpu_enable() method might get called multiple times on a given CPU.
-
-Could be worth a comment if cpu_enable() methods must be robust
-against this.
-
-> This avoids explicit checks in the call backs. The only constraint
-> here is that, all the entries should have the same "type".
+> Here I am with A33 waveforms:
+> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
+> dclk_d0 => https://pasteboard.co/H4rVXwy.png
+> dclk_de => https://pasteboard.co/H4rWDt8.png
+> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
+> dclk_hsync => https://pasteboard.co/H4rWK6I.png
 > 
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h |  1 +
->  arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
->  arch/arm64/kernel/cpufeature.c      |  7 +++--
->  3 files changed, 50 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 462c35d1a38c..b73247c27f00 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
->  			bool sign;
->  			unsigned long hwcap;
->  		};
-> +		const struct arm64_cpu_capabilities *cap_list;
+> It behaves the same way as A20, so as I mean IO polarity,
+> all signals(except D0-D23), are inverted.
+> For A33 I've used A33-OLinuXino.
+> For A20 our LiNova1.
 
-Should desc, capability, def_scope and/or cpu_enable match for every cap
-in such a group?
+If you have an A33 handy, you probably want to read that mail:
+https://lists.freedesktop.org/archives/dri-devel/2017-July/147951.html
 
-I'd expected something maybe like this:
+Especially the 90-phase part.
 
-struct arm64_cpu_capabilities {
-	const char *desc;
-	u16 capability;
-	struct arm64_capability_match {
-		bool (*matches)(const struct arm64_cpu_capabilities *, int);
-		int (*cpu_enable)(void);
-		union {
-			struct { ... midr ... };
-			struct { ... sysreg ... };
-			const struct arm64_capability_match *list;
-		};
->  	};
->  };
->  
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index eff5f4e380ac..b4f1c1c1f8ca 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -213,6 +213,36 @@ static void qcom_enable_link_stack_sanitization(
->  	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
->  	CAP_MIDR_RANGE_LIST(midr_list)
->  
-> +/*
-> + * Generic helper for handling capabilties with multiple (match,enable) pairs
-> + * of call backs, sharing the same capability bit.
-> + * Iterate over each entry to see if at least one matches.
-> + */
-> +static bool multi_entry_cap_matches(const struct arm64_cpu_capabilities *entry,
-> +				    int scope)
-> +{
-> +	const struct arm64_cpu_capabilities *caps = entry->cap_list;
-> +
-> +	for (; caps->matches; caps++)
-> +		if (caps->matches(caps, scope))
-> +			return true;
-> +	return false;
-> +}
-> +
-> +/*
-> + * Take appropriate action for all matching entries in the shared capability
-> + * entry.
-> + */
-> +static void multi_entry_cap_cpu_enable(const struct arm64_cpu_capabilities *entry)
-> +{
-> +	const struct arm64_cpu_capabilities *caps = entry->cap_list;
-> +
-> +	for (; caps->matches; caps++)
-> +		if (caps->matches(caps, SCOPE_LOCAL_CPU) &&
-> +		    caps->cpu_enable)
-> +			caps->cpu_enable(caps);
-> +}
-> +
->  #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
->  
->  /*
-> @@ -229,6 +259,18 @@ static const struct midr_range arm64_bp_harden_psci_cpus[] = {
->  	{},
->  };
->  
-> +static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
-> +	{
-> +		CAP_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
-> +		.cpu_enable = enable_psci_bp_hardening,
-> +	},
-> +	{
-> +		CAP_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-> +		.cpu_enable = qcom_enable_link_stack_sanitization,
-> +	},
-> +	{},
-> +};
-> +
->  #endif
->  
->  const struct arm64_cpu_capabilities arm64_errata[] = {
-> @@ -365,13 +407,10 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->  #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
->  	{
->  		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> -		ERRATA_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
-> -		.cpu_enable = enable_psci_bp_hardening,
-> -	},
-> -	{
-> -		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> -		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-> -		.cpu_enable = qcom_enable_link_stack_sanitization,
-> +		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
-> +		.matches = multi_entry_cap_matches,
-> +		.cpu_enable = multi_entry_cap_cpu_enable,
-> +		.cap_list = arm64_bp_harden_list,
->  	},
->  	{
->  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 65a8e5cc600c..13e30c1b1e99 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
->  		return false;
->  
->  	for (caps = cap_array; caps->matches; caps++)
-> -		if (caps->capability == cap &&
-> -		    caps->matches(caps, SCOPE_LOCAL_CPU))
-> -			return true;
-> +		if (caps->capability == cap)
-> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
+Maxime
 
-If we went for my capability { cap; match criteria or list; } approach,
-would it still be necessary to iterate over the whole list here?
-
-This seems preferable if this function is used by other paths that
-don't expect it to be so costly.  Currently I only see a call in
-arch/arm64/kvm/handle_exit.c:handle_exit_early() for the SError case --
-which is probably not expected to be a fast path.
-
-[...]
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180207/069af4a7/attachment.sig>
