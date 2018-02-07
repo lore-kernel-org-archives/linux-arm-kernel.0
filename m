@@ -1,147 +1,193 @@
 From: joonas.kylmala@iki.fi (=?UTF-8?q?Joonas=20Kylm=C3=A4l=C3=A4?=)
-Date: Wed,  7 Feb 2018 22:48:05 +0200
-Subject: [PATCH v2 2/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc1 from dts
+Date: Wed,  7 Feb 2018 22:48:04 +0200
+Subject: [PATCH v2 1/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 from dts
  to dtsi
 In-Reply-To: <20180207204805.16884-1-joonas.kylmala@iki.fi>
 References: <20180207204805.16884-1-joonas.kylmala@iki.fi>
-Message-ID: <20180207204805.16884-3-joonas.kylmala@iki.fi>
+Message-ID: <20180207204805.16884-2-joonas.kylmala@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the boards use the mmc1 pins and their attributes defined in
-mmc1_pins_a. Let's default to that by moving the pinctrl attributes to
-the dtsi file. This makes it easier to modify device trees in the
+Most of the boards use the mmc0 pins and their attributes defined in
+mmc0_pins_a. Let's default to those by moving the pinctrl attributes
+to the dtsi file. This makes it easier to modify device trees in the
 future as there is only one place to change the pinctrl attributes.
+
+As a side effect this patch also removes the GPIO detect
+pin (mmc0_cd_pin) from pinctrl. The GPIO detect pin is already
+requested and configured by mmc_gpiod_request_cd() in
+drivers/mmc/core/slot-gpio.c so pinctrl is not needed.
 
 Signed-off-by: Joonas Kylm?l? <joonas.kylmala@iki.fi>
 ---
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 2 --
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts   | 2 --
- arch/arm/boot/dts/sun8i-h3-beelink-x2.dts         | 2 --
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts     | 2 --
- arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts     | 2 --
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts         | 2 --
- arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts      | 2 --
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts   | 2 --
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                | 2 ++
- 9 files changed, 2 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  | 2 --
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    | 2 --
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          | 2 --
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 2 --
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts      | 2 --
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi             | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         | 2 --
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 8 ++------
+ 11 files changed, 2 insertions(+), 26 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-index f3b066ff63cb..73978853bb4c 100644
+index 9a5017bb1440..f3b066ff63cb 100644
 --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
 +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-@@ -119,8 +119,6 @@
+@@ -112,8 +112,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
- 	vmmc-supply = <&reg_vcc_wifi>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
+-	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v3>;
  	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
 diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index bea49ed89cc7..9c1bc472fb1c 100644
+index 3a196a86a984..bea49ed89cc7 100644
 --- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
 +++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -143,8 +143,6 @@
+@@ -136,8 +136,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
  	vmmc-supply = <&reg_vcc3v3>;
- 	vqmmc-supply = <&reg_vcc3v3>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
 diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-index 9fc07593e907..870aabcbb2d8 100644
+index 7824f0dbf022..9fc07593e907 100644
 --- a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
 +++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
-@@ -122,8 +122,6 @@
+@@ -115,8 +115,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
  	vmmc-supply = <&reg_vcc3v3>;
  	bus-width = <4>;
- 	non-removable;
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index a6e61915d648..07b51a2f14c6 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -101,8 +101,6 @@
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
+diff --git a/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+index d9dc14fe2aa3..d0d41eb86cb4 100644
+--- a/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+@@ -150,8 +150,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
- 	vmmc-supply = <&reg_vcc3v3>;
- 	vqmmc-supply = <&reg_vcc3v3>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
+-	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc_io>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
 diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-index 07e2e6180792..6246d3eff39d 100644
+index 48563adc7430..07e2e6180792 100644
 --- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
 +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-@@ -87,8 +87,6 @@
+@@ -80,8 +80,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
  	vmmc-supply = <&reg_vcc3v3>;
- 	vqmmc-supply = <&reg_vcc3v3>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+index e9af61394f5d..f110ee382239 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+@@ -96,8 +96,6 @@
+ &mmc0 {
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+ 	status = "okay";
+ 	vmmc-supply = <&reg_vcc3v3>;
+ };
 diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index ac6f52f3fa62..7569bd05e249 100644
+index 629f76b85005..ac6f52f3fa62 100644
 --- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
 +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -139,8 +139,6 @@
+@@ -132,8 +132,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
  	vmmc-supply = <&reg_vcc3v3>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
  	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
 diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
-index 82ab5b6b730b..2e59fd296717 100644
+index 398f975b380d..82ab5b6b730b 100644
 --- a/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
 +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
-@@ -113,8 +113,6 @@
+@@ -106,8 +106,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
  	vmmc-supply = <&reg_vcc3v3>;
  	bus-width = <4>;
- 	non-removable;
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-index a10281b455f5..71fb73208939 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-@@ -59,8 +59,6 @@
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 40941fef4ff3..c1a8cd93c463 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -106,8 +106,6 @@
  };
  
- &mmc1 {
+ &mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
  	vmmc-supply = <&reg_vcc3v3>;
  	bus-width = <4>;
- 	non-removable;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index c4769def8cd6..537227b85935 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -128,8 +128,6 @@
+ };
+ 
+ &mmc0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
 diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 3a0854a96a04..b4a4b3cb6c4e 100644
+index 7a83b15225c7..3a0854a96a04 100644
 --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
 +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -154,6 +154,8 @@
- 		mmc1: mmc at 1c10000 {
+@@ -141,6 +141,8 @@
+ 		mmc0: mmc at 1c0f000 {
  			/* compatible and clocks are in per SoC .dtsi file */
- 			reg = <0x01c10000 0x1000>;
+ 			reg = <0x01c0f000 0x1000>;
 +			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc1_pins_a>;
- 			resets = <&ccu RST_BUS_MMC1>;
++			pinctrl-0 = <&mmc0_pins_a>;
+ 			resets = <&ccu RST_BUS_MMC0>;
  			reset-names = "ahb";
- 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+@@ -356,12 +358,6 @@
+ 				bias-pull-up;
+ 			};
+ 
+-			mmc0_cd_pin: mmc0_cd_pin {
+-				pins = "PF6";
+-				function = "gpio_in";
+-				bias-pull-up;
+-			};
+-
+ 			mmc1_pins_a: mmc1 {
+ 				pins = "PG0", "PG1", "PG2", "PG3",
+ 				       "PG4", "PG5";
 -- 
 2.11.0
