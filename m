@@ -1,99 +1,125 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 7 Feb 2018 12:06:48 +0000
-Subject: [PATCH v3 1/2] Document: dt: binding: imx: update pinctrl doc for
- imx6sll
-In-Reply-To: <CACRpkdZn+A9Pv0ACQkjvq-2At39Ni9oB5Od=6+-5zk9b2qgNtA@mail.gmail.com>
-References: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
- <CACRpkdZn+A9Pv0ACQkjvq-2At39Ni9oB5Od=6+-5zk9b2qgNtA@mail.gmail.com>
-Message-ID: <AM3PR04MB3069D6F546F6DBB2FBDE07980FC0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Wed, 7 Feb 2018 17:45:53 +0530
+Subject: [alsa-devel] [RESEND PATCH v2 09/15] ASoC: qcom: qdsp6: Add
+ support to Q6CORE
+In-Reply-To: <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
+References: <20171214173402.19074-1-srinivas.kandagatla@linaro.org>
+ <20171214173402.19074-10-srinivas.kandagatla@linaro.org>
+Message-ID: <39d78468-db2b-05ce-9602-c76b083d7f75@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: 2018?2?7? 17:22
-> To: Jacky Bai <ping.bai@nxp.com>; Lucas Stach <l.stach@pengutronix.de>; A.s.
-> Dong <aisheng.dong@nxp.com>; Gary Bisson
-> <gary.bisson@boundarydevices.com>; Vladimir Zapolskiy <vz@mleia.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Shawn Guo <shawnguo@kernel.org>;
-> Sascha Hauer <kernel@pengutronix.de>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Linux ARM <linux-arm-kernel@lists.infradead.org>;
-> dl-linux-imx <linux-imx@nxp.com>; Jacky Bai <jacky.baip@gmail.com>
-> Subject: Re: [PATCH v3 1/2] Document: dt: binding: imx: update pinctrl doc for
-> imx6sll
-> 
-> On Wed, Feb 7, 2018 at 3:07 AM, Bai Ping <ping.bai@nxp.com> wrote:
-> 
-> > Add pinctrl binding doc update for imx6sll.
-> >
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> > ---
-> > changes v2-v3:
-> >  - add generic config binding
-> 
-> > +Optional Properties:
-> > +- drive-strength               Integer. Controls Drive Strength
-> > +                                       0: HI-Z
-> > +                                       1: 260 ohm at 3.3v, 150
-> ohm at 1.8v
-> > +                                       2: 130 ohm at 3.3v, 75
-> ohm at 1.8v
-> > +                                       3: 86 ohm at 3.3v, 50
-> ohm at 1.8v
-> > +                                       4: 65 ohm at 3.3v, 37
-> ohm at 1.8v
-> > +                                       5: 52 ohm at 3.3v, 30
-> ohm at 1.8v
-> > +                                       6: 43 ohm at 3.3v, 25
-> ohm at 1.8v
-> > +                                       7: 37 ohm at 3.3v, 21
-> ohm at 1.8v
-> 
-> HOW INTERESTING.
-> 
-> I am discussing this a lot with Lucas Stach right now, and in his SoC i.MX8MQ
-> that first resistance is said to be 255 Ohm etc.
-> 
-> Plus it seems he's missing the figures for 1.8V.
-> 
 
->From the reference on my hand, it's
 
-000  HI-Z ? Output driver is disabled (Hi-Z State)
-001  255_OHM ? 255 Ohm @3.3V, 240 Ohm @2.5V, 230 Ohm @1.8V, 265 Ohm @1.2V
-010  105_OHM ? 105 Ohm @3.3V, 100 Ohm @2.5V, 85 Ohm @1.8V, 110 Ohm @1.2V
-011  75_OHM ? 75 Ohm @3.3V, 70 Ohm @2.5V, 60 Ohm @1.8V, 80 Ohm @1.2V
-100  85_OHM ? 85 Ohm @3.3V, 80 Ohm @2.5V, 75 Ohm @1.8V, 90 Ohm @1.2V
-101  65_OHM ? 65 Ohm @3.3V, 60 Ohm @2.5V, 55 Ohm @1.8V, 65 Ohm @1.2V
-110  45_OHM ? 45 Ohm @3.3V, 45 Ohm @2.5V, 40 Ohm @1.8V, 50 Ohm @1.2V
-111  40_OHM ? 40 Ohm @3.3V, 40 Ohm @2.5V, 33 Ohm @1.8V, 40 Ohm @1.2V
-
-Which makes things a bit complicated as the value changes when voltage varies.
-
-> We're discussing whether this is used for impedance matching and what not.
-> We really need someone inside NXP to show us the way.
-> 
-> Anyways, I really need the two of you to discuss this, and I will forward my
-> conversation with Lucas to you.
-> 
-> If you can fish around a bit and tell us what this is used for and how:
-> 
-> - Is the intended usage for impedance matching?
-> - Does it control how many totem-poles are activated on the
->   output pad?
-> 
-
-I already forwarded the question to the IP owner from our IC design team,
-just as I replied in another mail to you.
-
-Regards
-Dong Aisheng
-
-> would all be very grateful.
-> 
-> > +- drive-open-drain             Bool. Enable Pin Open-drian
-> 
-> Open-drain?
-> 
-> Yours,
-> Linus Walleij
+On 12/14/2017 11:03 PM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> This patch adds support to core apr service, which is used to query
+> status of other static and dynamic services on the dsp.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>   sound/soc/qcom/Kconfig        |   5 +
+>   sound/soc/qcom/qdsp6/Makefile |   1 +
+>   sound/soc/qcom/qdsp6/q6core.c | 227 ++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 233 insertions(+)
+>   create mode 100644 sound/soc/qcom/qdsp6/q6core.c
+>
+> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+> index 7ebdb879a8a3..121b9c957024 100644
+> --- a/sound/soc/qcom/Kconfig
+> +++ b/sound/soc/qcom/Kconfig
+> @@ -56,11 +56,16 @@ config SND_SOC_QDSP6_ASM
+>   	tristate
+>   	default n
+>   
+> +config SND_SOC_QDSP6_CORE
+> +	tristate
+> +	default n
+> +
+>   config SND_SOC_QDSP6
+>   	tristate "SoC ALSA audio driver for QDSP6"
+>   	select SND_SOC_QDSP6_AFE
+>   	select SND_SOC_QDSP6_ADM
+>   	select SND_SOC_QDSP6_ASM
+> +	select SND_SOC_QDSP6_CORE
+>   	help
+>   	 To add support for MSM QDSP6 Soc Audio.
+>   	 This will enable sound soc platform specific
+> diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
+> index 49dd3ccab27b..ad7f10691e54 100644
+> --- a/sound/soc/qcom/qdsp6/Makefile
+> +++ b/sound/soc/qcom/qdsp6/Makefile
+> @@ -1,3 +1,4 @@
+>   obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
+>   obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+>   obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
+> +obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+> diff --git a/sound/soc/qcom/qdsp6/q6core.c b/sound/soc/qcom/qdsp6/q6core.c
+> new file mode 100644
+> index 000000000000..d4e2dbc62489
+> --- /dev/null
+> +++ b/sound/soc/qcom/qdsp6/q6core.c
+> @@ -0,0 +1,227 @@
+> +/* SPDX-License-Identifier: GPL-2.0
+> +* Copyright (c) 2017, Linaro Limited
+> +*/
+> +#include <linux/slab.h>
+> +#include <linux/wait.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/sched.h>
+> +#include <linux/jiffies.h>
+[..]
+> +
+> +	dev_set_drvdata(&adev->dev, core);
+> +
+> +	core->adev = adev;
+> +	init_waitqueue_head(&core->wait);
+> +
+> +	do {
+> +		if (!q6core_is_adsp_ready(core)) {
+> +			dev_info(&adev->dev, "ADSP Audio isn't ready\n");
+> +		} else {
+> +			dev_info(&adev->dev, "ADSP Audio is ready\n");
+> +
+If q6core_is_adsp_ready() return failure, then we should not call and 
+ADSP API.
+> +			ret = q6core_get_svc_versions(core);
+> +			if (!ret)
+> +				q6core_add_static_services(core);
+> +
+> +			break;
+> +		}
+> +	} while (time_after(timeout, jiffies));
+> +
+I think we should defer probe if q6core_is_adsp_ready() returns failure 
+and timeouts.
+> +	return ret;
+> +}
+> +
+> +static int q6core_exit(struct apr_device *adev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static const struct apr_device_id core_id[] = {
+> +	{"Q6CORE", APR_DOMAIN_ADSP, APR_SVC_ADSP_CORE, APR_CLIENT_AUDIO},
+> +	{ },
+> +};
+> +
+> +static struct apr_driver qcom_q6core_driver = {
+> +	.probe = q6core_probe,
+> +	.remove = q6core_exit,
+> +	.callback = core_callback,
+> +	.id_table = core_id,
+> +	.driver = {
+> +		   .name = "qcom-q6core",
+> +		   },
+> +};
+> +
+> +module_apr_driver(qcom_q6core_driver);
+> +
+> +MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org");
+> +MODULE_DESCRIPTION("q6 core");
+> +MODULE_LICENSE("GPL v2");
