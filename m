@@ -1,57 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Feb 2018 10:21:41 +0000
-Subject: [PATCH v2 6/7] arm64: tegra: Add Tegra194 chip device tree
-In-Reply-To: <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
-References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
- <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
-Message-ID: <458ba9f9-d703-9edf-8e7b-bc9d0f0ef0cc@arm.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Wed, 7 Feb 2018 18:22:47 +0800
+Subject: [PATCH v2 1/4] dt-bindings: soc: add SCPSYS binding for MT7623 and
+ MT7623A SoC
+Message-ID: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikko,
+From: Sean Wang <sean.wang@mediatek.com>
 
-On 06/02/18 07:22, Mikko Perttunen wrote:
-> Add the chip-level device tree, including binding headers, for the
-> NVIDIA Tegra194 "Xavier" system-on-chip. Only a small subset of devices
-> are initially available, enough to boot to UART console.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 342 +++++++++++++
->  include/dt-bindings/clock/tegra194-clock.h     | 664 +++++++++++++++++++++++++
->  include/dt-bindings/gpio/tegra194-gpio.h       |  59 +++
->  include/dt-bindings/power/tegra194-powergate.h |  49 ++
->  include/dt-bindings/reset/tegra194-reset.h     | 166 +++++++
->  5 files changed, 1280 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
->  create mode 100644 include/dt-bindings/clock/tegra194-clock.h
->  create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
->  create mode 100644 include/dt-bindings/power/tegra194-powergate.h
->  create mode 100644 include/dt-bindings/reset/tegra194-reset.h
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
-> new file mode 100644
-> index 000000000000..dda28d758cab
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+document the binding for enabling SCPSYS on MediaTek MT7623 and MT7623A
+SoC. Where MT7623 SoC has the same definition about power domains with
+MT2701, so it's fine to using MT2701 ones as MT7623's fallback.
 
-[...]
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> +		gic: interrupt-controller at 3881000 {
-> +			compatible = "arm,gic-400";
-> +			#interrupt-cells = <3>;
-> +			interrupt-controller;
-> +			reg = <0x03881000 0x1000>,
-> +			      <0x03882000 0x2000>;
-
-You're missing the GICH and GICV regions here.
-
-> +			interrupts = <GIC_PPI 9
-> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +			interrupt-parent = <&gic>;
-> +		};
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+index 76bf45b..d6fe16f 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -21,6 +21,8 @@ Required properties:
+ 	- "mediatek,mt2712-scpsys"
+ 	- "mediatek,mt6797-scpsys"
+ 	- "mediatek,mt7622-scpsys"
++	- "mediatek,mt7623-scpsys", "mediatek,mt2701-scpsys": For MT7623 SoC
++	- "mediatek,mt7623a-scpsys": For MT7623A SoC
+ 	- "mediatek,mt8173-scpsys"
+ - #power-domain-cells: Must be 1
+ - reg: Address range of the SCPSYS unit
+@@ -28,10 +30,11 @@ Required properties:
+ - clock, clock-names: clocks according to the common clock binding.
+                       These are clocks which hardware needs to be
+                       enabled before enabling certain power domains.
+-	Required clocks for MT2701: "mm", "mfg", "ethif"
++	Required clocks for MT2701 or MT7623: "mm", "mfg", "ethif"
+ 	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
+ 	Required clocks for MT6797: "mm", "mfg", "vdec"
+ 	Required clocks for MT7622: "hif_sel"
++	Required clocks for MT7622A: "ethif"
+ 	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
+ 
+ Optional properties:
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
