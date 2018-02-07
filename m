@@ -1,114 +1,59 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 7 Feb 2018 17:14:17 +0800
-Subject: [PATCH v2] pwm: mediatek: fix up PWM4 and PWM5 malfunction on MT7623
-Message-ID: <f94b2d4146ebe0f8eaae02b0dd951f39af0972d4.1517994540.git.sean.wang@mediatek.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 7 Feb 2018 10:21:48 +0100
+Subject: [PATCH v3 1/2] Document: dt: binding: imx: update pinctrl doc for
+ imx6sll
+In-Reply-To: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
+References: <1517969226-13076-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <CACRpkdZn+A9Pv0ACQkjvq-2At39Ni9oB5Od=6+-5zk9b2qgNtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Wed, Feb 7, 2018 at 3:07 AM, Bai Ping <ping.bai@nxp.com> wrote:
 
-Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
-control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
-programming on PWM hardware causes waveform cannot be output as expected.
-Thus, the patch adds the extra condition for fixing up the weird case to
-let PWM4 or PWM5 able to work on MT7623.
+> Add pinctrl binding doc update for imx6sll.
+>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> ---
+> changes v2-v3:
+>  - add generic config binding
 
-v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
+> +Optional Properties:
+> +- drive-strength               Integer. Controls Drive Strength
+> +                                       0: HI-Z
+> +                                       1: 260 ohm at 3.3v, 150 ohm at 1.8v
+> +                                       2: 130 ohm at 3.3v, 75 ohm at 1.8v
+> +                                       3: 86 ohm at 3.3v, 50 ohm at 1.8v
+> +                                       4: 65 ohm at 3.3v, 37 ohm at 1.8v
+> +                                       5: 52 ohm at 3.3v, 30 ohm at 1.8v
+> +                                       6: 43 ohm at 3.3v, 25 ohm at 1.8v
+> +                                       7: 37 ohm at 3.3v, 21 ohm at 1.8v
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Cc: Zhi Mao <zhi.mao@mediatek.com>
-Cc: John Crispin <john@phrozen.org>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+HOW INTERESTING.
 
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index f5d97e0..796baea 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -29,7 +29,9 @@
- #define PWMGDUR			0x0c
- #define PWMWAVENUM		0x28
- #define PWMDWIDTH		0x2c
-+#define PWM45DWIDTH_FIXUP	0x30
- #define PWMTHRES		0x30
-+#define PWM45THRES_FIXUP	0x34
- 
- #define PWM_CLK_DIV_MAX		7
- 
-@@ -54,6 +56,7 @@ static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
- 
- struct mtk_pwm_platform_data {
- 	unsigned int num_pwms;
-+	bool pwm45_fixup;
- };
- 
- /**
-@@ -66,6 +69,7 @@ struct mtk_pwm_chip {
- 	struct pwm_chip chip;
- 	void __iomem *regs;
- 	struct clk *clks[MTK_CLK_MAX];
-+	const struct mtk_pwm_platform_data *soc;
- };
- 
- static const unsigned int mtk_pwm_reg_offset[] = {
-@@ -131,7 +135,8 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- {
- 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
- 	struct clk *clk = pc->clks[MTK_CLK_PWM1 + pwm->hwpwm];
--	u32 resolution, clkdiv = 0;
-+	u32 resolution, clkdiv = 0, reg_width = PWMDWIDTH,
-+	    reg_thres = PWMTHRES;
- 	int ret;
- 
- 	ret = mtk_pwm_clk_enable(chip, pwm);
-@@ -151,9 +156,18 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 		return -EINVAL;
- 	}
- 
-+	if (pc->soc->pwm45_fixup && pwm->hwpwm > 2) {
-+		/*
-+		 * PWM[4,5] has distinct offset for PWMDWIDTH and PWMTHRES
-+		 * from the other PWMs on MT7623.
-+		 */
-+		reg_width = PWM45DWIDTH_FIXUP;
-+		reg_thres = PWM45THRES_FIXUP;
-+	}
-+
- 	mtk_pwm_writel(pc, pwm->hwpwm, PWMCON, BIT(15) | clkdiv);
--	mtk_pwm_writel(pc, pwm->hwpwm, PWMDWIDTH, period_ns / resolution);
--	mtk_pwm_writel(pc, pwm->hwpwm, PWMTHRES, duty_ns / resolution);
-+	mtk_pwm_writel(pc, pwm->hwpwm, reg_width, period_ns / resolution);
-+	mtk_pwm_writel(pc, pwm->hwpwm, reg_thres, duty_ns / resolution);
- 
- 	mtk_pwm_clk_disable(chip, pwm);
- 
-@@ -211,6 +225,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	data = of_device_get_match_data(&pdev->dev);
- 	if (data == NULL)
- 		return -EINVAL;
-+	pc->soc = data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
-@@ -251,14 +266,17 @@ static int mtk_pwm_remove(struct platform_device *pdev)
- 
- static const struct mtk_pwm_platform_data mt2712_pwm_data = {
- 	.num_pwms = 8,
-+	.pwm45_fixup = false,
- };
- 
- static const struct mtk_pwm_platform_data mt7622_pwm_data = {
- 	.num_pwms = 6,
-+	.pwm45_fixup = false,
- };
- 
- static const struct mtk_pwm_platform_data mt7623_pwm_data = {
- 	.num_pwms = 5,
-+	.pwm45_fixup = true,
- };
- 
- static const struct of_device_id mtk_pwm_of_match[] = {
--- 
-2.7.4
+I am discussing this a lot with Lucas Stach right now, and in his
+SoC i.MX8MQ that first resistance is said to be 255 Ohm etc.
+
+Plus it seems he's missing the figures for 1.8V.
+
+We're discussing whether this is used for impedance matching
+and what not. We really need someone inside NXP to show
+us the way.
+
+Anyways, I really need the two of you to discuss this, and I
+will forward my conversation with Lucas to you.
+
+If you can fish around a bit and tell us what this is used for
+and how:
+
+- Is the intended usage for impedance matching?
+- Does it control how many totem-poles are activated on the
+  output pad?
+
+would all be very grateful.
+
+> +- drive-open-drain             Bool. Enable Pin Open-drian
+
+Open-drain?
+
+Yours,
+Linus Walleij
