@@ -1,40 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Feb 2018 12:00:52 +0100
-Subject: [PATCH v1 07/16] kvm: arm/arm64: Remove spurious WARN_ON
-In-Reply-To: <20180109190414.4017-8-suzuki.poulose@arm.com>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-8-suzuki.poulose@arm.com>
-Message-ID: <20180208110052.GJ29286@cbox>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Thu, 8 Feb 2018 12:00:45 +0100
+Subject: [PATCH v2] media: stm32-dcmi: add g/s_parm framerate support
+Message-ID: <1518087645-1394-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 09, 2018 at 07:04:02PM +0000, Suzuki K Poulose wrote:
-> On a 4-level page table pgd entry can be empty, unlike a 3-level
-> page table. Remove the spurious WARN_ON() in stage_get_pud().
+Add g/s_parm framerate support by calling subdev
+g/s_frame_interval ops.
+This allows user to control sensor framerate by
+calling ioctl G/S_PARM.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+---
+version 2:
+  - Rebase on Hans branch to use new helpers:
+    See https://www.mail-archive.com/linux-media at vger.kernel.org/msg125769.html
 
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  virt/kvm/arm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index e6548c85c495..78253fe00fc4 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -870,7 +870,7 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
->  	pud_t *pud;
->  
->  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
-> -	if (WARN_ON(stage2_pgd_none(*pgd))) {
-> +	if (stage2_pgd_none(*pgd)) {
->  		if (!cache)
->  			return NULL;
->  		pud = mmu_memory_cache_alloc(cache);
-> -- 
-> 2.13.6
-> 
+ drivers/media/platform/stm32/stm32-dcmi.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 9460b30..60dd24c 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -1167,6 +1167,22 @@ static int dcmi_enum_framesizes(struct file *file, void *fh,
+ 	return 0;
+ }
+ 
++static int dcmi_g_parm(struct file *file, void *priv,
++		       struct v4l2_streamparm *p)
++{
++	struct stm32_dcmi *dcmi = video_drvdata(file);
++
++	return v4l2_g_parm_cap(video_devdata(file), dcmi->entity.subdev, p);
++}
++
++static int dcmi_s_parm(struct file *file, void *priv,
++		       struct v4l2_streamparm *p)
++{
++	struct stm32_dcmi *dcmi = video_drvdata(file);
++
++	return v4l2_s_parm_cap(video_devdata(file), dcmi->entity.subdev, p);
++}
++
+ static int dcmi_enum_frameintervals(struct file *file, void *fh,
+ 				    struct v4l2_frmivalenum *fival)
+ {
+@@ -1269,6 +1285,9 @@ static int dcmi_release(struct file *file)
+ 	.vidioc_g_input			= dcmi_g_input,
+ 	.vidioc_s_input			= dcmi_s_input,
+ 
++	.vidioc_g_parm			= dcmi_g_parm,
++	.vidioc_s_parm			= dcmi_s_parm,
++
+ 	.vidioc_enum_framesizes		= dcmi_enum_framesizes,
+ 	.vidioc_enum_frameintervals	= dcmi_enum_frameintervals,
+ 
+-- 
+1.9.1
