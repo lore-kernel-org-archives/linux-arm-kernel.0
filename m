@@ -1,30 +1,41 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 8 Feb 2018 14:55:41 +0100
-Subject: [PATCH 1/9] perf vendor events: drop incomplete multiple mapfile
- support
-In-Reply-To: <1517939104-230881-2-git-send-email-john.garry@huawei.com>
-References: <1517939104-230881-1-git-send-email-john.garry@huawei.com>
- <1517939104-230881-2-git-send-email-john.garry@huawei.com>
-Message-ID: <20180208135541.GJ10234@krava>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 8 Feb 2018 16:11:55 +0100
+Subject: [PATCH v5] ARM: sun8i: h2+: add support for Banana Pi M2 Zero
+ board
+In-Reply-To: <20180208100613.4761-1-icenowy@aosc.io>
+References: <20180208100613.4761-1-icenowy@aosc.io>
+Message-ID: <20180208151155.ncmsoeofjjj6nrid@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 01:44:56AM +0800, John Garry wrote:
-> Currently jevents supports multiple mapfiles, but this
-> is only in the form where mapfile basename starts with
-> 'mapfile.csv'
+On Thu, Feb 08, 2018 at 06:06:13PM +0800, Icenowy Zheng wrote:
+> Banana Pi M2 Zero board is a H2+-based board by Sinovoip, with a form
+> factor and GPIO holes similar to Raspberry Pi Zero.
 > 
-> At the moment, no architectures actually use multiple mapfiles,
-> so drop the support for now.
+> It features:
+> - Allwinner H2+ SoC
+> - Single-chip (16-bit) 512MiB DDR3 DRAM
+> - Ampak AP6212 Wi-Fi/Bluetooth module
+> - MicroSD slot
+> - Two MicroUSB Type-B ports (one can only be used to power the board and
+>   the other features OTG functionality)
+> - Two keys, a reset and a GPIO-connected key.
+> - HDMI Type-C (miniHDMI) connector connected to the HDMI part of H2+.
+> - CSI connector to connect the camera sensor provided by Sinovoip.
 > 
-> This patch also solves a nuisance where, when the mapfile is
-> edited and the text editor may create a backup, jevents may
-> use the backup, as shown:
-> jevents: Many mapfiles? Using pmu-events/arch/arm64/mapfile.csv~, ignoring pmu-events/arch/arm64/mapfile.csv
-> 
-> Signed-off-by: John Garry <john.garry@huawei.com>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Acked-by: Jiri Olsa <jolsa@kernel.org>
+Applied, thanks!
+Maxime
 
-thanks,
-jirka
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/2be443a3/attachment.sig>
