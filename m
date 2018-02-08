@@ -1,31 +1,122 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Feb 2018 11:25:41 +0000
-Subject: [PATCH 00/16] kvm: arm64: Support for dynamic IPA size
-In-Reply-To: <20180208111844.GN29286@cbox>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180208111844.GN29286@cbox>
-Message-ID: <20180208112540.GA17775@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Feb 2018 11:35:59 +0000
+Subject: [PATCH v2 11/20] arm64: capabilities: Add support for features
+ enabled early
+In-Reply-To: <a1275474-fbf0-91b2-befb-cbd59d5ccf1e@arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-12-suzuki.poulose@arm.com>
+ <20180207103855.GB5862@e103592.cambridge.arm.com>
+ <a1275474-fbf0-91b2-befb-cbd59d5ccf1e@arm.com>
+Message-ID: <20180208113559.GW5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I can comment on one part here:
+On Wed, Feb 07, 2018 at 06:34:37PM +0000, Suzuki K Poulose wrote:
+> On 07/02/18 10:38, Dave Martin wrote:
+> >On Wed, Jan 31, 2018 at 06:27:58PM +0000, Suzuki K Poulose wrote:
+> >>The kernel detects and uses some of the features based on the boot
+> >>CPU and expects that all the following CPUs conform to it. e.g,
+> >>with VHE and the boot CPU running at EL2, the kernel decides to
+> >>keep the kernel running at EL2. If another CPU is brought up without
+> >>this capability, we use custom hooks (via check_early_cpu_features())
+> >>to handle it. To handle such capabilities add support for detecting
+> >>and enabling capabilities based on the boot CPU.
+> >>
+> >>A bit is added to indicate if the capability should be detected
+> >>early on the boot CPU. The infrastructure then ensures that such
+> >>capabilities are probed and "enabled" early on in the boot CPU
+> >>and, enabled on the subsequent CPUs.
+> >>
+> >>Cc: Julien Thierry <julien.thierry@arm.com>
+> >>Cc: Dave Martin <dave.martin@arm.com>
+> >>Cc: Will Deacon <will.deacon@arm.com>
+> >>Cc: Mark Rutland <mark.rutland@arm.com>
+> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >>---
+> >>  arch/arm64/include/asm/cpufeature.h | 48 +++++++++++++++++++++++++++++--------
+> >>  arch/arm64/kernel/cpufeature.c      | 48 +++++++++++++++++++++++++++----------
+> >>  2 files changed, 74 insertions(+), 22 deletions(-)
+> >>
+> >>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
 
-On Thu, Feb 08, 2018 at 12:18:44PM +0100, Christoffer Dall wrote:
-> Wasn't this also the decision taken for IOMMU page table allocation, and
-> why was that the right approach for the IOMMU but not for KVM stage 2
-> page tables?  Is there room for reuse of the IOMMU page table allocation
-> logic in KVM as well?
+[...]
 
-There were a few reasons we did this for IOMMU page tables:
+> >>   * 3) Verification: When a CPU is brought online (e.g, by user or by the kernel),
+> >>   *    the kernel should make sure that it is safe to use the CPU, by verifying
+> >>@@ -139,11 +148,22 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+> >>   *
+> >>   *    As explained in (2) above, capabilities could be finalised at different
+> >>   *    points in the execution. Each CPU is verified against the "finalised"
+> >>- *    capabilities and if there is a conflict, the kernel takes an action, based
+> >>- *    on the severity (e.g, a CPU could be prevented from booting or cause a
+> >>- *    kernel panic). The CPU is allowed to "affect" the state of the capability,
+> >>- *    if it has not been finalised already. See section 5 for more details on
+> >>- *    conflicts.
+> >>+ *    capabilities.
+> >>+ *
+> >>+ *	x------------------------------------------------------------------- x
+> >>+ *	| Verification:       | Boot CPU | SMP CPUs by kernel | CPUs by user |
+> >>+ *	|--------------------------------------------------------------------|
+> >>+ *	| Primary boot CPU    |          |                    |              |
+> >>+ *	|  capability         |   n      |      y             |       y      |
+> >>+ *	|--------------------------------------------------------------------|
+> >>+ *	| All others          |   n      |      n             |       y      |
+> >>+ *	x--------------------------------------------------------------------x
+> >
+> >Minor clarify nit: it's not obvious that "n" means "no conflict" and "y"
+> >means "conflict".
+> >
+> >Could we have blank cell versus "X" (with a note saying what that
+> >means), or "ok" versus "CONFLICT"?
+> 
+> This is not strictly about conflicts, but about what each CPU get
+> verified against.  Since there are multiple stages of "finalisation"
 
-  * Ability to use different page size/VA bits/levels from the CPU
-  * Ability to support different page table formats (e.g. short descriptor)
-  * Ability to determine page table attributes at runtime
-  * Requirement to map/unmap in atomic context
-  * Ability to cope with non-coherent page table walkers
-  * Ability to create both stage-1 and stage-2 mappings
-  * Easier to hook in our own TLB invalidation routines
-  * Support for lockless concurrent map/unmap within confines of the DMA API
-    usage
+You're right: I meant something like "potential conflict", but I hadn't
+read the previous paragraph carefully enough and didn't explain what I
+meant very well.
 
-Will
+> for the capabilities, the table shows how the CPUs get verified.
+> 
+> Would it help if I changed the description above the table to :
+> 
+>  *    As explained in (2) above, capabilities could be finalised at different
+>  *    points in the execution. Each CPU is verified against the "finalised"
+>  *    capabilities. The following table shows, the capabilities verified
+>  *    against each CPU in the system.
+>  *
+>  *      x------------------------------------------------------------------- x
+>  *      | Verified against:   | Boot CPU | SMP CPUs by kernel | CPUs by user |
+
+I still find it a bit cryptic.
+
+Would it be simpler just to write this out in prose, with reference to
+the actual capability types?  I feel that things have to be abbreviated
+a bit to fit nicely into the table otherwise.
+
+What about:
+
+ * As explained in (2) above, capabilities could be finalised at different
+ * points in the execution, depending on the capability type. Each newly booted
+ * CPU is verified against those capabilities that have been finalised by the
+ * time that CPU boots:
+ *
+ *	* SCOPE_BOOT_CPU: all CPUs are verified against the capability except
+ *	  for the primary boot CPU.
+ *
+ *	* SCOPE_LOCAL_CPU, SCOPE_SYSTEM: all CPUs hotplugged on by the user
+ *	  after kernel boot are verified against the capability.
+
+> >>+ *    If there is a conflict, the kernel takes an action, based on the severity
+> >>+ *    (e.g, a CPU could be prevented from booting or cause a kernel panic).
+> >>+ *    The CPU is allowed to "affect" the state of the capability, if it has not
+> >>+ *    been finalised already. See section 5 for more details on conflicts.
+> >>   *
+> >>   * 4) Action: As mentioned in (2), the kernel can take an action for each detected
+> >>   *    capability, on all CPUs on the system. This is always initiated only after
+
+[...]
+
+Cheers
+---Dave
