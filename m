@@ -1,62 +1,47 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu,  8 Feb 2018 12:48:53 -0500
-Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for kevin
- panel
-In-Reply-To: <20180208174855.55620-1-seanpaul@chromium.org>
-References: <20180208174855.55620-1-seanpaul@chromium.org>
-Message-ID: <20180208174855.55620-7-seanpaul@chromium.org>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 8 Feb 2018 18:52:07 +0100
+Subject: [PATCH] drm/exynos: g2d: Delete an error message for a failed memory
+ allocation in two functions
+Message-ID: <f1a7c103-fd17-3a61-61f7-570436e3c452@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an override mode for kevin devices. The mode increases
-both back porches to allow a pixel clock of 26666kHz as opposed to the
-'typical' value of 252750kHz. This is needed to avoid interference with
-the touch digitizer on these laptops.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 8 Feb 2018 18:42:51 +0100
 
-Changes in v2:
- - Wrap the timing in display-timings node to match binding (Rob/Thierry)
-Changes in v3:
- - Unwrap the timing from display-timings and rename panel-timing (Rob)
+Omit an extra message for a memory allocation failure in these functions.
 
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: St?phane Marchesin <marcheu@chromium.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: devicetree at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-rockchip at lists.infradead.org
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-index 191a6bcb1704..658411ce37ea 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-@@ -98,6 +98,20 @@
- 		backlight = <&backlight>;
- 		power-supply = <&pp3300_disp>;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+index 2b8bf2dd6387..5eb0d3292525 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+@@ -286,7 +286,6 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
  
-+		panel-timing {
-+			clock-frequency = <266604720>;
-+			hactive = <2400>;
-+			hfront-porch = <48>;
-+			hback-porch = <84>;
-+			hsync-len = <32>;
-+			hsync-active = <0>;
-+			vactive = <1600>;
-+			vfront-porch = <3>;
-+			vback-porch = <120>;
-+			vsync-len = <10>;
-+			vsync-active = <0>;
-+		};
+ 	node = kcalloc(G2D_CMDLIST_NUM, sizeof(*node), GFP_KERNEL);
+ 	if (!node) {
+-		dev_err(dev, "failed to allocate memory\n");
+ 		ret = -ENOMEM;
+ 		goto err;
+ 	}
+@@ -1358,10 +1357,9 @@ int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
+ 		return -EFAULT;
+ 
+ 	runqueue_node = kmem_cache_alloc(g2d->runqueue_slab, GFP_KERNEL);
+-	if (!runqueue_node) {
+-		dev_err(dev, "failed to allocate memory\n");
++	if (!runqueue_node)
+ 		return -ENOMEM;
+-	}
 +
- 		ports {
- 			panel_in_edp: endpoint {
- 				remote-endpoint = <&edp_out_panel>;
+ 	run_cmdlist = &runqueue_node->run_cmdlist;
+ 	event_list = &runqueue_node->event_list;
+ 	INIT_LIST_HEAD(run_cmdlist);
 -- 
-2.16.0.rc1.238.g530d649a79-goog
+2.16.1
