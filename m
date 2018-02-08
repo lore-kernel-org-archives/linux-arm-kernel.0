@@ -1,47 +1,51 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Thu, 8 Feb 2018 10:52:11 -0600
-Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
-In-Reply-To: <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
-Message-ID: <CAHCPf3vt-ZCXgTfCZ-LSW3TSXAk5KBz3wCu-LuTOBdCB+sgGgw@mail.gmail.com>
+From: pintu.ping@gmail.com (Pintu Kumar)
+Date: Thu, 8 Feb 2018 22:23:20 +0530
+Subject: [VDSO]: vdso_test failing on arm 32 bit
+In-Reply-To: <1518106267799.61329@mentor.com>
+References: <20171212162612.GB10595@n2100.armlinux.org.uk>
+ <1513098352501.51185@mentor.com>
+ <20171212172034.GC10595@n2100.armlinux.org.uk>
+ <CAOuPNLiTf040ZOyEroq4oy=5Bz1LScmE-vpR3xdjXBGuCKcxMA@mail.gmail.com>
+ <20171213111718.GJ10595@n2100.armlinux.org.uk>
+ <CAOuPNLgM8OxP8cV9goAUDtXgxjhcfoe27M0Q=Ty1BVAPD5aipQ@mail.gmail.com>
+ <20171213171530.GM10595@n2100.armlinux.org.uk>
+ <1513186632784.96495@mentor.com>
+ <20171213173956.GN10595@n2100.armlinux.org.uk>
+ <CAOuPNLgZL0N0OuTUEVR6vFjykBtLeR+t0pvn3FSKsA4UqG-UGQ@mail.gmail.com>
+ <20171214102148.GO10595@n2100.armlinux.org.uk>
+ <CAOuPNLgj8c0a1gDESQDatoa4GU_PYu8TK1NJ0KKkVfjW7zvsdA@mail.gmail.com>
+ <1518106267799.61329@mentor.com>
+Message-ID: <CAOuPNLj8k0AdsOUJSgdZFNKPM0Q5bbjkSxrOCcCo+tniiXOCCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hiya,
+On Thu, Feb 8, 2018 at 9:41 PM, Lynch, Nathan <Nathan_Lynch@mentor.com> wrote:
+>> I commented the device tree reading property:
+>> arm,cpu-registers-not-fw-configured , from the arch/arm/kernel/vdso.c
+>
+> Don't do that, please. The presence of that property indicates that the counter is not suitable for use by the OS. There is nothing we can do in Linux to make the VDSO useful on this system; that is why it gets disabled at runtime.
+>
+> The timing measurements you get are likely tainted by garbage results from the VDSO itself.
 
-On 25 January 2018 at 17:55, Channagoud Kadabi <ckadabi@codeaurora.org> wrote:
-> Documentation for last level cache controller device tree bindings,
-> client bindings usage examples.
+OK thank you for your feedback.
 
-[snippety snip]
+But, we wanted to know, why vdso call timing is very high here. What
+does this timing indicates?
+gettimeofday: vdso: 4171 nsec/call
 
-> +- llcc-bank-off:
-> +       Usage: required
-> +       Value Type: <u32 array>
-> +       Definition: Offsets of llcc banks from llcc base address starting from
-> +                   LLCC bank0.
-> +
-> +- llcc-broadcast-off:
-> +       Usage: required
-> +       Value Type: <u32>
-> +       Definition: Offset of broadcast register from LLCC bank0 address.
+1) How to decide whether to enable or disable VDSO in the system, if
+its not suitable.
+Because in a VDSO enabled system, when we use gettimeofday API, we see
+that its not falling back to the systemically, but may rather return a
+garbage value from vdso itself.
+If that is the case, shall we disable CONFIG_VDSO itself or keep it as it is ?
 
-What's with the redundant namespacing?
+Please suggest your opinion.
 
-Have we not, as a community, realised that we do not need to namespace
-properties which are only present under
-a single binding or node, or even those that aren't? This mess started
-with the regulator bindings and it's never
-stopped. What are we at now, 25 years of device trees, 10 years of FDT on Arm?
+2) Can you list down 1-2 arm 32-bit board, where VDSO can work perfectly ?
 
-Notwithstanding the complete waste of rodata in the kernel image for
-matching (& increased time to compare), why
-wouldn't you consider why "bank-offset" for your node be any different
-than a common property for any other node?
+This will be really helpful for us to take some decision.
 
-And if you need to describe register offsets... why aren't you able to
-use the reg property?
 
-Ta,
-Matt
+Thank You!
+Pintu
