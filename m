@@ -1,11 +1,11 @@
 From: philippe.cornu@st.com (Philippe CORNU)
-Date: Thu, 8 Feb 2018 08:35:18 +0000
-Subject: [PATCH v2] drm/bridge/synopsys: dsi: Add 1.31 version support
-In-Reply-To: <bbe3ffeb-2e93-f36f-a8be-0319e16572e5@samsung.com>
-References: <CGME20180206084357epcas1p32e11d1e3c84de7da9d5ba150ded77cdf@epcas1p3.samsung.com>
- <20180206084251.303-1-philippe.cornu@st.com>
- <bbe3ffeb-2e93-f36f-a8be-0319e16572e5@samsung.com>
-Message-ID: <c43fbcbc-97f3-82de-4594-86211e930db9@st.com>
+Date: Thu, 8 Feb 2018 08:35:29 +0000
+Subject: [PATCH] drm/bridge/synopsys: dsi: Add read feature
+In-Reply-To: <a1a17a6e-8389-e04f-716e-29b10b295b54@samsung.com>
+References: <CGME20180204213219epcas2p429434ba0c87a0544dc5294facd80529b@epcas2p4.samsung.com>
+ <20180204213104.17834-1-philippe.cornu@st.com>
+ <a1a17a6e-8389-e04f-716e-29b10b295b54@samsung.com>
+Message-ID: <e187ceb1-ceba-916f-45da-fe999197ff9b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,11 @@ Many thanks
 Philippe :-)
 
 On 02/08/2018 08:39 AM, Andrzej Hajda wrote:
-> On 06.02.2018 09:42, Philippe Cornu wrote:
->> Add support for the Synopsys DesignWare MIPI DSI version 1.31
->> Two registers need to be updated/added for supporting 1.31:
->> * PHY_TMR_CFG 0x9c (updated)
->>    1.30 [31:24] phy_hs2lp_time
->>         [23:16] phy_lp2hs_time
->>         [14: 0] max_rd_time
->>
->>    1.31 [25:16] phy_hs2lp_time
->>         [ 9: 0] phy_lp2hs_time
->>
->> * PHY_TMR_RD_CFG 0xf4 (new)
->>    1.31 [14: 0] max_rd_time
+> On 04.02.2018 22:31, Philippe Cornu wrote:
+>> This patch adds the DCS/GENERIC DSI read feature.
 >>
 >> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+>> ---
 > Queued to drm-misc-next.
 > --
 > Regards
