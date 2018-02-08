@@ -1,77 +1,67 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 8 Feb 2018 15:27:32 +0100
-Subject: [PATCH 1/6] dt-bindings: mfd: Add ST Multi-Function eXpander driver
+Date: Thu, 8 Feb 2018 15:27:36 +0100
+Subject: [PATCH 5/6] ARM: dts: stm32: add joystick support on stm32746g-eval
 In-Reply-To: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
 References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1518100057-23234-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1518100057-23234-6-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the
-STMicroelectronics Multi-Function eXpander (MFX).
+The joystick on stm32746g-eval uses gpios on MFX gpio expander.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- Documentation/devicetree/bindings/mfd/st-mfx.txt | 51 ++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/st-mfx.txt
+ arch/arm/boot/dts/stm32746g-eval.dts | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/st-mfx.txt b/Documentation/devicetree/bindings/mfd/st-mfx.txt
-new file mode 100644
-index 0000000..423d800
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/st-mfx.txt
-@@ -0,0 +1,51 @@
-+STMicroelectronics Multi-Function eXpander
-+
-+ST Multi-Function eXpander (MFX) is a slave controller using I2C for
-+communication with the main MCU. Its main features are gpio expansion, main
-+MCU IDD measurement (IDD is the amount of current that flows through VDD)
-+and resistive touchscreen controller.
-+
-+Required properties:
-+- compatible: must be "st,mfx"
-+- reg: I2C address of the device
-+- interrupts: interrupt triggered by MFX_IRQ_OUT signal
-+- interrupt-parent: interrupt controller MFX is connected to
-+- interrupt-controller: marks the device as an interrupt controller
-+- #interrupt-cells: should be <1>, index of the interrupt within the
-+  controller, in accordance with the "one cell" variant of
-+  <devicetree/bindings/interrupt-controller/interrupt.txt>
-+
-+Optional nodes:
-+
-+* GPIO eXpander
-+MFX provides 16 programmable GPIOs, and it is also possible to recover 8
-+alternate GPIOs if the main functions are not used (touchscreen controller and
-+IDD measurement not enabled).
-+
-+Required properties:
-+- compatible : must be "st,mfx-gpio"
-+- interrupt-parent : must be <&mfx>
-+- interrupts = must be <0>
-+- gpio-controller: marks the device node as a GPIO controller
-+- #gpio-cells: should be <2>, the first cell is the GPIO offset on this GPIO
-+  controller, the second cell is the gpio flags in accordance with
-+  <dt-bindings/gpio/st-mfx-gpio.h>.
-+
-+Example:
-+
-+	mfx: mfx at 42 {
-+		compatible = "st,mfx";
-+		reg = <0x42>;
-+		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
-+		interrupt-parent = <&gpioi>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+
-+		mfxgpio: mfx_gpio {
-+			compatible = "st,mfx-gpio";
-+			interrupt-parent = <&mfx>;
-+			interrupts = <0>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
+diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
+index 99739f7..eb5f43b 100644
+--- a/arch/arm/boot/dts/stm32746g-eval.dts
++++ b/arch/arm/boot/dts/stm32746g-eval.dts
+@@ -43,6 +43,7 @@
+ /dts-v1/;
+ #include "stm32f746.dtsi"
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/st-mfx-gpio.h>
+ 
+ / {
+ 	model = "STMicroelectronics STM32746g-EVAL board";
+@@ -98,6 +99,36 @@
+ 		};
+ 	};
+ 
++	joystick {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button at 1 {
++			label = "JoySel";
++			linux,code = <KEY_ENTER>;
++			gpios = <&mfxgpio 0 (GPIO_ACTIVE_LOW | GPIO_IN_PUSH_PULL | GPIO_PULL_UP)>;
++		};
++		button at 2 {
++			label = "JoyDown";
++			linux,code = <KEY_DOWN>;
++			gpios = <&mfxgpio 1 (GPIO_ACTIVE_LOW | GPIO_IN_PUSH_PULL | GPIO_PULL_UP)>;
++		};
++		button at 3 {
++			label = "JoyLeft";
++			linux,code = <KEY_LEFT>;
++			gpios = <&mfxgpio 2 (GPIO_ACTIVE_LOW | GPIO_IN_PUSH_PULL | GPIO_PULL_UP)>;
++		};
++		button at 4 {
++			label = "JoyRight";
++			linux,code = <KEY_RIGHT>;
++			gpios = <&mfxgpio 3 (GPIO_ACTIVE_LOW | GPIO_IN_PUSH_PULL | GPIO_PULL_UP)>;
++		};
++		button at 5 {
++			label = "JoyUp";
++			linux,code = <KEY_UP>;
++			gpios = <&mfxgpio 4 (GPIO_ACTIVE_LOW | GPIO_IN_PUSH_PULL | GPIO_PULL_UP)>;
 +		};
 +	};
+ 
+ 	mmc_vcard: mmc_vcard {
+ 		compatible = "regulator-fixed";
 -- 
 2.7.4
