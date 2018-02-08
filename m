@@ -1,74 +1,62 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu,  8 Feb 2018 12:45:04 -0500
-Subject: [PATCH] perf: arm_pmu_acpi: Fix armpmu_alloc call from invalid context
-Message-ID: <20180208174504.30665-1-msalter@redhat.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu,  8 Feb 2018 12:48:53 -0500
+Subject: [PATCH v3 6/6] arm64: dts: rockchip: Specify override mode for kevin
+ panel
+In-Reply-To: <20180208174855.55620-1-seanpaul@chromium.org>
+References: <20180208174855.55620-1-seanpaul@chromium.org>
+Message-ID: <20180208174855.55620-7-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting an arm64 debug kernel with ACPI, I see:
+This patch adds an override mode for kevin devices. The mode increases
+both back porches to allow a pixel clock of 26666kHz as opposed to the
+'typical' value of 252750kHz. This is needed to avoid interference with
+the touch digitizer on these laptops.
 
-   BUG: sleeping function called from invalid context at mm/slab.h:420
-   in_atomic(): 0, irqs_disabled(): 128, pid: 12, name: cpuhp/0
-   1 lock held by cpuhp/0/12:
-    #0:  (cpuhp_state-up){+.+.}, at: [<0000000057aa0dae>] cpuhp_thread_fun+0x13c/0x258
-   irq event stamp: 28
-   hardirqs last  enabled at (27): [<000000000b861658>] _raw_spin_unlock_irq+0x38/0x58
-   hardirqs last disabled at (28): [<000000006231cfb1>] cpuhp_thread_fun+0xd0/0x258
-   softirqs last  enabled at (0): [<0000000054d9737a>] copy_process.isra.32.part.33+0x450/0x1480
-   softirqs last disabled at (0): [<          (null)>]           (null)
-   CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.15.0+ #18
-   Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.25 Oct 17 2016
-   Call trace:
-    dump_backtrace+0x0/0x188
-    show_stack+0x24/0x2c
-    dump_stack+0xa4/0xe0
-    ___might_sleep+0x208/0x234
-    __might_sleep+0x58/0x8c
-    kmem_cache_alloc_trace+0x248/0x3e0
-    armpmu_alloc+0x38/0x1a8
-    arm_pmu_acpi_cpu_starting+0x11c/0x15c
-    cpuhp_invoke_callback+0x120/0x100c
-    cpuhp_thread_fun+0xe8/0x258
-    smpboot_thread_fn+0x170/0x268
-    kthread+0x110/0x13c
-    ret_from_fork+0x10/0x18
+Changes in v2:
+ - Wrap the timing in display-timings node to match binding (Rob/Thierry)
+Changes in v3:
+ - Unwrap the timing from display-timings and rename panel-timing (Rob)
 
-With commit 7d88eb695a1f ("arm/perf: Convert to hotplug state machine"),
-arm_pmu uses the cpuhotplug framework to initialize the PMU driver when
-using ACPI. However, the arm_pmu_acpi_cpu_starting() callback comes
-before CPUHP_AP_ONLINE is reached which means it runs with interrupts
-diabled and tries to allocate memory with GFP_KERNEL alloc which may
-sleep.
-
-Move CPUHP_AP_PERF_ARM_ACPI_STARTING to come after CPUHP_AP_ONLINE so
-that the arm_pmu initialization runs with interrupts enabled as it
-does when booting with device tree.
-
-Fixes: 7d88eb695a1f ("arm/perf: Convert to hotplug state machine")
-Signed-off-by: Mark Salter <msalter@redhat.com>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: devicetree at vger.kernel.org
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-rockchip at lists.infradead.org
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
- include/linux/cpuhotplug.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 5172ad0..e07b2da 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -114,7 +114,6 @@ enum cpuhp_state {
- 	CPUHP_AP_ARM_VFP_STARTING,
- 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
- 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
--	CPUHP_AP_PERF_ARM_ACPI_STARTING,
- 	CPUHP_AP_PERF_ARM_STARTING,
- 	CPUHP_AP_ARM_L2X0_STARTING,
- 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-@@ -146,6 +145,7 @@ enum cpuhp_state {
- 	CPUHP_AP_SMPBOOT_THREADS,
- 	CPUHP_AP_X86_VDSO_VMA_ONLINE,
- 	CPUHP_AP_IRQ_AFFINITY_ONLINE,
-+	CPUHP_AP_PERF_ARM_ACPI_STARTING,
- 	CPUHP_AP_PERF_ONLINE,
- 	CPUHP_AP_PERF_X86_ONLINE,
- 	CPUHP_AP_PERF_X86_UNCORE_ONLINE,
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index 191a6bcb1704..658411ce37ea 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -98,6 +98,20 @@
+ 		backlight = <&backlight>;
+ 		power-supply = <&pp3300_disp>;
+ 
++		panel-timing {
++			clock-frequency = <266604720>;
++			hactive = <2400>;
++			hfront-porch = <48>;
++			hback-porch = <84>;
++			hsync-len = <32>;
++			hsync-active = <0>;
++			vactive = <1600>;
++			vfront-porch = <3>;
++			vback-porch = <120>;
++			vsync-len = <10>;
++			vsync-active = <0>;
++		};
++
+ 		ports {
+ 			panel_in_edp: endpoint {
+ 				remote-endpoint = <&edp_out_panel>;
 -- 
-1.8.3.1
+2.16.0.rc1.238.g530d649a79-goog
