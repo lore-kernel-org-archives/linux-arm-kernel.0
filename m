@@ -1,110 +1,73 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Thu,  8 Feb 2018 20:12:38 +0800
-Subject: [PATCH v8 0/3] Add Rockchip SFC(serial flash controller) support
-Message-ID: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
+Date: Thu,  8 Feb 2018 20:16:46 +0800
+Subject: [PATCH v8 1/3] mtd: spi-nor: Bindings for Rockchip serial flash
+ controller
+In-Reply-To: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
+References: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1518092206-3770-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Shawn Lin <shawn.lin@rock-chips.com>
 
-This is try to support SFC found on Rockchip RV1108 platform.
-Thanks for Cyrille's review, this version trys to address all
-his concern in V7 [0].
+Add binding document for the Rockchip serial flash controller.
 
-Feature:
-(1) Support x1, x2, x4 data bits mode
-(2) Support up to 4 chip select
-(3) Support two independent clock domain: AHB clock and SPI clock
-(4) Support DMA master up to 16KB - 1 transfer
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Test environment:
-This patchset was tested on RK1108 evb boards with Winboud w25q256,
-Gigadevice GD25Q256, working fine with squashfs and jffs2.
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
-[0] http://patchwork.ozlabs.org/patch/793292/
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Changes in v8:
-- remove unused macro SFC_CMD_TRAN_BYTES_MASK
-- set max transfer length to 15.5KB
-- remove unnecessary buffer align check
-- remove the duplicate logic what spi-nor.c already does for spi_nor_write
-- add spi_nor_erase, as the SFC should get the erase address.
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Changes in v7:
-- correct the fifo status check in pio read/write mode.
-- copy data from user buffer to dma buffer
-
-Changes in v6:
-- fold in Andy's improvement for checking fifo level
-  before pio read
-- rename the controller to rv1108 since offically it's
-  renamed and acked by Rob.
-- use dma_coerce_mask_and_coherent suggested by Andy.
-
-Changes in v5:
-- check if the buf is aligned to 32bit
-- check if the buf for dma comes from vmalloc
-- fix to use 1-1-n according to the current framework
-- avoid bytes cnt overflow
-
-Changes in v4:
-- use uppercase DMA for description
-- simplify the code of get_if_type
-- use dma_dir to simplify the code
-- simplify the rockchip_sfc_do_rd_wr
-- some minor improvements
-- add reset controller when doing resume
-
-Changes in v3:
-- use io{read32,write32}_rep to simplify the corner cases
-- remove more unnecessary bit definitions
-- some minor comment fixes and improvement
-- fix wrong unregister function
-- unify more code
-- use nor to avoid constantly replicating the whole
-  sfc->flash[sfc->num_chip].nor
-- add email for MODULE_AUTHOR
-- remove #if 1 --- #endif
-- extract DMA code to imporve the code structure
-- reset all when failing to do dma
-- pass sfc to get_if_type
-- rename sfc-no-dma to sfc-no-DMA
-
-Changes in v2:
-- fix typos
-- add some comment for buffer and others operations
-- rename SFC_MAX_CHIP_NUM to MAX_CHIPSELECT_NUM
-- use u8 for cs
-- return -EINVAL for default case of get_if_type
-- use readl_poll_*() to check timeout cases
-- simplify and clarify some condition checks
-- rework the bitshifts to simplify the code
-- define SFC_CMD_DUMMY(x)
-- fix ummap for dma read path and finish all the
-  cache maintenance.
-- rename to rockchip_sfc_chip_priv and embed struct spi_nor
-  in it.
-- add MODULE_AUTHOR
-- add runtime PM and general PM support.
-- Thanks for Marek's comments. Link:
-  http://lists.infradead.org/pipermail/linux-mtd/2016-November/070321.html
-
-Andy Yan (1):
-  ARM: dts: rockchip: enable sfc for rv1108 evb
-
-Shawn Lin (2):
-  mtd: spi-nor: Bindings for Rockchip serial flash controller
-  mtd: spi-nor: add rockchip serial flash controller driver
-
- .../devicetree/bindings/mtd/rockchip-sfc.txt       |  31 +
- MAINTAINERS                                        |   9 +
- arch/arm/boot/dts/rv1108-evb.dts                   |  10 +
- arch/arm/boot/dts/rv1108.dtsi                      |  13 +
- drivers/mtd/spi-nor/Kconfig                        |   7 +
- drivers/mtd/spi-nor/Makefile                       |   1 +
- drivers/mtd/spi-nor/rockchip-sfc.c                 | 942 +++++++++++++++++++++
- 7 files changed, 1013 insertions(+)
+ .../devicetree/bindings/mtd/rockchip-sfc.txt       | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mtd/rockchip-sfc.txt
- create mode 100644 drivers/mtd/spi-nor/rockchip-sfc.c
 
+diff --git a/Documentation/devicetree/bindings/mtd/rockchip-sfc.txt b/Documentation/devicetree/bindings/mtd/rockchip-sfc.txt
+new file mode 100644
+index 0000000..1e449b0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/rockchip-sfc.txt
+@@ -0,0 +1,31 @@
++Rockchip Serial Flash Controller
++
++Required properties:
++- compatible : Should be
++		"rockchip,rv1108-sfc", "rockchip,sfc" for ROCKCHIP RV1108.
++- address-cells : Should be 1.
++- size-cells : Should be 0.
++- clocks: Must contain two entries for each entry in clock-names.
++- clock-names: Shall be "sfc" for the transfer-clock, and "hsfc" for
++		the peripheral clock.
++- interrupts : Should contain the interrupt for the device.
++- reg: Physical base address of the controller and length of memory mapped.
++
++Optional properties:
++- rockchip,sfc-no-dma: Indicate the controller doesn't support DMA transfer.
++
++Example:
++nor_flash: sfc at 301c0000 {
++	compatible = "rockchip,rv1108-sfc", "rockchip,sfc";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	clocks = <&cru SCLK_SFC>, <&cru HCLK_SFC>;
++	clock-names = "sfc", "hsfc";
++	interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++	reg = <0x301c0000 0x1000>;
++	spi-nor at 0 {
++		compatible = "jedec,spi-nor";
++		spi-max-frequency = <12000000>;
++		reg = <0>;
++	};
++};
 -- 
 2.7.4
