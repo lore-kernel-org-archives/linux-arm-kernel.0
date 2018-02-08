@@ -1,104 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Feb 2018 14:45:57 +0100
-Subject: [PATCH v1 02/16] irqchip: gicv3-its: Add helpers for handling
- 52bit address
-In-Reply-To: <a9e37c29-3be0-8759-a8e3-3e0a273e151d@arm.com>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-3-suzuki.poulose@arm.com>
- <20180207151023.GD29286@cbox>
- <a9e37c29-3be0-8759-a8e3-3e0a273e151d@arm.com>
-Message-ID: <20180208134557.GQ29286@cbox>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 08 Feb 2018 14:46:32 +0100
+Subject: [PATCH v2 0/4] ARM/arm64: exynos: Fix missing missing reg
+ warning for syscon restart nodes
+In-Reply-To: <20180130211819.17139-1-krzk@kernel.org>
+References: <CGME20180130211855epcas1p25cce42a195d8b407f4267309f9b5ccb9@epcas1p2.samsung.com>
+ <20180130211819.17139-1-krzk@kernel.org>
+Message-ID: <4642d2d0-61c9-33b6-0289-76f487aa45ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 11:20:02AM +0000, Suzuki K Poulose wrote:
-> On 07/02/18 15:10, Christoffer Dall wrote:
-> >Hi Suzuki,
-> >
-> >On Tue, Jan 09, 2018 at 07:03:57PM +0000, Suzuki K Poulose wrote:
-> >>Add helpers for encoding/decoding 52bit address in GICv3 ITS BASER
-> >>register. When ITS uses 64K page size, the 52bits of physical address
-> >>are encoded in BASER[47:12] as follows :
-> >>
-> >>  Bits[47:16] of the register => bits[47:16] of the physical address
-> >>  Bits[15:12] of the register => bits[51:48] of the physical address
-> >>                                 bits[15:0] of the physical address are 0.
-> >>
-> >>Also adds a mask for CBASER address. This will be used for adding 52bit
-> >>support for VGIC ITS. More importantly ignore the upper bits if 52bit
-> >>support is not enabled.
-> >>
-> >>Cc: Shanker Donthineni <shankerd@codeaurora.org>
-> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> 
-> 
-> >>+
-> >>+/*
-> >>+ * With 64K page size, the physical address can be upto 52bit and
-> >>+ * uses the following encoding in the GITS_BASER[47:12]:
-> >>+ *
-> >>+ * Bits[47:16] of the register => bits[47:16] of the base physical address.
-> >>+ * Bits[15:12] of the register => bits[51:48] of the base physical address.
-> >>+ *                                bits[15:0] of the base physical address are 0.
-> >>+ * Clear the upper bits if the kernel doesn't support 52bits.
-> >>+ */
-> >>+#define GITS_BASER_ADDR64K_LO_MASK	GENMASK_ULL(47, 16)
-> >>+#define GITS_BASER_ADDR64K_HI_SHIFT	12
-> >>+#define GITS_BASER_ADDR64K_HI_MOVE	(48 - GITS_BASER_ADDR64K_HI_SHIFT)
-> >>+#define GITS_BASER_ADDR64K_HI_MASK	(GITS_PA_HI_MASK << GITS_BASER_ADDR64K_HI_SHIFT)
-> >>+#define GITS_BASER_ADDR64K_TO_PHYS(x)					\
-> >>+	(((x) & GITS_BASER_ADDR64K_LO_MASK) | 				\
-> >>+	 (((x) & GITS_BASER_ADDR64K_HI_MASK) << GITS_BASER_ADDR64K_HI_MOVE))
-> >>+#define GITS_BASER_ADDR64K_FROM_PHYS(p)					\
-> >>+	(((p) & GITS_BASER_ADDR64K_LO_MASK) | 				\
-> >>+	 (((p) >> GITS_BASER_ADDR64K_HI_MOVE) & GITS_BASER_ADDR64K_HI_MASK))
-> >
-> >I don't understand why you need this masking logic embedded in these
-> >macros?  Isn't it strictly an error if anyone passes a physical address
-> >with any of bits [51:48] set to the ITS on a system that doesn't support
-> >52 bit PAs, and just silently masking off those bits could lead to some
-> >interesting cases.
-> 
-> What do you think is the best way to handle such cases ? May be I could add
-> some checks where we get those addresses and handle it before we use this
-> macro ?
-> 
+Hi Krzysztof,
 
-I don't think the conversion macros should try to hide programming
-errors.  I think we should limit the functionality in the macros to be
-simple bit masking and shifting.
+On 2018-01-30 22:18, Krzysztof Kozlowski wrote:
+> Hi,
+>
+> Changes since v1:
+> 1. New patch (1/4) calling devm_of_platform_populate() in PMU driver,
+>     following Rob's advice.
+> 2. The DTS patches moving reboot/poweroff nodes (3/4 and 4/4) now depend
+>     on this.
 
-Any validation and masking depending on 52 PA support in the kernel
-should be done in the context of the functionality, just like the ITS
-driver already does.
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-> >
-> >This is also notably more difficult to read than the existing macro.
-> >
-> >If anything, I think it would be more useful to have
-> >GITS_BASER_TO_PHYS(x) and GITS_PHYS_TO_BASER(x) which takes into account
-> >CONFIG_ARM64_64K_PAGES.
-> 
-> I thought the 64K_PAGES is not kernel page size, but the page-size configured
-> by the "requester" for ITS. So, it doesn't really mean CONFIG_ARM64_64K_PAGES.
+Tested following boards and reboot works fine:
+Exynos3250 (artik5-eval)
+Exynos4412 (trats2)
+Exynos5410 (odroid xu)
+Exynos5422 (odroid xu3/xu4)
+Exynos5433 (tm2)
 
-You're right, I skimmed this logic too quickly.
+> Best regards,
+> Krzysztof
+>
+>
+> Krzysztof Kozlowski (4):
+>    soc: samsung: pmu: Populate children syscon nodes
+>    ARM: dts: exynos: Remove duplicated inclusion of syscon restart nodes
+>      on Exynos5410
+>    ARM: dts: exynos: Fix missing missing reg warning for syscon restart
+>      nodes
+>    arm64: dts: exynos: Fix missing missing reg warning for syscon restart
+>      nodes
+>
+>   .../devicetree/bindings/arm/samsung/pmu.txt        |  6 +++++
+>   arch/arm/boot/dts/exynos-syscon-restart.dtsi       | 28 ++++++++++------------
+>   arch/arm/boot/dts/exynos3250.dtsi                  |  2 +-
+>   arch/arm/boot/dts/exynos4.dtsi                     |  3 ++-
+>   arch/arm/boot/dts/exynos5.dtsi                     |  1 -
+>   arch/arm/boot/dts/exynos5250.dtsi                  |  1 +
+>   arch/arm/boot/dts/exynos5410.dtsi                  |  2 +-
+>   arch/arm/boot/dts/exynos5420.dtsi                  |  1 +
+>   arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 14 +++++------
+>   arch/arm64/boot/dts/exynos/exynos7.dtsi            | 12 +++++-----
+>   drivers/soc/samsung/exynos-pmu.c                   |  3 +++
+>   11 files changed, 40 insertions(+), 33 deletions(-)
+>
 
-> But the other way around, we can't handle 52bit address unless CONFIG_ARM64_64K_PAGES
-> is selected. Also, if the guest uses a 4K page size and uses a 48 bit address,
-> we could potentially mask Bits[15:12] to 0, which is not nice.
-> 
-> So I still think we need to have a special macro for handling addresses with 64K
-> page size in ITS.
-> 
-I think it's easier to have the current GITS_BASER_PHYS_52_to_48 and
-have a corresponding GITS_BASER_PHYS_48_to_52, following Robin's
-observation.
-
-Any additional logic can be written directly in the C code to check
-consitency etc.
-
-Thanks,
--Christoffer
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
