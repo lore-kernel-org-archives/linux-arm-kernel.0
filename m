@@ -1,62 +1,84 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 8 Feb 2018 16:13:16 +0000
-Subject: [PATCH] coresight replicator: set default y after Kconfig rename
-In-Reply-To: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
-References: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
-Message-ID: <4ed2bf14-206a-20c6-40a6-3ab9a2ec07b4@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 8 Feb 2018 16:31:47 +0000
+Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
+In-Reply-To: <20180208161015.GZ5862@e103592.cambridge.arm.com>
+References: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
+ <20180208121238.18792-1-suzuki.poulose@arm.com>
+ <20180208161015.GZ5862@e103592.cambridge.arm.com>
+Message-ID: <08474a1a-3abd-9b89-ce75-d01e4b6fa659@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/18 21:03, Kim Phillips wrote:
-> Commit 1c8859848dbb ("coresight replicator: Cleanup programmable
-> replicator naming") changed the Kconfig symbol name from
-> QCOM_REPLICATOR, which, whilst not in the single arm64 defconfig,
-> was being set in my juno build script, which left the new symbol unset,
-> causing the following unexpected grief:
+On 08/02/18 16:10, Dave Martin wrote:
+> On Thu, Feb 08, 2018 at 12:12:37PM +0000, Suzuki K Poulose wrote:
+>> So far we have restricted the scopes for the capabilities
+>> as follows :
+>>   1) Errata workaround check are run all CPUs (i.e, always
+>>      SCOPE_LOCAL_CPU)
+>>   2) Arm64 features are run only once after the sanitised
+>>      feature registers are available using the SCOPE_SYSTEM.
+>>
+>> This prevents detecting cpu features that can be detected
+>> on one or more CPUs with SCOPE_LOCAL_CPU (e.g KPTI). Similarly
+>> for errata workaround with SCOPE_SYSTEM.
+>>
+>> This patch makes sure that we allow flexibility of having
+>> any scope for a capability. So, we now run through both
+>> arm64_features and arm64_errata in two phases for detection:
+>>
+>>   a) with SCOPE_LOCAL_CPU filter on each boot time enabled
+>>      CPUs.
+>>   b) with SCOPE_SYSTEM filter only once after all boot time
+>>      enabled CPUs are active.
+>>
+
+
+>>   
+>>   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+>> @@ -1387,13 +1389,15 @@ static void verify_local_cpu_errata_workarounds(void)
+>>   static void update_cpu_errata_workarounds(void)
+>>   {
+>>   	update_cpu_capabilities(arm64_errata,
+>> -				ARM64_CPUCAP_SCOPE_ALL,
+>> +				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
 > 
->   # ./perf record -vvv -C 0 -e cs_etm/@20070000.etr/ --per-thread true
->   ..<snip>..
->   sys_perf_event_open: pid -1  cpu 0  group_fd -1  flags 0x8 = 5
->   mmap size 528384B
->   AUX area mmap length 4194304
->   perf event ring buffer mmapped per cpu
->   failed to mmap AUX area
->   failed to mmap with 12 (Cannot allocate memory)
+> In isolation, this looks strange because it seems to handle only a
+> subset of arm64_errata now.
 > 
-> Make it default y to help not surprise unsuspecting users.
-
-How many users are there relying on your Juno build script? :P
-
-> Fixes: 1c8859848dbb ("coresight replicator: Cleanup programmable replicator naming")
-
-Before that commit, CORESIGHT_QCOM_REPLICATOR was not "default y", nor 
-selected by any in-tree configs, so whatever the problem may be this is 
-clearly not the correct fix.
-
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> ---
->   drivers/hwtracing/coresight/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
+> I think I understand the change as follows:
 > 
-> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> index ef9cb3c164e1..b94bbd95efa6 100644
-> --- a/drivers/hwtracing/coresight/Kconfig
-> +++ b/drivers/hwtracing/coresight/Kconfig
-> @@ -73,6 +73,7 @@ config CORESIGHT_SOURCE_ETM4X
->   config CORESIGHT_DYNAMIC_REPLICATOR
->   	bool "CoreSight Programmable Replicator driver"
->   	depends on CORESIGHT_LINKS_AND_SINKS
-> +	default y
-
-CORESIGHT_LINKS_AND_SINKS is "default n" (as indeed is CORESIGHT), and 
-not selected by any defconfigs, so in general this doesn't really help 
-anyway.
-
-Robin.
-
->   	help
->   	  This enables support for dynamic CoreSight replicator link driver.
->   	  The programmable ATB replicator allows independent filtering of the
+>   * all previously-existing errata workarounds SCOPE_LOCAL_CPU
+>     anyway, so the behavior here doesn't change for any existing
+>     caps;
 > 
+>   * the non SCOPE_SYSTEM workarounds (which this patch prepares for)
+"the SCOPE_SYSTEM" workarounds..."
+
+>     are handled by the new setup_errata_workaround() path.
+
+> 
+> Similarly, the features handling is split into two: one mirroring
+> the current behaviour (for SCOPE_SYSTEM this time) and one handling> the rest, for supporting SCOPE_CPU_LOCAL features in subsequent
+> patches.
+
+Right. The changes here are :
+
+New behavior:
+   - Run SCOPE_LOCAL_CPU filter on arm64_features on all CPUs (newly added with
+     this patch) via (newly added)update_cpu_local_features().
+
+Split of existing behavior:
+   - Run SCOPE_LOCAL_CPU(instead of the earlier SCOPE_ALL) on all CPUs in
+     update_cpu_errata_workarounds()
+   - Run SCOPE_SYSTEM filter on arm64_errata, once, via setup_errata_workarounds()
+
+> 
+> Does that sound right?
+> 
+> I'm not sure we need extra comments or documentation; I just want
+> to check that I've understood the patch correctly.
+
+So, would you prefer this split to the original patch ?
+
+Cheers
+Suzuki
