@@ -1,37 +1,67 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 9 Feb 2018 02:07:59 +0800
-Subject: [PATCH] soc: mediatek: fix the mistaken pointer accessed when
- subdomains are added
-Message-ID: <9d9d75250bf62b491294a0c550c35ab7aba05eef.1518113047.git.sean.wang@mediatek.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 8 Feb 2018 18:01:21 +0000
+Subject: [PATCH] coresight replicator: set default y after Kconfig rename
+In-Reply-To: <20180208112213.2f466a1c09f942e8e158a168@arm.com>
+References: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
+ <CANLsYkwMUG9pwcMH9UdLWVqS9pzJCOFJa5Y0Y1NX0SqznUdx+w@mail.gmail.com>
+ <20180208112213.2f466a1c09f942e8e158a168@arm.com>
+Message-ID: <0457dce1-4cbf-1e29-1f8f-6a38b8d3d713@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On 08/02/18 17:22, Kim Phillips wrote:
+> On Thu, 8 Feb 2018 08:59:30 -0700
+> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+> 
+>> On 7 February 2018 at 14:03, Kim Phillips <kim.phillips@arm.com> wrote:
+>>> Commit 1c8859848dbb ("coresight replicator: Cleanup programmable
+>>> replicator naming") changed the Kconfig symbol name from
+>>> QCOM_REPLICATOR, which, whilst not in the single arm64 defconfig,
+>>> was being set in my juno build script, which left the new symbol unset,
+>>> causing the following unexpected grief:
+>>>
+>>>   # ./perf record -vvv -C 0 -e cs_etm/@20070000.etr/ --per-thread true
+>>>   ..<snip>..
+>>>   sys_perf_event_open: pid -1  cpu 0  group_fd -1  flags 0x8 = 5
+>>>   mmap size 528384B
+>>>   AUX area mmap length 4194304
+>>>   perf event ring buffer mmapped per cpu
+>>>   failed to mmap AUX area
+>>>   failed to mmap with 12 (Cannot allocate memory)
+>>>
+>>> Make it default y to help not surprise unsuspecting users.
+>>>
+>>> Fixes: 1c8859848dbb ("coresight replicator: Cleanup programmable replicator naming")
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+>>> ---
+>>>   drivers/hwtracing/coresight/Kconfig | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+>>> index ef9cb3c164e1..b94bbd95efa6 100644
+>>> --- a/drivers/hwtracing/coresight/Kconfig
+>>> +++ b/drivers/hwtracing/coresight/Kconfig
+>>> @@ -73,6 +73,7 @@ config CORESIGHT_SOURCE_ETM4X
+>>>   config CORESIGHT_DYNAMIC_REPLICATOR
+>>>          bool "CoreSight Programmable Replicator driver"
+>>>          depends on CORESIGHT_LINKS_AND_SINKS
+>>> +       default y
+>>>          help
+>>>            This enables support for dynamic CoreSight replicator link driver.
+>>>            The programmable ATB replicator allows independent filtering of the
+>>
+>> As I said before don't see why it needs to be treated differently than other CS
+>> blocks
+> 
+> I don't think it does either, but this one is special since it recently
+> underwent a rename, which breaks its users that were setting the old
+> name in their config builds.  The default y keeps it set in those
+> cases, thereby discontinuing any such regression.
 
-Fix the pointer to struct scp_subdomian not being moved forward
-when each sub-domain is expected to be iteratively added through
-pm_genpd_add_subdomain call.
+I don't think the kernel CONFIG symbols are part of the kernel ABI. So,
+unfortunately the users have to take care of making sure they select what
+they need.
 
-Cc: stable at vger.kernel.org
-Fixes: 53fddb1a66dd ("soc: mediatek: reduce code duplication of scpsys_probe across all SoCs")
-Reported-by: Weiyi Lu <weiyi.lu@mediatek.com>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/soc/mediatek/mtk-scpsys.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index fc55faa..9de801e 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -1048,7 +1048,7 @@ static int scpsys_probe(struct platform_device *pdev)
- 
- 	pd_data = &scp->pd_data;
- 
--	for (i = 0, sd = soc->subdomains ; i < soc->num_subdomains ; i++) {
-+	for (i = 0, sd = soc->subdomains; i < soc->num_subdomains; i++, sd++) {
- 		ret = pm_genpd_add_subdomain(pd_data->domains[sd->origin],
- 					     pd_data->domains[sd->subdomain]);
- 		if (ret && IS_ENABLED(CONFIG_PM))
--- 
-2.7.4
+Suzuki
