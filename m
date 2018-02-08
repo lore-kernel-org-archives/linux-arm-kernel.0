@@ -1,150 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Feb 2018 12:01:14 +0000
-Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
-In-Reply-To: <831ad839-3c68-fc1e-d578-f951b46ed6ed@arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-17-suzuki.poulose@arm.com>
- <20180207103934.GG5862@e103592.cambridge.arm.com>
- <831ad839-3c68-fc1e-d578-f951b46ed6ed@arm.com>
-Message-ID: <20180208120114.GX5862@e103592.cambridge.arm.com>
+From: joonas.kylmala@iki.fi (=?UTF-8?q?Joonas=20Kylm=C3=A4l=C3=A4?=)
+Date: Thu,  8 Feb 2018 14:01:37 +0200
+Subject: [PATCH v3 0/4] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 and mmc1
+ to dtsi
+Message-ID: <20180208120141.15780-1-joonas.kylmala@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 10:53:52AM +0000, Suzuki K Poulose wrote:
-> On 07/02/18 10:39, Dave Martin wrote:
-> >On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
-> >>Some capabilities have different criteria for detection and associated
-> >>actions based on the matching criteria, even though they all share the
-> >>same capability bit. So far we have used multiple entries with the same
-> >>capability bit to handle this. This is prone to errors, as the
-> >>cpu_enable is invoked for each entry, irrespective of whether the
-> >>detection rule applies to the CPU or not. And also this complicates
-> >>other helpers, e.g, __this_cpu_has_cap.
-> >>
-> >>This patch adds a wrapper entry to cover all the possible variations
-> >>of a capability and ensures :
-> >>  1) The capabilitiy is set when at least one of the entry detects
-> >>  2) Action is only taken for the entries that detects.
-> >
-> >I guess this means that where we have a single cpu_enable() method
-> >but complex match criteria that require multiple entries, then that
-> >cpu_enable() method might get called multiple times on a given CPU.
-> 
-> A CPU executes cpu_enable() only for the "matching" entries in the list,
-> unlike earlier. So as long as there is a single entry "matching" the given
-> CPU, the cpu_enable() will not be duplicated. May be we *should* mandate
-> that a CPU cannot be matched by multiple entries.
-> 
-> >
-> >Could be worth a comment if cpu_enable() methods must be robust
-> >against this.
+Hi,
 
-Could we say something like:
+This short patch series moves mmc0 and mmc1 pinctrl in H3 and H2+
+boards' dts files to the dtsi file in order to make it easier to do
+changes in the future to pinctrl attributes if required. This sort of
+cleaning up of the dts files was discussed earlier in the email thread
+with the subject "[linux-sunxi] [PATCH v2 6/8] ARM: dts: sun8i: a83t:
+Move mmc1 pinctrl setting to dtsi file".
 
-"Where a single capability has multiple entries, mutiple cpu_enable()
-methods may be called if more than one entry matches.  Where this is
-not desired, care should be taken to ensure that the entries are
-mutually exclusive: for example, two entries for a single capability
-that match on MIDR should be configured to match MIDR ranges that do
-not overlap."
+As this is my first patch submission I urge you to look through the
+patches carefully. I have tested that after applying the patches the
+Orange Pi Zero still boots and MMC0 works and also its detect pin. I
+don't have any of the other devices to test this with. I also build
+the kernel using ARCH=arm64 and ARCH=arm.
 
-This is more verbose than I would like however.  Maybe there's a simpler
-way to say it.
+These patches are prepared against the branch sunxi/dt-for-4.17.
 
-> >>This avoids explicit checks in the call backs. The only constraint
-> >>here is that, all the entries should have the same "type".
-> >>
-> >>Cc: Dave Martin <dave.martin@arm.com>
-> >>Cc: Will Deacon <will.deacon@arm.com>
-> >>Cc: Mark Rutland <mark.rutland@arm.com>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> >>  arch/arm64/include/asm/cpufeature.h |  1 +
-> >>  arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
-> >>  arch/arm64/kernel/cpufeature.c      |  7 +++--
-> >>  3 files changed, 50 insertions(+), 11 deletions(-)
-> >>
-> >>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> >>index 462c35d1a38c..b73247c27f00 100644
-> >>--- a/arch/arm64/include/asm/cpufeature.h
-> >>+++ b/arch/arm64/include/asm/cpufeature.h
-> >>@@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
-> >>  			bool sign;
-> >>  			unsigned long hwcap;
-> >>  		};
-> >>+		const struct arm64_cpu_capabilities *cap_list;
-> >
-> >Should desc, capability, def_scope and/or cpu_enable match for every cap
-> >in such a group?
-> 
-> As mentioned above, the "type" field should match, which implies scope
-> must match. The code ignores the scope, capability and desc of the individual
-> entries in the list. They should be shared by the parent entry.
-> 
-> cpu_enable could be duplicated as long as a CPU is not matched by multiple
-> entries.
-> 
-> >
-> >I'd expected something maybe like this:
-> >
-> >struct arm64_cpu_capabilities {
-> >	const char *desc;
-> >	u16 capability;
-> >	struct arm64_capability_match {
-> >		bool (*matches)(const struct arm64_cpu_capabilities *, int);
-> >		int (*cpu_enable)(void);
-> >		union {
-> >			struct { ... midr ... };
-> >			struct { ... sysreg ... };
-> >			const struct arm64_capability_match *list;
-> >		};
-> >>  	};
-> >>  };
-> 
-> Yes, thats makes it more explicit. However, it makes the "matches()"
-> complicated, as we have to change the prototype for matches to accept
-> struct arm64_capability_match *, to point to the right "matches" for
-> items in the list. And that makes a bit more of an invasive change, where
-> each matches() would then loose a way to get to the "capabilities" entry,
-> as they could be called with either the "match" in the top level or
-> the one in the list.
+Changes since v1:
+ - Remove pinctrl from CD pin as noted by Maxime Ripard.
+ - Move pinctrl to dtsi also from those new dts files that were
+   introduced after v1 patch.
 
-Yes, that's true.  matches() could take a pointer to the cap struct
-_and_ the relevant match entry, but I'm not sure it's worth it.  In any
-case, my previous objection below doesn't make as much sense as I
-thought.
+Changes since v2:
+ - Make the changes also to H5 boards.
+ - Split card detection pin removal to its own patch.
+ - Add patch for removing the _a suffix from mmc{0,1}_pins_a.
 
-> >>  		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-> >>diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> >>index 65a8e5cc600c..13e30c1b1e99 100644
-> >>--- a/arch/arm64/kernel/cpufeature.c
-> >>+++ b/arch/arm64/kernel/cpufeature.c
-> >>@@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-> >>  		return false;
-> >>  	for (caps = cap_array; caps->matches; caps++)
-> >>-		if (caps->capability == cap &&
-> >>-		    caps->matches(caps, SCOPE_LOCAL_CPU))
-> >>-			return true;
-> >>+		if (caps->capability == cap)
-> >>+			return caps->matches(caps, SCOPE_LOCAL_CPU);
-> >
-> >If we went for my capability { cap; match criteria or list; } approach,
-> >would it still be necessary to iterate over the whole list here?
-> 
-> Sorry, I couldn't follow this. With this patch, we already stop scanning
-> the list as soon as we find the first entry. It is upto "the entry" to run
-> individual match criteria to decide.
+Best regards,
+Joonas Kylm?l?
 
-Ah, I'm talking nonsense here.  Patch 6 iterates over the entire
-capability list via the call to __this_cpu_has_cap() in
-__verify_local_cpu_caps(), but this patch now changes the behaviour so
-that this doesn't happen any more.
+Joonas Kylm?l? (4):
+  ARM: dts: sunxi: h3-h5: remove mmc0 card detection pin from pinctrl
+  ARM: dts: sunxi: h3-h5: Move pinctrl of mmc0 from dts to dtsi
+  ARM: dts: sunxi: h3-h5: Move pinctrl of mmc1 from dts to dtsi
+  ARM: dts: sunxi: h3-h5: rename mmc0_pins_a and mmc1_pins_a
 
-The only other users of this_cpu_has_cap() don't have the right cap
-pointer already, so a scan over the whole list is required in those
-cases -- and anyway, those look like fast paths (RAS exceptions).
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts          |  6 +-----
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts            |  4 ----
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts                  |  4 ----
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts         |  2 --
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts              |  2 --
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts              |  4 ----
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi                     |  2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts                  |  4 ----
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts               |  4 ----
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts                |  2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts            |  2 --
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts                 |  2 --
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                         | 14 ++++++--------
+ .../boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts      |  4 ----
+ arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts    |  2 --
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts   |  2 --
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts |  4 ----
+ .../boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts   |  2 --
+ 18 files changed, 7 insertions(+), 59 deletions(-)
 
-[...]
-
-Cheers
----Dave
+-- 
+2.11.0
