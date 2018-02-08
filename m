@@ -1,107 +1,56 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Thu, 8 Feb 2018 15:07:18 -0600
-Subject: [PATCH] coresight replicator: set default y after Kconfig rename
-In-Reply-To: <8cdc4fe6-faf6-412e-51af-a65d576ecc3f@infradead.org>
-References: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
- <4ed2bf14-206a-20c6-40a6-3ab9a2ec07b4@arm.com>
- <20180208132354.5d66ab91234bd7c7d971c1b1@arm.com>
- <8cdc4fe6-faf6-412e-51af-a65d576ecc3f@infradead.org>
-Message-ID: <20180208150718.36e72e4c3e96e3f4357e5c08@arm.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Thu, 8 Feb 2018 22:23:33 +0100
+Subject: [PATCH 2/3] Documentation: bindings: add usb3-host-disable and
+ usb3-host-port for Rockchip USB Type-C PHY
+In-Reply-To: <CABGGisyaqV5HtTUL5LdjH3ZcU3_RTPmzMvEAhv5wZjCD_XCujg@mail.gmail.com>
+References: <20180208152028.9997-1-enric.balletbo@collabora.com>
+ <20180208152028.9997-2-enric.balletbo@collabora.com>
+ <CABGGisyaqV5HtTUL5LdjH3ZcU3_RTPmzMvEAhv5wZjCD_XCujg@mail.gmail.com>
+Message-ID: <CAFqH_53-iN9m=U+WdQh6_rKyxE5c9RUQO9qD1QaY0QePM_pOZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Feb 2018 11:53:44 -0800
-Randy Dunlap <rdunlap@infradead.org> wrote:
+Hi Rob,
 
-> On 02/08/2018 11:23 AM, Kim Phillips wrote:
-> > On Thu, 8 Feb 2018 16:13:16 +0000
-> > Robin Murphy <robin.murphy@arm.com> wrote:
-> > 
-> >> On 07/02/18 21:03, Kim Phillips wrote:
-> >>> Commit 1c8859848dbb ("coresight replicator: Cleanup programmable
-> >>> replicator naming") changed the Kconfig symbol name from
-> >>> QCOM_REPLICATOR, which, whilst not in the single arm64 defconfig,
-> >>> was being set in my juno build script, which left the new symbol unset,
-> >>> causing the following unexpected grief:
-> >>>
-> >>>   # ./perf record -vvv -C 0 -e cs_etm/@20070000.etr/ --per-thread true
-> >>>   ..<snip>..
-> >>>   sys_perf_event_open: pid -1  cpu 0  group_fd -1  flags 0x8 = 5
-> >>>   mmap size 528384B
-> >>>   AUX area mmap length 4194304
-> >>>   perf event ring buffer mmapped per cpu
-> >>>   failed to mmap AUX area
-> >>>   failed to mmap with 12 (Cannot allocate memory)
-> >>>
-> >>> Make it default y to help not surprise unsuspecting users.
-> >>
-> >> How many users are there relying on your Juno build script? :P
-> > 
-> > This shouldn't be that uncommon for coresight users:
-> > 
-> > make defconfig
-> > scripts/config -e CONFIG_CORESIGHT
-> > scripts/config -e CONFIG_CORESIGHT_LINK_AND_SINK_TMC
-> > scripts/config -e CONFIG_CORESIGHT_SINK_TPIU
-> > scripts/config -e CONFIG_CORESIGHT_SINK_ETBV10
-> > scripts/config -e CONFIG_CORESIGHT_LINKS_AND_SINKS
-> > scripts/config -e CONFIG_CORESIGHT_SOURCE_ETM3X
-> > scripts/config -e CONFIG_CORESIGHT_SOURCE_ETM4X
-> > #scripts/config -e CONFIG_CORESIGHT_QCOM_REPLICATOR
-> > scripts/config -e CONFIG_CORESIGHT_DYNAMIC_REPLICATOR
-> > scripts/config -e CONFIG_CORESIGHT_STM
-> > scripts/config -e CONFIG_CORESIGHT_CPU_DEBUG
-> > 
-> > FWIW, Mathieu - who helped me track the cannot allocate memory problem
-> > down to this config symbol - has also benn caught by this issue.
-> > 
-> >>> Fixes: 1c8859848dbb ("coresight replicator: Cleanup programmable replicator naming")
-> >>
-> >> Before that commit, CORESIGHT_QCOM_REPLICATOR was not "default y", nor 
-> >> selected by any in-tree configs, so whatever the problem may be this is 
-> >> clearly not the correct fix.
-> > 
-> > Well, there's only one defconfig for arm64.  I don't know why it
-> > doesn't set CORESIGHT, but you're right, this is taking the build fix
-> > one step further to facilitate user coresight configuration.  I can
-> > change the patch to make the change to the arm64 defconfig, but I still
-> > believe CORESIGHT_DYNAMIC_REPLICATOR should be default=y, and the
-> > defconfig just set CORESIGHT.
-> > 
-> >>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> >>> ---
-> >>>   drivers/hwtracing/coresight/Kconfig | 1 +
-> >>>   1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> >>> index ef9cb3c164e1..b94bbd95efa6 100644
-> >>> --- a/drivers/hwtracing/coresight/Kconfig
-> >>> +++ b/drivers/hwtracing/coresight/Kconfig
-> >>> @@ -73,6 +73,7 @@ config CORESIGHT_SOURCE_ETM4X
-> >>>   config CORESIGHT_DYNAMIC_REPLICATOR
-> >>>   	bool "CoreSight Programmable Replicator driver"
-> >>>   	depends on CORESIGHT_LINKS_AND_SINKS
-> >>> +	default y
-> >>
-> >> CORESIGHT_LINKS_AND_SINKS is "default n" (as indeed is CORESIGHT), and 
-> >> not selected by any defconfigs, so in general this doesn't really help 
-> >> anyway.
-> > 
-> > Yeah, CORESIGHT_LINKS_AND_SINKS should probably be default y too.
-> 
-> Are they required for system operation?  If not, they should not default to y.
+2018-02-08 18:52 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Thu, Feb 8, 2018 at 9:20 AM, Enric Balletbo i Serra
+> <enric.balletbo@collabora.com> wrote:
+>> From: William wu <wulf@rock-chips.com>
+>>
+>> rockchip,usb3-host-disable is the register of type-c phy disable usb3 host
+>> rockchip,usb3-host-port is the register of type-c phy usb3 port number
+>>
+>> Signed-off-by: William wu <wulf@rock-chips.com>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> index c3be83be9615..9085d95d0079 100644
+>> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> @@ -36,6 +36,12 @@ offset, enable bit, write mask bit.
+>>   - rockchip,uphy-dp-sel : the register of type-c phy enable DP function
+>>     for type-c phy0, it must be <0x6268 19 19>;
+>>     for type-c phy1, it must be <0x6268 3 19>;
+>> + - rockchip,usb3-host-disable : the register of type-c phy disable usb3 host
+>> +   for type-c phy0, it must be <0x2434 0 16>;
+>> +   for type-c phy1, it must be <0x2444 0 16>;
+>> + - rockchip,usb3-host-port : the register of type-c phy usb3 port number
+>> +   for type-c phy0, it must be <0x2434 12 28>;
+>> +   for type-c phy1, it must be <0x2444 12 28>;
+>
+> When does this list stop? Adding properties for various register
+> fields doesn't scale. This information should be in the driver and
+> based on the compatible string if necessary.
+>
 
-They're not required for general purpose system operation: they're
-protected by an if CORESIGHT.  All the other CORESIGHT symbols select
-CORESIGHT_LINKS_AND_SINKS except CORESIGHT_CPU_DEBUG, which doesn't
-need to be protected by the if CORESIGHT.
+I see, seams reasonable to me, is this applicable to the new ones only
+or I should get rid of all the proprieties like this from the DT
+(including the old ones)?
 
-> and if they are required, it seems odd that they are in drivers/hwtracing/.
+Thanks,
+  Enric
 
-Right, they are required for tracing using the Coresight subsystem, not
-general purpose system operation, so they can be 'default y' under 'if
-CORESIGHT' protection.
-
-Kim
+> Rob
