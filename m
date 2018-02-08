@@ -1,63 +1,69 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 08 Feb 2018 15:31:28 +0000
-Subject: EDAC driver for ARMv8 L1/L2 cache
-In-Reply-To: <HE1PR04MB207371A103409F815745F49A9AFA0@HE1PR04MB2073.eurprd04.prod.outlook.com>
-References: <20180112173802.kb32zrxc5uhsjlxk@lakrids.cambridge.arm.com>
- <VI1PR04MB20780EF853A0822A6EFCFE449A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180112180048.srniseo2ft7ytqve@lakrids.cambridge.arm.com>
- <VI1PR04MB2078FCB86150A2AABFE7AB439A170@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180113113156.nnmkuh25rilzwf4p@pd.tnic>
- <20180115142154.rj6cgnhlll7ivyew@lakrids.cambridge.arm.com>
- <20180115143249.tod4rqzn3udk6wmu@pd.tnic>
- <VI1PR04MB20786DE6AE24D4BB555E87C69AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180115232321.ojo3lfvces2q2qhm@pd.tnic>
- <VI1PR04MB207883AE86B7685B9D9DE3029AEB0@VI1PR04MB2078.eurprd04.prod.outlook.com>
- <20180115235248.snzpl5cajfkudluw@pd.tnic>
- <HE1PR04MB207371A103409F815745F49A9AFA0@HE1PR04MB2073.eurprd04.prod.outlook.com>
-Message-ID: <5A7C6D50.2000101@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 08 Feb 2018 15:41:57 +0000
+Subject: Applied "regulator: stm32-vrefbuf: fix check on ready flag" to the
+ regulator tree
+In-Reply-To: <1518097385-7449-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <E1ejoKj-00006C-SN@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi York,
+The patch
 
-On 01/02/18 20:56, York Sun wrote:
-> On 01/15/2018 03:52 PM, Borislav Petkov wrote:
->> On Mon, Jan 15, 2018 at 11:28:14PM +0000, York Sun wrote:
->>> It is generic ARM64 thing. I believe only SError interrupt is available.
->>
->> So if it is, then I'd suggest you hammer out a proper design with the
->> ARM folks.
+   regulator: stm32-vrefbuf: fix check on ready flag
 
-> I made some progress and need some help on coding. On the platform I am
-> working on, it has A53 cores. Each A53 core has a signal nINTERRIRQ.
-> They are connected to one GIC interrupt.
+has been applied to the regulator tree at
 
-Is this a fatal signal for the CPU that should have received it? The signals
-start out as being per-cpu, but configured like this you can only take the
-interrupt one one CPU...
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
 
-(is this thing edge or level triggered?)
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> I managed to inject errors to some safe address without triggering system
-> error and I got the interrupt.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-(okay, sounds like its a corrected error)
-
-
-> I will need to find out which core has errors by reading
-> register on each core (and clear the interrupt). How can I do this
-> within interrupt service routine? I tried to use
-> smp_call_function_single() but it doesn't like the IRQ being disabled.
-
-mm/memory-failure.c:memory_failure_queue() has an example of how you could do
-this. It uses 'schedule_work_on()' to re-run after the IRQ, from there you
-should be able to call something like on_each_cpu() or smp_call_function_many().
-
-If this thing is level triggered you can't escape the irq-handler until its
-cleared. If it needs clearing by a remote CPU this is going to be a problem.
-
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
+Mark
 
-James
+>From f63248fac563125fd5a2f0bc780ce7a299872cab Mon Sep 17 00:00:00 2001
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
+Date: Thu, 8 Feb 2018 14:43:05 +0100
+Subject: [PATCH] regulator: stm32-vrefbuf: fix check on ready flag
+
+stm32_vrefbuf_enable() wrongly checks VRR bit: 0 stands for not ready,
+1 for ready. It currently checks the opposite.
+This makes enable routine to exit immediately without waiting for ready
+flag.
+
+Fixes: 0cdbf481e927 ("regulator: Add support for stm32-vrefbuf")
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+Cc: stable at vger.kernel.org
+---
+ drivers/regulator/stm32-vrefbuf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/regulator/stm32-vrefbuf.c b/drivers/regulator/stm32-vrefbuf.c
+index 72c8b3e1022b..e0a9c445ed67 100644
+--- a/drivers/regulator/stm32-vrefbuf.c
++++ b/drivers/regulator/stm32-vrefbuf.c
+@@ -51,7 +51,7 @@ static int stm32_vrefbuf_enable(struct regulator_dev *rdev)
+ 	 * arbitrary timeout.
+ 	 */
+ 	ret = readl_poll_timeout(priv->base + STM32_VREFBUF_CSR, val,
+-				 !(val & STM32_VRR), 650, 10000);
++				 val & STM32_VRR, 650, 10000);
+ 	if (ret) {
+ 		dev_err(&rdev->dev, "stm32 vrefbuf timed out!\n");
+ 		val = readl_relaxed(priv->base + STM32_VREFBUF_CSR);
+-- 
+2.15.1
