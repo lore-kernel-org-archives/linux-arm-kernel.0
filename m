@@ -1,23 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Feb 2018 14:13:06 -0600
-Subject: [PATCH 09/11] DT: arm: shmobile: document Condor board bindings
-In-Reply-To: <30a4e575-a2c9-e0d3-f41f-4e9b15543365@cogentembedded.com>
-References: <46fca582-220d-e5a7-62cd-2fc77a29846b@cogentembedded.com>
- <30a4e575-a2c9-e0d3-f41f-4e9b15543365@cogentembedded.com>
-Message-ID: <20180208201306.peirumr6hvu22uyt@rob-hp-laptop>
+Date: Thu, 8 Feb 2018 14:16:43 -0600
+Subject: [PATCH v2 2/6] pinctrl: sunxi: add support for the Allwinner H6
+ main pin controller
+In-Reply-To: <20180203154942.63566-3-icenowy@aosc.io>
+References: <20180203154942.63566-1-icenowy@aosc.io>
+ <20180203154942.63566-3-icenowy@aosc.io>
+Message-ID: <20180208201643.vqj7o5v5rzlwsoch@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 02, 2018 at 09:45:08PM +0300, Sergei Shtylyov wrote:
-> Document the Condor device tree bindings, listing it as a supported board.
+On Sat, Feb 03, 2018 at 11:49:38PM +0800, Icenowy Zheng wrote:
+> The Allwinner H6 SoC has two pin controllers, one main controller
+> (called CPUX-PORT in user manual) and one controller in CPUs power
+> domain (called CPUS-PORT in user manual).
 > 
-> This allows to use checkpatch.pl to validate .dts files referring to the
-> Condor board.
+> This commit introduces support for the main pin controller on H6.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> The pin bank A and B are not wired out and hidden from the SoC's
+> documents, however it's shown that the "ATE" (an AC200 chip
+> co-packaged with the H6 die) is connected to the main SoC die via these
+> pin banks. The information about these banks is just copied from the BSP
+> pinctrl driver, but re-formatted to fit the mainline pinctrl driver
+> format.
 > 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
->  1 file changed, 2 insertions(+)
+> Changes in v2:
+> - Dropped without_bus_gate description.
+> - Switched to SPDX license identifier.
+> 
+>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/pinctrl/sunxi/Kconfig                      |   4 +
+>  drivers/pinctrl/sunxi/Makefile                     |   1 +
+>  drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c          | 676 +++++++++++++++++++++
+>  4 files changed, 682 insertions(+)
+>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h6.c
