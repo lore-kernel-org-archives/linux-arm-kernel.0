@@ -1,36 +1,34 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 8 Feb 2018 09:03:35 +0100
-Subject: [PATCH v4 02/12] clk: sunxi-ng: Use u64 for calculation of nkmp
- rate
-In-Reply-To: <20180207211713.3638-3-jernej.skrabec@siol.net>
-References: <20180207211713.3638-1-jernej.skrabec@siol.net>
- <20180207211713.3638-3-jernej.skrabec@siol.net>
-Message-ID: <20180208080335.uduk2aa6vdkaa5n3@flea>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 08 Feb 2018 08:22:54 +0000
+Subject: [PATCH] spi: bcm2835aux: use 64-bit arithmetic instead of 32-bit
+In-Reply-To: <20180207160002.GA9292@embeddedgus>
+References: <20180207160002.GA9292@embeddedgus>
+Message-ID: <87inb7c2ld.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 10:17:03PM +0100, Jernej Skrabec wrote:
-> When parent rate is 24MHz and multiplier N >= 180, intermediate clock
-> rate doesn't fit in 32 bit variable anymore.
-> 
-> Because of that, introduce function for calculating clock rate which
-> uses 64 bit variable for intermediate result.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+"Gustavo A. R. Silva" <gustavo@embeddedor.com> writes:
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Add suffix ULL to constant 9 in order to give the compiler complete
+> information about the proper arithmetic to use. Notice that this
+> constant is used in a context that expects an expression of type
+> unsigned long long (64 bits, unsigned).
+>
+> The expression tfr->len * 9 * 1000000 is currently being evaluated
+> using 32-bit arithmetic.
+>
+> Addresses-Coverity-ID: 1339619
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 
-Thanks!
-Maxime
+The effect looks like it would be that we would have chosen polling mode
+instead of waiting for interrupts for some transfers >477 seconds.
+Seems like a good fix for an unlikely bug.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Reviewed-by: Eric Anholt <eric@anholt.net>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
+Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/7308bd8c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/e27ae2aa/attachment.sig>
