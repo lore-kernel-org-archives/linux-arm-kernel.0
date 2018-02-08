@@ -1,164 +1,91 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 17:53:17 +0000
-Subject: [PATCH v1 15/16] kvm: arm64: Allow configuring physical address
- space size
-In-Reply-To: <20180208111414.GM29286@cbox>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-16-suzuki.poulose@arm.com> <20180208111414.GM29286@cbox>
-Message-ID: <31e5bf40-4fcb-934e-6036-ff2670f793df@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Feb 2018 17:54:33 +0000
+Subject: [PATCH] perf: arm_pmu_acpi: Fix armpmu_alloc call from invalid
+ context
+In-Reply-To: <20180208174504.30665-1-msalter@redhat.com>
+References: <20180208174504.30665-1-msalter@redhat.com>
+Message-ID: <20180208175433.p2a3g2q7tctfpk7c@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 11:14, Christoffer Dall wrote:
-> On Tue, Jan 09, 2018 at 07:04:10PM +0000, Suzuki K Poulose wrote:
->> Allow the guests to choose a larger physical address space size.
->> The default and minimum size is 40bits. A guest can change this
->> right after the VM creation, but before the stage2 entry page
->> tables are allocated (i.e, before it registers a memory range
->> or maps a device address). The size is restricted to the maximum
->> supported by the host. Also, the guest can only increase the PA size,
->> from the existing value, as reducing it could break the devices which
->> may have verified their physical address for validity and may do a
->> lazy mapping(e.g, VGIC).
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@linaro.org>
->> Cc: Peter Maydell <peter.maydell@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   Documentation/virtual/kvm/api.txt | 27 ++++++++++++++++++++++++++
->>   arch/arm/include/asm/kvm_host.h   |  7 +++++++
->>   arch/arm64/include/asm/kvm_host.h |  1 +
->>   arch/arm64/include/asm/kvm_mmu.h  | 41 ++++++++++++++++++++++++++++++---------
->>   arch/arm64/kvm/reset.c            | 28 ++++++++++++++++++++++++++
->>   include/uapi/linux/kvm.h          |  4 ++++
->>   virt/kvm/arm/arm.c                |  2 +-
->>   7 files changed, 100 insertions(+), 10 deletions(-)
->>
->> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> index 57d3ee9e4bde..a203faf768c4 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -3403,6 +3403,33 @@ invalid, if invalid pages are written to (e.g. after the end of memory)
->>   or if no page table is present for the addresses (e.g. when using
->>   hugepages).
->>   
->> +4.109 KVM_ARM_GET_PHYS_SHIFT
->> +
->> +Capability: KVM_CAP_ARM_CONFIG_PHYS_SHIFT
->> +Architectures: arm64
->> +Type: vm ioctl
->> +Parameters: __u32 (out)
->> +Returns: 0 on success, a negative value on error
->> +
->> +This ioctl is used to get the current maximum physical address size for
->> +the VM. The value is Log2(Maximum_Physical_Address). This is neither the
->> + amount of physical memory assigned to the VM nor the maximum physical address
->> +that a real CPU on the host can handle. Rather, this is the upper limit of the
->> +guest physical address that can be used by the VM.
-> 
-> What is the point of this?  Presumably if userspace has set the size, it
-> already knows the size?
+Hi Mark,
 
-This can help the userspace know, what the "default" limit is. As such I am
-not particular about keeping this around.
-
+On Thu, Feb 08, 2018 at 12:45:04PM -0500, Mark Salter wrote:
+> When booting an arm64 debug kernel with ACPI, I see:
 > 
->> +
->> +4.109 KVM_ARM_SET_PHYS_SHIFT
->> +
->> +Capability: KVM_CAP_ARM_CONFIG_PHYS_SHIFT
->> +Architectures: arm64
->> +Type: vm ioctl
->> +Parameters: __u32 (in)
->> +Returns: 0 on success, a negative value on error
->> +
->> +This ioctl is used to set the maximum physical address size for
->> +the VM. The value is Log2(Maximum_Physical_Address). The value can only
->> +be increased from the existing setting. The value cannot be changed
->> +after the stage-2 page tables are allocated and will return an error.
->> +
-> 
-> Is there a way for userspace to discover what the underlying hardware
-> can actually support, beyond trial-and-error on this ioctl?
+>    BUG: sleeping function called from invalid context at mm/slab.h:420
+>    in_atomic(): 0, irqs_disabled(): 128, pid: 12, name: cpuhp/0
+>    1 lock held by cpuhp/0/12:
+>     #0:  (cpuhp_state-up){+.+.}, at: [<0000000057aa0dae>] cpuhp_thread_fun+0x13c/0x258
+>    irq event stamp: 28
+>    hardirqs last  enabled at (27): [<000000000b861658>] _raw_spin_unlock_irq+0x38/0x58
+>    hardirqs last disabled at (28): [<000000006231cfb1>] cpuhp_thread_fun+0xd0/0x258
+>    softirqs last  enabled at (0): [<0000000054d9737a>] copy_process.isra.32.part.33+0x450/0x1480
+>    softirqs last disabled at (0): [<          (null)>]           (null)
+>    CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.15.0+ #18
+>    Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.25 Oct 17 2016
+>    Call trace:
+>     dump_backtrace+0x0/0x188
+>     show_stack+0x24/0x2c
+>     dump_stack+0xa4/0xe0
+>     ___might_sleep+0x208/0x234
+>     __might_sleep+0x58/0x8c
+>     kmem_cache_alloc_trace+0x248/0x3e0
+>     armpmu_alloc+0x38/0x1a8
+>     arm_pmu_acpi_cpu_starting+0x11c/0x15c
+>     cpuhp_invoke_callback+0x120/0x100c
+>     cpuhp_thread_fun+0xe8/0x258
+>     smpboot_thread_fn+0x170/0x268
+>     kthread+0x110/0x13c
+>     ret_from_fork+0x10/0x18
 
-Unfortunately, there is none. We don't expose ID_AA64MMFR0 via mrs emulation.
+I have patches to address this:
 
->> +static inline int kvm_reconfig_stage2(struct kvm *kvm, u32 phys_shift)
->> +{
->> +	int rc = 0;
->> +	unsigned int pa_max, parange;
->> +
->> +	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
->> +	pa_max = id_aa64mmfr0_parange_to_phys_shift(parange);
->> +	/* Raise it to 40bits for backward compatibility */
->> +	pa_max = (pa_max < 40) ? 40 : pa_max;
->> +	/* Make sure the size is supported/available */
->> +	if (phys_shift > PHYS_MASK_SHIFT || phys_shift > pa_max)
->> +		return -EINVAL;
->> +	/*
->> +	 * The stage2 PGD is dependent on the settings we initialise here
->> +	 * and should be allocated only after this step. We cannot allow
->> +	 * down sizing the IPA size as there could be devices or memory
->> +	 * regions, that depend on the previous size.
->> +	 */
->> +	mutex_lock(&kvm->slots_lock);
->> +	if (kvm->arch.pgd || phys_shift < kvm->arch.phys_shift) {
->> +		rc = -EPERM;
->> +	} else if (phys_shift > kvm->arch.phys_shift) {
->> +		kvm->arch.phys_shift = phys_shift;
->> +		kvm->arch.s2_levels = stage2_pt_levels(kvm->arch.phys_shift);
->> +		kvm->arch.vtcr_private = VTCR_EL2_SL0(kvm->arch.s2_levels) |
->> +					 TCR_T0SZ(kvm->arch.phys_shift);
->> +	}
-> 
-> I think you can rework the above to make it more obvious what's going on
-> in this way:
-> 
-> 	rc = -EPERM;
-> 	if (kvm->arch.pgd || phys_shift < kvm->arch.phys_shift)
-> 		goto out_unlock;
-> 
-> 	rc = 0;
-> 	if (phys_shift == kvm->arch.phys_shift)
-> 		goto out_unlock;
-> 
-> 	kvm->arch.phys_shift = phys_shift;
-> 	kvm->arch.s2_levels = stage2_pt_levels(kvm->arch.phys_shift);
-> 	kvm->arch.vtcr_private = VTCR_EL2_SL0(kvm->arch.s2_levels) |
-> 				 TCR_T0SZ(kvm->arch.phys_shift);
-> 
-> out_unlock:
-> 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/557838.html
+https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
 
-Sure.
-
-
-
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -1136,7 +1136,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
->>   		return 0;
->>   	}
->>   	default:
->> -		return -EINVAL;
->> +		return kvm_arch_dev_vm_ioctl(kvm, ioctl, arg);
->>   	}
->>   }
->>   
->> -- 
->> 2.13.6
->>
+> With commit 7d88eb695a1f ("arm/perf: Convert to hotplug state machine"),
+> arm_pmu uses the cpuhotplug framework to initialize the PMU driver when
+> using ACPI. However, the arm_pmu_acpi_cpu_starting() callback comes
+> before CPUHP_AP_ONLINE is reached which means it runs with interrupts
+> diabled and tries to allocate memory with GFP_KERNEL alloc which may
+> sleep.
 > 
-> Have you considered making this capability a generic capability and
-> encoding this in the 'type' argument to KVM_CREATE_VM?  This would
-> significantly simplify all the above and would allow you to drop patch 8
-> and 9 I think.
+> Move CPUHP_AP_PERF_ARM_ACPI_STARTING to come after CPUHP_AP_ONLINE so
+> that the arm_pmu initialization runs with interrupts enabled as it
+> does when booting with device tree.
+> 
+> Fixes: 7d88eb695a1f ("arm/perf: Convert to hotplug state machine")
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  include/linux/cpuhotplug.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> index 5172ad0..e07b2da 100644
+> --- a/include/linux/cpuhotplug.h
+> +++ b/include/linux/cpuhotplug.h
+> @@ -114,7 +114,6 @@ enum cpuhp_state {
+>  	CPUHP_AP_ARM_VFP_STARTING,
+>  	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
+>  	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
+> -	CPUHP_AP_PERF_ARM_ACPI_STARTING,
+>  	CPUHP_AP_PERF_ARM_STARTING,
+>  	CPUHP_AP_ARM_L2X0_STARTING,
+>  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+> @@ -146,6 +145,7 @@ enum cpuhp_state {
+>  	CPUHP_AP_SMPBOOT_THREADS,
+>  	CPUHP_AP_X86_VDSO_VMA_ONLINE,
+>  	CPUHP_AP_IRQ_AFFINITY_ONLINE,
+> +	CPUHP_AP_PERF_ARM_ACPI_STARTING,
 
-No. I will take a look. Btw, there were patches flying around to support
-"userspace" requesting specific values for ID feature registers. But even that
-doesn't help with the detection part. May be that is another way to configure
-the size, but not sure about the current status of that work.
+We need CPUHP_AP_PERF_ARM_ACPI_STARTING to happen before
+CPUHP_AP_PERF_ARM_STARTING, and I think this re-ordering prevents us
+from correctly resetting the PMU and enabling percpu interrupts, at
+least in heterogeneous configurations (e.g. big.LITTLE systems like
+Juno).
 
-Cheers
-Suzuki
+I'm not sure whether we could safely move both callbacks this late.
+
+Thanks,
+Mark.
