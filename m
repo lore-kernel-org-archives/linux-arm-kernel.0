@@ -1,73 +1,69 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 17:20:57 +0000
-Subject: [PATCH v1 09/16] kvm: arm/arm64: Delay stage2 page table
- allocation
-In-Reply-To: <20180208110114.GL29286@cbox>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-10-suzuki.poulose@arm.com> <20180208110114.GL29286@cbox>
-Message-ID: <53d91b79-67f3-c86f-8cda-d18939cfcaf8@arm.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 8 Feb 2018 11:22:13 -0600
+Subject: [PATCH] coresight replicator: set default y after Kconfig rename
+In-Reply-To: <CANLsYkwMUG9pwcMH9UdLWVqS9pzJCOFJa5Y0Y1NX0SqznUdx+w@mail.gmail.com>
+References: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
+ <CANLsYkwMUG9pwcMH9UdLWVqS9pzJCOFJa5Y0Y1NX0SqznUdx+w@mail.gmail.com>
+Message-ID: <20180208112213.2f466a1c09f942e8e158a168@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 11:01, Christoffer Dall wrote:
-> On Tue, Jan 09, 2018 at 07:04:04PM +0000, Suzuki K Poulose wrote:
->> We allocate the entry level page tables for stage2 when the
->> VM is created. This doesn't give us the flexibility of configuring
->> the physical address space size for a VM. In order to allow
->> the VM to choose the required size, we delay the allocation of
->> stage2 entry level tables until we really try to map something.
->>
->> This could be either when the VM creates a memory range or when
->> it tries to map a device memory. So we add in a hook to these
->> two places to make sure the tables are allocated. We use
->> kvm->slots_lock to serialize the allocation entry point, since
->> we add hooks to the arch specific call back with the mutex held.
+On Thu, 8 Feb 2018 08:59:30 -0700
+Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
 
-...
-
->>   
->> -/**
->> - * kvm_phys_addr_ioremap - map a device range to guest IPA
->> - *
->> - * @kvm:	The KVM pointer
->> - * @guest_ipa:	The IPA at which to insert the mapping
->> - * @pa:		The physical address of the device
->> - * @size:	The size of the mapping
->> +/*
->> + * Finalise the stage2 page table layout. Must be called with kvm->slots_lock
->> + * held.
->>    */
->> -int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->> +static int __kvm_init_stage2_table(struct kvm *kvm)
->> +{
->> +	/* Double check if somebody has already allocated it */
+> On 7 February 2018 at 14:03, Kim Phillips <kim.phillips@arm.com> wrote:
+> > Commit 1c8859848dbb ("coresight replicator: Cleanup programmable
+> > replicator naming") changed the Kconfig symbol name from
+> > QCOM_REPLICATOR, which, whilst not in the single arm64 defconfig,
+> > was being set in my juno build script, which left the new symbol unset,
+> > causing the following unexpected grief:
+> >
+> >  # ./perf record -vvv -C 0 -e cs_etm/@20070000.etr/ --per-thread true
+> >  ..<snip>..
+> >  sys_perf_event_open: pid -1  cpu 0  group_fd -1  flags 0x8 = 5
+> >  mmap size 528384B
+> >  AUX area mmap length 4194304
+> >  perf event ring buffer mmapped per cpu
+> >  failed to mmap AUX area
+> >  failed to mmap with 12 (Cannot allocate memory)
+> >
+> > Make it default y to help not surprise unsuspecting users.
+> >
+> > Fixes: 1c8859848dbb ("coresight replicator: Cleanup programmable replicator naming")
+> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> > ---
+> >  drivers/hwtracing/coresight/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> > index ef9cb3c164e1..b94bbd95efa6 100644
+> > --- a/drivers/hwtracing/coresight/Kconfig
+> > +++ b/drivers/hwtracing/coresight/Kconfig
+> > @@ -73,6 +73,7 @@ config CORESIGHT_SOURCE_ETM4X
+> >  config CORESIGHT_DYNAMIC_REPLICATOR
+> >         bool "CoreSight Programmable Replicator driver"
+> >         depends on CORESIGHT_LINKS_AND_SINKS
+> > +       default y
+> >         help
+> >           This enables support for dynamic CoreSight replicator link driver.
+> >           The programmable ATB replicator allows independent filtering of the
 > 
-> dubious comment: Either leave it out or explain that we need to check
-> again with the mutex held.
-> 
->> +	if (likely(kvm->arch.pgd))
->> +		return 0;
->> +	return kvm_alloc_stage2_pgd(kvm);
->> +}
->> +
->> +static int kvm_init_stage2_table(struct kvm *kvm)
->> +{
->> +	int rc;
->> +
->> +	/*
->> +	 * Once allocated, the stage2 entry level tables are only
->> +	 * freed when the KVM instance is destroyed. So, if we see
->> +	 * something valid here, that guarantees that we have
->> +	 * done the one time allocation and it is something valid
->> +	 * and won't go away until the last reference to the KVM
->> +	 * is gone.
->> +	 */
-> 
-> Really not sure if this comment adds something beyond what's described
-> by the code already?
+> As I said before don't see why it needs to be treated differently than other CS
+> blocks
 
-Agreed. Will clean it up.
+I don't think it does either, but this one is special since it recently
+underwent a rename, which breaks its users that were setting the old
+name in their config builds.  The default y keeps it set in those
+cases, thereby discontinuing any such regression.
 
-Thanks
+> - intelligent replicators show up on the AMBA bus and need to
+> be declared in the DT.  As such people are expected to enable the proper
+> option.
 
-Suzuki
+The driver should only run given a replicator in the device tree; if
+that's not the case, then that's another problem, and orthogonal to
+this one.
+
+Kim
