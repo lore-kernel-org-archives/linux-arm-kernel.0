@@ -1,216 +1,110 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  8 Feb 2018 12:12:38 +0000
-Subject: [PATCH 2/2] arm64: capabilities: Group handling of features and
- errata workarounds
-In-Reply-To: <20180208121238.18792-1-suzuki.poulose@arm.com>
-References: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
- <20180208121238.18792-1-suzuki.poulose@arm.com>
-Message-ID: <20180208121238.18792-2-suzuki.poulose@arm.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Thu,  8 Feb 2018 20:12:38 +0800
+Subject: [PATCH v8 0/3] Add Rockchip SFC(serial flash controller) support
+Message-ID: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now handle each capability entry independent of whether
-it is a feature or an errata workaround. This patch consolidates
-the handling of the capabilities, by grouping them, to streamline
-the code flow.
 
-Cc: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 99 +++++++++++++++++++++---------------------
- 1 file changed, 50 insertions(+), 49 deletions(-)
+This is try to support SFC found on Rockchip RV1108 platform.
+Thanks for Cyrille's review, this version trys to address all
+his concern in V7 [0].
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e1a56fa889a5..31d1e02ed5be 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -504,8 +504,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- }
- 
- extern const struct arm64_cpu_capabilities arm64_errata[];
--static void update_cpu_errata_workarounds(void);
--static void update_cpu_local_features(void);
-+static void update_cpu_local_capabilities(void);
- 
- void __init init_cpu_features(struct cpuinfo_arm64 *info)
- {
-@@ -554,8 +553,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	 * Run the errata work around checks on the boot CPU, once we have
- 	 * initialised the cpu feature infrastructure.
- 	 */
--	update_cpu_errata_workarounds();
--	update_cpu_local_features();
-+	update_cpu_local_capabilities();
- }
- 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -1223,8 +1221,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
- 	return false;
- }
- 
--static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
--				    u16 scope_mask, const char *info)
-+static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+				      u16 scope_mask, const char *info)
- {
- 	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
- 	for (; caps->matches; caps++) {
-@@ -1238,6 +1236,15 @@ static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 	}
- }
- 
-+/* Detect all capabilities which match the given scope_mask */
-+static void update_cpu_capabilities(u16 scope_mask)
-+{
-+	__update_cpu_capabilities(arm64_features, scope_mask,
-+				"detected feature:");
-+	__update_cpu_capabilities(arm64_errata, scope_mask,
-+				"enabling work around for");
-+}
-+
- static int __enable_cpu_capability(void *arg)
- {
- 	const struct arm64_cpu_capabilities *cap = arg;
-@@ -1251,7 +1258,7 @@ static int __enable_cpu_capability(void *arg)
-  * CPUs
-  */
- static void __init
--enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
-+__enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_mask)
- {
- 	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
- 	for (; caps->matches; caps++) {
-@@ -1330,6 +1337,13 @@ static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_li
- 	return true;
- }
- 
-+/* Verify this CPU against all the capabilities that match the scope */
-+static bool verify_local_cpu_caps(u16 scope_mask)
-+{
-+	return __verify_local_cpu_caps(arm64_features, scope_mask) &&
-+	       __verify_local_cpu_caps(arm64_errata, scope_mask);
-+}
-+
- /*
-  * Check for CPU features that are used in early boot
-  * based on the Boot CPU value.
-@@ -1352,12 +1366,6 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
- 		}
- }
- 
--static void verify_local_cpu_features(void)
--{
--	if (!__verify_local_cpu_caps(arm64_features, ARM64_CPUCAP_SCOPE_ALL))
--		cpu_die_early();
--}
--
- static void verify_sve_features(void)
- {
- 	u64 safe_zcr = read_sanitised_ftr_reg(SYS_ZCR_EL1);
-@@ -1376,28 +1384,29 @@ static void verify_sve_features(void)
- }
- 
- /*
-- * The CPU Errata work arounds are detected and applied at boot time
-- * and the related information is freed soon after. If the new CPU requires
-- * an errata not detected at boot, fail this CPU.
-+ * Check for all capablities within the scope of local CPU.
-+ * This is run on all boot time activated CPUs.
-  */
--static void verify_local_cpu_errata_workarounds(void)
-+static void update_cpu_local_capabilities(void)
- {
--	if (!__verify_local_cpu_caps(arm64_errata, ARM64_CPUCAP_SCOPE_ALL))
--		cpu_die_early();
-+	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_LOCAL_CPU);
- }
- 
--static void update_cpu_errata_workarounds(void)
-+/*
-+ * Check for all capablities with a system wide scope.
-+ * This is run only once after all the boot CPUs are
-+ * brought online.
-+ */
-+static void update_system_capabilities(void)
- {
--	update_cpu_capabilities(arm64_errata,
--				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
--				"enabling workaround for");
-+	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_SYSTEM);
- }
- 
--static void update_cpu_local_features(void)
-+/* Enable all the capabilities matching the given scope mask */
-+static void enable_cpu_capabilities(u16 scope_mask)
- {
--	update_cpu_capabilities(arm64_features,
--				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
--				"detected feature:");
-+	__enable_cpu_capabilities(arm64_errata, scope_mask);
-+	__enable_cpu_capabilities(arm64_features, scope_mask);
- }
- 
- /*
-@@ -1410,8 +1419,8 @@ static void update_cpu_local_features(void)
-  */
- static void verify_local_cpu_capabilities(void)
- {
--	verify_local_cpu_errata_workarounds();
--	verify_local_cpu_features();
-+	if (!verify_local_cpu_caps(ARM64_CPUCAP_SCOPE_ALL))
-+		cpu_die_early();
- 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
- 
- 	if (system_supports_32bit_el0())
-@@ -1438,28 +1447,21 @@ void check_local_cpu_capabilities(void)
- 	 * Otherwise, this CPU should verify that it has all the system
- 	 * advertised capabilities.
- 	 */
--	if (!sys_caps_initialised) {
--		update_cpu_errata_workarounds();
--		update_cpu_local_features();
--	} else {
-+	if (!sys_caps_initialised)
-+		update_cpu_local_capabilities();
-+	else
- 		verify_local_cpu_capabilities();
--	}
- }
- 
--static void __init setup_feature_capabilities(void)
-+static void __init setup_system_capabilities(void)
- {
--	update_cpu_capabilities(arm64_features,
--				ARM64_CPUCAP_SCOPE_SYSTEM,
--				"detected feature:");
--	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_SCOPE_ALL);
--}
--
--static void __init setup_errata_workarounds(void)
--{
--	update_cpu_capabilities(arm64_errata,
--				ARM64_CPUCAP_SCOPE_SYSTEM,
--				"enabling workaround for");
--	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_SCOPE_ALL);
-+	/*
-+	 * We have finalised the system wide safe feature registers,
-+	 * finalise the capabilities that depend on it.
-+	 */
-+	update_system_capabilities();
-+	/* Enable all the available capabilities */
-+	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_ALL);
- }
- 
- DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
-@@ -1484,8 +1486,7 @@ void __init setup_cpu_features(void)
- 	int cls;
- 
- 	/* Finalise the CPU capabilities */
--	setup_feature_capabilities();
--	setup_errata_workarounds();
-+	setup_system_capabilities();
- 	mark_const_caps_ready();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
- 
+Feature:
+(1) Support x1, x2, x4 data bits mode
+(2) Support up to 4 chip select
+(3) Support two independent clock domain: AHB clock and SPI clock
+(4) Support DMA master up to 16KB - 1 transfer
+
+Test environment:
+This patchset was tested on RK1108 evb boards with Winboud w25q256,
+Gigadevice GD25Q256, working fine with squashfs and jffs2.
+
+[0] http://patchwork.ozlabs.org/patch/793292/
+
+Changes in v8:
+- remove unused macro SFC_CMD_TRAN_BYTES_MASK
+- set max transfer length to 15.5KB
+- remove unnecessary buffer align check
+- remove the duplicate logic what spi-nor.c already does for spi_nor_write
+- add spi_nor_erase, as the SFC should get the erase address.
+
+Changes in v7:
+- correct the fifo status check in pio read/write mode.
+- copy data from user buffer to dma buffer
+
+Changes in v6:
+- fold in Andy's improvement for checking fifo level
+  before pio read
+- rename the controller to rv1108 since offically it's
+  renamed and acked by Rob.
+- use dma_coerce_mask_and_coherent suggested by Andy.
+
+Changes in v5:
+- check if the buf is aligned to 32bit
+- check if the buf for dma comes from vmalloc
+- fix to use 1-1-n according to the current framework
+- avoid bytes cnt overflow
+
+Changes in v4:
+- use uppercase DMA for description
+- simplify the code of get_if_type
+- use dma_dir to simplify the code
+- simplify the rockchip_sfc_do_rd_wr
+- some minor improvements
+- add reset controller when doing resume
+
+Changes in v3:
+- use io{read32,write32}_rep to simplify the corner cases
+- remove more unnecessary bit definitions
+- some minor comment fixes and improvement
+- fix wrong unregister function
+- unify more code
+- use nor to avoid constantly replicating the whole
+  sfc->flash[sfc->num_chip].nor
+- add email for MODULE_AUTHOR
+- remove #if 1 --- #endif
+- extract DMA code to imporve the code structure
+- reset all when failing to do dma
+- pass sfc to get_if_type
+- rename sfc-no-dma to sfc-no-DMA
+
+Changes in v2:
+- fix typos
+- add some comment for buffer and others operations
+- rename SFC_MAX_CHIP_NUM to MAX_CHIPSELECT_NUM
+- use u8 for cs
+- return -EINVAL for default case of get_if_type
+- use readl_poll_*() to check timeout cases
+- simplify and clarify some condition checks
+- rework the bitshifts to simplify the code
+- define SFC_CMD_DUMMY(x)
+- fix ummap for dma read path and finish all the
+  cache maintenance.
+- rename to rockchip_sfc_chip_priv and embed struct spi_nor
+  in it.
+- add MODULE_AUTHOR
+- add runtime PM and general PM support.
+- Thanks for Marek's comments. Link:
+  http://lists.infradead.org/pipermail/linux-mtd/2016-November/070321.html
+
+Andy Yan (1):
+  ARM: dts: rockchip: enable sfc for rv1108 evb
+
+Shawn Lin (2):
+  mtd: spi-nor: Bindings for Rockchip serial flash controller
+  mtd: spi-nor: add rockchip serial flash controller driver
+
+ .../devicetree/bindings/mtd/rockchip-sfc.txt       |  31 +
+ MAINTAINERS                                        |   9 +
+ arch/arm/boot/dts/rv1108-evb.dts                   |  10 +
+ arch/arm/boot/dts/rv1108.dtsi                      |  13 +
+ drivers/mtd/spi-nor/Kconfig                        |   7 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/rockchip-sfc.c                 | 942 +++++++++++++++++++++
+ 7 files changed, 1013 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/rockchip-sfc.txt
+ create mode 100644 drivers/mtd/spi-nor/rockchip-sfc.c
+
 -- 
-2.14.3
+2.7.4
