@@ -1,60 +1,53 @@
 From: john.garry@huawei.com (John Garry)
-Date: Thu, 8 Feb 2018 15:25:30 +0000
+Date: Thu, 8 Feb 2018 15:31:24 +0000
 Subject: [PATCH 5/9] perf utils: add support for arch standard events
-In-Reply-To: <20180208135533.GI10234@krava>
+In-Reply-To: <20180208140250.43a10b84@alans-desktop>
 References: <1517939104-230881-1-git-send-email-john.garry@huawei.com>
  <1517939104-230881-6-git-send-email-john.garry@huawei.com>
- <20180208135533.GI10234@krava>
-Message-ID: <312796a3-9818-7793-9e28-7a686c990977@huawei.com>
+ <20180208135423.GC10234@krava> <20180208140250.43a10b84@alans-desktop>
+Message-ID: <7d5b53dd-2e86-da0e-a7b6-9dd94ebcb49c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2018 13:55, Jiri Olsa wrote:
-> On Wed, Feb 07, 2018 at 01:45:00AM +0800, John Garry wrote:
+On 08/02/2018 14:02, Alan Cox wrote:
+> On Thu, 8 Feb 2018 14:54:23 +0100
+> Jiri Olsa <jolsa@redhat.com> wrote:
 >
-> SNIP
->
+>> On Wed, Feb 07, 2018 at 01:45:00AM +0800, John Garry wrote:
 >>
->> +static int is_json_file(const char *name)
->> +{
->> +	const char *suffix;
->> +
->> +	if (strlen(name) < 5)
->> +		return 0;
->> +
->> +	suffix = name + strlen(name) - 5;
->> +
->> +	if (strncmp(suffix, ".json", 5) == 0)
->> +		return 1;
->> +	return 0;
->> +}
->> +
->> +static int preprocess_arch_std_files(const char *fpath, const struct stat *sb,
->> +				int typeflag, struct FTW *ftwbuf)
->> +{
->> +	int level = ftwbuf->level;
->> +	int is_file = typeflag == FTW_F;
->> +
->> +	if (level == 1 && is_file && is_json_file(fpath))
->> +		return json_events(fpath, save_arch_std_events, (void *)sb);
+>> SNIP
+>>
+>>>  static void print_events_table_suffix(FILE *outfp)
+>>>  {
+>>>  	fprintf(outfp, "{\n");
+>>> @@ -407,6 +469,52 @@ static char *real_event(const char *name, char *event)
+>>>  	return event;
+>>>  }
+>>>
+>>> +static void fixup_field(char *from, char **to)
+>>> +{
+>>> +	*to = malloc(strlen(from));
+>>> +
+>>> +	strcpy(*to, from);
+>>> +}
+>>
+>> could you just call '*to = strdup(from)' in here?
+
+Right
+
 >
-> so any .json file will pass..
+> And check for malloc returning NULL.
+>
 
-Yes, so according to the scheme any architecture JSONs should be placed 
-in the arch root folder.
+Right again,
 
-just wondering you'd want to put
-> some name restriction for recomended events file like this -recomended
-> suffix you used later.. but that can be added later in case we'll
-> need some other json files in here ;-)
+> Alan
+>
 
-Sorry, but I don't see what the naming restriction would mean in practice.
+I should have concentrated on the coding as much as the feature being 
+added...
 
 Thanks,
 John
-
->
-> jirka
->
 > .
 >
