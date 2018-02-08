@@ -1,66 +1,42 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 9 Feb 2018 01:58:46 +0800
-Subject: [PATCH v4 0/5] add support for Mediatek High-Speed DMA controller on
- MT7622 and MT7623 SoC
-Message-ID: <cover.1518110810.git.sean.wang@mediatek.com>
+Date: Fri, 9 Feb 2018 01:58:49 +0800
+Subject: [PATCH v4 3/5] dmaengine: mediatek: update MAINTAINERS entry with
+ MediaTek DMA driver
+In-Reply-To: <cover.1518110810.git.sean.wang@mediatek.com>
+References: <cover.1518110810.git.sean.wang@mediatek.com>
+Message-ID: <b2551734d0d6aefb9c6201884c470b9d643e10f1.1518110810.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Changes since v3:
-- enhance dt-binding documents based on Rob's comments
-- make consistent among all comments
-- perfer ordering declarations longest to shortest
-- fix warning reported from kbuild test robot
-- add patch 4 and 5 to keep Fengguang and Julia's effort
+I work for MediaTek and maintain SoC targeting to home gateway and
+also will keep extending and testing the function.
 
-Changes since v2:
-- remove extra tasklets and refactor driver for letting descriptors being processed ASAP.
-- add more comments stating the relevant logic
-- remove unused macro and variables
-- change to use the disclaimer with SPDX identifier
-- add mt7622 support
-- refine hardware initialization sequence
-- add tx_status support for DMA_RESIDUE_GRANULARITY_SEGMENT
-- refine remove handler with killing vc's tasklet
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Changes since v1:
-- fix typo in the commit message.
-- delete status shown in the dt-binding example.
-
-This patchset introduces support for MediaTek High-Speed DMA controller
-(MTK-HSDMA) Currently, the driver is already tested successfully with
-dmatest module on MT7622 and MT7623 SoC. 
-
-MTK-HSDMA on MT7622/23 SoC has a single ring which is dedicated for
-doing memory-to-memory transfer through ring-based descriptor management.
-Even though there is only a single ring available inside HSDMA, the
-driver is being extended to the support for multiple virtual channels
-processing simultaneously by means of DMA_VIRTUAL_CHANNELS.
-
-Sean Wang (3):
-  dt-bindings: dmaengine: Add MediaTek High-Speed DMA controller
-    bindings
-  dmaengine: mediatek: Add MediaTek High-Speed DMA controller for MT7622
-    and MT7623 SoC
-  dmaengine: mediatek: update MAINTAINERS entry with MediaTek DMA driver
-
-kbuild test robot (1):
-  dmaengine: mediatek: mtk_hsdma_find_active_desc() can be static
-
- .../devicetree/bindings/dma/mtk-hsdma.txt          |   33 +
- MAINTAINERS                                        |    9 +
- drivers/dma/Kconfig                                |    2 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/mediatek/Kconfig                       |   13 +
- drivers/dma/mediatek/Makefile                      |    1 +
- drivers/dma/mediatek/mtk-hsdma.c                   | 1044 ++++++++++++++++++++
- 7 files changed, 1103 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
- create mode 100644 drivers/dma/mediatek/Kconfig
- create mode 100644 drivers/dma/mediatek/Makefile
- create mode 100644 drivers/dma/mediatek/mtk-hsdma.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c90687e..48f85f4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8786,6 +8786,15 @@ M:	Sean Wang <sean.wang@mediatek.com>
+ S:	Maintained
+ F:	drivers/media/rc/mtk-cir.c
+ 
++MEDIATEK DMA DRIVER
++M:	Sean Wang <sean.wang@mediatek.com>
++L:	dmaengine at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	Documentation/devicetree/bindings/dma/mtk-*
++F:	drivers/dma/mediatek/
++
+ MEDIATEK PMIC LED DRIVER
+ M:	Sean Wang <sean.wang@mediatek.com>
+ S:	Maintained
 -- 
 2.7.4
