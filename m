@@ -1,109 +1,74 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 8 Feb 2018 17:32:30 +0000
-Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
-In-Reply-To: <08474a1a-3abd-9b89-ce75-d01e4b6fa659@arm.com>
-References: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
- <20180208121238.18792-1-suzuki.poulose@arm.com>
- <20180208161015.GZ5862@e103592.cambridge.arm.com>
- <08474a1a-3abd-9b89-ce75-d01e4b6fa659@arm.com>
-Message-ID: <20180208173229.GA5862@e103592.cambridge.arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu,  8 Feb 2018 12:45:04 -0500
+Subject: [PATCH] perf: arm_pmu_acpi: Fix armpmu_alloc call from invalid context
+Message-ID: <20180208174504.30665-1-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 04:31:47PM +0000, Suzuki K Poulose wrote:
-> On 08/02/18 16:10, Dave Martin wrote:
-> >On Thu, Feb 08, 2018 at 12:12:37PM +0000, Suzuki K Poulose wrote:
-> >>So far we have restricted the scopes for the capabilities
-> >>as follows :
-> >>  1) Errata workaround check are run all CPUs (i.e, always
-> >>     SCOPE_LOCAL_CPU)
-> >>  2) Arm64 features are run only once after the sanitised
-> >>     feature registers are available using the SCOPE_SYSTEM.
-> >>
-> >>This prevents detecting cpu features that can be detected
-> >>on one or more CPUs with SCOPE_LOCAL_CPU (e.g KPTI). Similarly
-> >>for errata workaround with SCOPE_SYSTEM.
-> >>
-> >>This patch makes sure that we allow flexibility of having
-> >>any scope for a capability. So, we now run through both
-> >>arm64_features and arm64_errata in two phases for detection:
-> >>
-> >>  a) with SCOPE_LOCAL_CPU filter on each boot time enabled
-> >>     CPUs.
-> >>  b) with SCOPE_SYSTEM filter only once after all boot time
-> >>     enabled CPUs are active.
-> >>
-> 
-> 
-> >>  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-> >>@@ -1387,13 +1389,15 @@ static void verify_local_cpu_errata_workarounds(void)
-> >>  static void update_cpu_errata_workarounds(void)
-> >>  {
-> >>  	update_cpu_capabilities(arm64_errata,
-> >>-				ARM64_CPUCAP_SCOPE_ALL,
-> >>+				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
-> >
-> >In isolation, this looks strange because it seems to handle only a
-> >subset of arm64_errata now.
-> >
-> >I think I understand the change as follows:
-> >
-> >  * all previously-existing errata workarounds SCOPE_LOCAL_CPU
-> >    anyway, so the behavior here doesn't change for any existing
-> >    caps;
-> >
-> >  * the non SCOPE_SYSTEM workarounds (which this patch prepares for)
-> "the SCOPE_SYSTEM" workarounds..."
-> 
-> >    are handled by the new setup_errata_workaround() path.
-> 
-> >
-> >Similarly, the features handling is split into two: one mirroring
-> >the current behaviour (for SCOPE_SYSTEM this time) and one handling> the rest, for supporting SCOPE_CPU_LOCAL features in subsequent
-> >patches.
-> 
-> Right. The changes here are :
-> 
-> New behavior:
->   - Run SCOPE_LOCAL_CPU filter on arm64_features on all CPUs (newly added with
->     this patch) via (newly added)update_cpu_local_features().
-> 
-> Split of existing behavior:
->   - Run SCOPE_LOCAL_CPU(instead of the earlier SCOPE_ALL) on all CPUs in
->     update_cpu_errata_workarounds()
->   - Run SCOPE_SYSTEM filter on arm64_errata, once, via setup_errata_workarounds()
+When booting an arm64 debug kernel with ACPI, I see:
 
-OK, thanks for confirming.
+   BUG: sleeping function called from invalid context at mm/slab.h:420
+   in_atomic(): 0, irqs_disabled(): 128, pid: 12, name: cpuhp/0
+   1 lock held by cpuhp/0/12:
+    #0:  (cpuhp_state-up){+.+.}, at: [<0000000057aa0dae>] cpuhp_thread_fun+0x13c/0x258
+   irq event stamp: 28
+   hardirqs last  enabled at (27): [<000000000b861658>] _raw_spin_unlock_irq+0x38/0x58
+   hardirqs last disabled at (28): [<000000006231cfb1>] cpuhp_thread_fun+0xd0/0x258
+   softirqs last  enabled at (0): [<0000000054d9737a>] copy_process.isra.32.part.33+0x450/0x1480
+   softirqs last disabled at (0): [<          (null)>]           (null)
+   CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.15.0+ #18
+   Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.25 Oct 17 2016
+   Call trace:
+    dump_backtrace+0x0/0x188
+    show_stack+0x24/0x2c
+    dump_stack+0xa4/0xe0
+    ___might_sleep+0x208/0x234
+    __might_sleep+0x58/0x8c
+    kmem_cache_alloc_trace+0x248/0x3e0
+    armpmu_alloc+0x38/0x1a8
+    arm_pmu_acpi_cpu_starting+0x11c/0x15c
+    cpuhp_invoke_callback+0x120/0x100c
+    cpuhp_thread_fun+0xe8/0x258
+    smpboot_thread_fn+0x170/0x268
+    kthread+0x110/0x13c
+    ret_from_fork+0x10/0x18
 
-[...]
+With commit 7d88eb695a1f ("arm/perf: Convert to hotplug state machine"),
+arm_pmu uses the cpuhotplug framework to initialize the PMU driver when
+using ACPI. However, the arm_pmu_acpi_cpu_starting() callback comes
+before CPUHP_AP_ONLINE is reached which means it runs with interrupts
+diabled and tries to allocate memory with GFP_KERNEL alloc which may
+sleep.
 
-> >I'm not sure we need extra comments or documentation; I just want
-> >to check that I've understood the patch correctly.
-> 
-> So, would you prefer this split to the original patch ?
+Move CPUHP_AP_PERF_ARM_ACPI_STARTING to come after CPUHP_AP_ONLINE so
+that the arm_pmu initialization runs with interrupts enabled as it
+does when booting with device tree.
 
-I think splitting out this patch (1/2) makes sense.
+Fixes: 7d88eb695a1f ("arm/perf: Convert to hotplug state machine")
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ include/linux/cpuhotplug.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-For the second part (2/2) of the split, I still find that hard to
-review.  The commit message suggests trivially obvious refactoring
-only, but I think there are three things going on:
-
- 1) moving functions around (with the intention of merging them)
- 2) merging functions together
- 3) other miscellaneous bits of refactoring, and cleanups that become
-    "obvious" after steps (1) and (2).
-
-The refactoring is likely straightfoward, but the resulting diff is
-not (at least, I struggle to read it).
-
-Could you split the second part along the lines if (1)..(3) above?
-I think that would make for much easier review.  (Sorry to be a pain!)
-
-Also, the second patch leaves at least one function that does nothing
-except call a second function that has no other caller.  It may do
-no harm to remove and inline any such function.  (Falls under (3),
-I guess.)
-
-Cheers
----Dave
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 5172ad0..e07b2da 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -114,7 +114,6 @@ enum cpuhp_state {
+ 	CPUHP_AP_ARM_VFP_STARTING,
+ 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
+ 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
+-	CPUHP_AP_PERF_ARM_ACPI_STARTING,
+ 	CPUHP_AP_PERF_ARM_STARTING,
+ 	CPUHP_AP_ARM_L2X0_STARTING,
+ 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+@@ -146,6 +145,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_SMPBOOT_THREADS,
+ 	CPUHP_AP_X86_VDSO_VMA_ONLINE,
+ 	CPUHP_AP_IRQ_AFFINITY_ONLINE,
++	CPUHP_AP_PERF_ARM_ACPI_STARTING,
+ 	CPUHP_AP_PERF_ONLINE,
+ 	CPUHP_AP_PERF_X86_ONLINE,
+ 	CPUHP_AP_PERF_X86_UNCORE_ONLINE,
+-- 
+1.8.3.1
