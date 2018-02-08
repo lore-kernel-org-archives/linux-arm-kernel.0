@@ -1,52 +1,171 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Feb 2018 12:26:35 +0000
-Subject: [PATCH v2 17/20] arm64: bp hardening: Allow late CPUs to enable
- work around
-In-Reply-To: <b4705fa2-39aa-9fea-78c4-03ac5eb48a49@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 8 Feb 2018 12:32:56 +0000
+Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
+In-Reply-To: <20180208120114.GX5862@e103592.cambridge.arm.com>
 References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-18-suzuki.poulose@arm.com>
- <20180207103942.GH5862@e103592.cambridge.arm.com>
- <b4705fa2-39aa-9fea-78c4-03ac5eb48a49@arm.com>
-Message-ID: <bea7947f-79e1-53e5-30ec-3f28bda46e5a@arm.com>
+ <20180131182807.32134-17-suzuki.poulose@arm.com>
+ <20180207103934.GG5862@e103592.cambridge.arm.com>
+ <831ad839-3c68-fc1e-d578-f951b46ed6ed@arm.com>
+ <20180208120114.GX5862@e103592.cambridge.arm.com>
+Message-ID: <c10b7441-4643-4277-c6fc-a205f3687673@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 12:19, Suzuki K Poulose wrote:
-> On 07/02/18 10:39, Dave Martin wrote:
->> On Wed, Jan 31, 2018 at 06:28:04PM +0000, Suzuki K Poulose wrote:
->>> We defend against branch predictor training based exploits by
->>> taking specific actions (based on the CPU model) to invalidate
->>> the Branch predictor buffer (BPB). This is implemented by per-CPU
->>> ptr, which installs the specific actions for the CPU model.
+On 08/02/18 12:01, Dave Martin wrote:
+> On Thu, Feb 08, 2018 at 10:53:52AM +0000, Suzuki K Poulose wrote:
+>> On 07/02/18 10:39, Dave Martin wrote:
+>>> On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
+>>>> Some capabilities have different criteria for detection and associated
+>>>> actions based on the matching criteria, even though they all share the
+>>>> same capability bit. So far we have used multiple entries with the same
+>>>> capability bit to handle this. This is prone to errors, as the
+>>>> cpu_enable is invoked for each entry, irrespective of whether the
+>>>> detection rule applies to the CPU or not. And also this complicates
+>>>> other helpers, e.g, __this_cpu_has_cap.
+>>>>
+>>>> This patch adds a wrapper entry to cover all the possible variations
+>>>> of a capability and ensures :
+>>>>   1) The capabilitiy is set when at least one of the entry detects
+>>>>   2) Action is only taken for the entries that detects.
 >>>
->>> The core code can handle the following cases where:
->>>   1) some CPUs doesn't need any work around
->>>   2) a CPU can install the work around, when it is brought up,
->>>      irrespective of how late that happens.
+>>> I guess this means that where we have a single cpu_enable() method
+>>> but complex match criteria that require multiple entries, then that
+>>> cpu_enable() method might get called multiple times on a given CPU.
+>>
+>> A CPU executes cpu_enable() only for the "matching" entries in the list,
+>> unlike earlier. So as long as there is a single entry "matching" the given
+>> CPU, the cpu_enable() will not be duplicated. May be we *should* mandate
+>> that a CPU cannot be matched by multiple entries.
+>>
+>>>
+>>> Could be worth a comment if cpu_enable() methods must be robust
+>>> against this.
 > 
-> With the recent patches from Marc to expose this information to KVM
-> guests, it looks like allowing a late CPU to turn this on is not going
-> to be a good idea. We unconditionally set the capability even
-> when we don't need the mitigation. So I am not really sure if
-> we should go ahead with this patch. I am open to suggestions
+> Could we say something like:
 > 
-> Marc,
+> "Where a single capability has multiple entries, mutiple cpu_enable()
+> methods may be called if more than one entry matches.  Where this is
+> not desired, care should be taken to ensure that the entries are
+> mutually exclusive: for example, two entries for a single capability
+> that match on MIDR should be configured to match MIDR ranges that do
+> not overlap."
 > 
-> What do you think ?
+> This is more verbose than I would like however.  Maybe there's a simpler
+> way to say it.
 
-By the time we bring in that CPU that requires some level of mitigation,
-we may be running a guest already, and we've told that guest that no
-mitigation was required. If we bring in that CPU, we break that promise,
-and the guest becomes vulnerable without knowing about it.
+If we're not also talking about a capability having mutually exclusive 
+enable methods (it doesn't seem so, but I'm not necessarily 100% clear), 
+how about:
 
-The same thing is valid for userspace once we expose the status of the
-mitigation in /sys, just like x86 does. If we transition from not
-vulnerable to vulnerable (or even mitigated), we have lied to userspace.
+"If a cpu_enable() method is associated with multiple matches for a 
+single capability, care should be taken that either the match criteria 
+are mutually exclusive, or that the method is robust against being 
+called multiple times."
 
-In either case, I don't think breaking this contract is acceptable.
+?
 
-Thanks,
+Robin.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>>>> This avoids explicit checks in the call backs. The only constraint
+>>>> here is that, all the entries should have the same "type".
+>>>>
+>>>> Cc: Dave Martin <dave.martin@arm.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> ---
+>>>>   arch/arm64/include/asm/cpufeature.h |  1 +
+>>>>   arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
+>>>>   arch/arm64/kernel/cpufeature.c      |  7 +++--
+>>>>   3 files changed, 50 insertions(+), 11 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>>>> index 462c35d1a38c..b73247c27f00 100644
+>>>> --- a/arch/arm64/include/asm/cpufeature.h
+>>>> +++ b/arch/arm64/include/asm/cpufeature.h
+>>>> @@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
+>>>>   			bool sign;
+>>>>   			unsigned long hwcap;
+>>>>   		};
+>>>> +		const struct arm64_cpu_capabilities *cap_list;
+>>>
+>>> Should desc, capability, def_scope and/or cpu_enable match for every cap
+>>> in such a group?
+>>
+>> As mentioned above, the "type" field should match, which implies scope
+>> must match. The code ignores the scope, capability and desc of the individual
+>> entries in the list. They should be shared by the parent entry.
+>>
+>> cpu_enable could be duplicated as long as a CPU is not matched by multiple
+>> entries.
+>>
+>>>
+>>> I'd expected something maybe like this:
+>>>
+>>> struct arm64_cpu_capabilities {
+>>> 	const char *desc;
+>>> 	u16 capability;
+>>> 	struct arm64_capability_match {
+>>> 		bool (*matches)(const struct arm64_cpu_capabilities *, int);
+>>> 		int (*cpu_enable)(void);
+>>> 		union {
+>>> 			struct { ... midr ... };
+>>> 			struct { ... sysreg ... };
+>>> 			const struct arm64_capability_match *list;
+>>> 		};
+>>>>   	};
+>>>>   };
+>>
+>> Yes, thats makes it more explicit. However, it makes the "matches()"
+>> complicated, as we have to change the prototype for matches to accept
+>> struct arm64_capability_match *, to point to the right "matches" for
+>> items in the list. And that makes a bit more of an invasive change, where
+>> each matches() would then loose a way to get to the "capabilities" entry,
+>> as they could be called with either the "match" in the top level or
+>> the one in the list.
+> 
+> Yes, that's true.  matches() could take a pointer to the cap struct
+> _and_ the relevant match entry, but I'm not sure it's worth it.  In any
+> case, my previous objection below doesn't make as much sense as I
+> thought.
+> 
+>>>>   		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+>>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>>> index 65a8e5cc600c..13e30c1b1e99 100644
+>>>> --- a/arch/arm64/kernel/cpufeature.c
+>>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>>> @@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+>>>>   		return false;
+>>>>   	for (caps = cap_array; caps->matches; caps++)
+>>>> -		if (caps->capability == cap &&
+>>>> -		    caps->matches(caps, SCOPE_LOCAL_CPU))
+>>>> -			return true;
+>>>> +		if (caps->capability == cap)
+>>>> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
+>>>
+>>> If we went for my capability { cap; match criteria or list; } approach,
+>>> would it still be necessary to iterate over the whole list here?
+>>
+>> Sorry, I couldn't follow this. With this patch, we already stop scanning
+>> the list as soon as we find the first entry. It is upto "the entry" to run
+>> individual match criteria to decide.
+> 
+> Ah, I'm talking nonsense here.  Patch 6 iterates over the entire
+> capability list via the call to __this_cpu_has_cap() in
+> __verify_local_cpu_caps(), but this patch now changes the behaviour so
+> that this doesn't happen any more.
+> 
+> The only other users of this_cpu_has_cap() don't have the right cap
+> pointer already, so a scan over the whole list is required in those
+> cases -- and anyway, those look like fast paths (RAS exceptions).
+> 
+> [...]
+> 
+> Cheers
+> ---Dave
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
