@@ -1,74 +1,54 @@
-From: joonas.kylmala@iki.fi (=?UTF-8?q?Joonas=20Kylm=C3=A4l=C3=A4?=)
-Date: Thu,  8 Feb 2018 14:01:41 +0200
-Subject: [PATCH v3 4/4] ARM: dts: sunxi: h3-h5: rename mmc0_pins_a and
- mmc1_pins_a
-In-Reply-To: <20180208120141.15780-1-joonas.kylmala@iki.fi>
-References: <20180208120141.15780-1-joonas.kylmala@iki.fi>
-Message-ID: <20180208120141.15780-5-joonas.kylmala@iki.fi>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Feb 2018 12:04:22 +0000
+Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
+In-Reply-To: <20180131182807.32134-17-suzuki.poulose@arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-17-suzuki.poulose@arm.com>
+Message-ID: <20180208120421.GY5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only one pinctrl configuration for mmc0 and mmc1 so let's
-drop the _a suffix from both of them.
+On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
+> Some capabilities have different criteria for detection and associated
+> actions based on the matching criteria, even though they all share the
+> same capability bit. So far we have used multiple entries with the same
+> capability bit to handle this. This is prone to errors, as the
+> cpu_enable is invoked for each entry, irrespective of whether the
+> detection rule applies to the CPU or not. And also this complicates
+> other helpers, e.g, __this_cpu_has_cap.
+> 
+> This patch adds a wrapper entry to cover all the possible variations
+> of a capability and ensures :
+>  1) The capabilitiy is set when at least one of the entry detects
+>  2) Action is only taken for the entries that detects.
+> 
+> This avoids explicit checks in the call backs. The only constraint
+> here is that, all the entries should have the same "type".
+> 
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
 
-Signed-off-by: Joonas Kylm?l? <joonas.kylmala@iki.fi>
----
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 2 +-
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                | 8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+[...]
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-index 73978853bb4c..f868cf197c8e 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-@@ -134,7 +134,7 @@
- 	};
- };
- 
--&mmc1_pins_a {
-+&mmc1_pins {
- 	bias-pull-up;
- };
- 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index b4a4b3cb6c4e..7741166d34d8 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -142,7 +142,7 @@
- 			/* compatible and clocks are in per SoC .dtsi file */
- 			reg = <0x01c0f000 0x1000>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&mmc0_pins_a>;
-+			pinctrl-0 = <&mmc0_pins>;
- 			resets = <&ccu RST_BUS_MMC0>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-@@ -155,7 +155,7 @@
- 			/* compatible and clocks are in per SoC .dtsi file */
- 			reg = <0x01c10000 0x1000>;
- 			pinctrl-names = "default";
--			pinctrl-0 = <&mmc1_pins_a>;
-+			pinctrl-0 = <&mmc1_pins>;
- 			resets = <&ccu RST_BUS_MMC1>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-@@ -352,7 +352,7 @@
- 				function = "i2c2";
- 			};
- 
--			mmc0_pins_a: mmc0 {
-+			mmc0_pins: mmc0 {
- 				pins = "PF0", "PF1", "PF2", "PF3",
- 				       "PF4", "PF5";
- 				function = "mmc0";
-@@ -360,7 +360,7 @@
- 				bias-pull-up;
- 			};
- 
--			mmc1_pins_a: mmc1 {
-+			mmc1_pins: mmc1 {
- 				pins = "PG0", "PG1", "PG2", "PG3",
- 				       "PG4", "PG5";
- 				function = "mmc1";
--- 
-2.11.0
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+
+[...]
+
+> @@ -1275,7 +1274,7 @@ static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_li
+>  		if (!(caps->type & scope_mask))
+>  			continue;
+>  
+> -		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
+> +		cpu_has_cap = caps->matches(caps, SCOPE_LOCAL_CPU);
+
+One other minor thing: the original caps_list argument seems no longer
+to be needed in this function after this change.
+
+Can we rename the caps_list argument to "caps" and remove the local
+variable of the same name?
+
+Cheers
+---Dave
