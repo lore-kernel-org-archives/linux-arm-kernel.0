@@ -1,130 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Feb 2018 14:24:16 +0100
-Subject: [PATCH v3 04/41] KVM: arm64: Rework hyp_panic for VHE and non-VHE
-In-Reply-To: <be470bdb-258e-6b4d-b409-e230d2d90888@arm.com>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-5-christoffer.dall@linaro.org>
- <be470bdb-258e-6b4d-b409-e230d2d90888@arm.com>
-Message-ID: <20180208132416.GP29286@cbox>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 8 Feb 2018 14:27:42 +0100
+Subject: [PATCH 2/7] soc: davinci: new genpd driver
+In-Reply-To: <34d3980b-2c94-1540-94f0-dc0c86743475@ti.com>
+References: <20180207134553.13510-1-brgl@bgdev.pl>
+ <20180207134553.13510-3-brgl@bgdev.pl>
+ <65f2690c-c605-3c66-9d8a-9a882aaf446d@ti.com>
+ <CAMRc=Mf+S3k_wfhUWEx2-39AZx1szkgy-u-bsZQUMiaY06UKww@mail.gmail.com>
+ <34d3980b-2c94-1540-94f0-dc0c86743475@ti.com>
+Message-ID: <CAMRc=MeQUdzWfAgUCX5k5iwmyyVeCvjhw0CKauSY_1F0+SBPBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+2018-02-08 13:56 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Thursday 08 February 2018 03:24 PM, Bartosz Golaszewski wrote:
+>> 2018-02-08 10:30 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>>> On Wednesday 07 February 2018 07:15 PM, Bartosz Golaszewski wrote:
+>>>> +     /*
+>>>> +      * DaVinci always uses a single clock for power-management. We assume
+>>>> +      * it's the first one in the clocks property.
+>>>> +      */
+>>>> +     clk = of_clk_get(dev->of_node, 0);
+>>>> +     if (IS_ERR(clk))
+>>>> +             return PTR_ERR(clk);
+>>>
+>>> We already get this today with drivers/base/power/clock_ops.c once
+>>> .con_ids list is dropped from pm_clk_notifier_block (which I think it
+>>> should).
+>>>
+>>> If there is no reason to introduce thus functionality at this stage,
+>>> perhaps we should wait till such a time when its clearly needed?
+>>>
+>>> Thanks,
+>>> Sekhar
+>>
+>> If I understand correctly: once we drop the con_ids list, we end up
+>> calling clk_get(dev, NULL) from pm_clk_acquire(), which matches
+>> against the clock with NULL con_id, which may not necessarily be the
+>> first clock in the list.
+>
+> Hmm, not sure of this. In __of_clk_get_by_name() called by clk_get():
+>
+> int index = 0;
+>
+> /*
+>  * For named clocks, first look up the name in the
+>  * "clock-names" property.  If it cannot be found, then
+>  * index will be an error code, and of_clk_get() will fail.
+>  */
+> if (name)
+>         index = of_property_match_string(np, "clock-names", name);
+>
+> So, if no con_id is provided (name == NULL), then index is set to 0
+> which will always get the first clock in clocks = list.
+>
 
-On Mon, Feb 05, 2018 at 06:04:25PM +0000, Julien Grall wrote:
-> On 12/01/18 12:07, Christoffer Dall wrote:
-> >VHE actually doesn't rely on clearing the VTTBR when returning to the
-> >host kernel, and that is the current key mechanism of hyp_panic to
-> >figure out how to attempt to return to a state good enough to print a
-> >panic statement.
-> >
-> >Therefore, we split the hyp_panic function into two functions, a VHE and
-> >a non-VHE, keeping the non-VHE version intact, but changing the VHE
-> >behavior.
-> >
-> >The vttbr_el2 check on VHE doesn't really make that much sense, because
-> >the only situation where we can get here on VHE is when the hypervisor
-> >assembly code actually called into hyp_panic, which only happens when
-> >VBAR_EL2 has been set to the KVM exception vectors.  On VHE, we can
-> >always safely disable the traps and restore the host registers at this
-> >point, so we simply do that unconditionally and call into the panic
-> >function directly.
-> >
-> >Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >---
-> >  arch/arm64/kvm/hyp/switch.c | 42 +++++++++++++++++++++++-------------------
-> >  1 file changed, 23 insertions(+), 19 deletions(-)
-> >
-> >diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> >index 6fcb37e220b5..71700ecee308 100644
-> >--- a/arch/arm64/kvm/hyp/switch.c
-> >+++ b/arch/arm64/kvm/hyp/switch.c
-> >@@ -419,10 +419,20 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> >  static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
-> >  static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
-> >-					     struct kvm_vcpu *vcpu)
-> >+					     struct kvm_cpu_context *__host_ctxt)
-> >  {
-> >+	struct kvm_vcpu *vcpu;
-> >  	unsigned long str_va;
-> >+	vcpu = __host_ctxt->__hyp_running_vcpu;
-> >+
-> >+	if (read_sysreg(vttbr_el2)) {
-> >+		__timer_disable_traps(vcpu);
-> >+		__deactivate_traps(vcpu);
-> >+		__deactivate_vm(vcpu);
-> >+		__sysreg_restore_host_state(__host_ctxt);
-> >+	}
-> >+
-> >  	/*
-> >  	 * Force the panic string to be loaded from the literal pool,
-> >  	 * making sure it is a kernel address and not a PC-relative
-> >@@ -436,37 +446,31 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
-> >  		       read_sysreg(hpfar_el2), par, vcpu);
-> >  }
-> >-static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
-> >-					    struct kvm_vcpu *vcpu)
-> >+static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
-> >+				 struct kvm_cpu_context *host_ctxt)
-> >  {
-> >+	struct kvm_vcpu *vcpu;
-> >+	vcpu = host_ctxt->__hyp_running_vcpu;
-> >+
-> >+	__deactivate_traps(vcpu);
-> >+	__sysreg_restore_host_state(host_ctxt);
-> 
-> I was about to ask why you keep this function around as it does nothing in
-> VHE case. But I see that this will actually restore some values in a later
-> patch.
-> 
-> >+
-> >  	panic(__hyp_panic_string,
-> >  	      spsr,  elr,
-> >  	      read_sysreg_el2(esr),   read_sysreg_el2(far),
-> >  	      read_sysreg(hpfar_el2), par, vcpu);
-> >  }
-> >-static hyp_alternate_select(__hyp_call_panic,
-> >-			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
-> >-			    ARM64_HAS_VIRT_HOST_EXTN);
-> 
-> Out of interest, any specific rather to remove hyp_alternate_select and
-> "open-code" it?
-> 
+But we're talking here about device tree mode. In legacy mode the
+device_node pointer will be NULL, __of_clk_get_by_name() will return
+-ENOENT and we'll end up calling clk_get_sys() -> clk_find(). We'll
+then iterate over the clock entries and check the following:
 
-Not sure I understand your question.
+(...)
+152                 if (p->con_id) {
+153                         if (!con_id || strcmp(p->con_id, con_id))
+154                                 continue;
+155                         match += 1;
+156                 }
+(...)
 
-Are you asking why I replace the hyp alternatives with the has_vhe()?
-If so, has_vhe() uses a static key and should therefore have the same
-performance characteristics, but I find the has_vhe() version below much
-more readable.
+So we'll skip the first clock if it has a con_id and we passed an
+empty con_id to clk_get().
 
-> >-
-> >  void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt)
-> >  {
-> >-	struct kvm_vcpu *vcpu = NULL;
-> >-
-> >  	u64 spsr = read_sysreg_el2(spsr);
-> >  	u64 elr = read_sysreg_el2(elr);
-> >  	u64 par = read_sysreg(par_el1);
-> >-	if (read_sysreg(vttbr_el2)) {
-> >-		vcpu = host_ctxt->__hyp_running_vcpu;
-> >-		__timer_disable_traps(vcpu);
-> >-		__deactivate_traps(vcpu);
-> >-		__deactivate_vm(vcpu);
-> >-		__sysreg_restore_host_state(host_ctxt);
-> >-	}
-> >-
-> >-	/* Call panic for real */
-> >-	__hyp_call_panic()(spsr, elr, par, vcpu);
-> >+	if (!has_vhe())
-> >+		__hyp_call_panic_nvhe(spsr, elr, par, host_ctxt);
-> >+	else
-> >+		__hyp_call_panic_vhe(spsr, elr, par, host_ctxt);
-> >  	unreachable();
-> >  }
-> >
-> 
-
-Thanks,
--Christoffer
+Bartosz
