@@ -1,96 +1,107 @@
-From: ebiggers@google.com (Eric Biggers)
-Date: Thu, 8 Feb 2018 13:01:07 -0800
-Subject: [PATCH 0/5] crypto: Speck support
-In-Reply-To: <CAH8yC8m4F9SWum9D5ZV2wzVAsJaDxnkc1L6eSeEOV-cOdkcg6Q@mail.gmail.com>
-References: <20180208001001.19180-1-ebiggers@google.com>
- <CAH8yC8m4F9SWum9D5ZV2wzVAsJaDxnkc1L6eSeEOV-cOdkcg6Q@mail.gmail.com>
-Message-ID: <20180208210107.GA6720@google.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 8 Feb 2018 15:07:18 -0600
+Subject: [PATCH] coresight replicator: set default y after Kconfig rename
+In-Reply-To: <8cdc4fe6-faf6-412e-51af-a65d576ecc3f@infradead.org>
+References: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
+ <4ed2bf14-206a-20c6-40a6-3ab9a2ec07b4@arm.com>
+ <20180208132354.5d66ab91234bd7c7d971c1b1@arm.com>
+ <8cdc4fe6-faf6-412e-51af-a65d576ecc3f@infradead.org>
+Message-ID: <20180208150718.36e72e4c3e96e3f4357e5c08@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 08:47:05PM -0500, Jeffrey Walton wrote:
-> On Wed, Feb 7, 2018 at 7:09 PM, Eric Biggers <ebiggers@google.com> wrote:
-> > Hello,
-> >
-> > This series adds Speck support to the crypto API, including the Speck128
-> > and Speck64 variants.  Speck is a lightweight block cipher that can be
-> > much faster than AES on processors that don't have AES instructions.
-> >
-> > We are planning to offer Speck-XTS (probably Speck128/256-XTS) as an
-> > option for dm-crypt and fscrypt on Android, for low-end mobile devices
-> > with older CPUs such as ARMv7 which don't have the Cryptography
-> > Extensions.  Currently, such devices are unencrypted because AES is not
-> > fast enough, even when the NEON bit-sliced implementation of AES is
-> > used.  Other AES alternatives such as Blowfish, Twofish, Camellia,
-> > Cast6, and Serpent aren't fast enough either; it seems that only a
-> > modern ARX cipher can provide sufficient performance on these devices.
-> >
-> > This is a replacement for our original proposal
-> > (https://patchwork.kernel.org/patch/10101451/) which was to offer
-> > ChaCha20 for these devices.  However, the use of a stream cipher for
-> > disk/file encryption with no space to store nonces would have been much
-> > more insecure than we thought initially, given that it would be used on
-> > top of flash storage as well as potentially on top of F2FS, neither of
-> > which is guaranteed to overwrite data in-place.
-> >
-> > Speck has been somewhat controversial due to its origin.  Nevertheless,
-> > it has a straightforward design (it's an ARX cipher), and it appears to
-> > be the leading software-optimized lightweight block cipher currently,
-> > with the most cryptanalysis.  It's also easy to implement without side
-> > channels, unlike AES.  Moreover, we only intend Speck to be used when
-> > the status quo is no encryption, due to AES not being fast enough.
-> >
-> > We've also considered a novel length-preserving encryption mode based on
-> > ChaCha20 and Poly1305.  While theoretically attractive, such a mode
-> > would be a brand new crypto construction and would be more complicated
-> > and difficult to implement efficiently in comparison to Speck-XTS.
-> >
-> > Thus, patch 1 adds a generic implementation of Speck, and the following
-> > patches add a 32-bit ARM NEON implementation of Speck-XTS.  The
-> > NEON-accelerated implementation is much faster than the generic
-> > implementation and therefore is the implementation that would primarily
-> > be used in practice on the devices we are targeting.
-> >
-> > There is no AArch64 implementation added, since such CPUs are likely to
-> > have the Cryptography Extensions, allowing the use of AES.
+On Thu, 8 Feb 2018 11:53:44 -0800
+Randy Dunlap <rdunlap@infradead.org> wrote:
+
+> On 02/08/2018 11:23 AM, Kim Phillips wrote:
+> > On Thu, 8 Feb 2018 16:13:16 +0000
+> > Robin Murphy <robin.murphy@arm.com> wrote:
+> > 
+> >> On 07/02/18 21:03, Kim Phillips wrote:
+> >>> Commit 1c8859848dbb ("coresight replicator: Cleanup programmable
+> >>> replicator naming") changed the Kconfig symbol name from
+> >>> QCOM_REPLICATOR, which, whilst not in the single arm64 defconfig,
+> >>> was being set in my juno build script, which left the new symbol unset,
+> >>> causing the following unexpected grief:
+> >>>
+> >>>   # ./perf record -vvv -C 0 -e cs_etm/@20070000.etr/ --per-thread true
+> >>>   ..<snip>..
+> >>>   sys_perf_event_open: pid -1  cpu 0  group_fd -1  flags 0x8 = 5
+> >>>   mmap size 528384B
+> >>>   AUX area mmap length 4194304
+> >>>   perf event ring buffer mmapped per cpu
+> >>>   failed to mmap AUX area
+> >>>   failed to mmap with 12 (Cannot allocate memory)
+> >>>
+> >>> Make it default y to help not surprise unsuspecting users.
+> >>
+> >> How many users are there relying on your Juno build script? :P
+> > 
+> > This shouldn't be that uncommon for coresight users:
+> > 
+> > make defconfig
+> > scripts/config -e CONFIG_CORESIGHT
+> > scripts/config -e CONFIG_CORESIGHT_LINK_AND_SINK_TMC
+> > scripts/config -e CONFIG_CORESIGHT_SINK_TPIU
+> > scripts/config -e CONFIG_CORESIGHT_SINK_ETBV10
+> > scripts/config -e CONFIG_CORESIGHT_LINKS_AND_SINKS
+> > scripts/config -e CONFIG_CORESIGHT_SOURCE_ETM3X
+> > scripts/config -e CONFIG_CORESIGHT_SOURCE_ETM4X
+> > #scripts/config -e CONFIG_CORESIGHT_QCOM_REPLICATOR
+> > scripts/config -e CONFIG_CORESIGHT_DYNAMIC_REPLICATOR
+> > scripts/config -e CONFIG_CORESIGHT_STM
+> > scripts/config -e CONFIG_CORESIGHT_CPU_DEBUG
+> > 
+> > FWIW, Mathieu - who helped me track the cannot allocate memory problem
+> > down to this config symbol - has also benn caught by this issue.
+> > 
+> >>> Fixes: 1c8859848dbb ("coresight replicator: Cleanup programmable replicator naming")
+> >>
+> >> Before that commit, CORESIGHT_QCOM_REPLICATOR was not "default y", nor 
+> >> selected by any in-tree configs, so whatever the problem may be this is 
+> >> clearly not the correct fix.
+> > 
+> > Well, there's only one defconfig for arm64.  I don't know why it
+> > doesn't set CORESIGHT, but you're right, this is taking the build fix
+> > one step further to facilitate user coresight configuration.  I can
+> > change the patch to make the change to the arm64 defconfig, but I still
+> > believe CORESIGHT_DYNAMIC_REPLICATOR should be default=y, and the
+> > defconfig just set CORESIGHT.
+> > 
+> >>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >>> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+> >>> ---
+> >>>   drivers/hwtracing/coresight/Kconfig | 1 +
+> >>>   1 file changed, 1 insertion(+)
+> >>>
+> >>> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> >>> index ef9cb3c164e1..b94bbd95efa6 100644
+> >>> --- a/drivers/hwtracing/coresight/Kconfig
+> >>> +++ b/drivers/hwtracing/coresight/Kconfig
+> >>> @@ -73,6 +73,7 @@ config CORESIGHT_SOURCE_ETM4X
+> >>>   config CORESIGHT_DYNAMIC_REPLICATOR
+> >>>   	bool "CoreSight Programmable Replicator driver"
+> >>>   	depends on CORESIGHT_LINKS_AND_SINKS
+> >>> +	default y
+> >>
+> >> CORESIGHT_LINKS_AND_SINKS is "default n" (as indeed is CORESIGHT), and 
+> >> not selected by any defconfigs, so in general this doesn't really help 
+> >> anyway.
+> > 
+> > Yeah, CORESIGHT_LINKS_AND_SINKS should probably be default y too.
 > 
-> +1 on SPECK.
-> 
-> Its a nice cipher that runs fast. It is nice because the security
-> engineering and parameter selection is well specified, and you can
-> push the margins as low as you like. It does not guess at security
-> parameters like some of the other ciphers used in dm-crypt.
-> 
-> On a modern Core-i5 6th gen I've seen numbers as low as ...
-> SPECK-64/128 runs around 2.1 cpb, and SPECK-128/256 runs around 2.4
-> cpb.
-> 
-> I've already done some work for a US contractor who wanted/needed
-> SPECK for a possible NASA contract. NASA is looking at SPECK for some
-> satellite comms.
-> 
+> Are they required for system operation?  If not, they should not default to y.
 
-Hi Jeffrey,
+They're not required for general purpose system operation: they're
+protected by an if CORESIGHT.  All the other CORESIGHT symbols select
+CORESIGHT_LINKS_AND_SINKS except CORESIGHT_CPU_DEBUG, which doesn't
+need to be protected by the if CORESIGHT.
 
-I see you wrote the SPECK implementation in Crypto++, and you are treating the
-words as big endian.
+> and if they are required, it seems odd that they are in drivers/hwtracing/.
 
-Do you have a reference for this being the "correct" order?  Unfortunately the
-authors of the cipher failed to mention the byte order in their paper.  And they
-gave the test vectors as words, so the test vectors don't clarify it either.
+Right, they are required for tracing using the Coresight subsystem, not
+general purpose system operation, so they can be 'default y' under 'if
+CORESIGHT' protection.
 
-I had assumed little endian words, but now I am having second thoughts...  And
-to confuse things further, it seems that some implementations (including the
-authors own implementation for the SUPERCOP benchmark toolkit [1]) even consider
-the words themselves in the order (y, x) rather than the more intuitive (x, y).
-
-[1] https://github.com/iadgov/simon-speck-supercop/blob/master/crypto_stream/speck128128ctr/ref/stream.c
-
-In fact, even the reference code from the paper treats pt[0] as y and pt[1] as
-x, where 'pt' is a u64 array -- although that being said, it's not shown how the
-actual bytes should be translated to/from those u64 arrays.
-
-I'd really like to avoid people having to add additional versions of SPECK later
-for the different byte and word orders...
-
-- Eric
+Kim
