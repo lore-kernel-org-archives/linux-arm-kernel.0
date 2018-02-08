@@ -1,53 +1,28 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 8 Feb 2018 14:55:54 +0100
-Subject: [PATCH 2/9] perf utils: add support for pmu events vendor
- sub-directory
-In-Reply-To: <1517939104-230881-3-git-send-email-john.garry@huawei.com>
-References: <1517939104-230881-1-git-send-email-john.garry@huawei.com>
- <1517939104-230881-3-git-send-email-john.garry@huawei.com>
-Message-ID: <20180208135554.GL10234@krava>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Thu, 8 Feb 2018 15:24:40 +0100
+Subject: [PATCH] ARM: dts: ls1021a: add quadspi node
+In-Reply-To: <20180205080323.GP31354@dragon>
+References: <20180126142014.13819-1-rasmus.villemoes@prevas.dk>
+ <20180205080323.GP31354@dragon>
+Message-ID: <43c533e2-2b93-9672-3905-5f4ba8d6db19@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 01:44:57AM +0800, John Garry wrote:
-> For some architectures (like arm), it is required to support
-> a vendor sub-directory and not locate all the JSONs for a
-> specific vendor in the same folder.
+On 2018-02-05 09:03, Shawn Guo wrote:
+> On Fri, Jan 26, 2018 at 03:20:14PM +0100, Rasmus Villemoes wrote:
+>> Add a node to device tree repesenting the QuadSPI controller present on
+>> LS1021a. Driver support has been present since e8c034b2fbe5 (mtd:
+>> spi-nor: fsl-quadspi: add support for ls1021a).
+>>
+>> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
 > 
-> This is because all the events for the same vendor will be
-> placed in the same pmu events table, which may cause conflict.
-> This conflict would be in the instance that a vendor's custom
-> implemented events do have the same meaning on different platforms,
-> so events in the pmu table would conflict. In addition, per list
-> command may show events which are not even supported for a given
-> platform.
+> Applied, thanks.
 > 
-> This patch adds support for a arch/vendor/platform directory
-> hierarchy, while maintaining backwards-compatibility for existing
-> arch/platform structure. In this, each platform would always have
-> its own pmu events table.
-> 
-> In generated file pmu_events.c, each platform table name is in
-> the format pme{_vendor}_platform, like this:
-> 
-> struct pmu_events_map pmu_events_map[] = {
-> {
-> 	.cpuid = "0x00000000420f5160",
-> 	.version = "v1",
-> 	.type = "core",
-> 	.table = pme_cavium_thunderx2
-> },
-> {
-> 	.cpuid = 0,
-> 	.version = 0,
-> 	.type = 0,
-> 	.table = 0,
-> },
-> };
-> 
-> Signed-off-by: John Garry <john.garry@huawei.com>
 
-Acked-by: Jiri Olsa <jolsa@kernel.org>
+Sorry, I didn't know you already had a similar patch queued for 4.16
+(85f8ee78ab ARM: dts: ls1021a: Add support for QSPI with ls1021a SoC),
+so I have to ask you to unapply (or do you want me to send a revert?) -
+the ls1021a.dtsi in your imx/dt branch now has two almost-identical
+qspi: nodes.
 
-thanks,
-jirka
+Rasmus
