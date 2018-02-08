@@ -1,57 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Feb 2018 12:08:10 +0000
-Subject: [PATCH] KVM: arm64: Enable the EL1 physical timer for AArch32
- guests
-In-Reply-To: <1518091039-17356-1-git-send-email-j.fanguede@virtualopensystems.com>
-References: <1518091039-17356-1-git-send-email-j.fanguede@virtualopensystems.com>
-Message-ID: <51fa6f87-4d4d-0c14-9fb0-6ce0d2808ce3@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 8 Feb 2018 12:10:47 +0000
+Subject: [PATCH v2 08/20] arm64: capabilities: Group handling of features
+ and errata
+In-Reply-To: <20180207103829.GY5862@e103592.cambridge.arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-9-suzuki.poulose@arm.com>
+ <20180207103829.GY5862@e103592.cambridge.arm.com>
+Message-ID: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 11:57, J?r?my Fangu?de wrote:
-> Some 32bits guest OS can use the CNTP timer, however KVM does not
-> handle the accesses, injecting a fault instead.
+On 07/02/18 10:38, Dave Martin wrote:
+> On Wed, Jan 31, 2018 at 06:27:55PM +0000, Suzuki K Poulose wrote:
+>> So far we have had separate routes for triggering errata and feature
+>> capability detection. Also, we never allowed "features" based on local
+>> CPU and "errata" based on System wide safe registers. This patch
+>> groups the handling of errata and features and also allows them
+>> to have all the possible scopes. So we now run through both
+>> arm64_features and arm64_errata, in two phases for detection.
+>>
+>>   1) with SCOPE_LOCAL_CPU filter on each boot time enabled CPUs,
+>>      via update_cpu_local_capabilities().
+>>
+>>   2) with SCOPE_SYSTEM filter only once after all boot time enabled
+>>      CPUs are active, triggered from setup_cpu_features().
+>>
+>> A late CPU goes through both the tables for verification against
+>> established capabilities, as before.
+>>
+>> We could ideally merge the two tables into one. But leave it as
+>> it is for easy access to the list of particular type.
+>>
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
-> Use the proper handlers to emulate the EL1 Physical Timer (CNTP)
-> register accesses of AArch32 guests.
+> I don't know if there's a way of splitting or refactoring this patch to
+> make it easier to understand the changes, but I think I get what's going
+> on here now.
 > 
-> Signed-off-by: J?r?my Fangu?de <j.fanguede@virtualopensystems.com>
-> Signed-off-by: Alvise Rigo <a.rigo@virtualopensystems.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> So,
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 50a43c7..c0ab4f7 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1545,6 +1545,11 @@ static const struct sys_reg_desc cp15_regs[] = {
->  
->  	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
->  
-> +	/* CNTP_TVAL */
-> +	{ Op1( 0), CRn(14), CRm( 2), Op2( 0), access_cntp_tval },
-> +	/* CNTP_CTL */
-> +	{ Op1( 0), CRn(14), CRm( 2), Op2( 1), access_cntp_ctl },
-> +
->  	/* PMEVCNTRn */
->  	PMU_PMEVCNTR(0),
->  	PMU_PMEVCNTR(1),
-> @@ -1618,6 +1623,7 @@ static const struct sys_reg_desc cp15_64_regs[] = {
->  	{ Op1( 0), CRn( 0), CRm( 9), Op2( 0), access_pmu_evcntr },
->  	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
->  	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
-> +	{ Op1( 2), CRn( 0), CRm(14), Op2( 0), access_cntp_cval },
->  };
->  
->  /* Target specific emulation tables */
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 > 
-
-Seems OK to me. Can you please update the corresponding 32bit code while
-you're at it?
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> (But if you can see a good way to split it, I'll be happy to take
+> another look.)
+
+I did try this out, patches follows.
