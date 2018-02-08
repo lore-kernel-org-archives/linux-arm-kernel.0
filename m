@@ -1,46 +1,45 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 8 Feb 2018 16:14:28 +0100
-Subject: [PATCH v2] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
-In-Reply-To: <20180208145805.24762-1-philippe.cornu@st.com>
-References: <20180208145805.24762-1-philippe.cornu@st.com>
-Message-ID: <CAOFm3uFQYjTZxX7Ozf7CJMDof=pretbk4cKGFf0BtwWh0SXrfw@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 8 Feb 2018 17:16:07 +0200
+Subject: [PATCH 1/2] serial: 8250: Don't service RX FIFO if interrupts are
+ disabled
+In-Reply-To: <20180208125542.15649-2-vigneshr@ti.com>
+References: <20180208125542.15649-1-vigneshr@ti.com>
+ <20180208125542.15649-2-vigneshr@ti.com>
+Message-ID: <CAHp75Vdo+B=Z+ScUgYvoWMSP7G6iC=LOiW57dViXCXm=g2gOLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 8, 2018 at 3:58 PM, Philippe Cornu <philippe.cornu@st.com> wrote:
-> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
-> host controller driver.
+On Thu, Feb 8, 2018 at 2:55 PM, Vignesh R <vigneshr@ti.com> wrote:
+> Currently, data in RX FIFO is read based on UART_LSR register state even
+> if RDI and RLSI interrupts are disabled in UART_IER register.
+> This is because when IRQ handler is called due to TX FIFO empty event,
+> RX FIFO is serviced based on UART_LSR register status instead of
+> UART_IIR status. This defeats the purpose of disabling UART RX
+> FIFO interrupts during throttling(see, omap_8250_throttle()) as IRQ
+> handler continues to drain UART RX FIFO resulting in overflow of buffer
+> at tty layer.
+> Fix this by making sure that driver drains UART RX FIFO only when
+> UART_IIR_RDI is set along with UART_LSR_BI or UART_LSR_DR bits.
 >
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-> ---
-> Changes in v2: Update to "GPL-2.0+" following comments from Laurent
-> Pinchart, Benjamin Gaignard & Philippe Ombredanne.
->
->  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> index 7bac101c285c..99f0e4f51716 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
-> @@ -1,12 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0+
->  /*
->   * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
->   * Copyright (C) STMicroelectronics SA 2017
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - *
->   * Modified by Philippe Cornu <philippe.cornu@st.com>
->   * This generic Synopsys DesignWare MIPI DSI host driver is based on the
->   * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
-> --
-> 2.15.1
->
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Thank you.
+> -       if (status & (UART_LSR_DR | UART_LSR_BI)) {
+> +       if (status & (UART_LSR_DR | UART_LSR_BI) &&
+> +           iir & UART_IIR_RDI) {
 
-Acked-by: Philippe Ombredanne <pombredanne@nexB.com>
+>                 if (!up->dma || handle_rx_dma(up, iir))
+
+handle_rx_dma() checks for IRQ status as well.
+
+But for now it seems we are on safe side since checks are done versus
+IRQ status with bit 2 set, meaning that iir & RDI will be true.
+
+>                         status = serial8250_rx_chars(up, status);
+>         }
+
+Anyway, thanks for the patch, though I need some time to test it on
+non-OMAP hardware with DMA enabled.
+
+-- 
+With Best Regards,
+Andy Shevchenko
