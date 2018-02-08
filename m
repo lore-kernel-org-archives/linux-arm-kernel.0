@@ -1,68 +1,82 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Feb 2018 11:05:41 +0000
-Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
- define package boundaries
-In-Reply-To: <c9ab384b-1408-eccb-b417-af9a8a22119c@arm.com>
-References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
- <c9ab384b-1408-eccb-b417-af9a8a22119c@arm.com>
-Message-ID: <20180208110541.GB1179@e107981-ln.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Feb 2018 11:05:54 +0000
+Subject: [PATCH v2 10/20] arm64: capabilities: Restrict KPTI detection to
+ boot-time CPUs
+In-Reply-To: <ec712e11-baa5-aa2c-1b70-be221ea36f9f@arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-11-suzuki.poulose@arm.com>
+ <20180207103845.GA5862@e103592.cambridge.arm.com>
+ <ec712e11-baa5-aa2c-1b70-be221ea36f9f@arm.com>
+Message-ID: <20180208110550.GV5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 22, 2018 at 05:29:20PM +0000, Sudeep Holla wrote:
+On Wed, Feb 07, 2018 at 06:15:58PM +0000, Suzuki K Poulose wrote:
+> On 07/02/18 10:38, Dave Martin wrote:
+> >On Wed, Jan 31, 2018 at 06:27:57PM +0000, Suzuki K Poulose wrote:
+> >>KPTI is treated as a system wide feature, where we enable the feature
+> >>when all the CPUs on the system suffers from the security vulnerability,
+> >
+> >Should that be "when any CPU"?
+> >
 > 
+> Without this patch, we need all the CPUs to mandate the defense (as this
+> is a system feature). This patch changes it. I will change it to :
 > 
-> On 22/01/18 17:15, Lorenzo Pieralisi wrote:
-> > The current ARM DT topology description provides the operating system
-> > with a topological view of the system that is based on leaf nodes
-> > representing either cores or threads (in an SMT system) and a
-> > hierarchical set of cluster nodes that creates a hierarchical topology
-> > view of how those cores and threads are grouped.
-> > 
-> > As opposed to the ACPI topology description ([1], PPTT table), this
-> > hierarchical representation of clusters does not allow to describe what
-> > topology level actually represents the physical package boundary, which
-> > is a key piece of information to be used by an operating system to
-> > optimize resource allocation and scheduling.
-> > 
-> > Define an optional, backward compatible boolean property for cluster
-> > nodes that, by reusing the ACPI nomenclature, add to the ARM DT
-> > topological description a binding to define what cluster level
-> > represents a physical package boundary.
-> > 
-> > [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Jeremy Linton <jeremy.linton@arm.com>
-> > Cc: Morten Rasmussen <morten.rasmussen@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
-> > index de9eb0486630..8e78d76b0671 100644
-> > --- a/Documentation/devicetree/bindings/arm/topology.txt
-> > +++ b/Documentation/devicetree/bindings/arm/topology.txt
-> > @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
-> >  	The cluster node name must be "clusterN" as described in 2.1 above.
-> >  	A cluster node can not be a leaf node.
-> >  
-> > +	Properties for cluster nodes:
-> > +
-> > +	- physical-package
-> > +		Usage: optional
-> > +		Value type: <empty>
+> "KPTI is treated as a system wide feature and is only "detected" if all
+> the CPUs on the system needs the defense. This is not sufficient, as the
+> KPTI is turned off on a system with a mix of CPUs, where some CPUs can
+> defend and others can't,
 > 
-> IIUC, value type must be specified as boolean in this case.
+> >>unless it is forced via kernel command line. Also, if a late CPU needs
+> >>KPTI but KPTI was not enabled at boot time, the CPU is currently allowed
+> >>to boot, which is a potential security vulnerability.  This patch ensures
+> 
+> " This patch ensures that KPTI is turned on if at least one CPU requires the
+> defense and any late CPUs are rejected..."
+> .
 
-That's what I thought too but according to DT specs v0.2, table 2.3 the
-property value type is <empty>.
+Yes, that makes sense.
 
-I do not mind changing it - whatever DT maintainers think is more
-appropriate.
+[...]
 
-Thanks,
-Lorenzo
+> >>diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> >>index ecc87aa74c64..4a55492784b7 100644
+> >>--- a/arch/arm64/kernel/cpufeature.c
+> >>+++ b/arch/arm64/kernel/cpufeature.c
+
+[...]
+
+> >>@@ -1008,7 +1006,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+> >>  	{
+> >>  		.desc = "Kernel page table isolation (KPTI)",
+> >>  		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+> >>-		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+> >>+		.type = ARM64_CPUCAP_BOOT_RESTRICTED_CPU_LOCAL_FEATURE,
+> >>+		.sys_reg = SYS_ID_AA64PFR0_EL1,
+> >>+		.field_pos = ID_AA64PFR0_CSV3_SHIFT,
+> >>+		.min_field_value = 1,
+> >>  		.matches = unmap_kernel_at_el0,
+> >
+> >Minor nit, but:
+> >
+> >Can we have a comment here to explain that .min_field_value is the
+> >minimum value that indicates that KPTI is _not_ required by this cpu?
+> >This is the opposite of the usual semantics for this field.
+> 
+> Sure, will add it.
+> 
+> >
+> >Otherwise, this inversion of meaning is not obvious without digging into
+> >unmap_kernel_at_el0() and spotting the ! in !has_cpuid_feature().
+> >
+> >With that, or if this usage of !has_cpuid_feature() is already well-
+> >established so that a comment is deemed unnecessary:
+> 
+> This is the first time we have used it.
+
+Thought so, but I wasn't ruling out the possibility that I had missed
+it!
+
+Cheers
+---Dave
