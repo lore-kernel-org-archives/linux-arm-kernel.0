@@ -1,70 +1,86 @@
-From: noloader@gmail.com (Jeffrey Walton)
-Date: Wed, 7 Feb 2018 20:47:05 -0500
-Subject: [PATCH 0/5] crypto: Speck support
-In-Reply-To: <20180208001001.19180-1-ebiggers@google.com>
-References: <20180208001001.19180-1-ebiggers@google.com>
-Message-ID: <CAH8yC8m4F9SWum9D5ZV2wzVAsJaDxnkc1L6eSeEOV-cOdkcg6Q@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 8 Feb 2018 13:51:05 +0800
+Subject: [PATCH v2 4/5] dt-bindings: clock: mediatek: update audsys
+ documentation to adapt MFD device
+In-Reply-To: <CAL_Jsq+kM19=+cMzfgvE3j01L9ahbf6PNh2eJJOkwd096RcFhg@mail.gmail.com>
+References: <cover.1515639336.git.ryder.lee@mediatek.com>
+ <8651585c91ee40f6ab3e30b893bcfb90fe5c2c25.1515639336.git.ryder.lee@mediatek.com>
+ <20180205060833.p56dun5i4bvs3jye@rob-hp-laptop>
+ <1517821892.12510.32.camel@mtkswgap22>
+ <CAL_Jsq+kM19=+cMzfgvE3j01L9ahbf6PNh2eJJOkwd096RcFhg@mail.gmail.com>
+Message-ID: <1518069065.24094.48.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 7, 2018 at 7:09 PM, Eric Biggers <ebiggers@google.com> wrote:
-> Hello,
->
-> This series adds Speck support to the crypto API, including the Speck128
-> and Speck64 variants.  Speck is a lightweight block cipher that can be
-> much faster than AES on processors that don't have AES instructions.
->
-> We are planning to offer Speck-XTS (probably Speck128/256-XTS) as an
-> option for dm-crypt and fscrypt on Android, for low-end mobile devices
-> with older CPUs such as ARMv7 which don't have the Cryptography
-> Extensions.  Currently, such devices are unencrypted because AES is not
-> fast enough, even when the NEON bit-sliced implementation of AES is
-> used.  Other AES alternatives such as Blowfish, Twofish, Camellia,
-> Cast6, and Serpent aren't fast enough either; it seems that only a
-> modern ARX cipher can provide sufficient performance on these devices.
->
-> This is a replacement for our original proposal
-> (https://patchwork.kernel.org/patch/10101451/) which was to offer
-> ChaCha20 for these devices.  However, the use of a stream cipher for
-> disk/file encryption with no space to store nonces would have been much
-> more insecure than we thought initially, given that it would be used on
-> top of flash storage as well as potentially on top of F2FS, neither of
-> which is guaranteed to overwrite data in-place.
->
-> Speck has been somewhat controversial due to its origin.  Nevertheless,
-> it has a straightforward design (it's an ARX cipher), and it appears to
-> be the leading software-optimized lightweight block cipher currently,
-> with the most cryptanalysis.  It's also easy to implement without side
-> channels, unlike AES.  Moreover, we only intend Speck to be used when
-> the status quo is no encryption, due to AES not being fast enough.
->
-> We've also considered a novel length-preserving encryption mode based on
-> ChaCha20 and Poly1305.  While theoretically attractive, such a mode
-> would be a brand new crypto construction and would be more complicated
-> and difficult to implement efficiently in comparison to Speck-XTS.
->
-> Thus, patch 1 adds a generic implementation of Speck, and the following
-> patches add a 32-bit ARM NEON implementation of Speck-XTS.  The
-> NEON-accelerated implementation is much faster than the generic
-> implementation and therefore is the implementation that would primarily
-> be used in practice on the devices we are targeting.
->
-> There is no AArch64 implementation added, since such CPUs are likely to
-> have the Cryptography Extensions, allowing the use of AES.
+On Wed, 2018-02-07 at 18:49 -0600, Rob Herring wrote:
+> >> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+> >> > index 9b8f578..677af40 100644
+> >> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+> >> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+> >> > @@ -1,22 +1,45 @@
+> >> > -MediaTek AUDSYS controller
+> >> > +MediaTek Audio Subsystem
+> >> >  ============================
+> >> > +The audio subsystem is one of the multi-function blocks of MediaTek SoCs.
+> >> > +It contains a system controller, which provides a number registers giving
+> >> > +access to two features: AUDSYS clocks and Audio Front End (AFE) components.
+> >> >
+> >> > +For the top level node:
+> >> > +- compatible: must be: "syscon", "simple-mfd";
+> >>
+> >> This should have some SoC specific compatible.
+> >
+> > As we don't have a specific driver (compatible string) for it and if we
+> > need to add that I think the term '*-audsys' is very suitable here, but
+> > unfortunately, it has already picked for clock driver (see child node).
+> 
+> Perhaps the clocks block should have "-clk" on the end or something.
+> 
+> Why do you really need to change this in the first place? You don't
+> have to have DT child nodes to create child (struct) devices and child
+> drivers.
+> 
 
-+1 on SPECK.
+I'm not sure I get your point. Did you mean that we could have a parent
+(which represents clock and its compatible is something like
+"*-audsys","syscon","simple-mfd") with a subnode for audio function?
 
-Its a nice cipher that runs fast. It is nice because the security
-engineering and parameter selection is well specified, and you can
-push the margins as low as you like. It does not guess at security
-parameters like some of the other ciphers used in dm-crypt.
+If so, there's no special reason. I just think it more specifically to
+let people know we have an MFD (top node) and it has two sub-functions
+(children) share the same region.
 
-On a modern Core-i5 6th gen I've seen numbers as low as ...
-SPECK-64/128 runs around 2.1 cpb, and SPECK-128/256 runs around 2.4
-cpb.
+> >> > +Required sub-nodes:
+> >> > +
+> >> > +AUDSYS clocks:
+> >> > +-------
+> >> >  The MediaTek AUDSYS controller provides various clocks to the system.
+> >> >
+> >> >  Required Properties:
+> >> >
+> >> >  - compatible: Should be one of:
+> >> > -   - "mediatek,mt7622-audsys", "syscon"
+> >> > +   - "mediatek,mt2701-audsys";
+> >> > +   - "mediatek,mt7622-audsys";
+> >> >  - #clock-cells: Must be 1
+> >> >
+> >> >  The AUDSYS controller uses the common clk binding from
+> >> >  Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >> >  The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+> >>
+> >> There's no register range associated with the clocks? If there is, add a
+> >> reg property.
+> >
+> > No, we don't need reg property here, as the two sub-drivers will obtain
+> > the regmap  which is propagated from the parent.
+> 
+> I know regmap doesn't need it. That's not what I asked. If you have a
+> range of registers for the clocks, then define that in reg. Only if
+> the clock control bits are mixed up with other functions within the
+> same registers, then you can omit it.
+> 
 
-I've already done some work for a US contractor who wanted/needed
-SPECK for a possible NASA contract. NASA is looking at SPECK for some
-satellite comms.
+Oh okay, I didn't read the mail well.  We have four or five registers
+for the clocks, but one of them (offset:0x634) is mixed up with the
+audio function (bit 17-19), so I omit it.
 
-Jeff
+Ryder.
