@@ -1,92 +1,133 @@
-From: ran.wang_1@nxp.com (Ran Wang)
-Date: Thu, 8 Feb 2018 15:54:36 +0800
-Subject: [PATCH 3/3] arm64: dts: update the cpu idle node
-In-Reply-To: <20180208075436.38443-1-ran.wang_1@nxp.com>
-References: <20180208075436.38443-1-ran.wang_1@nxp.com>
-Message-ID: <20180208075436.38443-3-ran.wang_1@nxp.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 8 Feb 2018 10:53:52 +0000
+Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
+In-Reply-To: <20180207103934.GG5862@e103592.cambridge.arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-17-suzuki.poulose@arm.com>
+ <20180207103934.GG5862@e103592.cambridge.arm.com>
+Message-ID: <831ad839-3c68-fc1e-d578-f951b46ed6ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuantian Tang <andy.tang@nxp.com>
+On 07/02/18 10:39, Dave Martin wrote:
+> On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
+>> Some capabilities have different criteria for detection and associated
+>> actions based on the matching criteria, even though they all share the
+>> same capability bit. So far we have used multiple entries with the same
+>> capability bit to handle this. This is prone to errors, as the
+>> cpu_enable is invoked for each entry, irrespective of whether the
+>> detection rule applies to the CPU or not. And also this complicates
+>> other helpers, e.g, __this_cpu_has_cap.
+>>
+>> This patch adds a wrapper entry to cover all the possible variations
+>> of a capability and ensures :
+>>   1) The capabilitiy is set when at least one of the entry detects
+>>   2) Action is only taken for the entries that detects.
+> 
+> I guess this means that where we have a single cpu_enable() method
+> but complex match criteria that require multiple entries, then that
+> cpu_enable() method might get called multiple times on a given CPU.
 
-According to PSCI standard v0.2, for CPU_SUSPEND call, which is
-used by cpu idle framework, bit[16] of state parameter must be 0.
-So update bit[16] of property 'arm,psci-suspend-param', which is
-used as state parameter, to 0.
+A CPU executes cpu_enable() only for the "matching" entries in the list,
+unlike earlier. So as long as there is a single entry "matching" the given
+CPU, the cpu_enable() will not be duplicated. May be we *should* mandate
+that a CPU cannot be matched by multiple entries.
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi |    2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |    2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi |    2 +-
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> Could be worth a comment if cpu_enable() methods must be robust
+> against this.
+> 
+>> This avoids explicit checks in the call backs. The only constraint
+>> here is that, all the entries should have the same "type".
+>>
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/include/asm/cpufeature.h |  1 +
+>>   arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
+>>   arch/arm64/kernel/cpufeature.c      |  7 +++--
+>>   3 files changed, 50 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index 462c35d1a38c..b73247c27f00 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
+>>   			bool sign;
+>>   			unsigned long hwcap;
+>>   		};
+>> +		const struct arm64_cpu_capabilities *cap_list;
+> 
+> Should desc, capability, def_scope and/or cpu_enable match for every cap
+> in such a group?
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index 15421ef..3463b09 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -84,7 +84,7 @@
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
- 			idle-state-name = "PH20";
--			arm,psci-suspend-param = <0x00010000>;
-+			arm,psci-suspend-param = <0x0>;
- 			entry-latency-us = <1000>;
- 			exit-latency-us = <1000>;
- 			min-residency-us = <3000>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 18828b9..82ca0d9 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -126,7 +126,7 @@
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
- 			idle-state-name = "PH20";
--			arm,psci-suspend-param = <0x00010000>;
-+			arm,psci-suspend-param = <0x0>;
- 			entry-latency-us = <1000>;
- 			exit-latency-us = <1000>;
- 			min-residency-us = <3000>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 06b5e12..2c56f9d 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -122,7 +122,7 @@
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
- 			idle-state-name = "PH20";
--			arm,psci-suspend-param = <0x00010000>;
-+			arm,psci-suspend-param = <0x0>;
- 			entry-latency-us = <1000>;
- 			exit-latency-us = <1000>;
- 			min-residency-us = <3000>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 8ff2688..fa6820b 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -130,7 +130,7 @@
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
- 			idle-state-name = "PH20";
--			arm,psci-suspend-param = <0x00010000>;
-+			arm,psci-suspend-param = <0x0>;
- 			entry-latency-us = <1000>;
- 			exit-latency-us = <1000>;
- 			min-residency-us = <3000>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-index aeaef01..0884e1a 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-@@ -143,7 +143,7 @@
- 	CPU_PW20: cpu-pw20 {
- 		compatible = "arm,idle-state";
- 		idle-state-name = "PW20";
--		arm,psci-suspend-param = <0x00010000>;
-+		arm,psci-suspend-param = <0x0>;
- 		entry-latency-us = <2000>;
- 		exit-latency-us = <2000>;
- 		min-residency-us = <6000>;
--- 
-1.7.1
+As mentioned above, the "type" field should match, which implies scope
+must match. The code ignores the scope, capability and desc of the individual
+entries in the list. They should be shared by the parent entry.
+
+cpu_enable could be duplicated as long as a CPU is not matched by multiple
+entries.
+
+> 
+> I'd expected something maybe like this:
+> 
+> struct arm64_cpu_capabilities {
+> 	const char *desc;
+> 	u16 capability;
+> 	struct arm64_capability_match {
+> 		bool (*matches)(const struct arm64_cpu_capabilities *, int);
+> 		int (*cpu_enable)(void);
+> 		union {
+> 			struct { ... midr ... };
+> 			struct { ... sysreg ... };
+> 			const struct arm64_capability_match *list;
+> 		};
+>>   	};
+>>   };
+
+Yes, thats makes it more explicit. However, it makes the "matches()"
+complicated, as we have to change the prototype for matches to accept
+struct arm64_capability_match *, to point to the right "matches" for
+items in the list. And that makes a bit more of an invasive change, where
+each matches() would then loose a way to get to the "capabilities" entry,
+as they could be called with either the "match" in the top level or
+the one in the list.
+
+>>   		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 65a8e5cc600c..13e30c1b1e99 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+>>   		return false;
+>>   
+>>   	for (caps = cap_array; caps->matches; caps++)
+>> -		if (caps->capability == cap &&
+>> -		    caps->matches(caps, SCOPE_LOCAL_CPU))
+>> -			return true;
+>> +		if (caps->capability == cap)
+>> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
+> 
+> If we went for my capability { cap; match criteria or list; } approach,
+> would it still be necessary to iterate over the whole list here?
+
+Sorry, I couldn't follow this. With this patch, we already stop scanning
+the list as soon as we find the first entry. It is upto "the entry" to run
+individual match criteria to decide.
+
+> 
+> This seems preferable if this function is used by other paths that
+> don't expect it to be so costly.  Currently I only see a call in
+> arch/arm64/kvm/handle_exit.c:handle_exit_early() for the SError case --
+> which is probably not expected to be a fast path.
+uu>
+> [...]
+> 
+> Cheers
+> ---Dave
+> 
+
+Cheers
+Suzuki
