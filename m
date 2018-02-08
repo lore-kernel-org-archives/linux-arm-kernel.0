@@ -1,57 +1,31 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 8 Feb 2018 13:57:27 +0800
-Subject: [PATCH v2 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD
- device
-In-Reply-To: <0e0e703c-0ac9-06ad-91c5-abdf16de1ee9@gmail.com>
-References: <cover.1515639336.git.ryder.lee@mediatek.com>
- <d6669277f5232446b4798a6b724074b18d5c21aa.1515639336.git.ryder.lee@mediatek.com>
- <72058f8d-c83d-d0e6-dc07-83c9f5fc2710@gmail.com>
- <1517803655.1173.12.camel@mtkswgap22>
- <0e0e703c-0ac9-06ad-91c5-abdf16de1ee9@gmail.com>
-Message-ID: <1518069447.28878.4.camel@mtkswgap22>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Feb 2018 14:47:10 +0800
+Subject: [PATCH v2 1/2] soc: imx: gpcv2: Do not pass static memory as
+ platform data
+In-Reply-To: <20180122150748.1742-1-andrew.smirnov@gmail.com>
+References: <20180122150748.1742-1-andrew.smirnov@gmail.com>
+Message-ID: <20180208064709.GB31910@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-07 at 16:18 +0100, Matthias Brugger wrote:
+On Mon, Jan 22, 2018 at 07:07:47AM -0800, Andrey Smirnov wrote:
+> Platform device core assumes the ownership of dev.platform_data as
+> well as that it is dynamically allocated and it will try to kfree it
+> as a part of platform_device_release(). Change the code to pass
+> kzalloc'ed chunk of memory instead of a pointer to a static memory to
+> avoid causing a BUG() when calling platform_device_put().
 > 
-> On 02/05/2018 05:07 AM, Ryder Lee wrote:
-> > On Sat, 2018-02-03 at 15:26 +0100, Matthias Brugger wrote:
-> >>
-> >> On 01/31/2018 08:42 AM, Ryder Lee wrote:
-> >>> As the new MFD parent is in place, switch probing method to adapt it.
-> >>>
-> >>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> >>> ---
-> >>>  drivers/clk/mediatek/clk-mt7622-aud.c | 3 ++-
-> >>>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
-> >>> index 13f752d..8c18536 100644
-> >>> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
-> >>> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
-> >>> @@ -142,11 +142,12 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
-> >>>  {
-> >>>  	struct clk_onecell_data *clk_data;
-> >>>  	struct device_node *node = pdev->dev.of_node;
-> >>> +	struct device_node *pnode = pdev->dev.parent->of_node;
-> >>>  	int r;
-> >>>  
-> >>>  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
-> >>>  
-> >>> -	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
-> >>> +	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
-> >>
-> >> We will need a fallback here for older device tree bindings.
-> >>
-> >> Regards,
-> >> Matthias
-> > 
-> > Up to now, I didn't see both driver and bindings are used anywhere.
-> > Should I still care about that?
-> > 
+> The problem can be reproduced by artificially enabling the error path
+> of platform_device_add() call (around line 357).
 > 
-> Yes please, we have to ensure that newer kernel work with older bindings and
-> vice-versa.
+> Note that this change also allows us to constify imx7_pgc_domains,
+> since we no longer need to be able to modify it.
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-OKay. An unrelated question - is it possible to change the compatible
-string (*-audsys-clk) without breaking backward compatible?
+Applied both, thanks.
