@@ -1,133 +1,659 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 08 Feb 2018 19:44:08 +0100
-Subject: [PATCH v2 3/3] ARM: dts: exynos: Add support for HDMI audio on
- exynos5433-tm2
-In-Reply-To: <20180208184408.24185-1-s.nawrocki@samsung.com>
-References: <20180208184408.24185-1-s.nawrocki@samsung.com>
- <CGME20180208184446epcas2p2a5a59112f29b97dad9deb820699eb741@epcas2p2.samsung.com>
-Message-ID: <20180208184408.24185-3-s.nawrocki@samsung.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Thu, 8 Feb 2018 11:14:07 -0800
+Subject: [PATCH v4 2/5] dmaengine: mediatek: Add MediaTek High-Speed DMA
+ controller for MT7622 and MT7623 SoC
+In-Reply-To: <c8e4b2e4ca21b5a2b3706eee5d06187e78ccea84.1518110810.git.sean.wang@mediatek.com>
+References: <cover.1518110810.git.sean.wang@mediatek.com>
+ <c8e4b2e4ca21b5a2b3706eee5d06187e78ccea84.1518110810.git.sean.wang@mediatek.com>
+Message-ID: <10c340f9-cd1e-d448-678b-5c419b2cdc67@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the sound node of the exynos5433-tm2 board
-and adds clock tree configuration in order to support HDMI sound.
+On 02/08/2018 09:58 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> MediaTek High-Speed DMA controller (HSDMA) on MT7622 and MT7623 SoC has
+> a single ring is dedicated to memory-to-memory transfer through ring based
+> descriptor management.
+> 
+> Even though there is only one physical ring available inside HSDMA, the
+> driver can be easily extended to the support of multiple virtual channels
+> processing simultaneously by means of DMA_VIRTUAL_CHANNELS effort.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  drivers/dma/Kconfig              |    2 +
+>  drivers/dma/Makefile             |    1 +
+>  drivers/dma/mediatek/Kconfig     |   13 +
+>  drivers/dma/mediatek/Makefile    |    1 +
+>  drivers/dma/mediatek/mtk-hsdma.c | 1046 ++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 1063 insertions(+)
+>  create mode 100644 drivers/dma/mediatek/Kconfig
+>  create mode 100644 drivers/dma/mediatek/Makefile
+>  create mode 100644 drivers/dma/mediatek/mtk-hsdma.c
+> 
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-Changes since v1:
- - dropped unnecessary assigned-clock* properties for AUD PLL
-   in cmu_top node,
- - changed default AUD PLL frequency so it is withing recommended
-   252...400 MHz range.
----
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 60 ++++++++++++++++++++--
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  1 +
- 2 files changed, 57 insertions(+), 4 deletions(-)
+> diff --git a/drivers/dma/mediatek/Kconfig b/drivers/dma/mediatek/Kconfig
+> new file mode 100644
+> index 0000000..27bac0b
+> --- /dev/null
+> +++ b/drivers/dma/mediatek/Kconfig
+> @@ -0,0 +1,13 @@
+> +
+> +config MTK_HSDMA
+> +	tristate "MediaTek High-Speed DMA controller support"
+> +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> +	select DMA_ENGINE
+> +	select DMA_VIRTUAL_CHANNELS
+> +	---help---
+> +	  Enable support for High-Speed DMA controller on MediaTek
+> +	  SoCs.
+> +
+> +	  This controller provides the channels which is dedicated to
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-index a77462da4a36..5599f1941c64 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/sound/samsung-i2s.h>
- 
- / {
- 	aliases {
-@@ -112,8 +113,8 @@
- 
- 	sound {
- 		compatible = "samsung,tm2-audio";
--		audio-codec = <&wm5110>;
--		i2s-controller = <&i2s0>;
-+		audio-codec = <&wm5110>, <&hdmi>;
-+		i2s-controller = <&i2s0 0>, <&i2s1 0>;
- 		audio-amplifier = <&max98504>;
- 		mic-bias-gpios = <&gpr3 2 GPIO_ACTIVE_HIGH>;
- 		model = "wm5110";
-@@ -216,9 +217,56 @@
- 	status = "okay";
- };
- 
-+#define TM2_DEF_AUD_PLL_RATE	393216003U
-+
- &cmu_aud {
--	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
--	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
-+	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>,
-+		<&cmu_aud CLK_MOUT_SCLK_AUD_I2S>,
-+		<&cmu_aud CLK_MOUT_SCLK_AUD_PCM>,
-+		<&cmu_top CLK_MOUT_AUD_PLL>,
-+		<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
-+		<&cmu_top CLK_MOUT_SCLK_AUDIO0>,
-+		<&cmu_top CLK_MOUT_SCLK_AUDIO1>,
-+		<&cmu_top CLK_MOUT_SCLK_SPDIF>,
-+
-+		<&cmu_aud CLK_DIV_AUD_CA5>,
-+		<&cmu_aud CLK_DIV_ACLK_AUD>,
-+		<&cmu_aud CLK_DIV_PCLK_DBG_AUD>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_I2S>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_PCM>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_SLIMBUS>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_UART>,
-+		<&cmu_top CLK_DIV_SCLK_AUDIO0>,
-+		<&cmu_top CLK_DIV_SCLK_AUDIO1>,
-+		<&cmu_top CLK_DIV_SCLK_PCM1>,
-+		<&cmu_top CLK_DIV_SCLK_I2S1>;
-+
-+	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>,
-+		<&cmu_aud CLK_MOUT_AUD_PLL_USER>,
-+		<&cmu_aud CLK_MOUT_AUD_PLL_USER>,
-+		<&cmu_top CLK_FOUT_AUD_PLL>,
-+		<&cmu_top CLK_MOUT_AUD_PLL>,
-+		<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
-+		<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
-+		<&cmu_top CLK_SCLK_AUDIO0>;
-+
-+	assigned-clock-rates = <0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>,
-+		<((TM2_DEF_AUD_PLL_RATE / 2) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 6) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 12) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 8) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 192) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 16) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 2) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 16) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 4) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 192) + 1)>,
-+		<((TM2_DEF_AUD_PLL_RATE / 8) + 1)>;
-+};
-+
-+&i2s1 {
-+	assigned-clocks = <&i2s1 CLK_I2S_RCLK_SRC>;
-+	assigned-clock-parents = <&cmu_peric CLK_SCLK_I2S1>;
- };
- 
- &cmu_fsys {
-@@ -838,6 +886,10 @@
- 	status = "okay";
- };
- 
-+&i2s1 {
-+	status = "okay";
-+};
-+
- &mshc_0 {
- 	status = "okay";
- 	mmc-hs200-1_8v;
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 2b73bd86bc56..c0231d077fa6 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -969,6 +969,7 @@
- 			ddc = <&hsi2c_11>;
- 			samsung,syscon-phandle = <&pmu_system_controller>;
- 			samsung,sysreg-phandle = <&syscon_disp>;
-+			#sound-dai-cells = <0>;
- 			status = "disabled";
- 		};
- 
+	                                              are dedicated to
+
+> +	  memory-to-memory transfer to offload from CPU through ring-
+> +	  based descriptor management.
+
+> diff --git a/drivers/dma/mediatek/mtk-hsdma.c b/drivers/dma/mediatek/mtk-hsdma.c
+> new file mode 100644
+> index 0000000..d394fc6
+> --- /dev/null
+> +++ b/drivers/dma/mediatek/mtk-hsdma.c
+> @@ -0,0 +1,1046 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Driver for MediaTek High-Speed DMA Controller
+> + *
+> + * Copyright (c) 2017-2018 MediaTek Inc.
+> + * Author: Sean Wang <sean.wang@mediatek.com>
+> + *
+> + */
+> +
+
+#include <linux/bitops.h>
+for BIT() macro usage.
+
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/jiffies.h>
+> +#include <linux/list.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_dma.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/refcount.h>
+> +#include <linux/slab.h>
+> +
+> +#include "../virt-dma.h"
+> +
+> +#define MTK_DMA_DEV KBUILD_MODNAME
+> +
+> +#define MTK_HSDMA_USEC_POLL		20
+> +#define MTK_HSDMA_TIMEOUT_POLL		200000
+> +#define MTK_HSDMA_DMA_BUSWIDTHS		BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED)
+> +
+> +/* The default number of virtual channel */
+> +#define MTK_HSDMA_NR_VCHANS		3
+> +
+> +/* Only one physical channel supported */
+> +#define MTK_HSDMA_NR_MAX_PCHANS		1
+> +
+> +/* Macro for physical descriptor (PD) manipulation */
+> +/* The number of PD which must be 2 of power */
+> +#define MTK_DMA_SIZE			64
+> +#define MTK_HSDMA_NEXT_DESP_IDX(x, y)	(((x) + 1) & ((y) - 1))
+> +#define MTK_HSDMA_LAST_DESP_IDX(x, y)	(((x) - 1) & ((y) - 1))
+> +#define MTK_HSDMA_MAX_LEN		0x3f80
+> +#define MTK_HSDMA_ALIGN_SIZE		4
+> +#define MTK_HSDMA_PLEN_MASK		0x3fff
+> +#define MTK_HSDMA_DESC_PLEN(x)		(((x) & MTK_HSDMA_PLEN_MASK) << 16)
+> +#define MTK_HSDMA_DESC_PLEN_GET(x)	(((x) >> 16) & MTK_HSDMA_PLEN_MASK)
+> +
+> +/* Registers for underlying ring manipulation */
+> +#define MTK_HSDMA_TX_BASE		0x0
+> +#define MTK_HSDMA_TX_CNT		0x4
+> +#define MTK_HSDMA_TX_CPU		0x8
+> +#define MTK_HSDMA_TX_DMA		0xc
+> +#define MTK_HSDMA_RX_BASE		0x100
+> +#define MTK_HSDMA_RX_CNT		0x104
+> +#define MTK_HSDMA_RX_CPU		0x108
+> +#define MTK_HSDMA_RX_DMA		0x10c
+> +
+> +/* Registers for global setup */
+> +#define MTK_HSDMA_GLO			0x204
+> +#define MTK_HSDMA_GLO_MULTI_DMA		BIT(10)
+> +#define MTK_HSDMA_TX_WB_DDONE		BIT(6)
+> +#define MTK_HSDMA_BURST_64BYTES		(0x2 << 4)
+> +#define MTK_HSDMA_GLO_RX_BUSY		BIT(3)
+> +#define MTK_HSDMA_GLO_RX_DMA		BIT(2)
+> +#define MTK_HSDMA_GLO_TX_BUSY		BIT(1)
+> +#define MTK_HSDMA_GLO_TX_DMA		BIT(0)
+> +#define MTK_HSDMA_GLO_DMA		(MTK_HSDMA_GLO_TX_DMA |	\
+> +					 MTK_HSDMA_GLO_RX_DMA)
+> +#define MTK_HSDMA_GLO_BUSY		(MTK_HSDMA_GLO_RX_BUSY | \
+> +					 MTK_HSDMA_GLO_TX_BUSY)
+> +#define MTK_HSDMA_GLO_DEFAULT		(MTK_HSDMA_GLO_TX_DMA | \
+> +					 MTK_HSDMA_GLO_RX_DMA | \
+> +					 MTK_HSDMA_TX_WB_DDONE | \
+> +					 MTK_HSDMA_BURST_64BYTES | \
+> +					 MTK_HSDMA_GLO_MULTI_DMA)
+> +
+> +/* Registers for reset */
+> +#define MTK_HSDMA_RESET			0x208
+> +#define MTK_HSDMA_RST_TX		BIT(0)
+> +#define MTK_HSDMA_RST_RX		BIT(16)
+> +
+> +/* Registers for interrupt control */
+> +#define MTK_HSDMA_DLYINT		0x20c
+> +#define MTK_HSDMA_RXDLY_INT_EN		BIT(15)
+> +/* Interrupt fires when the pending number's more than the specified */
+> +#define MTK_HSDMA_RXMAX_PINT(x)		(((x) & 0x7f) << 8)
+> +/* Interrupt fires when the pending time's more than the specified in 20 us */
+> +#define MTK_HSDMA_RXMAX_PTIME(x)	((x) & 0x7f)
+> +#define MTK_HSDMA_DLYINT_DEFAULT	(MTK_HSDMA_RXDLY_INT_EN | \
+> +					 MTK_HSDMA_RXMAX_PINT(20) | \
+> +					 MTK_HSDMA_RXMAX_PTIME(20))
+> +#define MTK_HSDMA_INT_STATUS		0x220
+> +#define MTK_HSDMA_INT_ENABLE		0x228
+> +#define MTK_HSDMA_INT_RXDONE		BIT(16)
+> +
+> +enum mtk_hsdma_vdesc_flag {
+> +	MTK_HSDMA_VDESC_FINISHED	= 0x01,
+> +};
+> +
+> +#define IS_MTK_HSDMA_VDESC_FINISHED(x) ((x) == MTK_HSDMA_VDESC_FINISHED)
+> +
+> +/*
+> + * struct mtk_hsdma_pdesc - This is the struct holding info describing physical
+> + *			    descriptor (PD) and its placement must be kept at
+> + *			    4-bytes alignment in little endian order.
+> + * @des[1-4]:		    The control pad used to indicate hardware how to
+
+s/des/desc/
+
+> + *			    deal with the descriptor such as source and
+> + *			    destination address and data length. The maximum
+> + *			    data length each pdesc can handle is 0x3f80 bytes
+> + */
+> +struct mtk_hsdma_pdesc {
+> +	__le32 desc1;
+> +	__le32 desc2;
+> +	__le32 desc3;
+> +	__le32 desc4;
+> +} __packed __aligned(4);
+> +
+
+> +/*
+
+/**
+
+> + * struct mtk_hsdma_vdesc - This is the struct holding info describing virtual
+> + *			    descriptor (VD)
+> + * @vd:			    An instance for struct virt_dma_desc
+> + * @len:		    The total data size device wants to move
+> + * @residue:		    The remaining data size device will move
+> + * @dest:		    The destination address device wants to move to
+> + * @src:		    The source address device wants to move from
+> + */
+> +struct mtk_hsdma_vdesc {
+> +	struct virt_dma_desc vd;
+> +	size_t len;
+> +	size_t residue;
+> +	dma_addr_t dest;
+> +	dma_addr_t src;
+> +};
+> +
+> +/*
+> + * struct mtk_hsdma_cb - This is the struct holding extra info required for RX
+> + *			 ring to know what relevant VD the the PD is being
+> + *			 mapped to.
+> + * @vd:			 Pointer to the relevant VD.
+
+add * @flag: here, please
+
+> + */
+> +struct mtk_hsdma_cb {
+> +	struct virt_dma_desc *vd;
+> +	enum mtk_hsdma_vdesc_flag flag;
+> +};
+> +
+> +/*
+
+/** for kernel-doc comments.
+
+> + * struct mtk_hsdma_ring - This struct holds info describing underlying ring
+> + *			   space
+> + * @txd:		   The descriptor TX ring which describes DMA source
+> + *			   information
+> + * @rxd:		   The descriptor RX ring which describes DMA
+> + *			   destination information
+> + * @cb:			   The extra information pointed at by RX ring
+> + * @tphys:		   The physical addr of TX ring
+> + * @rphys:		   The physical addr of RX ring
+> + * @cur_tptr:		   Pointer to the next free descriptor used by the host
+> + * @cur_rptr:		   Pointer to the last done descriptor by the device
+> + */
+> +struct mtk_hsdma_ring {
+> +	struct mtk_hsdma_pdesc *txd;
+> +	struct mtk_hsdma_pdesc *rxd;
+> +	struct mtk_hsdma_cb *cb;
+> +	dma_addr_t tphys;
+> +	dma_addr_t rphys;
+> +	u16 cur_tptr;
+> +	u16 cur_rptr;
+> +};
+> +
+
+> +/*
+
+s:/*:/**:
+
+> + * struct mtk_hsdma_pchan - This is the struct holding info describing physical
+> + *			   channel (PC)
+> + * @ring:		   An instance for the underlying ring
+> + * @sz_ring:		   Total size allocated for the ring
+> + * @nr_free:		   Total number of free rooms in the ring. It would
+> + *			   be accessed and updated frequently between IRQ
+> + *			   context and user context to reflect whether ring
+> + *			   can accept requests from VD.
+> + */
+> +struct mtk_hsdma_pchan {
+> +	struct mtk_hsdma_ring ring;
+> +	size_t sz_ring;
+> +	atomic_t nr_free;
+> +};
+> +
+> +/*
+
+Use /** for kernel-doc comments.
+
+> + * struct mtk_hsdma_vchan - This is the struct holding info describing virtual
+> + *			   channel (VC)
+> + * @vc:			   An instance for struct virt_dma_chan
+> + * @issue_completion:	   The wait for all issued descriptors completited
+> + * @issue_synchronize:	   Bool indicating channel synchronization starts
+> + * @desc_hw_processing:	   List those descriptors the hardware is processing
+> + */
+> +struct mtk_hsdma_vchan {
+> +	struct virt_dma_chan vc;
+> +	struct completion issue_completion;
+> +	bool issue_synchronize;
+> +	/* protected by vc.lock */
+> +	struct list_head desc_hw_processing;
+> +};
+> +
+> +/*
+
+Use /** to begin a kernel-doc comment block.
+
+> + * struct mtk_hsdma_soc - This is the struct holding differences among SoCs
+> + * @ddone:		  Bit mask for DDONE
+> + * @ls0:		  Bit mask for LS0
+> + */
+> +struct mtk_hsdma_soc {
+> +	__le32 ddone;
+> +	__le32 ls0;
+> +};
+> +
+
+
+> +/*
+
+You can use /** to begin this kernel-doc comment block.
+
+> + * struct mtk_hsdma_device - This is the struct holding info describing HSDMA
+> + *			     device
+> + * @ddev:		     An instance for struct dma_device
+> + * @base:		     The mapped register I/O base
+> + * @clk:		     The clock that device internal is using
+> + * @irq:		     The IRQ that device are using
+> + * @dma_requests:	     The number of VCs the device supports to
+> + * @vc:			     The pointer to all available VCs
+> + * @pc:			     The pointer to the underlying PC
+> + * @pc_refcnt:		     Track how many VCs are using the PC
+> + * @lock:		     Lock protect agaisting multiple VCs access PC
+> + * @soc:		     The pointer to area holding differences among
+> + *			     vaious platform
+> + */
+> +struct mtk_hsdma_device {
+> +	struct dma_device ddev;
+> +	void __iomem *base;
+> +	struct clk *clk;
+> +	u32 irq;
+> +
+> +	u32 dma_requests;
+> +	struct mtk_hsdma_vchan *vc;
+> +	struct mtk_hsdma_pchan *pc;
+> +	refcount_t pc_refcnt;
+> +
+> +	/* Lock used to protect against multiple VCs access PC */
+> +	spinlock_t lock;
+> +
+> +	const struct mtk_hsdma_soc *soc;
+> +};
+
+
+[snip]
+
+> +
+> +static void mtk_hsdma_issue_vchan_pending(struct mtk_hsdma_device *hsdma,
+> +					  struct mtk_hsdma_vchan *hvc)
+> +{
+> +	struct virt_dma_desc *vd, *vd2;
+> +	int err;
+> +
+> +	lockdep_assert_held(&hvc->vc.lock);
+> +
+> +	list_for_each_entry_safe(vd, vd2, &hvc->vc.desc_issued, node) {
+> +		struct mtk_hsdma_vdesc *hvd;
+> +
+> +		hvd = to_hsdma_vdesc(vd);
+> +
+> +		/* Map VD into PC and all VCs shares a single PC */
+> +		err = mtk_hsdma_issue_pending_vdesc(hsdma, hsdma->pc, hvd);
+> +
+> +		/* Move VD from desc_issued to desc_hw_processing when entire
+> +		 * VD is fit into available PDs. Otherwise, the uncompleted
+> +		 * VDs would stay in list desc_issued and then restart the
+> +		 * processing as soon as possible once underlying ring space
+> +		 * got freed.
+> +		 */
+
+Please fix multi-line comment style.
+
+> +		if (err == -ENOSPC)
+> +			break;
+> +
+> +		/*
+> +		 * The extra list desc_hw_processing is used because
+> +		 * hardware can't provide sufficient information allowing us
+> +		 * to know what VDs are still working on the underlying ring.
+> +		 * Through the additional list, it can help us to implement
+> +		 * terminate_all, residue calculation and such thing needed
+> +		 * to know detail descriptor status on the hardware.
+> +		 */
+> +		list_move_tail(&vd->node, &hvc->desc_hw_processing);
+> +	}
+> +}
+> +
+> +static void mtk_hsdma_free_rooms_in_ring(struct mtk_hsdma_device *hsdma)
+> +{
+> +	struct mtk_hsdma_vchan *hvc;
+> +	struct mtk_hsdma_pdesc *rxd;
+> +	struct mtk_hsdma_vdesc *hvd;
+> +	struct mtk_hsdma_pchan *pc;
+> +	struct mtk_hsdma_cb *cb;
+> +	__le32 desc2;
+> +	u32 status;
+> +	u16 next;
+> +	int i;
+> +
+> +	pc = hsdma->pc;
+> +
+> +	/* Read IRQ status */
+> +	status = mtk_dma_read(hsdma, MTK_HSDMA_INT_STATUS);
+> +
+> +	/*
+> +	 * Ack the pending IRQ all to let hardware know software is handling
+> +	 * those finished physical descriptors. Otherwise, the hardware would
+> +	 * keep the used IRQ line in certain trigger state.
+> +	 */
+> +	mtk_dma_write(hsdma, MTK_HSDMA_INT_STATUS, status);
+> +
+> +	while (1) {
+> +		next = MTK_HSDMA_NEXT_DESP_IDX(pc->ring.cur_rptr,
+> +					       MTK_DMA_SIZE);
+> +		rxd = &pc->ring.rxd[next];
+> +		/*
+> +		 * If MTK_HSDMA_DESC_DDONE is no specified, that means data
+> +		 * moving for the PD is still under going.
+> +		 */
+> +		desc2 = READ_ONCE(rxd->desc2);
+> +		if (!(desc2 & hsdma->soc->ddone))
+> +			break;
+> +
+> +		cb = &pc->ring.cb[next];
+> +		if (unlikely(!cb->vd)) {
+> +			dev_err(hsdma2dev(hsdma), "cb->vd cannot be null\n");
+> +			break;
+> +		}
+> +
+> +		/* Update residue of VD the associated PD belonged to */
+> +		hvd = to_hsdma_vdesc(cb->vd);
+> +		hvd->residue -= MTK_HSDMA_DESC_PLEN_GET(rxd->desc2);
+> +
+> +		/* Complete VD until the relevant last PD is finished */
+> +		if (IS_MTK_HSDMA_VDESC_FINISHED(cb->flag)) {
+> +			hvc = to_hsdma_vchan(cb->vd->tx.chan);
+> +
+> +			spin_lock(&hvc->vc.lock);
+> +			/* Remove VD from list desc_hw_processing */
+> +			list_del(&cb->vd->node);
+> +			/* Add VD into list desc_completed */
+> +			vchan_cookie_complete(cb->vd);
+> +
+> +			if (hvc->issue_synchronize &&
+> +			    list_empty(&hvc->desc_hw_processing)) {
+> +				complete(&hvc->issue_completion);
+> +				hvc->issue_synchronize = false;
+> +			}
+> +			spin_unlock(&hvc->vc.lock);
+> +
+> +			cb->flag = 0;
+> +		}
+> +
+> +		cb->vd = 0;
+> +
+> +		/*
+> +		 * Recycle the RXD with the helper WRITE_ONCE that can ensure
+> +		 * data written into RAM would really happens.
+> +		 */
+> +		WRITE_ONCE(rxd->desc1, 0);
+> +		WRITE_ONCE(rxd->desc2, 0);
+> +		pc->ring.cur_rptr = next;
+> +
+> +		/* Release rooms */
+> +		atomic_inc(&pc->nr_free);
+> +	}
+> +
+> +	/* Ensure all changes indeed done before we're going on */
+> +	wmb();
+> +
+> +	/* Update CPU pointer for those completed PDs */
+> +	mtk_dma_write(hsdma, MTK_HSDMA_RX_CPU, pc->ring.cur_rptr);
+> +
+> +	/* ASAP handles pending VDs in all VCs after freeing some rooms */
+> +	for (i = 0; i < hsdma->dma_requests; i++) {
+> +		hvc = &hsdma->vc[i];
+> +		spin_lock(&hvc->vc.lock);
+> +		mtk_hsdma_issue_vchan_pending(hsdma, hvc);
+> +		spin_unlock(&hvc->vc.lock);
+> +	}
+> +
+> +	/* All completed PDs are cleaned up, so enable interrupt again */
+> +	mtk_dma_set(hsdma, MTK_HSDMA_INT_ENABLE, MTK_HSDMA_INT_RXDONE);
+> +}
+> +
+> +static irqreturn_t mtk_hsdma_irq(int irq, void *devid)
+> +{
+> +	struct mtk_hsdma_device *hsdma = devid;
+> +
+> +	/*
+> +	 * Disable interrupt until all completed PDs are cleaned up in
+> +	 * mtk_hsdma_free_rooms call.
+> +	 */
+> +	mtk_dma_clr(hsdma, MTK_HSDMA_INT_ENABLE, MTK_HSDMA_INT_RXDONE);
+> +
+> +	mtk_hsdma_free_rooms_in_ring(hsdma);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +struct virt_dma_desc *mtk_hsdma_find_active_desc(struct dma_chan *c,
+> +						 dma_cookie_t cookie)
+> +{
+> +	struct mtk_hsdma_vchan *hvc = to_hsdma_vchan(c);
+> +	struct virt_dma_desc *vd;
+> +
+> +	list_for_each_entry(vd, &hvc->desc_hw_processing, node)
+> +		if (vd->tx.cookie == cookie)
+> +			return vd;
+> +
+> +	list_for_each_entry(vd, &hvc->vc.desc_issued, node)
+> +		if (vd->tx.cookie == cookie)
+> +			return vd;
+> +
+> +	return NULL;
+> +}
+> +
+> +static enum dma_status mtk_hsdma_tx_status(struct dma_chan *c,
+> +					   dma_cookie_t cookie,
+> +					   struct dma_tx_state *txstate)
+> +{
+> +	struct mtk_hsdma_vchan *hvc = to_hsdma_vchan(c);
+> +	struct mtk_hsdma_vdesc *hvd;
+> +	struct virt_dma_desc *vd;
+> +	enum dma_status ret;
+> +	unsigned long flags;
+> +	size_t bytes = 0;
+> +
+> +	ret = dma_cookie_status(c, cookie, txstate);
+> +	if (ret == DMA_COMPLETE || !txstate)
+> +		return ret;
+> +
+> +	spin_lock_irqsave(&hvc->vc.lock, flags);
+> +	vd = mtk_hsdma_find_active_desc(c, cookie);
+> +	spin_unlock_irqrestore(&hvc->vc.lock, flags);
+> +
+> +	if (vd) {
+> +		hvd = to_hsdma_vdesc(vd);
+> +		bytes = hvd->residue;
+> +	}
+> +
+> +	dma_set_residue(txstate, bytes);
+> +
+> +	return ret;
+> +}
+> +
+> +static void mtk_hsdma_issue_pending(struct dma_chan *c)
+> +{
+> +	struct mtk_hsdma_device *hsdma = to_hsdma_dev(c);
+> +	struct mtk_hsdma_vchan *hvc = to_hsdma_vchan(c);
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&hvc->vc.lock, flags);
+> +
+> +	if (vchan_issue_pending(&hvc->vc))
+> +		mtk_hsdma_issue_vchan_pending(hsdma, hvc);
+> +
+> +	spin_unlock_irqrestore(&hvc->vc.lock, flags);
+> +}
+> +
+> +static struct dma_async_tx_descriptor *
+> +mtk_hsdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest,
+> +			  dma_addr_t src, size_t len, unsigned long flags)
+> +{
+> +	struct mtk_hsdma_vdesc *hvd;
+> +
+> +	hvd = kzalloc(sizeof(*hvd), GFP_NOWAIT);
+> +	if (!hvd)
+> +		return NULL;
+> +
+> +	hvd->len = len;
+> +	hvd->residue = len;
+> +	hvd->src = src;
+> +	hvd->dest = dest;
+> +
+> +	return vchan_tx_prep(to_virt_chan(c), &hvd->vd, flags);
+> +}
+> +
+> +static int mtk_hsdma_free_inactive_desc(struct dma_chan *c, bool reuse_clr)
+> +{
+> +	struct virt_dma_chan *vc = to_virt_chan(c);
+> +	unsigned long flags;
+> +	LIST_HEAD(head);
+> +
+> +	/* Terminate pending descriptors that have previously been submitted
+
+Begin multi-line comments with:
+	/*
+then real comments start on the next line.
+
+> +	 * to the channel. However, the DMA engine doesn't provide any way to
+> +	 * stop these descriptors being processed by hardware. The only way is
+> +	 * just waiting until these descriptors are all processing done. Thus,
+> +	 * users must synchronize to the DMA channel termination to guarantee
+> +	 * that all transfers for previously issued descriptors have stopped.
+> +	 */
+> +	spin_lock_irqsave(&vc->lock, flags);
+> +	list_splice_tail_init(&vc->desc_allocated, &head);
+> +	list_splice_tail_init(&vc->desc_submitted, &head);
+> +	list_splice_tail_init(&vc->desc_issued, &head);
+> +
+> +	if (reuse_clr) {
+> +		struct virt_dma_desc *vd;
+> +
+> +		list_for_each_entry(vd, &head, node)
+> +			dmaengine_desc_clear_reuse(&vd->tx);
+> +	}
+> +	spin_unlock_irqrestore(&vc->lock, flags);
+> +
+> +	/* At the point, we don't expect users put descriptor into VC again */
+> +	vchan_dma_desc_free_list(vc, &head);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_hsdma_terminate_all(struct dma_chan *c)
+> +{
+> +	mtk_hsdma_free_inactive_desc(c, false);
+> +
+> +	return 0;
+> +}
+> +
+> +static void mtk_hsdma_synchronize(struct dma_chan *c)
+> +{
+> +	struct mtk_hsdma_vchan *hvc = to_hsdma_vchan(c);
+> +	bool sync_needed = false;
+> +
+> +	/*
+> +	 * Once issue_synchronize is being set, which means once the hardware
+> +	 * consumes all descriptors for the channel in the ring, the
+> +	 * synchronization must be be notified immediately it is completed.
+> +	 */
+> +	spin_lock(&hvc->vc.lock);
+> +	if (!list_empty(&hvc->desc_hw_processing)) {
+> +		hvc->issue_synchronize = true;
+> +		sync_needed = true;
+> +	}
+> +	spin_unlock(&hvc->vc.lock);
+> +
+> +	if (sync_needed)
+> +		wait_for_completion(&hvc->issue_completion);
+> +	/*
+> +	 * At the point, we expect that all remaining descriptors in the ring
+> +	 * for the channel should be all processing done.
+> +	 */
+> +	WARN_ONCE(!list_empty(&hvc->desc_hw_processing),
+> +		  "Desc pending still in list desc_hw_processing\n");
+> +
+> +	/* Free all descriptors in list desc_completed */
+> +	vchan_synchronize(&hvc->vc);
+> +
+> +	WARN_ONCE(!list_empty(&hvc->vc.desc_completed),
+> +		  "Desc pending still in list desc_completed\n");
+> +}
+
+
+thanks,
 -- 
-2.14.2
+~Randy
