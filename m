@@ -1,60 +1,109 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 17:22:29 +0000
-Subject: [PATCH v1 14/16] kvm: arm64: Switch to per VM IPA
-In-Reply-To: <20180208110035.GG29286@cbox>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-15-suzuki.poulose@arm.com> <20180208110035.GG29286@cbox>
-Message-ID: <94aae952-d6c0-0a69-955f-81885ddb2f06@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Feb 2018 17:32:30 +0000
+Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
+In-Reply-To: <08474a1a-3abd-9b89-ce75-d01e4b6fa659@arm.com>
+References: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
+ <20180208121238.18792-1-suzuki.poulose@arm.com>
+ <20180208161015.GZ5862@e103592.cambridge.arm.com>
+ <08474a1a-3abd-9b89-ce75-d01e4b6fa659@arm.com>
+Message-ID: <20180208173229.GA5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 11:00, Christoffer Dall wrote:
-> On Tue, Jan 09, 2018 at 07:04:09PM +0000, Suzuki K Poulose wrote:
->> Now that we can manage the stage2 page table per VM, switch the
->> configuration details to per VM instance. We keep track of the
->> IPA bits, number of page table levels and the VTCR bits (which
->> depends on the IPA and the number of levels).
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h          |  1 +
->>   arch/arm64/include/asm/kvm_host.h       | 12 ++++++++++++
->>   arch/arm64/include/asm/kvm_mmu.h        | 22 ++++++++++++++++++++--
->>   arch/arm64/include/asm/stage2_pgtable.h |  1 -
->>   arch/arm64/kvm/hyp/switch.c             |  3 +--
->>   virt/kvm/arm/arm.c                      |  2 +-
->>   6 files changed, 35 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 440c80589453..dd592fe45660 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -48,6 +48,7 @@
->>   #define kvm_vttbr_baddr_mask(kvm)	VTTBR_BADDR_MASK
->>   
->>   #define stage2_pgd_size(kvm)	(PTRS_PER_S2_PGD * sizeof(pgd_t))
->> +#define kvm_init_stage2_config(kvm)	do { } while (0)
->>   int create_hyp_mappings(void *from, void *to, pgprot_t prot);
->>   int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
->>   void free_hyp_pgds(void);
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 9a9ddeb33c84..1e66e5ab3dde 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -64,6 +64,18 @@ struct kvm_arch {
->>   	/* VTTBR value associated with above pgd and vmid */
->>   	u64    vttbr;
->>   
->> +	/* Private bits of VTCR_EL2 for this VM */
->> +	u64    vtcr_private;
+On Thu, Feb 08, 2018 at 04:31:47PM +0000, Suzuki K Poulose wrote:
+> On 08/02/18 16:10, Dave Martin wrote:
+> >On Thu, Feb 08, 2018 at 12:12:37PM +0000, Suzuki K Poulose wrote:
+> >>So far we have restricted the scopes for the capabilities
+> >>as follows :
+> >>  1) Errata workaround check are run all CPUs (i.e, always
+> >>     SCOPE_LOCAL_CPU)
+> >>  2) Arm64 features are run only once after the sanitised
+> >>     feature registers are available using the SCOPE_SYSTEM.
+> >>
+> >>This prevents detecting cpu features that can be detected
+> >>on one or more CPUs with SCOPE_LOCAL_CPU (e.g KPTI). Similarly
+> >>for errata workaround with SCOPE_SYSTEM.
+> >>
+> >>This patch makes sure that we allow flexibility of having
+> >>any scope for a capability. So, we now run through both
+> >>arm64_features and arm64_errata in two phases for detection:
+> >>
+> >>  a) with SCOPE_LOCAL_CPU filter on each boot time enabled
+> >>     CPUs.
+> >>  b) with SCOPE_SYSTEM filter only once after all boot time
+> >>     enabled CPUs are active.
+> >>
 > 
-> As to my comments in the previous patch, why isn't this simply u64 vtcr;
+> 
+> >>  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+> >>@@ -1387,13 +1389,15 @@ static void verify_local_cpu_errata_workarounds(void)
+> >>  static void update_cpu_errata_workarounds(void)
+> >>  {
+> >>  	update_cpu_capabilities(arm64_errata,
+> >>-				ARM64_CPUCAP_SCOPE_ALL,
+> >>+				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
+> >
+> >In isolation, this looks strange because it seems to handle only a
+> >subset of arm64_errata now.
+> >
+> >I think I understand the change as follows:
+> >
+> >  * all previously-existing errata workarounds SCOPE_LOCAL_CPU
+> >    anyway, so the behavior here doesn't change for any existing
+> >    caps;
+> >
+> >  * the non SCOPE_SYSTEM workarounds (which this patch prepares for)
+> "the SCOPE_SYSTEM" workarounds..."
+> 
+> >    are handled by the new setup_errata_workaround() path.
+> 
+> >
+> >Similarly, the features handling is split into two: one mirroring
+> >the current behaviour (for SCOPE_SYSTEM this time) and one handling> the rest, for supporting SCOPE_CPU_LOCAL features in subsequent
+> >patches.
+> 
+> Right. The changes here are :
+> 
+> New behavior:
+>   - Run SCOPE_LOCAL_CPU filter on arm64_features on all CPUs (newly added with
+>     this patch) via (newly added)update_cpu_local_features().
+> 
+> Split of existing behavior:
+>   - Run SCOPE_LOCAL_CPU(instead of the earlier SCOPE_ALL) on all CPUs in
+>     update_cpu_errata_workarounds()
+>   - Run SCOPE_SYSTEM filter on arm64_errata, once, via setup_errata_workarounds()
 
-nit: I haven't received your response to the previous patch.
+OK, thanks for confirming.
 
-We could. I thought this gives a bit more clarity on what changes per-VM.
+[...]
 
-Thanks
-Suzuki
+> >I'm not sure we need extra comments or documentation; I just want
+> >to check that I've understood the patch correctly.
+> 
+> So, would you prefer this split to the original patch ?
+
+I think splitting out this patch (1/2) makes sense.
+
+
+For the second part (2/2) of the split, I still find that hard to
+review.  The commit message suggests trivially obvious refactoring
+only, but I think there are three things going on:
+
+ 1) moving functions around (with the intention of merging them)
+ 2) merging functions together
+ 3) other miscellaneous bits of refactoring, and cleanups that become
+    "obvious" after steps (1) and (2).
+
+The refactoring is likely straightfoward, but the resulting diff is
+not (at least, I struggle to read it).
+
+Could you split the second part along the lines if (1)..(3) above?
+I think that would make for much easier review.  (Sorry to be a pain!)
+
+Also, the second patch leaves at least one function that does nothing
+except call a second function that has no other caller.  It may do
+no harm to remove and inline any such function.  (Falls under (3),
+I guess.)
+
+Cheers
+---Dave
