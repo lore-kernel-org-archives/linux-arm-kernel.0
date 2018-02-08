@@ -1,96 +1,62 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 08 Feb 2018 12:58:20 -0500
-Subject: [PATCH] perf: arm_pmu_acpi: Fix armpmu_alloc call from invalid
- context
-In-Reply-To: <20180208175433.p2a3g2q7tctfpk7c@lakrids.cambridge.arm.com>
-References: <20180208174504.30665-1-msalter@redhat.com>
- <20180208175433.p2a3g2q7tctfpk7c@lakrids.cambridge.arm.com>
-Message-ID: <1518112700.2911.0.camel@redhat.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 9 Feb 2018 01:58:47 +0800
+Subject: [PATCH v4 1/5] dt-bindings: dmaengine: Add MediaTek High-Speed DMA
+ controller bindings
+In-Reply-To: <cover.1518110810.git.sean.wang@mediatek.com>
+References: <cover.1518110810.git.sean.wang@mediatek.com>
+Message-ID: <8e5bfa200cf28056741034c5b32c9b68e1974b5f.1518110810.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-02-08 at 17:54 +0000, Mark Rutland wrote:
-> Hi Mark,
-> 
-> On Thu, Feb 08, 2018 at 12:45:04PM -0500, Mark Salter wrote:
-> > When booting an arm64 debug kernel with ACPI, I see:
-> > 
-> >    BUG: sleeping function called from invalid context at mm/slab.h:420
-> >    in_atomic(): 0, irqs_disabled(): 128, pid: 12, name: cpuhp/0
-> >    1 lock held by cpuhp/0/12:
-> >     #0:  (cpuhp_state-up){+.+.}, at: [<0000000057aa0dae>] cpuhp_thread_fun+0x13c/0x258
-> >    irq event stamp: 28
-> >    hardirqs last  enabled at (27): [<000000000b861658>] _raw_spin_unlock_irq+0x38/0x58
-> >    hardirqs last disabled at (28): [<000000006231cfb1>] cpuhp_thread_fun+0xd0/0x258
-> >    softirqs last  enabled at (0): [<0000000054d9737a>] copy_process.isra.32.part.33+0x450/0x1480
-> >    softirqs last disabled at (0): [<          (null)>]           (null)
-> >    CPU: 0 PID: 12 Comm: cpuhp/0 Not tainted 4.15.0+ #18
-> >    Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board, BIOS 3.06.25 Oct 17 2016
-> >    Call trace:
-> >     dump_backtrace+0x0/0x188
-> >     show_stack+0x24/0x2c
-> >     dump_stack+0xa4/0xe0
-> >     ___might_sleep+0x208/0x234
-> >     __might_sleep+0x58/0x8c
-> >     kmem_cache_alloc_trace+0x248/0x3e0
-> >     armpmu_alloc+0x38/0x1a8
-> >     arm_pmu_acpi_cpu_starting+0x11c/0x15c
-> >     cpuhp_invoke_callback+0x120/0x100c
-> >     cpuhp_thread_fun+0xe8/0x258
-> >     smpboot_thread_fn+0x170/0x268
-> >     kthread+0x110/0x13c
-> >     ret_from_fork+0x10/0x18
-> 
-> I have patches to address this:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/557838.html
-> https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/acpi-pmu-lockdep
+From: Sean Wang <sean.wang@mediatek.com>
 
-Awesome, I completely missed that. Thanks.
+Document the devicetree bindings for MediaTek High-Speed DMA controller
+which could be found on MT7623 SoC or other similar Mediatek SoCs.
 
-> 
-> > With commit 7d88eb695a1f ("arm/perf: Convert to hotplug state machine"),
-> > arm_pmu uses the cpuhotplug framework to initialize the PMU driver when
-> > using ACPI. However, the arm_pmu_acpi_cpu_starting() callback comes
-> > before CPUHP_AP_ONLINE is reached which means it runs with interrupts
-> > diabled and tries to allocate memory with GFP_KERNEL alloc which may
-> > sleep.
-> > 
-> > Move CPUHP_AP_PERF_ARM_ACPI_STARTING to come after CPUHP_AP_ONLINE so
-> > that the arm_pmu initialization runs with interrupts enabled as it
-> > does when booting with device tree.
-> > 
-> > Fixes: 7d88eb695a1f ("arm/perf: Convert to hotplug state machine")
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > ---
-> >  include/linux/cpuhotplug.h | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-> > index 5172ad0..e07b2da 100644
-> > --- a/include/linux/cpuhotplug.h
-> > +++ b/include/linux/cpuhotplug.h
-> > @@ -114,7 +114,6 @@ enum cpuhp_state {
-> >  	CPUHP_AP_ARM_VFP_STARTING,
-> >  	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
-> >  	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
-> > -	CPUHP_AP_PERF_ARM_ACPI_STARTING,
-> >  	CPUHP_AP_PERF_ARM_STARTING,
-> >  	CPUHP_AP_ARM_L2X0_STARTING,
-> >  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-> > @@ -146,6 +145,7 @@ enum cpuhp_state {
-> >  	CPUHP_AP_SMPBOOT_THREADS,
-> >  	CPUHP_AP_X86_VDSO_VMA_ONLINE,
-> >  	CPUHP_AP_IRQ_AFFINITY_ONLINE,
-> > +	CPUHP_AP_PERF_ARM_ACPI_STARTING,
-> 
-> We need CPUHP_AP_PERF_ARM_ACPI_STARTING to happen before
-> CPUHP_AP_PERF_ARM_STARTING, and I think this re-ordering prevents us
-> from correctly resetting the PMU and enabling percpu interrupts, at
-> least in heterogeneous configurations (e.g. big.LITTLE systems like
-> Juno).
-> 
-> I'm not sure whether we could safely move both callbacks this late.
-> 
-> Thanks,
-> Mark.
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ .../devicetree/bindings/dma/mtk-hsdma.txt          | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/mtk-hsdma.txt b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+new file mode 100644
+index 0000000..4bb31735
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+@@ -0,0 +1,33 @@
++MediaTek High-Speed DMA Controller
++==================================
++
++This device follows the generic DMA bindings defined in dma/dma.txt.
++
++Required properties:
++
++- compatible:	Must be one of
++		  "mediatek,mt7622-hsdma": for MT7622 SoC
++		  "mediatek,mt7623-hsdma": for MT7623 SoC
++- reg:		Should contain the register's base address and length.
++- interrupts:	Should contain a reference to the interrupt used by this
++		device.
++- clocks:	Should be the clock specifiers corresponding to the entry in
++		clock-names property.
++- clock-names:	Should contain "hsdma" entries.
++- power-domains: Phandle to the power domain that the device is part of
++- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
++		in dmas property of a client device represents the channel
++		number.
++Example:
++
++        hsdma: dma-controller at 1b007000 {
++		compatible = "mediatek,mt7623-hsdma";
++		reg = <0 0x1b007000 0 0x1000>;
++		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&ethsys CLK_ETHSYS_HSDMA>;
++		clock-names = "hsdma";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
++		#dma-cells = <1>;
++	};
++
++DMA clients must use the format described in dma/dma.txt file.
+-- 
+2.7.4
