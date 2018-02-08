@@ -1,152 +1,96 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 8 Feb 2018 21:40:43 +0100
-Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
- correctly
-In-Reply-To: <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
-References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
- <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
- <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
- <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
- <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
- <20180207103905.mtyzgu73mmifyvvj@flea>
- <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
-Message-ID: <20180208204043.mqryuqhx7a6z4v3b@flea>
+From: ebiggers@google.com (Eric Biggers)
+Date: Thu, 8 Feb 2018 13:01:07 -0800
+Subject: [PATCH 0/5] crypto: Speck support
+In-Reply-To: <CAH8yC8m4F9SWum9D5ZV2wzVAsJaDxnkc1L6eSeEOV-cOdkcg6Q@mail.gmail.com>
+References: <20180208001001.19180-1-ebiggers@google.com>
+ <CAH8yC8m4F9SWum9D5ZV2wzVAsJaDxnkc1L6eSeEOV-cOdkcg6Q@mail.gmail.com>
+Message-ID: <20180208210107.GA6720@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 01:49:59PM +0100, Giulio Benetti wrote:
-> Hi,
+On Wed, Feb 07, 2018 at 08:47:05PM -0500, Jeffrey Walton wrote:
+> On Wed, Feb 7, 2018 at 7:09 PM, Eric Biggers <ebiggers@google.com> wrote:
+> > Hello,
+> >
+> > This series adds Speck support to the crypto API, including the Speck128
+> > and Speck64 variants.  Speck is a lightweight block cipher that can be
+> > much faster than AES on processors that don't have AES instructions.
+> >
+> > We are planning to offer Speck-XTS (probably Speck128/256-XTS) as an
+> > option for dm-crypt and fscrypt on Android, for low-end mobile devices
+> > with older CPUs such as ARMv7 which don't have the Cryptography
+> > Extensions.  Currently, such devices are unencrypted because AES is not
+> > fast enough, even when the NEON bit-sliced implementation of AES is
+> > used.  Other AES alternatives such as Blowfish, Twofish, Camellia,
+> > Cast6, and Serpent aren't fast enough either; it seems that only a
+> > modern ARX cipher can provide sufficient performance on these devices.
+> >
+> > This is a replacement for our original proposal
+> > (https://patchwork.kernel.org/patch/10101451/) which was to offer
+> > ChaCha20 for these devices.  However, the use of a stream cipher for
+> > disk/file encryption with no space to store nonces would have been much
+> > more insecure than we thought initially, given that it would be used on
+> > top of flash storage as well as potentially on top of F2FS, neither of
+> > which is guaranteed to overwrite data in-place.
+> >
+> > Speck has been somewhat controversial due to its origin.  Nevertheless,
+> > it has a straightforward design (it's an ARX cipher), and it appears to
+> > be the leading software-optimized lightweight block cipher currently,
+> > with the most cryptanalysis.  It's also easy to implement without side
+> > channels, unlike AES.  Moreover, we only intend Speck to be used when
+> > the status quo is no encryption, due to AES not being fast enough.
+> >
+> > We've also considered a novel length-preserving encryption mode based on
+> > ChaCha20 and Poly1305.  While theoretically attractive, such a mode
+> > would be a brand new crypto construction and would be more complicated
+> > and difficult to implement efficiently in comparison to Speck-XTS.
+> >
+> > Thus, patch 1 adds a generic implementation of Speck, and the following
+> > patches add a 32-bit ARM NEON implementation of Speck-XTS.  The
+> > NEON-accelerated implementation is much faster than the generic
+> > implementation and therefore is the implementation that would primarily
+> > be used in practice on the devices we are targeting.
+> >
+> > There is no AArch64 implementation added, since such CPUs are likely to
+> > have the Cryptography Extensions, allowing the use of AES.
 > 
-> Il 07/02/2018 11:39, Maxime Ripard ha scritto:
-> > On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
-> >>>>> Also, how was it tested? This seems quite weird that we haven't caught
-> >>>>> that one sooner, and I'm a bit worried about the possible regressions
-> >>>>> here.
-> >>>>
-> >>>> It sounds really strange to me too,
-> >>>> because everybody under uboot use "sync:3"(HIGH).
-> >>>> I will retry to measure,
-> >>>> unfortunately at home I don't have a scope,
-> >>>> but I think I'm going to have one soon, because of this. :)
-> >>>
-> >>> Here I am with scope captures and tcon0 registers dump:
-> >>> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
-> >>> dclk_d0 => https://pasteboard.co/H4r8QRe.png
-> >>> dclk_de => https://pasteboard.co/H4r8zh4R.png
-> >>> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
-> >>>
-> >>> As you can see circled in reg on registers,
-> >>> TCON0_IO_POL_REG = 0x00000000.
-> >>> But on all the waveforms you can see:
-> >>> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
-> >>> the rising front overlaps dclk rising edge(not good), so to me this is
-> >>> falling, then I mean it Negative.
-> >>> - dclk_de: de pulse is clearly negative, even if register is 0 and its'
-> >>> polarity bit is 0.
-> >>> - dclk_vsnc: same as dclk_de
-> >>> - dclk_hsync: I didn't take scope screenshot but I can assure you it's
-> >>> negative.
-> >>>
-> >>> You can also check all the other registers about TCON0.
-> >>>
-> >>> Now I proceed testing it on A33, maybe the peripheral is slightly
-> >>> different between Axx SoCs, if I find it that way,
-> >>> it should be only a check about SoC or peripheral ID,
-> >>> and treat polarity as it should be done.
-> >>
-> >> Here I am with A33 waveforms:
-> >> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
-> >> dclk_d0 => https://pasteboard.co/H4rVXwy.png
-> >> dclk_de => https://pasteboard.co/H4rWDt8.png
-> >> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
-> >> dclk_hsync => https://pasteboard.co/H4rWK6I.png
-> >>
-> >> It behaves the same way as A20, so as I mean IO polarity,
-> >> all signals(except D0-D23), are inverted.
-> >> For A33 I've used A33-OLinuXino.
-> >> For A20 our LiNova1.
-> > 
-> > If you have an A33 handy, you probably want to read that mail:
-> > https://lists.freedesktop.org/archives/dri-devel/2017-July/147951.html
-> > 
-> > Especially the 90-phase part.
+> +1 on SPECK.
 > 
-> Here is a summary of different SoCs TCON:
-> With DCLK_Sel:
-> 0x0 => normal phase
-> 0x1 => 1/3 phase
-> 0x2 => 2/3 phase
+> Its a nice cipher that runs fast. It is nice because the security
+> engineering and parameter selection is well specified, and you can
+> push the margins as low as you like. It does not guess at security
+> parameters like some of the other ciphers used in dm-crypt.
 > 
-> A10, A20
-
-Have you tested the option 4 and 5 there too?
-
-> With DCLK_Sel:
-> 0x0 => normal phase
-> 0x1 => 1/3 phase
-> 0x2 => 2/3 phase
-> 0x5 => DCLK/2 phase 0
-> 0x4 => DCLK/2 phase 90
+> On a modern Core-i5 6th gen I've seen numbers as low as ...
+> SPECK-64/128 runs around 2.1 cpb, and SPECK-128/256 runs around 2.4
+> cpb.
 > 
-> A31, A31s, A33, A80, A83T
-
-Ok, great, so Chen-Yu was right :)
-
-I guess the option 5 (DCLK/2 phase 0) is still to early, just like
-you've shown in the previous captures?
-
-> Also I've found that TCON1 has not this feature,
-> nor first, nor second case(at least is not described on user manuals).
-
-At lot of things are not described, unfortunately...
-
-> So I could handle differently according to SoC.
-> Unfortunately there is not TCON register keeping IP version,
-> so the only way I see is to create a long if-or statement to understand
-> which kind of TCON we're using.
-
-You can base that on the compatible, and add a field in the
-sun4i_tcon_quirks structure, that will avoid the if statements you
-mentionned.
-
-> But what sounds not the best to me, is that DCLK is divided by 2 if
-> using phase 90. So we need to reconsider also bitclock driver according
-> to this.
-> I don't know if it make sense.
+> I've already done some work for a US contractor who wanted/needed
+> SPECK for a possible NASA contract. NASA is looking at SPECK for some
+> satellite comms.
 > 
-> IMHO, I would keep only:
-> - As normal => "0x1 => 1/3 phase"
 
-So that would mean sampling at raising edge on this one??
+Hi Jeffrey,
 
-> - As inverted => "0x0 => normal phase"
+I see you wrote the SPECK implementation in Crypto++, and you are treating the
+words as big endian.
 
-And falling edge?
+Do you have a reference for this being the "correct" order?  Unfortunately the
+authors of the cipher failed to mention the byte order in their paper.  And they
+gave the test vectors as words, so the test vectors don't clarify it either.
 
-If so, and if remember the captures properly, the sampling would occur
-right before the rise, and not really around the fall.
+I had assumed little endian words, but now I am having second thoughts...  And
+to confuse things further, it seems that some implementations (including the
+authors own implementation for the SUPERCOP benchmark toolkit [1]) even consider
+the words themselves in the order (y, x) rather than the more intuitive (x, y).
 
-Would 2/3 be better here?
+[1] https://github.com/iadgov/simon-speck-supercop/blob/master/crypto_stream/speck128128ctr/ref/stream.c
 
-> According to scope captures above on both A20 and A33.
-> Unfortunately I don't have other boards for the other SoCs to take captures.
-> 
-> What do you think?
+In fact, even the reference code from the paper treats pt[0] as y and pt[1] as
+x, where 'pt' is a u64 array -- although that being said, it's not shown how the
+actual bytes should be translated to/from those u64 arrays.
 
-I guess we can make that part applicable to all SoCs, we haven't seen
-any significant differences on those part.
+I'd really like to avoid people having to add additional versions of SPECK later
+for the different byte and word orders...
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180208/5d5d9e7c/attachment.sig>
+- Eric
