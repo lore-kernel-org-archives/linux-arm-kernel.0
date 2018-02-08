@@ -1,133 +1,76 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 10:53:52 +0000
-Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
-In-Reply-To: <20180207103934.GG5862@e103592.cambridge.arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-17-suzuki.poulose@arm.com>
- <20180207103934.GG5862@e103592.cambridge.arm.com>
-Message-ID: <831ad839-3c68-fc1e-d578-f951b46ed6ed@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Feb 2018 10:57:02 +0000
+Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
+ define package boundaries
+In-Reply-To: <b58b99e8-dfa3-40d6-aba2-bc1f96170fd6@gmail.com>
+References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
+ <b58b99e8-dfa3-40d6-aba2-bc1f96170fd6@gmail.com>
+Message-ID: <20180208105702.GA1179@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/18 10:39, Dave Martin wrote:
-> On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
->> Some capabilities have different criteria for detection and associated
->> actions based on the matching criteria, even though they all share the
->> same capability bit. So far we have used multiple entries with the same
->> capability bit to handle this. This is prone to errors, as the
->> cpu_enable is invoked for each entry, irrespective of whether the
->> detection rule applies to the CPU or not. And also this complicates
->> other helpers, e.g, __this_cpu_has_cap.
->>
->> This patch adds a wrapper entry to cover all the possible variations
->> of a capability and ensures :
->>   1) The capabilitiy is set when at least one of the entry detects
->>   2) Action is only taken for the entries that detects.
+On Mon, Jan 22, 2018 at 08:45:26PM -0800, Frank Rowand wrote:
+> On 01/22/18 09:15, Lorenzo Pieralisi wrote:
+> > The current ARM DT topology description provides the operating system
+> > with a topological view of the system that is based on leaf nodes
+> > representing either cores or threads (in an SMT system) and a
+> > hierarchical set of cluster nodes that creates a hierarchical topology
+> > view of how those cores and threads are grouped.
+> > 
+> > As opposed to the ACPI topology description ([1], PPTT table), this
+> > hierarchical representation of clusters does not allow to describe what
+> > topology level actually represents the physical package boundary, which
+> > is a key piece of information to be used by an operating system to
+> > optimize resource allocation and scheduling.
+> > 
+> > Define an optional, backward compatible boolean property for cluster
+> > nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+> > topological description a binding to define what cluster level
+> > represents a physical package boundary.
+> > 
+> > [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Jeremy Linton <jeremy.linton@arm.com>
+> > Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> > index de9eb0486630..8e78d76b0671 100644
+> > --- a/Documentation/devicetree/bindings/arm/topology.txt
+> > +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> > @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+> >  	The cluster node name must be "clusterN" as described in 2.1 above.
+> >  	A cluster node can not be a leaf node.
+> >  
+> > +	Properties for cluster nodes:
+> > +
+> > +	- physical-package
+> > +		Usage: optional
+> > +		Value type: <empty>
+> > +		Definition: if present the cluster node represents the
+> > +			    boundary of a physical package, whether socketed
+> > +			    or surface mounted.
 > 
-> I guess this means that where we have a single cpu_enable() method
-> but complex match criteria that require multiple entries, then that
-> cpu_enable() method might get called multiple times on a given CPU.
+> I don't know how to interpret this.  Is the node with this property inside
+> or outside the boundary?  If I had to guess, I would guess inside.  A few
+> extra words to clarify this please.
 
-A CPU executes cpu_enable() only for the "matching" entries in the list,
-unlike earlier. So as long as there is a single entry "matching" the given
-CPU, the cpu_enable() will not be duplicated. May be we *should* mandate
-that a CPU cannot be matched by multiple entries.
+The node is neither inside nor outside, it _is_ the boundary. Every node
+defines a topology level - the property is there to define which one
+corresponds to a package, please let me know if it makes things clearer.
 
+Thanks,
+Lorenzo
+
+> > +
+> >  	A cluster node's child nodes must be:
+> >  
+> >  	- one or more cluster nodes; or
+> > 
 > 
-> Could be worth a comment if cpu_enable() methods must be robust
-> against this.
-> 
->> This avoids explicit checks in the call backs. The only constraint
->> here is that, all the entries should have the same "type".
->>
->> Cc: Dave Martin <dave.martin@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/include/asm/cpufeature.h |  1 +
->>   arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
->>   arch/arm64/kernel/cpufeature.c      |  7 +++--
->>   3 files changed, 50 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index 462c35d1a38c..b73247c27f00 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
->>   			bool sign;
->>   			unsigned long hwcap;
->>   		};
->> +		const struct arm64_cpu_capabilities *cap_list;
-> 
-> Should desc, capability, def_scope and/or cpu_enable match for every cap
-> in such a group?
-
-As mentioned above, the "type" field should match, which implies scope
-must match. The code ignores the scope, capability and desc of the individual
-entries in the list. They should be shared by the parent entry.
-
-cpu_enable could be duplicated as long as a CPU is not matched by multiple
-entries.
-
-> 
-> I'd expected something maybe like this:
-> 
-> struct arm64_cpu_capabilities {
-> 	const char *desc;
-> 	u16 capability;
-> 	struct arm64_capability_match {
-> 		bool (*matches)(const struct arm64_cpu_capabilities *, int);
-> 		int (*cpu_enable)(void);
-> 		union {
-> 			struct { ... midr ... };
-> 			struct { ... sysreg ... };
-> 			const struct arm64_capability_match *list;
-> 		};
->>   	};
->>   };
-
-Yes, thats makes it more explicit. However, it makes the "matches()"
-complicated, as we have to change the prototype for matches to accept
-struct arm64_capability_match *, to point to the right "matches" for
-items in the list. And that makes a bit more of an invasive change, where
-each matches() would then loose a way to get to the "capabilities" entry,
-as they could be called with either the "match" in the top level or
-the one in the list.
-
->>   		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 65a8e5cc600c..13e30c1b1e99 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
->>   		return false;
->>   
->>   	for (caps = cap_array; caps->matches; caps++)
->> -		if (caps->capability == cap &&
->> -		    caps->matches(caps, SCOPE_LOCAL_CPU))
->> -			return true;
->> +		if (caps->capability == cap)
->> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
-> 
-> If we went for my capability { cap; match criteria or list; } approach,
-> would it still be necessary to iterate over the whole list here?
-
-Sorry, I couldn't follow this. With this patch, we already stop scanning
-the list as soon as we find the first entry. It is upto "the entry" to run
-individual match criteria to decide.
-
-> 
-> This seems preferable if this function is used by other paths that
-> don't expect it to be so costly.  Currently I only see a call in
-> arch/arm64/kvm/handle_exit.c:handle_exit_early() for the SError case --
-> which is probably not expected to be a fast path.
-uu>
-> [...]
-> 
-> Cheers
-> ---Dave
-> 
-
-Cheers
-Suzuki
