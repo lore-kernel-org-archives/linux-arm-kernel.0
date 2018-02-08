@@ -1,58 +1,161 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 8 Feb 2018 08:59:30 -0700
-Subject: [PATCH] coresight replicator: set default y after Kconfig rename
-In-Reply-To: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
-References: <20180207150351.ce930e929bc0d7f6cfb1aa56@arm.com>
-Message-ID: <CANLsYkwMUG9pwcMH9UdLWVqS9pzJCOFJa5Y0Y1NX0SqznUdx+w@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 8 Feb 2018 16:10:16 +0000
+Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
+In-Reply-To: <20180208121238.18792-1-suzuki.poulose@arm.com>
+References: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
+ <20180208121238.18792-1-suzuki.poulose@arm.com>
+Message-ID: <20180208161015.GZ5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 February 2018 at 14:03, Kim Phillips <kim.phillips@arm.com> wrote:
-> Commit 1c8859848dbb ("coresight replicator: Cleanup programmable
-> replicator naming") changed the Kconfig symbol name from
-> QCOM_REPLICATOR, which, whilst not in the single arm64 defconfig,
-> was being set in my juno build script, which left the new symbol unset,
-> causing the following unexpected grief:
->
->  # ./perf record -vvv -C 0 -e cs_etm/@20070000.etr/ --per-thread true
->  ..<snip>..
->  sys_perf_event_open: pid -1  cpu 0  group_fd -1  flags 0x8 = 5
->  mmap size 528384B
->  AUX area mmap length 4194304
->  perf event ring buffer mmapped per cpu
->  failed to mmap AUX area
->  failed to mmap with 12 (Cannot allocate memory)
->
-> Make it default y to help not surprise unsuspecting users.
->
-> Fixes: 1c8859848dbb ("coresight replicator: Cleanup programmable replicator naming")
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+On Thu, Feb 08, 2018 at 12:12:37PM +0000, Suzuki K Poulose wrote:
+> So far we have restricted the scopes for the capabilities
+> as follows :
+>  1) Errata workaround check are run all CPUs (i.e, always
+>     SCOPE_LOCAL_CPU)
+>  2) Arm64 features are run only once after the sanitised
+>     feature registers are available using the SCOPE_SYSTEM.
+> 
+> This prevents detecting cpu features that can be detected
+> on one or more CPUs with SCOPE_LOCAL_CPU (e.g KPTI). Similarly
+> for errata workaround with SCOPE_SYSTEM.
+> 
+> This patch makes sure that we allow flexibility of having
+> any scope for a capability. So, we now run through both
+> arm64_features and arm64_errata in two phases for detection:
+> 
+>  a) with SCOPE_LOCAL_CPU filter on each boot time enabled
+>     CPUs.
+>  b) with SCOPE_SYSTEM filter only once after all boot time
+>     enabled CPUs are active.
+> 
+> Cc: Dave Martin <dave.martin@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  drivers/hwtracing/coresight/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> index ef9cb3c164e1..b94bbd95efa6 100644
-> --- a/drivers/hwtracing/coresight/Kconfig
-> +++ b/drivers/hwtracing/coresight/Kconfig
-> @@ -73,6 +73,7 @@ config CORESIGHT_SOURCE_ETM4X
->  config CORESIGHT_DYNAMIC_REPLICATOR
->         bool "CoreSight Programmable Replicator driver"
->         depends on CORESIGHT_LINKS_AND_SINKS
-> +       default y
->         help
->           This enables support for dynamic CoreSight replicator link driver.
->           The programmable ATB replicator allows independent filtering of the
+>  arch/arm64/kernel/cpufeature.c | 33 ++++++++++++++++++++++++---------
+>  1 file changed, 24 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 61d4c3cfb1cc..e1a56fa889a5 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -505,6 +505,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+>  
+>  extern const struct arm64_cpu_capabilities arm64_errata[];
+>  static void update_cpu_errata_workarounds(void);
+> +static void update_cpu_local_features(void);
+>  
+>  void __init init_cpu_features(struct cpuinfo_arm64 *info)
+>  {
+> @@ -554,6 +555,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+>  	 * initialised the cpu feature infrastructure.
+>  	 */
+>  	update_cpu_errata_workarounds();
+> +	update_cpu_local_features();
+>  }
+>  
+>  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+> @@ -1387,13 +1389,15 @@ static void verify_local_cpu_errata_workarounds(void)
+>  static void update_cpu_errata_workarounds(void)
+>  {
+>  	update_cpu_capabilities(arm64_errata,
+> -				ARM64_CPUCAP_SCOPE_ALL,
+> +				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
 
-As I said before don't see why it needs to be treated differently than other CS
-blocks - intelligent replicators show up on the AMBA bus and need to
-be declared in the DT.  As such people are expected to enable the proper
-option.
+In isolation, this looks strange because it seems to handle only a
+subset of arm64_errata now.
 
-Mathieu
+I think I understand the change as follows:
 
-> --
-> 2.16.1
->
+ * all previously-existing errata workarounds SCOPE_LOCAL_CPU
+   anyway, so the behavior here doesn't change for any existing
+   caps;
+
+ * the non SCOPE_SYSTEM workarounds (which this patch prepares for)
+   are handled by the new setup_errata_workaround() path.
+
+Similarly, the features handling is split into two: one mirroring
+the current behaviour (for SCOPE_SYSTEM this time) and one handling
+the rest, for supporting SCOPE_CPU_LOCAL features in subsequent
+patches.
+
+Does that sound right?
+
+I'm not sure we need extra comments or documentation; I just want
+to check that I've understood the patch correctly.
+
+Cheers
+---Dave
+
+>  				"enabling workaround for");
+>  }
+>  
+> -static void __init enable_errata_workarounds(void)
+> +static void update_cpu_local_features(void)
+>  {
+> -	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_SCOPE_ALL);
+> +	update_cpu_capabilities(arm64_features,
+> +				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
+> +				"detected feature:");
+>  }
+>  
+>  /*
+> @@ -1430,23 +1434,34 @@ void check_local_cpu_capabilities(void)
+>  
+>  	/*
+>  	 * If we haven't finalised the system capabilities, this CPU gets
+> -	 * a chance to update the errata work arounds.
+> +	 * a chance to update the errata work arounds and local CPU features.
+>  	 * Otherwise, this CPU should verify that it has all the system
+>  	 * advertised capabilities.
+>  	 */
+> -	if (!sys_caps_initialised)
+> +	if (!sys_caps_initialised) {
+>  		update_cpu_errata_workarounds();
+> -	else
+> +		update_cpu_local_features();
+> +	} else {
+>  		verify_local_cpu_capabilities();
+> +	}
+>  }
+>  
+>  static void __init setup_feature_capabilities(void)
+>  {
+>  	update_cpu_capabilities(arm64_features,
+> -				ARM64_CPUCAP_SCOPE_ALL, "detected feature:");
+> +				ARM64_CPUCAP_SCOPE_SYSTEM,
+> +				"detected feature:");
+>  	enable_cpu_capabilities(arm64_features, ARM64_CPUCAP_SCOPE_ALL);
+>  }
+>  
+> +static void __init setup_errata_workarounds(void)
+> +{
+> +	update_cpu_capabilities(arm64_errata,
+> +				ARM64_CPUCAP_SCOPE_SYSTEM,
+> +				"enabling workaround for");
+> +	enable_cpu_capabilities(arm64_errata, ARM64_CPUCAP_SCOPE_ALL);
+> +}
+> +
+>  DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+>  EXPORT_SYMBOL(arm64_const_caps_ready);
+>  
+> @@ -1468,9 +1483,9 @@ void __init setup_cpu_features(void)
+>  	u32 cwg;
+>  	int cls;
+>  
+> -	/* Set the CPU feature capabilies */
+> +	/* Finalise the CPU capabilities */
+>  	setup_feature_capabilities();
+> -	enable_errata_workarounds();
+> +	setup_errata_workarounds();
+>  	mark_const_caps_ready();
+>  	setup_elf_hwcaps(arm64_elf_hwcaps);
+>  
+> -- 
+> 2.14.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
