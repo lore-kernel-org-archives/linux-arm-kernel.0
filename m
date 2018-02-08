@@ -1,65 +1,53 @@
 From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 8 Feb 2018 14:55:49 +0100
-Subject: [PATCH 5/9] perf utils: add support for arch standard events
-In-Reply-To: <1517939104-230881-6-git-send-email-john.garry@huawei.com>
+Date: Thu, 8 Feb 2018 14:55:54 +0100
+Subject: [PATCH 2/9] perf utils: add support for pmu events vendor
+ sub-directory
+In-Reply-To: <1517939104-230881-3-git-send-email-john.garry@huawei.com>
 References: <1517939104-230881-1-git-send-email-john.garry@huawei.com>
- <1517939104-230881-6-git-send-email-john.garry@huawei.com>
-Message-ID: <20180208135549.GK10234@krava>
+ <1517939104-230881-3-git-send-email-john.garry@huawei.com>
+Message-ID: <20180208135554.GL10234@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 01:45:00AM +0800, John Garry wrote:
-> For some architectures (like arm), there are architecture-
-> defined events. Sometimes these events may be "recommended"
-> according to the architecture standard, in that the
-> implementer is free ignore the "recommendation" and create
-> its custom event.
+On Wed, Feb 07, 2018 at 01:44:57AM +0800, John Garry wrote:
+> For some architectures (like arm), it is required to support
+> a vendor sub-directory and not locate all the JSONs for a
+> specific vendor in the same folder.
 > 
-> This patch adds support for parsing standard events from
-> arch-defined JSONs, and fixing up vendor events when they
-> have implemented these events as standard.
+> This is because all the events for the same vendor will be
+> placed in the same pmu events table, which may cause conflict.
+> This conflict would be in the instance that a vendor's custom
+> implemented events do have the same meaning on different platforms,
+> so events in the pmu table would conflict. In addition, per list
+> command may show events which are not even supported for a given
+> platform.
 > 
-> Support is also ensured that the vendor may implement their
-> own custom events.
+> This patch adds support for a arch/vendor/platform directory
+> hierarchy, while maintaining backwards-compatibility for existing
+> arch/platform structure. In this, each platform would always have
+> its own pmu events table.
 > 
-> A new step is added to the pmu events parsing to fix up the
-> vendor events with the arch-standard events.
+> In generated file pmu_events.c, each platform table name is in
+> the format pme{_vendor}_platform, like this:
 > 
-> The arch-defined JSONs must be placed in the arch root
-> folder for preprocessing prior to tree JSON processing.
-> 
-> In the vendor JSON, to specify that the arch event is
-> supported, the keyword "ArchStdEvent" should be used,
-> like this:
-> [
->     {
->         "ArchStdEvent": "0x41",
-> 	"BriefDescription": "L1D cache access, write"
->     },
-> ]
-> 
-> No other JSON objects are strictly required. However,
-> for other objects added, these take precedence over
-> architecture defined standard events, thus supporting
-> separate events which have the same event code.
+> struct pmu_events_map pmu_events_map[] = {
+> {
+> 	.cpuid = "0x00000000420f5160",
+> 	.version = "v1",
+> 	.type = "core",
+> 	.table = pme_cavium_thunderx2
+> },
+> {
+> 	.cpuid = 0,
+> 	.version = 0,
+> 	.type = 0,
+> 	.table = 0,
+> },
+> };
 > 
 > Signed-off-by: John Garry <john.garry@huawei.com>
-> ---
->  tools/perf/pmu-events/Build     |   1 +
->  tools/perf/pmu-events/README    |   6 ++
->  tools/perf/pmu-events/jevents.c | 185 +++++++++++++++++++++++++++++++++++++---
->  3 files changed, 182 insertions(+), 10 deletions(-)
-> 
-> diff --git a/tools/perf/pmu-events/Build b/tools/perf/pmu-events/Build
-> index 999a4e8..f9e8466 100644
-> --- a/tools/perf/pmu-events/Build
-> +++ b/tools/perf/pmu-events/Build
-> @@ -1,5 +1,6 @@
->  hostprogs := jevents
->  
-> +CHOSTFLAGS	= -I$(srctree)/tools/include
 
-Ithink this could be just CHOSTFLAGS_jevents.o = -I$(srctree)/tools/include
-it's just for the list.h right?
+Acked-by: Jiri Olsa <jolsa@kernel.org>
 
+thanks,
 jirka
