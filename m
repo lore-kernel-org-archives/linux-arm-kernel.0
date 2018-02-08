@@ -1,171 +1,95 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 8 Feb 2018 12:32:56 +0000
-Subject: [PATCH v2 16/20] arm64: Handle shared capability entries
-In-Reply-To: <20180208120114.GX5862@e103592.cambridge.arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-17-suzuki.poulose@arm.com>
- <20180207103934.GG5862@e103592.cambridge.arm.com>
- <831ad839-3c68-fc1e-d578-f951b46ed6ed@arm.com>
- <20180208120114.GX5862@e103592.cambridge.arm.com>
-Message-ID: <c10b7441-4643-4277-c6fc-a205f3687673@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 8 Feb 2018 18:25:42 +0530
+Subject: [PATCH 2/2] serial: 8250: 8250_omap: Fix throttling when DMA is
+ enabled
+In-Reply-To: <20180208125542.15649-1-vigneshr@ti.com>
+References: <20180208125542.15649-1-vigneshr@ti.com>
+Message-ID: <20180208125542.15649-3-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 12:01, Dave Martin wrote:
-> On Thu, Feb 08, 2018 at 10:53:52AM +0000, Suzuki K Poulose wrote:
->> On 07/02/18 10:39, Dave Martin wrote:
->>> On Wed, Jan 31, 2018 at 06:28:03PM +0000, Suzuki K Poulose wrote:
->>>> Some capabilities have different criteria for detection and associated
->>>> actions based on the matching criteria, even though they all share the
->>>> same capability bit. So far we have used multiple entries with the same
->>>> capability bit to handle this. This is prone to errors, as the
->>>> cpu_enable is invoked for each entry, irrespective of whether the
->>>> detection rule applies to the CPU or not. And also this complicates
->>>> other helpers, e.g, __this_cpu_has_cap.
->>>>
->>>> This patch adds a wrapper entry to cover all the possible variations
->>>> of a capability and ensures :
->>>>   1) The capabilitiy is set when at least one of the entry detects
->>>>   2) Action is only taken for the entries that detects.
->>>
->>> I guess this means that where we have a single cpu_enable() method
->>> but complex match criteria that require multiple entries, then that
->>> cpu_enable() method might get called multiple times on a given CPU.
->>
->> A CPU executes cpu_enable() only for the "matching" entries in the list,
->> unlike earlier. So as long as there is a single entry "matching" the given
->> CPU, the cpu_enable() will not be duplicated. May be we *should* mandate
->> that a CPU cannot be matched by multiple entries.
->>
->>>
->>> Could be worth a comment if cpu_enable() methods must be robust
->>> against this.
-> 
-> Could we say something like:
-> 
-> "Where a single capability has multiple entries, mutiple cpu_enable()
-> methods may be called if more than one entry matches.  Where this is
-> not desired, care should be taken to ensure that the entries are
-> mutually exclusive: for example, two entries for a single capability
-> that match on MIDR should be configured to match MIDR ranges that do
-> not overlap."
-> 
-> This is more verbose than I would like however.  Maybe there's a simpler
-> way to say it.
+omap_8250_throttle() is called when tty RX buffer is about to overflow
+and can no longer keep up with the rate at which UART is receiving data.
+So, the expectation of this callback, is that UART stops RX and asserts
+HW flow control to signal the sender to stop sending more data.
+omap_8250_throttle() disables RX FIFO interrupts thus FIFO is no longer
+serviced, leading to assertion of flow control once RX FIFO is full.
+But, this does not work when DMA is enabled as driver keeps queuing new
+RX DMA request in completion handler without brothering about throttling
+request made by the higher layer.
+This patch introduces a flag that can be used to determine whether or
+not to queue next RX DMA request based on throttling request.
 
-If we're not also talking about a capability having mutually exclusive 
-enable methods (it doesn't seem so, but I'm not necessarily 100% clear), 
-how about:
+Without this patch, tty buffer overflows are reported at higher
+baudrates.
 
-"If a cpu_enable() method is associated with multiple matches for a 
-single capability, care should be taken that either the match criteria 
-are mutually exclusive, or that the method is robust against being 
-called multiple times."
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ drivers/tty/serial/8250/8250_omap.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-?
-
-Robin.
-
->>>> This avoids explicit checks in the call backs. The only constraint
->>>> here is that, all the entries should have the same "type".
->>>>
->>>> Cc: Dave Martin <dave.martin@arm.com>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>>>   arch/arm64/include/asm/cpufeature.h |  1 +
->>>>   arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
->>>>   arch/arm64/kernel/cpufeature.c      |  7 +++--
->>>>   3 files changed, 50 insertions(+), 11 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->>>> index 462c35d1a38c..b73247c27f00 100644
->>>> --- a/arch/arm64/include/asm/cpufeature.h
->>>> +++ b/arch/arm64/include/asm/cpufeature.h
->>>> @@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
->>>>   			bool sign;
->>>>   			unsigned long hwcap;
->>>>   		};
->>>> +		const struct arm64_cpu_capabilities *cap_list;
->>>
->>> Should desc, capability, def_scope and/or cpu_enable match for every cap
->>> in such a group?
->>
->> As mentioned above, the "type" field should match, which implies scope
->> must match. The code ignores the scope, capability and desc of the individual
->> entries in the list. They should be shared by the parent entry.
->>
->> cpu_enable could be duplicated as long as a CPU is not matched by multiple
->> entries.
->>
->>>
->>> I'd expected something maybe like this:
->>>
->>> struct arm64_cpu_capabilities {
->>> 	const char *desc;
->>> 	u16 capability;
->>> 	struct arm64_capability_match {
->>> 		bool (*matches)(const struct arm64_cpu_capabilities *, int);
->>> 		int (*cpu_enable)(void);
->>> 		union {
->>> 			struct { ... midr ... };
->>> 			struct { ... sysreg ... };
->>> 			const struct arm64_capability_match *list;
->>> 		};
->>>>   	};
->>>>   };
->>
->> Yes, thats makes it more explicit. However, it makes the "matches()"
->> complicated, as we have to change the prototype for matches to accept
->> struct arm64_capability_match *, to point to the right "matches" for
->> items in the list. And that makes a bit more of an invasive change, where
->> each matches() would then loose a way to get to the "capabilities" entry,
->> as they could be called with either the "match" in the top level or
->> the one in the list.
-> 
-> Yes, that's true.  matches() could take a pointer to the cap struct
-> _and_ the relevant match entry, but I'm not sure it's worth it.  In any
-> case, my previous objection below doesn't make as much sense as I
-> thought.
-> 
->>>>   		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
->>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>>> index 65a8e5cc600c..13e30c1b1e99 100644
->>>> --- a/arch/arm64/kernel/cpufeature.c
->>>> +++ b/arch/arm64/kernel/cpufeature.c
->>>> @@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
->>>>   		return false;
->>>>   	for (caps = cap_array; caps->matches; caps++)
->>>> -		if (caps->capability == cap &&
->>>> -		    caps->matches(caps, SCOPE_LOCAL_CPU))
->>>> -			return true;
->>>> +		if (caps->capability == cap)
->>>> +			return caps->matches(caps, SCOPE_LOCAL_CPU);
->>>
->>> If we went for my capability { cap; match criteria or list; } approach,
->>> would it still be necessary to iterate over the whole list here?
->>
->> Sorry, I couldn't follow this. With this patch, we already stop scanning
->> the list as soon as we find the first entry. It is upto "the entry" to run
->> individual match criteria to decide.
-> 
-> Ah, I'm talking nonsense here.  Patch 6 iterates over the entire
-> capability list via the call to __this_cpu_has_cap() in
-> __verify_local_cpu_caps(), but this patch now changes the behaviour so
-> that this doesn't happen any more.
-> 
-> The only other users of this_cpu_has_cap() don't have the right cap
-> pointer already, so a scan over the whole list is required in those
-> cases -- and anyway, those look like fast paths (RAS exceptions).
-> 
-> [...]
-> 
-> Cheers
-> ---Dave
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index 57f6eba47f44..624b501fd253 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -114,6 +114,7 @@ struct omap8250_priv {
+ 	struct uart_8250_dma omap8250_dma;
+ 	spinlock_t rx_dma_lock;
+ 	bool rx_dma_broken;
++	bool throttled;
+ };
+ 
+ #ifdef CONFIG_SERIAL_8250_DMA
+@@ -692,6 +693,7 @@ static void omap_8250_shutdown(struct uart_port *port)
+ 
+ static void omap_8250_throttle(struct uart_port *port)
+ {
++	struct omap8250_priv *priv = port->private_data;
+ 	struct uart_8250_port *up = up_to_u8250p(port);
+ 	unsigned long flags;
+ 
+@@ -700,6 +702,7 @@ static void omap_8250_throttle(struct uart_port *port)
+ 	spin_lock_irqsave(&port->lock, flags);
+ 	up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+ 	serial_out(up, UART_IER, up->ier);
++	priv->throttled = true;
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ 
+ 	pm_runtime_mark_last_busy(port->dev);
+@@ -738,12 +741,16 @@ static int omap_8250_rs485_config(struct uart_port *port,
+ 
+ static void omap_8250_unthrottle(struct uart_port *port)
+ {
++	struct omap8250_priv *priv = port->private_data;
+ 	struct uart_8250_port *up = up_to_u8250p(port);
+ 	unsigned long flags;
+ 
+ 	pm_runtime_get_sync(port->dev);
+ 
+ 	spin_lock_irqsave(&port->lock, flags);
++	priv->throttled = false;
++	if (up->dma)
++		up->dma->rx_dma(up);
+ 	up->ier |= UART_IER_RLSI | UART_IER_RDI;
+ 	serial_out(up, UART_IER, up->ier);
+ 	spin_unlock_irqrestore(&port->lock, flags);
+@@ -788,6 +795,7 @@ static void __dma_rx_do_complete(struct uart_8250_port *p)
+ static void __dma_rx_complete(void *param)
+ {
+ 	struct uart_8250_port *p = param;
++	struct omap8250_priv *priv = p->port.private_data;
+ 	struct uart_8250_dma *dma = p->dma;
+ 	struct dma_tx_state     state;
+ 	unsigned long flags;
+@@ -805,7 +813,8 @@ static void __dma_rx_complete(void *param)
+ 		return;
+ 	}
+ 	__dma_rx_do_complete(p);
+-	omap_8250_rx_dma(p);
++	if (!priv->throttled)
++		omap_8250_rx_dma(p);
+ 
+ 	spin_unlock_irqrestore(&p->port.lock, flags);
+ }
+-- 
+2.16.1
