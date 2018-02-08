@@ -1,42 +1,55 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 8 Feb 2018 18:25:41 +0530
-Subject: [PATCH 1/2] serial: 8250: Don't service RX FIFO if interrupts are
- disabled
-In-Reply-To: <20180208125542.15649-1-vigneshr@ti.com>
-References: <20180208125542.15649-1-vigneshr@ti.com>
-Message-ID: <20180208125542.15649-2-vigneshr@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 8 Feb 2018 18:26:20 +0530
+Subject: [PATCH 2/7] soc: davinci: new genpd driver
+In-Reply-To: <CAMRc=Mf+S3k_wfhUWEx2-39AZx1szkgy-u-bsZQUMiaY06UKww@mail.gmail.com>
+References: <20180207134553.13510-1-brgl@bgdev.pl>
+ <20180207134553.13510-3-brgl@bgdev.pl>
+ <65f2690c-c605-3c66-9d8a-9a882aaf446d@ti.com>
+ <CAMRc=Mf+S3k_wfhUWEx2-39AZx1szkgy-u-bsZQUMiaY06UKww@mail.gmail.com>
+Message-ID: <34d3980b-2c94-1540-94f0-dc0c86743475@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, data in RX FIFO is read based on UART_LSR register state even
-if RDI and RLSI interrupts are disabled in UART_IER register.
-This is because when IRQ handler is called due to TX FIFO empty event,
-RX FIFO is serviced based on UART_LSR register status instead of
-UART_IIR status. This defeats the purpose of disabling UART RX
-FIFO interrupts during throttling(see, omap_8250_throttle()) as IRQ
-handler continues to drain UART RX FIFO resulting in overflow of buffer
-at tty layer.
-Fix this by making sure that driver drains UART RX FIFO only when
-UART_IIR_RDI is set along with UART_LSR_BI or UART_LSR_DR bits.
+On Thursday 08 February 2018 03:24 PM, Bartosz Golaszewski wrote:
+> 2018-02-08 10:30 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>> On Wednesday 07 February 2018 07:15 PM, Bartosz Golaszewski wrote:
+>>> +     /*
+>>> +      * DaVinci always uses a single clock for power-management. We assume
+>>> +      * it's the first one in the clocks property.
+>>> +      */
+>>> +     clk = of_clk_get(dev->of_node, 0);
+>>> +     if (IS_ERR(clk))
+>>> +             return PTR_ERR(clk);
+>>
+>> We already get this today with drivers/base/power/clock_ops.c once
+>> .con_ids list is dropped from pm_clk_notifier_block (which I think it
+>> should).
+>>
+>> If there is no reason to introduce thus functionality at this stage,
+>> perhaps we should wait till such a time when its clearly needed?
+>>
+>> Thanks,
+>> Sekhar
+> 
+> If I understand correctly: once we drop the con_ids list, we end up
+> calling clk_get(dev, NULL) from pm_clk_acquire(), which matches
+> against the clock with NULL con_id, which may not necessarily be the
+> first clock in the list.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/tty/serial/8250/8250_port.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Hmm, not sure of this. In __of_clk_get_by_name() called by clk_get():
 
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index 1328c7e70108..ffbb955d1c06 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -1854,7 +1854,8 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
- 
- 	status = serial_port_in(port, UART_LSR);
- 
--	if (status & (UART_LSR_DR | UART_LSR_BI)) {
-+	if (status & (UART_LSR_DR | UART_LSR_BI) &&
-+	    iir & UART_IIR_RDI) {
- 		if (!up->dma || handle_rx_dma(up, iir))
- 			status = serial8250_rx_chars(up, status);
- 	}
--- 
-2.16.1
+int index = 0;
+
+/*
+ * For named clocks, first look up the name in the
+ * "clock-names" property.  If it cannot be found, then
+ * index will be an error code, and of_clk_get() will fail.
+ */
+if (name)
+	index = of_property_match_string(np, "clock-names", name);
+
+So, if no con_id is provided (name == NULL), then index is set to 0
+which will always get the first clock in clocks = list.
+
+Thanks,
+Sekhar
