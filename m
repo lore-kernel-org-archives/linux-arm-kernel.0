@@ -1,109 +1,73 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 12:19:18 +0000
-Subject: [PATCH v2 17/20] arm64: bp hardening: Allow late CPUs to enable
- work around
-In-Reply-To: <20180207103942.GH5862@e103592.cambridge.arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-18-suzuki.poulose@arm.com>
- <20180207103942.GH5862@e103592.cambridge.arm.com>
-Message-ID: <b4705fa2-39aa-9fea-78c4-03ac5eb48a49@arm.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Thu,  8 Feb 2018 20:20:33 +0800
+Subject: [PATCH v8 3/3] ARM: dts: rockchip: enable sfc for rv1108 evb
+In-Reply-To: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
+References: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1518092433-3893-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/18 10:39, Dave Martin wrote:
-> On Wed, Jan 31, 2018 at 06:28:04PM +0000, Suzuki K Poulose wrote:
->> We defend against branch predictor training based exploits by
->> taking specific actions (based on the CPU model) to invalidate
->> the Branch predictor buffer (BPB). This is implemented by per-CPU
->> ptr, which installs the specific actions for the CPU model.
->>
->> The core code can handle the following cases where:
->>   1) some CPUs doesn't need any work around
->>   2) a CPU can install the work around, when it is brought up,
->>      irrespective of how late that happens.
+Enable the sfc support for rv1108 evaluation board.
 
-With the recent patches from Marc to expose this information to KVM
-guests, it looks like allowing a late CPU to turn this on is not going
-to be a good idea. We unconditionally set the capability even
-when we don't need the mitigation. So I am not really sure if
-we should go ahead with this patch. I am open to suggestions
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Marc,
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-What do you think ?
+ arch/arm/boot/dts/rv1108-evb.dts | 10 ++++++++++
+ arch/arm/boot/dts/rv1108.dtsi    | 13 +++++++++++++
+ 2 files changed, 23 insertions(+)
 
->>
->> This concludes that it is safe to bring up a CPU which requires
->> bp hardening defense. However, with the current settings, we
->> reject a late CPU, if none of the active CPUs didn't need it.
-> 
-> Should this be "[...] reject a late CPU that needs the defense, if none
-> of the active CPUs needed it." ?
-
-Thats right. Will fix it.
-
-> 
->>
->> This patch solves issue by changing the flags for the capability
->> to indicate that it is safe for a late CPU to turn up with the
->> capability. This is not sufficient to get things working, as
->> we cannot change the system wide state of the capability established
->> at the kernel boot. So, we "set" the capability unconditionally
->> and make sure that the call backs are only installed for those
->> CPUs which actually needs them. This is done by adding a dummy
->> entry at the end of the list of shared entries, which :
->>   a) Always returns true for matches, to ensure we turn this on.
->>   b) has an empty "cpu_enable" call back, so that we don't take
->>      any action on the CPUs which weren't matched with the real
->>      entries.
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Dave Martin <dave.martin@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-
->> +
->>   static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
->>   	{
->>   		CAP_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
->> @@ -268,6 +274,17 @@ static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
->>   		CAP_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
->>   		.cpu_enable = qcom_enable_link_stack_sanitization,
->>   	},
->> +	/*
->> +	 * Always enable the capability to make sure a late CPU can
->> +	 * safely use the BP hardening call backs. Since we use per-CPU
->> +	 * pointers for the call backs, the work around only affects the
->> +	 * CPUs which have some methods installed by any real matching entries
->> +	 * above. As such we don't have any specific cpu_enable() callback
->> +	 * for this entry, as it is just to make sure we always "detect" it.
->> +	 */
->> +	{
->> +		.matches = bp_hardening_always_on,
-> 
-> This function could simply be called "always_on", since it expresses
-> something entirely generic and is static.
-
-Sure, if we still go ahead with this.
-
-> 
->> +	},
-> 
-> This feels like a bit of a hack: really there is no global on/off
-> state for a cap like this: it's truly independent for each cpu.
-
-Yea, I kind of didn't like it, but that does the job ;-).
-
-> 
-> OTOH, your code does achieve that, and the comment gives a good
-> explanation.
-> 
-> The alternative would be to add a cap type flag to indicate that
-> this cap is purely CPU-local, but it may not be worth it at this
-> stage.
-
-Agree. Thats going to make the code a bit more complex than it is already.
-
-Cheers
-Suzuki
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index ac27e11..5d0ebe3 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -239,6 +239,16 @@
+ 	};
+ };
+ 
++&sfc {
++	status = "okay";
++	spi-nor at 0 {
++		compatible = "jedec,spi-nor";
++		spi-max-frequency = <100000000>;
++		m25p,fast-read;
++		reg = <0>;
++	};
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index 76ea246..30435fc 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -554,6 +554,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	sfc: sfc at 301c0000 {
++		compatible = "rockchip,rv1108-sfc", "rockchip,sfc";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_SFC>, <&cru HCLK_SFC>;
++		clock-names = "sfc", "hsfc";
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0x301c0000 0x1000>;
++		/* If you want to use PIO mode, activate this */
++		/*rockchip,sfc-no-dma;*/
++		status = "disabled";
++	};
++
+ 	gic: interrupt-controller at 32010000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
+-- 
+2.7.4
