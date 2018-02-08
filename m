@@ -1,47 +1,44 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 8 Feb 2018 18:52:07 +0100
-Subject: [PATCH] drm/exynos: g2d: Delete an error message for a failed memory
- allocation in two functions
-Message-ID: <f1a7c103-fd17-3a61-61f7-570436e3c452@users.sourceforge.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Feb 2018 11:52:52 -0600
+Subject: [PATCH 2/3] Documentation: bindings: add usb3-host-disable and
+ usb3-host-port for Rockchip USB Type-C PHY
+In-Reply-To: <20180208152028.9997-2-enric.balletbo@collabora.com>
+References: <20180208152028.9997-1-enric.balletbo@collabora.com>
+ <20180208152028.9997-2-enric.balletbo@collabora.com>
+Message-ID: <CABGGisyaqV5HtTUL5LdjH3ZcU3_RTPmzMvEAhv5wZjCD_XCujg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 8 Feb 2018 18:42:51 +0100
+On Thu, Feb 8, 2018 at 9:20 AM, Enric Balletbo i Serra
+<enric.balletbo@collabora.com> wrote:
+> From: William wu <wulf@rock-chips.com>
+>
+> rockchip,usb3-host-disable is the register of type-c phy disable usb3 host
+> rockchip,usb3-host-port is the register of type-c phy usb3 port number
+>
+> Signed-off-by: William wu <wulf@rock-chips.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+>  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> index c3be83be9615..9085d95d0079 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -36,6 +36,12 @@ offset, enable bit, write mask bit.
+>   - rockchip,uphy-dp-sel : the register of type-c phy enable DP function
+>     for type-c phy0, it must be <0x6268 19 19>;
+>     for type-c phy1, it must be <0x6268 3 19>;
+> + - rockchip,usb3-host-disable : the register of type-c phy disable usb3 host
+> +   for type-c phy0, it must be <0x2434 0 16>;
+> +   for type-c phy1, it must be <0x2444 0 16>;
+> + - rockchip,usb3-host-port : the register of type-c phy usb3 port number
+> +   for type-c phy0, it must be <0x2434 12 28>;
+> +   for type-c phy1, it must be <0x2444 12 28>;
 
-Omit an extra message for a memory allocation failure in these functions.
+When does this list stop? Adding properties for various register
+fields doesn't scale. This information should be in the driver and
+based on the compatible string if necessary.
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/gpu/drm/exynos/exynos_drm_g2d.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 2b8bf2dd6387..5eb0d3292525 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -286,7 +286,6 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
- 
- 	node = kcalloc(G2D_CMDLIST_NUM, sizeof(*node), GFP_KERNEL);
- 	if (!node) {
--		dev_err(dev, "failed to allocate memory\n");
- 		ret = -ENOMEM;
- 		goto err;
- 	}
-@@ -1358,10 +1357,9 @@ int exynos_g2d_exec_ioctl(struct drm_device *drm_dev, void *data,
- 		return -EFAULT;
- 
- 	runqueue_node = kmem_cache_alloc(g2d->runqueue_slab, GFP_KERNEL);
--	if (!runqueue_node) {
--		dev_err(dev, "failed to allocate memory\n");
-+	if (!runqueue_node)
- 		return -ENOMEM;
--	}
-+
- 	run_cmdlist = &runqueue_node->run_cmdlist;
- 	event_list = &runqueue_node->event_list;
- 	INIT_LIST_HEAD(run_cmdlist);
--- 
-2.16.1
+Rob
