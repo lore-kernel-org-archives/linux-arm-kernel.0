@@ -1,109 +1,68 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Thu, 8 Feb 2018 11:02:50 +0000
-Subject: [PATCH] media: stm32-dcmi: add g/s_parm framerate support
-In-Reply-To: <727ee222-20f1-23d3-fdff-4b985e24593d@xs4all.nl>
-References: <1518025389-3677-1-git-send-email-hugues.fruchet@st.com>
- <727ee222-20f1-23d3-fdff-4b985e24593d@xs4all.nl>
-Message-ID: <60670590-0517-7fad-eed3-dac8fbf98403@st.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Feb 2018 11:05:41 +0000
+Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
+ define package boundaries
+In-Reply-To: <c9ab384b-1408-eccb-b417-af9a8a22119c@arm.com>
+References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
+ <c9ab384b-1408-eccb-b417-af9a8a22119c@arm.com>
+Message-ID: <20180208110541.GB1179@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Hans,
-v2 sent, rebased on your helpers !
-Best regards,
-Hugues.
+On Mon, Jan 22, 2018 at 05:29:20PM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 22/01/18 17:15, Lorenzo Pieralisi wrote:
+> > The current ARM DT topology description provides the operating system
+> > with a topological view of the system that is based on leaf nodes
+> > representing either cores or threads (in an SMT system) and a
+> > hierarchical set of cluster nodes that creates a hierarchical topology
+> > view of how those cores and threads are grouped.
+> > 
+> > As opposed to the ACPI topology description ([1], PPTT table), this
+> > hierarchical representation of clusters does not allow to describe what
+> > topology level actually represents the physical package boundary, which
+> > is a key piece of information to be used by an operating system to
+> > optimize resource allocation and scheduling.
+> > 
+> > Define an optional, backward compatible boolean property for cluster
+> > nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+> > topological description a binding to define what cluster level
+> > represents a physical package boundary.
+> > 
+> > [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Jeremy Linton <jeremy.linton@arm.com>
+> > Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> > index de9eb0486630..8e78d76b0671 100644
+> > --- a/Documentation/devicetree/bindings/arm/topology.txt
+> > +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> > @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+> >  	The cluster node name must be "clusterN" as described in 2.1 above.
+> >  	A cluster node can not be a leaf node.
+> >  
+> > +	Properties for cluster nodes:
+> > +
+> > +	- physical-package
+> > +		Usage: optional
+> > +		Value type: <empty>
+> 
+> IIUC, value type must be specified as boolean in this case.
 
-On 02/07/2018 06:52 PM, Hans Verkuil wrote:
-> On 02/07/2018 06:43 PM, Hugues Fruchet wrote:
->> Add g/s_parm framerate support by calling subdev
->> g/s_frame_interval ops.
->> This allows user to control sensor framerate by
->> calling ioctl G/S_PARM.
->>
->> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
->> ---
->>   drivers/media/platform/stm32/stm32-dcmi.c | 49 +++++++++++++++++++++++++++++++
->>   1 file changed, 49 insertions(+)
->>
->> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
->> index ab555d4..8197554 100644
->> --- a/drivers/media/platform/stm32/stm32-dcmi.c
->> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
->> @@ -1151,6 +1151,52 @@ static int dcmi_enum_framesizes(struct file *file, void *fh,
->>   	return 0;
->>   }
->>   
->> +static int dcmi_g_parm(struct file *file, void *priv,
->> +		       struct v4l2_streamparm *p)
->> +{
->> +	struct stm32_dcmi *dcmi = video_drvdata(file);
->> +	struct v4l2_subdev_frame_interval ival = { 0 };
->> +	int ret;
->> +
->> +	if (p->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
->> +		return -EINVAL;
->> +
->> +	p->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
->> +	ret = v4l2_subdev_call(dcmi->entity.subdev, video,
->> +			       g_frame_interval, &ival);
->> +	if (ret)
->> +		return ret;
->> +
->> +	p->parm.capture.timeperframe = ival.interval;
->> +
->> +	return ret;
->> +}
-> 
-> This function and the next can be simplified by using the help functions
-> introduced here:
-> 
-> https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=parm
-> 
-> I'll make a pull request for this later this week, so it's probably a good
-> idea to base your code on this as well.
-> 
-> Regards,
-> 
-> 	Hans
-> 
->> +
->> +static int dcmi_s_parm(struct file *file, void *priv,
->> +		       struct v4l2_streamparm *p)
->> +{
->> +	struct stm32_dcmi *dcmi = video_drvdata(file);
->> +	struct v4l2_subdev_frame_interval ival = {
->> +		0,
->> +		p->parm.capture.timeperframe
->> +	};
->> +	int ret;
->> +
->> +	if (p->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
->> +		return -EINVAL;
->> +
->> +	memset(&p->parm, 0, sizeof(p->parm));
->> +	p->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
->> +	ret = v4l2_subdev_call(dcmi->entity.subdev, video,
->> +			       s_frame_interval, &ival);
->> +	if (ret)
->> +		return ret;
->> +
->> +	p->parm.capture.timeperframe = ival.interval;
->> +
->> +	return ret;
->> +}
->> +
->>   static int dcmi_enum_frameintervals(struct file *file, void *fh,
->>   				    struct v4l2_frmivalenum *fival)
->>   {
->> @@ -1253,6 +1299,9 @@ static int dcmi_release(struct file *file)
->>   	.vidioc_g_input			= dcmi_g_input,
->>   	.vidioc_s_input			= dcmi_s_input,
->>   
->> +	.vidioc_g_parm			= dcmi_g_parm,
->> +	.vidioc_s_parm			= dcmi_s_parm,
->> +
->>   	.vidioc_enum_framesizes		= dcmi_enum_framesizes,
->>   	.vidioc_enum_frameintervals	= dcmi_enum_frameintervals,
->>   
->>
-> 
+That's what I thought too but according to DT specs v0.2, table 2.3 the
+property value type is <empty>.
+
+I do not mind changing it - whatever DT maintainers think is more
+appropriate.
+
+Thanks,
+Lorenzo
