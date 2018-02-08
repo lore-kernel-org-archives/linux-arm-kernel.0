@@ -1,23 +1,22 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 08 Feb 2018 11:05:41 +0100
-Subject: [PATCH -next] cpufreq: scpi: fix error return code in
- scpi_cpufreq_init()
-In-Reply-To: <15661228-4bb6-233e-b81b-8f51f4579616@arm.com>
-References: <1516673342-170261-1-git-send-email-weiyongjun1@huawei.com>
- <15661228-4bb6-233e-b81b-8f51f4579616@arm.com>
-Message-ID: <2101717.6379XIZ7aP@aspire.rjw.lan>
+From: joonas.kylmala@iki.fi (=?UTF-8?Q?Joonas_Kylm=c3=a4l=c3=a4?=)
+Date: Thu, 08 Feb 2018 10:26:00 +0000
+Subject: [PATCH v2 1/2] ARM: dts: sun8i: h3-h5: Move pinctrl of mmc0 from
+ dts to dtsi
+In-Reply-To: <20180208085221.zifabhit5adjodb7@flea>
+References: <20180207204805.16884-1-joonas.kylmala@iki.fi>
+ <20180207204805.16884-2-joonas.kylmala@iki.fi>
+ <20180208085221.zifabhit5adjodb7@flea>
+Message-ID: <df393f0c-cbe0-c6f2-c53c-37c10a3dac00@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 23, 2018 11:14:41 AM CET Sudeep Holla wrote:
-> 
-> On 23/01/18 02:09, Wei Yongjun wrote:
-> > Fix to return a negative error code from the clk_get() error handling
-> > case instead of 0, as done elsewhere in this function.
-> > 
-> 
-> Thanks for catching this.
-> 
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Maxime Ripard:
+> Also, wouldn't the H5 boards need some change too?
 
-Patch applied, thanks!
+Definitely. I was just looking for all the dts files in
+arch/arm/boot/dts/ and didn't even realize there was also
+arch/arm64/boot/dts/.
+
+I will send soon a new version of the patchset!
+
+Joonas
