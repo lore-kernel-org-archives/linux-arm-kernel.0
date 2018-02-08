@@ -1,84 +1,53 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 16:31:47 +0000
-Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
-In-Reply-To: <20180208161015.GZ5862@e103592.cambridge.arm.com>
-References: <86f23003-72bc-5bfc-af40-a92cc68def45@arm.com>
- <20180208121238.18792-1-suzuki.poulose@arm.com>
- <20180208161015.GZ5862@e103592.cambridge.arm.com>
-Message-ID: <08474a1a-3abd-9b89-ce75-d01e4b6fa659@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 08 Feb 2018 18:46:34 +0200
+Subject: [PATCH v2] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
+In-Reply-To: <20180208145805.24762-1-philippe.cornu@st.com>
+References: <20180208145805.24762-1-philippe.cornu@st.com>
+Message-ID: <101210971.aHjggv2rq0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 16:10, Dave Martin wrote:
-> On Thu, Feb 08, 2018 at 12:12:37PM +0000, Suzuki K Poulose wrote:
->> So far we have restricted the scopes for the capabilities
->> as follows :
->>   1) Errata workaround check are run all CPUs (i.e, always
->>      SCOPE_LOCAL_CPU)
->>   2) Arm64 features are run only once after the sanitised
->>      feature registers are available using the SCOPE_SYSTEM.
->>
->> This prevents detecting cpu features that can be detected
->> on one or more CPUs with SCOPE_LOCAL_CPU (e.g KPTI). Similarly
->> for errata workaround with SCOPE_SYSTEM.
->>
->> This patch makes sure that we allow flexibility of having
->> any scope for a capability. So, we now run through both
->> arm64_features and arm64_errata in two phases for detection:
->>
->>   a) with SCOPE_LOCAL_CPU filter on each boot time enabled
->>      CPUs.
->>   b) with SCOPE_SYSTEM filter only once after all boot time
->>      enabled CPUs are active.
->>
+Hi Philippe,
 
+Thank you for the patch.
 
->>   
->>   static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
->> @@ -1387,13 +1389,15 @@ static void verify_local_cpu_errata_workarounds(void)
->>   static void update_cpu_errata_workarounds(void)
->>   {
->>   	update_cpu_capabilities(arm64_errata,
->> -				ARM64_CPUCAP_SCOPE_ALL,
->> +				ARM64_CPUCAP_SCOPE_LOCAL_CPU,
+On Thursday, 8 February 2018 16:58:05 EET Philippe Cornu wrote:
+> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
+> host controller driver.
 > 
-> In isolation, this looks strange because it seems to handle only a
-> subset of arm64_errata now.
+> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> Changes in v2: Update to "GPL-2.0+" following comments from Laurent
+> Pinchart, Benjamin Gaignard & Philippe Ombredanne.
 > 
-> I think I understand the change as follows:
+>  drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
 > 
->   * all previously-existing errata workarounds SCOPE_LOCAL_CPU
->     anyway, so the behavior here doesn't change for any existing
->     caps;
-> 
->   * the non SCOPE_SYSTEM workarounds (which this patch prepares for)
-"the SCOPE_SYSTEM" workarounds..."
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
+> 7bac101c285c..99f0e4f51716 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+> @@ -1,12 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+>  /*
+>   * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+>   * Copyright (C) STMicroelectronics SA 2017
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - *
+>   * Modified by Philippe Cornu <philippe.cornu@st.com>
+>   * This generic Synopsys DesignWare MIPI DSI host driver is based on the
+>   * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
 
->     are handled by the new setup_errata_workaround() path.
 
-> 
-> Similarly, the features handling is split into two: one mirroring
-> the current behaviour (for SCOPE_SYSTEM this time) and one handling> the rest, for supporting SCOPE_CPU_LOCAL features in subsequent
-> patches.
+-- 
+Regards,
 
-Right. The changes here are :
-
-New behavior:
-   - Run SCOPE_LOCAL_CPU filter on arm64_features on all CPUs (newly added with
-     this patch) via (newly added)update_cpu_local_features().
-
-Split of existing behavior:
-   - Run SCOPE_LOCAL_CPU(instead of the earlier SCOPE_ALL) on all CPUs in
-     update_cpu_errata_workarounds()
-   - Run SCOPE_SYSTEM filter on arm64_errata, once, via setup_errata_workarounds()
-
-> 
-> Does that sound right?
-> 
-> I'm not sure we need extra comments or documentation; I just want
-> to check that I've understood the patch correctly.
-
-So, would you prefer this split to the original patch ?
-
-Cheers
-Suzuki
+Laurent Pinchart
