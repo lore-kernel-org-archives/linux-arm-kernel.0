@@ -1,73 +1,52 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Thu,  8 Feb 2018 20:20:33 +0800
-Subject: [PATCH v8 3/3] ARM: dts: rockchip: enable sfc for rv1108 evb
-In-Reply-To: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
-References: <1518091958-3672-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1518092433-3893-1-git-send-email-andy.yan@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 8 Feb 2018 12:26:35 +0000
+Subject: [PATCH v2 17/20] arm64: bp hardening: Allow late CPUs to enable
+ work around
+In-Reply-To: <b4705fa2-39aa-9fea-78c4-03ac5eb48a49@arm.com>
+References: <20180131182807.32134-1-suzuki.poulose@arm.com>
+ <20180131182807.32134-18-suzuki.poulose@arm.com>
+ <20180207103942.GH5862@e103592.cambridge.arm.com>
+ <b4705fa2-39aa-9fea-78c4-03ac5eb48a49@arm.com>
+Message-ID: <bea7947f-79e1-53e5-30ec-3f28bda46e5a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the sfc support for rv1108 evaluation board.
+On 08/02/18 12:19, Suzuki K Poulose wrote:
+> On 07/02/18 10:39, Dave Martin wrote:
+>> On Wed, Jan 31, 2018 at 06:28:04PM +0000, Suzuki K Poulose wrote:
+>>> We defend against branch predictor training based exploits by
+>>> taking specific actions (based on the CPU model) to invalidate
+>>> the Branch predictor buffer (BPB). This is implemented by per-CPU
+>>> ptr, which installs the specific actions for the CPU model.
+>>>
+>>> The core code can handle the following cases where:
+>>>   1) some CPUs doesn't need any work around
+>>>   2) a CPU can install the work around, when it is brought up,
+>>>      irrespective of how late that happens.
+> 
+> With the recent patches from Marc to expose this information to KVM
+> guests, it looks like allowing a late CPU to turn this on is not going
+> to be a good idea. We unconditionally set the capability even
+> when we don't need the mitigation. So I am not really sure if
+> we should go ahead with this patch. I am open to suggestions
+> 
+> Marc,
+> 
+> What do you think ?
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+By the time we bring in that CPU that requires some level of mitigation,
+we may be running a guest already, and we've told that guest that no
+mitigation was required. If we bring in that CPU, we break that promise,
+and the guest becomes vulnerable without knowing about it.
 
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+The same thing is valid for userspace once we expose the status of the
+mitigation in /sys, just like x86 does. If we transition from not
+vulnerable to vulnerable (or even mitigated), we have lied to userspace.
 
- arch/arm/boot/dts/rv1108-evb.dts | 10 ++++++++++
- arch/arm/boot/dts/rv1108.dtsi    | 13 +++++++++++++
- 2 files changed, 23 insertions(+)
+In either case, I don't think breaking this contract is acceptable.
 
-diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
-index ac27e11..5d0ebe3 100644
---- a/arch/arm/boot/dts/rv1108-evb.dts
-+++ b/arch/arm/boot/dts/rv1108-evb.dts
-@@ -239,6 +239,16 @@
- 	};
- };
- 
-+&sfc {
-+	status = "okay";
-+	spi-nor at 0 {
-+		compatible = "jedec,spi-nor";
-+		spi-max-frequency = <100000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
-index 76ea246..30435fc 100644
---- a/arch/arm/boot/dts/rv1108.dtsi
-+++ b/arch/arm/boot/dts/rv1108.dtsi
-@@ -554,6 +554,19 @@
- 		status = "disabled";
- 	};
- 
-+	sfc: sfc at 301c0000 {
-+		compatible = "rockchip,rv1108-sfc", "rockchip,sfc";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&cru SCLK_SFC>, <&cru HCLK_SFC>;
-+		clock-names = "sfc", "hsfc";
-+		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+		reg = <0x301c0000 0x1000>;
-+		/* If you want to use PIO mode, activate this */
-+		/*rockchip,sfc-no-dma;*/
-+		status = "disabled";
-+	};
-+
- 	gic: interrupt-controller at 32010000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
