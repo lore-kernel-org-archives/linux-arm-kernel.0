@@ -1,61 +1,205 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 8 Feb 2018 17:59:55 +0000
-Subject: [PATCH v2 17/20] arm64: bp hardening: Allow late CPUs to enable
- work around
-In-Reply-To: <77efc8b3-48c1-fbaf-ce11-15123755262a@arm.com>
-References: <20180131182807.32134-1-suzuki.poulose@arm.com>
- <20180131182807.32134-18-suzuki.poulose@arm.com>
- <20180207103942.GH5862@e103592.cambridge.arm.com>
- <b4705fa2-39aa-9fea-78c4-03ac5eb48a49@arm.com>
- <bea7947f-79e1-53e5-30ec-3f28bda46e5a@arm.com>
- <3b922643-ab97-e012-4268-c830b1bdaf10@arm.com>
- <77efc8b3-48c1-fbaf-ce11-15123755262a@arm.com>
-Message-ID: <5908ea11-a007-ff9f-b714-6dc0a6a1af01@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Feb 2018 19:04:14 +0100
+Subject: [PATCH v1 13/16] kvm: arm64: Configure VTCR per VM
+In-Reply-To: <20180109190414.4017-14-suzuki.poulose@arm.com>
+References: <20180109190414.4017-1-suzuki.poulose@arm.com>
+ <20180109190414.4017-14-suzuki.poulose@arm.com>
+Message-ID: <CAMJs5B_yvM8XNT=g8uN63G1G6uwGQcYF_0dxbC1Gaeb+j6UvpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/18 17:59, Suzuki K Poulose wrote:
-> On 08/02/18 16:58, Suzuki K Poulose wrote:
->> On 08/02/18 12:26, Marc Zyngier wrote:
->>> On 08/02/18 12:19, Suzuki K Poulose wrote:
->>>> On 07/02/18 10:39, Dave Martin wrote:
->>>>> On Wed, Jan 31, 2018 at 06:28:04PM +0000, Suzuki K Poulose wrote:
->>>>>> We defend against branch predictor training based exploits by
->>>>>> taking specific actions (based on the CPU model) to invalidate
->>>>>> the Branch predictor buffer (BPB). This is implemented by per-CPU
->>>>>> ptr, which installs the specific actions for the CPU model.
->>>>>>
->>>>>> The core code can handle the following cases where:
->>>>>> ?? 1) some CPUs doesn't need any work around
->>>>>> ?? 2) a CPU can install the work around, when it is brought up,
->>>>>> ????? irrespective of how late that happens.
->>>>
->>>> With the recent patches from Marc to expose this information to KVM
->>>> guests, it looks like allowing a late CPU to turn this on is not going
->>>> to be a good idea. We unconditionally set the capability even
->>>> when we don't need the mitigation. So I am not really sure if
->>>> we should go ahead with this patch. I am open to suggestions
->>>>
->>>> Marc,
->>>>
->>>> What do you think ?
->>>
->>> By the time we bring in that CPU that requires some level of mitigation,
->>> we may be running a guest already, and we've told that guest that no
->>> mitigation was required. If we bring in that CPU, we break that promise,
->>> and the guest becomes vulnerable without knowing about it.
->>>
->>> The same thing is valid for userspace once we expose the status of the
->>> mitigation in /sys, just like x86 does. If we transition from not
->>> vulnerable to vulnerable (or even mitigated), we have lied to userspace.
->>>
->>> In either case, I don't think breaking this contract is acceptable.
->>
->> Thanks Marc, I have dropped this patch from the series.
-> 
-> On a second thought, should we allow this if the KVM is not configured in ?
+On Tue, Jan 09, 2018 at 07:04:08PM +0000, Suzuki K Poulose wrote:
+> We set VTCR_EL2 very early during the stage2 init and don't
+> touch it ever. This is fine as we had a fixed IPA size. This
+> patch changes the behavior to set the VTCR for a given VM,
+> depending on its stage2 table. The common configuration for
+> VTCR is still performed during the early init. But the SL0
+> and T0SZ are programmed for each VM and is cleared once we
+> exit the VM.
+>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h  | 16 ++++++----------
+>  arch/arm64/include/asm/kvm_asm.h  |  2 +-
+>  arch/arm64/include/asm/kvm_host.h |  8 +++++---
+>  arch/arm64/kvm/hyp/s2-setup.c     | 16 +---------------
+>  arch/arm64/kvm/hyp/switch.c       |  9 +++++++++
+>  5 files changed, 22 insertions(+), 29 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index eb90d349e55f..d5c40816f073 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -115,9 +115,7 @@
+>  #define VTCR_EL2_IRGN0_WBWA TCR_IRGN0_WBWA
+>  #define VTCR_EL2_SL0_SHIFT 6
+>  #define VTCR_EL2_SL0_MASK (3 << VTCR_EL2_SL0_SHIFT)
+> -#define VTCR_EL2_SL0_LVL1 (1 << VTCR_EL2_SL0_SHIFT)
+>  #define VTCR_EL2_T0SZ_MASK 0x3f
+> -#define VTCR_EL2_T0SZ_40B 24
+>  #define VTCR_EL2_VS_SHIFT 19
+>  #define VTCR_EL2_VS_8BIT (0 << VTCR_EL2_VS_SHIFT)
+>  #define VTCR_EL2_VS_16BIT (1 << VTCR_EL2_VS_SHIFT)
+> @@ -139,38 +137,36 @@
+>   * D4-23 and D4-25 in ARM DDI 0487A.b.
+>   */
+>
+> -#define VTCR_EL2_T0SZ_IPA VTCR_EL2_T0SZ_40B
+>  #define VTCR_EL2_COMMON_BITS (VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+>   VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
+> +#define VTCR_EL2_PRIVATE_MASK (VTCR_EL2_SL0_MASK | VTCR_EL2_T0SZ_MASK)
+>
+>  #ifdef CONFIG_ARM64_64K_PAGES
+>  /*
+>   * Stage2 translation configuration:
+>   * 64kB pages (TG0 = 1)
+> - * 2 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_TGRAN_FLAGS (VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
+> +#define VTCR_EL2_TGRAN VTCR_EL2_TG0_64K
+>  #define VTCR_EL2_TGRAN_SL0_BASE 3UL
+>
+>  #elif defined(CONFIG_ARM64_16K_PAGES)
+>  /*
+>   * Stage2 translation configuration:
+>   * 16kB pages (TG0 = 2)
+> - * 2 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_TGRAN_FLAGS (VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
+> +#define VTCR_EL2_TGRAN VTCR_EL2_TG0_16K
+>  #define VTCR_EL2_TGRAN_SL0_BASE 3UL
+>  #else /* 4K */
+>  /*
+>   * Stage2 translation configuration:
+>   * 4kB pages (TG0 = 0)
+> - * 3 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_TGRAN_FLAGS (VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
+> +#define VTCR_EL2_TGRAN VTCR_EL2_TG0_4K
+>  #define VTCR_EL2_TGRAN_SL0_BASE 2UL
+>  #endif
+>
+> -#define VTCR_EL2_FLAGS (VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+> +#define VTCR_EL2_FLAGS (VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+> +
+>  /*
+>   * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
+>   * Interestingly, it depends on the page size.
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index ab4d0a926043..21cfd1fe692c 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -66,7 +66,7 @@ extern void __vgic_v3_init_lrs(void);
+>
+>  extern u32 __kvm_get_mdcr_el2(void);
+>
+> -extern u32 __init_stage2_translation(void);
+> +extern void __init_stage2_translation(void);
+>
+>  #endif
+>
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index ea6cb5b24258..9a9ddeb33c84 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -380,10 +380,12 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>
+>  static inline void __cpu_init_stage2(void)
+>  {
+> - u32 parange = kvm_call_hyp(__init_stage2_translation);
+> + u32 ps;
+>
+> - WARN_ONCE(parange < 40,
+> -  "PARange is %d bits, unsupported configuration!", parange);
+> + kvm_call_hyp(__init_stage2_translation);
+> + ps = id_aa64mmfr0_parange_to_phys_shift(read_sysreg(id_aa64mmfr0_el1));
+> + WARN_ONCE(ps < 40,
+> +  "PARange is %d bits, unsupported configuration!", ps);
+>  }
+>
+>  /*
+> diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
+> index b1129c83c531..5c26ad4b8ac9 100644
+> --- a/arch/arm64/kvm/hyp/s2-setup.c
+> +++ b/arch/arm64/kvm/hyp/s2-setup.c
+> @@ -19,13 +19,11 @@
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_hyp.h>
+> -#include <asm/cpufeature.h>
+>
+> -u32 __hyp_text __init_stage2_translation(void)
+> +void __hyp_text __init_stage2_translation(void)
+>  {
+>   u64 val = VTCR_EL2_FLAGS;
+>   u64 parange;
+> - u32 phys_shift;
+>   u64 tmp;
+>
+>   /*
+> @@ -38,16 +36,6 @@ u32 __hyp_text __init_stage2_translation(void)
+>   parange = ID_AA64MMFR0_PARANGE_MAX;
+>   val |= parange << 16;
+>
+> - /* Compute the actual PARange... */
+> - phys_shift = id_aa64mmfr0_parange_to_phys_shift(parange);
+> -
+> - /*
+> - * ... and clamp it to 40 bits, unless we have some braindead
+> - * HW that implements less than that. In all cases, we'll
+> - * return that value for the rest of the kernel to decide what
+> - * to do.
+> - */
+> - val |= 64 - (phys_shift > 40 ? 40 : phys_shift);
+>
+>   /*
+>   * Check the availability of Hardware Access Flag / Dirty Bit
+> @@ -67,6 +55,4 @@ u32 __hyp_text __init_stage2_translation(void)
+>   VTCR_EL2_VS_8BIT;
+>
+>   write_sysreg(val, vtcr_el2);
+> -
+> - return phys_shift;
+>  }
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index f7c651f3a8c0..523471f0af7b 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -157,11 +157,20 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>  static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+>  {
+>   struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> + u64 vtcr = read_sysreg(vtcr_el2);
+> +
+> + vtcr &= ~VTCR_EL2_PRIVATE_MASK;
+> + vtcr |= VTCR_EL2_SL0(stage2_pt_levels(kvm)) |
+> + VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
+> + write_sysreg(vtcr, vtcr_el2);
 
-Oops, no! Please ignore it. We are going to expose this to other userpsace anyway.
-Sorry about the noise.
+If we're writing VTCR_EL2 on each entry, do we really need to read the
+value back first and calculate things on every entry to the VM?  It
+seems to me we should be able to compute the vtcr_el2 and store it on
+struct kvm, and simply restore that per-VM value upon entering the VM?
 
-Suzuki
+>   write_sysreg(kvm->arch.vttbr, vttbr_el2);
+>  }
+>
+>  static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+>  {
+> + u64 vtcr = read_sysreg(vtcr_el2) & ~VTCR_EL2_PRIVATE_MASK;
+> +
+> + write_sysreg(vtcr, vtcr_el2);
+
+Why do we need to care about restoring VTCR when returning to the host?
+
+>   write_sysreg(0, vttbr_el2);
+>  }
+>
+> --
+> 2.13.6
+>
+
+Thanks,
+-Christoffer
