@@ -1,56 +1,50 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Thu, 8 Feb 2018 22:23:33 +0100
-Subject: [PATCH 2/3] Documentation: bindings: add usb3-host-disable and
- usb3-host-port for Rockchip USB Type-C PHY
-In-Reply-To: <CABGGisyaqV5HtTUL5LdjH3ZcU3_RTPmzMvEAhv5wZjCD_XCujg@mail.gmail.com>
-References: <20180208152028.9997-1-enric.balletbo@collabora.com>
- <20180208152028.9997-2-enric.balletbo@collabora.com>
- <CABGGisyaqV5HtTUL5LdjH3ZcU3_RTPmzMvEAhv5wZjCD_XCujg@mail.gmail.com>
-Message-ID: <CAFqH_53-iN9m=U+WdQh6_rKyxE5c9RUQO9qD1QaY0QePM_pOZA@mail.gmail.com>
+From: dnelson@redhat.com (Dean Nelson)
+Date: Thu, 8 Feb 2018 15:57:21 -0600
+Subject: net: thunder: change q_len's type to handle max ring size
+In-Reply-To: <20180208.153453.774785043965984772.davem@davemloft.net>
+References: <151811766130.10712.18293368656209944798.email-sent-by-dnelson@aqua>
+ <20180208.153453.774785043965984772.davem@davemloft.net>
+Message-ID: <41824374-cdea-a3ef-0109-20565dbba43e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 02/08/2018 02:34 PM, David Miller wrote:
+> From: Dean Nelson <dnelson@redhat.com>
+> Date:
+> 
+>> The Cavium thunder nicvf driver supports rx/tx rings of up to 65536 entries per.
+>> The number of entires are stored in the q_len member of struct q_desc_mem. The
+>> problem is that q_len being a u16, results in 65536 becoming 0.
+>>
+>> In getting pointers to descriptors in the rings, the driver uses q_len minus 1
+>> as a mask after incrementing the pointer, in order to go back to the beginning
+>> and not go past the end of the ring.
+>>
+>> With the q_len set to 0 the mask is no longer correct and the driver does go
+>> beyond the end of the ring, causing various ills. Usually the first thing that
+>> shows up is a "NETDEV WATCHDOG: enP2p1s0f1 (nicvf): transmit queue 7 timed out"
+>> warning.
+>>
+>> This patch remedies the problem by changing q_len to a u32.
+>>
+>> Signed-off-by: Dean Nelson <dnelson@redhat.com>
+> 
+> Applied, thanks.
 
-2018-02-08 18:52 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Thu, Feb 8, 2018 at 9:20 AM, Enric Balletbo i Serra
-> <enric.balletbo@collabora.com> wrote:
->> From: William wu <wulf@rock-chips.com>
->>
->> rockchip,usb3-host-disable is the register of type-c phy disable usb3 host
->> rockchip,usb3-host-port is the register of type-c phy usb3 port number
->>
->> Signed-off-by: William wu <wulf@rock-chips.com>
->> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> ---
->>  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> index c3be83be9615..9085d95d0079 100644
->> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> @@ -36,6 +36,12 @@ offset, enable bit, write mask bit.
->>   - rockchip,uphy-dp-sel : the register of type-c phy enable DP function
->>     for type-c phy0, it must be <0x6268 19 19>;
->>     for type-c phy1, it must be <0x6268 3 19>;
->> + - rockchip,usb3-host-disable : the register of type-c phy disable usb3 host
->> +   for type-c phy0, it must be <0x2434 0 16>;
->> +   for type-c phy1, it must be <0x2444 0 16>;
->> + - rockchip,usb3-host-port : the register of type-c phy usb3 port number
->> +   for type-c phy0, it must be <0x2434 12 28>;
->> +   for type-c phy1, it must be <0x2444 12 28>;
->
-> When does this list stop? Adding properties for various register
-> fields doesn't scale. This information should be in the driver and
-> based on the compatible string if necessary.
->
+Thank you!
 
-I see, seams reasonable to me, is this applicable to the new ones only
-or I should get rid of all the proprieties like this from the DT
-(including the old ones)?
+> 
+> Another way to solve this could have been to encode that length
+> as "length - 1"
+
+True. I had pondered that, but felt that since changing q_len's type
+didn't add any length to the structure and that it was less impactful
+from a number-of-lines of code changed perspective, I'd opt for this
+route.
+
+Cavium, if you'd prefer this goes the route that Dave just mentioned,
+please let me know and I can make a new patch against what's been
+applied?
 
 Thanks,
-  Enric
-
-> Rob
+Dean
