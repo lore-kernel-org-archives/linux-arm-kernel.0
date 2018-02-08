@@ -1,76 +1,271 @@
 From: ebiggers@google.com (Eric Biggers)
-Date: Wed,  7 Feb 2018 16:09:56 -0800
-Subject: [PATCH 0/5] crypto: Speck support
-Message-ID: <20180208001001.19180-1-ebiggers@google.com>
+Date: Wed,  7 Feb 2018 16:09:58 -0800
+Subject: [PATCH 2/5] crypto: speck - export common helpers
+In-Reply-To: <20180208001001.19180-1-ebiggers@google.com>
+References: <20180208001001.19180-1-ebiggers@google.com>
+Message-ID: <20180208001001.19180-3-ebiggers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Export the Speck constants and transform context and the ->setkey(),
+->encrypt(), and ->decrypt() functions so that they can be reused by the
+ARM NEON implementation of Speck-XTS.  The generic key expansion code
+will be reused because it is not performance-critical and is not
+vectorizable, while the generic encryption and decryption functions are
+needed as fallbacks and for the XTS tweak encryption.
 
-This series adds Speck support to the crypto API, including the Speck128
-and Speck64 variants.  Speck is a lightweight block cipher that can be
-much faster than AES on processors that don't have AES instructions.
-
-We are planning to offer Speck-XTS (probably Speck128/256-XTS) as an
-option for dm-crypt and fscrypt on Android, for low-end mobile devices
-with older CPUs such as ARMv7 which don't have the Cryptography
-Extensions.  Currently, such devices are unencrypted because AES is not
-fast enough, even when the NEON bit-sliced implementation of AES is
-used.  Other AES alternatives such as Blowfish, Twofish, Camellia,
-Cast6, and Serpent aren't fast enough either; it seems that only a
-modern ARX cipher can provide sufficient performance on these devices.
-
-This is a replacement for our original proposal
-(https://patchwork.kernel.org/patch/10101451/) which was to offer
-ChaCha20 for these devices.  However, the use of a stream cipher for
-disk/file encryption with no space to store nonces would have been much
-more insecure than we thought initially, given that it would be used on
-top of flash storage as well as potentially on top of F2FS, neither of
-which is guaranteed to overwrite data in-place.
-
-Speck has been somewhat controversial due to its origin.  Nevertheless,
-it has a straightforward design (it's an ARX cipher), and it appears to
-be the leading software-optimized lightweight block cipher currently,
-with the most cryptanalysis.  It's also easy to implement without side
-channels, unlike AES.  Moreover, we only intend Speck to be used when
-the status quo is no encryption, due to AES not being fast enough.
-
-We've also considered a novel length-preserving encryption mode based on
-ChaCha20 and Poly1305.  While theoretically attractive, such a mode
-would be a brand new crypto construction and would be more complicated
-and difficult to implement efficiently in comparison to Speck-XTS.
-
-Thus, patch 1 adds a generic implementation of Speck, and the following
-patches add a 32-bit ARM NEON implementation of Speck-XTS.  The
-NEON-accelerated implementation is much faster than the generic
-implementation and therefore is the implementation that would primarily
-be used in practice on the devices we are targeting.
-
-There is no AArch64 implementation added, since such CPUs are likely to
-have the Cryptography Extensions, allowing the use of AES.
-
-Eric Biggers (5):
-  crypto: add support for the Speck block cipher
-  crypto: speck - export common helpers
-  crypto: arm/speck: add NEON-accelerated implementation of Speck-XTS
-  crypto: speck - add test vectors for Speck128-XTS
-  crypto: speck - add test vectors for Speck64-XTS
-
- arch/arm/crypto/Kconfig           |    6 +
- arch/arm/crypto/Makefile          |    2 +
- arch/arm/crypto/speck-neon-core.S |  431 +++++++++++
- arch/arm/crypto/speck-neon-glue.c |  290 ++++++++
- crypto/Kconfig                    |   14 +
- crypto/Makefile                   |    1 +
- crypto/speck.c                    |  302 ++++++++
- crypto/testmgr.c                  |   36 +
- crypto/testmgr.h                  | 1478 +++++++++++++++++++++++++++++++++++++
- include/crypto/speck.h            |   62 ++
- 10 files changed, 2622 insertions(+)
- create mode 100644 arch/arm/crypto/speck-neon-core.S
- create mode 100644 arch/arm/crypto/speck-neon-glue.c
- create mode 100644 crypto/speck.c
+Signed-off-by: Eric Biggers <ebiggers@google.com>
+---
+ crypto/speck.c         | 90 +++++++++++++++++++++++++++-----------------------
+ include/crypto/speck.h | 62 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 111 insertions(+), 41 deletions(-)
  create mode 100644 include/crypto/speck.h
 
+diff --git a/crypto/speck.c b/crypto/speck.c
+index 89860688bf00..c78c8a782b0c 100644
+--- a/crypto/speck.c
++++ b/crypto/speck.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <asm/unaligned.h>
++#include <crypto/speck.h>
+ #include <linux/bitops.h>
+ #include <linux/crypto.h>
+ #include <linux/init.h>
+@@ -26,22 +27,6 @@
+ 
+ /* Speck128 */
+ 
+-#define SPECK128_BLOCK_SIZE	16
+-
+-#define SPECK128_128_KEY_SIZE	16
+-#define SPECK128_128_NROUNDS	32
+-
+-#define SPECK128_192_KEY_SIZE	24
+-#define SPECK128_192_NROUNDS	33
+-
+-#define SPECK128_256_KEY_SIZE	32
+-#define SPECK128_256_NROUNDS	34
+-
+-struct speck128_tfm_ctx {
+-	u64 round_keys[SPECK128_256_NROUNDS];
+-	int nrounds;
+-};
+-
+ static __always_inline void speck128_round(u64 *x, u64 *y, u64 k)
+ {
+ 	*x = ror64(*x, 8);
+@@ -60,9 +45,9 @@ static __always_inline void speck128_unround(u64 *x, u64 *y, u64 k)
+ 	*x = rol64(*x, 8);
+ }
+ 
+-static void speck128_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++void crypto_speck128_encrypt(const struct speck128_tfm_ctx *ctx,
++			     u8 *out, const u8 *in)
+ {
+-	const struct speck128_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+ 	u64 x = get_unaligned_le64(in + 0);
+ 	u64 y = get_unaligned_le64(in + 8);
+ 	int i;
+@@ -73,10 +58,16 @@ static void speck128_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+ 	put_unaligned_le64(x, out + 0);
+ 	put_unaligned_le64(y, out + 8);
+ }
++EXPORT_SYMBOL_GPL(crypto_speck128_encrypt);
+ 
+-static void speck128_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++static void speck128_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++{
++	crypto_speck128_encrypt(crypto_tfm_ctx(tfm), out, in);
++}
++
++void crypto_speck128_decrypt(const struct speck128_tfm_ctx *ctx,
++			     u8 *out, const u8 *in)
+ {
+-	const struct speck128_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+ 	u64 x = get_unaligned_le64(in + 0);
+ 	u64 y = get_unaligned_le64(in + 8);
+ 	int i;
+@@ -87,11 +78,16 @@ static void speck128_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+ 	put_unaligned_le64(x, out + 0);
+ 	put_unaligned_le64(y, out + 8);
+ }
++EXPORT_SYMBOL_GPL(crypto_speck128_decrypt);
+ 
+-static int speck128_setkey(struct crypto_tfm *tfm, const u8 *key,
++static void speck128_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++{
++	crypto_speck128_decrypt(crypto_tfm_ctx(tfm), out, in);
++}
++
++int crypto_speck128_setkey(struct speck128_tfm_ctx *ctx, const u8 *key,
+ 			   unsigned int keylen)
+ {
+-	struct speck128_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+ 	u64 l[3];
+ 	u64 k;
+ 	int i;
+@@ -133,21 +129,15 @@ static int speck128_setkey(struct crypto_tfm *tfm, const u8 *key,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(crypto_speck128_setkey);
+ 
+-/* Speck64 */
+-
+-#define SPECK64_BLOCK_SIZE	8
+-
+-#define SPECK64_96_KEY_SIZE	12
+-#define SPECK64_96_NROUNDS	26
+-
+-#define SPECK64_128_KEY_SIZE	16
+-#define SPECK64_128_NROUNDS	27
++static int speck128_setkey(struct crypto_tfm *tfm, const u8 *key,
++			   unsigned int keylen)
++{
++	return crypto_speck128_setkey(crypto_tfm_ctx(tfm), key, keylen);
++}
+ 
+-struct speck64_tfm_ctx {
+-	u32 round_keys[SPECK64_128_NROUNDS];
+-	int nrounds;
+-};
++/* Speck64 */
+ 
+ static __always_inline void speck64_round(u32 *x, u32 *y, u32 k)
+ {
+@@ -167,9 +157,9 @@ static __always_inline void speck64_unround(u32 *x, u32 *y, u32 k)
+ 	*x = rol32(*x, 8);
+ }
+ 
+-static void speck64_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++void crypto_speck64_encrypt(const struct speck64_tfm_ctx *ctx,
++			    u8 *out, const u8 *in)
+ {
+-	const struct speck64_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+ 	u32 x = get_unaligned_le32(in + 0);
+ 	u32 y = get_unaligned_le32(in + 4);
+ 	int i;
+@@ -180,10 +170,16 @@ static void speck64_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+ 	put_unaligned_le32(x, out + 0);
+ 	put_unaligned_le32(y, out + 4);
+ }
++EXPORT_SYMBOL_GPL(crypto_speck64_encrypt);
+ 
+-static void speck64_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++static void speck64_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++{
++	crypto_speck64_encrypt(crypto_tfm_ctx(tfm), out, in);
++}
++
++void crypto_speck64_decrypt(const struct speck64_tfm_ctx *ctx,
++			    u8 *out, const u8 *in)
+ {
+-	const struct speck64_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+ 	u32 x = get_unaligned_le32(in + 0);
+ 	u32 y = get_unaligned_le32(in + 4);
+ 	int i;
+@@ -194,11 +190,16 @@ static void speck64_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
+ 	put_unaligned_le32(x, out + 0);
+ 	put_unaligned_le32(y, out + 4);
+ }
++EXPORT_SYMBOL_GPL(crypto_speck64_decrypt);
+ 
+-static int speck64_setkey(struct crypto_tfm *tfm, const u8 *key,
++static void speck64_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
++{
++	crypto_speck64_decrypt(crypto_tfm_ctx(tfm), out, in);
++}
++
++int crypto_speck64_setkey(struct speck64_tfm_ctx *ctx, const u8 *key,
+ 			  unsigned int keylen)
+ {
+-	struct speck64_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+ 	u32 l[3];
+ 	u32 k;
+ 	int i;
+@@ -231,6 +232,13 @@ static int speck64_setkey(struct crypto_tfm *tfm, const u8 *key,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(crypto_speck64_setkey);
++
++static int speck64_setkey(struct crypto_tfm *tfm, const u8 *key,
++			  unsigned int keylen)
++{
++	return crypto_speck64_setkey(crypto_tfm_ctx(tfm), key, keylen);
++}
+ 
+ /* Algorithm definitions */
+ 
+diff --git a/include/crypto/speck.h b/include/crypto/speck.h
+new file mode 100644
+index 000000000000..73cfc952d405
+--- /dev/null
++++ b/include/crypto/speck.h
+@@ -0,0 +1,62 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Common values for the Speck algorithm
++ */
++
++#ifndef _CRYPTO_SPECK_H
++#define _CRYPTO_SPECK_H
++
++#include <linux/types.h>
++
++/* Speck128 */
++
++#define SPECK128_BLOCK_SIZE	16
++
++#define SPECK128_128_KEY_SIZE	16
++#define SPECK128_128_NROUNDS	32
++
++#define SPECK128_192_KEY_SIZE	24
++#define SPECK128_192_NROUNDS	33
++
++#define SPECK128_256_KEY_SIZE	32
++#define SPECK128_256_NROUNDS	34
++
++struct speck128_tfm_ctx {
++	u64 round_keys[SPECK128_256_NROUNDS];
++	int nrounds;
++};
++
++void crypto_speck128_encrypt(const struct speck128_tfm_ctx *ctx,
++			     u8 *out, const u8 *in);
++
++void crypto_speck128_decrypt(const struct speck128_tfm_ctx *ctx,
++			     u8 *out, const u8 *in);
++
++int crypto_speck128_setkey(struct speck128_tfm_ctx *ctx, const u8 *key,
++			   unsigned int keysize);
++
++/* Speck64 */
++
++#define SPECK64_BLOCK_SIZE	8
++
++#define SPECK64_96_KEY_SIZE	12
++#define SPECK64_96_NROUNDS	26
++
++#define SPECK64_128_KEY_SIZE	16
++#define SPECK64_128_NROUNDS	27
++
++struct speck64_tfm_ctx {
++	u32 round_keys[SPECK64_128_NROUNDS];
++	int nrounds;
++};
++
++void crypto_speck64_encrypt(const struct speck64_tfm_ctx *ctx,
++			    u8 *out, const u8 *in);
++
++void crypto_speck64_decrypt(const struct speck64_tfm_ctx *ctx,
++			    u8 *out, const u8 *in);
++
++int crypto_speck64_setkey(struct speck64_tfm_ctx *ctx, const u8 *key,
++			  unsigned int keysize);
++
++#endif /* _CRYPTO_SPECK_H */
 -- 
 2.16.0.rc1.238.g530d649a79-goog
