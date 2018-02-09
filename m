@@ -1,10 +1,10 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  9 Feb 2018 14:28:05 +0530
-Subject: [PATCH 05/10] ARM64: dts: hi6220: Remove "cooling-{min|max}-level"
- for CPU nodes
+Date: Fri,  9 Feb 2018 14:28:06 +0530
+Subject: [PATCH 06/10] ARM64: dts: meson: Remove "cooling-{min|max}-level" for
+ CPU nodes
 In-Reply-To: <cover.1518166039.git.viresh.kumar@linaro.org>
 References: <cover.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <68740229a7397336ae92bad65f69a58c91819c37.1518166039.git.viresh.kumar@linaro.org>
+Message-ID: <6c91ebfecf86da98a7682c6d262ff1218a1d7343.1518166039.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,31 @@ The "cooling-min-level" and "cooling-max-level" properties are not
 parsed by any part of the kernel currently and the max cooling state of
 a CPU cooling device is found by referring to the cpufreq table instead.
 
-Moreover, the entries are incorrect here as min level is 4 and the max
-level is 0.
-
 Remove the unused properties from the CPU nodes.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 6a180d1926e8..fca8e4ee98e7 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -88,8 +88,6 @@
- 			next-level-cache = <&CLUSTER0_L2>;
- 			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
--			cooling-min-level = <4>;
--			cooling-max-level = <0>;
- 			#cooling-cells = <2>; /* min followed by max */
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			dynamic-power-coefficient = <311>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+index 1448c3dba08e..658215c9822c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+@@ -209,14 +209,10 @@
+ };
+ 
+ &cpu0 {
+-	cooling-min-level = <0>;
+-	cooling-max-level = <6>;
+ 	#cooling-cells = <2>;
+ };
+ 
+ &cpu4 {
+-	cooling-min-level = <0>;
+-	cooling-max-level = <4>;
+ 	#cooling-cells = <2>;
+ };
+ 
 -- 
 2.15.0.194.g9af6a3dea062
