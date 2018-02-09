@@ -1,114 +1,121 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri,  9 Feb 2018 18:52:36 +0100
-Subject: [PATCH 3/3] arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
-In-Reply-To: <20180209175236.21215-1-embed3d@gmail.com>
-References: <20180209175236.21215-1-embed3d@gmail.com>
-Message-ID: <20180209175236.21215-4-embed3d@gmail.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Fri, 9 Feb 2018 17:53:43 +0000
+Subject: [PATCH v3 17/41] KVM: arm64: Remove noop calls to timer
+ save/restore from VHE switch
+In-Reply-To: <20180112120747.27999-18-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-18-christoffer.dall@linaro.org>
+Message-ID: <20074994-caac-2be0-6eaa-83115c616756@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a bootproblem with the Bananapi M2 board. Since there
-are some regulators missing we add them right now. Those values come
-from the schematic, below you can find a small overview:
+Hi Christoffer,
 
-* reg_aldo1:  3,3V, powers the wifi
-* reg_aldo2:  2,5V, powers the IO of the RTL8211E
-* reg_aldo3:  3,3V, powers the audio
+On 01/12/2018 12:07 PM, Christoffer Dall wrote:
+> The VHE switch function calls __timer_enable_traps and
+> __timer_disable_traps which don't do anything on VHE systems.
+> Therefore, simply remove these calls from the VHE switch function and
+> make the functions non-conditional as they are now only called from the
+> non-VHE switch path.
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm64/kvm/hyp/switch.c |  2 --
+>   virt/kvm/arm/hyp/timer-sr.c | 44 ++++++++++++++++++++++----------------------
+>   2 files changed, 22 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 9aadef6966bf..6175fcb33ed2 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -354,7 +354,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>   	__activate_vm(vcpu->kvm);
+>   
+>   	__vgic_restore_state(vcpu);
+> -	__timer_enable_traps(vcpu);
+>   
+>   	/*
+>   	 * We must restore the 32-bit state before the sysregs, thanks
+> @@ -373,7 +372,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>   
+>   	__sysreg_save_guest_state(guest_ctxt);
+>   	__sysreg32_save_state(vcpu);
+> -	__timer_disable_traps(vcpu);
+>   	__vgic_save_state(vcpu);
+>   
+>   	__deactivate_traps(vcpu);
+> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+> index f24404b3c8df..77754a62eb0c 100644
+> --- a/virt/kvm/arm/hyp/timer-sr.c
+> +++ b/virt/kvm/arm/hyp/timer-sr.c
+> @@ -27,34 +27,34 @@ void __hyp_text __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high)
+>   	write_sysreg(cntvoff, cntvoff_el2);
+>   }
+>   
+> +/*
+> + * Should only be called on non-VHE systems.
+> + * VHE systems use EL2 timers and configure EL1 timers in kvm_timer_init_vhe().
+> + */
+>   void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
 
-* reg_dldo1:  3,0V, powers the RTL8211E
-* reg_dldo2:  2,8V, powers the analog part of the csi
-* reg_dldo3:  3,3V, powers misc
-* reg_eldo1:  1,8V, powers the csi
-* reg_ldo_io1:1,8V, powers the gpio
+Would it be worth to suffix the function with nvhe? So it would be clear 
+that it should not be called for VHE system?
 
-* reg_dc5ldo: needs to be always on
+>   {
+> -	/*
+> -	 * We don't need to do this for VHE since the host kernel runs in EL2
+> -	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
+> -	 */
+> -	if (!has_vhe()) {
+> -		u64 val;
+> +	u64 val;
+>   
+> -		/* Allow physical timer/counter access for the host */
+> -		val = read_sysreg(cnthctl_el2);
+> -		val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
+> -		write_sysreg(val, cnthctl_el2);
+> -	}
+> +	/* Allow physical timer/counter access for the host */
+> +	val = read_sysreg(cnthctl_el2);
+> +	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
+> +	write_sysreg(val, cnthctl_el2);
+>   }
+>   
+> +/*
+> + * Should only be called on non-VHE systems.
+> + * VHE systems use EL2 timers and configure EL1 timers in kvm_timer_init_vhe().
+> + */
+>   void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 56 ++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Same here.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-index 51e6f1d21c32..01fcfe0649ad 100644
---- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-@@ -99,6 +99,7 @@
- 	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
- 	phy = <&phy1>;
- 	phy-mode = "rgmii";
-+	phy-supply = <&reg_dldo1>;
- 	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
- 	snps,reset-active-low;
- 	snps,reset-delays-us = <0 10000 30000>;
-@@ -193,7 +194,28 @@
- 
- #include "axp22x.dtsi"
- 
-+&reg_aldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vcc-gmac";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
- &reg_dc5ldo {
-+	regulator-always-on;
- 	regulator-min-microvolt = <700000>;
- 	regulator-max-microvolt = <1320000>;
- 	regulator-name = "vdd-cpus";
-@@ -233,6 +255,40 @@
- 	regulator-name = "vcc-dram";
- };
- 
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-mac";
-+};
-+
-+&reg_dldo2 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "avdd-csi";
-+};
-+
-+&reg_dldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pb";
-+};
-+
-+&reg_eldo1 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "vdd-csi";
-+	status = "okay";
-+};
-+
-+&reg_ldo_io1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "vcc-pm-cpus";
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+>   {
+> -	if (!has_vhe()) {
+> -		u64 val;
+> +	u64 val;
+>   
+> -		/*
+> -		 * Disallow physical timer access for the guest
+> -		 * Physical counter access is allowed
+> -		 */
+> -		val = read_sysreg(cnthctl_el2);
+> -		val &= ~CNTHCTL_EL1PCEN;
+> -		val |= CNTHCTL_EL1PCTEN;
+> -		write_sysreg(val, cnthctl_el2);
+> -	}
+> +	/*
+> +	 * Disallow physical timer access for the guest
+> +	 * Physical counter access is allowed
+> +	 */
+> +	val = read_sysreg(cnthctl_el2);
+> +	val &= ~CNTHCTL_EL1PCEN;
+> +	val |= CNTHCTL_EL1PCTEN;
+> +	write_sysreg(val, cnthctl_el2);
+>   }
+> 
+
+Cheers,
+
 -- 
-2.11.0
+Julien Grall
