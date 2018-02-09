@@ -1,59 +1,19 @@
-From: jaedon.shin@gmail.com (Jaedon Shin)
-Date: Fri,  9 Feb 2018 11:10:31 +0900
-Subject: [PATCH] irqchip: Use %px to print pointer value
-Message-ID: <20180209021031.20631-1-jaedon.shin@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Feb 2018 20:25:14 -0600
+Subject: [PATCHv3] tlv320dac33: Add device tree bindings
+In-Reply-To: <20180205082445.GA18274@amd>
+References: <20180129230539.GA18280@amd> <20180131190112.GA31608@amd>
+ <20b9ff40-a869-a165-07a2-2a103830efb3@ti.com>
+ <20180205082445.GA18274@amd>
+Message-ID: <20180209022514.ue6nxxwvv3g4nmva@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
-pointers printed with %p are hashed. Use %px instead of %p to print
-pointer value.
+On Mon, Feb 05, 2018 at 09:24:45AM +0100, Pavel Machek wrote:
+> 
+> This adds device tree bindings for tlv320dac33.c.
+> 
+> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
----
- drivers/irqchip/irq-bcm7038-l1.c | 2 +-
- drivers/irqchip/irq-bcm7120-l2.c | 2 +-
- drivers/irqchip/irq-brcmstb-l2.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
-index 55cfb986225b..f604c1d89b3b 100644
---- a/drivers/irqchip/irq-bcm7038-l1.c
-+++ b/drivers/irqchip/irq-bcm7038-l1.c
-@@ -339,7 +339,7 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
- 		goto out_unmap;
- 	}
- 
--	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
-+	pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
- 		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
- 
- 	return 0;
-diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
-index 983640eba418..1cc4dd1d584a 100644
---- a/drivers/irqchip/irq-bcm7120-l2.c
-+++ b/drivers/irqchip/irq-bcm7120-l2.c
-@@ -318,7 +318,7 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
- 		}
- 	}
- 
--	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
-+	pr_info("registered %s intc (mem: 0x%px, parent IRQ(s): %d)\n",
- 			intc_name, data->map_base[0], data->num_parent_irqs);
- 
- 	return 0;
-diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-index 691d20eb0bec..6760edeeb666 100644
---- a/drivers/irqchip/irq-brcmstb-l2.c
-+++ b/drivers/irqchip/irq-brcmstb-l2.c
-@@ -262,7 +262,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 		ct->chip.irq_set_wake = irq_gc_set_wake;
- 	}
- 
--	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
-+	pr_info("registered L2 intc (mem: 0x%px, parent irq: %d)\n",
- 			base, parent_irq);
- 
- 	return 0;
--- 
-2.16.1
+Reviewed-by: Rob Herring <robh@kernel.org>
