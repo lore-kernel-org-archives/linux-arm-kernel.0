@@ -1,128 +1,78 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 9 Feb 2018 11:55:46 +0800
-Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
- bananapi-r2
-In-Reply-To: <cd1df7f9-89f4-06d5-5384-9f3b9f7ade48@gmail.com>
-References: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
- <dc3c28c7-03c3-f1c6-39c1-b8df8be4fac3@gmail.com>
- <1514043318.30687.10.camel@mtkswgap22>
- <1516697505.12197.30.camel@mtkswgap22>
- <cd1df7f9-89f4-06d5-5384-9f3b9f7ade48@gmail.com>
-Message-ID: <1518148546.9025.20.camel@mtkswgap22>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Fri, 9 Feb 2018 09:59:52 +0530
+Subject: net: thunder: change q_len's type to handle max ring size
+In-Reply-To: <41824374-cdea-a3ef-0109-20565dbba43e@redhat.com>
+References: <151811766130.10712.18293368656209944798.email-sent-by-dnelson@aqua>
+ <20180208.153453.774785043965984772.davem@davemloft.net>
+ <41824374-cdea-a3ef-0109-20565dbba43e@redhat.com>
+Message-ID: <CA+sq2Cdkycu2BXOfywMTksUNOJcUS6-NStOXk=WHSZ9sT7np4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-07 at 17:01 +0100, Matthias Brugger wrote:
-> 
-> On 01/23/2018 09:51 AM, Sean Wang wrote:
-> > On Sat, 2017-12-23 at 23:35 +0800, Sean Wang wrote:
-> >> On Sat, 2017-12-23 at 08:52 +0100, Matthias Brugger wrote:
-> >>>
-> >>> On 12/22/2017 07:06 AM, sean.wang at mediatek.com wrote:
-> >>>> From: Sean Wang <sean.wang@mediatek.com>
-> >>>>
-> >>>> On bpi-r2 board, totally there're four uarts which we usually called
-> >>>> uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
-> >>>> dedicated pin slot which is used to conolse log. uart[0-1] appear at the
-> >>>> 40-pins connector and uart3 has no pinout, but just has test points (TP47
-> >>>> for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
-> >>>> pinctrl is being complemented for those devices.
-> >>>>
-> >>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> >>>> ---
-> >>>>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
-> >>>>  1 file changed, 24 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> >>>> index 7bf5aa2..64bf5db 100644
-> >>>> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> >>>> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> >>>> @@ -409,6 +409,20 @@
-> >>>>  				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
-> >>>>  		};do you like it or quite want me to remove the uart3 node?
-> >>>>  	};
-> >>>> +
-> >>>> +	uart2_pins_a: uart at 2 {
-> >>>> +		pins_dat {
-> >>>> +			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
-> >>>> +				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
-> >>>> +		};
-> >>>> +	};
-> >>>> +
-> >>>> +	uart3_pins_a: uart at 3 {
-> >>>> +		pins_dat {
-> >>>> +			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
-> >>>> +				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
-> >>>> +		};
-> >>>> +	};
-> >>>>  };
-> >>>>  
-> >>>>  &pwm {
-> >>>> @@ -454,16 +468,24 @@
-> >>>>  &uart0 {
-> >>>>  	pinctrl-names = "default";
-> >>>>  	pinctrl-0 = <&uart0_pins_a>;
-> >>>> -	status = "disabled";
-> >>>> +	status = "okay";
-> >>>>  };
-> >>>>  
-> >>>>  &uart1 {
-> >>>>  	pinctrl-names = "default";
-> >>>>  	pinctrl-0 = <&uart1_pins_a>;
-> >>>> -	status = "disabled";
-> >>>> +	status = "okay";
-> >>>>  };
-> >>>>  
-> >>>>  &uart2 {
-> >>>> +	pinctrl-names = "default";
-> >>>> +	pinctrl-0 = <&uart2_pins_a>;
-> >>>> +	status = "okay";
-> >>>> +};
-> >>>> +
-> >>>> +&uart3 {
-> >>>> +	pinctrl-names = "default";
-> >>>> +	pinctrl-0 = <&uart3_pins_a>;
-> >>>>  	status = "okay";
-> >>>>  };
-> >>>>  
-> >>>
-> >>> Why do we want to enable uart3 when there are only test points?
-> >>> It is not very useful, or do I oversee something?
-> >>>
-> > 
-> >> I have been listening to the sound from potential users of bpi-r2 to
-> >> understand what assistance I have to provide to them. Something could
-> >> be seen through [1] in the forum to know they had been trying hard to
-> >> explore all available UARTs from the SoC in the last weeks. The patch
-> >> should be really useful for these people and for the extra soldering
-> >> it shouldn't become a problem for these makers.
-> >>
-> >> [1] http://forum.banana-pi.org/t/gpio-uart-not-the-debug-port/3748
-> >>
-> >> 	Sean 
-> >>
-> > 
-> > Hi, Matthias
-> > 
-> > do you like it or quite want me to remove the uart3 node?
-> > 
-> > I can take it into account along with other pending dts changes in my
-> > queue.
-> > 
-> 
-> Sorry for the late answer.
-> Do I understand correctly that uart3 is routed to TP47 and TP48, and these test
-> points are accessible through the SATA connector? Doesn't they break SATA then?
-> 
+On Fri, Feb 9, 2018 at 3:27 AM, Dean Nelson <dnelson@redhat.com> wrote:
+> On 02/08/2018 02:34 PM, David Miller wrote:
+>>
+>> From: Dean Nelson <dnelson@redhat.com>
+>> Date:
+>>
+>>> The Cavium thunder nicvf driver supports rx/tx rings of up to 65536
+>>> entries per.
+>>> The number of entires are stored in the q_len member of struct
+>>> q_desc_mem. The
+>>> problem is that q_len being a u16, results in 65536 becoming 0.
+>>>
+>>> In getting pointers to descriptors in the rings, the driver uses q_len
+>>> minus 1
+>>> as a mask after incrementing the pointer, in order to go back to the
+>>> beginning
+>>> and not go past the end of the ring.
+>>>
+>>> With the q_len set to 0 the mask is no longer correct and the driver does
+>>> go
+>>> beyond the end of the ring, causing various ills. Usually the first thing
+>>> that
+>>> shows up is a "NETDEV WATCHDOG: enP2p1s0f1 (nicvf): transmit queue 7
+>>> timed out"
+>>> warning.
+>>>
+>>> This patch remedies the problem by changing q_len to a u32.
+>>>
+>>> Signed-off-by: Dean Nelson <dnelson@redhat.com>
+>>
+>>
+>> Applied, thanks.
+>
+>
+> Thank you!
+>
+>>
+>> Another way to solve this could have been to encode that length
+>> as "length - 1"
+>
+>
+> True. I had pondered that, but felt that since changing q_len's type
+> didn't add any length to the structure and that it was less impactful
+> from a number-of-lines of code changed perspective, I'd opt for this
+> route.
+>
+> Cavium, if you'd prefer this goes the route that Dave just mentioned,
+> please let me know and I can make a new patch against what's been
+> applied?
 
-TP47 and TP48 are directly pins out from SoC, not through the SATA
-connector.
+Thanks for fixing this and i think the current patch is fine.
 
-> I think as they are only available through a non-documented test point, we
-> shouldn't enable it.
-> 
+Thanks,
+Sunil.
 
-Okay, let's drop uart 3 setting here.
-
-> Regards,
-> Matthias
+>
+> Thanks,
+> Dean
+>
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
