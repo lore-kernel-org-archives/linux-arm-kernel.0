@@ -1,261 +1,231 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Feb 2018 17:55:00 +0000
-Subject: [PATCH v3 15/21] arm64: capabilities: Clean up midr range helpers
+Date: Fri,  9 Feb 2018 17:54:55 +0000
+Subject: [PATCH v3 13/21] arm64: capabilities: Add support for features
+ enabled early
 In-Reply-To: <20180209175513.17100-1-suzuki.poulose@arm.com>
 References: <20180209175513.17100-1-suzuki.poulose@arm.com>
-Message-ID: <20180209175513.17100-31-suzuki.poulose@arm.com>
+Message-ID: <20180209175513.17100-26-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to introduce generic MIDR range helpers. Clean
-up the existing helpers in erratum handling, preparing them
-to use generic version.
+The kernel detects and uses some of the features based on the boot
+CPU and expects that all the following CPUs conform to it. e.g,
+with VHE and the boot CPU running at EL2, the kernel decides to
+keep the kernel running at EL2. If another CPU is brought up without
+this capability, we use custom hooks (via check_early_cpu_features())
+to handle it. To handle such capabilities add support for detecting
+and enabling capabilities based on the boot CPU.
 
+A bit is added to indicate if the capability should be detected
+early on the boot CPU. The infrastructure then ensures that such
+capabilities are probed and "enabled" early on in the boot CPU
+and, enabled on the subsequent CPUs.
+
+Cc: Julien Thierry <julien.thierry@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Dave Martin <dave.martin@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 100 +++++++++++++++++++++++------------------
- 1 file changed, 56 insertions(+), 44 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 46 +++++++++++++++++++++++++++++-------
+ arch/arm64/kernel/cpufeature.c      | 47 +++++++++++++++++++++++++++----------
+ 2 files changed, 72 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 8d2d3cf819a7..22ea61141596 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -225,20 +225,35 @@ qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 383c69c95f23..5f56a8342065 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -104,7 +104,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+  *    some checks at runtime. This could be, e.g, checking the value of a field
+  *    in CPU ID feature register or checking the cpu model. The capability
+  *    provides a call back ( @matches() ) to perform the check.
+- *    Scope defines how the checks should be performed. There are two cases:
++ *    Scope defines how the checks should be performed. There are three cases:
+  *
+  *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
+  *        matches. This implies, we have to run the check on all the booting
+@@ -117,6 +117,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+  *        field in one of the CPU ID feature registers, we use the sanitised
+  *        value of the register from the CPU feature infrastructure to make
+  *        the decision.
++ *		Or
++ *     c) SCOPE_BOOT_CPU: Check only on the primary boot CPU to detect the feature.
++ *        This category is for features that are "finalised" (or used) by the kernel
++ *        very early even before the SMP cpus are brought up.
++ *
+  *    The process of detection is usually denoted by "update" capability state
+  *    in the code.
+  *
+@@ -133,6 +138,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+  *    w.r.t the capability. e.g, all secondary CPUs are treated "late CPUs" for
+  *    capabilities determined by the boot CPU.
+  *
++ *    At the moment there are two passes of finalising the capabilities.
++ *      a) Boot CPU scope capabilities - Finalised by primary boot CPU via
++ *         setup_boot_cpu_capabilities().
++ *      b) Everything except (a) - Run via setup_system_capabilities().
++ *
+  * 3) Verification: When a CPU is brought online (e.g, by user or by the kernel),
+  *    the kernel should make sure that it is safe to use the CPU, by verifying
+  *    that the CPU is compliant with the state of the capabilities finalised
+@@ -141,12 +151,19 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+  *	secondary_start_kernel()-> check_local_cpu_capabilities()
+  *
+  *    As explained in (2) above, capabilities could be finalised at different
+- *    points in the execution. Each CPU is verified against the "finalised"
+- *    capabilities and if there is a conflict, the kernel takes an action, based
+- *    on the severity (e.g, a CPU could be prevented from booting or cause a
+- *    kernel panic). The CPU is allowed to "affect" the state of the capability,
+- *    if it has not been finalised already. See section 5 for more details on
+- *    conflicts.
++ *    points in the execution. Each newly booted CPU is verified against those
++ *    capabilities that have been finalised by the time it boots.
++ *
++ *	a) SCOPE_BOOT_CPU : All CPUs are verified against the capability except
++ *	for the primary boot CPU.
++ *
++ *	b) SCOPE_LOCAL_CPU, SCOPE_SYSTEM: All CPUs hotplugged on by the user
++ *	after the kernel boot are verified against the capability.
++ *
++ *    If there is a conflict, the kernel takes an action, based on the severity
++ *    (e.g, a CPU could be prevented from booting or cause a kernel panic).
++ *    The CPU is allowed to "affect" the state of the capability, if it has not
++ *    been finalised already. See section 5 for more details on conflicts.
+  *
+  * 4) Action: As mentioned in (2), the kernel can take an action for each detected
+  *    capability, on all CPUs on the system. Appropriate actions include, turning
+@@ -193,15 +210,26 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
+  */
+ 
+ 
+-/* Decide how the capability is detected. On a local CPU vs System wide */
++/*
++ * Decide how the capability is detected.
++ * On any local CPU vs System wide vs the primary boot CPU
++ */
+ #define ARM64_CPUCAP_SCOPE_LOCAL_CPU		((u16)BIT(0))
+ #define ARM64_CPUCAP_SCOPE_SYSTEM		((u16)BIT(1))
++/*
++ * The capabilitiy is detected on the Boot CPU and is used by kernel
++ * during early boot. i.e, the capability should be "detected" and "enabled"
++ * as early as possibly on all booting CPUs.
++ */
++#define ARM64_CPUCAP_SCOPE_BOOT_CPU		((u16)BIT(2))
+ #define ARM64_CPUCAP_SCOPE_MASK			\
+ 	(ARM64_CPUCAP_SCOPE_SYSTEM	|	\
+-	 ARM64_CPUCAP_SCOPE_LOCAL_CPU)
++	 ARM64_CPUCAP_SCOPE_LOCAL_CPU	|	\
++	 ARM64_CPUCAP_SCOPE_BOOT_CPU)
+ 
+ #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
+ #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
++#define SCOPE_BOOT_CPU				ARM64_CPUCAP_SCOPE_BOOT_CPU
+ #define SCOPE_ALL				ARM64_CPUCAP_SCOPE_MASK
+ 
+ /*
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a15be4db6bf4..7625e2962e2b 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -504,7 +504,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
  }
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
  
--#define MIDR_RANGE(model, min, max) \
--	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM, \
--	.matches = is_affected_midr_range, \
--	.midr_model = model, \
--	.midr_range_min = min, \
--	.midr_range_max = max
-+#define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
-+	.matches = is_affected_midr_range,			\
-+	.midr_model = model,					\
-+	.midr_range_min = MIDR_CPU_VAR_REV(v_min, r_min),	\
-+	.midr_range_max = MIDR_CPU_VAR_REV(v_max, r_max)
+ extern const struct arm64_cpu_capabilities arm64_errata[];
+-static void update_cpu_capabilities(u16 scope_mask);
++static void __init setup_boot_cpu_capabilities(void);
  
--#define MIDR_ALL_VERSIONS(model) \
--	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM, \
--	.matches = is_affected_midr_range, \
--	.midr_model = model, \
--	.midr_range_min = 0, \
-+#define CAP_MIDR_ALL_VERSIONS(model)					\
-+	.matches = is_affected_midr_range,				\
-+	.midr_model = model,						\
-+	.midr_range_min = MIDR_CPU_VAR_REV(0, 0),			\
- 	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
+ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ {
+@@ -550,10 +550,10 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 	}
  
-+#define ERRATA_MIDR_RANGE(model, v_min, r_min, v_max, r_max)		\
-+	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,				\
-+	CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)
+ 	/*
+-	 * Run the errata work around and local feature checks on the
+-	 * boot CPU, once we have initialised the cpu feature infrastructure.
++	 * Detect and enable early CPU capabilities based on the boot CPU,
++	 * after we have initialised the CPU feature infrastructure.
+ 	 */
+-	update_cpu_capabilities(SCOPE_LOCAL_CPU);
++	setup_boot_cpu_capabilities();
+ }
+ 
+ static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+@@ -1277,12 +1277,21 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_m
+ 
+ 		if (caps->cpu_enable) {
+ 			/*
+-			 * Use stop_machine() as it schedules the work allowing
+-			 * us to modify PSTATE, instead of on_each_cpu() which
+-			 * uses an IPI, giving us a PSTATE that disappears when
+-			 * we return.
++			 * If we are dealing with a boot CPU capability, we
++			 * have to enable this only on the Boot CPU, where it
++			 * is detected. All the secondaries enable it via
++			 * check_local_cpu_capabilities().
++			 *
++			 * Otherwise, use stop_machine() as it schedules the
++			 * work allowing us to modify PSTATE, instead of
++			 * on_each_cpu() which uses an IPI, giving us a PSTATE
++			 * that disappears when we return.
+ 			 */
+-			stop_machine(__enable_cpu_capability, (void *)caps, cpu_online_mask);
++			if (scope_mask & SCOPE_BOOT_CPU)
++				caps->cpu_enable(caps);
++			else
++				stop_machine(__enable_cpu_capability,
++					(void *)caps, cpu_online_mask);
+ 		}
+ 	}
+ }
+@@ -1362,6 +1371,12 @@ static void check_early_cpu_features(void)
+ {
+ 	verify_cpu_run_el();
+ 	verify_cpu_asid_bits();
++	/*
++	 * Early features are used by the kernel already. If there
++	 * is a conflict, we cannot proceed further.
++	 */
++	if (!verify_local_cpu_caps(SCOPE_BOOT_CPU))
++		cpu_panic_kernel();
+ }
+ 
+ static void
+@@ -1403,9 +1418,8 @@ static void verify_sve_features(void)
+  */
+ static void verify_local_cpu_capabilities(void)
+ {
+-	if (!verify_local_cpu_caps(SCOPE_ALL))
++	if (!verify_local_cpu_caps(SCOPE_ALL & ~SCOPE_BOOT_CPU))
+ 		cpu_die_early();
+-
+ 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
+ 
+ 	if (system_supports_32bit_el0())
+@@ -1438,6 +1452,14 @@ void check_local_cpu_capabilities(void)
+ 		verify_local_cpu_capabilities();
+ }
+ 
++static void __init setup_boot_cpu_capabilities(void)
++{
++	/* Detect capabilities with either SCOPE_BOOT_CPU or SCOPE_LOCAL_CPU */
++	update_cpu_capabilities(SCOPE_BOOT_CPU | SCOPE_LOCAL_CPU);
++	/* Enable the SCOPE_BOOT_CPU capabilities alone right away */
++	enable_cpu_capabilities(SCOPE_BOOT_CPU);
++}
 +
-+/* Errata affecting a range of revisions of  given model variant */
-+#define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max)	 \
-+	ERRATA_MIDR_RANGE(m, var, r_min, var, r_max)
-+
-+/* Errata affecting a single variant/revision of a model */
-+#define ERRATA_MIDR_REV(model, var, rev)	\
-+	ERRATA_MIDR_RANGE(model, var, rev, var, rev)
-+
-+/* Errata affecting all variants/revisions of a given a model */
-+#define ERRATA_MIDR_ALL_VERSIONS(model)				\
-+	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
-+	CAP_MIDR_ALL_VERSIONS(model)
-+
- const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
-@@ -247,7 +262,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cortex-A53 r0p[012] */
- 		.desc = "ARM errata 826319, 827319, 824069",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
--		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
-+		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
- 		.cpu_enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
-@@ -256,7 +271,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cortex-A53 r0p[01] */
- 		.desc = "ARM errata 819472",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
--		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x01),
-+		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
- 		.cpu_enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
-@@ -265,9 +280,9 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cortex-A57 r0p0 - r1p2 */
- 		.desc = "ARM erratum 832075",
- 		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
--		MIDR_RANGE(MIDR_CORTEX_A57,
--			   MIDR_CPU_VAR_REV(0, 0),
--			   MIDR_CPU_VAR_REV(1, 2)),
-+		ERRATA_MIDR_RANGE(MIDR_CORTEX_A57,
-+				  0, 0,
-+				  1, 2),
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_834220
-@@ -275,9 +290,9 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cortex-A57 r0p0 - r1p2 */
- 		.desc = "ARM erratum 834220",
- 		.capability = ARM64_WORKAROUND_834220,
--		MIDR_RANGE(MIDR_CORTEX_A57,
--			   MIDR_CPU_VAR_REV(0, 0),
--			   MIDR_CPU_VAR_REV(1, 2)),
-+		ERRATA_MIDR_RANGE(MIDR_CORTEX_A57,
-+				  0, 0,
-+				  1, 2),
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_845719
-@@ -285,7 +300,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cortex-A53 r0p[01234] */
- 		.desc = "ARM erratum 845719",
- 		.capability = ARM64_WORKAROUND_845719,
--		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x04),
-+		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 4),
- 	},
- #endif
- #ifdef CONFIG_CAVIUM_ERRATUM_23154
-@@ -293,7 +308,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cavium ThunderX, pass 1.x */
- 		.desc = "Cavium erratum 23154",
- 		.capability = ARM64_WORKAROUND_CAVIUM_23154,
--		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
-+		ERRATA_MIDR_REV_RANGE(MIDR_THUNDERX, 0, 0, 1),
- 	},
- #endif
- #ifdef CONFIG_CAVIUM_ERRATUM_27456
-@@ -301,15 +316,15 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
- 		.desc = "Cavium erratum 27456",
- 		.capability = ARM64_WORKAROUND_CAVIUM_27456,
--		MIDR_RANGE(MIDR_THUNDERX,
--			   MIDR_CPU_VAR_REV(0, 0),
--			   MIDR_CPU_VAR_REV(1, 1)),
-+		ERRATA_MIDR_RANGE(MIDR_THUNDERX,
-+				  0, 0,
-+				  1, 1),
- 	},
- 	{
- 	/* Cavium ThunderX, T81 pass 1.0 */
- 		.desc = "Cavium erratum 27456",
- 		.capability = ARM64_WORKAROUND_CAVIUM_27456,
--		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
-+		ERRATA_MIDR_REV(MIDR_THUNDERX_81XX, 0, 0),
- 	},
- #endif
- #ifdef CONFIG_CAVIUM_ERRATUM_30115
-@@ -317,20 +332,21 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cavium ThunderX, T88 pass 1.x - 2.2 */
- 		.desc = "Cavium erratum 30115",
- 		.capability = ARM64_WORKAROUND_CAVIUM_30115,
--		MIDR_RANGE(MIDR_THUNDERX, 0x00,
--			   (1 << MIDR_VARIANT_SHIFT) | 2),
-+		ERRATA_MIDR_RANGE(MIDR_THUNDERX,
-+				      0, 0,
-+				      1, 2),
- 	},
- 	{
- 	/* Cavium ThunderX, T81 pass 1.0 - 1.2 */
- 		.desc = "Cavium erratum 30115",
- 		.capability = ARM64_WORKAROUND_CAVIUM_30115,
--		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x02),
-+		ERRATA_MIDR_REV_RANGE(MIDR_THUNDERX_81XX, 0, 0, 2),
- 	},
- 	{
- 	/* Cavium ThunderX, T83 pass 1.0 */
- 		.desc = "Cavium erratum 30115",
- 		.capability = ARM64_WORKAROUND_CAVIUM_30115,
--		MIDR_RANGE(MIDR_THUNDERX_83XX, 0x00, 0x00),
-+		ERRATA_MIDR_REV(MIDR_THUNDERX_83XX, 0, 0),
- 	},
- #endif
- 	{
-@@ -344,9 +360,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.desc = "Qualcomm Technologies Falkor erratum 1003",
- 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
--		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
--			   MIDR_CPU_VAR_REV(0, 0),
--			   MIDR_CPU_VAR_REV(0, 0)),
-+		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
- 	},
- 	{
- 		.desc = "Qualcomm Technologies Kryo erratum 1003",
-@@ -360,9 +374,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.desc = "Qualcomm Technologies Falkor erratum 1009",
- 		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
--		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
--			   MIDR_CPU_VAR_REV(0, 0),
--			   MIDR_CPU_VAR_REV(0, 0)),
-+		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
- 	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_858921
-@@ -370,47 +382,47 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	/* Cortex-A73 all versions */
- 		.desc = "ARM erratum 858921",
- 		.capability = ARM64_WORKAROUND_858921,
--		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
- 	},
- #endif
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
- 		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
- 		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
- 		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
- 		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
- 		.cpu_enable = qcom_enable_link_stack_sanitization,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
--		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
- 		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-+		ERRATA_MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
- 		.cpu_enable = enable_smccc_arch_workaround_1,
- 	},
- #endif
+ DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+ EXPORT_SYMBOL(arm64_const_caps_ready);
+ 
+@@ -1462,7 +1484,8 @@ static void __init setup_system_capabilities(void)
+ 	 * on it. Also enable all the available capabilities.
+ 	 */
+ 	update_cpu_capabilities(SCOPE_SYSTEM);
+-	enable_cpu_capabilities(SCOPE_ALL);
++	/* Enable all the available capabilities, which are not already enabled. */
++	enable_cpu_capabilities(SCOPE_ALL & ~SCOPE_BOOT_CPU);
+ }
+ 
+ void __init setup_cpu_features(void)
 -- 
 2.14.3
