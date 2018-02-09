@@ -1,121 +1,64 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Fri, 9 Feb 2018 17:53:43 +0000
-Subject: [PATCH v3 17/41] KVM: arm64: Remove noop calls to timer
- save/restore from VHE switch
-In-Reply-To: <20180112120747.27999-18-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-18-christoffer.dall@linaro.org>
-Message-ID: <20074994-caac-2be0-6eaa-83115c616756@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  9 Feb 2018 17:54:31 +0000
+Subject: [PATCH v3 01/21] arm64: capabilities: Move errata work around check
+ on boot CPU
+In-Reply-To: <20180209175513.17100-1-suzuki.poulose@arm.com>
+References: <20180209175513.17100-1-suzuki.poulose@arm.com>
+Message-ID: <20180209175513.17100-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+We trigger CPU errata work around check on the boot CPU from
+smp_prepare_boot_cpu() to make sure that we run the checks only
+after the CPU feature infrastructure is initialised. While this
+is correct, we can also do this from init_cpu_features() which
+initilises the infrastructure, and is called only on the
+Boot CPU. This helps to consolidate the CPU capability handling
+to cpufeature.c. No functional changes.
 
-On 01/12/2018 12:07 PM, Christoffer Dall wrote:
-> The VHE switch function calls __timer_enable_traps and
-> __timer_disable_traps which don't do anything on VHE systems.
-> Therefore, simply remove these calls from the VHE switch function and
-> make the functions non-conditional as they are now only called from the
-> non-VHE switch path.
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->   arch/arm64/kvm/hyp/switch.c |  2 --
->   virt/kvm/arm/hyp/timer-sr.c | 44 ++++++++++++++++++++++----------------------
->   2 files changed, 22 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 9aadef6966bf..6175fcb33ed2 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -354,7 +354,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->   	__activate_vm(vcpu->kvm);
->   
->   	__vgic_restore_state(vcpu);
-> -	__timer_enable_traps(vcpu);
->   
->   	/*
->   	 * We must restore the 32-bit state before the sysregs, thanks
-> @@ -373,7 +372,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->   
->   	__sysreg_save_guest_state(guest_ctxt);
->   	__sysreg32_save_state(vcpu);
-> -	__timer_disable_traps(vcpu);
->   	__vgic_save_state(vcpu);
->   
->   	__deactivate_traps(vcpu);
-> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-> index f24404b3c8df..77754a62eb0c 100644
-> --- a/virt/kvm/arm/hyp/timer-sr.c
-> +++ b/virt/kvm/arm/hyp/timer-sr.c
-> @@ -27,34 +27,34 @@ void __hyp_text __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high)
->   	write_sysreg(cntvoff, cntvoff_el2);
->   }
->   
-> +/*
-> + * Should only be called on non-VHE systems.
-> + * VHE systems use EL2 timers and configure EL1 timers in kvm_timer_init_vhe().
-> + */
->   void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 6 ++++++
+ arch/arm64/kernel/smp.c        | 6 ------
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-Would it be worth to suffix the function with nvhe? So it would be clear 
-that it should not be called for VHE system?
-
->   {
-> -	/*
-> -	 * We don't need to do this for VHE since the host kernel runs in EL2
-> -	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
-> -	 */
-> -	if (!has_vhe()) {
-> -		u64 val;
-> +	u64 val;
->   
-> -		/* Allow physical timer/counter access for the host */
-> -		val = read_sysreg(cnthctl_el2);
-> -		val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> -		write_sysreg(val, cnthctl_el2);
-> -	}
-> +	/* Allow physical timer/counter access for the host */
-> +	val = read_sysreg(cnthctl_el2);
-> +	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> +	write_sysreg(val, cnthctl_el2);
->   }
->   
-> +/*
-> + * Should only be called on non-VHE systems.
-> + * VHE systems use EL2 timers and configure EL1 timers in kvm_timer_init_vhe().
-> + */
->   void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
-
-Same here.
-
->   {
-> -	if (!has_vhe()) {
-> -		u64 val;
-> +	u64 val;
->   
-> -		/*
-> -		 * Disallow physical timer access for the guest
-> -		 * Physical counter access is allowed
-> -		 */
-> -		val = read_sysreg(cnthctl_el2);
-> -		val &= ~CNTHCTL_EL1PCEN;
-> -		val |= CNTHCTL_EL1PCTEN;
-> -		write_sysreg(val, cnthctl_el2);
-> -	}
-> +	/*
-> +	 * Disallow physical timer access for the guest
-> +	 * Physical counter access is allowed
-> +	 */
-> +	val = read_sysreg(cnthctl_el2);
-> +	val &= ~CNTHCTL_EL1PCEN;
-> +	val |= CNTHCTL_EL1PCTEN;
-> +	write_sysreg(val, cnthctl_el2);
->   }
-> 
-
-Cheers,
-
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index dc7efed09135..5c08d886b53d 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -545,6 +545,12 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 		init_cpu_ftr_reg(SYS_ZCR_EL1, info->reg_zcr);
+ 		sve_init_vq_map();
+ 	}
++
++	/*
++	 * Run the errata work around checks on the boot CPU, once we have
++	 * initialised the cpu feature infrastructure.
++	 */
++	update_cpu_errata_workarounds();
+ }
+ 
+ static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 3b8ad7be9c33..5cef11450183 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -448,12 +448,6 @@ void __init smp_prepare_boot_cpu(void)
+ 	jump_label_init();
+ 	cpuinfo_store_boot_cpu();
+ 	save_boot_cpu_run_el();
+-	/*
+-	 * Run the errata work around checks on the boot CPU, once we have
+-	 * initialised the cpu feature infrastructure from
+-	 * cpuinfo_store_boot_cpu() above.
+-	 */
+-	update_cpu_errata_workarounds();
+ }
+ 
+ static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 -- 
-Julien Grall
+2.14.3
