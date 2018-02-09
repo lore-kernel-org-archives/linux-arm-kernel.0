@@ -1,47 +1,59 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 08 Feb 2018 16:49:52 -0800
-Subject: [PATCH -next] meson-gx-socinfo: make local function
- meson_gx_socinfo_init static
-In-Reply-To: <3cb83737-bb60-7648-e72e-2d39590c8418@baylibre.com> (Neil
- Armstrong's message of "Tue, 6 Feb 2018 13:25:19 +0100")
-References: <1515593988-78626-1-git-send-email-weiyongjun1@huawei.com>
- <3cb83737-bb60-7648-e72e-2d39590c8418@baylibre.com>
-Message-ID: <7hh8qr9ebz.fsf@baylibre.com>
+From: jaedon.shin@gmail.com (Jaedon Shin)
+Date: Fri,  9 Feb 2018 11:10:31 +0900
+Subject: [PATCH] irqchip: Use %px to print pointer value
+Message-ID: <20180209021031.20631-1-jaedon.shin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
+pointers printed with %p are hashed. Use %px instead of %p to print
+pointer value.
 
-> On 10/01/2018 15:19, Wei Yongjun wrote:
->> Fixes the following sparse warnings:
->> 
->> drivers/soc/amlogic/meson-gx-socinfo.c:100:12: warning:
->>  symbol 'meson_gx_socinfo_init' was not declared. Should it be static?
->> 
->> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
->> ---
->>  drivers/soc/amlogic/meson-gx-socinfo.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/drivers/soc/amlogic/meson-gx-socinfo.c b/drivers/soc/amlogic/meson-gx-socinfo.c
->> index f2d8c3c..ea091f1 100644
->> --- a/drivers/soc/amlogic/meson-gx-socinfo.c
->> +++ b/drivers/soc/amlogic/meson-gx-socinfo.c
->> @@ -97,7 +97,7 @@ static const char *socinfo_to_soc_id(u32 socinfo)
->>  	return "Unknown";
->>  }
->>  
->> -int __init meson_gx_socinfo_init(void)
->> +static int __init meson_gx_socinfo_init(void)
->>  {
->>  	struct soc_device_attribute *soc_dev_attr;
->>  	struct soc_device *soc_dev;
->> 
->> 
->> 
->
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
+---
+ drivers/irqchip/irq-bcm7038-l1.c | 2 +-
+ drivers/irqchip/irq-bcm7120-l2.c | 2 +-
+ drivers/irqchip/irq-brcmstb-l2.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Applied for v4.17, with Neil's ack.
-
-Kevin
+diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
+index 55cfb986225b..f604c1d89b3b 100644
+--- a/drivers/irqchip/irq-bcm7038-l1.c
++++ b/drivers/irqchip/irq-bcm7038-l1.c
+@@ -339,7 +339,7 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
+ 		goto out_unmap;
+ 	}
+ 
+-	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
++	pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
+ 		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
+ 
+ 	return 0;
+diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
+index 983640eba418..1cc4dd1d584a 100644
+--- a/drivers/irqchip/irq-bcm7120-l2.c
++++ b/drivers/irqchip/irq-bcm7120-l2.c
+@@ -318,7 +318,7 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
+ 		}
+ 	}
+ 
+-	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
++	pr_info("registered %s intc (mem: 0x%px, parent IRQ(s): %d)\n",
+ 			intc_name, data->map_base[0], data->num_parent_irqs);
+ 
+ 	return 0;
+diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
+index 691d20eb0bec..6760edeeb666 100644
+--- a/drivers/irqchip/irq-brcmstb-l2.c
++++ b/drivers/irqchip/irq-brcmstb-l2.c
+@@ -262,7 +262,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
+ 		ct->chip.irq_set_wake = irq_gc_set_wake;
+ 	}
+ 
+-	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
++	pr_info("registered L2 intc (mem: 0x%px, parent irq: %d)\n",
+ 			base, parent_irq);
+ 
+ 	return 0;
+-- 
+2.16.1
