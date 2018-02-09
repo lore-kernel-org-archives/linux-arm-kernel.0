@@ -1,81 +1,97 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Feb 2018 18:18:34 +0000
-Subject: [PATCH v3 09/22] arm64: capabilities: Split the processing of
- errata work arounds
-In-Reply-To: <20180209175513.17100-19-suzuki.poulose@arm.com>
-References: <20180209175513.17100-1-suzuki.poulose@arm.com>
- <20180209175513.17100-19-suzuki.poulose@arm.com>
-Message-ID: <20180209181834.GG5862@e103592.cambridge.arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 9 Feb 2018 12:19:02 -0600
+Subject: [PATCHv3 1/3] dt-bindings: documentation: add clock bindings
+ information for Stratix10
+In-Reply-To: <20180209024340.f7sijb7h5egdn675@rob-hp-laptop>
+References: <1517847767-16053-1-git-send-email-dinguyen@kernel.org>
+ <20180209024340.f7sijb7h5egdn675@rob-hp-laptop>
+Message-ID: <9b8ae02b-67d5-8d0a-2e35-cab85f89470d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 05:54:48PM +0000, Suzuki K Poulose wrote:
-> Right now we run through the errata workarounds check on all boot
-> active CPUs, with SCOPE_ALL. This doesn't help with detecting the
-> errata's with a SYSTEM_SCOPE. While nobody uses it, let us clean
-> this up in preparation for merging capability handling.
+Hi Rob,
 
-errata; and SCOPE_SYSTEM (if I'm being pedantic)
 
-To make it clearer this this is adding support for new behaviour rather
-than changing old behaviour, perhaps change "This doesn't help ...
-While nobody uses it ..." to something like:
-
-"This wouldn't help for detecting erratum workarounds with SCOPE_SYSTEM.
-There are none yet, but we plan to introduce some: let us clean this up
-so that such workarounds can be detected and enabled correctly."
-
+On 02/08/2018 08:43 PM, Rob Herring wrote:
+> On Mon, Feb 05, 2018 at 10:22:45AM -0600, Dinh Nguyen wrote:
+>> Document that Stratix10 clock bindings, and add the clock header file. The
+>> clock header is an enumeration of all the different clocks on the Stratix10
+>> platform.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+>> ---
+>> v3:
+>> - s/intc/intel for correct vendor prefix
+>> - fixup node name to "intel,stratix10-clkmgr"
+>> - document the required fixed-clock for oscillators
+>> v2:
+>> - use a single binding for the clock controller
+>> ---
+>>  .../devicetree/bindings/clock/intc_stratix10.txt   | 47 ++++++++++++
+>>  include/dt-bindings/clock/stratix10-clock.h        | 85 ++++++++++++++++++++++
+>>  2 files changed, 132 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/intc_stratix10.txt
+>>  create mode 100644 include/dt-bindings/clock/stratix10-clock.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+>> new file mode 100644
+>> index 0000000..8d218f4
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+>> @@ -0,0 +1,47 @@
+>> +Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
+>> +
+>> +This binding uses the common clock binding[1].
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +Required properties:
+>> +- compatible : shall be
+>> +	"intel,stratix10-clkmgr"
+>> +
+>> +- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
+>> +
+>> +- #clock-cells : from common clock binding, shall be set to 1.
+>> +
+>> +- clocks : Should contain fixed-clock sources, such as oscillators.
+>> +
+>> +Example:
+>> +	clkmgr: clock-controller at ffd10000 {
+>> +		compatible = "intel,stratix10-clkmgr";
+>> +		reg = <0xffd10000 0x1000>;
+>> +		#clock-cells = <1>;
+>> +
+>> +		clocks {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +
+>> +			cb_intosc_hs_div2_clk: cb_intosc_hs_div2_clk {
 > 
-> So, we run the checks with SCOPE_LOCAL_CPU on all CPUs and SCOPE_SYSTEM
-> checks are run only once after all the boot time CPUs are active.
+> Don't use '_' in node names.
 > 
-> Cc: Dave Martin <dave.martin@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Otherwise,
+Ok..
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>> +				#clock-cells = <0>;
+>> +				compatible = "fixed-clock";
+> 
+> fixed clock with no frequency?
 
-> ---
->  arch/arm64/kernel/cpufeature.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 9f52678a4df1..a6e124063e21 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -554,7 +554,7 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
->  	 * Run the errata work around checks on the boot CPU, once we have
->  	 * initialised the cpu feature infrastructure.
->  	 */
-> -	update_cpu_capabilities(arm64_errata, SCOPE_ALL,
-> +	update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
->  				"enabling workaround for");
->  }
->  
-> @@ -1416,7 +1416,7 @@ void check_local_cpu_capabilities(void)
->  	 * advertised capabilities.
->  	 */
->  	if (!sys_caps_initialised)
-> -		update_cpu_capabilities(arm64_errata, SCOPE_ALL,
-> +		update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
->  					"enabling workaround for");
->  	else
->  		verify_local_cpu_capabilities();
-> @@ -1446,6 +1446,8 @@ void __init setup_cpu_features(void)
->  	/* Set the CPU feature capabilies */
->  	update_cpu_capabilities(arm64_features, SCOPE_ALL,
->  				"detected feature:");
-> +	update_cpu_capabilities(arm64_errata, SCOPE_SYSTEM,
-> +				"enabling workaround for");
->  	enable_cpu_capabilities(arm64_features, SCOPE_ALL);
->  	enable_cpu_capabilities(arm64_errata, SCOPE_ALL);
->  	mark_const_caps_ready();
-> -- 
-> 2.14.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The frequency gets populated in the board's dts file. This provides for
+the scenario where different boards might use different oscillator
+frequencies.
+
+So in socfpga_stratix10, I would have:
+
+soc {
+	clock-controller at ffd10000 {
+		clocks {
+			osc1 {
+				clock-frequency = <25000000>;
+			};
+		};
+	};
+};
+
+Thanks,
+Dinh
