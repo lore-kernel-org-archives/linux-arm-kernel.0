@@ -1,82 +1,144 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Fri, 9 Feb 2018 11:38:50 +0000
-Subject: [PATCH v3 05/41] KVM: arm64: Move HCR_INT_OVERRIDE to default
- HCR_EL2 guest flag
-In-Reply-To: <20180112120747.27999-6-christoffer.dall@linaro.org>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-6-christoffer.dall@linaro.org>
-Message-ID: <ffb7df11-b304-25f7-f3f4-b55cb106b747@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 9 Feb 2018 20:49:04 +0900
+Subject: [PATCH v7 00/11] arm64: kexec: add kexec_file_load() support
+In-Reply-To: <5A7B4761.3000808@arm.com>
+References: <20171204025801.12161-1-takahiro.akashi@linaro.org>
+ <5A7B4761.3000808@arm.com>
+Message-ID: <20180209114903.gaex3pge4ndzgbhd@fireball>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi James,
 
-On 01/12/2018 12:07 PM, Christoffer Dall wrote:
-> From: Shih-Wei Li <shihwei@cs.columbia.edu>
+On Wed, Feb 07, 2018 at 06:37:21PM +0000, James Morse wrote:
+> Hi Akashi,
 > 
-> We always set the IMO and FMO bits in the HCR_EL2 when running the
-> guest, regardless if we use the vgic or not.  By moving these flags to
-> HCR_GUEST_FLAGS we can avoid one of the extra save/restore operations of
-> HCR_EL2 in the world switch code, and we can also soon get rid of the
-> other one.
-> 
-> This is safe, because even though the IMO and FMO bits control both
-> taking the interrupts to EL2 and remapping ICC_*_EL1 to ICV_*_EL1
-> executed at EL1, as long as we ensure that these bits are clear when
-> running the EL1 host, as defined in the HCR_HOST_[VHE_]FLAGS, we're OK.
+> I'm still getting my head round how all this works, so please forgive what may
+> be stupid questions!
 
-NIT: I was a bit confused by the end of the sentence because 
-HCR_HOST_FLAGS define does not seem to exist.
+It is my pleasure.
+Hopefully I will be able to address all of your concerns before submitting
+a new version sometime next week.
 
 > 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->   arch/arm64/include/asm/kvm_arm.h | 4 ++--
->   arch/arm64/kvm/hyp/switch.c      | 3 ---
->   2 files changed, 2 insertions(+), 5 deletions(-)
+> On 04/12/17 02:57, AKASHI Takahiro wrote:
+> > This is the seventh round of implementing kexec_file_load() support
+> > on arm64.[1]
+> > Most of the code is based on kexec-tools (along with some kernel code
+> > from x86, which also came from kexec-tools).
+> > 
+> > 
+> > This patch series enables us to
+> >   * load the kernel, Image, via kexec_file_load() system call, and
+> >   * optionally verify its signature at load time for trusted boot.
 > 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 715d395ef45b..656deeb17bf2 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -79,9 +79,9 @@
->    */
->   #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
->   			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
-> -			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
-> +			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | \
-> +			 HCR_FMO | HCR_IMO)
->   #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
-> -#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
->   #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
->   
->   /* TCR_EL2 Registers bits */
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 71700ecee308..f6189d08753e 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -167,8 +167,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
->   		__vgic_v3_save_state(vcpu);
->   	else
->   		__vgic_v2_save_state(vcpu);
-> -
-> -	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
->   }
->   
->   static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-> @@ -176,7 +174,6 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
->   	u64 val;
->   
->   	val = read_sysreg(hcr_el2);
-> -	val |= 	HCR_INT_OVERRIDE;
->   	val |= vcpu->arch.irq_lines;
->   	write_sysreg(val, hcr_el2);
->   
+> Is kdump using kexec_file_load() possible? (questions on patch 3)
+> I can't work out why additional elf-generating code would be necessary if kdump
+> works today without it...
+
+The code that probably you are mentioning is the one for
+creating a content of an ELF header (elfcoreheader) of /proc/vmcore.
+The memory region is allocated by the kernel, but the content itself
+will be filled up by kexec-tools for kexec_load syscall, while by
+the kernel for kexec_file_load syscall.
+(In former case, a "user" buffer is passed via kexec_load syscall
+and copied into the crash dump kernel memory.)
+
+Please see kexec/crashdump.c and crashdump-elf.c on kexec-tools.
+
 > 
+> 
+> > To load the kernel via kexec_file_load() system call, a small change
+> > is also required on kexec-tools. See [2]. This enables '-s' option.
+> > (Please use v7.2.1+ crash utility for v4.14+ kernel)
+> 
+> (what does the -s option do?)
 
-Cheers,
+It is a switch for using kexec_file_load syscall instead of kexec_load
+syscall.
 
--- 
-Julien Grall
+> 
+> > As we discussed a long time ago, users may not be allowed to specify
+> > device-tree file of the 2nd kernel explicitly with kexec-tools, hence
+> > re-using the blob of the first kernel.
+> > 
+> > Regarding a kernel image verification, a signature must be presented
+> > along with the binary itself. A signature is basically a hash value
+> > calculated against the whole binary data and encrypted by a key which
+> > will be authenticated by the system's trusted certificate.
+> > Any attempt to read and load a to-be-kexec-ed kernel image through
+> > a system call will be checked and blocked if the binary's hash value
+> > doesn't match its associated signature.
+> 
+> > Concerns(or future works):
+> 
+> (lets keep this stuff in the future)
+
+Sure.
+
+> > * Even if the kernel is configured with CONFIG_RANDOMIZE_BASE, the 2nd
+> >   kernel won't be placed at a randomized address. We will have to
+> >   add some boot code similar to efi-stub to implement the randomization.
+> 
+> I think there are two parts to this. The efistub may copy the kernel to a new
+> ~random location in physical memory. It also adds a seed used to randomise the
+> virtual-addresses the kernel executes from.
+
+> For kexec_file_load() the first-kernel could apply some randomness to the
+> physical offset when it re-assembles the kexec-kernel. i.e. code in
+> arm64_relocate_new_kernel(). I don't think we should do this without some hint
+> that the new kernel supports this...
+
+Indeed. arm64_relocate_new_kernel belongs to the first kernel, while
+efistub to crash dump kernel.
+
+> For the virtual-addresses it would need to add a new kaslr-seed to the
+> DT/chosen, which should be harmless.
+
+Yeah, adding a seed is quite easy.
+
+> 
+> > for approach (1),
+> > * While big-endian kernel can support kernel signing, I'm not sure that
+> >   Image can be recognized as in PE format because x86 standard only
+> >   defines little-endian-based format.
+> 
+> What does the recognizing? (I don't think we should invent a new format..)
+
+The obvious problem is that there exists no defition of PE format for
+BE architecture. (I believe that MS only defines the format for x86).
+For exmaple, what magic number should we use? Are the fields in a header
+in BE or LE? I don't invent a new format, neither.
+
+Anyhow, if we allow for IMA-base kexec_file_load, it perfectly resolve
+the issue without any changes (maybe).
+
+> 
+> 
+> > * vmlinux support
+> 
+> (Patch 3 is why I'm here)
+> 
+> I don't think we need to support this. I can't boot a vmlinux file via UEFI. As
+> I understand it kexec_file_load() is all about the signature verification for
+> UEFI:SecureBoot. The chances of me having a vmlinux signed for SecureBoot use is
+> pretty low, chances are its a self-signed image I just built, in which case I
+> can use the arm64 Image file that was built at the same time.
+> 
+> Supporting two file formats is going to be a headache. Distributions ship
+> separate debug info packages for debugging, I don't think we need to make them
+> bootable...
+
+As I said somewhere before, the only reason that we may want to have
+vmlinux support is that kexec-tools (and in turn kexec_load syscall)
+supports both file types.
+(I don't know why Jeoff added this support first.)
+
+Thanks,
+-Takahiro AKASHI
+
+
+> 
+> Thanks,
+> 
+> James
