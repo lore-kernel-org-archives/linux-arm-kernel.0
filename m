@@ -1,150 +1,174 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Feb 2018 17:54:59 +0000
-Subject: [PATCH v3 15/22] arm64: capabilities: Change scope of VHE to Boot CPU
- feature
+Date: Fri,  9 Feb 2018 17:55:12 +0000
+Subject: [PATCH v3 21/22] arm64: Delay enabling hardware DBM feature
 In-Reply-To: <20180209175513.17100-1-suzuki.poulose@arm.com>
 References: <20180209175513.17100-1-suzuki.poulose@arm.com>
-Message-ID: <20180209175513.17100-30-suzuki.poulose@arm.com>
+Message-ID: <20180209175513.17100-43-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We expect all CPUs to be running at the same EL inside the kernel
-with or without VHE enabled and we have strict checks to ensure
-that any mismatch triggers a kernel panic. If VHE is enabled,
-we use the feature based on the boot CPU and all other CPUs
-should follow. This makes it a perfect candidate for a cpability
-based on the boot CPU,  which should be matched by all the CPUs
-(both when is ON and OFF). This saves us some not-so-pretty
-hooks and special code, just for verifying the conflict.
+We enable hardware DBM bit in a capable CPU, very early in the
+boot via __cpu_setup. This doesn't give us a flexibility of
+optionally disable the feature, as the clearing the bit
+is a bit costly as the TLB can cache the settings. Instead,
+we delay enabling the feature until the CPU is brought up
+into the kernel. We use the feature capability mechanism
+to handle it.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+The hardware DBM is a non-conflicting feature. i.e, the kernel
+can safely run with a mix of CPUs with some using the feature
+and the others don't. So, it is safe for a late CPU to have
+this capability and enable it, even if the active CPUs don't.
+
+To get this handled properly by the infrastructure, we
+unconditionally set the capability and only enable it
+on CPUs which really have the feature. Also, we print the
+feature detection from the "matches" call back to make sure
+we don't mislead the user when none of the CPUs could use the
+feature.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Dave Martin <dave.martin@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |  7 +++++++
- arch/arm64/include/asm/virt.h       |  6 ------
- arch/arm64/kernel/cpufeature.c      |  5 +++--
- arch/arm64/kernel/smp.c             | 38 -------------------------------------
- 4 files changed, 10 insertions(+), 46 deletions(-)
+Changes since V2
+ - Print the feature detection message only when at least one CPU
+   is actually using it.
+---
+ arch/arm64/include/asm/cpucaps.h |  3 +-
+ arch/arm64/kernel/cpufeature.c   | 71 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/proc.S             | 13 ++++----
+ 3 files changed, 79 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 5f56a8342065..dfce93f79ae7 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -276,6 +276,13 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
- 	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
- 	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index bb263820de13..8df80cc828ac 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -45,7 +45,8 @@
+ #define ARM64_HARDEN_BRANCH_PREDICTOR		24
+ #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
+ #define ARM64_HAS_RAS_EXTN			26
++#define ARM64_HW_DBM				27
  
-+/*
-+ * Critical CPU feature used early in the boot based on the boot CPU.
-+ * The feature should be matched by all booting CPU (both miss and hit
-+ * cases).
-+ */
-+#define ARM64_CPUCAP_CRITICAL_BOOT_CPU_FEATURE ARM64_CPUCAP_SCOPE_BOOT_CPU
-+
- struct arm64_cpu_capabilities {
- 	const char *desc;
- 	u16 capability;
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index c5f89442785c..9d1e24e030b3 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -102,12 +102,6 @@ static inline bool has_vhe(void)
- 	return false;
- }
+-#define ARM64_NCAPS				27
++#define ARM64_NCAPS				28
  
--#ifdef CONFIG_ARM64_VHE
--extern void verify_cpu_run_el(void);
--#else
--static inline void verify_cpu_run_el(void) {}
--#endif
--
- #endif /* __ASSEMBLY__ */
- 
- #endif /* ! __ASM__VIRT_H */
+ #endif /* __ASM_CPUCAPS_H */
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 7625e2962e2b..f66e66c79916 100644
+index d8663822c604..a96a1f94f427 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -1016,11 +1016,13 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	},
- #endif /* CONFIG_ARM64_PAN */
- 	{
-+#ifdef CONFIG_ARM64_VHE
- 		.desc = "Virtualization Host Extensions",
- 		.capability = ARM64_HAS_VIRT_HOST_EXTN,
--		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.type = ARM64_CPUCAP_CRITICAL_BOOT_CPU_FEATURE,
- 		.matches = runs_at_el2,
- 		.cpu_enable = cpu_copy_el2regs,
+@@ -939,6 +939,57 @@ static int __init parse_kpti(char *str)
+ __setup("kpti=", parse_kpti);
+ #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
++#ifdef CONFIG_ARM64_HW_AFDBM
++static inline void __cpu_enable_hw_dbm(void)
++{
++	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
++
++	write_sysreg(tcr, tcr_el1);
++	isb();
++}
++
++static bool cpu_can_use_dbm(const struct arm64_cpu_capabilities *cap)
++{
++	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU);
++}
++
++static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
++{
++	if (cpu_can_use_dbm(cap))
++		__cpu_enable_hw_dbm();
++}
++
++static bool has_hw_dbm(const struct arm64_cpu_capabilities *cap,
++		       int __unused)
++{
++	static bool detected = false;
++	/*
++	 * DBM is a non-conflicting feature. i.e, the kernel can safely
++	 * run a mix of CPUs with and without the feature. So, we
++	 * unconditionally enable the capability to allow any late CPU
++	 * to use the feature. We only enable the control bits on the
++	 * CPU, if it actually supports.
++	 *
++	 * We have to make sure we print the "feature" detection only
++	 * when at least one CPU actually uses it. So check if this CPU
++	 * can actually use it and print the message exactly once.
++	 *
++	 * This is safe as all CPUs (including secondary CPUs - due to the
++	 * LOCAL_CPU scope - and the hotplugged CPUs - via verification)
++	 * goes through the "matches" check exactly once. Also if a CPU
++	 * matches the criteria, it is guaranteed that the CPU will turn
++	 * the DBM on, as the capability is unconditionally enabled.
++	 */
++	if (!detected && cpu_can_use_dbm(cap)) {
++		detected = true;
++		pr_info("detected feature: Hardware dirty bit management\n");
++	}
++
++	return true;
++}
++
 +#endif
- 	},
- 	{
- 		.desc = "32-bit EL0 Support",
-@@ -1369,7 +1371,6 @@ static bool verify_local_cpu_caps(u16 scope_mask)
-  */
- static void check_early_cpu_features(void)
++
+ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
  {
--	verify_cpu_run_el();
- 	verify_cpu_asid_bits();
  	/*
- 	 * Early features are used by the kernel already. If there
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 5cef11450183..f3e2e3aec0b0 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -85,43 +85,6 @@ enum ipi_msg_type {
- 	IPI_WAKEUP
+@@ -1103,6 +1154,26 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.cpu_enable = cpu_clear_disr,
+ 	},
+ #endif /* CONFIG_ARM64_RAS_EXTN */
++#ifdef CONFIG_ARM64_HW_AFDBM
++	{
++		/*
++		 * Since we turn this on always, we don't want the user to
++		 * think that the feature is available when it may not be.
++		 * So hide the description.
++		 *
++		 * .desc = "Hardware pagetable Dirty Bit Management",
++		 *
++		 */
++		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE,
++		.capability = ARM64_HW_DBM,
++		.sys_reg = SYS_ID_AA64MMFR1_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
++		.min_field_value = 2,
++		.matches = has_hw_dbm,
++		.cpu_enable = cpu_enable_hw_dbm,
++	},
++#endif
+ 	{},
  };
  
--#ifdef CONFIG_ARM64_VHE
--
--/* Whether the boot CPU is running in HYP mode or not*/
--static bool boot_cpu_hyp_mode;
--
--static inline void save_boot_cpu_run_el(void)
--{
--	boot_cpu_hyp_mode = is_kernel_in_hyp_mode();
--}
--
--static inline bool is_boot_cpu_in_hyp_mode(void)
--{
--	return boot_cpu_hyp_mode;
--}
--
--/*
-- * Verify that a secondary CPU is running the kernel at the same
-- * EL as that of the boot CPU.
-- */
--void verify_cpu_run_el(void)
--{
--	bool in_el2 = is_kernel_in_hyp_mode();
--	bool boot_cpu_el2 = is_boot_cpu_in_hyp_mode();
--
--	if (in_el2 ^ boot_cpu_el2) {
--		pr_crit("CPU%d: mismatched Exception Level(EL%d) with boot CPU(EL%d)\n",
--					smp_processor_id(),
--					in_el2 ? 2 : 1,
--					boot_cpu_el2 ? 2 : 1);
--		cpu_panic_kernel();
--	}
--}
--
--#else
--static inline void save_boot_cpu_run_el(void) {}
--#endif
--
- #ifdef CONFIG_HOTPLUG_CPU
- static int op_cpu_kill(unsigned int cpu);
- #else
-@@ -447,7 +410,6 @@ void __init smp_prepare_boot_cpu(void)
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 71baed7e592a..ba9b69aa7f32 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -437,16 +437,15 @@ ENTRY(__cpu_setup)
+ 	tcr_compute_pa_size x10, #TCR_IPS_SHIFT, x5, x6
+ #ifdef CONFIG_ARM64_HW_AFDBM
+ 	/*
+-	 * Hardware update of the Access and Dirty bits.
++	 * Enable hardware update of the Access Flags bit.
++	 * Hardware dirty bit management is enabled later,
++	 * via capabilities.
  	 */
- 	jump_label_init();
- 	cpuinfo_store_boot_cpu();
--	save_boot_cpu_run_el();
- }
- 
- static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+ 	mrs	x9, ID_AA64MMFR1_EL1
+ 	and	x9, x9, #0xf
+-	cbz	x9, 2f
+-	cmp	x9, #2
+-	b.lt	1f
+-	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
+-1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
+-2:
++	cbz	x9, 1f
++	orr	x10, x10, #TCR_HA		// hardware Access flag update
++1:
+ #endif	/* CONFIG_ARM64_HW_AFDBM */
+ 	msr	tcr_el1, x10
+ 	ret					// return to head.S
 -- 
 2.14.3
