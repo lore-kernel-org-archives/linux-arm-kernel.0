@@ -1,71 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  9 Feb 2018 14:28:10 +0530
-Subject: [PATCH 10/10] dt-bindings: thermal: Remove "cooling-{min|max}-level"
- properties
-In-Reply-To: <cover.1518166039.git.viresh.kumar@linaro.org>
-References: <cover.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <0ec53640f1a09e6e0d7aa1a21d1a3266c3c209c7.1518166039.git.viresh.kumar@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 09 Feb 2018 11:10:49 +0100
+Subject: [2/9] phy: add Rockchip Innosilicon hdmi phy
+In-Reply-To: <313a1fb7-9ecf-ff94-d9b8-6ec63e80b058@samsung.com>
+References: <20180205143435.4723-3-heiko@sntech.de> <2860925.eKDKvHpOYg@phil>
+ <313a1fb7-9ecf-ff94-d9b8-6ec63e80b058@samsung.com>
+Message-ID: <1776656.PJyHqu906x@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "cooling-min-level" and "cooling-max-level" properties are not
-parsed by any part of kernel currently and the max cooling state of a
-CPU cooling device is found by referring to the cpufreq table instead.
+Am Freitag, 9. Februar 2018, 11:06:49 CET schrieb Andrzej Hajda:
+> On 09.02.2018 10:24, Heiko Stuebner wrote:
+> > Hi Martin,
+> >
+> > Am Montag, 5. Februar 2018, 22:32:08 CET schrieb Martin Cerveny:
+> >> On Mon, 5 Feb 2018, Heiko Stuebner wrote:
+> >>> From: Zheng Yang <zhengyang@rock-chips.com>
+> >>>
+> >>> Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
+> >>> and rk3328 socs from Rockchip.
+> >>>
+> >>> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+> >>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >>> ---
+> >>> +++ b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+> >>> +static u32 inno_hdmi_phy_get_tmdsclk(struct inno_hdmi_phy *inno, int rate)
+> >>> +{
+> >>> +	int bus_width = phy_get_bus_width(inno->phy);
+> >>> +	u32 tmdsclk;
+> >>> +
+> >>> +	switch (bus_width) {
+> >>> +	case 4:
+> >>> +		tmdsclk = rate / 2;
+> >>> +		break;
+> >>> +	case 5:
+> >>> +		tmdsclk = rate * 5 / 8;
+> >>> +		break;
+> >>> +	case 6:
+> >>> +		tmdsclk = rate * 3 / 4;
+> >>> +		break;
+> >>> +	case 10:
+> >>> +		tmdsclk = rate * 5 / 4;
+> >>> +		break;
+> >>> +	case 12:
+> >>> +		tmdsclk = rate * 3 / 2;
+> >>> +		break;
+> >>> +	case 16:
+> >>> +		tmdsclk = rate * 2;
+> >>> +		break;
+> >>> +	default:
+> >>> +		tmdsclk = rate;
+> >>> +	}
+> >>> +
+> >>> +	return tmdsclk;
+> >>> +}
+> >> Please corrects integer overflow 
+> >> like https://github.com/mcerveny/rockchip-linux/commit/b4bc703f2dca4e5115b22155920d2277671a9f00
+> > thanks for finding that possible issue. I've adapted the phy driver
+> > in a similar way (using u64 though) and will include that change in the
+> > next version.
+> 
+> Btw, wouldn't be simpler to just use:
+> switch (bus_width) {
+> case 4:
+> case 5:
+> case 6:
+> case 10:
+> case 12:
+> case 16:
+>     return (u64)rate * bus_width / 8;
+> default:
+>     return rate;
+> }
 
-Remove the unused bindings.
+you're a genius ;-) .
+I must be looking at this code for way to long to not see this relation.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- Documentation/devicetree/bindings/thermal/thermal.txt | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
-index 1719d47a5e2f..cc553f0952c5 100644
---- a/Documentation/devicetree/bindings/thermal/thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/thermal.txt
-@@ -55,8 +55,7 @@ of heat dissipation). For example a fan's cooling states correspond to
- the different fan speeds possible. Cooling states are referred to by
- single unsigned integers, where larger numbers mean greater heat
- dissipation. The precise set of cooling states associated with a device
--(as referred to by the cooling-min-level and cooling-max-level
--properties) should be defined in a particular device's binding.
-+should be defined in a particular device's binding.
- For more examples of cooling devices, refer to the example sections below.
- 
- Required properties:
-@@ -69,15 +68,6 @@ For more examples of cooling devices, refer to the example sections below.
- 			See Cooling device maps section below for more details
- 			on how consumers refer to cooling devices.
- 
--Optional properties:
--- cooling-min-level:	An integer indicating the smallest
--  Type: unsigned	cooling state accepted. Typically 0.
--  Size: one cell
--
--- cooling-max-level:	An integer indicating the largest
--  Type: unsigned	cooling state accepted.
--  Size: one cell
--
- * Trip points
- 
- The trip node is a node to describe a point in the temperature domain
-@@ -226,8 +216,6 @@ cpus {
- 			396000  950000
- 			198000  850000
- 		>;
--		cooling-min-level = <0>;
--		cooling-max-level = <3>;
- 		#cooling-cells = <2>; /* min followed by max */
- 	};
- 	...
-@@ -241,8 +229,6 @@ cpus {
- 	 */
- 	fan0: fan at 48 {
- 		...
--		cooling-min-level = <0>;
--		cooling-max-level = <9>;
- 		#cooling-cells = <2>; /* min followed by max */
- 	};
- };
--- 
-2.15.0.194.g9af6a3dea062
+Thanks
+Heiko
