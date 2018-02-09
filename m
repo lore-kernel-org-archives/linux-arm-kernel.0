@@ -1,79 +1,216 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 09 Feb 2018 07:54:35 -0800
-Subject: [PATCH] irqchip: Use %px to print pointer value
-In-Reply-To: <ba5fb474-4e45-8d8d-ee5d-9f1a211090e3@arm.com>
-References: <20180209021031.20631-1-jaedon.shin@gmail.com>
- <ba5fb474-4e45-8d8d-ee5d-9f1a211090e3@arm.com>
-Message-ID: <45424653-235D-4C4B-8908-417943F5283C@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Feb 2018 15:59:30 +0000
+Subject: [PATCH v3 09/41] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20180207175644.GF29286@cbox>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-10-christoffer.dall@linaro.org>
+ <20180122173326.GO22781@e103592.cambridge.arm.com>
+ <20180125194653.GR21802@cbox>
+ <20180207164955.GT5862@e103592.cambridge.arm.com>
+ <20180207175644.GF29286@cbox>
+Message-ID: <20180209155930.GD5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On February 9, 2018 12:51:33 AM PST, Marc Zyngier <marc.zyngier@arm.com> wrote:
->On 09/02/18 02:10, Jaedon Shin wrote:
->> Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
->> pointers printed with %p are hashed. Use %px instead of %p to print
->> pointer value.
->> 
->> Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
->> ---
->>  drivers/irqchip/irq-bcm7038-l1.c | 2 +-
->>  drivers/irqchip/irq-bcm7120-l2.c | 2 +-
->>  drivers/irqchip/irq-brcmstb-l2.c | 2 +-
->>  3 files changed, 3 insertions(+), 3 deletions(-)
->> 
->> diff --git a/drivers/irqchip/irq-bcm7038-l1.c
->b/drivers/irqchip/irq-bcm7038-l1.c
->> index 55cfb986225b..f604c1d89b3b 100644
->> --- a/drivers/irqchip/irq-bcm7038-l1.c
->> +++ b/drivers/irqchip/irq-bcm7038-l1.c
->> @@ -339,7 +339,7 @@ int __init bcm7038_l1_of_init(struct device_node
->*dn,
->>  		goto out_unmap;
->>  	}
->>  
->> -	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
->> +	pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
->>  		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
->>  
->>  	return 0;
->> diff --git a/drivers/irqchip/irq-bcm7120-l2.c
->b/drivers/irqchip/irq-bcm7120-l2.c
->> index 983640eba418..1cc4dd1d584a 100644
->> --- a/drivers/irqchip/irq-bcm7120-l2.c
->> +++ b/drivers/irqchip/irq-bcm7120-l2.c
->> @@ -318,7 +318,7 @@ static int __init bcm7120_l2_intc_probe(struct
->device_node *dn,
->>  		}
->>  	}
->>  
->> -	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
->> +	pr_info("registered %s intc (mem: 0x%px, parent IRQ(s): %d)\n",
->>  			intc_name, data->map_base[0], data->num_parent_irqs);
->>  
->>  	return 0;
->> diff --git a/drivers/irqchip/irq-brcmstb-l2.c
->b/drivers/irqchip/irq-brcmstb-l2.c
->> index 691d20eb0bec..6760edeeb666 100644
->> --- a/drivers/irqchip/irq-brcmstb-l2.c
->> +++ b/drivers/irqchip/irq-brcmstb-l2.c
->> @@ -262,7 +262,7 @@ static int __init brcmstb_l2_intc_of_init(struct
->device_node *np,
->>  		ct->chip.irq_set_wake = irq_gc_set_wake;
->>  	}
->>  
->> -	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
->> +	pr_info("registered L2 intc (mem: 0x%px, parent irq: %d)\n",
->>  			base, parent_irq);
->>  
->>  	return 0;
->> 
->
->Why is that something useful to do? This just tells you where the
->device
->is mapped in the VA space, and I doubt that's a useful information,
->hashed pointers or not. Am I missing something obvious?
+On Wed, Feb 07, 2018 at 06:56:44PM +0100, Christoffer Dall wrote:
+> On Wed, Feb 07, 2018 at 04:49:55PM +0000, Dave Martin wrote:
+> > On Thu, Jan 25, 2018 at 08:46:53PM +0100, Christoffer Dall wrote:
+> > > On Mon, Jan 22, 2018 at 05:33:28PM +0000, Dave Martin wrote:
+> > > > On Fri, Jan 12, 2018 at 01:07:15PM +0100, Christoffer Dall wrote:
+> > > > > Avoid saving the guest VFP registers and restoring the host VFP
+> > > > > registers on every exit from the VM.  Only when we're about to run
+> > > > > userspace or other threads in the kernel do we really have to switch the
+> > > > > state back to the host state.
+> > > > > 
+> > > > > We still initially configure the VFP registers to trap when entering the
+> > > > > VM, but the difference is that we now leave the guest state in the
+> > > > > hardware registers as long as we're running this VCPU, even if we
+> > > > > occasionally trap to the host, and we only restore the host state when
+> > > > > we return to user space or when scheduling another thread.
+> > > > > 
+> > > > > Reviewed-by: Andrew Jones <drjones@redhat.com>
+> > > > > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> > > > > index 883a6383cd36..848a46eb33bf 100644
+> > > > > --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> > > > > +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > @@ -213,6 +215,19 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+> > > > >   */
+> > > > >  void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+> > > > >  {
+> > > > > +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+> > > > > +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+> > > > > +
+> > > > > +	/* Restore host FP/SIMD state */
+> > > > > +	if (vcpu->arch.guest_vfp_loaded) {
+> > > > > +		if (vcpu_el1_is_32bit(vcpu)) {
+> > > > > +			kvm_call_hyp(__fpsimd32_save_state,
+> > > > > +				     kern_hyp_va(guest_ctxt));
+> > > > > +		}
+> > > > > +		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> > > > > +		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> > > > > +		vcpu->arch.guest_vfp_loaded = 0;
+> > > > 
+> > > > Provided we've already marked the host FPSIMD state as dirty on the way
+> > > > in, we probably don't need to restore it here.
+> > > > 
+> > > > In v4.15, the kvm_fpsimd_flush_cpu_state() call in
+> > > > kvm_arch_vcpu_ioctl_run() is supposed to do this marking: currently
+> > > > it's only done for SVE, since KVM was previously restoring the host
+> > > > FPSIMD subset of the state anyway, but it could be made unconditional.
+> > > > 
+> > > > For a returning run ioctl, this would have the effect of deferring the
+> > > > host FPSIMD reload until we return to userspace, which is probably
+> > > > no more costly since the kernel must check whether to do this in
+> > > > ret_to_user anyway; OTOH if the vcpu thread was preempted by some
+> > > > other thread we save the cost of restoring the host state entirely here
+> > > > ... I think.
+> > > 
+> > > Yes, I agree.  However, currently the low-level logic in
+> > > arch/arm64/kvm/hyp/entry.S:__fpsimd_guest_restore which saves the host
+> > > state into vcpu->arch.host_cpu_context->gp_regs.fp_regs (where
+> > > host_cpu_context is a KVM-specific per-cpu variable).  I think means
+> > > that simply marking the state as invalid would cause the kernel to
+> > > restore some potentially stale values when returning to userspace.  Am I
+> > > missing something?
+> > 
+> > I think my point was that there would be no need for the low-level
+> > save of the host fpsimd state currently done by hyp.  At all.  The
+> > state would already have been saved off to thread_struct before
+> > entering the guest.
+> 
+> Ah, so if userspace touched any FPSIMD state, then we always save that
+> state when entering the kernel, even if we're just going to return to
+> the same userspace process anyway?  (For any system call etc.?)
 
-No you are right there is not much value in printing the register virtual address (sometimes there is e.g: on MIPS) either we fix the prints to show the physical address of the base register or we could possibly drop the prints entirely.
+Not exactly.  The state is saved when the corresponding user task is
+scheduled out, or when it would become stale because we're about to
+modify the task_struct view of the state (sigreturn/PTRACE_SETREGST).
+The state is also saved if necessary by kernel_neon_begin().
 
--- 
-Florian
+Simply entering the kernel and returning to userspace doesn't have
+this effect by itself.
+
+
+Prior to the SVE patches, KVM makes itself orthogonal to the host
+context switch machinery by ensuring that whatever the host had
+in the FPSIMD regs at guest entry is restored before returning to
+the host. (IIUC)  This means that redundant save/restore work is
+done by KVM, but does have the advantage of simplicity.
+
+This breaks for SVE though: the high bits of the Z-registers will be
+zeroed as a side effect of the FPSIMD save/restore done by KVM.
+This means that if the host has state in those bits then it must
+be saved before entring the guest: that's what the new
+kvm_fpsimd_flush_cpu_state() hook in kvm_arch_vcpu_ioctl_run() is for.
+The alternative would have been for KVM to save/restore the host SVE
+state directly, but this seemed premature and invasive in the absence
+of full KVM SVE support.
+
+This means that KVM's own save/restore of the host's FPSIMD state
+becomes redundant in this case, but since there is no SVE hardware
+yet, I favoured correctness over optimal performance here.
+
+
+My point here was that we could modify this hook to always save off the
+host FPSIMD state unconditionally before entering the guts of KVM,
+instead of only doing it when there is live SVE state.  The benefit of
+this is that the host context switch machinery knows if the state has
+already been saved and won't do it again.  Thus a kvm userspace -> vcpu
+(-> guest exit -> vcpu)* -> guest_exit sequence of arbitrary length
+will only save the host FPSIMD (or SVE) state once, and won't restore
+it at all (assuming no context switches).
+
+Instead, the user thread's FPSIMD state is only reloaded on the final
+return to userspace.
+
+> > 
+> > This would result in a redundant save, but only when the host fpsimd
+> > state is dirty and the guest vcpu doesn't touch fpsimd before trapping
+> > back to the host.
+> > 
+> > For the host, the fpsimd state is only dirty after entering the kernel
+> > from userspace (or after certain other things like sigreturn or ptrace).
+> > So this approach would still avoid repeated save/restore when cycling
+> > between the guest and the kvm code in the host.
+> > 
+> 
+> I see.
+> 
+> > > It might very well be possible to change the logic so that we store the
+> > > host logic the same place where task_fpsimd_save() would have, and I
+> > > think that would make what you suggest possible.
+> > 
+> > That's certainly possible, but I viewed that as harder.  It would be
+> > necessary to map the host thread_struct into hyp etc. etc.
+> > 
+> 
+> And even then, unnecessary because it would duplicate the existing state
+> save, IIUC above.
+
+Agreed.  The main disadvantage of my approach is that the host state
+cannot be saved lazily any more, but it least it is only saved once
+for a given vcpu run loop.
+
+> > > I'd like to make that a separate change from this patch though, as we're
+> > > already changing quite a bit with this series, so I'm trying to make any
+> > > logical change as contained per patch as possible, so that problems can
+> > > be spotted by bisecting.
+> > 
+> > Yes, I think that's wise.
+> > 
+> 
+> ok, I'll try to incorporate this as a separate patch for the next
+> revision.
+> 
+> > > > Ultimately I'd like to go one better and actually treat a vcpu as a
+> > > > first-class fpsimd context, so that taking an interrupt to the host
+> > > > and then reentering the guest doesn't cause any reload at all.  
+> > > 
+> > > That should be the case already; kvm_vcpu_put_sysregs() is only called
+> > > when you run another thread (preemptively or voluntarily), or when you
+> > > return to user space, but making the vcpu fpsimd context a first-class
+> > > citizen fpsimd context would mean that you can run another thread (and
+> > > maybe run userspace if it doesn't use fpsimd?) without having to
+> > > save/restore anything.  Am I getting this right?
+> > 
+> > Yes (except that if a return to userspace happens then FPSIMD will be
+> > restored at that point: there is no laziness there -- it _could_
+> > be lazy, but it's deemed unlikely to be a performance win due to the
+> > fact that the compiler can and does generate FPSIMD code quite
+> > liberally by default).
+> > 
+> > For the case of being preempted within the kernel with no ret_to_user,
+> > you are correct.
+> > 
+> 
+> ok, that would indeed also be useful for things like switching to a
+> vhost thread and returning to the vcpu thread.
+
+What's a vhost thread?
+
+> > > 
+> > > > But
+> > > > that feels like too big a step for this series, and there are likely
+> > > > side-issues I've not thought about yet.
+> > > > 
+> > > 
+> > > It should definitely be in separate patches, but I would be optn to
+> > > tagging something on to the end of this series if we can stabilize this
+> > > series early after -rc1 is out.
+> > 
+> > I haven't fully got my head around it, but we can see where we get to.
+> > Best not to rush into it if there's any doubt...
+> > 
+> Agreed, we can always add things later.
+
+Cheers
+---Dave
