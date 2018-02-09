@@ -1,123 +1,261 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Feb 2018 18:58:41 +0000
-Subject: [PATCH v3 21/22] arm64: Delay enabling hardware DBM feature
-In-Reply-To: <20180209175513.17100-43-suzuki.poulose@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  9 Feb 2018 17:55:02 +0000
+Subject: [PATCH v3 16/22] arm64: capabilities: Clean up midr range helpers
+In-Reply-To: <20180209175513.17100-1-suzuki.poulose@arm.com>
 References: <20180209175513.17100-1-suzuki.poulose@arm.com>
- <20180209175513.17100-43-suzuki.poulose@arm.com>
-Message-ID: <20180209185840.GJ5862@e103592.cambridge.arm.com>
+Message-ID: <20180209175513.17100-33-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 05:55:12PM +0000, Suzuki K Poulose wrote:
-> We enable hardware DBM bit in a capable CPU, very early in the
-> boot via __cpu_setup. This doesn't give us a flexibility of
-> optionally disable the feature, as the clearing the bit
-> is a bit costly as the TLB can cache the settings. Instead,
-> we delay enabling the feature until the CPU is brought up
-> into the kernel. We use the feature capability mechanism
-> to handle it.
-> 
-> The hardware DBM is a non-conflicting feature. i.e, the kernel
-> can safely run with a mix of CPUs with some using the feature
-> and the others don't. So, it is safe for a late CPU to have
-> this capability and enable it, even if the active CPUs don't.
-> 
-> To get this handled properly by the infrastructure, we
-> unconditionally set the capability and only enable it
-> on CPUs which really have the feature. Also, we print the
-> feature detection from the "matches" call back to make sure
-> we don't mislead the user when none of the CPUs could use the
-> feature.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since V2
->  - Print the feature detection message only when at least one CPU
->    is actually using it.
-> ---
->  arch/arm64/include/asm/cpucaps.h |  3 +-
->  arch/arm64/kernel/cpufeature.c   | 71 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/mm/proc.S             | 13 ++++----
->  3 files changed, 79 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index bb263820de13..8df80cc828ac 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -45,7 +45,8 @@
->  #define ARM64_HARDEN_BRANCH_PREDICTOR		24
->  #define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
->  #define ARM64_HAS_RAS_EXTN			26
-> +#define ARM64_HW_DBM				27
->  
-> -#define ARM64_NCAPS				27
-> +#define ARM64_NCAPS				28
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index d8663822c604..a96a1f94f427 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -939,6 +939,57 @@ static int __init parse_kpti(char *str)
->  __setup("kpti=", parse_kpti);
->  #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
->  
-> +#ifdef CONFIG_ARM64_HW_AFDBM
-> +static inline void __cpu_enable_hw_dbm(void)
-> +{
-> +	u64 tcr = read_sysreg(tcr_el1) | TCR_HD;
-> +
-> +	write_sysreg(tcr, tcr_el1);
-> +	isb();
-> +}
-> +
-> +static bool cpu_can_use_dbm(const struct arm64_cpu_capabilities *cap)
-> +{
-> +	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU);
-> +}
-> +
-> +static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
-> +{
-> +	if (cpu_can_use_dbm(cap))
-> +		__cpu_enable_hw_dbm();
-> +}
-> +
-> +static bool has_hw_dbm(const struct arm64_cpu_capabilities *cap,
-> +		       int __unused)
-> +{
-> +	static bool detected = false;
-> +	/*
-> +	 * DBM is a non-conflicting feature. i.e, the kernel can safely
-> +	 * run a mix of CPUs with and without the feature. So, we
-> +	 * unconditionally enable the capability to allow any late CPU
-> +	 * to use the feature. We only enable the control bits on the
-> +	 * CPU, if it actually supports.
-> +	 *
-> +	 * We have to make sure we print the "feature" detection only
-> +	 * when at least one CPU actually uses it. So check if this CPU
-> +	 * can actually use it and print the message exactly once.
-> +	 *
-> +	 * This is safe as all CPUs (including secondary CPUs - due to the
-> +	 * LOCAL_CPU scope - and the hotplugged CPUs - via verification)
-> +	 * goes through the "matches" check exactly once. Also if a CPU
-> +	 * matches the criteria, it is guaranteed that the CPU will turn
-> +	 * the DBM on, as the capability is unconditionally enabled.
-> +	 */
-> +	if (!detected && cpu_can_use_dbm(cap)) {
-> +		detected = true;
-> +		pr_info("detected feature: Hardware dirty bit management\n");
-> +	}
+We are about to introduce generic MIDR range helpers. Clean
+up the existing helpers in erratum handling, preparing them
+to use generic version.
 
-Can we just do
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpu_errata.c | 100 +++++++++++++++++++++++------------------
+ 1 file changed, 56 insertions(+), 44 deletions(-)
 
-	if (cpu_can_use_dbm(cap))
-		pr_info_once(...);
-
-Then we can get rid of "detected".
-
-[...]
-
-Cheers
----Dave
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 8d2d3cf819a7..22ea61141596 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -225,20 +225,35 @@ qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
+ }
+ #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+ 
+-#define MIDR_RANGE(model, min, max) \
+-	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM, \
+-	.matches = is_affected_midr_range, \
+-	.midr_model = model, \
+-	.midr_range_min = min, \
+-	.midr_range_max = max
++#define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
++	.matches = is_affected_midr_range,			\
++	.midr_model = model,					\
++	.midr_range_min = MIDR_CPU_VAR_REV(v_min, r_min),	\
++	.midr_range_max = MIDR_CPU_VAR_REV(v_max, r_max)
+ 
+-#define MIDR_ALL_VERSIONS(model) \
+-	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM, \
+-	.matches = is_affected_midr_range, \
+-	.midr_model = model, \
+-	.midr_range_min = 0, \
++#define CAP_MIDR_ALL_VERSIONS(model)					\
++	.matches = is_affected_midr_range,				\
++	.midr_model = model,						\
++	.midr_range_min = MIDR_CPU_VAR_REV(0, 0),			\
+ 	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
+ 
++#define ERRATA_MIDR_RANGE(model, v_min, r_min, v_max, r_max)		\
++	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,				\
++	CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)
++
++/* Errata affecting a range of revisions of  given model variant */
++#define ERRATA_MIDR_REV_RANGE(m, var, r_min, r_max)	 \
++	ERRATA_MIDR_RANGE(m, var, r_min, var, r_max)
++
++/* Errata affecting a single variant/revision of a model */
++#define ERRATA_MIDR_REV(model, var, rev)	\
++	ERRATA_MIDR_RANGE(model, var, rev, var, rev)
++
++/* Errata affecting all variants/revisions of a given a model */
++#define ERRATA_MIDR_ALL_VERSIONS(model)				\
++	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
++	CAP_MIDR_ALL_VERSIONS(model)
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+@@ -247,7 +262,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A53 r0p[012] */
+ 		.desc = "ARM errata 826319, 827319, 824069",
+ 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+-		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x02),
++		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
+ 		.cpu_enable = cpu_enable_cache_maint_trap,
+ 	},
+ #endif
+@@ -256,7 +271,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A53 r0p[01] */
+ 		.desc = "ARM errata 819472",
+ 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+-		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x01),
++		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
+ 		.cpu_enable = cpu_enable_cache_maint_trap,
+ 	},
+ #endif
+@@ -265,9 +280,9 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A57 r0p0 - r1p2 */
+ 		.desc = "ARM erratum 832075",
+ 		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+-		MIDR_RANGE(MIDR_CORTEX_A57,
+-			   MIDR_CPU_VAR_REV(0, 0),
+-			   MIDR_CPU_VAR_REV(1, 2)),
++		ERRATA_MIDR_RANGE(MIDR_CORTEX_A57,
++				  0, 0,
++				  1, 2),
+ 	},
+ #endif
+ #ifdef CONFIG_ARM64_ERRATUM_834220
+@@ -275,9 +290,9 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A57 r0p0 - r1p2 */
+ 		.desc = "ARM erratum 834220",
+ 		.capability = ARM64_WORKAROUND_834220,
+-		MIDR_RANGE(MIDR_CORTEX_A57,
+-			   MIDR_CPU_VAR_REV(0, 0),
+-			   MIDR_CPU_VAR_REV(1, 2)),
++		ERRATA_MIDR_RANGE(MIDR_CORTEX_A57,
++				  0, 0,
++				  1, 2),
+ 	},
+ #endif
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+@@ -285,7 +300,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A53 r0p[01234] */
+ 		.desc = "ARM erratum 845719",
+ 		.capability = ARM64_WORKAROUND_845719,
+-		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x04),
++		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 4),
+ 	},
+ #endif
+ #ifdef CONFIG_CAVIUM_ERRATUM_23154
+@@ -293,7 +308,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cavium ThunderX, pass 1.x */
+ 		.desc = "Cavium erratum 23154",
+ 		.capability = ARM64_WORKAROUND_CAVIUM_23154,
+-		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
++		ERRATA_MIDR_REV_RANGE(MIDR_THUNDERX, 0, 0, 1),
+ 	},
+ #endif
+ #ifdef CONFIG_CAVIUM_ERRATUM_27456
+@@ -301,15 +316,15 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
+ 		.desc = "Cavium erratum 27456",
+ 		.capability = ARM64_WORKAROUND_CAVIUM_27456,
+-		MIDR_RANGE(MIDR_THUNDERX,
+-			   MIDR_CPU_VAR_REV(0, 0),
+-			   MIDR_CPU_VAR_REV(1, 1)),
++		ERRATA_MIDR_RANGE(MIDR_THUNDERX,
++				  0, 0,
++				  1, 1),
+ 	},
+ 	{
+ 	/* Cavium ThunderX, T81 pass 1.0 */
+ 		.desc = "Cavium erratum 27456",
+ 		.capability = ARM64_WORKAROUND_CAVIUM_27456,
+-		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
++		ERRATA_MIDR_REV(MIDR_THUNDERX_81XX, 0, 0),
+ 	},
+ #endif
+ #ifdef CONFIG_CAVIUM_ERRATUM_30115
+@@ -317,20 +332,21 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cavium ThunderX, T88 pass 1.x - 2.2 */
+ 		.desc = "Cavium erratum 30115",
+ 		.capability = ARM64_WORKAROUND_CAVIUM_30115,
+-		MIDR_RANGE(MIDR_THUNDERX, 0x00,
+-			   (1 << MIDR_VARIANT_SHIFT) | 2),
++		ERRATA_MIDR_RANGE(MIDR_THUNDERX,
++				      0, 0,
++				      1, 2),
+ 	},
+ 	{
+ 	/* Cavium ThunderX, T81 pass 1.0 - 1.2 */
+ 		.desc = "Cavium erratum 30115",
+ 		.capability = ARM64_WORKAROUND_CAVIUM_30115,
+-		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x02),
++		ERRATA_MIDR_REV_RANGE(MIDR_THUNDERX_81XX, 0, 0, 2),
+ 	},
+ 	{
+ 	/* Cavium ThunderX, T83 pass 1.0 */
+ 		.desc = "Cavium erratum 30115",
+ 		.capability = ARM64_WORKAROUND_CAVIUM_30115,
+-		MIDR_RANGE(MIDR_THUNDERX_83XX, 0x00, 0x00),
++		ERRATA_MIDR_REV(MIDR_THUNDERX_83XX, 0, 0),
+ 	},
+ #endif
+ 	{
+@@ -344,9 +360,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 		.desc = "Qualcomm Technologies Falkor erratum 1003",
+ 		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
+-		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
+-			   MIDR_CPU_VAR_REV(0, 0),
+-			   MIDR_CPU_VAR_REV(0, 0)),
++		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
+ 	},
+ 	{
+ 		.desc = "Qualcomm Technologies Kryo erratum 1003",
+@@ -360,9 +374,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 		.desc = "Qualcomm Technologies Falkor erratum 1009",
+ 		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
+-		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
+-			   MIDR_CPU_VAR_REV(0, 0),
+-			   MIDR_CPU_VAR_REV(0, 0)),
++		ERRATA_MIDR_REV(MIDR_QCOM_FALKOR_V1, 0, 0),
+ 	},
+ #endif
+ #ifdef CONFIG_ARM64_ERRATUM_858921
+@@ -370,47 +382,47 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A73 all versions */
+ 		.desc = "ARM erratum 858921",
+ 		.capability = ARM64_WORKAROUND_858921,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+ 	},
+ #endif
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+ 		.cpu_enable = qcom_enable_link_stack_sanitization,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+-		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+-		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 	},
+ #endif
+-- 
+2.14.3
