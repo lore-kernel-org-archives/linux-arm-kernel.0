@@ -1,70 +1,28 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 09 Feb 2018 13:05:27 +0100
-Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
- i.MX6UL/ULL
-In-Reply-To: <1619001.eqAapW3X4z@aspire.rjw.lan>
-References: <20180118235836.17393-1-stefan@agner.ch>
- <1619001.eqAapW3X4z@aspire.rjw.lan>
-Message-ID: <fedd9d818b58e5c19ad3201e68a1e55e@agner.ch>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 09 Feb 2018 11:12:45 +0000
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable serial console on RPi 3
+In-Reply-To: <20180207005309.14365-1-tuomas@tuxera.com>
+References: <20180207005309.14365-1-tuomas@tuxera.com>
+Message-ID: <87fu6aa02a.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.02.2018 12:52, Rafael J. Wysocki wrote:
-> On Friday, January 19, 2018 12:58:36 AM CET Stefan Agner wrote:
->> Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
->> Use PLL1 sys clock for all operating points higher than 528MHz.
->>
->> Note: For higher operating points VDD_SOC_IN needs to be 125mV
->> higher than the ARM set-point (see datasheet). Specifically, the
->> i.MX6UL/ULL EVK boards have an external DC regulator which needs
->> adjustment. The regulator adjustment is not covered with this
->> change.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> This makes sense to me, but I need someone with the requisite platform
-> knowledge to review it.
-> 
+Tuomas Tynkkynen <tuomas@tuxera.com> writes:
 
-Fabio, Leonard, maybe one of you could have a look at it?
+> The Raspberry Pi 3 uses the 8250-based auxilary UART of the BCM2837 SoC
+> as the primary serial console of the board, so enable it in the
+> multiplatform defconfig.
+>
+> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
 
-It is similar to what ("cpufreq: imx: Add support for 700MHz setpoint in
-cpufreq") in downstream is doing, it avoids changing pll twice though.
+Reviewed-by: Eric Anholt <eric@anholt.net>
 
-And, as mentioned in the commit log, the dc_reg part is missing. This is
-because it is not required on our Colibri iMX6ULL since it uses a higher
-(not switchable) VDD_SOC_IN voltage by default.
-
---
-Stefan
-
->> ---
->>  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
->>  1 file changed, 8 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
->> index 628fe899cb48..840f6386c780 100644
->> --- a/drivers/cpufreq/imx6q-cpufreq.c
->> +++ b/drivers/cpufreq/imx6q-cpufreq.c
->> @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->>  		 */
->>  		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->>  		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
->> -		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
->> -			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
->> -		else
->> -			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
->> -		clk_set_parent(step_clk, secondary_sel_clk);
->> -		clk_set_parent(pll1_sw_clk, step_clk);
->> +		if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
->> +			if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
->> +				clk_set_parent(secondary_sel_clk, pll2_bus_clk);
->> +			else
->> +				clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
->> +			clk_set_parent(step_clk, secondary_sel_clk);
->> +			clk_set_parent(pll1_sw_clk, step_clk);
->> +		}
->>  	} else {
->>  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->>  		clk_set_parent(pll1_sw_clk, step_clk);
->>
+I'm planning on putting this in -next once rc1 shows up, unless people
+really want it in -fixes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180209/31ed4362/attachment.sig>
