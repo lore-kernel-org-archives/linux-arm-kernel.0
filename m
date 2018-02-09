@@ -1,40 +1,41 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 9 Feb 2018 10:04:04 +0100
-Subject: [PATCH 08/10] ARM64: dts: meson: Remove "cooling-{min|max}-level"
- for gpio-fan node
-In-Reply-To: <24b53440922491982c781a3eb032b04c167d733d.1518166039.git.viresh.kumar@linaro.org>
-References: <cover.1518166039.git.viresh.kumar@linaro.org>
- <24b53440922491982c781a3eb032b04c167d733d.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <3237154b-18a9-9e8b-1e5f-a7ce261fe3ae@baylibre.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 9 Feb 2018 10:18:46 +0100
+Subject: [PATCH 09/11] DT: arm: shmobile: document Condor board bindings
+In-Reply-To: <CAMuHMdV+36Jff6ui1B_90GvPhTb7Xu7+_CaX44EcXxiLi3c=aQ@mail.gmail.com>
+ <20180208201306.peirumr6hvu22uyt@rob-hp-laptop>
+Message-ID: <20180209091846.cj62onabse2ag47s@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2018 09:58, Viresh Kumar wrote:
-> The "cooling-min-level" and "cooling-max-level" properties are not
-> parsed by any part of the kernel currently and the max cooling state of
-> gpio-fan cooling device is found by referring to the
-> "gpio-fan,speed-map" instead.
+On Thu, Feb 08, 2018 at 02:13:06PM -0600, Rob Herring wrote:
+> On Fri, Feb 02, 2018 at 09:45:08PM +0300, Sergei Shtylyov wrote:
+> > Document the Condor device tree bindings, listing it as a supported board.
+> > 
+> > This allows to use checkpatch.pl to validate .dts files referring to the
+> > Condor board.
+> > 
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > 
+> > ---
+> >  Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
+> >  1 file changed, 2 insertions(+)
 > 
-> Remove the unused properties from the gpio-fan node.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> index 658215c9822c..8ee4a693c438 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> @@ -59,8 +59,6 @@
->  				      1 1
->  				      2 2
->  				      3 3>;
-> -		cooling-min-level = <0>;
-> -		cooling-max-level = <3>;
->  		#cooling-cells = <2>;
->  	};
->  
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > 
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+On Fri, Feb 09, 2018 at 08:27:34AM +0100, Geert Uytterhoeven wrote:
+> On Fri, Feb 2, 2018 at 7:45 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > Document the Condor device tree bindings, listing it as a supported board.
+> >
+> > This allows to use checkpatch.pl to validate .dts files referring to the
+> > Condor board.
+> >
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+
+Thanks, applied with the following subject:
+
+dt-bindings: arm: document Condor board bindings
