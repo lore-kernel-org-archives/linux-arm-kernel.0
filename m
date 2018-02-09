@@ -1,124 +1,128 @@
 From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 9 Feb 2018 11:51:52 +0800
-Subject: [PATCH v2 14/16] arm64: dts: mt7622: add thermal and related nodes
-In-Reply-To: <4db5c81b-0e55-3676-d7c8-d1b6aefb99c4@gmail.com>
-References: <cover.1517910489.git.sean.wang@mediatek.com>
- <687a7c43e3e3260ebdf004a96d2cde143f563250.1517910489.git.sean.wang@mediatek.com>
- <4db5c81b-0e55-3676-d7c8-d1b6aefb99c4@gmail.com>
-Message-ID: <1518148312.9025.17.camel@mtkswgap22>
+Date: Fri, 9 Feb 2018 11:55:46 +0800
+Subject: [PATCH] arm: dts: mt7623: enable all four available UARTs on
+ bananapi-r2
+In-Reply-To: <cd1df7f9-89f4-06d5-5384-9f3b9f7ade48@gmail.com>
+References: <b4e84a68da76c1ca538150a730777ff530c1db5a.1513922513.git.sean.wang@mediatek.com>
+ <dc3c28c7-03c3-f1c6-39c1-b8df8be4fac3@gmail.com>
+ <1514043318.30687.10.camel@mtkswgap22>
+ <1516697505.12197.30.camel@mtkswgap22>
+ <cd1df7f9-89f4-06d5-5384-9f3b9f7ade48@gmail.com>
+Message-ID: <1518148546.9025.20.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-02-07 at 12:43 +0100, Matthias Brugger wrote:
+On Wed, 2018-02-07 at 17:01 +0100, Matthias Brugger wrote:
 > 
-> On 02/06/2018 10:53 AM, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
+> On 01/23/2018 09:51 AM, Sean Wang wrote:
+> > On Sat, 2017-12-23 at 23:35 +0800, Sean Wang wrote:
+> >> On Sat, 2017-12-23 at 08:52 +0100, Matthias Brugger wrote:
+> >>>
+> >>> On 12/22/2017 07:06 AM, sean.wang at mediatek.com wrote:
+> >>>> From: Sean Wang <sean.wang@mediatek.com>
+> >>>>
+> >>>> On bpi-r2 board, totally there're four uarts which we usually called
+> >>>> uart[0-3] helpful to extend slow I/O devices. Among those ones, uart2 has
+> >>>> dedicated pin slot which is used to conolse log. uart[0-1] appear at the
+> >>>> 40-pins connector and uart3 has no pinout, but just has test points (TP47
+> >>>> for TX and TP48 for RX, respectively) nearby uart2. Also, some missing
+> >>>> pinctrl is being complemented for those devices.
+> >>>>
+> >>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >>>> ---
+> >>>>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 26 ++++++++++++++++++++++++--
+> >>>>  1 file changed, 24 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> >>>> index 7bf5aa2..64bf5db 100644
+> >>>> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> >>>> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> >>>> @@ -409,6 +409,20 @@
+> >>>>  				 <MT7623_PIN_82_UTXD1_FUNC_UTXD1>;
+> >>>>  		};do you like it or quite want me to remove the uart3 node?
+> >>>>  	};
+> >>>> +
+> >>>> +	uart2_pins_a: uart at 2 {
+> >>>> +		pins_dat {
+> >>>> +			pinmux = <MT7623_PIN_14_GPIO14_FUNC_URXD2>,
+> >>>> +				 <MT7623_PIN_15_GPIO15_FUNC_UTXD2>;
+> >>>> +		};
+> >>>> +	};
+> >>>> +
+> >>>> +	uart3_pins_a: uart at 3 {
+> >>>> +		pins_dat {
+> >>>> +			pinmux = <MT7623_PIN_242_URTS2_FUNC_URTS2>,
+> >>>> +				 <MT7623_PIN_243_UCTS2_FUNC_UTXD3>;
+> >>>> +		};
+> >>>> +	};
+> >>>>  };
+> >>>>  
+> >>>>  &pwm {
+> >>>> @@ -454,16 +468,24 @@
+> >>>>  &uart0 {
+> >>>>  	pinctrl-names = "default";
+> >>>>  	pinctrl-0 = <&uart0_pins_a>;
+> >>>> -	status = "disabled";
+> >>>> +	status = "okay";
+> >>>>  };
+> >>>>  
+> >>>>  &uart1 {
+> >>>>  	pinctrl-names = "default";
+> >>>>  	pinctrl-0 = <&uart1_pins_a>;
+> >>>> -	status = "disabled";
+> >>>> +	status = "okay";
+> >>>>  };
+> >>>>  
+> >>>>  &uart2 {
+> >>>> +	pinctrl-names = "default";
+> >>>> +	pinctrl-0 = <&uart2_pins_a>;
+> >>>> +	status = "okay";
+> >>>> +};
+> >>>> +
+> >>>> +&uart3 {
+> >>>> +	pinctrl-names = "default";
+> >>>> +	pinctrl-0 = <&uart3_pins_a>;
+> >>>>  	status = "okay";
+> >>>>  };
+> >>>>  
+> >>>
+> >>> Why do we want to enable uart3 when there are only test points?
+> >>> It is not very useful, or do I oversee something?
+> >>>
 > > 
-> > add nodes for the thermal controller and associated thermal zone using
-> > CPU as the cooling device for each trip point. In addition, add a fixup
-> > for thermal_calibration on nvmem should be 12 bytes as the minimal
-> > requirement.
+> >> I have been listening to the sound from potential users of bpi-r2 to
+> >> understand what assistance I have to provide to them. Something could
+> >> be seen through [1] in the forum to know they had been trying hard to
+> >> explore all available UARTs from the SoC in the last weeks. The patch
+> >> should be really useful for these people and for the extra soldering
+> >> it shouldn't become a problem for these makers.
+> >>
+> >> [1] http://forum.banana-pi.org/t/gpio-uart-not-the-debug-port/3748
+> >>
+> >> 	Sean 
+> >>
 > > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 72 +++++++++++++++++++++++++++++++-
-> >  1 file changed, 71 insertions(+), 1 deletion(-)
+> > Hi, Matthias
 > > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > index e6dd4f6..6cf67dd 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > @@ -12,6 +12,7 @@
-> >  #include <dt-bindings/phy/phy.h>
-> >  #include <dt-bindings/power/mt7622-power.h>
-> >  #include <dt-bindings/reset/mt7622-reset.h>
-> > +#include <dt-bindings/thermal/thermal.h>
-> >  
-> >  / {
-> >  	compatible = "mediatek,mt7622";
-> > @@ -75,6 +76,7 @@
-> >  				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
-> >  			clock-names = "cpu", "intermediate";
-> >  			operating-points-v2 = <&cpu_opp_table>;
-> > +			#cooling-cells = <2>;
-> >  			enable-method = "psci";
-> >  			clock-frequency = <1300000000>;
-> >  		};
-> > @@ -119,6 +121,58 @@
-> >  		};
-> >  	};
-> >  
-> > +	thermal-zones {
-> > +		cpu_thermal: cpu-thermal {
-> > +			polling-delay-passive = <1000>;
-> > +			polling-delay = <1000>;
-> > +
-> > +			thermal-sensors = <&thermal 0>;
-> > +
-> > +			trips {
-> > +				cpu_passive: cpu-passive {
-> > +					temperature = <47000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				cpu_active: cpu-active {
-> > +					temperature = <67000>;
-> > +					hysteresis = <2000>;
-> > +					type = "active";
-> > +				};
-> > +
-> > +				cpu_hot: cpu-hot {
-> > +					temperature = <87000>;
-> > +					hysteresis = <2000>;
-> > +					type = "hot";
-> > +				};
-> > +
-> > +				cpu-crit {
-> > +					temperature = <107000>;
-> > +					hysteresis = <2000>;
-> > +					type = "critical";
-> > +				};
-> > +			};
-> > +
-> > +			cooling-maps {
-> > +				map0 {
-> > +					trip = <&cpu_passive>;
-> > +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> > +				};
-> > +
-> > +				map1 {
-> > +					trip = <&cpu_active>;
-> > +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> > +				};
-> > +
-> > +				map2 {
-> > +					trip = <&cpu_hot>;
-> > +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> > +				};
-> > +			};
-> > +		};
-> > +	};
-> > +
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> >  		interrupt-parent = <&gic>;
-> > @@ -201,7 +255,7 @@
-> >  		#size-cells = <1>;
-> >  
-> >  		thermal_calibration: calib at 198 {
-> > -			reg = <0x198 0x8>;
-> > +			reg = <0x198 0xc>;
+> > do you like it or quite want me to remove the uart3 node?
+> > 
+> > I can take it into account along with other pending dts changes in my
+> > queue.
+> > 
 > 
-> Any reason why this is not part of patch 8/16?
+> Sorry for the late answer.
+> Do I understand correctly that uart3 is routed to TP47 and TP48, and these test
+> points are accessible through the SATA connector? Doesn't they break SATA then?
 > 
 
-There's no strong reason wanting me to do that. patch 8 has contained a
-lot of nodes and patch 16 is present just in v2. So, I felt it should be
-a little bit easy that people reviews those patches if they are put into
-separate patches. But, It's still fine to make them into one in the next
-version.
+TP47 and TP48 are directly pins out from SoC, not through the SATA
+connector.
+
+> I think as they are only available through a non-documented test point, we
+> shouldn't enable it.
+> 
+
+Okay, let's drop uart 3 setting here.
 
 > Regards,
 > Matthias
-> 
