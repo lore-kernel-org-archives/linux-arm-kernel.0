@@ -1,78 +1,18 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 9 Feb 2018 14:08:34 -0600
-Subject: [PATCH] ARM: OMAP2+: Handle errors from cpu_pm_enter()
-In-Reply-To: <20180209174739.31072-1-tony@atomide.com>
-References: <20180209174739.31072-1-tony@atomide.com>
-Message-ID: <b00819ef-2daf-6209-c6e4-4c27d1074b94@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 9 Feb 2018 18:08:44 -0200
+Subject: [PATCHv3 2/2] ARM: dts: imx53: PPD: Enable secure-reg-access
+In-Reply-To: <20180209170358.7227-3-sebastian.reichel@collabora.co.uk>
+References: <20180209170358.7227-1-sebastian.reichel@collabora.co.uk>
+ <20180209170358.7227-3-sebastian.reichel@collabora.co.uk>
+Message-ID: <CAOMZO5AnTHn7VmD9dkOYwkW6eQNcdxC8tBOKNqhNGy5Oija2zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 9, 2018 at 3:03 PM, Sebastian Reichel
+<sebastian.reichel@collabora.co.uk> wrote:
+> Add secure-reg-access on PPD device tree to enable PMU and
+> hardware counters for perf.
+>
+> Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
-
-On 02/09/2018 11:47 AM, Tony Lindgren wrote:
-> Let's add error handling since we actually might get some.
-> 
-> Cc: Dave Gerlach <d-gerlach@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   arch/arm/mach-omap2/cpuidle44xx.c | 17 ++++++++++-------
->   1 file changed, 10 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-> --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-> @@ -125,6 +125,7 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->   {
->   	struct idle_statedata *cx = state_ptr + index;
->   	u32 mpuss_can_lose_context = 0;
-> +	int error;
->   
->   	/*
->   	 * CPU0 has to wait and stay ON until CPU1 is OFF state.
-> @@ -158,7 +159,9 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->   	 * Call idle CPU PM enter notifier chain so that
->   	 * VFP and per CPU interrupt context is saved.
->   	 */
-> -	cpu_pm_enter();
-> +	error = cpu_pm_enter();
-> +	if (error)
-> +		goto cpu_pm_out;
->   
->   	if (dev->cpu == 0) {
->   		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-> @@ -196,18 +199,18 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
->   		}
->   	}
->   
-> -	/*
-> -	 * Call idle CPU PM exit notifier chain to restore
-> -	 * VFP and per CPU IRQ context.
-> -	 */
-> -	cpu_pm_exit();
-> -
->   	/*
->   	 * Call idle CPU cluster PM exit notifier chain
->   	 * to restore GIC and wakeupgen context.
->   	 */
->   	if (dev->cpu == 0 && mpuss_can_lose_context)
->   		cpu_cluster_pm_exit();
-> +cpu_pm_out:
-> +	/*
-> +	 * Call idle CPU PM exit notifier chain to restore
-> +	 * VFP and per CPU IRQ context.
-> +	 */
-> +	cpu_pm_exit();
-
-It looks ok, in general, but you've changed order of calls here,
-so may be commit message need to be updated
-
-
->   
->   	tick_broadcast_exit();
->   
-> 
-
--- 
-regards,
--grygorii
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
