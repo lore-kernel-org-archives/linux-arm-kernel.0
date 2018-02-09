@@ -1,55 +1,28 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 09 Feb 2018 12:52:22 +0100
-Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
- i.MX6UL/ULL
-In-Reply-To: <20180118235836.17393-1-stefan@agner.ch>
-References: <20180118235836.17393-1-stefan@agner.ch>
-Message-ID: <1619001.eqAapW3X4z@aspire.rjw.lan>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri,  9 Feb 2018 19:55:07 +0800
+Subject: [PATCH 0/3] gpio-keys: Add support for specifying wakeup interrupt
+ trigger type
+Message-ID: <20180209115510.11868-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, January 19, 2018 12:58:36 AM CET Stefan Agner wrote:
-> Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
-> Use PLL1 sys clock for all operating points higher than 528MHz.
-> 
-> Note: For higher operating points VDD_SOC_IN needs to be 125mV
-> higher than the ARM set-point (see datasheet). Specifically, the
-> i.MX6UL/ULL EVK boards have an external DC regulator which needs
-> adjustment. The regulator adjustment is not covered with this
-> change.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-This makes sense to me, but I need someone with the requisite platform
-knowledge to review it.
+On chromebook kevin, we are using gpio-keys for pen insert event. But
+we only want it to wakeup the system when ejecting the pen.
 
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 628fe899cb48..840f6386c780 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		 */
->  		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->  		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> -		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> -			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> -		else
-> -			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> -		clk_set_parent(step_clk, secondary_sel_clk);
-> -		clk_set_parent(pll1_sw_clk, step_clk);
-> +		if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
-> +			if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> +				clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> +			else
-> +				clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> +			clk_set_parent(step_clk, secondary_sel_clk);
-> +			clk_set_parent(pll1_sw_clk, step_clk);
-> +		}
->  	} else {
->  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->  		clk_set_parent(pll1_sw_clk, step_clk);
-> 
+So we may need to change the interrupt trigger type during suspending.
+
+
+Jeffy Chen (3):
+  Input: gpio-keys - add support for wakeup interrupt trigger type
+  Input: gpio-keys - allow setting wakeup interrupt trigger type in DT
+  arm64: dts: rockchip: Avoid wakeup when inserting the pen
+
+ .../devicetree/bindings/input/gpio-keys.txt          |  9 +++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts    |  2 ++
+ drivers/input/keyboard/gpio_keys.c                   | 20 ++++++++++++++++++--
+ include/linux/gpio_keys.h                            |  2 ++
+ 4 files changed, 31 insertions(+), 2 deletions(-)
+
+-- 
+2.11.0
