@@ -1,61 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Feb 2018 12:15:10 +0000
-Subject: [PATCH] ACPI/IORT: Remove temporary iort_get_id_mapping_index()
- ACPICA guard
-Message-ID: <20180209121510.9015-1-lorenzo.pieralisi@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  9 Feb 2018 12:16:01 +0000
+Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
+In-Reply-To: <20180208173229.GA5862@e103592.cambridge.arm.com>
+References: <20180208173229.GA5862@e103592.cambridge.arm.com>
+Message-ID: <20180209121605.14091-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In IORT issue C SMMUv3 IORT nodes gained an additional field (DeviceID
-mapping index) so that the SMMUv3 can describe its MSI interrupts.
+>>> I'm not sure we need extra comments or documentation; I just want
+>>> to check that I've understood the patch correctly.
+>>
+>> So, would you prefer this split to the original patch ?
+> 
+> I think splitting out this patch (1/2) makes sense.
+> 
+> 
+> For the second part (2/2) of the split, I still find that hard to
+> review.  The commit message suggests trivially obvious refactoring
+> only, but I think there are three things going on:
+> 
+>   1) moving functions around (with the intention of merging them)
+>   2) merging functions together
+>   3) other miscellaneous bits of refactoring, and cleanups that become
+>      "obvious" after steps (1) and (2).
+> 
+> The refactoring is likely straightfoward, but the resulting diff is
+> not (at least, I struggle to read it).
+> 
+> Could you split the second part along the lines if (1)..(3) above?
+> I think that would make for much easier review.  (Sorry to be a pain!)
+> 
+> Also, the second patch leaves at least one function that does nothing
+> except call a second function that has no other caller.  It may do
+> no harm to remove and inline any such function.  (Falls under (3),
+> I guess.)
+> 
 
-Referring to it in the kernel requires ACPICA changes and in order
-to prevent kernel<->ACPICA dependencies kernel code depending on the
-SMMUv3 DeviceID mapping index field was guarded with an ACPICA version
-conditional.
+Here it goes...
 
-ACPICA changes introducing DeviceID mapping index in the IORT structs
-were integrated in the kernel with:
+Suzuki K Poulose (4):
+  arm64: capabilities: Prepare for grouping features and errata work
+    arounds
+  arm64: capabilities: Split the processing of errata work arounds
+  arm64: capabilities: Allow features based on local CPU scope
+  arm64: capabilities: Group handling of features and errata workarounds
 
-commit 4c106aa411ee ("ACPICA: iasl: Add SMMUv3 device ID mapping index
-support")
+ arch/arm64/kernel/cpufeature.c | 91 ++++++++++++++++++++----------------------
+ 1 file changed, 43 insertions(+), 48 deletions(-)
 
-so the temporary ACPICA guard has become stale and can be removed.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
----
- drivers/acpi/arm64/iort.c | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 95255ecfae7c..a84a5787bbd2 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -366,7 +366,6 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	return NULL;
- }
- 
--#if (ACPI_CA_VERSION > 0x20170929)
- static int iort_get_id_mapping_index(struct acpi_iort_node *node)
- {
- 	struct acpi_iort_smmu_v3 *smmu;
-@@ -400,12 +399,6 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
- 		return -EINVAL;
- 	}
- }
--#else
--static inline int iort_get_id_mapping_index(struct acpi_iort_node *node)
--{
--	return -EINVAL;
--}
--#endif
- 
- static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
- 					       u32 id_in, u32 *id_out,
 -- 
-2.15.0
+2.14.3
