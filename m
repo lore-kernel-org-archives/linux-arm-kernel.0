@@ -1,74 +1,43 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 9 Feb 2018 12:20:01 -0800
-Subject: [RFC/RFT PATCH 0/2] arm64: per-task stack canaries
-In-Reply-To: <20180123130302.29409-1-ard.biesheuvel@linaro.org>
-References: <20180123130302.29409-1-ard.biesheuvel@linaro.org>
-Message-ID: <4f8b8b42-7b95-a396-659f-0563030f5963@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Feb 2018 12:54:22 -0800
+Subject: [PATCH] ARM: OMAP2+: Handle errors from cpu_pm_enter()
+In-Reply-To: <b00819ef-2daf-6209-c6e4-4c27d1074b94@ti.com>
+References: <20180209174739.31072-1-tony@atomide.com>
+ <b00819ef-2daf-6209-c6e4-4c27d1074b94@ti.com>
+Message-ID: <20180209205422.GC4383@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2018 05:03 AM, Ard Biesheuvel wrote:
-> This is a proof of concept implementation of per-task stack canaries for
-> arm64. The purpose is to reach agreement between the arm64 kernel and GCC
-> maintainers on how to implement support for this in the compiler.
+* Grygorii Strashko <grygorii.strashko@ti.com> [180209 20:09]:
+> On 02/09/2018 11:47 AM, Tony Lindgren wrote:
+> > @@ -196,18 +199,18 @@ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+> >   		}
+> >   	}
+> > -	/*
+> > -	 * Call idle CPU PM exit notifier chain to restore
+> > -	 * VFP and per CPU IRQ context.
+> > -	 */
+> > -	cpu_pm_exit();
+> > -
+> >   	/*
+> >   	 * Call idle CPU cluster PM exit notifier chain
+> >   	 * to restore GIC and wakeupgen context.
+> >   	 */
+> >   	if (dev->cpu == 0 && mpuss_can_lose_context)
+> >   		cpu_cluster_pm_exit();
+> > +cpu_pm_out:
+> > +	/*
+> > +	 * Call idle CPU PM exit notifier chain to restore
+> > +	 * VFP and per CPU IRQ context.
+> > +	 */
+> > +	cpu_pm_exit();
 > 
-> What these patches show is that we can support per-task stack canaries
-> on arm64 using only very minor changes on the kernel side, i.e., all
-> that is needed is exposing the offset of stack_canary in task_struct
-> via an ELF symbol. With that in place, the compiler needs to emit the
-> following sequence when -fstack-protector-guard=tls is enabled
-> 
->    movz    xN, :abs_g0:__stack_chk_guard_offset
->    msr     xM, sp_el0
->    ldr     xM, [xM, xN]
-> 
-> Note that this does not involve per-CPU variables, and so there are no
-> concurrency issues to be addressed. sp_el0 is the current task pointer,
-> whose value never changes from the POV of the task, even when migrating
-> to another CPU.
-> 
-> Patch #1 implements a GCC plugin that patches the sequence
-> 
->    adrp    xN, __stack_chk_guard
->    add     xN, Xn, :lo12:__stack_chk_guard
-> 
-> into
-> 
->    mrs     xN, sp_el0
->    add     xN, xN, :lo12:__stack_chk_guard_offset
-> 
-> which is a poor man's version of the movz/msr/ldr sequence above (and only
-> works for small model code), but is sufficient as a proof of concept.
-> 
-> Patch #2 exposes the __stack_chk_guard_offset symbol and wires up the plugin
-> (if enabled in Kconfig)
-> 
-> Again, the point is not to use GCC plugin based hacks, but to reach agreement
-> on how to proceed with this for GCC.
-> 
-> Comments welcome.
-> 
+> It looks ok, in general, but you've changed order of calls here,
+> so may be commit message need to be updated
 
-I was seeing some crashes with these when I tried to boot up on my
-full Fedora system. It looked like a compiler bug with grabbing
-the wrong literal but I don't think it's worth looking at it since
-it's probably just something with the plugin which isn't the real
-focus here. I can send along the crash if you are interested.
+Hmm yeah good point, that's how it's usually done. I'll check
+and update the description like you suggested.
 
-It looked good to me otherwise.
+Regards,
 
-> Ard Biesheuvel (2):
->    gcc-plugins: add support plugin for arm64 per-task stack canaries
->    arm64: kernel: use a unique stack canary value for each task
-> 
->   arch/Kconfig                                    |   4 +
->   arch/arm64/Kconfig                              |   7 ++
->   arch/arm64/include/asm/stackprotector.h         |   4 +-
->   arch/arm64/kernel/asm-offsets.c                 |   3 +
->   arch/arm64/kernel/process.c                     |   4 +
->   arch/arm64/kernel/vmlinux.lds.S                 |   8 ++
->   scripts/Makefile.gcc-plugins                    |   2 +
->   scripts/gcc-plugins/arm64_ssp_per_task_plugin.c | 121 ++++++++++++++++++++
->   8 files changed, 152 insertions(+), 1 deletion(-)
->   create mode 100644 scripts/gcc-plugins/arm64_ssp_per_task_plugin.c
-> 
+Tony
