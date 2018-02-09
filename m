@@ -1,43 +1,42 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Fri, 9 Feb 2018 10:55:18 +0000
-Subject: [PATCH v3 04/41] KVM: arm64: Rework hyp_panic for VHE and non-VHE
-In-Reply-To: <20180208132416.GP29286@cbox>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-5-christoffer.dall@linaro.org>
- <be470bdb-258e-6b4d-b409-e230d2d90888@arm.com> <20180208132416.GP29286@cbox>
-Message-ID: <82ed8658-383e-4b10-866f-10389f697b73@arm.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 9 Feb 2018 12:07:20 +0100
+Subject: [PATCH 1/2] dt-bindings: clock: reset: Add AXG AO Clock and Reset
+ Bindings
+In-Reply-To: <20180209070026.193879-2-yixun.lan@amlogic.com>
+References: <20180209070026.193879-1-yixun.lan@amlogic.com>
+ <20180209070026.193879-2-yixun.lan@amlogic.com>
+Message-ID: <CAOFm3uFj-7kZNp6b3SerOzQ8Amfa5Usod+MxwvZJ1E1Z_V9VJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Fri, Feb 9, 2018 at 8:00 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> Add dt-bindings headers for the Meson-AXG's AO clock and
+> reset controller.
+>
+> CC: <devicetree@vger.kernel.org>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  include/dt-bindings/clock/axg-aoclkc.h | 26 ++++++++++++++++++++++++++
+>  include/dt-bindings/reset/axg-aoclkc.h | 20 ++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+>  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+>
+> diff --git a/include/dt-bindings/clock/axg-aoclkc.h b/include/dt-bindings/clock/axg-aoclkc.h
+> new file mode 100644
+> index 000000000000..78683abb4247
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/axg-aoclkc.h
+> @@ -0,0 +1,26 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD) */
 
-On 02/08/2018 01:24 PM, Christoffer Dall wrote:
-> On Mon, Feb 05, 2018 at 06:04:25PM +0000, Julien Grall wrote:
->> On 12/01/18 12:07, Christoffer Dall wrote:
->>> +
->>>   	panic(__hyp_panic_string,
->>>   	      spsr,  elr,
->>>   	      read_sysreg_el2(esr),   read_sysreg_el2(far),
->>>   	      read_sysreg(hpfar_el2), par, vcpu);
->>>   }
->>> -static hyp_alternate_select(__hyp_call_panic,
->>> -			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
->>> -			    ARM64_HAS_VIRT_HOST_EXTN);
->>
->> Out of interest, any specific rather to remove hyp_alternate_select and
->> "open-code" it?
->>
-> 
-> Not sure I understand your question.
-> 
-> Are you asking why I replace the hyp alternatives with the has_vhe()?
-> If so, has_vhe() uses a static key and should therefore have the same
-> performance characteristics, but I find the has_vhe() version below much
-> more readable.
+nit... BSD is not a valid license id as documented in LICENSES [1] :
+please use one of these:
+BSD-2-Clause or BSD-3-Clause
 
-That what I was asking. Thank you for the explanation.
+Thank you!
 
-Cheers,
-
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/LICENSES/preferred
 -- 
-Julien Grall
+Cordially
+Philippe Ombredanne
