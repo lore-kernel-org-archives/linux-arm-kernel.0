@@ -1,28 +1,61 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 09 Feb 2018 11:12:45 +0000
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable serial console on RPi 3
-In-Reply-To: <20180207005309.14365-1-tuomas@tuxera.com>
-References: <20180207005309.14365-1-tuomas@tuxera.com>
-Message-ID: <87fu6aa02a.fsf@anholt.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri,  9 Feb 2018 12:15:10 +0000
+Subject: [PATCH] ACPI/IORT: Remove temporary iort_get_id_mapping_index()
+ ACPICA guard
+Message-ID: <20180209121510.9015-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tuomas Tynkkynen <tuomas@tuxera.com> writes:
+In IORT issue C SMMUv3 IORT nodes gained an additional field (DeviceID
+mapping index) so that the SMMUv3 can describe its MSI interrupts.
 
-> The Raspberry Pi 3 uses the 8250-based auxilary UART of the BCM2837 SoC
-> as the primary serial console of the board, so enable it in the
-> multiplatform defconfig.
->
-> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+Referring to it in the kernel requires ACPICA changes and in order
+to prevent kernel<->ACPICA dependencies kernel code depending on the
+SMMUv3 DeviceID mapping index field was guarded with an ACPICA version
+conditional.
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
+ACPICA changes introducing DeviceID mapping index in the IORT structs
+were integrated in the kernel with:
 
-I'm planning on putting this in -next once rc1 shows up, unless people
-really want it in -fixes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180209/31ed4362/attachment.sig>
+commit 4c106aa411ee ("ACPICA: iasl: Add SMMUv3 device ID mapping index
+support")
+
+so the temporary ACPICA guard has become stale and can be removed.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ drivers/acpi/arm64/iort.c | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 95255ecfae7c..a84a5787bbd2 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -366,7 +366,6 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 	return NULL;
+ }
+ 
+-#if (ACPI_CA_VERSION > 0x20170929)
+ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+ {
+ 	struct acpi_iort_smmu_v3 *smmu;
+@@ -400,12 +399,6 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
+ 		return -EINVAL;
+ 	}
+ }
+-#else
+-static inline int iort_get_id_mapping_index(struct acpi_iort_node *node)
+-{
+-	return -EINVAL;
+-}
+-#endif
+ 
+ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+ 					       u32 id_in, u32 *id_out,
+-- 
+2.15.0
