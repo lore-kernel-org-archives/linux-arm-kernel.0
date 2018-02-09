@@ -1,181 +1,63 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Fri, 09 Feb 2018 22:20:57 +0100
-Subject: [PATCH] Revert "ARM: dts: sunxi: Add regulators for Sinovoip
- BPI-M2"
-In-Reply-To: <207CD143-6535-42C9-BEF3-9D2614336482@aosc.io>
-References: <20180203112353.13497-1-icenowy@aosc.io>
- <20180205095558.2e713c24cdb7c3232943db52@bidouilliste.com>
- <207CD143-6535-42C9-BEF3-9D2614336482@aosc.io>
-Message-ID: <c59ee4bd3246172ec62705967bb8f751@megadrive.org>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri,  9 Feb 2018 13:22:40 -0800
+Subject: [PATCH V2] tty: serial: imx: allow breaks to be received when using
+ dma
+Message-ID: <20180209212240.14095-1-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-02-05 10:05, Icenowy Zheng wrote:
-> ? 2018?2?5? GMT+08:00 ??4:55:58, Emmanuel Vadot <manu@bidouilliste.com> 
-> ??:
->> 
->> Hello,
->> 
->> On Sat,  3 Feb 2018 19:23:53 +0800
->> Icenowy Zheng <icenowy@aosc.io> wrote:
->> 
->>> This reverts commit 7daa213700758b5b08fc0daab09bb139dd334165.
->>> 
->>> The original commit has several problems:
->>> 
->>> - vdd-cpus and aldo3 (AVCC of the SoC) are not set to always-on,
->> which
->>> leads to system hang when disabling unused regulators.
->> 
->> Indeed I should have make those always-on.
->> 
->>> - GMAC (which uses dldo1 and aldo2) and Wi-Fi (which uses aldo1) are
->> not
->>> considered, and will fail to work after adding this commit.
->> 
->> While I understand the problem with vdd-cpus and aldo3 I don't see why
->> when you don't declare regulator the code should do something with it.
->> DT is supposed to describe the hardware and the code should not use
->> hardware not described right ?
->> The gmac node doesn't declare any regulators and the mmc2 uses
->> reg_vcc3v0 (haven't checked on the schematics yet if it is correct).
-> 
-> It's because the regulator support isn't present before
-> this commit. However these parts really need special
-> regulators. I don't have M2 schematics at hand, so you'd
-> check it by yourself.
+This allows me to login after sending a break when service
+serial-getty at ttymxc0.service is running
 
-  Yes but why does the PMIC should disable regulators not defined in the 
-DTS ? That the part I don't understand and want to know where it is 
-described/documented.
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
-> P.S. a proper device tree with AXP shouldn't use
-> reg_vcc3v0/3v3/1v8/etc. They're dummy
-> regulator nodes for
-> not implemented or not controllable regulators.
-> 
->> 
->>> This indicates that this patch should be not tested at all.
->> 
->> This have indeed not been tested with linux.
->> I think that this commit should not be reverted, I'll send a proper
->> patch tonight or tomorow night max.
-> 
-> Please test patches sent to Linux on Linux :-)
+---
+v2: rebase only
 
-  If my patches adhere to the bindings I don't see why.
-
->> 
->> P.S.: Also as I'm the original sender I think I should have been in CC
->> no ?
-> 
-> get_maintainer.pl didn't mention you and I forgot... sorry.
-> 
->> 
->> Cheers,
->> 
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 57
->> ------------------------
->>>  1 file changed, 57 deletions(-)
->>> 
->>> diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
->> b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
->>> index 51e6f1d21c32..a565316eb340 100644
->>> --- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
->>> +++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
->>> @@ -86,10 +86,6 @@
->>>  	};
->>>  };
->>> 
->>> -&cpu0 {
->>> -	cpu-supply = <&reg_dcdc3>;
->>> -};
->>> -
->>>  &ehci0 {
->>>  	status = "okay";
->>>  };
->>> @@ -155,17 +151,6 @@
->>>  	status = "okay";
->>>  };
->>> 
->>> -&p2wi {
->>> -	status = "okay";
->>> -
->>> -	axp22x: pmic at 68 {
->>> -		compatible = "x-powers,axp221";
->>> -		reg = <0x68>;
->>> -		interrupt-parent = <&nmi_intc>;
->>> -		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>> -	};
->>> -};
->>> -
->>>  &pio {
->>>  	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
->>>  		pins = "PA21";
->>> @@ -191,48 +176,6 @@
->>>  	};
->>>  };
->>> 
->>> -#include "axp22x.dtsi"
->>> -
->>> -&reg_dc5ldo {
->>> -	regulator-min-microvolt = <700000>;
->>> -	regulator-max-microvolt = <1320000>;
->>> -	regulator-name = "vdd-cpus";
->>> -};
->>> -
->>> -&reg_dcdc1 {
->>> -	regulator-always-on;
->>> -	regulator-min-microvolt = <3000000>;
->>> -	regulator-max-microvolt = <3000000>;
->>> -	regulator-name = "vdd-3v0";
->>> -};
->>> -
->>> -&reg_dcdc2 {
->>> -	regulator-min-microvolt = <700000>;
->>> -	regulator-max-microvolt = <1320000>;
->>> -	regulator-name = "vdd-gpu";
->>> -};
->>> -
->>> -&reg_dcdc3 {
->>> -	regulator-always-on;
->>> -	regulator-min-microvolt = <700000>;
->>> -	regulator-max-microvolt = <1320000>;
->>> -	regulator-name = "vdd-cpu";
->>> -};
->>> -
->>> -&reg_dcdc4 {
->>> -	regulator-always-on;
->>> -	regulator-min-microvolt = <700000>;
->>> -	regulator-max-microvolt = <1320000>;
->>> -	regulator-name = "vdd-sys-dll";
->>> -};
->>> -
->>> -&reg_dcdc5 {
->>> -	regulator-always-on;
->>> -	regulator-min-microvolt = <1500000>;
->>> -	regulator-max-microvolt = <1500000>;
->>> -	regulator-name = "vcc-dram";
->>> -};
->>> -
->>>  &uart0 {
->>>  	pinctrl-names = "default";
->>>  	pinctrl-0 = <&uart0_pins_a>;
->>> --
->>> 2.15.1
->>> 
->>> 
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 1d7ca382bc12..2eb8c4a20d68 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -927,7 +927,6 @@ static void dma_rx_callback(void *data)
+ 	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
+ 
+ 	if (status == DMA_ERROR) {
+-		dev_err(sport->port.dev, "DMA transaction error.\n");
+ 		clear_rx_errors(sport);
+ 		return;
+ 	}
+@@ -1028,6 +1027,7 @@ static int start_rx_dma(struct imx_port *sport)
+ 
+ static void clear_rx_errors(struct imx_port *sport)
+ {
++	struct tty_port *port = &sport->port.state->port;
+ 	unsigned int status_usr1, status_usr2;
+ 
+ 	status_usr1 = readl(sport->port.membase + USR1);
+@@ -1036,12 +1036,18 @@ static void clear_rx_errors(struct imx_port *sport)
+ 	if (status_usr2 & USR2_BRCD) {
+ 		sport->port.icount.brk++;
+ 		writel(USR2_BRCD, sport->port.membase + USR2);
+-	} else if (status_usr1 & USR1_FRAMERR) {
+-		sport->port.icount.frame++;
+-		writel(USR1_FRAMERR, sport->port.membase + USR1);
+-	} else if (status_usr1 & USR1_PARITYERR) {
+-		sport->port.icount.parity++;
+-		writel(USR1_PARITYERR, sport->port.membase + USR1);
++		if (tty_insert_flip_char(port, 0, TTY_BREAK) == 0)
++			sport->port.icount.buf_overrun++;
++		tty_flip_buffer_push(port);
++	} else {
++		dev_err(sport->port.dev, "DMA transaction error.\n");
++		if (status_usr1 & USR1_FRAMERR) {
++			sport->port.icount.frame++;
++			writel(USR1_FRAMERR, sport->port.membase + USR1);
++		} else if (status_usr1 & USR1_PARITYERR) {
++			sport->port.icount.parity++;
++			writel(USR1_PARITYERR, sport->port.membase + USR1);
++		}
+ 	}
+ 
+ 	if (status_usr2 & USR2_ORE) {
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+2.14.1
