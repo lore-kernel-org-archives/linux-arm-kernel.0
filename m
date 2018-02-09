@@ -1,208 +1,73 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 9 Feb 2018 08:48:20 -0800
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
-Message-ID: <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 9 Feb 2018 18:01:52 +0100 (CET)
+Subject: [PATCH] ARM: dts: bcm2837-rpi-3-b: fix pwm1 pin
+In-Reply-To: <726612883.202327.1514736894033@email.1und1.de>
+References: <da85c22315e08c7dc4dfdebae983278909cfee83.1514733168.git.baruch@tkos.co.il>
+ <726612883.202327.1514736894033@email.1und1.de>
+Message-ID: <468560280.82049.1518195712847@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz, all,
+Hi Eric,
 
-On Fri, Feb 9, 2018 at 8:22 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> 2018-01-08 3:17 GMT+01:00 David Lechner <david@lechnology.com>:
->> This adds platform-specific declarations for the PSC clocks on TI DA850/
->> OMAP-L138/AM18XX SoCs.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>  drivers/clk/davinci/Makefile    |   1 +
->>  drivers/clk/davinci/psc-da850.c | 117 ++++++++++++++++++++++++++++++++++++++++
->>  include/linux/clk/davinci.h     |   1 +
->>  3 files changed, 119 insertions(+)
->>  create mode 100644 drivers/clk/davinci/psc-da850.c
->>
->> diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
->> index fb14c8c..aef0390 100644
->> --- a/drivers/clk/davinci/Makefile
->> +++ b/drivers/clk/davinci/Makefile
->> @@ -11,4 +11,5 @@ obj-$(CONFIG_ARCH_DAVINCI_DM646x)     += pll-dm646x.o
->>
->>  obj-y += psc.o
->>  obj-$(CONFIG_ARCH_DAVINCI_DA830)       += psc-da830.o
->> +obj-$(CONFIG_ARCH_DAVINCI_DA850)       += psc-da850.o
->>  endif
->> diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
->> new file mode 100644
->> index 0000000..3b4583d
->> --- /dev/null
->> +++ b/drivers/clk/davinci/psc-da850.c
->> @@ -0,0 +1,117 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * PSC clock descriptions for TI DA850/OMAP-L138/AM18XX
->> + *
->> + * Copyright (C) 2017 David Lechner <david@lechnology.com>
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/init.h>
->> +#include <linux/of.h>
->> +#include <linux/types.h>
->> +
->> +#include "psc.h"
->> +
->> +static const struct davinci_psc_clk_info da850_psc0_info[] __initconst = {
->> +       LPSC(0, 0, tpcc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->> +       LPSC(1, 0, tptc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->> +       LPSC(2, 0, tptc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->> +       LPSC(3, 0, aemif, pll0_sysclk3, 0),
->> +       LPSC(4, 0, spi0, pll0_sysclk2, 0),
->> +       LPSC(5, 0, mmcsd0, pll0_sysclk2, 0),
->> +       LPSC(6, 0, aintc, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
->> +       LPSC(7, 0, arm_rom, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->> +       LPSC(9, 0, uart0, pll0_sysclk2, 0),
->> +       LPSC(13, 0, pruss, pll0_sysclk2, 0),
->> +       LPSC(14, 0, arm, pll0_sysclk6, LPSC_ALWAYS_ENABLED),
->> +       LPSC(15, 1, dsp, pll0_sysclk1, LPSC_FORCE | LPSC_LOCAL_RESET),
->> +       { }
->> +};
->> +
->> +static const struct davinci_psc_clk_info da850_psc1_info[] __initconst = {
->> +       LPSC(0, 0, tpcc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->> +       LPSC(1, 0, usb0, pll0_sysclk2, 0),
->> +       LPSC(2, 0, usb1, pll0_sysclk4, 0),
->> +       LPSC(3, 0, gpio, pll0_sysclk4, 0),
->> +       LPSC(5, 0, emac, pll0_sysclk4, 0),
->> +       LPSC(6, 0, emif3, pll0_sysclk5, LPSC_ALWAYS_ENABLED),
->> +       LPSC(7, 0, mcasp0, async3, 0),
->> +       LPSC(8, 0, sata, pll0_sysclk2, LPSC_FORCE),
->> +       LPSC(9, 0, vpif, pll0_sysclk2, 0),
->> +       LPSC(10, 0, spi1, async3, 0),
->> +       LPSC(11, 0, i2c1, pll0_sysclk4, 0),
->> +       LPSC(12, 0, uart1, async3, 0),
->> +       LPSC(13, 0, uart2, async3, 0),
->> +       LPSC(14, 0, mcbsp0, async3, 0),
->> +       LPSC(15, 0, mcbsp1, async3, 0),
->> +       LPSC(16, 0, lcdc, pll0_sysclk2, 0),
->> +       LPSC(17, 0, ehrpwm, async3, 0),
->> +       LPSC(18, 0, mmcsd1, pll0_sysclk2, 0),
->> +       LPSC(20, 0, ecap, async3, 0),
->> +       LPSC(21, 0, tptc2, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->> +       { }
->> +};
->> +
->> +void __init da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
->> +{
->> +       struct clk_onecell_data *clk_data;
->> +
->> +       clk_data = davinci_psc_register_clocks(psc0, da850_psc0_info, 16);
->> +       if (!clk_data)
->> +               return;
->> +
->> +       clk_register_clkdev(clk_data->clks[3], NULL, "ti-aemif");
->> +       clk_register_clkdev(clk_data->clks[3], "aemif", "davinci-nand.0");
->> +       clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
->> +       clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
->> +       clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
->> +       clk_register_clkdev(clk_data->clks[14], "arm", NULL);
->> +       clk_register_clkdev(clk_data->clks[15], NULL, "davinci-rproc.0");
->> +
->> +       clk_free_onecell_data(clk_data);
->> +
->> +       clk_data = davinci_psc_register_clocks(psc1, da850_psc1_info, 32);
->> +       if (!clk_data)
->> +               return;
->> +
->> +       clk_register_clkdev(clk_data->clks[1], "usb20_psc_clk", NULL);
->> +       clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
->> +       clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
->> +       clk_register_clkdev(clk_data->clks[2], NULL, "ohci-da8xx");
->> +       clk_register_clkdev(clk_data->clks[3], "gpio", NULL);
->> +       clk_register_clkdev(clk_data->clks[5], NULL, "davinci_emac.1");
->> +       clk_register_clkdev(clk_data->clks[5], "fck", "davinci_mdio.0");
->> +       clk_register_clkdev(clk_data->clks[7], NULL, "davinci-mcasp.0");
->> +       clk_register_clkdev(clk_data->clks[8], "fck", "ahci_da850");
->> +       clk_register_clkdev(clk_data->clks[9], NULL, "vpif");
->> +       clk_register_clkdev(clk_data->clks[10], NULL, "spi_davinci.1");
->> +       clk_register_clkdev(clk_data->clks[11], NULL, "i2c_davinci.2");
->> +       clk_register_clkdev(clk_data->clks[12], NULL, "serial8250.1");
->> +       clk_register_clkdev(clk_data->clks[13], NULL, "serial8250.2");
->> +       clk_register_clkdev(clk_data->clks[14], NULL, "davinci-mcbsp.0");
->> +       clk_register_clkdev(clk_data->clks[15], NULL, "davinci-mcbsp.1");
->> +       clk_register_clkdev(clk_data->clks[16], "fck", "da8xx_lcdc.0");
->> +       clk_register_clkdev(clk_data->clks[17], "fck", "ehrpwm.0");
->> +       clk_register_clkdev(clk_data->clks[17], "fck", "ehrpwm.1");
->> +       clk_register_clkdev(clk_data->clks[18], NULL, "da830-mmc.1");
->> +       clk_register_clkdev(clk_data->clks[20], "fck", "ecap.0");
->> +       clk_register_clkdev(clk_data->clks[20], "fck", "ecap.1");
->> +       clk_register_clkdev(clk_data->clks[20], "fck", "ecap.2");
->> +
->> +       clk_free_onecell_data(clk_data);
->> +}
->> +
->> +#ifdef CONFIG_OF
->> +static void __init of_da850_psc0_clk_init(struct device_node *node)
->> +{
->> +       of_davinci_psc_clk_init(node, da850_psc0_info, 16);
->> +}
->> +CLK_OF_DECLARE(da850_psc0_clk, "ti,da850-psc0", of_da850_psc0_clk_init);
->> +
->> +static void __init of_da850_psc1_clk_init(struct device_node *node)
->> +{
->> +       of_davinci_psc_clk_init(node, da850_psc1_info, 32);
->> +}
->> +CLK_OF_DECLARE(da850_psc1_clk, "ti,da850-psc1", of_da850_psc1_clk_init);
->> +#endif
->> diff --git a/include/linux/clk/davinci.h b/include/linux/clk/davinci.h
->> index 3ec8100..3d8bdfa 100644
->> --- a/include/linux/clk/davinci.h
->> +++ b/include/linux/clk/davinci.h
->> @@ -17,5 +17,6 @@ void dm644x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
->>  void dm646x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
->>
->>  void da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
->> +void da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
->>
->>  #endif /* __LINUX_CLK_DAVINCI_H__ */
->> --
->> 2.7.4
->>
->
-> Hi David,
->
-> I've been working on moving the genpd code from its own driver to the
-> psc one. I couldn't get the system to boot though and problems
-> happened very early in the boot sequence. I struggled to figure out
-> what's happening, but eventually I noticed that psc uses
-> CLK_OF_DECLARE() to initialize clocks. The functions registered this
-> way are called very early in the boot sequence, way before
-> late_initcall() in which the genpd framework is initialized. This of
-> course makes it impossible to register genpd at the same time we
-> register PSCs.
->
-> Mike, Stephen - it would be great if you could confirm, but I believe
-> the clock framework now only accepts clock drivers which create real
-> platform drivers, in which case this series would need to be modified.
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Dezember 2017 um 17:14 geschrieben:
+> 
+> 
+> Hi Baruch,
+> 
+> > Baruch Siach <baruch@tkos.co.il> hat am 31. Dezember 2017 um 16:12 geschrieben:
+> > 
+> > 
+> > Raspberry Pi 3 uses GPIO45 for I2C SCL0. pwm1 is on GPIO41. Update the
+> > DT description accordingly. Fix the following error that shows when
+> > GPIO44 and GPIO45 are configured to I2C:
+> > 
+> > [    1.751563] pinctrl-bcm2835 3f200000.gpio: pin gpio45 already requested by 3f205000.i2c; cannot claim for 3f20c000.pwm
+> > [    1.762474] pinctrl-bcm2835 3f200000.gpio: pin-45 (3f20c000.pwm) status -22
+> > [    1.775176] pinctrl-bcm2835 3f200000.gpio: could not request pin 45 (gpio45) from group gpio45  on device pinctrl-bcm2835
+> > [    1.786344] bcm2835-pwm 3f20c000.pwm: Error applying setting, reverse things back
+> > [    1.793980] bcm2835-pwm: probe of 3f20c000.pwm failed with error -22
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > index a8844d033b3f..b44b3b5af00d 100644
+> > --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > @@ -60,3 +60,9 @@
+> >  	status = "okay";
+> >  	bus-width = <4>;
+> >  };
+> > +
+> > +&pwm {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
+> > +	status = "okay";
+> > +};
+> 
+> thanks for addressing this old issue. Unfortunately this is only a part of the solution. The real problem is the definition of pinctrl in a very common dtsi file (bcm2835-rpi.dtsi). Based on the Firmware dt-blob i created a pin usage map [1], which also shows a potential conflict on RPI Zero W.
+> 
+> So i think we should remove the pwm part from bcm2835-rpi.dtsi and define it on board level like in your patch, but also for the other boards. My suggestion would be the following (based on Firmware):
+> 
+> A Plus -> PWM on pin 40,45
+> A -> PWM on pin 40,45
+> B Plus -> PWM on pin 40,45
+> B Rev 2 -> PWM on pin 40,45
+> B -> PWM on pin 40,45
+> 2 b -> PWM on pin 40,45
+> 3 b -> PWM on pin 40,41
+> Zero -> No PWM
+> Zero W -> No PWM
+> 
+> But i think we should wait for Eric's opinion.
 
-You are correct. All new uses of CLK_OF_DECLARE are met with high
-suspicion, and all new drivers should be platform drivers.
+ping ...
 
-There are cases when CLK_OF_DECLARE is necessary (sometimes
-temporarily while things are reworked), but it seems this is not the
-case for this driver based on your testing of the platform driver
-approach. Please use the platform driver approach instead.
-
-Thanks,
-Mike
-
->
-> David: FYI I quickly converted the functions in psc-da850.c to actual
-> probe callbacks and it worked just fine on a da850-lcdk board.
->
-> Best regards,
-> Bartosz Golaszewski
+> 
+> Regards
+> Stefan
+> 
+> [1] - https://github.com/raspberrypi/firmware/wiki/Pin-usage-reference
