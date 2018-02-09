@@ -1,97 +1,96 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Fri, 9 Feb 2018 12:19:02 -0600
-Subject: [PATCHv3 1/3] dt-bindings: documentation: add clock bindings
- information for Stratix10
-In-Reply-To: <20180209024340.f7sijb7h5egdn675@rob-hp-laptop>
-References: <1517847767-16053-1-git-send-email-dinguyen@kernel.org>
- <20180209024340.f7sijb7h5egdn675@rob-hp-laptop>
-Message-ID: <9b8ae02b-67d5-8d0a-2e35-cab85f89470d@kernel.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Feb 2018 18:22:13 +0000
+Subject: [PATCH v3 10/22] arm64: capabilities: Allow features based on
+ local CPU scope
+In-Reply-To: <20180209175513.17100-20-suzuki.poulose@arm.com>
+References: <20180209175513.17100-1-suzuki.poulose@arm.com>
+ <20180209175513.17100-20-suzuki.poulose@arm.com>
+Message-ID: <20180209182213.GH5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, Feb 09, 2018 at 05:54:49PM +0000, Suzuki K Poulose wrote:
+> So far we have treated the feature capabilities as system wide
+> and this doesn't help with features that could be detected on
 
+doesn't -> wouldn't (since no such features exist yet)
 
-On 02/08/2018 08:43 PM, Rob Herring wrote:
-> On Mon, Feb 05, 2018 at 10:22:45AM -0600, Dinh Nguyen wrote:
->> Document that Stratix10 clock bindings, and add the clock header file. The
->> clock header is an enumeration of all the different clocks on the Stratix10
->> platform.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
->> ---
->> v3:
->> - s/intc/intel for correct vendor prefix
->> - fixup node name to "intel,stratix10-clkmgr"
->> - document the required fixed-clock for oscillators
->> v2:
->> - use a single binding for the clock controller
->> ---
->>  .../devicetree/bindings/clock/intc_stratix10.txt   | 47 ++++++++++++
->>  include/dt-bindings/clock/stratix10-clock.h        | 85 ++++++++++++++++++++++
->>  2 files changed, 132 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/intc_stratix10.txt
->>  create mode 100644 include/dt-bindings/clock/stratix10-clock.h
->>
->> diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
->> new file mode 100644
->> index 0000000..8d218f4
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
->> @@ -0,0 +1,47 @@
->> +Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
->> +
->> +This binding uses the common clock binding[1].
->> +
->> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +
->> +Required properties:
->> +- compatible : shall be
->> +	"intel,stratix10-clkmgr"
->> +
->> +- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
->> +
->> +- #clock-cells : from common clock binding, shall be set to 1.
->> +
->> +- clocks : Should contain fixed-clock sources, such as oscillators.
->> +
->> +Example:
->> +	clkmgr: clock-controller at ffd10000 {
->> +		compatible = "intel,stratix10-clkmgr";
->> +		reg = <0xffd10000 0x1000>;
->> +		#clock-cells = <1>;
->> +
->> +		clocks {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			cb_intosc_hs_div2_clk: cb_intosc_hs_div2_clk {
+detected to "detected locally" (maybe)
+
+> one or more CPUs (e.g, KPTI, Software prefetch). This patch
+> splits the feature detection to two phases :
 > 
-> Don't use '_' in node names.
+>  1) Local CPU features are checked on all boot time active CPUs.
+>  2) System wide features are checked only once after all CPUs are
+>     active.
 > 
+> Cc: Dave Martin <dave.martin@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Ok..
+Otherwise,
 
->> +				#clock-cells = <0>;
->> +				compatible = "fixed-clock";
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+> ---
+>  arch/arm64/kernel/cpufeature.c | 17 +++++++++++------
+>  1 file changed, 11 insertions(+), 6 deletions(-)
 > 
-> fixed clock with no frequency?
-
-The frequency gets populated in the board's dts file. This provides for
-the scenario where different boards might use different oscillator
-frequencies.
-
-So in socfpga_stratix10, I would have:
-
-soc {
-	clock-controller at ffd10000 {
-		clocks {
-			osc1 {
-				clock-frequency = <25000000>;
-			};
-		};
-	};
-};
-
-Thanks,
-Dinh
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index a6e124063e21..45bac0c4ae91 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -551,11 +551,13 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+>  	}
+>  
+>  	/*
+> -	 * Run the errata work around checks on the boot CPU, once we have
+> -	 * initialised the cpu feature infrastructure.
+> +	 * Run the errata work around and local feature checks on the
+> +	 * boot CPU, once we have initialised the cpu feature infrastructure.
+>  	 */
+>  	update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
+>  				"enabling workaround for");
+> +	update_cpu_capabilities(arm64_features, SCOPE_LOCAL_CPU,
+> +				"detected feature:");
+>  }
+>  
+>  static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+> @@ -1411,15 +1413,18 @@ void check_local_cpu_capabilities(void)
+>  
+>  	/*
+>  	 * If we haven't finalised the system capabilities, this CPU gets
+> -	 * a chance to update the errata work arounds.
+> +	 * a chance to update the errata work arounds and local features.
+>  	 * Otherwise, this CPU should verify that it has all the system
+>  	 * advertised capabilities.
+>  	 */
+> -	if (!sys_caps_initialised)
+> +	if (!sys_caps_initialised) {
+>  		update_cpu_capabilities(arm64_errata, SCOPE_LOCAL_CPU,
+>  					"enabling workaround for");
+> -	else
+> +		update_cpu_capabilities(arm64_features, SCOPE_LOCAL_CPU,
+> +					"detected feature:");
+> +	} else {
+>  		verify_local_cpu_capabilities();
+> +	}
+>  }
+>  
+>  DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
+> @@ -1444,7 +1449,7 @@ void __init setup_cpu_features(void)
+>  	int cls;
+>  
+>  	/* Set the CPU feature capabilies */
+> -	update_cpu_capabilities(arm64_features, SCOPE_ALL,
+> +	update_cpu_capabilities(arm64_features, SCOPE_SYSTEM,
+>  				"detected feature:");
+>  	update_cpu_capabilities(arm64_errata, SCOPE_SYSTEM,
+>  				"enabling workaround for");
+> -- 
+> 2.14.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
