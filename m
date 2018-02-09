@@ -1,7 +1,7 @@
 From: yungching0725@gmail.com (Ken Lin)
-Date: Sat, 10 Feb 2018 05:53:52 +0800
+Date: Sat, 10 Feb 2018 05:55:15 +0800
 Subject: [v4] ARM: dts: imx: Add support for Advantech DMS-BA16
-Message-ID: <20180209215352.31015-1-yungching0725@gmail.com>
+Message-ID: <20180209215515.31136-1-yungching0725@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,6 +10,10 @@ the Advantech BA-16 module.
 
 Signed-off-by: Ken Lin <yungching0725@gmail.com>
 ---
+Changes in v4:
+- Fix the pinctrl entries order issue
+- Correct the USB_OTG_ID pinmux
+
  arch/arm/boot/dts/Makefile           |   1 +
  arch/arm/boot/dts/imx6q-dms-ba16.dts | 139 +++++++++++++++++++++++++++++++++++
  2 files changed, 140 insertions(+)
