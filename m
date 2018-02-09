@@ -1,51 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 09 Feb 2018 12:17:49 +0100
-Subject: [PATCH v2 0/4] ARM/arm64: exynos: Fix missing missing reg
- warning for syscon restart nodes
-In-Reply-To: <20180209104806.vcrrtpq6izcnwvy2@angband.pl>
-References: <CGME20180130211855epcas1p25cce42a195d8b407f4267309f9b5ccb9@epcas1p2.samsung.com>
- <20180130211819.17139-1-krzk@kernel.org>
- <4642d2d0-61c9-33b6-0289-76f487aa45ab@samsung.com>
- <20180209104806.vcrrtpq6izcnwvy2@angband.pl>
-Message-ID: <06515e72-d7b3-9799-698e-d8b2dd39e22a@samsung.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Fri, 9 Feb 2018 11:38:50 +0000
+Subject: [PATCH v3 05/41] KVM: arm64: Move HCR_INT_OVERRIDE to default
+ HCR_EL2 guest flag
+In-Reply-To: <20180112120747.27999-6-christoffer.dall@linaro.org>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-6-christoffer.dall@linaro.org>
+Message-ID: <ffb7df11-b304-25f7-f3f4-b55cb106b747@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+Hi,
 
-On 2018-02-09 11:48, Adam Borowski wrote:
-> On Thu, Feb 08, 2018 at 02:46:32PM +0100, Marek Szyprowski wrote:
->> On 2018-01-30 22:18, Krzysztof Kozlowski wrote:
->>> Changes since v1:
->>> 1. New patch (1/4) calling devm_of_platform_populate() in PMU driver,
->>>      following Rob's advice.
->>> 2. The DTS patches moving reboot/poweroff nodes (3/4 and 4/4) now depend
->>>      on this.
->> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> Tested following boards and reboot works fine:
->> Exynos3250 (artik5-eval)
->> Exynos4412 (trats2)
->> Exynos5410 (odroid xu)
->> Exynos5422 (odroid xu3/xu4)
->> Exynos5433 (tm2)
-> Doesn't seem to work on mine:
-> Exynos4412 (odroid u2)
->
-> Rebooting worked correctly with 3.8 + gazillion non-mainlined patches (as
-> shipped with providen images), never did with mainline.
->
-> Tested on current mid-of-the-merge-window, plus these four patches.
->
->
-> It's possible that I'm doing something wrong; might need an updated u-boot,
-> etc.  Log of a boot-till-reboot+hang session attached.
+On 01/12/2018 12:07 PM, Christoffer Dall wrote:
+> From: Shih-Wei Li <shihwei@cs.columbia.edu>
+> 
+> We always set the IMO and FMO bits in the HCR_EL2 when running the
+> guest, regardless if we use the vgic or not.  By moving these flags to
+> HCR_GUEST_FLAGS we can avoid one of the extra save/restore operations of
+> HCR_EL2 in the world switch code, and we can also soon get rid of the
+> other one.
+> 
+> This is safe, because even though the IMO and FMO bits control both
+> taking the interrupts to EL2 and remapping ICC_*_EL1 to ICV_*_EL1
+> executed at EL1, as long as we ensure that these bits are clear when
+> running the EL1 host, as defined in the HCR_HOST_[VHE_]FLAGS, we're OK.
 
-Reboot on Odroid X2/U2/U3 doesn't work now. It is broken by devfreq since
-a few kernel releases. Please disable devfreq in your .config and reboot
-should also work. That's why I didn't put Odroid U3 on the above list.
+NIT: I was a bit confused by the end of the sentence because 
+HCR_HOST_FLAGS define does not seem to exist.
 
-Best regards
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm64/include/asm/kvm_arm.h | 4 ++--
+>   arch/arm64/kvm/hyp/switch.c      | 3 ---
+>   2 files changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 715d395ef45b..656deeb17bf2 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -79,9 +79,9 @@
+>    */
+>   #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
+>   			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
+> -			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+> +			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | \
+> +			 HCR_FMO | HCR_IMO)
+>   #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+> -#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+>   #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+>   
+>   /* TCR_EL2 Registers bits */
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 71700ecee308..f6189d08753e 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -167,8 +167,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+>   		__vgic_v3_save_state(vcpu);
+>   	else
+>   		__vgic_v2_save_state(vcpu);
+> -
+> -	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+>   }
+>   
+>   static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+> @@ -176,7 +174,6 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+>   	u64 val;
+>   
+>   	val = read_sysreg(hcr_el2);
+> -	val |= 	HCR_INT_OVERRIDE;
+>   	val |= vcpu->arch.irq_lines;
+>   	write_sysreg(val, hcr_el2);
+>   
+> 
+
+Cheers,
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Julien Grall
