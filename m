@@ -1,188 +1,43 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Feb 2018 17:55:08 +0000
-Subject: [PATCH v3 19/22] arm64: capabilities: Handle shared entries
+Date: Fri,  9 Feb 2018 17:55:09 +0000
+Subject: [PATCH v3 20/22] arm64: Add MIDR encoding for Arm Cortex-A55 and
+ Cortex-A35
 In-Reply-To: <20180209175513.17100-1-suzuki.poulose@arm.com>
 References: <20180209175513.17100-1-suzuki.poulose@arm.com>
-Message-ID: <20180209175513.17100-39-suzuki.poulose@arm.com>
+Message-ID: <20180209175513.17100-40-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some capabilities have different criteria for detection and associated
-actions based on the matching criteria, even though they all share the
-same capability bit. So far we have used multiple entries with the same
-capability bit to handle this. This is prone to errors, as the
-cpu_enable is invoked for each entry, irrespective of whether the
-detection rule applies to the CPU or not. And also this complicates
-other helpers, e.g, __this_cpu_has_cap.
+Update the MIDR encodings for the Cortex-A55 and Cortex-A35
 
-This patch adds a wrapper entry to cover all the possible variations
-of a capability by maintaining list of matches + cpu_enable callbacks.
-To avoid complicating the prototypes for the "matches()", we use
-arm64_cpu_capabilities maintain the list and we ignore all the other
-fields except the matches & cpu_enable.
-
-This ensures :
-
- 1) The capabilitiy is set when at least one of the entry detects
- 2) Action is only taken for the entries that "matches".
-
-This avoids explicit checks in the cpu_enable() take some action.
-The only constraint here is that, all the entries should have the
-same "type" (i.e, scope and conflict rules).
-
-If a cpu_enable() method is associated with multiple matches for a
-single capability, care should be taken that either the match criteria
-are mutually exclusive, or that the method is robust against being
-called multiple times.
-
-This also reverts the changes introduced by commit 67948af41f2e6818ed
-("arm64: capabilities: Handle duplicate entries for a capability").
-
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 11 ++++++++
- arch/arm64/kernel/cpu_errata.c      | 53 ++++++++++++++++++++++++++++++++-----
- arch/arm64/kernel/cpufeature.c      | 10 +++----
- 3 files changed, 61 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/cputype.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 3ab1c3422f14..074537acc08b 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -306,6 +306,17 @@ struct arm64_cpu_capabilities {
- 			bool sign;
- 			unsigned long hwcap;
- 		};
-+		/*
-+		 * A list of "matches/cpu_enable" pair for the same "capability"
-+		 * of the same "type" as described by the parent. All the
-+		 * fields, except "matches"/"cpu_enable" are ignored in the list.
-+		 * The cpu_enable is invoked only if the corresponding entry
-+		 * "matches()". However, if a cpu_enable() method is associated
-+		 * with multiple matches, care should be taken that either the
-+		 * match criteria are mutually exclusive, or that the method is
-+		 * robust against being called multiple times.
-+		 */
-+		const struct arm64_cpu_capabilities *cap_list;
- 	};
- };
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 26bc5b302060..308507e99430 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -83,6 +83,8 @@
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
+ #define ARM_CPU_PART_CORTEX_A73		0xD09
+ #define ARM_CPU_PART_CORTEX_A75		0xD0A
++#define ARM_CPU_PART_CORTEX_A35		0xD04
++#define ARM_CPU_PART_CORTEX_A55		0xD05
  
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index a602a3049404..902d281ea26f 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -264,6 +264,36 @@ qcom_enable_link_stack_sanitization(const struct arm64_cpu_capabilities *entry)
- 	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
- 	CAP_MIDR_RANGE_LIST(midr_list)
+ #define APM_CPU_PART_POTENZA		0x000
  
-+/*
-+ * Generic helper for handling capabilties with multiple (match,enable) pairs
-+ * of call backs, sharing the same capability bit.
-+ * Iterate over each entry to see if at least one matches.
-+ */
-+static bool multi_entry_cap_matches(const struct arm64_cpu_capabilities *entry,
-+				    int scope)
-+{
-+	const struct arm64_cpu_capabilities *caps = entry->cap_list;
-+
-+	for (; caps->matches; caps++)
-+		if (caps->matches(caps, scope))
-+			return true;
-+	return false;
-+}
-+
-+/*
-+ * Take appropriate action for all matching entries in the shared capability
-+ * entry.
-+ */
-+static void multi_entry_cap_cpu_enable(const struct arm64_cpu_capabilities *entry)
-+{
-+	const struct arm64_cpu_capabilities *caps = entry->cap_list;
-+
-+	for (; caps->matches; caps++)
-+		if (caps->matches(caps, SCOPE_LOCAL_CPU) &&
-+		    caps->cpu_enable)
-+			caps->cpu_enable(caps);
-+}
-+
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- 
- /*
-@@ -280,6 +310,18 @@ static const struct midr_range arm64_bp_harden_psci_cpus[] = {
- 	{},
- };
- 
-+static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
-+	{
-+		CAP_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
-+		.cpu_enable = enable_smccc_arch_workaround_1,
-+	},
-+	{
-+		CAP_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
-+		.cpu_enable = qcom_enable_link_stack_sanitization,
-+	},
-+	{},
-+};
-+
- #endif
- 
- const struct arm64_cpu_capabilities arm64_errata[] = {
-@@ -416,13 +458,10 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		ERRATA_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
--		.cpu_enable = enable_smccc_arch_workaround_1,
--	},
--	{
--		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
--		ERRATA_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
--		.cpu_enable = qcom_enable_link_stack_sanitization,
-+		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
-+		.matches = multi_entry_cap_matches,
-+		.cpu_enable = multi_entry_cap_cpu_enable,
-+		.cap_list = arm64_bp_harden_list,
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9eb9e9570468..d8663822c604 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1225,9 +1225,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
- 		return false;
- 
- 	for (caps = cap_array; caps->matches; caps++)
--		if (caps->capability == cap &&
--		    caps->matches(caps, SCOPE_LOCAL_CPU))
--			return true;
-+		if (caps->capability == cap)
-+			return caps->matches(caps, SCOPE_LOCAL_CPU);
- 	return false;
- }
- 
-@@ -1313,18 +1312,17 @@ static void __init enable_cpu_capabilities(u16 scope_mask)
-  *
-  * Returns "false" on conflicts.
-  */
--static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list,
-+static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps,
- 				    u16 scope_mask)
- {
- 	bool cpu_has_cap, system_has_cap;
--	const struct arm64_cpu_capabilities *caps = caps_list;
- 
- 	scope_mask &= ARM64_CPUCAP_SCOPE_MASK;
- 	for (; caps->matches; caps++) {
- 		if (!(caps->type & scope_mask))
- 			continue;
- 
--		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
-+		cpu_has_cap = caps->matches(caps, SCOPE_LOCAL_CPU);
- 		system_has_cap = cpus_have_cap(caps->capability);
- 
- 		if (system_has_cap) {
+@@ -101,6 +103,8 @@
+ #define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
+ #define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
+ #define MIDR_CORTEX_A75 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A75)
++#define MIDR_CORTEX_A35 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A35)
++#define MIDR_CORTEX_A55 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A55)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_THUNDERX_83XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_83XX)
 -- 
 2.14.3
