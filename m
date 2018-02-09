@@ -1,44 +1,39 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 9 Feb 2018 10:03:57 +0100
-Subject: [PATCH 06/10] ARM64: dts: meson: Remove "cooling-{min|max}-level"
- for CPU nodes
-In-Reply-To: <6c91ebfecf86da98a7682c6d262ff1218a1d7343.1518166039.git.viresh.kumar@linaro.org>
+Date: Fri, 9 Feb 2018 10:04:04 +0100
+Subject: [PATCH 08/10] ARM64: dts: meson: Remove "cooling-{min|max}-level"
+ for gpio-fan node
+In-Reply-To: <24b53440922491982c781a3eb032b04c167d733d.1518166039.git.viresh.kumar@linaro.org>
 References: <cover.1518166039.git.viresh.kumar@linaro.org>
- <6c91ebfecf86da98a7682c6d262ff1218a1d7343.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <303e6c56-8076-e590-c778-81cb8c0181ed@baylibre.com>
+ <24b53440922491982c781a3eb032b04c167d733d.1518166039.git.viresh.kumar@linaro.org>
+Message-ID: <3237154b-18a9-9e8b-1e5f-a7ce261fe3ae@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/02/2018 09:58, Viresh Kumar wrote:
 > The "cooling-min-level" and "cooling-max-level" properties are not
 > parsed by any part of the kernel currently and the max cooling state of
-> a CPU cooling device is found by referring to the cpufreq table instead.
+> gpio-fan cooling device is found by referring to the
+> "gpio-fan,speed-map" instead.
 > 
-> Remove the unused properties from the CPU nodes.
+> Remove the unused properties from the gpio-fan node.
 > 
 > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts | 4 ----
->  1 file changed, 4 deletions(-)
+>  arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts | 2 --
+>  1 file changed, 2 deletions(-)
 > 
 > diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> index 1448c3dba08e..658215c9822c 100644
+> index 658215c9822c..8ee4a693c438 100644
 > --- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
 > +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
-> @@ -209,14 +209,10 @@
->  };
->  
->  &cpu0 {
-> -	cooling-min-level = <0>;
-> -	cooling-max-level = <6>;
->  	#cooling-cells = <2>;
->  };
->  
->  &cpu4 {
-> -	cooling-min-level = <0>;
-> -	cooling-max-level = <4>;
->  	#cooling-cells = <2>;
->  };
+> @@ -59,8 +59,6 @@
+>  				      1 1
+>  				      2 2
+>  				      3 3>;
+> -		cooling-min-level = <0>;
+> -		cooling-max-level = <3>;
+>  		#cooling-cells = <2>;
+>  	};
 >  
 > 
 
