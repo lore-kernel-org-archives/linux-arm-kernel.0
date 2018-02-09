@@ -1,203 +1,244 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 9 Feb 2018 13:04:32 +0800
-Subject: [PATCH v5 1/3] arm64/ras: support sea error recovery
-In-Reply-To: <5A7B4D87.9020207@arm.com>
-References: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
- <1516969885-150532-2-git-send-email-xiexiuqi@huawei.com>
- <5A70C536.7040208@arm.com> <5A7B4D87.9020207@arm.com>
-Message-ID: <92585a44-aeac-4e0e-f879-e2d00b30040f@huawei.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 9 Feb 2018 11:01:47 +0530
+Subject: [PATCH v6 15/15] dt-bindings: cpufreq: Document
+ operating-points-v2-krait-cpu
+In-Reply-To: <20180209025449.qvbirdvflijxo62j@rob-hp-laptop>
+References: <1517890108-8140-1-git-send-email-sricharan@codeaurora.org>
+ <1517890108-8140-16-git-send-email-sricharan@codeaurora.org>
+ <20180209025449.qvbirdvflijxo62j@rob-hp-laptop>
+Message-ID: <b81953c3-3bbd-2a06-90d3-a3cdd2a86418@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
+On 2/9/2018 8:24 AM, Rob Herring wrote:
+> On Tue, Feb 06, 2018 at 09:38:28AM +0530, Sricharan R wrote:
+>> In Certain QCOM SoCs like ipq8064, apq8064, msm8960, msm8974
+>> that has KRAIT processors the voltage/current value of each OPP
+>> varies based on the silicon variant in use.
+>> operating-points-v2-krait-cpu specifies the phandle to nvmem efuse cells
+>> and the operating-points-v2 table for each opp. The qcom-cpufreq driver
+>> reads the efuse value from the SoC to provide the required information
+>> that is used to determine the voltage and current value for each OPP of
+>> operating-points-v2 table when it is parsed by the OPP framework.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/cpufreq/krait-cpufreq.txt  | 363 +++++++++++++++++++++
+>>  1 file changed, 363 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/krait-cpufreq.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/krait-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/krait-cpufreq.txt
+>> new file mode 100644
+>> index 0000000..e7351f7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/cpufreq/krait-cpufreq.txt
+>> @@ -0,0 +1,363 @@
+>> +QCOM KRAIT CPUFreq and OPP bindings
+>> +===================================
+>> +
+>> +In Certain QCOM SoCs like ipq8064, apq8064, msm8960, msm8974
+>> +that has KRAIT processors the voltage value of each OPP varies
+>> +based on the silicon variant in use. Qualcomm Process Voltage Scaling Tables
+>> +defines the voltage and current value based on the speed/pvs/version
+>> +combination blown in the efuse. The qcom-cpufreq driver reads the efuse
+>> +value from the SoC to provide the OPP framework with required information.
+>> +This is used to determine the voltage and current value for each OPP of
+>> +operating-points-v2 table when it is parsed by the OPP framework.
+>> +
+>> +Required properties:
+>> +--------------------
+>> +In 'cpus' nodes:
+>> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
+>> +
+>> +In 'operating-points-v2' table:
+>> +- compatible: Should be
+>> +	- 'operating-points-v2-krait-cpu' for ipq8064, apq8064, msm8960,
+>> +					      msm8974.
+>> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
+>> +		efuse registers that has information about the
+>> +		speedbin/pvs/version that is used to select the right
+>> +		voltage/current value pair. Note that the length field of the
+>> +		nvmem-cell is used to differentiate between format 'A' or 'B'
+>> +		efuse settings. len of '4' bytes is for format 'A' and '8'
+>> +		bytes for format 'B'. Please refer the for nvmem-cells
+>> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
+>> +		and also examples below for both the cases.
+>> +Example 1:
+>> +---------
+>> +
+>> +/* For arch/arm/boot/dts/apq8064.dtsi --> format 'A' */
+>> +cpus {
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +
+>> +	CPU0: cpu at 0 {
+>> +		compatible = "qcom,krait";
+>> +		enable-method = "qcom,kpss-acc-v1";
+>> +		device_type = "cpu";
+>> +		reg = <0>;
+>> +		next-level-cache = <&L2>;
+>> +		qcom,acc = <&acc0>;
+>> +		qcom,saw = <&saw0>;
+>> +		cpu-idle-states = <&CPU_SPC>;
+>> +		operating-points-v2 = <&cpu_opp_table>;
+>> +	};
+>> +};
+>> +
+>> +qfprom: qfprom at 700000 {
+>> +	  compatible      = "qcom,qfprom";
+>> +	  reg	      = <0x00700000 0x1000>;
+>> +	  #address-cells  = <1>;
+>> +	  #size-cells     = <1>;
+>> +	  ranges;
+>> +	  pvs_efuse: pvs {
+>> +		reg = <0xc0 0x4>;
+>> +	};
+>> +};
+>> +
+>> +cpu_opp_table: opp-table {
+>> +	compatible = "operating-points-v2-krait-cpu";
+>> +	nvmem-cells = <&pvs_efuse>;
+>> +
+>> +		/*
+>> +		 * Missing opp-shared property means CPUs switch DVFS states
+>> +		 * independently.
+>> +		 */
+>> +
+>> +	       opp-918000000 {
+>> +			opp-hz = /bits/ 64 <918000000>;
+>> +			opp-microvolt-speed0-pvs0-v0 = <1100000>;
+> 
+> Where is this property defined? I'm not that happy with it, but don't 
+> have a better suggestion. Maybe make pvsN be an array of values with 0 
+> for any skipped indexes? The '-v0' seems pointless. 
+> 
 
-On 2018/2/8 3:03, James Morse wrote:
-> Hi Xie XiuQi,
-> 
-> On 30/01/18 19:19, James Morse wrote:
->> On 26/01/18 12:31, Xie XiuQi wrote:
->>> With ARM v8.2 RAS Extension, SEA are usually triggered when memory errors
->>> are consumed. According to the existing process, errors occurred in the
->>> kernel, leading to direct panic, if it occurred the user-space, we should
->>> just kill process.
->>>
->>> But there is a class of error, in fact, is not necessary to kill
->>> process, you can recover and continue to run the process. Such as
->>> the instruction data corrupted, where the memory page might be
->>> read-only, which is has not been modified, the disk might have the
->>> correct data, so you can directly drop the page, ant reload it when
->>> necessary.
->>
->> With firmware-first support, we do all this...
->>
->>
->>> So this patchset is just try to solve such problem: if the error is
->>> consumed in user-space and the error occurs on a clean page, you can
->>> directly drop the memory page without killing process.
->>>
->>> If the corrupted page is clean, just dropped it and return to user-space
->>> without side effects. And if corrupted page is dirty, memory_failure()
->>> will send SIGBUS with code=BUS_MCEERR_AR. While without this patchset,
->>> do_sea() will just send SIGBUS, so the process was killed in the same place.
->>
->> ... but this happens too. I agree its something we should fix, but I don't think
->> this is the best way to do it.
->>
->> This series is pulling the memory-failure-queue details back into the arch-code
->> to build a second list, that gets processed as extra work when we return to
->> user-space.
->>
->>
->> The root of the issue is ghes_notify_sea() claims the notification as something
->> APEI has dealt with, ... but it hasn't done it yet. The signals will be
->> generated by something currently stuck in a queue. (Evidently x86 doesn't handle
->> synchronous errors like this using firmware-first).
->>
->> I think a smaller fix is to give the queues that may be holding the
->> memory_failure() work a kick as part of the code that calls ghes_notify_sea().
->> This means that by the time we return to do_sea() ghes_notify_sea()'s claim that
->> APEI has dealt with it is true as any generated signals are pending. We can then
->> skip the existing SIGBUS generation code.
->>
->>
->>> Because memory_failure() may sleep, we can not call it directly in SEA
->>
->> (this one is more serious, I've attempted to fix it by moving all NMI-like
->> GHES-notifications to use the estatus queue).
->>
->>
->>> exception context. So we saved faulting physical address associated with
->>> a process in the ghes handler and set __TIF_SEA_NOTIFY. When we return
->>> from SEA exception context and get into do_notify_resume() before the
->>> process running, we could check it and call memory_failure() to do
->>> recovery.
->>
->>> It's safe, because we are in process context.
->>
->> I think this is the trick. When we take a Synchronous-external-abort out of
->> userspace, we're in process context too. We can add helpers to drain the
->> memory_failure_queue which can be called when do_sea() when we know we're
->> preemptible and interrupts-et-al are unmasked.
-> 
-> Something like... base on [0], in arch/arm64/kernel/acpi.c:
-> -----------------%<-----------------
-> int apei_claim_sea(struct pt_regs *regs)
-> {
->         int cpu;
->         int err = -ENOENT;
->         unsigned long current_flags = arch_local_save_flags();
->         unsigned long interrupted_flags = current_flags;
-> 
->         if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
->                 return err;
-> 
->         if (regs)
->                 interrupted_flags = regs->pstate;
-> 
->         /*
->          * APEI expects an NMI-like notification to always be called
->          * in NMI context.
->          */
->         local_daif_restore(DAIF_ERRCTX);
->         nmi_enter();
->         err = ghes_notify_sea();
->         cpu = smp_processor_id();
->         nmi_exit();
-> 
->         /*
->          * APEI NMI-like notifications are deferred to irq_work. Unless
->          * we interrupted irqs-masked code, we can do that now.
->          */
->         if (!err) {
->                 if (!arch_irqs_disabled_flags(interrupted_flags)) {
->                         local_daif_restore(DAIF_PROCCTX_NOIRQ);
->                         irq_work_run();
->                 } else {
->                         err = -EINPROGRESS;
->                 }
->         }
-> 
->         local_daif_restore(current_flags);
-> 
->         if (IS_ENABLED(CONFIG_ACPI_APEI_MEMORY_FAILURE) && !err) {
->                 /*
->                  * Memory failure work is scheduled on the local CPU.
->                  * If we interrupted userspace, or are in process context
->                  * we can do that now.
->                  */
->                 if ((regs && !user_mode(regs)) || !preemptible())
->                         err = -EINPROGRESS;
->                 else
->                         memory_failure_queue_kick(cpu);
->         }
-> 
->         return err;
-> }
-> -----------------%<-----------------
-> 
-> 
-> and to mm/memory-failure.c:
-> -----------------%<-----------------
-> @@ -1355,7 +1355,7 @@ static void memory_failure_work_func(struct work_struct *w
-> ork)
->         unsigned long proc_flags;
->         int gotten;
-> 
-> -       mf_cpu = this_cpu_ptr(&memory_failure_cpu);
-> +       mf_cpu = container_of(work, struct memory_failure_cpu, work);
->         for (;;) {
->                 spin_lock_irqsave(&mf_cpu->lock, proc_flags);
->                 gotten = kfifo_get(&mf_cpu->fifo, &entry);
-> 
-> @@ -1369,6 +1369,22 @@ static void memory_failure_work_func(struct work_struct *
-> work)
->         }
->  }
-> 
-> +/*
-> + * Process memory_failure work queued on the specified CPU.
-> + * Used to avoid return-to-userspace racing with the memory_failure workqueue.
-> + */
-> +void memory_failure_queue_kick(int cpu)
-> +{
-> +       unsigned long flags;
-> +       struct memory_failure_cpu *mf_cpu;
-> +
-> +       might_sleep();
-> +
-> +       mf_cpu = &per_cpu(memory_failure_cpu, cpu);
-> +       cancel_work_sync(&mf_cpu->work);
-> +       memory_failure_work_func(&mf_cpu->work);
-> +}
-> +
->  static int __init memory_failure_init(void)
->  {
->         struct memory_failure_cpu *mf_cpu;
-> -----------------%<-----------------
+ 'opp-microvolt' is the property that comes from OPP-V2 bindings and rest
+  of the string "speed%s-pvs%s-v%s" gets concatenated to the string
+  by the cpufreq driver using dev_pm_opp_set_prop_name api. So all
+  the three speed,pvs,v (version) come from efuse and can vary.
+  Just that in the data so far, v is always '0'.
 
-It look like the change is reasonable, thanks James's solving.
+>> +			opp-microvolt-speed0-pvs1-v0 = <1050000>;
+>> +			opp-microvolt-speed0-pvs3-v0 = <1000000>;
+>> +			opp-microvolt-speed0-pvs4-v0 = <975000>;
+>> +			opp-microvolt-speed1-pvs0-v0 = <1025000>;
+>> +			opp-microvolt-speed1-pvs1-v0 = <1000000>;
+>> +			opp-microvolt-speed1-pvs2-v0 = <950000>;
+>> +			opp-microvolt-speed1-pvs3-v0 = <925000>;
+>> +			opp-microvolt-speed1-pvs4-v0 = <900000>;
+>> +			opp-microvolt-speed1-pvs5-v0 = <900000>;
+>> +			opp-microvolt-speed1-pvs6-v0 = <900000>;
+>> +			opp-microvolt-speed2-pvs0-v0 = <975000>;
+>> +			opp-microvolt-speed2-pvs1-v0 = <950000>;
+>> +			opp-microvolt-speed2-pvs2-v0 = <925000>;
+>> +			opp-microvolt-speed2-pvs3-v0 = <912500>;
+>> +			opp-microvolt-speed2-pvs4-v0 = <900000>;
+>> +			opp-microvolt-speed2-pvs5-v0 = <900000>;
+>> +			opp-microvolt-speed2-pvs6-v0 = <900000>;
+>> +			opp-microvolt-speed14-pvs0-v0 = <1025000>;
+>> +			opp-microvolt-speed14-pvs1-v0 = <1000000>;
+>> +			opp-microvolt-speed14-pvs2-v0 = <950000>;
+>> +			opp-microvolt-speed14-pvs3-v0 = <925000>;
+>> +			opp-microvolt-speed14-pvs4-v0 = <900000>;
+>> +			opp-microvolt-speed14-pvs5-v0 = <900000>;
+>> +			opp-microvolt-speed14-pvs6-v0 = <900000>;
+>> +		};
+>> +
+>> +		opp-810000000 {
+>> +			opp-hz = /bits/ 64 <810000000>;
+>> +			opp-microvolt-speed0-pvs0-v0 =  < 1075000>;
+>> +			opp-microvolt-speed0-pvs1-v0 = 	< 1025000>;
+>> +			opp-microvolt-speed0-pvs3-v0 = 	< 975000>;
+>> +			opp-microvolt-speed0-pvs3-v0 = 	< 962500>;
+>> +			opp-microvolt-speed1-pvs0-v0 = 	< 1000000>;
+>> +			opp-microvolt-speed1-pvs1-v0 = 	< 975000>;
+>> +			opp-microvolt-speed1-pvs2-v0 = 	< 937500>;
+>> +			opp-microvolt-speed1-pvs3-v0 = 	< 900000>;
+>> +			opp-microvolt-speed1-pvs4-v0 = 	< 887500>;
+>> +			opp-microvolt-speed1-pvs5-v0 = 	< 887500>;
+>> +			opp-microvolt-speed1-pvs6-v0 = 	< 887500>;
+>> +			opp-microvolt-speed2-pvs0-v0 = 	< 962500>;
+>> +			opp-microvolt-speed2-pvs1-v0 = 	< 937500>;
+>> +			opp-microvolt-speed2-pvs2-v0 = 	< 912500>;
+>> +			opp-microvolt-speed2-pvs3-v0 = 	< 900000>;
+>> +			opp-microvolt-speed2-pvs4-v0 = 	< 887500>;
+>> +			opp-microvolt-speed2-pvs5-v0 = 	< 887500>;
+>> +			opp-microvolt-speed2-pvs6-v0 = 	< 887500>;
+> 
+> Some space then tab issues on the above. Also, drop the space after the 
+> '<'.
+
+ ok, will fix it.
 
 > 
-> I've cooked up some NOTFIY_SEA-ing APEI firmware using kvmtool to test this. I
-> haven't yet managed to hit irq-masked code with NOTIFY_SEA. I'll try and tidy
-> this up and post a branch to make it easier to test...
+>> +			opp-microvolt-speed14-pvs0-v0 =	< 1000000>;
+>> +			opp-microvolt-speed14-pvs1-v0 =	< 975000>;
+>> +			opp-microvolt-speed14-pvs2-v0 =	< 937500>;
+>> +			opp-microvolt-speed14-pvs3-v0 =	< 900000>;
+>> +			opp-microvolt-speed14-pvs4-v0 =	< 887500>;
+>> +			opp-microvolt-speed14-pvs5-v0 =	< 887500>;
+>> +			opp-microvolt-speed14-pvs6-v0 =	< 887500>;
+>> +		};
+>> +
+>> +		opp-702000000 {
+>> +			 opp-hz = /bits/ 64 <702000000>;
+>> +			 opp-microvolt-speed0-pvs0-v0 =  <1025000>;
+>> +			 opp-microvolt-speed0-pvs1-v0 =  <975000>;
+>> +			 opp-microvolt-speed0-pvs3-v0 =  <925000>;
+>> +			 opp-microvolt-speed0-pvs3-v0 =  <925000>;
+>> +			 opp-microvolt-speed1-pvs0-v0 =  <962500>;
+>> +			 opp-microvolt-speed1-pvs1-v0 =  <962500>;
+>> +			 opp-microvolt-speed1-pvs2-v0 =  <925000>;
+>> +			 opp-microvolt-speed1-pvs3-v0 =  <900000>;
+>> +			 opp-microvolt-speed1-pvs4-v0 =  <875000>;
+>> +			 opp-microvolt-speed1-pvs5-v0 =  <875000>;
+>> +			 opp-microvolt-speed1-pvs6-v0 =  <875000>;
+>> +			 opp-microvolt-speed2-pvs0-v0 =  <950000>;
+>> +			 opp-microvolt-speed2-pvs1-v0 =  <925000>;
+>> +			 opp-microvolt-speed2-pvs2-v0 =  <900000>;
+>> +			 opp-microvolt-speed2-pvs3-v0 =  <900000>;
+>> +			 opp-microvolt-speed2-pvs4-v0 =  <875000>;
+>> +			 opp-microvolt-speed2-pvs5-v0 =  <875000>;
+>> +			 opp-microvolt-speed2-pvs6-v0 =  <875000>;
+>> +			 opp-microvolt-speed14-pvs0-v0 = <962500>;
+>> +			 opp-microvolt-speed14-pvs1-v0 = <962500>;
+>> +			 opp-microvolt-speed14-pvs2-v0 = <925000>;
+>> +			 opp-microvolt-speed14-pvs3-v0 = <900000>;
+>> +			 opp-microvolt-speed14-pvs4-v0 = <875000>;
+>> +			 opp-microvolt-speed14-pvs5-v0 = <875000>;
+>> +			 opp-microvolt-speed14-pvs6-v0 = <875000>;
+>> +		};
+>> +
+>> +		opp-594000000 {
+>> +			opp-hz = /bits/ 64 <594000000>;
+>> +			opp-microvolt-speed0-pvs0-v0 =  <1000000>;
+>> +			opp-microvolt-speed0-pvs1-v0 = 	<950000>;
+>> +			opp-microvolt-speed0-pvs3-v0 = 	<900000>;
+>> +			opp-microvolt-speed0-pvs3-v0 = 	<900000>;
+>> +			opp-microvolt-speed1-pvs0-v0 = 	<950000>;
+>> +			opp-microvolt-speed1-pvs1-v0 = 	<950000>;
+>> +			opp-microvolt-speed1-pvs2-v0 = 	<925000>;
+>> +			opp-microvolt-speed1-pvs3-v0 = 	<900000>;
+>> +			opp-microvolt-speed1-pvs4-v0 = 	<875000>;
+>> +			opp-microvolt-speed1-pvs5-v0 = 	<875000>;
+>> +			opp-microvolt-speed1-pvs6-v0 = 	<875000>;
+>> +			opp-microvolt-speed2-pvs0-v0 = 	<950000>;
+>> +			opp-microvolt-speed2-pvs1-v0 = 	<925000>;
+>> +			opp-microvolt-speed2-pvs2-v0 = 	<900000>;
+>> +			opp-microvolt-speed2-pvs3-v0 = 	<900000>;
+>> +			opp-microvolt-speed2-pvs4-v0 = 	<875000>;
+>> +			opp-microvolt-speed2-pvs5-v0 = 	<875000>;
+>> +			opp-microvolt-speed2-pvs6-v0 = 	<875000>;
 > 
-> I prefer this as it doesn't duplicate the state then come back on a TIF flag.
-> I'd like to move the kicking logic into ghes.c, as that is where the queueing
-> happened, but the 'do-this, restore these flags, do-that' is somewhat tasteless,
-> and it looks like on arm64 has synchronous nmi-like notifications that must be
-> handled before returning to user-space...
+> More space then tab issues after the '='.
 > 
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> [0] https://www.spinics.net/lists/linux-acpi/msg80149.html
-> 
-> 
-> 
-> 
-> .
-> 
+ ok, will fix.
+
+Regards,
+ Sricharan
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
