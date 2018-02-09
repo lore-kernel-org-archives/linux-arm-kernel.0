@@ -1,44 +1,71 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 9 Feb 2018 09:48:48 +0100
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Feb 2018 08:51:33 +0000
 Subject: [PATCH] irqchip: Use %px to print pointer value
 In-Reply-To: <20180209021031.20631-1-jaedon.shin@gmail.com>
 References: <20180209021031.20631-1-jaedon.shin@gmail.com>
-Message-ID: <CAMuHMdXOtrnMrNkuexHdpX+asaG1ADwmb5JWwAYYrvvvn0P8ZQ@mail.gmail.com>
+Message-ID: <ba5fb474-4e45-8d8d-ee5d-9f1a211090e3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaedon,
-
-On Fri, Feb 9, 2018 at 3:10 AM, Jaedon Shin <jaedon.shin@gmail.com> wrote:
+On 09/02/18 02:10, Jaedon Shin wrote:
 > Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
 > pointers printed with %p are hashed. Use %px instead of %p to print
 > pointer value.
->
+> 
 > Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
-
-Thanks for your patch!
-
+> ---
+>  drivers/irqchip/irq-bcm7038-l1.c | 2 +-
+>  drivers/irqchip/irq-bcm7120-l2.c | 2 +-
+>  drivers/irqchip/irq-brcmstb-l2.c | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
+> index 55cfb986225b..f604c1d89b3b 100644
 > --- a/drivers/irqchip/irq-bcm7038-l1.c
 > +++ b/drivers/irqchip/irq-bcm7038-l1.c
 > @@ -339,7 +339,7 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
->                 goto out_unmap;
->         }
->
-> -       pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
-> +       pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
->                 intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
+>  		goto out_unmap;
+>  	}
+>  
+> -	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
+> +	pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
+>  		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
+>  
+>  	return 0;
+> diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
+> index 983640eba418..1cc4dd1d584a 100644
+> --- a/drivers/irqchip/irq-bcm7120-l2.c
+> +++ b/drivers/irqchip/irq-bcm7120-l2.c
+> @@ -318,7 +318,7 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
+>  		}
+>  	}
+>  
+> -	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
+> +	pr_info("registered %s intc (mem: 0x%px, parent IRQ(s): %d)\n",
+>  			intc_name, data->map_base[0], data->num_parent_irqs);
+>  
+>  	return 0;
+> diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
+> index 691d20eb0bec..6760edeeb666 100644
+> --- a/drivers/irqchip/irq-brcmstb-l2.c
+> +++ b/drivers/irqchip/irq-brcmstb-l2.c
+> @@ -262,7 +262,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
+>  		ct->chip.irq_set_wake = irq_gc_set_wake;
+>  	}
+>  
+> -	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
+> +	pr_info("registered L2 intc (mem: 0x%px, parent irq: %d)\n",
+>  			base, parent_irq);
+>  
+>  	return 0;
+> 
 
-I believe the printing of this value should just be removed.
-Printing virtual addresses of mapped registers is usually not helpful, except
-for an attacker.
+Why is that something useful to do? This just tells you where the device
+is mapped in the VA space, and I doubt that's a useful information,
+hashed pointers or not. Am I missing something obvious?
 
-Gr{oetje,eeting}s,
+Thanks,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Jazz is not dead. It just smells funny...
