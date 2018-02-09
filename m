@@ -1,63 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri,  9 Feb 2018 08:15:53 -0800
-Subject: [PATCH] ARM: OMAP3: Fix prm wake interrupt for resume
-Message-ID: <20180209161553.19129-1-tony@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Feb 2018 16:17:39 +0000
+Subject: [PATCH v3 26/41] KVM: arm64: Introduce framework for accessing
+ deferred sysregs
+In-Reply-To: <20180125195413.GT21802@cbox>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-27-christoffer.dall@linaro.org>
+ <20180123160431.GA5862@e103592.cambridge.arm.com>
+ <20180125195413.GT21802@cbox>
+Message-ID: <20180209161739.GE5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For platform_suspend_ops, the finish call is too late to re-enable wake
-irqs and we need re-enable wake irqs on wake call instead.
+On Thu, Jan 25, 2018 at 08:54:13PM +0100, Christoffer Dall wrote:
+> On Tue, Jan 23, 2018 at 04:04:40PM +0000, Dave Martin wrote:
+> > On Fri, Jan 12, 2018 at 01:07:32PM +0100, Christoffer Dall wrote:
+> > > We are about to defer saving and restoring some groups of system
+> > > registers to vcpu_put and vcpu_load on supported systems.  This means
+> > > that we need some infrastructure to access system registes which
+> > > supports either accessing the memory backing of the register or directly
+> > > accessing the system registers, depending on the state of the system
+> > > when we access the register.
+> > > 
+> > > We do this by defining a set of read/write accessors for each system
+> > > register, and letting each system register be defined as "immediate" or
+> > > "deferrable".  Immediate registers are always saved/restored in the
+> > > world-switch path, but deferrable registers are only saved/restored in
+> > > vcpu_put/vcpu_load when supported and sysregs_loaded_on_cpu will be set
+> > > in that case.
+> > > 
+> > > Not that we don't use the deferred mechanism yet in this patch, but only
+> > > introduce infrastructure.  This is to improve convenience of review in
+> > > the subsequent patches where it is clear which registers become
+> > > deferred.
+> > 
+> > Might this table-driven approach result in a lot of branch mispredicts,
+> > particularly across load/put boundaries?
+> > 
+> > If we were to move the whole construct to a header, then it could get
+> > constant-folded at the call site down to the individual reg accessed,
+> > say:
+> > 
+> > 	if (sys_regs_loaded)
+> > 		read_sysreg_s(TPIDR_EL0);
+> > 	else
+> > 		__vcpu_sys_reg(v, TPIDR_EL0);
+> > 
+> > Where multiple regs are accessed close to each other, the compiler
+> > may be able to specialise the whole sequence for the loaded and !loaded
+> > cases so that there is only one conditional branch.
+> > 
+> 
+> That's an interesting thing to consider indeed.  I wasn't really sure
+> how to put this in a header file which wouldn't look overly bloated for
+> inclusion elsewhere, so we ended up with this.
+> 
+> I don't think the alternative suggestion that I discused with Julien on
+> this patch changes this much, but since you've had a look at this, I'm
+> curious which one of the two (lookup table vs. giant switch) you prefer?
 
-Otherwise noirq resume for devices has already happened. And then
-dev_pm_disarm_wake_irq() has already disabled the dedicated wake irqs
-when the interrupt triggers and the wake irq is never handled.
+The giant switch approach has the advantage that it is likely to be
+folded down to a single case when the switch control expression is
+const-foldable; the flipside is that when that fails the entire
+switch would be inlined.
 
-For devices that are already in PM runtime suspended state when we
-enter suspend this means that a possible wake irq will never trigger.
+> > The individual accessor functions also become unnecessary in this case,
+> > because we wouldn't need to derive function pointers from them any
+> > more.
+> > 
+> > I don't know how performance would compare in practice though.
+> 
+> I don't know either.  But I will say that the whole idea behind put/load
+> is that you do this rarely, and going to userspace from KVM is
+> notriously expensive, also on x86.
 
-And this can lead into a situation where a device has a pending padconf
-wake irq, and the device will stay unresponsive to any further wake
-irqs.
+I guess that makes sense.  I'm still a bit hazy on the big picture
+for KVM.
 
-This issue can be easily reproduced by setting serial console log level
-to zero, letting the serial console idle, and suspend the system from
-an ssh terminal. Then try to wake up the system by typing to the serial
-console.
+> > I'm also assuming that all calls to these accessors are const-foldable.
+> > If not, relying on inlining would bloat the generated code a lot.
+> 
+> We have places where this is not the cae, access_vm_reg() for example.
+> But if we really, really, wanted to, we could rewrite that to have a
+> function for each register, but that's pretty horrid on its own.
 
-Note that this affects only omap3 PRM interrupt as that's currently
-the only omap variant that does anything in omap_pm_wake().
+That might not be too bad if there is only one giant inline expansion
+and the rest are folded down.
 
-In general, for the wake irqs to work, the interrupt must have either
-IRQF_NO_SUSPEND or IRQF_EARLY_RESUME set for it to trigger before
-dev_pm_disarm_wake_irq() disables the wake irqs.
 
-Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/pm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I guess this is something to revisit _if_ we suspect a performance
+bottleneck later on.
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -186,7 +186,7 @@ static void omap_pm_end(void)
- 	cpu_idle_poll_ctrl(false);
- }
- 
--static void omap_pm_finish(void)
-+static void omap_pm_wake(void)
- {
- 	if (soc_is_omap34xx())
- 		omap_prcm_irq_complete();
-@@ -196,7 +196,7 @@ static const struct platform_suspend_ops omap_pm_ops = {
- 	.begin		= omap_pm_begin,
- 	.end		= omap_pm_end,
- 	.enter		= omap_pm_enter,
--	.finish		= omap_pm_finish,
-+	.wake		= omap_pm_wake,
- 	.valid		= suspend_valid_only_mem,
- };
- 
--- 
-2.16.1
+For now, I was lacking some understanding regarding how this code gets
+run, so I was guessing about potential issues rather then proven
+issues.
+
+As you might guess, I'm still at the "stupid questions" stage for
+this series :)
+
+[...]
+
+Cheers
+---Dave
