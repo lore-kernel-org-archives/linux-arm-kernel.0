@@ -1,69 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 9 Feb 2018 14:24:22 +0100
-Subject: [PATCH v2 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD
- device
-In-Reply-To: <1518069447.28878.4.camel@mtkswgap22>
-References: <cover.1515639336.git.ryder.lee@mediatek.com>
- <d6669277f5232446b4798a6b724074b18d5c21aa.1515639336.git.ryder.lee@mediatek.com>
- <72058f8d-c83d-d0e6-dc07-83c9f5fc2710@gmail.com>
- <1517803655.1173.12.camel@mtkswgap22>
- <0e0e703c-0ac9-06ad-91c5-abdf16de1ee9@gmail.com>
- <1518069447.28878.4.camel@mtkswgap22>
-Message-ID: <6fc674ba-a540-ef25-932d-afdc9d8e7fbe@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Feb 2018 14:21:26 +0000
+Subject: [PATCH 1/2] arm64: capabilities: Allow flexibility in scope
+In-Reply-To: <20180209121605.14091-1-suzuki.poulose@arm.com>
+References: <20180208173229.GA5862@e103592.cambridge.arm.com>
+ <20180209121605.14091-1-suzuki.poulose@arm.com>
+Message-ID: <20180209142126.GC5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/08/2018 06:57 AM, Ryder Lee wrote:
-> On Wed, 2018-02-07 at 16:18 +0100, Matthias Brugger wrote:
->>
->> On 02/05/2018 05:07 AM, Ryder Lee wrote:
->>> On Sat, 2018-02-03 at 15:26 +0100, Matthias Brugger wrote:
->>>>
->>>> On 01/31/2018 08:42 AM, Ryder Lee wrote:
->>>>> As the new MFD parent is in place, switch probing method to adapt it.
->>>>>
->>>>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->>>>> ---
->>>>>  drivers/clk/mediatek/clk-mt7622-aud.c | 3 ++-
->>>>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
->>>>> index 13f752d..8c18536 100644
->>>>> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
->>>>> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
->>>>> @@ -142,11 +142,12 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
->>>>>  {
->>>>>  	struct clk_onecell_data *clk_data;
->>>>>  	struct device_node *node = pdev->dev.of_node;
->>>>> +	struct device_node *pnode = pdev->dev.parent->of_node;
->>>>>  	int r;
->>>>>  
->>>>>  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
->>>>>  
->>>>> -	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
->>>>> +	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
->>>>
->>>> We will need a fallback here for older device tree bindings.
->>>>
->>>> Regards,
->>>> Matthias
->>>
->>> Up to now, I didn't see both driver and bindings are used anywhere.
->>> Should I still care about that?
->>>
->>
->> Yes please, we have to ensure that newer kernel work with older bindings and
->> vice-versa.
+On Fri, Feb 09, 2018 at 12:16:01PM +0000, Suzuki K Poulose wrote:
+> >>> I'm not sure we need extra comments or documentation; I just want
+> >>> to check that I've understood the patch correctly.
+> >>
+> >> So, would you prefer this split to the original patch ?
+> > 
+> > I think splitting out this patch (1/2) makes sense.
+> > 
+> > 
+> > For the second part (2/2) of the split, I still find that hard to
+> > review.  The commit message suggests trivially obvious refactoring
+> > only, but I think there are three things going on:
+> > 
+> >   1) moving functions around (with the intention of merging them)
+> >   2) merging functions together
+> >   3) other miscellaneous bits of refactoring, and cleanups that become
+> >      "obvious" after steps (1) and (2).
+> > 
+> > The refactoring is likely straightfoward, but the resulting diff is
+> > not (at least, I struggle to read it).
+> > 
+> > Could you split the second part along the lines if (1)..(3) above?
+> > I think that would make for much easier review.  (Sorry to be a pain!)
+> > 
+> > Also, the second patch leaves at least one function that does nothing
+> > except call a second function that has no other caller.  It may do
+> > no harm to remove and inline any such function.  (Falls under (3),
+> > I guess.)
+> > 
 > 
-> OKay. An unrelated question - is it possible to change the compatible
-> string (*-audsys-clk) without breaking backward compatible?
+> Here it goes...
 > 
+> Suzuki K Poulose (4):
+>   arm64: capabilities: Prepare for grouping features and errata work
+>     arounds
+>   arm64: capabilities: Split the processing of errata work arounds
+>   arm64: capabilities: Allow features based on local CPU scope
+>   arm64: capabilities: Group handling of features and errata workarounds
 
-You can't change the compatible string, but you can add a new one, if the DT
-maintainer are ok with that. Beware that you won't be able to re-use the old one
-in a different driver.
+This is a lot easier to follow now, thanks.
 
-Regards,
-Matthias
+The patches look OK to me, but I'll comment when you repost whole
+series in its updated form, so I don't get confused about which
+patches are live now...
+
+
+Cheers
+---Dave
