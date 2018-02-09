@@ -1,71 +1,130 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Feb 2018 08:51:33 +0000
-Subject: [PATCH] irqchip: Use %px to print pointer value
-In-Reply-To: <20180209021031.20631-1-jaedon.shin@gmail.com>
-References: <20180209021031.20631-1-jaedon.shin@gmail.com>
-Message-ID: <ba5fb474-4e45-8d8d-ee5d-9f1a211090e3@arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 9 Feb 2018 09:51:27 +0100
+Subject: [PATCH 5/5] arm: zynq: Add support for Xilinx zc770 xm013 dc4
+ board
+In-Reply-To: <3be3cd00b710827da46817693748eb6bcee00f82.1516200065.git.michal.simek@xilinx.com>
+References: <cover.1516200065.git.michal.simek@xilinx.com>
+ <3be3cd00b710827da46817693748eb6bcee00f82.1516200065.git.michal.simek@xilinx.com>
+Message-ID: <6f40dd95-f6bf-aac8-33ac-9fef54447ec3@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/18 02:10, Jaedon Shin wrote:
-> Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
-> pointers printed with %p are hashed. Use %px instead of %p to print
-> pointer value.
+On 17.1.2018 15:41, Michal Simek wrote:
+> zc770 is based board which is extended by FMC/DC cards for SoC
+> validation. FMCs/DCs are supposed to cover all SoC configurations.
+> FMC/DC contains can, ethernet, i2c, qspi, spi and uart.
 > 
-> Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > ---
->  drivers/irqchip/irq-bcm7038-l1.c | 2 +-
->  drivers/irqchip/irq-bcm7120-l2.c | 2 +-
->  drivers/irqchip/irq-brcmstb-l2.c | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
-> index 55cfb986225b..f604c1d89b3b 100644
-> --- a/drivers/irqchip/irq-bcm7038-l1.c
-> +++ b/drivers/irqchip/irq-bcm7038-l1.c
-> @@ -339,7 +339,7 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
->  		goto out_unmap;
->  	}
->  
-> -	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
-> +	pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
->  		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
->  
->  	return 0;
-> diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
-> index 983640eba418..1cc4dd1d584a 100644
-> --- a/drivers/irqchip/irq-bcm7120-l2.c
-> +++ b/drivers/irqchip/irq-bcm7120-l2.c
-> @@ -318,7 +318,7 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
->  		}
->  	}
->  
-> -	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
-> +	pr_info("registered %s intc (mem: 0x%px, parent IRQ(s): %d)\n",
->  			intc_name, data->map_base[0], data->num_parent_irqs);
->  
->  	return 0;
-> diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-> index 691d20eb0bec..6760edeeb666 100644
-> --- a/drivers/irqchip/irq-brcmstb-l2.c
-> +++ b/drivers/irqchip/irq-brcmstb-l2.c
-> @@ -262,7 +262,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
->  		ct->chip.irq_set_wake = irq_gc_set_wake;
->  	}
->  
-> -	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
-> +	pr_info("registered L2 intc (mem: 0x%px, parent irq: %d)\n",
->  			base, parent_irq);
->  
->  	return 0;
+>  arch/arm/boot/dts/Makefile             |  1 +
+>  arch/arm/boot/dts/zynq-zc770-xm013.dts | 78 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 79 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/zynq-zc770-xm013.dts
 > 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 6bd4b9a29511..44be37afa544 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1044,6 +1044,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
+>  	zynq-zc770-xm010.dtb \
+>  	zynq-zc770-xm011.dtb \
+>  	zynq-zc770-xm012.dtb \
+> +	zynq-zc770-xm013.dtb \
+>  	zynq-zed.dtb \
+>  	zynq-zybo.dtb
+>  dtb-$(CONFIG_MACH_ARMADA_370) += \
+> diff --git a/arch/arm/boot/dts/zynq-zc770-xm013.dts b/arch/arm/boot/dts/zynq-zc770-xm013.dts
+> new file mode 100644
+> index 000000000000..ad3e1d108a9b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/zynq-zc770-xm013.dts
+> @@ -0,0 +1,78 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Xilinx ZC770 XM013 board DTS
+> + *
+> + * Copyright (C) 2013 Xilinx, Inc.
+> + */
+> +/dts-v1/;
+> +#include "zynq-7000.dtsi"
+> +
+> +/ {
+> +	compatible = "xlnx,zynq-zc770-xm013", "xlnx,zynq-7000";
+> +	model = "Xilinx Zynq";
+> +
+> +	aliases {
+> +		ethernet0 = &gem1;
+> +		i2c0 = &i2c1;
+> +		serial0 = &uart0;
+> +		spi1 = &spi0;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "";
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x40000000>;
+> +	};
+> +};
+> +
+> +&can1 {
+> +	status = "okay";
+> +};
+> +
+> +&gem1 {
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +	phy-handle = <&ethernet_phy>;
+> +
+> +	ethernet_phy: ethernet-phy at 7 {
+> +		reg = <7>;
+> +		device_type = "ethernet-phy";
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	si570: clock-generator at 55 {
+> +		#clock-cells = <0>;
+> +		compatible = "silabs,si570";
+> +		temperature-stability = <50>;
+> +		reg = <0x55>;
+> +		factory-fout = <156250000>;
+> +		clock-frequency = <148500000>;
+> +	};
+> +};
+> +
+> +&spi0 {
+> +	status = "okay";
+> +	num-cs = <4>;
+> +	is-decoded-cs = <0>;
+> +	eeprom: at25 at 0 {
 
-Why is that something useful to do? This just tells you where the device
-is mapped in the VA space, and I doubt that's a useful information,
-hashed pointers or not. Am I missing something obvious?
+This should be probably eeprom: eeprom at 25.
+
+Rob: Do you see any other issue with this series? Or can I apply?
 
 Thanks,
+Michal
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180209/d007ce7a/attachment.sig>
