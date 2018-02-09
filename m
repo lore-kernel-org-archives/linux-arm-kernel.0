@@ -1,37 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  9 Feb 2018 14:28:07 +0530
-Subject: [PATCH 07/10] ARM: dts: gemini: Remove "cooling-{min|max}-level" for
- gpio-fan node
-In-Reply-To: <cover.1518166039.git.viresh.kumar@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 9 Feb 2018 10:03:57 +0100
+Subject: [PATCH 06/10] ARM64: dts: meson: Remove "cooling-{min|max}-level"
+ for CPU nodes
+In-Reply-To: <6c91ebfecf86da98a7682c6d262ff1218a1d7343.1518166039.git.viresh.kumar@linaro.org>
 References: <cover.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <01ddf0ac8962feb63e8871a2c2c3498c763f649b.1518166039.git.viresh.kumar@linaro.org>
+ <6c91ebfecf86da98a7682c6d262ff1218a1d7343.1518166039.git.viresh.kumar@linaro.org>
+Message-ID: <303e6c56-8076-e590-c778-81cb8c0181ed@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "cooling-min-level" and "cooling-max-level" properties are not
-parsed by any part of the kernel currently and the max cooling state of
-gpio-fan cooling device is found by referring to the
-"gpio-fan,speed-map" instead.
+On 09/02/2018 09:58, Viresh Kumar wrote:
+> The "cooling-min-level" and "cooling-max-level" properties are not
+> parsed by any part of the kernel currently and the max cooling state of
+> a CPU cooling device is found by referring to the cpufreq table instead.
+> 
+> Remove the unused properties from the CPU nodes.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+> index 1448c3dba08e..658215c9822c 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+> @@ -209,14 +209,10 @@
+>  };
+>  
+>  &cpu0 {
+> -	cooling-min-level = <0>;
+> -	cooling-max-level = <6>;
+>  	#cooling-cells = <2>;
+>  };
+>  
+>  &cpu4 {
+> -	cooling-min-level = <0>;
+> -	cooling-max-level = <4>;
+>  	#cooling-cells = <2>;
+>  };
+>  
+> 
 
-Remove the unused properties from the gpio-fan node.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/boot/dts/gemini-dlink-dns-313.dts | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-index 08568ce24d06..727d16eb02d9 100644
---- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-+++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
-@@ -78,8 +78,6 @@
- 		gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
- 			<&gpio0 12 GPIO_ACTIVE_HIGH>;
- 		gpio-fan,speed-map = <0 0>, <3000 1>, <6000 2>;
--		cooling-min-level = <0>;
--		cooling-max-level = <2>;
- 		#cooling-cells = <2>;
- 	};
- 
--- 
-2.15.0.194.g9af6a3dea062
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
