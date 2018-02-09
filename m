@@ -1,12 +1,12 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 9 Feb 2018 14:41:33 -0800
+Date: Fri, 9 Feb 2018 14:43:00 -0800
 Subject: [PATCH 4/7] watchdog: pnx4008: make use of timeout-secs provided
  in devicetree
 In-Reply-To: <20180209192724.1227-5-marcus.folkesson@gmail.com>
 References: <marcus.folkesson@gmail.com>
  <20180209192724.1227-1-marcus.folkesson@gmail.com>
  <20180209192724.1227-5-marcus.folkesson@gmail.com>
-Message-ID: <20180209224133.GE19627@roeck-us.net>
+Message-ID: <20180209224300.GF19627@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
