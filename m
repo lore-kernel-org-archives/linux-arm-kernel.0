@@ -1,10 +1,10 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Feb 2018 17:55:03 +0000
-Subject: [PATCH v3 17/22] arm64: Add helpers for checking CPU MIDR against a
+Date: Fri,  9 Feb 2018 17:55:01 +0000
+Subject: [PATCH v3 16/21] arm64: Add helpers for checking CPU MIDR against a
  range
 In-Reply-To: <20180209175513.17100-1-suzuki.poulose@arm.com>
 References: <20180209175513.17100-1-suzuki.poulose@arm.com>
-Message-ID: <20180209175513.17100-34-suzuki.poulose@arm.com>
+Message-ID: <20180209175513.17100-32-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
