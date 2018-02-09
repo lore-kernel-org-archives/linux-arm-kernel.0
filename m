@@ -1,42 +1,51 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Fri, 9 Feb 2018 12:07:20 +0100
-Subject: [PATCH 1/2] dt-bindings: clock: reset: Add AXG AO Clock and Reset
- Bindings
-In-Reply-To: <20180209070026.193879-2-yixun.lan@amlogic.com>
-References: <20180209070026.193879-1-yixun.lan@amlogic.com>
- <20180209070026.193879-2-yixun.lan@amlogic.com>
-Message-ID: <CAOFm3uFj-7kZNp6b3SerOzQ8Amfa5Usod+MxwvZJ1E1Z_V9VJA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 09 Feb 2018 12:17:49 +0100
+Subject: [PATCH v2 0/4] ARM/arm64: exynos: Fix missing missing reg
+ warning for syscon restart nodes
+In-Reply-To: <20180209104806.vcrrtpq6izcnwvy2@angband.pl>
+References: <CGME20180130211855epcas1p25cce42a195d8b407f4267309f9b5ccb9@epcas1p2.samsung.com>
+ <20180130211819.17139-1-krzk@kernel.org>
+ <4642d2d0-61c9-33b6-0289-76f487aa45ab@samsung.com>
+ <20180209104806.vcrrtpq6izcnwvy2@angband.pl>
+Message-ID: <06515e72-d7b3-9799-698e-d8b2dd39e22a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 9, 2018 at 8:00 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
-> Add dt-bindings headers for the Meson-AXG's AO clock and
-> reset controller.
+Hi Adam,
+
+On 2018-02-09 11:48, Adam Borowski wrote:
+> On Thu, Feb 08, 2018 at 02:46:32PM +0100, Marek Szyprowski wrote:
+>> On 2018-01-30 22:18, Krzysztof Kozlowski wrote:
+>>> Changes since v1:
+>>> 1. New patch (1/4) calling devm_of_platform_populate() in PMU driver,
+>>>      following Rob's advice.
+>>> 2. The DTS patches moving reboot/poweroff nodes (3/4 and 4/4) now depend
+>>>      on this.
+>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>
+>> Tested following boards and reboot works fine:
+>> Exynos3250 (artik5-eval)
+>> Exynos4412 (trats2)
+>> Exynos5410 (odroid xu)
+>> Exynos5422 (odroid xu3/xu4)
+>> Exynos5433 (tm2)
+> Doesn't seem to work on mine:
+> Exynos4412 (odroid u2)
 >
-> CC: <devicetree@vger.kernel.org>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  include/dt-bindings/clock/axg-aoclkc.h | 26 ++++++++++++++++++++++++++
->  include/dt-bindings/reset/axg-aoclkc.h | 20 ++++++++++++++++++++
->  2 files changed, 46 insertions(+)
->  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
->  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+> Rebooting worked correctly with 3.8 + gazillion non-mainlined patches (as
+> shipped with providen images), never did with mainline.
 >
-> diff --git a/include/dt-bindings/clock/axg-aoclkc.h b/include/dt-bindings/clock/axg-aoclkc.h
-> new file mode 100644
-> index 000000000000..78683abb4247
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/axg-aoclkc.h
-> @@ -0,0 +1,26 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD) */
+> Tested on current mid-of-the-merge-window, plus these four patches.
+>
+>
+> It's possible that I'm doing something wrong; might need an updated u-boot,
+> etc.  Log of a boot-till-reboot+hang session attached.
 
-nit... BSD is not a valid license id as documented in LICENSES [1] :
-please use one of these:
-BSD-2-Clause or BSD-3-Clause
+Reboot on Odroid X2/U2/U3 doesn't work now. It is broken by devfreq since
+a few kernel releases. Please disable devfreq in your .config and reboot
+should also work. That's why I didn't put Odroid U3 on the above list.
 
-Thank you!
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/LICENSES/preferred
+Best regards
 -- 
-Cordially
-Philippe Ombredanne
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
