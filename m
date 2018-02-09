@@ -1,49 +1,77 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 9 Feb 2018 21:23:02 -0200
-Subject: [PATCH RFC] ARM: imx: avic: set low-power interrupt mask for imx25
-In-Reply-To: <1518180203-9698-1-git-send-email-martin@kaiser.cx>
-References: <1518180203-9698-1-git-send-email-martin@kaiser.cx>
-Message-ID: <CAOMZO5DQ-nUULrX4255RNiWpkPMQj66Sp08MYA1ZmQmFt7XhXQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 09 Feb 2018 21:28:55 +0000
+Subject: [PATCH] ARM: dts: bcm2837-rpi-3-b: fix pwm1 pin
+In-Reply-To: <726612883.202327.1514736894033@email.1und1.de>
+References: <da85c22315e08c7dc4dfdebae983278909cfee83.1514733168.git.baruch@tkos.co.il>
+ <726612883.202327.1514736894033@email.1und1.de>
+Message-ID: <877erlett4.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-On Fri, Feb 9, 2018 at 10:43 AM, Martin Kaiser <martin@kaiser.cx> wrote:
-> imx25 contains two registers (LPIMR0 and 1) to define which interrupts
-> are enabled in low-power mode. As of today, those two registers are
-> configured to enable all interrupts. Before going to low-power mode, the
-> AVIC's INTENABLEH and INTENABLEL registers are configured to enable only
-> those interrupts which are used as wakeup sources.
+> Hi Baruch,
 >
-> It turned out that this approach is not sufficient if we want the imx25
-> to go into stop mode during suspend-to-ram. (Stop mode is the low-power
-> mode that consumes the least power. The peripheral master clock is
-> switched off in this mode). For stop mode to work, the LPIMR0 and 1
-> registers have to be configured with the set of interrupts that are
-> allowed in low-power mode. Fortunately, the bits in the LPIMR registers
-> are assigned to the same interrups as the bits in INTENABLEH and
-> INTENABLEL. However, LPIMR uses 1 to mask an interrupt whereas the
-> INTENABLE registers use 1 to enable an interrupt.
+>> Baruch Siach <baruch@tkos.co.il> hat am 31. Dezember 2017 um 16:12 geschrieben:
+>> 
+>> 
+>> Raspberry Pi 3 uses GPIO45 for I2C SCL0. pwm1 is on GPIO41. Update the
+>> DT description accordingly. Fix the following error that shows when
+>> GPIO44 and GPIO45 are configured to I2C:
+>> 
+>> [    1.751563] pinctrl-bcm2835 3f200000.gpio: pin gpio45 already requested by 3f205000.i2c; cannot claim for 3f20c000.pwm
+>> [    1.762474] pinctrl-bcm2835 3f200000.gpio: pin-45 (3f20c000.pwm) status -22
+>> [    1.775176] pinctrl-bcm2835 3f200000.gpio: could not request pin 45 (gpio45) from group gpio45  on device pinctrl-bcm2835
+>> [    1.786344] bcm2835-pwm 3f20c000.pwm: Error applying setting, reverse things back
+>> [    1.793980] bcm2835-pwm: probe of 3f20c000.pwm failed with error -22
+>> 
+>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>> ---
+>>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+>> index a8844d033b3f..b44b3b5af00d 100644
+>> --- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+>> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+   >> @@ -60,3 +60,9 @@
+>>  	status = "okay";
+>>  	bus-width = <4>;
+>>  };
+>> +
+>> +&pwm {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
+>> +	status = "okay";
+>> +};
 >
-> This patch sets the LPIMR registers to the inverted bitmask of the
-> INTENABLE registers during suspend and goes back to "all interrupts
-> masked" when we wake up again. We also make this the default at startup.
+> thanks for addressing this old issue. Unfortunately this is only a part of the solution. The real problem is the definition of pinctrl in a very common dtsi file (bcm2835-rpi.dtsi). Based on the Firmware dt-blob i created a pin usage map [1], which also shows a potential conflict on RPI Zero W.
 >
-> As far as I know, the other supported imx architectures have no similar
-> mechanism. Since the LPIMR registers are part of the CCM module, we
-> query the device tree for an imx25 ccm node in order to detect if we're
-> running on imx25.
+> So i think we should remove the pwm part from bcm2835-rpi.dtsi and define it on board level like in your patch, but also for the other boards. My suggestion would be the following (based on Firmware):
 >
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
+> A Plus -> PWM on pin 40,45
+> A -> PWM on pin 40,45
+> B Plus -> PWM on pin 40,45
+> B Rev 2 -> PWM on pin 40,45
+> B -> PWM on pin 40,45
+> 2 b -> PWM on pin 40,45
+> 3 b -> PWM on pin 40,41
+> Zero -> No PWM
+> Zero W -> No PWM
 >
-> Dear all,
->
-> could you have a look at this first draft? The approach to detect imx25
-> looks a bit hackish, I'd appreciate your suggestions how to do this
-> properly.
+> But i think we should wait for Eric's opinion.
 
-The way you did to detect mx25 looks good.
+This seems like a reasonable plan for resolving the boot error. The
+alternative I can see would be to drop our pwm pinmux setup, in the
+absence of any consumer of pwm trying to use it for some specific
+purpose.
 
-Thanks
+(Some day it would be nice to have an analog audio driver using pwm on
+these pins, but I'm not volunteering to write that code either)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180209/b5189393/attachment.sig>
