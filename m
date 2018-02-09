@@ -1,80 +1,158 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 09 Feb 2018 11:10:49 +0100
-Subject: [2/9] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <313a1fb7-9ecf-ff94-d9b8-6ec63e80b058@samsung.com>
-References: <20180205143435.4723-3-heiko@sntech.de> <2860925.eKDKvHpOYg@phil>
- <313a1fb7-9ecf-ff94-d9b8-6ec63e80b058@samsung.com>
-Message-ID: <1776656.PJyHqu906x@phil>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 9 Feb 2018 18:13:15 +0800
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <20180208204043.mqryuqhx7a6z4v3b@flea>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180207103905.mtyzgu73mmifyvvj@flea>
+ <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
+ <20180208204043.mqryuqhx7a6z4v3b@flea>
+Message-ID: <CAGb2v662tX+rN5DuA+VSX_RMJ8ENx_EXfZe8mQgLVtHd-3885w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 9. Februar 2018, 11:06:49 CET schrieb Andrzej Hajda:
-> On 09.02.2018 10:24, Heiko Stuebner wrote:
-> > Hi Martin,
-> >
-> > Am Montag, 5. Februar 2018, 22:32:08 CET schrieb Martin Cerveny:
-> >> On Mon, 5 Feb 2018, Heiko Stuebner wrote:
-> >>> From: Zheng Yang <zhengyang@rock-chips.com>
-> >>>
-> >>> Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
-> >>> and rk3328 socs from Rockchip.
-> >>>
-> >>> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
-> >>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >>> ---
-> >>> +++ b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
-> >>> +static u32 inno_hdmi_phy_get_tmdsclk(struct inno_hdmi_phy *inno, int rate)
-> >>> +{
-> >>> +	int bus_width = phy_get_bus_width(inno->phy);
-> >>> +	u32 tmdsclk;
-> >>> +
-> >>> +	switch (bus_width) {
-> >>> +	case 4:
-> >>> +		tmdsclk = rate / 2;
-> >>> +		break;
-> >>> +	case 5:
-> >>> +		tmdsclk = rate * 5 / 8;
-> >>> +		break;
-> >>> +	case 6:
-> >>> +		tmdsclk = rate * 3 / 4;
-> >>> +		break;
-> >>> +	case 10:
-> >>> +		tmdsclk = rate * 5 / 4;
-> >>> +		break;
-> >>> +	case 12:
-> >>> +		tmdsclk = rate * 3 / 2;
-> >>> +		break;
-> >>> +	case 16:
-> >>> +		tmdsclk = rate * 2;
-> >>> +		break;
-> >>> +	default:
-> >>> +		tmdsclk = rate;
-> >>> +	}
-> >>> +
-> >>> +	return tmdsclk;
-> >>> +}
-> >> Please corrects integer overflow 
-> >> like https://github.com/mcerveny/rockchip-linux/commit/b4bc703f2dca4e5115b22155920d2277671a9f00
-> > thanks for finding that possible issue. I've adapted the phy driver
-> > in a similar way (using u64 though) and will include that change in the
-> > next version.
-> 
-> Btw, wouldn't be simpler to just use:
-> switch (bus_width) {
-> case 4:
-> case 5:
-> case 6:
-> case 10:
-> case 12:
-> case 16:
->     return (u64)rate * bus_width / 8;
-> default:
->     return rate;
-> }
+On Fri, Feb 9, 2018 at 4:40 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Wed, Feb 07, 2018 at 01:49:59PM +0100, Giulio Benetti wrote:
+>> Hi,
+>>
+>> Il 07/02/2018 11:39, Maxime Ripard ha scritto:
+>> > On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
+>> >>>>> Also, how was it tested? This seems quite weird that we haven't caught
+>> >>>>> that one sooner, and I'm a bit worried about the possible regressions
+>> >>>>> here.
+>> >>>>
+>> >>>> It sounds really strange to me too,
+>> >>>> because everybody under uboot use "sync:3"(HIGH).
+>> >>>> I will retry to measure,
+>> >>>> unfortunately at home I don't have a scope,
+>> >>>> but I think I'm going to have one soon, because of this. :)
+>> >>>
+>> >>> Here I am with scope captures and tcon0 registers dump:
+>> >>> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+>> >>> dclk_d0 => https://pasteboard.co/H4r8QRe.png
+>> >>> dclk_de => https://pasteboard.co/H4r8zh4R.png
+>> >>> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
+>> >>>
+>> >>> As you can see circled in reg on registers,
+>> >>> TCON0_IO_POL_REG = 0x00000000.
+>> >>> But on all the waveforms you can see:
+>> >>> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
+>> >>> the rising front overlaps dclk rising edge(not good), so to me this is
+>> >>> falling, then I mean it Negative.
+>> >>> - dclk_de: de pulse is clearly negative, even if register is 0 and its'
+>> >>> polarity bit is 0.
+>> >>> - dclk_vsnc: same as dclk_de
+>> >>> - dclk_hsync: I didn't take scope screenshot but I can assure you it's
+>> >>> negative.
+>> >>>
+>> >>> You can also check all the other registers about TCON0.
+>> >>>
+>> >>> Now I proceed testing it on A33, maybe the peripheral is slightly
+>> >>> different between Axx SoCs, if I find it that way,
+>> >>> it should be only a check about SoC or peripheral ID,
+>> >>> and treat polarity as it should be done.
+>> >>
+>> >> Here I am with A33 waveforms:
+>> >> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
+>> >> dclk_d0 => https://pasteboard.co/H4rVXwy.png
+>> >> dclk_de => https://pasteboard.co/H4rWDt8.png
+>> >> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
+>> >> dclk_hsync => https://pasteboard.co/H4rWK6I.png
+>> >>
+>> >> It behaves the same way as A20, so as I mean IO polarity,
+>> >> all signals(except D0-D23), are inverted.
+>> >> For A33 I've used A33-OLinuXino.
+>> >> For A20 our LiNova1.
+>> >
+>> > If you have an A33 handy, you probably want to read that mail:
+>> > https://lists.freedesktop.org/archives/dri-devel/2017-July/147951.html
+>> >
+>> > Especially the 90-phase part.
+>>
+>> Here is a summary of different SoCs TCON:
+>> With DCLK_Sel:
+>> 0x0 => normal phase
+>> 0x1 => 1/3 phase
+>> 0x2 => 2/3 phase
+>>
+>> A10, A20
+>
+> Have you tested the option 4 and 5 there too?
+>
+>> With DCLK_Sel:
+>> 0x0 => normal phase
+>> 0x1 => 1/3 phase
+>> 0x2 => 2/3 phase
+>> 0x5 => DCLK/2 phase 0
+>> 0x4 => DCLK/2 phase 90
+>>
+>> A31, A31s, A33, A80, A83T
+>
+> Ok, great, so Chen-Yu was right :)
+>
+> I guess the option 5 (DCLK/2 phase 0) is still to early, just like
+> you've shown in the previous captures?
+>
+>> Also I've found that TCON1 has not this feature,
+>> nor first, nor second case(at least is not described on user manuals).
+>
+> At lot of things are not described, unfortunately...
 
-you're a genius ;-) .
-I must be looking at this code for way to long to not see this relation.
+On some SoCs, TCON1 does not have channel 0 (LCD), so it does
+not have a configurable dot clock, so no settings.
 
+ChenYu
 
-Thanks
-Heiko
+>> So I could handle differently according to SoC.
+>> Unfortunately there is not TCON register keeping IP version,
+>> so the only way I see is to create a long if-or statement to understand
+>> which kind of TCON we're using.
+>
+> You can base that on the compatible, and add a field in the
+> sun4i_tcon_quirks structure, that will avoid the if statements you
+> mentionned.
+>
+>> But what sounds not the best to me, is that DCLK is divided by 2 if
+>> using phase 90. So we need to reconsider also bitclock driver according
+>> to this.
+>> I don't know if it make sense.
+>>
+>> IMHO, I would keep only:
+>> - As normal => "0x1 => 1/3 phase"
+>
+> So that would mean sampling at raising edge on this one??
+>
+>> - As inverted => "0x0 => normal phase"
+>
+> And falling edge?
+>
+> If so, and if remember the captures properly, the sampling would occur
+> right before the rise, and not really around the fall.
+>
+> Would 2/3 be better here?
+>
+>> According to scope captures above on both A20 and A33.
+>> Unfortunately I don't have other boards for the other SoCs to take captures.
+>>
+>> What do you think?
+>
+> I guess we can make that part applicable to all SoCs, we haven't seen
+> any significant differences on those part.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> http://bootlin.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
