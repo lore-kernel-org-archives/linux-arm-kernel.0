@@ -1,33 +1,38 @@
 From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Fri,  9 Feb 2018 20:27:17 +0100
-Subject: [PATCH 0/7] watchdog: make use of timeout-secs
-In-Reply-To: <marcus.folkesson@gmail.com>
+Date: Fri,  9 Feb 2018 20:27:21 +0100
+Subject: [PATCH 4/7] watchdog: pnx4008: make use of timeout-secs provided in
+ devicetree
+In-Reply-To: <20180209192724.1227-1-marcus.folkesson@gmail.com>
 References: <marcus.folkesson@gmail.com>
-Message-ID: <20180209192724.1227-1-marcus.folkesson@gmail.com>
+ <20180209192724.1227-1-marcus.folkesson@gmail.com>
+Message-ID: <20180209192724.1227-5-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All these drivers is using watchdog_init_timeout() to set timeout.
-If the timeout-parameter is set to an valid value, it will allways pick
-that and not even consider if timeout-secs is set in the devicetree.
+watchdog_init_timeout() will allways pick timeout_param since it
+defaults to a valid timeout.
 
-Most of the patches will just remove the initial value for
-timeout-parameter.
+Following best practice described in
+Documentation/watchdog/watchdog-kernel-api.txt to make use of
+the parameter logic.
 
-Some of the drivers allready has documented device-tree-bindings for
-timeout-secs (but will not work), add property for those which not.
+Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+---
+ drivers/watchdog/pnx4008_wdt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I wrote a similiar (tested) patch for imx2 and simply did the same to these drivers.
-These patches is *NOT* tested, so please review extra carefully.
-
-
-Taken from Documentation/watchdog/watchdog-kernel-api.txt:
-	The watchdog_init_timeout function allows you to initialize the timeout field
-	using the module timeout parameter or by retrieving the timeout-sec property from
-	the device tree (if the module timeout parameter is invalid). Best practice is
-	to set the default timeout value as timeout value in the watchdog_device and
-	then use this function to set the user "preferred" timeout value.
-
-
-Best regards
-Marcus Folkesson
+diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
+index 0529aed158a4..8e261799c84e 100644
+--- a/drivers/watchdog/pnx4008_wdt.c
++++ b/drivers/watchdog/pnx4008_wdt.c
+@@ -78,7 +78,7 @@
+ #define WDOG_COUNTER_RATE 13000000	/*the counter clock is 13 MHz fixed */
+ 
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+-static unsigned int heartbeat = DEFAULT_HEARTBEAT;
++static unsigned int heartbeat;
+ 
+ static DEFINE_SPINLOCK(io_lock);
+ static void __iomem	*wdt_base;
+-- 
+2.15.1
