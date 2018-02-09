@@ -1,10 +1,10 @@
 From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Fri,  9 Feb 2018 20:27:19 +0100
-Subject: [PATCH 2/7] watchdog: sunxi: allow setting timeout in devicetree
+Date: Fri,  9 Feb 2018 20:27:23 +0100
+Subject: [PATCH 6/7] watchdog: meson: allow setting timeout in devicetree
 In-Reply-To: <20180209192724.1227-1-marcus.folkesson@gmail.com>
 References: <marcus.folkesson@gmail.com>
  <20180209192724.1227-1-marcus.folkesson@gmail.com>
-Message-ID: <20180209192724.1227-3-marcus.folkesson@gmail.com>
+Message-ID: <20180209192724.1227-7-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,40 +17,40 @@ let us to set timout-sec property in devicetree.
 
 Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
 ---
- Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 4 ++++
- drivers/watchdog/sunxi_wdt.c                             | 2 +-
+ Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 4 ++++
+ drivers/watchdog/meson_wdt.c                             | 2 +-
  2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-index 62dd5baad70e..49900e72f6b1 100644
---- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-@@ -6,9 +6,13 @@ Required properties:
-                "allwinner,sun6i-a31-wdt"
+diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+index 8a6d84cb36c9..7588cc3971bf 100644
+--- a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+@@ -9,9 +9,13 @@ Required properties:
+ 	"amlogic,meson8m2-wdt" and "amlogic,meson8b-wdt" on Meson8m2 SoCs
  - reg : Specifies base physical address and size of the registers.
  
 +Optional properties:
-+- timeout-sec : Contains the watchdog timeout in seconds
++- timeout-sec: contains the watchdog timeout in seconds.
 +
  Example:
  
- wdt: watchdog at 1c20c90 {
- 	compatible = "allwinner,sun4i-a10-wdt";
- 	reg = <0x01c20c90 0x10>;
+ wdt: watchdog at c1109900 {
+ 	compatible = "amlogic,meson6-wdt";
+ 	reg = <0xc1109900 0x8>;
 +	timeout-sec = <10>;
  };
-diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-index 9728fa32c357..55f166bec0ca 100644
---- a/drivers/watchdog/sunxi_wdt.c
-+++ b/drivers/watchdog/sunxi_wdt.c
-@@ -39,7 +39,7 @@
- #define DRV_VERSION		"1.0"
+diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
+index 304274c67735..cd0275a6cdac 100644
+--- a/drivers/watchdog/meson_wdt.c
++++ b/drivers/watchdog/meson_wdt.c
+@@ -36,7 +36,7 @@
+ #define MESON_SEC_TO_TC(s, c)	((s) * (c))
  
  static bool nowayout = WATCHDOG_NOWAYOUT;
--static unsigned int timeout = WDT_MAX_TIMEOUT;
+-static unsigned int timeout = MESON_WDT_TIMEOUT;
 +static unsigned int timeout;
  
- /*
-  * This structure stores the register offsets for different variants
+ struct meson_wdt_data {
+ 	unsigned int enable;
 -- 
 2.15.1
