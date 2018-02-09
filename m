@@ -1,45 +1,37 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  9 Feb 2018 14:28:09 +0530
-Subject: [PATCH 09/10] dt-bindings: cpufreq-dt: Remove
- "cooling-{min|max}-level" properties
+Date: Fri,  9 Feb 2018 14:28:07 +0530
+Subject: [PATCH 07/10] ARM: dts: gemini: Remove "cooling-{min|max}-level" for
+ gpio-fan node
 In-Reply-To: <cover.1518166039.git.viresh.kumar@linaro.org>
 References: <cover.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <aef1b506b365920d82b17c0712a3428196f72dc5.1518166039.git.viresh.kumar@linaro.org>
+Message-ID: <01ddf0ac8962feb63e8871a2c2c3498c763f649b.1518166039.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The "cooling-min-level" and "cooling-max-level" properties are not
-parsed by any part of kernel currently and the max cooling state of a
-CPU cooling device is found by referring to the cpufreq table instead.
+parsed by any part of the kernel currently and the max cooling state of
+gpio-fan cooling device is found by referring to the
+"gpio-fan,speed-map" instead.
 
-Remove the unused bindings.
+Remove the unused properties from the gpio-fan node.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-index dd3929e85dec..332aed8f4597 100644
---- a/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
-@@ -18,8 +18,6 @@ under node /cpus/cpu at 0.
-   in unit of nanoseconds.
- - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
- - #cooling-cells:
--- cooling-min-level:
--- cooling-max-level:
-      Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
- 
- Examples:
-@@ -40,8 +38,6 @@ cpus {
- 		>;
- 		clock-latency = <61036>; /* two CLK32 periods */
- 		#cooling-cells = <2>;
+diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
+index 08568ce24d06..727d16eb02d9 100644
+--- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
++++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
+@@ -78,8 +78,6 @@
+ 		gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
+ 			<&gpio0 12 GPIO_ACTIVE_HIGH>;
+ 		gpio-fan,speed-map = <0 0>, <3000 1>, <6000 2>;
 -		cooling-min-level = <0>;
 -		cooling-max-level = <2>;
+ 		#cooling-cells = <2>;
  	};
  
- 	cpu at 1 {
 -- 
 2.15.0.194.g9af6a3dea062
