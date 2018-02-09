@@ -1,41 +1,64 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 9 Feb 2018 10:18:46 +0100
-Subject: [PATCH 09/11] DT: arm: shmobile: document Condor board bindings
-In-Reply-To: <CAMuHMdV+36Jff6ui1B_90GvPhTb7Xu7+_CaX44EcXxiLi3c=aQ@mail.gmail.com>
- <20180208201306.peirumr6hvu22uyt@rob-hp-laptop>
-Message-ID: <20180209091846.cj62onabse2ag47s@verge.net.au>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 09 Feb 2018 10:24:01 +0100
+Subject: [2/9] phy: add Rockchip Innosilicon hdmi phy
+In-Reply-To: <alpine.GSO.2.00.1802052159530.23549@dmz.c-home.cz>
+References: <20180205143435.4723-3-heiko@sntech.de>
+ <alpine.GSO.2.00.1802052159530.23549@dmz.c-home.cz>
+Message-ID: <2860925.eKDKvHpOYg@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 02:13:06PM -0600, Rob Herring wrote:
-> On Fri, Feb 02, 2018 at 09:45:08PM +0300, Sergei Shtylyov wrote:
-> > Document the Condor device tree bindings, listing it as a supported board.
-> > 
-> > This allows to use checkpatch.pl to validate .dts files referring to the
-> > Condor board.
-> > 
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > 
+Hi Martin,
+
+Am Montag, 5. Februar 2018, 22:32:08 CET schrieb Martin Cerveny:
+> On Mon, 5 Feb 2018, Heiko Stuebner wrote:
+> > From: Zheng Yang <zhengyang@rock-chips.com>
+> >
+> > Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
+> > and rk3328 socs from Rockchip.
+> >
+> > Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > > ---
-> >  Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
-> >  1 file changed, 2 insertions(+)
+> > +++ b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+> > +static u32 inno_hdmi_phy_get_tmdsclk(struct inno_hdmi_phy *inno, int rate)
+> > +{
+> > +	int bus_width = phy_get_bus_width(inno->phy);
+> > +	u32 tmdsclk;
+> > +
+> > +	switch (bus_width) {
+> > +	case 4:
+> > +		tmdsclk = rate / 2;
+> > +		break;
+> > +	case 5:
+> > +		tmdsclk = rate * 5 / 8;
+> > +		break;
+> > +	case 6:
+> > +		tmdsclk = rate * 3 / 4;
+> > +		break;
+> > +	case 10:
+> > +		tmdsclk = rate * 5 / 4;
+> > +		break;
+> > +	case 12:
+> > +		tmdsclk = rate * 3 / 2;
+> > +		break;
+> > +	case 16:
+> > +		tmdsclk = rate * 2;
+> > +		break;
+> > +	default:
+> > +		tmdsclk = rate;
+> > +	}
+> > +
+> > +	return tmdsclk;
+> > +}
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> 
+> Please corrects integer overflow 
+> like https://github.com/mcerveny/rockchip-linux/commit/b4bc703f2dca4e5115b22155920d2277671a9f00
 
-On Fri, Feb 09, 2018 at 08:27:34AM +0100, Geert Uytterhoeven wrote:
-> On Fri, Feb 2, 2018 at 7:45 PM, Sergei Shtylyov
-> <sergei.shtylyov@cogentembedded.com> wrote:
-> > Document the Condor device tree bindings, listing it as a supported board.
-> >
-> > This allows to use checkpatch.pl to validate .dts files referring to the
-> > Condor board.
-> >
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+thanks for finding that possible issue. I've adapted the phy driver
+in a similar way (using u64 though) and will include that change in the
+next version.
 
 
-Thanks, applied with the following subject:
-
-dt-bindings: arm: document Condor board bindings
+Thanks
+Heiko
