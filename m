@@ -1,59 +1,62 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  9 Feb 2018 14:28:03 +0530
-Subject: [PATCH 03/10] ARM: dts: mt7623: Remove "cooling-{min|max}-level" for
- CPU nodes
-In-Reply-To: <cover.1518166039.git.viresh.kumar@linaro.org>
-References: <cover.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <33d7494641d2f89c827e5e09d1143f125c33e784.1518166039.git.viresh.kumar@linaro.org>
+Date: Fri,  9 Feb 2018 14:28:00 +0530
+Subject: [PATCH 00/10] thermal: Remove "cooling-{min|max}-level" properties
+Message-ID: <cover.1518166039.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The "cooling-min-level" and "cooling-max-level" properties are not
 parsed by any part of the kernel currently and the max cooling state of
-a CPU cooling device is found by referring to the cpufreq table instead.
+a cooling devices is found by cooling-device's driver itself.
 
-Remove the unused properties from the CPU nodes.
+Also note that a very small number of platforms that support cooling
+devices currently contain these properties in their dts files. Most of
+them don't specify them (as no one is going to use them anyway).
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt | 4 ----
- arch/arm/boot/dts/mt7623.dtsi                                  | 2 --
- 2 files changed, 6 deletions(-)
+Only two type of cooling devices are using these properties currently:
+cpu-cooling and gpio-fan. This series first updates all the dts files to
+not specify the min/max cooling states and then removes the bindings.
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-index f6403089edcf..d36f07e0a2bb 100644
---- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
-@@ -21,8 +21,6 @@ Binding for MediaTek's CPUFreq driver
- 	       flow is handled by hardware, hence no software "voltage tracking" is
- 	       needed.
- - #cooling-cells:
--- cooling-min-level:
--- cooling-max-level:
- 	Please refer to Documentation/devicetree/bindings/thermal/thermal.txt
- 	for detail.
- 
-@@ -67,8 +65,6 @@ Binding for MediaTek's CPUFreq driver
- 		clock-names = "cpu", "intermediate";
- 		operating-points-v2 = <&cpu_opp_table>;
- 		#cooling-cells = <2>;
--		cooling-min-level = <0>;
--		cooling-max-level = <7>;
- 	};
- 	cpu at 1 {
- 		device_type = "cpu";
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index b750da5362f7..8e7c65464c9d 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -87,8 +87,6 @@
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cpu_opp_table>;
- 			#cooling-cells = <2>;
--			cooling-min-level = <0>;
--			cooling-max-level = <7>;
- 			clock-frequency = <1300000000>;
- 		};
- 
+The maintainers are requested to apply the relevant patches to their
+trees directly as there is no dependency between the patches.
+
+--
+viresh
+
+Viresh Kumar (10):
+  ARM: dts: exynos: Remove "cooling-{min|max}-level" for CPU nodes
+  ARM: dts: omap: Remove "cooling-{min|max}-level" for CPU nodes
+  ARM: dts: mt7623: Remove "cooling-{min|max}-level" for CPU nodes
+  ARM: dts: sun[4-7]i: Remove "cooling-{min|max}-level" for CPU nodes
+  ARM64: dts: hi6220: Remove "cooling-{min|max}-level" for CPU nodes
+  ARM64: dts: meson: Remove "cooling-{min|max}-level" for CPU nodes
+  ARM: dts: gemini: Remove "cooling-{min|max}-level" for gpio-fan node
+  ARM64: dts: meson: Remove "cooling-{min|max}-level" for gpio-fan node
+  dt-bindings: cpufreq-dt: Remove "cooling-{min|max}-level" properties
+  dt-bindings: thermal: Remove "cooling-{min|max}-level" properties
+
+ Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt |  4 ----
+ .../devicetree/bindings/cpufreq/cpufreq-mediatek.txt     |  4 ----
+ Documentation/devicetree/bindings/thermal/thermal.txt    | 16 +---------------
+ arch/arm/boot/dts/dra7.dtsi                              |  2 --
+ arch/arm/boot/dts/exynos4210.dtsi                        |  2 --
+ arch/arm/boot/dts/exynos4412.dtsi                        |  2 --
+ arch/arm/boot/dts/exynos5250.dtsi                        |  2 --
+ arch/arm/boot/dts/exynos5420-cpus.dtsi                   | 16 ----------------
+ arch/arm/boot/dts/exynos5422-cpus.dtsi                   | 16 ----------------
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts               |  2 --
+ arch/arm/boot/dts/mt7623.dtsi                            |  2 --
+ arch/arm/boot/dts/omap443x.dtsi                          |  2 --
+ arch/arm/boot/dts/omap4460.dtsi                          |  2 --
+ arch/arm/boot/dts/omap5.dtsi                             |  2 --
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts           |  1 -
+ arch/arm/boot/dts/sun4i-a10.dtsi                         |  2 --
+ arch/arm/boot/dts/sun5i-a13.dtsi                         |  2 --
+ arch/arm/boot/dts/sun6i-a31.dtsi                         |  2 --
+ arch/arm/boot/dts/sun7i-a20.dtsi                         |  2 --
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts    |  6 ------
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi                |  2 --
+ 21 files changed, 1 insertion(+), 90 deletions(-)
+
 -- 
 2.15.0.194.g9af6a3dea062
