@@ -1,193 +1,143 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 9 Feb 2018 10:27:29 +0100
-Subject: [PATCH v1 15/16] kvm: arm64: Allow configuring physical address
- space size
-In-Reply-To: <20180209081606.GC7339@cbox>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-16-suzuki.poulose@arm.com>
- <20180208111414.GM29286@cbox>
- <31e5bf40-4fcb-934e-6036-ff2670f793df@arm.com>
- <20180209081606.GC7339@cbox>
-Message-ID: <20180209092729.o55kl2tjg5hplk52@hawk.localdomain>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 9 Feb 2018 09:43:43 +0000
+Subject: [RFC PATCH] Documentation: DT: arm: Add topology property to
+ define package boundaries
+In-Reply-To: <d4ef76c3-fb4a-f879-44a8-7322ebde36ac@gmail.com>
+References: <20180122171534.7681-1-lorenzo.pieralisi@arm.com>
+ <b58b99e8-dfa3-40d6-aba2-bc1f96170fd6@gmail.com>
+ <20180208105702.GA1179@e107981-ln.cambridge.arm.com>
+ <d4ef76c3-fb4a-f879-44a8-7322ebde36ac@gmail.com>
+Message-ID: <20180209094343.GA18656@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 09:16:06AM +0100, Christoffer Dall wrote:
-> On Thu, Feb 08, 2018 at 05:53:17PM +0000, Suzuki K Poulose wrote:
-> > On 08/02/18 11:14, Christoffer Dall wrote:
-> > >On Tue, Jan 09, 2018 at 07:04:10PM +0000, Suzuki K Poulose wrote:
-> > >>Allow the guests to choose a larger physical address space size.
-> > >>The default and minimum size is 40bits. A guest can change this
-> > >>right after the VM creation, but before the stage2 entry page
-> > >>tables are allocated (i.e, before it registers a memory range
-> > >>or maps a device address). The size is restricted to the maximum
-> > >>supported by the host. Also, the guest can only increase the PA size,
-> > >>from the existing value, as reducing it could break the devices which
-> > >>may have verified their physical address for validity and may do a
-> > >>lazy mapping(e.g, VGIC).
-> > >>
-> > >>Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > >>Cc: Christoffer Dall <cdall@linaro.org>
-> > >>Cc: Peter Maydell <peter.maydell@linaro.org>
-> > >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > >>---
-> > >>  Documentation/virtual/kvm/api.txt | 27 ++++++++++++++++++++++++++
-> > >>  arch/arm/include/asm/kvm_host.h   |  7 +++++++
-> > >>  arch/arm64/include/asm/kvm_host.h |  1 +
-> > >>  arch/arm64/include/asm/kvm_mmu.h  | 41 ++++++++++++++++++++++++++++++---------
-> > >>  arch/arm64/kvm/reset.c            | 28 ++++++++++++++++++++++++++
-> > >>  include/uapi/linux/kvm.h          |  4 ++++
-> > >>  virt/kvm/arm/arm.c                |  2 +-
-> > >>  7 files changed, 100 insertions(+), 10 deletions(-)
-> > >>
-> > >>diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> > >>index 57d3ee9e4bde..a203faf768c4 100644
-> > >>--- a/Documentation/virtual/kvm/api.txt
-> > >>+++ b/Documentation/virtual/kvm/api.txt
-> > >>@@ -3403,6 +3403,33 @@ invalid, if invalid pages are written to (e.g. after the end of memory)
-> > >>  or if no page table is present for the addresses (e.g. when using
-> > >>  hugepages).
-> > >>+4.109 KVM_ARM_GET_PHYS_SHIFT
-> > >>+
-> > >>+Capability: KVM_CAP_ARM_CONFIG_PHYS_SHIFT
-> > >>+Architectures: arm64
-> > >>+Type: vm ioctl
-> > >>+Parameters: __u32 (out)
-> > >>+Returns: 0 on success, a negative value on error
-> > >>+
-> > >>+This ioctl is used to get the current maximum physical address size for
-> > >>+the VM. The value is Log2(Maximum_Physical_Address). This is neither the
-> > >>+ amount of physical memory assigned to the VM nor the maximum physical address
-> > >>+that a real CPU on the host can handle. Rather, this is the upper limit of the
-> > >>+guest physical address that can be used by the VM.
-> > >
-> > >What is the point of this?  Presumably if userspace has set the size, it
-> > >already knows the size?
+On Thu, Feb 08, 2018 at 02:22:00PM -0800, Frank Rowand wrote:
+> On 02/08/18 02:57, Lorenzo Pieralisi wrote:
+> > On Mon, Jan 22, 2018 at 08:45:26PM -0800, Frank Rowand wrote:
+> >> On 01/22/18 09:15, Lorenzo Pieralisi wrote:
+> >>> The current ARM DT topology description provides the operating system
+> >>> with a topological view of the system that is based on leaf nodes
+> >>> representing either cores or threads (in an SMT system) and a
+> >>> hierarchical set of cluster nodes that creates a hierarchical topology
+> >>> view of how those cores and threads are grouped.
+> >>>
+> >>> As opposed to the ACPI topology description ([1], PPTT table), this
+> >>> hierarchical representation of clusters does not allow to describe what
+> >>> topology level actually represents the physical package boundary, which
+> >>> is a key piece of information to be used by an operating system to
+> >>> optimize resource allocation and scheduling.
+> >>>
+> >>> Define an optional, backward compatible boolean property for cluster
+> >>> nodes that, by reusing the ACPI nomenclature, add to the ARM DT
+> >>> topological description a binding to define what cluster level
+> >>> represents a physical package boundary.
+> >>>
+> >>> [1] http://www.uefi.org/sites/default/files/resources/ACPI_6_2.pdf
+> >>>
+> >>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>> Cc: Rob Herring <robh+dt@kernel.org>
+> >>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> >>> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> >>> Cc: Morten Rasmussen <morten.rasmussen@arm.com>
+> >>> Cc: Mark Rutland <mark.rutland@arm.com>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/arm/topology.txt | 9 +++++++++
+> >>>  1 file changed, 9 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+> >>> index de9eb0486630..8e78d76b0671 100644
+> >>> --- a/Documentation/devicetree/bindings/arm/topology.txt
+> >>> +++ b/Documentation/devicetree/bindings/arm/topology.txt
+> >>> @@ -109,6 +109,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+> >>>  	The cluster node name must be "clusterN" as described in 2.1 above.
+> >>>  	A cluster node can not be a leaf node.
+> >>>  
+> >>> +	Properties for cluster nodes:
+> >>> +
+> >>> +	- physical-package
+> >>> +		Usage: optional
+> >>> +		Value type: <empty>
+> >>> +		Definition: if present the cluster node represents the
+> >>> +			    boundary of a physical package, whether socketed
+> >>> +			    or surface mounted.
+> >>
+> >> I don't know how to interpret this.  Is the node with this property inside
+> >> or outside the boundary?  If I had to guess, I would guess inside.  A few
+> >> extra words to clarify this please.
 > > 
-> > This can help the userspace know, what the "default" limit is. As such I am
-> > not particular about keeping this around.
-> > 
+> > The node is neither inside nor outside, it _is_ the boundary. Every node
+> > defines a topology level - the property is there to define which one
+> > corresponds to a package, please let me know if it makes things clearer.
 > 
-> Userspace has to already know, since otherwise things don't work today,
-> so I think we can omit this.
+> Not at all clear.
 > 
-> > >
-> > >>+
-> > >>+4.109 KVM_ARM_SET_PHYS_SHIFT
-> > >>+
-> > >>+Capability: KVM_CAP_ARM_CONFIG_PHYS_SHIFT
-> > >>+Architectures: arm64
-> > >>+Type: vm ioctl
-> > >>+Parameters: __u32 (in)
-> > >>+Returns: 0 on success, a negative value on error
-> > >>+
-> > >>+This ioctl is used to set the maximum physical address size for
-> > >>+the VM. The value is Log2(Maximum_Physical_Address). The value can only
-> > >>+be increased from the existing setting. The value cannot be changed
-> > >>+after the stage-2 page tables are allocated and will return an error.
-> > >>+
-> > >
-> > >Is there a way for userspace to discover what the underlying hardware
-> > >can actually support, beyond trial-and-error on this ioctl?
-> > 
-> > Unfortunately, there is none. We don't expose ID_AA64MMFR0 via mrs emulation.
-> > 
+> Using Example 1, from section "4 - Example dts" of topology.txt:
 > 
-> We should probably think about that.  Perhaps it could be tied to the
-> return value of KVM_CAP_ARM_CONFIG_PHYS_SHIFT ?
+> 
+>        cpu-map {
+>                 cluster0 {
+>                         cluster0 {
+>                                 core0 {
+>                                         thread0 {
+>                                                 cpu = <&CPU0>;
+>                                         };
+>                                         thread1 {
+>                                                 cpu = <&CPU1>;
+>                                         };
+>                                 };
+> 
+>                                 core1 {
+>                                         thread0 {
+>                                                 cpu = <&CPU2>;
+>                                         };
+>                                         thread1 {
+>                                                 cpu = <&CPU3>;
+>                                         };
+>                                 };
+>                         };
+> 
+>                         cluster1 {
+>                                 core0 {
+>                                         thread0 {
+>                                                 cpu = <&CPU4>;
+>                                         };
+>                                         thread1 {
+>                                                 cpu = <&CPU5>;
+>                                         };
+>                                 };
+> 
+>                                 core1 {
+>                                         thread0 {
+>                                                 cpu = <&CPU6>;
+>                                         };
+>                                         thread1 {
+>                                                 cpu = <&CPU7>;
+>                                         };
+>                                 };
+>                         };
+>                 };
+> 
+> Pretend that cpu-map/cluster0/cluster0 is a physical package that
+> contains two cores, and cpu-map/cluster0/cluster1 is another
+> physical package that contains two cores.  My guess as to how
+> to use the property "physical-package" would be to place it
+> in nodes cpu-map/cluster0/cluster0 and cpu-map/cluster0/cluster1.
+> In that case, those two nodes are on the "inside" of two different
+> packages.
+> 
+> The alternate way to use the property "physical-package" would be
+> to place it in node cpu-map/cluster0.  In this case, the node is
+> "outside" of the packages.
+> 
+> Again, I suspect that the intended use is the first of my two
+> examples, but the proposed binding wording does not make that
+> clear to me.  My use of "inside" and "outside" may not be the
+> proper words or concept, but the binding somehow needs to
+> say which of my two above example locations is the correct place
+> to use the "physical-package" property.
 
-FWIW, that sounds good to me.
+Ok, I see, I will update the description accordingly to make it
+clearer.
 
-> 
-> > >>+static inline int kvm_reconfig_stage2(struct kvm *kvm, u32 phys_shift)
-> > >>+{
-> > >>+	int rc = 0;
-> > >>+	unsigned int pa_max, parange;
-> > >>+
-> > >>+	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
-> > >>+	pa_max = id_aa64mmfr0_parange_to_phys_shift(parange);
-> > >>+	/* Raise it to 40bits for backward compatibility */
-> > >>+	pa_max = (pa_max < 40) ? 40 : pa_max;
-> > >>+	/* Make sure the size is supported/available */
-> > >>+	if (phys_shift > PHYS_MASK_SHIFT || phys_shift > pa_max)
-> > >>+		return -EINVAL;
-> > >>+	/*
-> > >>+	 * The stage2 PGD is dependent on the settings we initialise here
-> > >>+	 * and should be allocated only after this step. We cannot allow
-> > >>+	 * down sizing the IPA size as there could be devices or memory
-> > >>+	 * regions, that depend on the previous size.
-> > >>+	 */
-> > >>+	mutex_lock(&kvm->slots_lock);
-> > >>+	if (kvm->arch.pgd || phys_shift < kvm->arch.phys_shift) {
-> > >>+		rc = -EPERM;
-> > >>+	} else if (phys_shift > kvm->arch.phys_shift) {
-> > >>+		kvm->arch.phys_shift = phys_shift;
-> > >>+		kvm->arch.s2_levels = stage2_pt_levels(kvm->arch.phys_shift);
-> > >>+		kvm->arch.vtcr_private = VTCR_EL2_SL0(kvm->arch.s2_levels) |
-> > >>+					 TCR_T0SZ(kvm->arch.phys_shift);
-> > >>+	}
-> > >
-> > >I think you can rework the above to make it more obvious what's going on
-> > >in this way:
-> > >
-> > >	rc = -EPERM;
-> > >	if (kvm->arch.pgd || phys_shift < kvm->arch.phys_shift)
-> > >		goto out_unlock;
-> > >
-> > >	rc = 0;
-> > >	if (phys_shift == kvm->arch.phys_shift)
-> > >		goto out_unlock;
-> > >
-> > >	kvm->arch.phys_shift = phys_shift;
-> > >	kvm->arch.s2_levels = stage2_pt_levels(kvm->arch.phys_shift);
-> > >	kvm->arch.vtcr_private = VTCR_EL2_SL0(kvm->arch.s2_levels) |
-> > >				 TCR_T0SZ(kvm->arch.phys_shift);
-> > >
-> > >out_unlock:
-> > >
-> > 
-> > Sure.
-> > 
-> > 
-> > 
-> > >>--- a/virt/kvm/arm/arm.c
-> > >>+++ b/virt/kvm/arm/arm.c
-> > >>@@ -1136,7 +1136,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
-> > >>  		return 0;
-> > >>  	}
-> > >>  	default:
-> > >>-		return -EINVAL;
-> > >>+		return kvm_arch_dev_vm_ioctl(kvm, ioctl, arg);
-> > >>  	}
-> > >>  }
-> > >>-- 
-> > >>2.13.6
-> > >>
-> > >
-> > >Have you considered making this capability a generic capability and
-> > >encoding this in the 'type' argument to KVM_CREATE_VM?  This would
-> > >significantly simplify all the above and would allow you to drop patch 8
-> > >and 9 I think.
-> > 
-> > No. I will take a look. Btw, there were patches flying around to support
-> > "userspace" requesting specific values for ID feature registers. But even that
-> > doesn't help with the detection part. May be that is another way to configure
-> > the size, but not sure about the current status of that work.
-> > 
-> 
-> It's a bit stranded.  Drew was driving this work (on cc).  But the ID
-> register exposed to the guest should represent the actual limits
-> of the VM, so I don't think we need userspace to configure this, but we
-> can implement this in KVM based on the PA range configured for the VM.
->
-
-I heard there were some patches being worked by someone at Arm, which
-haven't been posted yet (obviously), but maybe that was just a rumor?
-I was about to revisit this topic myself, at least to some degree, to
-attempt to address PMU hiding. We really need to put some thought into
-how best to generally give userspace control of the VM's ID registers,
-within the constraints of the host. Anyway, I guess that should be done
-in a separate thread, so I won't start brainstorming now, here.
-
-Thanks,
-drew
+Thank you,
+Lorenzo
