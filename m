@@ -1,57 +1,54 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Sat, 10 Feb 2018 07:41:30 +0100
-Subject: [PATCH] ARM: dts: armada: netgear-rn*: fix rtc node name
-Message-ID: <20180210064130.6422-1-alexandre.belloni@bootlin.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Sat, 10 Feb 2018 08:07:58 +0100
+Subject: [PATCH 5/6] ARM: dts: tegra: apalis-tk1: copyright period,
+ spurious newlines
+In-Reply-To: <20180210013806.28496-6-marcel@ziswiler.com>
+References: <20180210013806.28496-1-marcel@ziswiler.com>
+ <20180210013806.28496-6-marcel@ziswiler.com>
+Message-ID: <CAOFm3uH+aasUA9MrV+uXvHUT=fzS63PvC2fDfNo3q687dUQ_dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The node name should be generic and must not contain the part number.
+Marcel,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 2 +-
- arch/arm/boot/dts/armada-370-netgear-rn104.dts | 2 +-
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+On Sat, Feb 10, 2018 at 2:38 AM, Marcel Ziswiler <marcel@ziswiler.com> wrote:
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+>
+> Update the copyright period and get rid of some spurious newlines.
+>
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+>
+> ---
+>
+>  arch/arm/boot/dts/tegra124-apalis-eval.dts |  6 ++----
+>  arch/arm/boot/dts/tegra124-apalis.dtsi     | 11 +----------
+>  2 files changed, 3 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/tegra124-apalis-eval.dts b/arch/arm/boot/dts/tegra124-apalis-eval.dts
+> index f1010cefb993..a6ad759dddb4 100644
+> --- a/arch/arm/boot/dts/tegra124-apalis-eval.dts
+> +++ b/arch/arm/boot/dts/tegra124-apalis-eval.dts
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright 2016 Toradex AG
+> + * Copyright 2016-2018 Toradex AG
+>   *
+>   * This file is dual-licensed: you can use it either under the terms
+>   * of the GPL or the X11 license, at your option. Note that this dual
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index b1a96e95e921..d2225bd4a76f 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -103,7 +103,7 @@
- 
- 				status = "okay";
- 
--				isl12057: isl12057 at 68 {
-+				isl12057: rtc at 68 {
- 					compatible = "isil,isl12057";
- 					reg = <0x68>;
- 					wakeup-source;
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-index d67e7aa42b54..b73cae836bc1 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-@@ -105,7 +105,7 @@
- 
- 				status = "okay";
- 
--				isl12057: isl12057 at 68 {
-+				isl12057: rtc at 68 {
- 					compatible = "isil,isl12057";
- 					reg = <0x68>;
- 					wakeup-source;
-diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-index 40c6fe21e720..e66fe80cf279 100644
---- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-+++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-@@ -115,7 +115,7 @@
- 					reg = <0x4c>;
- 				};
- 
--				isl12057: isl12057 at 68 {
-+				isl12057: rtc at 68 {
- 					compatible = "isil,isl12057";
- 					reg = <0x68>;
- 					wakeup-source;
+Since you are fixing copyrights, would you consider also fixing the
+license to use a proper SPDX Id instead?
+
+It would be super gentle of you!
+
+And you will get extra good karma point if you feel like doing the
+same for every Toradex-copyrighted files ;)
+
+The (still new and fresh) license documentation contributed by tglx
+--the only real-time docu-mentalist-- is in:
+Documentation/process/license-rules.rst
+
+Thanks!
 -- 
-2.16.1
+Cordially
+Philippe Ombredanne
