@@ -1,46 +1,36 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sat, 10 Feb 2018 22:01:30 +0100
-Subject: [PATCH 0/3] Fix broken bananapi m2 devicetree/regulators
-In-Reply-To: <160b60e2-6e50-0d63-e6ac-b67e10317e12@orpaltech.com>
-References: <20180209175236.21215-1-embed3d@gmail.com>
- <160b60e2-6e50-0d63-e6ac-b67e10317e12@orpaltech.com>
-Message-ID: <d3fcc9d2-f2e6-189c-529f-890f2afdd837@gmail.com>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Sat, 10 Feb 2018 21:36:20 +0100
+Subject: [PATCH 1/4] watchdog: uniphier: change order for setting default
+ timeout
+Message-ID: <20180210203623.17832-1-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Sergey,
+watchdog_init_timeout() will preserve wdd->timeout value if no parameter
+nor timeout-secs dt property is set.
 
-Thanks for mentioning, but I think the problem has nothing to do with 
-those patches. I tested them with the v4.15.0 Kernel since this is the 
-last stable release and we are right now in the merging window.
+Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+---
+ drivers/watchdog/uniphier_wdt.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-I tested the latest mainline, without those patches and the kernel is 
-not booting (I can't see any uart output).
-
-Thanks,
-Philipp
-
-On 10.02.2018 14:56, Sergey Suloev wrote:
-> On 02/09/2018 08:52 PM, Philipp Rossak wrote:
->> This patchseries fixes the bananapi m1 devicetree, to be able to boot 
->> again.
->> The first two patches update/improve the devicetree and the last patch 
->> adds
->> all missing regulators.
->>
->> Regards,
->> Philipp
->>
->> Philipp Rossak (3):
->> ?? arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
->> ?? arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
->> ?? arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
->>
->> ? arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 70 
->> +++++++++++++++++++++++-
->> ? 1 file changed, 67 insertions(+), 3 deletions(-)
->>
-> patches are not working
-> 
-> Thanks
-> 
+diff --git a/drivers/watchdog/uniphier_wdt.c b/drivers/watchdog/uniphier_wdt.c
+index 0ea2339d9702..0e4f8d53ce3c 100644
+--- a/drivers/watchdog/uniphier_wdt.c
++++ b/drivers/watchdog/uniphier_wdt.c
+@@ -212,11 +212,10 @@ static int uniphier_wdt_probe(struct platform_device *pdev)
+ 	wdev->wdt_dev.ops = &uniphier_wdt_ops;
+ 	wdev->wdt_dev.max_timeout = WDT_PERIOD_MAX;
+ 	wdev->wdt_dev.min_timeout = WDT_PERIOD_MIN;
++	wdev->wdt_dev.timeout = WDT_DEFAULT_TIMEOUT;
+ 	wdev->wdt_dev.parent = dev;
+ 
+-	if (watchdog_init_timeout(&wdev->wdt_dev, timeout, dev) < 0) {
+-		wdev->wdt_dev.timeout = WDT_DEFAULT_TIMEOUT;
+-	}
++	watchdog_init_timeout(&wdev->wdt_dev, timeout, dev);
+ 	watchdog_set_nowayout(&wdev->wdt_dev, nowayout);
+ 	watchdog_stop_on_reboot(&wdev->wdt_dev);
+ 
+-- 
+2.15.1
