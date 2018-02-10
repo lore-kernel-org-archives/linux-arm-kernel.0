@@ -1,45 +1,32 @@
-From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Sat, 10 Feb 2018 10:27:01 +0100
-Subject: [PATCH] watchdog: coh901327: make license text and module licence
- match
-Message-ID: <20180210092702.4393-1-marcus.folkesson@gmail.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Sat, 10 Feb 2018 19:09:04 +0800
+Subject: [PATCH v2 0/3] gpio-keys: Add support for specifying wakeup event
+ action
+Message-ID: <20180210110907.5504-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Licence text is specifying "GPLv2" but the MODULE_LICENSE is set to "GPLv2
-or later".
 
-See include/linux/module.h:
-"GPL"				[GNU Public License v2 or later]
-"GPL v2"			[GNU Public License v2]
+On chromebook kevin, we are using gpio-keys for pen insert event. But
+we only want it to wakeup the system when ejecting the pen.
 
-When on it, add SPDX identifier tag.
+So we may need to change the interrupt trigger type during suspending.
 
-Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
----
- drivers/watchdog/coh901327_wdt.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes in v2:
+Specify wakeup event action instead of irq trigger type as Brian
+suggested.
 
-diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-index 5d8eb9a30879..7b71e0a3e6cc 100644
---- a/drivers/watchdog/coh901327_wdt.c
-+++ b/drivers/watchdog/coh901327_wdt.c
-@@ -1,8 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * coh901327_wdt.c
-  *
-  * Copyright (C) 2008-2009 ST-Ericsson AB
-- * License terms: GNU General Public License (GPL) version 2
-  * Watchdog driver for the ST-Ericsson AB COH 901 327 IP core
-  * Author: Linus Walleij <linus.walleij@stericsson.com>
-  */
-@@ -420,5 +420,5 @@ MODULE_DESCRIPTION("COH 901 327 Watchdog");
- module_param(margin, uint, 0);
- MODULE_PARM_DESC(margin, "Watchdog margin in seconds (default 60s)");
- 
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
- MODULE_ALIAS("platform:coh901327-watchdog");
+Jeffy Chen (3):
+  Input: gpio-keys - add support for wakeup event action
+  Input: gpio-keys - allow setting wakeup event action in DT
+  arm64: dts: rockchip: Avoid wakeup when inserting the pen
+
+ .../devicetree/bindings/input/gpio-keys.txt        |  8 +++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  2 ++
+ drivers/input/keyboard/gpio_keys.c                 | 27 ++++++++++++++++++++++
+ include/linux/gpio_keys.h                          |  2 ++
+ include/uapi/linux/input-event-codes.h             |  9 ++++++++
+ 5 files changed, 48 insertions(+)
+
 -- 
-2.15.1
+2.11.0
