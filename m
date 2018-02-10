@@ -1,32 +1,69 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Sat, 10 Feb 2018 19:09:04 +0800
-Subject: [PATCH v2 0/3] gpio-keys: Add support for specifying wakeup event
- action
-Message-ID: <20180210110907.5504-1-jeffy.chen@rock-chips.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Sat, 10 Feb 2018 19:10:02 +0800
+Subject: [PATCH v2 5/7] watchdog: mtk: allow setting timeout in devicetree
+In-Reply-To: <20180210091911.3644-5-marcus.folkesson@gmail.com>
+References: <20180210091911.3644-1-marcus.folkesson@gmail.com>
+ <20180210091911.3644-5-marcus.folkesson@gmail.com>
+Message-ID: <1518261002.9025.36.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On chromebook kevin, we are using gpio-keys for pen insert event. But
-we only want it to wakeup the system when ejecting the pen.
+Hi, Marcus
 
-So we may need to change the interrupt trigger type during suspending.
+The changes you made for dt-bindings and driver should be put into
+separate patches.
 
-Changes in v2:
-Specify wakeup event action instead of irq trigger type as Brian
-suggested.
+And the property timeout-sec seems to be generic enough to all devices,
+so why not add a common document to describe it and allow those devices
+to refer to, like other dt-bindings for other kinds of devices usually
+did.
 
-Jeffy Chen (3):
-  Input: gpio-keys - add support for wakeup event action
-  Input: gpio-keys - allow setting wakeup event action in DT
-  arm64: dts: rockchip: Avoid wakeup when inserting the pen
+	Sean
 
- .../devicetree/bindings/input/gpio-keys.txt        |  8 +++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  2 ++
- drivers/input/keyboard/gpio_keys.c                 | 27 ++++++++++++++++++++++
- include/linux/gpio_keys.h                          |  2 ++
- include/uapi/linux/input-event-codes.h             |  9 ++++++++
- 5 files changed, 48 insertions(+)
-
--- 
-2.11.0
+On Sat, 2018-02-10 at 10:19 +0100, Marcus Folkesson wrote:
+> watchdog_init_timeout() will allways pick timeout_param since it
+> defaults to a valid timeout.
+> 
+> By following best practice described in
+> Documentation/watchdog/watchdog-kernel-api.txt, it also
+> let us to set timout-sec property in devicetree.
+> 
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 4 ++++
+>  drivers/watchdog/mtk_wdt.c                             | 2 +-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> index 5b38a30e608c..859dee167b91 100644
+> --- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> @@ -11,9 +11,13 @@ Required properties:
+>  
+>  - reg : Specifies base physical address and size of the registers.
+>  
+> +Optional properties:
+> +- timeout-sec: contains the watchdog timeout in seconds.
+> +
+>  Example:
+>  
+>  wdt: watchdog at 10000000 {
+>  	compatible = "mediatek,mt6589-wdt";
+>  	reg = <0x10000000 0x18>;
+> +	timeout-sec = <10>;
+>  };
+> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
+> index 7ed417a765c7..fcdc10ec28a3 100644
+> --- a/drivers/watchdog/mtk_wdt.c
+> +++ b/drivers/watchdog/mtk_wdt.c
+> @@ -57,7 +57,7 @@
+>  #define DRV_VERSION		"1.0"
+>  
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+> -static unsigned int timeout = WDT_MAX_TIMEOUT;
+> +static unsigned int timeout;
+>  
+>  struct mtk_wdt_dev {
+>  	struct watchdog_device wdt_dev;
