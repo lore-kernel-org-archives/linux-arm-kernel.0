@@ -1,80 +1,61 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Sat, 10 Feb 2018 10:45:35 +0200
-Subject: [PATCH v2 4/7] dt-bindings: tegra: Add missing chips and NVIDIA
- boards
-In-Reply-To: <20180209224922.4fxlpl77kwibzfui@rob-hp-laptop>
-References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
- <1517901757-15353-5-git-send-email-mperttunen@nvidia.com>
- <20180209224922.4fxlpl77kwibzfui@rob-hp-laptop>
-Message-ID: <5105d996-8020-ebcf-cf46-2f13c6b8b35f@kapsi.fi>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Sat, 10 Feb 2018 09:54:06 +0100
+Subject: [PATCH 7/7] watchdog: coh901327: make use of timeout-secs
+ provided in devicetree
+In-Reply-To: <20180209225200.GI19627@roeck-us.net>
+References: <marcus.folkesson@gmail.com>
+ <20180209192724.1227-1-marcus.folkesson@gmail.com>
+ <20180209192724.1227-8-marcus.folkesson@gmail.com>
+ <20180209225200.GI19627@roeck-us.net>
+Message-ID: <20180210085406.GA744@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2018 12:49 AM, Rob Herring wrote:
-> On Tue, Feb 06, 2018 at 09:22:34AM +0200, Mikko Perttunen wrote:
->> Add compatibility strings for supported but undocumented Tegra chips
->> (Tegra114/124/132/210/186/194) and reference boards.
->>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->>
->> Notes:
->>      v2:
->>      - add patch
->>
->>   Documentation/devicetree/bindings/arm/tegra.txt | 16 ++++++++++++++++
->>   1 file changed, 16 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
->> index 7f1411bbabf7..32f62bb7006d 100644
->> --- a/Documentation/devicetree/bindings/arm/tegra.txt
->> +++ b/Documentation/devicetree/bindings/arm/tegra.txt
->> @@ -9,6 +9,12 @@ following compatible values:
->>   
->>     nvidia,tegra20
->>     nvidia,tegra30
->> +  nvidia,tegra114
->> +  nvidia,tegra124
->> +  nvidia,tegra132
->> +  nvidia,tegra210
-> 
-> Some reason why this is not in numerical order?
+Hi,
 
-They are in chronological/chip generation order, and for whatever 
-reason, that isn't numerical.
+On Fri, Feb 09, 2018 at 02:52:00PM -0800, Guenter Roeck wrote:
+> On Fri, Feb 09, 2018 at 08:27:24PM +0100, Marcus Folkesson wrote:
+> > watchdog_init_timeout() will allways pick timeout_param since it
+> > defaults to a valid timeout.
+> > 
+> > Following best practice described in
+> > Documentation/watchdog/watchdog-kernel-api.txt to make use of
+> > the parameter logic.
+> > 
+> > Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+> > ---
+> >  drivers/watchdog/coh901327_wdt.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+> > index 4410337f4f7f..437f865e5c6b 100644
+> > --- a/drivers/watchdog/coh901327_wdt.c
+> > +++ b/drivers/watchdog/coh901327_wdt.c
+> > @@ -67,7 +67,7 @@
+> >  #define U300_WDOG_IFR_WILL_BARK_IRQ_FORCE_ENABLE			0x0001U
+> >  
+> >  /* Default timeout in seconds = 1 minute */
+> > -static unsigned int margin = 60;
+> > +static unsigned int margin;
+> >  static int irq;
+> >  static void __iomem *virtbase;
+> >  static struct device *parent;
+> 
+> I would suggest to initialize .timeout in 'static struct watchdog_device
+> coh901327_wdt', and drop the error check when calling watchdog_init_timeout().
 
-Mikko
+Will do, thank you.
 
 > 
->> +  nvidia,tegra186
->> +  nvidia,tegra194
->>   
->>   Boards
->>   -------------------------------------------
->> @@ -26,8 +32,18 @@ board-specific compatible values:
->>     nvidia,cardhu
->>     nvidia,cardhu-a02
->>     nvidia,cardhu-a04
->> +  nvidia,dalmore
->>     nvidia,harmony
->> +  nvidia,jetson-tk1
->> +  nvidia,norrin
->> +  nvidia,p2371-0000
->> +  nvidia,p2371-2180
->> +  nvidia,p2571
->> +  nvidia,p2771-0000
->> +  nvidia,p2972-0000
->> +  nvidia,roth
->>     nvidia,seaboard
->> +  nvidia,tn7
->>     nvidia,ventana
->>     toradex,apalis_t30
->>     toradex,apalis_t30-eval
->> -- 
->> 2.1.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Guenter
+
+
+Best regards
+Marcus Folkesson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180210/13b40f3d/attachment.sig>
