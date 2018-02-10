@@ -1,50 +1,58 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Feb 2018 07:32:33 -0800
-Subject: [PATCH] watchdog: coh901327: make license text and module licence
- match
-In-Reply-To: <20180210092702.4393-1-marcus.folkesson@gmail.com>
-References: <20180210092702.4393-1-marcus.folkesson@gmail.com>
-Message-ID: <63b79477-3506-0cb7-3d5d-a2c34d2de82c@roeck-us.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 10 Feb 2018 16:46:10 +0100
+Subject: [PATCH] soc: imx: gpc: de-register power domains only if
+ initialized
+In-Reply-To: <20180107134905.15624-1-stefan@agner.ch>
+References: <20180107134905.15624-1-stefan@agner.ch>
+Message-ID: <58a199f07ff636d1a5ad69aa54ce30ea@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2018 01:27 AM, Marcus Folkesson wrote:
-> Licence text is specifying "GPLv2" but the MODULE_LICENSE is set to "GPLv2
-> or later".
-> 
-> See include/linux/module.h:
-> "GPL"				[GNU Public License v2 or later]
-> "GPL v2"			[GNU Public License v2]
-> 
-> When on it, add SPDX identifier tag.
-> 
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+On 07.01.2018 14:49, Stefan Agner wrote:
+> If power domain information are missing in the device tree, no
+> power domains get initialized. However, imx_gpc_remove tries to
+> remove power domains always in the old DT binding case. Only
+> remove power domains when imx_gpc_probe initialized them in
+> first place.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Shawn, I think this patch can be merged. The discussion branches a bit
+off into a second problem, but this patch should be fine.
 
+--
+Stefan
+
+> 
+> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->   drivers/watchdog/coh901327_wdt.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/soc/imx/gpc.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-> index 5d8eb9a30879..7b71e0a3e6cc 100644
-> --- a/drivers/watchdog/coh901327_wdt.c
-> +++ b/drivers/watchdog/coh901327_wdt.c
-> @@ -1,8 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0
->   /*
->    * coh901327_wdt.c
->    *
->    * Copyright (C) 2008-2009 ST-Ericsson AB
-> - * License terms: GNU General Public License (GPL) version 2
->    * Watchdog driver for the ST-Ericsson AB COH 901 327 IP core
->    * Author: Linus Walleij <linus.walleij@stericsson.com>
->    */
-> @@ -420,5 +420,5 @@ MODULE_DESCRIPTION("COH 901 327 Watchdog");
->   module_param(margin, uint, 0);
->   MODULE_PARM_DESC(margin, "Watchdog margin in seconds (default 60s)");
->   
-> -MODULE_LICENSE("GPL");
-> +MODULE_LICENSE("GPL v2");
->   MODULE_ALIAS("platform:coh901327-watchdog");
-> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 53f7275d6cbd..62bb724726d9 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -470,13 +470,21 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  
+>  static int imx_gpc_remove(struct platform_device *pdev)
+>  {
+> +	struct device_node *pgc_node;
+>  	int ret;
+>  
+> +	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
+> +
+> +	/* bail out if DT too old and doesn't provide the necessary info */
+> +	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
+> +	    !pgc_node)
+> +		return 0;
+> +
+>  	/*
+>  	 * If the old DT binding is used the toplevel driver needs to
+>  	 * de-register the power domains
+>  	 */
+> -	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
+> +	if (!pgc_node) {
+>  		of_genpd_del_provider(pdev->dev.of_node);
+>  
+>  		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
