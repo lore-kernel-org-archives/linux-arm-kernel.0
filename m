@@ -1,62 +1,100 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 10 Feb 2018 17:35:01 +0100
-Subject: [PATCH 2/3] soc: rockchip: power-domain: Use
- of_clk_get_parent_count() instead of open coding
-In-Reply-To: <1516375101-29836-3-git-send-email-geert+renesas@glider.be>
-References: <1516375101-29836-1-git-send-email-geert+renesas@glider.be>
- <1516375101-29836-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <11171053.oOJPuGlHoK@phil>
+From: eric@anholt.net (Eric Anholt)
+Date: Sat, 10 Feb 2018 17:08:34 +0000
+Subject: [PATCH 1/3] drm: simple_kms_helper: Add mode_valid() callback
+ support
+In-Reply-To: <20180206121854.4407-2-linus.walleij@linaro.org>
+References: <20180206121854.4407-1-linus.walleij@linaro.org>
+ <20180206121854.4407-2-linus.walleij@linaro.org>
+Message-ID: <87bmgwdb71.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Am Freitag, 19. Januar 2018, 16:18:20 CET schrieb Geert Uytterhoeven:
-> As of_clk_get_parent_count() returns zero on failure, while
-> of_count_phandle_with_args() might return a negative error code, this
-> also fixes the issue of possibly using a negative number in the
-> allocation below.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> The PL111 needs to filter valid modes based on memory bandwidth.
+> I guess it is a pretty simple operation, so we can still claim
+> the DRM KMS helper pipeline is simple after adding this (optional)
+> vtable callback.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/soc/rockchip/pm_domains.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-> index 5c342167b9db7a16..9936038d38771784 100644
-> --- a/drivers/soc/rockchip/pm_domains.c
-> +++ b/drivers/soc/rockchip/pm_domains.c
-> @@ -16,6 +16,7 @@
->  #include <linux/of_address.h>
->  #include <linux/of_platform.h>
->  #include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-
-not wanting to be to nitpicky, but clk-provider.h seems that it should be
-used from drivers exposing clocks to the system, not from clock users.
-
-I just remember that in the past clk maintainers tried to keep their
-layering intact, so I've included them for clarification.
-
-Mike, Stephen: the power-domain driver of Rockchip socs needs
-to toggle all clocks of domain peripherals when turning a domain
-on or off, so has a variable list of clocks in the clocks property in dt.
-Hence the of_count_... call which could be replaced with
-of_clk_get_parent_count to not open-code this.
-
-
-Heiko
-
->  #include <linux/regmap.h>
->  #include <linux/mfd/syscon.h>
->  #include <dt-bindings/power/rk3288-power.h>
-> @@ -391,7 +392,7 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
->  		return -EINVAL;
->  	}
+>  drivers/gpu/drm/drm_simple_kms_helper.c | 15 +++++++++++++++
+>  include/drm/drm_simple_kms_helper.h     | 15 +++++++++++++++
+>  2 files changed, 30 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/drm_simple_kms_helper.c b/drivers/gpu/drm/drm_simple_kms_helper.c
+> index dc9fd109de14..b7840cf34808 100644
+> --- a/drivers/gpu/drm/drm_simple_kms_helper.c
+> +++ b/drivers/gpu/drm/drm_simple_kms_helper.c
+> @@ -34,6 +34,20 @@ static const struct drm_encoder_funcs drm_simple_kms_encoder_funcs = {
+>  	.destroy = drm_encoder_cleanup,
+>  };
 >  
-> -	clk_cnt = of_count_phandle_with_args(node, "clocks", "#clock-cells");
-> +	clk_cnt = of_clk_get_parent_count(node);
->  	pd = devm_kzalloc(pmu->dev,
->  			  sizeof(*pd) + clk_cnt * sizeof(pd->clks[0]),
->  			  GFP_KERNEL);
-> 
+> +static enum drm_mode_status
+> +drm_simple_kms_crtc_mode_valid(struct drm_crtc *crtc,
+> +			       const struct drm_display_mode *mode)
+> +{
+> +	struct drm_simple_display_pipe *pipe;
+> +
+> +	pipe = container_of(crtc, struct drm_simple_display_pipe, crtc);
+> +	if (!pipe->funcs || !pipe->funcs->mode_valid)
+> +		/* Anything goes */
+> +		return MODE_OK;
+> +
+> +	return pipe->funcs->mode_valid(crtc, mode);
+> +}
+> +
+>  static int drm_simple_kms_crtc_check(struct drm_crtc *crtc,
+>  				     struct drm_crtc_state *state)
+>  {
+> @@ -72,6 +86,7 @@ static void drm_simple_kms_crtc_disable(struct drm_crtc *crtc,
+>  }
+>  
+>  static const struct drm_crtc_helper_funcs drm_simple_kms_crtc_helper_funcs = {
+> +	.mode_valid = drm_simple_kms_crtc_mode_valid,
+>  	.atomic_check = drm_simple_kms_crtc_check,
+>  	.atomic_enable = drm_simple_kms_crtc_enable,
+>  	.atomic_disable = drm_simple_kms_crtc_disable,
+> diff --git a/include/drm/drm_simple_kms_helper.h b/include/drm/drm_simple_kms_helper.h
+> index 6d9adbb46293..ad74cb33c539 100644
+> --- a/include/drm/drm_simple_kms_helper.h
+> +++ b/include/drm/drm_simple_kms_helper.h
+> @@ -21,6 +21,21 @@ struct drm_simple_display_pipe;
+>   *                                        display pipeline
+>   */
+>  struct drm_simple_display_pipe_funcs {
+> +	/**
+> +	 * @mode_valid:
+> +	 *
+> +	 * This function is called to filter out valid modes from the
+> +	 * suggestions suggested by the bridge or display. This optional
+> +	 * hook is passed in when initializing the pipeline.
+> +	 *
+> +	 * RETURNS:
+> +	 *
+> +	 * MODE_OK if the mode is acceptable.
+> +	 * MODE_BAD if we need to try something else.
+> +	 */
+
+I don't see why MODE_BAD would be the only valid error return from this
+hook.  Can we just use the same RETURNS docs as other mode_valid methods?
+
+Other than that,
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+
+> +	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
+> +					   const struct drm_display_mode *mode);
+> +
+>  	/**
+>  	 * @enable:
+>  	 *
+> -- 
+> 2.14.3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180210/46e6f7bb/attachment.sig>
