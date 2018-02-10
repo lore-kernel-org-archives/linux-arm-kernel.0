@@ -1,26 +1,39 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Sat, 10 Feb 2018 15:48:22 +0100
-Subject: [PATCH 5/6] ARM: dts: tegra: apalis-tk1: copyright period,
- spurious newlines
-In-Reply-To: <C651C677-D157-41A3-B206-CB02B986AD19@ziswiler.com>
-References: <20180210013806.28496-1-marcel@ziswiler.com>
- <20180210013806.28496-6-marcel@ziswiler.com>
- <CAOFm3uH+aasUA9MrV+uXvHUT=fzS63PvC2fDfNo3q687dUQ_dw@mail.gmail.com>
- <C651C677-D157-41A3-B206-CB02B986AD19@ziswiler.com>
-Message-ID: <CAOFm3uGyspJshw7h=fhobEpCS971k+kfF_RN0ppXc8Uc_teJ7g@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 10 Feb 2018 16:32:04 +0100
+Subject: [PATCH] MAINTAINERS: add Freescale pin controllers
+Message-ID: <20180210153204.12728-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 10, 2018 at 9:40 AM, Marcel Ziswiler <marcel@ziswiler.com> wrote:
+Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
+and Sascha as reviewer.
 
-> Yes, I'm already in the process of preparing a separate patch set fixing this
-> across all Toradex files. However I'm running this through our legal as well
-> first to make absolutely sure it's all proper.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ MAINTAINERS | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-That's the way to go and thank you for this.
-Do not hesitate to ping here or privately if there is any legal
-concern that comes up.
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 82ad0eabce4f..fb672dfc519d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
+ S:	Supported
+ F:	drivers/pinctrl/pinctrl-at91-pio4.*
+ 
++PIN CONTROLLER - FREESCALE
++M:	Dong Aisheng <aisheng.dong@nxp.com>
++M:	Fabio Estevam <festevam@gmail.com>
++M:	Shawn Guo <shawnguo@kernel.org>
++M:	Stefan Agner <stefan@agner.ch>
++R:	Sascha Hauer <kernel@pengutronix.de>
++L:	linux-gpio at vger.kernel.org
++S:	Maintained
++F:	drivers/pinctrl/freescale/*
++F:	Documentation/devicetree/bindings/pinctrl/fsl,*
++
+ PIN CONTROLLER - INTEL
+ M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+ M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
 -- 
-Cordially
-Philippe Ombredanne
+2.16.1
