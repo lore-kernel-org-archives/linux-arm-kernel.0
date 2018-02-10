@@ -1,26 +1,72 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 10 Feb 2018 15:29:41 +0100
-Subject: [PATCH v2 1/7] watchdog: sama5d4: make use of timeout-secs
- provided in devicetree
-In-Reply-To: <20180210091911.3644-1-marcus.folkesson@gmail.com>
-References: <20180210091911.3644-1-marcus.folkesson@gmail.com>
-Message-ID: <20180210142940.GA2452@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 10 Feb 2018 14:35:01 +0000
+Subject: [PATCH] drm/rockchip: Don't use spin_lock_irqsave in interrupt context
+Message-ID: <20180210143501.30407-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2018 at 10:19:05 +0100, Marcus Folkesson wrote:
-> watchdog_init_timeout() will allways pick timeout_param since it
-> defaults to a valid timeout.
-> 
-> Following best practice described in
-> Documentation/watchdog/watchdog-kernel-api.txt to make use of
-> the parameter logic.
-> 
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+The rockchip DRM driver is quite careful to disable interrupts
+when taking a lock that is also taken in interrupt context,
+which is a good thing.
 
+What is a bit over the top is to use spin_lock_irqsave when
+already in interrupt context, as you cannot take another
+interrupt again, and disabling interrupt is just pure
+overhead.
+
+Switching to the non _irqsave version in interrupt context is
+more logical, and less heavy handed.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 72554f404b7e..e23877e72c43 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1159,15 +1159,14 @@ static void vop_handle_vblank(struct vop *vop)
+ {
+ 	struct drm_device *drm = vop->drm_dev;
+ 	struct drm_crtc *crtc = &vop->crtc;
+-	unsigned long flags;
+ 
+-	spin_lock_irqsave(&drm->event_lock, flags);
++	spin_lock(&drm->event_lock);
+ 	if (vop->event) {
+ 		drm_crtc_send_vblank_event(crtc, vop->event);
+ 		drm_crtc_vblank_put(crtc);
+ 		vop->event = NULL;
+ 	}
+-	spin_unlock_irqrestore(&drm->event_lock, flags);
++	spin_unlock(&drm->event_lock);
+ 
+ 	if (test_and_clear_bit(VOP_PENDING_FB_UNREF, &vop->pending))
+ 		drm_flip_work_commit(&vop->fb_unref_work, system_unbound_wq);
+@@ -1178,21 +1177,20 @@ static irqreturn_t vop_isr(int irq, void *data)
+ 	struct vop *vop = data;
+ 	struct drm_crtc *crtc = &vop->crtc;
+ 	uint32_t active_irqs;
+-	unsigned long flags;
+ 	int ret = IRQ_NONE;
+ 
+ 	/*
+ 	 * interrupt register has interrupt status, enable and clear bits, we
+ 	 * must hold irq_lock to avoid a race with enable/disable_vblank().
+ 	*/
+-	spin_lock_irqsave(&vop->irq_lock, flags);
++	spin_lock(&vop->irq_lock);
+ 
+ 	active_irqs = VOP_INTR_GET_TYPE(vop, status, INTR_MASK);
+ 	/* Clear all active interrupt sources */
+ 	if (active_irqs)
+ 		VOP_INTR_SET_TYPE(vop, clear, active_irqs, 1);
+ 
+-	spin_unlock_irqrestore(&vop->irq_lock, flags);
++	spin_unlock(&vop->irq_lock);
+ 
+ 	/* This is expected for vop iommu irqs, since the irq is shared */
+ 	if (!active_irqs)
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.14.2
