@@ -1,131 +1,142 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 11 Feb 2018 17:17:32 +0100
-Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
- i.MX6UL/ULL
-In-Reply-To: <AM3PR04MB1315240E4A77431A58AC8501F5F00@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <20180118235836.17393-1-stefan@agner.ch>
- <CAOMZO5CBTTi2QMfM0yDVEMTYm06pGyasUcaLWD8wDHiVi9oshg@mail.gmail.com>
- <AM3PR04MB1315240E4A77431A58AC8501F5F00@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <79baed40abbcc72920fd133bc43e378a@agner.ch>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 12 Feb 2018 00:34:57 +0800
+Subject: [arm-platforms:hack/kevin 13/19] drivers/mfd/cros_ec.c:152:6: error:
+ implicit declaration of function 'cros_ec_check_features';
+ did you mean 'cros_ec_check_result'?
+Message-ID: <201802120055.4g814Ncr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.02.2018 02:42, Anson Huang wrote:
-> Anson Huang
-> Best Regards!
-> 
-> 
->> -----Original Message-----
->> From: Fabio Estevam [mailto:festevam at gmail.com]
->> Sent: Sunday, February 11, 2018 12:26 AM
->> To: Stefan Agner <stefan@agner.ch>; Anson Huang <anson.huang@nxp.com>
->> Cc: rjw at rjwysocki.net; viresh kumar <viresh.kumar@linaro.org>;
->> linux-pm at vger.kernel.org; Marcel Ziswiler <marcel.ziswiler@toradex.com>;
->> max.oss.09 at gmail.com; linux-kernel <linux-kernel@vger.kernel.org>; Octavian
->> Purdila <octavian.purdila@nxp.com>; Fabio Estevam
->> <fabio.estevam@nxp.com>; Shawn Guo <shawnguo@kernel.org>; moderated
->> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
->> <linux-arm-kernel@lists.infradead.org>; dl-linux-imx <linux-imx@nxp.com>
->> Subject: Re: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
->> i.MX6UL/ULL
->>
->> Hi Anson,
->>
->> On Thu, Jan 18, 2018 at 9:58 PM, Stefan Agner <stefan@agner.ch> wrote:
->> > Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
->> > Use PLL1 sys clock for all operating points higher than 528MHz.
->> >
->> > Note: For higher operating points VDD_SOC_IN needs to be 125mV higher
->> > than the ARM set-point (see datasheet). Specifically, the i.MX6UL/ULL
->> > EVK boards have an external DC regulator which needs adjustment. The
->> > regulator adjustment is not covered with this change.
->> >
->> > Signed-off-by: Stefan Agner <stefan@agner.ch>
->> > ---
->> >  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
->> >  1 file changed, 8 insertions(+), 6 deletions(-)
->> >
->> > diff --git a/drivers/cpufreq/imx6q-cpufreq.c
->> > b/drivers/cpufreq/imx6q-cpufreq.c index 628fe899cb48..840f6386c780
->> > 100644
->> > --- a/drivers/cpufreq/imx6q-cpufreq.c
->> > +++ b/drivers/cpufreq/imx6q-cpufreq.c
->> > @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy
->> *policy, unsigned int index)
->> >                  */
->> >                 clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->> >                 clk_set_parent(pll1_sw_clk, pll1_sys_clk);
->> > -               if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
->> > -                       clk_set_parent(secondary_sel_clk, pll2_bus_clk);
->> > -               else
->> > -                       clk_set_parent(secondary_sel_clk,
->> pll2_pfd2_396m_clk);
->> > -               clk_set_parent(step_clk, secondary_sel_clk);
->> > -               clk_set_parent(pll1_sw_clk, step_clk);
->> > +               if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
->> > +                       if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
->> > +                               clk_set_parent(secondary_sel_clk,
->> pll2_bus_clk);
->> > +                       else
->> > +                               clk_set_parent(secondary_sel_clk,
->> pll2_pfd2_396m_clk);
->> > +                       clk_set_parent(step_clk, secondary_sel_clk);
->> > +                       clk_set_parent(pll1_sw_clk, step_clk);
->> > +               }
-> 
-> For cpufreq > 528MHz, ARM PLL needs to be set_rate, I did NOT see
-> where sets ARM PLL rate?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git hack/kevin
+head:   1b72d390ddf16ef46ff8a182db6a9ca869f2d28c
+commit: afef7b6c71990b94b58f78dd12a0cdfa4bfe2a82 [13/19] mfd: cros_ec: add RTC as mfd subdevice
+config: i386-randconfig-i0-201806 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        git checkout afef7b6c71990b94b58f78dd12a0cdfa4bfe2a82
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-This is done unconditionally after the if statement:
+Note: the arm-platforms/hack/kevin HEAD 1b72d390ddf16ef46ff8a182db6a9ca869f2d28c builds fine.
+      It only hurts bisectibility.
 
-	if (of_machine_is_compatible("fsl,imx6ul") ||
-	    of_machine_is_compatible("fsl,imx6ull")) {
-		/*
-		 * When changing pll1_sw_clk's parent to pll1_sys_clk,
-		 * CPU may run at higher than 528MHz, this will lead to
-		 * the system unstable if the voltage is lower than the
-		 * voltage of 528MHz, so lower the CPU frequency to one
-		 * half before changing CPU frequency.
-		 */
-		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
-		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-		if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
-			if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-				clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-			else
-				clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-			clk_set_parent(step_clk, secondary_sel_clk);
-			clk_set_parent(pll1_sw_clk, step_clk);
-		}
-	} else {
-		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
-		clk_set_parent(pll1_sw_clk, step_clk);
-		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
-			clk_set_rate(pll1_sys_clk, new_freq * 1000);
-			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-		} else {
-			/* pll1_sys needs to be enabled for divider rate change to work. */
-			pll1_sys_temp_enabled = true;
-			clk_prepare_enable(pll1_sys_clk);
-		}
-	}
+All errors (new ones prefixed by >>):
 
-	/* Ensure the arm clock divider is what we expect */
-	ret = clk_set_rate(arm_clk, new_freq * 1000);
+   drivers/mfd/cros_ec.c: In function 'cros_ec_register':
+>> drivers/mfd/cros_ec.c:152:6: error: implicit declaration of function 'cros_ec_check_features'; did you mean 'cros_ec_check_result'? [-Werror=implicit-function-declaration]
+     if (cros_ec_check_features(ec_dev, EC_FEATURE_RTC))
+         ^~~~~~~~~~~~~~~~~~~~~~
+         cros_ec_check_result
+   cc1: some warnings being treated as errors
 
+vim +152 drivers/mfd/cros_ec.c
 
---
-Stefan
+   107	
+   108	int cros_ec_register(struct cros_ec_device *ec_dev)
+   109	{
+   110		struct device *dev = ec_dev->dev;
+   111		int err = 0;
+   112	
+   113		BLOCKING_INIT_NOTIFIER_HEAD(&ec_dev->event_notifier);
+   114	
+   115		ec_dev->max_request = sizeof(struct ec_params_hello);
+   116		ec_dev->max_response = sizeof(struct ec_response_get_protocol_info);
+   117		ec_dev->max_passthru = 0;
+   118	
+   119		ec_dev->din = devm_kzalloc(dev, ec_dev->din_size, GFP_KERNEL);
+   120		if (!ec_dev->din)
+   121			return -ENOMEM;
+   122	
+   123		ec_dev->dout = devm_kzalloc(dev, ec_dev->dout_size, GFP_KERNEL);
+   124		if (!ec_dev->dout)
+   125			return -ENOMEM;
+   126	
+   127		mutex_init(&ec_dev->lock);
+   128	
+   129		cros_ec_query_all(ec_dev);
+   130	
+   131		if (ec_dev->irq) {
+   132			err = request_threaded_irq(ec_dev->irq, NULL, ec_irq_thread,
+   133						   IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+   134						   "chromeos-ec", ec_dev);
+   135			if (err) {
+   136				dev_err(dev, "Failed to request IRQ %d: %d",
+   137					ec_dev->irq, err);
+   138				return err;
+   139			}
+   140		}
+   141	
+   142		err = mfd_add_devices(ec_dev->dev, PLATFORM_DEVID_AUTO, &ec_cell, 1,
+   143				      NULL, ec_dev->irq, NULL);
+   144		if (err) {
+   145			dev_err(dev,
+   146				"Failed to register Embedded Controller subdevice %d\n",
+   147				err);
+   148			goto fail_mfd;
+   149		}
+   150	
+   151		/* Check whether this EC has RTC support */
+ > 152		if (cros_ec_check_features(ec_dev, EC_FEATURE_RTC))
+   153			cros_ec_rtc_register(ec_dev);
+   154	
+   155		if (ec_dev->max_passthru) {
+   156			/*
+   157			 * Register a PD device as well on top of this device.
+   158			 * We make the following assumptions:
+   159			 * - behind an EC, we have a pd
+   160			 * - only one device added.
+   161			 * - the EC is responsive at init time (it is not true for a
+   162			 *   sensor hub.
+   163			 */
+   164			err = mfd_add_devices(ec_dev->dev, PLATFORM_DEVID_AUTO,
+   165					      &ec_pd_cell, 1, NULL, ec_dev->irq, NULL);
+   166			if (err) {
+   167				dev_err(dev,
+   168					"Failed to register Power Delivery subdevice %d\n",
+   169					err);
+   170				goto fail_mfd;
+   171			}
+   172		}
+   173	
+   174		if (IS_ENABLED(CONFIG_OF) && dev->of_node) {
+   175			err = devm_of_platform_populate(dev);
+   176			if (err) {
+   177				mfd_remove_devices(dev);
+   178				dev_err(dev, "Failed to register sub-devices\n");
+   179				goto fail_mfd;
+   180			}
+   181		}
+   182	
+   183		/*
+   184		 * Clear sleep event - this will fail harmlessly on platforms that
+   185		 * don't implement the sleep event host command.
+   186		 */
+   187		err = cros_ec_sleep_event(ec_dev, 0);
+   188		if (err < 0)
+   189			dev_dbg(ec_dev->dev, "Error %d clearing sleep event to ec",
+   190				err);
+   191	
+   192		dev_info(dev, "Chrome EC device registered\n");
+   193	
+   194		cros_ec_acpi_install_gpe_handler(dev);
+   195	
+   196		return 0;
+   197	
+   198	fail_mfd:
+   199		if (ec_dev->irq)
+   200			free_irq(ec_dev->irq, ec_dev);
+   201		return err;
+   202	}
+   203	EXPORT_SYMBOL(cros_ec_register);
+   204	
 
-
-
-> 
-> Anson.
-> 
->> >         } else {
->> >                 clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->> >                 clk_set_parent(pll1_sw_clk, step_clk);
->>
->> Could you please help reviewing this patch?
->>
->> Thanks
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31352 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180212/9a6b8b1b/attachment-0001.gz>
