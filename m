@@ -1,37 +1,58 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sun, 11 Feb 2018 10:06:02 +0800
-Subject: [PATCH] ACPI/IORT: Remove temporary iort_get_id_mapping_index()
- ACPICA guard
-In-Reply-To: <20180209121510.9015-1-lorenzo.pieralisi@arm.com>
-References: <20180209121510.9015-1-lorenzo.pieralisi@arm.com>
-Message-ID: <da3331ec-686d-5809-65ce-9c562682b4fc@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 10 Feb 2018 17:52:49 -0800
+Subject: [PATCH v2 5/7] watchdog: mtk: allow setting timeout in devicetree
+In-Reply-To: <20180210201207.GC744@gmail.com>
+References: <20180210091911.3644-1-marcus.folkesson@gmail.com>
+ <20180210091911.3644-5-marcus.folkesson@gmail.com>
+ <1518261002.9025.36.camel@mtkswgap22> <20180210124328.GB744@gmail.com>
+ <20180210201207.GC744@gmail.com>
+Message-ID: <5449674d-2812-c9b5-9c06-af2fbfa72737@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/2/9 20:15, Lorenzo Pieralisi wrote:
-> In IORT issue C SMMUv3 IORT nodes gained an additional field (DeviceID
-> mapping index) so that the SMMUv3 can describe its MSI interrupts.
+On 02/10/2018 12:12 PM, Marcus Folkesson wrote:
+> Hello Sean,
 > 
-> Referring to it in the kernel requires ACPICA changes and in order
-> to prevent kernel<->ACPICA dependencies kernel code depending on the
-> SMMUv3 DeviceID mapping index field was guarded with an ACPICA version
-> conditional.
+> On Sat, Feb 10, 2018 at 01:43:28PM +0100, Marcus Folkesson wrote:
+>> Hello Sean,
+>>
+>> On Sat, Feb 10, 2018 at 07:10:02PM +0800, Sean Wang wrote:
+>>>
+>>> Hi, Marcus
+>>>
+>>> The changes you made for dt-bindings and driver should be put into
+>>> separate patches.
+>>
+>> I actually thought about it but chose to have it in the same patch because I
+>> did not see any direct advantage to separating them.
+>>
+>> But I can do that.
+>> I will come up with a v3 with this change if no one thinks differently.
+>>
 > 
-> ACPICA changes introducing DeviceID mapping index in the IORT structs
-> were integrated in the kernel with:
+> When looking at the git log, I'm not that convinced it should be
+> separate patches.
 > 
-> commit 4c106aa411ee ("ACPICA: iasl: Add SMMUv3 device ID mapping index
-> support")
+> For example, I found a4f741e3e157c3a5c8aea5f2ea62b692fbf17338 that is
+> doing the exact same thing as this patch.
 > 
-> so the temporary ACPICA guard has become stale and can be removed.
+> There is plenty of patches that mixes the code change and dt bindings
+> updates.
+> Could it not be useful to overview both the implementation and
+> dt-mapping change in one view?
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> If you or anyone else still think it should be separated, please let me know and I will
+> come up with a v3.
+> 
 
-Thanks for doing this,
+If we were talking about something new, specifically new and unapproved DT bindings,
+it should be separate patches. However, that is not the case here. The DT bindings
+are well established. Sure, we could be pedantic and request a split into two
+patches. However, the only benefit of that would be more work for the maintainers,
+ie Wim and myself (including me having to send this e-mail). I don't really see
+the point of that.
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+I have already sent my Reviewed-by:, and I don't intend to withdraw it.
 
-Thanks
-Hanjun
+Thanks,
+Guenter
