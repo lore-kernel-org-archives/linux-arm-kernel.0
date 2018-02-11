@@ -1,59 +1,56 @@
 From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Sun, 11 Feb 2018 21:08:41 +0100
-Subject: [PATCH v3 1/7] watchdog: sama5d4: make use of timeout-secs provided
- in devicetree
-Message-ID: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+Date: Sun, 11 Feb 2018 21:08:42 +0100
+Subject: [PATCH v3 2/7] watchdog: sunxi: allow setting timeout in devicetree
+In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+Message-ID: <20180211200847.25000-2-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 watchdog_init_timeout() will allways pick timeout_param since it
 defaults to a valid timeout.
 
-Following best practice described in
-Documentation/watchdog/watchdog-kernel-api.txt to make use of
-the parameter logic.
+By following best practice described in
+Documentation/watchdog/watchdog-kernel-api.txt, it also
+let us to set timout-sec property in devicetree.
 
 Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
+ Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 4 ++++
+ drivers/watchdog/sunxi_wdt.c                             | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-Notes:
-    v3:
-    	- Use wdd->timeout instead of wdt_timeout when print out
-    	  timout in probe function.
-
- drivers/watchdog/sama5d4_wdt.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-index 0ae947c3d7bc..255169916dbb 100644
---- a/drivers/watchdog/sama5d4_wdt.c
-+++ b/drivers/watchdog/sama5d4_wdt.c
-@@ -33,7 +33,7 @@ struct sama5d4_wdt {
- 	unsigned long		last_ping;
+diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+index 62dd5baad70e..49900e72f6b1 100644
+--- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+@@ -6,9 +6,13 @@ Required properties:
+                "allwinner,sun6i-a31-wdt"
+ - reg : Specifies base physical address and size of the registers.
+ 
++Optional properties:
++- timeout-sec : Contains the watchdog timeout in seconds
++
+ Example:
+ 
+ wdt: watchdog at 1c20c90 {
+ 	compatible = "allwinner,sun4i-a10-wdt";
+ 	reg = <0x01c20c90 0x10>;
++	timeout-sec = <10>;
  };
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index 9728fa32c357..55f166bec0ca 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -39,7 +39,7 @@
+ #define DRV_VERSION		"1.0"
  
--static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-+static int wdt_timeout;
  static bool nowayout = WATCHDOG_NOWAYOUT;
+-static unsigned int timeout = WDT_MAX_TIMEOUT;
++static unsigned int timeout;
  
- module_param(wdt_timeout, int, 0);
-@@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	wdd = &wdt->wdd;
--	wdd->timeout = wdt_timeout;
-+	wdd->timeout = WDT_DEFAULT_TIMEOUT;
- 	wdd->info = &sama5d4_wdt_info;
- 	wdd->ops = &sama5d4_wdt_ops;
- 	wdd->min_timeout = MIN_WDT_TIMEOUT;
-@@ -273,7 +273,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, wdt);
- 
- 	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
--		 wdt_timeout, nowayout);
-+		 wdd->timeout, nowayout);
- 
- 	return 0;
- }
+ /*
+  * This structure stores the register offsets for different variants
 -- 
 2.15.1
