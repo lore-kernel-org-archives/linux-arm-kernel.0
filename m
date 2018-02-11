@@ -1,56 +1,55 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sun, 11 Feb 2018 23:15:02 +0100
-Subject: [PATCH 1/3] arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
-In-Reply-To: <20180209175236.21215-2-embed3d@gmail.com>
-References: <20180209175236.21215-1-embed3d@gmail.com>
- <20180209175236.21215-2-embed3d@gmail.com>
-Message-ID: <1518387302.1342.3.camel@gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Sun, 11 Feb 2018 18:10:28 -0500 (EST)
+Subject: [PATCH] mvpp2: fix multicast address filter
+Message-ID: <alpine.LRH.2.02.1802111806550.12159@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 09.02.2018, 18:52 +0100 schrieb Philipp Rossak:
-> This patch updates the vmmc-supply properties on the mmc0 and mmc2
-> node to use the allready existent regulators.
-> We can now remove the sunxi-common-regulators.dtsi include since we
-> don't need it anymore.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
-> ?arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 5 ++---
-> ?1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-> b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-> index 51e6f1d21c32..a8d86211c8f3 100644
-> --- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-> +++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-> @@ -42,7 +42,6 @@
-> ?
-> ?/dts-v1/;
-> ?#include "sun6i-a31s.dtsi"
-> -#include "sunxi-common-regulators.dtsi"
-> ?#include <dt-bindings/gpio/gpio.h>
-> ?
-> ?/ {
-> @@ -118,7 +117,7 @@
-> ?&mmc0 {
-> ?	pinctrl-names = "default";
-> ?	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
-> -	vmmc-supply = <&reg_vcc3v0>;
-> +	vmmc-supply = <&reg_dcdc1>;
-> ?	bus-width = <4>;
-> ?	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
-> ?	cd-inverted;
-> @@ -132,7 +131,7 @@
-> ?&mmc2 {
-> ?	pinctrl-names = "default";
-> ?	pinctrl-0 = <&mmc2_pins_a>;
-> -	vmmc-supply = <&reg_vcc3v0>;
-> +	vmmc-supply = <&reg_dcdc1>;
-			^^
-		this here is wrong! this should be &reg_aldo1
-> ?	mmc-pwrseq = <&mmc2_pwrseq>;
-> ?	bus-width = <4>;
-> ?	non-removable;
+IPv6 doesn't work on the MacchiatoBIN board. It is caused by broken
+multicast address filter in the mvpp2 driver.
 
-Philipp
+The driver loads doesn't load any multicast entries if "allmulti" is not
+set. This condition should be reversed.
+
+The condition !netdev_mc_empty(dev) is useless (because
+netdev_for_each_mc_addr is nop if the list is empty).
+
+This patch also fixes a possible overflow of the multicast list - if
+mvpp2_prs_mac_da_accept fails, we set the allmulti flag and retry.
+
+Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
+Cc: stable at vger.kernel.org
+
+---
+ drivers/net/ethernet/marvell/mvpp2.c |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+Index: linux-2.6/drivers/net/ethernet/marvell/mvpp2.c
+===================================================================
+--- linux-2.6.orig/drivers/net/ethernet/marvell/mvpp2.c	2018-02-11 23:40:01.000000000 +0100
++++ linux-2.6/drivers/net/ethernet/marvell/mvpp2.c	2018-02-11 23:44:09.000000000 +0100
+@@ -7137,6 +7137,7 @@ static void mvpp2_set_rx_mode(struct net
+ 	int id = port->id;
+ 	bool allmulti = dev->flags & IFF_ALLMULTI;
+ 
++retry:
+ 	mvpp2_prs_mac_promisc_set(priv, id, dev->flags & IFF_PROMISC);
+ 	mvpp2_prs_mac_multi_set(priv, id, MVPP2_PE_MAC_MC_ALL, allmulti);
+ 	mvpp2_prs_mac_multi_set(priv, id, MVPP2_PE_MAC_MC_IP6, allmulti);
+@@ -7144,9 +7145,13 @@ static void mvpp2_set_rx_mode(struct net
+ 	/* Remove all port->id's mcast enries */
+ 	mvpp2_prs_mcast_del_all(priv, id);
+ 
+-	if (allmulti && !netdev_mc_empty(dev)) {
+-		netdev_for_each_mc_addr(ha, dev)
+-			mvpp2_prs_mac_da_accept(priv, id, ha->addr, true);
++	if (!allmulti) {
++		netdev_for_each_mc_addr(ha, dev) {
++			if (mvpp2_prs_mac_da_accept(priv, id, ha->addr, true)) {
++				allmulti = true;
++				goto retry;
++			}
++		}
+ 	}
+ }
+ 
