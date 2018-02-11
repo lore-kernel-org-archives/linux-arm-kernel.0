@@ -1,39 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 11 Feb 2018 17:21:53 -0200
-Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
-In-Reply-To: <CAOMZO5D=83p947b=0d6zrxv8mGONjMzXJP1Jyg8W+u1eH=Spww@mail.gmail.com>
-References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
- <CAOcK=CMFahBh9rmm5PGHe=UVrdxi_pwWH=cOs9Q_kCgzTTKOew@mail.gmail.com>
- <CAOcK=CMoVd=nWQd1pyCM4J0YXpMj1i4+nn4o60tPZfntwFm8AA@mail.gmail.com>
- <CAOMZO5D=83p947b=0d6zrxv8mGONjMzXJP1Jyg8W+u1eH=Spww@mail.gmail.com>
-Message-ID: <CAOMZO5BSWvjHaXH=xq67pwUADa055_Et6xu08Yy3c3ow0yvn9Q@mail.gmail.com>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Sun, 11 Feb 2018 21:08:41 +0100
+Subject: [PATCH v3 1/7] watchdog: sama5d4: make use of timeout-secs provided
+ in devicetree
+Message-ID: <20180211200847.25000-1-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+watchdog_init_timeout() will allways pick timeout_param since it
+defaults to a valid timeout.
 
-On Sun, Feb 11, 2018 at 11:58 AM, Fabio Estevam <festevam@gmail.com> wrote:
+Following best practice described in
+Documentation/watchdog/watchdog-kernel-api.txt to make use of
+the parameter logic.
 
->> With your changes the board will boot again, so a step forward (but
->> USB will not working).
+Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+---
 
-If you re-enable USBH1 and apply this quick hack:
+Notes:
+    v3:
+    	- Use wdd->timeout instead of wdt_timeout when print out
+    	  timout in probe function.
 
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -920,5 +920,11 @@ static void __init imx6q_clocks_init(struct
-device_node *ccm_node)
-        }
+ drivers/watchdog/sama5d4_wdt.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-        imx_register_uart_clocks(uart_clks);
-+
-+       if (of_machine_is_compatible("udoo,imx6dl-udoo") ||
-+           of_machine_is_compatible("udoo,imx6q-udoo"))
-+               clk_prepare_enable(clk[IMX6QDL_CLK_CKO]);
-+
+diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+index 0ae947c3d7bc..255169916dbb 100644
+--- a/drivers/watchdog/sama5d4_wdt.c
++++ b/drivers/watchdog/sama5d4_wdt.c
+@@ -33,7 +33,7 @@ struct sama5d4_wdt {
+ 	unsigned long		last_ping;
+ };
+ 
+-static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
++static int wdt_timeout;
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ 
+ module_param(wdt_timeout, int, 0);
+@@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	wdd = &wdt->wdd;
+-	wdd->timeout = wdt_timeout;
++	wdd->timeout = WDT_DEFAULT_TIMEOUT;
+ 	wdd->info = &sama5d4_wdt_info;
+ 	wdd->ops = &sama5d4_wdt_ops;
+ 	wdd->min_timeout = MIN_WDT_TIMEOUT;
+@@ -273,7 +273,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, wdt);
+ 
+ 	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
+-		 wdt_timeout, nowayout);
++		 wdd->timeout, nowayout);
+ 
+ 	return 0;
  }
- CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
-
-Does USB work again?
-
-I don't have access to my udoo board at the moment.
+-- 
+2.15.1
