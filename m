@@ -1,117 +1,44 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Sun, 11 Feb 2018 14:44:33 +0300
-Subject: [PATCH 0/3] Fix broken bananapi m2 devicetree/regulators
-In-Reply-To: <1518348631.1342.1.camel@gmail.com>
-References: <20180209175236.21215-1-embed3d@gmail.com>
- <160b60e2-6e50-0d63-e6ac-b67e10317e12@orpaltech.com>
- <d3fcc9d2-f2e6-189c-529f-890f2afdd837@gmail.com>
- <40887d4b-0fb0-239e-e5a9-1a87f82946c2@orpaltech.com>
- <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
- <45fb86c9-2218-d00d-1952-6b79f9101049@orpaltech.com>
- <1518348631.1342.1.camel@gmail.com>
-Message-ID: <d90584ac-ae76-39fc-c0e1-ba2ff2151c30@orpaltech.com>
+From: maggu2810@gmail.com (Markus Rathgeb)
+Date: Sun, 11 Feb 2018 14:47:31 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-udoo: Disable usbh1 to avoid kernel hang
+In-Reply-To: <CAOcK=CMFahBh9rmm5PGHe=UVrdxi_pwWH=cOs9Q_kCgzTTKOew@mail.gmail.com>
+References: <1516278858-15464-1-git-send-email-fabio.estevam@nxp.com>
+ <CAOcK=CMFahBh9rmm5PGHe=UVrdxi_pwWH=cOs9Q_kCgzTTKOew@mail.gmail.com>
+Message-ID: <CAOcK=CMoVd=nWQd1pyCM4J0YXpMj1i4+nn4o60tPZfntwFm8AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2018 02:30 PM, Philipp Rossak wrote:
-> Am Sonntag, den 11.02.2018, 10:55 +0300 schrieb Sergey Suloev:
->> On 02/11/2018 01:07 AM, Philipp Rossak wrote:
->>>
->>> On 10.02.2018 22:08, Sergey Suloev wrote:
->>>> On 02/11/2018 12:01 AM, Philipp Rossak wrote:
->>>>> Hey Sergey,
->>>>>
->>>>> Thanks for mentioning, but I think the problem has nothing to
->>>>> do
->>>>> with those patches. I tested them with the v4.15.0 Kernel since
->>>>> this
->>>>> is the last stable release and we are right now in the merging
->>>>> window.
->>>>>
->>>>> I tested the latest mainline, without those patches and the
->>>>> kernel
->>>>> is not booting (I can't see any uart output).
->>>>>
->>>>> Thanks,
->>>>> Philipp
->>>>>
->>>>> On 10.02.2018 14:56, Sergey Suloev wrote:
->>>>>> On 02/09/2018 08:52 PM, Philipp Rossak wrote:
->>>>>>> This patchseries fixes the bananapi m1 devicetree, to be
->>>>>>> able to
->>>>>>> boot again.
->>>>>>> The first two patches update/improve the devicetree and the
->>>>>>> last
->>>>>>> patch adds
->>>>>>> all missing regulators.
->>>>>>>
->>>>>>> Regards,
->>>>>>> Philipp
->>>>>>>
->>>>>>> Philipp Rossak (3):
->>>>>>>  ?? arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
->>>>>>>  ?? arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
->>>>>>>  ?? arm: dts: sun6i: a31s: fix: bpi-m2: add missing
->>>>>>> regulators
->>>>>>>
->>>>>>>  ? arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 70
->>>>>>> +++++++++++++++++++++++-
->>>>>>>  ? 1 file changed, 67 insertions(+), 3 deletions(-)
->>>>>>>
->>>>>> patches are not working
->>>>>>
->>>>>> Thanks
->>>>>>
->>>> same problem, but after applying the patches my device is till
->>>> hanging.
->>>>
->>>>
->>> Can you please share a bootlog? Here is mine [1]. As you can see
->>> I'm
->>> able to boot.
->>> I build it with this branch [2]. For testing you should replace
->>> the
->>> dtb and the uImage/zImage
->>>
->>> Philipp
->>>
->>>
->>> [1]: https://pastebin.com/mVjv3LDf
->>> [2]:
->>> https://github.com/embed-3d/linux/tree/testing/bpi-m2-regulator-tes
->>> t-2
->> My dmesg is very similar to yours unless it hangs on the last line
->> [1].
->> For this test I used kernel from tag v4.15 with no additional
->> patching.
->>
->> [1] https://pastebin.com/3a6bk5Dk
->>
->>
-> For me it looks like you have a different kernel and also an different
-> dtb that you patch! And you are applying also a fixup script.
-> These patches should be applied on top of linux mainline.
->
-> fixup script:
-> Applying kernel provided DT fixup script (sun6i-a31s-fixup.scr)
->
->
-> Linux versions:
-> 4.15.0-00003-g1bbe5edde691   vs   4.15.0-sunxi-dirty
->
-> In addition to that you are also booting into fb/hdmi.
->
-> If you use my branch (uImage and dtb) and replace the current boot.cmd
-> with this (to get the boot.scr you need to use mkimage) it should work:
->
-> setenv bootargs console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait
-> panic=10
-> load mmc 0:1 0x43000000 ${fdtfile} || load mmc 0:1 0x43000000
-> boot/${fdtfile}
-> load mmc 0:1 0x42000000 uImage || load mmc 0:1 0x42000000 boot/uImage
-> bootm 0x42000000 - 0x43000000
->
-ok, I confirm that your patches are not related to the issue. It is the 
-problem with sun4i drm / hdmi which is not working on bpi m2.
+Hi Fabio,
 
-Thanks
+have you seen my message from
+
+2018-01-20 10:14 GMT+01:00 Markus Rathgeb <maggu2810@gmail.com>:
+>
+>
+> I tested the patch that sets usbh1's status to disable using the
+> kernel 4.13 that previously hangs.
+> I confirm the disabled usb host allows to boot my imx6q-udoo board.
+>
+> Tested-by: Markus Rathgeb <maggu2810@gmail.com>
+
+or missed I some further messages on that topic?
+
+With your changes the board will boot again, so a step forward (but
+USB will not working).
+
+I recently read the "Linux Kernel Release Model"
+(http://kroah.com/log/blog/2018/02/05/linux-kernel-release-model/) and
+stumbled about that sentence: "The Linux kernel community has promised
+its userbase that no upgrade will ever break anything that is
+currently working in a previous release."
+I used the Udoo board a long time for my USB printer to access it over
+the network. So USB has been working in a release but does not work
+anymore.
+"Regressions do happen, but those are the highest priority bugs and
+are either quickly fixed, or the change that caused the regression is
+quickly reverted from the Linux kernel tree."
+So, can we expect that USB will be working soon again or are such
+boards an exception to that overcome?
+
+Best regards,
+Markus
