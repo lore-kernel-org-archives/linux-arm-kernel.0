@@ -1,34 +1,41 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Feb 2018 19:56:27 -0800
-Subject: [PATCH 4/4] watchdog: lpc18xx: remove assignment of unused
- ret-value
-In-Reply-To: <20180210203623.17832-4-marcus.folkesson@gmail.com>
-References: <20180210203623.17832-1-marcus.folkesson@gmail.com>
- <20180210203623.17832-4-marcus.folkesson@gmail.com>
-Message-ID: <55a198d0-3d58-52e5-0304-5212d7ba5dca@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 11 Feb 2018 13:06:04 +0800
+Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
+In-Reply-To: <20180205155222.22189-1-brgl@bgdev.pl>
+References: <20180205155222.22189-1-brgl@bgdev.pl>
+Message-ID: <201802111325.SE0T4030%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2018 12:36 PM, Marcus Folkesson wrote:
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+Hi Bartosz,
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+I love your patch! Yet something to improve:
 
-> ---
->   drivers/watchdog/lpc18xx_wdt.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/watchdog/lpc18xx_wdt.c b/drivers/watchdog/lpc18xx_wdt.c
-> index b4221f43cd94..331cadb459ac 100644
-> --- a/drivers/watchdog/lpc18xx_wdt.c
-> +++ b/drivers/watchdog/lpc18xx_wdt.c
-> @@ -265,7 +265,7 @@ static int lpc18xx_wdt_probe(struct platform_device *pdev)
->   	lpc18xx_wdt->wdt_dev.parent = dev;
->   	watchdog_set_drvdata(&lpc18xx_wdt->wdt_dev, lpc18xx_wdt);
->   
-> -	ret = watchdog_init_timeout(&lpc18xx_wdt->wdt_dev, heartbeat, dev);
-> +	watchdog_init_timeout(&lpc18xx_wdt->wdt_dev, heartbeat, dev);
->   
->   	__lpc18xx_wdt_set_timeout(lpc18xx_wdt);
->   
-> 
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.15 next-20180209]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/ARM-dts-da850-evm-add-clock-properties-to-the-nand-node/20180208-105626
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23273 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180211/5feae002/attachment-0001.gz>
