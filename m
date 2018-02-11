@@ -1,141 +1,56 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 11 Feb 2018 22:06:49 +0100
-Subject: [PATCH usb-next v9 6/8] usb: host: ehci-platform: remove custom USB
- PHY handling
-In-Reply-To: <20180211210651.2046-1-martin.blumenstingl@googlemail.com>
-References: <20180211210651.2046-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180211210651.2046-7-martin.blumenstingl@googlemail.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Sun, 11 Feb 2018 23:15:02 +0100
+Subject: [PATCH 1/3] arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
+In-Reply-To: <20180209175236.21215-2-embed3d@gmail.com>
+References: <20180209175236.21215-1-embed3d@gmail.com>
+ <20180209175236.21215-2-embed3d@gmail.com>
+Message-ID: <1518387302.1342.3.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new PHY wrapper is now wired up in the core HCD code. This means
-that PHYs are now controlled (initialized, enabled, disabled, exited)
-without requiring any host-driver specific code.
-Remove the custom USB PHY handling from the ehci-platform driver as the
-core HCD code now handles this.
+Am Freitag, den 09.02.2018, 18:52 +0100 schrieb Philipp Rossak:
+> This patch updates the vmmc-supply properties on the mmc0 and mmc2
+> node to use the allready existent regulators.
+> We can now remove the sunxi-common-regulators.dtsi include since we
+> don't need it anymore.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+> ?arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 5 ++---
+> ?1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+> b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+> index 51e6f1d21c32..a8d86211c8f3 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+> +++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+> @@ -42,7 +42,6 @@
+> ?
+> ?/dts-v1/;
+> ?#include "sun6i-a31s.dtsi"
+> -#include "sunxi-common-regulators.dtsi"
+> ?#include <dt-bindings/gpio/gpio.h>
+> ?
+> ?/ {
+> @@ -118,7 +117,7 @@
+> ?&mmc0 {
+> ?	pinctrl-names = "default";
+> ?	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
+> -	vmmc-supply = <&reg_vcc3v0>;
+> +	vmmc-supply = <&reg_dcdc1>;
+> ?	bus-width = <4>;
+> ?	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
+> ?	cd-inverted;
+> @@ -132,7 +131,7 @@
+> ?&mmc2 {
+> ?	pinctrl-names = "default";
+> ?	pinctrl-0 = <&mmc2_pins_a>;
+> -	vmmc-supply = <&reg_vcc3v0>;
+> +	vmmc-supply = <&reg_dcdc1>;
+			^^
+		this here is wrong! this should be &reg_aldo1
+> ?	mmc-pwrseq = <&mmc2_pwrseq>;
+> ?	bus-width = <4>;
+> ?	non-removable;
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ehci-platform.c | 55 +++-------------------------------------
- 1 file changed, 4 insertions(+), 51 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 40fbc4925378..4c306fb6b069 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -27,7 +27,6 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
--#include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- #include <linux/reset.h>
- #include <linux/usb.h>
-@@ -44,8 +43,6 @@
- struct ehci_platform_priv {
- 	struct clk *clks[EHCI_MAX_CLKS];
- 	struct reset_control *rsts;
--	struct phy **phys;
--	int num_phys;
- 	bool reset_on_resume;
- };
- 
-@@ -80,7 +77,7 @@ static int ehci_platform_power_on(struct platform_device *dev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
--	int clk, ret, phy_num;
-+	int clk, ret;
- 
- 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++) {
- 		ret = clk_prepare_enable(priv->clks[clk]);
-@@ -88,24 +85,8 @@ static int ehci_platform_power_on(struct platform_device *dev)
- 			goto err_disable_clks;
- 	}
- 
--	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		ret = phy_init(priv->phys[phy_num]);
--		if (ret)
--			goto err_exit_phy;
--		ret = phy_power_on(priv->phys[phy_num]);
--		if (ret) {
--			phy_exit(priv->phys[phy_num]);
--			goto err_exit_phy;
--		}
--	}
--
- 	return 0;
- 
--err_exit_phy:
--	while (--phy_num >= 0) {
--		phy_power_off(priv->phys[phy_num]);
--		phy_exit(priv->phys[phy_num]);
--	}
- err_disable_clks:
- 	while (--clk >= 0)
- 		clk_disable_unprepare(priv->clks[clk]);
-@@ -117,12 +98,7 @@ static void ehci_platform_power_off(struct platform_device *dev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
--	int clk, phy_num;
--
--	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		phy_power_off(priv->phys[phy_num]);
--		phy_exit(priv->phys[phy_num]);
--	}
-+	int clk;
- 
- 	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
- 		if (priv->clks[clk])
-@@ -149,7 +125,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
--	int err, irq, phy_num, clk = 0;
-+	int err, irq, clk = 0;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -202,29 +178,6 @@ static int ehci_platform_probe(struct platform_device *dev)
- 					  "has-transaction-translator"))
- 			hcd->has_tt = 1;
- 
--		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
--				"phys", "#phy-cells");
--
--		if (priv->num_phys > 0) {
--			priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
--					    sizeof(struct phy *), GFP_KERNEL);
--			if (!priv->phys)
--				return -ENOMEM;
--		} else
--			priv->num_phys = 0;
--
--		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--			priv->phys[phy_num] = devm_of_phy_get_by_index(
--					&dev->dev, dev->dev.of_node, phy_num);
--			if (IS_ERR(priv->phys[phy_num])) {
--				err = PTR_ERR(priv->phys[phy_num]);
--					goto err_put_hcd;
--			} else {
--				/* Avoiding phy_get() in usb_add_hcd() */
--				hcd->skip_phy_initialization = true;
--			}
--		}
--
- 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
- 			priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
- 			if (IS_ERR(priv->clks[clk])) {
-@@ -306,7 +259,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
--err_put_hcd:
-+
- 	if (pdata == &ehci_platform_defaults)
- 		dev->dev.platform_data = NULL;
- 
--- 
-2.16.1
+Philipp
