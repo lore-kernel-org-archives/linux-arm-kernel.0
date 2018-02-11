@@ -1,56 +1,161 @@
-From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Sun, 11 Feb 2018 21:08:46 +0100
-Subject: [PATCH v3 6/7] watchdog: meson: allow setting timeout in devicetree
-In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
-References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
-Message-ID: <20180211200847.25000-6-marcus.folkesson@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 11 Feb 2018 22:06:44 +0100
+Subject: [PATCH usb-next v9 1/8] dt-bindings: usb: add the documentation for
+ USB HCDs
+In-Reply-To: <20180211210651.2046-1-martin.blumenstingl@googlemail.com>
+References: <20180211210651.2046-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20180211210651.2046-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-watchdog_init_timeout() will allways pick timeout_param since it
-defaults to a valid timeout.
+A USB HCD may have several PHYs which need to be configured before the
+the HCD starts working.
+This adds the documentation for such a USB HCD as well as a reference to
+the new "usb-hcd.txt" from all bindings that implement a USB HCD which
+support one USB PHY per port.
 
-By following best practice described in
-Documentation/watchdog/watchdog-kernel-api.txt, it also
-let us to set timout-sec property in devicetree.
-
-Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Tested-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 4 ++++
- drivers/watchdog/meson_wdt.c                             | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 5 ++++-
+ Documentation/devicetree/bindings/usb/mediatek,mtu3.txt     | 5 ++++-
+ Documentation/devicetree/bindings/usb/usb-ehci.txt          | 6 ++++--
+ Documentation/devicetree/bindings/usb/usb-hcd.txt           | 9 +++++++++
+ Documentation/devicetree/bindings/usb/usb-ohci.txt          | 6 ++++--
+ Documentation/devicetree/bindings/usb/usb-uhci.txt          | 3 +++
+ Documentation/devicetree/bindings/usb/usb-xhci.txt          | 5 +++++
+ 7 files changed, 33 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/usb-hcd.txt
 
-diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-index 8a6d84cb36c9..7588cc3971bf 100644
---- a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-@@ -9,9 +9,13 @@ Required properties:
- 	"amlogic,meson8m2-wdt" and "amlogic,meson8b-wdt" on Meson8m2 SoCs
- - reg : Specifies base physical address and size of the registers.
+diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+index 88d9f4a4b280..266c2d917a28 100644
+--- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+@@ -32,7 +32,7 @@ Required properties:
+ 	"mcu_ck": mcu_bus clock for register access,
+ 	"dma_ck": dma_bus clock for data transfer by DMA
  
+- - phys : a list of phandle + phy specifier pairs
++ - phys : see usb-hcd.txt in the current directory
+ 
+ Optional properties:
+  - wakeup-source : enable USB remote wakeup;
+@@ -52,6 +52,9 @@ Optional properties:
+ 	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+  - imod-interval-ns: default interrupt moderation interval is 5000ns
+ 
++additionally the properties from usb-hcd.txt (in the current directory) are
++supported.
++
+ Example:
+ usb30: usb at 11270000 {
+ 	compatible = "mediatek,mt8173-xhci";
+diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+index d589a1ef96a1..3382b5cb471d 100644
+--- a/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtu3.txt
+@@ -17,7 +17,7 @@ Required properties:
+  - clock-names : must contain "sys_ck" for clock of controller,
+ 	the following clocks are optional:
+ 	"ref_ck", "mcu_ck" and "dam_ck";
+- - phys : a list of phandle + phy specifier pairs
++ - phys : see usb-hcd.txt in the current directory
+  - dr_mode : should be one of "host", "peripheral" or "otg",
+ 	refer to usb/generic.txt
+ 
+@@ -53,6 +53,9 @@ Optional properties:
+  - mediatek,u3p-dis-msk : mask to disable u3ports, bit0 for u3port0,
+ 	bit1 for u3port1, ... etc;
+ 
++additionally the properties from usb-hcd.txt (in the current directory) are
++supported.
++
+ Sub-nodes:
+ The xhci should be added as subnode to mtu3 as shown in the following example
+ if host mode is enabled. The DT binding details of xhci can be found in:
+diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+index 3efde12b5d68..0f1b75386207 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+@@ -16,10 +16,12 @@ Optional properties:
+  - has-transaction-translator : boolean, set this if EHCI have a Transaction
+ 				Translator built into the root hub.
+  - clocks : a list of phandle + clock specifier pairs
+- - phys : phandle + phy specifier pair
+- - phy-names : "usb"
++ - phys : see usb-hcd.txt in the current directory
+  - resets : phandle + reset specifier pair
+ 
++additionally the properties from usb-hcd.txt (in the current directory) are
++supported.
++
+ Example (Sequoia 440EPx):
+     ehci at e0000300 {
+ 	   compatible = "ibm,usb-ehci-440epx", "usb-ehci";
+diff --git a/Documentation/devicetree/bindings/usb/usb-hcd.txt b/Documentation/devicetree/bindings/usb/usb-hcd.txt
+new file mode 100644
+index 000000000000..50529b838c9c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/usb-hcd.txt
+@@ -0,0 +1,9 @@
++Generic USB HCD (Host Controller Device) Properties
++
 +Optional properties:
-+- timeout-sec: contains the watchdog timeout in seconds.
++- phys: a list of all USB PHYs on this HCD
++
++Example:
++	&usb1 {
++		phys = <&usb2_phy1>, <&usb3_phy1>;
++	};
+diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+index 09e70c875bc6..a8d2103d1f3d 100644
+--- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+@@ -13,10 +13,12 @@ Optional properties:
+ - remote-wakeup-connected: remote wakeup is wired on the platform
+ - num-ports : u32, to override the detected port count
+ - clocks : a list of phandle + clock specifier pairs
+-- phys : phandle + phy specifier pair
+-- phy-names : "usb"
++- phys : see usb-hcd.txt in the current directory
+ - resets : a list of phandle + reset specifier pairs
+ 
++additionally the properties from usb-hcd.txt (in the current directory) are
++supported.
 +
  Example:
  
- wdt: watchdog at c1109900 {
- 	compatible = "amlogic,meson6-wdt";
- 	reg = <0xc1109900 0x8>;
-+	timeout-sec = <10>;
- };
-diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
-index 304274c67735..cd0275a6cdac 100644
---- a/drivers/watchdog/meson_wdt.c
-+++ b/drivers/watchdog/meson_wdt.c
-@@ -36,7 +36,7 @@
- #define MESON_SEC_TO_TC(s, c)	((s) * (c))
+ 	ohci0: usb at 1c14400 {
+diff --git a/Documentation/devicetree/bindings/usb/usb-uhci.txt b/Documentation/devicetree/bindings/usb/usb-uhci.txt
+index 298133416c97..cc2e6f7d602e 100644
+--- a/Documentation/devicetree/bindings/usb/usb-uhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-uhci.txt
+@@ -6,6 +6,9 @@ Required properties:
+ - reg : Should contain 1 register ranges(address and length)
+ - interrupts : UHCI controller interrupt
  
- static bool nowayout = WATCHDOG_NOWAYOUT;
--static unsigned int timeout = MESON_WDT_TIMEOUT;
-+static unsigned int timeout;
++additionally the properties from usb-hcd.txt (in the current directory) are
++supported.
++
+ Example:
  
- struct meson_wdt_data {
- 	unsigned int enable;
+ 	uhci at d8007b00 {
+diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+index e2ea59bbca93..2f7663bb69ff 100644
+--- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+@@ -32,6 +32,11 @@ Optional properties:
+   - usb3-lpm-capable: determines if platform is USB3 LPM capable
+   - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+   - imod-interval-ns: default interrupt moderation interval is 5000ns
++  - phys : see usb-hcd.txt in the current directory
++
++additionally the properties from usb-hcd.txt (in the current directory) are
++supported.
++
+ 
+ Example:
+ 	usb at f0931000 {
 -- 
-2.15.1
+2.16.1
