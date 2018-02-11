@@ -1,73 +1,69 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Sun, 11 Feb 2018 10:55:01 +0300
-Subject: [PATCH 0/3] Fix broken bananapi m2 devicetree/regulators
-In-Reply-To: <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
-References: <20180209175236.21215-1-embed3d@gmail.com>
- <160b60e2-6e50-0d63-e6ac-b67e10317e12@orpaltech.com>
- <d3fcc9d2-f2e6-189c-529f-890f2afdd837@gmail.com>
- <40887d4b-0fb0-239e-e5a9-1a87f82946c2@orpaltech.com>
- <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
-Message-ID: <45fb86c9-2218-d00d-1952-6b79f9101049@orpaltech.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 11 Feb 2018 12:05:27 +0100
+Subject: [PATCH 3/3] drm/pl111: Use max memory bandwidth for resolution
+In-Reply-To: <876074dax5.fsf@anholt.net>
+References: <20180206121854.4407-1-linus.walleij@linaro.org>
+ <20180206121854.4407-4-linus.walleij@linaro.org> <876074dax5.fsf@anholt.net>
+Message-ID: <CACRpkdZ9jOhtxKRgv_XtJMTgT0_fSKg9HMoyDGOJTTaLd+GOLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2018 01:07 AM, Philipp Rossak wrote:
->
->
-> On 10.02.2018 22:08, Sergey Suloev wrote:
->> On 02/11/2018 12:01 AM, Philipp Rossak wrote:
->>> Hey Sergey,
->>>
->>> Thanks for mentioning, but I think the problem has nothing to do 
->>> with those patches. I tested them with the v4.15.0 Kernel since this 
->>> is the last stable release and we are right now in the merging window.
->>>
->>> I tested the latest mainline, without those patches and the kernel 
->>> is not booting (I can't see any uart output).
->>>
->>> Thanks,
->>> Philipp
->>>
->>> On 10.02.2018 14:56, Sergey Suloev wrote:
->>>> On 02/09/2018 08:52 PM, Philipp Rossak wrote:
->>>>> This patchseries fixes the bananapi m1 devicetree, to be able to 
->>>>> boot again.
->>>>> The first two patches update/improve the devicetree and the last 
->>>>> patch adds
->>>>> all missing regulators.
->>>>>
->>>>> Regards,
->>>>> Philipp
->>>>>
->>>>> Philipp Rossak (3):
->>>>> ?? arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
->>>>> ?? arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
->>>>> ?? arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
->>>>>
->>>>> ? arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 70 
->>>>> +++++++++++++++++++++++-
->>>>> ? 1 file changed, 67 insertions(+), 3 deletions(-)
->>>>>
->>>> patches are not working
->>>>
->>>> Thanks
->>>>
->> same problem, but after applying the patches my device is till hanging.
->>
->>
-> Can you please share a bootlog? Here is mine [1]. As you can see I'm 
-> able to boot.
-> I build it with this branch [2]. For testing you should replace the 
-> dtb and the uImage/zImage
->
-> Philipp
->
->
-> [1]: https://pastebin.com/mVjv3LDf
-> [2]: 
-> https://github.com/embed-3d/linux/tree/testing/bpi-m2-regulator-test-2
+On Sat, Feb 10, 2018 at 6:14 PM, Eric Anholt <eric@anholt.net> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
 
-My dmesg is very similar to yours unless it hangs on the last line [1]. 
-For this test I used kernel from tag v4.15 with no additional patching.
+>> +static enum drm_mode_status
+>> +pl111_mode_valid(struct drm_crtc *crtc,
+>> +              const struct drm_display_mode *mode)
+>> +{
+>> +     struct drm_device *drm = crtc->dev;
+>> +     struct pl111_drm_dev_private *priv = drm->dev_private;
+>> +     u32 cpp = priv->variant->fb_bpp / 8;
+>> +     u64 bw;
+>
+> Using the variant->fb_bpp for mode_valid checks here feels wrong to me
+> -- it means a larger mode wouldn't be considered valid on a
+> 32bpp-preferred platform when 16bpp would make it work, and a 16bpp
+> platform will happily try to set a 32bpp mode that exceeds the
+> bandwidth.
 
-[1] https://pastebin.com/3a6bk5Dk
+Yeah. So I have an additional patch (that I will send out with the
+rest of the v2 patches) that actually go in and set ->fb_bpp to
+16 on the RealViews to get some nice 1024x768 on these.
+
+The other mode_valid() checks I've seen (well, OMAPDRM)
+just assume 32bpp and goes on. I guess it is saved by not
+supporting anything else.
+
+> On the other hand, if it makes things work most of the time I'm also
+> kind of OK with it.  Anyone else want to chime in here?
+
+This makes things work but can be improved upon.
+
+The core of the problem is that resolution is CRTC business
+and seen as something limited by the monitor or
+bridge/connector or so, then it calls this hook into the driver to
+check that it can provide what the monitor/bridge/connector
+suggests.
+
+And then we have the opportunity to say we can't do such or
+such resolution.
+
+The pixel format on the other hand is seen as a display hardware
+thing, so if I had an API here to call back into the driver and
+restrict the formats to say 16bpp, I could confirm better
+resolutions.
+
+We can put that in place later and remove the ->fb_bpp if we
+can chisel out the right API to set the pixel format.
+
+I am working on another patch to set the preferred pixel format
+instead of BPP when intiializing the framebuffer, so I will
+investigate this at the same time, but I'd really like to build
+on top of this code to avoid too many variables.
+
+> Maybe DRM_DEBUG_KMS for these?
+
+OK I fix :)
+
+Yours,
+Linus Walleij
