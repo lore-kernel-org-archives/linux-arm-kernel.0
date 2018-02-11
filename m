@@ -1,41 +1,72 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 11 Feb 2018 13:06:04 +0800
-Subject: [PATCH] ARM: dts: da850-evm: add clock properties to the nand node
-In-Reply-To: <20180205155222.22189-1-brgl@bgdev.pl>
-References: <20180205155222.22189-1-brgl@bgdev.pl>
-Message-ID: <201802111325.SE0T4030%fengguang.wu@intel.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Sun, 11 Feb 2018 10:29:28 +0300
+Subject: [PATCH 0/3] Fix broken bananapi m2 devicetree/regulators
+In-Reply-To: <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
+References: <20180209175236.21215-1-embed3d@gmail.com>
+ <160b60e2-6e50-0d63-e6ac-b67e10317e12@orpaltech.com>
+ <d3fcc9d2-f2e6-189c-529f-890f2afdd837@gmail.com>
+ <40887d4b-0fb0-239e-e5a9-1a87f82946c2@orpaltech.com>
+ <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
+Message-ID: <cfdd543b-9a50-002e-34af-d611aca4d1a6@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+On 02/11/2018 01:07 AM, Philipp Rossak wrote:
+>
+>
+> On 10.02.2018 22:08, Sergey Suloev wrote:
+>> On 02/11/2018 12:01 AM, Philipp Rossak wrote:
+>>> Hey Sergey,
+>>>
+>>> Thanks for mentioning, but I think the problem has nothing to do 
+>>> with those patches. I tested them with the v4.15.0 Kernel since this 
+>>> is the last stable release and we are right now in the merging window.
+>>>
+>>> I tested the latest mainline, without those patches and the kernel 
+>>> is not booting (I can't see any uart output).
+>>>
+>>> Thanks,
+>>> Philipp
+>>>
+>>> On 10.02.2018 14:56, Sergey Suloev wrote:
+>>>> On 02/09/2018 08:52 PM, Philipp Rossak wrote:
+>>>>> This patchseries fixes the bananapi m1 devicetree, to be able to 
+>>>>> boot again.
+>>>>> The first two patches update/improve the devicetree and the last 
+>>>>> patch adds
+>>>>> all missing regulators.
+>>>>>
+>>>>> Regards,
+>>>>> Philipp
+>>>>>
+>>>>> Philipp Rossak (3):
+>>>>> ?? arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
+>>>>> ?? arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
+>>>>> ?? arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
+>>>>>
+>>>>> ? arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 70 
+>>>>> +++++++++++++++++++++++-
+>>>>> ? 1 file changed, 67 insertions(+), 3 deletions(-)
+>>>>>
+>>>> patches are not working
+>>>>
+>>>> Thanks
+>>>>
+>> same problem, but after applying the patches my device is till hanging.
+>>
+>>
+> Can you please share a bootlog? Here is mine [1]. As you can see I'm 
+> able to boot.
+> I build it with this branch [2]. For testing you should replace the 
+> dtb and the uImage/zImage
+>
+> Philipp
+>
+>
+> [1]: https://pastebin.com/mVjv3LDf
+> [2]: 
+> https://github.com/embed-3d/linux/tree/testing/bpi-m2-regulator-test-2
 
-I love your patch! Yet something to improve:
+I am going to test it and come back with outcome
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.15 next-20180209]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/ARM-dts-da850-evm-add-clock-properties-to-the-nand-node/20180208-105626
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-sunxi_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> ERROR: Input tree has errors, aborting (use -f to force output)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23273 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180211/5feae002/attachment-0001.gz>
+Thanks
