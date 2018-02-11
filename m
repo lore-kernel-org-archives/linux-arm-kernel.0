@@ -1,9 +1,9 @@
 From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Sun, 11 Feb 2018 21:08:45 +0100
-Subject: [PATCH v3 5/7] watchdog: mtk: allow setting timeout in devicetree
+Date: Sun, 11 Feb 2018 21:08:43 +0100
+Subject: [PATCH v3 3/7] watchdog: sirfsoc: allow setting timeout in devicetree
 In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
 References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
-Message-ID: <20180211200847.25000-5-marcus.folkesson@gmail.com>
+Message-ID: <20180211200847.25000-3-marcus.folkesson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,40 +17,41 @@ let us to set timout-sec property in devicetree.
 Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
- Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 4 ++++
- drivers/watchdog/mtk_wdt.c                             | 2 +-
+ Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt | 4 ++++
+ drivers/watchdog/sirfsoc_wdt.c                             | 2 +-
  2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-index 5b38a30e608c..859dee167b91 100644
---- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-@@ -11,9 +11,13 @@ Required properties:
- 
- - reg : Specifies base physical address and size of the registers.
+diff --git a/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt b/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
+index 9cbc76c89b2b..0dce5e3100b4 100644
+--- a/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
+@@ -5,10 +5,14 @@ Required properties:
+ - reg: Address range of tick timer/WDT register set
+ - interrupts: interrupt number to the cpu
  
 +Optional properties:
-+- timeout-sec: contains the watchdog timeout in seconds.
++- timeout-sec : Contains the watchdog timeout in seconds
 +
  Example:
  
- wdt: watchdog at 10000000 {
- 	compatible = "mediatek,mt6589-wdt";
- 	reg = <0x10000000 0x18>;
-+	timeout-sec = <10>;
+ timer at b0020000 {
+ 	compatible = "sirf,prima2-tick";
+ 	reg = <0xb0020000 0x1000>;
+ 	interrupts = <0>;
++	timeout-sec = <30>;
  };
-diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
-index 7ed417a765c7..fcdc10ec28a3 100644
---- a/drivers/watchdog/mtk_wdt.c
-+++ b/drivers/watchdog/mtk_wdt.c
-@@ -57,7 +57,7 @@
- #define DRV_VERSION		"1.0"
+diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
+index 4eea351e09b0..ac0c9d2c4aee 100644
+--- a/drivers/watchdog/sirfsoc_wdt.c
++++ b/drivers/watchdog/sirfsoc_wdt.c
+@@ -29,7 +29,7 @@
+ #define SIRFSOC_WDT_MAX_TIMEOUT		(10 * 60)	/* 10 mins */
+ #define SIRFSOC_WDT_DEFAULT_TIMEOUT	30		/* 30 secs */
  
- static bool nowayout = WATCHDOG_NOWAYOUT;
--static unsigned int timeout = WDT_MAX_TIMEOUT;
+-static unsigned int timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT;
 +static unsigned int timeout;
+ static bool nowayout = WATCHDOG_NOWAYOUT;
  
- struct mtk_wdt_dev {
- 	struct watchdog_device wdt_dev;
+ module_param(timeout, uint, 0);
 -- 
 2.15.1
