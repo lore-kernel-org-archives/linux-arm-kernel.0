@@ -1,38 +1,73 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 11 Feb 2018 15:54:13 +0800
-Subject: [RFC PATCH] mtd: spi-nor: rockchip_sfc_runtime_suspend() can be static
-In-Reply-To: <1518092327-3827-1-git-send-email-andy.yan@rock-chips.com>
-References: <1518092327-3827-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20180211075413.GA11432@lkp-wsm-ep2>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Sun, 11 Feb 2018 10:55:01 +0300
+Subject: [PATCH 0/3] Fix broken bananapi m2 devicetree/regulators
+In-Reply-To: <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
+References: <20180209175236.21215-1-embed3d@gmail.com>
+ <160b60e2-6e50-0d63-e6ac-b67e10317e12@orpaltech.com>
+ <d3fcc9d2-f2e6-189c-529f-890f2afdd837@gmail.com>
+ <40887d4b-0fb0-239e-e5a9-1a87f82946c2@orpaltech.com>
+ <da8909da-4eea-0fdf-e104-4442f7986455@gmail.com>
+Message-ID: <45fb86c9-2218-d00d-1952-6b79f9101049@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/11/2018 01:07 AM, Philipp Rossak wrote:
+>
+>
+> On 10.02.2018 22:08, Sergey Suloev wrote:
+>> On 02/11/2018 12:01 AM, Philipp Rossak wrote:
+>>> Hey Sergey,
+>>>
+>>> Thanks for mentioning, but I think the problem has nothing to do 
+>>> with those patches. I tested them with the v4.15.0 Kernel since this 
+>>> is the last stable release and we are right now in the merging window.
+>>>
+>>> I tested the latest mainline, without those patches and the kernel 
+>>> is not booting (I can't see any uart output).
+>>>
+>>> Thanks,
+>>> Philipp
+>>>
+>>> On 10.02.2018 14:56, Sergey Suloev wrote:
+>>>> On 02/09/2018 08:52 PM, Philipp Rossak wrote:
+>>>>> This patchseries fixes the bananapi m1 devicetree, to be able to 
+>>>>> boot again.
+>>>>> The first two patches update/improve the devicetree and the last 
+>>>>> patch adds
+>>>>> all missing regulators.
+>>>>>
+>>>>> Regards,
+>>>>> Philipp
+>>>>>
+>>>>> Philipp Rossak (3):
+>>>>> ?? arm: dts: sun6i: a31s: bpi-m2: update mmc supply nodes
+>>>>> ?? arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
+>>>>> ?? arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
+>>>>>
+>>>>> ? arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 70 
+>>>>> +++++++++++++++++++++++-
+>>>>> ? 1 file changed, 67 insertions(+), 3 deletions(-)
+>>>>>
+>>>> patches are not working
+>>>>
+>>>> Thanks
+>>>>
+>> same problem, but after applying the patches my device is till hanging.
+>>
+>>
+> Can you please share a bootlog? Here is mine [1]. As you can see I'm 
+> able to boot.
+> I build it with this branch [2]. For testing you should replace the 
+> dtb and the uImage/zImage
+>
+> Philipp
+>
+>
+> [1]: https://pastebin.com/mVjv3LDf
+> [2]: 
+> https://github.com/embed-3d/linux/tree/testing/bpi-m2-regulator-test-2
 
-Fixes: dbc2d867929a ("mtd: spi-nor: add rockchip serial flash controller driver")
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
----
- rockchip-sfc.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+My dmesg is very similar to yours unless it hangs on the last line [1]. 
+For this test I used kernel from tag v4.15 with no additional patching.
 
-diff --git a/drivers/mtd/spi-nor/rockchip-sfc.c b/drivers/mtd/spi-nor/rockchip-sfc.c
-index 60371011..e38d79d 100644
---- a/drivers/mtd/spi-nor/rockchip-sfc.c
-+++ b/drivers/mtd/spi-nor/rockchip-sfc.c
-@@ -896,7 +896,7 @@ static int rockchip_sfc_remove(struct platform_device *pdev)
- }
- 
- #ifdef CONFIG_PM
--int rockchip_sfc_runtime_suspend(struct device *dev)
-+static int rockchip_sfc_runtime_suspend(struct device *dev)
- {
- 	struct rockchip_sfc *sfc = dev_get_drvdata(dev);
- 
-@@ -904,7 +904,7 @@ int rockchip_sfc_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
--int rockchip_sfc_runtime_resume(struct device *dev)
-+static int rockchip_sfc_runtime_resume(struct device *dev)
- {
- 	struct rockchip_sfc *sfc = dev_get_drvdata(dev);
- 
+[1] https://pastebin.com/3a6bk5Dk
