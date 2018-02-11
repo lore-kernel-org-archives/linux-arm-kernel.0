@@ -1,74 +1,36 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Sun, 11 Feb 2018 15:46:24 +0800
-Subject: [PATCH v2 5/7] watchdog: mtk: allow setting timeout in devicetree
-In-Reply-To: <5449674d-2812-c9b5-9c06-af2fbfa72737@roeck-us.net>
-References: <20180210091911.3644-1-marcus.folkesson@gmail.com>
- <20180210091911.3644-5-marcus.folkesson@gmail.com>
- <1518261002.9025.36.camel@mtkswgap22> <20180210124328.GB744@gmail.com>
- <20180210201207.GC744@gmail.com>
- <5449674d-2812-c9b5-9c06-af2fbfa72737@roeck-us.net>
-Message-ID: <1518335184.9025.43.camel@mtkswgap22>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 11 Feb 2018 15:54:13 +0800
+Subject: [PATCH v8 2/3] mtd: spi-nor: add rockchip serial flash
+ controller driver
+In-Reply-To: <1518092327-3827-1-git-send-email-andy.yan@rock-chips.com>
+References: <1518092327-3827-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <201802111502.mUO8hPlO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-02-10 at 17:52 -0800, Guenter Roeck wrote:
-> On 02/10/2018 12:12 PM, Marcus Folkesson wrote:
-> > Hello Sean,
-> > 
-> > On Sat, Feb 10, 2018 at 01:43:28PM +0100, Marcus Folkesson wrote:
-> >> Hello Sean,
-> >>
-> >> On Sat, Feb 10, 2018 at 07:10:02PM +0800, Sean Wang wrote:
-> >>>
-> >>> Hi, Marcus
-> >>>
-> >>> The changes you made for dt-bindings and driver should be put into
-> >>> separate patches.
-> >>
-> >> I actually thought about it but chose to have it in the same patch because I
-> >> did not see any direct advantage to separating them.
-> >>
-> >> But I can do that.
-> >> I will come up with a v3 with this change if no one thinks differently.
-> >>
-> > 
-> > When looking at the git log, I'm not that convinced it should be
-> > separate patches.
-> > 
-> > For example, I found a4f741e3e157c3a5c8aea5f2ea62b692fbf17338 that is
-> > doing the exact same thing as this patch.
-> > 
-> > There is plenty of patches that mixes the code change and dt bindings
-> > updates.
-> > Could it not be useful to overview both the implementation and
-> > dt-mapping change in one view?
-> > 
-> > If you or anyone else still think it should be separated, please let me know and I will
-> > come up with a v3.
-> > 
-> 
-> If we were talking about something new, specifically new and unapproved DT bindings,
-> it should be separate patches. However, that is not the case here. The DT bindings
-> are well established. Sure, we could be pedantic and request a split into two
-> patches. However, the only benefit of that would be more work for the maintainers,
-> ie Wim and myself (including me having to send this e-mail). I don't really see
-> the point of that.
-> 
-> I have already sent my Reviewed-by:, and I don't intend to withdraw it.
-> 
-Hi, both
+Hi Shawn,
 
-Sorry for that if I caused any inconvenience to you. I didn't really
-insist on if the patch is needed to split into two, which totally
-depends on whether dt maintainers like it.
+I love your patch! Perhaps something to improve:
 
-The change for dt-binding is usually added as a split patch with
-dt-bindings as a prefix. This way I thought dt maintainers is not
-easy to miss those patches and also can give some useful feedback
-for them.
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.15 next-20180209]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-	Sean
+url:    https://github.com/0day-ci/linux/commits/Andy-Yan/Add-Rockchip-SFC-serial-flash-controller-support/20180211-135616
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-> Thanks,
-> Guenter
-> 
+
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/mtd/spi-nor/rockchip-sfc.c:899:5: sparse: symbol 'rockchip_sfc_runtime_suspend' was not declared. Should it be
+>> drivers/mtd/spi-nor/rockchip-sfc.c:907:5: sparse: symbol 'rockchip_sfc_runtime_resume' was not declared. Should it be
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
