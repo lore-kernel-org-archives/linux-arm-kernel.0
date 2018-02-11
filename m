@@ -1,55 +1,31 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Sun, 11 Feb 2018 18:10:28 -0500 (EST)
-Subject: [PATCH] mvpp2: fix multicast address filter
-Message-ID: <alpine.LRH.2.02.1802111806550.12159@file01.intranet.prod.int.rdu2.redhat.com>
+From: pbrobinson@gmail.com (Peter Robinson)
+Date: Sun, 11 Feb 2018 23:15:37 +0000
+Subject: [PATCH] crypto: sunxi-ss: Add MODULE_ALIAS to sun4i-ss
+Message-ID: <20180211231537.26487-1-pbrobinson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IPv6 doesn't work on the MacchiatoBIN board. It is caused by broken
-multicast address filter in the mvpp2 driver.
+The MODULE_ALIAS is required to enable the sun4i-ss driver to load
+automatically when built at a module. Tested on a Cubietruck.
 
-The driver loads doesn't load any multicast entries if "allmulti" is not
-set. This condition should be reversed.
-
-The condition !netdev_mc_empty(dev) is useless (because
-netdev_for_each_mc_addr is nop if the list is empty).
-
-This patch also fixes a possible overflow of the multicast list - if
-mvpp2_prs_mac_da_accept fails, we set the allmulti flag and retry.
-
-Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
-Cc: stable at vger.kernel.org
-
+Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/crypto/sunxi-ss/sun4i-ss-core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Index: linux-2.6/drivers/net/ethernet/marvell/mvpp2.c
-===================================================================
---- linux-2.6.orig/drivers/net/ethernet/marvell/mvpp2.c	2018-02-11 23:40:01.000000000 +0100
-+++ linux-2.6/drivers/net/ethernet/marvell/mvpp2.c	2018-02-11 23:44:09.000000000 +0100
-@@ -7137,6 +7137,7 @@ static void mvpp2_set_rx_mode(struct net
- 	int id = port->id;
- 	bool allmulti = dev->flags & IFF_ALLMULTI;
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+index 1547cbe13dc2..a81d89b3b7d8 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+@@ -451,6 +451,7 @@ static struct platform_driver sun4i_ss_driver = {
  
-+retry:
- 	mvpp2_prs_mac_promisc_set(priv, id, dev->flags & IFF_PROMISC);
- 	mvpp2_prs_mac_multi_set(priv, id, MVPP2_PE_MAC_MC_ALL, allmulti);
- 	mvpp2_prs_mac_multi_set(priv, id, MVPP2_PE_MAC_MC_IP6, allmulti);
-@@ -7144,9 +7145,13 @@ static void mvpp2_set_rx_mode(struct net
- 	/* Remove all port->id's mcast enries */
- 	mvpp2_prs_mcast_del_all(priv, id);
+ module_platform_driver(sun4i_ss_driver);
  
--	if (allmulti && !netdev_mc_empty(dev)) {
--		netdev_for_each_mc_addr(ha, dev)
--			mvpp2_prs_mac_da_accept(priv, id, ha->addr, true);
-+	if (!allmulti) {
-+		netdev_for_each_mc_addr(ha, dev) {
-+			if (mvpp2_prs_mac_da_accept(priv, id, ha->addr, true)) {
-+				allmulti = true;
-+				goto retry;
-+			}
-+		}
- 	}
- }
- 
++MODULE_ALIAS("platform:sun4i-ss");
+ MODULE_DESCRIPTION("Allwinner Security System cryptographic accelerator");
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Corentin LABBE <clabbe.montjoie@gmail.com>");
+-- 
+2.14.3
