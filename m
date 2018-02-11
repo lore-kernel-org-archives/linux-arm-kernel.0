@@ -1,69 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Feb 2018 12:05:27 +0100
-Subject: [PATCH 3/3] drm/pl111: Use max memory bandwidth for resolution
-In-Reply-To: <876074dax5.fsf@anholt.net>
-References: <20180206121854.4407-1-linus.walleij@linaro.org>
- <20180206121854.4407-4-linus.walleij@linaro.org> <876074dax5.fsf@anholt.net>
-Message-ID: <CACRpkdZ9jOhtxKRgv_XtJMTgT0_fSKg9HMoyDGOJTTaLd+GOLA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 11 Feb 2018 03:17:16 -0800
+Subject: [PATCH v2 5/7] watchdog: mtk: allow setting timeout in devicetree
+In-Reply-To: <1518335184.9025.43.camel@mtkswgap22>
+References: <20180210091911.3644-1-marcus.folkesson@gmail.com>
+ <20180210091911.3644-5-marcus.folkesson@gmail.com>
+ <1518261002.9025.36.camel@mtkswgap22> <20180210124328.GB744@gmail.com>
+ <20180210201207.GC744@gmail.com>
+ <5449674d-2812-c9b5-9c06-af2fbfa72737@roeck-us.net>
+ <1518335184.9025.43.camel@mtkswgap22>
+Message-ID: <80a95963-7bd9-a350-d899-3b0cf2d646fc@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 10, 2018 at 6:14 PM, Eric Anholt <eric@anholt.net> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
+On 02/10/2018 11:46 PM, Sean Wang wrote:
+> On Sat, 2018-02-10 at 17:52 -0800, Guenter Roeck wrote:
+>> On 02/10/2018 12:12 PM, Marcus Folkesson wrote:
+>>> Hello Sean,
+>>>
+>>> On Sat, Feb 10, 2018 at 01:43:28PM +0100, Marcus Folkesson wrote:
+>>>> Hello Sean,
+>>>>
+>>>> On Sat, Feb 10, 2018 at 07:10:02PM +0800, Sean Wang wrote:
+>>>>>
+>>>>> Hi, Marcus
+>>>>>
+>>>>> The changes you made for dt-bindings and driver should be put into
+>>>>> separate patches.
+>>>>
+>>>> I actually thought about it but chose to have it in the same patch because I
+>>>> did not see any direct advantage to separating them.
+>>>>
+>>>> But I can do that.
+>>>> I will come up with a v3 with this change if no one thinks differently.
+>>>>
+>>>
+>>> When looking at the git log, I'm not that convinced it should be
+>>> separate patches.
+>>>
+>>> For example, I found a4f741e3e157c3a5c8aea5f2ea62b692fbf17338 that is
+>>> doing the exact same thing as this patch.
+>>>
+>>> There is plenty of patches that mixes the code change and dt bindings
+>>> updates.
+>>> Could it not be useful to overview both the implementation and
+>>> dt-mapping change in one view?
+>>>
+>>> If you or anyone else still think it should be separated, please let me know and I will
+>>> come up with a v3.
+>>>
+>>
+>> If we were talking about something new, specifically new and unapproved DT bindings,
+>> it should be separate patches. However, that is not the case here. The DT bindings
+>> are well established. Sure, we could be pedantic and request a split into two
+>> patches. However, the only benefit of that would be more work for the maintainers,
+>> ie Wim and myself (including me having to send this e-mail). I don't really see
+>> the point of that.
+>>
+>> I have already sent my Reviewed-by:, and I don't intend to withdraw it.
+>>
+> Hi, both
+> 
+> Sorry for that if I caused any inconvenience to you. I didn't really
+> insist on if the patch is needed to split into two, which totally
+> depends on whether dt maintainers like it.
+> 
+> The change for dt-binding is usually added as a split patch with
+> dt-bindings as a prefix. This way I thought dt maintainers is not
+> easy to miss those patches and also can give some useful feedback
+> for them.
+> 
 
->> +static enum drm_mode_status
->> +pl111_mode_valid(struct drm_crtc *crtc,
->> +              const struct drm_display_mode *mode)
->> +{
->> +     struct drm_device *drm = crtc->dev;
->> +     struct pl111_drm_dev_private *priv = drm->dev_private;
->> +     u32 cpp = priv->variant->fb_bpp / 8;
->> +     u64 bw;
->
-> Using the variant->fb_bpp for mode_valid checks here feels wrong to me
-> -- it means a larger mode wouldn't be considered valid on a
-> 32bpp-preferred platform when 16bpp would make it work, and a 16bpp
-> platform will happily try to set a 32bpp mode that exceeds the
-> bandwidth.
+With all the trouble this one-line change is making, I feel inclined to drop
+the patch for this driver.
 
-Yeah. So I have an additional patch (that I will send out with the
-rest of the v2 patches) that actually go in and set ->fb_bpp to
-16 on the RealViews to get some nice 1024x768 on these.
-
-The other mode_valid() checks I've seen (well, OMAPDRM)
-just assume 32bpp and goes on. I guess it is saved by not
-supporting anything else.
-
-> On the other hand, if it makes things work most of the time I'm also
-> kind of OK with it.  Anyone else want to chime in here?
-
-This makes things work but can be improved upon.
-
-The core of the problem is that resolution is CRTC business
-and seen as something limited by the monitor or
-bridge/connector or so, then it calls this hook into the driver to
-check that it can provide what the monitor/bridge/connector
-suggests.
-
-And then we have the opportunity to say we can't do such or
-such resolution.
-
-The pixel format on the other hand is seen as a display hardware
-thing, so if I had an API here to call back into the driver and
-restrict the formats to say 16bpp, I could confirm better
-resolutions.
-
-We can put that in place later and remove the ->fb_bpp if we
-can chisel out the right API to set the pixel format.
-
-I am working on another patch to set the preferred pixel format
-instead of BPP when intiializing the framebuffer, so I will
-investigate this at the same time, but I'd really like to build
-on top of this code to avoid too many variables.
-
-> Maybe DRM_DEBUG_KMS for these?
-
-OK I fix :)
-
-Yours,
-Linus Walleij
+Guenter
