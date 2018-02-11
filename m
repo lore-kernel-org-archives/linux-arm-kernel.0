@@ -1,58 +1,28 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Feb 2018 17:52:49 -0800
-Subject: [PATCH v2 5/7] watchdog: mtk: allow setting timeout in devicetree
-In-Reply-To: <20180210201207.GC744@gmail.com>
-References: <20180210091911.3644-1-marcus.folkesson@gmail.com>
- <20180210091911.3644-5-marcus.folkesson@gmail.com>
- <1518261002.9025.36.camel@mtkswgap22> <20180210124328.GB744@gmail.com>
- <20180210201207.GC744@gmail.com>
-Message-ID: <5449674d-2812-c9b5-9c06-af2fbfa72737@roeck-us.net>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Sun, 11 Feb 2018 03:43:07 +0100
+Subject: [BUG]: A83T - AC100 gets the wrong number of parents
+Message-ID: <1518316987.5562.7.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2018 12:12 PM, Marcus Folkesson wrote:
-> Hello Sean,
-> 
-> On Sat, Feb 10, 2018 at 01:43:28PM +0100, Marcus Folkesson wrote:
->> Hello Sean,
->>
->> On Sat, Feb 10, 2018 at 07:10:02PM +0800, Sean Wang wrote:
->>>
->>> Hi, Marcus
->>>
->>> The changes you made for dt-bindings and driver should be put into
->>> separate patches.
->>
->> I actually thought about it but chose to have it in the same patch because I
->> did not see any direct advantage to separating them.
->>
->> But I can do that.
->> I will come up with a v3 with this change if no one thinks differently.
->>
-> 
-> When looking at the git log, I'm not that convinced it should be
-> separate patches.
-> 
-> For example, I found a4f741e3e157c3a5c8aea5f2ea62b692fbf17338 that is
-> doing the exact same thing as this patch.
-> 
-> There is plenty of patches that mixes the code change and dt bindings
-> updates.
-> Could it not be useful to overview both the implementation and
-> dt-mapping change in one view?
-> 
-> If you or anyone else still think it should be separated, please let me know and I will
-> come up with a v3.
-> 
+Hey,
 
-If we were talking about something new, specifically new and unapproved DT bindings,
-it should be separate patches. However, that is not the case here. The DT bindings
-are well established. Sure, we could be pedantic and request a split into two
-patches. However, the only benefit of that would be more work for the maintainers,
-ie Wim and myself (including me having to send this e-mail). I don't really see
-the point of that.
+When I boot my A83T I get the following bootlog [1].
 
-I have already sent my Reviewed-by:, and I don't intend to withdraw it.
+After some debugging, I found out that the function call:
+clk_hw_get_num_parents() returns 2. After a look in the devicetree I
+found out that this value should be 1, since we only have one parent
+clock [3].
+Setting the variable num_parents to 1 fixes the problem, but this is no
+soultion.
 
-Thanks,
-Guenter
+Regards,
+Philipp
+
+
+
+[1]: https://pastebin.com/5c7hxjsS
+[2]: http://lxr.bootlin.com/linux/v4.15/source/drivers/rtc/rtc-ac100.c#
+L180
+[3]: http://lxr.bootlin.com/linux/v4.15/source/arch/arm/boot/dts/sun8i-
+a83t-bananapi-m3.dts#L159
