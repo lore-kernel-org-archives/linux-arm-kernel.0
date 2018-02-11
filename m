@@ -1,53 +1,84 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 11 Feb 2018 09:38:37 -0800
-Subject: [1/7] watchdog: sama5d4: make use of timeout-secs provided in
- devicetree
-In-Reply-To: <20180209192724.1227-2-marcus.folkesson@gmail.com>
-References: <20180209192724.1227-2-marcus.folkesson@gmail.com>
-Message-ID: <20180211173837.GA18566@roeck-us.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 11 Feb 2018 18:45:04 +0000
+Subject: [PATCH] irqchip/gic-v3-its: handle rd_idx wrapping in
+ its_wait_for_range_completion()
+In-Reply-To: <1518320521-12536-1-git-send-email-yangyingliang@huawei.com>
+References: <1518320521-12536-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <866073z7pr.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 08:27:18PM +0100, Marcus Folkesson wrote:
-> watchdog_init_timeout() will allways pick timeout_param since it
-> defaults to a valid timeout.
-> 
-> Following best practice described in
-> Documentation/watchdog/watchdog-kernel-api.txt to make use of
-> the parameter logic.
-> 
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+On Sun, 11 Feb 2018 03:42:01 +0000,
+Yang Yingliang wrote:
 
-Unfortunately I'll have to withdraw the Reviewed-by:. wdt_timeout is used at
-the end of the probe function to display the selected timeout. This will have
-to be changed to display the actual timeout.
+Hi Yang,
 
-Guenter
+> In direct case, rd_idx will wrap if other cpus post commands
+> that make rd_idx increase. When rd_idx wrapped, the driver prints
+> timeout messages but in fact the command is finished. To handle
+> this case by adding last_rd_id to check rd_idx whether wrapped.
+> 
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+
+Please always Cc LKML on irqchip related patches.
 
 > ---
->  drivers/watchdog/sama5d4_wdt.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/irqchip/irq-gic-v3-its.c | 84 ++++++++++++++++++++++------------------
+>  1 file changed, 46 insertions(+), 38 deletions(-)
 > 
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index 0ae947c3d7bc..e6c679383734 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -33,7 +33,7 @@ struct sama5d4_wdt {
->  	unsigned long		last_ping;
->  };
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 06f025f..d7176d1 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -713,7 +713,8 @@ static void its_flush_cmd(struct its_node *its, struct its_cmd_block *cmd)
 >  
-> -static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> +static int wdt_timeout;
->  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  static int its_wait_for_range_completion(struct its_node *its,
+>  					 struct its_cmd_block *from,
+> -					 struct its_cmd_block *to)
+> +					 struct its_cmd_block *to,
+> +					 u64 last_rd_idx)
+>  {
+>  	u64 rd_idx, from_idx, to_idx;
+>  	u32 count = 1000000;	/* 1s! */
+> @@ -724,9 +725,14 @@ static int its_wait_for_range_completion(struct its_node *its,
+>  	while (1) {
+>  		rd_idx = readl_relaxed(its->base + GITS_CREADR);
 >  
->  module_param(wdt_timeout, int, 0);
-> @@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
->  		return -ENOMEM;
+> -		/* Direct case */
+> -		if (from_idx < to_idx && rd_idx >= to_idx)
+> -			break;
+> +
+> +		/*
+> +		 * Direct case. In this case, rd_idx may wrapped,
+> +		 * because other cpus may post commands that make
+> +		 * rd_idx increase.
+> +		 */
+> +		if (from_idx < to_idx && (rd_idx >= to_idx || rd_idx < last_rd_idx))
+> +				break;
 >  
->  	wdd = &wdt->wdd;
-> -	wdd->timeout = wdt_timeout;
-> +	wdd->timeout = WDT_DEFAULT_TIMEOUT;
->  	wdd->info = &sama5d4_wdt_info;
->  	wdd->ops = &sama5d4_wdt_ops;
->  	wdd->min_timeout = MIN_WDT_TIMEOUT;
+>  		/* Wrapped case */
+>  		if (from_idx >= to_idx && rd_idx >= to_idx && rd_idx < from_idx)
+> @@ -746,40 +752,42 @@ static int its_wait_for_range_completion(struct its_node *its,
+
+[...]
+
+> +	last_rd_idx = readl_relaxed(its->base + GITS_CREADR);			\
+
+What is this last_rd_idx exactly? It is just some random sampling of
+the read pointer after we've posted our commands. It can still be in
+any position. And if the reader as wrapped because other CPUs are
+feeding more commands to the queue, it could just as well overtake
+last_rd_idx, making your new condition just as false. Yes, this is
+unlikely, but still.
+
+If you're going to harden the command queue wrapping, I'd suggest you
+implement a generation mechanism so that we can easily work out if
+we've seen the queue wrapping or not. THis would lift any kind of
+ambiguity once and for all.
+
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
