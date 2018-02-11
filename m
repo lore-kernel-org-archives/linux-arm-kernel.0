@@ -1,41 +1,34 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Feb 2018 19:54:09 -0800
-Subject: [PATCH 1/4] watchdog: uniphier: change order for setting default
- timeout
-In-Reply-To: <20180210203623.17832-1-marcus.folkesson@gmail.com>
+Date: Sat, 10 Feb 2018 19:56:27 -0800
+Subject: [PATCH 4/4] watchdog: lpc18xx: remove assignment of unused
+ ret-value
+In-Reply-To: <20180210203623.17832-4-marcus.folkesson@gmail.com>
 References: <20180210203623.17832-1-marcus.folkesson@gmail.com>
-Message-ID: <2427b67d-7d4f-e82f-a6bf-cb51a75a67dc@roeck-us.net>
+ <20180210203623.17832-4-marcus.folkesson@gmail.com>
+Message-ID: <55a198d0-3d58-52e5-0304-5212d7ba5dca@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/10/2018 12:36 PM, Marcus Folkesson wrote:
-> watchdog_init_timeout() will preserve wdd->timeout value if no parameter
-> nor timeout-secs dt property is set.
-> 
 > Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
 
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
 > ---
->   drivers/watchdog/uniphier_wdt.c | 5 ++---
->   1 file changed, 2 insertions(+), 3 deletions(-)
+>   drivers/watchdog/lpc18xx_wdt.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/watchdog/uniphier_wdt.c b/drivers/watchdog/uniphier_wdt.c
-> index 0ea2339d9702..0e4f8d53ce3c 100644
-> --- a/drivers/watchdog/uniphier_wdt.c
-> +++ b/drivers/watchdog/uniphier_wdt.c
-> @@ -212,11 +212,10 @@ static int uniphier_wdt_probe(struct platform_device *pdev)
->   	wdev->wdt_dev.ops = &uniphier_wdt_ops;
->   	wdev->wdt_dev.max_timeout = WDT_PERIOD_MAX;
->   	wdev->wdt_dev.min_timeout = WDT_PERIOD_MIN;
-> +	wdev->wdt_dev.timeout = WDT_DEFAULT_TIMEOUT;
->   	wdev->wdt_dev.parent = dev;
+> diff --git a/drivers/watchdog/lpc18xx_wdt.c b/drivers/watchdog/lpc18xx_wdt.c
+> index b4221f43cd94..331cadb459ac 100644
+> --- a/drivers/watchdog/lpc18xx_wdt.c
+> +++ b/drivers/watchdog/lpc18xx_wdt.c
+> @@ -265,7 +265,7 @@ static int lpc18xx_wdt_probe(struct platform_device *pdev)
+>   	lpc18xx_wdt->wdt_dev.parent = dev;
+>   	watchdog_set_drvdata(&lpc18xx_wdt->wdt_dev, lpc18xx_wdt);
 >   
-> -	if (watchdog_init_timeout(&wdev->wdt_dev, timeout, dev) < 0) {
-> -		wdev->wdt_dev.timeout = WDT_DEFAULT_TIMEOUT;
-> -	}
-> +	watchdog_init_timeout(&wdev->wdt_dev, timeout, dev);
->   	watchdog_set_nowayout(&wdev->wdt_dev, nowayout);
->   	watchdog_stop_on_reboot(&wdev->wdt_dev);
+> -	ret = watchdog_init_timeout(&lpc18xx_wdt->wdt_dev, heartbeat, dev);
+> +	watchdog_init_timeout(&lpc18xx_wdt->wdt_dev, heartbeat, dev);
+>   
+>   	__lpc18xx_wdt_set_timeout(lpc18xx_wdt);
 >   
 > 
