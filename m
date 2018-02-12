@@ -1,14 +1,14 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 12 Feb 2018 17:44:23 +0000
-Subject: [PATCH v5 14/26] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
+Date: Mon, 12 Feb 2018 17:44:25 +0000
+Subject: [PATCH v5 16/26] clk: renesas: r8a7745: Add rwdt clock
 In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1518457475-4480-15-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1518457475-4480-17-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
-its driver by default.
+Add "rwdt" clock to r8a7745_mod_clks. Also, since we may need to access
+the watchdog registers at any time, declare the clock as critical.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
@@ -17,20 +17,28 @@ Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 v4->v5:
 * no change
 
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/renesas/r8a7745-cpg-mssr.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 578434c..d5cdad8 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
-+CONFIG_RENESAS_WDT=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
+diff --git a/drivers/clk/renesas/r8a7745-cpg-mssr.c b/drivers/clk/renesas/r8a7745-cpg-mssr.c
+index 2859504..87f5a36 100644
+--- a/drivers/clk/renesas/r8a7745-cpg-mssr.c
++++ b/drivers/clk/renesas/r8a7745-cpg-mssr.c
+@@ -114,6 +114,7 @@ static const struct mssr_mod_clk r8a7745_mod_clks[] __initconst = {
+ 	DEF_MOD("cmt1",			 329,	R8A7745_CLK_R),
+ 	DEF_MOD("usbhs-dmac0",		 330,	R8A7745_CLK_HP),
+ 	DEF_MOD("usbhs-dmac1",		 331,	R8A7745_CLK_HP),
++	DEF_MOD("rwdt",			 402,	R8A7745_CLK_R),
+ 	DEF_MOD("irqc",			 407,	R8A7745_CLK_CP),
+ 	DEF_MOD("intc-sys",		 408,	R8A7745_CLK_ZS),
+ 	DEF_MOD("audio-dmac0",		 502,	R8A7745_CLK_HP),
+@@ -180,6 +181,7 @@ static const struct mssr_mod_clk r8a7745_mod_clks[] __initconst = {
+ };
+ 
+ static const unsigned int r8a7745_crit_mod_clks[] __initconst = {
++	MOD_CLK_ID(402),	/* RWDT */
+ 	MOD_CLK_ID(408),	/* INTC-SYS (GIC) */
+ };
+ 
 -- 
 2.7.4
