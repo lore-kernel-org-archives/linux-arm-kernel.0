@@ -1,100 +1,148 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Mon, 12 Feb 2018 15:43:05 +0100
-Subject: [PATCH v2 07/12] ARM: dts: STi: Add fake reg for restart,
- powerdown and picophy/softreset
+Date: Mon, 12 Feb 2018 15:43:09 +0100
+Subject: [PATCH v2 11/12] ARM: dts: STi: Move clk_sysin clock ouside soc node
 In-Reply-To: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
 References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1518446590-16800-8-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518446590-16800-12-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Add fake reg property for restart, powerdown, picophyreset
-and softreset.
-This allows to fix the following warning when compiling
-dtb with W=1 option:
-
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
+As clk_sysin node describes the external oscillator, there is no
+reason to put it into soc node.
+This allows to fix the following warnings when compiling
+dtb with W=1 option :
 
 arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
+Node /clocks/clk-sysin missing or empty reg/ranges property
 
 arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
+Node /clocks/clk-sysin missing or empty reg/ranges property
 
 arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
+Node /clocks/clk-sysin missing or empty reg/ranges property
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
 
-v2: _ add a fake reg property to node without reg property
+v2: _ move clk_sys_in outside soc node
 
- arch/arm/boot/dts/stih407-family.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/stih407-clock.dtsi | 18 +++++++++---------
+ arch/arm/boot/dts/stih410-clock.dtsi | 20 ++++++++++----------
+ arch/arm/boot/dts/stih418-clock.dtsi | 20 ++++++++++----------
+ 3 files changed, 29 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 5a0bad07da9e..00a3838236d1 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -125,24 +125,28 @@
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index 1bba47e06ebe..f4e21e2234c9 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -7,21 +7,21 @@
+  */
+ #include <dt-bindings/clock/stih407-clks.h>
+ / {
++	/*
++	 * Fixed 30MHz oscillator inputs to SoC
++	 */
++	clk_sysin: clk-sysin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <30000000>;
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
  		ranges;
- 		compatible = "simple-bus";
  
--		restart {
-+		restart: restart-controller at 0 {
- 			compatible = "st,stih407-restart";
-+			reg = <0 0>;
- 			st,syscfg = <&syscfg_sbc_reg>;
- 			status = "okay";
- 		};
+ 		/*
+-		 * Fixed 30MHz oscillator inputs to SoC
+-		 */
+-		clk_sysin: clk-sysin {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <30000000>;
+-		};
+-
+-		/*
+ 		 * ARM Peripheral clock for timers
+ 		 */
+ 		arm_periph_clk: clk-m-a9-periphs at 0 {
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index 41fb1a910d49..9481f8769e8a 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -7,6 +7,16 @@
+  */
+ #include <dt-bindings/clock/stih410-clks.h>
+ / {
++	/*
++	 * Fixed 30MHz oscillator inputs to SoC
++	 */
++	clk_sysin: clk-sysin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <30000000>;
++		clock-output-names = "CLK_SYSIN";
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -15,16 +25,6 @@
+ 		compatible = "st,stih410-clk", "simple-bus";
  
--		powerdown: powerdown-controller {
-+		powerdown: powerdown-controller at 0 {
- 			compatible = "st,stih407-powerdown";
-+			reg = <0 0>;
- 			#reset-cells = <1>;
- 		};
+ 		/*
+-		 * Fixed 30MHz oscillator inputs to SoC
+-		 */
+-		clk_sysin: clk-sysin {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <30000000>;
+-			clock-output-names = "CLK_SYSIN";
+-		};
+-
+-		/*
+ 		 * ARM Peripheral clock for timers
+ 		 */
+ 		arm_periph_clk: clk-m-a9-periphs at 0 {
+diff --git a/arch/arm/boot/dts/stih418-clock.dtsi b/arch/arm/boot/dts/stih418-clock.dtsi
+index 50413eabe73a..9e3790198f51 100644
+--- a/arch/arm/boot/dts/stih418-clock.dtsi
++++ b/arch/arm/boot/dts/stih418-clock.dtsi
+@@ -7,6 +7,16 @@
+  */
+ #include <dt-bindings/clock/stih418-clks.h>
+ / {
++	/*
++	 * Fixed 30MHz oscillator inputs to SoC
++	 */
++	clk_sysin: clk-sysin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <30000000>;
++		clock-output-names = "CLK_SYSIN";
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -15,16 +25,6 @@
+ 		compatible = "st,stih418-clk", "simple-bus";
  
--		softreset: softreset-controller {
-+		softreset: softreset-controller at 0 {
- 			compatible = "st,stih407-softreset";
-+			reg = <0 0>;
- 			#reset-cells = <1>;
- 		};
- 
--		picophyreset: picophyreset-controller {
-+		picophyreset: picophyreset-controller at 0 {
- 			compatible = "st,stih407-picophyreset";
-+			reg = <0 0>;
- 			#reset-cells = <1>;
- 		};
- 
+ 		/*
+-		 * Fixed 30MHz oscillator inputs to SoC
+-		 */
+-		clk_sysin: clk-sysin {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <30000000>;
+-			clock-output-names = "CLK_SYSIN";
+-		};
+-
+-		/*
+ 		 * ARM Peripheral clock for timers
+ 		 */
+ 		arm_periph_clk: clk-m-a9-periphs at 0 {
 -- 
 1.9.1
