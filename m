@@ -1,45 +1,65 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 12 Feb 2018 18:13:23 +1030
-Subject: [PATCH 4/6] ARM: dts: aspeed: Add LPC clock phandles
+Date: Mon, 12 Feb 2018 18:13:24 +1030
+Subject: [PATCH 5/6] ARM: dts: palmetto: Add LEDs and GPIO keys
 In-Reply-To: <20180212074325.23436-1-joel@jms.id.au>
 References: <20180212074325.23436-1-joel@jms.id.au>
-Message-ID: <20180212074325.23436-5-joel@jms.id.au>
+Message-ID: <20180212074325.23436-6-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LPC device uses LCLK.
+These describe the front panel LEDs that are present on a Palmetto
+chassis, and the checkstop GPIO that comes from the Power8 CPU to
+indicate a host error.
 
-Tested-by: Lei YU <mine260309@gmail.com>
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 1 +
- arch/arm/boot/dts/aspeed-g5.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 8b18176dca59..48c28a71ae7e 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -233,6 +233,7 @@
- 					lpc_ctrl: lpc-ctrl at 0 {
- 						compatible = "aspeed,ast2400-lpc-ctrl";
- 						reg = <0x0 0x80>;
-+						clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
- 						status = "disabled";
- 					};
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+index 5115247e5e59..2a4a355a779d 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -2,6 +2,7 @@
+ /dts-v1/;
  
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index e0b6803f6845..8eac57c33880 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -283,6 +283,7 @@
- 					lpc_ctrl: lpc-ctrl at 0 {
- 						compatible = "aspeed,ast2500-lpc-ctrl";
- 						reg = <0x0 0x80>;
-+						clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
- 						status = "disabled";
- 					};
+ #include "aspeed-g4.dtsi"
++#include <dt-bindings/gpio/aspeed-gpio.h>
  
+ / {
+ 	model = "Palmetto BMC";
+@@ -26,6 +27,32 @@
+ 			reg = <0x5f000000 0x01000000>; /* 16M */
+ 		};
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		heartbeat {
++			gpios = <&gpio ASPEED_GPIO(R, 4) GPIO_ACTIVE_LOW>;
++		};
++
++		power {
++			gpios = <&gpio ASPEED_GPIO(R, 5) GPIO_ACTIVE_LOW>;
++		};
++
++		identify {
++			gpios = <&gpio ASPEED_GPIO(A, 2) GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		checkstop {
++			label = "checkstop";
++			gpios = <&gpio ASPEED_GPIO(P, 5) GPIO_ACTIVE_LOW>;
++			linux,code = <ASPEED_GPIO(P, 5)>;
++		};
++	};
+ };
+ 
+ &fmc {
 -- 
 2.15.1
