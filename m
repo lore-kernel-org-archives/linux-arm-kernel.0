@@ -1,58 +1,62 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 11 Feb 2018 19:16:15 -0600
-Subject: [PATCH] arm64: Add missing Falkor part number for branch predictor
- hardening
-Message-ID: <1518398175-28378-1-git-send-email-shankerd@codeaurora.org>
+From: jaedon.shin@gmail.com (Jaedon Shin)
+Date: Mon, 12 Feb 2018 11:18:12 +0900
+Subject: [PATCH] irqchip: Remove hashed address printing
+Message-ID: <20180212021812.3882-1-jaedon.shin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-References to CPU part number MIDR_QCOM_FALKOR were dropped from the
-mailing list patch due to mainline/arm64 branch dependency. So this
-patch adds the missing part number.
+Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
+pointers are being hashed when printed. Displaying the virtual memory at
+bootup time is not helpful. so delete the prints.
 
-Fixes: ec82b567a74f ("arm64: Implement branch predictor hardening for Falkor")
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 9 +++++++++
- arch/arm64/kvm/hyp/switch.c    | 4 +++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-bcm7038-l1.c | 3 ---
+ drivers/irqchip/irq-bcm7120-l2.c | 3 ---
+ drivers/irqchip/irq-brcmstb-l2.c | 3 ---
+ 3 files changed, 9 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 0782359..52f15cd 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -408,6 +408,15 @@ static int qcom_enable_link_stack_sanitization(void *data)
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-+		.enable = qcom_enable_link_stack_sanitization,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
- 		.enable = enable_smccc_arch_workaround_1,
- 	},
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 116252a8..870f4b1 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -407,8 +407,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 		u32 midr = read_cpuid_id();
- 
- 		/* Apply BTAC predictors mitigation to all Falkor chips */
--		if ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)
-+		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-+		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
- 			__qcom_hyp_sanitize_btac_predictors();
-+		}
+diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
+index 55cfb986225b..faf734ff4cf3 100644
+--- a/drivers/irqchip/irq-bcm7038-l1.c
++++ b/drivers/irqchip/irq-bcm7038-l1.c
+@@ -339,9 +339,6 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
+ 		goto out_unmap;
  	}
  
- 	fp_enabled = __fpsimd_enabled();
+-	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
+-		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
+-
+ 	return 0;
+ 
+ out_unmap:
+diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
+index 983640eba418..8968e5e93fcb 100644
+--- a/drivers/irqchip/irq-bcm7120-l2.c
++++ b/drivers/irqchip/irq-bcm7120-l2.c
+@@ -318,9 +318,6 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
+ 		}
+ 	}
+ 
+-	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
+-			intc_name, data->map_base[0], data->num_parent_irqs);
+-
+ 	return 0;
+ 
+ out_free_domain:
+diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
+index 691d20eb0bec..0e65f609352e 100644
+--- a/drivers/irqchip/irq-brcmstb-l2.c
++++ b/drivers/irqchip/irq-brcmstb-l2.c
+@@ -262,9 +262,6 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
+ 		ct->chip.irq_set_wake = irq_gc_set_wake;
+ 	}
+ 
+-	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
+-			base, parent_irq);
+-
+ 	return 0;
+ 
+ out_free_domain:
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.16.1
