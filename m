@@ -1,20 +1,23 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 12 Feb 2018 14:34:29 +0100
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <20180118150951.28964-1-prarit@redhat.com>
-References: <20180118150951.28964-1-prarit@redhat.com>
-Message-ID: <20180212133429.GC25314@hirez.programming.kicks-ass.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 12 Feb 2018 21:35:18 +0800
+Subject: [PATCH v2 1/4] dt-bindings: add binding for i.MX8MQ CCM
+In-Reply-To: <20180201175412.9480-1-l.stach@pengutronix.de>
+References: <20180201175412.9480-1-l.stach@pengutronix.de>
+Message-ID: <20180212133438.GB2939@X250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 18, 2018 at 10:09:51AM -0500, Prarit Bhargava wrote:
->  config ACPI_SPCR_TABLE
-> +	bool "ACPI Serial Port Console Redirection Support"
-> +	default y if X86
-> +	help
-> +	  Enable support for Serial Port Console Redirection (SPCR) Table.
-> +	  This table provides information about the configuration of the
-> +	  earlycon console.
+On Thu, Feb 01, 2018 at 06:54:09PM +0100, Lucas Stach wrote:
+> This adds the binding for the i.MX8MQ Clock Controller Module.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-I just got asked this by oldconfig, which left me rather puzzled, WTF
-does this do?
+Hi Stephen,
+
+To make your life a bit easier, I plan to collect drivers/clk/imx/
+patches and send you pull request at a proper time.  Doing this will
+also help resolve the clock ID dependency between clock driver and
+device trees.  Sounds good to you?
+
+Shawn
