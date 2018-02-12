@@ -1,181 +1,77 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 12 Feb 2018 18:33:43 +0000
-Subject: [PATCH 28/37] iommu/arm-smmu-v3: Maintain a SID->device structure
+Date: Mon, 12 Feb 2018 18:33:45 +0000
+Subject: [PATCH 30/37] ACPI/IORT: Check ATS capability in root complex nodes
 In-Reply-To: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
 References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180212183352.22730-29-jean-philippe.brucker@arm.com>
+Message-ID: <20180212183352.22730-31-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When handling faults from the event or PRI queue, we need to find the
-struct device associated to a SID. Add a rb_tree to keep track of SIDs.
+Root complex node in IORT has a bit telling whether it supports ATS or
+not. Store this bit in the IOMMU fwspec when setting up a device, so it
+can be accessed later by an IOMMU driver.
+
+Use the negative version (NO_ATS) at the moment because it's not clear
+if/how the bit needs to be integrated in other firmware descriptions. The
+SMMU has a feature bit telling if it supports ATS, which might be
+sufficient in most systems for deciding whether or not we should enable
+the ATS capability in endpoints.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 105 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+ drivers/acpi/arm64/iort.c | 11 +++++++++++
+ include/linux/iommu.h     |  4 ++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index c5b3a43becaf..2430b2140f8d 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -615,10 +615,19 @@ struct arm_smmu_device {
- 	/* IOMMU core code handle */
- 	struct iommu_device		iommu;
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 95255ecfae7c..db374062ec9d 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -911,6 +911,14 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+ 	dev_dbg(dev, "dma_pfn_offset(%#08llx)\n", offset);
+ }
  
-+	struct rb_root			streams;
-+	struct mutex			streams_mutex;
++static bool iort_pci_rc_supports_ats(struct acpi_iort_node *node)
++{
++	struct acpi_iort_root_complex *pci_rc;
 +
- 	/* Notifier for the fault queue */
- 	struct notifier_block		faultq_nb;
++	pci_rc = (struct acpi_iort_root_complex *)node->node_data;
++	return pci_rc->ats_attribute & ACPI_IORT_ATS_SUPPORTED;
++}
++
+ /**
+  * iort_iommu_configure - Set-up IOMMU configuration for a device.
+  *
+@@ -946,6 +954,9 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ 		info.node = node;
+ 		err = pci_for_each_dma_alias(to_pci_dev(dev),
+ 					     iort_pci_iommu_init, &info);
++
++		if (!err && !iort_pci_rc_supports_ats(node))
++			dev->iommu_fwspec->flags |= IOMMU_FWSPEC_PCI_NO_ATS;
+ 	} else {
+ 		int i = 0;
+ 
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index f5c2f4be2b42..641aaf0f1b81 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -631,12 +631,16 @@ struct iommu_fwspec {
+ 	const struct iommu_ops	*ops;
+ 	struct fwnode_handle	*iommu_fwnode;
+ 	void			*iommu_priv;
++	u32			flags;
+ 	unsigned int		num_ids;
+ 	unsigned int		num_pasid_bits;
+ 	bool			can_stall;
+ 	u32			ids[1];
  };
  
-+struct arm_smmu_stream {
-+	u32				id;
-+	struct arm_smmu_master_data	*master;
-+	struct rb_node			node;
-+};
++/* Firmware disabled ATS in the root complex */
++#define IOMMU_FWSPEC_PCI_NO_ATS			(1 << 0)
 +
- /* SMMU private data for each master */
- struct arm_smmu_master_data {
- 	struct arm_smmu_device		*smmu;
-@@ -626,6 +635,7 @@ struct arm_smmu_master_data {
- 
- 	struct arm_smmu_domain		*domain;
- 	struct list_head		list; /* domain->devices */
-+	struct arm_smmu_stream		*streams;
- 
- 	struct device			*dev;
- 
-@@ -1250,6 +1260,31 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
- 	return 0;
- }
- 
-+static struct arm_smmu_master_data *
-+arm_smmu_find_master(struct arm_smmu_device *smmu, u32 sid)
-+{
-+	struct rb_node *node;
-+	struct arm_smmu_stream *stream;
-+	struct arm_smmu_master_data *master = NULL;
-+
-+	mutex_lock(&smmu->streams_mutex);
-+	node = smmu->streams.rb_node;
-+	while (node) {
-+		stream = rb_entry(node, struct arm_smmu_stream, node);
-+		if (stream->id < sid) {
-+			node = node->rb_right;
-+		} else if (stream->id > sid) {
-+			node = node->rb_left;
-+		} else {
-+			master = stream->master;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&smmu->streams_mutex);
-+
-+	return master;
-+}
-+
- /* IRQ and event handlers */
- static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
- {
-@@ -2146,6 +2181,71 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
- 	return sid < limit;
- }
- 
-+static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
-+				  struct arm_smmu_master_data *master)
-+{
-+	int i;
-+	int ret = 0;
-+	struct arm_smmu_stream *new_stream, *cur_stream;
-+	struct rb_node **new_node, *parent_node = NULL;
-+	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
-+
-+	master->streams = kcalloc(fwspec->num_ids,
-+				  sizeof(struct arm_smmu_stream), GFP_KERNEL);
-+	if (!master->streams)
-+		return -ENOMEM;
-+
-+	mutex_lock(&smmu->streams_mutex);
-+	for (i = 0; i < fwspec->num_ids && !ret; i++) {
-+		new_stream = &master->streams[i];
-+		new_stream->id = fwspec->ids[i];
-+		new_stream->master = master;
-+
-+		new_node = &(smmu->streams.rb_node);
-+		while (*new_node) {
-+			cur_stream = rb_entry(*new_node, struct arm_smmu_stream,
-+					      node);
-+			parent_node = *new_node;
-+			if (cur_stream->id > new_stream->id) {
-+				new_node = &((*new_node)->rb_left);
-+			} else if (cur_stream->id < new_stream->id) {
-+				new_node = &((*new_node)->rb_right);
-+			} else {
-+				dev_warn(master->dev,
-+					 "stream %u already in tree\n",
-+					 cur_stream->id);
-+				ret = -EINVAL;
-+				break;
-+			}
-+		}
-+
-+		if (!ret) {
-+			rb_link_node(&new_stream->node, parent_node, new_node);
-+			rb_insert_color(&new_stream->node, &smmu->streams);
-+		}
-+	}
-+	mutex_unlock(&smmu->streams_mutex);
-+
-+	return ret;
-+}
-+
-+static void arm_smmu_remove_master(struct arm_smmu_device *smmu,
-+				   struct arm_smmu_master_data *master)
-+{
-+	int i;
-+	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
-+
-+	if (!master->streams)
-+		return;
-+
-+	mutex_lock(&smmu->streams_mutex);
-+	for (i = 0; i < fwspec->num_ids; i++)
-+		rb_erase(&master->streams[i].node, &smmu->streams);
-+	mutex_unlock(&smmu->streams_mutex);
-+
-+	kfree(master->streams);
-+}
-+
- static struct iommu_ops arm_smmu_ops;
- 
- static int arm_smmu_add_device(struct device *dev)
-@@ -2198,6 +2298,7 @@ static int arm_smmu_add_device(struct device *dev)
- 
- 	group = iommu_group_get_for_dev(dev);
- 	if (!IS_ERR(group)) {
-+		arm_smmu_insert_master(smmu, master);
- 		iommu_group_put(group);
- 		iommu_device_link(&smmu->iommu, dev);
- 	}
-@@ -2218,6 +2319,7 @@ static void arm_smmu_remove_device(struct device *dev)
- 	smmu = master->smmu;
- 	if (master && master->ste.assigned)
- 		arm_smmu_detach_dev(dev);
-+	arm_smmu_remove_master(smmu, master);
- 	iommu_group_remove_device(dev);
- 	iommu_device_unlink(&smmu->iommu, dev);
- 	kfree(master);
-@@ -2527,6 +2629,9 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- 	int ret;
- 
- 	atomic_set(&smmu->sync_nr, 0);
-+	mutex_init(&smmu->streams_mutex);
-+	smmu->streams = RB_ROOT;
-+
- 	ret = arm_smmu_init_queues(smmu);
- 	if (ret)
- 		return ret;
+ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
+ 		      const struct iommu_ops *ops);
+ void iommu_fwspec_free(struct device *dev);
 -- 
 2.15.1
