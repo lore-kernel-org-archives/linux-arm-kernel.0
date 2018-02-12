@@ -1,26 +1,69 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 12 Feb 2018 12:47:45 +0100
-Subject: [PATCH v2 3/3] ARM: dts: exynos: Add support for HDMI audio on
- exynos5433-tm2
-In-Reply-To: <CAJKOXPfXR3pRcTy_y2jwg7R8Pkg15+VJyOvCaXvQa8ZHS=HeBA@mail.gmail.com>
-References: <CGME20180208184446epcas2p2a5a59112f29b97dad9deb820699eb741@epcas2p2.samsung.com>
- <20180208184408.24185-1-s.nawrocki@samsung.com>
- <20180208184408.24185-3-s.nawrocki@samsung.com>
- <CAJKOXPfXR3pRcTy_y2jwg7R8Pkg15+VJyOvCaXvQa8ZHS=HeBA@mail.gmail.com>
-Message-ID: <c40f9d95-cf7d-c505-ab56-55b475efe136@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 12 Feb 2018 12:53:59 +0100
+Subject: [PATCH] MAINTAINERS: add Freescale pin controllers
+In-Reply-To: <1518435295.2744.7.camel@pengutronix.de>
+References: <20180210153204.12728-1-stefan@agner.ch>
+ <1518432502.2744.5.camel@pengutronix.de>
+ <20180212112255.u333xb676kfmi63f@sapphire.tkos.co.il>
+ <1518435295.2744.7.camel@pengutronix.de>
+Message-ID: <3701bd50c7b3269af308223a1712f6d9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 10:28 AM, Krzysztof Kozlowski wrote:
->> +&i2s1 {
->> +       assigned-clocks = <&i2s1 CLK_I2S_RCLK_SRC>;
->> +       assigned-clock-parents = <&cmu_peric CLK_SCLK_I2S1>;
->
-> Reorder alphabetically the node (and then you'll see you already add
-> one for i2s1).
+On 12.02.2018 12:34, Lucas Stach wrote:
+> Am Montag, den 12.02.2018, 13:22 +0200 schrieb Baruch Siach:
+>> Hi Lucas,
+>>
+>> On Mon, Feb 12, 2018 at 11:48:22AM +0100, Lucas Stach wrote:
+>> > Am Samstag, den 10.02.2018, 16:32 +0100 schrieb Stefan Agner:
+>> > > Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as
+>> > > maintainer
+>> > > and Sascha as reviewer.
+>> > >
+>> > > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> > > ---
+>> > > ?MAINTAINERS | 11 +++++++++++
+>> > > ?1 file changed, 11 insertions(+)
+>> > >
+>> > > diff --git a/MAINTAINERS b/MAINTAINERS
+>> > > index 82ad0eabce4f..fb672dfc519d 100644
+>> > > --- a/MAINTAINERS
+>> > > +++ b/MAINTAINERS
+>> > > @@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
+>> > > ?S:	Supported
+>> > > ?F:	drivers/pinctrl/pinctrl-at91-pio4.*
+>> > > ?
+>> > > +PIN CONTROLLER - FREESCALE
+>> > > +M:	Dong Aisheng <aisheng.dong@nxp.com>
+>> > > +M:	Fabio Estevam <festevam@gmail.com>
+>> > > +M:	Shawn Guo <shawnguo@kernel.org>
+>> > > +M:	Stefan Agner <stefan@agner.ch>
+>> > > +R:	Sascha Hauer <kernel@pengutronix.de>
+>> >
+>> > I'm fine with the patch, but it might make sense to clarify this a
+>> > bit:
+>> > the kernel@ address is really the whole Pengutronix kernel team,
+>> > not
+>> > just Sascha. Using this address is totally fine if you expect
+>> > comments
+>> > on patches, as it gives them a quite wide exposure inside of PTX.
+>>
+>> Of the 5 mentions of kernel at pengutronix.de in MAINTAINERS as of
+>> v4.16-rc1,?
+>> three name Sascha, and two name Uwe. Would you like to also clarify
+>> those?
+> 
+> I think it fine to keep the names of the individual people where they
+> maintain stuff, as this is usually bound to a single person (where
+> kernel@ address is only used for the exposure benefits), but I think it
+> makes less sense for the reviewer role.
 
-Oops, my fault, let me correct this again and resend.
+Sounds reasonable, I will send a v2 with:
+R:	Pengutronix Kernel Team <kernel@pengutronix.de>
 
--- 
-Regards,
-Sylwester
+--
+Stefan
+
+> 
+> Regards,
+> Lucas
