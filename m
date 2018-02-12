@@ -1,22 +1,106 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Feb 2018 12:22:21 -0800
-Subject: [PATCH] hwrng: bcm2835: Handle deferred clock properly
-In-Reply-To: <1518466296-30161-1-git-send-email-stefan.wahren@i2se.com>
-References: <1518466296-30161-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <d3f5b375-d2e8-2e7c-526d-aa5d49751ed4@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 12 Feb 2018 13:32:36 -0700
+Subject: [PATCH 2/3] perf util: Use target->per_thread and target->system_wide
+ flags
+In-Reply-To: <1518467557-18505-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1518467557-18505-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1518467557-18505-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 12:11 PM, Stefan Wahren wrote:
-> In case the probe of the clock is deferred, we would assume it is
-> optional. This is wrong, so defer the probe of this driver until
-> the clock is available.
-> 
-> Fixes: 791af4f4907a ("hwrng: bcm2835 - Manage an optional clock")
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+From: Jin Yao <yao.jin@linux.intel.com>
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Mathieu Poirier reports issue in commit ("73c0ca1eee3d perf thread_map:
+Enumerate all threads from /proc") that it has negative impact on
+'perf record --per-thread'. It has the effect of creating a kernel event
+for each thread in the system for 'perf record --per-thread'.
 
-Thanks Stephan!
+Mathieu Poirier's patch ("perf util: Do not reuse target->per_thread flag")
+can fix this issue by creating a new target->all_threads flag.
+
+This patch is based on Mathieu Poirier's patch but it doesn't use a new
+target->all_threads flag. This patch just uses 'target->per_thread &&
+target->system_wide' as a condition to check for all threads case.
+
+Signed-off-by: Jin Yao <yao.jin@linux.intel.com>
+[Fixed checkpatch warning about line over 80 characters]
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/perf/util/evlist.c     | 21 ++++++++++++++++++++-
+ tools/perf/util/thread_map.c |  4 ++--
+ tools/perf/util/thread_map.h |  2 +-
+ 3 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/tools/perf/util/evlist.c b/tools/perf/util/evlist.c
+index e5fc14e53c05..7b7d535396f7 100644
+--- a/tools/perf/util/evlist.c
++++ b/tools/perf/util/evlist.c
+@@ -1086,11 +1086,30 @@ int perf_evlist__mmap(struct perf_evlist *evlist, unsigned int pages)
+ 
+ int perf_evlist__create_maps(struct perf_evlist *evlist, struct target *target)
+ {
++	bool all_threads = (target->per_thread && target->system_wide);
+ 	struct cpu_map *cpus;
+ 	struct thread_map *threads;
+ 
++	/*
++	 * If specify '-a' and '--per-thread' to perf record, perf record
++	 * will override '--per-thread'. target->per_thread = false and
++	 * target->system_wide = true.
++	 *
++	 * If specify '--per-thread' only to perf record,
++	 * target->per_thread = true and target->system_wide = false.
++	 *
++	 * So target->per_thread && target->system_wide is false.
++	 * For perf record, thread_map__new_str doesn't call
++	 * thread_map__new_all_cpus. That will keep perf record's
++	 * current behavior.
++	 *
++	 * For perf stat, it allows the case that target->per_thread and
++	 * target->system_wide are all true. It means to collect system-wide
++	 * per-thread data. thread_map__new_str will call
++	 * thread_map__new_all_cpus to enumerate all threads.
++	 */
+ 	threads = thread_map__new_str(target->pid, target->tid, target->uid,
+-				      target->per_thread);
++				      all_threads);
+ 
+ 	if (!threads)
+ 		return -1;
+diff --git a/tools/perf/util/thread_map.c b/tools/perf/util/thread_map.c
+index 3e1038f6491c..729dad8f412d 100644
+--- a/tools/perf/util/thread_map.c
++++ b/tools/perf/util/thread_map.c
+@@ -323,7 +323,7 @@ struct thread_map *thread_map__new_by_tid_str(const char *tid_str)
+ }
+ 
+ struct thread_map *thread_map__new_str(const char *pid, const char *tid,
+-				       uid_t uid, bool per_thread)
++				       uid_t uid, bool all_threads)
+ {
+ 	if (pid)
+ 		return thread_map__new_by_pid_str(pid);
+@@ -331,7 +331,7 @@ struct thread_map *thread_map__new_str(const char *pid, const char *tid,
+ 	if (!tid && uid != UINT_MAX)
+ 		return thread_map__new_by_uid(uid);
+ 
+-	if (per_thread)
++	if (all_threads)
+ 		return thread_map__new_all_cpus();
+ 
+ 	return thread_map__new_by_tid_str(tid);
+diff --git a/tools/perf/util/thread_map.h b/tools/perf/util/thread_map.h
+index 0a806b99e73c..5ec91cfd1869 100644
+--- a/tools/perf/util/thread_map.h
++++ b/tools/perf/util/thread_map.h
+@@ -31,7 +31,7 @@ struct thread_map *thread_map__get(struct thread_map *map);
+ void thread_map__put(struct thread_map *map);
+ 
+ struct thread_map *thread_map__new_str(const char *pid,
+-		const char *tid, uid_t uid, bool per_thread);
++		const char *tid, uid_t uid, bool all_threads);
+ 
+ struct thread_map *thread_map__new_by_tid_str(const char *tid_str);
+ 
 -- 
-Florian
+2.7.4
