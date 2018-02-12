@@ -1,9 +1,9 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 12 Feb 2018 17:44:34 +0000
-Subject: [PATCH v5 25/26] ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+Date: Mon, 12 Feb 2018 17:44:35 +0000
+Subject: [PATCH v5 26/26] ARM: dts: iwg22m: Add watchdog support to SoM dtsi
 In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1518457475-4480-26-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1518457475-4480-27-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,13 +17,13 @@ Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 v4->v5:
 * no change
 
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 5 +++++
+ arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-index 1d3e950..d364685 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-+++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+index 8d0a392b..29b6e10 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
++++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
 @@ -91,6 +91,11 @@
  	};
  };
@@ -33,8 +33,8 @@ index 1d3e950..d364685 100644
 +	status = "okay";
 +};
 +
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
+ &sdhi1 {
+ 	pinctrl-0 = <&sdhi1_pins>;
  	pinctrl-names = "default";
 -- 
 2.7.4
