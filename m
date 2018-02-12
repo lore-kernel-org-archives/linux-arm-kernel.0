@@ -1,64 +1,40 @@
-From: kbingham@kernel.org (Kieran Bingham)
-Date: Mon, 12 Feb 2018 18:11:55 +0000
-Subject: [PATCH v2 3/5] [RFT] ARM: dts: wheat: Fix ADV7513 address usage
-In-Reply-To: <1518459117-16733-1-git-send-email-kbingham@kernel.org>
-References: <1518459117-16733-1-git-send-email-kbingham@kernel.org>
-Message-ID: <1518459117-16733-4-git-send-email-kbingham@kernel.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 12 Feb 2018 18:17:13 +0000
+Subject: [PATCH 2/2] arm64: dts: juno: Describe the full GICv2m region
+In-Reply-To: <20180207143255.17003-3-marc.zyngier@arm.com>
+References: <20180207143255.17003-1-marc.zyngier@arm.com>
+ <20180207143255.17003-3-marc.zyngier@arm.com>
+Message-ID: <d10fa874-1de2-1b95-dae1-42a336b98fa2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-The r8a7792 Wheat board has two ADV7513 devices sharing a single i2c
-bus, however in low power mode the ADV7513 will reset it's slave maps to
-use the hardware defined default addresses.
 
-The ADV7511 driver was adapted to allow the two devices to be registered
-correctly - but it did not take into account the fault whereby the
-devices reset the addresses.
+On 07/02/18 14:32, Marc Zyngier wrote:
+> From: Robin Murphy <robin.murphy@arm.com>
+> 
+> Juno's GICv2m implementation consists of four frames providing 32
+> interrupts each. Since it is possible to plug in enough PCIe endpoints
+> to consume more than 32 MSIs, and the driver already has a bodge to
+> handle multiple frames, let's expose the other three as well.
+> 
 
-This results in an address conflict between the device using the default
-addresses, and the other device if it is in low-power-mode.
+Change on it own looks good. So if you want to merge via your tree:
 
-Repair this issue by moving both devices away from the default address
-definitions.
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/r8a7792-wheat.dts | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Let me know if you decide not to take it via your tree and you want me
+to send it to arm-soc.
 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index b9471b67b728..c94f330392ee 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -240,9 +240,16 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 
-+	/*
-+	 * The adv75xx resets its addresses to defaults during low power power
-+	 * mode. Because we have two ADV7513 devices on the same bus, we must
-+	 * change both of them away from the defaults so that they do not
-+	 * conflict.
-+	 */
- 	hdmi at 3d {
- 		compatible = "adi,adv7513";
--		reg = <0x3d>;
-+		reg = <0x3d 0x2d 0x4d, 0x5d>;
-+		reg-names = "main", "cec", "edid", "packet";
- 
- 		adi,input-depth = <8>;
- 		adi,input-colorspace = "rgb";
-@@ -272,7 +279,8 @@
- 
- 	hdmi at 39 {
- 		compatible = "adi,adv7513";
--		reg = <0x39>;
-+		reg = <0x39 0x29 0x49, 0x59>;
-+		reg-names = "main", "cec", "edid", "packet";
- 
- 		adi,input-depth = <8>;
- 		adi,input-colorspace = "rgb";
+On the side note I just noticed the Juno TRM[1] has 64k for each of
+these MSI frames(page 3-24 section 3.3.5 Application memory map summary)
+
+I am not sure if TRM is wrong. This patch is just copying the 4k size
+from frame 0 which got added with initial Juno DTS.
+
 -- 
-2.7.4
+Regards,
+Sudeep
+
+[1]
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0515f/DDI0515F_juno_arm_development_platform_soc_trm.pdf
