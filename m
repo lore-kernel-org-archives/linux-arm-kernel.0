@@ -1,64 +1,84 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Mon, 12 Feb 2018 11:38:14 -0800
-Subject: [PATCH] spi: bcm2835aux: Avoid 64-bit arithmetic in xfer len calc
-In-Reply-To: <1518463905.25398.281.camel@impinj.com>
-References: <1518463905.25398.281.camel@impinj.com>
-Message-ID: <20180212193814.17644-1-tpiepho@impinj.com>
+From: noloader@gmail.com (Jeffrey Walton)
+Date: Mon, 12 Feb 2018 14:57:06 -0500
+Subject: [PATCH 0/5] crypto: Speck support
+In-Reply-To: <20180212191903.GD193902@google.com>
+References: <20180208001001.19180-1-ebiggers@google.com>
+ <CAH8yC8m4F9SWum9D5ZV2wzVAsJaDxnkc1L6eSeEOV-cOdkcg6Q@mail.gmail.com>
+ <20180208210107.GA6720@google.com>
+ <CAH8yC8k2ZNffeb6oak0_xCUVS+kyO_9SiFmbTjY7SdseN2xULw@mail.gmail.com>
+ <20180212191903.GD193902@google.com>
+Message-ID: <CAH8yC8numVB=XX2M9GhsH8-xOQpsxEE3i6JJLd_nfUd7v7hDFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to check for xfers that are over 30 microseconds.  Rather than
-find how many ?s a xfer will take, instead find how many bytes can be
-transferred in 30 ?s.  The latter must be less than 32 bits (since our
-clock speed is limited to 32 bits), while the former involves 64 bit
-quantities and more arithmetic operations.
+On Mon, Feb 12, 2018 at 2:19 PM, Eric Biggers <ebiggers@google.com> wrote:
+> Hi all,
+>
+> On Fri, Feb 09, 2018 at 07:07:01PM -0500, Jeffrey Walton wrote:
+>> > Hi Jeffrey,
+>> >
+>> > I see you wrote the SPECK implementation in Crypto++, and you are treating the
+>> > words as big endian.
+>> >
+>> > Do you have a reference for this being the "correct" order?  Unfortunately the
+>> > authors of the cipher failed to mention the byte order in their paper.  And they
+>> > gave the test vectors as words, so the test vectors don't clarify it either.
+>> >
+>> > I had assumed little endian words, but now I am having second thoughts...  And
+>> > to confuse things further, it seems that some implementations (including the
+>> > authors own implementation for the SUPERCOP benchmark toolkit [1]) even consider
+>> > the words themselves in the order (y, x) rather than the more intuitive (x, y).
+>> >
+>> > [1] https://github.com/iadgov/simon-speck-supercop/blob/master/crypto_stream/speck128128ctr/ref/stream.c
+>> >
+>> > In fact, even the reference code from the paper treats pt[0] as y and pt[1] as
+>> > x, where 'pt' is a u64 array -- although that being said, it's not shown how the
+>> > actual bytes should be translated to/from those u64 arrays.
+>> >
+>> > I'd really like to avoid people having to add additional versions of SPECK later
+>> > for the different byte and word orders...
+>>
+>> Hi Eric,
+>>
+>> Yeah, this was a point of confusion for us as well. After the sidebar
+>> conversations I am wondering about the correctness of Crypto++
+>> implementation.
+>>
+>
+> We've received another response from one of the Speck creators (Louis Wingers)
+> that (to summarize) the intended byte order is little endian, and the intended
+> word order is (y, x), i.e. 'y' is at a lower memory address than 'x'.  Or
+> equivalently: the test vectors given in the original paper need to be read as
+> byte arrays from *right-to-left*.
+>
+> (y, x) is not the intuitive order, but it's not a huge deal.  The more important
+> thing is that we don't end up with multiple implementations with different byte
+> and/or word orders.
+>
+> So, barring any additional confusion, I'll send a revised version of this
+> patchset that flips the word order.  Jeff would need to flip both the byte and
+> word orders in his implementation in Crypto++ as well.
 
-Signed-off-by: Trent Piepho <tpiepho@impinj.com>
----
- drivers/spi/spi-bcm2835aux.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+Thanks Eric.
 
-diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
-index 7428091d3f5b..1431cb98fe40 100644
---- a/drivers/spi/spi-bcm2835aux.c
-+++ b/drivers/spi/spi-bcm2835aux.c
-@@ -321,7 +321,6 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
- 	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
- 	unsigned long spi_hz, clk_hz, speed;
- 	unsigned long spi_used_hz;
--	unsigned long long xfer_time_us;
- 
- 	/* calculate the registers to handle
- 	 *
-@@ -358,20 +357,21 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
- 	bs->rx_len = tfr->len;
- 	bs->pending = 0;
- 
--	/* calculate the estimated time in us the transfer runs
--	 * note that there are are 2 idle clocks after each
--	 * chunk getting transferred - in our case the chunk size
--	 * is 3 bytes, so we approximate this by 9 bits/byte
-+	/* Calculate the estimated time in us the transfer runs.  Note that
-+	 * there are are 2 idle clocks cycles after each chunk getting
-+	 * transferred - in our case the chunk size is 3 bytes, so we
-+	 * approximate this by 9 cycles/byte.  This is used to find the number
-+	 * of Hz per byte per polling limit.  E.g., we can transfer 1 byte in
-+	 * 30 ?s per 300,000 Hz of bus clock.
- 	 */
--	xfer_time_us = tfr->len * 9 * 1000000;
--	do_div(xfer_time_us, spi_used_hz);
--
-+#define HZ_PER_BYTE ((9 * 1000000) / BCM2835_AUX_SPI_POLLING_LIMIT_US)
- 	/* run in polling mode for short transfers */
--	if (xfer_time_us < BCM2835_AUX_SPI_POLLING_LIMIT_US)
-+	if (tfr->len < spi_used_hz / HZ_PER_BYTE)
- 		return bcm2835aux_spi_transfer_one_poll(master, spi, tfr);
- 
- 	/* run in interrupt mode for all others */
- 	return bcm2835aux_spi_transfer_one_irq(master, spi, tfr);
-+#undef HZ_PER_BYTE
- }
- 
- static int bcm2835aux_spi_prepare_message(struct spi_master *master,
--- 
-2.14.3
+Yeah, the (y,x) explains a lot of the confusion, and explains the
+modification I needed in my GitHub clone of the IAD Team's SUPERCOP to
+arrive at test vector results. My clone is available at
+https://github.com/noloader/simon-speck-supercop.
+
+So let me ask you... Given the Speck-128(128) test vector from Appendix C:
+
+    Key: 0f0e0d0c0b0a0908 0706050403020100
+    Plaintext: 6c61766975716520 7469206564616d20
+    Ciphertext: a65d985179783265 7860fedf5c570d18
+
+Will the Linux implementation arrive at the published result, or will
+it arrive at a different result? I guess what I am asking, where is
+the presentation detail going to be handled?
+
+A related question is, will the kernel be parsing just the key as
+(y,x), or will all parameters be handled as (y,x)? At this point I
+believe it only needs to apply to the key but I did not investigate
+the word swapping in detail because I was chasing the test vector.
+
+Jeff
