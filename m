@@ -1,81 +1,83 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Mon, 12 Feb 2018 18:19:24 +0800
-Subject: [PATCH v9 5/7] arm64: kvm: Introduce KVM_ARM_SET_SERROR_ESR ioctl
-In-Reply-To: <5A7DDDEE.9050306@arm.com>
-References: <0184EA26B2509940AA629AE1405DD7F201A9E8EA@DGGEMA503-MBS.china.huawei.com>
- <5A70C5A0.1050600@arm.com> <d1b17dae-9d9c-970a-d164-a41c618d449b@huawei.com>
- <5A7DDDEE.9050306@arm.com>
-Message-ID: <93d07d3e-8388-7814-d674-538071d84e2a@huawei.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 12 Feb 2018 10:31:06 +0000
+Subject: [RFC v4 12/26] watchdog: renesas_wdt: Add R-Car Gen2 support
+In-Reply-To: <20180207225356.pgirh2ohdsv7xdne@katana>
+References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1517423070-24236-13-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20180207225356.pgirh2ohdsv7xdne@katana>
+Message-ID: <TY1PR06MB0895E25D31BA11A42F24DF80C0F70@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
- Thanks for the mail.
+Hello Wolfram,
 
-On 2018/2/10 1:44, James Morse wrote:
-[...]
-> 
->> its ESR is 0, can not control the virtual SError's syndrom value, it does not have
->> such registers to control that.
-> 
-> My point was its more nuanced than this: the ARM-ARM's
-> TakeVirtualSErrorException() pseudo-code lets virtual-SError have an
-> implementation defined syndrome. I've never seen Juno generate anything other
-> than '0', but it might do something different on a thursday.
+thank you for your feedback!
 
-I checked the "aarch64/exceptions/asynch/AArch64.TakeVirtualSErrorException",
-you are right, the virtual SError's syndrome value can be 0 or implementation defined value, not always 0,
-which is decided by the "exception.syndrome<24>".
-thanks for the clarification.
+> Subject: Re: [RFC v4 12/26] watchdog: renesas_wdt: Add R-Car Gen2 support
+>
+>
+> > +#ifdef CONFIG_PM
+> > +static int rwdt_suspend(struct device *dev)
+> > +{
+> > +struct platform_device *pdev;
+> > +struct rwdt_priv *priv;
+> > +
+> > +pdev = to_platform_device(dev);
+> > +priv = platform_get_drvdata(pdev);
+>
+> struct rwdt_priv *priv = dev_get_drvdata(dev);
+>
+> ?
 
-> 
-> The point? We can't know what a CPU without the RAS extensions puts in there.
-> 
-> Why Does this matter? When migrating a pending SError we have to know the
-> difference between 'use this 64bit value', and 'the CPU will generate it'.
-> If I make an SError pending with ESR=0 on a CPU with VSESR, I can't migrated to
-> a system that generates an impdef SError-ESR, because I can't know it will be 0.
-Yes,
-But it will have a issue,
-For the target system, before taking the SError, no one can know whether its syndrome value
-is IMPLEMENTATION DEFINED or architecturally defined.
+will change
 
-when the virtual SError is taken, the ESR_ELx.IDS will be updated, then we can know
-whether the ESR value is impdef or architecturally defined.
+>
+>
+> > +if (watchdog_active(&priv->wdev)) {
+> > +rwdt_write(priv, priv->cks, RWTCSRA);
+> > +}
+> > +return 0;
+> > +}
+> > +
+> > +static int rwdt_resume(struct device *dev)
+> > +{
+> > +struct platform_device *pdev;
+> > +struct rwdt_priv *priv;
+> > +
+> > +pdev = to_platform_device(dev);
+> > +priv = platform_get_drvdata(pdev);
+>
+> ditto
 
-It seems migration is only allowed only when target system and source system all support RAS extension, because we do not know
-whether its syndrome is IMPLEMENTATION DEFINED or architecturally defined.
+will change
 
-> 
-> 
->> Does Juno not have RAS Extension? 
-> 
-> It's two types of v8.0 CPU, no RAS extensions.
-> 
-> 
->> if yes, I think we can only inject an SError, but can not change its ESR value,
->> because it does not have vsesr_el2.
-> 
-> I agree, this means we need to be able to tell the difference between 'pending'
-> and 'pending with this ESR'.
-> 
-> 
->>> Just because we can't control the ESR doesn't mean injecting an SError isn't
->>> something user-space may want to do.
-> 
->> yes, we may need to support user-space injects an SError even through CPU does not have RAS Extension.
->>
->>> If we tackle migration of pending-SError first, I think that will give us the
->>> API to create a new pending SError with/without an ESR as appropriate.
->>
->> sure, we should. Last week, I checked the KVM_GET/SET_VCPU_EVENTS IOCTL, it should meet our
->> migration requirements
-> 
-> Great!
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
+>
+> > +if (watchdog_active(&priv->wdev)) {
+> > +rwdt_write(priv, priv->cks | RWTCSRA_TME, RWTCSRA);
+> > +}
+> > +return 0;
+> > +}
+> > +
+> > +static const struct dev_pm_ops rwdt_pm = {
+> > +.suspend = rwdt_suspend,
+> > +.resume = rwdt_resume,
+> > +};
+>
+> Use SIMPLE_DEV_PM_OPS macro (see stmp3xxx_rtc_wdt.c for an example) for
+> more compact code and...
+>
+> > +#ifdef CONFIG_PM
+> > +.pm = &rwdt_pm,
+> > +#endif
+>
+> ... removing this ifdeffery?
+
+will take out the ifdeffery
+
+
+Thanks,
+Fabrizio
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
