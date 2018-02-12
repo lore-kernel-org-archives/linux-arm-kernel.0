@@ -1,99 +1,82 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Mon, 12 Feb 2018 15:43:02 +0100
-Subject: [PATCH v2 04/12] ARM: dts: STi: Add fake reg property for
- miphy28lp_phy
+Date: Mon, 12 Feb 2018 15:43:01 +0100
+Subject: [PATCH v2 03/12] ARM: dts: STi: Add fake reg property for
+ sti-display-subsystem
 In-Reply-To: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
 References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1518446590-16800-5-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518446590-16800-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Add fake reg property to miphy28lp_phy.
+As sti-display-subsystem sub-nodes (sti-compositor, sti-tvout
+sti-hdmi, sti-hda and sti-hqvdp) are SoC's IP, we add a fake
+reg property.
 This allows to fix the following warning when compiling
 dtb with W=1 option:
 
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/miphy28lp missing or empty reg/ranges property
-
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/miphy28lp missing or empty reg/ranges property
-
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/miphy28lp missing or empty reg/ranges property
-
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/miphy28lp missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
+Node /soc/sti-display-subsystem/sti-hda at 8d02000 has a unit name, but no reg property
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
 
 v2: _ add a fake reg property to node without reg property
 
- arch/arm/boot/dts/stih407-family.dtsi | 3 ++-
- arch/arm/boot/dts/stih410-b2260.dts   | 2 +-
- arch/arm/boot/dts/stih418-b2199.dts   | 2 +-
- arch/arm/boot/dts/stihxxx-b2120.dtsi  | 2 +-
- 4 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/stih407.dtsi      | 4 ++--
+ arch/arm/boot/dts/stih410-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410.dtsi      | 3 ++-
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 1608c70f05a9..e279cd07ba67 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -389,12 +389,13 @@
- 			reset-names = "global", "port";
- 		};
- 
--		miphy28lp_phy: miphy28lp {
-+		miphy28lp_phy: miphy28lp at 0 {
- 			compatible = "st,miphy28lp-phy";
- 			st,syscfg = <&syscfg_core>;
- 			#address-cells	= <1>;
- 			#size-cells	= <1>;
- 			ranges;
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 11fdecd9312e..4f01777082f5 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -11,11 +11,11 @@
+ #include <dt-bindings/gpio/gpio.h>
+ / {
+ 	soc {
+-		sti-display-subsystem {
++		sti-display-subsystem at 0 {
+ 			compatible = "st,sti-display-subsystem";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-
 +			reg = <0 0>;
+ 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
+ 					  <&clk_s_d2_quadfs 1>,
+ 					  <&clk_s_c0_pll1 0>,
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index 37a42afa0dd1..23199b1b0991 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -61,7 +61,7 @@
+ 			status = "okay";
+ 		};
  
- 			phy_port0: port at 9b22000 {
- 				reg = <0x9b22000 0xff>,
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index 69c2abcaeda8..cea5c840ca9f 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -200,7 +200,7 @@
+-		sti-display-subsystem {
++		sti-display-subsystem at 0 {
+ 			sti-hda at 8d02000 {
+ 				status = "okay";
  			};
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index e4b7e3ddc9ee..d9f964702933 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -102,11 +102,12 @@
+ 			status = "disabled";
  		};
  
--		miphy28lp_phy: miphy28lp {
-+		miphy28lp_phy: miphy28lp at 0 {
+-		sti-display-subsystem {
++		sti-display-subsystem at 0 {
+ 			compatible = "st,sti-display-subsystem";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
  
- 			phy_port1: port at 9b2a000 {
- 				st,osc-force-ext;
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 1ce38ce79952..be0bbb05c5ec 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -88,7 +88,7 @@
- 			non-removable;
- 		};
- 
--		miphy28lp_phy: miphy28lp {
-+		miphy28lp_phy: miphy28lp at 0 {
- 
- 			phy_port0: port at 9b22000 {
- 				st,osc-rdy;
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 1fd3a2b5b938..66c1c6a5eb76 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -80,7 +80,7 @@
- 			st,i2c-min-sda-pulse-width-us = <5>;
- 		};
- 
--		miphy28lp_phy: miphy28lp {
-+		miphy28lp_phy: miphy28lp at 0 {
- 
- 			phy_port0: port at 9b22000 {
- 				st,osc-rdy;
++			reg = <0 0>;
+ 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
+ 					  <&clk_s_d2_quadfs 1>,
+ 					  <&clk_s_c0_pll1 0>,
 -- 
 1.9.1
