@@ -1,135 +1,74 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 12 Feb 2018 17:31:47 +0100
-Subject: [PATCH v3 3/3] ARM: dts: exynos: Add support for HDMI audio on
- exynos5433-tm2
-In-Reply-To: <20180212163147.11561-1-s.nawrocki@samsung.com>
-References: <20180212163147.11561-1-s.nawrocki@samsung.com>
- <CGME20180212163212epcas2p15a43c33e24b6c800544637ca0b030cb6@epcas2p1.samsung.com>
-Message-ID: <20180212163147.11561-3-s.nawrocki@samsung.com>
+From: wulf@rock-chips.com (wlf)
+Date: Tue, 13 Feb 2018 00:40:31 +0800
+Subject: [PATCH 1/3] dt-bindings: phy: phy-rockchip-typec: add usb3 otg
+ reset
+In-Reply-To: <1907466.pgqOKPpIkg@phil>
+References: <1515751704-13213-1-git-send-email-william.wu@rock-chips.com>
+ <20180119214916.fegrzgcmbbdiesyz@rob-hp-laptop>
+ <d05fb977-cd6c-4875-25be-9212e75b7e39@rock-chips.com>
+ <1907466.pgqOKPpIkg@phil>
+Message-ID: <7996ee24-1376-a7ec-91dc-26798c9159c7@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the sound node of the exynos5433-tm2 board
-and adds clock tree configuration in order to support HDMI sound.
+Dear Heiko,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-Changes since v2:
- - nodes sorted alphabetically, changed the assigned clock
-   frequencies.
+? 2018?02?11? 03:55, Heiko Stuebner ??:
+> Hi Wulf,
+>
+> Am Montag, 22. Januar 2018, 12:33:05 CET schrieb wlf:
+>> ? 2018?01?20? 05:49, Rob Herring ??:
+>>> On Thu, Jan 18, 2018 at 09:47:50AM -0800, Brian Norris wrote:
+>>>> On Thu, Jan 18, 2018 at 06:20:09PM +0100, Enric Balletbo Serra wrote:
+>>>>> As Brian said commit 06c47e6286d5 'usb: dwc3: of-simple: Add support
+>>>>> to get resets for the device' introduced the support to get the resets
+>>>>> from dwc3-of-simple and the queued commit 'b7e63d95c14d arm64: dts:
+>>>>> rockchip: add reset property for dwc3 controllers on rk3399' started
+>>>>> using it. Without the latest I get errors like this doing bind/unbind
+>>>>> tests.
+>>>>>
+>>>>>      dwc3: probe of fe900000.dwc3 failed with error -110
+>>>>>
+>>>>> I just tested these series on top of mainline, I reverted my patch
+>>>>> because otherwise two drivers are requesting the same reset and fails,
+>>>>> and I did some of the bind/unbind test. They just worked fine, and
+>>>>> seems that this is right way, so this makes me think some questions.
+>>>> Actually, this was intended to coexist with DWC3 optionally controlling
+>>>> the same reset. It was written before the reset framework was rewritten
+>>>> to have shared and exclusive resets. Should this be rewritten to use
+>>>> shared resets? We'd have to modify both dwc3 core and the PHY driver.
+>>> Seems like abuse of DT to me. If you need to control the controller's
+>>> reset from the phy driver, then get the reset out of the controller
+>>> node. The phy node should describe the connections to the phy.
+>> I try to get the reset out of the controller, but I don't find a good
+>> way to get the reset ofthe controller associated with the given phy
+>> device node.  Is there an API like theof_usb_get_dr_mode_by_phy() to
+>> get 'dr_mode' of the controller?
+> I guess the easiest way would be taking the of_usb_get_dr_mode_by_phy()
+> function move the part above the "finish" label into a separate function
+> like of_usb_get_node_by_phy (or possibly move that to an even more general
+> place as it is not usb-related at all) and use that function in
+> of_usb_get_dr_mode_by_phy() and also use it to get the reset you want via
+> something like:
+>
+> node = of_usb_get_node_by_phy(...);
+> rst = of_reset_control_get(node, ...);
+Thanks for your good suggestion. I think it's a good way to get the 
+reset of the
+controller by phy.
+>> And we're trying to find another method to fix the RK3399 tcphy power
+>> on fail issue.If we get another proper method, we may not need these
+>> phy patch series.
+> Did you find any different solution for that yet?
+>
+> Heiko
+Yes, finally, we have found another way to fix the? RK3399 tcphy usb power
+on fail issue. And Enric Balletbo i Serra <Enric Balletbo i Serra> has 
+submitted
+new patch series, refer to the following patches:
+https://patchwork.kernel.org/patch/10207261/
+https://patchwork.kernel.org/patch/10207267/
+https://patchwork.kernel.org/patch/10207263/
 
-Changes since v1:
- - dropped unnecessary assigned-clock* properties for AUD PLL
-   in cmu_top node,
- - changed default AUD PLL frequency so it is within recommended
-   252...400 MHz range.
----
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 52 ++++++++++++++++++++--
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  1 +
- 2 files changed, 49 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-index a77462da4a36..b73c389e1a8b 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/sound/samsung-i2s.h>
- 
- / {
- 	aliases {
-@@ -112,8 +113,8 @@
- 
- 	sound {
- 		compatible = "samsung,tm2-audio";
--		audio-codec = <&wm5110>;
--		i2s-controller = <&i2s0>;
-+		audio-codec = <&wm5110>, <&hdmi>;
-+		i2s-controller = <&i2s0 0>, <&i2s1 0>;
- 		audio-amplifier = <&max98504>;
- 		mic-bias-gpios = <&gpr3 2 GPIO_ACTIVE_HIGH>;
- 		model = "wm5110";
-@@ -217,8 +218,40 @@
- };
- 
- &cmu_aud {
--	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
--	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
-+	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>,
-+		<&cmu_aud CLK_MOUT_SCLK_AUD_I2S>,
-+		<&cmu_aud CLK_MOUT_SCLK_AUD_PCM>,
-+		<&cmu_top CLK_MOUT_AUD_PLL>,
-+		<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
-+		<&cmu_top CLK_MOUT_SCLK_AUDIO0>,
-+		<&cmu_top CLK_MOUT_SCLK_AUDIO1>,
-+		<&cmu_top CLK_MOUT_SCLK_SPDIF>,
-+
-+		<&cmu_aud CLK_DIV_AUD_CA5>,
-+		<&cmu_aud CLK_DIV_ACLK_AUD>,
-+		<&cmu_aud CLK_DIV_PCLK_DBG_AUD>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_I2S>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_PCM>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_SLIMBUS>,
-+		<&cmu_aud CLK_DIV_SCLK_AUD_UART>,
-+		<&cmu_top CLK_DIV_SCLK_AUDIO0>,
-+		<&cmu_top CLK_DIV_SCLK_AUDIO1>,
-+		<&cmu_top CLK_DIV_SCLK_PCM1>,
-+		<&cmu_top CLK_DIV_SCLK_I2S1>;
-+
-+	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>,
-+		<&cmu_aud CLK_MOUT_AUD_PLL_USER>,
-+		<&cmu_aud CLK_MOUT_AUD_PLL_USER>,
-+		<&cmu_top CLK_FOUT_AUD_PLL>,
-+		<&cmu_top CLK_MOUT_AUD_PLL>,
-+		<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
-+		<&cmu_top CLK_MOUT_AUD_PLL_USER_T>,
-+		<&cmu_top CLK_SCLK_AUDIO0>;
-+
-+	assigned-clock-rates = <0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>,
-+		<196608001>, <65536001>, <32768001>, <49152001>,
-+		<2048001>, <24576001>, <196608001>,
-+		<24576001>, <98304001>, <2048001>, <49152001>;
- };
- 
- &cmu_fsys {
-@@ -267,6 +300,11 @@
- 				 <&cmu_top CLK_MOUT_BUS_PLL_USER>;
- };
- 
-+&cmu_top {
-+	assigned-clocks = <&cmu_top CLK_FOUT_AUD_PLL>;
-+	assigned-clock-rates = <196608001>;
-+};
-+
- &cpu0 {
- 	cpu-supply = <&buck3_reg>;
- };
-@@ -838,6 +876,12 @@
- 	status = "okay";
- };
- 
-+&i2s1 {
-+	assigned-clocks = <&i2s1 CLK_I2S_RCLK_SRC>;
-+	assigned-clock-parents = <&cmu_peric CLK_SCLK_I2S1>;
-+	status = "okay";
-+};
-+
- &mshc_0 {
- 	status = "okay";
- 	mmc-hs200-1_8v;
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 2b73bd86bc56..c0231d077fa6 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -969,6 +969,7 @@
- 			ddc = <&hsi2c_11>;
- 			samsung,syscon-phandle = <&pmu_system_controller>;
- 			samsung,sysreg-phandle = <&syscon_disp>;
-+			#sound-dai-cells = <0>;
- 			status = "disabled";
- 		};
- 
--- 
-2.14.2
+So my patches can be abandoned.
+>
