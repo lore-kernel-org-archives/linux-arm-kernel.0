@@ -1,49 +1,90 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 12 Feb 2018 11:48:22 +0100
-Subject: [PATCH] MAINTAINERS: add Freescale pin controllers
-In-Reply-To: <20180210153204.12728-1-stefan@agner.ch>
-References: <20180210153204.12728-1-stefan@agner.ch>
-Message-ID: <1518432502.2744.5.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Feb 2018 10:49:35 +0000
+Subject: [RFC/RFT PATCH 0/2] arm64: per-task stack canaries
+In-Reply-To: <4f8b8b42-7b95-a396-659f-0563030f5963@redhat.com>
+References: <20180123130302.29409-1-ard.biesheuvel@linaro.org>
+ <4f8b8b42-7b95-a396-659f-0563030f5963@redhat.com>
+Message-ID: <CAKv+Gu9Xk852y8q7RZ_gsa28PCT+564fFWJA276S2EB6=JjSiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 10.02.2018, 16:32 +0100 schrieb Stefan Agner:
-> Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
-> and Sascha as reviewer.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> ?MAINTAINERS | 11 +++++++++++
-> ?1 file changed, 11 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 82ad0eabce4f..fb672dfc519d 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
-> ?S:	Supported
-> ?F:	drivers/pinctrl/pinctrl-at91-pio4.*
-> ?
-> +PIN CONTROLLER - FREESCALE
-> +M:	Dong Aisheng <aisheng.dong@nxp.com>
-> +M:	Fabio Estevam <festevam@gmail.com>
-> +M:	Shawn Guo <shawnguo@kernel.org>
-> +M:	Stefan Agner <stefan@agner.ch>
-> +R:	Sascha Hauer <kernel@pengutronix.de>
+On 9 February 2018 at 20:20, Laura Abbott <labbott@redhat.com> wrote:
+> On 01/23/2018 05:03 AM, Ard Biesheuvel wrote:
+>>
+>> This is a proof of concept implementation of per-task stack canaries for
+>> arm64. The purpose is to reach agreement between the arm64 kernel and GCC
+>> maintainers on how to implement support for this in the compiler.
+>>
+>> What these patches show is that we can support per-task stack canaries
+>> on arm64 using only very minor changes on the kernel side, i.e., all
+>> that is needed is exposing the offset of stack_canary in task_struct
+>> via an ELF symbol. With that in place, the compiler needs to emit the
+>> following sequence when -fstack-protector-guard=tls is enabled
+>>
+>>    movz    xN, :abs_g0:__stack_chk_guard_offset
+>>    msr     xM, sp_el0
+>>    ldr     xM, [xM, xN]
+>>
+>> Note that this does not involve per-CPU variables, and so there are no
+>> concurrency issues to be addressed. sp_el0 is the current task pointer,
+>> whose value never changes from the POV of the task, even when migrating
+>> to another CPU.
+>>
+>> Patch #1 implements a GCC plugin that patches the sequence
+>>
+>>    adrp    xN, __stack_chk_guard
+>>    add     xN, Xn, :lo12:__stack_chk_guard
+>>
+>> into
+>>
+>>    mrs     xN, sp_el0
+>>    add     xN, xN, :lo12:__stack_chk_guard_offset
+>>
+>> which is a poor man's version of the movz/msr/ldr sequence above (and only
+>> works for small model code), but is sufficient as a proof of concept.
+>>
+>> Patch #2 exposes the __stack_chk_guard_offset symbol and wires up the
+>> plugin
+>> (if enabled in Kconfig)
+>>
+>> Again, the point is not to use GCC plugin based hacks, but to reach
+>> agreement
+>> on how to proceed with this for GCC.
+>>
+>> Comments welcome.
+>>
+>
+> I was seeing some crashes with these when I tried to boot up on my
+> full Fedora system. It looked like a compiler bug with grabbing
+> the wrong literal but I don't think it's worth looking at it since
+> it's probably just something with the plugin which isn't the real
+> focus here. I can send along the crash if you are interested.
+>
 
-I'm fine with the patch, but it might make sense to clarify this a bit:
-the kernel@ address is really the whole Pengutronix kernel team, not
-just Sascha. Using this address is totally fine if you expect comments
-on patches, as it gives them a quite wide exposure inside of PTX.
+Yes please. Did it crash in a modules? Did you build with
+KASLR/erratum 843419 disabled?
 
-Regards,
-Lucas
 
-> +L:	linux-gpio at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pinctrl/freescale/*
-> +F:	Documentation/devicetree/bindings/pinctrl/fsl,*
-> +
-> ?PIN CONTROLLER - INTEL
-> ?M:	Mika Westerberg <mika.westerberg@linux.intel.com>
-> ?M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> It looked good to me otherwise.
+>
+
+Thanks. I intend to try and restart the discussion on this topic this week.
+
+>
+>> Ard Biesheuvel (2):
+>>    gcc-plugins: add support plugin for arm64 per-task stack canaries
+>>    arm64: kernel: use a unique stack canary value for each task
+>>
+>>   arch/Kconfig                                    |   4 +
+>>   arch/arm64/Kconfig                              |   7 ++
+>>   arch/arm64/include/asm/stackprotector.h         |   4 +-
+>>   arch/arm64/kernel/asm-offsets.c                 |   3 +
+>>   arch/arm64/kernel/process.c                     |   4 +
+>>   arch/arm64/kernel/vmlinux.lds.S                 |   8 ++
+>>   scripts/Makefile.gcc-plugins                    |   2 +
+>>   scripts/gcc-plugins/arm64_ssp_per_task_plugin.c | 121
+>> ++++++++++++++++++++
+>>   8 files changed, 152 insertions(+), 1 deletion(-)
+>>   create mode 100644 scripts/gcc-plugins/arm64_ssp_per_task_plugin.c
+>>
+>
