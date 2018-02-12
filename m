@@ -1,23 +1,81 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 12 Feb 2018 17:52:24 -0600
-Subject: [PATCH] arm64: Make L1_CACHE_SHIFT configurable
-In-Reply-To: <1518479125-14428-1-git-send-email-f.fainelli@gmail.com>
-References: <1518479125-14428-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <ca6c47f9-86df-bcdb-bbe1-eac9db68ec33@codeaurora.org>
+From: ebiggers@google.com (Eric Biggers)
+Date: Mon, 12 Feb 2018 15:52:04 -0800
+Subject: [PATCH v2 0/5] crypto: Speck support
+Message-ID: <20180212235209.117393-1-ebiggers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 05:45 PM, Florian Fainelli wrote:
-> +config ARM64_L1_CACHE_SHIFT
-> +	int
-> +	default 7 if ARM64_L1_CACHE_SHIFT_7
-> +	default 6
+Hello,
 
-Shouldn't this be the other way around?  Everyone is used to 7 now, so 
-you're changing the default back to 6.  I would think that it should be 
-7 by default, and platforms like Brahma-B53 should force it to 6.
+This series adds Speck support to the crypto API, including the Speck128
+and Speck64 variants.  Speck is a lightweight block cipher that can be
+much faster than AES on processors that don't have AES instructions.
+
+We are planning to offer Speck-XTS (probably Speck128/256-XTS) as an
+option for dm-crypt and fscrypt on Android, for low-end mobile devices
+with older CPUs such as ARMv7 which don't have the Cryptography
+Extensions.  Currently, such devices are unencrypted because AES is not
+fast enough, even when the NEON bit-sliced implementation of AES is
+used.  Other AES alternatives such as Twofish, Threefish, Camellia,
+CAST6, and Serpent aren't fast enough either; it seems that only a
+modern ARX cipher can provide sufficient performance on these devices.
+
+This is a replacement for our original proposal
+(https://patchwork.kernel.org/patch/10101451/) which was to offer
+ChaCha20 for these devices.  However, the use of a stream cipher for
+disk/file encryption with no space to store nonces would have been much
+more insecure than we thought initially, given that it would be used on
+top of flash storage as well as potentially on top of F2FS, neither of
+which is guaranteed to overwrite data in-place.
+
+Speck has been somewhat controversial due to its origin.  Nevertheless,
+it has a straightforward design (it's an ARX cipher), and it appears to
+be the leading software-optimized lightweight block cipher currently,
+with the most cryptanalysis.  It's also easy to implement without side
+channels, unlike AES.  Moreover, we only intend Speck to be used when
+the status quo is no encryption, due to AES not being fast enough.
+
+We've also considered a novel length-preserving encryption mode based on
+ChaCha20 and Poly1305.  While theoretically attractive, such a mode
+would be a brand new crypto construction and would be more complicated
+and difficult to implement efficiently in comparison to Speck-XTS.
+
+Thus, patch 1 adds a generic implementation of Speck, and the following
+patches add a 32-bit ARM NEON implementation of Speck-XTS.  The
+NEON-accelerated implementation is much faster than the generic
+implementation and therefore is the implementation that would primarily
+be used in practice on the devices we are targeting.
+
+There is no AArch64 implementation added, since such CPUs are likely to
+have the Cryptography Extensions, allowing the use of AES.
+
+Changed since v1:
+
+  - Use the word order recommended by the Speck authors.  All test
+    vectors were updated.
+
+Eric Biggers (5):
+  crypto: add support for the Speck block cipher
+  crypto: speck - export common helpers
+  crypto: arm/speck - add NEON-accelerated implementation of Speck-XTS
+  crypto: speck - add test vectors for Speck128-XTS
+  crypto: speck - add test vectors for Speck64-XTS
+
+ arch/arm/crypto/Kconfig           |    6 +
+ arch/arm/crypto/Makefile          |    2 +
+ arch/arm/crypto/speck-neon-core.S |  432 +++++++++++
+ arch/arm/crypto/speck-neon-glue.c |  290 ++++++++
+ crypto/Kconfig                    |   14 +
+ crypto/Makefile                   |    1 +
+ crypto/speck.c                    |  307 ++++++++
+ crypto/testmgr.c                  |   36 +
+ crypto/testmgr.h                  | 1486 +++++++++++++++++++++++++++++++++++++
+ include/crypto/speck.h            |   62 ++
+ 10 files changed, 2636 insertions(+)
+ create mode 100644 arch/arm/crypto/speck-neon-core.S
+ create mode 100644 arch/arm/crypto/speck-neon-glue.c
+ create mode 100644 crypto/speck.c
+ create mode 100644 include/crypto/speck.h
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.16.0.rc1.238.g530d649a79-goog
