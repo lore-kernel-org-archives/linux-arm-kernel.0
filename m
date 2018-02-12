@@ -1,126 +1,124 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 12 Feb 2018 18:33:23 +0000
-Subject: [PATCH 08/37] iommu/fault: Handle mm faults
+Date: Mon, 12 Feb 2018 18:33:24 +0000
+Subject: [PATCH 09/37] iommu/fault: Let handler return a fault response
 In-Reply-To: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
 References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180212183352.22730-9-jean-philippe.brucker@arm.com>
+Message-ID: <20180212183352.22730-10-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a recoverable page fault is handled by the fault workqueue, find the
-associated mm and call handle_mm_fault.
+It is really convenient to let fault handlers return the action to perform
+on the fault immediately, instead of having to call iommu_page_response
+with a crafted structure. Update IOMMU_PAGE_RESP* values to encompass most
+needs:
+
+- IOMMU_PAGE_RESP_HANDLED means "I took ownership of the fault and will
+  send a response later"
+
+- IOMMU_PAGE_RESP_CONTINUE means "I didn't handle the fault, let the next
+  handler in the chain take care of it"
+
+- IOMMU_PAGE_RESP_SUCCESS, IOMMU_PAGE_RESP_INVALID,
+  IOMMU_PAGE_RESP_FAILURE are the PCI PRI values, and mean respectively
+  "fault fixed, retry the translation", "could not fix the fault, abort
+  the translation" and "unexpected fault, disable PRI".
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/io-pgfault.c | 89 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 87 insertions(+), 2 deletions(-)
+ drivers/iommu/io-pgfault.c |  8 +++++++-
+ drivers/iommu/iommu.c      |  5 ++++-
+ include/linux/iommu.h      | 30 ++++++++++++++++++++++++------
+ 3 files changed, 35 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/iommu/io-pgfault.c b/drivers/iommu/io-pgfault.c
-index 33309ed316d2..565ec01a1b5f 100644
+index 565ec01a1b5f..484a39710d3f 100644
 --- a/drivers/iommu/io-pgfault.c
 +++ b/drivers/iommu/io-pgfault.c
-@@ -9,6 +9,7 @@
+@@ -63,6 +63,9 @@ static int iommu_fault_complete(struct iommu_domain *domain, struct device *dev,
+ 	if (status == IOMMU_PAGE_RESP_HANDLED)
+ 		return 0;
  
- #include <linux/iommu.h>
- #include <linux/list.h>
-+#include <linux/sched/mm.h>
- #include <linux/slab.h>
- #include <linux/workqueue.h>
++	if (WARN_ON(status == IOMMU_PAGE_RESP_CONTINUE))
++		return -EINVAL;
++
+ 	/*
+ 	 * There was an internal error with handling the recoverable fault. Try
+ 	 * to complete the fault if possible.
+@@ -272,7 +275,10 @@ int iommu_report_device_fault(struct device *dev, struct iommu_fault_event *evt)
+ 	if (iommu_has_device_fault_handler(dev)) {
+ 		struct iommu_fault_param *param = dev->iommu_param->fault_param;
  
-@@ -82,8 +83,92 @@ static int iommu_fault_complete(struct iommu_domain *domain, struct device *dev,
+-		return param->handler(evt, param->data);
++		ret = param->handler(evt, param->data);
++		if (ret != IOMMU_PAGE_RESP_CONTINUE)
++			return iommu_fault_complete(domain, dev, evt, ret);
++		ret = -ENOSYS;
+ 	}
  
- static int iommu_fault_handle_single(struct iommu_fault_context *fault)
- {
--	/* TODO */
--	return -ENODEV;
-+	struct mm_struct *mm;
-+	struct vm_area_struct *vma;
-+	unsigned int access_flags = 0;
-+	int ret = IOMMU_PAGE_RESP_INVALID;
-+	unsigned int fault_flags = FAULT_FLAG_REMOTE;
-+	struct iommu_fault_event *evt = &fault->evt;
-+
-+	if (!evt->pasid_valid)
-+		return ret;
-+
-+	/*
-+	 * Special case: PASID Stop Marker (LRW = 0b100) doesn't expect a
-+	 * response. A Stop Marker may be generated when disabling a PASID
-+	 * (issuing a PASID stop request) in some PCI devices.
-+	 *
-+	 * When the mm_exit() callback returns from the device driver, no page
-+	 * request is generated for this PASID anymore and outstanding ones have
-+	 * been pushed to the IOMMU (as per PCIe 4.0r1.0 - 6.20.1 and 10.4.1.2 -
-+	 * Managing PASID TLP Prefix Usage). Some PCI devices will wait for all
-+	 * outstanding page requests to come back with a response before
-+	 * completing the PASID stop request. Others do not wait for page
-+	 * responses, and instead issue this Stop Marker that tells us when the
-+	 * PASID can be reallocated.
-+	 *
-+	 * We ignore the Stop Marker because:
-+	 * a. Page requests, which are posted requests, have been flushed to the
-+	 *    IOMMU when mm_exit() returns,
-+	 * b. We flush all fault queues after mm_exit() returns and before
-+	 *    freeing the PASID.
-+	 *
-+	 * So even though the Stop Marker might be issued by the device *after*
-+	 * the stop request completes, outstanding faults will have been dealt
-+	 * with by the time we free the PASID.
-+	 */
-+	if (evt->last_req &&
-+	    !(evt->prot & (IOMMU_FAULT_READ | IOMMU_FAULT_WRITE)))
-+		return IOMMU_PAGE_RESP_HANDLED;
-+
-+	mm = iommu_sva_find(evt->pasid);
-+	if (!mm)
-+		return ret;
-+
-+	down_read(&mm->mmap_sem);
-+
-+	vma = find_extend_vma(mm, evt->addr);
-+	if (!vma)
-+		/* Unmapped area */
-+		goto out_put_mm;
-+
-+	if (evt->prot & IOMMU_FAULT_READ)
-+		access_flags |= VM_READ;
-+
-+	if (evt->prot & IOMMU_FAULT_WRITE) {
-+		access_flags |= VM_WRITE;
-+		fault_flags |= FAULT_FLAG_WRITE;
-+	}
-+
-+	if (evt->prot & IOMMU_FAULT_EXEC) {
-+		access_flags |= VM_EXEC;
-+		fault_flags |= FAULT_FLAG_INSTRUCTION;
-+	}
-+
-+	if (!(evt->prot & IOMMU_FAULT_PRIV))
-+		fault_flags |= FAULT_FLAG_USER;
-+
-+	if (access_flags & ~vma->vm_flags)
-+		/* Access fault */
-+		goto out_put_mm;
-+
-+	ret = handle_mm_fault(vma, evt->addr, fault_flags);
-+	ret = ret & VM_FAULT_ERROR ? IOMMU_PAGE_RESP_INVALID :
-+		IOMMU_PAGE_RESP_SUCCESS;
-+
-+out_put_mm:
-+	up_read(&mm->mmap_sem);
-+
-+	/*
-+	 * If the process exits while we're handling the fault on its mm, we
-+	 * can't do mmput(). exit_mmap() would release the MMU notifier, calling
-+	 * iommu_notifier_release(), which has to flush the fault queue that
-+	 * we're executing on... So mmput_async() moves the release of the mm to
-+	 * another thread, if we're the last user.
-+	 */
-+	mmput_async(mm);
-+
-+	return ret;
- }
+ 	/* If the handler is blocking, handle fault in the workqueue */
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index c475893ec7dc..9bec8390694c 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -805,7 +805,10 @@ EXPORT_SYMBOL_GPL(iommu_group_unregister_notifier);
+  * @data: private data passed as argument to the callback
+  *
+  * When an IOMMU fault event is received, call this handler with the fault event
+- * and data as argument.
++ * and data as argument. If the fault is recoverable (IOMMU_FAULT_PAGE_REQ), the
++ * handler can either return a status code (IOMMU_PAGE_RESP_*) to complete the
++ * fault, or return IOMMU_PAGE_RESP_HANDLED and complete the fault later by
++ * calling iommu_page_response().
+  *
+  * Return 0 if the fault handler was installed successfully, or an error.
+  */
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 65e56f28e0ce..d29991be9401 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -189,6 +189,29 @@ enum page_response_type {
+ 	IOMMU_PAGE_GROUP_RESP,
+ };
  
- static void iommu_fault_handle_group(struct work_struct *work)
++/**
++ * enum page_response_code - Return status of fault handlers, telling the IOMMU
++ * driver how to proceed with the fault.
++ *
++ * @IOMMU_FAULT_STATUS_HANDLED: Stop processing the fault, and do not send a
++ *	reply to the device.
++ * @IOMMU_FAULT_STATUS_CONTINUE: Fault was not handled. Call the next handler,
++ *	or terminate.
++ * @IOMMU_FAULT_STATUS_SUCCESS: Fault has been handled and the page tables
++ *	populated, retry the access. This is "Success" in PCI PRI.
++ * @IOMMU_FAULT_STATUS_FAILURE: General error. Drop all subsequent faults from
++ *	this device if possible. This is "Response Failure" in PCI PRI.
++ * @IOMMU_FAULT_STATUS_INVALID: Could not handle this fault, don't retry the
++ *	access. This is "Invalid Request" in PCI PRI.
++ */
++enum page_response_code {
++	IOMMU_PAGE_RESP_HANDLED = 0,
++	IOMMU_PAGE_RESP_CONTINUE,
++	IOMMU_PAGE_RESP_SUCCESS,
++	IOMMU_PAGE_RESP_INVALID,
++	IOMMU_PAGE_RESP_FAILURE,
++};
++
+ /**
+  * Generic page response information based on PCI ATS and PASID spec.
+  * @addr: servicing page address
+@@ -202,12 +225,7 @@ enum page_response_type {
+ struct page_response_msg {
+ 	u64 addr;
+ 	u32 pasid;
+-	u32 resp_code:4;
+-#define IOMMU_PAGE_RESP_SUCCESS	0
+-#define IOMMU_PAGE_RESP_INVALID	1
+-#define IOMMU_PAGE_RESP_HANDLED	2
+-#define IOMMU_PAGE_RESP_FAILURE	0xF
+-
++	enum page_response_code resp_code;
+ 	u32 pasid_present:1;
+ 	u32 page_req_group_id : 9;
+ 	enum page_response_type type;
 -- 
 2.15.1
