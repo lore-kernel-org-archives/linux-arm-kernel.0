@@ -1,185 +1,99 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Mon, 12 Feb 2018 15:43:00 +0100
-Subject: [PATCH v2 02/12] ARM: dts: STi: Move leds node outside soc node
+Date: Mon, 12 Feb 2018 15:43:02 +0100
+Subject: [PATCH v2 04/12] ARM: dts: STi: Add fake reg property for
+ miphy28lp_phy
 In-Reply-To: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
 References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1518446590-16800-3-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518446590-16800-5-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Leds are not part of soc, so nove them outside soc node.
-This allows to fix the following warnings when compiling
-dtb with W=1 option :
+Add fake reg property to miphy28lp_phy.
+This allows to fix the following warning when compiling
+dtb with W=1 option:
 
 arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/leds missing or empty reg/ranges property
+Node /soc/miphy28lp missing or empty reg/ranges property
 
 arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/leds missing or empty reg/ranges property
+Node /soc/miphy28lp missing or empty reg/ranges property
+
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+Node /soc/miphy28lp missing or empty reg/ranges property
 
 arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/leds missing or empty reg/ranges property
+Node /soc/miphy28lp missing or empty reg/ranges property
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
 
-v2: _ none
+v2: _ add a fake reg property to node without reg property
 
- arch/arm/boot/dts/stih410-b2260.dts  | 49 ++++++++++++++++++------------------
- arch/arm/boot/dts/stih418-b2199.dts  | 26 +++++++++----------
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 26 +++++++++----------
- 3 files changed, 50 insertions(+), 51 deletions(-)
+ arch/arm/boot/dts/stih407-family.dtsi | 3 ++-
+ arch/arm/boot/dts/stih410-b2260.dts   | 2 +-
+ arch/arm/boot/dts/stih418-b2199.dts   | 2 +-
+ arch/arm/boot/dts/stihxxx-b2120.dtsi  | 2 +-
+ 4 files changed, 5 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 1608c70f05a9..e279cd07ba67 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -389,12 +389,13 @@
+ 			reset-names = "global", "port";
+ 		};
+ 
+-		miphy28lp_phy: miphy28lp {
++		miphy28lp_phy: miphy28lp at 0 {
+ 			compatible = "st,miphy28lp-phy";
+ 			st,syscfg = <&syscfg_core>;
+ 			#address-cells	= <1>;
+ 			#size-cells	= <1>;
+ 			ranges;
++			reg = <0 0>;
+ 
+ 			phy_port0: port at 9b22000 {
+ 				reg = <0x9b22000 0xff>,
 diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index faafc7b12951..69c2abcaeda8 100644
+index 69c2abcaeda8..cea5c840ca9f 100644
 --- a/arch/arm/boot/dts/stih410-b2260.dts
 +++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -29,36 +29,35 @@
- 		ethernet0 = &ethernet0;
- 	};
- 
--	soc {
--
--		leds {
--			compatible = "gpio-leds";
--			user_green_1 {
--				label = "User_green_1";
--				gpios = <&pio1 3 GPIO_ACTIVE_LOW>;
--				linux,default-trigger = "heartbeat";
--				default-state = "off";
--			};
-+	leds {
-+		compatible = "gpio-leds";
-+		user_green_1 {
-+			label = "User_green_1";
-+			gpios = <&pio1 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
- 
--			user_green_2 {
--				label = "User_green_2";
--				gpios = <&pio4 1 GPIO_ACTIVE_LOW>;
--				default-state = "off";
--			};
-+		user_green_2 {
-+			label = "User_green_2";
-+			gpios = <&pio4 1 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
- 
--			user_green_3 {
--				label = "User_green_3";
--				gpios = <&pio2 1 GPIO_ACTIVE_LOW>;
--				default-state = "off";
--			};
-+		user_green_3 {
-+			label = "User_green_3";
-+			gpios = <&pio2 1 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
- 
--			user_green_4 {
--				label = "User_green_4";
--				gpios = <&pio2 5 GPIO_ACTIVE_LOW>;
--				default-state = "off";
--			};
-+		user_green_4 {
-+			label = "User_green_4";
-+			gpios = <&pio2 5 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
+@@ -200,7 +200,7 @@
+ 			};
  		};
-+	};
  
-+	soc {
- 		/* Low speed expansion connector */
- 		uart0: serial at 9830000 {
- 			label = "LS-UART0";
+-		miphy28lp_phy: miphy28lp {
++		miphy28lp_phy: miphy28lp at 0 {
+ 
+ 			phy_port1: port at 9b2a000 {
+ 				st,osc-force-ext;
 diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 5418a0ece659..1ce38ce79952 100644
+index 1ce38ce79952..be0bbb05c5ec 100644
 --- a/arch/arm/boot/dts/stih418-b2199.dts
 +++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -28,24 +28,24 @@
- 		ethernet0 = &ethernet0;
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		red {
-+			label = "Front Panel LED";
-+			gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+		green {
-+			gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
- 	soc {
- 		sbc_serial0: serial at 9530000 {
- 			status = "okay";
+@@ -88,7 +88,7 @@
+ 			non-removable;
  		};
  
--		leds {
--			compatible = "gpio-leds";
--			red {
--				label = "Front Panel LED";
--				gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
--				linux,default-trigger = "heartbeat";
--			};
--			green {
--				gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
--				default-state = "off";
--			};
--		};
--
- 		i2c at 9842000 {
- 			status = "okay";
- 		};
+-		miphy28lp_phy: miphy28lp {
++		miphy28lp_phy: miphy28lp at 0 {
+ 
+ 			phy_port0: port at 9b22000 {
+ 				st,osc-rdy;
 diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 68783e8223b8..1fd3a2b5b938 100644
+index 1fd3a2b5b938..66c1c6a5eb76 100644
 --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
 +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -10,24 +10,24 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/media/c8sectpfe.h>
- / {
-+	leds {
-+		compatible = "gpio-leds";
-+		red {
-+			label = "Front Panel LED";
-+			gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+		green {
-+			gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
- 	soc {
- 		sbc_serial0: serial at 9530000 {
- 			status = "okay";
+@@ -80,7 +80,7 @@
+ 			st,i2c-min-sda-pulse-width-us = <5>;
  		};
  
--		leds {
--			compatible = "gpio-leds";
--			red {
--				label = "Front Panel LED";
--				gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
--				linux,default-trigger = "heartbeat";
--			};
--			green {
--				gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
--				default-state = "off";
--			};
--		};
--
- 		pwm0: pwm at 9810000 {
- 			status = "okay";
- 		};
+-		miphy28lp_phy: miphy28lp {
++		miphy28lp_phy: miphy28lp at 0 {
+ 
+ 			phy_port0: port at 9b22000 {
+ 				st,osc-rdy;
 -- 
 1.9.1
