@@ -1,38 +1,70 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 12 Feb 2018 07:55:21 -0800
-Subject: [PATCH v2] MAINTAINERS: add Freescale pin controllers
-In-Reply-To: <20180212150549.8622-1-stefan@agner.ch>
-References: <20180212150549.8622-1-stefan@agner.ch>
-Message-ID: <1518450921.4139.9.camel@perches.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 12 Feb 2018 16:57:52 +0100
+Subject: [PATCH v2] ARM: dts: imx6: remove GPU subsystem nodes
+Message-ID: <20180212155752.11301-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-02-12 at 16:05 +0100, Stefan Agner wrote:
-> Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
-> and the Pengutronix kernel team as reviewer.
-[]
-> diff --git a/MAINTAINERS b/MAINTAINERS
-[]
-> @@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
->  S:	Supported
->  F:	drivers/pinctrl/pinctrl-at91-pio4.*
->  
-> +PIN CONTROLLER - FREESCALE
-> +M:	Dong Aisheng <aisheng.dong@nxp.com>
-> +M:	Fabio Estevam <festevam@gmail.com>
-> +M:	Shawn Guo <shawnguo@kernel.org>
-> +M:	Stefan Agner <stefan@agner.ch>
-> +R:	Pengutronix Kernel Team <kernel@pengutronix.de>
-> +L:	linux-gpio at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/pinctrl/freescale/*
+They aren't needed by the etnaviv driver anymore and have been removed
+from the binding.
 
-The * here should probably be removed so perhaps just
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+This patch is aimed at the 4.17 merge window, as this is when the
+etnaviv change will land.
 
-F:	drivers/pinctrl/freescale/
+v2: Also remove in imx6sx DT
+---
+ arch/arm/boot/dts/imx6dl.dtsi | 5 -----
+ arch/arm/boot/dts/imx6q.dtsi  | 5 -----
+ arch/arm/boot/dts/imx6sx.dtsi | 5 -----
+ 3 files changed, 15 deletions(-)
 
-> +F:	Documentation/devicetree/bindings/pinctrl/fsl,*
-> +
->  PIN CONTROLLER - INTEL
->  M:	Mika Westerberg <mika.westerberg@linux.intel.com>
->  M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index c01674fa098a..25833724484e 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -109,11 +109,6 @@
+ 		compatible = "fsl,imx-display-subsystem";
+ 		ports = <&ipu1_di0>, <&ipu1_di1>;
+ 	};
+-
+-	gpu-subsystem {
+-		compatible = "fsl,imx-gpu-subsystem";
+-		cores = <&gpu_2d>, <&gpu_3d>;
+-	};
+ };
+ 
+ &gpio1 {
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index bc581aa5cf17..ae7b3f107893 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -215,11 +215,6 @@
+ 		compatible = "fsl,imx-display-subsystem";
+ 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
+ 	};
+-
+-	gpu-subsystem {
+-		compatible = "fsl,imx-gpu-subsystem";
+-		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
+-	};
+ };
+ 
+ &gpio1 {
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index fd7879342d0d..108275d4c079 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -1355,9 +1355,4 @@
+ 			status = "disabled";
+ 		};
+ 	};
+-
+-	gpu-subsystem {
+-		compatible = "fsl,imx-gpu-subsystem";
+-		cores = <&gpu>;
+-	};
+ };
+-- 
+2.15.1
