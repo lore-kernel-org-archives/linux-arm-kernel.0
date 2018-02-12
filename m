@@ -1,129 +1,72 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 12 Feb 2018 12:55:44 +0100
-Subject: [PATCH v2 14/16] arm64: dts: mt7622: add thermal and related nodes
-In-Reply-To: <1518148312.9025.17.camel@mtkswgap22>
-References: <cover.1517910489.git.sean.wang@mediatek.com>
- <687a7c43e3e3260ebdf004a96d2cde143f563250.1517910489.git.sean.wang@mediatek.com>
- <4db5c81b-0e55-3676-d7c8-d1b6aefb99c4@gmail.com>
- <1518148312.9025.17.camel@mtkswgap22>
-Message-ID: <b7d74cbb-9ad8-23cb-aa3c-e9704aafa107@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 12 Feb 2018 13:01:57 +0100
+Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
+ i.MX6UL/ULL
+In-Reply-To: <CAJZ5v0jGCzb3q5q6QxZWK7kTKHj66oHvdq=VKVXJ3TeDW_EmEA@mail.gmail.com>
+References: <20180118235836.17393-1-stefan@agner.ch>
+ <CAJZ5v0jGCzb3q5q6QxZWK7kTKHj66oHvdq=VKVXJ3TeDW_EmEA@mail.gmail.com>
+Message-ID: <6935d5dee61697743a7cb9f0760f33d5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/09/2018 04:51 AM, Sean Wang wrote:
-> On Wed, 2018-02-07 at 12:43 +0100, Matthias Brugger wrote:
+On 12.02.2018 11:18, Rafael J. Wysocki wrote:
+> On Fri, Jan 19, 2018 at 12:58 AM, Stefan Agner <stefan@agner.ch> wrote:
+>> Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
+>> Use PLL1 sys clock for all operating points higher than 528MHz.
 >>
->> On 02/06/2018 10:53 AM, sean.wang at mediatek.com wrote:
->>> From: Sean Wang <sean.wang@mediatek.com>
->>>
->>> add nodes for the thermal controller and associated thermal zone using
->>> CPU as the cooling device for each trip point. In addition, add a fixup
->>> for thermal_calibration on nvmem should be 12 bytes as the minimal
->>> requirement.
->>>
->>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>> ---
->>>  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 72 +++++++++++++++++++++++++++++++-
->>>  1 file changed, 71 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
->>> index e6dd4f6..6cf67dd 100644
->>> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
->>> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
->>> @@ -12,6 +12,7 @@
->>>  #include <dt-bindings/phy/phy.h>
->>>  #include <dt-bindings/power/mt7622-power.h>
->>>  #include <dt-bindings/reset/mt7622-reset.h>
->>> +#include <dt-bindings/thermal/thermal.h>
->>>  
->>>  / {
->>>  	compatible = "mediatek,mt7622";
->>> @@ -75,6 +76,7 @@
->>>  				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
->>>  			clock-names = "cpu", "intermediate";
->>>  			operating-points-v2 = <&cpu_opp_table>;
->>> +			#cooling-cells = <2>;
->>>  			enable-method = "psci";
->>>  			clock-frequency = <1300000000>;
->>>  		};
->>> @@ -119,6 +121,58 @@
->>>  		};
->>>  	};
->>>  
->>> +	thermal-zones {
->>> +		cpu_thermal: cpu-thermal {
->>> +			polling-delay-passive = <1000>;
->>> +			polling-delay = <1000>;
->>> +
->>> +			thermal-sensors = <&thermal 0>;
->>> +
->>> +			trips {
->>> +				cpu_passive: cpu-passive {
->>> +					temperature = <47000>;
->>> +					hysteresis = <2000>;
->>> +					type = "passive";
->>> +				};
->>> +
->>> +				cpu_active: cpu-active {
->>> +					temperature = <67000>;
->>> +					hysteresis = <2000>;
->>> +					type = "active";
->>> +				};
->>> +
->>> +				cpu_hot: cpu-hot {
->>> +					temperature = <87000>;
->>> +					hysteresis = <2000>;
->>> +					type = "hot";
->>> +				};
->>> +
->>> +				cpu-crit {
->>> +					temperature = <107000>;
->>> +					hysteresis = <2000>;
->>> +					type = "critical";
->>> +				};
->>> +			};
->>> +
->>> +			cooling-maps {
->>> +				map0 {
->>> +					trip = <&cpu_passive>;
->>> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->>> +				};
->>> +
->>> +				map1 {
->>> +					trip = <&cpu_active>;
->>> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->>> +				};
->>> +
->>> +				map2 {
->>> +					trip = <&cpu_hot>;
->>> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->>> +				};
->>> +			};
->>> +		};
->>> +	};
->>> +
->>>  	timer {
->>>  		compatible = "arm,armv8-timer";
->>>  		interrupt-parent = <&gic>;
->>> @@ -201,7 +255,7 @@
->>>  		#size-cells = <1>;
->>>  
->>>  		thermal_calibration: calib at 198 {
->>> -			reg = <0x198 0x8>;
->>> +			reg = <0x198 0xc>;
+>> Note: For higher operating points VDD_SOC_IN needs to be 125mV
+>> higher than the ARM set-point (see datasheet). Specifically, the
+>> i.MX6UL/ULL EVK boards have an external DC regulator which needs
+>> adjustment. The regulator adjustment is not covered with this
+>> change.
 >>
->> Any reason why this is not part of patch 8/16?
->>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> There's no strong reason wanting me to do that. patch 8 has contained a
-> lot of nodes and patch 16 is present just in v2. So, I felt it should be
-> a little bit easy that people reviews those patches if they are put into
-> separate patches. But, It's still fine to make them into one in the next
-> version.
+> Can you please rebase this on top of 4.16-rc1?  It doesn't apply for me as is.
 > 
 
-Please add it to 8/16 as this is where you define the node in the first place.
+Oh I see, Anson actually already submitted a patch which makes higher
+CPU rates working.
 
-Thanks!
+My solution is slightly different in that it avoids unnecessary parent
+changes...
+
+I will rework this patch to apply this simplification to the current
+state of the driver.
+
+--
+Stefan
+
+
+>> ---
+>>  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
+>>  1 file changed, 8 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+>> index 628fe899cb48..840f6386c780 100644
+>> --- a/drivers/cpufreq/imx6q-cpufreq.c
+>> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+>> @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>>                  */
+>>                 clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
+>>                 clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+>> -               if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
+>> -                       clk_set_parent(secondary_sel_clk, pll2_bus_clk);
+>> -               else
+>> -                       clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
+>> -               clk_set_parent(step_clk, secondary_sel_clk);
+>> -               clk_set_parent(pll1_sw_clk, step_clk);
+>> +               if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
+>> +                       if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
+>> +                               clk_set_parent(secondary_sel_clk, pll2_bus_clk);
+>> +                       else
+>> +                               clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
+>> +                       clk_set_parent(step_clk, secondary_sel_clk);
+>> +                       clk_set_parent(pll1_sw_clk, step_clk);
+>> +               }
+>>         } else {
+>>                 clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+>>                 clk_set_parent(pll1_sw_clk, step_clk);
+>> --
+>> 2.15.1
+>>
