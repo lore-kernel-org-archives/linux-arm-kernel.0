@@ -1,72 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Feb 2018 08:57:36 +0000
-Subject: [PATCH] arm64: Add missing Falkor part number for branch
- predictor hardening
-In-Reply-To: <1518398175-28378-1-git-send-email-shankerd@codeaurora.org>
-References: <1518398175-28378-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <86po5ah9fj.wl-marc.zyngier@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 12 Feb 2018 09:59:00 +0100
+Subject: [PATCH v3 1/7] watchdog: sama5d4: make use of timeout-secs
+ provided in devicetree
+In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+Message-ID: <c925c4cb-1367-d57e-49eb-f88a6d2a1e70@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Feb 2018 01:16:15 +0000,
-Shanker Donthineni wrote:
+On 11/02/2018 at 21:08, Marcus Folkesson wrote:
+> watchdog_init_timeout() will allways pick timeout_param since it
+> defaults to a valid timeout.
 > 
-> References to CPU part number MIDR_QCOM_FALKOR were dropped from the
-> mailing list patch due to mainline/arm64 branch dependency. So this
-> patch adds the missing part number.
+> Following best practice described in
+> Documentation/watchdog/watchdog-kernel-api.txt to make use of
+> the parameter logic.
 > 
-> Fixes: ec82b567a74f ("arm64: Implement branch predictor hardening for Falkor")
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Thanks, best regards,
+  Nicolas
+
 > ---
->  arch/arm64/kernel/cpu_errata.c | 9 +++++++++
->  arch/arm64/kvm/hyp/switch.c    | 4 +++-
->  2 files changed, 12 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 0782359..52f15cd 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -408,6 +408,15 @@ static int qcom_enable_link_stack_sanitization(void *data)
->  	},
->  	{
->  		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-> +		.enable = qcom_enable_link_stack_sanitization,
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
-> +	},
-> +	{
-> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
->  		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
->  		.enable = enable_smccc_arch_workaround_1,
->  	},
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 116252a8..870f4b1 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -407,8 +407,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  		u32 midr = read_cpuid_id();
+> Notes:
+>     v3:
+>     	- Use wdd->timeout instead of wdt_timeout when print out
+>     	  timout in probe function.
+> 
+>  drivers/watchdog/sama5d4_wdt.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index 0ae947c3d7bc..255169916dbb 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -33,7 +33,7 @@ struct sama5d4_wdt {
+>  	unsigned long		last_ping;
+>  };
 >  
->  		/* Apply BTAC predictors mitigation to all Falkor chips */
-> -		if ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)
-> +		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-> +		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
->  			__qcom_hyp_sanitize_btac_predictors();
-> +		}
->  	}
+> -static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+> +static int wdt_timeout;
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
 >  
->  	fp_enabled = __fpsimd_enabled();
+>  module_param(wdt_timeout, int, 0);
+> @@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	wdd = &wdt->wdd;
+> -	wdd->timeout = wdt_timeout;
+> +	wdd->timeout = WDT_DEFAULT_TIMEOUT;
+>  	wdd->info = &sama5d4_wdt_info;
+>  	wdd->ops = &sama5d4_wdt_ops;
+>  	wdd->min_timeout = MIN_WDT_TIMEOUT;
+> @@ -273,7 +273,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, wdt);
+>  
+>  	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
+> -		 wdt_timeout, nowayout);
+> +		 wdd->timeout, nowayout);
+>  
+>  	return 0;
+>  }
+> 
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-I'd suggest this goes via the arm64 tree as a matter of consistency
-with the rest of the variant-2 series.
-
-Thanks,
-
-	M.
 
 -- 
-Jazz is not dead, it just smell funny.
+Nicolas Ferre
