@@ -1,75 +1,37 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Mon, 12 Feb 2018 08:39:43 -0500
-Subject: [PATCH v4 4/8] PCI: brcmstb: Add dma-range mapping for inbound
- traffic
-In-Reply-To: <CANCKTBszKRp7gYKE=S3fA0=MoOVFFkO6PgmR476t3HAJ9US2gg@mail.gmail.com>
-References: <1516058925-46522-1-git-send-email-jim2101024@gmail.com>
- <1516058925-46522-5-git-send-email-jim2101024@gmail.com>
- <CAL_JsqKpWNJXNpKS5qC99N0+H_P37DcRE-rN9HFwT5tVmRFCNw@mail.gmail.com>
- <20180118073123.GA15766@lst.de>
- <EDAEFB0F-BB7C-444A-B282-F178F5ADFCBF@gmail.com>
- <20180118152331.GA24461@lst.de>
- <d62226a2-a92c-cdcb-4a9b-e69ab677bc60@broadcom.com>
- <20180123132033.GA21438@lst.de>
- <f746f9d5-b12d-9ffc-83e3-3851b4de6e52@gmail.com>
- <20180126075343.GB2356@lst.de>
- <CANCKTBszKRp7gYKE=S3fA0=MoOVFFkO6PgmR476t3HAJ9US2gg@mail.gmail.com>
-Message-ID: <CANCKTBvS8jCgoq4EzBSdXeQ_Hc50+WHfyAoc=H8LJTbF3dCtNA@mail.gmail.com>
+From: prarit@redhat.com (Prarit Bhargava)
+Date: Mon, 12 Feb 2018 08:47:57 -0500
+Subject: [PATCH] acpi, spcr: Make SPCR available to x86
+In-Reply-To: <20180212133429.GC25314@hirez.programming.kicks-ass.net>
+References: <20180118150951.28964-1-prarit@redhat.com>
+ <20180212133429.GC25314@hirez.programming.kicks-ass.net>
+Message-ID: <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 12:46 PM, Jim Quinlan <jim2101024@gmail.com> wrote:
-> On Fri, Jan 26, 2018 at 2:53 AM, Christoph Hellwig <hch@lst.de> wrote:
->> On Wed, Jan 24, 2018 at 12:04:58PM -0800, Florian Fainelli wrote:
->>> This looks nicer than the current shape, but this still requires to
->>> register a PCI fixup to override phys_to_dma() and dma_to_phys(), and it
->>> would appear that you have dodged my question about how this is supposed
->>> to fit with an entirely modular PCIe root complex driver? Are you
->>> suggesting that we split the module into a built-in part and a modular part?
->>
->> I don't think entirely modular PCI root bridges should be a focal point
->> for the design.  If we happen to support them by other design choices:
->> fine, but they should not be a priority.
->
-> I disagree.  If there is one common thing our customers request  it is
-> the ability to remove (or control the insmod of after boot)  the pcie
-> RC driver.  I didn't add this in as a "nice-to-have".
->
->>
->> That being said if we have core dma mapping or PCIe code that has
->> a list of offsets and the root complex only populates them it should
->> work just fine.
->
-> I'm looking at arch/arm/include/asm/dma-mapping.h.  In addition to
-> overriding dma_to_phsy() and phys_to_dma(), it looks like I may have
-> to define __arch_pfn_to_dma(), __arch_dma_to_pfn(),
-> __arch_dma_to_virt(), __arch_virt_to_dma().  Do  you agree or is this
-> not necessary?  If it is, this seems more intrusive than our
-> pcie-brcmstb-dma.c solution which  doesn't require tentacles into
-> major include files and Kconfigs.
->
-> Another issue is that our function wrappers -- depending upon whether
-> we are dealing with a pci device or not -- will have to possibly call
-> the actual ARM and ARM64 definitions of these functions, which have
-> been of course #ifdef'd out.  This means that our code must contain
-> identical copies of these functions' code and that the code must
-> somehow be kept in sync.  Do you see a solution to this?
->
-> Jim
 
-Cristoph,
-Could you please respond to my comments?  Even a negative response is
-better than none.  The problem with doing what you suggested is with
-ARM -- ARM64 and MIPS relatively uncomplicated .  With ARM, I have to
-define the aforementioned functions -- the only way of doing this is
-to define arch/arm/mach-bcm/include/mach/memory.h, and for that to be
-picked up we no longer can have CONFIG_ARCH_MULTIPLATFORM=y, which is
-an unacceptable cost to pay for just an unusual PCIe RC controller.
 
-Regarding my current submission -- you are right, SWIOTLB will not
-work for EPs that require it.  However, we don't care about these
-devices, and can just bailout with EPs when the dma_mask is <=
-0xffff_ffff or if swiotlb_force ==  SWIOTLB_FORCE.  Note that this
-would only affect PCIe DMA.  We also have no plan of using MIPS64.
+On 02/12/2018 08:34 AM, Peter Zijlstra wrote:
+> On Thu, Jan 18, 2018 at 10:09:51AM -0500, Prarit Bhargava wrote:
+>>  config ACPI_SPCR_TABLE
+>> +	bool "ACPI Serial Port Console Redirection Support"
+>> +	default y if X86
+>> +	help
+>> +	  Enable support for Serial Port Console Redirection (SPCR) Table.
+>> +	  This table provides information about the configuration of the
+>> +	  earlycon console.
+> 
+> I just got asked this by oldconfig, which left me rather puzzled, WTF
+> does this do?
 
--- Jim
+Odd -- I thought I had taken care of that :(  My apologies Peter.
+
+ACPI SPCR is used by a vendor to define the serial console for a system.  If
+SPCR exists a user can add kernel parameter "earlycon" (no extra kernel
+parameters) and the console will work out-of-the-box.
+
+The serial console configuration varies from vendor to vendor.  This takes the
+guess-work out of defining a serial console.
+
+P.
+
+> 
