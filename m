@@ -1,230 +1,106 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 12 Feb 2018 18:33:40 +0000
-Subject: [PATCH 25/37] iommu/arm-smmu-v3: Implement mm operations
+Date: Mon, 12 Feb 2018 18:33:39 +0000
+Subject: [PATCH 24/37] iommu/arm-smmu-v3: Add SVA feature checking
 In-Reply-To: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
 References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180212183352.22730-26-jean-philippe.brucker@arm.com>
+Message-ID: <20180212183352.22730-25-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook mm operations to support PASID and page table sharing with the
-SMMUv3:
-
-* mm_alloc allocates a context descriptor.
-* mm_free releases the context descriptor.
-* mm_attach checks device capabilities and writes the context descriptor.
-* mm_detach clears the context descriptor and sends required
-  invalidations.
-* mm_invalidate sends required invalidations.
+Aggregate all sanity-checks for sharing CPU page tables with the SMMU
+under a single ARM_SMMU_FEAT_SVA bit. For PCIe SVA, users also need to
+check FEAT_ATS and FEAT_PRI. For platform SVM, they will most likely have
+to check FEAT_STALLS.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/Kconfig       |   1 +
- drivers/iommu/arm-smmu-v3.c | 131 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 132 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 4b272925ee78..d434f7085dc2 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -353,6 +353,7 @@ config ARM_SMMU_V3
- 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
- 	depends on ARM64
- 	select IOMMU_API
-+	select IOMMU_SVA
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select ARM_SMMU_V3_CONTEXT
- 	select GENERIC_MSI_IRQ_DOMAIN
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 79bc5b5cceed..1cdeea7e22cb 100644
+index 98690589156b..79bc5b5cceed 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -29,6 +29,7 @@
- #include <linux/interrupt.h>
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
-+#include <linux/mmu_context.h>
- #include <linux/module.h>
- #include <linux/msi.h>
- #include <linux/of.h>
-@@ -37,6 +38,7 @@
- #include <linux/of_platform.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
-+#include <linux/sched/mm.h>
+@@ -570,6 +570,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_STALL_FORCE	(1 << 13)
+ #define ARM_SMMU_FEAT_E2H		(1 << 14)
+ #define ARM_SMMU_FEAT_BTM		(1 << 15)
++#define ARM_SMMU_FEAT_SVA		(1 << 16)
+ 	u32				features;
  
- #include <linux/amba/bus.h>
- 
-@@ -617,6 +619,7 @@ struct arm_smmu_master_data {
- 	struct device			*dev;
- 
- 	size_t				ssid_bits;
-+	bool				can_fault;
- };
- 
- /* SMMU private data for an IOMMU domain */
-@@ -645,6 +648,13 @@ struct arm_smmu_domain {
- 	spinlock_t			devices_lock;
- };
- 
-+struct arm_smmu_mm {
-+	struct io_mm			io_mm;
-+	struct iommu_pasid_entry	*cd;
-+	/* Only for release ! */
-+	struct iommu_pasid_table_ops	*ops;
-+};
-+
- struct arm_smmu_option_prop {
- 	u32 opt;
- 	const char *prop;
-@@ -671,6 +681,11 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
- 	return container_of(dom, struct arm_smmu_domain, domain);
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+@@ -2619,6 +2620,62 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+ 	return 0;
  }
  
-+static struct arm_smmu_mm *to_smmu_mm(struct io_mm *io_mm)
++static bool arm_smmu_supports_sva(struct arm_smmu_device *smmu)
 +{
-+	return container_of(io_mm, struct arm_smmu_mm, io_mm);
-+}
++	unsigned long reg, fld;
++	unsigned long oas;
++	unsigned long asid_bits;
 +
- static void parse_driver_options(struct arm_smmu_device *smmu)
- {
- 	int i = 0;
-@@ -1785,6 +1800,8 @@ static void arm_smmu_detach_dev(struct device *dev)
- 	struct arm_smmu_domain *smmu_domain = master->domain;
- 
- 	if (smmu_domain) {
-+		__iommu_sva_unbind_dev_all(dev);
++	u32 feat_mask = ARM_SMMU_FEAT_BTM | ARM_SMMU_FEAT_COHERENCY;
 +
- 		spin_lock_irqsave(&smmu_domain->devices_lock, flags);
- 		list_del(&master->list);
- 		spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
-@@ -1902,6 +1919,113 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
- 	return ops->iova_to_phys(ops, iova);
- }
- 
-+static int arm_smmu_sva_init(struct device *dev, unsigned long features,
-+			     unsigned int *min_pasid, unsigned int *max_pasid)
-+{
-+	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
++	if ((smmu->features & feat_mask) != feat_mask)
++		return false;
 +
-+	if (features & IOMMU_SVA_FEAT_IOPF && !master->can_fault)
-+		return -EINVAL;
++	if (!(smmu->pgsize_bitmap & PAGE_SIZE))
++		return false;
 +
-+	if (features & IOMMU_SVA_FEAT_PASID && !master->ssid_bits)
-+		return -EINVAL;
-+
-+	if (!*max_pasid)
-+		*max_pasid = 0xfffffU;
-+
-+	/* SSID support in the SMMU requires at least one SSID bit */
-+	*min_pasid = max(*min_pasid, 1U);
-+	*max_pasid = min(*max_pasid, (1U << master->ssid_bits) - 1);
-+
-+	return 0;
-+}
-+
-+static void arm_smmu_sva_shutdown(struct device *dev)
-+{
-+}
-+
-+static struct io_mm *arm_smmu_mm_alloc(struct iommu_domain *domain,
-+				       struct mm_struct *mm)
-+{
-+	struct arm_smmu_mm *smmu_mm;
-+	struct iommu_pasid_entry *cd;
-+	struct iommu_pasid_table_ops *ops;
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+
-+	if (smmu_domain->stage != ARM_SMMU_DOMAIN_S1)
-+		return NULL;
-+
-+	smmu_mm = kzalloc(sizeof(*smmu_mm), GFP_KERNEL);
-+	if (!smmu_mm)
-+		return NULL;
-+
-+	smmu_mm->ops = ops = smmu_domain->s1_cfg.ops;
-+	cd = ops->alloc_shared_entry(ops, mm);
-+	if (IS_ERR(cd)) {
-+		kfree(smmu_mm);
-+		return ERR_CAST(cd);
++	/*
++	 * Get the smallest PA size of all CPUs (sanitized by cpufeature). We're
++	 * not even pretending to support AArch32 here.
++	 */
++	reg = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	fld = cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR0_PARANGE_SHIFT);
++	switch (fld) {
++	case 0x0:
++		oas = 32;
++		break;
++	case 0x1:
++		oas = 36;
++		break;
++	case 0x2:
++		oas = 40;
++		break;
++	case 0x3:
++		oas = 42;
++		break;
++	case 0x4:
++		oas = 44;
++		break;
++	case 0x5:
++		oas = 48;
++		break;
++	default:
++		return false;
 +	}
 +
-+	smmu_mm->cd = cd;
-+	return &smmu_mm->io_mm;
++	/* abort if MMU outputs addresses greater than what we support. */
++	if (smmu->oas < oas)
++		return false;
++
++	/* We can support bigger ASIDs than the CPU, but not smaller */
++	fld = cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR0_ASID_SHIFT);
++	asid_bits = fld ? 16 : 8;
++	if (smmu->asid_bits < asid_bits)
++		return false;
++
++	return true;
 +}
 +
-+static void arm_smmu_mm_free(struct io_mm *io_mm)
-+{
-+	struct arm_smmu_mm *smmu_mm = to_smmu_mm(io_mm);
-+
-+	smmu_mm->ops->free_entry(smmu_mm->ops, smmu_mm->cd);
-+	kfree(smmu_mm);
-+}
-+
-+static int arm_smmu_mm_attach(struct iommu_domain *domain, struct device *dev,
-+			      struct io_mm *io_mm, bool attach_domain)
-+{
-+	struct arm_smmu_mm *smmu_mm = to_smmu_mm(io_mm);
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	struct iommu_pasid_table_ops *ops = smmu_domain->s1_cfg.ops;
-+	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
-+
-+	if (smmu_domain->stage != ARM_SMMU_DOMAIN_S1)
-+		return -EINVAL;
-+
-+	if (!(master->smmu->features & ARM_SMMU_FEAT_SVA))
-+		return -ENODEV;
-+
-+	/* TODO: io_mm->no_need_for_pri_ill_pin_everything */
-+	if (!master->can_fault)
-+		return -ENODEV;
-+
-+	if (!attach_domain)
-+		return 0;
-+
-+	return ops->set_entry(ops, io_mm->pasid, smmu_mm->cd);
-+}
-+
-+static void arm_smmu_mm_detach(struct iommu_domain *domain, struct device *dev,
-+			       struct io_mm *io_mm, bool detach_domain)
-+{
-+	struct arm_smmu_mm *smmu_mm = to_smmu_mm(io_mm);
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+	struct iommu_pasid_table_ops *ops = smmu_domain->s1_cfg.ops;
-+
-+	if (detach_domain)
-+		ops->clear_entry(ops, io_mm->pasid, smmu_mm->cd);
-+
-+	/* TODO: Invalidate ATC. */
-+	/* TODO: Invalidate all mappings if last and not DVM. */
-+}
-+
-+static void arm_smmu_mm_invalidate(struct iommu_domain *domain,
-+				   struct device *dev, struct io_mm *io_mm,
-+				   unsigned long iova, size_t size)
-+{
-+	/*
-+	 * TODO: Invalidate ATC.
-+	 * TODO: Invalidate mapping if not DVM
-+	 */
-+}
-+
- static struct platform_driver arm_smmu_driver;
+ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ {
+ 	u32 reg;
+@@ -2813,6 +2870,9 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
  
- static int arm_smmu_match_node(struct device *dev, void *data)
-@@ -2108,6 +2232,13 @@ static struct iommu_ops arm_smmu_ops = {
- 	.domain_alloc		= arm_smmu_domain_alloc,
- 	.domain_free		= arm_smmu_domain_free,
- 	.attach_dev		= arm_smmu_attach_dev,
-+	.sva_device_init	= arm_smmu_sva_init,
-+	.sva_device_shutdown	= arm_smmu_sva_shutdown,
-+	.mm_alloc		= arm_smmu_mm_alloc,
-+	.mm_free		= arm_smmu_mm_free,
-+	.mm_attach		= arm_smmu_mm_attach,
-+	.mm_detach		= arm_smmu_mm_detach,
-+	.mm_invalidate		= arm_smmu_mm_invalidate,
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.map_sg			= default_iommu_map_sg,
+ 	smmu->ias = max(smmu->ias, smmu->oas);
+ 
++	if (arm_smmu_supports_sva(smmu))
++		smmu->features |= ARM_SMMU_FEAT_SVA;
++
+ 	dev_info(smmu->dev, "ias %lu-bit, oas %lu-bit (features 0x%08x)\n",
+ 		 smmu->ias, smmu->oas, smmu->features);
+ 	return 0;
 -- 
 2.15.1
