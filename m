@@ -1,75 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 12 Feb 2018 12:27:36 +0000
-Subject: Applied "ASoC: stm32: spdifrx: fix typo in function name." to the
- asoc tree
-In-Reply-To: <1517417223-21899-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1elDCq-0002ne-BX@debutante>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Mon, 12 Feb 2018 13:35:28 +0100
+Subject: [PATCH 1/2] dt-bindings: phy: add support for STM32 USB PHY
+ Controller (USBPHYC)
+In-Reply-To: <1518438929-5254-1-git-send-email-amelie.delaunay@st.com>
+References: <1518438929-5254-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1518438929-5254-2-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+This patch adds the device tree bindings description for STM32 USBPHYC
+(USB PHY Controller).
 
-   ASoC: stm32: spdifrx: fix typo in function name.
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From b9aa4716281247960e009dd55c38bcc4c2e4cb94 Mon Sep 17 00:00:00 2001
-From: olivier moysan <olivier.moysan@st.com>
-Date: Wed, 31 Jan 2018 17:47:02 +0100
-Subject: [PATCH] ASoC: stm32: spdifrx: fix typo in function name.
-
-Fix function name prefix for naming consistency.
-
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- sound/soc/stm/stm32_spdifrx.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/phy/phy-stm32-usbphyc.txt  | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
 
-diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
-index b9bdefcd3e10..42ad2ae22d21 100644
---- a/sound/soc/stm/stm32_spdifrx.c
-+++ b/sound/soc/stm/stm32_spdifrx.c
-@@ -858,8 +858,8 @@ static const struct of_device_id stm32_spdifrx_ids[] = {
- 	{}
- };
- 
--static int stm_spdifrx_parse_of(struct platform_device *pdev,
--				struct stm32_spdifrx_data *spdifrx)
-+static int stm32_spdifrx_parse_of(struct platform_device *pdev,
-+				  struct stm32_spdifrx_data *spdifrx)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *of_id;
-@@ -914,7 +914,7 @@ static int stm32_spdifrx_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, spdifrx);
- 
--	ret = stm_spdifrx_parse_of(pdev, spdifrx);
-+	ret = stm32_spdifrx_parse_of(pdev, spdifrx);
- 	if (ret)
- 		return ret;
- 
+diff --git a/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+new file mode 100644
+index 0000000..1e65e0a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-stm32-usbphyc.txt
+@@ -0,0 +1,46 @@
++STMicroelectronics STM32 USB HS PHY controller
++
++The STM32 USBPHYC block contains a dual port High Speed UTMI+ PHY and a UTMI
++switch. It controls PHY configuration and status, and the UTMI+ switch that
++selects either OTG or HOST controller for the second PHY port. It also sets
++PLL configuration.
++
++USBPHYC
++  |_ PLL
++  |
++  |_ PHY port#1 _________________ HOST controller
++  |                                      |
++  |_ PHY port#2_______                   |
++  |                   |_                 |
++  |_ UTMI switch_____/ 1|________________|
++                    |   |________________
++                     \_0|                |
++		                  OTG controller
++
++Required properties:
++- compatible: must be "st,stm32mp1-usbphyc"
++- reg: address and length of the usb phy control register set
++- clocks: phandle + clock specifier for the PLL phy clock
++- phy-supply: from the generic phy bindings, phandle to the regulator
++  providing 3V3 power to the PHY, see phy-bindings.txt
++- vdda1v1-supply: phandle to the regulator providing 1V1 power to the PHY
++- vdda1v8-supply: phandle to the regulator providing 1V8 power to the PHY
++
++Optional properties:
++- assigned-clocks: phandle + clock specifier for the PLL phy clock
++- assigned-clock-parents: the PLL phy clock parent
++- resets: phandle + reset specifier
++- st,port2-switch-to-host: select HOST controller on UTMI switch for port#2
++
++
++Example:
++		usbphyc: usbphyc at 5a006000 {
++			compatible = "st,stm32mp1-usbphyc";
++			reg = <0x5a006000 0x1000>;
++			clocks = <&rcc_clk USBPHY_K>;
++			resets = <&rcc_rst USBPHY_R>;
++			st,port2-switch-to-host;
++			phy-supply = <&vdd_usb>;
++			vdda1v1-supply = <&reg11>;
++			vdda1v8-supply = <&reg18>
++		};
 -- 
-2.16.1
+2.7.4
