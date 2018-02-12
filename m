@@ -1,37 +1,51 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Mon, 12 Feb 2018 08:47:57 -0500
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <20180212133429.GC25314@hirez.programming.kicks-ass.net>
-References: <20180118150951.28964-1-prarit@redhat.com>
- <20180212133429.GC25314@hirez.programming.kicks-ass.net>
-Message-ID: <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Mon, 12 Feb 2018 22:52:37 +0900
+Subject: [PATCH] crypto: arm/aes-cipher - move S-box to .rodata section
+Message-ID: <20180212135237.GA3011@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Move the AES inverse S-box to the .rodata section
+where it is safe from abuse by speculation.
 
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/crypto/aes-cipher-core.S | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-On 02/12/2018 08:34 AM, Peter Zijlstra wrote:
-> On Thu, Jan 18, 2018 at 10:09:51AM -0500, Prarit Bhargava wrote:
->>  config ACPI_SPCR_TABLE
->> +	bool "ACPI Serial Port Console Redirection Support"
->> +	default y if X86
->> +	help
->> +	  Enable support for Serial Port Console Redirection (SPCR) Table.
->> +	  This table provides information about the configuration of the
->> +	  earlycon console.
-> 
-> I just got asked this by oldconfig, which left me rather puzzled, WTF
-> does this do?
-
-Odd -- I thought I had taken care of that :(  My apologies Peter.
-
-ACPI SPCR is used by a vendor to define the serial console for a system.  If
-SPCR exists a user can add kernel parameter "earlycon" (no extra kernel
-parameters) and the console will work out-of-the-box.
-
-The serial console configuration varies from vendor to vendor.  This takes the
-guess-work out of defining a serial console.
-
-P.
-
-> 
+diff --git a/arch/arm/crypto/aes-cipher-core.S b/arch/arm/crypto/aes-cipher-core.S
+index 54b3840..184d6c2 100644
+--- a/arch/arm/crypto/aes-cipher-core.S
++++ b/arch/arm/crypto/aes-cipher-core.S
+@@ -174,6 +174,16 @@
+ 	.ltorg
+ 	.endm
+ 
++ENTRY(__aes_arm_encrypt)
++	do_crypt	fround, crypto_ft_tab, crypto_ft_tab + 1, 2
++ENDPROC(__aes_arm_encrypt)
++
++	.align		5
++ENTRY(__aes_arm_decrypt)
++	do_crypt	iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
++ENDPROC(__aes_arm_decrypt)
++
++	.section	".rodata", "a"
+ 	.align		L1_CACHE_SHIFT
+ 	.type		__aes_arm_inverse_sbox, %object
+ __aes_arm_inverse_sbox:
+@@ -210,12 +220,3 @@ __aes_arm_inverse_sbox:
+ 	.byte		0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26
+ 	.byte		0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
+ 	.size		__aes_arm_inverse_sbox, . - __aes_arm_inverse_sbox
+-
+-ENTRY(__aes_arm_encrypt)
+-	do_crypt	fround, crypto_ft_tab, crypto_ft_tab + 1, 2
+-ENDPROC(__aes_arm_encrypt)
+-
+-	.align		5
+-ENTRY(__aes_arm_decrypt)
+-	do_crypt	iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
+-ENDPROC(__aes_arm_decrypt)
+-- 
+1.9.1
