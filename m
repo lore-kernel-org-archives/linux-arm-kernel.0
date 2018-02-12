@@ -1,98 +1,63 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Sun, 11 Feb 2018 23:26:51 +0000
-Subject: [linux-sunxi] [PATCH v2 6/6] arm64: allwinner: h6: add support
- for Pine H64 board
-In-Reply-To: <20180203154942.63566-7-icenowy@aosc.io>
-References: <20180203154942.63566-1-icenowy@aosc.io>
- <20180203154942.63566-7-icenowy@aosc.io>
-Message-ID: <3705fc05-f1ec-a6ee-d204-d1f8f0916069@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 11 Feb 2018 17:10:51 -0800
+Subject: [v3, 1/7] watchdog: sama5d4: make use of timeout-secs provided
+ in devicetree
+In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+Message-ID: <20180212011051.GA4673@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 03/02/18 15:49, Icenowy Zheng wrote:
-> Pine H64 is an Allwinner H6-based SBC from Pine64, with the following
-> features:
+On Sun, Feb 11, 2018 at 09:08:41PM +0100, Marcus Folkesson wrote:
+> watchdog_init_timeout() will allways pick timeout_param since it
+> defaults to a valid timeout.
 > 
-> - 1GiB/2GiB/4GiB LPDDR3 DRAM (in 4GiB situation only 3GiB is
-> accessible)
-> - AXP805 PMIC
-> - Raspberry-Pi-compatible GPIO header, "Euler" GPIO header (not
-> compatible with the "Euler" on Pine A64) and "Expansion" pin header
-> - 2 USB 2.0 ports and 1 USB 3.0 ports
-> - Audio jack
-> - MicroSD slot and eMMC module slot
-> - on-board SPI NOR flash
-> - 1Gbps Ethernet port (via RTL8211E PHY)
-> - HDMI port
+> Following best practice described in
+> Documentation/watchdog/watchdog-kernel-api.txt to make use of
+> the parameter logic.
 > 
-> Adds initial support for it, including the UART on the Expansion pin
-> header.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
 
-I booted this to the point where the kernel complained about the missing
-rootfs, also with an initrd to the prompt. So:
-
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-Tested-by: Andre Przywara <andre.przywara@arm.com>
-
-Thanks!
-Andre.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
 > ---
-> Changes in v2:
-> - Switch to SPDX license identifier.
 > 
->  arch/arm64/boot/dts/allwinner/Makefile             |  1 +
->  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 30 ++++++++++++++++++++++
->  2 files changed, 31 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> Notes:
+>     v3:
+>     	- Use wdd->timeout instead of wdt_timeout when print out
+>     	  timout in probe function.
 > 
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index f505227b0250..addf245226f6 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -10,3 +10,4 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-pine-h64.dtb
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> new file mode 100644
-> index 000000000000..dc850a1c0885
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Copyright (c) 2017 Icenowy Zheng <icenowy@aosc.io>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ or MIT)
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-h6.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "Pine H64";
-> +	compatible = "pine64,pine-h64", "allwinner,sun50i-h6";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_ph_pins>;
-> +	status = "okay";
-> +};
+>  drivers/watchdog/sama5d4_wdt.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index 0ae947c3d7bc..255169916dbb 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -33,7 +33,7 @@ struct sama5d4_wdt {
+>  	unsigned long		last_ping;
+>  };
+>  
+> -static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+> +static int wdt_timeout;
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  
+>  module_param(wdt_timeout, int, 0);
+> @@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	wdd = &wdt->wdd;
+> -	wdd->timeout = wdt_timeout;
+> +	wdd->timeout = WDT_DEFAULT_TIMEOUT;
+>  	wdd->info = &sama5d4_wdt_info;
+>  	wdd->ops = &sama5d4_wdt_ops;
+>  	wdd->min_timeout = MIN_WDT_TIMEOUT;
+> @@ -273,7 +273,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, wdt);
+>  
+>  	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
+> -		 wdt_timeout, nowayout);
+> +		 wdd->timeout, nowayout);
+>  
+>  	return 0;
+>  }
