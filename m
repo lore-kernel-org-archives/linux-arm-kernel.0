@@ -1,86 +1,58 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 11 Feb 2018 17:11:58 -0800
-Subject: [v3, 7/7] watchdog: coh901327: make use of timeout-secs provided
- in devicetree
-In-Reply-To: <20180211200847.25000-7-marcus.folkesson@gmail.com>
-References: <20180211200847.25000-7-marcus.folkesson@gmail.com>
-Message-ID: <20180212011158.GA4778@roeck-us.net>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun, 11 Feb 2018 19:16:15 -0600
+Subject: [PATCH] arm64: Add missing Falkor part number for branch predictor
+ hardening
+Message-ID: <1518398175-28378-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 11, 2018 at 09:08:47PM +0100, Marcus Folkesson wrote:
-> watchdog_init_timeout() will allways pick timeout_param since it
-> defaults to a valid timeout.
-> 
-> Following best practice described in
-> Documentation/watchdog/watchdog-kernel-api.txt to make use of
-> the parameter logic.
-> 
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+References to CPU part number MIDR_QCOM_FALKOR were dropped from the
+mailing list patch due to mainline/arm64 branch dependency. So this
+patch adds the missing part number.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Fixes: ec82b567a74f ("arm64: Implement branch predictor hardening for Falkor")
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ arch/arm64/kernel/cpu_errata.c | 9 +++++++++
+ arch/arm64/kvm/hyp/switch.c    | 4 +++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-> ---
-> 
-> Notes:
->     v3:
->     	- Reformat and use coh901327_wdt.timeout instead of margin when print out
->     	  timout in probe function.
->     
->     v2:
->     	- Set .timeout in coh901327_wdt structure declaration.
->     	- Set .min_timeout to 1 instead of 0. I could not find a datasheet
->     	  for coh901327, so I'm not sure if 0 is valid. However, 0 seems
->     	  wrong to me and most driver has 1 as min value. If it should
->     	  be 0, please let me know and I have to set another initial
->     	  value for margin.
-> 
->  drivers/watchdog/coh901327_wdt.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-> index 4410337f4f7f..500af8a7ec5a 100644
-> --- a/drivers/watchdog/coh901327_wdt.c
-> +++ b/drivers/watchdog/coh901327_wdt.c
-> @@ -67,7 +67,9 @@
->  #define U300_WDOG_IFR_WILL_BARK_IRQ_FORCE_ENABLE			0x0001U
->  
->  /* Default timeout in seconds = 1 minute */
-> -static unsigned int margin = 60;
-> +#define U300_WDOG_DEFAULT_TIMEOUT					60
-> +
-> +static unsigned int margin;
->  static int irq;
->  static void __iomem *virtbase;
->  static struct device *parent;
-> @@ -235,8 +237,9 @@ static struct watchdog_device coh901327_wdt = {
->  	 * timeout register is max
->  	 * 0x7FFF = 327670ms ~= 327s.
->  	 */
-> -	.min_timeout = 0,
-> +	.min_timeout = 1,
->  	.max_timeout = 327,
-> +	.timeout = U300_WDOG_DEFAULT_TIMEOUT,
->  };
->  
->  static int __exit coh901327_remove(struct platform_device *pdev)
-> @@ -315,16 +318,15 @@ static int __init coh901327_probe(struct platform_device *pdev)
->  		goto out_no_irq;
->  	}
->  
-> -	ret = watchdog_init_timeout(&coh901327_wdt, margin, dev);
-> -	if (ret < 0)
-> -		coh901327_wdt.timeout = 60;
-> +	watchdog_init_timeout(&coh901327_wdt, margin, dev);
->  
->  	coh901327_wdt.parent = dev;
->  	ret = watchdog_register_device(&coh901327_wdt);
->  	if (ret)
->  		goto out_no_wdog;
->  
-> -	dev_info(dev, "initialized. timer margin=%d sec\n", margin);
-> +	dev_info(dev, "initialized. (timeout=%d sec)\n",
-> +			coh901327_wdt.timeout);
->  	return 0;
->  
->  out_no_wdog:
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 0782359..52f15cd 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -408,6 +408,15 @@ static int qcom_enable_link_stack_sanitization(void *data)
+ 	},
+ 	{
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
++		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
++		.enable = qcom_enable_link_stack_sanitization,
++	},
++	{
++		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
++		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
++	},
++	{
++		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+ 		.enable = enable_smccc_arch_workaround_1,
+ 	},
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 116252a8..870f4b1 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -407,8 +407,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 		u32 midr = read_cpuid_id();
+ 
+ 		/* Apply BTAC predictors mitigation to all Falkor chips */
+-		if ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)
++		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
++		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
+ 			__qcom_hyp_sanitize_btac_predictors();
++		}
+ 	}
+ 
+ 	fp_enabled = __fpsimd_enabled();
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
