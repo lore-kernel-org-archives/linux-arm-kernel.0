@@ -1,53 +1,66 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 12 Feb 2018 16:21:58 +0100
-Subject: [PATCH] ARM: dts: imx6: remove GPU subsystem nodes
-Message-ID: <20180212152158.11823-1-l.stach@pengutronix.de>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Mon, 12 Feb 2018 09:22:55 -0600
+Subject: [PATCH v2 10/12] ARM: dts: STi: Add fake reg property for clocks
+In-Reply-To: <1518446590-16800-11-git-send-email-patrice.chotard@st.com>
+References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
+ <1518446590-16800-11-git-send-email-patrice.chotard@st.com>
+Message-ID: <CABGGisxgejFHj0xQq-aBQETt9CX3OzLc3ER_Y9nyrw7FeLdt6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They aren't needed by the etnaviv driver anymore and have been removed
-from the binding.
+On Mon, Feb 12, 2018 at 8:43 AM,  <patrice.chotard@st.com> wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> For all clock's element inside SoC, add a fake reg property,
+> this allows to fix the following warnings when compiling
+> dtb with W=1 option :
+>
+> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+>
+> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+>
+> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>
+> v2: _ add a fake reg property to node without reg property.
+>
+>  arch/arm/boot/dts/stih407-clock.dtsi | 9 ++++++---
+>  arch/arm/boot/dts/stih410-clock.dtsi | 9 ++++++---
+>  arch/arm/boot/dts/stih418-clock.dtsi | 9 ++++++---
+>  3 files changed, 18 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+> index b882dcf3a649..1bba47e06ebe 100644
+> --- a/arch/arm/boot/dts/stih407-clock.dtsi
+> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
+> @@ -24,9 +24,10 @@
+>                 /*
+>                  * ARM Peripheral clock for timers
+>                  */
+> -               arm_periph_clk: clk-m-a9-periphs {
+> +               arm_periph_clk: clk-m-a9-periphs at 0 {
+>                         #clock-cells = <0>;
+>                         compatible = "fixed-factor-clock";
+> +                       reg = <0 0>;
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-This patch is aimed at the 4.17 merge window, as this is when the
-etnaviv change will land.
----
- arch/arm/boot/dts/imx6dl.dtsi | 5 -----
- arch/arm/boot/dts/imx6q.dtsi  | 5 -----
- 2 files changed, 10 deletions(-)
+Don't do this. The correct fix is change the location of these nodes
+to be under whatever controls them.
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index c01674fa098a..25833724484e 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -109,11 +109,6 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>;
- 	};
--
--	gpu-subsystem {
--		compatible = "fsl,imx-gpu-subsystem";
--		cores = <&gpu_2d>, <&gpu_3d>;
--	};
- };
- 
- &gpio1 {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index bc581aa5cf17..ae7b3f107893 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -215,11 +215,6 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
- 	};
--
--	gpu-subsystem {
--		compatible = "fsl,imx-gpu-subsystem";
--		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
--	};
- };
- 
- &gpio1 {
--- 
-2.15.1
+Rob
