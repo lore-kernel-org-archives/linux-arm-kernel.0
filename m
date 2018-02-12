@@ -1,70 +1,53 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 12 Feb 2018 16:57:52 +0100
-Subject: [PATCH v2] ARM: dts: imx6: remove GPU subsystem nodes
-Message-ID: <20180212155752.11301-1-l.stach@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Feb 2018 16:00:39 +0000
+Subject: [PATCHv2 05/12] arm64: Don't trap host pointer auth use to EL2
+In-Reply-To: <20180206123906.GZ21802@cbox>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+ <20171127163806.31435-6-mark.rutland@arm.com>
+ <20180206123906.GZ21802@cbox>
+Message-ID: <20180212160039.br2emy3zt6ftmwfu@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They aren't needed by the etnaviv driver anymore and have been removed
-from the binding.
+On Tue, Feb 06, 2018 at 01:39:06PM +0100, Christoffer Dall wrote:
+> Hi Mark,
+> 
+> On Mon, Nov 27, 2017 at 04:37:59PM +0000, Mark Rutland wrote:
+> > To allow EL0 (and/or EL1) to use pointer authentication functionality,
+> > we must ensure that pointer authentication instructions and accesses to
+> > pointer authentication keys are not trapped to EL2 (where we will not be
+> > able to handle them).
+> 
+> ...on non-VHE systems, presumably?
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-This patch is aimed at the 4.17 merge window, as this is when the
-etnaviv change will land.
+For EL0 usage, we don't want to trap even in the absence of VHE, so I'll
+drop the bit in brackets entirely.
 
-v2: Also remove in imx6sx DT
----
- arch/arm/boot/dts/imx6dl.dtsi | 5 -----
- arch/arm/boot/dts/imx6q.dtsi  | 5 -----
- arch/arm/boot/dts/imx6sx.dtsi | 5 -----
- 3 files changed, 15 deletions(-)
+> > This patch ensures that HCR_EL2 is configured appropriately when the
+> > kernel is booted at EL2. For non-VHE kernels we set HCR_EL2.{API,APK},
+> > ensuring that EL1 can access keys and permit EL0 use of instructions.
+> > For VHE kernels, EL2 access is controlled by EL3, and we need not set
+> > anything.
+> 
+> 
+> for VHE kernels host EL0 (TGE && E2H) is unaffected by these settings,
+> and it doesn't matter how we configure HCR_EL2.{API,APK}.
+> 
+> (Because you do actually set these bits when the features are present if
+> I read the code correctly).
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index c01674fa098a..25833724484e 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -109,11 +109,6 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>;
- 	};
--
--	gpu-subsystem {
--		compatible = "fsl,imx-gpu-subsystem";
--		cores = <&gpu_2d>, <&gpu_3d>;
--	};
- };
- 
- &gpio1 {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index bc581aa5cf17..ae7b3f107893 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -215,11 +215,6 @@
- 		compatible = "fsl,imx-display-subsystem";
- 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
- 	};
--
--	gpu-subsystem {
--		compatible = "fsl,imx-gpu-subsystem";
--		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
--	};
- };
- 
- &gpio1 {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index fd7879342d0d..108275d4c079 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -1355,9 +1355,4 @@
- 			status = "disabled";
- 		};
- 	};
--
--	gpu-subsystem {
--		compatible = "fsl,imx-gpu-subsystem";
--		cores = <&gpu>;
--	};
- };
--- 
-2.15.1
+Ah, true. I've taken your proposed wording.
+
+> > This does not enable support for KVM guests, since KVM manages HCR_EL2
+> > itself.
+> 
+>         (...when running VMs.)
+> 
+> 
+> Besides the nits:
+> 
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Cheers!
+
+Mark.
