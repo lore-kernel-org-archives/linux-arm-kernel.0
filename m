@@ -1,24 +1,43 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 12 Feb 2018 09:10:29 -0600
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <7bd5897f-d6da-7e29-29c4-aa26d24f6355@redhat.com>
-References: <20180118150951.28964-1-prarit@redhat.com>
- <20180212133429.GC25314@hirez.programming.kicks-ass.net>
- <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
- <953565bd-436b-c1fe-d3c5-cde731dee83d@codeaurora.org>
- <7bd5897f-d6da-7e29-29c4-aa26d24f6355@redhat.com>
-Message-ID: <50309183-d8e4-aa24-f37d-596e4334f50e@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 12 Feb 2018 16:12:02 +0100
+Subject: [PATCH 0/4] ARM: dts: r7s72100: add soc node
+In-Reply-To: <20180212143930.4763-1-horms+renesas@verge.net.au>
+References: <20180212143930.4763-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXbpRGmUCcfND2h4=g0v5Cj9L=VYZGVLntjbBgsN4Q4HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/18 8:49 AM, Prarit Bhargava wrote:
-> That's true on ARM64.  I specifically did not enable the console by default on
-> x86.  There are users who do not want a console active during boot & runtime.
+Hi Simon,
 
-Hmmmm... That's a good point.  On ARM systems with SPCR, you get a 
-console whether you like it or not.
+On Mon, Feb 12, 2018 at 3:39 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> this patchset adds an soc node, moves all nodes for IP blocks with an
+> address on the bus to be sub nodes of the soc node, removes the clock node
+> and sorts subnodes of the root and soc nodes.
+>
+> This brings the DTS of the r7s72100 in line with that of R-Car Gen 2 SoCs.
+>
+> Simon Horman (4):
+>   ARM: dts: r7s72100: add soc node
+>   ARM: dts: r7s72100: sort subnodes of soc node
+>   ARM: dts: r7s72100: stop grouping clocks under a "clocks" subnode
+>   ARM: dts: r7s72100: sort subnodes of root node
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks!
+
+>  arch/arm/boot/dts/r7s72100.dtsi | 1038 ++++++++++++++++++++-------------------
+>  1 file changed, 521 insertions(+), 517 deletions(-)
+
+For the whole series, with a bit of help from dtx_diff:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
