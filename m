@@ -1,56 +1,47 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 12 Feb 2018 11:18:33 +0100
-Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
- i.MX6UL/ULL
-In-Reply-To: <20180118235836.17393-1-stefan@agner.ch>
-References: <20180118235836.17393-1-stefan@agner.ch>
-Message-ID: <CAJZ5v0jGCzb3q5q6QxZWK7kTKHj66oHvdq=VKVXJ3TeDW_EmEA@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 12 Feb 2018 11:20:42 +0100
+Subject: [PATCH v3 5/7] mtd: nand: use Marvell reworked NAND controller
+ driver with all platforms
+In-Reply-To: <20180109103637.23798-6-miquel.raynal@free-electrons.com>
+References: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
+ <20180109103637.23798-6-miquel.raynal@free-electrons.com>
+Message-ID: <20180212112042.5b3f758f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 19, 2018 at 12:58 AM, Stefan Agner <stefan@agner.ch> wrote:
-> Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
-> Use PLL1 sys clock for all operating points higher than 528MHz.
->
-> Note: For higher operating points VDD_SOC_IN needs to be 125mV
-> higher than the ARM set-point (see datasheet). Specifically, the
-> i.MX6UL/ULL EVK boards have an external DC regulator which needs
-> adjustment. The regulator adjustment is not covered with this
-> change.
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+On Tue,  9 Jan 2018 11:36:35 +0100
+Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-Can you please rebase this on top of 4.16-rc1?  It doesn't apply for me as is.
-
+> Actually remove pxa3xx_nand.c to let marvell_nand.c be compiled instead.
+> Also change the defconfig files using it as well as some board files
+> depending on CONFIG_MTD_NAND_PXA3xx.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 > ---
->  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 628fe899cb48..840f6386c780 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->                  */
->                 clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->                 clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> -               if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> -                       clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> -               else
-> -                       clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> -               clk_set_parent(step_clk, secondary_sel_clk);
-> -               clk_set_parent(pll1_sw_clk, step_clk);
-> +               if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
-> +                       if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> +                               clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> +                       else
-> +                               clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> +                       clk_set_parent(step_clk, secondary_sel_clk);
-> +                       clk_set_parent(pll1_sw_clk, step_clk);
-> +               }
->         } else {
->                 clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->                 clk_set_parent(pll1_sw_clk, step_clk);
-> --
-> 2.15.1
->
+>  arch/arm/configs/cm_x300_defconfig  |    2 +-
+>  arch/arm/configs/pxa3xx_defconfig   |    3 +-
+>  arch/arm/configs/pxa_defconfig      |    2 +-
+>  arch/arm/configs/raumfeld_defconfig |    2 +-
+>  arch/arm/mach-mmp/ttc_dkb.c         |    4 +-
+>  arch/arm/mach-pxa/cm-x300.c         |    2 +-
+>  arch/arm/mach-pxa/colibri-pxa3xx.c  |    2 +-
+>  arch/arm/mach-pxa/colibri.h         |    2 +-
+>  arch/arm/mach-pxa/littleton.c       |    4 +-
+>  arch/arm/mach-pxa/mxm8x10.c         |    4 +-
+>  arch/arm/mach-pxa/zylonite.c        |    4 +-
+>  drivers/mtd/nand/Kconfig            |   11 -
+>  drivers/mtd/nand/Makefile           |    1 -
+>  drivers/mtd/nand/pxa3xx_nand.c      | 2104 -----------------------------------
+
+Can you please split this patch in 2, one that patches defconfig and
+board files to use the new driver and one that actually removes the old
+driver.
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
