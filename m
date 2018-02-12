@@ -1,73 +1,38 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Mon, 12 Feb 2018 13:39:44 +0100
-Subject: [PATCHv4 1/2] ARM: imx53: add secure-reg-access support for PMU
-In-Reply-To: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
-References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
-Message-ID: <20180212123945.15732-2-sebastian.reichel@collabora.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Feb 2018 13:40:19 +0100
+Subject: [PATCH] drm/pl111: Fix regression from fbdev CMA helper
+Message-ID: <20180212124019.25268-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX53 it is necessary to set the DBG_EN bit in the
-platform GPC register to enable access to PMU counters
-other than the cycle counter.
+Commit d18df744de1a ("drm/pl111: Use drm_fb_cma_fbdev_init/fini()")
+refactored the driver to use fbdev handling in the core, but
+mistakedly limited the number of maximum connections to 0.
 
-Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Predictably, zero possible connections also gives zero
+framebuffers when using the system. So let's bump it to 1 so
+we get our framebuffer back.
+
+Cc: Noralf Tr?nnes <noralf@tronnes.org>
+Cc: Eric Anholt <eric@anholt.net>
+Fixes: d18df744de1a ("drm/pl111: Use drm_fb_cma_fbdev_init/fini()")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-imx/mach-imx53.c | 39 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/pl111/pl111_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index 07c2e8dca494..658e28604dca 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -28,10 +28,47 @@ static void __init imx53_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX53);
- }
+diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
+index acb738c69873..306ac7cabd90 100644
+--- a/drivers/gpu/drm/pl111/pl111_drv.c
++++ b/drivers/gpu/drm/pl111/pl111_drv.c
+@@ -138,7 +138,7 @@ static int pl111_modeset_init(struct drm_device *dev)
  
-+#define MXC_CORTEXA8_PLAT_GPC 0x63fa0004
-+#define GPC_DBG_EN BIT(16)
-+
-+/*
-+ * This enables the DBGEN bit in ARM_GPC register, which is
-+ * required for accessing some performance counter features.
-+ * Technically it is only required while perf is used, but to
-+ * keep the source code simple we just enable it all the time
-+ * when the kernel configuration allows using the feature.
-+ */
-+static void imx53_pmu_init(void)
-+{
-+	void __iomem *gpc_reg;
-+	struct device_node *node;
-+	u32 gpc;
-+
-+	if (!IS_ENABLED(CONFIG_ARM_PMU))
-+		return;
-+
-+	node = of_find_compatible_node(NULL, NULL, "arm,cortex-a8-pmu");
-+	if (!node)
-+		return;
-+
-+	if (!of_property_read_bool(node, "secure-reg-access"))
-+		return;
-+
-+	gpc_reg = ioremap(MXC_CORTEXA8_PLAT_GPC, 4);
-+	if (!gpc_reg) {
-+		pr_warning("unable to map GPC to enable perf\n");
-+		return;
-+	}
-+
-+	gpc = readl_relaxed(gpc_reg);
-+	gpc |= GPC_DBG_EN;
-+	writel_relaxed(gpc, gpc_reg);
-+}
-+
- static void __init imx53_dt_init(void)
- {
- 	imx_src_init();
--
-+	imx53_pmu_init();
- 	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
- }
+ 	drm_mode_config_reset(dev);
+ 
+-	drm_fb_cma_fbdev_init(dev, 32, 0);
++	drm_fb_cma_fbdev_init(dev, 32, 1);
+ 
+ 	drm_kms_helper_poll_init(dev);
  
 -- 
-2.15.1
+2.14.3
