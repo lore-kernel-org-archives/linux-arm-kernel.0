@@ -1,40 +1,47 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 12 Feb 2018 19:28:48 +0800
-Subject: [PATCH v3 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD device
+Date: Mon, 12 Feb 2018 19:28:47 +0800
+Subject: [PATCH v3 1/5] clk: mediatek: update missing clock data for MT7622
+ audsys
 In-Reply-To: <cover.1518424204.git.ryder.lee@mediatek.com>
 References: <cover.1518424204.git.ryder.lee@mediatek.com>
-Message-ID: <f8e87179bd7700130e294393592719fac8590c59.1518424204.git.ryder.lee@mediatek.com>
+Message-ID: <ee93f496edb238935940233d88f5548940b53b6a.1518424204.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the new MFD device is in place, switch probing method to adapt it.
+Add missing clock data 'CLK_AUDIO_AFE_CONN' for MT7622 audsys.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/mediatek/clk-mt7622-aud.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/clk/mediatek/clk-mt7622-aud.c  | 1 +
+ include/dt-bindings/clock/mt7622-clk.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
-index 13f752d..68c52a9 100644
+index fad7d9f..13f752d 100644
 --- a/drivers/clk/mediatek/clk-mt7622-aud.c
 +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
-@@ -142,11 +142,16 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
- {
- 	struct clk_onecell_data *clk_data;
- 	struct device_node *node = pdev->dev.of_node;
-+	struct device_node *pnode = pdev->dev.parent->of_node;
- 	int r;
+@@ -106,6 +106,7 @@
+ 	GATE_AUDIO1(CLK_AUDIO_INTDIR, "audio_intdir", "intdir_sel", 20),
+ 	GATE_AUDIO1(CLK_AUDIO_A1SYS, "audio_a1sys", "a1sys_hp_sel", 21),
+ 	GATE_AUDIO1(CLK_AUDIO_A2SYS, "audio_a2sys", "a2sys_hp_sel", 22),
++	GATE_AUDIO1(CLK_AUDIO_AFE_CONN, "audio_afe_conn", "a1sys_hp_sel", 23),
+ 	/* AUDIO2 */
+ 	GATE_AUDIO2(CLK_AUDIO_UL1, "audio_ul1", "a1sys_hp_sel", 0),
+ 	GATE_AUDIO2(CLK_AUDIO_UL2, "audio_ul2", "a1sys_hp_sel", 1),
+diff --git a/include/dt-bindings/clock/mt7622-clk.h b/include/dt-bindings/clock/mt7622-clk.h
+index 3e514ed..e9d77f0 100644
+--- a/include/dt-bindings/clock/mt7622-clk.h
++++ b/include/dt-bindings/clock/mt7622-clk.h
+@@ -235,7 +235,8 @@
+ #define CLK_AUDIO_MEM_ASRC3		43
+ #define CLK_AUDIO_MEM_ASRC4		44
+ #define CLK_AUDIO_MEM_ASRC5		45
+-#define CLK_AUDIO_NR_CLK		46
++#define CLK_AUDIO_AFE_CONN		46
++#define CLK_AUDIO_NR_CLK		47
  
- 	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
+ /* SSUSBSYS */
  
--	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
-+	/* Check if called from MFD */
-+	if (!pnode)
-+		pnode = node;
-+
-+	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
- 			       clk_data);
- 
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 -- 
 1.9.1
