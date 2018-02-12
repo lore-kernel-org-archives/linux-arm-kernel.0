@@ -1,67 +1,126 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Feb 2018 16:29:46 -0600
-Subject: [PATCH 2/3] Documentation: bindings: add usb3-host-disable and
- usb3-host-port for Rockchip USB Type-C PHY
-In-Reply-To: <20180212212643.GA37044@ban.mtv.corp.google.com>
-References: <20180208152028.9997-1-enric.balletbo@collabora.com>
- <20180208152028.9997-2-enric.balletbo@collabora.com>
- <CABGGisyaqV5HtTUL5LdjH3ZcU3_RTPmzMvEAhv5wZjCD_XCujg@mail.gmail.com>
- <CAFqH_53-iN9m=U+WdQh6_rKyxE5c9RUQO9qD1QaY0QePM_pOZA@mail.gmail.com>
- <CAL_JsqLvkPEm1mZaEfEVFEYMoGvOsbSQb8c35UvjmRTCwrCF8Q@mail.gmail.com>
- <20180212212643.GA37044@ban.mtv.corp.google.com>
-Message-ID: <CAL_Jsq+iqc8SB-=8mRbsvBg6XB+hjUcRrbEtUhDWiXVNZetcrA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Feb 2018 23:35:02 +0100
+Subject: [PATCH] ARM: defconfig: Update Gemini defconfig
+Message-ID: <20180212223502.27371-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 3:26 PM, Brian Norris <briannorris@chromium.org> wrote:
-> Hi,
->
-> On Mon, Feb 12, 2018 at 10:43:41AM -0600, Rob Herring wrote:
->> On Thu, Feb 8, 2018 at 3:23 PM, Enric Balletbo Serra
->> <eballetbo@gmail.com> wrote:
->> > 2018-02-08 18:52 GMT+01:00 Rob Herring <robh@kernel.org>:
->> >> On Thu, Feb 8, 2018 at 9:20 AM, Enric Balletbo i Serra
->> >> <enric.balletbo@collabora.com> wrote:
->> >>> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> >>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
->> >>> @@ -36,6 +36,12 @@ offset, enable bit, write mask bit.
->> >>>   - rockchip,uphy-dp-sel : the register of type-c phy enable DP function
->> >>>     for type-c phy0, it must be <0x6268 19 19>;
->> >>>     for type-c phy1, it must be <0x6268 3 19>;
->> >>> + - rockchip,usb3-host-disable : the register of type-c phy disable usb3 host
->> >>> +   for type-c phy0, it must be <0x2434 0 16>;
->> >>> +   for type-c phy1, it must be <0x2444 0 16>;
->> >>> + - rockchip,usb3-host-port : the register of type-c phy usb3 port number
->> >>> +   for type-c phy0, it must be <0x2434 12 28>;
->> >>> +   for type-c phy1, it must be <0x2444 12 28>;
->> >>
->> >> When does this list stop? Adding properties for various register
->> >> fields doesn't scale. This information should be in the driver and
->> >> based on the compatible string if necessary.
->> >>
->> >
->> > I see, seams reasonable to me, is this applicable to the new ones only
->> > or I should get rid of all the proprieties like this from the DT
->> > (including the old ones)?
->>
->> We're already kind of stuck with the existing ones. So it depends if
->> people want to phase them out or not.
->
-> FWIW, any Chrome{device} using these sort of bindings is perfectly
-> capable of handling changed bindings (we ship DTBs with the kernel). But
-> that's not typically how mainline covers binding deprecation.
+This updates the Gemini defconfig with a config that will bring
+up most of the recently merged and updated devices to some
+functional level:
 
-If it's CrOS only that's using these, then it's really up to you all.
-I guess it depends if many folks are trying to run mainline on CrOS
-devices and don't necessarily keep things in sync.
+- We enable high resolution timers (the right thing to do)
+- Enable CMA for the framebuffer, and the new TVE200
+  framebuffer driver and the Ilitek ILI9322 driver for
+  graphics on the D-Link DIR-685.
+- Enable networking and the new Cortina Gemini ethernet
+  driver.
+- Enable MDIO over GPIO and the Realtek PHY devices used on
+  several of these systems.
+- Enable some basic RT2x Wirelss configuration, as many of
+  these devides have these wireless cards. (Explicitly disable
+  the rest for now.)
+- Enable I2C over GPIO and SPI over GPIO which is used on
+  several of these devices.
+- Enable the Thermal framework, GPIO fan control and LM75 sensor
+  adding cooling on the D-Link DNS-313 with no userspace
+  involved even if only the kernel is working, rock solid
+  thermal for this platform.
 
-> If we're going to start recommending not putting these offsets in the
-> DT, I'd vote for deprecating them, for consistency. (Otherwise, we'll
-> keep running into this same question.) We only documented the RK3399
-> ("rockchip,rk3399-typec-phy") binding, so all users should have the same
-> offsets. I dunno if/how we pick a time for eventually removing the
-> bindings entirely.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this for fixes.
+---
+ arch/arm/configs/gemini_defconfig | 48 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 46 insertions(+), 2 deletions(-)
 
-Yes, makes sense.
-
-Rob
+diff --git a/arch/arm/configs/gemini_defconfig b/arch/arm/configs/gemini_defconfig
+index 2a63fa10c813..7fb96a26dd12 100644
+--- a/arch/arm/configs/gemini_defconfig
++++ b/arch/arm/configs/gemini_defconfig
+@@ -1,6 +1,7 @@
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BSD_PROCESS_ACCT=y
+ CONFIG_USER_NS=y
+ CONFIG_RELAY=y
+@@ -12,10 +13,18 @@ CONFIG_ARCH_GEMINI=y
+ CONFIG_PCI=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
++CONFIG_CMA=y
+ CONFIG_CMDLINE="console=ttyS0,115200n8"
+ CONFIG_KEXEC=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_NET_DSA=y
++CONFIG_CFG80211=y
++CONFIG_CFG80211_WEXT=y
++CONFIG_MAC80211=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_MTD=y
+@@ -33,6 +42,29 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_ATA=y
+ CONFIG_PATA_FTIDE010=y
++CONFIG_NETDEVICES=y
++CONFIG_GEMINI_ETHERNET=y
++CONFIG_MDIO_BITBANG=y
++CONFIG_MDIO_GPIO=y
++CONFIG_REALTEK_PHY=y
++# CONFIG_USB_NET_DRIVERS is not set
++# CONFIG_WLAN_VENDOR_ADMTEK is not set
++# CONFIG_WLAN_VENDOR_ATH is not set
++# CONFIG_WLAN_VENDOR_ATMEL is not set
++# CONFIG_WLAN_VENDOR_BROADCOM is not set
++# CONFIG_WLAN_VENDOR_CISCO is not set
++# CONFIG_WLAN_VENDOR_INTEL is not set
++# CONFIG_WLAN_VENDOR_INTERSIL is not set
++# CONFIG_WLAN_VENDOR_MARVELL is not set
++# CONFIG_WLAN_VENDOR_MEDIATEK is not set
++CONFIG_RT2X00=y
++CONFIG_RT61PCI=y
++CONFIG_RT2800PCI=y
++# CONFIG_WLAN_VENDOR_REALTEK is not set
++# CONFIG_WLAN_VENDOR_RSI is not set
++# CONFIG_WLAN_VENDOR_ST is not set
++# CONFIG_WLAN_VENDOR_TI is not set
++# CONFIG_WLAN_VENDOR_ZYDAS is not set
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+@@ -43,12 +75,24 @@ CONFIG_SERIAL_8250_NR_UARTS=1
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=1
+ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+-# CONFIG_HWMON is not set
++CONFIG_I2C_GPIO=y
++CONFIG_SPI=y
++CONFIG_SPI_GPIO=y
++CONFIG_SENSORS_GPIO_FAN=y
++CONFIG_SENSORS_LM75=y
++CONFIG_THERMAL=y
+ CONFIG_WATCHDOG=y
+-CONFIG_GEMINI_WATCHDOG=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_DRM=y
++CONFIG_DRM_PANEL_ILITEK_IL9322=y
++CONFIG_DRM_TVE200=y
++CONFIG_LOGO=y
+ CONFIG_USB=y
+ CONFIG_USB_MON=y
++CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_FOTG210_HCD=y
++CONFIG_USB_UHCI_HCD=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+-- 
+2.14.3
