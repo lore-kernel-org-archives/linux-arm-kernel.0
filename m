@@ -1,33 +1,38 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Mon, 12 Feb 2018 10:54:41 -0500
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <20180212154434.GX25201@hirez.programming.kicks-ass.net>
-References: <20180118150951.28964-1-prarit@redhat.com>
- <20180212133429.GC25314@hirez.programming.kicks-ass.net>
- <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
- <20180212145652.GM25181@hirez.programming.kicks-ass.net>
- <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
- <20180212154434.GX25201@hirez.programming.kicks-ass.net>
-Message-ID: <3299be7d-66cf-1116-042b-8c68c9b401af@redhat.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 12 Feb 2018 07:55:21 -0800
+Subject: [PATCH v2] MAINTAINERS: add Freescale pin controllers
+In-Reply-To: <20180212150549.8622-1-stefan@agner.ch>
+References: <20180212150549.8622-1-stefan@agner.ch>
+Message-ID: <1518450921.4139.9.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2018-02-12 at 16:05 +0100, Stefan Agner wrote:
+> Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
+> and the Pengutronix kernel team as reviewer.
+[]
+> diff --git a/MAINTAINERS b/MAINTAINERS
+[]
+> @@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
+>  S:	Supported
+>  F:	drivers/pinctrl/pinctrl-at91-pio4.*
+>  
+> +PIN CONTROLLER - FREESCALE
+> +M:	Dong Aisheng <aisheng.dong@nxp.com>
+> +M:	Fabio Estevam <festevam@gmail.com>
+> +M:	Shawn Guo <shawnguo@kernel.org>
+> +M:	Stefan Agner <stefan@agner.ch>
+> +R:	Pengutronix Kernel Team <kernel@pengutronix.de>
+> +L:	linux-gpio at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/pinctrl/freescale/*
 
+The * here should probably be removed so perhaps just
 
-On 02/12/2018 10:44 AM, Peter Zijlstra wrote:
-> On Mon, Feb 12, 2018 at 10:18:06AM -0500, Prarit Bhargava wrote:
->>> But when I specify "earlyprintk=serial,ttyS0,115200" this SPCR crud will
->>> not interfere?
->>>
->>
->> I tested "earlyprintk=serial,ttyS0,115200" on a system which is known to have a
->> functional console with "console=ttyS0,1152008N1" both with and without
->> CONFIG_ACPI_SPCR_TABLE enabled.
-> 
-> OK, but my point was that SPCR will never override explicit earlyprintk
-> stuff. There is absolutely nothing worse than breaking working setups.
-> 
+F:	drivers/pinctrl/freescale/
 
-Oh, I see.  SPCR will not override earlyprintk config.
-
-P.
+> +F:	Documentation/devicetree/bindings/pinctrl/fsl,*
+> +
+>  PIN CONTROLLER - INTEL
+>  M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+>  M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
