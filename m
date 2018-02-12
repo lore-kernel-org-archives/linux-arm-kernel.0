@@ -1,24 +1,33 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 12 Feb 2018 16:44:34 +0100
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
-References: <20180118150951.28964-1-prarit@redhat.com>
- <20180212133429.GC25314@hirez.programming.kicks-ass.net>
- <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
- <20180212145652.GM25181@hirez.programming.kicks-ass.net>
- <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
-Message-ID: <20180212154434.GX25201@hirez.programming.kicks-ass.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 12 Feb 2018 16:44:17 +0100
+Subject: [PATCH 0/5] soc: renesas: dd symbols for R-Car Gen3 register offsets
+Message-ID: <20180212154422.13900-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 10:18:06AM -0500, Prarit Bhargava wrote:
-> > But when I specify "earlyprintk=serial,ttyS0,115200" this SPCR crud will
-> > not interfere?
-> > 
-> 
-> I tested "earlyprintk=serial,ttyS0,115200" on a system which is known to have a
-> functional console with "console=ttyS0,1152008N1" both with and without
-> CONFIG_ACPI_SPCR_TABLE enabled.
+Add and use symbols for Gen3 register offsets to improve readability.
 
-OK, but my point was that SPCR will never override explicit earlyprintk
-stuff. There is absolutely nothing worse than breaking working setups.
+This has no functional change.
+
+Based on renesas-devel-20180212-v4.16-rc1.
+
+Simon Horman (5):
+  soc: renesas: Add symbols for R-Car Gen3 register offsets
+  soc: renesas: Use symbols for register offsets for R-Car H3 power
+    areas
+  soc: renesas: Use symbols for register offsets for R-Car M3-W power
+    areas
+  soc: renesas: Use symbols for register offsets for R-Car V3M power
+    areas
+  soc: renesas: Use symbols for register offsets for R-Car D3 power
+    areas
+
+ drivers/soc/renesas/r8a7795-sysc.c  | 76 +++++++++++++++++++++----------------
+ drivers/soc/renesas/r8a7796-sysc.c  | 56 +++++++++++++++------------
+ drivers/soc/renesas/r8a77970-sysc.c | 39 +++++++++++--------
+ drivers/soc/renesas/r8a77995-sysc.c | 11 +++---
+ drivers/soc/renesas/rcar-sysc.h     | 19 ++++++++++
+ 5 files changed, 125 insertions(+), 76 deletions(-)
+
+-- 
+2.11.0
