@@ -1,67 +1,85 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 12 Feb 2018 20:25:36 +0100
-Subject: [PATCH usb-next v9 2/8] usb: add a flag to skip PHY
- initialization to struct usb_hcd
-In-Reply-To: <Pine.LNX.4.44L0.1802121013360.1411-100000@iolanthe.rowland.org>
-References: <20180211210651.2046-3-martin.blumenstingl@googlemail.com>
- <Pine.LNX.4.44L0.1802121013360.1411-100000@iolanthe.rowland.org>
-Message-ID: <CAFBinCBnea-Nt73Lz6K+hKub++Upxa6ot8o857rG3GeuLugZYw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 12 Feb 2018 11:24:15 -0800
+Subject: [PATCH v5 12/26] watchdog: renesas_wdt: Add R-Car Gen2 support
+In-Reply-To: <1518457475-4480-13-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1518457475-4480-13-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180212192415.GA22927@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Mon, Feb 12, 2018 at 05:44:21PM +0000, Fabrizio Castro wrote:
+> Due to commits:
+> * "ARM: shmobile: Add watchdog support",
+> * "ARM: shmobile: rcar-gen2: Add watchdog support", and
+> * "soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2",
+> we now have everything we needed for the watchdog to work on Gen2 and
+> RZ/G1.
+> 
+> This commit adds "renesas,rcar-gen2-wdt" as compatible string for R-Car
+> Gen2 and RZ/G1, and since on those platforms the rwdt clock needs to be
+> always ON, when suspending to RAM we need to explicitly disable the
+> counting by clearing TME from RWTCSRA.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 
-On Mon, Feb 12, 2018 at 4:15 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Sun, 11 Feb 2018, Martin Blumenstingl wrote:
->
->> The USB HCD core driver parses the device-tree node for "phys" and
->> "usb-phys" properties. It also manages the power state of these PHYs
->> automatically.
->> However, drivers may opt-out of this behavior by setting "phy" or
->> "usb_phy" in struct usb_hcd to a non-null value. An example where this
->> is required is the "Qualcomm USB2 controller", implemented by the
->> chipidea driver. The hardware requires that the PHY is only powered on
->> after the "reset completed" event from the controller is received.
->>
->> A follow-up patch will allow the USB HCD core driver to manage more than
->> one PHY. Add a new "bool skip_phy_initialization" field to struct
->> usb_hcd so drivers can opt-out of any PHY management provided by the USB
->> HCD core driver. The new field will be used in that patch as well.
->>
->> This also updates the existing drivers so they use the new flag if they
->> want to opt out of the PHY management provided by the USB HCD core
->> driver. This means that for these drivers the new "multiple PHY"
->> handling (which will be added in a follow-up patch) will be disabled as
->> well.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->
->> --- a/include/linux/usb/hcd.h
->> +++ b/include/linux/usb/hcd.h
->> @@ -98,6 +98,12 @@ struct usb_hcd {
->>        */
->>       const struct hc_driver  *driver;        /* hw-specific hooks */
->>
->> +     /*
->> +      * do not manage the PHY state in the HCD core, instead let the driver
->> +      * handle this (for example if the PHY can only be turned on after a
->> +      * specific event)
->> +      */
->> +     bool skip_phy_initialization;
->
-> Instead of declaring this as a bool at some random location in the
-> structure, it would be better to make this a bitflag along with the
-> other ones that get set at registration.  For example, it could come
-> right after the remove_phy flag.
-I'll move it to the other bitflags as suggested - thanks for pointing this out!
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-just to save you from reviewing this over and over again:
-- I'll move the skip_phy_initialization field below remove_phy
-- it's new definition will be "unsigned skip_phy_initialization:1"
-- do you see any issues with the rest of the patch (the "concept" of
-using a flag to skip all kinds of PHY initialization)?
-
-
-Regards
-Martin
+> ---
+> v4->v5:
+> * various improvements suggested by Wolfram
+> 
+>  drivers/watchdog/renesas_wdt.c | 27 ++++++++++++++++++++++-----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/watchdog/renesas_wdt.c b/drivers/watchdog/renesas_wdt.c
+> index 831ef83..e972b7b 100644
+> --- a/drivers/watchdog/renesas_wdt.c
+> +++ b/drivers/watchdog/renesas_wdt.c
+> @@ -203,13 +203,29 @@ static int rwdt_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -/*
+> - * This driver does also fit for R-Car Gen2 (r8a779[0-4]) WDT. However, for SMP
+> - * to work there, one also needs a RESET (RST) driver which does not exist yet
+> - * due to HW issues. This needs to be solved before adding compatibles here.
+> - */
+> +static int __maybe_unused rwdt_suspend(struct device *dev)
+> +{
+> +	struct rwdt_priv *priv = dev_get_drvdata(dev);
+> +
+> +	if (watchdog_active(&priv->wdev))
+> +		rwdt_write(priv, priv->cks, RWTCSRA);
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused rwdt_resume(struct device *dev)
+> +{
+> +	struct rwdt_priv *priv = dev_get_drvdata(dev);
+> +
+> +	if (watchdog_active(&priv->wdev))
+> +		rwdt_write(priv, priv->cks | RWTCSRA_TME, RWTCSRA);
+> +	return 0;
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(rwdt_pm_ops, rwdt_suspend, rwdt_resume);
+> +
+>  static const struct of_device_id rwdt_ids[] = {
+>  	{ .compatible = "renesas,rcar-gen3-wdt", },
+> +	{ .compatible = "renesas,rcar-gen2-wdt", },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, rwdt_ids);
+> @@ -218,6 +234,7 @@ static struct platform_driver rwdt_driver = {
+>  	.driver = {
+>  		.name = "renesas_wdt",
+>  		.of_match_table = rwdt_ids,
+> +		.pm = &rwdt_pm_ops,
+>  	},
+>  	.probe = rwdt_probe,
+>  	.remove = rwdt_remove,
+> -- 
+> 2.7.4
+> 
