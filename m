@@ -1,47 +1,81 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 12 Feb 2018 11:20:42 +0100
-Subject: [PATCH v3 5/7] mtd: nand: use Marvell reworked NAND controller
- driver with all platforms
-In-Reply-To: <20180109103637.23798-6-miquel.raynal@free-electrons.com>
-References: <20180109103637.23798-1-miquel.raynal@free-electrons.com>
- <20180109103637.23798-6-miquel.raynal@free-electrons.com>
-Message-ID: <20180212112042.5b3f758f@bbrezillon>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 12 Feb 2018 18:19:24 +0800
+Subject: [PATCH v9 5/7] arm64: kvm: Introduce KVM_ARM_SET_SERROR_ESR ioctl
+In-Reply-To: <5A7DDDEE.9050306@arm.com>
+References: <0184EA26B2509940AA629AE1405DD7F201A9E8EA@DGGEMA503-MBS.china.huawei.com>
+ <5A70C5A0.1050600@arm.com> <d1b17dae-9d9c-970a-d164-a41c618d449b@huawei.com>
+ <5A7DDDEE.9050306@arm.com>
+Message-ID: <93d07d3e-8388-7814-d674-538071d84e2a@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  9 Jan 2018 11:36:35 +0100
-Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+Hi James,
+ Thanks for the mail.
 
-> Actually remove pxa3xx_nand.c to let marvell_nand.c be compiled instead.
-> Also change the defconfig files using it as well as some board files
-> depending on CONFIG_MTD_NAND_PXA3xx.
+On 2018/2/10 1:44, James Morse wrote:
+[...]
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-> ---
->  arch/arm/configs/cm_x300_defconfig  |    2 +-
->  arch/arm/configs/pxa3xx_defconfig   |    3 +-
->  arch/arm/configs/pxa_defconfig      |    2 +-
->  arch/arm/configs/raumfeld_defconfig |    2 +-
->  arch/arm/mach-mmp/ttc_dkb.c         |    4 +-
->  arch/arm/mach-pxa/cm-x300.c         |    2 +-
->  arch/arm/mach-pxa/colibri-pxa3xx.c  |    2 +-
->  arch/arm/mach-pxa/colibri.h         |    2 +-
->  arch/arm/mach-pxa/littleton.c       |    4 +-
->  arch/arm/mach-pxa/mxm8x10.c         |    4 +-
->  arch/arm/mach-pxa/zylonite.c        |    4 +-
->  drivers/mtd/nand/Kconfig            |   11 -
->  drivers/mtd/nand/Makefile           |    1 -
->  drivers/mtd/nand/pxa3xx_nand.c      | 2104 -----------------------------------
+>> its ESR is 0, can not control the virtual SError's syndrom value, it does not have
+>> such registers to control that.
+> 
+> My point was its more nuanced than this: the ARM-ARM's
+> TakeVirtualSErrorException() pseudo-code lets virtual-SError have an
+> implementation defined syndrome. I've never seen Juno generate anything other
+> than '0', but it might do something different on a thursday.
 
-Can you please split this patch in 2, one that patches defconfig and
-board files to use the new driver and one that actually removes the old
-driver.
+I checked the "aarch64/exceptions/asynch/AArch64.TakeVirtualSErrorException",
+you are right, the virtual SError's syndrome value can be 0 or implementation defined value, not always 0,
+which is decided by the "exception.syndrome<24>".
+thanks for the clarification.
 
-Thanks,
+> 
+> The point? We can't know what a CPU without the RAS extensions puts in there.
+> 
+> Why Does this matter? When migrating a pending SError we have to know the
+> difference between 'use this 64bit value', and 'the CPU will generate it'.
+> If I make an SError pending with ESR=0 on a CPU with VSESR, I can't migrated to
+> a system that generates an impdef SError-ESR, because I can't know it will be 0.
+Yes,
+But it will have a issue,
+For the target system, before taking the SError, no one can know whether its syndrome value
+is IMPLEMENTATION DEFINED or architecturally defined.
 
-Boris
+when the virtual SError is taken, the ESR_ELx.IDS will be updated, then we can know
+whether the ESR value is impdef or architecturally defined.
 
--- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+It seems migration is only allowed only when target system and source system all support RAS extension, because we do not know
+whether its syndrome is IMPLEMENTATION DEFINED or architecturally defined.
+
+> 
+> 
+>> Does Juno not have RAS Extension? 
+> 
+> It's two types of v8.0 CPU, no RAS extensions.
+> 
+> 
+>> if yes, I think we can only inject an SError, but can not change its ESR value,
+>> because it does not have vsesr_el2.
+> 
+> I agree, this means we need to be able to tell the difference between 'pending'
+> and 'pending with this ESR'.
+> 
+> 
+>>> Just because we can't control the ESR doesn't mean injecting an SError isn't
+>>> something user-space may want to do.
+> 
+>> yes, we may need to support user-space injects an SError even through CPU does not have RAS Extension.
+>>
+>>> If we tackle migration of pending-SError first, I think that will give us the
+>>> API to create a new pending SError with/without an ESR as appropriate.
+>>
+>> sure, we should. Last week, I checked the KVM_GET/SET_VCPU_EVENTS IOCTL, it should meet our
+>> migration requirements
+> 
+> Great!
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
