@@ -1,56 +1,176 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 12 Feb 2018 18:33:27 +0000
-Subject: [PATCH 12/37] iommu/of: Add stall and pasid properties to iommu_fwspec
+Date: Mon, 12 Feb 2018 18:33:30 +0000
+Subject: [PATCH 15/37] iommu/io-pgtable-arm: Factor out ARM LPAE register
+ defines
 In-Reply-To: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
 References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180212183352.22730-13-jean-philippe.brucker@arm.com>
+Message-ID: <20180212183352.22730-16-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add stall and pasid properties to iommu_fwspec, and fill them when
-dma-can-stall and pasid-bits properties are present in the device tree.
+For SVA, we'll need to extract CPU page table information and mirror it in
+the substream setup. Move relevant defines to a common header.
+
+Fix TCR_SZ_MASK while we're at it.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/of_iommu.c | 12 ++++++++++++
- include/linux/iommu.h    |  2 ++
- 2 files changed, 14 insertions(+)
+ MAINTAINERS                    |  1 +
+ drivers/iommu/io-pgtable-arm.c | 48 +-----------------------------
+ drivers/iommu/io-pgtable-arm.h | 67 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 47 deletions(-)
+ create mode 100644 drivers/iommu/io-pgtable-arm.h
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 5c36a8b7656a..98158fc061ca 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -204,6 +204,18 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 			if (err)
- 				break;
- 		}
-+
-+		fwspec = dev->iommu_fwspec;
-+		if (!err && fwspec) {
-+			const __be32 *prop;
-+
-+			if (of_get_property(master_np, "dma-can-stall", NULL))
-+				fwspec->can_stall = true;
-+
-+			prop = of_get_property(master_np, "pasid-bits", NULL);
-+			if (prop)
-+				fwspec->num_pasid_bits = be32_to_cpu(*prop);
-+		}
- 	}
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3bdc260e36b7..9cb8ced8322a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1106,6 +1106,7 @@ S:	Maintained
+ F:	drivers/iommu/arm-smmu.c
+ F:	drivers/iommu/arm-smmu-v3.c
+ F:	drivers/iommu/io-pgtable-arm.c
++F:	drivers/iommu/io-pgtable-arm.h
+ F:	drivers/iommu/io-pgtable-arm-v7s.c
  
- 	/*
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 36fcb579f5ed..37c3b9d087ce 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -632,6 +632,8 @@ struct iommu_fwspec {
- 	struct fwnode_handle	*iommu_fwnode;
- 	void			*iommu_priv;
- 	unsigned int		num_ids;
-+	unsigned int		num_pasid_bits;
-+	bool			can_stall;
- 	u32			ids[1];
- };
+ ARM SUB-ARCHITECTURES
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 51e5c43caed1..fff0b6ba0a69 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -31,6 +31,7 @@
+ #include <asm/barrier.h>
  
+ #include "io-pgtable.h"
++#include "io-pgtable-arm.h"
+ 
+ #define ARM_LPAE_MAX_ADDR_BITS		48
+ #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
+@@ -118,53 +119,6 @@
+ #define ARM_LPAE_PTE_MEMATTR_DEV	(((arm_lpae_iopte)0x1) << 2)
+ 
+ /* Register bits */
+-#define ARM_32_LPAE_TCR_EAE		(1 << 31)
+-#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
+-
+-#define ARM_LPAE_TCR_EPD1		(1 << 23)
+-
+-#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
+-#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
+-#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
+-
+-#define ARM_LPAE_TCR_SH0_SHIFT		12
+-#define ARM_LPAE_TCR_SH0_MASK		0x3
+-#define ARM_LPAE_TCR_SH_NS		0
+-#define ARM_LPAE_TCR_SH_OS		2
+-#define ARM_LPAE_TCR_SH_IS		3
+-
+-#define ARM_LPAE_TCR_ORGN0_SHIFT	10
+-#define ARM_LPAE_TCR_IRGN0_SHIFT	8
+-#define ARM_LPAE_TCR_RGN_MASK		0x3
+-#define ARM_LPAE_TCR_RGN_NC		0
+-#define ARM_LPAE_TCR_RGN_WBWA		1
+-#define ARM_LPAE_TCR_RGN_WT		2
+-#define ARM_LPAE_TCR_RGN_WB		3
+-
+-#define ARM_LPAE_TCR_SL0_SHIFT		6
+-#define ARM_LPAE_TCR_SL0_MASK		0x3
+-
+-#define ARM_LPAE_TCR_T0SZ_SHIFT		0
+-#define ARM_LPAE_TCR_SZ_MASK		0xf
+-
+-#define ARM_LPAE_TCR_PS_SHIFT		16
+-#define ARM_LPAE_TCR_PS_MASK		0x7
+-
+-#define ARM_LPAE_TCR_IPS_SHIFT		32
+-#define ARM_LPAE_TCR_IPS_MASK		0x7
+-
+-#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
+-#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
+-#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
+-#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
+-#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
+-#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
+-
+-#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
+-#define ARM_LPAE_MAIR_ATTR_MASK		0xff
+-#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
+-#define ARM_LPAE_MAIR_ATTR_NC		0x44
+-#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
+ #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
+ #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
+ #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
+diff --git a/drivers/iommu/io-pgtable-arm.h b/drivers/iommu/io-pgtable-arm.h
+new file mode 100644
+index 000000000000..cb31314971ac
+--- /dev/null
++++ b/drivers/iommu/io-pgtable-arm.h
+@@ -0,0 +1,67 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2017 ARM Limited
++ */
++#ifndef __IO_PGTABLE_ARM_H
++#define __IO_PGTABLE_ARM_H
++
++#define ARM_32_LPAE_TCR_EAE		(1 << 31)
++#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
++
++#define ARM_LPAE_TCR_EPD1		(1 << 23)
++
++#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
++#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
++#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
++
++#define ARM_LPAE_TCR_SH0_SHIFT		12
++#define ARM_LPAE_TCR_SH0_MASK		0x3
++#define ARM_LPAE_TCR_SH_NS		0
++#define ARM_LPAE_TCR_SH_OS		2
++#define ARM_LPAE_TCR_SH_IS		3
++
++#define ARM_LPAE_TCR_ORGN0_SHIFT	10
++#define ARM_LPAE_TCR_IRGN0_SHIFT	8
++#define ARM_LPAE_TCR_RGN_MASK		0x3
++#define ARM_LPAE_TCR_RGN_NC		0
++#define ARM_LPAE_TCR_RGN_WBWA		1
++#define ARM_LPAE_TCR_RGN_WT		2
++#define ARM_LPAE_TCR_RGN_WB		3
++
++#define ARM_LPAE_TCR_SL0_SHIFT		6
++#define ARM_LPAE_TCR_SL0_MASK		0x3
++
++#define ARM_LPAE_TCR_T0SZ_SHIFT		0
++#define ARM_LPAE_TCR_SZ_MASK		0x3f
++
++#define ARM_LPAE_TCR_PS_SHIFT		16
++#define ARM_LPAE_TCR_PS_MASK		0x7
++
++#define ARM_LPAE_TCR_IPS_SHIFT		32
++#define ARM_LPAE_TCR_IPS_MASK		0x7
++
++#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
++#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
++#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
++#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
++#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
++#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
++
++#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
++#define ARM_LPAE_MAIR_ATTR_MASK		0xff
++#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
++#define ARM_LPAE_MAIR_ATTR_NC		0x44
++#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
++
++#endif /* __IO_PGTABLE_ARM_H */
 -- 
 2.15.1
