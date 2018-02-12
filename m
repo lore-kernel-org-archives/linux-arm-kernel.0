@@ -1,215 +1,336 @@
-From: david@lechnology.com (David Lechner)
-Date: Sun, 11 Feb 2018 21:03:40 -0600
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
- <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
-Message-ID: <9f534bee-9d27-f878-f0b8-58d8d9ece9fa@lechnology.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Sun, 11 Feb 2018 22:08:43 -0500 (EST)
+Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
+In-Reply-To: <cover.1518397634.git.fthain@telegraphics.com.au>
+References: <cover.1518397634.git.fthain@telegraphics.com.au>
+Message-ID: <f697da2b2513e025688f6c48088536060575a249.1518397634.git.fthain@telegraphics.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2018 10:48 AM, Michael Turquette wrote:
-> Hi Bartosz, all,
-> 
-> On Fri, Feb 9, 2018 at 8:22 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> 2018-01-08 3:17 GMT+01:00 David Lechner <david@lechnology.com>:
->>> This adds platform-specific declarations for the PSC clocks on TI DA850/
->>> OMAP-L138/AM18XX SoCs.
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>> ---
->>>   drivers/clk/davinci/Makefile    |   1 +
->>>   drivers/clk/davinci/psc-da850.c | 117 ++++++++++++++++++++++++++++++++++++++++
->>>   include/linux/clk/davinci.h     |   1 +
->>>   3 files changed, 119 insertions(+)
->>>   create mode 100644 drivers/clk/davinci/psc-da850.c
->>>
->>> diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
->>> index fb14c8c..aef0390 100644
->>> --- a/drivers/clk/davinci/Makefile
->>> +++ b/drivers/clk/davinci/Makefile
->>> @@ -11,4 +11,5 @@ obj-$(CONFIG_ARCH_DAVINCI_DM646x)     += pll-dm646x.o
->>>
->>>   obj-y += psc.o
->>>   obj-$(CONFIG_ARCH_DAVINCI_DA830)       += psc-da830.o
->>> +obj-$(CONFIG_ARCH_DAVINCI_DA850)       += psc-da850.o
->>>   endif
->>> diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
->>> new file mode 100644
->>> index 0000000..3b4583d
->>> --- /dev/null
->>> +++ b/drivers/clk/davinci/psc-da850.c
->>> @@ -0,0 +1,117 @@
->>> +// SPDX-License-Identifier: GPL-2.0
->>> +/*
->>> + * PSC clock descriptions for TI DA850/OMAP-L138/AM18XX
->>> + *
->>> + * Copyright (C) 2017 David Lechner <david@lechnology.com>
->>> + */
->>> +
->>> +#include <linux/clk-provider.h>
->>> +#include <linux/clkdev.h>
->>> +#include <linux/init.h>
->>> +#include <linux/of.h>
->>> +#include <linux/types.h>
->>> +
->>> +#include "psc.h"
->>> +
->>> +static const struct davinci_psc_clk_info da850_psc0_info[] __initconst = {
->>> +       LPSC(0, 0, tpcc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(1, 0, tptc0, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(2, 0, tptc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(3, 0, aemif, pll0_sysclk3, 0),
->>> +       LPSC(4, 0, spi0, pll0_sysclk2, 0),
->>> +       LPSC(5, 0, mmcsd0, pll0_sysclk2, 0),
->>> +       LPSC(6, 0, aintc, pll0_sysclk4, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(7, 0, arm_rom, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(9, 0, uart0, pll0_sysclk2, 0),
->>> +       LPSC(13, 0, pruss, pll0_sysclk2, 0),
->>> +       LPSC(14, 0, arm, pll0_sysclk6, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(15, 1, dsp, pll0_sysclk1, LPSC_FORCE | LPSC_LOCAL_RESET),
->>> +       { }
->>> +};
->>> +
->>> +static const struct davinci_psc_clk_info da850_psc1_info[] __initconst = {
->>> +       LPSC(0, 0, tpcc1, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(1, 0, usb0, pll0_sysclk2, 0),
->>> +       LPSC(2, 0, usb1, pll0_sysclk4, 0),
->>> +       LPSC(3, 0, gpio, pll0_sysclk4, 0),
->>> +       LPSC(5, 0, emac, pll0_sysclk4, 0),
->>> +       LPSC(6, 0, emif3, pll0_sysclk5, LPSC_ALWAYS_ENABLED),
->>> +       LPSC(7, 0, mcasp0, async3, 0),
->>> +       LPSC(8, 0, sata, pll0_sysclk2, LPSC_FORCE),
->>> +       LPSC(9, 0, vpif, pll0_sysclk2, 0),
->>> +       LPSC(10, 0, spi1, async3, 0),
->>> +       LPSC(11, 0, i2c1, pll0_sysclk4, 0),
->>> +       LPSC(12, 0, uart1, async3, 0),
->>> +       LPSC(13, 0, uart2, async3, 0),
->>> +       LPSC(14, 0, mcbsp0, async3, 0),
->>> +       LPSC(15, 0, mcbsp1, async3, 0),
->>> +       LPSC(16, 0, lcdc, pll0_sysclk2, 0),
->>> +       LPSC(17, 0, ehrpwm, async3, 0),
->>> +       LPSC(18, 0, mmcsd1, pll0_sysclk2, 0),
->>> +       LPSC(20, 0, ecap, async3, 0),
->>> +       LPSC(21, 0, tptc2, pll0_sysclk2, LPSC_ALWAYS_ENABLED),
->>> +       { }
->>> +};
->>> +
->>> +void __init da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1)
->>> +{
->>> +       struct clk_onecell_data *clk_data;
->>> +
->>> +       clk_data = davinci_psc_register_clocks(psc0, da850_psc0_info, 16);
->>> +       if (!clk_data)
->>> +               return;
->>> +
->>> +       clk_register_clkdev(clk_data->clks[3], NULL, "ti-aemif");
->>> +       clk_register_clkdev(clk_data->clks[3], "aemif", "davinci-nand.0");
->>> +       clk_register_clkdev(clk_data->clks[4], NULL, "spi_davinci.0");
->>> +       clk_register_clkdev(clk_data->clks[5], NULL, "da830-mmc.0");
->>> +       clk_register_clkdev(clk_data->clks[9], NULL, "serial8250.0");
->>> +       clk_register_clkdev(clk_data->clks[14], "arm", NULL);
->>> +       clk_register_clkdev(clk_data->clks[15], NULL, "davinci-rproc.0");
->>> +
->>> +       clk_free_onecell_data(clk_data);
->>> +
->>> +       clk_data = davinci_psc_register_clocks(psc1, da850_psc1_info, 32);
->>> +       if (!clk_data)
->>> +               return;
->>> +
->>> +       clk_register_clkdev(clk_data->clks[1], "usb20_psc_clk", NULL);
->>> +       clk_register_clkdev(clk_data->clks[1], NULL, "musb-da8xx");
->>> +       clk_register_clkdev(clk_data->clks[1], NULL, "cppi41-dmaengine");
->>> +       clk_register_clkdev(clk_data->clks[2], NULL, "ohci-da8xx");
->>> +       clk_register_clkdev(clk_data->clks[3], "gpio", NULL);
->>> +       clk_register_clkdev(clk_data->clks[5], NULL, "davinci_emac.1");
->>> +       clk_register_clkdev(clk_data->clks[5], "fck", "davinci_mdio.0");
->>> +       clk_register_clkdev(clk_data->clks[7], NULL, "davinci-mcasp.0");
->>> +       clk_register_clkdev(clk_data->clks[8], "fck", "ahci_da850");
->>> +       clk_register_clkdev(clk_data->clks[9], NULL, "vpif");
->>> +       clk_register_clkdev(clk_data->clks[10], NULL, "spi_davinci.1");
->>> +       clk_register_clkdev(clk_data->clks[11], NULL, "i2c_davinci.2");
->>> +       clk_register_clkdev(clk_data->clks[12], NULL, "serial8250.1");
->>> +       clk_register_clkdev(clk_data->clks[13], NULL, "serial8250.2");
->>> +       clk_register_clkdev(clk_data->clks[14], NULL, "davinci-mcbsp.0");
->>> +       clk_register_clkdev(clk_data->clks[15], NULL, "davinci-mcbsp.1");
->>> +       clk_register_clkdev(clk_data->clks[16], "fck", "da8xx_lcdc.0");
->>> +       clk_register_clkdev(clk_data->clks[17], "fck", "ehrpwm.0");
->>> +       clk_register_clkdev(clk_data->clks[17], "fck", "ehrpwm.1");
->>> +       clk_register_clkdev(clk_data->clks[18], NULL, "da830-mmc.1");
->>> +       clk_register_clkdev(clk_data->clks[20], "fck", "ecap.0");
->>> +       clk_register_clkdev(clk_data->clks[20], "fck", "ecap.1");
->>> +       clk_register_clkdev(clk_data->clks[20], "fck", "ecap.2");
->>> +
->>> +       clk_free_onecell_data(clk_data);
->>> +}
->>> +
->>> +#ifdef CONFIG_OF
->>> +static void __init of_da850_psc0_clk_init(struct device_node *node)
->>> +{
->>> +       of_davinci_psc_clk_init(node, da850_psc0_info, 16);
->>> +}
->>> +CLK_OF_DECLARE(da850_psc0_clk, "ti,da850-psc0", of_da850_psc0_clk_init);
->>> +
->>> +static void __init of_da850_psc1_clk_init(struct device_node *node)
->>> +{
->>> +       of_davinci_psc_clk_init(node, da850_psc1_info, 32);
->>> +}
->>> +CLK_OF_DECLARE(da850_psc1_clk, "ti,da850-psc1", of_da850_psc1_clk_init);
->>> +#endif
->>> diff --git a/include/linux/clk/davinci.h b/include/linux/clk/davinci.h
->>> index 3ec8100..3d8bdfa 100644
->>> --- a/include/linux/clk/davinci.h
->>> +++ b/include/linux/clk/davinci.h
->>> @@ -17,5 +17,6 @@ void dm644x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
->>>   void dm646x_pll_clk_init(void __iomem *pll1, void __iomem *pll2);
->>>
->>>   void da830_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
->>> +void da850_psc_clk_init(void __iomem *psc0, void __iomem *psc1);
->>>
->>>   #endif /* __LINUX_CLK_DAVINCI_H__ */
->>> --
->>> 2.7.4
->>>
->>
->> Hi David,
->>
->> I've been working on moving the genpd code from its own driver to the
->> psc one. I couldn't get the system to boot though and problems
->> happened very early in the boot sequence. I struggled to figure out
->> what's happening, but eventually I noticed that psc uses
->> CLK_OF_DECLARE() to initialize clocks. The functions registered this
->> way are called very early in the boot sequence, way before
->> late_initcall() in which the genpd framework is initialized. This of
->> course makes it impossible to register genpd at the same time we
->> register PSCs.
->>
->> Mike, Stephen - it would be great if you could confirm, but I believe
->> the clock framework now only accepts clock drivers which create real
->> platform drivers, in which case this series would need to be modified.
-> 
-> You are correct. All new uses of CLK_OF_DECLARE are met with high
-> suspicion, and all new drivers should be platform drivers.
+The lib8390 module parameter 'msg_enable' doesn't do anything useful:
+it causes an ancient version string to be logged.
 
-Oh boy. I'll try to get a v7 out this week with these changes.
+Remove redundant code that logs the same string.
 
+In ne.c and wd.c, the value of ei_local->msg_enable is used before
+being assigned. Use ne_msg_enable and wd_msg_enable, respectively.
 
+Most of the other 8390 drivers never assign ei_local->msg_enable.
+Use the 'msg_enable' module parameter from lib8390 as the default
+value.
 
-> 
-> There are cases when CLK_OF_DECLARE is necessary (sometimes
-> temporarily while things are reworked), but it seems this is not the
-> case for this driver based on your testing of the platform driver
-> approach. Please use the platform driver approach instead.
-> 
-> Thanks,
-> Mike
-> 
->>
->> David: FYI I quickly converted the functions in psc-da850.c to actual
->> probe callbacks and it worked just fine on a da850-lcdk board.
->>
->> Best regards,
->> Bartosz Golaszewski
+Eliminate the pointless static and local variables.
+
+Clean up an indentation mistake.
+
+All of these issues originated from the same patch.
+
+Cc: Russell King <linux@armlinux.org.uk>
+Fixes: c45f812f0280 ("8390 : Replace ei_debug with msg_enable/NETIF_MSG_* feature")
+Tested-by: Stan Johnson <userm57@yahoo.com>
+Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+---
+Only the mac8390.c and lib8390.c changes have been tested. The other
+changes are similar but untested.
+---
+ drivers/net/ethernet/8390/ax88796.c   |  3 ---
+ drivers/net/ethernet/8390/axnet_cs.c  |  2 --
+ drivers/net/ethernet/8390/etherh.c    | 17 -----------------
+ drivers/net/ethernet/8390/hydra.c     |  4 ----
+ drivers/net/ethernet/8390/lib8390.c   |  2 ++
+ drivers/net/ethernet/8390/mac8390.c   |  8 --------
+ drivers/net/ethernet/8390/mcf8390.c   |  4 ----
+ drivers/net/ethernet/8390/ne.c        |  2 +-
+ drivers/net/ethernet/8390/pcnet_cs.c  |  4 ----
+ drivers/net/ethernet/8390/wd.c        |  2 +-
+ drivers/net/ethernet/8390/zorro8390.c |  5 -----
+ 11 files changed, 4 insertions(+), 49 deletions(-)
+
+diff --git a/drivers/net/ethernet/8390/ax88796.c b/drivers/net/ethernet/8390/ax88796.c
+index 245554707163..da61cf3cb3a9 100644
+--- a/drivers/net/ethernet/8390/ax88796.c
++++ b/drivers/net/ethernet/8390/ax88796.c
+@@ -77,8 +77,6 @@ static unsigned char version[] = "ax88796.c: Copyright 2005,2007 Simtec Electron
+ 
+ #define AX_GPOC_PPDSET	BIT(6)
+ 
+-static u32 ax_msg_enable;
+-
+ /* device private data */
+ 
+ struct ax_device {
+@@ -747,7 +745,6 @@ static int ax_init_dev(struct net_device *dev)
+ 	ei_local->block_output = &ax_block_output;
+ 	ei_local->get_8390_hdr = &ax_get_8390_hdr;
+ 	ei_local->priv = 0;
+-	ei_local->msg_enable = ax_msg_enable;
+ 
+ 	dev->netdev_ops = &ax_netdev_ops;
+ 	dev->ethtool_ops = &ax_ethtool_ops;
+diff --git a/drivers/net/ethernet/8390/axnet_cs.c b/drivers/net/ethernet/8390/axnet_cs.c
+index 7bddb8efb6d5..d422a124cd7c 100644
+--- a/drivers/net/ethernet/8390/axnet_cs.c
++++ b/drivers/net/ethernet/8390/axnet_cs.c
+@@ -104,7 +104,6 @@ static void AX88190_init(struct net_device *dev, int startp);
+ static int ax_open(struct net_device *dev);
+ static int ax_close(struct net_device *dev);
+ static irqreturn_t ax_interrupt(int irq, void *dev_id);
+-static u32 axnet_msg_enable;
+ 
+ /*====================================================================*/
+ 
+@@ -151,7 +150,6 @@ static int axnet_probe(struct pcmcia_device *link)
+ 	return -ENOMEM;
+ 
+     ei_local = netdev_priv(dev);
+-    ei_local->msg_enable = axnet_msg_enable;
+     spin_lock_init(&ei_local->page_lock);
+ 
+     info = PRIV(dev);
+diff --git a/drivers/net/ethernet/8390/etherh.c b/drivers/net/ethernet/8390/etherh.c
+index 11cbf22ad201..32e9627e3880 100644
+--- a/drivers/net/ethernet/8390/etherh.c
++++ b/drivers/net/ethernet/8390/etherh.c
+@@ -64,8 +64,6 @@ static char version[] =
+ 
+ #include "lib8390.c"
+ 
+-static u32 etherh_msg_enable;
+-
+ struct etherh_priv {
+ 	void __iomem	*ioc_fast;
+ 	void __iomem	*memc;
+@@ -502,18 +500,6 @@ etherh_close(struct net_device *dev)
+ }
+ 
+ /*
+- * Initialisation
+- */
+-
+-static void __init etherh_banner(void)
+-{
+-	static int version_printed;
+-
+-	if ((etherh_msg_enable & NETIF_MSG_DRV) && (version_printed++ == 0))
+-		pr_info("%s", version);
+-}
+-
+-/*
+  * Read the ethernet address string from the on board rom.
+  * This is an ascii string...
+  */
+@@ -671,8 +657,6 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
+ 	struct etherh_priv *eh;
+ 	int ret;
+ 
+-	etherh_banner();
+-
+ 	ret = ecard_request_resources(ec);
+ 	if (ret)
+ 		goto out;
+@@ -757,7 +741,6 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
+ 	ei_local->block_output  = etherh_block_output;
+ 	ei_local->get_8390_hdr  = etherh_get_header;
+ 	ei_local->interface_num = 0;
+-	ei_local->msg_enable = etherh_msg_enable;
+ 
+ 	etherh_reset(dev);
+ 	__NS8390_init(dev, 0);
+diff --git a/drivers/net/ethernet/8390/hydra.c b/drivers/net/ethernet/8390/hydra.c
+index 8ae249195301..941754ea78ec 100644
+--- a/drivers/net/ethernet/8390/hydra.c
++++ b/drivers/net/ethernet/8390/hydra.c
+@@ -66,7 +66,6 @@ static void hydra_block_input(struct net_device *dev, int count,
+ static void hydra_block_output(struct net_device *dev, int count,
+ 			       const unsigned char *buf, int start_page);
+ static void hydra_remove_one(struct zorro_dev *z);
+-static u32 hydra_msg_enable;
+ 
+ static struct zorro_device_id hydra_zorro_tbl[] = {
+     { ZORRO_PROD_HYDRA_SYSTEMS_AMIGANET },
+@@ -119,7 +118,6 @@ static int hydra_init(struct zorro_dev *z)
+     int start_page, stop_page;
+     int j;
+     int err;
+-    struct ei_device *ei_local;
+ 
+     static u32 hydra_offsets[16] = {
+ 	0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+@@ -138,8 +136,6 @@ static int hydra_init(struct zorro_dev *z)
+     start_page = NESM_START_PG;
+     stop_page = NESM_STOP_PG;
+ 
+-    ei_local = netdev_priv(dev);
+-    ei_local->msg_enable = hydra_msg_enable;
+     dev->base_addr = ioaddr;
+     dev->irq = IRQ_AMIGA_PORTS;
+ 
+diff --git a/drivers/net/ethernet/8390/lib8390.c b/drivers/net/ethernet/8390/lib8390.c
+index 60f8e2c8e726..5d9bbde9fe68 100644
+--- a/drivers/net/ethernet/8390/lib8390.c
++++ b/drivers/net/ethernet/8390/lib8390.c
+@@ -975,6 +975,8 @@ static void ethdev_setup(struct net_device *dev)
+ 	ether_setup(dev);
+ 
+ 	spin_lock_init(&ei_local->page_lock);
++
++	ei_local->msg_enable = msg_enable;
+ }
+ 
+ /**
+diff --git a/drivers/net/ethernet/8390/mac8390.c b/drivers/net/ethernet/8390/mac8390.c
+index 2f91ce8dc614..abe50338b9f7 100644
+--- a/drivers/net/ethernet/8390/mac8390.c
++++ b/drivers/net/ethernet/8390/mac8390.c
+@@ -168,7 +168,6 @@ static void slow_sane_block_output(struct net_device *dev, int count,
+ 				   const unsigned char *buf, int start_page);
+ static void word_memcpy_tocard(unsigned long tp, const void *fp, int count);
+ static void word_memcpy_fromcard(void *tp, unsigned long fp, int count);
+-static u32 mac8390_msg_enable;
+ 
+ static enum mac8390_type __init mac8390_ident(struct nubus_rsrc *fres)
+ {
+@@ -299,8 +298,6 @@ static bool __init mac8390_init(struct net_device *dev,
+ 	int offset;
+ 	volatile unsigned short *i;
+ 
+-	printk_once(KERN_INFO pr_fmt("%s"), version);
+-
+ 	dev->irq = SLOT2IRQ(ndev->board->slot);
+ 	/* This is getting to be a habit */
+ 	dev->base_addr = (ndev->board->slot_addr |
+@@ -398,8 +395,6 @@ struct net_device * __init mac8390_probe(int unit)
+ 	struct net_device *dev;
+ 	struct nubus_rsrc *ndev = NULL;
+ 	int err = -ENODEV;
+-	struct ei_device *ei_local;
+-
+ 	static unsigned int slots;
+ 
+ 	enum mac8390_type cardtype;
+@@ -441,9 +436,6 @@ struct net_device * __init mac8390_probe(int unit)
+ 	if (!ndev)
+ 		goto out;
+ 
+-	 ei_local = netdev_priv(dev);
+-	 ei_local->msg_enable = mac8390_msg_enable;
+-
+ 	err = register_netdev(dev);
+ 	if (err)
+ 		goto out;
+diff --git a/drivers/net/ethernet/8390/mcf8390.c b/drivers/net/ethernet/8390/mcf8390.c
+index 4bb967bc879e..4ad8031ab669 100644
+--- a/drivers/net/ethernet/8390/mcf8390.c
++++ b/drivers/net/ethernet/8390/mcf8390.c
+@@ -38,7 +38,6 @@ static const char version[] =
+ 
+ #define NESM_START_PG	0x40	/* First page of TX buffer */
+ #define NESM_STOP_PG	0x80	/* Last page +1 of RX ring */
+-static u32 mcf8390_msg_enable;
+ 
+ #ifdef NE2000_ODDOFFSET
+ /*
+@@ -407,7 +406,6 @@ static int mcf8390_init(struct net_device *dev)
+ static int mcf8390_probe(struct platform_device *pdev)
+ {
+ 	struct net_device *dev;
+-	struct ei_device *ei_local;
+ 	struct resource *mem, *irq;
+ 	resource_size_t msize;
+ 	int ret;
+@@ -435,8 +433,6 @@ static int mcf8390_probe(struct platform_device *pdev)
+ 
+ 	SET_NETDEV_DEV(dev, &pdev->dev);
+ 	platform_set_drvdata(pdev, dev);
+-	ei_local = netdev_priv(dev);
+-	ei_local->msg_enable = mcf8390_msg_enable;
+ 
+ 	dev->irq = irq->start;
+ 	dev->base_addr = mem->start;
+diff --git a/drivers/net/ethernet/8390/ne.c b/drivers/net/ethernet/8390/ne.c
+index 66f47987e2a2..4cdff6e6af89 100644
+--- a/drivers/net/ethernet/8390/ne.c
++++ b/drivers/net/ethernet/8390/ne.c
+@@ -485,7 +485,7 @@ static int __init ne_probe1(struct net_device *dev, unsigned long ioaddr)
+ 		mdelay(10);		/* wait 10ms for interrupt to propagate */
+ 		outb_p(0x00, ioaddr + EN0_IMR); 		/* Mask it again. */
+ 		dev->irq = probe_irq_off(cookie);
+-		if (netif_msg_probe(ei_local))
++		if (ne_msg_enable & NETIF_MSG_PROBE)
+ 			pr_cont(" autoirq is %d", dev->irq);
+ 	} else if (dev->irq == 2)
+ 		/* Fixup for users that don't know that IRQ 2 is really IRQ 9,
+diff --git a/drivers/net/ethernet/8390/pcnet_cs.c b/drivers/net/ethernet/8390/pcnet_cs.c
+index bcad4a7fac9f..61e43802b9a5 100644
+--- a/drivers/net/ethernet/8390/pcnet_cs.c
++++ b/drivers/net/ethernet/8390/pcnet_cs.c
+@@ -66,7 +66,6 @@
+ #define PCNET_RDC_TIMEOUT (2*HZ/100)	/* Max wait in jiffies for Tx RDC */
+ 
+ static const char *if_names[] = { "auto", "10baseT", "10base2"};
+-static u32 pcnet_msg_enable;
+ 
+ /*====================================================================*/
+ 
+@@ -556,7 +555,6 @@ static int pcnet_config(struct pcmcia_device *link)
+     int start_pg, stop_pg, cm_offset;
+     int has_shmem = 0;
+     struct hw_info *local_hw_info;
+-    struct ei_device *ei_local;
+ 
+     dev_dbg(&link->dev, "pcnet_config\n");
+ 
+@@ -606,8 +604,6 @@ static int pcnet_config(struct pcmcia_device *link)
+ 	mii_phy_probe(dev);
+ 
+     SET_NETDEV_DEV(dev, &link->dev);
+-    ei_local = netdev_priv(dev);
+-    ei_local->msg_enable = pcnet_msg_enable;
+ 
+     if (register_netdev(dev) != 0) {
+ 	pr_notice("register_netdev() failed\n");
+diff --git a/drivers/net/ethernet/8390/wd.c b/drivers/net/ethernet/8390/wd.c
+index 6efa2722f850..fb17c2c7e1dd 100644
+--- a/drivers/net/ethernet/8390/wd.c
++++ b/drivers/net/ethernet/8390/wd.c
+@@ -299,7 +299,7 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
+ 
+ 			outb_p(0x00, nic_addr+EN0_IMR);	/* Mask all intrs. again. */
+ 
+-			if (netif_msg_drv(ei_local))
++			if (wd_msg_enable & NETIF_MSG_PROBE)
+ 				pr_cont(" autoirq is %d", dev->irq);
+ 			if (dev->irq < 2)
+ 				dev->irq = word16 ? 10 : 5;
+diff --git a/drivers/net/ethernet/8390/zorro8390.c b/drivers/net/ethernet/8390/zorro8390.c
+index 6d93956b293b..35a500a21521 100644
+--- a/drivers/net/ethernet/8390/zorro8390.c
++++ b/drivers/net/ethernet/8390/zorro8390.c
+@@ -44,8 +44,6 @@
+ static const char version[] =
+ 	"8390.c:v1.10cvs 9/23/94 Donald Becker (becker at cesdis.gsfc.nasa.gov)\n";
+ 
+-static u32 zorro8390_msg_enable;
+-
+ #include "lib8390.c"
+ 
+ #define DRV_NAME	"zorro8390"
+@@ -296,7 +294,6 @@ static int zorro8390_init(struct net_device *dev, unsigned long board,
+ 	int err;
+ 	unsigned char SA_prom[32];
+ 	int start_page, stop_page;
+-	struct ei_device *ei_local = netdev_priv(dev);
+ 	static u32 zorro8390_offsets[16] = {
+ 		0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+ 		0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
+@@ -388,8 +385,6 @@ static int zorro8390_init(struct net_device *dev, unsigned long board,
+ 	dev->netdev_ops = &zorro8390_netdev_ops;
+ 	__NS8390_init(dev, 0);
+ 
+-	ei_local->msg_enable = zorro8390_msg_enable;
+-
+ 	err = register_netdev(dev);
+ 	if (err) {
+ 		free_irq(IRQ_AMIGA_PORTS, dev);
+-- 
+2.13.6
