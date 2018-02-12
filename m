@@ -1,40 +1,29 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 12 Feb 2018 17:44:35 +0000
-Subject: [PATCH v5 26/26] ARM: dts: iwg22m: Add watchdog support to SoM dtsi
-In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1518457475-4480-27-git-send-email-fabrizio.castro@bp.renesas.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 13 Feb 2018 01:53:10 +0800
+Subject: [RFC PATCH asoc] ASoC: uniphier: aiodma_rb_get_rp() can be static
+In-Reply-To: <201802130150.A223WMAh%fengguang.wu@intel.com>
+References: <201802130150.A223WMAh%fengguang.wu@intel.com>
+Message-ID: <20180212175310.GA13659@lkp-wsm-ep1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the watchdog from within the iwg20m SoM dtsi.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Fixes: f37fe2f9987b ("ASoC: uniphier: add support for UniPhier AIO common driver")
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
 ---
-v4->v5:
-* no change
+ aio-core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-index 8d0a392b..29b6e10 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-+++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-@@ -91,6 +91,11 @@
- 	};
- };
+diff --git a/sound/soc/uniphier/aio-core.c b/sound/soc/uniphier/aio-core.c
+index 7e9451c..1e5f053 100644
+--- a/sound/soc/uniphier/aio-core.c
++++ b/sound/soc/uniphier/aio-core.c
+@@ -904,7 +904,7 @@ void aiodma_ch_set_enable(struct uniphier_aio_sub *sub, int enable)
+ 	}
+ }
  
-+&rwdt {
-+	timeout-sec = <60>;
-+	status = "okay";
-+};
-+
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
- 	pinctrl-names = "default";
--- 
-2.7.4
+-u64 aiodma_rb_get_rp(struct uniphier_aio_sub *sub)
++static u64 aiodma_rb_get_rp(struct uniphier_aio_sub *sub)
+ {
+ 	struct regmap *r = sub->aio->chip->regmap;
+ 	u32 pos_u, pos_l;
