@@ -1,104 +1,38 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 12 Feb 2018 17:44:09 +0000
-Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
-Message-ID: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Mon, 12 Feb 2018 17:44:12 +0000
+Subject: [PATCH v5 03/26] ARM: dts: r8a7745: Adjust SMP routine size
+In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1518457475-4480-4-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+This patch adjusts the definition of the SMP routine size according
+to the latest changes made by commit:
+"ARM: shmobile: Add watchdog support"
 
-this series has been around for some time as RFC, and it has collected
-useful comments from the community along the way.
-The solution proposed by this patch set works for most R-Car Gen2 and
-RZ/G1 devices, but not all of them. We now know that for some R-Car
-Gen2 early revisions there is no proper software fix. Anyway, no
-product has been built around early revisions, but development boards
-mounting early revisions (basically prototypes) are still out there.
-As a result, this series isn't enabling the internal watchdog on R-Car
-Gen2 boards, developers may enable it in board specific device trees
-if needed.
-This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
-and Koelsch boards.
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v4->v5:
+* no change
 
-The problem
-===========
-To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
-to ICRAM1 and we program the [S]BAR registers so that when we turn ON
-the non-boot CPUs they are redirected to the reset vector installed by
-Linux in ICRAM1, and eventually they continue the execution to RAM,
-where the SMP bring-up code will take care of the rest.
-The content of the [S]BAR registers survives a watchdog triggered reset,
-and as such after the watchdog fires the boot core will try and execute
-the SMP bring-up code instead of jumping to the bootrom code.
+ arch/arm/boot/dts/r8a7745.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The fix
-=======
-The main strategy for the solution is to let the reset vector decide
-if it needs to jump to shmobile_boot_fn or to the bootrom code.
-In a watchdog triggered reset scenario, since the [S]BAR registers keep
-their values, the boot CPU will jump into the newly designed reset
-vector, the assembly routine will eventually test WOVF (a bit in register
-RWTCSRA that indicates if the watchdog counter has overflown, the value
-of this bit gets retained in this scenario), and jump to the bootrom code
-which will in turn load up the bootloader, etc.
-When bringing up SMP or using CPU hotplug, the reset vector will jump
-to shmobile_boot_fn instead.
-
-Thank you All for your help.
-
-Best regards,
-
-Fabrizio Castro (26):
-  ARM: shmobile: Add watchdog support
-  ARM: dts: r8a7743: Adjust SMP routine size
-  ARM: dts: r8a7745: Adjust SMP routine size
-  ARM: dts: r8a7790: Adjust SMP routine size
-  ARM: dts: r8a7791: Adjust SMP routine size
-  ARM: dts: r8a7792: Adjust SMP routine size
-  ARM: dts: r8a7793: Adjust SMP routine size
-  ARM: dts: r8a7794: Adjust SMP routine size
-  soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
-  ARM: shmobile: rcar-gen2: Add watchdog support
-  dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
-  watchdog: renesas_wdt: Add R-Car Gen2 support
-  watchdog: renesas_wdt: Add restart handler
-  ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
-  clk: renesas: r8a7743: Add rwdt clock
-  clk: renesas: r8a7745: Add rwdt clock
-  clk: renesas: r8a7790: Add rwdt clock
-  clk: renesas: r8a7791/r8a7793: Add rwdt clock
-  clk: renesas: r8a7794: Add rwdt clock
-  ARM: dts: r8a7743: Add watchdog support to SoC dtsi
-  ARM: dts: r8a7745: Add watchdog support to SoC dtsi
-  ARM: dts: r8a7790: Add watchdog support to SoC dtsi
-  ARM: dts: r8a7791: Add watchdog support to SoC dtsi
-  ARM: dts: r8a7794: Add watchdog support to SoC dtsi
-  ARM: dts: iwg20m: Add watchdog support to SoM dtsi
-  ARM: dts: iwg22m: Add watchdog support to SoM dtsi
-
- .../devicetree/bindings/watchdog/renesas-wdt.txt   | 19 ++++++--
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |  5 ++
- arch/arm/boot/dts/r8a7743.dtsi                     | 12 ++++-
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi              |  5 ++
- arch/arm/boot/dts/r8a7745.dtsi                     | 12 ++++-
- arch/arm/boot/dts/r8a7790.dtsi                     | 12 ++++-
- arch/arm/boot/dts/r8a7791.dtsi                     | 12 ++++-
- arch/arm/boot/dts/r8a7792.dtsi                     |  2 +-
- arch/arm/boot/dts/r8a7793.dtsi                     |  2 +-
- arch/arm/boot/dts/r8a7794.dtsi                     | 12 ++++-
- arch/arm/configs/shmobile_defconfig                |  1 +
- arch/arm/mach-shmobile/common.h                    |  6 +++
- arch/arm/mach-shmobile/headsmp.S                   | 55 ++++++++++++++++++++++
- arch/arm/mach-shmobile/platsmp-apmu.c              |  1 +
- arch/arm/mach-shmobile/pm-rcar-gen2.c              | 15 ++++--
- drivers/clk/renesas/r8a7743-cpg-mssr.c             |  2 +
- drivers/clk/renesas/r8a7745-cpg-mssr.c             |  2 +
- drivers/clk/renesas/r8a7790-cpg-mssr.c             |  2 +
- drivers/clk/renesas/r8a7791-cpg-mssr.c             |  2 +
- drivers/clk/renesas/r8a7794-cpg-mssr.c             |  2 +
- drivers/soc/renesas/rcar-rst.c                     | 35 +++++++++++---
- drivers/watchdog/renesas_wdt.c                     | 39 +++++++++++++--
- 22 files changed, 229 insertions(+), 26 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index ddc3da2..6bc1cf4 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -755,7 +755,7 @@
+ 
+ 			smp-sram at 0 {
+ 				compatible = "renesas,smp-sram";
+-				reg = <0 0x10>;
++				reg = <0 0x100>;
+ 			};
+ 		};
+ 
 -- 
 2.7.4
