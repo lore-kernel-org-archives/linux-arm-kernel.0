@@ -1,71 +1,98 @@
-From: kbingham@kernel.org (Kieran Bingham)
-Date: Mon, 12 Feb 2018 22:07:51 +0000
-Subject: [PATCH v3 3/5] [RFT] ARM: dts: wheat: Fix ADV7513 address usage
-In-Reply-To: <1518473273-6333-1-git-send-email-kbingham@kernel.org>
-References: <1518473273-6333-1-git-send-email-kbingham@kernel.org>
-Message-ID: <1518473273-6333-4-git-send-email-kbingham@kernel.org>
+From: jonas.gorski@gmail.com (Jonas Gorski)
+Date: Mon, 12 Feb 2018 23:17:47 +0100
+Subject: [PATCH] irqchip: Use %px to print pointer value
+In-Reply-To: <6bf05e81-2334-f3ac-08a7-e53ee59bb4c0@arm.com>
+References: <20180209021031.20631-1-jaedon.shin@gmail.com>
+ <ba5fb474-4e45-8d8d-ee5d-9f1a211090e3@arm.com>
+ <45424653-235D-4C4B-8908-417943F5283C@gmail.com>
+ <6bf05e81-2334-f3ac-08a7-e53ee59bb4c0@arm.com>
+Message-ID: <CAOiHx=n7yS2dD9LVeQp7p48Sai51aQHjyLHUQMnBvXjwChoh7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+On 9 February 2018 at 17:04, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 09/02/18 15:54, Florian Fainelli wrote:
+>> On February 9, 2018 12:51:33 AM PST, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 09/02/18 02:10, Jaedon Shin wrote:
+>>>> Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
+>>>> pointers printed with %p are hashed. Use %px instead of %p to print
+>>>> pointer value.
+>>>>
+>>>> Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-bcm7038-l1.c | 2 +-
+>>>>  drivers/irqchip/irq-bcm7120-l2.c | 2 +-
+>>>>  drivers/irqchip/irq-brcmstb-l2.c | 2 +-
+>>>>  3 files changed, 3 insertions(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-bcm7038-l1.c
+>>> b/drivers/irqchip/irq-bcm7038-l1.c
+>>>> index 55cfb986225b..f604c1d89b3b 100644
+>>>> --- a/drivers/irqchip/irq-bcm7038-l1.c
+>>>> +++ b/drivers/irqchip/irq-bcm7038-l1.c
+>>>> @@ -339,7 +339,7 @@ int __init bcm7038_l1_of_init(struct device_node
+>>> *dn,
+>>>>             goto out_unmap;
+>>>>     }
+>>>>
+>>>> -   pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
+>>>> +   pr_info("registered BCM7038 L1 intc (mem: 0x%px, IRQs: %d)\n",
+>>>>             intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
+>>>>
+>>>>     return 0;
+>>>> diff --git a/drivers/irqchip/irq-bcm7120-l2.c
+>>> b/drivers/irqchip/irq-bcm7120-l2.c
+>>>> index 983640eba418..1cc4dd1d584a 100644
+>>>> --- a/drivers/irqchip/irq-bcm7120-l2.c
+>>>> +++ b/drivers/irqchip/irq-bcm7120-l2.c
+>>>> @@ -318,7 +318,7 @@ static int __init bcm7120_l2_intc_probe(struct
+>>> device_node *dn,
+>>>>             }
+>>>>     }
+>>>>
+>>>> -   pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
+>>>> +   pr_info("registered %s intc (mem: 0x%px, parent IRQ(s): %d)\n",
+>>>>                     intc_name, data->map_base[0], data->num_parent_irqs);
+>>>>
+>>>>     return 0;
+>>>> diff --git a/drivers/irqchip/irq-brcmstb-l2.c
+>>> b/drivers/irqchip/irq-brcmstb-l2.c
+>>>> index 691d20eb0bec..6760edeeb666 100644
+>>>> --- a/drivers/irqchip/irq-brcmstb-l2.c
+>>>> +++ b/drivers/irqchip/irq-brcmstb-l2.c
+>>>> @@ -262,7 +262,7 @@ static int __init brcmstb_l2_intc_of_init(struct
+>>> device_node *np,
+>>>>             ct->chip.irq_set_wake = irq_gc_set_wake;
+>>>>     }
+>>>>
+>>>> -   pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
+>>>> +   pr_info("registered L2 intc (mem: 0x%px, parent irq: %d)\n",
+>>>>                     base, parent_irq);
+>>>>
+>>>>     return 0;
+>>>>
+>>>
+>>> Why is that something useful to do? This just tells you where the
+>>> device
+>>> is mapped in the VA space, and I doubt that's a useful information,
+>>> hashed pointers or not. Am I missing something obvious?
+>>
+>> No you are right there is not much value in printing the register
+>> virtual address (sometimes there is e.g: on MIPS) either we fix the
+>> prints to show the physical address of the base register or we could
+>> possibly drop the prints entirely.
+>
+> Displaying the PA can be useful if you have several identical blocks in
+> your system and you want to be able to identify them. Given that there
+> is probably only one of these controllers per system, the address is
+> pretty pointless.
 
-The r8a7792 Wheat board has two ADV7513 devices sharing a single i2c
-bus, however in low power mode the ADV7513 will reset it's slave maps to
-use the hardware defined default addresses.
+Multiple instances are actually quite common in the STB SoCs, e.g.
+bcm7362 has one instance of bcm7038-l1, two instances of bcm7120-l2
+and four instances of brcmstb-l2.
 
-The ADV7511 driver was adapted to allow the two devices to be registered
-correctly - but it did not take into account the fault whereby the
-devices reset the addresses.
 
-This results in an address conflict between the device using the default
-addresses, and the other device if it is in low-power-mode.
+Regards
+Jonas
 
-Repair this issue by moving both devices away from the default address
-definitions.
-
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-
----
-v2:
- - Addition to series
-
-v3:
- - Split map register addresses into individual declarations.
-
- arch/arm/boot/dts/r8a7792-wheat.dts | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index b9471b67b728..42fff8837eab 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -240,9 +240,16 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 
-+	/*
-+	 * The adv75xx resets its addresses to defaults during low power power
-+	 * mode. Because we have two ADV7513 devices on the same bus, we must
-+	 * change both of them away from the defaults so that they do not
-+	 * conflict.
-+	 */
- 	hdmi at 3d {
- 		compatible = "adi,adv7513";
--		reg = <0x3d>;
-+		reg = <0x3d>, <0x2d>, <0x4d>, <0x5d>;
-+		reg-names = "main", "cec", "edid", "packet";
- 
- 		adi,input-depth = <8>;
- 		adi,input-colorspace = "rgb";
-@@ -272,7 +279,8 @@
- 
- 	hdmi at 39 {
- 		compatible = "adi,adv7513";
--		reg = <0x39>;
-+		reg = <0x39>, <0x29>, <0x49>, <0x59>;
-+		reg-names = "main", "cec", "edid", "packet";
- 
- 		adi,input-depth = <8>;
- 		adi,input-colorspace = "rgb";
--- 
-2.7.4
+P.S: Also What about bcm6345-l1? It also prints it's mapped VAs, not the PAs.
