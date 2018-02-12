@@ -1,91 +1,67 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Mon, 12 Feb 2018 15:01:57 +0100
-Subject: [PATCH] drm/pl111: Fix regression from fbdev CMA helper
-In-Reply-To: <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
-References: <20180212124019.25268-1-linus.walleij@linaro.org>
- <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
-Message-ID: <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 12 Feb 2018 15:15:39 +0100
+Subject: [PATCH 2/6] mfd: Add ST Multi-Function eXpander core driver
+In-Reply-To: <20180212120600.5cghrzz4jqvvkgz6@dell>
+References: <1518100057-23234-1-git-send-email-amelie.delaunay@st.com>
+ <1518100057-23234-3-git-send-email-amelie.delaunay@st.com>
+ <20180212120600.5cghrzz4jqvvkgz6@dell>
+Message-ID: <CAOFm3uH+DLcOqiSV0z0N6JnmSk+JfTF3bfkC0_2kdFT-eDMr8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Amelie,
 
-Den 12.02.2018 14.42, skrev Noralf Tr?nnes:
+On Mon, Feb 12, 2018 at 1:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 08 Feb 2018, Amelie Delaunay wrote:
 >
-> Den 12.02.2018 13.40, skrev Linus Walleij:
->> Commit d18df744de1a ("drm/pl111: Use drm_fb_cma_fbdev_init/fini()")
->> refactored the driver to use fbdev handling in the core, but
->> mistakedly limited the number of maximum connections to 0.
+>> ST Multi-Function eXpander (MFX) is a slave controller using I2C
+>> for communication with the main MCU. Main features are:
+>> - 16 fast GPIOs individually configurable in input/output
+>> - 8 alternate GPIOs individually configurable in input/output
+>> - Main MCU IDD measurement
+>> - Resistive touchscreen controller
 >>
->> Predictably, zero possible connections also gives zero
->> framebuffers when using the system. So let's bump it to 1 so
->> we get our framebuffer back.
+>> Only GPIO expander (16 fast GPIOs + 8 alternate) feature is
+>> supported for the moment.
 >>
->> Cc: Noralf Tr?nnes <noralf@tronnes.org>
->> Cc: Eric Anholt <eric@anholt.net>
->> Fixes: d18df744de1a ("drm/pl111: Use drm_fb_cma_fbdev_init/fini()")
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ? drivers/gpu/drm/pl111/pl111_drv.c | 2 +-
->> ? 1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c 
->> b/drivers/gpu/drm/pl111/pl111_drv.c
->> index acb738c69873..306ac7cabd90 100644
->> --- a/drivers/gpu/drm/pl111/pl111_drv.c
->> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
->> @@ -138,7 +138,7 @@ static int pl111_modeset_init(struct drm_device 
->> *dev)
->> ? ????? drm_mode_config_reset(dev);
->> ? -??? drm_fb_cma_fbdev_init(dev, 32, 0);
->> +??? drm_fb_cma_fbdev_init(dev, 32, 1);
->> ? ????? drm_kms_helper_poll_init(dev);
+>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+
+<snip>
+
+>> --- /dev/null
+>> +++ b/drivers/mfd/st-mfx.c
+>> @@ -0,0 +1,526 @@
+>> +/*
+>> + * STMicroelectronics Multi-Function eXpander (ST-MFX) Core Driver
+>> + *
+>> + * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>> + * Author(s): Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
 >
-> Sorry about that.
+> You don't need to put "for STMicroelectronics".  This was something we
+> made up when submitting from a different (!st.com) email address.
 >
-> I don't know how bridges work, but since it doesn't work this means that
-> there's no connector available at this point?
+>> + * License terms: GPL V2.0.
+>> + *
+>> + * st-mfx Core Driver is free software; you can redistribute it and/or modify it
+>> + * under the terms of the GNU General Public License version 2 as published by
+>> + * the Free Software Foundation.
+>> + *
+>> + * st-mfx Core Driver is distributed in the hope that it will be useful, but
+>> + * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+>> + * details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * st-mfx Core Driver. If not, see <http://www.gnu.org/licenses/>.
 >
-> This is the arg docs:
->
-> ?* @max_conn_count: Maximum number of connectors.
-> ?*????????????????? @dev->mode_config.num_connector is used if this is 
-> zero.
->
-> Anyways:
-> Acked-by: Noralf Tr?nnes <noralf@tronnes.org>
->
+> You should be able to use the short version of the licensing
+> agreement.  Also, please grep for "SPDX".
 
-I forgot to look at the change, and I don't understand how this broke 
-anything,
+You can check the doc for the (fairly new) way to remove legalese
+boilerplate at Documentation/process/license-rules.rst or [1]
+It helps keep the focus on the code and less on licensing!
 
-drm/pl111: Use drm_fb_cma_fbdev_init/fini():
-
-@@ -137,8 +138,7 @@ static int pl111_modeset_init(struct drm_device *dev)
-
- ???? drm_mode_config_reset(dev);
-
--??? priv->fbdev = drm_fbdev_cma_init(dev, 32,
--??? ??? ??? ??? ??? ?dev->mode_config.num_connector);
-+??? drm_fb_cma_fbdev_init(dev, 32, 0);
-
- ???? drm_kms_helper_poll_init(dev);
-
-New max_conn_count setting:
-
-int drm_fb_cma_fbdev_init(struct drm_device *dev, unsigned int 
-preferred_bpp,
- ??? ??? ??? ? unsigned int max_conn_count)
-{
- ??? return drm_fb_cma_fbdev_init_with_funcs(dev, preferred_bpp,
- ??? ??? ??? ??? ??? ??? max_conn_count, NULL);
-}
-
-int drm_fb_cma_fbdev_init_with_funcs(struct drm_device *dev,
- ??? unsigned int preferred_bpp, unsigned int max_conn_count,
- ??? const struct drm_framebuffer_funcs *funcs)
-{
-...
- ??? if (!max_conn_count)
- ??? ??? max_conn_count = dev->mode_config.num_connector;
-
-Noralf.
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
+-- 
+Cordially
+Philippe Ombredanne
