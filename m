@@ -1,126 +1,118 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Feb 2018 23:35:02 +0100
-Subject: [PATCH] ARM: defconfig: Update Gemini defconfig
-Message-ID: <20180212223502.27371-1-linus.walleij@linaro.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 12 Feb 2018 16:38:57 -0700
+Subject: [PATCH] perf-tools: cs-etm: Properly deal with cpu maps
+Message-ID: <1518478737-24649-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the Gemini defconfig with a config that will bring
-up most of the recently merged and updated devices to some
-functional level:
+This patch allows the CoreSight AUX info section to fit topologies where
+only a subset of all available CPUs are present, avoiding at the same time
+accessing the ETM configuration areas of CPUs that have been offlined.
 
-- We enable high resolution timers (the right thing to do)
-- Enable CMA for the framebuffer, and the new TVE200
-  framebuffer driver and the Ilitek ILI9322 driver for
-  graphics on the D-Link DIR-685.
-- Enable networking and the new Cortina Gemini ethernet
-  driver.
-- Enable MDIO over GPIO and the Realtek PHY devices used on
-  several of these systems.
-- Enable some basic RT2x Wirelss configuration, as many of
-  these devides have these wireless cards. (Explicitly disable
-  the rest for now.)
-- Enable I2C over GPIO and SPI over GPIO which is used on
-  several of these devices.
-- Enable the Thermal framework, GPIO fan control and LM75 sensor
-  adding cooling on the D-Link DNS-313 with no userspace
-  involved even if only the kernel is working, rock solid
-  thermal for this platform.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
-ARM SoC folks: please apply this for fixes.
----
- arch/arm/configs/gemini_defconfig | 48 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 46 insertions(+), 2 deletions(-)
+ tools/perf/arch/arm/util/cs-etm.c | 51 +++++++++++++++++++++++++++------------
+ 1 file changed, 36 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/configs/gemini_defconfig b/arch/arm/configs/gemini_defconfig
-index 2a63fa10c813..7fb96a26dd12 100644
---- a/arch/arm/configs/gemini_defconfig
-+++ b/arch/arm/configs/gemini_defconfig
-@@ -1,6 +1,7 @@
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BSD_PROCESS_ACCT=y
- CONFIG_USER_NS=y
- CONFIG_RELAY=y
-@@ -12,10 +13,18 @@ CONFIG_ARCH_GEMINI=y
- CONFIG_PCI=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-+CONFIG_CMA=y
- CONFIG_CMDLINE="console=ttyS0,115200n8"
- CONFIG_KEXEC=y
- CONFIG_BINFMT_MISC=y
- CONFIG_PM=y
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_NET_DSA=y
-+CONFIG_CFG80211=y
-+CONFIG_CFG80211_WEXT=y
-+CONFIG_MAC80211=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_MTD=y
-@@ -33,6 +42,29 @@ CONFIG_BLK_DEV_SD=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_ATA=y
- CONFIG_PATA_FTIDE010=y
-+CONFIG_NETDEVICES=y
-+CONFIG_GEMINI_ETHERNET=y
-+CONFIG_MDIO_BITBANG=y
-+CONFIG_MDIO_GPIO=y
-+CONFIG_REALTEK_PHY=y
-+# CONFIG_USB_NET_DRIVERS is not set
-+# CONFIG_WLAN_VENDOR_ADMTEK is not set
-+# CONFIG_WLAN_VENDOR_ATH is not set
-+# CONFIG_WLAN_VENDOR_ATMEL is not set
-+# CONFIG_WLAN_VENDOR_BROADCOM is not set
-+# CONFIG_WLAN_VENDOR_CISCO is not set
-+# CONFIG_WLAN_VENDOR_INTEL is not set
-+# CONFIG_WLAN_VENDOR_INTERSIL is not set
-+# CONFIG_WLAN_VENDOR_MARVELL is not set
-+# CONFIG_WLAN_VENDOR_MEDIATEK is not set
-+CONFIG_RT2X00=y
-+CONFIG_RT61PCI=y
-+CONFIG_RT2800PCI=y
-+# CONFIG_WLAN_VENDOR_REALTEK is not set
-+# CONFIG_WLAN_VENDOR_RSI is not set
-+# CONFIG_WLAN_VENDOR_ST is not set
-+# CONFIG_WLAN_VENDOR_TI is not set
-+# CONFIG_WLAN_VENDOR_ZYDAS is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-@@ -43,12 +75,24 @@ CONFIG_SERIAL_8250_NR_UARTS=1
- CONFIG_SERIAL_8250_RUNTIME_UARTS=1
- CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
--# CONFIG_HWMON is not set
-+CONFIG_I2C_GPIO=y
-+CONFIG_SPI=y
-+CONFIG_SPI_GPIO=y
-+CONFIG_SENSORS_GPIO_FAN=y
-+CONFIG_SENSORS_LM75=y
-+CONFIG_THERMAL=y
- CONFIG_WATCHDOG=y
--CONFIG_GEMINI_WATCHDOG=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_DRM=y
-+CONFIG_DRM_PANEL_ILITEK_IL9322=y
-+CONFIG_DRM_TVE200=y
-+CONFIG_LOGO=y
- CONFIG_USB=y
- CONFIG_USB_MON=y
-+CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_FOTG210_HCD=y
-+CONFIG_USB_UHCI_HCD=y
- CONFIG_USB_STORAGE=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
+diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+index fbfc055d3f4d..5c655ad4621e 100644
+--- a/tools/perf/arch/arm/util/cs-etm.c
++++ b/tools/perf/arch/arm/util/cs-etm.c
+@@ -298,12 +298,17 @@ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+ {
+ 	int i;
+ 	int etmv3 = 0, etmv4 = 0;
+-	const struct cpu_map *cpus = evlist->cpus;
++	struct cpu_map *event_cpus = evlist->cpus;
++	struct cpu_map *online_cpus = cpu_map__new(NULL);
+ 
+ 	/* cpu map is not empty, we have specific CPUs to work with */
+-	if (!cpu_map__empty(cpus)) {
+-		for (i = 0; i < cpu_map__nr(cpus); i++) {
+-			if (cs_etm_is_etmv4(itr, cpus->map[i]))
++	if (!cpu_map__empty(event_cpus)) {
++		for (i = 0; i < cpu__max_cpu(); i++) {
++			if (!cpu_map__has(event_cpus, i) ||
++			    !cpu_map__has(online_cpus, i))
++				continue;
++
++			if (cs_etm_is_etmv4(itr, i))
+ 				etmv4++;
+ 			else
+ 				etmv3++;
+@@ -311,6 +316,9 @@ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+ 	} else {
+ 		/* get configuration for all CPUs in the system */
+ 		for (i = 0; i < cpu__max_cpu(); i++) {
++			if (!cpu_map__has(online_cpus, i))
++				continue;
++
+ 			if (cs_etm_is_etmv4(itr, i))
+ 				etmv4++;
+ 			else
+@@ -318,6 +326,8 @@ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+ 		}
+ 	}
+ 
++	cpu_map__put(online_cpus);
++
+ 	return (CS_ETM_HEADER_SIZE +
+ 	       (etmv4 * CS_ETMV4_PRIV_SIZE) +
+ 	       (etmv3 * CS_ETMV3_PRIV_SIZE));
+@@ -447,7 +457,9 @@ static int cs_etm_info_fill(struct auxtrace_record *itr,
+ 	int i;
+ 	u32 offset;
+ 	u64 nr_cpu, type;
+-	const struct cpu_map *cpus = session->evlist->cpus;
++	struct cpu_map *cpu_map;
++	struct cpu_map *event_cpus = session->evlist->cpus;
++	struct cpu_map *online_cpus = cpu_map__new(NULL);
+ 	struct cs_etm_recording *ptr =
+ 			container_of(itr, struct cs_etm_recording, itr);
+ 	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
+@@ -458,8 +470,21 @@ static int cs_etm_info_fill(struct auxtrace_record *itr,
+ 	if (!session->evlist->nr_mmaps)
+ 		return -EINVAL;
+ 
+-	/* If the cpu_map is empty all CPUs are involved */
+-	nr_cpu = cpu_map__empty(cpus) ? cpu__max_cpu() : cpu_map__nr(cpus);
++	/* If the cpu_map is empty all online CPUs are involved */
++	if (cpu_map__empty(event_cpus)) {
++		cpu_map = online_cpus;
++	} else {
++		/* Make sure all specified CPUs are online */
++		for (i = 0; i < cpu_map__nr(event_cpus); i++) {
++			if (cpu_map__has(event_cpus, i) &&
++			    !cpu_map__has(online_cpus, i))
++				return -EINVAL;
++		}
++
++		cpu_map = event_cpus;
++	}
++
++	nr_cpu = cpu_map__nr(cpu_map);
+ 	/* Get PMU type as dynamically assigned by the core */
+ 	type = cs_etm_pmu->type;
+ 
+@@ -472,15 +497,11 @@ static int cs_etm_info_fill(struct auxtrace_record *itr,
+ 
+ 	offset = CS_ETM_SNAPSHOT + 1;
+ 
+-	/* cpu map is not empty, we have specific CPUs to work with */
+-	if (!cpu_map__empty(cpus)) {
+-		for (i = 0; i < cpu_map__nr(cpus) && offset < priv_size; i++)
+-			cs_etm_get_metadata(cpus->map[i], &offset, itr, info);
+-	} else {
+-		/* get configuration for all CPUs in the system */
+-		for (i = 0; i < cpu__max_cpu(); i++)
++	for (i = 0; i < cpu__max_cpu() && offset < priv_size; i++)
++		if (cpu_map__has(cpu_map, i))
+ 			cs_etm_get_metadata(i, &offset, itr, info);
+-	}
++
++	cpu_map__put(online_cpus);
+ 
+ 	return 0;
+ }
 -- 
-2.14.3
+2.7.4
