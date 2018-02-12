@@ -1,52 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 12 Feb 2018 18:26:09 +0000
-Subject: [PATCH 2/2] arm64: dts: juno: Describe the full GICv2m region
-In-Reply-To: <b0604207-8edf-6b32-9bf1-e45895926178@arm.com>
-References: <20180207143255.17003-1-marc.zyngier@arm.com>
- <20180207143255.17003-3-marc.zyngier@arm.com>
- <d10fa874-1de2-1b95-dae1-42a336b98fa2@arm.com>
- <b0604207-8edf-6b32-9bf1-e45895926178@arm.com>
-Message-ID: <4bdc6616-c616-9d28-797d-fb445f263e22@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 12 Feb 2018 21:04:06 +0300
+Subject: [PATCH 0/3] Add R8A77970/Eagle PFC support
+In-Reply-To: <049b0a0a-b1c2-73e6-c471-ca8342bba6ab@ideasonboard.com>
+References: <20171110200218.747996672@cogentembedded.com>
+ <20171113075303.zmkmq6bt3lfuttwu@verge.net.au>
+ <049b0a0a-b1c2-73e6-c471-ca8342bba6ab@ideasonboard.com>
+Message-ID: <19d23fa2-1205-89a0-786f-f301ca7a0f7b@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 01/19/2018 01:48 PM, Kieran Bingham wrote:
 
-On 12/02/18 18:22, Robin Murphy wrote:
-> On 12/02/18 18:17, Sudeep Holla wrote:
->>
->>
->> On 07/02/18 14:32, Marc Zyngier wrote:
->>> From: Robin Murphy <robin.murphy@arm.com>
+>>> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
+>>> 'renesas-devel-20171110-v4.14-rc8' tag.  We're adding the R8A77970 PFC node
+>>> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
+>>> These patches depend on the R8A77970 PFC suport in order to work properly.
 >>>
->>> Juno's GICv2m implementation consists of four frames providing 32
->>> interrupts each. Since it is possible to plug in enough PCIe endpoints
->>> to consume more than 32 MSIs, and the driver already has a bodge to
->>> handle multiple frames, let's expose the other three as well.
->>>
+>>> [1/3] arm64: dts: renesas: r8a77970: add PFC support
+>>> [2/3] arm64: dts: renesas: eagle: add SCIF0 pins
+>>> [3/3] arm64: dts: renesas: eagle: add EtherAVB pins
 >>
->> Change on it own looks good. So if you want to merge via your tree:
+>> Hi Sergei,
 >>
->> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->>
->> Let me know if you decide not to take it via your tree and you want me
->> to send it to arm-soc.
->>
->> On the side note I just noticed the Juno TRM[1] has 64k for each of
->> these MSI frames(page 3-24 section 3.3.5 Application memory map summary)
->>
->> I am not sure if TRM is wrong. This patch is just copying the 4k size
->> from frame 0 which got added with initial Juno DTS.
+>> I have marked these patches as deferred pending acceptance of the PFC
+>> driver. Please repost or otherwise ping me once that dependency has been
+>> accepted.
 > 
-> Depends what your point of view is: The address map allocates 64KB worth
-> of space for the device, but the device itself only decodes the first
-> 4KB of that. My view is that the DT is describing the actual devices,
-> not the interconnect routing between them, so there's really no need to
-> tell consumers to map known-useless empty space.
+> Has the dependency blocking this series been resolved yet ?
+
+   Now it is, except for the 3rd patch... Simon, do I need to repost the first two?
+The 1st one did apply to 4.16-rc1 here with a fuzz...
+
+> (I have patches for the Eagle-V3M which are blocked waiting for the PFC support)
 > 
+> --
+> Regards
+> 
+> Kieran
 
-Thanks for the clarification.
-
--- 
-Regards,
-Sudeep
+MBR, Sergei
