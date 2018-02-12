@@ -1,34 +1,64 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 12 Feb 2018 12:04:34 -0600
-Subject: [PATCH] spi: bcm2835aux: use 64-bit arithmetic instead of 32-bit
-In-Reply-To: <CAKv+Gu9hmxLSS0ekr8av-ADt3OQjBV=Bt-hRq_-SzWaGODs4SQ@mail.gmail.com>
-References: <20180207160002.GA9292@embeddedgus>
- <CAKv+Gu9hmxLSS0ekr8av-ADt3OQjBV=Bt-hRq_-SzWaGODs4SQ@mail.gmail.com>
-Message-ID: <275feee3-7140-498b-714f-4c88a302d3f6@embeddedor.com>
+From: kbingham@kernel.org (Kieran Bingham)
+Date: Mon, 12 Feb 2018 18:11:55 +0000
+Subject: [PATCH v2 3/5] [RFT] ARM: dts: wheat: Fix ADV7513 address usage
+In-Reply-To: <1518459117-16733-1-git-send-email-kbingham@kernel.org>
+References: <1518459117-16733-1-git-send-email-kbingham@kernel.org>
+Message-ID: <1518459117-16733-4-git-send-email-kbingham@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-On 02/08/2018 03:54 AM, Ard Biesheuvel wrote:
-> On 7 February 2018 at 16:00, Gustavo A. R. Silva <gustavo@embeddedor.com> wrote:
->> Add suffix ULL to constant 9 in order to give the compiler complete
->> information about the proper arithmetic to use. Notice that this
->> constant is used in a context that expects an expression of type
->> unsigned long long (64 bits, unsigned).
->>
->> The expression tfr->len * 9 * 1000000 is currently being evaluated
->> using 32-bit arithmetic.
->>
->> Addresses-Coverity-ID: 1339619
-> 
-> What does this number mean? If it is an index into some internal
-> database, please remove it.
-> 
+The r8a7792 Wheat board has two ADV7513 devices sharing a single i2c
+bus, however in low power mode the ADV7513 will reset it's slave maps to
+use the hardware defined default addresses.
 
-This is a unique Coverity identifier. We want to keep information like 
-public Bugzilla IDs and tools like Coverity on the commit message.
+The ADV7511 driver was adapted to allow the two devices to be registered
+correctly - but it did not take into account the fault whereby the
+devices reset the addresses.
 
-Thanks
---
-Gustavo
+This results in an address conflict between the device using the default
+addresses, and the other device if it is in low-power-mode.
+
+Repair this issue by moving both devices away from the default address
+definitions.
+
+Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+---
+ arch/arm/boot/dts/r8a7792-wheat.dts | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
+index b9471b67b728..c94f330392ee 100644
+--- a/arch/arm/boot/dts/r8a7792-wheat.dts
++++ b/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -240,9 +240,16 @@
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+ 
++	/*
++	 * The adv75xx resets its addresses to defaults during low power power
++	 * mode. Because we have two ADV7513 devices on the same bus, we must
++	 * change both of them away from the defaults so that they do not
++	 * conflict.
++	 */
+ 	hdmi at 3d {
+ 		compatible = "adi,adv7513";
+-		reg = <0x3d>;
++		reg = <0x3d 0x2d 0x4d, 0x5d>;
++		reg-names = "main", "cec", "edid", "packet";
+ 
+ 		adi,input-depth = <8>;
+ 		adi,input-colorspace = "rgb";
+@@ -272,7 +279,8 @@
+ 
+ 	hdmi at 39 {
+ 		compatible = "adi,adv7513";
+-		reg = <0x39>;
++		reg = <0x39 0x29 0x49, 0x59>;
++		reg-names = "main", "cec", "edid", "packet";
+ 
+ 		adi,input-depth = <8>;
+ 		adi,input-colorspace = "rgb";
+-- 
+2.7.4
