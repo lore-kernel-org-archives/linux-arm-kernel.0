@@ -1,53 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Feb 2018 16:00:39 +0000
-Subject: [PATCHv2 05/12] arm64: Don't trap host pointer auth use to EL2
-In-Reply-To: <20180206123906.GZ21802@cbox>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-6-mark.rutland@arm.com>
- <20180206123906.GZ21802@cbox>
-Message-ID: <20180212160039.br2emy3zt6ftmwfu@lakrids.cambridge.arm.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Mon, 12 Feb 2018 17:02:00 +0100
+Subject: [PATCH] drm/pl111: Fix regression from fbdev CMA helper
+In-Reply-To: <CACRpkdbaCuhzuzkRgUpfwGmwJrJ61E0cK76WLAr=6f=pkX8TuQ@mail.gmail.com>
+References: <20180212124019.25268-1-linus.walleij@linaro.org>
+ <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
+ <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
+ <CACRpkdbaCuhzuzkRgUpfwGmwJrJ61E0cK76WLAr=6f=pkX8TuQ@mail.gmail.com>
+Message-ID: <eefffc00-6ab7-2fe8-9ba6-6ecf6dbac8e2@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 01:39:06PM +0100, Christoffer Dall wrote:
-> Hi Mark,
-> 
-> On Mon, Nov 27, 2017 at 04:37:59PM +0000, Mark Rutland wrote:
-> > To allow EL0 (and/or EL1) to use pointer authentication functionality,
-> > we must ensure that pointer authentication instructions and accesses to
-> > pointer authentication keys are not trapped to EL2 (where we will not be
-> > able to handle them).
-> 
-> ...on non-VHE systems, presumably?
 
-For EL0 usage, we don't want to trap even in the absence of VHE, so I'll
-drop the bit in brackets entirely.
+Den 12.02.2018 16.53, skrev Linus Walleij:
+> On Mon, Feb 12, 2018 at 3:01 PM, Noralf Tr?nnes <noralf@tronnes.org> wrote:
+>> Den 12.02.2018 14.42, skrev Noralf Tr?nnes:
+>>> Den 12.02.2018 13.40, skrev Linus Walleij:
+>>>>          drm_mode_config_reset(dev);
+>>>>    -    drm_fb_cma_fbdev_init(dev, 32, 0);
+>>>> +    drm_fb_cma_fbdev_init(dev, 32, 1);
+>>>>          drm_kms_helper_poll_init(dev);
+> (...)
+>
+>> I forgot to look at the change, and I don't understand how this broke
+>> anything,
+> My wrong.
+>
+> I had some old codepaths in my out-of-tree stuff (sorry
+> the only thing that makes the hardware work...).
+>
+> I was using the old drm_fbdev_cma_init() which isn't
+> as helpful as the new drm_fb_cma_fbdev_init() but
+> as the old function is still there it all just "worked"
+> except for this...
+>
+> Theres is some confusion with these similarly named
+> functions :D
 
-> > This patch ensures that HCR_EL2 is configured appropriately when the
-> > kernel is booted at EL2. For non-VHE kernels we set HCR_EL2.{API,APK},
-> > ensuring that EL1 can access keys and permit EL0 use of instructions.
-> > For VHE kernels, EL2 access is controlled by EL3, and we need not set
-> > anything.
-> 
-> 
-> for VHE kernels host EL0 (TGE && E2H) is unaffected by these settings,
-> and it doesn't matter how we configure HCR_EL2.{API,APK}.
-> 
-> (Because you do actually set these bits when the features are present if
-> I read the code correctly).
+Yeah, that's my doing :-/
+I have yet to do the final cleanup to remove struct drm_fbdev_cma.
+If the generic fbdev emulation that I'm working on turns out good,
+then it's possible to entirely drop fbdev code from many drivers.
+Hence the waiting.
 
-Ah, true. I've taken your proposed wording.
+> Sorry for the fuzz, I fixed my patch set to use the new
+> function now.
 
-> > This does not enable support for KVM guests, since KVM manages HCR_EL2
-> > itself.
-> 
->         (...when running VMs.)
-> 
-> 
-> Besides the nits:
-> 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+No problem.
 
-Cheers!
+Noralf.
 
-Mark.
+>
+> Let's just drop this patch.
+>
+> Yours,
+> Linus Walleij
+>
