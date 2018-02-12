@@ -1,51 +1,91 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Mon, 12 Feb 2018 22:52:37 +0900
-Subject: [PATCH] crypto: arm/aes-cipher - move S-box to .rodata section
-Message-ID: <20180212135237.GA3011@pjb1027-Latitude-E5410>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Mon, 12 Feb 2018 15:01:57 +0100
+Subject: [PATCH] drm/pl111: Fix regression from fbdev CMA helper
+In-Reply-To: <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
+References: <20180212124019.25268-1-linus.walleij@linaro.org>
+ <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
+Message-ID: <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the AES inverse S-box to the .rodata section
-where it is safe from abuse by speculation.
 
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
- arch/arm/crypto/aes-cipher-core.S | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+Den 12.02.2018 14.42, skrev Noralf Tr?nnes:
+>
+> Den 12.02.2018 13.40, skrev Linus Walleij:
+>> Commit d18df744de1a ("drm/pl111: Use drm_fb_cma_fbdev_init/fini()")
+>> refactored the driver to use fbdev handling in the core, but
+>> mistakedly limited the number of maximum connections to 0.
+>>
+>> Predictably, zero possible connections also gives zero
+>> framebuffers when using the system. So let's bump it to 1 so
+>> we get our framebuffer back.
+>>
+>> Cc: Noralf Tr?nnes <noralf@tronnes.org>
+>> Cc: Eric Anholt <eric@anholt.net>
+>> Fixes: d18df744de1a ("drm/pl111: Use drm_fb_cma_fbdev_init/fini()")
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ? drivers/gpu/drm/pl111/pl111_drv.c | 2 +-
+>> ? 1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c 
+>> b/drivers/gpu/drm/pl111/pl111_drv.c
+>> index acb738c69873..306ac7cabd90 100644
+>> --- a/drivers/gpu/drm/pl111/pl111_drv.c
+>> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
+>> @@ -138,7 +138,7 @@ static int pl111_modeset_init(struct drm_device 
+>> *dev)
+>> ? ????? drm_mode_config_reset(dev);
+>> ? -??? drm_fb_cma_fbdev_init(dev, 32, 0);
+>> +??? drm_fb_cma_fbdev_init(dev, 32, 1);
+>> ? ????? drm_kms_helper_poll_init(dev);
+>
+> Sorry about that.
+>
+> I don't know how bridges work, but since it doesn't work this means that
+> there's no connector available at this point?
+>
+> This is the arg docs:
+>
+> ?* @max_conn_count: Maximum number of connectors.
+> ?*????????????????? @dev->mode_config.num_connector is used if this is 
+> zero.
+>
+> Anyways:
+> Acked-by: Noralf Tr?nnes <noralf@tronnes.org>
+>
 
-diff --git a/arch/arm/crypto/aes-cipher-core.S b/arch/arm/crypto/aes-cipher-core.S
-index 54b3840..184d6c2 100644
---- a/arch/arm/crypto/aes-cipher-core.S
-+++ b/arch/arm/crypto/aes-cipher-core.S
-@@ -174,6 +174,16 @@
- 	.ltorg
- 	.endm
- 
-+ENTRY(__aes_arm_encrypt)
-+	do_crypt	fround, crypto_ft_tab, crypto_ft_tab + 1, 2
-+ENDPROC(__aes_arm_encrypt)
-+
-+	.align		5
-+ENTRY(__aes_arm_decrypt)
-+	do_crypt	iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
-+ENDPROC(__aes_arm_decrypt)
-+
-+	.section	".rodata", "a"
- 	.align		L1_CACHE_SHIFT
- 	.type		__aes_arm_inverse_sbox, %object
- __aes_arm_inverse_sbox:
-@@ -210,12 +220,3 @@ __aes_arm_inverse_sbox:
- 	.byte		0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26
- 	.byte		0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
- 	.size		__aes_arm_inverse_sbox, . - __aes_arm_inverse_sbox
--
--ENTRY(__aes_arm_encrypt)
--	do_crypt	fround, crypto_ft_tab, crypto_ft_tab + 1, 2
--ENDPROC(__aes_arm_encrypt)
--
--	.align		5
--ENTRY(__aes_arm_decrypt)
--	do_crypt	iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
--ENDPROC(__aes_arm_decrypt)
--- 
-1.9.1
+I forgot to look at the change, and I don't understand how this broke 
+anything,
+
+drm/pl111: Use drm_fb_cma_fbdev_init/fini():
+
+@@ -137,8 +138,7 @@ static int pl111_modeset_init(struct drm_device *dev)
+
+ ???? drm_mode_config_reset(dev);
+
+-??? priv->fbdev = drm_fbdev_cma_init(dev, 32,
+-??? ??? ??? ??? ??? ?dev->mode_config.num_connector);
++??? drm_fb_cma_fbdev_init(dev, 32, 0);
+
+ ???? drm_kms_helper_poll_init(dev);
+
+New max_conn_count setting:
+
+int drm_fb_cma_fbdev_init(struct drm_device *dev, unsigned int 
+preferred_bpp,
+ ??? ??? ??? ? unsigned int max_conn_count)
+{
+ ??? return drm_fb_cma_fbdev_init_with_funcs(dev, preferred_bpp,
+ ??? ??? ??? ??? ??? ??? max_conn_count, NULL);
+}
+
+int drm_fb_cma_fbdev_init_with_funcs(struct drm_device *dev,
+ ??? unsigned int preferred_bpp, unsigned int max_conn_count,
+ ??? const struct drm_framebuffer_funcs *funcs)
+{
+...
+ ??? if (!max_conn_count)
+ ??? ??? max_conn_count = dev->mode_config.num_connector;
+
+Noralf.
