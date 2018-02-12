@@ -1,60 +1,41 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 12 Feb 2018 13:32:20 +0530
-Subject: [PATCH] ARM: da8xx: use platform data for CFGCHIP syscon regmap
-In-Reply-To: <92c5a905-a3d3-1fcc-ff76-66ec075fbadc@ti.com>
-References: <1516750563-24981-1-git-send-email-david@lechnology.com>
- <0ca5c498-e16e-f02a-28be-51ee9abb3363@ti.com>
- <92c5a905-a3d3-1fcc-ff76-66ec075fbadc@ti.com>
-Message-ID: <76797622-733f-fe00-4a15-46a5f867a186@ti.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 12 Feb 2018 15:42:34 +0800
+Subject: [shawnguo:imx/dt 1/42] Error:
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts:19.1-2 syntax error
+Message-ID: <201802121532.20rd85VM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/dt
+head:   4ce917f8d003453415200c6be13b74ba4676ddeb
+commit: d287e28b2c909bf99a4aac5eb98521247b476517 [1/42] ARM: dts: ls1021a: add nodes for on-chip ram
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout d287e28b2c909bf99a4aac5eb98521247b476517
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
+All errors (new ones prefixed by >>):
 
-On Monday 12 February 2018 01:26 PM, Sekhar Nori wrote:
-> On Thursday 25 January 2018 08:57 PM, Sekhar Nori wrote:
->> + Arnd, Kishon and Lee for their information.
->>
->> On Wednesday 24 January 2018 05:06 AM, David Lechner wrote:
->>> This converts from using a platform device for the CFGCHIP syscon
->>> regmap to using platform data to pass the regmap to consumers.
->>>
->>> A lazy getter function is used so that the regmap will only be
->>> created if it is actually used. This function will also be used
->>> in the clock init when we convert to the common clock framework.
->>>
->>> The USB PHY driver is currently the only consumer. This driver is
->>> updated to use platform data to get the CFGCHIP regmap instead of
->>> syscon_regmap_lookup_by_pdevname().
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>> ---
->>>
->>> This is based on the feedback from the series "ARM: davinci: common clock prep
->>> work?". https://lkml.org/lkml/2018/1/19/715
->>
->> It will be nice to have the discussion link as part of commit description.
->>
->> Links:
->> https://lkml.kernel.org/r/<CAK8P3a1AP1sz3nT8S6WMupo3iSVRsn2t9sPg2Mj1RAY1AS58UQ@mail.gmail.com>
->>
->> Kishon,
->>
->> With your ack I would like to queue this through the DaVinci tree for
-> 
-> Kishon, ping on this.
+>> Error: arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts:19.1-2 syntax error
+>> FATAL ERROR: Unable to parse input tree
+--
+>> Error: arch/arm/boot/dts/ls1021a-qds.dts:51.1-2 syntax error
+>> FATAL ERROR: Unable to parse input tree
+--
+>> Error: arch/arm/boot/dts/ls1021a-twr.dts:51.1-2 syntax error
+>> FATAL ERROR: Unable to parse input tree
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
->> v4.17. Due to ongoing common clock framework conversion effort, I expect
->> to queue a number of other patches dependent on this.
->>
->> Once v4.16-rc1 comes out, I can provide an immutable commit/tag with
->> just this patch applied. You can use that if you end up queuing other
->> patches which conflict with this.
->>
->> Let me know.
-> 
-> Thanks,
-> Sekhar
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23600 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180212/1c9342c6/attachment-0001.gz>
