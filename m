@@ -1,71 +1,63 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 12 Feb 2018 09:59:00 +0100
-Subject: [PATCH v3 1/7] watchdog: sama5d4: make use of timeout-secs
- provided in devicetree
-In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
-References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
-Message-ID: <c925c4cb-1367-d57e-49eb-f88a6d2a1e70@microchip.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 12 Feb 2018 10:16:03 +0100
+Subject: [linux-sunxi] [PATCH v2 5/6] arm64: allwinner: h6: add the
+ basical Allwinner H6 DTSI file
+In-Reply-To: <a4299cac-84c1-6468-c38a-f232d0dbfb8a@arm.com>
+References: <20180203154942.63566-1-icenowy@aosc.io>
+ <20180203154942.63566-6-icenowy@aosc.io>
+ <a4299cac-84c1-6468-c38a-f232d0dbfb8a@arm.com>
+Message-ID: <CAOFm3uHoQcZ3TZg_uTs2aBgU-p0r2ffJ2VLK+E4V19fmLW10WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2018 at 21:08, Marcus Folkesson wrote:
-> watchdog_init_timeout() will allways pick timeout_param since it
-> defaults to a valid timeout.
-> 
-> Following best practice described in
-> Documentation/watchdog/watchdog-kernel-api.txt to make use of
-> the parameter logic.
-> 
-> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
+Icenowy,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+On Mon, Feb 12, 2018 at 12:26 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> On 03/02/18 15:49, Icenowy Zheng wrote:
+>> Allwinner H6 is a new SoC with Cortex-A53 cores from Allwinner, with its
+>> memory map fully reworked and some high-speed peripherals (PCIe, USB
+>> 3.0) introduced.
+>>
+>> This commit adds the basical DTSI file of it, including the clock
+>> support and UART support.
+>
+> Checked the MMIO addresses and the interrupt numbers against the manual.
+>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+>
+> Thanks!
+> Andre.
+>
+>> ---
+>> Changes in v2:
+>> - Add APB1 clock as PIO's APB clock.
+>> - Switched to SPDX license identifier.
+>>
+>>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 178 +++++++++++++++++++++++++++
+>>  1 file changed, 178 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>> new file mode 100644
+>> index 000000000000..d4697bb42496
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+>> @@ -0,0 +1,178 @@
+>> +/*
+>> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
+>> + *
+>> + * SPDX-License-Identifier: (GPL-2.0+ or MIT)
+>> + */
 
-Thanks, best regards,
-  Nicolas
+Thank you for using SPDX ids: this needs to be on the first line
+though! [1] and eventually some special comments style.
 
-> ---
-> 
-> Notes:
->     v3:
->     	- Use wdd->timeout instead of wdt_timeout when print out
->     	  timout in probe function.
-> 
->  drivers/watchdog/sama5d4_wdt.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index 0ae947c3d7bc..255169916dbb 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -33,7 +33,7 @@ struct sama5d4_wdt {
->  	unsigned long		last_ping;
->  };
->  
-> -static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> +static int wdt_timeout;
->  static bool nowayout = WATCHDOG_NOWAYOUT;
->  
->  module_param(wdt_timeout, int, 0);
-> @@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	wdd = &wdt->wdd;
-> -	wdd->timeout = wdt_timeout;
-> +	wdd->timeout = WDT_DEFAULT_TIMEOUT;
->  	wdd->info = &sama5d4_wdt_info;
->  	wdd->ops = &sama5d4_wdt_ops;
->  	wdd->min_timeout = MIN_WDT_TIMEOUT;
-> @@ -273,7 +273,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, wdt);
->  
->  	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
-> -		 wdt_timeout, nowayout);
-> +		 wdd->timeout, nowayout);
->  
->  	return 0;
->  }
-> 
-
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
 
 -- 
-Nicolas Ferre
+Cordially
+Philippe Ombredanne
