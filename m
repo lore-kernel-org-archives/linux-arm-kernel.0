@@ -1,40 +1,24 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 12 Feb 2018 16:05:49 +0100
-Subject: [PATCH v2] MAINTAINERS: add Freescale pin controllers
-Message-ID: <20180212150549.8622-1-stefan@agner.ch>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 12 Feb 2018 09:10:29 -0600
+Subject: [PATCH] acpi, spcr: Make SPCR available to x86
+In-Reply-To: <7bd5897f-d6da-7e29-29c4-aa26d24f6355@redhat.com>
+References: <20180118150951.28964-1-prarit@redhat.com>
+ <20180212133429.GC25314@hirez.programming.kicks-ass.net>
+ <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
+ <953565bd-436b-c1fe-d3c5-cde731dee83d@codeaurora.org>
+ <7bd5897f-d6da-7e29-29c4-aa26d24f6355@redhat.com>
+Message-ID: <50309183-d8e4-aa24-f37d-596e4334f50e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
-and the Pengutronix kernel team as reviewer.
+On 2/12/18 8:49 AM, Prarit Bhargava wrote:
+> That's true on ARM64.  I specifically did not enable the console by default on
+> x86.  There are users who do not want a console active during boot & runtime.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
----
- MAINTAINERS | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Hmmmm... That's a good point.  On ARM systems with SPCR, you get a 
+console whether you like it or not.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 82ad0eabce4f..df60ca7c3355 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
- S:	Supported
- F:	drivers/pinctrl/pinctrl-at91-pio4.*
- 
-+PIN CONTROLLER - FREESCALE
-+M:	Dong Aisheng <aisheng.dong@nxp.com>
-+M:	Fabio Estevam <festevam@gmail.com>
-+M:	Shawn Guo <shawnguo@kernel.org>
-+M:	Stefan Agner <stefan@agner.ch>
-+R:	Pengutronix Kernel Team <kernel@pengutronix.de>
-+L:	linux-gpio at vger.kernel.org
-+S:	Maintained
-+F:	drivers/pinctrl/freescale/*
-+F:	Documentation/devicetree/bindings/pinctrl/fsl,*
-+
- PIN CONTROLLER - INTEL
- M:	Mika Westerberg <mika.westerberg@linux.intel.com>
- M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
 -- 
-2.16.1
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
