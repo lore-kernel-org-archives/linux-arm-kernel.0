@@ -1,176 +1,110 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 12 Feb 2018 18:33:30 +0000
-Subject: [PATCH 15/37] iommu/io-pgtable-arm: Factor out ARM LPAE register
- defines
+Date: Mon, 12 Feb 2018 18:33:29 +0000
+Subject: [PATCH 14/37] iommu/arm-smmu-v3: Link domains and devices
 In-Reply-To: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
 References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
-Message-ID: <20180212183352.22730-16-jean-philippe.brucker@arm.com>
+Message-ID: <20180212183352.22730-15-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For SVA, we'll need to extract CPU page table information and mirror it in
-the substream setup. Move relevant defines to a common header.
+When removing a mapping from a domain, we need to send an invalidation to
+all devices that might have stored it in their Address Translation Cache
+(ATC). In addition when updating the context descriptor of a live domain,
+we'll need to send invalidations for all devices attached to it.
 
-Fix TCR_SZ_MASK while we're at it.
+Maintain a list of devices in each domain, protected by a spinlock. It is
+updated every time we attach or detach devices to and from domains.
+
+It needs to be a spinlock because we'll invalidate ATC entries from
+within hardirq-safe contexts, but it may be possible to relax the read
+side with RCU later.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- MAINTAINERS                    |  1 +
- drivers/iommu/io-pgtable-arm.c | 48 +-----------------------------
- drivers/iommu/io-pgtable-arm.h | 67 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+), 47 deletions(-)
- create mode 100644 drivers/iommu/io-pgtable-arm.h
+ drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3bdc260e36b7..9cb8ced8322a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1106,6 +1106,7 @@ S:	Maintained
- F:	drivers/iommu/arm-smmu.c
- F:	drivers/iommu/arm-smmu-v3.c
- F:	drivers/iommu/io-pgtable-arm.c
-+F:	drivers/iommu/io-pgtable-arm.h
- F:	drivers/iommu/io-pgtable-arm-v7s.c
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 3f2f1fc68b52..fb2507ffcdaf 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -652,6 +652,11 @@ struct arm_smmu_device {
+ struct arm_smmu_master_data {
+ 	struct arm_smmu_device		*smmu;
+ 	struct arm_smmu_strtab_ent	ste;
++
++	struct arm_smmu_domain		*domain;
++	struct list_head		list; /* domain->devices */
++
++	struct device			*dev;
+ };
  
- ARM SUB-ARCHITECTURES
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 51e5c43caed1..fff0b6ba0a69 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -31,6 +31,7 @@
- #include <asm/barrier.h>
+ /* SMMU private data for an IOMMU domain */
+@@ -675,6 +680,9 @@ struct arm_smmu_domain {
+ 	};
  
- #include "io-pgtable.h"
-+#include "io-pgtable-arm.h"
+ 	struct iommu_domain		domain;
++
++	struct list_head		devices;
++	spinlock_t			devices_lock;
+ };
  
- #define ARM_LPAE_MAX_ADDR_BITS		48
- #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
-@@ -118,53 +119,6 @@
- #define ARM_LPAE_PTE_MEMATTR_DEV	(((arm_lpae_iopte)0x1) << 2)
+ struct arm_smmu_option_prop {
+@@ -1540,6 +1548,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	}
  
- /* Register bits */
--#define ARM_32_LPAE_TCR_EAE		(1 << 31)
--#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
--
--#define ARM_LPAE_TCR_EPD1		(1 << 23)
--
--#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
--#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
--#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
--
--#define ARM_LPAE_TCR_SH0_SHIFT		12
--#define ARM_LPAE_TCR_SH0_MASK		0x3
--#define ARM_LPAE_TCR_SH_NS		0
--#define ARM_LPAE_TCR_SH_OS		2
--#define ARM_LPAE_TCR_SH_IS		3
--
--#define ARM_LPAE_TCR_ORGN0_SHIFT	10
--#define ARM_LPAE_TCR_IRGN0_SHIFT	8
--#define ARM_LPAE_TCR_RGN_MASK		0x3
--#define ARM_LPAE_TCR_RGN_NC		0
--#define ARM_LPAE_TCR_RGN_WBWA		1
--#define ARM_LPAE_TCR_RGN_WT		2
--#define ARM_LPAE_TCR_RGN_WB		3
--
--#define ARM_LPAE_TCR_SL0_SHIFT		6
--#define ARM_LPAE_TCR_SL0_MASK		0x3
--
--#define ARM_LPAE_TCR_T0SZ_SHIFT		0
--#define ARM_LPAE_TCR_SZ_MASK		0xf
--
--#define ARM_LPAE_TCR_PS_SHIFT		16
--#define ARM_LPAE_TCR_PS_MASK		0x7
--
--#define ARM_LPAE_TCR_IPS_SHIFT		32
--#define ARM_LPAE_TCR_IPS_MASK		0x7
--
--#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
--#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
--#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
--#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
--#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
--#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
--
--#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
--#define ARM_LPAE_MAIR_ATTR_MASK		0xff
--#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
--#define ARM_LPAE_MAIR_ATTR_NC		0x44
--#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
- #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
- #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
- #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
-diff --git a/drivers/iommu/io-pgtable-arm.h b/drivers/iommu/io-pgtable-arm.h
-new file mode 100644
-index 000000000000..cb31314971ac
---- /dev/null
-+++ b/drivers/iommu/io-pgtable-arm.h
-@@ -0,0 +1,67 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Copyright (C) 2017 ARM Limited
-+ */
-+#ifndef __IO_PGTABLE_ARM_H
-+#define __IO_PGTABLE_ARM_H
+ 	mutex_init(&smmu_domain->init_mutex);
++	INIT_LIST_HEAD(&smmu_domain->devices);
++	spin_lock_init(&smmu_domain->devices_lock);
 +
-+#define ARM_32_LPAE_TCR_EAE		(1 << 31)
-+#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
+ 	return &smmu_domain->domain;
+ }
+ 
+@@ -1754,7 +1765,17 @@ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ 
+ static void arm_smmu_detach_dev(struct device *dev)
+ {
++	unsigned long flags;
+ 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
++	struct arm_smmu_domain *smmu_domain = master->domain;
 +
-+#define ARM_LPAE_TCR_EPD1		(1 << 23)
++	if (smmu_domain) {
++		spin_lock_irqsave(&smmu_domain->devices_lock, flags);
++		list_del(&master->list);
++		spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
 +
-+#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
-+#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
-+#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
++		master->domain = NULL;
++	}
+ 
+ 	master->ste.assigned = false;
+ 	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+@@ -1763,6 +1784,7 @@ static void arm_smmu_detach_dev(struct device *dev)
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ {
+ 	int ret = 0;
++	unsigned long flags;
+ 	struct arm_smmu_device *smmu;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 	struct arm_smmu_master_data *master;
+@@ -1798,6 +1820,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	}
+ 
+ 	ste->assigned = true;
++	master->domain = smmu_domain;
 +
-+#define ARM_LPAE_TCR_SH0_SHIFT		12
-+#define ARM_LPAE_TCR_SH0_MASK		0x3
-+#define ARM_LPAE_TCR_SH_NS		0
-+#define ARM_LPAE_TCR_SH_OS		2
-+#define ARM_LPAE_TCR_SH_IS		3
-+
-+#define ARM_LPAE_TCR_ORGN0_SHIFT	10
-+#define ARM_LPAE_TCR_IRGN0_SHIFT	8
-+#define ARM_LPAE_TCR_RGN_MASK		0x3
-+#define ARM_LPAE_TCR_RGN_NC		0
-+#define ARM_LPAE_TCR_RGN_WBWA		1
-+#define ARM_LPAE_TCR_RGN_WT		2
-+#define ARM_LPAE_TCR_RGN_WB		3
-+
-+#define ARM_LPAE_TCR_SL0_SHIFT		6
-+#define ARM_LPAE_TCR_SL0_MASK		0x3
-+
-+#define ARM_LPAE_TCR_T0SZ_SHIFT		0
-+#define ARM_LPAE_TCR_SZ_MASK		0x3f
-+
-+#define ARM_LPAE_TCR_PS_SHIFT		16
-+#define ARM_LPAE_TCR_PS_MASK		0x7
-+
-+#define ARM_LPAE_TCR_IPS_SHIFT		32
-+#define ARM_LPAE_TCR_IPS_MASK		0x7
-+
-+#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
-+#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
-+#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
-+#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
-+#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
-+#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
-+
-+#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
-+#define ARM_LPAE_MAIR_ATTR_MASK		0xff
-+#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
-+#define ARM_LPAE_MAIR_ATTR_NC		0x44
-+#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
-+
-+#endif /* __IO_PGTABLE_ARM_H */
++	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
++	list_add(&master->list, &smmu_domain->devices);
++	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
+ 
+ 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
+ 		ste->s1_cfg = NULL;
+@@ -1916,6 +1943,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 			return -ENOMEM;
+ 
+ 		master->smmu = smmu;
++		master->dev = dev;
+ 		fwspec->iommu_priv = master;
+ 	}
+ 
 -- 
 2.15.1
