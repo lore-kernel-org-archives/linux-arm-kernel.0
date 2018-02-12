@@ -1,55 +1,72 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 12 Feb 2018 14:23:02 +0530
-Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
- i.MX6UL/ULL
-In-Reply-To: <20180118235836.17393-1-stefan@agner.ch>
-References: <20180118235836.17393-1-stefan@agner.ch>
-Message-ID: <20180212085302.GR28462@vireshk-i7>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Feb 2018 08:57:36 +0000
+Subject: [PATCH] arm64: Add missing Falkor part number for branch
+ predictor hardening
+In-Reply-To: <1518398175-28378-1-git-send-email-shankerd@codeaurora.org>
+References: <1518398175-28378-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <86po5ah9fj.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-01-18, 00:58, Stefan Agner wrote:
-> Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
-> Use PLL1 sys clock for all operating points higher than 528MHz.
+On Mon, 12 Feb 2018 01:16:15 +0000,
+Shanker Donthineni wrote:
 > 
-> Note: For higher operating points VDD_SOC_IN needs to be 125mV
-> higher than the ARM set-point (see datasheet). Specifically, the
-> i.MX6UL/ULL EVK boards have an external DC regulator which needs
-> adjustment. The regulator adjustment is not covered with this
-> change.
+> References to CPU part number MIDR_QCOM_FALKOR were dropped from the
+> mailing list patch due to mainline/arm64 branch dependency. So this
+> patch adds the missing part number.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Fixes: ec82b567a74f ("arm64: Implement branch predictor hardening for Falkor")
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 > ---
->  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
+>  arch/arm64/kernel/cpu_errata.c | 9 +++++++++
+>  arch/arm64/kvm/hyp/switch.c    | 4 +++-
+>  2 files changed, 12 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 628fe899cb48..840f6386c780 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		 */
->  		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->  		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> -		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> -			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> -		else
-> -			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> -		clk_set_parent(step_clk, secondary_sel_clk);
-> -		clk_set_parent(pll1_sw_clk, step_clk);
-> +		if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
-> +			if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
-> +				clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-> +			else
-> +				clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
-> +			clk_set_parent(step_clk, secondary_sel_clk);
-> +			clk_set_parent(pll1_sw_clk, step_clk);
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 0782359..52f15cd 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -408,6 +408,15 @@ static int qcom_enable_link_stack_sanitization(void *data)
+>  	},
+>  	{
+>  		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+> +		.enable = qcom_enable_link_stack_sanitization,
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
+> +		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
+> +	},
+> +	{
+> +		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+>  		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
+>  		.enable = enable_smccc_arch_workaround_1,
+>  	},
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 116252a8..870f4b1 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -407,8 +407,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  		u32 midr = read_cpuid_id();
+>  
+>  		/* Apply BTAC predictors mitigation to all Falkor chips */
+> -		if ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)
+> +		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
+> +		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
+>  			__qcom_hyp_sanitize_btac_predictors();
 > +		}
->  	} else {
->  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->  		clk_set_parent(pll1_sw_clk, step_clk);
+>  	}
+>  
+>  	fp_enabled = __fpsimd_enabled();
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+I'd suggest this goes via the arm64 tree as a matter of consistency
+with the rest of the variant-2 series.
+
+Thanks,
+
+	M.
 
 -- 
-viresh
+Jazz is not dead, it just smell funny.
