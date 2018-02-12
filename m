@@ -1,57 +1,71 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 12 Feb 2018 18:13:20 +1030
-Subject: [PATCH 1/6] ARM: dts: aspeed: Add IPMI BT node
+Date: Mon, 12 Feb 2018 18:13:21 +1030
+Subject: [PATCH 2/6] ARM: dts: aspeed: Enable IPMI BT node on OpenPower
+ machines
 In-Reply-To: <20180212074325.23436-1-joel@jms.id.au>
 References: <20180212074325.23436-1-joel@jms.id.au>
-Message-ID: <20180212074325.23436-2-joel@jms.id.au>
+Message-ID: <20180212074325.23436-3-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPMI BT device part of the LPC interface and is used for
-communication with the host processor.
+These BMC systems require this device to communicate with the host.
 
 Acked-by: Andrew Jeffery <andrew@aj.id.au>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 7 +++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 7 +++++++
- 2 files changed, 14 insertions(+)
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts    | 4 ++++
+ arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts     | 4 ++++
+ arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts | 4 ++++
+ arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts       | 4 ++++
+ 4 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index b0d8431a3700..8b18176dca59 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -247,6 +247,13 @@
- 						compatible = "aspeed,ast2400-lhc";
- 						reg = <0x20 0x24 0x48 0x8>;
- 					};
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+index 4379d09a261f..5115247e5e59 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -111,3 +111,7 @@
+ &vuart {
+ 	status = "okay";
+ };
 +
-+					ibt: ibt at c0  {
-+						compatible = "aspeed,ast2400-ibt-bmc";
-+						reg = <0xc0 0x18>;
-+						interrupts = <8>;
-+						status = "disabled";
-+					};
- 				};
- 			};
- 
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 40de3b66c33f..18185484a224 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -298,6 +298,13 @@
- 						compatible = "aspeed,ast2500-lhc";
- 						reg = <0x20 0x24 0x48 0x8>;
- 					};
++&ibt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+index 623b6ab42021..d41be52c2393 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
+@@ -257,3 +257,7 @@
+ 		aspeed,fan-tach-ch = /bits/ 8 <0x0e>;
+ 	};
+ };
 +
-+					ibt: ibt at c0 {
-+						compatible = "aspeed,ast2500-ibt-bmc";
-+						reg = <0xc0 0x18>;
-+						interrupts = <8>;
-+						status = "disabled";
-+					};
- 				};
- 			};
- 
++&ibt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts b/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
+index 5f9049d2c4c3..7056231cbee6 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts
+@@ -546,3 +546,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_wdtrst1_default>;
+ };
++
++&ibt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts b/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
+index c881484a85cf..ebe726a0d311 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts
+@@ -424,3 +424,7 @@
+ 		aspeed,fan-tach-ch = /bits/ 8 <0x03>;
+ 	};
+ };
++
++&ibt {
++	status = "okay";
++};
 -- 
 2.15.1
