@@ -1,24 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Feb 2018 13:44:54 -0200
-Subject: [PATCH] ARM: dts: imx6: remove GPU subsystem nodes
-In-Reply-To: <20180212152158.11823-1-l.stach@pengutronix.de>
-References: <20180212152158.11823-1-l.stach@pengutronix.de>
-Message-ID: <CAOMZO5D9nB_Q1JOSouha44k4VU0r_KrPGBu6jjV4wUxw5pLm5Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Feb 2018 16:53:18 +0100
+Subject: [PATCH] drm/pl111: Fix regression from fbdev CMA helper
+In-Reply-To: <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
+References: <20180212124019.25268-1-linus.walleij@linaro.org>
+ <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
+ <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
+Message-ID: <CACRpkdbaCuhzuzkRgUpfwGmwJrJ61E0cK76WLAr=6f=pkX8TuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+On Mon, Feb 12, 2018 at 3:01 PM, Noralf Tr?nnes <noralf@tronnes.org> wrote:
+> Den 12.02.2018 14.42, skrev Noralf Tr?nnes:
+>> Den 12.02.2018 13.40, skrev Linus Walleij:
 
-On Mon, Feb 12, 2018 at 1:21 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> They aren't needed by the etnaviv driver anymore and have been removed
-> from the binding.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> This patch is aimed at the 4.17 merge window, as this is when the
-> etnaviv change will land.
-> ---
->  arch/arm/boot/dts/imx6dl.dtsi | 5 -----
->  arch/arm/boot/dts/imx6q.dtsi  | 5 -----
+>>>         drm_mode_config_reset(dev);
+>>>   -    drm_fb_cma_fbdev_init(dev, 32, 0);
+>>> +    drm_fb_cma_fbdev_init(dev, 32, 1);
+>>>         drm_kms_helper_poll_init(dev);
 
-Looks like you missed imx6sx.dtsi?
+(...)
+
+> I forgot to look at the change, and I don't understand how this broke
+> anything,
+
+My wrong.
+
+I had some old codepaths in my out-of-tree stuff (sorry
+the only thing that makes the hardware work...).
+
+I was using the old drm_fbdev_cma_init() which isn't
+as helpful as the new drm_fb_cma_fbdev_init() but
+as the old function is still there it all just "worked"
+except for this...
+
+Theres is some confusion with these similarly named
+functions :D
+
+Sorry for the fuzz, I fixed my patch set to use the new
+function now.
+
+Let's just drop this patch.
+
+Yours,
+Linus Walleij
