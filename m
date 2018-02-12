@@ -1,82 +1,103 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Mon, 12 Feb 2018 15:43:01 +0100
-Subject: [PATCH v2 03/12] ARM: dts: STi: Add fake reg property for
- sti-display-subsystem
+Date: Mon, 12 Feb 2018 15:43:10 +0100
+Subject: [PATCH v2 12/12] ARM: dts: STi: Remove unused clk_ext2f_a9 clock
 In-Reply-To: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
 References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1518446590-16800-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518446590-16800-13-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-As sti-display-subsystem sub-nodes (sti-compositor, sti-tvout
-sti-hdmi, sti-hda and sti-hqvdp) are SoC's IP, we add a fake
-reg property.
-This allows to fix the following warning when compiling
-dtb with W=1 option:
+This clock node is unused, remove it.
+This allows to fix the following warnings when compiling
+dtb with W=1 option :
 
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
-Node /soc/sti-display-subsystem/sti-hda at 8d02000 has a unit name, but no reg property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /clocks/clockgen-c0 missing or empty reg/ranges property
+
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+Node /clocks/clockgen-c0 missing or empty reg/ranges property
+
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+Node /clocks/clockgen-c0 missing or empty reg/ranges property
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
 
-v2: _ add a fake reg property to node without reg property
+v2: _ remove clk_ext2f_a9 node
 
- arch/arm/boot/dts/stih407.dtsi      | 4 ++--
- arch/arm/boot/dts/stih410-b2120.dts | 2 +-
- arch/arm/boot/dts/stih410.dtsi      | 3 ++-
- 3 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 11fdecd9312e..4f01777082f5 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -11,11 +11,11 @@
- #include <dt-bindings/gpio/gpio.h>
- / {
- 	soc {
--		sti-display-subsystem {
-+		sti-display-subsystem at 0 {
- 			compatible = "st,sti-display-subsystem";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+ arch/arm/boot/dts/stih407-clock.dtsi | 11 -----------
+ arch/arm/boot/dts/stih410-clock.dtsi | 11 -----------
+ arch/arm/boot/dts/stih418-clock.dtsi | 11 -----------
+ 3 files changed, 33 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index f4e21e2234c9..d63d5e83e1ce 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -81,17 +81,6 @@
+ 			clock-mult = <1>;
+ 		};
+ 
+-		/*
+-		 * Bootloader initialized system infrastructure clock for
+-		 * serial devices.
+-		 */
+-		clk_ext2f_a9: clockgen-c0 {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <200000000>;
+-			clock-output-names = "clk-s-icn-reg-0";
+-		};
 -
-+			reg = <0 0>;
- 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
- 					  <&clk_s_d2_quadfs 1>,
- 					  <&clk_s_c0_pll1 0>,
-diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
-index 37a42afa0dd1..23199b1b0991 100644
---- a/arch/arm/boot/dts/stih410-b2120.dts
-+++ b/arch/arm/boot/dts/stih410-b2120.dts
-@@ -61,7 +61,7 @@
- 			status = "okay";
+ 		clockgen-a at 90ff000 {
+ 			compatible = "st,clkgen-c32";
+ 			reg = <0x90ff000 0x1000>;
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index 9481f8769e8a..c061b67e09d2 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -83,17 +83,6 @@
+ 			clock-mult = <1>;
  		};
  
--		sti-display-subsystem {
-+		sti-display-subsystem at 0 {
- 			sti-hda at 8d02000 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-index e4b7e3ddc9ee..d9f964702933 100644
---- a/arch/arm/boot/dts/stih410.dtsi
-+++ b/arch/arm/boot/dts/stih410.dtsi
-@@ -102,11 +102,12 @@
- 			status = "disabled";
+-		/*
+-		 * Bootloader initialized system infrastructure clock for
+-		 * serial devices.
+-		 */
+-		clk_ext2f_a9: clockgen-c0 {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <200000000>;
+-			clock-output-names = "clk-s-icn-reg-0";
+-		};
+-
+ 		clockgen-a at 90ff000 {
+ 			compatible = "st,clkgen-c32";
+ 			reg = <0x90ff000 0x1000>;
+diff --git a/arch/arm/boot/dts/stih418-clock.dtsi b/arch/arm/boot/dts/stih418-clock.dtsi
+index 9e3790198f51..14cdeb5d1599 100644
+--- a/arch/arm/boot/dts/stih418-clock.dtsi
++++ b/arch/arm/boot/dts/stih418-clock.dtsi
+@@ -83,17 +83,6 @@
+ 			clock-mult = <1>;
  		};
  
--		sti-display-subsystem {
-+		sti-display-subsystem at 0 {
- 			compatible = "st,sti-display-subsystem";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 
-+			reg = <0 0>;
- 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
- 					  <&clk_s_d2_quadfs 1>,
- 					  <&clk_s_c0_pll1 0>,
+-		/*
+-		 * Bootloader initialized system infrastructure clock for
+-		 * serial devices.
+-		 */
+-		clk_ext2f_a9: clockgen-c0 {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <200000000>;
+-			clock-output-names = "clk-s-icn-reg-0";
+-		};
+-
+ 		clockgen-a at 90ff000 {
+ 			compatible = "st,clkgen-c32";
+ 			reg = <0x90ff000 0x1000>;
 -- 
 1.9.1
