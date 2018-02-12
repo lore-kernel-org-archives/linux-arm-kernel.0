@@ -1,92 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Feb 2018 09:40:44 -0600
-Subject: [PATCH v2 09/12] ARM: dts: STi: Add fake reg property for sound
- related nodes
-In-Reply-To: <1518446590-16800-10-git-send-email-patrice.chotard@st.com>
-References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
- <1518446590-16800-10-git-send-email-patrice.chotard@st.com>
-Message-ID: <CABGGiszvx=Nyeq+KTt9uHGwSabxsJuEfvG01H4NyrBtB40atoA@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 12 Feb 2018 16:44:34 +0100
+Subject: [PATCH] acpi, spcr: Make SPCR available to x86
+In-Reply-To: <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
+References: <20180118150951.28964-1-prarit@redhat.com>
+ <20180212133429.GC25314@hirez.programming.kicks-ass.net>
+ <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
+ <20180212145652.GM25181@hirez.programming.kicks-ass.net>
+ <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
+Message-ID: <20180212154434.GX25201@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 8:43 AM,  <patrice.chotard@st.com> wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
->
-> Add fake reg property to sound, simple-audio-card, dai-link and
-> sti_sasg_codec nodes, this allows to fix the following warning
-> when compiling dtb with W=1 option:
->
-> arch/arm/boot/dts/stih407-b2120.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/stih407-b2120.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 1 has a unit name, but no reg property
-> arch/arm/boot/dts/stih407-b2120.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 2 has a unit name, but no reg property
-> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->
-> arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 1 has a unit name, but no reg property
-> arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 2 has a unit name, but no reg property
-> arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-> Node /soc/sound missing or empty reg/ranges property
-> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->
-> arch/arm/boot/dts/stih410-b2260.dtb: Warning (unit_address_vs_reg):
-> Node /soc/sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-> Node /soc/sti-sasg-codec missing or empty reg/ranges property
-> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-> Node /soc/sound missing or empty reg/ranges property
->
-> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
->
-> v2: _ add a fake reg property to node without reg property.
->
->  arch/arm/boot/dts/stih407-family.dtsi |  3 ++-
->  arch/arm/boot/dts/stih410-b2260.dts   |  5 +++--
->  arch/arm/boot/dts/stihxxx-b2120.dtsi  | 11 ++++++-----
->  3 files changed, 11 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 5df827b00eb6..df1a3f1dc5a7 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -894,8 +894,9 @@
->                         status = "disabled";
->                 };
->
-> -               sti_sasg_codec: sti-sasg-codec {
-> +               sti_sasg_codec: sti-sasg-codec at 0 {
->                         compatible = "st,stih407-sas-codec";
-> +                       reg = <0 0>;
->                         #sound-dai-cells = <1>;
->                         status = "disabled";
->                         st,syscfg = <&syscfg_core>;
+On Mon, Feb 12, 2018 at 10:18:06AM -0500, Prarit Bhargava wrote:
+> > But when I specify "earlyprintk=serial,ttyS0,115200" this SPCR crud will
+> > not interfere?
+> > 
+> 
+> I tested "earlyprintk=serial,ttyS0,115200" on a system which is known to have a
+> functional console with "console=ttyS0,1152008N1" both with and without
+> CONFIG_ACPI_SPCR_TABLE enabled.
 
-This should probably be a child of syscfg to fix this. And if this
-block has a dedicated set of registers, then use reg to define those
-(even though regmap/syscon doesn't need it).
-
-> diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-> index 8bcd58118dba..03d05a98b7fc 100644
-> --- a/arch/arm/boot/dts/stih410-b2260.dts
-> +++ b/arch/arm/boot/dts/stih410-b2260.dts
-> @@ -181,12 +181,13 @@
->                         status = "okay";
->                 };
->
-> -               sound {
-> +               sound: sound at 0 {
-
-I'd move this up to top level.
-
-Rob
+OK, but my point was that SPCR will never override explicit earlyprintk
+stuff. There is absolutely nothing worse than breaking working setups.
