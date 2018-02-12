@@ -1,43 +1,53 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Feb 2018 09:19:35 -0600
-Subject: [PATCH v2 01/12] ARM: dts: STi: Fix bindings notation
-In-Reply-To: <1518446590-16800-2-git-send-email-patrice.chotard@st.com>
-References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
- <1518446590-16800-2-git-send-email-patrice.chotard@st.com>
-Message-ID: <CABGGiswMN1-CQi-guB5y5YFNLhKH3z58b_skxb_q+ZMm7+n1Nw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 12 Feb 2018 16:21:58 +0100
+Subject: [PATCH] ARM: dts: imx6: remove GPU subsystem nodes
+Message-ID: <20180212152158.11823-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 8:42 AM,  <patrice.chotard@st.com> wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
->
-> Remove leading 0x and 0s from bindings notation
-> Add missing unit-address and remove some which are useless.
->
-> This allows to fix several warnings like :
->
-> Warning (unit_address_vs_reg): Node XXXX has a reg or ranges property, but no unit name
-> Warning (simple_bus_reg): Node XXXX simple-bus unit address format error, expected "123456"
-> Warning (unit_address_vs_reg): Node XXXX has a unit name, but no reg property
->
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
+They aren't needed by the etnaviv driver anymore and have been removed
+from the binding.
 
-[...]
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+This patch is aimed at the 4.17 merge window, as this is when the
+etnaviv change will land.
+---
+ arch/arm/boot/dts/imx6dl.dtsi | 5 -----
+ arch/arm/boot/dts/imx6q.dtsi  | 5 -----
+ 2 files changed, 10 deletions(-)
 
-> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index a29090077fdf..53c6888d1fc0 100644
-> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -45,7 +45,7 @@
->         };
->
->         soc {
-> -               pin-controller-sbc {
-> +               pin-controller-sbc at 961f080 {
-
-While you're here changing the node name, these all should be "pinctrl at ..."
-
-With that,
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index c01674fa098a..25833724484e 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -109,11 +109,6 @@
+ 		compatible = "fsl,imx-display-subsystem";
+ 		ports = <&ipu1_di0>, <&ipu1_di1>;
+ 	};
+-
+-	gpu-subsystem {
+-		compatible = "fsl,imx-gpu-subsystem";
+-		cores = <&gpu_2d>, <&gpu_3d>;
+-	};
+ };
+ 
+ &gpio1 {
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index bc581aa5cf17..ae7b3f107893 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -215,11 +215,6 @@
+ 		compatible = "fsl,imx-display-subsystem";
+ 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
+ 	};
+-
+-	gpu-subsystem {
+-		compatible = "fsl,imx-gpu-subsystem";
+-		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
+-	};
+ };
+ 
+ &gpio1 {
+-- 
+2.15.1
