@@ -1,41 +1,52 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 12 Feb 2018 15:42:34 +0800
-Subject: [shawnguo:imx/dt 1/42] Error:
- arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts:19.1-2 syntax error
-Message-ID: <201802121532.20rd85VM%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 12 Feb 2018 16:47:45 +0800
+Subject: [BUG]: A83T - AC100 gets the wrong number of parents
+In-Reply-To: <1518316987.5562.7.camel@gmail.com>
+References: <1518316987.5562.7.camel@gmail.com>
+Message-ID: <CAGb2v64L8Va65vf1_cgW8GkdmWuROGC6aUXsLytjcxipUWGWEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/dt
-head:   4ce917f8d003453415200c6be13b74ba4676ddeb
-commit: d287e28b2c909bf99a4aac5eb98521247b476517 [1/42] ARM: dts: ls1021a: add nodes for on-chip ram
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d287e28b2c909bf99a4aac5eb98521247b476517
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Sun, Feb 11, 2018 at 10:43 AM, Philipp Rossak <embed3d@gmail.com> wrote:
+> Hey,
+>
+> When I boot my A83T I get the following bootlog [1].
+>
+> After some debugging, I found out that the function call:
+> clk_hw_get_num_parents() returns 2. After a look in the devicetree I
+> found out that this value should be 1, since we only have one parent
+> clock [3].
 
-All errors (new ones prefixed by >>):
+Not really. The first parent is registered within the rtc-ac100 driver,
+which also handles the clocks on the RTC side of the chip.
 
->> Error: arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts:19.1-2 syntax error
->> FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/ls1021a-qds.dts:51.1-2 syntax error
->> FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm/boot/dts/ls1021a-twr.dts:51.1-2 syntax error
->> FATAL ERROR: Unable to parse input tree
+The clock in the device tree is meant to tie the two parts of the chip
+together: the codec side provides a high speed clock to the RTC side.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23600 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180212/1c9342c6/attachment-0001.gz>
+> Setting the variable num_parents to 1 fixes the problem, but this is no
+> soultion.
+
+A good fix would be to check the return value of clk_hw_get_parent_by_index()
+here: http://lxr.bootlin.com/linux/v4.16-rc1/source/drivers/rtc/rtc-ac100.c#L186
+and skip it if it's NULL.
+
+The driver is setup this way because the codec side is not implemented,
+but the device tree binding is partially defined to include the clock.
+
+ChenYu
+
+> Regards,
+> Philipp
+>
+>
+>
+> [1]: https://pastebin.com/5c7hxjsS
+> [2]: http://lxr.bootlin.com/linux/v4.15/source/drivers/rtc/rtc-ac100.c#
+> L180
+> [3]: http://lxr.bootlin.com/linux/v4.15/source/arch/arm/boot/dts/sun8i-
+> a83t-bananapi-m3.dts#L159
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
