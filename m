@@ -1,29 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Feb 2018 08:40:28 -0600
-Subject: [PATCH 1/1] dt-bindings: thermal: imx: update the binding to new
- method
-In-Reply-To: <1516862269-25543-1-git-send-email-aisheng.dong@nxp.com>
-References: <1516862269-25543-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180212144028.al7thpjxvefnfyze@rob-hp-laptop>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Mon, 12 Feb 2018 15:41:20 +0100
+Subject: [PATCH v2 00/12] ARM: dts: STi: Fix DT dtc warnings 
+Message-ID: <1518446480-16713-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 25, 2018 at 02:37:49PM +0800, Dong Aisheng wrote:
-> Due to the old method has already been marked as deprecated in binding
-> doc, so obviously it's better to update the example to new bindings
-> as well.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  .../devicetree/bindings/thermal/imx-thermal.txt    | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Applied, thanks.
+This series fixes all dtc warnings related to STi platforms dt files.
+It has been reported by Rob Herring [1]
 
-Rob
+For most of implicated node, the addition of a fake reg property
+fixes these warnings.
+
+[1] https://www.spinics.net/lists/devicetree/msg206209.html
+
+v2: _ add a fake reg property to node without reg property, instead 
+      of moving them outside soc node.
+
+Patrice Chotard (7):
+  ARM: dts: STi: fix bindings notation
+  ARM: dts: STi: Add gpio polarity for "hdmi,hpd-gpio" property
+  ARM: dts: STi: Move clocks without reg outside soc
+  ARM: dts: STi: Move leds node outside soc node
+  ARM: dts: STi: Add fake reg property for sti-display-subsystem
+  ARM: dts: STi: Add fake reg property for miphy28lp_phy
+  ARM: dts: STi: Add fake reg property for irq-syscfg
+  ARM: dts: STi: Add fake reg property for remote processors
+  ARM: dts: STi: Add fake reg for restart, powerdown and
+    picophy/softreset
+  ARM: dts: STi: Add fake reg property for usb2_picophyX nodes
+  ARM: dts: STi: Add fake reg property for sound related nodes
+  ARM: dts: STi: Add fake reg property for clocks
+  ARM: dts: STi: Move clk_sysin clock ouside soc node
+  ARM: dts: STi: Remove unused clk_ext2f_a9 clock
+
+ arch/arm/boot/dts/stih407-b2120.dts    |  2 +-
+ arch/arm/boot/dts/stih407-clock.dtsi   | 40 +++++++++-------------
+ arch/arm/boot/dts/stih407-family.dtsi  | 31 +++++++++++------
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 10 +++---
+ arch/arm/boot/dts/stih407.dtsi         |  4 +--
+ arch/arm/boot/dts/stih410-b2120.dts    |  8 ++---
+ arch/arm/boot/dts/stih410-b2260.dts    | 62 +++++++++++++++++-----------------
+ arch/arm/boot/dts/stih410-clock.dtsi   | 42 ++++++++++-------------
+ arch/arm/boot/dts/stih410-pinctrl.dtsi |  2 +-
+ arch/arm/boot/dts/stih410.dtsi         | 13 ++++---
+ arch/arm/boot/dts/stih418-b2199.dts    | 30 ++++++++--------
+ arch/arm/boot/dts/stih418-clock.dtsi   | 42 ++++++++++-------------
+ arch/arm/boot/dts/stih418.dtsi         |  6 ++--
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   | 41 +++++++++++-----------
+ 14 files changed, 163 insertions(+), 170 deletions(-)
+
+-- 
+1.9.1
