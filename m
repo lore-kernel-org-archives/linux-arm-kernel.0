@@ -1,27 +1,16 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Feb 2018 08:44:01 -0600
-Subject: [PATCH v2 2/4] dt-bindings: soc: add header files required for
- MT7623A SCPSYS dt-binding
-In-Reply-To: <9955178588f8bde01782d0645b25a7b24cceb87b.1517998367.git.sean.wang@mediatek.com>
-References: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
- <9955178588f8bde01782d0645b25a7b24cceb87b.1517998367.git.sean.wang@mediatek.com>
-Message-ID: <20180212144401.yzrecztdveua3zix@rob-hp-laptop>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 12 Feb 2018 12:44:03 -0200
+Subject: [PATCH] ARM: dts: imx6: RDU2: detail USDHC description
+In-Reply-To: <20180212130818.12665-1-l.stach@pengutronix.de>
+References: <20180212130818.12665-1-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5C_qaM69VXS1zF45ZZsc1sLdWB3sxNLeGaG3cXP7+E_=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 06:22:48PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Add relevant header files required for dt-bindings of SCPSYS power domain
-> control for subsystems found on MT7623A SoC.
-> 
-> v1 -> v2: fix typos and treat the patch as a dt-binding patch
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Rob Herring <robh@kernel.org>
-> ---
->  include/dt-bindings/power/mt7623a-power.h | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->  create mode 100644 include/dt-bindings/power/mt7623a-power.h
+On Mon, Feb 12, 2018 at 11:08 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> None of the slots support 1.8V signaling or SDIO. There is no point in
+> probing for a SD card on the eMMC controller.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
