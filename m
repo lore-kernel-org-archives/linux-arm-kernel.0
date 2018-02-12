@@ -1,17 +1,17 @@
 From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 12 Feb 2018 11:57:20 -0600
+Date: Mon, 12 Feb 2018 12:04:34 -0600
 Subject: [PATCH] spi: bcm2835aux: use 64-bit arithmetic instead of 32-bit
-In-Reply-To: <87inb7c2ld.fsf@anholt.net>
-References: <20180207160002.GA9292@embeddedgus> <87inb7c2ld.fsf@anholt.net>
-Message-ID: <c3e615e4-5c2d-4c3c-0417-5c04230bd5e5@embeddedor.com>
+In-Reply-To: <CAKv+Gu9hmxLSS0ekr8av-ADt3OQjBV=Bt-hRq_-SzWaGODs4SQ@mail.gmail.com>
+References: <20180207160002.GA9292@embeddedgus>
+ <CAKv+Gu9hmxLSS0ekr8av-ADt3OQjBV=Bt-hRq_-SzWaGODs4SQ@mail.gmail.com>
+Message-ID: <275feee3-7140-498b-714f-4c88a302d3f6@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Ard,
 
-On 02/08/2018 02:22 AM, Eric Anholt wrote:
-> "Gustavo A. R. Silva" <gustavo@embeddedor.com> writes:
-> 
+On 02/08/2018 03:54 AM, Ard Biesheuvel wrote:
+> On 7 February 2018 at 16:00, Gustavo A. R. Silva <gustavo@embeddedor.com> wrote:
 >> Add suffix ULL to constant 9 in order to give the compiler complete
 >> information about the proper arithmetic to use. Notice that this
 >> constant is used in a context that expects an expression of type
@@ -21,16 +21,14 @@ On 02/08/2018 02:22 AM, Eric Anholt wrote:
 >> using 32-bit arithmetic.
 >>
 >> Addresses-Coverity-ID: 1339619
->> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 > 
-> The effect looks like it would be that we would have chosen polling mode
-> instead of waiting for interrupts for some transfers >477 seconds.
-> Seems like a good fix for an unlikely bug.
-> 
-> Reviewed-by: Eric Anholt <eric@anholt.net>
+> What does this number mean? If it is an index into some internal
+> database, please remove it.
 > 
 
-Thank you for your review.
+This is a unique Coverity identifier. We want to keep information like 
+public Bugzilla IDs and tools like Coverity on the commit message.
 
+Thanks
 --
 Gustavo
