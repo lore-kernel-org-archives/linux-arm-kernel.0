@@ -1,51 +1,40 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 12 Feb 2018 13:22:55 +0200
-Subject: [PATCH] MAINTAINERS: add Freescale pin controllers
-In-Reply-To: <1518432502.2744.5.camel@pengutronix.de>
-References: <20180210153204.12728-1-stefan@agner.ch>
- <1518432502.2744.5.camel@pengutronix.de>
-Message-ID: <20180212112255.u333xb676kfmi63f@sapphire.tkos.co.il>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 12 Feb 2018 19:28:48 +0800
+Subject: [PATCH v3 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD device
+In-Reply-To: <cover.1518424204.git.ryder.lee@mediatek.com>
+References: <cover.1518424204.git.ryder.lee@mediatek.com>
+Message-ID: <f8e87179bd7700130e294393592719fac8590c59.1518424204.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+As the new MFD device is in place, switch probing method to adapt it.
 
-On Mon, Feb 12, 2018 at 11:48:22AM +0100, Lucas Stach wrote:
-> Am Samstag, den 10.02.2018, 16:32 +0100 schrieb Stefan Agner:
-> > Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer
-> > and Sascha as reviewer.
-> > 
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > ---
-> > ?MAINTAINERS | 11 +++++++++++
-> > ?1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 82ad0eabce4f..fb672dfc519d 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
-> > ?S:	Supported
-> > ?F:	drivers/pinctrl/pinctrl-at91-pio4.*
-> > ?
-> > +PIN CONTROLLER - FREESCALE
-> > +M:	Dong Aisheng <aisheng.dong@nxp.com>
-> > +M:	Fabio Estevam <festevam@gmail.com>
-> > +M:	Shawn Guo <shawnguo@kernel.org>
-> > +M:	Stefan Agner <stefan@agner.ch>
-> > +R:	Sascha Hauer <kernel@pengutronix.de>
-> 
-> I'm fine with the patch, but it might make sense to clarify this a bit:
-> the kernel@ address is really the whole Pengutronix kernel team, not
-> just Sascha. Using this address is totally fine if you expect comments
-> on patches, as it gives them a quite wide exposure inside of PTX.
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/clk/mediatek/clk-mt7622-aud.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Of the 5 mentions of kernel at pengutronix.de in MAINTAINERS as of v4.16-rc1, 
-three name Sascha, and two name Uwe. Would you like to also clarify those?
-
-baruch
-
+diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+index 13f752d..68c52a9 100644
+--- a/drivers/clk/mediatek/clk-mt7622-aud.c
++++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+@@ -142,11 +142,16 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	struct device_node *node = pdev->dev.of_node;
++	struct device_node *pnode = pdev->dev.parent->of_node;
+ 	int r;
+ 
+ 	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
+ 
+-	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
++	/* Check if called from MFD */
++	if (!pnode)
++		pnode = node;
++
++	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
+ 			       clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.9.1
