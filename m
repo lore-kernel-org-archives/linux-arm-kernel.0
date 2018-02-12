@@ -1,71 +1,35 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 12 Feb 2018 15:19:42 -0600
-Subject: [PATCH] clk: don't call __of_clk_get_by_name() unnecessarily from
- clk_get()
-In-Reply-To: <20180212210053.GO9418@n2100.armlinux.org.uk>
-References: <20180212142439.15885-1-brgl@bgdev.pl>
- <36b4b8a0-0254-c6fa-c84f-ceab20c326ad@lechnology.com>
- <20180212210053.GO9418@n2100.armlinux.org.uk>
-Message-ID: <12e2aeb6-d1be-4c62-d48f-4d62b46dfc99@lechnology.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 12 Feb 2018 13:32:37 -0700
+Subject: [PATCH 3/3] perf tools: Fixing uninitialised variable
+In-Reply-To: <1518467557-18505-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1518467557-18505-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1518467557-18505-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 03:00 PM, Russell King - ARM Linux wrote:
-> On Mon, Feb 12, 2018 at 02:51:57PM -0600, David Lechner wrote:
->> On 02/12/2018 08:24 AM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> The way this function is implemented caused some confusion when
->>> converting the TI DaVinci platform to using the common clock framework.
->>>
->>> Current kernel supports booting DaVinci boards both in device tree as
->>> well as legacy, board-file mode. In the latter, we always end up
->>> calling clk_get_sys() as of_node is NULL and __of_clk_get_by_name()
->>> returns -ENOENT.
->>>
->>> It was not obvious at first glance how clk_get(dev, NULL) will work in
->>> board-file mode since we always call __of_clk_get_by_name(). Let's make
->>> it clearer by checking if of_node is NULL and skipping right to
->>> clk_get_sys().
->>>
->>> Cc: Sekhar Nori <nsekhar@ti.com>
->>> Cc: Kevin Hilman <khilman@baylibre.com>
->>> Cc: David Lechner <david@lechnology.com>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>   drivers/clk/clkdev.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
->>> index 7513411140b6..f394e8964909 100644
->>> --- a/drivers/clk/clkdev.c
->>> +++ b/drivers/clk/clkdev.c
->>> @@ -199,7 +199,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
->>>   	const char *dev_id = dev ? dev_name(dev) : NULL;
->>>   	struct clk *clk;
->>> -	if (dev) {
->>> +	if (dev && dev->of_node) {
->>>   		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
->>>   		if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
->>>   			return clk;
->>>
->>
->> Shouldn't you be sending this to the linux-clk mailing list and cc'ing
->> the clock maintainers?
-> 
-> No, I'm the maintainer for clkdev, as per MAINTAINERS.
+When working natively on arm64 the compiler gets pesky and complains
+that variable 'i' is uninitialised, something that breaks the
+compilation.  Here no further checks are needed since variable 'found_spe'
+can only be true if variable 'i' has been initialised as part of the for
+loop.
 
-Oops, I guess I should have looked before I said something.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/perf/arch/arm/util/auxtrace.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
->> FWIW, it seems pretty clear to me that if we are using a board file
->> then we should expect clk_get_sys() to be called because there is
->> no device tree.
-> 
-> clk_get() pre-dates DT, and using it has no bearing on whether DT is
-> in use or not.  The above change looks correct to me - if the
-> struct device is not a DT device, then we shouldn't be trying to look
-> up the clock in DT.
-> 
-
-Looks fine to me too.
+diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
+index 2323581b157d..fa639e3e52ac 100644
+--- a/tools/perf/arch/arm/util/auxtrace.c
++++ b/tools/perf/arch/arm/util/auxtrace.c
+@@ -68,7 +68,7 @@ struct auxtrace_record
+ 	bool found_spe = false;
+ 	static struct perf_pmu **arm_spe_pmus = NULL;
+ 	static int nr_spes = 0;
+-	int i;
++	int i = 0;
+ 
+ 	if (!evlist)
+ 		return NULL;
+-- 
+2.7.4
