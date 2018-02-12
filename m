@@ -1,102 +1,43 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Mon, 12 Feb 2018 10:18:06 -0500
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <20180212145652.GM25181@hirez.programming.kicks-ass.net>
-References: <20180118150951.28964-1-prarit@redhat.com>
- <20180212133429.GC25314@hirez.programming.kicks-ass.net>
- <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
- <20180212145652.GM25181@hirez.programming.kicks-ass.net>
-Message-ID: <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Feb 2018 09:19:35 -0600
+Subject: [PATCH v2 01/12] ARM: dts: STi: Fix bindings notation
+In-Reply-To: <1518446590-16800-2-git-send-email-patrice.chotard@st.com>
+References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
+ <1518446590-16800-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <CABGGiswMN1-CQi-guB5y5YFNLhKH3z58b_skxb_q+ZMm7+n1Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 12, 2018 at 8:42 AM,  <patrice.chotard@st.com> wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> Remove leading 0x and 0s from bindings notation
+> Add missing unit-address and remove some which are useless.
+>
+> This allows to fix several warnings like :
+>
+> Warning (unit_address_vs_reg): Node XXXX has a reg or ranges property, but no unit name
+> Warning (simple_bus_reg): Node XXXX simple-bus unit address format error, expected "123456"
+> Warning (unit_address_vs_reg): Node XXXX has a unit name, but no reg property
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
 
+[...]
 
-On 02/12/2018 09:56 AM, Peter Zijlstra wrote:
-> On Mon, Feb 12, 2018 at 08:47:57AM -0500, Prarit Bhargava wrote:
->>
->>
->> On 02/12/2018 08:34 AM, Peter Zijlstra wrote:
->>> On Thu, Jan 18, 2018 at 10:09:51AM -0500, Prarit Bhargava wrote:
->>>>  config ACPI_SPCR_TABLE
->>>> +	bool "ACPI Serial Port Console Redirection Support"
->>>> +	default y if X86
->>>> +	help
->>>> +	  Enable support for Serial Port Console Redirection (SPCR) Table.
->>>> +	  This table provides information about the configuration of the
->>>> +	  earlycon console.
->>>
->>> I just got asked this by oldconfig, which left me rather puzzled, WTF
->>> does this do?
->>
->> Odd -- I thought I had taken care of that :(  My apologies Peter.
->>
->> ACPI SPCR is used by a vendor to define the serial console for a system.  If
->> SPCR exists a user can add kernel parameter "earlycon" (no extra kernel
->> parameters) and the console will work out-of-the-box.
->>
->> The serial console configuration varies from vendor to vendor.  This takes the
->> guess-work out of defining a serial console.
-> 
-> But when I specify "earlyprintk=serial,ttyS0,115200" this SPCR crud will
-> not interfere?
-> 
+> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+> index a29090077fdf..53c6888d1fc0 100644
+> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+> @@ -45,7 +45,7 @@
+>         };
+>
+>         soc {
+> -               pin-controller-sbc {
+> +               pin-controller-sbc at 961f080 {
 
-I tested "earlyprintk=serial,ttyS0,115200" on a system which is known to have a
-functional console with "console=ttyS0,1152008N1" both with and without
-CONFIG_ACPI_SPCR_TABLE enabled.
+While you're here changing the node name, these all should be "pinctrl at ..."
 
-I do not see any significant difference in output.
+With that,
 
-diff of boot logs:
-
---- earlyprintk_no_spcr_enable  2018-02-12 10:11:00.477288423 -0500
-+++ earlyprintk_spcr_enable     2018-02-12 10:16:02.282574797 -0500
-@@ -1,5 +1,5 @@
- microcode: microcode updated early to revision 0x2000035, date = 2017-10-17
--Linux version 4.15.0+ (root at intel-purley-lr-02.khw.lab.eng.bos.redhat.com) (gcc
-version 4.8.5 20150623 (Red Hat 4.8.5-28) (GCC)) #5 SMP Mon Feb 12 10:06:08 EST 2018
-+Linux version 4.15.0+ (root at intel-purley-lr-02.khw.lab.eng.bos.redhat.com) (gcc
-version 4.8.5 20150623 (Red Hat 4.8.5-28) (GCC)) #6 SMP Mon Feb 12 10:11:42 EST 2018
- Command line: BOOT_IMAGE=/vmlinuz-4.15.0+
-root=/dev/mapper/rhel_intel--purley--lr--02-root ro crashkernel=auto
-rd.lvm.lv=rhel_intel-purley-lr-02/root rd.lvm.lv=rhel_intel-purley-lr-02/swap
-earlyprintk=serial,ttyS0,115200 LANG=en_US.UTF-8
- x86/fpu: Supporting XSAVE feature 0x001: 'x87 floating point registers'
- x86/fpu: Supporting XSAVE feature 0x002: 'SSE registers'
-@@ -205,7 +205,7 @@
- e820: last_pfn = 0x6f800 max_arch_pfn = 0x400000000
- Using GB pages for direct mapping
- Secure boot disabled
--RAMDISK: [mem 0x3a563000-0x3bba2fff]
-+RAMDISK: [mem 0x3a5da000-0x3bba2fff]
- ACPI: Early table checksum verification disabled
- ACPI: RSDP 0x000000006922A014 000024 (v02 INTEL )
- ACPI: XSDT 0x00000000690DD188 000114 (v01 INTEL  EDK2     00000000      01000013)
-@@ -519,6 +519,8 @@
- ACPI: INT_SRC_OVR (bus 0 bus_irq 9 global_irq 9 high level)
- Using ACPI (MADT) for SMP configuration information
- ACPI: HPET id: 0x8086a701 base: 0xfed00000
-+ACPI: SPCR: SPCR table version 1
-+ACPI: SPCR: console: uart,io,0x3f8,115200
- smpboot: Allowing 432 CPUs, 224 hotplug CPUs
- PM: Registered nosave memory: [mem 0x00000000-0x00000fff]
- PM: Registered nosave memory: [mem 0x000a0000-0x000fffff]
-@@ -555,10 +557,10 @@
- log_buf_len total cpu_extra contributions: 1765376 bytes
- log_buf_len min size: 524288 bytes
- log_buf_len: 4194304 bytes
--early log buf free: 477984(91%)
--Memory: 394593504K/401282564K available (10252K kernel code, 2147K rwdata,
-3664K rodata, 2504K init, 1800K bss, 6689060K reserved, 0K cma-reserved)
-+early log buf free: 477876(91%)
-+Memory: 394593976K/401282564K available (10252K kernel code, 2147K rwdata,
-3664K rodata, 2504K init, 1800K bss, 6688588K reserved, 0K cma-reserved)
- Kernel/User page tables isolation: enabled
--ftrace: allocating 35205 entries in 138 pages
-+ftrace: allocating 35206 entries in 138 pages
- Hierarchical RCU implementation.
-        RCU restricting CPUs from NR_CPUS=8192 to nr_cpu_ids=432.
-        Tasks RCU enabled.
-
-P.
+Reviewed-by: Rob Herring <robh@kernel.org>
