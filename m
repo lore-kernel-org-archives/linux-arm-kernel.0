@@ -1,23 +1,27 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 12 Feb 2018 08:43:45 -0600
-Subject: [PATCH] acpi, spcr: Make SPCR available to x86
-In-Reply-To: <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
-References: <20180118150951.28964-1-prarit@redhat.com>
- <20180212133429.GC25314@hirez.programming.kicks-ass.net>
- <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
-Message-ID: <953565bd-436b-c1fe-d3c5-cde731dee83d@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Feb 2018 08:44:01 -0600
+Subject: [PATCH v2 2/4] dt-bindings: soc: add header files required for
+ MT7623A SCPSYS dt-binding
+In-Reply-To: <9955178588f8bde01782d0645b25a7b24cceb87b.1517998367.git.sean.wang@mediatek.com>
+References: <ecfc548fc3d22aa335b50e552ad2ad88427a0bb2.1517998367.git.sean.wang@mediatek.com>
+ <9955178588f8bde01782d0645b25a7b24cceb87b.1517998367.git.sean.wang@mediatek.com>
+Message-ID: <20180212144401.yzrecztdveua3zix@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/18 7:47 AM, Prarit Bhargava wrote:
-> ACPI SPCR is used by a vendor to define the serial console for a system.  If
-> SPCR exists a user can add kernel parameter "earlycon" (no extra kernel
-> parameters) and the console will work out-of-the-box.
+On Wed, Feb 07, 2018 at 06:22:48PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Add relevant header files required for dt-bindings of SCPSYS power domain
+> control for subsystems found on MT7623A SoC.
+> 
+> v1 -> v2: fix typos and treat the patch as a dt-binding patch
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Rob Herring <robh@kernel.org>
+> ---
+>  include/dt-bindings/power/mt7623a-power.h | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>  create mode 100644 include/dt-bindings/power/mt7623a-power.h
 
-"earlycon" is needed only for an *early* console.  You don't need any 
-command line parameters for a normal console to work with SPCR.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Reviewed-by: Rob Herring <robh@kernel.org>
