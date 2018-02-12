@@ -1,68 +1,63 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Feb 2018 11:14:25 -0800
-Subject: [PATCH] spi: bcm2835aux: use 64-bit arithmetic instead of 32-bit
-In-Reply-To: <CAKv+Gu9Mb7Wpzwvr=1WsUs1jXYT16DL2dYBfhSWH0HYZMYM5Nw@mail.gmail.com>
-References: <20180207160002.GA9292@embeddedgus>
- <CAKv+Gu9hmxLSS0ekr8av-ADt3OQjBV=Bt-hRq_-SzWaGODs4SQ@mail.gmail.com>
- <275feee3-7140-498b-714f-4c88a302d3f6@embeddedor.com>
- <CAKv+Gu9VTkNN-6MCCuQ2jWFyDMeZKNRyPqMpTWB5jvuSw7MWeA@mail.gmail.com>
- <bab99bbb-c84b-3413-e7f8-203c7daad8b3@gmail.com>
- <CAKv+Gu9Mb7Wpzwvr=1WsUs1jXYT16DL2dYBfhSWH0HYZMYM5Nw@mail.gmail.com>
-Message-ID: <f93d501d-4aaf-9504-aeb0-944dc8797ce3@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 12 Feb 2018 19:17:07 +0000
+Subject: [PATCH 2/2] arm64: dts: juno: Describe the full GICv2m region
+In-Reply-To: <a0707972-f984-7aea-98fb-8cd8382f8287@arm.com>
+References: <20180207143255.17003-1-marc.zyngier@arm.com>
+ <20180207143255.17003-3-marc.zyngier@arm.com>
+ <d10fa874-1de2-1b95-dae1-42a336b98fa2@arm.com>
+ <a0707972-f984-7aea-98fb-8cd8382f8287@arm.com>
+Message-ID: <e66f71b8-fd0f-c7a5-dcc3-852d44898276@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 11:11 AM, Ard Biesheuvel wrote:
-> On 12 February 2018 at 19:10, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 02/12/2018 10:45 AM, Ard Biesheuvel wrote:
->>> On 12 February 2018 at 18:04, Gustavo A. R. Silva
->>> <garsilva@embeddedor.com> wrote:
->>>> Hi Ard,
->>>>
->>>> On 02/08/2018 03:54 AM, Ard Biesheuvel wrote:
->>>>>
->>>>> On 7 February 2018 at 16:00, Gustavo A. R. Silva <gustavo@embeddedor.com>
->>>>> wrote:
->>>>>>
->>>>>> Add suffix ULL to constant 9 in order to give the compiler complete
->>>>>> information about the proper arithmetic to use. Notice that this
->>>>>> constant is used in a context that expects an expression of type
->>>>>> unsigned long long (64 bits, unsigned).
->>>>>>
->>>>>> The expression tfr->len * 9 * 1000000 is currently being evaluated
->>>>>> using 32-bit arithmetic.
->>>>>>
->>>>>> Addresses-Coverity-ID: 1339619
->>>>>
->>>>>
->>>>> What does this number mean? If it is an index into some internal
->>>>> database, please remove it.
->>>>>
->>>>
->>>> This is a unique Coverity identifier. We want to keep information like
->>>> public Bugzilla IDs and tools like Coverity on the commit message.
->>>>
->>>
->>> Who is 'we' in this case? And how is this id to any benefit of other
->>> people that have been excluded from 'we'?
->>
->> We is probably the greater Linux community here.
->>
->>>
->>> If you add identifiers like this, make sure that they don't only make
->>> sense to the in-crowd. For instance, you could replace this with a
->>> http link to the database entry if you really must.
->>
->> I don't think it is that easy to extract good URLs from the public Linux
->> coverity instance which is why referring to coverity IDs is being done
->> AFAICT.
+On 12/02/18 18:27, Marc Zyngier wrote:
+> Hi Sudeep,
 > 
-> Ah ok, pardon my ignorance then. I wasn't aware there is a public
-> Linux coverity instance. Got a link?
+> On 12/02/18 18:17, Sudeep Holla wrote:
+>>
+>>
+>> On 07/02/18 14:32, Marc Zyngier wrote:
+>>> From: Robin Murphy <robin.murphy@arm.com>
+>>>
+>>> Juno's GICv2m implementation consists of four frames providing 32
+>>> interrupts each. Since it is possible to plug in enough PCIe endpoints
+>>> to consume more than 32 MSIs, and the driver already has a bodge to
+>>> handle multiple frames, let's expose the other three as well.
+>>>
+>>
+>> Change on it own looks good. So if you want to merge via your tree:
+>>
+>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>> Let me know if you decide not to take it via your tree and you want me
+>> to send it to arm-soc.
+> 
+> If this would usually go via arm-soc, feel free to take it via this
+> route. I'll drop the patch from my tree.
+> 
+>> On the side note I just noticed the Juno TRM[1] has 64k for each of
+>> these MSI frames(page 3-24 section 3.3.5 Application memory map summary)
+>>
+>> I am not sure if TRM is wrong. This patch is just copying the 4k size
+>> from frame 0 which got added with initial Juno DTS.
+> 
+> I can't see why the TRM would be wrong. This is actually consistent with
+> the expected practice of aligning all devices on a 64kB boundary and
+> size so that you don't get any nasty surprise when passing the device to
+> a VM (*cough* GIC400 *cough*).
+> 
+> Robin, any chance you could check this?
 
-It requires you to sign up to get notifications and have a dashboard,
-does this link work for you?
+Well, the engineering spec for the v2m widget does claim that only the 
+bottom 12 bits of AxADDR are used, but on the other hand it also implies 
+that the "real" endpoint here is a single monolithic block of 4 such 
+widgets, so a third truth is that there is only a single 256KB region...
 
-https://scan.coverity.com/projects/linux?tab=overview
--- 
-Florian
+As usual, I've completely forgotten about virtualisation when it comes 
+to hardware :) On reflection I do of course appreciate that whilst 60KB 
+of RAZ/WI space isn't significant in terms of "a device", it is rather 
+more so in terms of "not a device" - if the only reasonable way to 
+communicate that is to describe the v2m devices each owning 64KB, then 
+I'm quite happy for you to fix up the patch that way if you want.
+
+Robin.
