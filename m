@@ -1,64 +1,350 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 12 Feb 2018 16:26:18 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <20180112153903.GB5992@localhost>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost>
-Message-ID: <20180212152618.GC13962@amd>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 12 Feb 2018 16:32:51 +0100
+Subject: [PATCH 2/2] clk: meson-axg: Add AO Clock and Reset controller
+ driver
+In-Reply-To: <20180209070026.193879-3-yixun.lan@amlogic.com>
+References: <20180209070026.193879-1-yixun.lan@amlogic.com>
+ <20180209070026.193879-3-yixun.lan@amlogic.com>
+Message-ID: <1518449571.2883.30.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Let's restart this discussion and focus on the main roadblock (others
-> > are minor details which can be sorted out later).
-> > 
-> > If it feels like a hack, the key issue seems to me to be the choice of
-> > the API to present the GPS data to user space. Right?
+On Fri, 2018-02-09 at 15:00 +0800, Yixun Lan wrote:
+> Adds a Clock and Reset controller driver for the Always-On part
+> of the Amlogic Meson-AXG SoC.
 > 
-> Or even more fundamentally, does this belong in the kernel at all?
+> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  drivers/clk/meson/Makefile    |   2 +-
+>  drivers/clk/meson/axg-aoclk.c | 236 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/meson/axg-aoclk.h |  25 +++++
+>  3 files changed, 262 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/meson/axg-aoclk.c
+>  create mode 100644 drivers/clk/meson/axg-aoclk.h
+> 
+> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+> index 11f99139b844..c7510744406a 100644
+> --- a/drivers/clk/meson/Makefile
+> +++ b/drivers/clk/meson/Makefile
+> @@ -6,6 +6,6 @@ obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-audio-divider.o
+>  obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-phase.o
+>  obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+>  obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
+> -obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o
+> +obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o axg-aoclk.o
+>  obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)	+= axg-audio.o
+>  obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)	+= clk-regmap.o
+> diff --git a/drivers/clk/meson/axg-aoclk.c b/drivers/clk/meson/axg-aoclk.c
+> new file mode 100644
+> index 000000000000..832aa19dd76c
+> --- /dev/null
+> +++ b/drivers/clk/meson/axg-aoclk.c
+> @@ -0,0 +1,236 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * AmLogic Meson-AXG Clock Controller Driver
 
-Yes, it does.
+Unless there a rule behind it, I think we should stop 
+with the funny camel case and stick to "Amlogic" like written below.
 
-> Given that we'd still depend on gpsd and other, proprietary, daemons to
-> actually parse and use (also for control) the plethora of GPS protocols
-> available, it may even be best to just keep it all in user space.
+> + *
+> + * Copyright (c) 2016 Baylibre SAS.
+> + * Author: Michael Turquette <mturquette@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
+> + */
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+I did not see what is requiring this header. Did I miss something ?
 
-No. We'd want to move away from gpsd in the long
-term. (/dev/input/mice was in similar situation.)
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/init.h>
+> +#include <linux/delay.h>
+Same question for this one.
 
-> Now, if we'd ever have a proper GPS framework that handled everything in
-> kernel space (i.e. no more gpsd) then we would be able to write kernel
-> drivers that also take care of PM. But perhaps that's unlikely to ever
-> be realised given the state of things (proprietary protocols, numerous
-> quirky implementations, etc).
+> +#include <dt-bindings/clock/axg-aoclkc.h>
+> +#include <dt-bindings/reset/axg-aoclkc.h>
 
-That is what needs to happen.
+I think those should be included in the same fashion as axg.h, gxbb.h and
+meson8.h ... which is at the end of the private header.
 
-> The kernel is probably not the place to be working around issues like
-> that, even if serdev at least allows for such hacks to be fairly
-> isolated in drivers (unlike some of the earlier proposals touching core
-> code).
+> +#include "clkc.h"
+> +#include "axg-aoclk.h"
+> +
+> +struct axg_aoclk_reset_controller {
+> +	struct reset_controller_dev reset;
+> +	unsigned int *data;
+> +	struct regmap *regmap;
+> +};
 
-Oh, kernel is indeed right place to provide hardware abstraction --
-and that includes bug workarounds.
+This duplicate what is gxbb-aoclk.
+Please make something cleaner with a shared definition.
 
-We'd like unmodified userspace to run on any supported hardware,
-remember?
+> +
+> +static int axg_aoclk_do_reset(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
+> +{
+> +	struct axg_aoclk_reset_controller *reset =
+> +		container_of(rcdev, struct axg_aoclk_reset_controller, reset);
+> +
+> +	return regmap_write(reset->regmap, AO_RTI_GEN_CNTL_REG0,
+> +			    BIT(reset->data[id]));
+> +}
+> +
+> +static const struct reset_control_ops axg_aoclk_reset_ops = {
+> +	.reset = axg_aoclk_do_reset,
+> +};
+> +
+> +#define AXG_AO_GATE(_name, _bit)					\
+> +static struct clk_regmap _name##_ao = {					\
+> +	.data = &(struct clk_regmap_gate_data) {			\
+> +		.offset = (AO_RTI_GEN_CNTL_REG0),			\
+> +		.bit_idx = (_bit),					\
+> +	},								\
+> +	.hw.init = &(struct clk_init_data) {				\
+> +		.name = #_name "_ao",					\
+> +		.ops = &clk_regmap_gate_ops,				\
+> +		.parent_names = (const char *[]){ "clk81" },		\
+> +		.num_parents = 1,					\
+> +		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),	\
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180212/24d60393/attachment.sig>
+These clock are peripheral clocks (meant to enable/disable IPs):
+* CLK_SET_RATE_PARENT: why do you need rate propagation here ? do you really
+want a consumer of these gate to be able to change clk81 ? 
+
+* CLK_IGNORE_UNUSED: Why do need this flag ? All the IPs behind this
+definition should be able to claim the pclk properly. If not the driver should
+be fixed.
+
+> +	},								\
+> +}
+> +
+> +AXG_AO_GATE(remote, 0);
+> +AXG_AO_GATE(i2c_master, 1);
+> +AXG_AO_GATE(i2c_slave, 2);
+> +AXG_AO_GATE(uart1, 3);
+> +AXG_AO_GATE(uart2, 5);
+> +AXG_AO_GATE(ir_blaster, 6);
+> +AXG_AO_GATE(saradc, 7);
+> +
+> +static struct clk_fixed_rate ao_alt_xtal = {
+> +	.fixed_rate = 32000,
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "ao_alt_xtal",
+> +		.num_parents = 0,
+> +		.ops = &clk_fixed_rate_ops,
+> +	},
+> +};
+
+Unless this xtal is actually embedded in SoC, this should be defined it the DT,
+same as the other xtal.
+
+> +
+> +static struct clk_regmap ao_clk81 = {
+> +	.data = &(struct clk_regmap_mux_data) {
+> +		.offset = AO_RTI_PWR_CNTL_REG0,
+> +		.mask = 0x1,
+> +		.shift = 8,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "ao_clk81",
+> +		.ops = &clk_regmap_mux_ro_ops,
+> +		.parent_names = (const char *[]){ "clk81", "ao_alt_xtal"},
+> +		.num_parents = 2,
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_saradc_mux = {
+> +	.data = &(struct clk_regmap_mux_data) {
+> +		.offset = AO_SAR_CLK,
+> +		.mask = 0x3,
+> +		.shift = 9,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "axg_saradc_mux",
+> +		.ops = &clk_regmap_mux_ops,
+> +		.parent_names = (const char *[]){ "xtal", "ao_clk81" },
+> +		.num_parents = 2,
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_saradc_div = {
+> +	.data = &(struct clk_regmap_div_data) {
+> +		.offset = AO_SAR_CLK,
+> +		.shift = 0,
+> +		.width = 8,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "axg_saradc_div",
+> +		.ops = &clk_regmap_divider_ops,
+> +		.parent_names = (const char *[]){ "axg_saradc_mux" },
+> +		.num_parents = 1,
+
+Should the saradc mux change to accomodate the requested rate, if needed ?
+If so, you might want to add a CLK_SET_RATE_PARENT here.
+
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_saradc_gate = {
+> +	.data = &(struct clk_regmap_gate_data) {
+> +		.offset = AO_SAR_CLK,
+> +		.bit_idx = 8,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "axg_saradc_gate",
+> +		.ops = &clk_regmap_gate_ops,
+> +		.parent_names = (const char *[]){ "axg_saradc_div" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static unsigned int axg_aoclk_reset[] = {
+> +	[RESET_AO_REMOTE] = 16,
+> +	[RESET_AO_I2C_MASTER] = 18,
+> +	[RESET_AO_I2C_SLAVE] = 19,
+> +	[RESET_AO_UART1] = 17,
+> +	[RESET_AO_UART2] = 22,
+> +	[RESET_AO_IR_BLASTER] = 23,
+> +};
+> +
+> +static struct clk_regmap *axg_aoclk_regmap[] = {
+> +	[CLKID_AO_REMOTE]	= &remote_ao,
+> +	[CLKID_AO_I2C_MASTER]	= &i2c_master_ao,
+> +	[CLKID_AO_I2C_SLAVE]	= &i2c_slave_ao,
+> +	[CLKID_AO_UART1]	= &uart1_ao,
+> +	[CLKID_AO_UART2]	= &uart2_ao,
+> +	[CLKID_AO_IR_BLASTER]	= &ir_blaster_ao,
+> +	[CLKID_AO_SAR_ADC]	= &saradc_ao,
+> +	[CLKID_AO_CLK81]	= &ao_clk81,
+> +	[CLKID_AO_SAR_ADC_SEL]	= &axg_saradc_mux,
+> +	[CLKID_AO_SAR_ADC_DIV]	= &axg_saradc_div,
+> +	[CLKID_AO_SAR_ADC_CLK]	= &axg_saradc_gate,
+> +};
+> +
+> +static struct clk_hw_onecell_data axg_aoclk_onecell_data = {
+> +	.hws = {
+> +		[CLKID_AO_REMOTE]	= &remote_ao.hw,
+> +		[CLKID_AO_I2C_MASTER]	= &i2c_master_ao.hw,
+> +		[CLKID_AO_I2C_SLAVE]	= &i2c_slave_ao.hw,
+> +		[CLKID_AO_UART1]	= &uart1_ao.hw,
+> +		[CLKID_AO_UART2]	= &uart2_ao.hw,
+> +		[CLKID_AO_IR_BLASTER]	= &ir_blaster_ao.hw,
+> +		[CLKID_AO_SAR_ADC]	= &saradc_ao.hw,
+> +		[CLKID_AO_CLK81]	= &ao_clk81.hw,
+> +		[CLKID_AO_SAR_ADC_SEL]	= &axg_saradc_mux.hw,
+> +		[CLKID_AO_SAR_ADC_DIV]	= &axg_saradc_div.hw,
+> +		[CLKID_AO_SAR_ADC_CLK]	= &axg_saradc_gate.hw,
+> +		[CLKID_AO_ALT_XTAL]	= &ao_alt_xtal.hw,
+> +	},
+> +	.num = 12,
+
+I would prefer having a NR_CLKS defined in drivers/clk/meson/axg-aoclk.h
+
+> +};
+> +
+> +static int axg_aoclkc_probe(struct platform_device *pdev)
+> +{
+> +	struct axg_aoclk_reset_controller *rstc;
+> +	struct device *dev = &pdev->dev;
+> +	struct regmap *regmap;
+> +	int ret, clkid;
+> +
+> +	rstc = devm_kzalloc(dev, sizeof(*rstc), GFP_KERNEL);
+> +	if (!rstc)
+> +		return -ENOMEM;
+> +
+> +	regmap = syscon_node_to_regmap(of_get_parent(dev->of_node));
+> +	if (IS_ERR(regmap)) {
+> +		dev_err(dev, "failed to get regmap\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	/* Reset Controller */
+> +	rstc->regmap = regmap;
+> +	rstc->data = axg_aoclk_reset;
+> +	rstc->reset.ops = &axg_aoclk_reset_ops;
+> +	rstc->reset.nr_resets = ARRAY_SIZE(axg_aoclk_reset);
+> +	rstc->reset.of_node = dev->of_node;
+> +	ret = devm_reset_controller_register(dev, &rstc->reset);
+> +
+> +	/*
+> +	 * Populate regmap and register all clks
+> +	 */
+> +	for (clkid = 0; clkid < ARRAY_SIZE(axg_aoclk_regmap); clkid++) {
+> +		axg_aoclk_regmap[clkid]->map = regmap;
+> +
+> +		ret = devm_clk_hw_register(dev,
+> +					axg_aoclk_onecell_data.hws[clkid]);
+> +		if (ret) {
+> +			dev_err(dev, "clk register failed.\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	/* Specific clocks */
+> +	ret = devm_clk_hw_register(dev, &ao_alt_xtal.hw);
+> +	if (ret) {
+> +		dev_err(dev, "clk alt_xtal register failed.\n");
+> +		return ret;
+> +	}
+> +
+> +	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+> +			&axg_aoclk_onecell_data);
+> +}
+> +
+> +static const struct of_device_id axg_aoclkc_match_table[] = {
+> +	{ .compatible = "amlogic,meson-axg-aoclkc" },
+> +	{ }
+> +};
+> +
+> +static struct platform_driver axg_aoclkc_driver = {
+> +	.probe		= axg_aoclkc_probe,
+> +	.driver		= {
+> +		.name	= "axg-aoclkc",
+> +		.of_match_table = axg_aoclkc_match_table,
+> +	},
+> +};
+> +
+> +builtin_platform_driver(axg_aoclkc_driver);
+> diff --git a/drivers/clk/meson/axg-aoclk.h b/drivers/clk/meson/axg-aoclk.h
+> new file mode 100644
+> index 000000000000..70f82004d3db
+> --- /dev/null
+> +++ b/drivers/clk/meson/axg-aoclk.h
+> @@ -0,0 +1,25 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+> +/*
+> + * Copyright (c) 2017 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
+> + */
+> +
+> +#ifndef __AXG_AOCLKC_H
+> +#define __AXG_AOCLKC_H
+> +
+> +/* AO Configuration Clock registers offsets
+> + * Register offsets from the data sheet must be multiplied by 4.
+> + */
+> +#define AO_RTI_PWR_CNTL_REG1	(0x03 << 2)
+> +#define AO_RTI_PWR_CNTL_REG0	(0x04 << 2)
+> +#define AO_RTI_GEN_CNTL_REG0	(0x10 << 2)
+> +#define AO_OSCIN_CNTL		(0x16 << 2)
+> +#define AO_CRT_CLK_CNTL1	(0x1a << 2)
+> +#define AO_SAR_CLK		(0x24 << 2)
+> +#define AO_RTC_ALT_CLK_CNTL0	(0x25 << 2)
+> +#define AO_RTC_ALT_CLK_CNTL1	(0x26 << 2)
+
+As already pointed out for the axg clk series, please remove those
+calculation from the header file.
+
+> +
+> +#endif /* __AXG_AOCLKC_H */
