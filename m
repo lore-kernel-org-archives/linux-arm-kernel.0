@@ -1,35 +1,56 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 12 Feb 2018 11:54:56 +0100
-Subject: [RFC v4 13/26] watchdog: renesas_wdt: Add restart handler
-In-Reply-To: <TY1PR06MB089578618AA33335D90D16CEC0F70@TY1PR06MB0895.apcprd06.prod.outlook.com>
-References: <1517423070-24236-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1517423070-24236-14-git-send-email-fabrizio.castro@bp.renesas.com>
- <20180207230309.goxig2irkpxrw5el@katana>
- <TY1PR06MB089578618AA33335D90D16CEC0F70@TY1PR06MB0895.apcprd06.prod.outlook.com>
-Message-ID: <20180212105456.3zejp3j7hfuzyc3c@ninjato>
+From: lionel.debieve@st.com (Lionel Debieve)
+Date: Mon, 12 Feb 2018 11:56:42 +0100
+Subject: [PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
+In-Reply-To: <20180212105642.8662-1-lionel.debieve@st.com>
+References: <20180212105642.8662-1-lionel.debieve@st.com>
+Message-ID: <20180212105642.8662-2-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Update license template using SPDX. Move the global layout
+of UBI headers to dual license helping UBI to be the standard
+solution for raw NAND management.
 
-> > I used to have this simpler version (back then for the UP case):
-> >
-> > +rwdt_start(wdev);
-> > +rwdt_write(priv, 0xffff, RWTCNT);
-> > +return 0;
-> >
-> > It should still work probably...
-> 
-> It should still work, but it would be slower, I would stick with the
-> version I have submitted if you don't mind.
+Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+---
+ drivers/mtd/ubi/ubi-media.h | 22 +++-------------------
+ 1 file changed, 3 insertions(+), 19 deletions(-)
 
-Actually, I do mind. Because of code duplication reasons. We have a fix
-in the works for rwdt_start() and it would be too easy to overlook the
-same fix will be needed for a restart.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180212/2d35a33c/attachment.sig>
+diff --git a/drivers/mtd/ubi/ubi-media.h b/drivers/mtd/ubi/ubi-media.h
+index bfceae5a890e..195ff8ca8211 100644
+--- a/drivers/mtd/ubi/ubi-media.h
++++ b/drivers/mtd/ubi/ubi-media.h
+@@ -1,28 +1,12 @@
++/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+ /*
+- * Copyright (c) International Business Machines Corp., 2006
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+- * the GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+- *
++ * Copyright (C) International Business Machines Corp., 2006
+  * Authors: Artem Bityutskiy (???????? ?????)
+  *          Thomas Gleixner
+  *          Frank Haverkamp
+  *          Oliver Lohmann
+  *          Andreas Arnez
+- */
+-
+-/*
++ *
+  * This file defines the layout of UBI headers and all the other UBI on-flash
+  * data structures.
+  */
+-- 
+2.15.1
