@@ -1,29 +1,48 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 12 Feb 2018 21:02:44 +0100
-Subject: [PATCH] mmc: sdhci-iproc: Disable preset values for BCM2835
-Message-ID: <1518465764-30051-1-git-send-email-stefan.wahren@i2se.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 12 Feb 2018 21:10:10 +0100
+Subject: [PATCH 1/3] dt-bindings: mfd: axp20x: Document backup battery
+ charging property
+In-Reply-To: <20171230152330.28946-2-contact@paulk.fr>
+References: <20171230152330.28946-1-contact@paulk.fr>
+ <20171230152330.28946-2-contact@paulk.fr>
+Message-ID: <20180212201010.GB25608@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the BCM2835 datasheet there are no preset value registers.
-This wasn't an issue before, because we didn't propagate 1.8V support.
+Hi!
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/mmc/host/sdhci-iproc.c | 1 +
- 1 file changed, 1 insertion(+)
+> This adds documentation for the "backup" property of the axp20x driver,
+> that controls the charging mechanism for the backup battery on axp20x.
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index 9455503b0299..382776b29932 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -58,6 +58,11 @@ Optional properties:
+>  	      See Documentation/devicetree/bindings/regulator/regulator.txt
+>  	      for more information on standard regulator bindings.
+>  
+> +- backup: An array of two integers for backup battery charging (axp20x-only),
+> +	  describing the charging voltage in mV first and the charging current
+> +	  in uA second. Backup battery charging is only enabled when these two
+> +	  fields are filled.
 
-diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
-index 61666d2..0ef741b 100644
---- a/drivers/mmc/host/sdhci-iproc.c
-+++ b/drivers/mmc/host/sdhci-iproc.c
-@@ -214,6 +214,7 @@ static const struct sdhci_pltfm_data sdhci_bcm2835_pltfm_data = {
- 		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
- 		  SDHCI_QUIRK_MISSING_CAPS |
- 		  SDHCI_QUIRK_NO_HISPD_BIT,
-+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
- 	.ops = &sdhci_iproc_32only_ops,
- };
- 
+Well...
+
+We do want to charge batteries other than your backup
+battery. Probably this should get separate "backup battery" node with
+properties explaining how it is charged?
+									Pavel
+
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180212/bf991805/attachment-0001.sig>
