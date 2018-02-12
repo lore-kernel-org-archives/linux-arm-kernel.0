@@ -1,78 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Feb 2018 08:49:59 +0000
-Subject: [PATCH] irqchip: Remove hashed address printing
-In-Reply-To: <20180212021812.3882-1-jaedon.shin@gmail.com>
-References: <20180212021812.3882-1-jaedon.shin@gmail.com>
-Message-ID: <86r2pqh9s8.wl-marc.zyngier@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 12 Feb 2018 14:23:02 +0530
+Subject: [PATCH] cpufreq: imx6q: support frequencies >528MHz for
+ i.MX6UL/ULL
+In-Reply-To: <20180118235836.17393-1-stefan@agner.ch>
+References: <20180118235836.17393-1-stefan@agner.ch>
+Message-ID: <20180212085302.GR28462@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Feb 2018 02:18:12 +0000,
-Jaedon Shin wrote:
+On 19-01-18, 00:58, Stefan Agner wrote:
+> Depending on SKU i.MX6UL/i.MX6ULL support frequencies up to 900MHz.
+> Use PLL1 sys clock for all operating points higher than 528MHz.
 > 
-> Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
-> pointers are being hashed when printed. Displaying the virtual memory at
-> bootup time is not helpful. so delete the prints.
+> Note: For higher operating points VDD_SOC_IN needs to be 125mV
+> higher than the ARM set-point (see datasheet). Specifically, the
+> i.MX6UL/ULL EVK boards have an external DC regulator which needs
+> adjustment. The regulator adjustment is not covered with this
+> change.
 > 
-> Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->  drivers/irqchip/irq-bcm7038-l1.c | 3 ---
->  drivers/irqchip/irq-bcm7120-l2.c | 3 ---
->  drivers/irqchip/irq-brcmstb-l2.c | 3 ---
->  3 files changed, 9 deletions(-)
+>  drivers/cpufreq/imx6q-cpufreq.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
-> index 55cfb986225b..faf734ff4cf3 100644
-> --- a/drivers/irqchip/irq-bcm7038-l1.c
-> +++ b/drivers/irqchip/irq-bcm7038-l1.c
-> @@ -339,9 +339,6 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
->  		goto out_unmap;
->  	}
->  
-> -	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
-> -		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
-> -
->  	return 0;
->  
->  out_unmap:
-> diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
-> index 983640eba418..8968e5e93fcb 100644
-> --- a/drivers/irqchip/irq-bcm7120-l2.c
-> +++ b/drivers/irqchip/irq-bcm7120-l2.c
-> @@ -318,9 +318,6 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
->  		}
->  	}
->  
-> -	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
-> -			intc_name, data->map_base[0], data->num_parent_irqs);
-> -
->  	return 0;
->  
->  out_free_domain:
-> diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-> index 691d20eb0bec..0e65f609352e 100644
-> --- a/drivers/irqchip/irq-brcmstb-l2.c
-> +++ b/drivers/irqchip/irq-brcmstb-l2.c
-> @@ -262,9 +262,6 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
->  		ct->chip.irq_set_wake = irq_gc_set_wake;
->  	}
->  
-> -	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
-> -			base, parent_irq);
-> -
->  	return 0;
->  
->  out_free_domain:
-> -- 
-> 2.16.1
-> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index 628fe899cb48..840f6386c780 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -114,12 +114,14 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  		 */
+>  		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
+>  		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+> -		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
+> -			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
+> -		else
+> -			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
+> -		clk_set_parent(step_clk, secondary_sel_clk);
+> -		clk_set_parent(pll1_sw_clk, step_clk);
+> +		if (freq_hz <= clk_get_rate(pll2_bus_clk)) {
+> +			if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
+> +				clk_set_parent(secondary_sel_clk, pll2_bus_clk);
+> +			else
+> +				clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
+> +			clk_set_parent(step_clk, secondary_sel_clk);
+> +			clk_set_parent(pll1_sw_clk, step_clk);
+> +		}
+>  	} else {
+>  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
+>  		clk_set_parent(pll1_sw_clk, step_clk);
 
-Looks good to me. Florian, if you're happy with that, I'll queue it
-for -rc2.
-
-Thanks,
-
-	M.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-Jazz is not dead, it just smell funny.
+viresh
