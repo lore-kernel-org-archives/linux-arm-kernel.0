@@ -1,43 +1,49 @@
 From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Mon, 12 Feb 2018 13:39:43 +0100
-Subject: [PATCHv4 0/2] Improved perf support for imx53/ppd
-Message-ID: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
+Date: Mon, 12 Feb 2018 13:39:45 +0100
+Subject: [PATCHv4 2/2] ARM: dts: imx53: PPD: Enable secure-reg-access
+In-Reply-To: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
+References: <20180212123945.15732-1-sebastian.reichel@collabora.co.uk>
+Message-ID: <20180212123945.15732-3-sebastian.reichel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add secure-reg-access on PPD device tree to enable PMU and
+hardware counters for perf.
 
-This improves perf on imx53 by adding support for enabling the Secure
-Debug Enable Register (SDER) SUNIDEN bit. This unlocks new
-functionality:
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+---
+ arch/arm/boot/dts/imx53-ppd.dts | 4 ++++
+ arch/arm/boot/dts/imx53.dtsi    | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-ppd before patchset# perf stat -e cycles,instructions sleep 1 2>&1 | grep instructions
-                 0      instructions              #    0.00  insn per cycle
-
-ppd  after patchset# perf stat -e cycles,instructions sleep 1 2>&1 | grep instructions
-            177864      instructions              #    0.05  insn per cycle
-
-Changes since PATCHV3:
- * Use readl_relaxed instead of __raw_readl (and the same for writel)
- * Drop final return in void function
- * Add Reviewed-by from Fabio to 2nd patch
-Changes since PATCHv2:
- * Always enable GPC_DBG_EN when kernel configuration allows using perf
-   to allow cleanup of the arm-pmu driver.
-Changes since PATCHv1:
- * Update DTS patch to reference imx53.dtsi's pmu node
- * Remove a superfluous newline in first patch
-
--- Sebastian
-
-Sebastian Reichel (2):
-  ARM: imx53: add secure-reg-access support for PMU
-  ARM: dts: imx53: PPD: Enable secure-reg-access
-
- arch/arm/boot/dts/imx53-ppd.dts |  4 ++++
- arch/arm/boot/dts/imx53.dtsi    |  2 +-
- arch/arm/mach-imx/mach-imx53.c  | 39 ++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 43 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
+index dd1b524e5074..3c87e0d73f63 100644
+--- a/arch/arm/boot/dts/imx53-ppd.dts
++++ b/arch/arm/boot/dts/imx53-ppd.dts
+@@ -562,6 +562,10 @@
+ 	};
+ };
+ 
++&pmu {
++	secure-reg-access;
++};
++
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 1040251f2951..7df4853dc771 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -116,7 +116,7 @@
+ 		};
+ 	};
+ 
+-	pmu {
++	pmu: pmu {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupt-parent = <&tzic>;
+ 		interrupts = <77>;
 -- 
 2.15.1
