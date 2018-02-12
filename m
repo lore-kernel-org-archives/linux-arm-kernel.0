@@ -1,52 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 Feb 2018 16:47:45 +0800
-Subject: [BUG]: A83T - AC100 gets the wrong number of parents
-In-Reply-To: <1518316987.5562.7.camel@gmail.com>
-References: <1518316987.5562.7.camel@gmail.com>
-Message-ID: <CAGb2v64L8Va65vf1_cgW8GkdmWuROGC6aUXsLytjcxipUWGWEw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Feb 2018 08:49:59 +0000
+Subject: [PATCH] irqchip: Remove hashed address printing
+In-Reply-To: <20180212021812.3882-1-jaedon.shin@gmail.com>
+References: <20180212021812.3882-1-jaedon.shin@gmail.com>
+Message-ID: <86r2pqh9s8.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 11, 2018 at 10:43 AM, Philipp Rossak <embed3d@gmail.com> wrote:
-> Hey,
->
-> When I boot my A83T I get the following bootlog [1].
->
-> After some debugging, I found out that the function call:
-> clk_hw_get_num_parents() returns 2. After a look in the devicetree I
-> found out that this value should be 1, since we only have one parent
-> clock [3].
+On Mon, 12 Feb 2018 02:18:12 +0000,
+Jaedon Shin wrote:
+> 
+> Since commit ad67b74d2469 ("printk: hash addresses printed with %p")
+> pointers are being hashed when printed. Displaying the virtual memory at
+> bootup time is not helpful. so delete the prints.
+> 
+> Signed-off-by: Jaedon Shin <jaedon.shin@gmail.com>
+> ---
+>  drivers/irqchip/irq-bcm7038-l1.c | 3 ---
+>  drivers/irqchip/irq-bcm7120-l2.c | 3 ---
+>  drivers/irqchip/irq-brcmstb-l2.c | 3 ---
+>  3 files changed, 9 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
+> index 55cfb986225b..faf734ff4cf3 100644
+> --- a/drivers/irqchip/irq-bcm7038-l1.c
+> +++ b/drivers/irqchip/irq-bcm7038-l1.c
+> @@ -339,9 +339,6 @@ int __init bcm7038_l1_of_init(struct device_node *dn,
+>  		goto out_unmap;
+>  	}
+>  
+> -	pr_info("registered BCM7038 L1 intc (mem: 0x%p, IRQs: %d)\n",
+> -		intc->cpus[0]->map_base, IRQS_PER_WORD * intc->n_words);
+> -
+>  	return 0;
+>  
+>  out_unmap:
+> diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
+> index 983640eba418..8968e5e93fcb 100644
+> --- a/drivers/irqchip/irq-bcm7120-l2.c
+> +++ b/drivers/irqchip/irq-bcm7120-l2.c
+> @@ -318,9 +318,6 @@ static int __init bcm7120_l2_intc_probe(struct device_node *dn,
+>  		}
+>  	}
+>  
+> -	pr_info("registered %s intc (mem: 0x%p, parent IRQ(s): %d)\n",
+> -			intc_name, data->map_base[0], data->num_parent_irqs);
+> -
+>  	return 0;
+>  
+>  out_free_domain:
+> diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
+> index 691d20eb0bec..0e65f609352e 100644
+> --- a/drivers/irqchip/irq-brcmstb-l2.c
+> +++ b/drivers/irqchip/irq-brcmstb-l2.c
+> @@ -262,9 +262,6 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
+>  		ct->chip.irq_set_wake = irq_gc_set_wake;
+>  	}
+>  
+> -	pr_info("registered L2 intc (mem: 0x%p, parent irq: %d)\n",
+> -			base, parent_irq);
+> -
+>  	return 0;
+>  
+>  out_free_domain:
+> -- 
+> 2.16.1
+> 
 
-Not really. The first parent is registered within the rtc-ac100 driver,
-which also handles the clocks on the RTC side of the chip.
+Looks good to me. Florian, if you're happy with that, I'll queue it
+for -rc2.
 
-The clock in the device tree is meant to tie the two parts of the chip
-together: the codec side provides a high speed clock to the RTC side.
+Thanks,
 
-> Setting the variable num_parents to 1 fixes the problem, but this is no
-> soultion.
+	M.
 
-A good fix would be to check the return value of clk_hw_get_parent_by_index()
-here: http://lxr.bootlin.com/linux/v4.16-rc1/source/drivers/rtc/rtc-ac100.c#L186
-and skip it if it's NULL.
-
-The driver is setup this way because the codec side is not implemented,
-but the device tree binding is partially defined to include the clock.
-
-ChenYu
-
-> Regards,
-> Philipp
->
->
->
-> [1]: https://pastebin.com/5c7hxjsS
-> [2]: http://lxr.bootlin.com/linux/v4.15/source/drivers/rtc/rtc-ac100.c#
-> L180
-> [3]: http://lxr.bootlin.com/linux/v4.15/source/arch/arm/boot/dts/sun8i-
-> a83t-bananapi-m3.dts#L159
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Jazz is not dead, it just smell funny.
