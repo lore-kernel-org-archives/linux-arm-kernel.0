@@ -1,45 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Feb 2018 16:53:18 +0100
-Subject: [PATCH] drm/pl111: Fix regression from fbdev CMA helper
-In-Reply-To: <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
-References: <20180212124019.25268-1-linus.walleij@linaro.org>
- <0a3e5888-e8fc-df25-377c-5259c767aeed@tronnes.org>
- <139b8daa-26c9-1aff-60f0-26c8749eede6@tronnes.org>
-Message-ID: <CACRpkdbaCuhzuzkRgUpfwGmwJrJ61E0cK76WLAr=6f=pkX8TuQ@mail.gmail.com>
+From: prarit@redhat.com (Prarit Bhargava)
+Date: Mon, 12 Feb 2018 10:54:41 -0500
+Subject: [PATCH] acpi, spcr: Make SPCR available to x86
+In-Reply-To: <20180212154434.GX25201@hirez.programming.kicks-ass.net>
+References: <20180118150951.28964-1-prarit@redhat.com>
+ <20180212133429.GC25314@hirez.programming.kicks-ass.net>
+ <1e69fffc-1c3b-8cc0-f1cb-695de5ccdcb5@redhat.com>
+ <20180212145652.GM25181@hirez.programming.kicks-ass.net>
+ <03e799c6-a0f3-eccf-882d-78205e9335ad@redhat.com>
+ <20180212154434.GX25201@hirez.programming.kicks-ass.net>
+Message-ID: <3299be7d-66cf-1116-042b-8c68c9b401af@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 3:01 PM, Noralf Tr?nnes <noralf@tronnes.org> wrote:
-> Den 12.02.2018 14.42, skrev Noralf Tr?nnes:
->> Den 12.02.2018 13.40, skrev Linus Walleij:
 
->>>         drm_mode_config_reset(dev);
->>>   -    drm_fb_cma_fbdev_init(dev, 32, 0);
->>> +    drm_fb_cma_fbdev_init(dev, 32, 1);
->>>         drm_kms_helper_poll_init(dev);
 
-(...)
+On 02/12/2018 10:44 AM, Peter Zijlstra wrote:
+> On Mon, Feb 12, 2018 at 10:18:06AM -0500, Prarit Bhargava wrote:
+>>> But when I specify "earlyprintk=serial,ttyS0,115200" this SPCR crud will
+>>> not interfere?
+>>>
+>>
+>> I tested "earlyprintk=serial,ttyS0,115200" on a system which is known to have a
+>> functional console with "console=ttyS0,1152008N1" both with and without
+>> CONFIG_ACPI_SPCR_TABLE enabled.
+> 
+> OK, but my point was that SPCR will never override explicit earlyprintk
+> stuff. There is absolutely nothing worse than breaking working setups.
+> 
 
-> I forgot to look at the change, and I don't understand how this broke
-> anything,
+Oh, I see.  SPCR will not override earlyprintk config.
 
-My wrong.
-
-I had some old codepaths in my out-of-tree stuff (sorry
-the only thing that makes the hardware work...).
-
-I was using the old drm_fbdev_cma_init() which isn't
-as helpful as the new drm_fb_cma_fbdev_init() but
-as the old function is still there it all just "worked"
-except for this...
-
-Theres is some confusion with these similarly named
-functions :D
-
-Sorry for the fuzz, I fixed my patch set to use the new
-function now.
-
-Let's just drop this patch.
-
-Yours,
-Linus Walleij
+P.
