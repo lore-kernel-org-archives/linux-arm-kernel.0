@@ -1,36 +1,191 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 13 Feb 2018 12:16:59 +0530
-Subject: [PATCH v4 5/5] dmaengine: mediatek: fix zalloc-simple.cocci
- warnings
-In-Reply-To: <alpine.DEB.2.20.1802091555290.2944@hadrien>
-References: <cover.1518110810.git.sean.wang@mediatek.com>
- <ede5702c460a5b4b41186a8cff1e3c29b2380c08.1518110810.git.sean.wang@mediatek.com>
- <20180209125817.GB3666@localhost>
- <alpine.DEB.2.20.1802091555290.2944@hadrien>
-Message-ID: <20180213064659.GD3666@localhost>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Tue, 13 Feb 2018 06:45:21 +0000
+Subject: [PATCH v2 1/2] mtd: fsl-quadspi: Update slave device hwcap based
+ on mode provided in dtsi file
+In-Reply-To: <b868bd0c-2d5e-f4cf-a32c-012e021d3a89@wedev4u.fr>
+References: <1517549484-6024-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1517549484-6024-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <b868bd0c-2d5e-f4cf-a32c-012e021d3a89@wedev4u.fr>
+Message-ID: <DB6PR0402MB28386AD10C84F1BA9DCD2B2799F60@DB6PR0402MB2838.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 03:55:58PM +0100, Julia Lawall wrote:
+Hi Cyrille,
+
+> -----Original Message-----
+> From: Cyrille Pitchen [mailto:cyrille.pitchen at wedev4u.fr]
+> Sent: Tuesday, February 06, 2018 2:19 AM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; linux-
+> mtd at lists.infradead.org; devicetree at vger.kernel.org; robh at kernel.org;
+> mark.rutland at arm.com; shawnguo at kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; boris.brezillon at free-electrons.com;
+> computersforpeace at gmail.com; Han Xu <han.xu@nxp.com>;
+> festevam at gmail.com; Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
+> Suresh Gupta <suresh.gupta@nxp.com>
+> Subject: Re: [PATCH v2 1/2] mtd: fsl-quadspi: Update slave device hwcap based
+> on mode provided in dtsi file
 > 
-> > > -	ring->txd = dma_alloc_coherent(hsdma2dev(hsdma),
-> > > -				       pc->sz_ring, &ring->tphys,
-> > > -				       GFP_ATOMIC | __GFP_ZERO);
-> > > +	ring->txd = dma_zalloc_coherent(hsdma2dev(hsdma), pc->sz_ring,
-> > > +					&ring->tphys, GFP_ATOMIC);
-> > >  	if (!ring->txd)
-> > >  		return -ENOMEM;
-> > >
-> > > -	memset(ring->txd, 0, pc->sz_ring);
+> Hi Yogesh,
+> 
+> Le 02/02/2018 ? 06:31, Yogesh Gaur a ?crit?:
+> > FSL QuadSPI controller supports Single, dual, quad modes of operation.
+> > Mode information is available via "spi-tx-bus-width" and
+> > "spi-rx-bus-width" nodes of device tree for the connected slave device.
 > >
-> > This should be folded back..
+> > Update read and write hwcap capability for slave device by reading
+> > "spi-rx-bus-width" and "spi-tx-bus-width" respectively.
+> > Assign hwcaps mask to minimal caps for the slave node i.e.
+> > 	SNOR_HWCAPS_READ | SNOR_HWCAPS_PP
+> >
+> > If value not provided in device tree file, then fallback to default
+> > mode i.e. SNOR_HWCAPS_READ_1_1_4 and SNOR_HWCAPS_PP.
+> >
+> > Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> > ---
+> > Changes for v2:
+> > - None
+> >
+> >  drivers/mtd/spi-nor/fsl-quadspi.c | 56
+> > +++++++++++++++++++++++++++++++++++----
+> >  1 file changed, 51 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c
+> > b/drivers/mtd/spi-nor/fsl-quadspi.c
+> > index b9c5918..1503e0c 100644
+> > --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> > +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> > @@ -994,17 +994,14 @@ static void fsl_qspi_unprep(struct spi_nor *nor,
+> > enum spi_nor_ops ops)
+> >
+> >  static int fsl_qspi_probe(struct platform_device *pdev)  {
+> > -	const struct spi_nor_hwcaps hwcaps = {
+> > -		.mask = SNOR_HWCAPS_READ_1_1_4 |
+> > -			SNOR_HWCAPS_PP,
+> > -	};
+> > +	struct spi_nor_hwcaps hwcaps;
+> >  	struct device_node *np = pdev->dev.of_node;
+> >  	struct device *dev = &pdev->dev;
+> >  	struct fsl_qspi *q;
+> >  	struct resource *res;
+> >  	struct spi_nor *nor;
+> >  	struct mtd_info *mtd;
+> > -	int ret, i = 0;
+> > +	int ret, i = 0, value;
+> >
+> >  	q = devm_kzalloc(dev, sizeof(*q), GFP_KERNEL);
+> >  	if (!q)
+> > @@ -1077,6 +1074,10 @@ static int fsl_qspi_probe(struct
+> > platform_device *pdev)
+> >
+> >  	/* iterate the subnodes. */
+> >  	for_each_available_child_of_node(dev->of_node, np) {
+> > +		/* Reset hwcaps mask to minimal caps for the slave node. */
+> > +		hwcaps.mask = SNOR_HWCAPS_READ | SNOR_HWCAPS_PP;
+> > +		value = 0;
+> > +
+> >  		/* skip the holes */
+> >  		if (!q->has_second_chip)
+> >  			i *= 2;
+> > @@ -1106,6 +1107,51 @@ static int fsl_qspi_probe(struct platform_device
+> *pdev)
+> >  		/* set the chip address for READID */
+> >  		fsl_qspi_set_base_addr(q, nor);
+> >
+> > +		/*
+> > +		 * If spi-rx-bus-width and spi-tx-bus-width not defined assign
+> > +		 * default hardware capabilities SNOR_HWCAPS_READ_1_1_4
+> and
+> > +		 * SNOR_HWCAPS_PP supported by the Quad-SPI controller.
+> > +		 */
+> > +		if (!of_property_read_u32(np, "spi-rx-bus-width", &value)) {
+> > +			switch (value) {
+> > +			case 1:
+> > +				hwcaps.mask |= SNOR_HWCAPS_READ |
+> > +					       SNOR_HWCAPS_READ_FAST;
+> > +				break;
+> > +			case 2:
+> > +				hwcaps.mask |= SNOR_HWCAPS_READ_1_1_2
+> |
+> > +					       SNOR_HWCAPS_READ_1_2_2;
 > 
-> Sorry, I'm not sure what you mean by "folded back".
+> I guess there is a misunderstanding in the meaning of spi-rx-bus-width and spi-
+> tx-bus_width.
+> 
+> spi-rx-bus-width = <N>, resp. spi-tx-bus-width = <N>, means the SPI controller
+> can receive, resp. send, data on N I/O Lines.
+> 
+> Then let's take the example of some Fast Read X-Y-Z command:
+> 
+> the op code is *sent* on X I/O lines: you need to check spi-tx-bus-width the
+> address/mode/dummy bits are *sent* on Y I/O lines: check spi-tx-bus-width too
+> the data bits are *received* on Z I/O lines: check spi-rx-bus_width.
+> 
+> > +				break;
+> > +			case 4:
+> > +				hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4
+> |
+> > +					       SNOR_HWCAPS_READ_1_4_4;
+> 
+> The same here: to allow SPI 1-4-4, you have to check that spi-tx-bus-width == 4.
+> 
+> So your usage of spi-{tx|rx}-bus-width is not consistent with the usage done in
+> the SPI subsystem. Please have a look at drivers/mtd/devices/m25p80.c,
+> especially how the SPI_RX_QUAD and SPI_TX_QUAD flags are used in the
+> m25p_probe() function to have a better idea of how it should work.
+> 
+> Also have a look at of_spi_parse_dt() in drivers/spi/spi.c, to figure out how the
+> SPI_{TX|RX}_{DUAL|QUAD} flags are set according to the spi-{tx|rx}-bus-width
+> DT properties.
+> 
+Thanks for review, would incorporate your review comments and would have usage of spi-{rx/tx}-bus-width as being done in SPI subsystem.
 
-Since the original patch is also up for review in this series, it doesn't
-help much to add a change and fix on top in a series. The fix should be
-folded back into the original commit. IIRC Fengguang's bot also recommends
-so..
+> > +				break;
+> > +			default:
+> > +				dev_err(dev,
+> > +					"spi-rx-bus-width %d not supported\n",
+> > +					value);
+> > +				break;
+> > +			}
+> > +		} else
+> > +			hwcaps.mask |= SNOR_HWCAPS_READ_1_1_4;
+> 
+> Not sure whether it passes checkpatch, you may have to add { } for the else
+> statement even if there is a single line as the if statement use { }.
+> 
+I have run ' ./scripts/checkpatch.pl' present in linux-mtd code base and it hasn't reported any warning or error messages.
+Meanwhile, would add {} braces for this else statement also.
 
--- 
-~Vinod
+--
+Regards
+Yogesh Gaur.
+
+> Personally I don't mind that much. Please just check that your patch passes
+> checkpatch verification and it will be okay for me :)
+> 
+> Best regards,
+> 
+> Cyrille
+> 
+> > +
+> > +		if (!of_property_read_u32(np, "spi-tx-bus-width", &value)) {
+> > +			switch (value) {
+> > +			case 1:
+> > +				hwcaps.mask |= SNOR_HWCAPS_PP;
+> > +				break;
+> > +			case 4:
+> > +				hwcaps.mask |= SNOR_HWCAPS_PP_1_1_4 |
+> > +					       SNOR_HWCAPS_PP_1_4_4;
+> > +				break;
+> > +			default:
+> > +				dev_err(dev,
+> > +					"spi-tx-bus-width %d not supported\n",
+> > +					value);
+> > +				break;
+> > +			}
+> > +		}
+> > +
+> >  		ret = spi_nor_scan(nor, NULL, &hwcaps);
+> >  		if (ret)
+> >  			goto mutex_failed;
+> >
