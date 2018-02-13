@@ -1,312 +1,109 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 14 Feb 2018 01:05:16 +0530
-Subject: [net PATCH] Revert "net: thunderx: Add support for xdp redirect"
-In-Reply-To: <151854116184.18303.13476104443853509134.stgit@firesoul>
-References: <151854116184.18303.13476104443853509134.stgit@firesoul>
-Message-ID: <CA+sq2CfYosrbZUEb0hLZS1u6tiz+m4oxEXF3-43ZxyoHq=cAVg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Feb 2018 19:35:35 +0000
+Subject: [PATCH] arm64: acpi,efi: fix alignment fault in accessing ACPI
+ tables at kdump
+In-Reply-To: <5A7DC66C.10107@arm.com>
+References: <20180201090449.19514-1-takahiro.akashi@linaro.org>
+ <CAKv+Gu-2-cG3vse4briKPK0gpi5Zrg+pZHiiN7-4DSBPn0n_3A@mail.gmail.com>
+ <20180202043519.GD23847@linaro.org> <5A7DC66C.10107@arm.com>
+Message-ID: <CAKv+Gu9kLJRUV4imXWx=aUnvzbJKxUwQpP6rBsFA0vV5iR+F-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 10:29 PM, Jesper Dangaard Brouer
-<brouer@redhat.com> wrote:
-> This reverts commit aa136d0c82fcd6af14535853c30e219e02b2692d.
+On 9 February 2018 at 16:03, James Morse <james.morse@arm.com> wrote:
+> Hi Akashi, Ard,
 >
-> As I previously[1] pointed out this implementation of XDP_REDIRECT is
-> wrong.  XDP_REDIRECT is a facility that must work between different
-> NIC drivers.  Another NIC driver can call ndo_xdp_xmit/nicvf_xdp_xmit,
-> but your driver patch assumes payload data (at top of page) will
-> contain a queue index and a DMA addr, this is not true and worse will
-> likely contain garbage.
+> On 02/02/18 04:35, AKASHI Takahiro wrote:
+>> On Thu, Feb 01, 2018 at 05:34:26PM +0000, Ard Biesheuvel wrote:
+>>> On 1 February 2018 at 09:04, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+>>>> * Initial ACPI tables are normally stored in system ram and marked as
+>>>>   "ACPI Reclaim memory" by the firmware.
 >
-> Given you have not fixed this in due time (just reached v4.16-rc1),
-> the only option I see is a revert.
+>>>> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+>>>>   memory as MEMBLOCK_NOMAP"), those regions are differently handled
+>>>>   as they are "memblock-reserved", without NOMAP bit.
+>
+> I don't think I'd grasped the implications of this before... are we accessing
+> the acpi tables via the linear map now?
+>
 
-Sorry that i missed your email ie didn't respond.
-This driver is not for a generic PCI endpoint NIC, it's an on-silicon
-ethernet device
-found only on Cavium's ThunderX or OCTEONTX SOCs which supports upto 16 ports.
-XDP_REDIRECT here is mainly aimed at forwarding packets from one port
-to another
-port of same type.
-
-The only way I could have avoided the payload data is by unmapping and remapping
-of DMA buffer which is quite expensive especially when IOMMU is enabled.
-So I thought this small optimization should be acceptable.
-
-If you still think that this shouldn't be done this way then go ahead
-and revert the patch,
-I will try to redo this as and when i find time.
-
-Thanks,
-Sunil.
+Yes. As the commit log for that patch says, the fact that the firmware
+chose to allocate them as 'ACPI reclaim memory' implies that the
+memory has no special significance to the firmware, and can be covered
+by the linear mapping. This aims to reduce page table fragmentation.
 
 >
-> [1] http://lkml.kernel.org/r/20171211130902.482513d3 at redhat.com
+>>>> * So they are now excluded from device tree's "usable-memory-range"
+>>>>   which kexec-tools determines based on a current view of /proc/iomem.
 >
-> Cc: Sunil Goutham <sgoutham@cavium.com>
-> Cc: Christina Jacob <cjacob@caviumnetworks.com>
-> Cc: Aleksey Makarov <aleksey.makarov@cavium.com>
-> Fixes: aa136d0c82fc ("net: thunderx: Add support for xdp redirect")
-> Signed-off-by: Jesper Dangaard Brouer <brouer@redhat.com>
-> ---
->  drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  110 +++++---------------
->  drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   11 +-
->  drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    4 -
->  3 files changed, 31 insertions(+), 94 deletions(-)
+>>> So this patch does fix the fallout of how this issue affects ACPI boot
+>>> in particular, but is it correct in the first place for the kexec
+>>> tools to disregard memory that has been memblock_reserved()?
 >
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> index b68cde9f17d2..7d9c5ffbd041 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> @@ -67,11 +67,6 @@ module_param(cpi_alg, int, S_IRUGO);
->  MODULE_PARM_DESC(cpi_alg,
->                  "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
+> I don't think kexec should be allowed to accidentally overwrite these regions as
+> they contain data needed to boot the system.
+> The reason to allow this would be booting a non-acpi OS and removing all the
+> ACPI gubbins from the DTB, (but I don't care if kexec can't do this).
 >
-> -struct nicvf_xdp_tx {
-> -       u64 dma_addr;
-> -       u8  qidx;
-> -};
-> -
->  static inline u8 nicvf_netdev_qidx(struct nicvf *nic, u8 qidx)
->  {
->         if (nic->sqs_mode)
-> @@ -507,29 +502,14 @@ static int nicvf_init_resources(struct nicvf *nic)
->         return 0;
->  }
+> Overwriting these regions used to be prevented because these regions were nomap,
+> but now they are showing up as 'System RAM', so they could be accidentally
+> overwritten. It looks like /proc/iomem doesn't see memblock_reserve()d regions
+> as they are in both memblock.memory and memblock.reserved.
 >
-> -static void nicvf_unmap_page(struct nicvf *nic, struct page *page, u64 dma_addr)
-> -{
-> -       /* Check if it's a recycled page, if not unmap the DMA mapping.
-> -        * Recycled page holds an extra reference.
-> -        */
-> -       if (page_ref_count(page) == 1) {
-> -               dma_addr &= PAGE_MASK;
-> -               dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
-> -                                    RCV_FRAG_LEN + XDP_HEADROOM,
-> -                                    DMA_FROM_DEVICE,
-> -                                    DMA_ATTR_SKIP_CPU_SYNC);
-> -       }
-> -}
-> -
->  static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
->                                 struct cqe_rx_t *cqe_rx, struct snd_queue *sq,
->                                 struct rcv_queue *rq, struct sk_buff **skb)
->  {
->         struct xdp_buff xdp;
->         struct page *page;
-> -       struct nicvf_xdp_tx *xdp_tx = NULL;
->         u32 action;
-> -       u16 len, err, offset = 0;
-> +       u16 len, offset = 0;
->         u64 dma_addr, cpu_addr;
->         void *orig_data;
+
+Aren't there other memblock_reserve'd regions that we need to preserve
+across kexec? I'd be surprised if these ACPI tables are the only thing
+that may get clobbered this way.
+
 >
-> @@ -543,7 +523,7 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
->         cpu_addr = (u64)phys_to_virt(cpu_addr);
->         page = virt_to_page((void *)cpu_addr);
+>> My previous patch[1] is just for this. It would work not only for
+>> the case here but also for any "reserved" memory regions.
+>> The only noticeable drawback that I see in this approach is that
+>> the meaning of "usable-memory-range" is now a bit obscure.
 >
-> -       xdp.data_hard_start = page_address(page) + RCV_BUF_HEADROOM;
-> +       xdp.data_hard_start = page_address(page);
->         xdp.data = (void *)cpu_addr;
->         xdp_set_data_meta_invalid(&xdp);
->         xdp.data_end = xdp.data + len;
-> @@ -563,7 +543,18 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+> usable-memory-range is only for kdump. The usable-memory-range is the reserved
+> crash region of the previous kernel, it can't overlap with anything that is
+> reserved by firmware.
 >
->         switch (action) {
->         case XDP_PASS:
-> -               nicvf_unmap_page(nic, page, dma_addr);
-> +               /* Check if it's a recycled page, if not
-> +                * unmap the DMA mapping.
-> +                *
-> +                * Recycled page holds an extra reference.
-> +                */
-> +               if (page_ref_count(page) == 1) {
-> +                       dma_addr &= PAGE_MASK;
-> +                       dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
-> +                                            RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
-> +                                            DMA_FROM_DEVICE,
-> +                                            DMA_ATTR_SKIP_CPU_SYNC);
-> +               }
+> Have I understood the problem correctly?:
+> 1. ACPI reserved regions may be accidentally overwritten by kexec,
+> 2. Kdump-kernel can't access the ACPI reserved regions via its linear map.
 >
->                 /* Build SKB and pass on packet to network stack */
->                 *skb = build_skb(xdp.data,
-> @@ -576,20 +567,6 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
->         case XDP_TX:
->                 nicvf_xdp_sq_append_pkt(nic, sq, (u64)xdp.data, dma_addr, len);
->                 return true;
-> -       case XDP_REDIRECT:
-> -               /* Save DMA address for use while transmitting */
-> -               xdp_tx = (struct nicvf_xdp_tx *)page_address(page);
-> -               xdp_tx->dma_addr = dma_addr;
-> -               xdp_tx->qidx = nicvf_netdev_qidx(nic, cqe_rx->rq_idx);
-> -
-> -               err = xdp_do_redirect(nic->pnicvf->netdev, &xdp, prog);
-> -               if (!err)
-> -                       return true;
-> -
-> -               /* Free the page on error */
-> -               nicvf_unmap_page(nic, page, dma_addr);
-> -               put_page(page);
-> -               break;
->         default:
->                 bpf_warn_invalid_xdp_action(action);
->                 /* fall through */
-> @@ -597,7 +574,18 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
->                 trace_xdp_exception(nic->netdev, prog, action);
->                 /* fall through */
->         case XDP_DROP:
-> -               nicvf_unmap_page(nic, page, dma_addr);
-> +               /* Check if it's a recycled page, if not
-> +                * unmap the DMA mapping.
-> +                *
-> +                * Recycled page holds an extra reference.
-> +                */
-> +               if (page_ref_count(page) == 1) {
-> +                       dma_addr &= PAGE_MASK;
-> +                       dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
-> +                                            RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
-> +                                            DMA_FROM_DEVICE,
-> +                                            DMA_ATTR_SKIP_CPU_SYNC);
-> +               }
->                 put_page(page);
->                 return true;
->         }
-> @@ -1864,50 +1852,6 @@ static int nicvf_xdp(struct net_device *netdev, struct netdev_bpf *xdp)
->         }
->  }
 >
-> -static int nicvf_xdp_xmit(struct net_device *netdev, struct xdp_buff *xdp)
-> -{
-> -       struct nicvf *nic = netdev_priv(netdev);
-> -       struct nicvf *snic = nic;
-> -       struct nicvf_xdp_tx *xdp_tx;
-> -       struct snd_queue *sq;
-> -       struct page *page;
-> -       int err, qidx;
-> -
-> -       if (!netif_running(netdev) || !nic->xdp_prog)
-> -               return -EINVAL;
-> -
-> -       page = virt_to_page(xdp->data);
-> -       xdp_tx = (struct nicvf_xdp_tx *)page_address(page);
-> -       qidx = xdp_tx->qidx;
-> -
-> -       if (xdp_tx->qidx >= nic->xdp_tx_queues)
-> -               return -EINVAL;
-> -
-> -       /* Get secondary Qset's info */
-> -       if (xdp_tx->qidx >= MAX_SND_QUEUES_PER_QS) {
-> -               qidx = xdp_tx->qidx / MAX_SND_QUEUES_PER_QS;
-> -               snic = (struct nicvf *)nic->snicvf[qidx - 1];
-> -               if (!snic)
-> -                       return -EINVAL;
-> -               qidx = xdp_tx->qidx % MAX_SND_QUEUES_PER_QS;
-> -       }
-> -
-> -       sq = &snic->qs->sq[qidx];
-> -       err = nicvf_xdp_sq_append_pkt(snic, sq, (u64)xdp->data,
-> -                                     xdp_tx->dma_addr,
-> -                                     xdp->data_end - xdp->data);
-> -       if (err)
-> -               return -ENOMEM;
-> -
-> -       nicvf_xdp_sq_doorbell(snic, sq, qidx);
-> -       return 0;
-> -}
-> -
-> -static void nicvf_xdp_flush(struct net_device *dev)
-> -{
-> -       return;
-> -}
-> -
->  static int nicvf_config_hwtstamp(struct net_device *netdev, struct ifreq *ifr)
->  {
->         struct hwtstamp_config config;
-> @@ -1986,8 +1930,6 @@ static const struct net_device_ops nicvf_netdev_ops = {
->         .ndo_fix_features       = nicvf_fix_features,
->         .ndo_set_features       = nicvf_set_features,
->         .ndo_bpf                = nicvf_xdp,
-> -       .ndo_xdp_xmit           = nicvf_xdp_xmit,
-> -       .ndo_xdp_flush          = nicvf_xdp_flush,
->         .ndo_do_ioctl           = nicvf_ioctl,
->  };
+>> Alternatively we may want to modify /proc/iomem, adding a specific
+>> resource entry for "ACPI Reclaim regions,"
 >
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> index 3eae9ff9b53a..d42704d07484 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> @@ -204,7 +204,7 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+> This covers 1, nicely. kexec-tool's arm64:iomem_range_callback() looks like it
+> ignores regions it doesn't know about.
 >
->         /* Reserve space for header modifications by BPF program */
->         if (rbdr->is_xdp)
-> -               buf_len += XDP_HEADROOM;
-> +               buf_len += XDP_PACKET_HEADROOM;
 >
->         /* Check if it's recycled */
->         if (pgcache)
-> @@ -224,9 +224,8 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
->                         nic->rb_page = NULL;
->                         return -ENOMEM;
->                 }
-> -
->                 if (pgcache)
-> -                       pgcache->dma_addr = *rbuf + XDP_HEADROOM;
-> +                       pgcache->dma_addr = *rbuf + XDP_PACKET_HEADROOM;
->                 nic->rb_page_offset += buf_len;
->         }
+>> and in turn kexec-tool so as to put them into "usable-memory-range",
+>> but it is rather a stopgap
+>> measure in my opinion. I don't like kexec relying heavily on userspace
+>> tool as exporting the reserved regions in /proc/iomem is also useless
+>> for most users.
 >
-> @@ -1244,7 +1243,7 @@ int nicvf_xdp_sq_append_pkt(struct nicvf *nic, struct snd_queue *sq,
->         int qentry;
->
->         if (subdesc_cnt > sq->xdp_free_cnt)
-> -               return -1;
-> +               return 0;
->
->         qentry = nicvf_get_sq_desc(sq, subdesc_cnt);
->
-> @@ -1255,7 +1254,7 @@ int nicvf_xdp_sq_append_pkt(struct nicvf *nic, struct snd_queue *sq,
->
->         sq->xdp_desc_cnt += subdesc_cnt;
->
-> -       return 0;
-> +       return 1;
->  }
->
->  /* Calculate no of SQ subdescriptors needed to transmit all
-> @@ -1656,7 +1655,7 @@ static void nicvf_unmap_rcv_buffer(struct nicvf *nic, u64 dma_addr,
->                 if (page_ref_count(page) != 1)
->                         return;
->
-> -               len += XDP_HEADROOM;
-> +               len += XDP_PACKET_HEADROOM;
->                 /* Receive buffers in XDP mode are mapped from page start */
->                 dma_addr &= PAGE_MASK;
->         }
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-> index ce1eed7a6d63..5e9a03cf1b4d 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-> @@ -11,7 +11,6 @@
->
->  #include <linux/netdevice.h>
->  #include <linux/iommu.h>
-> -#include <linux/bpf.h>
->  #include <net/xdp.h>
->  #include "q_struct.h"
->
-> @@ -94,9 +93,6 @@
->  #define RCV_FRAG_LEN    (SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
->                          SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
->
-> -#define RCV_BUF_HEADROOM       128 /* To store dma address for XDP redirect */
-> -#define XDP_HEADROOM           (XDP_PACKET_HEADROOM + RCV_BUF_HEADROOM)
-> -
->  #define MAX_CQES_FOR_TX                ((SND_QUEUE_LEN / MIN_SQ_DESC_PER_PKT_XMIT) * \
->                                  MAX_CQE_PER_PKT_XMIT)
+> Describing all the iomem:reserved regions in dt:usable-memory-range? Yes, that
+> sounds fragile.
 >
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> For 1:
+> Changing /proc/iomem to report memblock_reserved() regions as reserved would fix
+> 1. (I assume its harder to find the ACPI reserved regions again to describe them
+> separately). This stops kexec overwriting them.
+>
+>
+> For 2:
+> This patch solves the problem, but we access the acpi tables via the linear map
+> in the first kernel, but ioremap() them in the kdump kernel.
+>
+> The only way to avoid this would be for the kernel's efi code to check that the
+> ACPI regions are mapped by the linear map, and add them if they aren't... which
+> is much scarier. So I prefer this patch for 2..
+>
+>
+>
+> Thanks,
+>
+> James
