@@ -1,43 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 13 Feb 2018 13:46:58 +0300
-Subject: [PATCH 0/3] Add R8A77970/Eagle PFC support
-In-Reply-To: <20180213075222.mf7dsbwgv5ln4ond@verge.net.au>
-References: <20171110200218.747996672@cogentembedded.com>
- <20171113075303.zmkmq6bt3lfuttwu@verge.net.au>
- <049b0a0a-b1c2-73e6-c471-ca8342bba6ab@ideasonboard.com>
- <19d23fa2-1205-89a0-786f-f301ca7a0f7b@cogentembedded.com>
- <20180213075222.mf7dsbwgv5ln4ond@verge.net.au>
-Message-ID: <b6f69e47-1bce-1939-9315-0364c6397a85@cogentembedded.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Feb 2018 10:57:25 +0000
+Subject: [PATCH] crypto: arm/aes-cipher - move S-box to .rodata section
+In-Reply-To: <20180212135237.GA3011@pjb1027-Latitude-E5410>
+References: <20180212135237.GA3011@pjb1027-Latitude-E5410>
+Message-ID: <CAKv+Gu93OdaWyMcm3nqV38-RmoYoCceQ4f4DfT65t9amRm_gFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2018 10:52 AM, Simon Horman wrote:
+On 12 February 2018 at 13:52, Jinbum Park <jinb.park7@gmail.com> wrote:
+> Move the AES inverse S-box to the .rodata section
+> where it is safe from abuse by speculation.
+>
+> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
 
->>>>> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
->>>>> 'renesas-devel-20171110-v4.14-rc8' tag.  We're adding the R8A77970 PFC node
->>>>> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
->>>>> These patches depend on the R8A77970 PFC suport in order to work properly.
->>>>>
->>>>> [1/3] arm64: dts: renesas: r8a77970: add PFC support
->>>>> [2/3] arm64: dts: renesas: eagle: add SCIF0 pins
->>>>> [3/3] arm64: dts: renesas: eagle: add EtherAVB pins
->>>>
->>>> Hi Sergei,
->>>>
->>>> I have marked these patches as deferred pending acceptance of the PFC
->>>> driver. Please repost or otherwise ping me once that dependency has been
->>>> accepted.
->>>
->>> Has the dependency blocking this series been resolved yet ?
->>
->>    Now it is, except for the 3rd patch... Simon, do I need to repost the first two?
->> The 1st one did apply to 4.16-rc1 here with a fuzz...
-> 
-> Thanks for bringing this to my attention.  No need to repost. I've applied
-> all three patches and plan to push later today.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-   My mentioning of the patch #3 wasn't just random: that patch shouldn't have been
-merged since the EtherAVB pin groups were dropped by Geert while merging the R8A77970
-PFC code. Now Eagle can't mount NFS root.
-
-MBR, Sergei
+> ---
+>  arch/arm/crypto/aes-cipher-core.S | 19 ++++++++++---------
+>  1 file changed, 10 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/crypto/aes-cipher-core.S b/arch/arm/crypto/aes-cipher-core.S
+> index 54b3840..184d6c2 100644
+> --- a/arch/arm/crypto/aes-cipher-core.S
+> +++ b/arch/arm/crypto/aes-cipher-core.S
+> @@ -174,6 +174,16 @@
+>         .ltorg
+>         .endm
+>
+> +ENTRY(__aes_arm_encrypt)
+> +       do_crypt        fround, crypto_ft_tab, crypto_ft_tab + 1, 2
+> +ENDPROC(__aes_arm_encrypt)
+> +
+> +       .align          5
+> +ENTRY(__aes_arm_decrypt)
+> +       do_crypt        iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
+> +ENDPROC(__aes_arm_decrypt)
+> +
+> +       .section        ".rodata", "a"
+>         .align          L1_CACHE_SHIFT
+>         .type           __aes_arm_inverse_sbox, %object
+>  __aes_arm_inverse_sbox:
+> @@ -210,12 +220,3 @@ __aes_arm_inverse_sbox:
+>         .byte           0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26
+>         .byte           0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
+>         .size           __aes_arm_inverse_sbox, . - __aes_arm_inverse_sbox
+> -
+> -ENTRY(__aes_arm_encrypt)
+> -       do_crypt        fround, crypto_ft_tab, crypto_ft_tab + 1, 2
+> -ENDPROC(__aes_arm_encrypt)
+> -
+> -       .align          5
+> -ENTRY(__aes_arm_decrypt)
+> -       do_crypt        iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
+> -ENDPROC(__aes_arm_decrypt)
+> --
+> 1.9.1
+>
