@@ -1,48 +1,82 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 14 Feb 2018 01:06:49 +0900
-Subject: [PATCH v3 0/3] add UniPhier audio nodes
-In-Reply-To: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
-References: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNARaJB-ymtj3b0XQn0P7yo7se0CXgCCO6pb5oKEhCxf4CQ@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 13 Feb 2018 17:11:08 +0100
+Subject: [PATCH] ARM: dts: armada: netgear-rn*: fix rtc node name
+In-Reply-To: <20180210064130.6422-1-alexandre.belloni@bootlin.com> (Alexandre
+ Belloni's message of "Sat, 10 Feb 2018 07:41:30 +0100")
+References: <20180210064130.6422-1-alexandre.belloni@bootlin.com>
+Message-ID: <87h8qkq38j.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-13 22:01 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This series adds device-tree nodes for Socionext audio system
-> for UniPhier LD11/LD20 SoCs. This one enables I2S output for
-> Line-In, Line-Out, S/PDIF output and compress audio output.
+Hi Alexandre,
+ 
+ On sam., f?vr. 10 2018, Alexandre Belloni <alexandre.belloni@bootlin.com> wrote:
+
+> The node name should be generic and must not contain the part number.
 >
-> Katsuhiro Suzuki (3):
->   arm64: dts: uniphier: add sound node for UniPhier
->   arm64: dts: uniphier: add speaker out for UniPhier LD11/LD20 boards
->   arm64: dts: uniphier: add compress audio out for UniPhier LD11/LD20
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
+Applied on mvebu/dt
 
-Series, applied to linux-uniphier.  Thanks!
+Thanks,
 
-Note, I locally fixed trivial things:
- - Use #include <...> instead of #include "..." to include dt-binding header
- - Fix DTC warnings (Character '_' not recommended in node)
- - Remove unused labels such as 'audio', 'evea'
+Gregory
 
-
-
->  .../boot/dts/socionext/uniphier-ld11-global.dts    | 62 ++++++++++++++
->  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 92 +++++++++++++++++++++
->  .../boot/dts/socionext/uniphier-ld20-global.dts    | 62 ++++++++++++++
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 96 ++++++++++++++++++++++
->  4 files changed, 312 insertions(+)
+> ---
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 2 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 2 +-
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
 >
-> --
-> 2.15.1
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> index b1a96e95e921..d2225bd4a76f 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -103,7 +103,7 @@
+>  
+>  				status = "okay";
+>  
+> -				isl12057: isl12057 at 68 {
+> +				isl12057: rtc at 68 {
+>  					compatible = "isil,isl12057";
+>  					reg = <0x68>;
+>  					wakeup-source;
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> index d67e7aa42b54..b73cae836bc1 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> @@ -105,7 +105,7 @@
+>  
+>  				status = "okay";
+>  
+> -				isl12057: isl12057 at 68 {
+> +				isl12057: rtc at 68 {
+>  					compatible = "isil,isl12057";
+>  					reg = <0x68>;
+>  					wakeup-source;
+> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> index 40c6fe21e720..e66fe80cf279 100644
+> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> @@ -115,7 +115,7 @@
+>  					reg = <0x4c>;
+>  				};
+>  
+> -				isl12057: isl12057 at 68 {
+> +				isl12057: rtc at 68 {
+>  					compatible = "isil,isl12057";
+>  					reg = <0x68>;
+>  					wakeup-source;
+> -- 
+> 2.16.1
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Best Regards
-Masahiro Yamada
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
