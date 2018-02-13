@@ -1,28 +1,34 @@
 From: mmayer@broadcom.com (Markus Mayer)
-Date: Tue, 13 Feb 2018 12:40:37 -0800
-Subject: [PATCH 0/3] Update for the Broadcom STB DPFE driver
-Message-ID: <1518554440-21805-1-git-send-email-mmayer@broadcom.com>
+Date: Tue, 13 Feb 2018 12:40:38 -0800
+Subject: [PATCH 1/3] memory: brcmstb: dpfe: properly mask vendor error bits
+In-Reply-To: <1518554440-21805-1-git-send-email-mmayer@broadcom.com>
+References: <1518554440-21805-1-git-send-email-mmayer@broadcom.com>
+Message-ID: <1518554440-21805-2-git-send-email-mmayer@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series primarily introduces a new way of passing information from
-the DCPU to the host CPU.
+We were printing the entire 32 bit register rather than just the lower
+8 bits. Anything above bit 7 is reserved and may be any random value.
 
-Previously, all communication was via the DCPU data RAM. This
-communication mode is still supported. In addition, we now support
-passing data via the message RAM. The driver will dynamically detect
-which method to use upon receiving a reply.
+Fixes: 2f330caff577 ("memory: brcmstb: Add driver for DPFE")
+Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+---
+ drivers/memory/brcmstb_dpfe.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-The series also contains two fixes to the driver that have no direct
-relation with the new communication feature.
-
-Markus Mayer (3):
-  memory: brcmstb: dpfe: properly mask vendor error bits
-  memory: brcmstb: dpfe: fix type declaration of variable "ret"
-  memory: brcmstb: dpfe: support new way of passing data from the DCPU
-
- drivers/memory/brcmstb_dpfe.c | 74 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 60 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/memory/brcmstb_dpfe.c b/drivers/memory/brcmstb_dpfe.c
+index 0a7bdbed3a6f..088153760e52 100644
+--- a/drivers/memory/brcmstb_dpfe.c
++++ b/drivers/memory/brcmstb_dpfe.c
+@@ -603,7 +603,8 @@ static ssize_t show_vendor(struct device *dev, struct device_attribute *devattr,
+ 		       readl_relaxed(info + DRAM_VENDOR_MR6) & DRAM_VENDOR_MASK,
+ 		       readl_relaxed(info + DRAM_VENDOR_MR7) & DRAM_VENDOR_MASK,
+ 		       readl_relaxed(info + DRAM_VENDOR_MR8) & DRAM_VENDOR_MASK,
+-		       readl_relaxed(info + DRAM_VENDOR_ERROR));
++		       readl_relaxed(info + DRAM_VENDOR_ERROR) &
++				     DRAM_VENDOR_MASK);
+ }
+ 
+ static int brcmstb_dpfe_resume(struct platform_device *pdev)
 -- 
 2.7.4
