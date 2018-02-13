@@ -1,87 +1,125 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Tue, 13 Feb 2018 16:03:09 +1100 (AEDT)
-Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
-In-Reply-To: <20180212.103956.1262868827217051631.davem@davemloft.net>
-References: <cover.1518397634.git.fthain@telegraphics.com.au>
- <f697da2b2513e025688f6c48088536060575a249.1518397634.git.fthain@telegraphics.com.au>
- <20180212.103956.1262868827217051631.davem@davemloft.net>
-Message-ID: <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 13 Feb 2018 16:52:56 +1030
+Subject: [PATCH v9 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <20180205235757.246758-3-brendanhiggins@google.com>
+References: <20180205235757.246758-1-brendanhiggins@google.com>
+ <20180205235757.246758-3-brendanhiggins@google.com>
+Message-ID: <CACPK8XdXOaPZ5i=qKns3=V87nhfY62PNr4kwH9xwVYxY0djo0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Feb 2018, David Miller wrote:
+Hi Brendan,
 
-> From: Finn Thain <fthain@telegraphics.com.au>
-> Date: Sun, 11 Feb 2018 22:08:43 -0500 (EST)
-> 
-> > The lib8390 module parameter 'msg_enable' doesn't do anything useful:
-> > it causes an ancient version string to be logged.
-> 
-> Not true.
-> 
-> You need to look at the various netif_*() et al. message logging
-> interfaces, they check "p->msg_enable" to determine which messages to
-> print.
-> 
+On Tue, Feb 6, 2018 at 10:27 AM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
+> specific device tree for the NPCM750 (Poleg) evaluation board.
+>
+> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+> Reviewed-by: Joel Stanley <joel@jms.id.au>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+> Tested-by: Avi Fishman <avifishman70@gmail.com>
 
-I think you have overlooked those modules which offer no way to set 
-p->msg_enable, i.e. ax88796, axnet_cs, etherh, hydra, mac8390, mcf8390, 
-pcnet_cs and zorro8390.
+This looks well acked, reviewed and tested. How do you plan to have
+the ARM SoC maintainers merge your patches?
 
-The apne, ne, ne2k-pci, smc-ultra, stnic, and wd modules are not at issue 
-here because they define their own msg_enable parameters and they also 
-assign p->msg_enable accordingly.
+> ---
+>  .../arm/cpu-enable-method/nuvoton,npcm7xx-smp      |  42 ++++++
+>  .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
+>  arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  35 +++++
+>  arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 162 +++++++++++++++++++++
+>  include/dt-bindings/clock/nuvoton,npcm7xx-clks.h   |  35 +++++
+>  5 files changed, 280 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/nuvoton,npcm7xx-smp
+>  create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
+>  create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
+>  create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
+>  create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
 
-> I'm not applying this, sorry.
-> 
+You need to add nuvoton-npcm750-evb.dts to arch/arm/boot/dts/Makefile
 
-Please take another look.
+Once you've done that you can add
 
-> Just for the record, I consider these kinds of ancient driver cleanups 
-> painful to review, and unless they allow some ugly global kernel API to 
-> be improved or removed such changes have very little gain.
-> 
+Tested-by: Joel Stanley <joel@jms.id.au>
 
-OK. When there are no users, I'll send you no patches.
+as I tested this on an EVB.
 
-But even then, I may continue to send patches to other maintainers who may 
-be open to the possibility of unforeseen future uses of the body of 
-contributed code under their care.
+> diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+> new file mode 100644
+> index 000000000000..08e906f88c49
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
+> @@ -0,0 +1,162 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018 Nuvoton Technology corporation.
+> +// Copyright 2018 Google, Inc.
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
+> +
+> +/ {
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               enable-method = "nuvoton,npcm7xx-smp";
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a9";
+> +                       clocks = <&clk NPCM7XX_CLK_CPU>;
+> +                       clock-names = "clk_cpu";
+> +                       reg = <0>;
+> +                       next-level-cache = <&l2>;
+> +               };
+> +
+> +               cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a9";
+> +                       clocks = <&clk NPCM7XX_CLK_CPU>;
+> +                       clock-names = "clk_cpu";
+> +                       reg = <1>;
+> +                       next-level-cache = <&l2>;
+> +               };
+> +       };
+> +
+> +/* external clock signal rg1refck, supplied by the phy */
+> +clk-rg1refck {
+> +       compatible = "fixed-clock";
+> +       #clock-cells = <0>;
+> +       clock-frequency = <125000000>;
+> +};
+> +
+> +/* external clock signal rg2refck, supplied by the phy */
+> +clk-rg2refck {
+> +       compatible = "fixed-clock";
+> +       #clock-cells = <0>;
+> +       clock-frequency = <125000000>;
+> +};
+> +
+> +clk-xin {
+> +       compatible = "fixed-clock";
+> +       #clock-cells = <0>;
+> +       clock-frequency = <50000000>;
+> +};
 
-> In fact, most of them have a good chance to break things.
-> 
+The whitespace here needs to be fixed.
 
-You saw the tested-by tags, right? Anyway, if you consider my previous 
-work, I believe you'll find that I've fixed more bugs than I've 
-introduced.
+Cheers,
 
-> It is especially a dubious sequence when you cluster so many of these 
-> things together into a large patch series.
-> 
+Joel
 
-Sorry if that gave the wrong impression. Doing that made my workflow 
-easier.
-
-> If you are really serious about fixing real bugs, post these one at a 
-> time, very slowly, for us to review properly and apply.
-> 
-> Thank you.
-
-Please don't feel like I'm trying to pressure you to expedite this.
-
-FWIW, this submission was arranged so that you might cherry-pick the first 
-N patches, for some satisfactory value of N.
-
-I will split up this series by driver (8390, sonic, etc) so it's more 
-clear which patches are independent and which patches can be reviewed 
-together.
-
-Thanks.
-
--- 
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-m68k" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> +
+> +       soc {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               interrupt-parent = <&gic>;
+> +               ranges = <0x0 0xf0000000 0x00900000>;
+> +
