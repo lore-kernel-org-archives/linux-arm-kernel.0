@@ -1,118 +1,308 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Feb 2018 14:37:33 +0000
-Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
-In-Reply-To: <2801cac8583d56260a9df0cdf7f41f47@codeaurora.org>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
- <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
- <d2751939f5813c296cdcb7a92d5698bf@codeaurora.org>
- <20180202110532.n2eez3zqbmf2jelr@lakrids.cambridge.arm.com>
- <2801cac8583d56260a9df0cdf7f41f47@codeaurora.org>
-Message-ID: <20180213143733.ts3dlcnhcf7jzbbm@lakrids.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 13 Feb 2018 14:08:47 +0000
+Subject: [PATCH v3 09/41] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20180213085130.GB23189@cbox>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-10-christoffer.dall@linaro.org>
+ <20180122173326.GO22781@e103592.cambridge.arm.com>
+ <20180125194653.GR21802@cbox>
+ <20180207164955.GT5862@e103592.cambridge.arm.com>
+ <20180207175644.GF29286@cbox>
+ <20180209155930.GD5862@e103592.cambridge.arm.com>
+ <20180213085130.GB23189@cbox>
+Message-ID: <20180213140843.GN5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 11:56:50AM -0800, Channa wrote:
-> On 2018-02-02 03:05, Mark Rutland wrote:
-> > On Thu, Feb 01, 2018 at 12:39:09PM -0800, Channa wrote:
-> > > On 2018-02-01 02:44, Mark Rutland wrote:
-> > > > On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
-> > > > > +- llcc-bank-off:
-> > > > > +	Usage: required
-> > > > > +	Value Type: <u32 array>
-> > > > > +	Definition: Offsets of llcc banks from llcc base address starting
-> > > > > from
-> > > > > +		    LLCC bank0.
-> > > > > +
-> > > > > +- llcc-broadcast-off:
-> > > > > +	Usage: required
-> > > > > +	Value Type: <u32>
-> > > > > +	Definition: Offset of broadcast register from LLCC bank0 address.
-> > > >
-> > > > Please could we use "offset" rather than "off" for both of these? That
-> > > > way it's obvious these aren't properties for disabling some feature.
-> > > >
-> > > > How variable are these offsets in practice? Is the memory map not fixed?
-> > > 
-> > > The offsets depends on the number of LLCC HW blocks. These number of
-> > > HW
-> > > blocks vary from
-> > > chipset to chipset and new registers could be added that changes the
-> > > offset.
+On Tue, Feb 13, 2018 at 09:51:30AM +0100, Christoffer Dall wrote:
+> On Fri, Feb 09, 2018 at 03:59:30PM +0000, Dave Martin wrote:
+> > On Wed, Feb 07, 2018 at 06:56:44PM +0100, Christoffer Dall wrote:
+> > > On Wed, Feb 07, 2018 at 04:49:55PM +0000, Dave Martin wrote:
+
+[...]
+
+> > Simply entering the kernel and returning to userspace doesn't have
+> > this effect by itself.
 > > 
-> > Surely if new registers are added, we need a new compatible string?
 > > 
-> > Can't we encode the number of LLCC HW blocks, instead? Presumably that
-> > would give enough information to cover both llcc-bank-off and
-> > llcc-broadcast-off.
-> > 
-> > [...]
+> > Prior to the SVE patches, KVM makes itself orthogonal to the host
+> > context switch machinery by ensuring that whatever the host had
+> > in the FPSIMD regs at guest entry is restored before returning to
+> > the host. (IIUC)  
 > 
-> Are you suggesting to move these offset handing out of DTS files and manage
-> in the driver?
+> Only if the guest actually touches FPSIMD state.  If the guest doesn't
+> touch FPSIMD (no trap to EL2), then we never touch the state at all.
 
-Something like that, though it depends on how exactly the offsets can be
-derived.
+I should have been clearer: KVM ensures that the state is _unchanged_
+before returning to the host, but can elide the save/restore when the
+guest doesn't touch the state...
 
-Using reg entries, as Matt suggested, sounds better though.
-
-> > > > > +compatible devices:
-> > > > > +		qcom,sdm845-llcc
-> > > >
-> > > > Huh? The "qcom,sdm845-llcc" bindings wasn't described above, and it's
-> > > > not clear what this means.
-> > > >
-> > > > > +
-> > > > > +Example:
-> > > > > +
-> > > > > +	qcom,system-cache at 1300000 {
-> > > > > +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
-> > > >
-> > > > This looks very wrong. Why do you need syscon and simple-mfd?
-> > > 
-> > > LLCC HW block has 3 functionalities:
-> > > System cache core, ECC & AMON drivers for debugging.
-> > > All three drivers use the same register space for configuration,
-> > > status etc.
-> > > In order to avoid remapping the same address region across multiple
-> > > drivers,
-> > > I have implemented this driver as a syncon and simple-mfd.
-> > 
-> > Please don't do that; that's completely dependent on Linux
-> > implementation details.
 > 
-> Why do you think simple-mfd is not good here? The LLCC HW clock is outside
-> of CPUSS and has
-> multiple functional blocks.
-
-For one thing, there's no need for this to be a syscon *and* a
-simple-mfd.
-
-W.R.T. simple-mfd, I think it would bet better to decompose the device
-in a top-level driver, as I described in my prior reply, rather than
-describing a set of drivers (which are not themselves HW).
-
-> > > > > +- cache-slices:
-> > > > > +	Usage: required
-> > > > > +	Value type: <prop-encoded-array>
-> > > > > +	Definition: The tuple has phandle to llcc device as the first
-> > > > > argument and the
-> > > > > +		    second argument is the usecase id of the client.
-> > > >
-> > > > What is a "usecase id" ?
-> > > 
-> > > Usecase id for use case that wants to use system cache for eg:
-> > > video-encode
-> > > and video-decode
-> > 
-> > Sure, but how is the value used? Is it the index of a slice? Or
-> > something more abstract?
+> > This means that redundant save/restore work is
+> > done by KVM, but does have the advantage of simplicity.
 > 
-> This is used as an index to the SCT (System cache Table) configuration
-> data that controls the behavior of each cache slice.
+> I don't understand what the redundant part here is?  Isn't it only
+> redundant in the case where the host (for some reason) has already saved
+> its FPSIMD state?  I assume that won't be the common case, since
+> "userspace->kernel->kvm_run" won't save the FPSIMD state, as you just
+> explained above.
 
-Ok. Where does that SCT live? Is that in HW? Is it programmed by SW, or
-statically configured for a given platform?
+...however, when this elision does not occur, it may duplicate
+save/restore done by the kernel, or it may save/restore worthless data
+if the host's FPSIMD state is non-live at the time.
 
-Thanks,
-Mark.
+It's hard to gauge the impact of this: it seems unlikely to make a
+massive difference, but will be highly workload-dependent.
+
+
+The redundancy occurs because of the deferred restore of the FPSIMD
+registers for host userspace: as a result, the host FPSIMD regs are
+either discardable (i.e., already saved) or not live at all between
+and context switch and the next ret_to_user.
+
+This means that if the vcpu run loop is preempted, then when the host
+switches back to the run loop it is pointless to save or restore the
+host FPSIMD state.
+
+A typical sequence of events exposing this redundancy would be as
+follows.  I assume here that there are two cpu-bound tasks A and B
+competing for a host CPU, where A is a vcpu thread:
+
+ - vcpu A is in the guest running a compute-heavy task
+ - FPSIMD typically traps to the host before context switch
+ X kvm saves the host FPSIMD state
+ - kvm loads the guest FPSIMD state
+ - vcpu A reenters the guest
+ - host context switch IRQ preempts A back to the run loop
+ Y kvm loads the host FPSIMD state via vcpu_put
+
+ - host context switch:
+ - TIF_FOREIGN_FPSTATE is set -> no save of user FPSIMD state
+ - switch to B
+ - B reaches ret_to_user
+ Y B's user FPSIMD state is loaded: TIF_FOREIGN_FPSTATE now clear
+ - B enters userspace
+
+ - host context switch:
+ - B enters kernel
+ X TIF_FOREIGN_FPSTATE now set -> host saves B's FPSIMD state
+ - switch to A -> set TIF_FOREIGN_FPSTATE for A
+ - back to the KVM run loop
+
+ - vcpu A enters guest
+ - redo from start
+
+Here, the two saves marked X are redundant with respect to each other,
+and the two restores marked Y are redundant with respect to each other.
+
+> > This breaks for SVE though: the high bits of the Z-registers will be
+> > zeroed as a side effect of the FPSIMD save/restore done by KVM.
+> > This means that if the host has state in those bits then it must
+> > be saved before entring the guest: that's what the new
+> > kvm_fpsimd_flush_cpu_state() hook in kvm_arch_vcpu_ioctl_run() is for.
+> 
+> Again, I'm confused, because to me it looks like
+> kvm_fpsimd_flush_cpu_state() boils down to fpsimd_flush_cpu_state()
+> which just sets a pointer to NULL, but doesn't actually save the state.
+> 
+> So, when is the state in the hardware registers saved to memory?
+
+This _is_ quite confusing: in writing this answer I identified a bug
+and then realised why there is no bug...
+
+kvm_fpsimd_flush_cpu_state() is just an invalidation.  No state is
+actually saved today because we explicitly don't care about preserving
+the SVE state, because the syscall ABI throws the SVE regs away as
+a side effect any syscall including ioctl(KVM_RUN); also (currently) KVM
+ensures that the non-SVE FPSIMD bits _are_ restored by itself.
+
+I think my proposal is that this hook might take on the role of
+actually saving the state too, if we move that out of the KVM host
+context save/restore code.
+
+Perhaps we could even replace
+
+	preempt_disable();
+	kvm_fpsimd_flush_cpu_state();
+	/* ... */
+	preempt_enable();
+
+with
+
+	kernel_neon_begin();
+	/* ... */
+	kernel_neon_end();
+
+which does have the host user context saving built in -- though this
+may have unwanted side effects, such as masking softirqs.  Possibly not
+a big deal though if the region is kept small (?)
+
+
+<aside>
+
+Understanding precisely what kvm_fpsimd_flush_cpu_state() does is
+not trivial...  the explanation goes something like this:
+
+(*takes deep breath*)
+
+A link is maintained between tasks and CPUs to indicate whether a
+given CPU has the task's FPSIMD state in its regs.
+
+For brevity, I'll describe this link as a relation loaded(task, cpu).
+
+	loaded(current, smp_processor_id()) <->
+		!test_thread_flag(TIF_FOREIGN_FPSTATE).
+
+(In effect, TIF_FOREIGN_FPSTATE caches this relation for current.)
+
+For non-current tasks, the relation is something like
+
+	loaded(task, cpu) <->
+		&task->thread.fpsimd_state ==
+			per_cpu(fpsimd_last_state.st, cpu) &&
+		task->thread.fpsimd_state.cpu == cpu.
+
+There are subtleties about when these equivalences are meaningful
+and how they can be checked safely that I'll gloss over here --
+to get an idea, see cb968afc7898 ("arm64/sve: Avoid dereference of dead
+task_struct in KVM guest entry").
+
+ * loaded(task, cpu) is made false for all cpus and a given task
+   by fpsimd_flush_task_state(task).
+
+   This is how we invalidate a stale copy of some task's state when
+   the kernel deliberately changes the state (e.g., exec, sigreturn,
+   PTRACE_SETREGSET).
+
+ * loaded(task, smp_processor_id()) is made false for all tasks
+   by fpsimd_flush_cpu_state().
+
+   This is how we avoid using the FPSIMD regs of some CPU that
+   the kernel trashed (e.g., kernel_mode_neon, KVM) as a source
+   of any task's FPSIMD state.
+
+ * loaded(current, smp_processor_id()) is made true by
+   fpsimd_bind_to_cpu().
+
+   fpsimd_bind_to_cpu() also implies the effects of
+   fpsimd_flush_task_state(current) and
+   fpsimd_flush_cpu_state(smp_processor_id()) before the new relation is
+   established.  This is not explicit in the code, but falls out from
+   the way the relation is represented.
+
+
+( There is a wrinkle here: fpsimd_flush_task_state(task) should always
+be followed by set_thread_flag(TIF_FOREIGN_FPSTATE) if task == current.
+fpsimd_flush_cpu_state() should similarly set that flag, otherwise the
+garbage left in the SVE bits by KVM's save/restore may spuriously
+appear in the vcpu thread's user regs.  But since that data will be (a)
+zeros or (b) the task's own data; and because TIF_SVE is cleared in
+entry.S:el0_svc is a side-effect of the ioctl(KVM_RUN) syscall, I don't
+think this matters in practice.
+
+If we extend kvm_fpsimd_flush_cpu_state() to invalidate in the non-SVE
+case too then this becomes significant and we _would_ need to clear
+TIF_FOREIGN_FPSTATE to avoid the guests FPSIMD regs appearing in the
+vcpu user thread. )
+
+</aside>
+
+> > The alternative would have been for KVM to save/restore the host SVE
+> > state directly, but this seemed premature and invasive in the absence
+> > of full KVM SVE support.
+> > 
+> > This means that KVM's own save/restore of the host's FPSIMD state
+> > becomes redundant in this case, but since there is no SVE hardware
+> > yet, I favoured correctness over optimal performance here.
+> > 
+> 
+> I agree with the approach, I guess I just can't seem to follow the code
+> correctly...
+
+Understandable... even trying to remember how it works is giving me a
+headache #P
+
+> 
+> > 
+> > My point here was that we could modify this hook to always save off the
+> > host FPSIMD state unconditionally before entering the guts of KVM,
+> > instead of only doing it when there is live SVE state.  The benefit of
+> > this is that the host context switch machinery knows if the state has
+> > already been saved and won't do it again.  Thus a kvm userspace -> vcpu
+> > (-> guest exit -> vcpu)* -> guest_exit sequence of arbitrary length
+> > will only save the host FPSIMD (or SVE) state once, and won't restore
+> > it at all (assuming no context switches).
+> > 
+> > Instead, the user thread's FPSIMD state is only reloaded on the final
+> > return to userspace.
+> > 
+> 
+> I think that would invert the logic we have now, so instead of only
+> saving/restoring the FPSIMD state when the guest uses it (as we do now),
+> we would only save/restore the FPSIMD state when the host uses it,
+> regardless of what the guest does.
+
+I'm not sure that's a complete characterisation of what's going on,
+but I'm struggling to describe my view in simple terms.
+
+> Ideally, we could have a combination of both, but it's unclear to me if
+> we have good indications that one case is more likely than the other.
+> 
+> My gut feeling though, is that the guest will be likely to often access
+> FPSIMD state for as long as we're in KVM_RUN, and that host userspace
+> also often uses FPSIMD (memcopy, etc.), but the rest of the host kernel
+> (kernel threads etc.) is unlikely to use FPSIMD for a system that is
+> primarily running VMs.
+
+I think my suggestion:
+
+ * neither adds nor elides any saves or restores of the guest context;
+ * elides some saves and restores of the host context;
+ * moves the host context save with respect to your series in those
+   cases where it does occur; and
+ * adds 1 host context save for each preempt-or-enter-userspace ...
+   preempt-or-enter-userspace interval of a vcpu thread during which
+   the guest does not use FPSIMD.
+  
+The last bullet is the only one that can add cost.  I can imagine
+hitting this during an I/O emulation storm.  I feel that most of the
+rest of the time the change would be a net win, but it's hard to gauge
+the overall impact.
+
+
+Migrating to using the host context switch machinery as-is for
+managing the guest FPSIMD context would allow all the redundant
+saves/restores would be eliminated.
+
+It would be a more invasive change though, and I don't think this
+series should attempt it.
+
+> > > > Yes (except that if a return to userspace happens then FPSIMD will be
+> > > > restored at that point: there is no laziness there -- it _could_
+> > > > be lazy, but it's deemed unlikely to be a performance win due to the
+> > > > fact that the compiler can and does generate FPSIMD code quite
+> > > > liberally by default).
+> > > > 
+> > > > For the case of being preempted within the kernel with no ret_to_user,
+> > > > you are correct.
+> > > > 
+> > > 
+> > > ok, that would indeed also be useful for things like switching to a
+> > > vhost thread and returning to the vcpu thread.
+> > 
+> > What's a vhost thread?
+> > 
+> 
+> vhost is the offload mechanism for the data-path of virtio devices, and
+> for example if you have an application in your VM which is sending data,
+> the VM will typically fill some buffer and then cause a trap to the host
+> kernel by writing to an emulated PCI MMIO register, and that trap is
+> handled by KVM's IO bus infrastructure, which schedules a vhost kernel
+> thread which actually sends the data from the buffer shared between the
+> VM and the host kernel onto the physical network.
+
+Ah, right.
+
+Cheers
+---Dave
