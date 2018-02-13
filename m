@@ -1,45 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 12 Feb 2018 16:17:44 -0800
-Subject: [PATCH] arm64: Make L1_CACHE_SHIFT configurable
-In-Reply-To: <f5d6d768-d354-56b5-ce0c-4f46d4e6d642@codeaurora.org>
-References: <1518479125-14428-1-git-send-email-f.fainelli@gmail.com>
- <ca6c47f9-86df-bcdb-bbe1-eac9db68ec33@codeaurora.org>
- <ffc090d5-62c9-e608-32e2-8d13d01234e6@gmail.com>
- <f5d6d768-d354-56b5-ce0c-4f46d4e6d642@codeaurora.org>
-Message-ID: <126b2cc2-a61e-b30d-1ff9-ea30af7abf57@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 12 Feb 2018 16:19:38 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.16-rc2
+Message-ID: <7h8tbxagh1.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2018 04:10 PM, Timur Tabi wrote:
-> On 02/12/2018 05:57 PM, Florian Fainelli wrote:
->> That is debatable, is there a good publicly available table of what the
->> typical L1 cache line size is on ARMv8 platforms?
-> 
-> I don't have that, but I was under the impression that we moved from 6
-> to 7 because more and more ARMv8 platforms have 128-byte caches, so that
-> is the "new normal".
-> 
+Arnd, Olof,
 
-That does not seem to be the data that I am collecting from ARM's
-website and some quick googling:
+Here are a couple small DT-only fixes for v4.16-rc.
 
-The following cores appear to have a 64bytes L1D cache line size: A55,
-A73 (fixed), A35, A32, A53, A57 (fixed), A72 (fixed) even the Falkor
-seems to be that way according to [1].
+Please pull,
 
-APM Mustang also seems to be 64b L1D according to [2].
+Thanks,
 
-[1]: https://en.wikichip.org/wiki/qualcomm/microarchitectures/falkor
-[2]: http://www.7-cpu.com/cpu/X-Gene.html
+Kevin
 
-And then we seem to covering what the ARM64 mainline kernel knows about
-non-ARM implementations: ThunderX and ThunderX2 (formerly Broadcom
-Vulcan). There is possibly the Qualcomm Kryo is different, but wikipedia
-seems to suggest it is a derivative of existing Cortex-A CPUs which have
-a 64b cache line size.
 
-Let's see what Catalin and Will think about what the default should be.
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Thanks!
--- 
-Florian
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
+
+for you to fetch changes up to 77f5cdbd78ec5e17022725a5da476f4ca08b1dfa:
+
+  ARM64: dts: meson: uart: fix address space range (2018-02-12 14:13:04 -0800)
+
+----------------------------------------------------------------
+Amlogic fixes for v4.16-rc1
+- DT: fix UART address ranges
+- DT: enable PHY interrupts
+
+----------------------------------------------------------------
+Jerome Brunet (1):
+      ARM64: dts: meson-gxl: add internal ethernet PHY irq
+
+Yixun Lan (1):
+      ARM64: dts: meson: uart: fix address space range
+
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi |  4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 10 +++++-----
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi |  1 +
+ 3 files changed, 8 insertions(+), 7 deletions(-)
