@@ -1,78 +1,56 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 13 Feb 2018 14:27:50 +0000
-Subject: [PATCH v3 26/41] KVM: arm64: Introduce framework for accessing
- deferred sysregs
-In-Reply-To: <20180213085502.GF23189@cbox>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-27-christoffer.dall@linaro.org>
- <20180123160431.GA5862@e103592.cambridge.arm.com>
- <20180125195413.GT21802@cbox>
- <20180209161739.GE5862@e103592.cambridge.arm.com>
- <20180213085502.GF23189@cbox>
-Message-ID: <20180213142749.GO5862@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Feb 2018 14:33:19 +0000
+Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
+In-Reply-To: <0ce690ab886d4896506ba916d2d39554@codeaurora.org>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+ <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
+ <CAHCPf3vt-ZCXgTfCZ-LSW3TSXAk5KBz3wCu-LuTOBdCB+sgGgw@mail.gmail.com>
+ <0ce690ab886d4896506ba916d2d39554@codeaurora.org>
+Message-ID: <20180213143318.be2dmmmoiafkehqk@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 09:55:02AM +0100, Christoffer Dall wrote:
-> On Fri, Feb 09, 2018 at 04:17:39PM +0000, Dave Martin wrote:
-> > On Thu, Jan 25, 2018 at 08:54:13PM +0100, Christoffer Dall wrote:
-> > > On Tue, Jan 23, 2018 at 04:04:40PM +0000, Dave Martin wrote:
+On Thu, Feb 08, 2018 at 04:24:16PM -0800, Channa wrote:
+> On 2018-02-08 08:52, Matt Sealey wrote:
+> > On 25 January 2018 at 17:55, Channagoud Kadabi <ckadabi@codeaurora.org>
+> > wrote:
+> > > Documentation for last level cache controller device tree bindings,
+> > > client bindings usage examples.
+> > 
+> > [snippety snip]
+> > 
+> > > +- llcc-bank-off:
+> > > +       Usage: required
+> > > +       Value Type: <u32 array>
+> > > +       Definition: Offsets of llcc banks from llcc base address
+> > > starting from
+> > > +                   LLCC bank0.
+> > > +
+> > > +- llcc-broadcast-off:
+> > > +       Usage: required
+> > > +       Value Type: <u32>
+> > > +       Definition: Offset of broadcast register from LLCC bank0
+> > > address.
 
-[...]
-
-> > > > The individual accessor functions also become unnecessary in this case,
-> > > > because we wouldn't need to derive function pointers from them any
-> > > > more.
-> > > > 
-> > > > I don't know how performance would compare in practice though.
-> > > 
-> > > I don't know either.  But I will say that the whole idea behind put/load
-> > > is that you do this rarely, and going to userspace from KVM is
-> > > notriously expensive, also on x86.
-> > 
-> > I guess that makes sense.  I'm still a bit hazy on the big picture
-> > for KVM.
-> > 
-> > > > I'm also assuming that all calls to these accessors are const-foldable.
-> > > > If not, relying on inlining would bloat the generated code a lot.
-> > > 
-> > > We have places where this is not the cae, access_vm_reg() for example.
-> > > But if we really, really, wanted to, we could rewrite that to have a
-> > > function for each register, but that's pretty horrid on its own.
-> > 
-> > That might not be too bad if there is only one giant inline expansion
-> > and the rest are folded down.
-> > 
-> > 
-> > I guess this is something to revisit _if_ we suspect a performance
-> > bottleneck later on.
-> > 
-> > For now, I was lacking some understanding regarding how this code gets
-> > run, so I was guessing about potential issues rather then proven
-> > issues.
-> > 
+> > And if you need to describe register offsets... why aren't you able to
+> > use the reg property?
 > 
-> This was a very useful discussion.  I think I'll change this to a big
-> switch statement in the header file using a static inline, because it
-> makes the code more readable, and if we notice a huge code size
-> explosion, we can take measures to make sure things are const-foldable.
+> Reg property did not suit well for my need, so I choose to maintain offsets
+> instead.
+> 
+> The registers in the HW block are organized as
+>                 (offset1)    (offset2)     (offset3)     (offset4)
+> Base(Block0) -- Block1 -- Block 2 -- Block 3 -- Broadcast_Block
+> 
+> Each block has identical register mapping. You can think of it as 4
+> instances of identical HW.
 
-Sure, that sounds reasonable.
+We have similar in other devices (e.g. GICv3 has multiple instances of
+the same register block).
 
-C99 inline semantics allow a single out-of-line body to be linked in
-somewhere for when the function isn't inlined, so we might be able to
-mitigate the bloat that way if it's a problem... unless the compiler
-flags sabotage it (I remember GCC traditionally does something a bit
-different where there's a particular difference between "inline" and
-"extern inline".)
+If there's nothing between those blocks, using a reg entry sounds
+prefectly reasonable. You can list the broadcast block first, then the
+others, or use reg-names.
 
-> > As you might guess, I'm still at the "stupid questions" stage for
-> > this series :)
->
-> Not at all.
-
-Hmmm, I must try to be more stupid when I look at the other
-patches...
-
-Cheers
----Dave
+Thanks,
+Mark.
