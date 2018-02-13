@@ -1,65 +1,44 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 13 Feb 2018 14:32:22 +0200
-Subject: [PATCH 2/4] arm64: dts: renesas: r8a77995: add FCPVD nodes
-In-Reply-To: <1518474330-8713-3-git-send-email-kbingham@kernel.org>
-References: <1518474330-8713-1-git-send-email-kbingham@kernel.org>
- <1518474330-8713-3-git-send-email-kbingham@kernel.org>
-Message-ID: <1541765.WkmPmS7X3L@avalon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Feb 2018 12:36:02 +0000
+Subject: revisit arm64 per-task stack canaries
+Message-ID: <CAKv+Gu9RAXhMAwKJgNAZEBZRMNfpyDNS-rxa+U2EpNxEVq77vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
+Hello all,
 
-Thank you for the patch.
+I guess my most recent emails kind of got lost in the avalanche of
+Meltdown/Spectre related activities.
 
-On Tuesday, 13 February 2018 00:25:27 EET Kieran Bingham wrote:
-> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> 
-> The FCPVD handles the interface between the VSPD and memory.
-> 
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Now that the dust seems to have settled a bit, may I kindly bring this
+topic to your attention again?
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+In summary, the default aarch64 way of using a single value for the
+stack canary for all threads sharing an address space severely limits
+the kernel's ability to implement stack canaries in a meaningful way.
 
-I would however squash this with patch 1/4 from the same series.
+Originally, we assumed that the only way to overcome this was to
+implement per-CPU stack canaries, where each CPU loads the stack
+canary of the task it executes at context switch. This is racy and
+cumbersome in the presence of kernel support of VHE, which means the
+per-CPU thread ID register is not fixed at compile time.
 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
-> 6cf935d307d9..196a917afea6 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-> @@ -700,6 +700,24 @@
->  			resets = <&cpg 607>;
->  			iommus = <&ipmmu_vp0 5>;
->  		};
-> +
-> +		fcpvd0: fcp at fea27000 {
-> +			compatible = "renesas,fcpv";
-> +			reg = <0 0xfea27000 0 0x200>;
-> +			clocks = <&cpg CPG_MOD 603>;
-> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-> +			resets = <&cpg 603>;
-> +			iommus = <&ipmmu_vi0 8>;
-> +		};
-> +
-> +		fcpvd1: fcp at fea2f000 {
-> +			compatible = "renesas,fcpv";
-> +			reg = <0 0xfea2f000 0 0x200>;
-> +			clocks = <&cpg CPG_MOD 602>;
-> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-> +			resets = <&cpg 602>;
-> +			iommus = <&ipmmu_vi0 9>;
-> +		};
->  	};
-> 
->  	timer {
+Instead, I have proposed a proof of concept [0] where the compiler
+emits an instruction sequence that loads the canary directly from the
+task struct, which is the per-thread data structure maintained by the
+kernel. Accessing that can be done safely without any of the
+limitations per-CPU variables have. The task struct pointer is kept in
+system register sp_el0 while running in the kernel.
+
+The purpose of this email to reach agreement between the various
+stakeholders (mainly the arm64 linux maintainers and the ARM GCC
+maintainers) on a way to proceed with implementing this in GCC.
+
+So please, do share your opinions and questions on this matter, so
+that we can settle this matter asap.
+
+Kind regards,
+Ard.
 
 
--- 
-Regards,
-
-Laurent Pinchart
+[0] http://www.workofard.com/2018/01/per-task-stack-canaries-for-arm64/
