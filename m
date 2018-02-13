@@ -1,256 +1,40 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 12 Feb 2018 20:06:26 -0600
-Subject: [PATCH v7 3/9] arm: omap: Move dmtimer.h out of plat-omap
-In-Reply-To: <1515478987-5786-4-git-send-email-j-keerthy@ti.com>
-References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
- <1515478987-5786-4-git-send-email-j-keerthy@ti.com>
-Message-ID: <1c9f5c72-f589-d7c7-399f-ef55ecb828a0@ti.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Mon, 12 Feb 2018 18:08:45 -0800
+Subject: [PATCH v1 1/2] arm: npcm: add low-level debug support for NPCM7XX
+In-Reply-To: <CACPK8XcGhxTq7QGeub2rAEtGSyrOmnobspVJfhE5YmB6MQRM9w@mail.gmail.com>
+References: <20180212205833.151019-1-brendanhiggins@google.com>
+ <20180212205833.151019-2-brendanhiggins@google.com>
+ <CACPK8XcGhxTq7QGeub2rAEtGSyrOmnobspVJfhE5YmB6MQRM9w@mail.gmail.com>
+Message-ID: <CAFd5g46EVEQmETawUagDLzySLTFQqc2aM4kFJvvHMU_dvP5V3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Keerthy,
+On Mon, Feb 12, 2018 at 5:59 PM, Joel Stanley <joel@jms.id.au> wrote:
+> Hi Brendan,
+>
+> On Tue, Feb 13, 2018 at 7:28 AM, Brendan Higgins
+> <brendanhiggins@google.com> wrote:
+>> Enable low-level debug support for Nuvoton NPCM7XX family by adding the
+>> debug port definitions for the SoC.
+>
+> When playing with the Poleg boards at the recent OpenBMC hackathon
+> Jeremy discovered that the UART is a normal-ish 8250, with a custom
+> divisor and a few extra bits to be set.
+>
+> I found that we can us the generic 8250 low level debugging support
+> just fine. This is because u-boot sets up the divisor settings for us
+> (as you've assumed with your version here), and from there it's just
+> reading/writing characters.
+>
+> Assuming you can reproduce our results, I suggest we drop these
+> patches in favour of adding the correct configuration the Poleg.
+>
 
-On 01/09/2018 12:23 AM, J, KEERTHY wrote:
-> The header file is currently under plat-omap directory
-> under arch/omap. Move this out to an accessible place.
-> 
-> No Code changes done to the header file.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> Tested-by: Ladislav Michl <ladis@linux-mips.org>
-> ---
->   arch/arm/mach-omap1/pm.c                                           | 2 +-
->   arch/arm/mach-omap1/timer.c                                        | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_2420_data.c                         | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_2430_data.c                         | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c                 | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c                         | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c                         | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_54xx_data.c                         | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_7xx_data.c                          | 2 +-
->   arch/arm/mach-omap2/omap_hwmod_81xx_data.c                         | 2 +-
->   arch/arm/mach-omap2/pdata-quirks.c                                 | 2 +-
->   arch/arm/mach-omap2/timer.c                                        | 2 +-
->   arch/arm/plat-omap/dmtimer.c                                       | 2 +-
->   {arch/arm/plat-omap/include/plat => include/clocksource}/dmtimer.h | 0
->   14 files changed, 13 insertions(+), 13 deletions(-)
->   rename {arch/arm/plat-omap/include/plat => include/clocksource}/dmtimer.h (100%)
-> 
-> diff --git a/arch/arm/mach-omap1/pm.c b/arch/arm/mach-omap1/pm.c
-> index f1135bf..a07d47cf 100644
-> --- a/arch/arm/mach-omap1/pm.c
-> +++ b/arch/arm/mach-omap1/pm.c
-> @@ -55,7 +55,7 @@
->   #include <mach/tc.h>
->   #include <mach/mux.h>
->   #include <linux/omap-dma.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include <mach/irqs.h>
-> 
-> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
-> index 8fb1ec6..7c057ab 100644
-> --- a/arch/arm/mach-omap1/timer.c
-> +++ b/arch/arm/mach-omap1/timer.c
-> @@ -27,7 +27,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/platform_data/dmtimer-omap.h>
-> 
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "soc.h"
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> index 0afb014..0a8b95f 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> @@ -16,7 +16,7 @@
->   #include <linux/i2c-omap.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
->   #include <linux/omap-dma.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "omap_hwmod.h"
->   #include "l3_2xxx.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-> index 013b26b..16e3d8c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-> @@ -18,7 +18,7 @@
->   #include <linux/platform_data/hsmmc-omap.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
->   #include <linux/omap-dma.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
+Sounds good to me. I trust that if you were able to get the 8250 driver
+working on the Poleg that it does indeed work.
 
-These headers are actually not needed in the first-place since we no
-longer create any non-DT timer devices. I have submitted a series to
-cleanup the presence of this header file, as part of a larger hwmod data
-cleanup series.
+We can talk about configuring it off the Linux mailing lists.
 
-> 
->   #include "omap_hwmod.h"
->   #include "l3_2xxx.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-> index 4b094cb..8a65f70 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-> @@ -11,7 +11,7 @@
-> 
->   #include <linux/platform_data/gpio-omap.h>
->   #include <linux/omap-dma.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
-> 
->   #include "omap_hwmod.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> index 1a2f224..b030137 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -25,7 +25,7 @@
->   #include "l4_3xxx.h"
->   #include <linux/platform_data/asoc-ti-mcbsp.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "soc.h"
->   #include "omap_hwmod.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index a1901c2..51c7d62 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -30,7 +30,7 @@
-> 
->   #include <linux/platform_data/spi-omap2-mcspi.h>
->   #include <linux/platform_data/asoc-ti-mcbsp.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "omap_hwmod.h"
->   #include "omap_hwmod_common_data.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> index 988e7ea..530334e 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-> @@ -26,7 +26,7 @@
->   #include <linux/omap-dma.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
->   #include <linux/platform_data/asoc-ti-mcbsp.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "omap_hwmod.h"
->   #include "omap_hwmod_common_data.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 4c2a05b..2452649 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -26,7 +26,7 @@
->   #include <linux/omap-dma.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
->   #include <linux/platform_data/asoc-ti-mcbsp.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "omap_hwmod.h"
->   #include "omap_hwmod_common_data.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c 
-> b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> index 84f1182..94f3bb1 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> @@ -18,7 +18,7 @@
->   #include <linux/platform_data/gpio-omap.h>
->   #include <linux/platform_data/hsmmc-omap.h>
->   #include <linux/platform_data/spi-omap2-mcspi.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "omap_hwmod_common_data.h"
->   #include "cm81xx.h"
-> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-> index 6b433fc..ad9df86 100644
-> --- a/arch/arm/mach-omap2/pdata-quirks.c
-> +++ b/arch/arm/mach-omap2/pdata-quirks.c
-> @@ -27,7 +27,7 @@
->   #include <linux/platform_data/pwm_omap_dmtimer.h>
->   #include <linux/platform_data/media/ir-rx51.h>
->   #include <linux/platform_data/asoc-ti-mcbsp.h>
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   #include "common.h"
->   #include "common-board-devices.h"
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index ece09c9..31c1b01 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -26,6 +26,7 @@
->    * License. See the file "COPYING" in the main directory of this archive
->    * for more details.
->    */
-> +#include <clocksource/dmtimer.h>
->   #include <linux/init.h>
->   #include <linux/time.h>
->   #include <linux/interrupt.h>
-> @@ -49,7 +50,6 @@
->   #include "omap_hwmod.h"
->   #include "omap_device.h"
->   #include <plat/counter-32k.h>
-> -#include <plat/dmtimer.h>
->   #include "omap-pm.h"
-> 
->   #include "soc.h"
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index 72565fc..afe1dc9 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -47,7 +47,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/platform_data/dmtimer-omap.h>
-> 
-> -#include <plat/dmtimer.h>
-> +#include <clocksource/dmtimer.h>
-> 
->   static u32 omap_reserved_systimers;
->   static LIST_HEAD(omap_timer_list);
-> diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h 
-> b/include/clocksource/dmtimer.h
-> similarity index 100%
-> rename from arch/arm/plat-omap/include/plat/dmtimer.h
-> rename to include/clocksource/dmtimer.h
+<snip>
 
-Can you fix up the file name and the header guard to appropriate names
-as per the include/clocksource folder convention.
-
-arch/arm/plat-omap/include/plat/dmtimer.h => include/clocksource/dmtimer.h
-and
-__ASM_ARCH_DMTIMER_H => __CLOCKSOURCE_DMTIMER_H
-
-I still see this file as OMAP-specific, so should this be renamed to
-dmtimer-omap.h instead of a generic dmtimer.h name?
-
-regards
-Suman
-
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at http://vger.kernel.org/majordomo-info.html
-> 
+Thanks!
