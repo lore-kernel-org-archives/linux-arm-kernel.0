@@ -1,44 +1,108 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Feb 2018 12:36:02 +0000
-Subject: revisit arm64 per-task stack canaries
-Message-ID: <CAKv+Gu9RAXhMAwKJgNAZEBZRMNfpyDNS-rxa+U2EpNxEVq77vQ@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 13 Feb 2018 12:40:13 +0000
+Subject: [PATCH 01/37] iommu: Introduce Shared Virtual Addressing API
+In-Reply-To: <AADFC41AFE54684AB9EE6CBC0274A5D191002823@SHSMSX101.ccr.corp.intel.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-2-jean-philippe.brucker@arm.com>
+ <AADFC41AFE54684AB9EE6CBC0274A5D191002823@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <b3c190e7-1a33-971e-b86c-a9725118ba05@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi Kevin,
 
-I guess my most recent emails kind of got lost in the avalanche of
-Meltdown/Spectre related activities.
+Thanks for taking a look!
 
-Now that the dust seems to have settled a bit, may I kindly bring this
-topic to your attention again?
+On 13/02/18 07:31, Tian, Kevin wrote:
+>> From: Jean-Philippe Brucker
+>> Sent: Tuesday, February 13, 2018 2:33 AM
+>>
+>> Shared Virtual Addressing (SVA) provides a way for device drivers to bind
+>> process address spaces to devices. This requires the IOMMU to support the
+>> same page table format as CPUs, and requires the system to support I/O
+> 
+> "same" is a bit restrictive. "compatible" is better as you used in coverletter. :-)
 
-In summary, the default aarch64 way of using a single value for the
-stack canary for all threads sharing an address space severely limits
-the kernel's ability to implement stack canaries in a meaningful way.
+Indeed
 
-Originally, we assumed that the only way to overcome this was to
-implement per-CPU stack canaries, where each CPU loads the stack
-canary of the task it executes at context switch. This is racy and
-cumbersome in the presence of kernel support of VHE, which means the
-per-CPU thread ID register is not fixed at compile time.
+[..]
+>> +config IOMMU_SVA
+>> +	bool "Shared Virtual Addressing API for the IOMMU"
+>> +	select IOMMU_API
+>> +	help
+>> +	  Enable process address space management for the IOMMU API. In
+>> systems
+>> +	  that support it, device drivers can bind process address spaces to
+>> +	  devices and share their page tables using this API.
+> 
+> "their page table" is a bit confusing here.
 
-Instead, I have proposed a proof of concept [0] where the compiler
-emits an instruction sequence that loads the canary directly from the
-task struct, which is the per-thread data structure maintained by the
-kernel. Accessing that can be done safely without any of the
-limitations per-CPU variables have. The task struct pointer is kept in
-system register sp_el0 while running in the kernel.
+Maybe this is sufficient:
+"In systems that support it, drivers can share process address spaces with
+their devices using this API."
 
-The purpose of this email to reach agreement between the various
-stakeholders (mainly the arm64 linux maintainers and the ARM GCC
-maintainers) on a way to proceed with implementing this in GCC.
+[...]
+>> +
+>> +/**
+>> + * iommu_sva_device_init() - Initialize Shared Virtual Addressing for a
+>> device
+>> + * @dev: the device
+>> + * @features: bitmask of features that need to be initialized
+>> + * @max_pasid: max PASID value supported by the device
+>> + *
+>> + * Users of the bind()/unbind() API must call this function to initialize all
+>> + * features required for SVA.
+>> + *
+>> + * - If the device should support multiple address spaces (e.g. PCI PASID),
+>> + *   IOMMU_SVA_FEAT_PASID must be requested.
+> 
+> I think it is by default assumed when using this API, based on definition of
+> SVA. Can you elaborate the situation where this flag can be cleared?
 
-So please, do share your opinions and questions on this matter, so
-that we can settle this matter asap.
+When passing a device to userspace, you could also share its non-pasid
+address space with the process. It requires a new domain type so is left
+as a TODO in patch 2/37. I did get requests for this feature, though I
+think it was mostly for prototyping. I guess I could remove the flag, and
+reintroduce it as IOMMU_SVA_FEAT_NO_PASID later on.
 
-Kind regards,
-Ard.
+>> + *
+>> + *   By default the PASID allocated during bind() is limited by the IOMMU
+>> + *   capacity, and by the device PASID width defined in the PCI capability or
+>> in
+>> + *   the firmware description. Setting @max_pasid to a non-zero value
+>> smaller
+>> + *   than this limit overrides it.
+>> + *
+>> + * - If the device should support I/O Page Faults (e.g. PCI PRI),
+>> + *   IOMMU_SVA_FEAT_IOPF must be requested.
+>> + *
+>> + * The device should not be be performing any DMA while this function is
+> 
+> remove double "be"
+> 
+>> + * running.
+> 
+> "otherwise the behavior is undefined"
 
+ok
 
-[0] http://www.workofard.com/2018/01/per-task-stack-canaries-for-arm64/
+[...]
+>> +	ret = domain->ops->sva_device_init(dev, features, &min_pasid,
+>> +					   &max_pasid);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/* FIXME: racy. Next version should have a mutex (same as fault
+>> handler) */
+>> +	dev_param->sva_features = features;
+>> +	dev_param->min_pasid = min_pasid;
+>> +	dev_param->max_pasid = max_pasid;
+> 
+> what's the point of min_pasid here?
+
+Arm SMMUv3 uses entry 0 of the PASID table for the default (non-pasid)
+context, so it needs to set min_pasid to 1. AMD IOMMU recently added a
+similar feature (GIoSup), if I understood correctly.
+
+Thanks,
+Jean
