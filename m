@@ -1,62 +1,82 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 13 Feb 2018 17:17:42 +0100
-Subject: [PATCH 6/9] ARM: dts: kirkwood: Fix "debounce-interval" property
- misspelling
-In-Reply-To: <1518531335-5170-7-git-send-email-geert+renesas@glider.be> (Geert
- Uytterhoeven's message of "Tue, 13 Feb 2018 15:15:32 +0100")
-References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
- <1518531335-5170-7-git-send-email-geert+renesas@glider.be>
-Message-ID: <87d118q2xl.fsf@bootlin.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Tue, 13 Feb 2018 17:55:10 +0100
+Subject: [PATCH 0/9] Some OMAP2+ legacy hwmod data cleanup
+In-Reply-To: <20180213154622.GE6364@atomide.com>
+References: <20180213013243.8378-1-s-anna@ti.com>
+ <20180213154622.GE6364@atomide.com>
+Message-ID: <96379836-1E9F-4E90-B6E4-31DB544A18BB@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
- 
- On mar., f?vr. 13 2018, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+Hi,
 
-> "debounce_interval" was never supported.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Am 13.02.2018 um 16:46 schrieb Tony Lindgren <tony@atomide.com>:
+> 
+> * Suman Anna <s-anna@ti.com> [180213 01:33]:
+>> Hi Tony,
+>> 
+>> The following series cleans up some legacy dev_attr data associated
+>> with OMAP DMTimer, I2C, McBSP, McSPI and GPIO modules and removes
+>> roughly ~500 lines. Patches are based on v4.16-rc1. I have build tested
+>> for both omap2plus and omap1 defconfigs, and booted on a few OMAP4+
+>> boards that I have on my desk.
+> 
+> Hey that's great :)
+> 
+>> Here is the patch summary:
+>> 1. First two patches fixes header inclusion in omap-dmaengine.h and
+>>    hsmmc-omap.h as I am getting build errors on subsequent patches when
+>>    I removed some of the platform_data header files.
+>> 2. Patches 3 through 7 remove the .dev_attr data for the above modules
+>>    from various hwmod data files and some macros from McSPI & McBSP
+>>    platform data header files
+>> 3. Patch 8 moves the plat-omap/include/plat/i2c.h into mach-omap1
+>>    folder as there is no common i2c code in plat-omap folder anymore.
+>> 4. Last patch is a minor cleanup of gpio headers from couple of files.
+>> 
+>> Some important notes/comments:
+>> - The DMTimer patch cleanup will conflict with Keerthy's current dmtimer->
+>>   clocksource series, but ideally he wouldn't need to convert the plat/dmtimer.h
+>>   into a clocksource header with the removal of the plat/dmtimer.h inclusion
+>>   from the hwmod data files.
+> 
+> OK. It seems that we should do the clean up first if it just means
+> leaving out unused header files.
+> 
+>> - I found some gaps w.r.t DMTimers on DM814x/DM816x platforms, and haven't
+>>   fixed them. Both seems to have DMTimer1 through 8, but only DMTimers 1, 2
+>>   and 3 are defined in dm814x.dtsi, while dm816x.dtsi is missing DMTimer8.
+>>   DMTimer3 hwmod is not in the dm814x hwmod list, while DMTimer8 is left out
+>>   altogther. The timer capabilities are also different between the hwmod
+>>   data files (lists always-on) which is missing from corresponding dts files.
+>>   Not sure which one is correct.
+> 
+> OK we should fix them. The capabilities can be seen by looking at
+> the hardware and clockdomains. The always-on timers are of sysc
+> type 1 (ti,sysc-omap2-timer) and in a always on power domain. The
+> others are of sysc type 2 (ti,sysc-omap4-timer). We should get
+> warnings for those from ti,sysc driver eventually if they don't
+> match :)
+> 
+>> This leaves the hsmmc-omap and omap-dma pieces still using the .dev_attr. The
+>> former is only used by one OMAP3 board, so can be cleaned up if we limit the
+>> init code just for that one board.
+> 
+> I think Nikolaus had patches coming for removing the last user
+> of mmc pdata?
 
-Applied on mvebu/fixes with the Reviewed-by flag from Andrew Lunn
+Well, the idea was to convert the wl1251 driver to DT (like e.g. wl183x)
+and get rid of the pdata. But I didn't find any time to work on this,
+especially since the driver itself is broken for a while (I think up
+to 4.11 the wl1251 was found and working, after that it wasn't working
+and after 4.14 or so it wasn't even found any more). Probably some
+simple things, but as usual time consuming to dig into.
 
-Thanks,
+> 
+> I think all we need to do is have pandora_wl1251_init_card
+> initialized in the MMC driver based on a compatible value..
 
-Gregory
+Yes, looks so.
 
-> ---
-> Please apply to your tree when appropriate.
->
->  arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-> index 5ce220ac9611fa78..5aa4669ae2548a8c 100644
-> --- a/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-> +++ b/arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts
-> @@ -35,7 +35,7 @@
->  		pinctrl-names = "default";
->  
->  		eject {
-> -			debounce_interval = <50>;
-> +			debounce-interval = <50>;
->  			wakeup-source;
->  			linux,code = <KEY_EJECTCD>;
->  			label = "Eject Button";
-> -- 
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+BR and thanks,
+Nikolaus
