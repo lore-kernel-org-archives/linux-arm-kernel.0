@@ -1,247 +1,114 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Tue, 13 Feb 2018 15:20:50 +0000
-Subject: [PATCH v13 1/2] ACPI/IORT: Add msi address regions reservation helper
-In-Reply-To: <20180213152051.10296-1-shameerali.kolothum.thodi@huawei.com>
-References: <20180213152051.10296-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20180213152051.10296-2-shameerali.kolothum.thodi@huawei.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 13 Feb 2018 15:22:08 +0000
+Subject: [RFC PATCH v2 3/3] arm64: signal: Ensure si_code is valid for
+ all fault signals
+In-Reply-To: <5A82EF1F.8010701@arm.com>
+References: <1517338243-9749-1-git-send-email-Dave.Martin@arm.com>
+ <1517338243-9749-4-git-send-email-Dave.Martin@arm.com>
+ <5A82EF1F.8010701@arm.com>
+Message-ID: <20180213152207.GP5862@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms msi parent address regions have to be excluded from
-normal IOVA allocation in that they are detected and decoded in a HW
-specific way by system components and so they cannot be considered normal
-IOVA address space.
+On Tue, Feb 13, 2018 at 01:58:55PM +0000, James Morse wrote:
+> Hi Dave,
+> 
+> On 30/01/18 18:50, Dave Martin wrote:
 
-Add a helper function that retrieves ITS address regions - the msi
-parent - through IORT device <-> ITS mappings and reserves it so that
-these regions will not be translated by IOMMU and will be excluded from
-IOVA allocations. The function checks for the smmu model number and
-only applies the msi reservation if the platform requires it.
+[...]
 
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-[For the ITS part]
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/acpi/arm64/iort.c        | 111 +++++++++++++++++++++++++++++++++++++--
- drivers/irqchip/irq-gic-v3-its.c |   3 +-
- include/linux/acpi_iort.h        |   7 ++-
- 3 files changed, 116 insertions(+), 5 deletions(-)
+> > The approach taken in this patch is to translate all such
+> > undiagnosable or "impossible" synchronous fault conditions to
+> > SIGKILL, since these are at least probably localisable to a single
+> > process.  Some of these conditions should really result in a kernel
+> > panic, but due to the lack of diagnostic information it is
+> > difficult to be certain: this patch does not add any calls to
+> > panic(), but this could change later if justified.
+> > 
+> > Although si_code will not reach userspace in the case of SIGKILL,
+> > it is still desirable to pass a nonzero value so that the common
+> > siginfo handling code can detect incorrect use of si_code == 0
+> > without false positives.  In this case the si_code dependent
+> > siginfo fields will not be correctly initialised, but since they
+> > are not passed to userspace I deem this not to matter.
+> > 
+> > A few faults can reasonably occur in realistic userspace scenarios,
+> > and _should_ raise a regular, handleable (but perhaps not
+> > ignorable/blockable) signal: for these, this patch attempts to
+> > choose a suitable standard si_code value for the raised signal in
+> > each case instead of 0.
+> 
+> 
+> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > index 9b7f89d..4baa922 100644
+> > --- a/arch/arm64/mm/fault.c
+> > +++ b/arch/arm64/mm/fault.c
+> > @@ -607,70 +607,70 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+> [..]
+> > +	{ do_sea,		SIGKILL, SI_KERNEL,	"level 0 (translation table walk)"	},
+> > +	{ do_sea,		SIGKILL, SI_KERNEL,	"level 1 (translation table walk)"	},
+> > +	{ do_sea,		SIGKILL, SI_KERNEL,	"level 2 (translation table walk)"	},
+> > +	{ do_sea,		SIGKILL, SI_KERNEL,	"level 3 (translation table walk)"	},
+> > +	{ do_sea,		SIGBUS,  BUS_OBJERR,	"synchronous parity or ECC error" },	// Reserved when RAS is implemented
+> 
+> I agree the translation-table related external-aborts should end up with
+> SIGKILL: there is nothing user-space can do.
+> 
+> You use the fault_info table to vary the signal and si_code that should be used,
+> but do_mem_abort() only uses these if the fn returns an error. For do_sea(),
+> regardless of the values in this table SIGBUS will be generated as it always
+> returns 0.
+> 
+> 
+> > @@ -596,7 +596,7 @@ static int do_sea(unsigned long addr, unsigned int esr,
+> struct pt_regs *regs)
+> >
+> >  	info.si_signo = SIGBUS;
+> >  	info.si_errno = 0;
+> > -	info.si_code  = 0;
+> > +	info.si_code  = BUS_OBJERR;
+> >  	if (esr & ESR_ELx_FnV)
+> >  		info.si_addr = NULL;
+> >  	else
+> 
+> do_sea() has the right fault_info entry to hand, so I think these need to change
+> to inf->sig and inf->code. (I assume its not valid to set si_addr for SIGKILL...)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 95255ec..e2f7bdd 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -39,6 +39,7 @@
- struct iort_its_msi_chip {
- 	struct list_head	list;
- 	struct fwnode_handle	*fw_node;
-+	phys_addr_t		base_addr;
- 	u32			translation_id;
- };
- 
-@@ -161,14 +162,16 @@ static LIST_HEAD(iort_msi_chip_list);
- static DEFINE_SPINLOCK(iort_msi_chip_lock);
- 
- /**
-- * iort_register_domain_token() - register domain token and related ITS ID
-- * to the list from where we can get it back later on.
-+ * iort_register_domain_token() - register domain token along with related
-+ * ITS ID and base address to the list from where we can get it back later on.
-  * @trans_id: ITS ID.
-+ * @base: ITS base address.
-  * @fw_node: Domain token.
-  *
-  * Returns: 0 on success, -ENOMEM if no memory when allocating list element
-  */
--int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-+int iort_register_domain_token(int trans_id, phys_addr_t base,
-+			       struct fwnode_handle *fw_node)
- {
- 	struct iort_its_msi_chip *its_msi_chip;
- 
-@@ -178,6 +181,7 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
- 
- 	its_msi_chip->fw_node = fw_node;
- 	its_msi_chip->translation_id = trans_id;
-+	its_msi_chip->base_addr = base;
- 
- 	spin_lock(&iort_msi_chip_lock);
- 	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-@@ -581,6 +585,24 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
- 	return -ENODEV;
- }
- 
-+static int __maybe_unused iort_find_its_base(u32 its_id, phys_addr_t *base)
-+{
-+	struct iort_its_msi_chip *its_msi_chip;
-+	int ret = -ENODEV;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-+		if (its_msi_chip->translation_id == its_id) {
-+			*base = its_msi_chip->base_addr;
-+			ret = 0;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_msi_chip_lock);
-+
-+	return ret;
-+}
-+
- /**
-  * iort_dev_find_its_id() - Find the ITS identifier for a device
-  * @dev: The device.
-@@ -766,6 +788,24 @@ static inline bool iort_iommu_driver_enabled(u8 type)
- }
- 
- #ifdef CONFIG_IOMMU_API
-+static struct acpi_iort_node *iort_get_msi_resv_iommu(struct device *dev)
-+{
-+	struct acpi_iort_node *iommu;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+
-+	iommu = iort_get_iort_node(fwspec->iommu_fwnode);
-+
-+	if (iommu && (iommu->type == ACPI_IORT_NODE_SMMU_V3)) {
-+		struct acpi_iort_smmu_v3 *smmu;
-+
-+		smmu = (struct acpi_iort_smmu_v3 *)iommu->node_data;
-+		if (smmu->model == ACPI_IORT_SMMU_V3_HISILICON_HI161X)
-+			return iommu;
-+	}
-+
-+	return NULL;
-+}
-+
- static inline const struct iommu_ops *iort_fwspec_iommu_ops(
- 				struct iommu_fwspec *fwspec)
- {
-@@ -782,6 +822,69 @@ static inline int iort_add_device_replay(const struct iommu_ops *ops,
- 
- 	return err;
- }
-+
-+/**
-+ * iort_iommu_msi_get_resv_regions - Reserved region driver helper
-+ * @dev: Device from iommu_get_resv_regions()
-+ * @head: Reserved region list from iommu_get_resv_regions()
-+ *
-+ * Returns: Number of msi reserved regions on success (0 if platform
-+ *          doesn't require the reservation or no associated msi regions),
-+ *          appropriate error value otherwise. The ITS interrupt translation
-+ *          spaces (ITS_base + SZ_64K, SZ_64K) associated with the device
-+ *          are the msi reserved regions.
-+ */
-+int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
-+{
-+	struct acpi_iort_its_group *its;
-+	struct acpi_iort_node *iommu_node, *its_node = NULL;
-+	int i, resv = 0;
-+
-+	iommu_node = iort_get_msi_resv_iommu(dev);
-+	if (!iommu_node)
-+		return 0;
-+
-+	/*
-+	 * Current logic to reserve ITS regions relies on HW topologies
-+	 * where a given PCI or named component maps its IDs to only one
-+	 * ITS group; if a PCI or named component can map its IDs to
-+	 * different ITS groups through IORT mappings this function has
-+	 * to be reworked to ensure we reserve regions for all ITS groups
-+	 * a given PCI or named component may map IDs to.
-+	 */
-+
-+	for (i = 0; i < dev->iommu_fwspec->num_ids; i++) {
-+		its_node = iort_node_map_id(iommu_node,
-+					dev->iommu_fwspec->ids[i],
-+					NULL, IORT_MSI_TYPE);
-+		if (its_node)
-+			break;
-+	}
-+
-+	if (!its_node)
-+		return 0;
-+
-+	/* Move to ITS specific data */
-+	its = (struct acpi_iort_its_group *)its_node->node_data;
-+
-+	for (i = 0; i < its->its_count; i++) {
-+		phys_addr_t base;
-+
-+		if (!iort_find_its_base(its->identifiers[i], &base)) {
-+			int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-+			struct iommu_resv_region *region;
-+
-+			region = iommu_alloc_resv_region(base + SZ_64K, SZ_64K,
-+							 prot, IOMMU_RESV_MSI);
-+			if (region) {
-+				list_add_tail(&region->list, head);
-+				resv++;
-+			}
-+		}
-+	}
-+
-+	return (resv == its->its_count) ? resv : -ENODEV;
-+}
- #else
- static inline const struct iommu_ops *iort_fwspec_iommu_ops(
- 				struct iommu_fwspec *fwspec)
-@@ -789,6 +892,8 @@ static inline const struct iommu_ops *iort_fwspec_iommu_ops(
- static inline int iort_add_device_replay(const struct iommu_ops *ops,
- 					 struct device *dev)
- { return 0; }
-+int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
-+{ return 0; }
- #endif
- 
- static int iort_iommu_xlate(struct device *dev, struct acpi_iort_node *node,
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 06f025f..ab99d1b 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -3450,7 +3450,8 @@ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
- 		return -ENOMEM;
- 	}
- 
--	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
-+	err = iort_register_domain_token(its_entry->translation_id, res.start,
-+					 dom_handle);
- 	if (err) {
- 		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
- 		       &res.start, its_entry->translation_id);
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 2f7a292..38cd77b 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -26,7 +26,8 @@
- #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
- #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
- 
--int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-+int iort_register_domain_token(int trans_id, phys_addr_t base,
-+			       struct fwnode_handle *fw_node);
- void iort_deregister_domain_token(int trans_id);
- struct fwnode_handle *iort_find_domain_token(int trans_id);
- #ifdef CONFIG_ACPI_IORT
-@@ -38,6 +39,7 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
- /* IOMMU interface */
- void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
-+int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head);
- #else
- static inline void acpi_iort_init(void) { }
- static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-@@ -52,6 +54,9 @@ static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
- static inline const struct iommu_ops *iort_iommu_configure(
- 				      struct device *dev)
- { return NULL; }
-+static inline
-+int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
-+{ return 0; }
- #endif
- 
- #endif /* __ACPI_IORT_H__ */
--- 
-2.7.4
+Yes, I guess that makes sense.
+
+For SIGKILL, I'm assuming that it is harmless to populate si_addr: even
+though not strictly valid, the signal is never delivered to userspace.
+Even ptrace cannot see SIGKILL -- the trace just disappears and further
+ptrace calls fail with ESRCH.
+
+If is matters, I guess we could prepopulate si_uid = si_pid = 0 for
+this case.  That's at least cleaner, so I might do that.
+
+
+For do_sea:
+
+I was thinking of the fault_info[] table entries as for the fallback
+case only, but (a) I also try to use them to affect what do_sea() does
+(which, as you observe, doesn't work right now), and (b) there's no
+reason why they shouldn't inform what fn does.
+
+So I think you're right.
+
+However, rather than duplicate code I wonder whether we can just
+rearrange do_mem_abort() so that the lines
+
+	info.si_signo = inf->sig;
+	info.si_errno = 0;
+	info.si_code  = inf->code;
+	info.si_addr  = (void __user *)addr;
+
+are moved ahead of the call to inf->fn().
+
+This would have the effect of pre-populating info with sane defaults
+while still allowing inf->fn() to override them if appropriate.
+
+Thoughts?
+
+
+Cheers
+---Dave
