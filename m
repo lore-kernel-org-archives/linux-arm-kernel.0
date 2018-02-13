@@ -1,72 +1,109 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 13 Feb 2018 16:43:11 +0100
-Subject: [PATCH 01/20] ARM: mvebu: Fix broken PL310_ERRATA_753970 selects
-In-Reply-To: <20180205012146.23981-2-ulfalizer@gmail.com> (Ulf Magnusson's
- message of "Mon, 5 Feb 2018 02:21:13 +0100")
-References: <20180205012146.23981-1-ulfalizer@gmail.com>
- <20180205012146.23981-2-ulfalizer@gmail.com>
-Message-ID: <87lgfwq4j4.fsf@bootlin.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 13 Feb 2018 09:44:49 -0600
+Subject: [PATCHv4 1/3] dt-bindings: documentation: add clock bindings
+ information for Stratix10
+In-Reply-To: <1518516286-14428-1-git-send-email-dinguyen@kernel.org>
+References: <1518516286-14428-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <CAL_JsqJNbMQOXxxDbHc=sVJFOmBWMjR25vHR-Jsqde_GnBsF0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
- 
- On lun., f?vr. 05 2018, Ulf Magnusson <ulfalizer@gmail.com> wrote:
-
-> The MACH_ARMADA_375 and MACH_ARMADA_38X boards select ARM_ERRATA_753970,
-> but it was renamed to PL310_ERRATA_753970 by commit fa0ce4035d48 ("ARM:
-> 7162/1: errata: tidy up Kconfig options for PL310 errata workarounds").
+On Tue, Feb 13, 2018 at 4:04 AM, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> Document that Stratix10 clock bindings, and add the clock header file. The
+> clock header is an enumeration of all the different clocks on the Stratix10
+> platform.
 >
-> Fix the selects to use the new name.
->
-> Discovered with the
-> https://github.com/ulfalizer/Kconfiglib/blob/master/examples/list_undefined.py
-> script.
-
-Applied on mvebu/fixes with the "Fixes": and "CC:stable" flags
-
-Thanks,
-
-Gregory
-
->
-> Signed-off-by: Ulf Magnusson <ulfalizer@gmail.com>
+> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 > ---
->  arch/arm/mach-mvebu/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> v4:
+> - remove '_' in node names
+> - remove stray tab
+> - add clock-frequency property for fixed-clocks
+> - put SPDX license as the very top line
+> v3:
+> - s/intc/intel for correct vendor prefix
+> - fixup node name to "intel,stratix10-clkmgr"
+> - document the required fixed-clock for oscillators
+> v2:
+> - use a single binding for the clock controller
+> ---
+>  .../devicetree/bindings/clock/intc_stratix10.txt   | 51 +++++++++++++
+>  include/dt-bindings/clock/stratix10-clock.h        | 84 ++++++++++++++++++++++
+>  2 files changed, 135 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/intc_stratix10.txt
+>  create mode 100644 include/dt-bindings/clock/stratix10-clock.h
 >
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 6b32dc527edc..2c20599cc350 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -41,7 +41,7 @@ config MACH_ARMADA_375
->  	depends on ARCH_MULTI_V7
->  	select ARMADA_370_XP_IRQ
->  	select ARM_ERRATA_720789
-> -	select ARM_ERRATA_753970
-> +	select PL310_ERRATA_753970
->  	select ARM_GIC
->  	select ARMADA_375_CLK
->  	select HAVE_ARM_SCU
-> @@ -57,7 +57,7 @@ config MACH_ARMADA_38X
->  	bool "Marvell Armada 380/385 boards"
->  	depends on ARCH_MULTI_V7
->  	select ARM_ERRATA_720789
-> -	select ARM_ERRATA_753970
-> +	select PL310_ERRATA_753970
->  	select ARM_GIC
->  	select ARM_GLOBAL_TIMER
->  	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> -- 
-> 2.14.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+> new file mode 100644
+> index 0000000..0652ff1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+> @@ -0,0 +1,51 @@
+> +Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Required properties:
+> +- compatible : shall be
+> +       "intel,stratix10-clkmgr"
+> +
+> +- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
+> +
+> +- #clock-cells : from common clock binding, shall be set to 1.
+> +
+> +- clocks : Should contain fixed-clock sources, such as oscillators.
+> +
+> +Example:
+> +       clkmgr: clock-controller at ffd10000 {
+> +               compatible = "intel,stratix10-clkmgr";
+> +               reg = <0xffd10000 0x1000>;
+> +               #clock-cells = <1>;
+> +
+> +               clocks {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       cb_intosc_hs_div2_clk: cb-intosc-hs-div2-clk {
+> +                               #clock-cells = <0>;
+> +                               compatible = "fixed-clock";
+> +                               clock-frequency = <25000000>;
+> +                       };
+> +
+> +                       cb_intosc_ls_clk: cb-intosc-ls-clk {
+> +                               #clock-cells = <0>;
+> +                               compatible = "fixed-clock";
+> +                               clock-frequency = <25000000>;
+> +                       };
+> +
+> +                       f2s_free_clk: f2s-free-clk {
+> +                               #clock-cells = <0>;
+> +                               compatible = "fixed-clock";
+> +                               clock-frequency = <25000000>;
+> +                       };
+> +
+> +                       osc1: osc1 {
+> +                               #clock-cells = <0>;
+> +                               compatible = "fixed-clock";
+> +                               clock-frequency = <25000000>;
+> +                       };
+> +               };
+> +       };
+> diff --git a/include/dt-bindings/clock/stratix10-clock.h b/include/dt-bindings/clock/stratix10-clock.h
+> new file mode 100644
+> index 0000000..5be885d
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/stratix10-clock.h
+> @@ -0,0 +1,84 @@
+> +/* SPDX-License-Identifier:    GPL-2.0
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Sigh. Should be a single line comment and a single space:
+
+/* SPDX-License-Identifier: GPL-2.0 */
+
+With that,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+Rob
