@@ -1,134 +1,38 @@
-From: ckadabi@codeaurora.org (Channa)
-Date: Tue, 13 Feb 2018 09:38:38 -0800
-Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
-In-Reply-To: <20180213143733.ts3dlcnhcf7jzbbm@lakrids.cambridge.arm.com>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
- <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
- <d2751939f5813c296cdcb7a92d5698bf@codeaurora.org>
- <20180202110532.n2eez3zqbmf2jelr@lakrids.cambridge.arm.com>
- <2801cac8583d56260a9df0cdf7f41f47@codeaurora.org>
- <20180213143733.ts3dlcnhcf7jzbbm@lakrids.cambridge.arm.com>
-Message-ID: <d0974a24890cf187324d60743f690249@codeaurora.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 13 Feb 2018 18:56:43 +0100
+Subject: [PATCH v2 0/4] ARM/arm64: exynos: Fix missing missing reg
+ warning for syscon restart nodes
+In-Reply-To: <4642d2d0-61c9-33b6-0289-76f487aa45ab@samsung.com>
+References: <CGME20180130211855epcas1p25cce42a195d8b407f4267309f9b5ccb9@epcas1p2.samsung.com>
+ <20180130211819.17139-1-krzk@kernel.org>
+ <4642d2d0-61c9-33b6-0289-76f487aa45ab@samsung.com>
+Message-ID: <20180213175643.4h5anubed4w4lclb@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-02-13 06:37, Mark Rutland wrote:
-> On Tue, Feb 06, 2018 at 11:56:50AM -0800, Channa wrote:
->> On 2018-02-02 03:05, Mark Rutland wrote:
->> > On Thu, Feb 01, 2018 at 12:39:09PM -0800, Channa wrote:
->> > > On 2018-02-01 02:44, Mark Rutland wrote:
->> > > > On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
->> > > > > +- llcc-bank-off:
->> > > > > +	Usage: required
->> > > > > +	Value Type: <u32 array>
->> > > > > +	Definition: Offsets of llcc banks from llcc base address starting
->> > > > > from
->> > > > > +		    LLCC bank0.
->> > > > > +
->> > > > > +- llcc-broadcast-off:
->> > > > > +	Usage: required
->> > > > > +	Value Type: <u32>
->> > > > > +	Definition: Offset of broadcast register from LLCC bank0 address.
->> > > >
->> > > > Please could we use "offset" rather than "off" for both of these? That
->> > > > way it's obvious these aren't properties for disabling some feature.
->> > > >
->> > > > How variable are these offsets in practice? Is the memory map not fixed?
->> > >
->> > > The offsets depends on the number of LLCC HW blocks. These number of
->> > > HW
->> > > blocks vary from
->> > > chipset to chipset and new registers could be added that changes the
->> > > offset.
->> >
->> > Surely if new registers are added, we need a new compatible string?
->> >
->> > Can't we encode the number of LLCC HW blocks, instead? Presumably that
->> > would give enough information to cover both llcc-bank-off and
->> > llcc-broadcast-off.
->> >
->> > [...]
->> 
->> Are you suggesting to move these offset handing out of DTS files and 
->> manage
->> in the driver?
+On Thu, Feb 08, 2018 at 02:46:32PM +0100, Marek Szyprowski wrote:
+> Hi Krzysztof,
 > 
-> Something like that, though it depends on how exactly the offsets can 
-> be
-> derived.
+> On 2018-01-30 22:18, Krzysztof Kozlowski wrote:
+> > Hi,
+> > 
+> > Changes since v1:
+> > 1. New patch (1/4) calling devm_of_platform_populate() in PMU driver,
+> >     following Rob's advice.
+> > 2. The DTS patches moving reboot/poweroff nodes (3/4 and 4/4) now depend
+> >     on this.
 > 
-> Using reg entries, as Matt suggested, sounds better though.
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > 
->> > > > > +compatible devices:
->> > > > > +		qcom,sdm845-llcc
->> > > >
->> > > > Huh? The "qcom,sdm845-llcc" bindings wasn't described above, and it's
->> > > > not clear what this means.
->> > > >
->> > > > > +
->> > > > > +Example:
->> > > > > +
->> > > > > +	qcom,system-cache at 1300000 {
->> > > > > +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
->> > > >
->> > > > This looks very wrong. Why do you need syscon and simple-mfd?
->> > >
->> > > LLCC HW block has 3 functionalities:
->> > > System cache core, ECC & AMON drivers for debugging.
->> > > All three drivers use the same register space for configuration,
->> > > status etc.
->> > > In order to avoid remapping the same address region across multiple
->> > > drivers,
->> > > I have implemented this driver as a syncon and simple-mfd.
->> >
->> > Please don't do that; that's completely dependent on Linux
->> > implementation details.
->> 
->> Why do you think simple-mfd is not good here? The LLCC HW clock is 
->> outside
->> of CPUSS and has
->> multiple functional blocks.
-> 
-> For one thing, there's no need for this to be a syscon *and* a
-> simple-mfd.
-> 
-> W.R.T. simple-mfd, I think it would bet better to decompose the device
-> in a top-level driver, as I described in my prior reply, rather than
-> describing a set of drivers (which are not themselves HW).
-> 
->> > > > > +- cache-slices:
->> > > > > +	Usage: required
->> > > > > +	Value type: <prop-encoded-array>
->> > > > > +	Definition: The tuple has phandle to llcc device as the first
->> > > > > argument and the
->> > > > > +		    second argument is the usecase id of the client.
->> > > >
->> > > > What is a "usecase id" ?
->> > >
->> > > Usecase id for use case that wants to use system cache for eg:
->> > > video-encode
->> > > and video-decode
->> >
->> > Sure, but how is the value used? Is it the index of a slice? Or
->> > something more abstract?
->> 
->> This is used as an index to the SCT (System cache Table) configuration
->> data that controls the behavior of each cache slice.
-> 
-> Ok. Where does that SCT live? Is that in HW? Is it programmed by SW, or
-> statically configured for a given platform?
+> Tested following boards and reboot works fine:
+> Exynos3250 (artik5-eval)
+> Exynos4412 (trats2)
+> Exynos5410 (odroid xu)
+> Exynos5422 (odroid xu3/xu4)
+> Exynos5433 (tm2)
 
-SCT is in the HW. Kernel driver programs these settings for a given
-platform. The table is also used to lookup size, cache slice id details
-requested by client drivers.
+Thanks for testing. I applied 1/4 and 2/4. The remaining DTS patches
+depend on 1/4 so they will wait till next release.
 
-> 
-> Thanks,
-> Mark.
-
--- 
---
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
