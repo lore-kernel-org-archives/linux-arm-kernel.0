@@ -1,108 +1,43 @@
-From: j.fanguede@virtualopensystems.com (=?UTF-8?q?J=C3=A9r=C3=A9my=20Fangu=C3=A8de?=)
-Date: Tue, 13 Feb 2018 11:41:16 +0100
-Subject: [PATCH] KVM: arm: Enable emulation of the physical timer
-Message-ID: <1518518476-26645-1-git-send-email-j.fanguede@virtualopensystems.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 13 Feb 2018 13:46:58 +0300
+Subject: [PATCH 0/3] Add R8A77970/Eagle PFC support
+In-Reply-To: <20180213075222.mf7dsbwgv5ln4ond@verge.net.au>
+References: <20171110200218.747996672@cogentembedded.com>
+ <20171113075303.zmkmq6bt3lfuttwu@verge.net.au>
+ <049b0a0a-b1c2-73e6-c471-ca8342bba6ab@ideasonboard.com>
+ <19d23fa2-1205-89a0-786f-f301ca7a0f7b@cogentembedded.com>
+ <20180213075222.mf7dsbwgv5ln4ond@verge.net.au>
+Message-ID: <b6f69e47-1bce-1939-9315-0364c6397a85@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the handlers to emulate read and write operations for CNTP_CTL,
-CNTP_CVAL and CNTP_TVAL registers in such a way that VMs can use the
-physical timer.
+On 02/13/2018 10:52 AM, Simon Horman wrote:
 
-Signed-off-by: J?r?my Fangu?de <j.fanguede@virtualopensystems.com>
----
+>>>>> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
+>>>>> 'renesas-devel-20171110-v4.14-rc8' tag.  We're adding the R8A77970 PFC node
+>>>>> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
+>>>>> These patches depend on the R8A77970 PFC suport in order to work properly.
+>>>>>
+>>>>> [1/3] arm64: dts: renesas: r8a77970: add PFC support
+>>>>> [2/3] arm64: dts: renesas: eagle: add SCIF0 pins
+>>>>> [3/3] arm64: dts: renesas: eagle: add EtherAVB pins
+>>>>
+>>>> Hi Sergei,
+>>>>
+>>>> I have marked these patches as deferred pending acceptance of the PFC
+>>>> driver. Please repost or otherwise ping me once that dependency has been
+>>>> accepted.
+>>>
+>>> Has the dependency blocking this series been resolved yet ?
+>>
+>>    Now it is, except for the 3rd patch... Simon, do I need to repost the first two?
+>> The 1st one did apply to 4.16-rc1 here with a fuzz...
+> 
+> Thanks for bringing this to my attention.  No need to repost. I've applied
+> all three patches and plan to push later today.
 
-This patch is the equivalent of this one: [1], but for arm 32bits
-instead of ARMv8 aarch32.
+   My mentioning of the patch #3 wasn't just random: that patch shouldn't have been
+merged since the EtherAVB pin groups were dropped by Geert while merging the R8A77970
+PFC code. Now Eagle can't mount NFS root.
 
-[1] https://patchwork.kernel.org/patch/10207019/
-
----
- arch/arm/kvm/coproc.c | 61 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
-
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 6d1d2e2..3a02e76 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -270,6 +270,60 @@ static bool access_gic_sre(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
-+static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-+			     const struct coproc_params *p,
-+			     const struct coproc_reg *r)
-+{
-+	u64 now = kvm_phys_timer_read();
-+	u64 val;
-+
-+	if (p->is_write) {
-+		val = *vcpu_reg(vcpu, p->Rt1);
-+		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val + now);
-+	} else {
-+		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-+		*vcpu_reg(vcpu, p->Rt1) = val - now;
-+	}
-+
-+	return true;
-+}
-+
-+static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-+			    const struct coproc_params *p,
-+			    const struct coproc_reg *r)
-+{
-+	u32 val;
-+
-+	if (p->is_write) {
-+		val = *vcpu_reg(vcpu, p->Rt1);
-+		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, val);
-+	} else {
-+		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
-+		*vcpu_reg(vcpu, p->Rt1) = val;
-+	}
-+
-+	return true;
-+}
-+
-+static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-+			     const struct coproc_params *p,
-+			     const struct coproc_reg *r)
-+{
-+	u64 val;
-+
-+	if (p->is_write) {
-+		val = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
-+		val |= *vcpu_reg(vcpu, p->Rt1);
-+		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val);
-+	} else {
-+		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-+		*vcpu_reg(vcpu, p->Rt1) = val;
-+		*vcpu_reg(vcpu, p->Rt2) = val >> 32;
-+	}
-+
-+	return true;
-+}
-+
- /*
-  * We could trap ID_DFR0 and tell the guest we don't support performance
-  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-@@ -423,10 +477,17 @@ static const struct coproc_reg cp15_regs[] = {
- 	{ CRn(13), CRm( 0), Op1( 0), Op2( 4), is32,
- 			NULL, reset_unknown, c13_TID_PRIV },
- 
-+	/* CNTP */
-+	{ CRm64(14), Op1( 2), is64, access_cntp_cval},
-+
- 	/* CNTKCTL: swapped by interrupt.S. */
- 	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
- 			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
- 
-+	/* CNTP */
-+	{ CRn(14), CRm( 2), Op1( 0), Op2( 0), is32, access_cntp_tval },
-+	{ CRn(14), CRm( 2), Op1( 0), Op2( 1), is32, access_cntp_ctl },
-+
- 	/* The Configuration Base Address Register. */
- 	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
- };
--- 
-2.7.4
+MBR, Sergei
