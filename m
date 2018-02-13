@@ -1,109 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Feb 2018 19:35:35 +0000
-Subject: [PATCH] arm64: acpi,efi: fix alignment fault in accessing ACPI
- tables at kdump
-In-Reply-To: <5A7DC66C.10107@arm.com>
-References: <20180201090449.19514-1-takahiro.akashi@linaro.org>
- <CAKv+Gu-2-cG3vse4briKPK0gpi5Zrg+pZHiiN7-4DSBPn0n_3A@mail.gmail.com>
- <20180202043519.GD23847@linaro.org> <5A7DC66C.10107@arm.com>
-Message-ID: <CAKv+Gu9kLJRUV4imXWx=aUnvzbJKxUwQpP6rBsFA0vV5iR+F-w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Feb 2018 20:53:05 +0100
+Subject: [PATCH v9 2/3] arm: dts: add Nuvoton NPCM750 device tree
+In-Reply-To: <CAFd5g44iHgSoPfko6hgMjz=QMm6ZUScUWbnho1w0bL_brTCjrA@mail.gmail.com>
+References: <20180205235757.246758-1-brendanhiggins@google.com>
+ <20180205235757.246758-3-brendanhiggins@google.com>
+ <CAK8P3a0SJTAkv7_QtDW1sDWFDYHw8tFWZqO6EMwpZ_5KPbhq3Q@mail.gmail.com>
+ <CAKKbWA6Otc1ZO_yHpfhxPjbgvvn-QXcXG9sy5=3FZDY8d_20rw@mail.gmail.com>
+ <CAFd5g44iHgSoPfko6hgMjz=QMm6ZUScUWbnho1w0bL_brTCjrA@mail.gmail.com>
+Message-ID: <CAK8P3a0CESqe9gEPhBXO0-J9SB=wyM6p3Fg-abr3BDtExYgfYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 February 2018 at 16:03, James Morse <james.morse@arm.com> wrote:
-> Hi Akashi, Ard,
+On Tue, Feb 13, 2018 at 8:12 PM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+> On Tue, Feb 13, 2018 at 1:29 AM, Avi Fishman <avifishman70@gmail.com> wrote:
+>> On Tue, Feb 13, 2018 at 10:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> On Tue, Feb 6, 2018 at 12:57 AM, Brendan Higgins
+>>> <brendanhiggins@google.com> wrote:
+>>>> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
+>>>> specific device tree for the NPCM750 (Poleg) evaluation board.
+>>>>
+>>>> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+>>>> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+>>>> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+>>>> Reviewed-by: Joel Stanley <joel@jms.id.au>
+>>>> Reviewed-by: Rob Herring <robh@kernel.org>
+>>>> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+>>>> Tested-by: Avi Fishman <avifishman70@gmail.com>
+>>> ...
+>>>> +               enable-method = "nuvoton,npcm7xx-smp";
+>>>
+>>> I see this has already been reviewed quite a bit, but I'm curious
+>>> about the 'npcm7xx'
+>>> part here. Shouldn't that be a real chip name rather than a wildcard?
+>>
+>> There is a family of npcm7xx, some with SMP and some without.
+>> For those who has it, it is common for all to use the same
+>> "nuvoton,npcm7xx-smp".
 >
-> On 02/02/18 04:35, AKASHI Takahiro wrote:
->> On Thu, Feb 01, 2018 at 05:34:26PM +0000, Ard Biesheuvel wrote:
->>> On 1 February 2018 at 09:04, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->>>> * Initial ACPI tables are normally stored in system ram and marked as
->>>>   "ACPI Reclaim memory" by the firmware.
+> I think Arnd is right. In this case it should be "nuvoton,npcm750-smp". We can
+> use CPU_METHOD_OF_DECLARE to alias to as many compatible properties as needed.
 >
->>>> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
->>>>   memory as MEMBLOCK_NOMAP"), those regions are differently handled
->>>>   as they are "memblock-reserved", without NOMAP bit.
->
-> I don't think I'd grasped the implications of this before... are we accessing
-> the acpi tables via the linear map now?
->
+> Although everything in the 7xx family currently is either single core or has the
+> same SMP behavior, you could paint yourself into a corner if you were to make
+> one SMP device in the 7xx family which behaves differently from all other
+> devices and then need to come up with new compatible string names just for that.
 
-Yes. As the commit log for that patch says, the fact that the firmware
-chose to allocate them as 'ACPI reclaim memory' implies that the
-memory has no special significance to the firmware, and can be covered
-by the linear mapping. This aims to reduce page table fragmentation.
+Right, this is the reason for the very simple 'no wildcards in DT
+identifiers' rule.
+There simply isn't a reason to make an exception here.
 
->
->>>> * So they are now excluded from device tree's "usable-memory-range"
->>>>   which kexec-tools determines based on a current view of /proc/iomem.
->
->>> So this patch does fix the fallout of how this issue affects ACPI boot
->>> in particular, but is it correct in the first place for the kexec
->>> tools to disregard memory that has been memblock_reserved()?
->
-> I don't think kexec should be allowed to accidentally overwrite these regions as
-> they contain data needed to boot the system.
-> The reason to allow this would be booting a non-acpi OS and removing all the
-> ACPI gubbins from the DTB, (but I don't care if kexec can't do this).
->
-> Overwriting these regions used to be prevented because these regions were nomap,
-> but now they are showing up as 'System RAM', so they could be accidentally
-> overwritten. It looks like /proc/iomem doesn't see memblock_reserve()d regions
-> as they are in both memblock.memory and memblock.reserved.
->
-
-Aren't there other memblock_reserve'd regions that we need to preserve
-across kexec? I'd be surprised if these ACPI tables are the only thing
-that may get clobbered this way.
-
->
->> My previous patch[1] is just for this. It would work not only for
->> the case here but also for any "reserved" memory regions.
->> The only noticeable drawback that I see in this approach is that
->> the meaning of "usable-memory-range" is now a bit obscure.
->
-> usable-memory-range is only for kdump. The usable-memory-range is the reserved
-> crash region of the previous kernel, it can't overlap with anything that is
-> reserved by firmware.
->
-> Have I understood the problem correctly?:
-> 1. ACPI reserved regions may be accidentally overwritten by kexec,
-> 2. Kdump-kernel can't access the ACPI reserved regions via its linear map.
->
->
->> Alternatively we may want to modify /proc/iomem, adding a specific
->> resource entry for "ACPI Reclaim regions,"
->
-> This covers 1, nicely. kexec-tool's arm64:iomem_range_callback() looks like it
-> ignores regions it doesn't know about.
->
->
->> and in turn kexec-tool so as to put them into "usable-memory-range",
->> but it is rather a stopgap
->> measure in my opinion. I don't like kexec relying heavily on userspace
->> tool as exporting the reserved regions in /proc/iomem is also useless
->> for most users.
->
-> Describing all the iomem:reserved regions in dt:usable-memory-range? Yes, that
-> sounds fragile.
->
->
->
-> For 1:
-> Changing /proc/iomem to report memblock_reserved() regions as reserved would fix
-> 1. (I assume its harder to find the ACPI reserved regions again to describe them
-> separately). This stops kexec overwriting them.
->
->
-> For 2:
-> This patch solves the problem, but we access the acpi tables via the linear map
-> in the first kernel, but ioremap() them in the kdump kernel.
->
-> The only way to avoid this would be for the kernel's efi code to check that the
-> ACPI regions are mapped by the linear map, and add them if they aren't... which
-> is much scarier. So I prefer this patch for 2..
->
->
->
-> Thanks,
->
-> James
+       Arnd
