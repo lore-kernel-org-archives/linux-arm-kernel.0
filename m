@@ -1,113 +1,118 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 13 Feb 2018 14:36:24 +0000
-Subject: [PATCH 01/14] dt-bindings: Document STM32MP1 Reset Clock
- Controller (RCC) bindings
-In-Reply-To: <CAL_JsqJFD5g46mkyEWo2uH_ogYLhnvBLQ0f6mU9DG_bdh9n7sA@mail.gmail.com>
-References: <1517580222-23301-1-git-send-email-gabriel.fernandez@st.com>
- <1517580222-23301-2-git-send-email-gabriel.fernandez@st.com>
- <20180205042238.64xjrrguls2drtrg@rob-hp-laptop>
- <19273eb9-0c8c-cd2a-d100-f25f25e93234@st.com>
- <CAL_JsqJFD5g46mkyEWo2uH_ogYLhnvBLQ0f6mU9DG_bdh9n7sA@mail.gmail.com>
-Message-ID: <3152089f-5a87-513b-7d6b-93ba38cf1d9f@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Feb 2018 14:37:33 +0000
+Subject: [PATCH 1/2] dt-bindings: Documentation for qcom,llcc
+In-Reply-To: <2801cac8583d56260a9df0cdf7f41f47@codeaurora.org>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+ <1516924513-20183-2-git-send-email-ckadabi@codeaurora.org>
+ <20180201104434.7j27fl2hb4glqd3v@lakrids.cambridge.arm.com>
+ <d2751939f5813c296cdcb7a92d5698bf@codeaurora.org>
+ <20180202110532.n2eez3zqbmf2jelr@lakrids.cambridge.arm.com>
+ <2801cac8583d56260a9df0cdf7f41f47@codeaurora.org>
+Message-ID: <20180213143733.ts3dlcnhcf7jzbbm@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 06, 2018 at 11:56:50AM -0800, Channa wrote:
+> On 2018-02-02 03:05, Mark Rutland wrote:
+> > On Thu, Feb 01, 2018 at 12:39:09PM -0800, Channa wrote:
+> > > On 2018-02-01 02:44, Mark Rutland wrote:
+> > > > On Thu, Jan 25, 2018 at 03:55:12PM -0800, Channagoud Kadabi wrote:
+> > > > > +- llcc-bank-off:
+> > > > > +	Usage: required
+> > > > > +	Value Type: <u32 array>
+> > > > > +	Definition: Offsets of llcc banks from llcc base address starting
+> > > > > from
+> > > > > +		    LLCC bank0.
+> > > > > +
+> > > > > +- llcc-broadcast-off:
+> > > > > +	Usage: required
+> > > > > +	Value Type: <u32>
+> > > > > +	Definition: Offset of broadcast register from LLCC bank0 address.
+> > > >
+> > > > Please could we use "offset" rather than "off" for both of these? That
+> > > > way it's obvious these aren't properties for disabling some feature.
+> > > >
+> > > > How variable are these offsets in practice? Is the memory map not fixed?
+> > > 
+> > > The offsets depends on the number of LLCC HW blocks. These number of
+> > > HW
+> > > blocks vary from
+> > > chipset to chipset and new registers could be added that changes the
+> > > offset.
+> > 
+> > Surely if new registers are added, we need a new compatible string?
+> > 
+> > Can't we encode the number of LLCC HW blocks, instead? Presumably that
+> > would give enough information to cover both llcc-bank-off and
+> > llcc-broadcast-off.
+> > 
+> > [...]
+> 
+> Are you suggesting to move these offset handing out of DTS files and manage
+> in the driver?
 
+Something like that, though it depends on how exactly the offsets can be
+derived.
 
-On 02/07/2018 07:03 PM, Rob Herring wrote:
-> On Mon, Feb 5, 2018 at 1:01 AM, Gabriel FERNANDEZ
-> <gabriel.fernandez@st.com>  wrote:
->> Hi Rob,
->>
->> Thanks for reviewing.
->>
->>
->> On 02/05/2018 07:09 AM, Rob Herring wrote:
->>> On Fri, Feb 02, 2018 at 03:03:29PM +0100,gabriel.fernandez at st.com  wrote:
->>>> From: Gabriel Fernandez<gabriel.fernandez@st.com>
->>>>
->>>> The RCC block is responsible of the management of the clock and reset
->>>> generation for the complete circuit.
->>>>
->>>> Signed-off-by: Gabriel Fernandez<gabriel.fernandez@st.com>
->>>> ---
->>>>    .../devicetree/bindings/mfd/st,stm32-rcc.txt       | 85 ++++++++++++++++++++++
->>>>    1 file changed, 85 insertions(+)
->>>>    create mode 100644 Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
->>>> new file mode 100644
->>>> index 0000000..28017a1
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/mfd/st,stm32-rcc.txt
->>>> @@ -0,0 +1,85 @@
->>>> +STMicroelectronics STM32 Peripheral Reset Clock Controller
->>>> +==========================================================
->>>> +
->>>> +The RCC IP is both a reset and a clock controller.
->>>> +
->>>> +Please also refer to reset.txt for common reset controller binding usage.
->>>> +
->>>> +Please also refer to clock-bindings.txt for common clock controller
->>>> +binding usage.
->>>> +
->>>> +
->>>> +Required properties:
->>>> +- compatible: "simple-mfd", "syscon"
->>>> +- reg: should be register base and length as documented in the datasheet
->>>> +
->>>> +- Sub-nodes:
->>>> +  - compatible: "st,stm32mp1-rcc-clk"
->>>> +    - #clock-cells: 1, device nodes should specify the clock in their
->>>> +      "clocks" property, containing a phandle to the clock device node,
->>>> +      an index specifying the clock to use.
->>>> +
->>>> +  - compatible: "st,stm32mp1-rcc-rst"
->>>> +    - #reset-cells: Shall be 1
->>>> +
->>>> +Example:
->>>> +    rcc: rcc at 50000000 {
->>>> +            compatible = "syscon", "simple-mfd";
->>>> +            reg = <0x50000000 0x1000>;
->>>> +
->>>> +            rcc_clk: rcc-clk at 50000000 {
->>>> +                    #clock-cells = <1>;
->>>> +                    compatible = "st,stm32mp1-rcc-clk";
->>>> +            };
->>>> +
->>>> +            rcc_rst: rcc-reset at 50000000 {
->>> You should not have the same unit-address twice.
->>>
->>> IMO, this should just be:
->>>
->>>        rcc: rcc at 50000000 {
->>>                compatible = "st-stm32mp1-rcc";
->>>                reg = <0x50000000 0x1000>;
->>>                #clock-cells = <1>;
->>>                #reset-cells = <1>;
->>>        };
->>>
->>> There's no reason a node can't provide more than 1 function.
->> RCC is an dedicated IP for clocks and resets, but also for power
->> management (patches will be sent later)
-> If there's additional functions, they should be part of the binding
-> now, not later. bindings should not unnecessarily evolve.
-Yes you're right i will do it.
->> Then i need to probe 3 drivers with same IP.
-> Drivers and DT nodes don't have to be 1-1. A parent driver can create
-> additional child devices.
->
-> Also, looking at your existing bindings for RCC IP, it is done as I suggested.
->
->> It's also a way to avoid use of 'CLK_OF_DECLARE_DRIVER' and i need it to
->> probe the 3th driver.
-> Sounds like a Linux problem, not a DT issue.
->
-> Rob
-RCC is an IP block wich exposed multiple functionalities (clock, reset, 
-power management),
-mfd should be the best solution to populate each functionality in 
-natural way,
-and to access to registers ?
+Using reg entries, as Matt suggested, sounds better though.
 
-Gabriel
+> > > > > +compatible devices:
+> > > > > +		qcom,sdm845-llcc
+> > > >
+> > > > Huh? The "qcom,sdm845-llcc" bindings wasn't described above, and it's
+> > > > not clear what this means.
+> > > >
+> > > > > +
+> > > > > +Example:
+> > > > > +
+> > > > > +	qcom,system-cache at 1300000 {
+> > > > > +		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
+> > > >
+> > > > This looks very wrong. Why do you need syscon and simple-mfd?
+> > > 
+> > > LLCC HW block has 3 functionalities:
+> > > System cache core, ECC & AMON drivers for debugging.
+> > > All three drivers use the same register space for configuration,
+> > > status etc.
+> > > In order to avoid remapping the same address region across multiple
+> > > drivers,
+> > > I have implemented this driver as a syncon and simple-mfd.
+> > 
+> > Please don't do that; that's completely dependent on Linux
+> > implementation details.
+> 
+> Why do you think simple-mfd is not good here? The LLCC HW clock is outside
+> of CPUSS and has
+> multiple functional blocks.
+
+For one thing, there's no need for this to be a syscon *and* a
+simple-mfd.
+
+W.R.T. simple-mfd, I think it would bet better to decompose the device
+in a top-level driver, as I described in my prior reply, rather than
+describing a set of drivers (which are not themselves HW).
+
+> > > > > +- cache-slices:
+> > > > > +	Usage: required
+> > > > > +	Value type: <prop-encoded-array>
+> > > > > +	Definition: The tuple has phandle to llcc device as the first
+> > > > > argument and the
+> > > > > +		    second argument is the usecase id of the client.
+> > > >
+> > > > What is a "usecase id" ?
+> > > 
+> > > Usecase id for use case that wants to use system cache for eg:
+> > > video-encode
+> > > and video-decode
+> > 
+> > Sure, but how is the value used? Is it the index of a slice? Or
+> > something more abstract?
+> 
+> This is used as an index to the SCT (System cache Table) configuration
+> data that controls the behavior of each cache slice.
+
+Ok. Where does that SCT live? Is that in HW? Is it programmed by SW, or
+statically configured for a given platform?
+
+Thanks,
+Mark.
