@@ -1,34 +1,81 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Feb 2018 13:13:07 +0000
-Subject: [PATCH] arm64: lse: Pass -fomit-frame-pointer to out-of-line ll/sc
- atomics
-Message-ID: <1518527587-18260-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 13 Feb 2018 13:14:09 +0000
+Subject: [PATCH] arm64: proc: Set PTE_NG for table entries to avoid traversing
+ them twice
+Message-ID: <1518527649-18358-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In cases where x30 is used as a temporary in the out-of-line ll/sc atomics
-(e.g. atomic_fetch_add), the compiler tends to put out a full stackframe,
-which included pointing the x29 at the new frame.
+When KASAN is enabled, the swapper page table contains many identical
+mappings of the zero page, which can lead to a stall during boot whilst
+the G -> nG code continually walks the same page table entries looking
+for global mappings.
 
-Since these things aren't traceable anyway, we can pass -fomit-frame-pointer
-to reduce the work when spilling.
+This patch sets the nG bit (bit 11, which is IGNORED) in table entries
+after processing the subtree so we can easily skip them if we see them
+a second time.
 
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/lib/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/mm/proc.S | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 4e696f96451f..c287b58b257a 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -17,6 +17,6 @@ CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
- 		   -ffixed-x7 -fcall-saved-x8 -fcall-saved-x9		\
- 		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
- 		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
--		   -fcall-saved-x18
-+		   -fcall-saved-x18 -fomit-frame-pointer
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 71baed7e592a..c0af47617299 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -205,7 +205,8 @@ ENDPROC(idmap_cpu_replace_ttbr1)
+ 	dc	cvac, cur_\()\type\()p		// Ensure any existing dirty
+ 	dmb	sy				// lines are written back before
+ 	ldr	\type, [cur_\()\type\()p]	// loading the entry
+-	tbz	\type, #0, next_\()\type	// Skip invalid entries
++	tbz	\type, #0, skip_\()\type	// Skip invalid and
++	tbnz	\type, #11, skip_\()\type	// non-global entries
+ 	.endm
  
- lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
+ 	.macro __idmap_kpti_put_pgtable_ent_ng, type
+@@ -265,8 +266,9 @@ ENTRY(idmap_kpti_install_ng_mappings)
+ 	add	end_pgdp, cur_pgdp, #(PTRS_PER_PGD * 8)
+ do_pgd:	__idmap_kpti_get_pgtable_ent	pgd
+ 	tbnz	pgd, #1, walk_puds
+-	__idmap_kpti_put_pgtable_ent_ng	pgd
+ next_pgd:
++	__idmap_kpti_put_pgtable_ent_ng	pgd
++skip_pgd:
+ 	add	cur_pgdp, cur_pgdp, #8
+ 	cmp	cur_pgdp, end_pgdp
+ 	b.ne	do_pgd
+@@ -294,8 +296,9 @@ walk_puds:
+ 	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
+ do_pud:	__idmap_kpti_get_pgtable_ent	pud
+ 	tbnz	pud, #1, walk_pmds
+-	__idmap_kpti_put_pgtable_ent_ng	pud
+ next_pud:
++	__idmap_kpti_put_pgtable_ent_ng	pud
++skip_pud:
+ 	add	cur_pudp, cur_pudp, 8
+ 	cmp	cur_pudp, end_pudp
+ 	b.ne	do_pud
+@@ -314,8 +317,9 @@ walk_pmds:
+ 	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
+ do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
+ 	tbnz	pmd, #1, walk_ptes
+-	__idmap_kpti_put_pgtable_ent_ng	pmd
+ next_pmd:
++	__idmap_kpti_put_pgtable_ent_ng	pmd
++skip_pmd:
+ 	add	cur_pmdp, cur_pmdp, #8
+ 	cmp	cur_pmdp, end_pmdp
+ 	b.ne	do_pmd
+@@ -333,7 +337,7 @@ walk_ptes:
+ 	add	end_ptep, cur_ptep, #(PTRS_PER_PTE * 8)
+ do_pte:	__idmap_kpti_get_pgtable_ent	pte
+ 	__idmap_kpti_put_pgtable_ent_ng	pte
+-next_pte:
++skip_pte:
+ 	add	cur_ptep, cur_ptep, #8
+ 	cmp	cur_ptep, end_ptep
+ 	b.ne	do_pte
 -- 
 2.1.4
