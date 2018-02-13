@@ -1,82 +1,312 @@
-From: kbingham@kernel.org (Kieran Bingham)
-Date: Tue, 13 Feb 2018 19:30:35 +0000
-Subject: [PATCH v2 2/4] arm64: dts: renesas: r8a77995: add VSP instances
-In-Reply-To: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
-References: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
-Message-ID: <1518550237-16753-3-git-send-email-kbingham@kernel.org>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Wed, 14 Feb 2018 01:05:16 +0530
+Subject: [net PATCH] Revert "net: thunderx: Add support for xdp redirect"
+In-Reply-To: <151854116184.18303.13476104443853509134.stgit@firesoul>
+References: <151854116184.18303.13476104443853509134.stgit@firesoul>
+Message-ID: <CA+sq2CfYosrbZUEb0hLZS1u6tiz+m4oxEXF3-43ZxyoHq=cAVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+On Tue, Feb 13, 2018 at 10:29 PM, Jesper Dangaard Brouer
+<brouer@redhat.com> wrote:
+> This reverts commit aa136d0c82fcd6af14535853c30e219e02b2692d.
+>
+> As I previously[1] pointed out this implementation of XDP_REDIRECT is
+> wrong.  XDP_REDIRECT is a facility that must work between different
+> NIC drivers.  Another NIC driver can call ndo_xdp_xmit/nicvf_xdp_xmit,
+> but your driver patch assumes payload data (at top of page) will
+> contain a queue index and a DMA addr, this is not true and worse will
+> likely contain garbage.
+>
+> Given you have not fixed this in due time (just reached v4.16-rc1),
+> the only option I see is a revert.
 
-The r8a77995 has a VSPBS to support image processing such as blending of
-two input images, and has two VSPDs to handle display pipelines with a
-DU.
+Sorry that i missed your email ie didn't respond.
+This driver is not for a generic PCI endpoint NIC, it's an on-silicon
+ethernet device
+found only on Cavium's ThunderX or OCTEONTX SOCs which supports upto 16 ports.
+XDP_REDIRECT here is mainly aimed at forwarding packets from one port
+to another
+port of same type.
 
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+The only way I could have avoided the payload data is by unmapping and remapping
+of DMA buffer which is quite expensive especially when IOMMU is enabled.
+So I thought this small optimization should be acceptable.
 
----
-v2:
- - Fix VSPD register map size
- - Squash VSPBS and VSPD patches together
+If you still think that this shouldn't be done this way then go ahead
+and revert the patch,
+I will try to redo this as and when i find time.
 
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Thanks,
+Sunil.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 196a917afea6..19bd8be9926a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -692,6 +692,16 @@
- 			status = "disabled";
- 		};
- 
-+		vspbs: vsp at fe960000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfe960000 0 0x4000>;
-+			interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 627>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 627>;
-+			renesas,fcp = <&fcpvb0>;
-+		};
-+
- 		fcpvb0: fcp at fe96f000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfe96f000 0 0x200>;
-@@ -701,6 +711,16 @@
- 			iommus = <&ipmmu_vp0 5>;
- 		};
- 
-+		vspd0: vsp at fea20000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea20000 0 0x8000>;
-+			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 623>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 623>;
-+			renesas,fcp = <&fcpvd0>;
-+		};
-+
- 		fcpvd0: fcp at fea27000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfea27000 0 0x200>;
-@@ -710,6 +730,16 @@
- 			iommus = <&ipmmu_vi0 8>;
- 		};
- 
-+		vspd1: vsp at fea80000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea28000 0 0x8000>;
-+			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 622>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 622>;
-+			renesas,fcp = <&fcpvd1>;
-+		};
-+
- 		fcpvd1: fcp at fea2f000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfea2f000 0 0x200>;
--- 
-2.7.4
+>
+> [1] http://lkml.kernel.org/r/20171211130902.482513d3 at redhat.com
+>
+> Cc: Sunil Goutham <sgoutham@cavium.com>
+> Cc: Christina Jacob <cjacob@caviumnetworks.com>
+> Cc: Aleksey Makarov <aleksey.makarov@cavium.com>
+> Fixes: aa136d0c82fc ("net: thunderx: Add support for xdp redirect")
+> Signed-off-by: Jesper Dangaard Brouer <brouer@redhat.com>
+> ---
+>  drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  110 +++++---------------
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   11 +-
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    4 -
+>  3 files changed, 31 insertions(+), 94 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> index b68cde9f17d2..7d9c5ffbd041 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> @@ -67,11 +67,6 @@ module_param(cpi_alg, int, S_IRUGO);
+>  MODULE_PARM_DESC(cpi_alg,
+>                  "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
+>
+> -struct nicvf_xdp_tx {
+> -       u64 dma_addr;
+> -       u8  qidx;
+> -};
+> -
+>  static inline u8 nicvf_netdev_qidx(struct nicvf *nic, u8 qidx)
+>  {
+>         if (nic->sqs_mode)
+> @@ -507,29 +502,14 @@ static int nicvf_init_resources(struct nicvf *nic)
+>         return 0;
+>  }
+>
+> -static void nicvf_unmap_page(struct nicvf *nic, struct page *page, u64 dma_addr)
+> -{
+> -       /* Check if it's a recycled page, if not unmap the DMA mapping.
+> -        * Recycled page holds an extra reference.
+> -        */
+> -       if (page_ref_count(page) == 1) {
+> -               dma_addr &= PAGE_MASK;
+> -               dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
+> -                                    RCV_FRAG_LEN + XDP_HEADROOM,
+> -                                    DMA_FROM_DEVICE,
+> -                                    DMA_ATTR_SKIP_CPU_SYNC);
+> -       }
+> -}
+> -
+>  static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+>                                 struct cqe_rx_t *cqe_rx, struct snd_queue *sq,
+>                                 struct rcv_queue *rq, struct sk_buff **skb)
+>  {
+>         struct xdp_buff xdp;
+>         struct page *page;
+> -       struct nicvf_xdp_tx *xdp_tx = NULL;
+>         u32 action;
+> -       u16 len, err, offset = 0;
+> +       u16 len, offset = 0;
+>         u64 dma_addr, cpu_addr;
+>         void *orig_data;
+>
+> @@ -543,7 +523,7 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+>         cpu_addr = (u64)phys_to_virt(cpu_addr);
+>         page = virt_to_page((void *)cpu_addr);
+>
+> -       xdp.data_hard_start = page_address(page) + RCV_BUF_HEADROOM;
+> +       xdp.data_hard_start = page_address(page);
+>         xdp.data = (void *)cpu_addr;
+>         xdp_set_data_meta_invalid(&xdp);
+>         xdp.data_end = xdp.data + len;
+> @@ -563,7 +543,18 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+>
+>         switch (action) {
+>         case XDP_PASS:
+> -               nicvf_unmap_page(nic, page, dma_addr);
+> +               /* Check if it's a recycled page, if not
+> +                * unmap the DMA mapping.
+> +                *
+> +                * Recycled page holds an extra reference.
+> +                */
+> +               if (page_ref_count(page) == 1) {
+> +                       dma_addr &= PAGE_MASK;
+> +                       dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
+> +                                            RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
+> +                                            DMA_FROM_DEVICE,
+> +                                            DMA_ATTR_SKIP_CPU_SYNC);
+> +               }
+>
+>                 /* Build SKB and pass on packet to network stack */
+>                 *skb = build_skb(xdp.data,
+> @@ -576,20 +567,6 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+>         case XDP_TX:
+>                 nicvf_xdp_sq_append_pkt(nic, sq, (u64)xdp.data, dma_addr, len);
+>                 return true;
+> -       case XDP_REDIRECT:
+> -               /* Save DMA address for use while transmitting */
+> -               xdp_tx = (struct nicvf_xdp_tx *)page_address(page);
+> -               xdp_tx->dma_addr = dma_addr;
+> -               xdp_tx->qidx = nicvf_netdev_qidx(nic, cqe_rx->rq_idx);
+> -
+> -               err = xdp_do_redirect(nic->pnicvf->netdev, &xdp, prog);
+> -               if (!err)
+> -                       return true;
+> -
+> -               /* Free the page on error */
+> -               nicvf_unmap_page(nic, page, dma_addr);
+> -               put_page(page);
+> -               break;
+>         default:
+>                 bpf_warn_invalid_xdp_action(action);
+>                 /* fall through */
+> @@ -597,7 +574,18 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+>                 trace_xdp_exception(nic->netdev, prog, action);
+>                 /* fall through */
+>         case XDP_DROP:
+> -               nicvf_unmap_page(nic, page, dma_addr);
+> +               /* Check if it's a recycled page, if not
+> +                * unmap the DMA mapping.
+> +                *
+> +                * Recycled page holds an extra reference.
+> +                */
+> +               if (page_ref_count(page) == 1) {
+> +                       dma_addr &= PAGE_MASK;
+> +                       dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
+> +                                            RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
+> +                                            DMA_FROM_DEVICE,
+> +                                            DMA_ATTR_SKIP_CPU_SYNC);
+> +               }
+>                 put_page(page);
+>                 return true;
+>         }
+> @@ -1864,50 +1852,6 @@ static int nicvf_xdp(struct net_device *netdev, struct netdev_bpf *xdp)
+>         }
+>  }
+>
+> -static int nicvf_xdp_xmit(struct net_device *netdev, struct xdp_buff *xdp)
+> -{
+> -       struct nicvf *nic = netdev_priv(netdev);
+> -       struct nicvf *snic = nic;
+> -       struct nicvf_xdp_tx *xdp_tx;
+> -       struct snd_queue *sq;
+> -       struct page *page;
+> -       int err, qidx;
+> -
+> -       if (!netif_running(netdev) || !nic->xdp_prog)
+> -               return -EINVAL;
+> -
+> -       page = virt_to_page(xdp->data);
+> -       xdp_tx = (struct nicvf_xdp_tx *)page_address(page);
+> -       qidx = xdp_tx->qidx;
+> -
+> -       if (xdp_tx->qidx >= nic->xdp_tx_queues)
+> -               return -EINVAL;
+> -
+> -       /* Get secondary Qset's info */
+> -       if (xdp_tx->qidx >= MAX_SND_QUEUES_PER_QS) {
+> -               qidx = xdp_tx->qidx / MAX_SND_QUEUES_PER_QS;
+> -               snic = (struct nicvf *)nic->snicvf[qidx - 1];
+> -               if (!snic)
+> -                       return -EINVAL;
+> -               qidx = xdp_tx->qidx % MAX_SND_QUEUES_PER_QS;
+> -       }
+> -
+> -       sq = &snic->qs->sq[qidx];
+> -       err = nicvf_xdp_sq_append_pkt(snic, sq, (u64)xdp->data,
+> -                                     xdp_tx->dma_addr,
+> -                                     xdp->data_end - xdp->data);
+> -       if (err)
+> -               return -ENOMEM;
+> -
+> -       nicvf_xdp_sq_doorbell(snic, sq, qidx);
+> -       return 0;
+> -}
+> -
+> -static void nicvf_xdp_flush(struct net_device *dev)
+> -{
+> -       return;
+> -}
+> -
+>  static int nicvf_config_hwtstamp(struct net_device *netdev, struct ifreq *ifr)
+>  {
+>         struct hwtstamp_config config;
+> @@ -1986,8 +1930,6 @@ static const struct net_device_ops nicvf_netdev_ops = {
+>         .ndo_fix_features       = nicvf_fix_features,
+>         .ndo_set_features       = nicvf_set_features,
+>         .ndo_bpf                = nicvf_xdp,
+> -       .ndo_xdp_xmit           = nicvf_xdp_xmit,
+> -       .ndo_xdp_flush          = nicvf_xdp_flush,
+>         .ndo_do_ioctl           = nicvf_ioctl,
+>  };
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> index 3eae9ff9b53a..d42704d07484 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+> @@ -204,7 +204,7 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+>
+>         /* Reserve space for header modifications by BPF program */
+>         if (rbdr->is_xdp)
+> -               buf_len += XDP_HEADROOM;
+> +               buf_len += XDP_PACKET_HEADROOM;
+>
+>         /* Check if it's recycled */
+>         if (pgcache)
+> @@ -224,9 +224,8 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+>                         nic->rb_page = NULL;
+>                         return -ENOMEM;
+>                 }
+> -
+>                 if (pgcache)
+> -                       pgcache->dma_addr = *rbuf + XDP_HEADROOM;
+> +                       pgcache->dma_addr = *rbuf + XDP_PACKET_HEADROOM;
+>                 nic->rb_page_offset += buf_len;
+>         }
+>
+> @@ -1244,7 +1243,7 @@ int nicvf_xdp_sq_append_pkt(struct nicvf *nic, struct snd_queue *sq,
+>         int qentry;
+>
+>         if (subdesc_cnt > sq->xdp_free_cnt)
+> -               return -1;
+> +               return 0;
+>
+>         qentry = nicvf_get_sq_desc(sq, subdesc_cnt);
+>
+> @@ -1255,7 +1254,7 @@ int nicvf_xdp_sq_append_pkt(struct nicvf *nic, struct snd_queue *sq,
+>
+>         sq->xdp_desc_cnt += subdesc_cnt;
+>
+> -       return 0;
+> +       return 1;
+>  }
+>
+>  /* Calculate no of SQ subdescriptors needed to transmit all
+> @@ -1656,7 +1655,7 @@ static void nicvf_unmap_rcv_buffer(struct nicvf *nic, u64 dma_addr,
+>                 if (page_ref_count(page) != 1)
+>                         return;
+>
+> -               len += XDP_HEADROOM;
+> +               len += XDP_PACKET_HEADROOM;
+>                 /* Receive buffers in XDP mode are mapped from page start */
+>                 dma_addr &= PAGE_MASK;
+>         }
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> index ce1eed7a6d63..5e9a03cf1b4d 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> @@ -11,7 +11,6 @@
+>
+>  #include <linux/netdevice.h>
+>  #include <linux/iommu.h>
+> -#include <linux/bpf.h>
+>  #include <net/xdp.h>
+>  #include "q_struct.h"
+>
+> @@ -94,9 +93,6 @@
+>  #define RCV_FRAG_LEN    (SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
+>                          SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+>
+> -#define RCV_BUF_HEADROOM       128 /* To store dma address for XDP redirect */
+> -#define XDP_HEADROOM           (XDP_PACKET_HEADROOM + RCV_BUF_HEADROOM)
+> -
+>  #define MAX_CQES_FOR_TX                ((SND_QUEUE_LEN / MIN_SQ_DESC_PER_PKT_XMIT) * \
+>                                  MAX_CQE_PER_PKT_XMIT)
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
