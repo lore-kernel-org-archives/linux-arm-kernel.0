@@ -1,188 +1,175 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Tue, 13 Feb 2018 16:58:34 +0000
-Subject: [PATCH v3 22/25] ASoC: qcom: q6routing: add support to MI2S Mixers
+Date: Tue, 13 Feb 2018 16:58:37 +0000
+Subject: [PATCH v3 25/25] arm64: dts: msm8996: db820c: Add sound card support
 In-Reply-To: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
 References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180213165837.1620-23-srinivas.kandagatla@linaro.org>
+Message-ID: <20180213165837.1620-26-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch add support to MI2S mixers required to select path between
-ASM stream and AFE ports.
+This patch adds hdmi sound card support to db820c via qdsp.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6routing.c | 142 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 142 insertions(+)
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 44 +++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi        | 62 ++++++++++++++++++++++++++++
+ 2 files changed, 105 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index 8c9b5d899ba7..8ffcc49a79a1 100644
---- a/sound/soc/qcom/qdsp6/q6routing.c
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -232,6 +232,102 @@ static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
- 		       msm_routing_put_audio_mixer),
- };
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 9769053957af..6f6f21501ee9 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -18,7 +18,8 @@
+ #include "apq8096-db820c-pmic-pins.dtsi"
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/gpio/gpio.h>
+-
++#include <dt-bindings/sound/qcom,q6afe.h>
++#include <dt-bindings/sound/qcom,q6asm.h>
+ / {
+ 	aliases {
+ 		serial0 = &blsp2_uart1;
+@@ -186,6 +187,7 @@
  
-+static const struct snd_kcontrol_new primary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+};
+ 				core-vdda-supply = <&pm8994_l12>;
+ 				core-vcc-supply = <&pm8994_s4>;
++				#sound-dai-cells = <1>;
+ 			};
+ 		};
+ 	};
+@@ -360,4 +362,44 @@
+ 			};
+ 		};
+ 	};
++	adsp-pil {
++		power-domains = <&gcc HLOS1_VOTE_LPASS_ADSP_GDSC>;
++		smd-edge {
++			apr {
++				iommus = <&lpass_q6_smmu 1>;
++				audio {
++					compatible = "qcom,apq8096-sndcard";
++					qcom,model = "DB820c";
++					qcom,audio-routing =
++						"RX_BIAS", "MCLK";
 +
-+static const struct snd_kcontrol_new secondary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+};
++					fe at 1 {
++						is-fe;
++						link-name = "MultiMedia1 Playback";
++						cpu {
++							sound-dai = <&q6asm  MSM_FRONTEND_DAI_MULTIMEDIA1>;
++						};
++						platform {
++							sound-dai = <&q6asm  MSM_FRONTEND_DAI_MULTIMEDIA1>;
++						};
++					};
 +
-+static const struct snd_kcontrol_new quaternary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+};
++					be at 1 {
++						link-name = "HDMI Playback";
++						cpu {
++							sound-dai = <&q6afe AFE_PORT_HDMI_RX>;
++						};
 +
-+static const struct snd_kcontrol_new tertiary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+};
++						platform {
++							sound-dai = <&q6adm>;
++						};
 +
- static const struct snd_kcontrol_new slimbus_rx_mixer_controls[] = {
- 	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_0_RX,
- 	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-@@ -443,6 +539,18 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
- 	SND_SOC_DAPM_MIXER("SLIMBUS_6_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
- 			   slimbus_6_rx_mixer_controls,
- 			   ARRAY_SIZE(slimbus_6_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRI_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   primary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(primary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   secondary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(secondary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   quaternary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(quaternary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   tertiary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(tertiary_mi2s_rx_mixer_controls)),
++						codec {
++							sound-dai = <&hdmi 0>;
++						};
++					};
++				};
++			};
++		};
++	};
  };
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index c93bbae645bd..75cb055b0c55 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/clock/qcom,gcc-msm8996.h>
+ #include <dt-bindings/clock/qcom,mmcc-msm8996.h>
+ #include <dt-bindings/clock/qcom,rpmcc.h>
++#include <dt-bindings/soc/qcom,apr.h>
  
- static const struct snd_soc_dapm_route intercon[] = {
-@@ -520,6 +628,40 @@ static const struct snd_soc_dapm_route intercon[] = {
- 	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
- 	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
- 	{"SLIMBUS_6_RX", NULL, "SLIMBUS_6_RX Audio Mixer"},
+ / {
+ 	model = "Qualcomm Technologies, Inc. MSM8996";
+@@ -1287,6 +1288,34 @@
+ 					      "ref_clk";
+ 			};
+ 		};
 +
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
-+	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX Audio Mixer"},
++	        lpass_q6_smmu: arm,smmu-lpass_q6 at 1600000 {
++			compatible = "qcom,msm8996-smmu-v2";
++	                reg = <0x1600000 0x20000>;
++	                #iommu-cells = <1>;
++                        power-domains = <&gcc HLOS1_VOTE_LPASS_CORE_GDSC>;
 +
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"TERT_MI2S_RX", NULL, "TERT_MI2S_RX Audio Mixer"},
++			#global-interrupts = <1>;
++		        interrupts = <GIC_SPI 404 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 226 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 394 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 395 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 396 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 398 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 399 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 400 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 402 IRQ_TYPE_LEVEL_HIGH>,
++		                <GIC_SPI 403 IRQ_TYPE_LEVEL_HIGH>;
 +
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL5"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL7"},
-+	{"SEC_MI2S_RX", NULL, "SEC_MI2S_RX Audio Mixer"},
++			clocks = <&gcc GCC_HLOS1_VOTE_LPASS_CORE_SMMU_CLK>,
++				 <&gcc GCC_HLOS1_VOTE_LPASS_ADSP_SMMU_CLK>;
++			clock-names = "iface", "bus";
++                        status = "okay";
++		};
 +
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
-+	{"PRI_MI2S_RX", NULL, "PRI_MI2S_RX Audio Mixer"},
- };
+ 	};
  
- static int routing_hw_params(struct snd_pcm_substream *substream,
+ 	adsp-pil {
+@@ -1315,6 +1344,39 @@
+ 			qcom,ipc = <&apcs 16 8>;
+ 			qcom,smd-edge = <1>;
+ 			qcom,remote-pid = <2>;
++			apr {
++				compatible = "qcom,apr-v2";
++				qcom,smd-channels = "apr_audio_svc";
++				qcom,apr-dest-domain-id = <APR_DOMAIN_ADSP>;
++
++				q6core {
++					qcom,apr-svc-name = "CORE";
++					qcom,apr-svc-id = <APR_SVC_ADSP_CORE>;
++					compatible = "qcom,q6core";
++				};
++
++				q6afe: q6afe {
++					compatible = "qcom,q6afe";
++					qcom,apr-svc-name = "AFE";
++					qcom,apr-svc-id = <APR_SVC_AFE>;
++					#sound-dai-cells = <1>;
++				};
++
++				q6asm: q6asm {
++					compatible = "qcom,q6asm";
++					qcom,apr-svc-name = "ASM";
++					qcom,apr-svc-id = <APR_SVC_ASM>;
++					#sound-dai-cells = <1>;
++				};
++
++				q6adm: q6adm {
++					compatible = "qcom,q6adm";
++					qcom,apr-svc-name = "ADM";
++					qcom,apr-svc-id = <APR_SVC_ADM>;
++					#sound-dai-cells = <0>;
++				};
++
++			};
+ 		};
+ 	};
+ 
 -- 
 2.15.1
