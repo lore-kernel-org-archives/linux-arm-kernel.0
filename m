@@ -1,119 +1,88 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 13 Feb 2018 17:12:44 -0600
-Subject: [PATCH v3 01/25] dt-bindings: soc: qcom: Add bindings for APR bus
-In-Reply-To: <20180213165837.1620-2-srinivas.kandagatla@linaro.org>
-References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
- <20180213165837.1620-2-srinivas.kandagatla@linaro.org>
-Message-ID: <20180213231244.ama4bwsehzuh5sr7@rob-hp-laptop>
+Date: Tue, 13 Feb 2018 17:20:07 -0600
+Subject: [PATCH v4 2/5] dt-bindings: gpio: add raspberry pi GPIO expander
+ binding
+In-Reply-To: <214ff3856c430b8045b63b25d83733b77054dfab.1517923836.git.baruch@tkos.co.il>
+References: <cover.1517923836.git.baruch@tkos.co.il>
+ <214ff3856c430b8045b63b25d83733b77054dfab.1517923836.git.baruch@tkos.co.il>
+Message-ID: <20180213232007.ieme6rjxgc7vidbw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 04:58:13PM +0000, srinivas.kandagatla at linaro.org wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Wed, Feb 07, 2018 at 08:35:23PM +0200, Baruch Siach wrote:
+> The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware over
+> I2C. The firmware mailbox interface allows the ARM core to control the
+> GPIO lines.
 > 
-> This patch add dt bindings for Qualcomm APR (Asynchronous Packet Router)
-> bus driver. This bus is used for communicating with DSP which provides
-> audio and various other services to cpu.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > ---
->  .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 83 ++++++++++++++++++++++
->  1 file changed, 83 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+> v4:
+>   * Move the example gpio node under the firmware node
+>   * Rename gpio node name to plain 'gpio'
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
+> v3:
+>   * Rename node name.
+> 
+> v2:
+>   * Rename compatible string to raspberrypi,firmware-gpio
+> ---
+>  .../bindings/gpio/raspberrypi,firmware-gpio.txt    | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
 > new file mode 100644
-> index 000000000000..1b95fbfed348
+> index 000000000000..30326528faa9
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-> @@ -0,0 +1,83 @@
-> +Qualcomm APR (Asynchronous Packet Router) binding
+> +++ b/Documentation/devicetree/bindings/gpio/raspberrypi,firmware-gpio.txt
+> @@ -0,0 +1,29 @@
+> +Raspberry Pi GPIO expander
 > +
-> +This binding describes the Qualcomm APR. APR is a IPC protocol for
-> +communication between Application processor and QDSP. APR is mainly
-> +used for audio/voice services on the QDSP.
+> +The Raspberry Pi 3 GPIO expander is controlled by the VC4 firmware. The
+> +firmware exposes a mailbox interface that allows the ARM core to control the
+> +GPIO lines on the expander.
 > +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be "qcom,apr-v<VERSION-NUMBER>", example "qcom,apr-v2"
+> +Required properties:
 > +
-> +- qcom,apr-dest-domain-id
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: Destination processor ID.
-> +	Possible values are :
-> +			1 - APR simulator
-> +			2 - PC
-> +			3 - MODEM
-> +			4 - ADSP
-> +			5 - APPS
-> +			6 - MODEM2
-> +			7 - APPS2
-> +
-> += APR SERVICES
-> +Each subnode of the APR node can represent service tied to this apr. The name
-> +of the nodes are not important. The properties of these nodes are defined
-> +by the individual bindings for the specific service
-> +- but must contain the following property:
-> +
-> +- qcom,apr-svc-id
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: APR Service ID, used for matching the service.
-> +	Possible values are :
-> +			3 - DSP Core Service
-> +			4 - Audio Front End Service.
-> +			5 - Voice Stream Manager Service.
-> +			6 - Voice processing manager.
-> +			7 - Audio Stream Manager Service.
-> +			8 - Audio Device Manager Service.
-> +			9 - Multimode voice manager.
-> +			10 - Core voice stream.
-> +			11 - Core voice processor.
-> +			12 - Ultrasound stream manager.
-> +			13 - Listen stream manager.
-> +
-> +- qcom,apr-svc-name
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: User readable name of a APR service.
-> +
-> += APR DEVICES:
-> +Each subnode of the APR node can represent devices tied to this apr, like
-> +sound-card. The properties of these nodes are defined by the individual
-> +bindings for the specific device.
+> +- compatible : Should be "raspberrypi,firmware-gpio"
+> +- gpio-controller : Marks the device node as a gpio controller
+> +- #gpio-cells : Should be two.  The first cell is the pin number, and
+> +  the second cell is used to specify the gpio polarity:
+> +  0 = active high
+> +  1 = active low
+> +- firmware : Reference to the RPi firmware device node
 
-It's not a good design generally to mix different types of nodes at one 
-level.
+This is the parent node. You don't need it.
 
 > +
-> += EXAMPLE
-> +The following example represents a QDSP based sound card on a MSM8996 device
-> +which uses apr as communication between Apps and QDSP.
+> +Example:
 > +
-> +	apr {
-> +		compatible = "qcom,apr-v2";
-> +		qcom,smd-channels = "apr_audio_svc";
-> +		qcom,apr-dest-domain-id = <APR_DOMAIN_ADSP>;
+> +firmware: firmware {
+> +	compatible = "raspberrypi,bcm2835-firmware";
+> +	mboxes = <&mailbox>;
+
+No, sorry. /firmware is the container of firmware nodes. So 
+something like this:
+
+firmware {
+	rpi-firmware {
+		compatible = "raspberrypi,bcm2835-firmware";
+		mboxes = <&mailbox>;
+		gpio {
+		 compatible = "raspberrypi,firmware-gpio";
+
+		};
+	};
+};
+
 > +
-> +		q6core {
-> +			compatible = "qcom,q6core";
-> +			qcom,apr-svc-name = "CORE";
-> +			qcom,apr-svc-id = <APR_SVC_ADSP_CORE>;
-> +		};
-> +
-> +		q6afe {
-> +			compatible = "qcom,q6afe";
-> +			qcom,apr-svc-name = "AFE";
-> +			qcom,apr-svc-id = <APR_SVC_AFE>;
-> +		};
-> +
-> +		audio {
-> +			compatible = "qcom,msm8996-snd-card";
-> +			...
-> +		};
-> +	};
+> +	expgpio: gpio {
+> +		 compatible = "raspberrypi,firmware-gpio";
+> +		 gpio-controller;
+> +		 #gpio-cells = <2>;
+> +		 firmware = <&firmware>;
+> +	 };
+> +};
 > -- 
 > 2.15.1
 > 
