@@ -1,32 +1,24 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 13 Feb 2018 19:16:36 +0100
-Subject: [PATCH 01/10] ARM: dts: exynos: Remove "cooling-{min|max}-level"
- for CPU nodes
-In-Reply-To: <f808613a9c7a4f23d3a0c64b6f3d4df1b905b16b.1518166039.git.viresh.kumar@linaro.org>
-References: <cover.1518166039.git.viresh.kumar@linaro.org>
- <f808613a9c7a4f23d3a0c64b6f3d4df1b905b16b.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <20180213181636.dwjyfqcunynonwrf@kozik-lap>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 13 Feb 2018 19:33:30 +0100
+Subject: [PATCH 1/1] iommu/io-pgtable: use size_t return type for all
+ foo_unmap
+In-Reply-To: <1517853559-5869-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1517853559-5869-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <20180213183330.6su6gc3uctpvaa2e@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 02:28:01PM +0530, Viresh Kumar wrote:
-> The "cooling-min-level" and "cooling-max-level" properties are not
-> parsed by any part of the kernel currently and the max cooling state of
-> a CPU cooling device is found by referring to the cpufreq table instead.
+On Mon, Feb 05, 2018 at 11:29:19PM +0530, Vivek Gautam wrote:
+> Unmap returns a size_t all throughout the IOMMU framework.
+> Make io-pgtable match this convention.
+> Moreover, there isn't a need to have a signed int return type
+> as we return 0 in case of failures.
 > 
-> Remove the unused properties from the CPU nodes.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 > ---
->  arch/arm/boot/dts/exynos4210.dtsi      |  2 --
->  arch/arm/boot/dts/exynos4412.dtsi      |  2 --
->  arch/arm/boot/dts/exynos5250.dtsi      |  2 --
->  arch/arm/boot/dts/exynos5420-cpus.dtsi | 16 ----------------
->  arch/arm/boot/dts/exynos5422-cpus.dtsi | 16 ----------------
->  5 files changed, 38 deletions(-)
-> 
+>  drivers/iommu/io-pgtable-arm-v7s.c | 21 +++++++++++----------
+>  drivers/iommu/io-pgtable-arm.c     | 24 ++++++++++++------------
+>  drivers/iommu/io-pgtable.h         |  4 ++--
+>  3 files changed, 25 insertions(+), 24 deletions(-)
 
-Thanks, applied.
-
-Best regards,
-Krzysztof
+Applied, thanks.
