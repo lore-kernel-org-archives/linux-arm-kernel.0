@@ -1,186 +1,425 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 13 Feb 2018 13:53:28 +0100
-Subject: [PATCH v3 02/11] ARM: dts: STi: Move leds node outside soc node
+Date: Tue, 13 Feb 2018 13:53:36 +0100
+Subject: [PATCH v3 10/11] ARM: dts: STi: Update clocks node location
 In-Reply-To: <1518526417-11919-1-git-send-email-patrice.chotard@st.com>
 References: <1518526417-11919-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1518526417-11919-3-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518526417-11919-11-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Leds are not part of soc, so nove them outside soc node.
+Move:
+ _ arm_periph_clk node as child of clockgen-a9 at 92b0000 node
+ _ clk_m_a9_ext2f_div2 node as child of clk_s_c0_flexgen node
+ _ clk-tmdsout-hdmi node outiside soc node
+
 This allows to fix the following warnings when compiling
 dtb with W=1 option :
 
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/leds missing or empty reg/ranges property
-
 arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/leds missing or empty reg/ranges property
+Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
 
 arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/leds missing or empty reg/ranges property
+Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
 
-v3: _ none
-v2: _ none
+v3: _ update location of some clocks node and remove the fake reg property
+    _ merge previous patch 10 and 11
+v2: _ add a fake reg property to node without reg property.
 
- arch/arm/boot/dts/stih410-b2260.dts  | 49 ++++++++++++++++++------------------
- arch/arm/boot/dts/stih418-b2199.dts  | 26 +++++++++----------
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 26 +++++++++----------
- 3 files changed, 50 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index faafc7b12951..69c2abcaeda8 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -29,36 +29,35 @@
- 		ethernet0 = &ethernet0;
- 	};
- 
--	soc {
--
--		leds {
--			compatible = "gpio-leds";
--			user_green_1 {
--				label = "User_green_1";
--				gpios = <&pio1 3 GPIO_ACTIVE_LOW>;
--				linux,default-trigger = "heartbeat";
--				default-state = "off";
--			};
-+	leds {
-+		compatible = "gpio-leds";
-+		user_green_1 {
-+			label = "User_green_1";
-+			gpios = <&pio1 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
- 
--			user_green_2 {
--				label = "User_green_2";
--				gpios = <&pio4 1 GPIO_ACTIVE_LOW>;
--				default-state = "off";
--			};
-+		user_green_2 {
-+			label = "User_green_2";
-+			gpios = <&pio4 1 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
- 
--			user_green_3 {
--				label = "User_green_3";
--				gpios = <&pio2 1 GPIO_ACTIVE_LOW>;
--				default-state = "off";
--			};
-+		user_green_3 {
-+			label = "User_green_3";
-+			gpios = <&pio2 1 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
- 
--			user_green_4 {
--				label = "User_green_4";
--				gpios = <&pio2 5 GPIO_ACTIVE_LOW>;
--				default-state = "off";
--			};
-+		user_green_4 {
-+			label = "User_green_4";
-+			gpios = <&pio2 5 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
- 		};
-+	};
- 
-+	soc {
- 		/* Low speed expansion connector */
- 		uart0: serial at 9830000 {
- 			label = "LS-UART0";
-diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
-index 5418a0ece659..1ce38ce79952 100644
---- a/arch/arm/boot/dts/stih418-b2199.dts
-+++ b/arch/arm/boot/dts/stih418-b2199.dts
-@@ -28,24 +28,24 @@
- 		ethernet0 = &ethernet0;
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		red {
-+			label = "Front Panel LED";
-+			gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+		green {
-+			gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
- 	soc {
- 		sbc_serial0: serial at 9530000 {
- 			status = "okay";
- 		};
- 
--		leds {
--			compatible = "gpio-leds";
--			red {
--				label = "Front Panel LED";
--				gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
--				linux,default-trigger = "heartbeat";
--			};
--			green {
--				gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
--				default-state = "off";
--			};
--		};
--
- 		i2c at 9842000 {
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 68783e8223b8..1fd3a2b5b938 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -10,24 +10,24 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/media/c8sectpfe.h>
+ arch/arm/boot/dts/stih407-clock.dtsi | 79 +++++++++++++++++-----------------
+ arch/arm/boot/dts/stih410-clock.dtsi | 83 ++++++++++++++++++------------------
+ arch/arm/boot/dts/stih418-clock.dtsi | 82 +++++++++++++++++------------------
+ 3 files changed, 122 insertions(+), 122 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index b882dcf3a649..084c02926f33 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -7,33 +7,27 @@
+  */
+ #include <dt-bindings/clock/stih407-clks.h>
  / {
-+	leds {
-+		compatible = "gpio-leds";
-+		red {
-+			label = "Front Panel LED";
-+			gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+		green {
-+			gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
++	/*
++	 * Fixed 30MHz oscillator inputs to SoC
++	 */
++	clk_sysin: clk-sysin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <30000000>;
 +	};
 +
- 	soc {
- 		sbc_serial0: serial at 9530000 {
- 			status = "okay";
- 		};
++	clk_tmdsout_hdmi: clk-tmdsout-hdmi {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <0>;
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
  
--		leds {
--			compatible = "gpio-leds";
--			red {
--				label = "Front Panel LED";
--				gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
--				linux,default-trigger = "heartbeat";
--			};
--			green {
--				gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
--				default-state = "off";
--			};
+ 		/*
+-		 * Fixed 30MHz oscillator inputs to SoC
+-		 */
+-		clk_sysin: clk-sysin {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <30000000>;
 -		};
 -
- 		pwm0: pwm at 9810000 {
- 			status = "okay";
+-		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		arm_periph_clk: clk-m-a9-periphs {
+-			#clock-cells = <0>;
+-			compatible = "fixed-factor-clock";
+-
+-			clocks = <&clk_m_a9>;
+-			clock-div = <2>;
+-			clock-mult = <1>;
+-		};
+-
+-		/*
+ 		 * A9 PLL.
+ 		 */
+ 		clockgen-a9 at 92b0000 {
+@@ -62,21 +56,19 @@
+ 				 <&clockgen_a9_pll 0>,
+ 				 <&clk_s_c0_flexgen 13>,
+ 				 <&clk_m_a9_ext2f_div2>;
+-		};
+-
+-		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		clk_m_a9_ext2f_div2: clk-m-a9-ext2f-div2s {
+-			#clock-cells = <0>;
+-			compatible = "fixed-factor-clock";
+ 
+-			clocks = <&clk_s_c0_flexgen 13>;
+ 
+-			clock-output-names = "clk-m-a9-ext2f-div2";
++			/*
++			 * ARM Peripheral clock for timers
++			 */
++			arm_periph_clk: clk-m-a9-periphs {
++				#clock-cells = <0>;
++				compatible = "fixed-factor-clock";
+ 
+-			clock-div = <2>;
+-			clock-mult = <1>;
++				clocks = <&clk_m_a9>;
++				clock-div = <2>;
++				clock-mult = <1>;
++			};
  		};
+ 
+ 		/*
+@@ -204,6 +196,21 @@
+ 						 <CLK_EXT2F_A9>,
+ 						 <CLK_ICN_LMI>,
+ 						 <CLK_ICN_SBC>;
++
++				/*
++				 * ARM Peripheral clock for timers
++				 */
++				clk_m_a9_ext2f_div2: clk-m-a9-ext2f-div2s {
++					#clock-cells = <0>;
++					compatible = "fixed-factor-clock";
++
++					clocks = <&clk_s_c0_flexgen 13>;
++
++					clock-output-names = "clk-m-a9-ext2f-div2";
++
++					clock-div = <2>;
++					clock-mult = <1>;
++				};
+ 			};
+ 		};
+ 
+@@ -254,12 +261,6 @@
+ 					     "clk-s-d2-fs0-ch3";
+ 		};
+ 
+-		clk_tmdsout_hdmi: clk-tmdsout-hdmi {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <0>;
+-		};
+-
+ 		clockgen-d2 at 9106000 {
+ 			compatible = "st,clkgen-c32";
+ 			reg = <0x9106000 0x1000>;
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index 4df1b2187aa2..b2c814f1261a 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -7,6 +7,22 @@
+  */
+ #include <dt-bindings/clock/stih410-clks.h>
+ / {
++	/*
++	 * Fixed 30MHz oscillator inputs to SoC
++	 */
++	clk_sysin: clk-sysin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <30000000>;
++		clock-output-names = "CLK_SYSIN";
++	};
++
++	clk_tmdsout_hdmi: clk-tmdsout-hdmi {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <0>;
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -15,27 +31,6 @@
+ 		compatible = "st,stih410-clk", "simple-bus";
+ 
+ 		/*
+-		 * Fixed 30MHz oscillator inputs to SoC
+-		 */
+-		clk_sysin: clk-sysin {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <30000000>;
+-			clock-output-names = "CLK_SYSIN";
+-		};
+-
+-		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		arm_periph_clk: clk-m-a9-periphs {
+-			#clock-cells = <0>;
+-			compatible = "fixed-factor-clock";
+-			clocks = <&clk_m_a9>;
+-			clock-div = <2>;
+-			clock-mult = <1>;
+-		};
+-
+-		/*
+ 		 * A9 PLL.
+ 		 */
+ 		clockgen-a9 at 92b0000 {
+@@ -64,21 +59,16 @@
+ 				 <&clockgen_a9_pll 0>,
+ 				 <&clk_s_c0_flexgen 13>,
+ 				 <&clk_m_a9_ext2f_div2>;
+-		};
+-
+-		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		clk_m_a9_ext2f_div2: clk-m-a9-ext2f-div2s {
+-			#clock-cells = <0>;
+-			compatible = "fixed-factor-clock";
+-
+-			clocks = <&clk_s_c0_flexgen 13>;
+-
+-			clock-output-names = "clk-m-a9-ext2f-div2";
+-
+-			clock-div = <2>;
+-			clock-mult = <1>;
++			/*
++			 * ARM Peripheral clock for timers
++			 */
++			arm_periph_clk: clk-m-a9-periphs {
++				#clock-cells = <0>;
++				compatible = "fixed-factor-clock";
++				clocks = <&clk_m_a9>;
++				clock-div = <2>;
++				clock-mult = <1>;
++			};
+ 		};
+ 
+ 		/*
+@@ -214,6 +204,21 @@
+ 						 <CLK_EXT2F_A9>,
+ 						 <CLK_ICN_LMI>,
+ 						 <CLK_ICN_SBC>;
++
++				/*
++				 * ARM Peripheral clock for timers
++				 */
++				clk_m_a9_ext2f_div2: clk-m-a9-ext2f-div2s {
++					#clock-cells = <0>;
++					compatible = "fixed-factor-clock";
++
++					clocks = <&clk_s_c0_flexgen 13>;
++
++					clock-output-names = "clk-m-a9-ext2f-div2";
++
++					clock-div = <2>;
++					clock-mult = <1>;
++				};
+ 			};
+ 		};
+ 
+@@ -266,12 +271,6 @@
+ 					     "clk-s-d2-fs0-ch3";
+ 		};
+ 
+-		clk_tmdsout_hdmi: clk-tmdsout-hdmi {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <0>;
+-		};
+-
+ 		clockgen-d2 at 9106000 {
+ 			compatible = "st,clkgen-c32";
+ 			reg = <0x9106000 0x1000>;
+diff --git a/arch/arm/boot/dts/stih418-clock.dtsi b/arch/arm/boot/dts/stih418-clock.dtsi
+index e68bf28bd038..a192608ff689 100644
+--- a/arch/arm/boot/dts/stih418-clock.dtsi
++++ b/arch/arm/boot/dts/stih418-clock.dtsi
+@@ -7,6 +7,22 @@
+  */
+ #include <dt-bindings/clock/stih418-clks.h>
+ / {
++	/*
++	 * Fixed 30MHz oscillator inputs to SoC
++	 */
++	clk_sysin: clk-sysin {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <30000000>;
++		clock-output-names = "CLK_SYSIN";
++	};
++
++	clk_tmdsout_hdmi: clk-tmdsout-hdmi {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <0>;
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -15,27 +31,6 @@
+ 		compatible = "st,stih418-clk", "simple-bus";
+ 
+ 		/*
+-		 * Fixed 30MHz oscillator inputs to SoC
+-		 */
+-		clk_sysin: clk-sysin {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <30000000>;
+-			clock-output-names = "CLK_SYSIN";
+-		};
+-
+-		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		arm_periph_clk: clk-m-a9-periphs {
+-			#clock-cells = <0>;
+-			compatible = "fixed-factor-clock";
+-			clocks = <&clk_m_a9>;
+-			clock-div = <2>;
+-			clock-mult = <1>;
+-		};
+-
+-		/*
+ 		 * A9 PLL.
+ 		 */
+ 		clockgen-a9 at 92b0000 {
+@@ -64,21 +59,17 @@
+ 				 <&clockgen_a9_pll 0>,
+ 				 <&clk_s_c0_flexgen 13>,
+ 				 <&clk_m_a9_ext2f_div2>;
+-		};
+ 
+-		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		clk_m_a9_ext2f_div2: clk-m-a9-ext2f-div2s {
+-			#clock-cells = <0>;
+-			compatible = "fixed-factor-clock";
+-
+-			clocks = <&clk_s_c0_flexgen 13>;
+-
+-			clock-output-names = "clk-m-a9-ext2f-div2";
+-
+-			clock-div = <2>;
+-			clock-mult = <1>;
++			/*
++			 * ARM Peripheral clock for timers
++			 */
++			arm_periph_clk: clk-m-a9-periphs {
++				#clock-cells = <0>;
++				compatible = "fixed-factor-clock";
++				clocks = <&clk_m_a9>;
++				clock-div = <2>;
++				clock-mult = <1>;
++			};
+ 		};
+ 
+ 		/*
+@@ -207,6 +198,21 @@
+ 						     "clk-proc-mixer",
+ 						     "clk-proc-sc",
+ 						     "clk-avsp-hevc";
++
++				/*
++				 * ARM Peripheral clock for timers
++				 */
++				clk_m_a9_ext2f_div2: clk-m-a9-ext2f-div2s {
++					#clock-cells = <0>;
++					compatible = "fixed-factor-clock";
++
++					clocks = <&clk_s_c0_flexgen 13>;
++
++					clock-output-names = "clk-m-a9-ext2f-div2";
++
++					clock-div = <2>;
++					clock-mult = <1>;
++				};
+ 			};
+ 		};
+ 
+@@ -259,12 +265,6 @@
+ 					     "clk-s-d2-fs0-ch3";
+ 		};
+ 
+-		clk_tmdsout_hdmi: clk-tmdsout-hdmi {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <0>;
+-		};
+-
+ 		clockgen-d2 at 9106000 {
+ 			compatible = "st,clkgen-c32";
+ 			reg = <0x9106000 0x1000>;
 -- 
 1.9.1
