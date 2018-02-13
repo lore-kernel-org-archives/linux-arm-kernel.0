@@ -1,299 +1,189 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 13 Feb 2018 21:28:06 +0800
-Subject: [PATCH RESEND V3 1/9] clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk
- support
+Date: Tue, 13 Feb 2018 21:28:13 +0800
+Subject: [PATCH RESEND V3 8/9] clk: imx: implement new clk_hw based APIs
 In-Reply-To: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
 References: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1518528494-25723-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1518528494-25723-9-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For dividers with zero indicating clock is disabled, instead of giving a
-warning each time like "clkx: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not
-set" in exist code, we'd like to introduce enable/disable function for it.
-e.g.
-000b - Clock disabled
-001b - Divide by 1
-010b - Divide by 2
-...
+Clock providers are recommended to use the new struct clk_hw based API,
+so implement IMX clk_hw based provider helpers functions to the new
+approach.
 
-Set rate when the clk is disabled will cache the rate request and only
-when the clk is enabled will the driver actually program the hardware to
-have the requested divider value. Similarly, when the clk is disabled we'll
-write a 0 there, but when the clk is enabled we'll restore whatever rate
-(divider) was chosen last.
-
-It does mean that recalc rate will be sort of odd, because when the clk is
-off it will return 0, and when the clk is on it will return the right rate.
-So to make things work, we'll need to return the cached rate in recalc rate
-when the clk is off and read the hardware when the clk is on.
-
-NOTE for the default off divider, the recalc rate will still return 0 as
-there's still no proper preset rate. Enable such divider will give user
-a reminder error message.
-
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
 ChangeLog:
 v2->v3:
- * split normal and gate ops
- * fix the possible racy
-v1->v2:
- * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+ * no changes
+v1->v2:  new patches
 ---
- drivers/clk/clk-divider.c    | 152 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |   9 +++
- 2 files changed, 161 insertions(+)
+ drivers/clk/imx/clk.c | 22 ++++++++++++++++++
+ drivers/clk/imx/clk.h | 62 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index b49942b..6143895 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -124,6 +124,9 @@ unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
- 
- 	div = _get_div(table, val, flags, width);
- 	if (!div) {
-+		if (flags & CLK_DIVIDER_ZERO_GATE)
-+			return 0;
-+
- 		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
- 			"%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
- 			clk_hw_get_name(hw));
-@@ -147,6 +150,34 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
- 				   divider->flags, divider->width);
+diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
+index 9074e69..1efed86 100644
+--- a/drivers/clk/imx/clk.c
++++ b/drivers/clk/imx/clk.c
+@@ -18,6 +18,16 @@ void __init imx_check_clocks(struct clk *clks[], unsigned int count)
+ 			       i, PTR_ERR(clks[i]));
  }
  
-+static unsigned long clk_divider_gate_recalc_rate(struct clk_hw *hw,
-+						  unsigned long parent_rate)
++void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count)
 +{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	unsigned int val;
++	unsigned int i;
 +
-+	if (divider->lock)
-+		spin_lock_irqsave(divider->lock, flags);
-+	else
-+		__acquire(divider->lock);
-+
-+	if (!clk_hw_is_enabled(hw)) {
-+		val = divider->cached_val;
-+	} else {
-+		val = clk_readl(divider->reg) >> divider->shift;
-+		val &= div_mask(divider->width);
-+	}
-+
-+	if (divider->lock)
-+		spin_unlock_irqrestore(divider->lock, flags);
-+	else
-+		__release(divider->lock);
-+
-+	return divider_recalc_rate(hw, parent_rate, val, divider->table,
-+				   divider->flags, divider->width);
++	for (i = 0; i < count; i++)
++		if (IS_ERR(clks[i]))
++			pr_err("i.MX clk %u: register failed with %ld\n",
++			       i, PTR_ERR(clks[i]));
 +}
 +
- static bool _is_valid_table_div(const struct clk_div_table *table,
- 							 unsigned int div)
+ static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
  {
-@@ -415,6 +446,108 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
+ 	struct of_phandle_args phandle;
+@@ -49,6 +59,18 @@ struct clk * __init imx_obtain_fixed_clock(
+ 	return clk;
  }
  
-+static int clk_divider_gate_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
++struct clk_hw * __init imx_obtain_fixed_clk_hw(struct device_node *np,
++					       const char *name)
 +{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	int value;
-+	u32 val;
++	struct clk *clk;
 +
-+	value = divider_get_val(rate, parent_rate, divider->table,
-+				divider->width, divider->flags);
-+	if (value < 0)
-+		return value;
++	clk = of_clk_get_by_name(np, name);
++	if (IS_ERR(clk))
++		return ERR_PTR(-ENOENT);
 +
-+	if (divider->lock)
-+		spin_lock_irqsave(divider->lock, flags);
-+	else
-+		__acquire(divider->lock);
-+
-+	if (clk_hw_is_enabled(hw)) {
-+		if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
-+			val = div_mask(divider->width) << (divider->shift + 16);
-+		} else {
-+			val = clk_readl(divider->reg);
-+			val &= ~(div_mask(divider->width) << divider->shift);
-+		}
-+		val |= (u32)value << divider->shift;
-+		clk_writel(val, divider->reg);
-+	} else {
-+		divider->cached_val = value;
-+	}
-+
-+	if (divider->lock)
-+		spin_unlock_irqrestore(divider->lock, flags);
-+	else
-+		__release(divider->lock);
-+
-+	return 0;
++	return __clk_get_hw(clk);
 +}
 +
-+static int clk_divider_enable(struct clk_hw *hw)
+ /*
+  * This fixups the register CCM_CSCMR1 write value.
+  * The write/read/divider values of the aclk_podf field
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 956155c..3d58420 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -8,6 +8,7 @@
+ extern spinlock_t imx_ccm_lock;
+ 
+ void imx_check_clocks(struct clk *clks[], unsigned int count);
++void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count);
+ void imx_register_uart_clocks(struct clk ** const clks[]);
+ 
+ extern void imx_cscmr1_fixup(u32 *val);
+@@ -54,6 +55,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ struct clk * imx_obtain_fixed_clock(
+ 			const char *name, unsigned long rate);
+ 
++struct clk_hw *imx_obtain_fixed_clk_hw(struct device_node *np,
++				       const char *name);
++
+ struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
+ 	 void __iomem *reg, u8 shift, u32 exclusive_mask);
+ 
+@@ -90,6 +94,16 @@ static inline struct clk *imx_clk_fixed(const char *name, int rate)
+ 	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_fixed(const char *name, int rate)
 +{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	u32 val;
-+
-+	if (!divider->cached_val) {
-+		pr_err("%s: no valid preset rate\n", clk_hw_get_name(hw));
-+		return -EINVAL;
-+	}
-+
-+	if (divider->lock)
-+		spin_lock_irqsave(divider->lock, flags);
-+	else
-+		__acquire(divider->lock);
-+
-+	/* restore div val */
-+	val = clk_readl(divider->reg);
-+	val |= divider->cached_val << divider->shift;
-+	clk_writel(val, divider->reg);
-+
-+	if (divider->lock)
-+		spin_unlock_irqrestore(divider->lock, flags);
-+	else
-+		__release(divider->lock);
-+
-+	return 0;
++	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
 +}
 +
-+static void clk_divider_disable(struct clk_hw *hw)
++static inline struct clk_hw *imx_get_clk_hw_fixed(const char *name, int rate)
 +{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	u32 val;
-+
-+	if (divider->lock)
-+		spin_lock_irqsave(divider->lock, flags);
-+	else
-+		__acquire(divider->lock);
-+
-+	/* store the current div val */
-+	val = clk_readl(divider->reg) >> divider->shift;
-+	val &= div_mask(divider->width);
-+	divider->cached_val = val;
-+	clk_writel(0, divider->reg);
-+
-+	if (divider->lock)
-+		spin_unlock_irqrestore(divider->lock, flags);
-+	else
-+		__release(divider->lock);
++	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
 +}
 +
-+static int clk_divider_is_enabled(struct clk_hw *hw)
+ static inline struct clk *imx_clk_mux_ldb(const char *name, void __iomem *reg,
+ 			u8 shift, u8 width, const char * const *parents,
+ 			int num_parents)
+@@ -113,6 +127,15 @@ static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
+ 
++static inline struct clk_hw *imx_clk_hw_divider(const char *name,
++						const char *parent,
++						void __iomem *reg, u8 shift,
++						u8 width)
 +{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	u32 val;
-+
-+	val = clk_readl(divider->reg) >> divider->shift;
-+	val &= div_mask(divider->width);
-+
-+	return val ? 1 : 0;
++	return clk_hw_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
++				       reg, shift, width, 0, &imx_ccm_lock);
 +}
 +
- const struct clk_ops clk_divider_ops = {
- 	.recalc_rate = clk_divider_recalc_rate,
- 	.round_rate = clk_divider_round_rate,
-@@ -422,6 +555,16 @@ const struct clk_ops clk_divider_ops = {
- };
- EXPORT_SYMBOL_GPL(clk_divider_ops);
+ static inline struct clk *imx_clk_divider_flags(const char *name,
+ 		const char *parent, void __iomem *reg, u8 shift, u8 width,
+ 		unsigned long flags)
+@@ -121,6 +144,15 @@ static inline struct clk *imx_clk_divider_flags(const char *name,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
  
-+const struct clk_ops clk_divider_gate_ops = {
-+	.recalc_rate = clk_divider_gate_recalc_rate,
-+	.round_rate = clk_divider_round_rate,
-+	.set_rate = clk_divider_gate_set_rate,
-+	.enable = clk_divider_enable,
-+	.disable = clk_divider_disable,
-+	.is_enabled = clk_divider_is_enabled,
-+};
-+EXPORT_SYMBOL_GPL(clk_divider_gate_ops);
++static inline struct clk_hw *imx_clk_hw_divider_flags(const char *name,
++						   const char *parent,
++						   void __iomem *reg, u8 shift,
++						   u8 width, unsigned long flags)
++{
++	return clk_hw_register_divider(NULL, name, parent, flags,
++				       reg, shift, width, 0, &imx_ccm_lock);
++}
 +
- const struct clk_ops clk_divider_ro_ops = {
- 	.recalc_rate = clk_divider_recalc_rate,
- 	.round_rate = clk_divider_round_rate,
-@@ -437,6 +580,7 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
- 	struct clk_divider *div;
- 	struct clk_hw *hw;
- 	struct clk_init_data init;
-+	u32 val;
- 	int ret;
+ static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift, u8 width)
+ {
+@@ -136,6 +168,13 @@ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
+ 			shift, 0, &imx_ccm_lock);
+ }
  
- 	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
-@@ -454,6 +598,8 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
- 	init.name = name;
- 	if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
- 		init.ops = &clk_divider_ro_ops;
-+	else if (clk_divider_flags & CLK_DIVIDER_ZERO_GATE)
-+		init.ops = &clk_divider_gate_ops;
- 	else
- 		init.ops = &clk_divider_ops;
- 	init.flags = flags | CLK_IS_BASIC;
-@@ -469,6 +615,12 @@ static struct clk_hw *_register_divider(struct device *dev, const char *name,
- 	div->hw.init = &init;
- 	div->table = table;
- 
-+	if (div->flags & CLK_DIVIDER_ZERO_GATE) {
-+		val = clk_readl(reg) >> shift;
-+		val &= div_mask(width);
-+		div->cached_val = val;
-+	}
++static inline struct clk_hw *imx_clk_hw_gate(const char *name, const char *parent,
++					     void __iomem *reg, u8 shift)
++{
++	return clk_hw_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++				    shift, 0, &imx_ccm_lock);
++}
 +
- 	/* register the clock */
- 	hw = &div->hw;
- 	ret = clk_hw_register(dev, hw);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index f711be6..68ccd36 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -360,6 +360,7 @@ struct clk_div_table {
-  * @shift:	shift to the divider bit field
-  * @width:	width of the divider bit field
-  * @table:	array of value/divider pairs, last entry should have div = 0
-+ * @cached_val: cached div hw value used for CLK_DIVIDER_ZERO_GATE
-  * @lock:	register lock
-  *
-  * Clock with an adjustable divider affecting its output frequency.  Implements
-@@ -388,6 +389,12 @@ struct clk_div_table {
-  * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
-  *	except when the value read from the register is zero, the divisor is
-  *	2^width of the field.
-+ * CLK_DIVIDER_ZERO_GATE - For dividers which are like CLK_DIVIDER_ONE_BASED
-+ *	when the value read from the register is zero, it means the divisor
-+ *	is gated. For this case, the cached_val will be used to store the
-+ *	intermediate div for the normal rate operation, like set_rate/get_rate/
-+ *	recalc_rate. When the divider is ungated, the driver will actually
-+ *	program the hardware to have the requested divider value.
-  */
- struct clk_divider {
- 	struct clk_hw	hw;
-@@ -396,6 +403,7 @@ struct clk_divider {
- 	u8		width;
- 	u8		flags;
- 	const struct clk_div_table	*table;
-+	u32		cached_val;
- 	spinlock_t	*lock;
- };
+ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
+@@ -208,6 +247,17 @@ static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
+ 			reg, shift, width, 0, &imx_ccm_lock);
+ }
  
-@@ -408,6 +416,7 @@ struct clk_divider {
- #define CLK_DIVIDER_ROUND_CLOSEST	BIT(4)
- #define CLK_DIVIDER_READ_ONLY		BIT(5)
- #define CLK_DIVIDER_MAX_AT_ZERO		BIT(6)
-+#define CLK_DIVIDER_ZERO_GATE		BIT(7)
++static inline struct clk_hw *imx_clk_hw_mux2(const char *name, void __iomem *reg,
++					     u8 shift, u8 width,
++					     const char * const *parents,
++					     int num_parents)
++{
++	return clk_hw_register_mux(NULL, name, parents, num_parents,
++				   CLK_SET_RATE_NO_REPARENT |
++				   CLK_OPS_PARENT_ENABLE,
++				   reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 			void __iomem *reg, u8 shift, u8 width,
+ 			const char * const *parents, int num_parents,
+@@ -218,6 +268,18 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
+ 			&imx_ccm_lock);
+ }
  
- extern const struct clk_ops clk_divider_ops;
- extern const struct clk_ops clk_divider_ro_ops;
++static inline struct clk_hw *imx_clk_hw_mux_flags(const char *name,
++						  void __iomem *reg, u8 shift,
++						  u8 width,
++						  const char * const *parents,
++						  int num_parents,
++						  unsigned long flags)
++{
++	return clk_hw_register_mux(NULL, name, parents, num_parents,
++				   flags | CLK_SET_RATE_NO_REPARENT,
++				   reg, shift, width, 0, &imx_ccm_lock);
++}
++
+ struct clk *imx_clk_cpu(const char *name, const char *parent_name,
+ 		struct clk *div, struct clk *mux, struct clk *pll,
+ 		struct clk *step);
 -- 
 2.7.4
