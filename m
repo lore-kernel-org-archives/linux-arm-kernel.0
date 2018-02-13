@@ -1,107 +1,95 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Tue, 13 Feb 2018 22:01:56 +0900
-Subject: [PATCH v3 3/3] arm64: dts: uniphier: add compress audio out for
- UniPhier LD11/LD20
-In-Reply-To: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
-References: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180213130156.27827-4-suzuki.katsuhiro@socionext.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Tue, 13 Feb 2018 13:02:44 +0000
+Subject: [PATCH v6 09/26] soc: renesas: rcar-rst: Enable watchdog as reset
+ trigger for Gen2
+In-Reply-To: <20180213081910.x5llcsmwza44u4ow@verge.net.au>
+References: <20180213081910.x5llcsmwza44u4ow@verge.net.au>
+Message-ID: <1518526964-7400-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds compress audio node for S/PDIF on UniPhier LD11/20
-global boards. And adds settings of AIO for it.
+This patch allows for platform specific quirks as some of the SoC need
+further customization for the watchdog to work properly, like for R-Car
+Gen2 and for RZ/G.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 ---
+v5->v6:
+* rebased on top of renesas-devel-20180213-v4.16-rc1
 
-Changes in v3:
-  - Move comp-spdif-out node to root from soc node
-  - Use phandle of endpoint directly instead of port node
----
- arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 18 +++++++++++++++++-
- arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 18 +++++++++++++++++-
- 2 files changed, 34 insertions(+), 2 deletions(-)
+ drivers/soc/renesas/rcar-rst.c | 37 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 30 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-index f057ee80f38e..875d05b1356e 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-@@ -47,7 +47,8 @@
- 		dais = <&i2s_port2
- 			&i2s_port3
- 			&i2s_port4
--			&spdif_port0>;
-+			&spdif_port0
-+			&comp_spdif_port0>;
- 	};
+diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+index e2340eb..3413666 100644
+--- a/drivers/soc/renesas/rcar-rst.c
++++ b/drivers/soc/renesas/rcar-rst.c
+@@ -13,8 +13,18 @@
+ #include <linux/of_address.h>
+ #include <linux/soc/renesas/rcar-rst.h>
  
- 	spdif-out {
-@@ -60,6 +61,17 @@
- 			};
- 		};
- 	};
++#define WDTRSTCR_RESET		0xA55A0002
++#define WDTRSTCR		0x0054
 +
-+	comp-spdif-out {
-+		compatible = "linux,spdif-dit";
-+		#sound-dai-cells = <0>;
++static int rcar_rst_enable_wdt_reset(void __iomem *base)
++{
++	iowrite32(WDTRSTCR_RESET, base + WDTRSTCR);
++	return 0;
++}
 +
-+		port at 0 {
-+			comp_spdif_tx: endpoint {
-+				remote-endpoint = <&comp_spdif_hiecout1>;
-+			};
-+		};
-+	};
+ struct rst_config {
+-	unsigned int modemr;	/* Mode Monitoring Register Offset */
++	unsigned int modemr;		/* Mode Monitoring Register Offset */
++	int (*configure)(void *base);	/* Platform specific configuration */
  };
  
- &serial0 {
-@@ -118,3 +130,7 @@
- &spdif_hiecout1 {
- 	remote-endpoint = <&spdif_tx>;
- };
-+
-+&comp_spdif_hiecout1 {
-+	remote-endpoint = <&comp_spdif_tx>;
+ static const struct rst_config rcar_rst_gen1 __initconst = {
+@@ -23,6 +33,11 @@ static const struct rst_config rcar_rst_gen1 __initconst = {
+ 
+ static const struct rst_config rcar_rst_gen2 __initconst = {
+ 	.modemr = 0x60,
++	.configure = rcar_rst_enable_wdt_reset,
 +};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-index b2e197bc968c..34537f9dce82 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-@@ -47,7 +47,8 @@
- 		dais = <&i2s_port2
- 			&i2s_port3
- 			&i2s_port4
--			&spdif_port0>;
-+			&spdif_port0
-+			&comp_spdif_port0>;
- 	};
- 
- 	spdif-out {
-@@ -60,6 +61,17 @@
- 			};
- 		};
- 	};
 +
-+	comp-spdif-out {
-+		compatible = "linux,spdif-dit";
-+		#sound-dai-cells = <0>;
-+
-+		port at 0 {
-+			comp_spdif_tx: endpoint {
-+				remote-endpoint = <&comp_spdif_hiecout1>;
-+			};
-+		};
-+	};
++static const struct rst_config rcar_rst_gen3 __initconst = {
++	.modemr = 0x60,
  };
  
- &serial0 {
-@@ -100,3 +112,7 @@
- &spdif_hiecout1 {
- 	remote-endpoint = <&spdif_tx>;
+ static const struct of_device_id rcar_rst_matches[] __initconst = {
+@@ -38,12 +53,12 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
+ 	{ .compatible = "renesas,r8a7792-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a7793-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a7794-rst", .data = &rcar_rst_gen2 },
+-	/* R-Car Gen3 is handled like R-Car Gen2 */
+-	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen2 },
++	/* R-Car Gen3 */
++	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen3 },
+ 	{ /* sentinel */ }
  };
-+
-+&comp_spdif_hiecout1 {
-+	remote-endpoint = <&comp_spdif_tx>;
-+};
+ 
+@@ -72,6 +87,14 @@ static int __init rcar_rst_init(void)
+ 	rcar_rst_base = base;
+ 	cfg = match->data;
+ 	saved_mode = ioread32(base + cfg->modemr);
++	if (cfg->configure) {
++		error = cfg->configure(base);
++		if (error) {
++			pr_warn("%pOF: Cannot run SoC specific configuration\n",
++				np);
++			goto out_put;
++		}
++	}
+ 
+ 	pr_debug("%pOF: MODE = 0x%08x\n", np, saved_mode);
+ 
 -- 
-2.15.1
+2.7.4
