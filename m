@@ -1,29 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 13 Feb 2018 16:54:22 +0100
-Subject: [PATCH 6/9] ARM: dts: kirkwood: Fix "debounce-interval" property
- misspelling
-In-Reply-To: <1518531335-5170-7-git-send-email-geert+renesas@glider.be>
-References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
- <1518531335-5170-7-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180213155422.GC1325@lunn.ch>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 14 Feb 2018 01:06:49 +0900
+Subject: [PATCH v3 0/3] add UniPhier audio nodes
+In-Reply-To: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
+References: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CAK7LNARaJB-ymtj3b0XQn0P7yo7se0CXgCCO6pb5oKEhCxf4CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 03:15:32PM +0100, Geert Uytterhoeven wrote:
-> "debounce_interval" was never supported.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+2018-02-13 22:01 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> This series adds device-tree nodes for Socionext audio system
+> for UniPhier LD11/LD20 SoCs. This one enables I2S output for
+> Line-In, Line-Out, S/PDIF output and compress audio output.
+>
+> Katsuhiro Suzuki (3):
+>   arm64: dts: uniphier: add sound node for UniPhier
+>   arm64: dts: uniphier: add speaker out for UniPhier LD11/LD20 boards
+>   arm64: dts: uniphier: add compress audio out for UniPhier LD11/LD20
 
-Hi Geert
 
-Did you notice
-Documentation/devicetree/bindings/power/wakeup-source.txt ?  It has
-the same problem.
+Series, applied to linux-uniphier.  Thanks!
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Note, I locally fixed trivial things:
+ - Use #include <...> instead of #include "..." to include dt-binding header
+ - Fix DTC warnings (Character '_' not recommended in node)
+ - Remove unused labels such as 'audio', 'evea'
 
-    Andrew
+
+
+>  .../boot/dts/socionext/uniphier-ld11-global.dts    | 62 ++++++++++++++
+>  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 92 +++++++++++++++++++++
+>  .../boot/dts/socionext/uniphier-ld20-global.dts    | 62 ++++++++++++++
+>  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 96 ++++++++++++++++++++++
+>  4 files changed, 312 insertions(+)
+>
+> --
+> 2.15.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
