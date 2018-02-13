@@ -1,49 +1,59 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Tue, 13 Feb 2018 11:12:19 -0800
-Subject: [PATCH v9 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <CAKKbWA6Otc1ZO_yHpfhxPjbgvvn-QXcXG9sy5=3FZDY8d_20rw@mail.gmail.com>
-References: <20180205235757.246758-1-brendanhiggins@google.com>
- <20180205235757.246758-3-brendanhiggins@google.com>
- <CAK8P3a0SJTAkv7_QtDW1sDWFDYHw8tFWZqO6EMwpZ_5KPbhq3Q@mail.gmail.com>
- <CAKKbWA6Otc1ZO_yHpfhxPjbgvvn-QXcXG9sy5=3FZDY8d_20rw@mail.gmail.com>
-Message-ID: <CAFd5g44iHgSoPfko6hgMjz=QMm6ZUScUWbnho1w0bL_brTCjrA@mail.gmail.com>
+From: kbingham@kernel.org (Kieran Bingham)
+Date: Tue, 13 Feb 2018 19:30:34 +0000
+Subject: [PATCH v2 1/4] arm64: dts: renesas: r8a77995: add FCPV nodes
+In-Reply-To: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
+References: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
+Message-ID: <1518550237-16753-2-git-send-email-kbingham@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 1:29 AM, Avi Fishman <avifishman70@gmail.com> wrote:
-> On Tue, Feb 13, 2018 at 10:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tue, Feb 6, 2018 at 12:57 AM, Brendan Higgins
->> <brendanhiggins@google.com> wrote:
->>> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
->>> specific device tree for the NPCM750 (Poleg) evaluation board.
->>>
->>> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
->>> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
->>> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
->>> Reviewed-by: Joel Stanley <joel@jms.id.au>
->>> Reviewed-by: Rob Herring <robh@kernel.org>
->>> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
->>> Tested-by: Avi Fishman <avifishman70@gmail.com>
->> ...
->>> +               enable-method = "nuvoton,npcm7xx-smp";
->>
->> I see this has already been reviewed quite a bit, but I'm curious
->> about the 'npcm7xx'
->> part here. Shouldn't that be a real chip name rather than a wildcard?
->>
->>        Arnd
->
-> There is a family of npcm7xx, some with SMP and some without.
-> For those who has it, it is common for all to use the same
-> "nuvoton,npcm7xx-smp".
+From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-I think Arnd is right. In this case it should be "nuvoton,npcm750-smp". We can
-use CPU_METHOD_OF_DECLARE to alias to as many compatible properties as needed.
+The FCPVB handles the interface between the VSPB and memory, while the
+FCPVD handles the interface between the VSPD and memory.
 
-Although everything in the 7xx family currently is either single core or has the
-same SMP behavior, you could paint yourself into a corner if you were to make
-one SMP device in the 7xx family which behaves differently from all other
-devices and then need to come up with new compatible string names just for that.
+Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
->
-> Avi
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index cd3c6a30fc47..196a917afea6 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -691,6 +691,33 @@
+ 			#phy-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		fcpvb0: fcp at fe96f000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfe96f000 0 0x200>;
++			clocks = <&cpg CPG_MOD 607>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 607>;
++			iommus = <&ipmmu_vp0 5>;
++		};
++
++		fcpvd0: fcp at fea27000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea27000 0 0x200>;
++			clocks = <&cpg CPG_MOD 603>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 603>;
++			iommus = <&ipmmu_vi0 8>;
++		};
++
++		fcpvd1: fcp at fea2f000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea2f000 0 0x200>;
++			clocks = <&cpg CPG_MOD 602>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 602>;
++			iommus = <&ipmmu_vi0 9>;
++		};
+ 	};
+ 
+ 	timer {
+-- 
+2.7.4
