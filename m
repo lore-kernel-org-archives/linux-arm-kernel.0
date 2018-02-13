@@ -1,339 +1,142 @@
-From: xuzaibo@huawei.com (Xu Zaibo)
-Date: Tue, 13 Feb 2018 09:46:01 +0800
-Subject: [PATCH 29/37] iommu/arm-smmu-v3: Add stall support for platform
- devices
-In-Reply-To: <20180212183352.22730-30-jean-philippe.brucker@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-30-jean-philippe.brucker@arm.com>
-Message-ID: <5A824359.1080005@huawei.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 13 Feb 2018 12:29:32 +1030
+Subject: [PATCH v1 1/2] arm: npcm: add low-level debug support for NPCM7XX
+In-Reply-To: <20180212205833.151019-2-brendanhiggins@google.com>
+References: <20180212205833.151019-1-brendanhiggins@google.com>
+ <20180212205833.151019-2-brendanhiggins@google.com>
+Message-ID: <CACPK8XcGhxTq7QGeub2rAEtGSyrOmnobspVJfhE5YmB6MQRM9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Brendan,
 
-On 2018/2/13 2:33, Jean-Philippe Brucker wrote:
-> The SMMU provides a Stall model for handling page faults in platform
-> devices. It is similar to PCI PRI, but doesn't require devices to have
-> their own translation cache. Instead, faulting transactions are parked and
-> the OS is given a chance to fix the page tables and retry the transaction.
+On Tue, Feb 13, 2018 at 7:28 AM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+> Enable low-level debug support for Nuvoton NPCM7XX family by adding the
+> debug port definitions for the SoC.
+
+When playing with the Poleg boards at the recent OpenBMC hackathon
+Jeremy discovered that the UART is a normal-ish 8250, with a custom
+divisor and a few extra bits to be set.
+
+I found that we can us the generic 8250 low level debugging support
+just fine. This is because u-boot sets up the divisor settings for us
+(as you've assumed with your version here), and from there it's just
+reading/writing characters.
+
+Assuming you can reproduce our results, I suggest we drop these
+patches in favour of adding the correct configuration the Poleg.
+
+Cheers,
+
+Joel
+
 >
-> Enable stall for devices that support it (opt-in by firmware). When an
-> event corresponds to a translation error, call the IOMMU fault handler. If
-> the fault is recoverable, it will call us back to terminate or continue
-> the stall.
->
-> Note that this patch tweaks the iommu_fault_event and page_response_msg to
-> extend the fault id field. Stall uses 16 bits of IDs whereas PCI PRI only
-> uses 9.
-For PCIe devices without ATC,  can they use this Stall model?
-
-Thanks.
-
-Xu Zaibo
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
 > ---
->   drivers/iommu/arm-smmu-v3.c | 175 +++++++++++++++++++++++++++++++++++++++++++-
->   include/linux/iommu.h       |   4 +-
->   2 files changed, 173 insertions(+), 6 deletions(-)
+>  arch/arm/Kconfig.debug           | 11 +++++++++++
+>  arch/arm/include/debug/npcm7xx.S | 30 ++++++++++++++++++++++++++++++
+>  2 files changed, 41 insertions(+)
+>  create mode 100644 arch/arm/include/debug/npcm7xx.S
 >
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 2430b2140f8d..8b9f5dd06be0 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -338,6 +338,15 @@
->   #define CMDQ_PRI_1_RESP_FAIL		(1UL << CMDQ_PRI_1_RESP_SHIFT)
->   #define CMDQ_PRI_1_RESP_SUCC		(2UL << CMDQ_PRI_1_RESP_SHIFT)
->   
-> +#define CMDQ_RESUME_0_SID_SHIFT		32
-> +#define CMDQ_RESUME_0_SID_MASK		0xffffffffUL
-> +#define CMDQ_RESUME_0_ACTION_SHIFT	12
-> +#define CMDQ_RESUME_0_ACTION_TERM	(0UL << CMDQ_RESUME_0_ACTION_SHIFT)
-> +#define CMDQ_RESUME_0_ACTION_RETRY	(1UL << CMDQ_RESUME_0_ACTION_SHIFT)
-> +#define CMDQ_RESUME_0_ACTION_ABORT	(2UL << CMDQ_RESUME_0_ACTION_SHIFT)
-> +#define CMDQ_RESUME_1_STAG_SHIFT	0
-> +#define CMDQ_RESUME_1_STAG_MASK		0xffffUL
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 447629d89884..d8f925cb8872 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -595,6 +595,12 @@ choice
+>                   Say Y here if you want kernel low-level debugging support
+>                   on Hilscher NetX based platforms.
+>
+> +       config DEBUG_NPCM7XX_UART
+> +               bool "Kernel low-level debugging messages via Nuvoton NPCMx50 UART"
+> +               help
+> +                 Say Y here if you want kernel low-level debugging support
+> +                 on Nuvoton based platforms.
 > +
->   #define CMDQ_SYNC_0_CS_SHIFT		12
->   #define CMDQ_SYNC_0_CS_NONE		(0UL << CMDQ_SYNC_0_CS_SHIFT)
->   #define CMDQ_SYNC_0_CS_IRQ		(1UL << CMDQ_SYNC_0_CS_SHIFT)
-> @@ -358,6 +367,31 @@
->   #define EVTQ_0_ID_SHIFT			0
->   #define EVTQ_0_ID_MASK			0xffUL
->   
-> +#define EVT_ID_TRANSLATION_FAULT	0x10
-> +#define EVT_ID_ADDR_SIZE_FAULT		0x11
-> +#define EVT_ID_ACCESS_FAULT		0x12
-> +#define EVT_ID_PERMISSION_FAULT		0x13
+>         config DEBUG_NOMADIK_UART
+>                 bool "Kernel low-level debugging messages via NOMADIK UART"
+>                 depends on ARCH_NOMADIK
+> @@ -1444,6 +1450,7 @@ config DEBUG_LL_INCLUDE
+>         default "debug/ks8695.S" if DEBUG_KS8695_UART
+>         default "debug/msm.S" if DEBUG_QCOM_UARTDM
+>         default "debug/netx.S" if DEBUG_NETX_UART
+> +       default "debug/npcm7xx.S" if DEBUG_NPCM7XX_UART
+>         default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+>         default "debug/renesas-scif.S" if DEBUG_R7S72100_SCIF2
+>         default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF0
+> @@ -1481,6 +1488,7 @@ config DEBUG_UART_8250
+>  config DEBUG_UART_PHYS
+>         hex "Physical base address of debug UART"
+>         default 0x00100a00 if DEBUG_NETX_UART
+> +       default 0xf0004000 if DEBUG_NPCM7XX_UART
+>         default 0x01c20000 if DEBUG_DAVINCI_DMx_UART0
+>         default 0x01c28000 if DEBUG_SUNXI_UART0
+>         default 0x01c28400 if DEBUG_SUNXI_UART1
+> @@ -1589,6 +1597,7 @@ config DEBUG_UART_PHYS
+>                 DEBUG_LL_UART_EFM32 || \
+>                 DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+>                 DEBUG_NETX_UART || \
+> +               DEBUG_NPCM7XX_UART || \
+>                 DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
+>                 DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
+>                 DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
+> @@ -1605,6 +1614,7 @@ config DEBUG_UART_VIRT
+>         default 0xc8821000 if DEBUG_RV1108_UART1
+>         default 0xc8912000 if DEBUG_RV1108_UART0
+>         default 0xe0000a00 if DEBUG_NETX_UART
+> +       default 0xf0001000 if DEBUG_NPCM7XX_UART
+>         default 0xe0010fe0 if ARCH_RPC
+>         default 0xf0000be0 if ARCH_EBSA110
+>         default 0xf0010000 if DEBUG_ASM9260_UART
+> @@ -1695,6 +1705,7 @@ config DEBUG_UART_VIRT
+>         depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+>                 DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+>                 DEBUG_NETX_UART || \
+> +               DEBUG_NPCM7XX_UART || \
+>                 DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
+>                 DEBUG_S3C64XX_UART || \
+>                 DEBUG_BCM63XX_UART || DEBUG_ASM9260_UART || \
+> diff --git a/arch/arm/include/debug/npcm7xx.S b/arch/arm/include/debug/npcm7xx.S
+> new file mode 100644
+> index 000000000000..d08e14e73d79
+> --- /dev/null
+> +++ b/arch/arm/include/debug/npcm7xx.S
+> @@ -0,0 +1,30 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright 2018 Google, Inc.
+> +// This is heavily based on arch/arm/include/debug/at91.S
 > +
-> +#define EVTQ_0_SSV			(1UL << 11)
-> +#define EVTQ_0_SSID_SHIFT		12
-> +#define EVTQ_0_SSID_MASK		0xfffffUL
-> +#define EVTQ_0_SID_SHIFT		32
-> +#define EVTQ_0_SID_MASK			0xffffffffUL
-> +#define EVTQ_1_STAG_SHIFT		0
-> +#define EVTQ_1_STAG_MASK		0xffffUL
-> +#define EVTQ_1_STALL			(1UL << 31)
-> +#define EVTQ_1_PRIV			(1UL << 33)
-> +#define EVTQ_1_EXEC			(1UL << 34)
-> +#define EVTQ_1_READ			(1UL << 35)
-> +#define EVTQ_1_S2			(1UL << 39)
-> +#define EVTQ_1_CLASS_SHIFT		40
-> +#define EVTQ_1_CLASS_MASK		0x3UL
-> +#define EVTQ_1_TT_READ			(1UL << 44)
-> +#define EVTQ_2_ADDR_SHIFT		0
-> +#define EVTQ_2_ADDR_MASK		0xffffffffffffffffUL
-> +#define EVTQ_3_IPA_SHIFT		12
-> +#define EVTQ_3_IPA_MASK			0xffffffffffUL
+> +#define NPCM7XX_SR     (0x14)  /* Status Register */
+> +#define NPCM7XX_THR    (0x00)  /* Transmitter Holding Register */
+> +#define NPCM7XX_TXRDY  (1 << 6)        /* Transmitter Ready */
+> +#define NPCM7XX_TXEMPTY        (1 << 6)        /* Transmitter Empty */
 > +
->   /* PRI queue */
->   #define PRIQ_ENT_DWORDS			2
->   #define PRIQ_MAX_SZ_SHIFT		8
-> @@ -472,6 +506,13 @@ struct arm_smmu_cmdq_ent {
->   			enum pri_resp		resp;
->   		} pri;
->   
-> +		#define CMDQ_OP_RESUME		0x44
-> +		struct {
-> +			u32			sid;
-> +			u16			stag;
-> +			enum page_response_code	resp;
-> +		} resume;
+> +       .macro  addruart, rp, rv, tmp
+> +       ldr     \rp, =CONFIG_DEBUG_UART_PHYS    @ System peripherals (phys)
+> +       ldr     \rv, =CONFIG_DEBUG_UART_VIRT    @ System peripherals (virt)
+> +       .endm
 > +
->   		#define CMDQ_OP_CMD_SYNC	0x46
->   		struct {
->   			u32			msidata;
-> @@ -545,6 +586,8 @@ struct arm_smmu_strtab_ent {
->   	bool				assigned;
->   	struct arm_smmu_s1_cfg		*s1_cfg;
->   	struct arm_smmu_s2_cfg		*s2_cfg;
+> +       .macro  senduart,rd,rx
+> +       strb    \rd, [\rx, #(NPCM7XX_THR)]      @ Write to Transmit Holding Reg
+> +       .endm
 > +
-> +	bool				can_stall;
->   };
->   
->   struct arm_smmu_strtab_cfg {
-> @@ -904,6 +947,21 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->   			return -EINVAL;
->   		}
->   		break;
-> +	case CMDQ_OP_RESUME:
-> +		cmd[0] |= (u64)ent->resume.sid << CMDQ_RESUME_0_SID_SHIFT;
-> +		cmd[1] |= ent->resume.stag << CMDQ_RESUME_1_STAG_SHIFT;
-> +		switch (ent->resume.resp) {
-> +		case IOMMU_PAGE_RESP_INVALID:
-> +		case IOMMU_PAGE_RESP_FAILURE:
-> +			cmd[0] |= CMDQ_RESUME_0_ACTION_ABORT;
-> +			break;
-> +		case IOMMU_PAGE_RESP_SUCCESS:
-> +			cmd[0] |= CMDQ_RESUME_0_ACTION_RETRY;
-> +			break;
-> +		default:
-> +			return -EINVAL;
-> +		}
-> +		break;
->   	case CMDQ_OP_CMD_SYNC:
->   		if (ent->sync.msiaddr)
->   			cmd[0] |= CMDQ_SYNC_0_CS_IRQ;
-> @@ -1065,6 +1123,35 @@ static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->   		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
->   }
->   
-> +static int arm_smmu_page_response(struct iommu_domain *domain,
-> +				  struct device *dev,
-> +				  struct page_response_msg *resp)
-> +{
-> +	int sid = dev->iommu_fwspec->ids[0];
-> +	struct arm_smmu_cmdq_ent cmd = {0};
-> +	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
+> +       .macro  waituart,rd,rx
+> +1001:  ldr     \rd, [\rx, #(NPCM7XX_SR)]       @ Read Status Register
+> +       tst     \rd, #NPCM7XX_TXRDY             @ TXRDY = 1 when ready to tx
+> +       beq     1001b
+> +       .endm
 > +
-> +	if (master->ste.can_stall) {
-> +		cmd.opcode		= CMDQ_OP_RESUME;
-> +		cmd.resume.sid		= sid;
-> +		cmd.resume.stag		= resp->page_req_group_id;
-> +		cmd.resume.resp		= resp->resp_code;
-> +	} else {
-> +		/* TODO: put PRI response here */
-> +		return -EINVAL;
-> +	}
+> +       .macro  busyuart,rd,rx
+> +1001:  ldr     \rd, [\rx, #(NPCM7XX_SR)]       @ Read Status Register
+> +       tst     \rd, #NPCM7XX_TXEMPTY           @ TXEMPTY = 1 when tx complete
+> +       beq     1001b
+> +       .endm
 > +
-> +	arm_smmu_cmdq_issue_cmd(master->smmu, &cmd);
-> +	/*
-> +	 * Don't send a SYNC, it doesn't do anything for RESUME or PRI_RESP.
-> +	 * RESUME consumption guarantees that the stalled transaction will be
-> +	 * terminated... at some point in the future. PRI_RESP is fire and
-> +	 * forget.
-> +	 */
-> +
-> +	return 0;
-> +}
-> +
->   /* Stream table manipulation functions */
->   static void
->   arm_smmu_write_strtab_l1_desc(__le64 *dst, struct arm_smmu_strtab_l1_desc *desc)
-> @@ -1182,7 +1269,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->   			 STRTAB_STE_1_STRW_SHIFT);
->   
->   		if (smmu->features & ARM_SMMU_FEAT_STALLS &&
-> -		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
-> +		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE) &&
-> +		   !ste->can_stall)
->   			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
->   
->   		val |= (cfg->base & STRTAB_STE_0_S1CTXPTR_MASK
-> @@ -1285,10 +1373,73 @@ arm_smmu_find_master(struct arm_smmu_device *smmu, u32 sid)
->   	return master;
->   }
->   
-> +static int arm_smmu_handle_evt(struct arm_smmu_device *smmu, u64 *evt)
-> +{
-> +	struct arm_smmu_master_data *master;
-> +	u8 type = evt[0] >> EVTQ_0_ID_SHIFT & EVTQ_0_ID_MASK;
-> +	u32 sid = evt[0] >> EVTQ_0_SID_SHIFT & EVTQ_0_SID_MASK;
-> +
-> +	struct iommu_fault_event fault = {
-> +		.page_req_group_id = evt[1] >> EVTQ_1_STAG_SHIFT & EVTQ_1_STAG_MASK,
-> +		.addr		= evt[2] >> EVTQ_2_ADDR_SHIFT & EVTQ_2_ADDR_MASK,
-> +		.last_req	= true,
-> +	};
-> +
-> +	switch (type) {
-> +	case EVT_ID_TRANSLATION_FAULT:
-> +	case EVT_ID_ADDR_SIZE_FAULT:
-> +	case EVT_ID_ACCESS_FAULT:
-> +		fault.reason = IOMMU_FAULT_REASON_PTE_FETCH;
-> +		break;
-> +	case EVT_ID_PERMISSION_FAULT:
-> +		fault.reason = IOMMU_FAULT_REASON_PERMISSION;
-> +		break;
-> +	default:
-> +		/* TODO: report other unrecoverable faults. */
-> +		return -EFAULT;
-> +	}
-> +
-> +	/* Stage-2 is always pinned at the moment */
-> +	if (evt[1] & EVTQ_1_S2)
-> +		return -EFAULT;
-> +
-> +	master = arm_smmu_find_master(smmu, sid);
-> +	if (!master)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * The domain is valid until the fault returns, because detach() flushes
-> +	 * the fault queue.
-> +	 */
-> +	if (evt[1] & EVTQ_1_STALL)
-> +		fault.type = IOMMU_FAULT_PAGE_REQ;
-> +	else
-> +		fault.type = IOMMU_FAULT_DMA_UNRECOV;
-> +
-> +	if (evt[1] & EVTQ_1_READ)
-> +		fault.prot |= IOMMU_FAULT_READ;
-> +	else
-> +		fault.prot |= IOMMU_FAULT_WRITE;
-> +
-> +	if (evt[1] & EVTQ_1_EXEC)
-> +		fault.prot |= IOMMU_FAULT_EXEC;
-> +
-> +	if (evt[1] & EVTQ_1_PRIV)
-> +		fault.prot |= IOMMU_FAULT_PRIV;
-> +
-> +	if (evt[0] & EVTQ_0_SSV) {
-> +		fault.pasid_valid = true;
-> +		fault.pasid = evt[0] >> EVTQ_0_SSID_SHIFT & EVTQ_0_SSID_MASK;
-> +	}
-> +
-> +	/* Report to device driver or populate the page tables */
-> +	return iommu_report_device_fault(master->dev, &fault);
-> +}
-> +
->   /* IRQ and event handlers */
->   static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
->   {
-> -	int i;
-> +	int i, ret;
->   	int num_handled = 0;
->   	struct arm_smmu_device *smmu = dev;
->   	struct arm_smmu_queue *q = &smmu->evtq.q;
-> @@ -1300,12 +1451,19 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
->   		while (!queue_remove_raw(q, evt)) {
->   			u8 id = evt[0] >> EVTQ_0_ID_SHIFT & EVTQ_0_ID_MASK;
->   
-> +			spin_unlock(&q->wq.lock);
-> +			ret = arm_smmu_handle_evt(smmu, evt);
-> +			spin_lock(&q->wq.lock);
-> +
->   			if (++num_handled == queue_size) {
->   				q->batch++;
->   				wake_up_locked(&q->wq);
->   				num_handled = 0;
->   			}
->   
-> +			if (!ret)
-> +				continue;
-> +
->   			dev_info(smmu->dev, "event 0x%02x received:\n", id);
->   			for (i = 0; i < ARRAY_SIZE(evt); ++i)
->   				dev_info(smmu->dev, "\t0x%016llx\n",
-> @@ -1442,7 +1600,9 @@ static int arm_smmu_flush_queues(struct notifier_block *nb,
->   		master = dev->iommu_fwspec->iommu_priv;
->   
->   	if (master) {
-> -		/* TODO: add support for PRI and Stall */
-> +		if (master->ste.can_stall)
-> +			arm_smmu_flush_queue(smmu, &smmu->evtq.q, "evtq");
-> +		/* TODO: add support for PRI */
->   		return 0;
->   	}
->   
-> @@ -1756,7 +1916,8 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
->   		.order			= master->ssid_bits,
->   		.sync			= &arm_smmu_ctx_sync,
->   		.arm_smmu = {
-> -			.stall		= !!(smmu->features & ARM_SMMU_FEAT_STALL_FORCE),
-> +			.stall		= !!(smmu->features & ARM_SMMU_FEAT_STALL_FORCE) ||
-> +					  master->ste.can_stall,
->   			.asid_bits	= smmu->asid_bits,
->   			.hw_access	= !!(smmu->features & ARM_SMMU_FEAT_HA),
->   			.hw_dirty	= !!(smmu->features & ARM_SMMU_FEAT_HD),
-> @@ -2296,6 +2457,11 @@ static int arm_smmu_add_device(struct device *dev)
->   
->   	master->ssid_bits = min(smmu->ssid_bits, fwspec->num_pasid_bits);
->   
-> +	if (fwspec->can_stall && smmu->features & ARM_SMMU_FEAT_STALLS) {
-> +		master->can_fault = true;
-> +		master->ste.can_stall = true;
-> +	}
-> +
->   	group = iommu_group_get_for_dev(dev);
->   	if (!IS_ERR(group)) {
->   		arm_smmu_insert_master(smmu, master);
-> @@ -2435,6 +2601,7 @@ static struct iommu_ops arm_smmu_ops = {
->   	.mm_attach		= arm_smmu_mm_attach,
->   	.mm_detach		= arm_smmu_mm_detach,
->   	.mm_invalidate		= arm_smmu_mm_invalidate,
-> +	.page_response		= arm_smmu_page_response,
->   	.map			= arm_smmu_map,
->   	.unmap			= arm_smmu_unmap,
->   	.map_sg			= default_iommu_map_sg,
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 37c3b9d087ce..f5c2f4be2b42 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -227,7 +227,7 @@ struct page_response_msg {
->   	u32 pasid;
->   	enum page_response_code resp_code;
->   	u32 pasid_present:1;
-> -	u32 page_req_group_id : 9;
-> +	u32 page_req_group_id;
->   	enum page_response_type type;
->   	u32 private_data;
->   };
-> @@ -421,7 +421,7 @@ struct iommu_fault_event {
->   	enum iommu_fault_reason reason;
->   	u64 addr;
->   	u32 pasid;
-> -	u32 page_req_group_id : 9;
-> +	u32 page_req_group_id;
->   	u32 last_req : 1;
->   	u32 pasid_valid : 1;
->   	u32 prot;
+> --
+> 2.16.0.rc1.238.g530d649a79-goog
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
