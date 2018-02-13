@@ -1,55 +1,23 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 13 Feb 2018 13:53:33 +0100
-Subject: [PATCH v3 07/11] ARM: dts: STi: Add fake reg for restart,
- powerdown and picophy/softreset
+Date: Tue, 13 Feb 2018 13:53:29 +0100
+Subject: [PATCH v3 03/11] ARM: dts: STi: Add fake reg property for
+ sti-display-subsystem
 In-Reply-To: <1518526417-11919-1-git-send-email-patrice.chotard@st.com>
 References: <1518526417-11919-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1518526417-11919-8-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518526417-11919-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-Add fake reg property for restart, powerdown, picophyreset
-and softreset.
+As sti-display-subsystem sub-nodes (sti-compositor, sti-tvout
+sti-hdmi, sti-hda and sti-hqvdp) are SoC's IP, we add a fake
+reg property.
 This allows to fix the following warning when compiling
 dtb with W=1 option:
 
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
-
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
-
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
-
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/restart missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/powerdown-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/softreset-controller missing or empty reg/ranges property
-arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
-Node /soc/picophyreset-controller missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
+Node /soc/sti-display-subsystem/sti-hda at 8d02000 has a unit name, but no reg property
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
@@ -57,46 +25,59 @@ Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 v3: _ none
 v2: _ add a fake reg property to node without reg property
 
+ arch/arm/boot/dts/stih407.dtsi      | 4 ++--
+ arch/arm/boot/dts/stih410-b2120.dts | 2 +-
+ arch/arm/boot/dts/stih410.dtsi      | 3 ++-
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
- arch/arm/boot/dts/stih407-family.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 5a0bad07da9e..00a3838236d1 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -125,24 +125,28 @@
- 		ranges;
- 		compatible = "simple-bus";
- 
--		restart {
-+		restart: restart-controller at 0 {
- 			compatible = "st,stih407-restart";
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 11fdecd9312e..4f01777082f5 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -11,11 +11,11 @@
+ #include <dt-bindings/gpio/gpio.h>
+ / {
+ 	soc {
+-		sti-display-subsystem {
++		sti-display-subsystem at 0 {
+ 			compatible = "st,sti-display-subsystem";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-
 +			reg = <0 0>;
- 			st,syscfg = <&syscfg_sbc_reg>;
+ 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
+ 					  <&clk_s_d2_quadfs 1>,
+ 					  <&clk_s_c0_pll1 0>,
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index 37a42afa0dd1..23199b1b0991 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -61,7 +61,7 @@
  			status = "okay";
  		};
  
--		powerdown: powerdown-controller {
-+		powerdown: powerdown-controller at 0 {
- 			compatible = "st,stih407-powerdown";
-+			reg = <0 0>;
- 			#reset-cells = <1>;
+-		sti-display-subsystem {
++		sti-display-subsystem at 0 {
+ 			sti-hda at 8d02000 {
+ 				status = "okay";
+ 			};
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index e4b7e3ddc9ee..d9f964702933 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -102,11 +102,12 @@
+ 			status = "disabled";
  		};
  
--		softreset: softreset-controller {
-+		softreset: softreset-controller at 0 {
- 			compatible = "st,stih407-softreset";
-+			reg = <0 0>;
- 			#reset-cells = <1>;
- 		};
+-		sti-display-subsystem {
++		sti-display-subsystem at 0 {
+ 			compatible = "st,sti-display-subsystem";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
  
--		picophyreset: picophyreset-controller {
-+		picophyreset: picophyreset-controller at 0 {
- 			compatible = "st,stih407-picophyreset";
 +			reg = <0 0>;
- 			#reset-cells = <1>;
- 		};
- 
+ 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
+ 					  <&clk_s_d2_quadfs 1>,
+ 					  <&clk_s_c0_pll1 0>,
 -- 
 1.9.1
