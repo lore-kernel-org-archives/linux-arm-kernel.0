@@ -1,203 +1,239 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Tue, 13 Feb 2018 16:58:32 +0000
-Subject: [PATCH v3 20/25] ASoC: qcom: q6afe: add support to MI2S sysclks
+Date: Tue, 13 Feb 2018 16:58:31 +0000
+Subject: [PATCH v3 19/25] ASoC: qcom: q6afe: add support to MI2S ports
 In-Reply-To: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
 References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180213165837.1620-21-srinivas.kandagatla@linaro.org>
+Message-ID: <20180213165837.1620-20-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to LPASS Bit clock, LPASS Digital
-core clock and OSR clock. These clocks are required for both
-MI2S and PCM setup.
-
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6afe.c | 115 +++++++++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h |  10 ++++
- 2 files changed, 125 insertions(+)
+ include/dt-bindings/sound/qcom,q6afe.h |  10 +++
+ sound/soc/qcom/qdsp6/q6afe.c           | 111 +++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h           |  10 +++
+ 3 files changed, 131 insertions(+)
 
+diff --git a/include/dt-bindings/sound/qcom,q6afe.h b/include/dt-bindings/sound/qcom,q6afe.h
+index e9004ee39f72..3cd862262369 100644
+--- a/include/dt-bindings/sound/qcom,q6afe.h
++++ b/include/dt-bindings/sound/qcom,q6afe.h
+@@ -16,6 +16,16 @@
+ #define SLIMBUS_4_TX    24
+ #define SLIMBUS_5_RX    25
+ #define SLIMBUS_5_TX    26
++#define QUATERNARY_MI2S_RX	34
++#define QUATERNARY_MI2S_TX	35
++#define SECONDARY_MI2S_RX	36
++#define SECONDARY_MI2S_TX	37
++#define TERTIARY_MI2S_RX	38
++#define TERTIARY_MI2S_TX	39
++#define PRIMARY_MI2S_RX		40
++#define PRIMARY_MI2S_TX		41
++#define SECONDARY_PCM_RX	42
++#define SECONDARY_PCM_TX	43
+ #define SLIMBUS_6_RX    45
+ #define SLIMBUS_6_TX    46
+ 
 diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-index c04caea5481c..ea6fa3848007 100644
+index 637390f5421e..c04caea5481c 100644
 --- a/sound/soc/qcom/qdsp6/q6afe.c
 +++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -31,6 +31,9 @@
+@@ -14,6 +14,10 @@
+ #include <linux/of.h>
+ #include <linux/delay.h>
+ #include <linux/soc/qcom/apr.h>
++#include <sound/soc.h>
++#include <sound/soc-dai.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
+ #include "q6dsp-errno.h"
+ #include "q6afe.h"
  
+@@ -28,6 +32,24 @@
  #define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
  
-+#define AFE_PARAM_ID_LPAIF_CLK_CONFIG	0x00010238
-+#define AFE_PARAM_ID_INTERNAL_DIGITAL_CDC_CLK_CONFIG	0x00010239
-+
  #define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
- #define AFE_PARAM_ID_I2S_CONFIG	0x0001020D
- 
-@@ -94,6 +97,11 @@
- #define AFE_PORT_ID_QUATERNARY_MI2S_RX      0x1006
- #define AFE_PORT_ID_QUATERNARY_MI2S_TX      0x1007
- 
-+#define Q6AFE_LPASS_MODE_CLK1_VALID 1
-+#define Q6AFE_LPASS_MODE_CLK2_VALID 2
-+#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
-+#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
++#define AFE_PARAM_ID_I2S_CONFIG	0x0001020D
 +
++/* I2S config specific */
++#define AFE_API_VERSION_I2S_CONFIG	0x1
++#define AFE_PORT_I2S_SD0		0x1
++#define AFE_PORT_I2S_SD1		0x2
++#define AFE_PORT_I2S_SD2		0x3
++#define AFE_PORT_I2S_SD3		0x4
++#define AFE_PORT_I2S_QUAD01		0x5
++#define AFE_PORT_I2S_QUAD23		0x6
++#define AFE_PORT_I2S_6CHS		0x7
++#define AFE_PORT_I2S_8CHS		0x8
++#define AFE_PORT_I2S_MONO		0x0
++#define AFE_PORT_I2S_STEREO		0x1
++#define AFE_PORT_CONFIG_I2S_WS_SRC_EXTERNAL	0x0
++#define AFE_PORT_CONFIG_I2S_WS_SRC_INTERNAL	0x1
++#define AFE_LINEAR_PCM_DATA				0x0
++
+ 
+ /* Port IDs */
+ #define AFE_API_VERSION_HDMI_CONFIG	0x1
+@@ -63,6 +85,14 @@
+ #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX      0x400c
+ /* SLIMbus Tx port on channel 6. */
+ #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX      0x400d
++#define AFE_PORT_ID_PRIMARY_MI2S_RX         0x1000
++#define AFE_PORT_ID_PRIMARY_MI2S_TX         0x1001
++#define AFE_PORT_ID_SECONDARY_MI2S_RX       0x1002
++#define AFE_PORT_ID_SECONDARY_MI2S_TX       0x1003
++#define AFE_PORT_ID_TERTIARY_MI2S_RX        0x1004
++#define AFE_PORT_ID_TERTIARY_MI2S_TX        0x1005
++#define AFE_PORT_ID_QUATERNARY_MI2S_RX      0x1006
++#define AFE_PORT_ID_QUATERNARY_MI2S_TX      0x1007
+ 
  #define TIMEOUT_MS 1000
  #define AFE_CMD_RESP_AVAIL	0
- #define AFE_CMD_RESP_NONE	1
-@@ -191,6 +199,23 @@ struct afe_param_id_slimbus_cfg {
+@@ -161,10 +191,21 @@ struct afe_param_id_slimbus_cfg {
   */
  } __packed;
  
-+struct afe_clk_cfg {
-+	u32                  i2s_cfg_minor_version;
-+	u32                  clk_val1;
-+	u32                  clk_val2;
-+	u16                  clk_src;
-+	u16                  clk_root;
-+	u16                  clk_set_mode;
-+	u16                  reserved;
++struct afe_param_id_i2s_cfg {
++	u32	i2s_cfg_minor_version;
++	u16	bit_width;
++	u16	channel_mode;
++	u16	mono_stereo;
++	u16	ws_src;
++	u32	sample_rate;
++	u16	data_format;
++	u16	reserved;
 +} __packed;
-+
-+struct afe_digital_clk_cfg {
-+	u32                  i2s_cfg_minor_version;
-+	u32                  clk_val;
-+	u16                  clk_root;
-+	u16                  reserved;
-+} __packed;
-+
- struct afe_param_id_i2s_cfg {
- 	u32	i2s_cfg_minor_version;
- 	u16	bit_width;
-@@ -208,6 +233,21 @@ union afe_port_config {
- 	struct afe_param_id_i2s_cfg	i2s_cfg;
+ 
+ union afe_port_config {
+ 	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
+ 	struct afe_param_id_slimbus_cfg           slim_cfg;
++	struct afe_param_id_i2s_cfg	i2s_cfg;
  } __packed;
  
-+struct afe_lpass_clk_config_command {
-+	struct apr_hdr			 hdr;
-+	struct afe_port_cmd_set_param_v2 param;
-+	struct afe_port_param_data_v2    pdata;
-+	struct afe_clk_cfg clk_cfg;
-+} __packed;
-+
-+struct afe_lpass_digital_clk_config_command {
-+	struct apr_hdr			 hdr;
-+	struct afe_port_cmd_set_param_v2 param;
-+	struct afe_port_param_data_v2    pdata;
-+	struct afe_digital_clk_cfg clk_cfg;
-+} __packed;
-+
-+/* This param id is used to configure internal clk */
  struct q6afe_port {
- 	wait_queue_head_t wait;
- 	union afe_port_config port_cfg;
-@@ -425,6 +465,81 @@ static int q6afe_port_set_param_v2(struct q6afe_port *port, void *data,
- 	return ret;
+@@ -207,6 +248,14 @@ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
+ 				SLIMBUS_4_RX, 1, 1},
+ 	[SLIMBUS_5_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX,
+ 				SLIMBUS_5_RX, 1, 1},
++	[QUATERNARY_MI2S_RX] = { AFE_PORT_ID_QUATERNARY_MI2S_RX,
++				QUATERNARY_MI2S_RX, 1, 1},
++	[SECONDARY_MI2S_RX] = { AFE_PORT_ID_SECONDARY_MI2S_RX,
++				SECONDARY_MI2S_RX, 1, 1},
++	[TERTIARY_MI2S_RX] = { AFE_PORT_ID_TERTIARY_MI2S_RX,
++				TERTIARY_MI2S_RX, 1, 1},
++	[PRIMARY_MI2S_RX] = { AFE_PORT_ID_PRIMARY_MI2S_RX,
++				PRIMARY_MI2S_RX, 1, 1},
+ 	[SLIMBUS_6_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX,
+ 				SLIMBUS_6_RX, 1, 1},
+ };
+@@ -513,6 +562,61 @@ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
  }
+ EXPORT_SYMBOL_GPL(q6afe_hdmi_port_prepare);
  
-+static int q6afe_set_lpass_clock(struct q6afe_port *port,
-+				 struct afe_clk_cfg *cfg)
++/**
++ * q6afe_i2s_port_prepare() - Prepare i2s afe port.
++ *
++ * @port: Instance of afe port
++ * @cfg: I2S configuration for the afe port
++ *
++ */
++void q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg)
 +{
-+	struct afe_lpass_clk_config_command clk_cfg = {0};
-+	int param_id = AFE_PARAM_ID_LPAIF_CLK_CONFIG;
-+	struct q6afe *afe = port->afe;
++	union afe_port_config *pcfg = &port->port_cfg;
 +
-+	if (!cfg) {
-+		dev_err(afe->dev, "clock cfg is NULL\n");
-+		return -EINVAL;
-+	}
++	pcfg->i2s_cfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++	pcfg->i2s_cfg.sample_rate = cfg->sample_rate;
++	pcfg->i2s_cfg.bit_width = cfg->bit_width;
++	pcfg->i2s_cfg.data_format = AFE_LINEAR_PCM_DATA;
 +
-+	clk_cfg.clk_cfg = *cfg;
-+
-+	return q6afe_port_set_param_v2(port, &clk_cfg, param_id, sizeof(*cfg));
-+}
-+
-+static int q6afe_set_digital_codec_core_clock(struct q6afe_port *port,
-+					      struct afe_digital_clk_cfg *cfg)
-+{
-+	struct afe_lpass_digital_clk_config_command clk_cfg = {0};
-+	int param_id = AFE_PARAM_ID_INTERNAL_DIGITAL_CDC_CLK_CONFIG;
-+	struct q6afe *afe = port->afe;
-+
-+	if (!cfg) {
-+		dev_err(afe->dev, "clock cfg is NULL\n");
-+		return -EINVAL;
-+	}
-+
-+	clk_cfg.clk_cfg = *cfg;
-+
-+	return q6afe_port_set_param_v2(port, &clk_cfg, param_id, sizeof(*cfg));
-+}
-+
-+int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
-+			  int clk_src, int clk_root,
-+			  unsigned int freq, int dir)
-+{
-+	struct afe_clk_cfg ccfg = {0,};
-+	struct afe_digital_clk_cfg dcfg = {0,};
-+	int ret;
-+
-+	switch (clk_id) {
-+	case LPAIF_DIG_CLK:
-+		dcfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		dcfg.clk_val = freq;
-+		dcfg.clk_root = clk_root;
-+		ret = q6afe_set_digital_codec_core_clock(port, &dcfg);
++	switch (cfg->fmt & SND_SOC_DAIFMT_MASTER_MASK) {
++	case SND_SOC_DAIFMT_CBS_CFS:
++		pcfg->i2s_cfg.ws_src = AFE_PORT_CONFIG_I2S_WS_SRC_INTERNAL;
 +		break;
-+	case LPAIF_BIT_CLK:
-+		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		ccfg.clk_val1 = freq;
-+		ccfg.clk_src = clk_src;
-+		ccfg.clk_root = clk_root;
-+		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK1_VALID;
-+		ret = q6afe_set_lpass_clock(port, &ccfg);
-+		break;
-+
-+	case LPAIF_OSR_CLK:
-+		ccfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
-+		ccfg.clk_val2 = freq;
-+		ccfg.clk_src = clk_src;
-+		ccfg.clk_root = clk_root;
-+		ccfg.clk_set_mode = Q6AFE_LPASS_MODE_CLK2_VALID;
-+		ret = q6afe_set_lpass_clock(port, &ccfg);
++	case SND_SOC_DAIFMT_CBM_CFM:
++		/* CPU is slave */
++		pcfg->i2s_cfg.ws_src = AFE_PORT_CONFIG_I2S_WS_SRC_EXTERNAL;
 +		break;
 +	default:
-+		ret = -EINVAL;
 +		break;
 +	}
 +
-+	return ret;
++	switch (cfg->num_channels) {
++	case 1:
++			pcfg->i2s_cfg.mono_stereo = AFE_PORT_I2S_MONO;
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD0;
++		break;
++	case 2:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD0;
++			pcfg->i2s_cfg.mono_stereo = AFE_PORT_I2S_STEREO;
++		break;
++	case 3:
++	case 4:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_QUAD01;
++		break;
++	case 5:
++	case 6:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_6CHS;
++			break;
++	case 7:
++	case 8:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_8CHS;
++			break;
++	default:
++		break;
++	}
 +}
-+EXPORT_SYMBOL_GPL(q6afe_port_set_sysclk);
++EXPORT_SYMBOL_GPL(q6afe_i2s_port_prepare);
 +
- static int afe_port_start(struct q6afe_port *port,
- 			  union afe_port_config *afe_config)
- {
+ /**
+  * q6afe_port_start() - Start a afe port
+  *
+@@ -562,6 +666,13 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
+ 	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX:
+ 		cfg_type = AFE_PARAM_ID_SLIMBUS_CONFIG;
+ 		break;
++
++	case AFE_PORT_ID_PRIMARY_MI2S_RX:
++	case AFE_PORT_ID_SECONDARY_MI2S_RX:
++	case AFE_PORT_ID_TERTIARY_MI2S_RX:
++	case AFE_PORT_ID_QUATERNARY_MI2S_RX:
++		cfg_type = AFE_PARAM_ID_I2S_CONFIG;
++		break;
+ 	default:
+ 		dev_err(dev, "Invalid port id 0x%x\n", port_id);
+ 		return ERR_PTR(-EINVAL);
 diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
-index 9114d68a79cb..c469f6de38d2 100644
+index aeacf1f2c9a9..9114d68a79cb 100644
 --- a/sound/soc/qcom/qdsp6/q6afe.h
 +++ b/sound/soc/qcom/qdsp6/q6afe.h
-@@ -14,6 +14,13 @@
- #define AFE_MAX_CHAN_COUNT	8
- #define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
+@@ -29,9 +29,18 @@ struct q6afe_slim_cfg {
+ 	u8	ch_mapping[AFE_MAX_CHAN_COUNT];
+ };
  
-+#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
-+#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
++struct q6afe_i2s_cfg {
++	u32	sample_rate;
++	u16	bit_width;
++	u16	data_format;
++	u16	num_channels;
++	int fmt;
++};
 +
-+#define LPAIF_DIG_CLK	1
-+#define LPAIF_BIT_CLK	2
-+#define LPAIF_OSR_CLK	3
-+
- struct q6afe_hdmi_cfg {
- 	u16                  datatype;
- 	u16                  channel_allocation;
-@@ -61,4 +68,7 @@ void q6afe_slim_port_prepare(struct q6afe_port *port,
+ struct q6afe_port_config {
+ 	struct q6afe_hdmi_cfg hdmi;
+ 	struct q6afe_slim_cfg slim;
++	struct q6afe_i2s_cfg i2s_cfg;
+ };
+ 
+ struct q6afe_port;
+@@ -50,5 +59,6 @@ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
+ 			    struct q6afe_hdmi_cfg *cfg);
+ void q6afe_slim_port_prepare(struct q6afe_port *port,
  			  struct q6afe_slim_cfg *cfg);
- void q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
++void q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
  
-+int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
-+			  int clk_src, int clk_root,
-+			  unsigned int freq, int dir);
  #endif /* __Q6AFE_H__ */
 -- 
 2.15.1
