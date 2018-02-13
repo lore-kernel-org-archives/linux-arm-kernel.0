@@ -1,77 +1,149 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Tue, 13 Feb 2018 12:58:52 +0000
-Subject: [PATCH v2 10/12] ARM: dts: STi: Add fake reg property for clocks
-In-Reply-To: <CABGGisxgejFHj0xQq-aBQETt9CX3OzLc3ER_Y9nyrw7FeLdt6g@mail.gmail.com>
-References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
- <1518446590-16800-11-git-send-email-patrice.chotard@st.com>
- <CABGGisxgejFHj0xQq-aBQETt9CX3OzLc3ER_Y9nyrw7FeLdt6g@mail.gmail.com>
-Message-ID: <ce036283-586b-0603-2c85-a502ed656e72@st.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Tue, 13 Feb 2018 13:53:34 +0100
+Subject: [PATCH v3 08/11] ARM: dts: STi: Add fake reg property for
+ usb2_picophyX nodes
+In-Reply-To: <1518526417-11919-1-git-send-email-patrice.chotard@st.com>
+References: <1518526417-11919-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1518526417-11919-9-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+From: Patrice Chotard <patrice.chotard@st.com>
 
-On 02/12/2018 04:22 PM, Rob Herring wrote:
-> On Mon, Feb 12, 2018 at 8:43 AM,  <patrice.chotard@st.com> wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> For all clock's element inside SoC, add a fake reg property,
->> this allows to fix the following warnings when compiling
->> dtb with W=1 option :
->>
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
->>
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
->>
->> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
->> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
->> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
->> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->> ---
->>
->> v2: _ add a fake reg property to node without reg property.
->>
->>   arch/arm/boot/dts/stih407-clock.dtsi | 9 ++++++---
->>   arch/arm/boot/dts/stih410-clock.dtsi | 9 ++++++---
->>   arch/arm/boot/dts/stih418-clock.dtsi | 9 ++++++---
->>   3 files changed, 18 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
->> index b882dcf3a649..1bba47e06ebe 100644
->> --- a/arch/arm/boot/dts/stih407-clock.dtsi
->> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
->> @@ -24,9 +24,10 @@
->>                  /*
->>                   * ARM Peripheral clock for timers
->>                   */
->> -               arm_periph_clk: clk-m-a9-periphs {
->> +               arm_periph_clk: clk-m-a9-periphs at 0 {
->>                          #clock-cells = <0>;
->>                          compatible = "fixed-factor-clock";
->> +                       reg = <0 0>;
-> 
-> Don't do this. The correct fix is change the location of these nodes
-> to be under whatever controls them.
-> 
-Ok i will put this node as a child of clockgen-a9 at 92b0000
+Add fake reg property for usb2_picophy nodes.
+This allows to fix the following warning when compiling dtb
+with W=1 option :
 
-Thanks
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /soc/phy2 missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /soc/phy3 missing or empty reg/ranges property
 
-Patrice
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /soc/phy2 missing or empty reg/ranges property
+arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+Node /soc/phy3 missing or empty reg/ranges property
 
-> Rob
-> 
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+Node /soc/phy2 missing or empty reg/ranges property
+arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+Node /soc/phy3 missing or empty reg/ranges property
+
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+v3: _ none
+v2: _ add a fake reg property to node without reg property.
+
+
+ arch/arm/boot/dts/stih407-family.dtsi | 3 ++-
+ arch/arm/boot/dts/stih410-b2120.dts   | 4 ++--
+ arch/arm/boot/dts/stih410-b2260.dts   | 4 ++--
+ arch/arm/boot/dts/stih410.dtsi        | 6 ++++--
+ arch/arm/boot/dts/stih418.dtsi        | 6 ++++--
+ 5 files changed, 14 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 00a3838236d1..5df827b00eb6 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -385,8 +385,9 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usb2_picophy0: phy1 {
++		usb2_picophy0: phy1 at 0 {
+ 			compatible = "st,stih407-usb2-phy";
++			reg = <0 0>;
+ 			#phy-cells = <0>;
+ 			st,syscfg = <&syscfg_core 0x100 0xf4>;
+ 			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+index 23199b1b0991..d1d908b9e34c 100644
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@ -37,11 +37,11 @@
+ 			sd-uhs-ddr50;
+ 		};
+ 
+-		usb2_picophy1: phy2 {
++		usb2_picophy1: phy2 at 0 {
+ 			status = "okay";
+ 		};
+ 
+-		usb2_picophy2: phy3 {
++		usb2_picophy2: phy3 at 0 {
+ 			status = "okay";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+index cea5c840ca9f..8bcd58118dba 100644
+--- a/arch/arm/boot/dts/stih410-b2260.dts
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@ -127,11 +127,11 @@
+ 			status = "okay";
+ 		};
+ 
+-		usb2_picophy1: phy2 {
++		usb2_picophy1: phy2 at 0 {
+ 			status = "okay";
+ 		};
+ 
+-		usb2_picophy2: phy3 {
++		usb2_picophy2: phy3 at 0 {
+ 			status = "okay";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 815df2f7c103..bfbc73743b29 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -16,8 +16,9 @@
+ 	};
+ 
+ 	soc {
+-		usb2_picophy1: phy2 {
++		usb2_picophy1: phy2 at 0 {
+ 			compatible = "st,stih407-usb2-phy";
++			reg = <0 0>;
+ 			#phy-cells = <0>;
+ 			st,syscfg = <&syscfg_core 0xf8 0xf4>;
+ 			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+@@ -27,8 +28,9 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usb2_picophy2: phy3 {
++		usb2_picophy2: phy3 at 0 {
+ 			compatible = "st,stih407-usb2-phy";
++			reg = <0 0>;
+ 			#phy-cells = <0>;
+ 			st,syscfg = <&syscfg_core 0xfc 0xf4>;
+ 			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+diff --git a/arch/arm/boot/dts/stih418.dtsi b/arch/arm/boot/dts/stih418.dtsi
+index e6525ab4d9bb..0efb3cd6a86e 100644
+--- a/arch/arm/boot/dts/stih418.dtsi
++++ b/arch/arm/boot/dts/stih418.dtsi
+@@ -30,8 +30,9 @@
+ 	};
+ 
+ 	soc {
+-		usb2_picophy1: phy2 {
++		usb2_picophy1: phy2 at 0 {
+ 			compatible = "st,stih407-usb2-phy";
++			reg = <0 0>;
+ 			#phy-cells = <0>;
+ 			st,syscfg = <&syscfg_core 0xf8 0xf4>;
+ 			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+@@ -39,8 +40,9 @@
+ 			reset-names = "global", "port";
+ 		};
+ 
+-		usb2_picophy2: phy3 {
++		usb2_picophy2: phy3 at 0 {
+ 			compatible = "st,stih407-usb2-phy";
++			reg = <0 0>;
+ 			#phy-cells = <0>;
+ 			st,syscfg = <&syscfg_core 0xfc 0xf4>;
+ 			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+-- 
+1.9.1
