@@ -1,35 +1,328 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 13 Feb 2018 12:57:56 +0000
-Subject: [PATCH v5 09/26] soc: renesas: rcar-rst: Enable watchdog as reset
- trigger for Gen2
-In-Reply-To: <20180213081910.x5llcsmwza44u4ow@verge.net.au>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1518457475-4480-10-git-send-email-fabrizio.castro@bp.renesas.com>
- <20180213081910.x5llcsmwza44u4ow@verge.net.au>
-Message-ID: <TY1PR06MB08958CD1E38DBA3F321977EDC0F60@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Tue, 13 Feb 2018 22:01:54 +0900
+Subject: [PATCH v3 1/3] arm64: dts: uniphier: add sound node for UniPhier
+In-Reply-To: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
+References: <20180213130156.27827-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180213130156.27827-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+This patch adds audio controller, codec and simple card node of
+UniPhier AIO sound system for LD11/20 SoCs.
 
-> Subject: Re: [PATCH v5 09/26] soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
->
-> On Mon, Feb 12, 2018 at 05:44:18PM +0000, Fabrizio Castro wrote:
-> > This patch allows for platform specific quirks as some of the SoC need
-> > further customization for the watchdog to work properly, like for R-Car
-> > Gen2 and for RZ/G.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
->
-> I am fine with this patch but please rebase it on top of
-> renesas-devel-20180212-v4.16-rc1 (or later).
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 
-sure, I will.
+---
 
-Thanks,
-Fab
+Changes in v3:
+  - Move sound and spdif-out nodes to root from soc node
+  - Use phandle of endpoint directly instead of port node
+  - Describe connections between AIO and EVEA in *.dtsi
+    because these cores are in inside of SoC
+---
+ .../boot/dts/socionext/uniphier-ld11-global.dts    | 25 ++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 92 +++++++++++++++++++++
+ .../boot/dts/socionext/uniphier-ld20-global.dts    | 25 ++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 96 ++++++++++++++++++++++
+ 4 files changed, 238 insertions(+)
 
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
+index 2452b2243f42..fb6bf435dc96 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
+@@ -37,6 +37,27 @@
+ 		device_type = "memory";
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
++
++	sound {
++		compatible = "audio-graph-card";
++		label = "UniPhier LD11";
++		widgets = "Headphone", "Headphone Jack";
++
++		dais = <&i2s_port2
++			&i2s_port4
++			&spdif_port0>;
++	};
++
++	spdif-out {
++		compatible = "linux,spdif-dit";
++		#sound-dai-cells = <0>;
++
++		port at 0 {
++			spdif_tx: endpoint {
++				remote-endpoint = <&spdif_hiecout1>;
++			};
++		};
++	};
+ };
+ 
+ &serial0 {
+@@ -72,3 +93,7 @@
+ &nand {
+ 	status = "okay";
+ };
++
++&spdif_hiecout1 {
++	remote-endpoint = <&spdif_tx>;
++};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index cd7c2d0a1f64..f4eb1c6353a5 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -187,6 +187,90 @@
+ 						     <21 217 3>;
+ 		};
+ 
++		audio: audio at 56000000 {
++			compatible = "socionext,uniphier-ld11-aio";
++			reg = <0x56000000 0x80000>;
++			interrupts = <0 144 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_aout>;
++			clock-names = "aio";
++			clocks = <&sys_clk 40>;
++			reset-names = "aio";
++			resets = <&sys_rst 40>;
++			#sound-dai-cells = <1>;
++
++			i2s_port0: port at 0 {
++				i2s_hdmi: endpoint {
++				};
++			};
++
++			i2s_port1: port at 1 {
++				i2s_pcmin2: endpoint {
++				};
++			};
++
++			i2s_port2: port at 2 {
++				i2s_line: endpoint {
++					dai-format = "i2s";
++					remote-endpoint = <&evea_line>;
++				};
++			};
++
++			i2s_port3: port at 3 {
++				i2s_hpcmout1: endpoint {
++				};
++			};
++
++			i2s_port4: port at 4 {
++				i2s_hp: endpoint {
++					dai-format = "i2s";
++					remote-endpoint = <&evea_hp>;
++				};
++			};
++
++			spdif_port0: port at 5 {
++				spdif_hiecout1: endpoint {
++				};
++			};
++
++			src_port0: port at 6 {
++				i2s_epcmout2: endpoint {
++				};
++			};
++
++			src_port1: port at 7 {
++				i2s_epcmout3: endpoint {
++				};
++			};
++
++			comp_spdif_port0: port at 8 {
++				comp_spdif_hiecout1: endpoint {
++				};
++			};
++		};
++
++		evea: codec at 57900000 {
++			compatible = "socionext,uniphier-evea";
++			reg = <0x57900000 0x1000>;
++			clock-names = "evea", "exiv";
++			clocks = <&sys_clk 41>, <&sys_clk 42>;
++			reset-names = "evea", "exiv", "adamv";
++			resets = <&sys_rst 41>, <&sys_rst 42>, <&adamv_rst 0>;
++			#sound-dai-cells = <1>;
++
++			evea_line_port: port at 0 {
++				evea_line: endpoint {
++					remote-endpoint = <&i2s_line>;
++				};
++			};
++
++			evea_hp_port: port at 1 {
++				evea_hp: endpoint {
++					remote-endpoint = <&i2s_hp>;
++				};
++			};
++		};
++
+ 		adamv at 57920000 {
+ 			compatible = "socionext,uniphier-ld11-adamv",
+ 				     "simple-mfd", "syscon";
+@@ -475,3 +559,11 @@
+ };
+ 
+ #include "uniphier-pinctrl.dtsi"
++
++&pinctrl_aout {
++	drive-strength = <4>;	/* default: 4mA */
++	group_1 {
++		pins = "AO1ARC";
++		drive-strength = <8>;	/* 8mA */
++	};
++};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
+index fc2bc9d75d35..2d49163cfde4 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
+@@ -37,6 +37,27 @@
+ 		device_type = "memory";
+ 		reg = <0 0x80000000 0 0xc0000000>;
+ 	};
++
++	sound {
++		compatible = "audio-graph-card";
++		label = "UniPhier LD20";
++		widgets = "Headphone", "Headphone Jack";
++
++		dais = <&i2s_port2
++			&i2s_port4
++			&spdif_port0>;
++	};
++
++	spdif-out {
++		compatible = "linux,spdif-dit";
++		#sound-dai-cells = <0>;
++
++		port at 0 {
++			spdif_tx: endpoint {
++				remote-endpoint = <&spdif_hiecout1>;
++			};
++		};
++	};
+ };
+ 
+ &serial0 {
+@@ -54,3 +75,7 @@
+ &nand {
+ 	status = "okay";
+ };
++
++&spdif_hiecout1 {
++	remote-endpoint = <&spdif_tx>;
++};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 8a3276ba2da1..9d0f23f100df 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -287,6 +287,90 @@
+ 						     <21 217 3>;
+ 		};
+ 
++		audio: audio at 56000000 {
++			compatible = "socionext,uniphier-ld20-aio";
++			reg = <0x56000000 0x80000>;
++			interrupts = <0 144 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_aout>;
++			clock-names = "aio";
++			clocks = <&sys_clk 40>;
++			reset-names = "aio";
++			resets = <&sys_rst 40>;
++			#sound-dai-cells = <1>;
++
++			i2s_port0: port at 0 {
++				i2s_hdmi: endpoint {
++				};
++			};
++
++			i2s_port1: port at 1 {
++				i2s_pcmin2: endpoint {
++				};
++			};
++
++			i2s_port2: port at 2 {
++				i2s_line: endpoint {
++					dai-format = "i2s";
++					remote-endpoint = <&evea_line>;
++				};
++			};
++
++			i2s_port3: port at 3 {
++				i2s_hpcmout1: endpoint {
++				};
++			};
++
++			i2s_port4: port at 4 {
++				i2s_hp: endpoint {
++					dai-format = "i2s";
++					remote-endpoint = <&evea_hp>;
++				};
++			};
++
++			spdif_port0: port at 5 {
++				spdif_hiecout1: endpoint {
++				};
++			};
++
++			src_port0: port at 6 {
++				i2s_epcmout2: endpoint {
++				};
++			};
++
++			src_port1: port at 7 {
++				i2s_epcmout3: endpoint {
++				};
++			};
++
++			comp_spdif_port0: port at 8 {
++				comp_spdif_hiecout1: endpoint {
++				};
++			};
++		};
++
++		evea: codec at 57900000 {
++			compatible = "socionext,uniphier-evea";
++			reg = <0x57900000 0x1000>;
++			clock-names = "evea", "exiv";
++			clocks = <&sys_clk 41>, <&sys_clk 42>;
++			reset-names = "evea", "exiv", "adamv";
++			resets = <&sys_rst 41>, <&sys_rst 42>, <&adamv_rst 0>;
++			#sound-dai-cells = <1>;
++
++			evea_line_port: port at 0 {
++				evea_line: endpoint {
++					remote-endpoint = <&i2s_line>;
++				};
++			};
++
++			evea_hp_port: port at 1 {
++				evea_hp: endpoint {
++					remote-endpoint = <&i2s_hp>;
++				};
++			};
++		};
++
+ 		adamv at 57920000 {
+ 			compatible = "socionext,uniphier-ld20-adamv",
+ 				     "simple-mfd", "syscon";
+@@ -528,3 +612,15 @@
+ };
+ 
+ #include "uniphier-pinctrl.dtsi"
++
++&pinctrl_aout {
++	drive-strength = <4>;	/* default: 3.5mA */
++	group_1 {
++		pins = "AO1DACCK";
++		drive-strength = <5>;	/* 5mA */
++	};
++	group_2 {
++		pins = "AO1ARC";
++		drive-strength = <11>;	/* 11mA */
++	};
++};
+-- 
+2.15.1
