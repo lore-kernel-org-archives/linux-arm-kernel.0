@@ -1,62 +1,34 @@
 From: liwei213@huawei.com (Li Wei)
-Date: Tue, 13 Feb 2018 18:14:09 +0800
-Subject: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+Date: Tue, 13 Feb 2018 18:14:11 +0800
+Subject: [PATCH v8 4/5] arm64: defconfig: enable configs for Hisilicon ufs
 In-Reply-To: <20180213101412.5717-1-liwei213@huawei.com>
 References: <20180213101412.5717-1-liwei213@huawei.com>
-Message-ID: <20180213101412.5717-3-liwei213@huawei.com>
+Message-ID: <20180213101412.5717-5-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add ufs node document for Hisilicon.
+This enable configs for Hisilicon Hixxxx UFS driver.
 
 Signed-off-by: Li Wei <liwei213@huawei.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-new file mode 100644
-index 000000000000..0d21b57496cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-@@ -0,0 +1,37 @@
-+* Hisilicon Universal Flash Storage (UFS) Host Controller
-+
-+UFS nodes are defined to describe on-chip UFS hardware macro.
-+Each UFS Host Controller should have its own node.
-+
-+Required properties:
-+- compatible        : compatible list, contains one of the following -
-+					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
-+					host controller present on Hi36xx chipset.
-+- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-+- interrupt-parent  : interrupt device
-+- interrupts        : interrupt number
-+- clocks	        : List of phandle and clock specifier pairs
-+- clock-names       : List of clock input name strings sorted in the same
-+					order as the clocks property. "ref_clk", "phy_clk" is optional
-+- resets            : reset node register, one reset the clk and the other reset the controller
-+- reset-names       : describe reset node register
-+
-+Example:
-+
-+	ufs: ufs at ff3b0000 {
-+		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-+		/* 0: HCI standard */
-+		/* 1: UFS SYS CTRL */
-+		reg = <0x0 0xff3b0000 0x0 0x1000>,
-+			<0x0 0xff3b1000 0x0 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-+			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-+		clock-names = "ref_clk", "phy_clk";
-+		/* offset: 0x84; bit: 12 */
-+		/* offset: 0x84; bit: 7  */
-+		resets = <&crg_rst 0x84 12>,
-+			<&crg_rst 0x84 7>;
-+		reset-names = "rst", "assert";
-+	};
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6356c6da34ea..fa6f921eed86 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -174,6 +174,9 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_SAS_ATA=y
+ CONFIG_SCSI_HISI_SAS=y
+ CONFIG_SCSI_HISI_SAS_PCI=y
++CONFIG_SCSI_UFSHCD=y
++CONFIG_SCSI_UFSHCD_PLATFORM=y
++CONFIG_SCSI_UFS_HISI=y
+ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_AHCI_PLATFORM=y
 -- 
 2.15.0
