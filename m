@@ -1,109 +1,38 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Tue, 13 Feb 2018 12:54:56 +0000
-Subject: [PATCH v2 09/12] ARM: dts: STi: Add fake reg property for sound
- related nodes
-In-Reply-To: <CABGGiszvx=Nyeq+KTt9uHGwSabxsJuEfvG01H4NyrBtB40atoA@mail.gmail.com>
-References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
- <1518446590-16800-10-git-send-email-patrice.chotard@st.com>
- <CABGGiszvx=Nyeq+KTt9uHGwSabxsJuEfvG01H4NyrBtB40atoA@mail.gmail.com>
-Message-ID: <99afc3f9-d0b4-b13c-ac97-4347f25aa000@st.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 13 Feb 2018 12:58:56 +0000
+Subject: [PATCH 29/37] iommu/arm-smmu-v3: Add stall support for platform
+ devices
+In-Reply-To: <5A824359.1080005@huawei.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-30-jean-philippe.brucker@arm.com>
+ <5A824359.1080005@huawei.com>
+Message-ID: <f8005429-8e51-fe54-17f8-820543883ce9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Hi,
 
-On 02/12/2018 04:40 PM, Rob Herring wrote:
-> On Mon, Feb 12, 2018 at 8:43 AM,  <patrice.chotard@st.com> wrote:
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> Add fake reg property to sound, simple-audio-card, dai-link and
->> sti_sasg_codec nodes, this allows to fix the following warning
->> when compiling dtb with W=1 option:
->>
->> arch/arm/boot/dts/stih407-b2120.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
->> arch/arm/boot/dts/stih407-b2120.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 1 has a unit name, but no reg property
->> arch/arm/boot/dts/stih407-b2120.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 2 has a unit name, but no reg property
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
->> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->>
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 1 has a unit name, but no reg property
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 2 has a unit name, but no reg property
->> arch/arm/boot/dts/stih407-b2120.dtb: Warning (simple_bus_reg):
->> Node /soc/sound missing or empty reg/ranges property
->> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
->> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->>
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (unit_address_vs_reg):
->> Node /soc/sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
->> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
->> Node /soc/sound missing or empty reg/ranges property
->>
->> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
->> Node /soc/sti-sasg-codec missing or empty reg/ranges property
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->> ---
->>
->> v2: _ add a fake reg property to node without reg property.
->>
->>   arch/arm/boot/dts/stih407-family.dtsi |  3 ++-
->>   arch/arm/boot/dts/stih410-b2260.dts   |  5 +++--
->>   arch/arm/boot/dts/stihxxx-b2120.dtsi  | 11 ++++++-----
->>   3 files changed, 11 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
->> index 5df827b00eb6..df1a3f1dc5a7 100644
->> --- a/arch/arm/boot/dts/stih407-family.dtsi
->> +++ b/arch/arm/boot/dts/stih407-family.dtsi
->> @@ -894,8 +894,9 @@
->>                          status = "disabled";
->>                  };
->>
->> -               sti_sasg_codec: sti-sasg-codec {
->> +               sti_sasg_codec: sti-sasg-codec at 0 {
->>                          compatible = "st,stih407-sas-codec";
->> +                       reg = <0 0>;
->>                          #sound-dai-cells = <1>;
->>                          status = "disabled";
->>                          st,syscfg = <&syscfg_core>;
+On 13/02/18 01:46, Xu Zaibo wrote:
+> Hi,
 > 
-> This should probably be a child of syscfg to fix this. And if this
-> block has a dedicated set of registers, then use reg to define those
-> (even though regmap/syscon doesn't need it).
-
-Ok, i will mode this node
-
-> 
->> diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
->> index 8bcd58118dba..03d05a98b7fc 100644
->> --- a/arch/arm/boot/dts/stih410-b2260.dts
->> +++ b/arch/arm/boot/dts/stih410-b2260.dts
->> @@ -181,12 +181,13 @@
->>                          status = "okay";
->>                  };
+> On 2018/2/13 2:33, Jean-Philippe Brucker wrote:
+>> The SMMU provides a Stall model for handling page faults in platform
+>> devices. It is similar to PCI PRI, but doesn't require devices to have
+>> their own translation cache. Instead, faulting transactions are parked and
+>> the OS is given a chance to fix the page tables and retry the transaction.
 >>
->> -               sound {
->> +               sound: sound at 0 {
-> 
-> I'd move this up to top level.
+>> Enable stall for devices that support it (opt-in by firmware). When an
+>> event corresponds to a translation error, call the IOMMU fault handler. If
+>> the fault is recoverable, it will call us back to terminate or continue
+>> the stall.
+>>
+>> Note that this patch tweaks the iommu_fault_event and page_response_msg to
+>> extend the fault id field. Stall uses 16 bits of IDs whereas PCI PRI only
+>> uses 9.
+> For PCIe devices without ATC,  can they use this Stall model?
 
-Ok
+Unfortunately no, Stall it is incompatible with PCI. Timing constraints in
+PCI prevent from stalling transactions in the IOMMU.
 
-Thanks
-
-Patrice
-
-
-
-> 
-> Rob
-> 
+Thanks,
+Jean
