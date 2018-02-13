@@ -1,72 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Feb 2018 13:56:49 +0000
-Subject: revisit arm64 per-task stack canaries
-In-Reply-To: <20180213125201.otz3cse4wftcq4fe@lakrids.cambridge.arm.com>
-References: <CAKv+Gu9RAXhMAwKJgNAZEBZRMNfpyDNS-rxa+U2EpNxEVq77vQ@mail.gmail.com>
- <20180213125201.otz3cse4wftcq4fe@lakrids.cambridge.arm.com>
-Message-ID: <CAKv+Gu-WVMnk2AhB9ziupL-TQoR8gZ121mkQAV9mvbgjirhbmg@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 13 Feb 2018 15:51:33 +0100
+Subject: [PATCH 2/2] clk: meson-axg: Add AO Clock and Reset controller
+ driver
+In-Reply-To: <1518449571.2883.30.camel@baylibre.com>
+References: <20180209070026.193879-1-yixun.lan@amlogic.com>
+ <20180209070026.193879-3-yixun.lan@amlogic.com>
+ <1518449571.2883.30.camel@baylibre.com>
+Message-ID: <1518533493.2883.35.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 February 2018 at 12:52, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Feb 13, 2018 at 12:36:02PM +0000, Ard Biesheuvel wrote:
->> Hello all,
->
-> Hi,
->
->> In summary, the default aarch64 way of using a single value for the
->> stack canary for all threads sharing an address space severely limits
->> the kernel's ability to implement stack canaries in a meaningful way.
->>
->> Originally, we assumed that the only way to overcome this was to
->> implement per-CPU stack canaries, where each CPU loads the stack
->> canary of the task it executes at context switch. This is racy and
->> cumbersome in the presence of kernel support of VHE, which means the
->> per-CPU thread ID register is not fixed at compile time.
->>
->> Instead, I have proposed a proof of concept [0] where the compiler
->> emits an instruction sequence that loads the canary directly from the
->> task struct, which is the per-thread data structure maintained by the
->> kernel. Accessing that can be done safely without any of the
->> limitations per-CPU variables have. The task struct pointer is kept in
->> system register sp_el0 while running in the kernel.
->
-> My major concern here is being tied to using sysregs in a particular
-> way. We might want to fiddle with that in future (e.g. using the
-> platform register as an optimization, or switching to a different sysreg
-> due to architectural extensions).
->
+On Mon, 2018-02-12 at 16:32 +0100, Jerome Brunet wrote:
+> On Fri, 2018-02-09 at 15:00 +0800, Yixun Lan wrote:
+> > Adds a Clock and Reset controller driver for the Always-On part
+> > of the Amlogic Meson-AXG SoC.
+> > 
+> > Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+> > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> > ---
+> >   drivers/clk/meson/Makefile    |   2 +-
+> >   drivers/clk/meson/axg-aoclk.c | 236 ++++++++++++++++++++++++++++++++++++++++++
+> >   drivers/clk/meson/axg-aoclk.h |  25 +++++
+> >   3 files changed, 262 insertions(+), 1 deletion(-)
+> >   create mode 100644 drivers/clk/meson/axg-aoclk.c
+> >   create mode 100644 drivers/clk/meson/axg-aoclk.h
 
-Yes. Also, there is a disparity between userland (using tpidr_el0) and
-kernel (using sp_el0), and perhaps it would make more sense to switch
-to tpidr_el0 in the kernel as well. But the general objection remains.
+Yixun,
 
->> The purpose of this email to reach agreement between the various
->> stakeholders (mainly the arm64 linux maintainers and the ARM GCC
->> maintainers) on a way to proceed with implementing this in GCC.
->
-> Would it be possible to have an always inline function to get the
-> canary, which GCC would implicitly fold into functions as necessary?
->
-> ... then we could have something in a header, like:
->
-> static __always_inline unsigned long get_task_canary(void)
-> {
->         return current->canary;
-> }
->
-> ... which we could change in future as needs change.
->
+Actually, looking at this driver further, except for some of the data, the
+driver is exactly the same as gxbb-aoclk. There is no reason to duplicate all
+this code.
 
-This is a question to the compiler folks, I suppose, but I'd venture a
-guess that this is rather hard. Perhaps a true function call would be
-better if it is done in a way that can be optimized by LTO (this is of
-course assuming that by GCC 9, this is something we are likely to use
-in the kernel)
+I'd prefer if you'd factor all this in a dedicated driver.
+This philosophy is more or less the same as meson's pinctrl drivers, which all
+provides their own data and bindings but share the driver code.
 
-An alternative could be to decide to rely on a GCC plugin instead
-(although this would not be my preference). My poc implementation is a
-bit clunky, but I did not spend a lot of time on it. If we can refine
-it to replace the high/lo ref to __stack_chk_guard with something more
-robust, then we remain in control of which register and/or symbol ref
-we use and we don't paint ourselves into a corner.
+Regards
+Jerome
