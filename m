@@ -1,51 +1,77 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 13 Feb 2018 13:08:19 +0000
-Subject: [PATCH v5 14/26] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
-In-Reply-To: <1518457475-4480-15-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1518457475-4480-15-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <TY1PR06MB0895970E6725F954D1A97E4CC0F60@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Tue, 13 Feb 2018 12:58:52 +0000
+Subject: [PATCH v2 10/12] ARM: dts: STi: Add fake reg property for clocks
+In-Reply-To: <CABGGisxgejFHj0xQq-aBQETt9CX3OzLc3ER_Y9nyrw7FeLdt6g@mail.gmail.com>
+References: <1518446590-16800-1-git-send-email-patrice.chotard@st.com>
+ <1518446590-16800-11-git-send-email-patrice.chotard@st.com>
+ <CABGGisxgejFHj0xQq-aBQETt9CX3OzLc3ER_Y9nyrw7FeLdt6g@mail.gmail.com>
+Message-ID: <ce036283-586b-0603-2c85-a502ed656e72@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Hi Rob
 
-what do you think about enabling the watchdog in multi_v7_defconfig as a module?
+On 02/12/2018 04:22 PM, Rob Herring wrote:
+> On Mon, Feb 12, 2018 at 8:43 AM,  <patrice.chotard@st.com> wrote:
+>> From: Patrice Chotard <patrice.chotard@st.com>
+>>
+>> For all clock's element inside SoC, add a fake reg property,
+>> this allows to fix the following warnings when compiling
+>> dtb with W=1 option :
+>>
+>> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+>> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+>> arch/arm/boot/dts/stih410-b2120.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+>>
+>> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+>> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+>> arch/arm/boot/dts/stih410-b2260.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+>>
+>> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-m-a9-periphs missing or empty reg/ranges property
+>> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-m-a9-ext2f-div2s missing or empty reg/ranges property
+>> arch/arm/boot/dts/stih418-b2199.dtb: Warning (simple_bus_reg):
+>> Node /clocks/clk-tmdsout-hdmi missing or empty reg/ranges property
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>> ---
+>>
+>> v2: _ add a fake reg property to node without reg property.
+>>
+>>   arch/arm/boot/dts/stih407-clock.dtsi | 9 ++++++---
+>>   arch/arm/boot/dts/stih410-clock.dtsi | 9 ++++++---
+>>   arch/arm/boot/dts/stih418-clock.dtsi | 9 ++++++---
+>>   3 files changed, 18 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+>> index b882dcf3a649..1bba47e06ebe 100644
+>> --- a/arch/arm/boot/dts/stih407-clock.dtsi
+>> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
+>> @@ -24,9 +24,10 @@
+>>                  /*
+>>                   * ARM Peripheral clock for timers
+>>                   */
+>> -               arm_periph_clk: clk-m-a9-periphs {
+>> +               arm_periph_clk: clk-m-a9-periphs at 0 {
+>>                          #clock-cells = <0>;
+>>                          compatible = "fixed-factor-clock";
+>> +                       reg = <0 0>;
+> 
+> Don't do this. The correct fix is change the location of these nodes
+> to be under whatever controls them.
+> 
+Ok i will put this node as a child of clockgen-a9 at 92b0000
 
-Thanks,
-Fab
+Thanks
 
-> Subject: [PATCH v5 14/26] ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
->
-> R-Car Gen2 and RZ/G1 platforms come with a watchdog IP, therefore enable
-> its driver by default.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
-> v4->v5:
-> * no change
->
->  arch/arm/configs/shmobile_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index 578434c..d5cdad8 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -132,6 +132,7 @@ CONFIG_CPU_THERMAL=y
->  CONFIG_RCAR_THERMAL=y
->  CONFIG_WATCHDOG=y
->  CONFIG_DA9063_WATCHDOG=y
-> +CONFIG_RENESAS_WDT=y
->  CONFIG_MFD_AS3711=y
->  CONFIG_MFD_DA9063=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> --
-> 2.7.4
+Patrice
 
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+> Rob
+> 
