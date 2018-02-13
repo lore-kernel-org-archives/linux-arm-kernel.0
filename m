@@ -1,116 +1,43 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 12 Feb 2018 16:51:58 -0800
-Subject: [PATCH v3 2/3] arm64: dts: sdm845: Add minimal dts files for
- sdm845 SoC/MTP
-In-Reply-To: <20180212062832.2791-3-rnayak@codeaurora.org>
-References: <20180212062832.2791-1-rnayak@codeaurora.org>
- <20180212062832.2791-3-rnayak@codeaurora.org>
-Message-ID: <CAD=FV=UQ4YD7M8pqReBwE2etUbhuewye0akp0P9SuTnjwLgL4w@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 12 Feb 2018 17:13:02 -0800
+Subject: [PATCH] arm64: defconfig: Enable the APCS IPC driver on Qualcomm
+ platforms
+In-Reply-To: <6ab84c75aadc152fdd7c63282ee6690096b8b704.1518415510.git.amit.kucheria@linaro.org>
+References: <6ab84c75aadc152fdd7c63282ee6690096b8b704.1518415510.git.amit.kucheria@linaro.org>
+Message-ID: <20180213011302.GZ7250@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon 12 Feb 03:03 PST 2018, Amit Kucheria wrote:
 
-On Sun, Feb 11, 2018 at 10:28 PM, Rajendra Nayak <rnayak@codeaurora.org> wrote:
-> Add a skeletal sdm845 SoC dtsi and MTP board dts/dtsi files
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> The APCS block is present on several Qualcomm SoCs e.g. 8916, 8996.  On the
+> 8916 it is needed to enable the clock controller that in turn enables
+> cpufreq on the platform while on the 8996 it is needed for communication
+> with RPM.
+> 
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 > ---
->  arch/arm64/boot/dts/qcom/Makefile       |   1 +
->  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  13 ++
->  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 275 ++++++++++++++++++++++++++++++++
->  3 files changed, 289 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->  create mode 100644 arch/arm64/boot/dts/qcom/sdm845.dtsi
->
-> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-> index 55ec5ee7f7e8..9319e74b8906 100644
-> --- a/arch/arm64/boot/dts/qcom/Makefile
-> +++ b/arch/arm64/boot/dts/qcom/Makefile
-> @@ -6,3 +6,4 @@ dtb-$(CONFIG_ARCH_QCOM) += msm8916-mtp.dtb
->  dtb-$(CONFIG_ARCH_QCOM)        += msm8992-bullhead-rev-101.dtb
->  dtb-$(CONFIG_ARCH_QCOM)        += msm8994-angler-rev-101.dtb
->  dtb-$(CONFIG_ARCH_QCOM)        += msm8996-mtp.dtb
-> +dtb-$(CONFIG_ARCH_QCOM)        += sdm845-mtp.dtb
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-> new file mode 100644
-> index 000000000000..617c7bb25fb1
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-> @@ -0,0 +1,13 @@
-> +// SPDX-License-Identifier: GPL-2.0
-
-It would, of course, be up to Qualcomm.  ...but might I suggest instead:
-
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-The device tree files really don't have any special secret sauce in
-them and IIRC allowing them to have a more permissive MIT license _or_
-a GPL allowed people to run other operating systems on these boards.
-This kind of thing is better to fix now so we don't have to go and get
-everyone's permission later on.
-
-In the past we went through this with Rockchip SoCs in commit
-b1772506206f ("ARM: dts: rockchip: relicense rk3288.dtsi under
-GPLv2/X11").
-
-
-> +/*
-> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> + */
-
-IMHO add an extra line to this comment with a description to avoid the
-bike shedding of how we're supposed to do 1-line comments in device
-tree files.  AKA:
-
-/*
- * SDM845 MTP board device tree source
- *
- * Copyright (c) 2018, The Linux Foundation. All rights reserved.
- */
-
-
-> +
-> +/dts-v1/;
-> +
-> +#include "sdm845.dtsi"
-> +
-> +/ {
-> +       model = "Qualcomm Technologies, Inc. SDM845 MTP";
-> +       compatible = "qcom,sdm845-mtp";
-
-For me checkpatch complains about this.  It looks like the file
-"Documentation/devicetree/bindings/arm/qcom.txt" needs to be updated
-with "sdm845".  I don't think that will make checkpatch be quiet
-(since  that file doesn't have a full list of every board), but it
-still should be the correct thing to do.
-
-
-> +};
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> new file mode 100644
-> index 000000000000..55a7e0b454e1
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -0,0 +1,275 @@
-> +// SPDX-License-Identifier: GPL-2.0
-
-As per above, suggest dual licensed?
-
-
-> +/*
-> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-
-As per above, suggest adding an extra line to avoid the bikeshed.
-
-SDM845 SoC device tree source
-
-
-Besides those things, everything looks good as far as I can see.  I'm
-not an expert on every one of the devices used in this file, but
-reading through bindings docs and looking at other users of them, it
-looks sane enough.  Thus, with the above nits fixed you can feel free
-to add my Reviewed-by.
-
-
--Doug
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 634b373..96a8ed8 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -525,6 +525,7 @@ CONFIG_ARM_MHU=y
+>  CONFIG_PLATFORM_MHU=y
+>  CONFIG_BCM2835_MBOX=y
+>  CONFIG_HI6220_MBOX=y
+> +CONFIG_QCOM_APCS_IPC=y
+>  CONFIG_ROCKCHIP_IOMMU=y
+>  CONFIG_ARM_SMMU=y
+>  CONFIG_ARM_SMMU_V3=y
+> -- 
+> 2.7.4
+> 
