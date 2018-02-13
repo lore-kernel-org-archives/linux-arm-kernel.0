@@ -1,131 +1,262 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 13 Feb 2018 21:28:12 +0800
-Subject: [PATCH RESEND V3 7/9] clk: imx: make mux parent strings const
+Date: Tue, 13 Feb 2018 21:28:08 +0800
+Subject: [PATCH RESEND V3 3/9] clk: imx: add pllv4 support
 In-Reply-To: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
 References: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1518528494-25723-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1518528494-25723-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the commit 2893c379461a ("clk: make strings in parent name arrays
-const"), let's make the parent strings const, otherwise we may meet
-the following warning when compiling:
+pllv4 is designed for System Clock Generation (SCG) module observed
+in IMX ULP SoC series. e.g. i.MX7ULP.
 
-drivers/clk/imx/clk-imx7ulp.c: In function 'imx7ulp_clocks_init':
-drivers/clk/imx/clk-imx7ulp.c:73:35: warning: passing argument 5 of
-	'imx_clk_mux_flags' discards 'const' qualifier from pointer target type
-
-  clks[IMX7ULP_CLK_APLL_PRE_SEL] = imx_clk_mux_flags("apll_pre_sel", base + 0x508, 0,
-	1, pll_pre_sels, ARRAY_SIZE(pll_pre_sels), CLK_SET_PARENT_GATE);
-                                   ^
-In file included from drivers/clk/imx/clk-imx7ulp.c:23:0:
-drivers/clk/imx/clk.h:200:27: note: expected 'const char **' but argument is
- of type 'const char * const*'
-...
+The SCG modules generates clock used to derive processor, system,
+peripheral bus and external memory interface clocks while this patch
+intends to support the PLL part.
 
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Anson Huang <Anson.Huang@nxp.com>
+Cc: Bai Ping <ping.bai@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
 ChangeLog:
-v1->v3: no changes
+v2->v3:
+ * no changes
+v1->v2:
+ * remove clk_pllv4_is_enabled() check in set_rate, instead it will
+   be handled by core later.
+ * use readl_poll_timeout
+ * use clk_hw_register instead of clk_register
+ * other minor changes
 ---
- drivers/clk/imx/clk-busy.c      |  2 +-
- drivers/clk/imx/clk-fixup-mux.c |  2 +-
- drivers/clk/imx/clk.h           | 18 +++++++++++-------
- 3 files changed, 13 insertions(+), 9 deletions(-)
+ drivers/clk/imx/Makefile    |   1 +
+ drivers/clk/imx/clk-pllv4.c | 188 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h       |   3 +
+ 3 files changed, 192 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-pllv4.c
 
-diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
-index 6df3389..ba1541f 100644
---- a/drivers/clk/imx/clk-busy.c
-+++ b/drivers/clk/imx/clk-busy.c
-@@ -154,7 +154,7 @@ static const struct clk_ops clk_busy_mux_ops = {
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index f91f2b2..2f00b03 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -11,6 +11,7 @@ obj-y += \
+ 	clk-pllv1.o \
+ 	clk-pllv2.o \
+ 	clk-pllv3.o \
++	clk-pllv4.o \
+ 	clk-pfd.o
  
- struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
- 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
--			     const char **parent_names, int num_parents)
-+			     const char * const *parent_names, int num_parents)
- {
- 	struct clk_busy_mux *busy;
- 	struct clk *clk;
-diff --git a/drivers/clk/imx/clk-fixup-mux.c b/drivers/clk/imx/clk-fixup-mux.c
-index c9b327e..44817c1 100644
---- a/drivers/clk/imx/clk-fixup-mux.c
-+++ b/drivers/clk/imx/clk-fixup-mux.c
-@@ -70,7 +70,7 @@ static const struct clk_ops clk_fixup_mux_ops = {
- };
- 
- struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
--			      u8 shift, u8 width, const char **parents,
-+			      u8 shift, u8 width, const char * const *parents,
- 			      int num_parents, void (*fixup)(u32 *val))
- {
- 	struct clk_fixup_mux *fixup_mux;
+ obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
+diff --git a/drivers/clk/imx/clk-pllv4.c b/drivers/clk/imx/clk-pllv4.c
+new file mode 100644
+index 0000000..47e4d1c
+--- /dev/null
++++ b/drivers/clk/imx/clk-pllv4.c
+@@ -0,0 +1,188 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
++ *
++ * Author: Dong Aisheng <aisheng.dong@nxp.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/iopoll.h>
++#include <linux/slab.h>
++
++/* PLL Control Status Register (xPLLCSR) */
++#define PLL_CSR_OFFSET		0x0
++#define PLL_VLD			BIT(24)
++#define PLL_EN			BIT(0)
++
++/* PLL Configuration Register (xPLLCFG) */
++#define PLL_CFG_OFFSET		0x08
++#define BP_PLL_MULT		16
++#define BM_PLL_MULT		(0x7f << 16)
++
++/* PLL Numerator Register (xPLLNUM) */
++#define PLL_NUM_OFFSET		0x10
++
++/* PLL Denominator Register (xPLLDENOM) */
++#define PLL_DENOM_OFFSET	0x14
++
++struct clk_pllv4 {
++	struct clk_hw	hw;
++	void __iomem	*base;
++};
++
++/* Valid PLL MULT Table */
++static const int pllv4_mult_table[] = {33, 27, 22, 20, 17, 16};
++
++#define to_clk_pllv4(__hw) container_of(__hw, struct clk_pllv4, hw)
++
++#define LOCK_TIMEOUT_US		USEC_PER_MSEC
++
++static inline int clk_pllv4_wait_lock(struct clk_pllv4 *pll)
++{
++	u32 csr;
++
++	return readl_poll_timeout(pll->base  + PLL_CSR_OFFSET,
++				  csr, csr & PLL_VLD, 0, LOCK_TIMEOUT_US);
++}
++
++static int clk_pllv4_is_enabled(struct clk_hw *hw)
++{
++	struct clk_pllv4 *pll = to_clk_pllv4(hw);
++
++	if (readl_relaxed(pll->base) & PLL_EN)
++		return 1;
++
++	return 0;
++}
++
++static unsigned long clk_pllv4_recalc_rate(struct clk_hw *hw,
++					   unsigned long parent_rate)
++{
++	struct clk_pllv4 *pll = to_clk_pllv4(hw);
++	u32 div;
++
++	div = readl_relaxed(pll->base + PLL_CFG_OFFSET);
++	div &= BM_PLL_MULT;
++	div >>= BP_PLL_MULT;
++
++	return parent_rate * div;
++}
++
++static long clk_pllv4_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *prate)
++{
++	unsigned long parent_rate = *prate;
++	unsigned long round_rate, i;
++
++	for (i = 0; i < ARRAY_SIZE(pllv4_mult_table); i++) {
++		round_rate = parent_rate * pllv4_mult_table[i];
++		if (rate >= round_rate)
++			return round_rate;
++	}
++
++	return round_rate;
++}
++
++static bool clk_pllv4_is_valid_mult(unsigned int mult)
++{
++	int i;
++
++	/* check if mult is in valid MULT table */
++	for (i = 0; i < ARRAY_SIZE(pllv4_mult_table); i++) {
++		if (pllv4_mult_table[i] == mult)
++			return true;
++	}
++
++	return false;
++}
++
++static int clk_pllv4_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct clk_pllv4 *pll = to_clk_pllv4(hw);
++	u32 val, mult;
++
++	mult = rate / parent_rate;
++
++	if (clk_pllv4_is_valid_mult(mult))
++		return -EINVAL;
++
++	val = readl_relaxed(pll->base + PLL_CFG_OFFSET);
++	val &= ~BM_PLL_MULT;
++	val |= mult << BP_PLL_MULT;
++	writel_relaxed(val, pll->base + PLL_CFG_OFFSET);
++
++	return 0;
++}
++
++static int clk_pllv4_enable(struct clk_hw *hw)
++{
++	u32 val;
++	struct clk_pllv4 *pll = to_clk_pllv4(hw);
++
++	val = readl_relaxed(pll->base);
++	val |= PLL_EN;
++	writel_relaxed(val, pll->base);
++
++	return clk_pllv4_wait_lock(pll);
++}
++
++static void clk_pllv4_disable(struct clk_hw *hw)
++{
++	u32 val;
++	struct clk_pllv4 *pll = to_clk_pllv4(hw);
++
++	val = readl_relaxed(pll->base);
++	val &= ~PLL_EN;
++	writel_relaxed(val, pll->base);
++}
++
++static const struct clk_ops clk_pllv4_ops = {
++	.recalc_rate	= clk_pllv4_recalc_rate,
++	.round_rate	= clk_pllv4_round_rate,
++	.set_rate	= clk_pllv4_set_rate,
++	.enable		= clk_pllv4_enable,
++	.disable	= clk_pllv4_disable,
++	.is_enabled	= clk_pllv4_is_enabled,
++};
++
++struct clk_hw *imx_clk_pllv4(const char *name, const char *parent_name,
++			  void __iomem *base)
++{
++	struct clk_pllv4 *pll;
++	struct clk_hw *hw;
++	struct clk_init_data init;
++	int ret;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	pll->base = base;
++
++	init.name = name;
++	init.ops = &clk_pllv4_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++	init.flags = CLK_SET_RATE_GATE;
++
++	pll->hw.init = &init;
++
++	hw = &pll->hw;
++	ret = clk_hw_register(NULL, hw);
++	if (ret) {
++		kfree(pll);
++		hw = ERR_PTR(ret);
++	}
++
++	return hw;
++}
 diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index fed7660..956155c 100644
+index d69c4bb..52f7c9d 100644
 --- a/drivers/clk/imx/clk.h
 +++ b/drivers/clk/imx/clk.h
-@@ -69,7 +69,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+@@ -42,6 +42,9 @@ enum imx_pllv3_type {
+ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+ 		const char *parent_name, void __iomem *base, u32 div_mask);
  
- struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
- 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
--			     const char **parent_names, int num_parents);
-+			     const char * const *parent_names, int num_parents);
- 
- struct clk_hw *imx_clk_composite(const char *name,
- 				 const char * const *parent_names,
-@@ -82,7 +82,7 @@ struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
- 				  void (*fixup)(u32 *val));
- 
- struct clk *imx_clk_fixup_mux(const char *name, void __iomem *reg,
--			      u8 shift, u8 width, const char **parents,
-+			      u8 shift, u8 width, const char * const *parents,
- 			      int num_parents, void (*fixup)(u32 *val));
- 
- static inline struct clk *imx_clk_fixed(const char *name, int rate)
-@@ -91,7 +91,8 @@ static inline struct clk *imx_clk_fixed(const char *name, int rate)
- }
- 
- static inline struct clk *imx_clk_mux_ldb(const char *name, void __iomem *reg,
--		u8 shift, u8 width, const char **parents, int num_parents)
-+			u8 shift, u8 width, const char * const *parents,
-+			int num_parents)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
- 			CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT, reg,
-@@ -190,7 +191,8 @@ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
- }
- 
- static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
--		u8 shift, u8 width, const char **parents, int num_parents)
-+			u8 shift, u8 width, const char * const *parents,
-+			int num_parents)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
- 			CLK_SET_RATE_NO_REPARENT, reg, shift,
-@@ -198,7 +200,8 @@ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
- }
- 
- static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
--		u8 shift, u8 width, const char **parents, int num_parents)
-+			u8 shift, u8 width, const char * const *parents,
-+			int num_parents)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
- 			CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE,
-@@ -206,8 +209,9 @@ static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
- }
- 
- static inline struct clk *imx_clk_mux_flags(const char *name,
--		void __iomem *reg, u8 shift, u8 width, const char **parents,
--		int num_parents, unsigned long flags)
-+			void __iomem *reg, u8 shift, u8 width,
-+			const char * const *parents, int num_parents,
-+			unsigned long flags)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
- 			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
++struct clk_hw *imx_clk_pllv4(const char *name, const char *parent_name,
++			     void __iomem *base);
++
+ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 bit_idx, u8 cgr_val,
 -- 
 2.7.4
