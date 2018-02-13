@@ -1,36 +1,52 @@
 From: d.schultz@phytec.de (Daniel Schultz)
-Date: Tue, 13 Feb 2018 10:44:33 +0100
-Subject: [PATCH 2/3] ARM: dts: rockchip: phycore: Fix supply node for card's
- power
-In-Reply-To: <1518515074-22526-1-git-send-email-d.schultz@phytec.de>
-References: <1518515074-22526-1-git-send-email-d.schultz@phytec.de>
-Message-ID: <1518515074-22526-2-git-send-email-d.schultz@phytec.de>
+Date: Tue, 13 Feb 2018 10:44:32 +0100
+Subject: [PATCH 1/3] ARM: dts: rockchip: phycore: Remove 1.8 GHz operation
+ point
+Message-ID: <1518515074-22526-1-git-send-email-d.schultz@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wadim Egorov <w.egorov@phytec.de>
+Rockchip recommends to run the CPU cores only with operations points of
+1.6 GHz or lower.
 
-The card is powered by the RK818 switch vdd_sd which is supplied
-by VCC9 (VDD_3V3_IO).
+Removed the cpu0 node with too high operation points and use the default
+values instead.
 
-Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
 Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
 ---
- arch/arm/boot/dts/rk3288-phycore-rdk.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3288-phycore-som.dtsi | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-phycore-rdk.dts b/arch/arm/boot/dts/rk3288-phycore-rdk.dts
-index 1241cbc..ecb26f0 100644
---- a/arch/arm/boot/dts/rk3288-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/rk3288-phycore-rdk.dts
-@@ -265,7 +265,7 @@
- 	disable-wp;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
--	vmmc-supply = <&vdd_io_sd>;
-+	vmmc-supply = <&vdd_sd>;
- 	vqmmc-supply = <&vdd_io_sd>;
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/rk3288-phycore-som.dtsi b/arch/arm/boot/dts/rk3288-phycore-som.dtsi
+index 99cfae8..5eae477 100644
+--- a/arch/arm/boot/dts/rk3288-phycore-som.dtsi
++++ b/arch/arm/boot/dts/rk3288-phycore-som.dtsi
+@@ -110,26 +110,6 @@
+ 	};
  };
+ 
+-&cpu0 {
+-	cpu0-supply = <&vdd_cpu>;
+-	operating-points = <
+-		/* KHz    uV */
+-		1800000	1400000
+-		1608000	1350000
+-		1512000 1300000
+-		1416000 1200000
+-		1200000 1100000
+-		1008000 1050000
+-		 816000 1000000
+-		 696000  950000
+-		 600000  900000
+-		 408000  900000
+-		 312000  900000
+-		 216000  900000
+-		 126000  900000
+-	>;
+-};
+-
+ &emmc {
+ 	status = "okay";
+ 	bus-width = <8>;
 -- 
 2.7.4
