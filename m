@@ -1,36 +1,55 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 13 Feb 2018 15:15:30 +0100
-Subject: [PATCH 4/9] ARM: dts: exynos: Fix "debounce-interval" property
- misspelling
-In-Reply-To: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
-References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1518531335-5170-5-git-send-email-geert+renesas@glider.be>
+Date: Tue, 13 Feb 2018 15:15:26 +0100
+Subject: [PATCH 0/9] DT: Fix "debounce-interval" property misspellings
+Message-ID: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"debounce-inteval" was never supported.
+	Hi all,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
----
-Please apply to your tree when appropriate.
+This patch series fixes various misspellings of the "debounce-interval"
+DT property.
 
- arch/arm/boot/dts/exynos4412-trats2.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks for applying where appropriate!
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index f285790e8e047bb8..a1e506054fba7fde 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -157,7 +157,7 @@
- 			gpios = <&gpx0 1 GPIO_ACTIVE_LOW>;
- 			linux,code = <139>;
- 			label = "ok";
--			debounce-inteval = <10>;
-+			debounce-interval = <10>;
- 			wakeup-source;
- 		};
- 	};
+Geert Uytterhoeven (9):
+  dt-bindings: power: Fix "debounce-interval" property misspelling
+  ARM: dts: atlas7: Fix "debounce-interval" property misspelling
+  ARM: dts: kzm9d: Fix "debounce-interval" property misspelling
+  ARM: dts: exynos: Fix "debounce-interval" property misspelling
+  ARM: dts: gemini: Fix "debounce-interval" property misspelling
+  ARM: dts: kirkwood: Fix "debounce-interval" property misspelling
+  ARM: dts: OMAP5: uevm: Fix "debounce-interval" property misspelling
+  ARM: dts: Ux500: Fix "debounce-interval" property misspelling
+  arm64: dts: juno: Fix "debounce-interval" property misspelling
+
+ Documentation/devicetree/bindings/power/wakeup-source.txt |  2 +-
+ arch/arm/boot/dts/atlas7-evb.dts                          |  2 +-
+ arch/arm/boot/dts/emev2-kzm9d.dts                         |  8 ++++----
+ arch/arm/boot/dts/exynos4412-trats2.dts                   |  2 +-
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts                |  4 ++--
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts                |  2 +-
+ arch/arm/boot/dts/gemini-nas4220b.dts                     |  4 ++--
+ arch/arm/boot/dts/gemini-rut1xx.dts                       |  2 +-
+ arch/arm/boot/dts/gemini-sq201.dts                        |  2 +-
+ arch/arm/boot/dts/gemini-wbd111.dts                       |  2 +-
+ arch/arm/boot/dts/gemini-wbd222.dts                       |  2 +-
+ arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts          |  2 +-
+ arch/arm/boot/dts/omap5-uevm.dts                          |  2 +-
+ arch/arm/boot/dts/ste-snowball.dts                        | 10 +++++-----
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi             | 12 ++++++------
+ 15 files changed, 29 insertions(+), 29 deletions(-)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
