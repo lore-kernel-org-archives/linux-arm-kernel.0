@@ -1,58 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Feb 2018 10:57:25 +0000
-Subject: [PATCH] crypto: arm/aes-cipher - move S-box to .rodata section
-In-Reply-To: <20180212135237.GA3011@pjb1027-Latitude-E5410>
-References: <20180212135237.GA3011@pjb1027-Latitude-E5410>
-Message-ID: <CAKv+Gu93OdaWyMcm3nqV38-RmoYoCceQ4f4DfT65t9amRm_gFA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 13 Feb 2018 16:40:07 +0530
+Subject: [PATCH v2 15/15] ARM: dts: dra7: Add high speed modes capability
+ to MMC1/MMC2 dt node
+In-Reply-To: <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
+References: <20180206125806.19350-1-kishon@ti.com>
+ <20180206125806.19350-16-kishon@ti.com>
+ <210939ed-67fc-fa37-b4f2-c1faefcc4642@ti.com>
+ <b411cf11-61e9-e688-6f04-e624fe52ac66@ti.com>
+Message-ID: <4f18dab9-aee3-1023-d301-f142c6e2d358@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2018 at 13:52, Jinbum Park <jinb.park7@gmail.com> wrote:
-> Move the AES inverse S-box to the .rodata section
-> where it is safe from abuse by speculation.
->
-> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+On Wednesday 07 February 2018 02:51 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Wednesday 07 February 2018 02:41 PM, Sekhar Nori wrote:
+>> Kishon,
+>>
+>> On Tuesday 06 February 2018 06:28 PM, Kishon Vijay Abraham I wrote:
+>>> Add UHS/HS200/DDR speed mode capability to MMC1 and MMC2 dt nodes.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>
+>> Along with this, dont we need to have
+>>
+>> 	/delete-property/ mmc-hs200-1_8v;
+>>
+>> for eMMC on Beagle x15 which does not support HS200?
+>>
+>> Or are you planning to depend on lack of pinctrl entries for HS200 to
+>> take care of that?
+> 
+> right now it relies on lack of pinctrl entries but I think adding delete
+> property is appropriate. Actually I missed porting the patch that adds
+> /delete-property/.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Actually, thinking more, this should be probably be handled using
+"no-1-8-v" property. Reading the comment above SDHCI_QUIRK2_NO_1_8_V, it
+is specifically meant for the case when system (board) does not support
+1.8V even when host (controller) does. Which is exactly the case with
+Beagle x15.
 
-> ---
->  arch/arm/crypto/aes-cipher-core.S | 19 ++++++++++---------
->  1 file changed, 10 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/crypto/aes-cipher-core.S b/arch/arm/crypto/aes-cipher-core.S
-> index 54b3840..184d6c2 100644
-> --- a/arch/arm/crypto/aes-cipher-core.S
-> +++ b/arch/arm/crypto/aes-cipher-core.S
-> @@ -174,6 +174,16 @@
->         .ltorg
->         .endm
->
-> +ENTRY(__aes_arm_encrypt)
-> +       do_crypt        fround, crypto_ft_tab, crypto_ft_tab + 1, 2
-> +ENDPROC(__aes_arm_encrypt)
-> +
-> +       .align          5
-> +ENTRY(__aes_arm_decrypt)
-> +       do_crypt        iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
-> +ENDPROC(__aes_arm_decrypt)
-> +
-> +       .section        ".rodata", "a"
->         .align          L1_CACHE_SHIFT
->         .type           __aes_arm_inverse_sbox, %object
->  __aes_arm_inverse_sbox:
-> @@ -210,12 +220,3 @@ __aes_arm_inverse_sbox:
->         .byte           0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26
->         .byte           0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
->         .size           __aes_arm_inverse_sbox, . - __aes_arm_inverse_sbox
-> -
-> -ENTRY(__aes_arm_encrypt)
-> -       do_crypt        fround, crypto_ft_tab, crypto_ft_tab + 1, 2
-> -ENDPROC(__aes_arm_encrypt)
-> -
-> -       .align          5
-> -ENTRY(__aes_arm_decrypt)
-> -       do_crypt        iround, crypto_it_tab, __aes_arm_inverse_sbox, 0
-> -ENDPROC(__aes_arm_decrypt)
-> --
-> 1.9.1
->
+Thanks,
+Sekhar
