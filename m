@@ -1,82 +1,158 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 13 Feb 2018 09:05:12 +0100
-Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
-In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20180213080512.huhc6pkowhie74nq@verge.net.au>
+From: kevin.tian@intel.com (Tian, Kevin)
+Date: Tue, 13 Feb 2018 08:11:03 +0000
+Subject: [PATCH 04/37] iommu/sva: Add a mm_exit callback for device drivers
+In-Reply-To: <20180212183352.22730-5-jean-philippe.brucker@arm.com>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-5-jean-philippe.brucker@arm.com>
+Message-ID: <AADFC41AFE54684AB9EE6CBC0274A5D1910028F9@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 05:44:09PM +0000, Fabrizio Castro wrote:
-> Dear All,
+> From: Jean-Philippe Brucker
+> Sent: Tuesday, February 13, 2018 2:33 AM
 > 
-> this series has been around for some time as RFC, and it has collected
-> useful comments from the community along the way.
-> The solution proposed by this patch set works for most R-Car Gen2 and
-> RZ/G1 devices, but not all of them. We now know that for some R-Car
-> Gen2 early revisions there is no proper software fix. Anyway, no
-> product has been built around early revisions, but development boards
-> mounting early revisions (basically prototypes) are still out there.
-> As a result, this series isn't enabling the internal watchdog on R-Car
-> Gen2 boards, developers may enable it in board specific device trees
-> if needed.
-> This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
-> and Koelsch boards.
-> 
-> The problem
-> ===========
-> To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
-> to ICRAM1 and we program the [S]BAR registers so that when we turn ON
-> the non-boot CPUs they are redirected to the reset vector installed by
-> Linux in ICRAM1, and eventually they continue the execution to RAM,
-> where the SMP bring-up code will take care of the rest.
-> The content of the [S]BAR registers survives a watchdog triggered reset,
-> and as such after the watchdog fires the boot core will try and execute
-> the SMP bring-up code instead of jumping to the bootrom code.
-> 
-> The fix
-> =======
-> The main strategy for the solution is to let the reset vector decide
-> if it needs to jump to shmobile_boot_fn or to the bootrom code.
-> In a watchdog triggered reset scenario, since the [S]BAR registers keep
-> their values, the boot CPU will jump into the newly designed reset
-> vector, the assembly routine will eventually test WOVF (a bit in register
-> RWTCSRA that indicates if the watchdog counter has overflown, the value
-> of this bit gets retained in this scenario), and jump to the bootrom code
-> which will in turn load up the bootloader, etc.
-> When bringing up SMP or using CPU hotplug, the reset vector will jump
-> to shmobile_boot_fn instead.
-> 
-> Thank you All for your help.
-> 
-> Best regards,
-> 
-> Fabrizio Castro (26):
->   ARM: shmobile: Add watchdog support
->   ARM: dts: r8a7743: Adjust SMP routine size
->   ARM: dts: r8a7745: Adjust SMP routine size
->   ARM: dts: r8a7790: Adjust SMP routine size
->   ARM: dts: r8a7791: Adjust SMP routine size
->   ARM: dts: r8a7792: Adjust SMP routine size
->   ARM: dts: r8a7793: Adjust SMP routine size
->   ARM: dts: r8a7794: Adjust SMP routine size
->   soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
->   ARM: shmobile: rcar-gen2: Add watchdog support
->   dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
->   watchdog: renesas_wdt: Add R-Car Gen2 support
->   watchdog: renesas_wdt: Add restart handler
->   ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
->   clk: renesas: r8a7743: Add rwdt clock
->   clk: renesas: r8a7745: Add rwdt clock
->   clk: renesas: r8a7790: Add rwdt clock
->   clk: renesas: r8a7791/r8a7793: Add rwdt clock
->   clk: renesas: r8a7794: Add rwdt clock
->   ARM: dts: r8a7743: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7745: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7790: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7791: Add watchdog support to SoC dtsi
->   ARM: dts: r8a7794: Add watchdog support to SoC dtsi
->   ARM: dts: iwg20m: Add watchdog support to SoM dtsi
->   ARM: dts: iwg22m: Add watchdog support to SoM dtsi
+> When an mm exits, devices that were bound to it must stop performing
+> DMA
+> on its PASID. Let device drivers register a callback to be notified on mm
+> exit. Add the callback to the iommu_param structure attached to struct
+> device.
 
-Thanks, I have applied the above "dts" and "defconfig" patches for v4.17.
+what about registering the callback in sva_device_init? 
+
+> 
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/iommu/iommu-sva.c | 54
+> +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/iommu.h     | 18 ++++++++++++++++
+>  2 files changed, 72 insertions(+)
+> 
+> diff --git a/drivers/iommu/iommu-sva.c b/drivers/iommu/iommu-sva.c
+> index f9af9d66b3ed..90b524c99d3d 100644
+> --- a/drivers/iommu/iommu-sva.c
+> +++ b/drivers/iommu/iommu-sva.c
+> @@ -569,3 +569,57 @@ void __iommu_sva_unbind_dev_all(struct device
+> *dev)
+>  	spin_unlock(&iommu_sva_lock);
+>  }
+>  EXPORT_SYMBOL_GPL(__iommu_sva_unbind_dev_all);
+> +
+> +/**
+> + * iommu_register_mm_exit_handler() - Set a callback for mm exit
+> + * @dev: the device
+> + * @handler: exit handler
+> + *
+> + * Users of the bind/unbind API should call this function to set a
+> + * device-specific callback telling them when a mm is exiting.
+> + *
+> + * After the callback returns, the device must not issue any more
+> transaction
+> + * with the PASID given as argument to the handler. In addition the
+> handler gets
+> + * an opaque pointer corresponding to the drvdata passed as argument of
+> bind().
+> + *
+> + * The handler itself should return 0 on success, and an appropriate error
+> code
+> + * otherwise.
+> + */
+> +int iommu_register_mm_exit_handler(struct device *dev,
+> +				   iommu_mm_exit_handler_t handler)
+> +{
+> +	struct iommu_param *dev_param = dev->iommu_param;
+> +
+> +	if (!dev_param)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * FIXME: racy. Same as iommu_sva_device_init, but here we'll
+> need a
+> +	 * spinlock to call the mm_exit param from atomic context.
+> +	 */
+> +	if (dev_param->mm_exit)
+> +		return -EBUSY;
+> +
+> +	get_device(dev);
+> +	dev_param->mm_exit = handler;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_register_mm_exit_handler);
+> +
+> +/**
+> + * iommu_unregister_mm_exit_handler() - Remove mm exit callback
+> + */
+> +int iommu_unregister_mm_exit_handler(struct device *dev)
+> +{
+> +	struct iommu_param *dev_param = dev->iommu_param;
+> +
+> +	if (!dev_param || !dev_param->mm_exit)
+> +		return -EINVAL;
+> +
+> +	dev_param->mm_exit = NULL;
+> +	put_device(dev);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_unregister_mm_exit_handler);
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 09d85f44142a..1b1a16892ac1 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -65,6 +65,8 @@ typedef int (*iommu_dev_fault_handler_t)(struct
+> iommu_fault_event *, void *);
+>  /* Request I/O page fault support */
+>  #define IOMMU_SVA_FEAT_IOPF		(1 << 1)
+> 
+> +typedef int (*iommu_mm_exit_handler_t)(struct device *dev, int pasid,
+> void *);
+> +
+>  struct iommu_domain_geometry {
+>  	dma_addr_t aperture_start; /* First address that can be mapped
+> */
+>  	dma_addr_t aperture_end;   /* Last address that can be mapped
+> */
+> @@ -424,6 +426,7 @@ struct iommu_param {
+>  	unsigned int min_pasid;
+>  	unsigned int max_pasid;
+>  	struct list_head mm_list;
+> +	iommu_mm_exit_handler_t mm_exit;
+>  };
+> 
+>  int  iommu_device_register(struct iommu_device *iommu);
+> @@ -941,6 +944,10 @@ extern int iommu_sva_bind_device(struct device
+> *dev, struct mm_struct *mm,
+>  				int *pasid, unsigned long flags, void
+> *drvdata);
+>  extern int iommu_sva_unbind_device(struct device *dev, int pasid);
+>  extern void __iommu_sva_unbind_dev_all(struct device *dev);
+> +extern int iommu_register_mm_exit_handler(struct device *dev,
+> +					  iommu_mm_exit_handler_t
+> handler);
+> +extern int iommu_unregister_mm_exit_handler(struct device *dev);
+> +
+>  #else /* CONFIG_IOMMU_SVA */
+>  static inline int iommu_sva_device_init(struct device *dev,
+>  					unsigned long features,
+> @@ -969,6 +976,17 @@ static inline int iommu_sva_unbind_device(struct
+> device *dev, int pasid)
+>  static inline void __iommu_sva_unbind_dev_all(struct device *dev)
+>  {
+>  }
+> +
+> +static inline int iommu_register_mm_exit_handler(struct device *dev,
+> +						 iommu_mm_exit_handler_t
+> handler)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline int iommu_unregister_mm_exit_handler(struct device *dev)
+> +{
+> +	return -ENODEV;
+> +}
+>  #endif /* CONFIG_IOMMU_SVA */
+> 
+>  #endif /* __LINUX_IOMMU_H */
+> --
+> 2.15.1
