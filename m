@@ -1,54 +1,50 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Tue, 13 Feb 2018 15:20:51 +0000
-Subject: [PATCH v13 2/2] iommu/dma: Add HW MSI(GICv3 ITS) address regions
- reservation
-In-Reply-To: <20180213152051.10296-1-shameerali.kolothum.thodi@huawei.com>
-References: <20180213152051.10296-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20180213152051.10296-3-shameerali.kolothum.thodi@huawei.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 13 Feb 2018 09:32:55 -0600
+Subject: [PATCH] arm64: dts: Remove leading 0x and 0s from bindings
+ notation
+In-Reply-To: <20171214165352.27902-1-malat@debian.org>
+References: <20171214165352.27902-1-malat@debian.org>
+Message-ID: <CAL_JsqLyv5io+iXWnzmUhZ1r=PBnA=MdZet8idJDmL8XphxThA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modified iommu_dma_get_resv_regions() to include GICv3 ITS
-region on ACPI based ARM platfiorms which may require HW MSI
-reservations.
+On Thu, Dec 14, 2017 at 10:53 AM, Mathieu Malaterre <malat@debian.org> wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
+>
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
+>
+> and
+>
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+>
+> Converted using the following command:
+>
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -E -i -e "s/@0x([0-9a-fA-F\.]+)\s?\{/@\L\1 \{/g" -e "s/@0+([0-9a-fA-F\.]+)\s?\{/@\L\1 \{/g" {} +
+>
+> For simplicity, two sed expressions were used to solve each warnings separately.
+>
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+>
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+>
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+>
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 +-
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi       | 2 +-
+>  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi   | 6 +++---
+>  arch/arm64/boot/dts/qcom/msm8996.dtsi          | 6 +++---
+>  4 files changed, 8 insertions(+), 8 deletions(-)
 
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/dma-iommu.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Arnd, Olof, Looks like this got missed. Can you pick up for 4.16.
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 25914d3..f05f3cf 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi_iort.h>
- #include <linux/device.h>
- #include <linux/dma-iommu.h>
- #include <linux/gfp.h>
-@@ -167,13 +168,18 @@ EXPORT_SYMBOL(iommu_put_dma_cookie);
-  *
-  * IOMMU drivers can use this to implement their .get_resv_regions callback
-  * for general non-IOMMU-specific reservations. Currently, this covers host
-- * bridge windows for PCI devices.
-+ * bridge windows for PCI devices and GICv3 ITS region reservation on ACPI
-+ * based ARM platforms that may require HW MSI reservation.
-  */
- void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
- {
- 	struct pci_host_bridge *bridge;
- 	struct resource_entry *window;
- 
-+	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode) &&
-+		iort_iommu_msi_get_resv_regions(dev, list) < 0)
-+		return;
-+
- 	if (!dev_is_pci(dev))
- 		return;
- 
--- 
-2.7.4
+There's some arm32 ones too, but most of them need to be respun to
+mention upper to lower case fixes.
+
+Rob
