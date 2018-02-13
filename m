@@ -1,53 +1,64 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 13 Feb 2018 09:37:12 -0600
-Subject: [PATCH 16/25] arm: zx: dts: Remove leading 0x and 0s from
- bindings notation
-In-Reply-To: <20171226080312.GE23070@X250>
-References: <20171215124649.30692-1-malat@debian.org>
- <20171226080312.GE23070@X250>
-Message-ID: <CAL_JsqL02_v46mxqF2cFerC82fNPQAEpm0vfjr2F_78i3fVM7Q@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 13 Feb 2018 16:37:35 +0100
+Subject: [PATCH] MAINTAINERS: update email address for Gregory CLEMENT
+In-Reply-To: <20180202134922.12213-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Fri, 2 Feb 2018 14:49:22 +0100")
+References: <20180202134922.12213-1-gregory.clement@free-electrons.com>
+Message-ID: <87sha4q4sg.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 26, 2017 at 2:03 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Fri, Dec 15, 2017 at 01:46:48PM +0100, Mathieu Malaterre wrote:
->> Improve the DTS files by removing all the leading "0x" and zeros to fix the
->> following dtc warnings:
->>
->> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
->>
->> and
->>
->> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
->>
->> Converted using the following command:
->>
->> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
->>
->> For simplicity, two sed expressions were used to solve each warnings separately.
->>
->> To make the regex expression more robust a few other issues were resolved,
->> namely setting unit-address to lower case, and adding a whitespace before the
->> the opening curly brace:
->>
->> https://elinux.org/Device_Tree_Linux#Linux_conventions
->>
->> This will solve as a side effect warning:
->>
->> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
->>
->> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
->>
->> Reported-by: David Daney <ddaney@caviumnetworks.com>
->> Suggested-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Mathieu Malaterre <malat@debian.org>
->
-> Hi Arnd, Olof,
->
-> I do not have any other ZTE ZX platform patches to send you.  Is it okay
-> to send this one using IMX branch, or can you apply it to arm-soc
-> directly?
+Hi,
+ 
+ On ven., f?vr. 02 2018, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Ping. This one didn't make it into 4.16.
+> Free Electrons is now Bootlin, change my email address accordingly.
+> Actually the free-electrons.com emails are still valid but as I don't
+> know for how many time, it's better to do the change now.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Rob
+
+Applied on mvebu/fixes
+
+Gregory
+
+> ---
+>  MAINTAINERS | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 4c104dbc746d..33783c2fecfc 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1592,7 +1592,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
+>  M:	Jason Cooper <jason@lakedaemon.net>
+>  M:	Andrew Lunn <andrew@lunn.ch>
+>  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> -M:	Gregory Clement <gregory.clement@free-electrons.com>
+> +M:	Gregory Clement <gregory.clement@bootlin.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	Documentation/devicetree/bindings/soc/dove/
+> @@ -1606,7 +1606,7 @@ F:	arch/arm/boot/dts/orion5x*
+>  ARM/Marvell Kirkwood and Armada 370, 375, 38x, 39x, XP, 3700, 7K/8K SOC support
+>  M:	Jason Cooper <jason@lakedaemon.net>
+>  M:	Andrew Lunn <andrew@lunn.ch>
+> -M:	Gregory Clement <gregory.clement@free-electrons.com>
+> +M:	Gregory Clement <gregory.clement@bootlin.com>
+>  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+> -- 
+> 2.15.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
