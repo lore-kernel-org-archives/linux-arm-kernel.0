@@ -1,56 +1,64 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 13 Feb 2018 16:37:35 +0100
-Subject: [PATCH] MAINTAINERS: update email address for Gregory CLEMENT
-In-Reply-To: <20180202134922.12213-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Fri, 2 Feb 2018 14:49:22 +0100")
-References: <20180202134922.12213-1-gregory.clement@free-electrons.com>
-Message-ID: <87sha4q4sg.fsf@bootlin.com>
+Date: Tue, 13 Feb 2018 16:43:11 +0100
+Subject: [PATCH 01/20] ARM: mvebu: Fix broken PL310_ERRATA_753970 selects
+In-Reply-To: <20180205012146.23981-2-ulfalizer@gmail.com> (Ulf Magnusson's
+ message of "Mon, 5 Feb 2018 02:21:13 +0100")
+References: <20180205012146.23981-1-ulfalizer@gmail.com>
+ <20180205012146.23981-2-ulfalizer@gmail.com>
+Message-ID: <87lgfwq4j4.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ulf,
  
- On ven., f?vr. 02 2018, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+ On lun., f?vr. 05 2018, Ulf Magnusson <ulfalizer@gmail.com> wrote:
 
-> Free Electrons is now Bootlin, change my email address accordingly.
-> Actually the free-electrons.com emails are still valid but as I don't
-> know for how many time, it's better to do the change now.
+> The MACH_ARMADA_375 and MACH_ARMADA_38X boards select ARM_ERRATA_753970,
+> but it was renamed to PL310_ERRATA_753970 by commit fa0ce4035d48 ("ARM:
+> 7162/1: errata: tidy up Kconfig options for PL310 errata workarounds").
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Fix the selects to use the new name.
+>
+> Discovered with the
+> https://github.com/ulfalizer/Kconfiglib/blob/master/examples/list_undefined.py
+> script.
 
+Applied on mvebu/fixes with the "Fixes": and "CC:stable" flags
 
-Applied on mvebu/fixes
+Thanks,
 
 Gregory
 
+>
+> Signed-off-by: Ulf Magnusson <ulfalizer@gmail.com>
 > ---
->  MAINTAINERS | 4 ++--
+>  arch/arm/mach-mvebu/Kconfig | 4 ++--
 >  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 4c104dbc746d..33783c2fecfc 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1592,7 +1592,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
->  M:	Andrew Lunn <andrew@lunn.ch>
->  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> -M:	Gregory Clement <gregory.clement@free-electrons.com>
-> +M:	Gregory Clement <gregory.clement@bootlin.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	Documentation/devicetree/bindings/soc/dove/
-> @@ -1606,7 +1606,7 @@ F:	arch/arm/boot/dts/orion5x*
->  ARM/Marvell Kirkwood and Armada 370, 375, 38x, 39x, XP, 3700, 7K/8K SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
->  M:	Andrew Lunn <andrew@lunn.ch>
-> -M:	Gregory Clement <gregory.clement@free-electrons.com>
-> +M:	Gregory Clement <gregory.clement@bootlin.com>
->  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 6b32dc527edc..2c20599cc350 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -41,7 +41,7 @@ config MACH_ARMADA_375
+>  	depends on ARCH_MULTI_V7
+>  	select ARMADA_370_XP_IRQ
+>  	select ARM_ERRATA_720789
+> -	select ARM_ERRATA_753970
+> +	select PL310_ERRATA_753970
+>  	select ARM_GIC
+>  	select ARMADA_375_CLK
+>  	select HAVE_ARM_SCU
+> @@ -57,7 +57,7 @@ config MACH_ARMADA_38X
+>  	bool "Marvell Armada 380/385 boards"
+>  	depends on ARCH_MULTI_V7
+>  	select ARM_ERRATA_720789
+> -	select ARM_ERRATA_753970
+> +	select PL310_ERRATA_753970
+>  	select ARM_GIC
+>  	select ARM_GLOBAL_TIMER
+>  	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
 > -- 
-> 2.15.1
+> 2.14.1
 >
 >
 > _______________________________________________
