@@ -1,612 +1,105 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 12 Feb 2018 19:32:37 -0600
-Subject: [PATCH 3/9] ARM: OMAP2+: Cleanup omap_gpio_dev_attr usage
+Date: Mon, 12 Feb 2018 19:32:42 -0600
+Subject: [PATCH 8/9] ARM: OMAP: Move plat/i2c.h into mach-omap1 folder
 In-Reply-To: <20180213013243.8378-1-s-anna@ti.com>
 References: <20180213013243.8378-1-s-anna@ti.com>
-Message-ID: <20180213013243.8378-4-s-anna@ti.com>
+Message-ID: <20180213013243.8378-9-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap_gpio_dev_attr data was used to supply instance-specific
-data for legacy non-DT devices. The GPIO legacy device support has
-been cleaned up in commit 14944934f8ac ("ARM: OMAP2+: Remove legacy
-gpio code") a while ago and this data is therefore no longer needed.
-So, cleanup the structure and all the associated data in various
-hwmod data files.
+The current contents of plat/i2c.h are only relevant for OMAP1
+platforms, as all the equivalent functions for OMAP2 has been
+dropped in commit 65fa3e719f36 ("ARM: OMAP2+: Remove legacy i2c.c
+platform init code"), and which has also moved the left-over code
+from plat-omap into mach-omap1. The hwmod is a concept only
+applicable for OMAP2 platforms, and the omap_i2c_reset() is
+already declared in mach-omap2/i2c.h. So, move the current
+plat/i2c.h header file into the mach-omap1 folder, and adjust
+the header usage accordingly.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2430_data.c              |  1 -
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 11 -----------
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  1 -
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  9 ---------
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c              |  2 --
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c              | 13 -------------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c              |  4 ----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c              | 13 -------------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c              | 15 ---------------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c               | 15 ---------------
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c              |  8 --------
- arch/arm/mach-omap2/omap_hwmod_common_data.h            |  1 -
- include/linux/platform_data/gpio-omap.h                 |  5 -----
- 13 files changed, 98 deletions(-)
+ arch/arm/mach-omap1/common.h                          | 3 +--
+ arch/arm/mach-omap1/i2c.c                             | 2 --
+ arch/arm/{plat-omap/include/plat => mach-omap1}/i2c.h | 9 +++------
+ arch/arm/mach-omap2/i2c.h                             | 4 ++--
+ 4 files changed, 6 insertions(+), 12 deletions(-)
+ rename arch/arm/{plat-omap/include/plat => mach-omap1}/i2c.h (90%)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 013b26b305d2..1f696bec9962 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -134,7 +134,6 @@ static struct omap_hwmod omap2430_gpio5_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_gpio_hwmod_class,
--	.dev_attr	= &omap2xxx_gpio_dev_attr,
- };
+diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+index 65bb6e8085de..d83ff257eaa8 100644
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -32,11 +32,10 @@
  
- /* dma attributes */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index 4b094cb384cb..a6b2875b3e7c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -9,7 +9,6 @@
-  * published by the Free Software Foundation.
-  */
+ #include <asm/exception.h>
  
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/omap-dma.h>
- #include <plat/dmtimer.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
-@@ -568,12 +567,6 @@ struct omap_hwmod omap2xxx_dss_venc_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
- };
- 
--/* gpio dev_attr */
--struct omap_gpio_dev_attr omap2xxx_gpio_dev_attr = {
--	.bank_width = 32,
--	.dbck_flag = false,
--};
+-#include <plat/i2c.h>
 -
- /* gpio1 */
- struct omap_hwmod omap2xxx_gpio1_hwmod = {
- 	.name		= "gpio1",
-@@ -587,7 +580,6 @@ struct omap_hwmod omap2xxx_gpio1_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_gpio_hwmod_class,
--	.dev_attr	= &omap2xxx_gpio_dev_attr,
- };
+ #include <mach/irqs.h>
  
- /* gpio2 */
-@@ -603,7 +595,6 @@ struct omap_hwmod omap2xxx_gpio2_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_gpio_hwmod_class,
--	.dev_attr	= &omap2xxx_gpio_dev_attr,
- };
+ #include "soc.h"
++#include "i2c.h"
  
- /* gpio3 */
-@@ -619,7 +610,6 @@ struct omap_hwmod omap2xxx_gpio3_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_gpio_hwmod_class,
--	.dev_attr	= &omap2xxx_gpio_dev_attr,
- };
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ void omap7xx_map_io(void);
+diff --git a/arch/arm/mach-omap1/i2c.c b/arch/arm/mach-omap1/i2c.c
+index 32f6c53367bf..5bdf3c4190f9 100644
+--- a/arch/arm/mach-omap1/i2c.c
++++ b/arch/arm/mach-omap1/i2c.c
+@@ -24,8 +24,6 @@
+ #include <mach/mux.h>
+ #include "soc.h"
  
- /* gpio4 */
-@@ -635,7 +625,6 @@ struct omap_hwmod omap2xxx_gpio4_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_gpio_hwmod_class,
--	.dev_attr	= &omap2xxx_gpio_dev_attr,
- };
- 
- /* mcspi1 */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-index 434bd1a77229..bbda6887388b 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-@@ -139,7 +139,6 @@ extern struct omap_hwmod_class am33xx_epwmss_hwmod_class;
- extern struct omap_hwmod_class am33xx_ehrpwm_hwmod_class;
- extern struct omap_hwmod_class am33xx_spi_hwmod_class;
- 
--extern struct omap_gpio_dev_attr gpio_dev_attr;
- extern struct omap2_mcspi_dev_attr mcspi_attrib;
- 
- void omap_hwmod_am33xx_reg(void);
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index 4bcf9f3e1544..b710b6d984cc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -14,7 +14,6 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include "omap_hwmod.h"
-@@ -537,11 +536,6 @@ struct omap_hwmod_class am33xx_gpio_hwmod_class = {
- 	.rev		= 2,
- };
- 
--struct omap_gpio_dev_attr gpio_dev_attr = {
--	.bank_width	= 32,
--	.dbck_flag	= true,
--};
+-#include <plat/i2c.h>
 -
- /* gpio1 */
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
- 	{ .role = "dbclk", .clk = "gpio1_dbclk" },
-@@ -560,7 +554,6 @@ struct omap_hwmod am33xx_gpio1_hwmod = {
- 	},
- 	.opt_clks	= gpio1_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio1_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
+ #define OMAP_I2C_SIZE		0x3f
+ #define OMAP1_I2C_BASE		0xfffb3800
  
- /* gpio2 */
-@@ -581,7 +574,6 @@ struct omap_hwmod am33xx_gpio2_hwmod = {
- 	},
- 	.opt_clks	= gpio2_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio2_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio3 */
-@@ -602,7 +594,6 @@ struct omap_hwmod am33xx_gpio3_hwmod = {
- 	},
- 	.opt_clks	= gpio3_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio3_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpmc */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 4d16b15bb0cf..232d03045c6d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -17,7 +17,6 @@
- #include <linux/i2c-omap.h>
- 
- #include "omap_hwmod.h"
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- 
- #include "omap_hwmod_common_data.h"
-@@ -252,7 +251,6 @@ static struct omap_hwmod am33xx_gpio0_hwmod = {
- 	},
- 	.opt_clks	= gpio0_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio0_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* lcdc */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 1a2f2242e31b..c7ff7560f47a 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -17,7 +17,6 @@
- 
- #include <linux/i2c-omap.h>
- #include <linux/power/smartreflex.h>
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- 
- #include <linux/omap-dma.h>
-@@ -769,12 +768,6 @@ static struct omap_hwmod_class omap3xxx_gpio_hwmod_class = {
- 	.rev = 1,
- };
- 
--/* gpio_dev_attr */
--static struct omap_gpio_dev_attr gpio_dev_attr = {
--	.bank_width = 32,
--	.dbck_flag = true,
--};
--
- /* gpio1 */
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
- 	{ .role = "dbclk", .clk = "gpio1_dbck", },
-@@ -794,7 +787,6 @@ static struct omap_hwmod omap3xxx_gpio1_hwmod = {
- 		},
- 	},
- 	.class		= &omap3xxx_gpio_hwmod_class,
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio2 */
-@@ -816,7 +808,6 @@ static struct omap_hwmod omap3xxx_gpio2_hwmod = {
- 		},
- 	},
- 	.class		= &omap3xxx_gpio_hwmod_class,
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio3 */
-@@ -838,7 +829,6 @@ static struct omap_hwmod omap3xxx_gpio3_hwmod = {
- 		},
- 	},
- 	.class		= &omap3xxx_gpio_hwmod_class,
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio4 */
-@@ -860,7 +850,6 @@ static struct omap_hwmod omap3xxx_gpio4_hwmod = {
- 		},
- 	},
- 	.class		= &omap3xxx_gpio_hwmod_class,
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio5 */
-@@ -883,7 +872,6 @@ static struct omap_hwmod omap3xxx_gpio5_hwmod = {
- 		},
- 	},
- 	.class		= &omap3xxx_gpio_hwmod_class,
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio6 */
-@@ -906,7 +894,6 @@ static struct omap_hwmod omap3xxx_gpio6_hwmod = {
- 		},
- 	},
- 	.class		= &omap3xxx_gpio_hwmod_class,
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* dma attributes */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index afbce1f6f641..4f31ce899869 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -14,7 +14,6 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include "omap_hwmod.h"
- #include "omap_hwmod_33xx_43xx_common_data.h"
-@@ -107,7 +106,6 @@ static struct omap_hwmod am43xx_gpio0_hwmod = {
- 	},
- 	.opt_clks	= gpio0_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio0_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- static struct omap_hwmod_class_sysconfig am43xx_synctimer_sysc = {
-@@ -288,7 +286,6 @@ static struct omap_hwmod am43xx_gpio4_hwmod = {
- 	},
- 	.opt_clks	= gpio4_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio4_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- static struct omap_hwmod_opt_clk gpio5_opt_clks[] = {
-@@ -309,7 +306,6 @@ static struct omap_hwmod am43xx_gpio5_hwmod = {
- 	},
- 	.opt_clks	= gpio5_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio5_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- static struct omap_hwmod_class am43xx_ocp2scp_hwmod_class = {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index a1901c22a0f0..3afb7333b800 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -21,7 +21,6 @@
-  */
- 
- #include <linux/io.h>
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/power/smartreflex.h>
- #include <linux/i2c-omap.h>
-@@ -1083,12 +1082,6 @@ static struct omap_hwmod_class omap44xx_gpio_hwmod_class = {
- 	.rev	= 2,
- };
- 
--/* gpio dev_attr */
--static struct omap_gpio_dev_attr gpio_dev_attr = {
--	.bank_width	= 32,
--	.dbck_flag	= true,
--};
--
- /* gpio1 */
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
- 	{ .role = "dbclk", .clk = "gpio1_dbclk" },
-@@ -1108,7 +1101,6 @@ static struct omap_hwmod omap44xx_gpio1_hwmod = {
- 	},
- 	.opt_clks	= gpio1_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio1_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio2 */
-@@ -1131,7 +1123,6 @@ static struct omap_hwmod omap44xx_gpio2_hwmod = {
- 	},
- 	.opt_clks	= gpio2_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio2_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio3 */
-@@ -1154,7 +1145,6 @@ static struct omap_hwmod omap44xx_gpio3_hwmod = {
- 	},
- 	.opt_clks	= gpio3_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio3_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio4 */
-@@ -1177,7 +1167,6 @@ static struct omap_hwmod omap44xx_gpio4_hwmod = {
- 	},
- 	.opt_clks	= gpio4_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio4_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio5 */
-@@ -1200,7 +1189,6 @@ static struct omap_hwmod omap44xx_gpio5_hwmod = {
- 	},
- 	.opt_clks	= gpio5_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio5_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio6 */
-@@ -1223,7 +1211,6 @@ static struct omap_hwmod omap44xx_gpio6_hwmod = {
- 	},
- 	.opt_clks	= gpio6_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio6_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index 988e7eaa1330..593b4bc92d99 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -18,7 +18,6 @@
-  */
- 
- #include <linux/io.h>
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/power/smartreflex.h>
- #include <linux/i2c-omap.h>
-@@ -627,12 +626,6 @@ static struct omap_hwmod_class omap54xx_gpio_hwmod_class = {
- 	.rev	= 2,
- };
- 
--/* gpio dev_attr */
--static struct omap_gpio_dev_attr gpio_dev_attr = {
--	.bank_width	= 32,
--	.dbck_flag	= true,
--};
--
- /* gpio1 */
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
- 	{ .role = "dbclk", .clk = "gpio1_dbclk" },
-@@ -652,7 +645,6 @@ static struct omap_hwmod omap54xx_gpio1_hwmod = {
- 	},
- 	.opt_clks	= gpio1_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio1_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio2 */
-@@ -675,7 +667,6 @@ static struct omap_hwmod omap54xx_gpio2_hwmod = {
- 	},
- 	.opt_clks	= gpio2_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio2_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio3 */
-@@ -698,7 +689,6 @@ static struct omap_hwmod omap54xx_gpio3_hwmod = {
- 	},
- 	.opt_clks	= gpio3_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio3_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio4 */
-@@ -721,7 +711,6 @@ static struct omap_hwmod omap54xx_gpio4_hwmod = {
- 	},
- 	.opt_clks	= gpio4_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio4_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio5 */
-@@ -744,7 +733,6 @@ static struct omap_hwmod omap54xx_gpio5_hwmod = {
- 	},
- 	.opt_clks	= gpio5_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio5_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio6 */
-@@ -767,7 +755,6 @@ static struct omap_hwmod omap54xx_gpio6_hwmod = {
- 	},
- 	.opt_clks	= gpio6_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio6_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio7 */
-@@ -790,7 +777,6 @@ static struct omap_hwmod omap54xx_gpio7_hwmod = {
- 	},
- 	.opt_clks	= gpio7_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio7_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio8 */
-@@ -813,7 +799,6 @@ static struct omap_hwmod omap54xx_gpio8_hwmod = {
- 	},
- 	.opt_clks	= gpio8_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio8_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 4c2a05b1bd19..523e89498fd3 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -18,7 +18,6 @@
-  */
- 
- #include <linux/io.h>
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/power/smartreflex.h>
- #include <linux/i2c-omap.h>
-@@ -818,12 +817,6 @@ static struct omap_hwmod_class dra7xx_gpio_hwmod_class = {
- 	.rev	= 2,
- };
- 
--/* gpio dev_attr */
--static struct omap_gpio_dev_attr gpio_dev_attr = {
--	.bank_width	= 32,
--	.dbck_flag	= true,
--};
--
- /* gpio1 */
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
- 	{ .role = "dbclk", .clk = "gpio1_dbclk" },
-@@ -844,7 +837,6 @@ static struct omap_hwmod dra7xx_gpio1_hwmod = {
- 	},
- 	.opt_clks	= gpio1_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio1_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio2 */
-@@ -867,7 +859,6 @@ static struct omap_hwmod dra7xx_gpio2_hwmod = {
- 	},
- 	.opt_clks	= gpio2_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio2_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio3 */
-@@ -890,7 +881,6 @@ static struct omap_hwmod dra7xx_gpio3_hwmod = {
- 	},
- 	.opt_clks	= gpio3_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio3_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio4 */
-@@ -913,7 +903,6 @@ static struct omap_hwmod dra7xx_gpio4_hwmod = {
- 	},
- 	.opt_clks	= gpio4_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio4_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio5 */
-@@ -936,7 +925,6 @@ static struct omap_hwmod dra7xx_gpio5_hwmod = {
- 	},
- 	.opt_clks	= gpio5_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio5_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio6 */
-@@ -959,7 +947,6 @@ static struct omap_hwmod dra7xx_gpio6_hwmod = {
- 	},
- 	.opt_clks	= gpio6_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio6_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio7 */
-@@ -982,7 +969,6 @@ static struct omap_hwmod dra7xx_gpio7_hwmod = {
- 	},
- 	.opt_clks	= gpio7_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio7_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /* gpio8 */
-@@ -1005,7 +991,6 @@ static struct omap_hwmod dra7xx_gpio8_hwmod = {
- 	},
- 	.opt_clks	= gpio8_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio8_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index 84f118280a0e..90fd06682ef5 100644
---- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -15,7 +15,6 @@
+diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/mach-omap1/i2c.h
+similarity index 90%
+rename from arch/arm/plat-omap/include/plat/i2c.h
+rename to arch/arm/mach-omap1/i2c.h
+index 810629d79668..54a2bce7879e 100644
+--- a/arch/arm/plat-omap/include/plat/i2c.h
++++ b/arch/arm/mach-omap1/i2c.h
+@@ -19,8 +19,8 @@
   *
   */
  
--#include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include <plat/dmtimer.h>
-@@ -488,11 +487,6 @@ static struct omap_hwmod_class dm81xx_gpio_hwmod_class = {
- 	.rev	= 2,
- };
+-#ifndef __PLAT_OMAP_I2C_H
+-#define __PLAT_OMAP_I2C_H
++#ifndef __ARCH_ARM_MACH_OMAP1_I2C_H
++#define __ARCH_ARM_MACH_OMAP1_I2C_H
  
--static struct omap_gpio_dev_attr gpio_dev_attr = {
--	.bank_width	= 32,
--	.dbck_flag	= true,
--};
+ struct i2c_board_info;
+ struct omap_i2c_bus_platform_data;
+@@ -47,7 +47,4 @@ static inline int omap_register_i2c_bus_cmdline(void)
+ }
+ #endif
+ 
+-struct omap_hwmod;
+-int omap_i2c_reset(struct omap_hwmod *oh);
 -
- static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
- 	{ .role = "dbclk", .clk = "sysclk18_ck" },
- };
-@@ -510,7 +504,6 @@ static struct omap_hwmod dm81xx_gpio1_hwmod = {
- 	},
- 	.opt_clks	= gpio1_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio1_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
+-#endif /* __PLAT_OMAP_I2C_H */
++#endif /* __ARCH_ARM_MACH_OMAP1_I2C_H */
+diff --git a/arch/arm/mach-omap2/i2c.h b/arch/arm/mach-omap2/i2c.h
+index f76ff790b435..4d085c7ad425 100644
+--- a/arch/arm/mach-omap2/i2c.h
++++ b/arch/arm/mach-omap2/i2c.h
+@@ -19,11 +19,11 @@
+  *
+  */
  
- static struct omap_hwmod_ocp_if dm81xx_l4_ls__gpio1 = {
-@@ -537,7 +530,6 @@ static struct omap_hwmod dm81xx_gpio2_hwmod = {
- 	},
- 	.opt_clks	= gpio2_opt_clks,
- 	.opt_clks_cnt	= ARRAY_SIZE(gpio2_opt_clks),
--	.dev_attr	= &gpio_dev_attr,
- };
- 
- static struct omap_hwmod_ocp_if dm81xx_l4_ls__gpio2 = {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.h b/arch/arm/mach-omap2/omap_hwmod_common_data.h
-index 29a52df2de26..56dbaca9a728 100644
---- a/arch/arm/mach-omap2/omap_hwmod_common_data.h
-+++ b/arch/arm/mach-omap2/omap_hwmod_common_data.h
-@@ -19,7 +19,6 @@
- #include "display.h"
- 
- /* Common IP block data across OMAP2xxx */
--extern struct omap_gpio_dev_attr omap2xxx_gpio_dev_attr;
- extern struct omap_hwmod omap2xxx_l3_main_hwmod;
- extern struct omap_hwmod omap2xxx_l4_core_hwmod;
- extern struct omap_hwmod omap2xxx_l4_wkup_hwmod;
-diff --git a/include/linux/platform_data/gpio-omap.h b/include/linux/platform_data/gpio-omap.h
-index cb2618147c34..8612855691b2 100644
---- a/include/linux/platform_data/gpio-omap.h
-+++ b/include/linux/platform_data/gpio-omap.h
-@@ -157,11 +157,6 @@
- #define OMAP_MPUIO(nr)		(OMAP_MAX_GPIO_LINES + (nr))
- #define OMAP_GPIO_IS_MPUIO(nr)	((nr) >= OMAP_MAX_GPIO_LINES)
- 
--struct omap_gpio_dev_attr {
--	int bank_width;		/* GPIO bank width */
--	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
--};
+-#include <plat/i2c.h>
 -
- struct omap_gpio_reg_offs {
- 	u16 revision;
- 	u16 direction;
+ #ifndef __MACH_OMAP2_I2C_H
+ #define __MACH_OMAP2_I2C_H
+ 
++struct omap_hwmod;
++
+ int omap_i2c_reset(struct omap_hwmod *oh);
+ 
+ #endif	/* __MACH_OMAP2_I2C_H */
 -- 
 2.15.1
