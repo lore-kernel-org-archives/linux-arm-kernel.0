@@ -1,93 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Feb 2018 12:39:37 +0000
-Subject: [PATCH] arm64/kvm: Prohibit guest LOR accesses
-In-Reply-To: <20180213102742.GG23189@cbox>
-References: <20180212111424.39248-1-mark.rutland@arm.com>
- <20180213102742.GG23189@cbox>
-Message-ID: <20180213123022.zidr5oztavixe2p5@lakrids.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 13 Feb 2018 14:31:48 +0200
+Subject: [PATCH 1/4] arm64: dts: renesas: r8a77995: add FCPVB node
+In-Reply-To: <1518474330-8713-2-git-send-email-kbingham@kernel.org>
+References: <1518474330-8713-1-git-send-email-kbingham@kernel.org>
+ <1518474330-8713-2-git-send-email-kbingham@kernel.org>
+Message-ID: <7882079.DMVypBKPF4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 11:27:42AM +0100, Christoffer Dall wrote:
-> Hi Mark,
+Hi Kieran,
 
-Hi Christoffer,
+Thank you for the patch.
 
-> On Mon, Feb 12, 2018 at 11:14:24AM +0000, Mark Rutland wrote:
-> > We don't currently limit guest accesses to the LOR registers, which we
-> > neither virtualize nor context-switch. As such, guests are provided with
-> > unusable information/controls, and are not isolated from each other (or
-> > the host).
-> > 
-> > To prevent these issues, we can trap register accesses and present the
-> > illusion that no LORegions are implemented.
+On Tuesday, 13 February 2018 00:25:26 EET Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 > 
-> Shouldn't we then also hide this from the ID register similar to what we
-> do for SVE at the moment, using something like this (untested):
+> The FCPVB handles the interface between the VSPB and memory.
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index a828a209716f..b7ee414aee67 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1064,6 +1064,12 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
->  				    task_pid_nr(current));
->  
->  		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-> +	} else if (id == SYS_ID_AA64MMFR1_EL) {
-> +		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
-> +			pr_err_once("kvm [%i]: LORegions unsupported for guests, suppressing\n",
-> +				    task_pid_nr(current));
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
+> cd3c6a30fc47..6cf935d307d9 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> @@ -691,6 +691,15 @@
+>  			#phy-cells = <0>;
+>  			status = "disabled";
+>  		};
 > +
-> +		val &= ~(0xfUL << ID_AA64MMFR1_LOR_SHIFT);
->  	}
->  
->  	return val;
-
-Sure. With that, it would make sense for the trapped LOR* register
-accesses to UNDEF, as they logically shouldn't exist.
-
-[...]
-
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index 50a43c7b97ca..67b10b7a07bf 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -175,6 +175,17 @@ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
-> >  		return read_zero(vcpu, p);
-> >  }
-> >  
-> > +static bool trap_raz_ro(struct kvm_vcpu *vcpu,
-> > +			struct sys_reg_params *p,
-> > +			const struct sys_reg_desc *r)
-> > +{
-> > +	if (!p->is_write)
-> > +		return read_zero(vcpu, p);
-> > +
-> > +	kvm_inject_undefined(vcpu);
-> > +	return false;
-> > +}
-> > +
+> +		fcpvb0: fcp at fe96f000 {
+> +			compatible = "renesas,fcpv";
+> +			reg = <0 0xfe96f000 0 0x200>;
+> +			clocks = <&cpg CPG_MOD 607>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 607>;
+> +			iommus = <&ipmmu_vp0 5>;
+> +		};
+>  	};
 > 
-> I'm a little unclear if this is stricly the right thing to do.  I can't
-> seem to find anything specific about writes to this register (which has
-> some text about RW fields but only specifies it can be *read* with an
-> MRS instruction), so it seems to me that this should either be
-> trap_raz_wi(), or call write_to_read_only() if we expect a write to
-> undef at EL1 rather than trap to EL2.  On the other hand, if the
-> architecture is unclear, then we're at least enforcing one
-> interpretation here I suppose.
+>  	timer {
 
-Having looked at the ARM ARM, I think write_to_read_only() is the right
-thing to do.
+-- 
+Regards,
 
-It's not clear to me whether HCR_EL2.TLOR traps writes to LORID_EL1, or
-leaves these UNDEFINED at EL1. In the description of traps and enables
-it's stated that HCR_EL2.TLOR traps "Non-secure accesses to this
-register from EL1", which could be read to mean either. I'll see if I
-can get to the bottom of that.
-
-I don't think trap_raz_wi(), as LORID_EL1 is never RW at EL1, and a
-write wound UNDEF were HCR_EL2.TLOR clear.
-
-Thanks,
-Mark.
+Laurent Pinchart
