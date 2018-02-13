@@ -1,39 +1,65 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 13 Feb 2018 13:29:51 +0100
-Subject: [RESEND PATCH v5 5/6] arm: dts: sun8i: a83t: bananapi-m3: Enable IR
- controller
-In-Reply-To: <20180213122952.8420-1-embed3d@gmail.com>
-References: <20180213122952.8420-1-embed3d@gmail.com>
-Message-ID: <20180213122952.8420-6-embed3d@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 13 Feb 2018 14:32:22 +0200
+Subject: [PATCH 2/4] arm64: dts: renesas: r8a77995: add FCPVD nodes
+In-Reply-To: <1518474330-8713-3-git-send-email-kbingham@kernel.org>
+References: <1518474330-8713-1-git-send-email-kbingham@kernel.org>
+ <1518474330-8713-3-git-send-email-kbingham@kernel.org>
+Message-ID: <1541765.WkmPmS7X3L@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M3 has an onboard IR receiver.
-This enables the onboard IR receiver subnode.
-Unlike the other IR receivers this one needs a base clock frequency
-of 3000000 Hz (3 MHz), to be able to work.
+Hi Kieran,
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Thank you for the patch.
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 6550bf0e594b..26c015fd4f4d 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -145,6 +145,11 @@
- 	status = "okay";
- };
- 
-+&r_cir {
-+	clock-frequency = <3000000>;
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
+On Tuesday, 13 February 2018 00:25:27 EET Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> The FCPVD handles the interface between the VSPD and memory.
+> 
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+I would however squash this with patch 1/4 from the same series.
+
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
+> 6cf935d307d9..196a917afea6 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> @@ -700,6 +700,24 @@
+>  			resets = <&cpg 607>;
+>  			iommus = <&ipmmu_vp0 5>;
+>  		};
+> +
+> +		fcpvd0: fcp at fea27000 {
+> +			compatible = "renesas,fcpv";
+> +			reg = <0 0xfea27000 0 0x200>;
+> +			clocks = <&cpg CPG_MOD 603>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 603>;
+> +			iommus = <&ipmmu_vi0 8>;
+> +		};
+> +
+> +		fcpvd1: fcp at fea2f000 {
+> +			compatible = "renesas,fcpv";
+> +			reg = <0 0xfea2f000 0 0x200>;
+> +			clocks = <&cpg CPG_MOD 602>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 602>;
+> +			iommus = <&ipmmu_vi0 9>;
+> +		};
+>  	};
+> 
+>  	timer {
+
+
 -- 
-2.11.0
+Regards,
+
+Laurent Pinchart
