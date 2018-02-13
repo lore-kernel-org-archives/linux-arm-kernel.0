@@ -1,95 +1,82 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Feb 2018 08:58:28 +0100
-Subject: [PATCH v5 0/6] IR support for A83T
-In-Reply-To: <a1ce4422-33d7-1214-6527-0d299e97fe8b@gmail.com>
-References: <20180130174656.10657-1-embed3d@gmail.com>
- <a1ce4422-33d7-1214-6527-0d299e97fe8b@gmail.com>
-Message-ID: <20180213075828.zkm2p67dsr7f6bde@flea.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 13 Feb 2018 09:05:12 +0100
+Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
+In-Reply-To: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180213080512.huhc6pkowhie74nq@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Mon, Feb 12, 2018 at 12:00:02PM +0100, Philipp Rossak wrote:
-> On 30.01.2018 18:46, Philipp Rossak wrote:
-> > This patch series adds support for the sunxi A83T ir module and enhances
-> > the sunxi-ir driver. Right now the base clock frequency for the ir driver
-> > is a hard coded define and is set to 8 MHz.
-> > This works for the most common ir receivers. On the Sinovoip Bananapi M3
-> > the ir receiver needs, a 3 MHz base clock frequency to work without
-> > problems with this driver.
-> > 
-> > This patch series adds support for an optinal property that makes it able
-> > to override the default base clock frequency and enables the ir interface
-> > on the a83t and the Bananapi M3.
-> > 
-> > changes since v4:
-> > * rename cir pin from cir_pins to r_cir_pin
-> > * drop unit-adress from r_cir_pin
-> > * add a83t compatible to the cir node
-> > * move muxing options to dtsi
-> > * rename cir label and reorder it in the bananpim3.dts file
-> > 
-> > changes since v3:
-> > * collecting all acks & reviewd by
-> > * fixed typos
-> > 
-> > changes since v2:
-> > * reorder cir pin (alphabetical)
-> > * fix typo in documentation
-> > 
-> > changes since v1:
-> > * fix typos, reword Documentation
-> > * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
-> > * change dev_info() to dev_dbg()
-> > * change naming to cir* in dts/dtsi
-> > * Added acked Ackedi-by to related patch
-> > * use whole memory block instead of registers needed + fix for h3/h5
-> > 
-> > changes since rfc:
-> > * The property is now optinal. If the property is not available in
-> >    the dtb the driver uses the default base clock frequency.
-> > * the driver prints out the the selected base clock frequency.
-> > * changed devicetree property from base-clk-frequency to clock-frequency
-> > 
-> > Regards,
-> > Philipp
-> > 
-> > Philipp Rossak (6):
-> >    media: rc: update sunxi-ir driver to get base clock frequency from
-> >      devicetree
-> >    media: dt: bindings: Update binding documentation for sunxi IR
-> >      controller
-> >    arm: dts: sun8i: a83t: Add the cir pin for the A83T
-> >    arm: dts: sun8i: a83t: Add support for the cir interface
-> >    arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
-> >    arm: dts: sun8i: h3-h5: ir register size should be the whole memory
-> >      block
-> > 
-> >   Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
-> >   arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
-> >   arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
-> >   arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
-> >   drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
-> >   5 files changed, 38 insertions(+), 9 deletions(-)
-> > 
+On Mon, Feb 12, 2018 at 05:44:09PM +0000, Fabrizio Castro wrote:
+> Dear All,
 > 
-> RC1 is now out, thus I would like to ask you to have a look at this patch
-> series again. Some patches still miss an acked-by. It would be nice if we
-> could schedule this for v4.17.
+> this series has been around for some time as RFC, and it has collected
+> useful comments from the community along the way.
+> The solution proposed by this patch set works for most R-Car Gen2 and
+> RZ/G1 devices, but not all of them. We now know that for some R-Car
+> Gen2 early revisions there is no proper software fix. Anyway, no
+> product has been built around early revisions, but development boards
+> mounting early revisions (basically prototypes) are still out there.
+> As a result, this series isn't enabling the internal watchdog on R-Car
+> Gen2 boards, developers may enable it in board specific device trees
+> if needed.
+> This series has been tested by me on the iwg20d, iwg22d, Lager, Alt,
+> and Koelsch boards.
+> 
+> The problem
+> ===========
+> To deal with SMP on R-Car Gen2 and RZ/G1, we install a reset vector
+> to ICRAM1 and we program the [S]BAR registers so that when we turn ON
+> the non-boot CPUs they are redirected to the reset vector installed by
+> Linux in ICRAM1, and eventually they continue the execution to RAM,
+> where the SMP bring-up code will take care of the rest.
+> The content of the [S]BAR registers survives a watchdog triggered reset,
+> and as such after the watchdog fires the boot core will try and execute
+> the SMP bring-up code instead of jumping to the bootrom code.
+> 
+> The fix
+> =======
+> The main strategy for the solution is to let the reset vector decide
+> if it needs to jump to shmobile_boot_fn or to the bootrom code.
+> In a watchdog triggered reset scenario, since the [S]BAR registers keep
+> their values, the boot CPU will jump into the newly designed reset
+> vector, the assembly routine will eventually test WOVF (a bit in register
+> RWTCSRA that indicates if the watchdog counter has overflown, the value
+> of this bit gets retained in this scenario), and jump to the bootrom code
+> which will in turn load up the bootloader, etc.
+> When bringing up SMP or using CPU hotplug, the reset vector will jump
+> to shmobile_boot_fn instead.
+> 
+> Thank you All for your help.
+> 
+> Best regards,
+> 
+> Fabrizio Castro (26):
+>   ARM: shmobile: Add watchdog support
+>   ARM: dts: r8a7743: Adjust SMP routine size
+>   ARM: dts: r8a7745: Adjust SMP routine size
+>   ARM: dts: r8a7790: Adjust SMP routine size
+>   ARM: dts: r8a7791: Adjust SMP routine size
+>   ARM: dts: r8a7792: Adjust SMP routine size
+>   ARM: dts: r8a7793: Adjust SMP routine size
+>   ARM: dts: r8a7794: Adjust SMP routine size
+>   soc: renesas: rcar-rst: Enable watchdog as reset trigger for Gen2
+>   ARM: shmobile: rcar-gen2: Add watchdog support
+>   dt-bindings: watchdog: renesas-wdt: Add R-Car Gen2 support
+>   watchdog: renesas_wdt: Add R-Car Gen2 support
+>   watchdog: renesas_wdt: Add restart handler
+>   ARM: shmobile: defconfig: Enable RENESAS_WDT_GEN
+>   clk: renesas: r8a7743: Add rwdt clock
+>   clk: renesas: r8a7745: Add rwdt clock
+>   clk: renesas: r8a7790: Add rwdt clock
+>   clk: renesas: r8a7791/r8a7793: Add rwdt clock
+>   clk: renesas: r8a7794: Add rwdt clock
+>   ARM: dts: r8a7743: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7790: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7791: Add watchdog support to SoC dtsi
+>   ARM: dts: r8a7794: Add watchdog support to SoC dtsi
+>   ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+>   ARM: dts: iwg22m: Add watchdog support to SoM dtsi
 
-Just resend it, this will send pretty much the same signal :)
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180213/ed70a08d/attachment-0001.sig>
+Thanks, I have applied the above "dts" and "defconfig" patches for v4.17.
