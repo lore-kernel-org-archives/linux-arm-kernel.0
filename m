@@ -1,28 +1,87 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 13 Feb 2018 04:24:29 +0000
-Subject: [PATCH v2 0/9] add UniPhier audio system support
-In-Reply-To: <20180212124858.GC12976@sirena.org.uk>
-References: <20180119092536.22501-1-suzuki.katsuhiro@socionext.com>
- <20180212124858.GC12976@sirena.org.uk>
-Message-ID: <87vaf1jz6z.wl%kuninori.morimoto.gx@renesas.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Tue, 13 Feb 2018 16:03:09 +1100 (AEDT)
+Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
+In-Reply-To: <20180212.103956.1262868827217051631.davem@davemloft.net>
+References: <cover.1518397634.git.fthain@telegraphics.com.au>
+ <f697da2b2513e025688f6c48088536060575a249.1518397634.git.fthain@telegraphics.com.au>
+ <20180212.103956.1262868827217051631.davem@davemloft.net>
+Message-ID: <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 12 Feb 2018, David Miller wrote:
 
-Hi Mark
-
-> > This series adds support for Socionext audio system for
-> > UniPhier LD11/LD20 SoCs. This driver supports I2S output
-> > for Line-In, Line-Out and S/PDIF output.
+> From: Finn Thain <fthain@telegraphics.com.au>
+> Date: Sun, 11 Feb 2018 22:08:43 -0500 (EST)
 > 
-> These look fine so I'll apply them however a patch series from
-> Morimoto-san (CCed) moving things to use components rather than
-> CODEC/platform/whatever driver types that was sent about the same time
-> has just gone in - the driver will require the same conversions.
+> > The lib8390 module parameter 'msg_enable' doesn't do anything useful:
+> > it causes an ancient version string to be logged.
+> 
+> Not true.
+> 
+> You need to look at the various netif_*() et al. message logging
+> interfaces, they check "p->msg_enable" to determine which messages to
+> print.
+> 
 
-Thank you for pointing it.
-I posted conversion patch for this driver.
+I think you have overlooked those modules which offer no way to set 
+p->msg_enable, i.e. ax88796, axnet_cs, etherh, hydra, mac8390, mcf8390, 
+pcnet_cs and zorro8390.
 
-Best regards
----
-Kuninori Morimoto
+The apne, ne, ne2k-pci, smc-ultra, stnic, and wd modules are not at issue 
+here because they define their own msg_enable parameters and they also 
+assign p->msg_enable accordingly.
+
+> I'm not applying this, sorry.
+> 
+
+Please take another look.
+
+> Just for the record, I consider these kinds of ancient driver cleanups 
+> painful to review, and unless they allow some ugly global kernel API to 
+> be improved or removed such changes have very little gain.
+> 
+
+OK. When there are no users, I'll send you no patches.
+
+But even then, I may continue to send patches to other maintainers who may 
+be open to the possibility of unforeseen future uses of the body of 
+contributed code under their care.
+
+> In fact, most of them have a good chance to break things.
+> 
+
+You saw the tested-by tags, right? Anyway, if you consider my previous 
+work, I believe you'll find that I've fixed more bugs than I've 
+introduced.
+
+> It is especially a dubious sequence when you cluster so many of these 
+> things together into a large patch series.
+> 
+
+Sorry if that gave the wrong impression. Doing that made my workflow 
+easier.
+
+> If you are really serious about fixing real bugs, post these one at a 
+> time, very slowly, for us to review properly and apply.
+> 
+> Thank you.
+
+Please don't feel like I'm trying to pressure you to expedite this.
+
+FWIW, this submission was arranged so that you might cherry-pick the first 
+N patches, for some satisfactory value of N.
+
+I will split up this series by driver (8390, sonic, etc) so it's more 
+clear which patches are independent and which patches can be reviewed 
+together.
+
+Thanks.
+
+-- 
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-m68k" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
