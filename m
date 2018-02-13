@@ -1,81 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Feb 2018 13:14:09 +0000
-Subject: [PATCH] arm64: proc: Set PTE_NG for table entries to avoid traversing
- them twice
-Message-ID: <1518527649-18358-1-git-send-email-will.deacon@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 13 Feb 2018 13:32:26 +0000
+Subject: [PATCH v2] MAINTAINERS: add Freescale pin controllers
+In-Reply-To: <20180212150549.8622-1-stefan@agner.ch>
+References: <20180212150549.8622-1-stefan@agner.ch>
+Message-ID: <AM3PR04MB306CC7D8349BD66C47BDD0180F60@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When KASAN is enabled, the swapper page table contains many identical
-mappings of the zero page, which can lead to a stall during boot whilst
-the G -> nG code continually walks the same page table entries looking
-for global mappings.
+Hi Stefan,
 
-This patch sets the nG bit (bit 11, which is IGNORED) in table entries
-after processing the subtree so we can easily skip them if we see them
-a second time.
+> -----Original Message-----
+> From: Stefan Agner [mailto:stefan at agner.ch]
+> Sent: Monday, February 12, 2018 11:06 PM
+> To: linus.walleij at linaro.org; A.s. Dong <aisheng.dong@nxp.com>; Fabio
+> Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org;
+> kernel at pengutronix.de
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> Stefan Agner <stefan@agner.ch>
+> Subject: [PATCH v2] MAINTAINERS: add Freescale pin controllers
+> 
+> Add Dong Aisheng, Fabio Estevam, Shawn Guo and myself as maintainer and
+> the Pengutronix kernel team as reviewer.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Reviewed-by: Fabio Estevam <festevam@gmail.com>
 
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/proc.S | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+Thanks for sending this.
+Besides Joe's comments, I'm fine with it.
+So:
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 71baed7e592a..c0af47617299 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -205,7 +205,8 @@ ENDPROC(idmap_cpu_replace_ttbr1)
- 	dc	cvac, cur_\()\type\()p		// Ensure any existing dirty
- 	dmb	sy				// lines are written back before
- 	ldr	\type, [cur_\()\type\()p]	// loading the entry
--	tbz	\type, #0, next_\()\type	// Skip invalid entries
-+	tbz	\type, #0, skip_\()\type	// Skip invalid and
-+	tbnz	\type, #11, skip_\()\type	// non-global entries
- 	.endm
- 
- 	.macro __idmap_kpti_put_pgtable_ent_ng, type
-@@ -265,8 +266,9 @@ ENTRY(idmap_kpti_install_ng_mappings)
- 	add	end_pgdp, cur_pgdp, #(PTRS_PER_PGD * 8)
- do_pgd:	__idmap_kpti_get_pgtable_ent	pgd
- 	tbnz	pgd, #1, walk_puds
--	__idmap_kpti_put_pgtable_ent_ng	pgd
- next_pgd:
-+	__idmap_kpti_put_pgtable_ent_ng	pgd
-+skip_pgd:
- 	add	cur_pgdp, cur_pgdp, #8
- 	cmp	cur_pgdp, end_pgdp
- 	b.ne	do_pgd
-@@ -294,8 +296,9 @@ walk_puds:
- 	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
- do_pud:	__idmap_kpti_get_pgtable_ent	pud
- 	tbnz	pud, #1, walk_pmds
--	__idmap_kpti_put_pgtable_ent_ng	pud
- next_pud:
-+	__idmap_kpti_put_pgtable_ent_ng	pud
-+skip_pud:
- 	add	cur_pudp, cur_pudp, 8
- 	cmp	cur_pudp, end_pudp
- 	b.ne	do_pud
-@@ -314,8 +317,9 @@ walk_pmds:
- 	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
- do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
- 	tbnz	pmd, #1, walk_ptes
--	__idmap_kpti_put_pgtable_ent_ng	pmd
- next_pmd:
-+	__idmap_kpti_put_pgtable_ent_ng	pmd
-+skip_pmd:
- 	add	cur_pmdp, cur_pmdp, #8
- 	cmp	cur_pmdp, end_pmdp
- 	b.ne	do_pmd
-@@ -333,7 +337,7 @@ walk_ptes:
- 	add	end_ptep, cur_ptep, #(PTRS_PER_PTE * 8)
- do_pte:	__idmap_kpti_get_pgtable_ent	pte
- 	__idmap_kpti_put_pgtable_ent_ng	pte
--next_pte:
-+skip_pte:
- 	add	cur_ptep, cur_ptep, #8
- 	cmp	cur_ptep, end_ptep
- 	b.ne	do_pte
--- 
-2.1.4
+Regards
+Dong Aisheng
+
+> ---
+>  MAINTAINERS | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 82ad0eabce4f..df60ca7c3355 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -10768,6 +10768,17 @@ L:	linux-gpio at vger.kernel.org
+>  S:	Supported
+>  F:	drivers/pinctrl/pinctrl-at91-pio4.*
+> 
+> +PIN CONTROLLER - FREESCALE
+> +M:	Dong Aisheng <aisheng.dong@nxp.com>
+> +M:	Fabio Estevam <festevam@gmail.com>
+> +M:	Shawn Guo <shawnguo@kernel.org>
+> +M:	Stefan Agner <stefan@agner.ch>
+> +R:	Pengutronix Kernel Team <kernel@pengutronix.de>
+> +L:	linux-gpio at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/pinctrl/freescale/*
+> +F:	Documentation/devicetree/bindings/pinctrl/fsl,*
+> +
+>  PIN CONTROLLER - INTEL
+>  M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+>  M:	Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> --
+> 2.16.1
