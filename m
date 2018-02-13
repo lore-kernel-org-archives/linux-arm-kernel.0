@@ -1,82 +1,282 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 13 Feb 2018 17:55:10 +0100
-Subject: [PATCH 0/9] Some OMAP2+ legacy hwmod data cleanup
-In-Reply-To: <20180213154622.GE6364@atomide.com>
-References: <20180213013243.8378-1-s-anna@ti.com>
- <20180213154622.GE6364@atomide.com>
-Message-ID: <96379836-1E9F-4E90-B6E4-31DB544A18BB@goldelico.com>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Tue, 13 Feb 2018 17:59:22 +0100
+Subject: [net PATCH] Revert "net: thunderx: Add support for xdp redirect"
+Message-ID: <151854116184.18303.13476104443853509134.stgit@firesoul>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This reverts commit aa136d0c82fcd6af14535853c30e219e02b2692d.
 
-> Am 13.02.2018 um 16:46 schrieb Tony Lindgren <tony@atomide.com>:
-> 
-> * Suman Anna <s-anna@ti.com> [180213 01:33]:
->> Hi Tony,
->> 
->> The following series cleans up some legacy dev_attr data associated
->> with OMAP DMTimer, I2C, McBSP, McSPI and GPIO modules and removes
->> roughly ~500 lines. Patches are based on v4.16-rc1. I have build tested
->> for both omap2plus and omap1 defconfigs, and booted on a few OMAP4+
->> boards that I have on my desk.
-> 
-> Hey that's great :)
-> 
->> Here is the patch summary:
->> 1. First two patches fixes header inclusion in omap-dmaengine.h and
->>    hsmmc-omap.h as I am getting build errors on subsequent patches when
->>    I removed some of the platform_data header files.
->> 2. Patches 3 through 7 remove the .dev_attr data for the above modules
->>    from various hwmod data files and some macros from McSPI & McBSP
->>    platform data header files
->> 3. Patch 8 moves the plat-omap/include/plat/i2c.h into mach-omap1
->>    folder as there is no common i2c code in plat-omap folder anymore.
->> 4. Last patch is a minor cleanup of gpio headers from couple of files.
->> 
->> Some important notes/comments:
->> - The DMTimer patch cleanup will conflict with Keerthy's current dmtimer->
->>   clocksource series, but ideally he wouldn't need to convert the plat/dmtimer.h
->>   into a clocksource header with the removal of the plat/dmtimer.h inclusion
->>   from the hwmod data files.
-> 
-> OK. It seems that we should do the clean up first if it just means
-> leaving out unused header files.
-> 
->> - I found some gaps w.r.t DMTimers on DM814x/DM816x platforms, and haven't
->>   fixed them. Both seems to have DMTimer1 through 8, but only DMTimers 1, 2
->>   and 3 are defined in dm814x.dtsi, while dm816x.dtsi is missing DMTimer8.
->>   DMTimer3 hwmod is not in the dm814x hwmod list, while DMTimer8 is left out
->>   altogther. The timer capabilities are also different between the hwmod
->>   data files (lists always-on) which is missing from corresponding dts files.
->>   Not sure which one is correct.
-> 
-> OK we should fix them. The capabilities can be seen by looking at
-> the hardware and clockdomains. The always-on timers are of sysc
-> type 1 (ti,sysc-omap2-timer) and in a always on power domain. The
-> others are of sysc type 2 (ti,sysc-omap4-timer). We should get
-> warnings for those from ti,sysc driver eventually if they don't
-> match :)
-> 
->> This leaves the hsmmc-omap and omap-dma pieces still using the .dev_attr. The
->> former is only used by one OMAP3 board, so can be cleaned up if we limit the
->> init code just for that one board.
-> 
-> I think Nikolaus had patches coming for removing the last user
-> of mmc pdata?
+As I previously[1] pointed out this implementation of XDP_REDIRECT is
+wrong.  XDP_REDIRECT is a facility that must work between different
+NIC drivers.  Another NIC driver can call ndo_xdp_xmit/nicvf_xdp_xmit,
+but your driver patch assumes payload data (at top of page) will
+contain a queue index and a DMA addr, this is not true and worse will
+likely contain garbage.
 
-Well, the idea was to convert the wl1251 driver to DT (like e.g. wl183x)
-and get rid of the pdata. But I didn't find any time to work on this,
-especially since the driver itself is broken for a while (I think up
-to 4.11 the wl1251 was found and working, after that it wasn't working
-and after 4.14 or so it wasn't even found any more). Probably some
-simple things, but as usual time consuming to dig into.
+Given you have not fixed this in due time (just reached v4.16-rc1),
+the only option I see is a revert.
 
-> 
-> I think all we need to do is have pandora_wl1251_init_card
-> initialized in the MMC driver based on a compatible value..
+[1] http://lkml.kernel.org/r/20171211130902.482513d3 at redhat.com
 
-Yes, looks so.
+Cc: Sunil Goutham <sgoutham@cavium.com>
+Cc: Christina Jacob <cjacob@caviumnetworks.com>
+Cc: Aleksey Makarov <aleksey.makarov@cavium.com>
+Fixes: aa136d0c82fc ("net: thunderx: Add support for xdp redirect")
+Signed-off-by: Jesper Dangaard Brouer <brouer@redhat.com>
+---
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  110 +++++---------------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   11 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    4 -
+ 3 files changed, 31 insertions(+), 94 deletions(-)
 
-BR and thanks,
-Nikolaus
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index b68cde9f17d2..7d9c5ffbd041 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -67,11 +67,6 @@ module_param(cpi_alg, int, S_IRUGO);
+ MODULE_PARM_DESC(cpi_alg,
+ 		 "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
+ 
+-struct nicvf_xdp_tx {
+-	u64 dma_addr;
+-	u8  qidx;
+-};
+-
+ static inline u8 nicvf_netdev_qidx(struct nicvf *nic, u8 qidx)
+ {
+ 	if (nic->sqs_mode)
+@@ -507,29 +502,14 @@ static int nicvf_init_resources(struct nicvf *nic)
+ 	return 0;
+ }
+ 
+-static void nicvf_unmap_page(struct nicvf *nic, struct page *page, u64 dma_addr)
+-{
+-	/* Check if it's a recycled page, if not unmap the DMA mapping.
+-	 * Recycled page holds an extra reference.
+-	 */
+-	if (page_ref_count(page) == 1) {
+-		dma_addr &= PAGE_MASK;
+-		dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
+-				     RCV_FRAG_LEN + XDP_HEADROOM,
+-				     DMA_FROM_DEVICE,
+-				     DMA_ATTR_SKIP_CPU_SYNC);
+-	}
+-}
+-
+ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 				struct cqe_rx_t *cqe_rx, struct snd_queue *sq,
+ 				struct rcv_queue *rq, struct sk_buff **skb)
+ {
+ 	struct xdp_buff xdp;
+ 	struct page *page;
+-	struct nicvf_xdp_tx *xdp_tx = NULL;
+ 	u32 action;
+-	u16 len, err, offset = 0;
++	u16 len, offset = 0;
+ 	u64 dma_addr, cpu_addr;
+ 	void *orig_data;
+ 
+@@ -543,7 +523,7 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 	cpu_addr = (u64)phys_to_virt(cpu_addr);
+ 	page = virt_to_page((void *)cpu_addr);
+ 
+-	xdp.data_hard_start = page_address(page) + RCV_BUF_HEADROOM;
++	xdp.data_hard_start = page_address(page);
+ 	xdp.data = (void *)cpu_addr;
+ 	xdp_set_data_meta_invalid(&xdp);
+ 	xdp.data_end = xdp.data + len;
+@@ -563,7 +543,18 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 
+ 	switch (action) {
+ 	case XDP_PASS:
+-		nicvf_unmap_page(nic, page, dma_addr);
++		/* Check if it's a recycled page, if not
++		 * unmap the DMA mapping.
++		 *
++		 * Recycled page holds an extra reference.
++		 */
++		if (page_ref_count(page) == 1) {
++			dma_addr &= PAGE_MASK;
++			dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
++					     RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
++					     DMA_FROM_DEVICE,
++					     DMA_ATTR_SKIP_CPU_SYNC);
++		}
+ 
+ 		/* Build SKB and pass on packet to network stack */
+ 		*skb = build_skb(xdp.data,
+@@ -576,20 +567,6 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 	case XDP_TX:
+ 		nicvf_xdp_sq_append_pkt(nic, sq, (u64)xdp.data, dma_addr, len);
+ 		return true;
+-	case XDP_REDIRECT:
+-		/* Save DMA address for use while transmitting */
+-		xdp_tx = (struct nicvf_xdp_tx *)page_address(page);
+-		xdp_tx->dma_addr = dma_addr;
+-		xdp_tx->qidx = nicvf_netdev_qidx(nic, cqe_rx->rq_idx);
+-
+-		err = xdp_do_redirect(nic->pnicvf->netdev, &xdp, prog);
+-		if (!err)
+-			return true;
+-
+-		/* Free the page on error */
+-		nicvf_unmap_page(nic, page, dma_addr);
+-		put_page(page);
+-		break;
+ 	default:
+ 		bpf_warn_invalid_xdp_action(action);
+ 		/* fall through */
+@@ -597,7 +574,18 @@ static inline bool nicvf_xdp_rx(struct nicvf *nic, struct bpf_prog *prog,
+ 		trace_xdp_exception(nic->netdev, prog, action);
+ 		/* fall through */
+ 	case XDP_DROP:
+-		nicvf_unmap_page(nic, page, dma_addr);
++		/* Check if it's a recycled page, if not
++		 * unmap the DMA mapping.
++		 *
++		 * Recycled page holds an extra reference.
++		 */
++		if (page_ref_count(page) == 1) {
++			dma_addr &= PAGE_MASK;
++			dma_unmap_page_attrs(&nic->pdev->dev, dma_addr,
++					     RCV_FRAG_LEN + XDP_PACKET_HEADROOM,
++					     DMA_FROM_DEVICE,
++					     DMA_ATTR_SKIP_CPU_SYNC);
++		}
+ 		put_page(page);
+ 		return true;
+ 	}
+@@ -1864,50 +1852,6 @@ static int nicvf_xdp(struct net_device *netdev, struct netdev_bpf *xdp)
+ 	}
+ }
+ 
+-static int nicvf_xdp_xmit(struct net_device *netdev, struct xdp_buff *xdp)
+-{
+-	struct nicvf *nic = netdev_priv(netdev);
+-	struct nicvf *snic = nic;
+-	struct nicvf_xdp_tx *xdp_tx;
+-	struct snd_queue *sq;
+-	struct page *page;
+-	int err, qidx;
+-
+-	if (!netif_running(netdev) || !nic->xdp_prog)
+-		return -EINVAL;
+-
+-	page = virt_to_page(xdp->data);
+-	xdp_tx = (struct nicvf_xdp_tx *)page_address(page);
+-	qidx = xdp_tx->qidx;
+-
+-	if (xdp_tx->qidx >= nic->xdp_tx_queues)
+-		return -EINVAL;
+-
+-	/* Get secondary Qset's info */
+-	if (xdp_tx->qidx >= MAX_SND_QUEUES_PER_QS) {
+-		qidx = xdp_tx->qidx / MAX_SND_QUEUES_PER_QS;
+-		snic = (struct nicvf *)nic->snicvf[qidx - 1];
+-		if (!snic)
+-			return -EINVAL;
+-		qidx = xdp_tx->qidx % MAX_SND_QUEUES_PER_QS;
+-	}
+-
+-	sq = &snic->qs->sq[qidx];
+-	err = nicvf_xdp_sq_append_pkt(snic, sq, (u64)xdp->data,
+-				      xdp_tx->dma_addr,
+-				      xdp->data_end - xdp->data);
+-	if (err)
+-		return -ENOMEM;
+-
+-	nicvf_xdp_sq_doorbell(snic, sq, qidx);
+-	return 0;
+-}
+-
+-static void nicvf_xdp_flush(struct net_device *dev)
+-{
+-	return;
+-}
+-
+ static int nicvf_config_hwtstamp(struct net_device *netdev, struct ifreq *ifr)
+ {
+ 	struct hwtstamp_config config;
+@@ -1986,8 +1930,6 @@ static const struct net_device_ops nicvf_netdev_ops = {
+ 	.ndo_fix_features       = nicvf_fix_features,
+ 	.ndo_set_features       = nicvf_set_features,
+ 	.ndo_bpf		= nicvf_xdp,
+-	.ndo_xdp_xmit		= nicvf_xdp_xmit,
+-	.ndo_xdp_flush          = nicvf_xdp_flush,
+ 	.ndo_do_ioctl           = nicvf_ioctl,
+ };
+ 
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 3eae9ff9b53a..d42704d07484 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -204,7 +204,7 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+ 
+ 	/* Reserve space for header modifications by BPF program */
+ 	if (rbdr->is_xdp)
+-		buf_len += XDP_HEADROOM;
++		buf_len += XDP_PACKET_HEADROOM;
+ 
+ 	/* Check if it's recycled */
+ 	if (pgcache)
+@@ -224,9 +224,8 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, struct rbdr *rbdr,
+ 			nic->rb_page = NULL;
+ 			return -ENOMEM;
+ 		}
+-
+ 		if (pgcache)
+-			pgcache->dma_addr = *rbuf + XDP_HEADROOM;
++			pgcache->dma_addr = *rbuf + XDP_PACKET_HEADROOM;
+ 		nic->rb_page_offset += buf_len;
+ 	}
+ 
+@@ -1244,7 +1243,7 @@ int nicvf_xdp_sq_append_pkt(struct nicvf *nic, struct snd_queue *sq,
+ 	int qentry;
+ 
+ 	if (subdesc_cnt > sq->xdp_free_cnt)
+-		return -1;
++		return 0;
+ 
+ 	qentry = nicvf_get_sq_desc(sq, subdesc_cnt);
+ 
+@@ -1255,7 +1254,7 @@ int nicvf_xdp_sq_append_pkt(struct nicvf *nic, struct snd_queue *sq,
+ 
+ 	sq->xdp_desc_cnt += subdesc_cnt;
+ 
+-	return 0;
++	return 1;
+ }
+ 
+ /* Calculate no of SQ subdescriptors needed to transmit all
+@@ -1656,7 +1655,7 @@ static void nicvf_unmap_rcv_buffer(struct nicvf *nic, u64 dma_addr,
+ 		if (page_ref_count(page) != 1)
+ 			return;
+ 
+-		len += XDP_HEADROOM;
++		len += XDP_PACKET_HEADROOM;
+ 		/* Receive buffers in XDP mode are mapped from page start */
+ 		dma_addr &= PAGE_MASK;
+ 	}
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+index ce1eed7a6d63..5e9a03cf1b4d 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+@@ -11,7 +11,6 @@
+ 
+ #include <linux/netdevice.h>
+ #include <linux/iommu.h>
+-#include <linux/bpf.h>
+ #include <net/xdp.h>
+ #include "q_struct.h"
+ 
+@@ -94,9 +93,6 @@
+ #define RCV_FRAG_LEN	 (SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
+ 			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+ 
+-#define RCV_BUF_HEADROOM	128 /* To store dma address for XDP redirect */
+-#define XDP_HEADROOM		(XDP_PACKET_HEADROOM + RCV_BUF_HEADROOM)
+-
+ #define MAX_CQES_FOR_TX		((SND_QUEUE_LEN / MIN_SQ_DESC_PER_PKT_XMIT) * \
+ 				 MAX_CQE_PER_PKT_XMIT)
+ 
