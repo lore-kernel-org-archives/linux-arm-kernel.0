@@ -1,151 +1,38 @@
-From: mmayer@broadcom.com (Markus Mayer)
-Date: Tue, 13 Feb 2018 12:40:40 -0800
-Subject: [PATCH 3/3] memory: brcmstb: dpfe: support new way of passing data
- from the DCPU
-In-Reply-To: <1518554440-21805-1-git-send-email-mmayer@broadcom.com>
-References: <1518554440-21805-1-git-send-email-mmayer@broadcom.com>
-Message-ID: <1518554440-21805-4-git-send-email-mmayer@broadcom.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Tue, 13 Feb 2018 21:54:03 +0100
+Subject: [PATCH] dmaengine: at_xdmac: Delete an error message for a failed
+ memory allocation in at_xdmac_probe()
+Message-ID: <980fa869-f75b-3436-a329-09613e2ab915@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCPU can now send message data in two ways:
-  - via the data RAM, as before (this is now message type 0)
-  - via the message RAM (this is message type 1)
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Tue, 13 Feb 2018 21:48:26 +0100
 
-In order to support both methods, we check the message type of the
-response (bits 31:28) and then treat the offset (bits 27:0)
-accordingly.
+Omit an extra message for a memory allocation failure in this function.
 
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/memory/brcmstb_dpfe.c | 65 ++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 55 insertions(+), 10 deletions(-)
+ drivers/dma/at_xdmac.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/memory/brcmstb_dpfe.c b/drivers/memory/brcmstb_dpfe.c
-index 2013a91217a9..e9c1485c32b9 100644
---- a/drivers/memory/brcmstb_dpfe.c
-+++ b/drivers/memory/brcmstb_dpfe.c
-@@ -45,8 +45,16 @@
- #define REG_TO_DCPU_MBOX	0x10
- #define REG_TO_HOST_MBOX	0x14
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index c00e3923d7d8..818ab96f9601 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1950,10 +1950,8 @@ static int at_xdmac_probe(struct platform_device *pdev)
+ 	size = sizeof(*atxdmac);
+ 	size += nr_channels * sizeof(struct at_xdmac_chan);
+ 	atxdmac = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+-	if (!atxdmac) {
+-		dev_err(&pdev->dev, "can't allocate at_xdmac structure\n");
++	if (!atxdmac)
+ 		return -ENOMEM;
+-	}
  
-+/* Macros to process offsets returned by the DCPU */
-+#define DRAM_MSG_ADDR_OFFSET	0x0
-+#define DRAM_MSG_TYPE_OFFSET	0x1c
-+#define DRAM_MSG_ADDR_MASK	((1UL << DRAM_MSG_TYPE_OFFSET) - 1)
-+#define DRAM_MSG_TYPE_MASK	((1UL << \
-+				 (BITS_PER_LONG - DRAM_MSG_TYPE_OFFSET)) - 1)
-+
- /* Message RAM */
--#define DCPU_MSG_RAM(x)		(0x100 + (x) * sizeof(u32))
-+#define DCPU_MSG_RAM_START	0x100
-+#define DCPU_MSG_RAM(x)		(DCPU_MSG_RAM_START + (x) * sizeof(u32))
- 
- /* DRAM Info Offsets & Masks */
- #define DRAM_INFO_INTERVAL	0x0
-@@ -255,6 +263,40 @@ static unsigned int get_msg_chksum(const u32 msg[])
- 	return sum;
- }
- 
-+static void __iomem *get_msg_ptr(struct private_data *priv, u32 response,
-+				 char *buf, ssize_t *size)
-+{
-+	unsigned int msg_type;
-+	unsigned int offset;
-+	void __iomem *ptr = NULL;
-+
-+	msg_type = (response >> DRAM_MSG_TYPE_OFFSET) & DRAM_MSG_TYPE_MASK;
-+	offset = (response >> DRAM_MSG_ADDR_OFFSET) & DRAM_MSG_ADDR_MASK;
-+
-+	/*
-+	 * msg_type == 1: the offset is relative to the message RAM
-+	 * msg_type == 0: the offset is relative to the data RAM (this is the
-+	 *                previous way of passing data)
-+	 * msg_type is anything else: there's critical hardware problem
-+	 */
-+	switch (msg_type) {
-+	case 1:
-+		ptr = priv->regs + DCPU_MSG_RAM_START + offset;
-+		break;
-+	case 0:
-+		ptr = priv->dmem + offset;
-+		break;
-+	default:
-+		dev_emerg(priv->dev, "invalid message reply from DCPU: %#x\n",
-+			response);
-+		if (buf && size)
-+			*size = sprintf(buf,
-+				"FATAL: communication error with DCPU\n");
-+	}
-+
-+	return ptr;
-+}
-+
- static int __send_command(struct private_data *priv, unsigned int cmd,
- 			  u32 result[])
- {
-@@ -528,7 +570,6 @@ static ssize_t show_refresh(struct device *dev,
- 	u32 response[MSG_FIELD_MAX];
- 	void __iomem *info;
- 	struct private_data *priv;
--	unsigned int offset;
- 	u8 refresh, sr_abort, ppre, thermal_offs, tuf;
- 	u32 mr4;
- 	ssize_t ret;
-@@ -538,8 +579,10 @@ static ssize_t show_refresh(struct device *dev,
- 		return ret;
- 
- 	priv = dev_get_drvdata(dev);
--	offset = response[MSG_ARG0];
--	info = priv->dmem + offset;
-+
-+	info = get_msg_ptr(priv, response[MSG_ARG0], buf, &ret);
-+	if (!info)
-+		return ret;
- 
- 	mr4 = readl_relaxed(info + DRAM_INFO_MR4) & DRAM_INFO_MR4_MASK;
- 
-@@ -561,7 +604,6 @@ static ssize_t store_refresh(struct device *dev, struct device_attribute *attr,
- 	u32 response[MSG_FIELD_MAX];
- 	struct private_data *priv;
- 	void __iomem *info;
--	unsigned int offset;
- 	unsigned long val;
- 	int ret;
- 
-@@ -574,8 +616,10 @@ static ssize_t store_refresh(struct device *dev, struct device_attribute *attr,
- 	if (ret)
- 		return ret;
- 
--	offset = response[MSG_ARG0];
--	info = priv->dmem + offset;
-+	info = get_msg_ptr(priv, response[MSG_ARG0], NULL, NULL);
-+	if (!info)
-+		return -EIO;
-+
- 	writel_relaxed(val, info + DRAM_INFO_INTERVAL);
- 
- 	return count;
-@@ -587,16 +631,17 @@ static ssize_t show_vendor(struct device *dev, struct device_attribute *devattr,
- 	u32 response[MSG_FIELD_MAX];
- 	struct private_data *priv;
- 	void __iomem *info;
--	unsigned int offset;
- 	ssize_t ret;
- 
- 	ret = generic_show(DPFE_CMD_GET_VENDOR, response, dev, buf);
- 	if (ret)
- 		return ret;
- 
--	offset = response[MSG_ARG0];
- 	priv = dev_get_drvdata(dev);
--	info = priv->dmem + offset;
-+
-+	info = get_msg_ptr(priv, response[MSG_ARG0], buf, &ret);
-+	if (!info)
-+		return ret;
- 
- 	return sprintf(buf, "%#x %#x %#x %#x %#x\n",
- 		       readl_relaxed(info + DRAM_VENDOR_MR5) & DRAM_VENDOR_MASK,
+ 	atxdmac->regs = base;
+ 	atxdmac->irq = irq;
 -- 
-2.7.4
+2.16.1
