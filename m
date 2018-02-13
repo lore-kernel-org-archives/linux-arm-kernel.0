@@ -1,40 +1,115 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Mon, 12 Feb 2018 18:08:45 -0800
-Subject: [PATCH v1 1/2] arm: npcm: add low-level debug support for NPCM7XX
-In-Reply-To: <CACPK8XcGhxTq7QGeub2rAEtGSyrOmnobspVJfhE5YmB6MQRM9w@mail.gmail.com>
-References: <20180212205833.151019-1-brendanhiggins@google.com>
- <20180212205833.151019-2-brendanhiggins@google.com>
- <CACPK8XcGhxTq7QGeub2rAEtGSyrOmnobspVJfhE5YmB6MQRM9w@mail.gmail.com>
-Message-ID: <CAFd5g46EVEQmETawUagDLzySLTFQqc2aM4kFJvvHMU_dvP5V3w@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 12 Feb 2018 20:24:06 -0600
+Subject: [PATCH v7 4/9] arm: OMAP: Move dmtimer driver out of plat-omap to
+ drivers under clocksource
+In-Reply-To: <1515478987-5786-5-git-send-email-j-keerthy@ti.com>
+References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
+ <1515478987-5786-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <ed5ed107-e17d-a568-3f21-17f710388ef2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 5:59 PM, Joel Stanley <joel@jms.id.au> wrote:
-> Hi Brendan,
->
-> On Tue, Feb 13, 2018 at 7:28 AM, Brendan Higgins
-> <brendanhiggins@google.com> wrote:
->> Enable low-level debug support for Nuvoton NPCM7XX family by adding the
->> debug port definitions for the SoC.
->
-> When playing with the Poleg boards at the recent OpenBMC hackathon
-> Jeremy discovered that the UART is a normal-ish 8250, with a custom
-> divisor and a few extra bits to be set.
->
-> I found that we can us the generic 8250 low level debugging support
-> just fine. This is because u-boot sets up the divisor settings for us
-> (as you've assumed with your version here), and from there it's just
-> reading/writing characters.
->
-> Assuming you can reproduce our results, I suggest we drop these
-> patches in favour of adding the correct configuration the Poleg.
->
+Hi Keerthy,
 
-Sounds good to me. I trust that if you were able to get the 8250 driver
-working on the Poleg that it does indeed work.
+On 01/09/2018 12:23 AM, J, KEERTHY wrote:
+> Move the dmtimer driver out of plat-omap to clocksource.
+> So that non-omap devices also could use this.
 
-We can talk about configuring it off the Linux mailing lists.
+What non-omap devices do you have in mind? I don't think this driver is
+ready for that yet. It still has a lot of OMAP dependencies. So you
+should defer this for later along with the rest of the cleanup and when
+the driver is ready for that.
 
-<snip>
+> 
+> No Code changes done to the driver file only renamed to timer-dm.c.
+> Also removed the config dependencies for OMAP_DM_TIMER.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> Tested-by: Ladislav Michl <ladis@linux-mips.org>
+> ---
+>   arch/arm/plat-omap/Kconfig                                     | 6 ------
+>   arch/arm/plat-omap/Makefile                                    | 1 -
+>   drivers/clocksource/Kconfig                                    | 3 +++
+>   drivers/clocksource/Makefile                                   | 1 +
+>   arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c | 0
+>   5 files changed, 4 insertions(+), 7 deletions(-)
+>   rename arch/arm/plat-omap/dmtimer.c => drivers/clocksource/timer-dm.c (100%)
+> 
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index 7276afe..afc1a1d 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
+>           help
+>             PPA routine service ID for setting L2 auxiliary control register.
+> 
+> -config OMAP_DM_TIMER
+> -       bool "Use dual-mode timer"
+> -       depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+> -       help
+> -        Select this option if you want to use OMAP Dual-Mode timers.
+> -
+>   config OMAP_SERIAL_WAKE
+>           bool "Enable wake-up events for serial ports"
+>           depends on ARCH_OMAP1 && OMAP_MUX
+> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+> index 47e1867..7215ada 100644
+> --- a/arch/arm/plat-omap/Makefile
+> +++ b/arch/arm/plat-omap/Makefile
+> @@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
+> 
+>   # omap_device support (OMAP2+ only at the moment)
+> 
+> -obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+>   obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index c729a88..3f799b2 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -21,6 +21,9 @@ config CLKEVT_I8253
+>   config I8253_LOCK
+>           bool
+> 
+> +config OMAP_DM_TIMER
+> +       bool
+> +
+>   config CLKBLD_I8253
+>           def_bool y if CLKSRC_I8253 || CLKEVT_I8253 || I8253_LOCK
+> 
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 72711f1..27b5497 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)    += em_sti.o
+>   obj-$(CONFIG_CLKBLD_I8253)      += i8253.o
+>   obj-$(CONFIG_CLKSRC_MMIO)       += mmio.o
+>   obj-$(CONFIG_DIGICOLOR_TIMER)   += timer-digicolor.o
+> +obj-$(CONFIG_OMAP_DM_TIMER)    += timer-dm.o
+>   obj-$(CONFIG_DW_APB_TIMER)      += dw_apb_timer.o
+>   obj-$(CONFIG_DW_APB_TIMER_OF)   += dw_apb_timer_of.o
+>   obj-$(CONFIG_FTTMR010_TIMER)    += timer-fttmr010.o
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/timer-dm.c
+> similarity index 100%
+> rename from arch/arm/plat-omap/dmtimer.c
+> rename to drivers/clocksource/timer-dm.c
 
-Thanks!
+Similar comments as in patch 3 about the file name at the top, and the
+question about adding omap to the file name.
+
+Also, I see that omap_dm_timer_get_fclk() is only defined for
+!CONFIG_ARCH_OMAP1, but currently the function is declared in the header
+file for both OMAP1 and OMAP2. You would want to inline that for OMAP1
+in the header file (we currently get away with it because no one uses it).
+
+regards
+Suman
+
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at http://vger.kernel.org/majordomo-info.html
+> 
