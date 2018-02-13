@@ -1,38 +1,51 @@
-From: avifishman70@gmail.com (Avi Fishman)
-Date: Tue, 13 Feb 2018 11:29:32 +0200
-Subject: [PATCH v9 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <CAK8P3a0SJTAkv7_QtDW1sDWFDYHw8tFWZqO6EMwpZ_5KPbhq3Q@mail.gmail.com>
-References: <20180205235757.246758-1-brendanhiggins@google.com>
- <20180205235757.246758-3-brendanhiggins@google.com>
- <CAK8P3a0SJTAkv7_QtDW1sDWFDYHw8tFWZqO6EMwpZ_5KPbhq3Q@mail.gmail.com>
-Message-ID: <CAKKbWA6Otc1ZO_yHpfhxPjbgvvn-QXcXG9sy5=3FZDY8d_20rw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 13 Feb 2018 10:24:47 +0100
+Subject: [PATCH v3 2/5] clk: mediatek: modify MT7622 audsys to adapt MFD
+ device
+In-Reply-To: <f8e87179bd7700130e294393592719fac8590c59.1518424204.git.ryder.lee@mediatek.com>
+References: <cover.1518424204.git.ryder.lee@mediatek.com>
+ <f8e87179bd7700130e294393592719fac8590c59.1518424204.git.ryder.lee@mediatek.com>
+Message-ID: <cb75cdaa-eb84-d01e-60bd-21a928ddc090@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 10:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tue, Feb 6, 2018 at 12:57 AM, Brendan Higgins
-> <brendanhiggins@google.com> wrote:
->> Add a common device tree for all Nuvoton NPCM750 BMCs and a board
->> specific device tree for the NPCM750 (Poleg) evaluation board.
->>
->> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
->> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
->> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
->> Reviewed-by: Joel Stanley <joel@jms.id.au>
->> Reviewed-by: Rob Herring <robh@kernel.org>
->> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
->> Tested-by: Avi Fishman <avifishman70@gmail.com>
-> ...
->> +               enable-method = "nuvoton,npcm7xx-smp";
->
-> I see this has already been reviewed quite a bit, but I'm curious
-> about the 'npcm7xx'
-> part here. Shouldn't that be a real chip name rather than a wildcard?
->
->        Arnd
 
-There is a family of npcm7xx, some with SMP and some without.
-For those who has it, it is common for all to use the same
-"nuvoton,npcm7xx-smp".
 
-Avi
+On 02/12/2018 12:28 PM, Ryder Lee wrote:
+> As the new MFD device is in place, switch probing method to adapt it.
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/clk/mediatek/clk-mt7622-aud.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/mediatek/clk-mt7622-aud.c b/drivers/clk/mediatek/clk-mt7622-aud.c
+> index 13f752d..68c52a9 100644
+> --- a/drivers/clk/mediatek/clk-mt7622-aud.c
+> +++ b/drivers/clk/mediatek/clk-mt7622-aud.c
+> @@ -142,11 +142,16 @@ static int clk_mt7622_audiosys_init(struct platform_device *pdev)
+>  {
+>  	struct clk_onecell_data *clk_data;
+>  	struct device_node *node = pdev->dev.of_node;
+> +	struct device_node *pnode = pdev->dev.parent->of_node;
+>  	int r;
+>  
+>  	clk_data = mtk_alloc_clk_data(CLK_AUDIO_NR_CLK);
+>  
+> -	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
+> +	/* Check if called from MFD */
+> +	if (!pnode)
+> +		pnode = node;
+
+This is needed for backwards compatibility, correct?
+Please change the comment accordingly. The same holds for mt2701 driver.
+
+Thanks,
+Matthias
+
+> +
+> +	mtk_clk_register_gates(pnode, audio_clks, ARRAY_SIZE(audio_clks),
+>  			       clk_data);
+>  
+>  	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> 
