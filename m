@@ -1,628 +1,597 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 12 Feb 2018 19:32:40 -0600
-Subject: [PATCH 6/9] ARM: OMAP2+: Cleanup omap2_spi_dev_attr and other legacy
- data
+Date: Mon, 12 Feb 2018 19:32:39 -0600
+Subject: [PATCH 5/9] ARM: OMAP2+: Cleanup omap_timer_capability_dev_attr usage
 In-Reply-To: <20180213013243.8378-1-s-anna@ti.com>
 References: <20180213013243.8378-1-s-anna@ti.com>
-Message-ID: <20180213013243.8378-7-s-anna@ti.com>
+Message-ID: <20180213013243.8378-6-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap2_spi_dev_attr data was used to supply instance-specific
-data for legacy non-DT devices. The SPI legacy device support
-including the usage of the hwmod class revision data has been
-dropped in commit 6f3ab009a178 ("ARM: OMAP2+: Remove unused legacy
-code for device init") and this data is therefore no longer needed.
-So, cleanup the structure and all the associated data in various
-hwmod data files.
+The omap_timer_capability_dev_attr data was used to supply instance
+specific capabilities (like always-on, PWM functionality or ability
+to interrupt DSP cores) for legacy non-DT devices. These capabilities
+are now provided through device-tree properties. The legacy device
+support has been cleaned up in commit 8d39ff3d1696 ("ARM: OMAP2+:
+Remove unused legacy code for timer") and this data is therefore
+no longer needed. So, cleanup the structure and all the associated
+data in various hwmod data files.
 
+While at this, remove the stale header in hwmod data files that
+already do not have any timer capability data.
+
+Cc: Keerthy <j-keerthy@ti.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  1 -
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  6 -----
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 12 ----------
- .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |  2 --
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  7 ------
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  2 --
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 26 ----------------------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  4 ----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 22 ------------------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         | 26 ----------------------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 26 ----------------------
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  7 ------
- include/linux/platform_data/spi-omap2-mcspi.h      |  8 -------
- 13 files changed, 149 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  1 -
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 37 ----------------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 36 ---------------------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 29 -----------------
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  1 -
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  1 -
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c         | 14 --------
+ arch/arm/plat-omap/include/plat/dmtimer.h          |  4 ---
+ 9 files changed, 124 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index 9f16b1b8d882..fe66cf247874 100644
+index 1fdfd4568899..9f16b1b8d882 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -14,7 +14,6 @@
-  */
- 
- #include <linux/i2c-omap.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
- #include <linux/omap-dma.h>
- 
- #include "omap_hwmod.h"
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 409f0e634707..cdbd09b21168 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
 @@ -16,7 +16,6 @@
  #include <linux/i2c-omap.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
- #include <linux/platform_data/hsmmc-omap.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
  #include <linux/omap-dma.h>
+-#include <plat/dmtimer.h>
  
  #include "omap_hwmod.h"
-@@ -157,10 +156,6 @@ static struct omap_hwmod omap2430_mailbox_hwmod = {
- };
+ #include "l3_2xxx.h"
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 9b5a18b35ff6..409f0e634707 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -18,7 +18,6 @@
+ #include <linux/platform_data/hsmmc-omap.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/omap-dma.h>
+-#include <plat/dmtimer.h>
  
- /* mcspi3 */
--static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
--	.num_chipselect = 2,
--};
--
- static struct omap_hwmod omap2430_mcspi3_hwmod = {
- 	.name		= "mcspi3",
- 	.main_clk	= "mcspi3_fck",
-@@ -172,7 +167,6 @@ static struct omap_hwmod omap2430_mcspi3_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_mcspi_class,
--	.dev_attr	= &omap_mcspi3_dev_attr,
- };
- 
- /* usbhsotg */
+ #include "omap_hwmod.h"
+ #include "l3_2xxx.h"
 diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index a6c2fa96628c..3f2e5c933825 100644
+index a6b2875b3e7c..a6c2fa96628c 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
 @@ -10,7 +10,6 @@
   */
  
  #include <linux/omap-dma.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
+-#include <plat/dmtimer.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
  
  #include "omap_hwmod.h"
- #include "omap_hwmod_common_data.h"
-@@ -157,7 +156,6 @@ static struct omap_hwmod_class_sysconfig omap2xxx_mcspi_sysc = {
- struct omap_hwmod_class omap2xxx_mcspi_class = {
- 	.name	= "mcspi",
- 	.sysc	= &omap2xxx_mcspi_sysc,
--	.rev	= OMAP2_MCSPI_REV,
+@@ -219,23 +218,7 @@ struct omap_hwmod omap2xxx_iva_hwmod = {
+ 	.class		= &iva_hwmod_class,
  };
  
- /*
-@@ -591,10 +589,6 @@ struct omap_hwmod omap2xxx_gpio4_hwmod = {
- };
- 
- /* mcspi1 */
--static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
--	.num_chipselect = 4,
+-/* always-on timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_alwon_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_ALWON,
 -};
 -
- struct omap_hwmod omap2xxx_mcspi1_hwmod = {
- 	.name		= "mcspi1",
- 	.main_clk	= "mcspi1_fck",
-@@ -606,14 +600,9 @@ struct omap_hwmod omap2xxx_mcspi1_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_mcspi_class,
--	.dev_attr	= &omap_mcspi1_dev_attr,
- };
- 
- /* mcspi2 */
--static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
--	.num_chipselect = 2,
+-/* pwm timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_pwm_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_HAS_PWM,
 -};
 -
- struct omap_hwmod omap2xxx_mcspi2_hwmod = {
- 	.name		= "mcspi2",
- 	.main_clk	= "mcspi2_fck",
-@@ -625,7 +614,6 @@ struct omap_hwmod omap2xxx_mcspi2_hwmod = {
- 		},
- 	},
- 	.class		= &omap2xxx_mcspi_class,
--	.dev_attr	= &omap_mcspi2_dev_attr,
- };
- 
- static struct omap_hwmod_class omap2xxx_counter_hwmod_class = {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-index bbda6887388b..6f81d7a4fec1 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_common_data.h
-@@ -139,8 +139,6 @@ extern struct omap_hwmod_class am33xx_epwmss_hwmod_class;
- extern struct omap_hwmod_class am33xx_ehrpwm_hwmod_class;
- extern struct omap_hwmod_class am33xx_spi_hwmod_class;
- 
--extern struct omap2_mcspi_dev_attr mcspi_attrib;
--
- void omap_hwmod_am33xx_reg(void);
- void omap_hwmod_am43xx_reg(void);
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index 641b94f8ddb4..9843179b0217 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -15,7 +15,6 @@
-  */
- 
- #include <linux/platform_data/hsmmc-omap.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
- #include "omap_hwmod.h"
- #include "i2c.h"
- #include "wd_timer.h"
-@@ -877,13 +876,9 @@ static struct omap_hwmod_class_sysconfig am33xx_mcspi_sysc = {
- struct omap_hwmod_class am33xx_spi_hwmod_class = {
- 	.name		= "mcspi",
- 	.sysc		= &am33xx_mcspi_sysc,
--	.rev		= OMAP4_MCSPI_REV,
- };
- 
- /* spi0 */
--struct omap2_mcspi_dev_attr mcspi_attrib = {
--	.num_chipselect	= 2,
+-/* timers with DSP interrupt dev attribute */
+-static struct omap_timer_capability_dev_attr capability_dsp_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ,
 -};
- struct omap_hwmod am33xx_spi0_hwmod = {
- 	.name		= "spi0",
- 	.class		= &am33xx_spi_hwmod_class,
-@@ -894,7 +889,6 @@ struct omap_hwmod am33xx_spi0_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi_attrib,
- };
- 
- /* spi1 */
-@@ -908,7 +902,6 @@ struct omap_hwmod am33xx_spi1_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi_attrib,
- };
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 232d03045c6d..53e1ac3724f2 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -17,8 +17,6 @@
- #include <linux/i2c-omap.h>
- 
- #include "omap_hwmod.h"
--#include <linux/platform_data/spi-omap2-mcspi.h>
 -
- #include "omap_hwmod_common_data.h"
+ /* timer1 */
+-
+ struct omap_hwmod omap2xxx_timer1_hwmod = {
+ 	.name		= "timer1",
+ 	.main_clk	= "gpt1_fck",
+@@ -246,13 +229,11 @@ struct omap_hwmod omap2xxx_timer1_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT1_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
  
- #include "control.h"
+ /* timer2 */
+-
+ struct omap_hwmod omap2xxx_timer2_hwmod = {
+ 	.name		= "timer2",
+ 	.main_clk	= "gpt2_fck",
+@@ -268,7 +249,6 @@ struct omap_hwmod omap2xxx_timer2_hwmod = {
+ };
+ 
+ /* timer3 */
+-
+ struct omap_hwmod omap2xxx_timer3_hwmod = {
+ 	.name		= "timer3",
+ 	.main_clk	= "gpt3_fck",
+@@ -284,7 +264,6 @@ struct omap_hwmod omap2xxx_timer3_hwmod = {
+ };
+ 
+ /* timer4 */
+-
+ struct omap_hwmod omap2xxx_timer4_hwmod = {
+ 	.name		= "timer4",
+ 	.main_clk	= "gpt4_fck",
+@@ -300,7 +279,6 @@ struct omap_hwmod omap2xxx_timer4_hwmod = {
+ };
+ 
+ /* timer5 */
+-
+ struct omap_hwmod omap2xxx_timer5_hwmod = {
+ 	.name		= "timer5",
+ 	.main_clk	= "gpt5_fck",
+@@ -311,13 +289,11 @@ struct omap_hwmod omap2xxx_timer5_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT5_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer6 */
+-
+ struct omap_hwmod omap2xxx_timer6_hwmod = {
+ 	.name		= "timer6",
+ 	.main_clk	= "gpt6_fck",
+@@ -328,13 +304,11 @@ struct omap_hwmod omap2xxx_timer6_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT6_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer7 */
+-
+ struct omap_hwmod omap2xxx_timer7_hwmod = {
+ 	.name		= "timer7",
+ 	.main_clk	= "gpt7_fck",
+@@ -345,13 +319,11 @@ struct omap_hwmod omap2xxx_timer7_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT7_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer8 */
+-
+ struct omap_hwmod omap2xxx_timer8_hwmod = {
+ 	.name		= "timer8",
+ 	.main_clk	= "gpt8_fck",
+@@ -362,13 +334,11 @@ struct omap_hwmod omap2xxx_timer8_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT8_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer9 */
+-
+ struct omap_hwmod omap2xxx_timer9_hwmod = {
+ 	.name		= "timer9",
+ 	.main_clk	= "gpt9_fck",
+@@ -379,13 +349,11 @@ struct omap_hwmod omap2xxx_timer9_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT9_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer10 */
+-
+ struct omap_hwmod omap2xxx_timer10_hwmod = {
+ 	.name		= "timer10",
+ 	.main_clk	= "gpt10_fck",
+@@ -396,13 +364,11 @@ struct omap_hwmod omap2xxx_timer10_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT10_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer11 */
+-
+ struct omap_hwmod omap2xxx_timer11_hwmod = {
+ 	.name		= "timer11",
+ 	.main_clk	= "gpt11_fck",
+@@ -413,13 +379,11 @@ struct omap_hwmod omap2xxx_timer11_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT11_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+ 
+ /* timer12 */
+-
+ struct omap_hwmod omap2xxx_timer12_hwmod = {
+ 	.name		= "timer12",
+ 	.main_clk	= "gpt12_fck",
+@@ -430,7 +394,6 @@ struct omap_hwmod omap2xxx_timer12_hwmod = {
+ 			.idlest_idle_bit = OMAP24XX_ST_GPT12_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap2xxx_timer_hwmod_class,
+ 	.flags          = HWMOD_SET_DEFAULT_CLOCKACT,
+ };
 diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 7515119cab64..23008cb35140 100644
+index 1bb33d8bd2ac..7515119cab64 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -23,7 +23,6 @@
- #include "l3_3xxx.h"
+@@ -24,7 +24,6 @@
  #include "l4_3xxx.h"
  #include <linux/platform_data/asoc-ti-mcbsp.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+-#include <plat/dmtimer.h>
  
  #include "soc.h"
  #include "omap_hwmod.h"
-@@ -1189,14 +1188,9 @@ static struct omap_hwmod_class_sysconfig omap34xx_mcspi_sysc = {
- static struct omap_hwmod_class omap34xx_mcspi_class = {
- 	.name = "mcspi",
- 	.sysc = &omap34xx_mcspi_sysc,
--	.rev = OMAP3_MCSPI_REV,
+@@ -154,31 +153,6 @@ static struct omap_hwmod_class omap3xxx_timer_hwmod_class = {
+ 	.sysc = &omap3xxx_timer_sysc,
  };
  
- /* mcspi1 */
--static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
--	.num_chipselect = 4,
+-/* secure timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_secure_dev_attr = {
+-	.timer_capability	= OMAP_TIMER_ALWON | OMAP_TIMER_SECURE,
 -};
 -
- static struct omap_hwmod omap34xx_mcspi1 = {
- 	.name		= "mcspi1",
- 	.main_clk	= "mcspi1_fck",
-@@ -1208,14 +1202,9 @@ static struct omap_hwmod omap34xx_mcspi1 = {
- 		},
- 	},
- 	.class		= &omap34xx_mcspi_class,
--	.dev_attr       = &omap_mcspi1_dev_attr,
- };
- 
- /* mcspi2 */
--static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
--	.num_chipselect = 2,
+-/* always-on timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_alwon_dev_attr = {
+-	.timer_capability	= OMAP_TIMER_ALWON,
 -};
 -
- static struct omap_hwmod omap34xx_mcspi2 = {
- 	.name		= "mcspi2",
- 	.main_clk	= "mcspi2_fck",
-@@ -1227,16 +1216,9 @@ static struct omap_hwmod omap34xx_mcspi2 = {
- 		},
- 	},
- 	.class		= &omap34xx_mcspi_class,
--	.dev_attr       = &omap_mcspi2_dev_attr,
- };
- 
- /* mcspi3 */
--
--
--static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
--	.num_chipselect = 2,
+-/* pwm timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_pwm_dev_attr = {
+-	.timer_capability	= OMAP_TIMER_HAS_PWM,
 -};
 -
- static struct omap_hwmod omap34xx_mcspi3 = {
- 	.name		= "mcspi3",
- 	.main_clk	= "mcspi3_fck",
-@@ -1248,16 +1230,9 @@ static struct omap_hwmod omap34xx_mcspi3 = {
- 		},
- 	},
- 	.class		= &omap34xx_mcspi_class,
--	.dev_attr       = &omap_mcspi3_dev_attr,
- };
- 
- /* mcspi4 */
--
--
--static struct omap2_mcspi_dev_attr omap_mcspi4_dev_attr = {
--	.num_chipselect = 1,
+-/* timers with DSP interrupt dev attribute */
+-static struct omap_timer_capability_dev_attr capability_dsp_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ,
 -};
 -
- static struct omap_hwmod omap34xx_mcspi4 = {
- 	.name		= "mcspi4",
- 	.main_clk	= "mcspi4_fck",
-@@ -1269,7 +1244,6 @@ static struct omap_hwmod omap34xx_mcspi4 = {
+-/* pwm timers with DSP interrupt dev attribute */
+-static struct omap_timer_capability_dev_attr capability_dsp_pwm_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ | OMAP_TIMER_HAS_PWM,
+-};
+-
+ /* timer1 */
+ static struct omap_hwmod omap3xxx_timer1_hwmod = {
+ 	.name		= "timer1",
+@@ -190,7 +164,6 @@ static struct omap_hwmod omap3xxx_timer1_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT1_SHIFT,
  		},
  	},
- 	.class		= &omap34xx_mcspi_class,
--	.dev_attr       = &omap_mcspi4_dev_attr,
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
  };
- 
- /* usbhsotg */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index 4f31ce899869..5f73b730d4fc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -14,7 +14,6 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/platform_data/spi-omap2-mcspi.h>
- #include "omap_hwmod.h"
- #include "omap_hwmod_33xx_43xx_common_data.h"
- #include "prcm43xx.h"
-@@ -237,7 +236,6 @@ static struct omap_hwmod am43xx_spi2_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
+@@ -251,7 +224,6 @@ static struct omap_hwmod omap3xxx_timer5_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT5_SHIFT,
  		},
  	},
--	.dev_attr	= &mcspi_attrib,
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
  };
- 
- static struct omap_hwmod am43xx_spi3_hwmod = {
-@@ -251,7 +249,6 @@ static struct omap_hwmod am43xx_spi3_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
+@@ -267,7 +239,6 @@ static struct omap_hwmod omap3xxx_timer6_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT6_SHIFT,
  		},
  	},
--	.dev_attr	= &mcspi_attrib,
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
  };
- 
- static struct omap_hwmod am43xx_spi4_hwmod = {
-@@ -265,7 +262,6 @@ static struct omap_hwmod am43xx_spi4_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
+@@ -283,7 +254,6 @@ static struct omap_hwmod omap3xxx_timer7_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT7_SHIFT,
  		},
  	},
--	.dev_attr	= &mcspi_attrib,
+-	.dev_attr	= &capability_dsp_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+@@ -299,7 +269,6 @@ static struct omap_hwmod omap3xxx_timer8_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT8_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_dsp_pwm_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+@@ -315,7 +284,6 @@ static struct omap_hwmod omap3xxx_timer9_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT9_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+@@ -331,7 +299,6 @@ static struct omap_hwmod omap3xxx_timer10_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT10_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
+@@ -347,13 +314,11 @@ static struct omap_hwmod omap3xxx_timer11_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT11_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
  };
  
- static struct omap_hwmod_opt_clk gpio4_opt_clks[] = {
+ /* timer12 */
+-
+ static struct omap_hwmod omap3xxx_timer12_hwmod = {
+ 	.name		= "timer12",
+ 	.main_clk	= "gpt12_fck",
+@@ -364,7 +329,6 @@ static struct omap_hwmod omap3xxx_timer12_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT12_SHIFT,
+ 		},
+ 	},
+-	.dev_attr	= &capability_secure_dev_attr,
+ 	.class		= &omap3xxx_timer_hwmod_class,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 70eb826d5f65..5a313483b3b8 100644
+index cb39901d611b..70eb826d5f65 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -27,7 +27,6 @@
+@@ -29,7 +29,6 @@
  
- #include <linux/omap-dma.h>
- 
--#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
  #include <linux/platform_data/asoc-ti-mcbsp.h>
+-#include <plat/dmtimer.h>
  
  #include "omap_hwmod.h"
-@@ -1838,14 +1837,9 @@ static struct omap_hwmod_class_sysconfig omap44xx_mcspi_sysc = {
- static struct omap_hwmod_class omap44xx_mcspi_hwmod_class = {
- 	.name	= "mcspi",
- 	.sysc	= &omap44xx_mcspi_sysc,
--	.rev	= OMAP4_MCSPI_REV,
+ #include "omap_hwmod_common_data.h"
+@@ -2526,26 +2525,6 @@ static struct omap_hwmod_class omap44xx_timer_hwmod_class = {
+ 	.sysc	= &omap44xx_timer_sysc,
  };
  
- /* mcspi1 */
--static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
--	.num_chipselect	= 4,
+-/* always-on timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_alwon_dev_attr = {
+-	.timer_capability	= OMAP_TIMER_ALWON,
 -};
 -
- static struct omap_hwmod omap44xx_mcspi1_hwmod = {
- 	.name		= "mcspi1",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -1858,14 +1852,9 @@ static struct omap_hwmod omap44xx_mcspi1_hwmod = {
+-/* pwm timers dev attribute */
+-static struct omap_timer_capability_dev_attr capability_pwm_dev_attr = {
+-	.timer_capability	= OMAP_TIMER_HAS_PWM,
+-};
+-
+-/* timers with DSP interrupt dev attribute */
+-static struct omap_timer_capability_dev_attr capability_dsp_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ,
+-};
+-
+-/* pwm timers with DSP interrupt dev attribute */
+-static struct omap_timer_capability_dev_attr capability_dsp_pwm_dev_attr = {
+-	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ | OMAP_TIMER_HAS_PWM,
+-};
+-
+ /* timer1 */
+ static struct omap_hwmod omap44xx_timer1_hwmod = {
+ 	.name		= "timer1",
+@@ -2560,7 +2539,6 @@ static struct omap_hwmod omap44xx_timer1_hwmod = {
  			.modulemode   = MODULEMODE_SWCTRL,
  		},
  	},
--	.dev_attr	= &mcspi1_dev_attr,
+-	.dev_attr	= &capability_alwon_dev_attr,
  };
  
- /* mcspi2 */
--static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
--	.num_chipselect	= 2,
--};
--
- static struct omap_hwmod omap44xx_mcspi2_hwmod = {
- 	.name		= "mcspi2",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -1878,14 +1867,9 @@ static struct omap_hwmod omap44xx_mcspi2_hwmod = {
+ /* timer2 */
+@@ -2622,7 +2600,6 @@ static struct omap_hwmod omap44xx_timer5_hwmod = {
  			.modulemode   = MODULEMODE_SWCTRL,
  		},
  	},
--	.dev_attr	= &mcspi2_dev_attr,
+-	.dev_attr	= &capability_dsp_dev_attr,
  };
  
- /* mcspi3 */
--static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
--	.num_chipselect	= 2,
--};
--
- static struct omap_hwmod omap44xx_mcspi3_hwmod = {
- 	.name		= "mcspi3",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -1898,14 +1882,9 @@ static struct omap_hwmod omap44xx_mcspi3_hwmod = {
+ /* timer6 */
+@@ -2638,7 +2615,6 @@ static struct omap_hwmod omap44xx_timer6_hwmod = {
  			.modulemode   = MODULEMODE_SWCTRL,
  		},
  	},
--	.dev_attr	= &mcspi3_dev_attr,
+-	.dev_attr	= &capability_dsp_dev_attr,
  };
  
- /* mcspi4 */
--static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
--	.num_chipselect	= 1,
--};
--
- static struct omap_hwmod omap44xx_mcspi4_hwmod = {
- 	.name		= "mcspi4",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -1918,7 +1897,6 @@ static struct omap_hwmod omap44xx_mcspi4_hwmod = {
+ /* timer7 */
+@@ -2654,7 +2630,6 @@ static struct omap_hwmod omap44xx_timer7_hwmod = {
  			.modulemode   = MODULEMODE_SWCTRL,
  		},
  	},
--	.dev_attr	= &mcspi4_dev_attr,
+-	.dev_attr	= &capability_dsp_dev_attr,
+ };
+ 
+ /* timer8 */
+@@ -2670,7 +2645,6 @@ static struct omap_hwmod omap44xx_timer8_hwmod = {
+ 			.modulemode   = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_dsp_pwm_dev_attr,
+ };
+ 
+ /* timer9 */
+@@ -2686,7 +2660,6 @@ static struct omap_hwmod omap44xx_timer9_hwmod = {
+ 			.modulemode   = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ };
+ 
+ /* timer10 */
+@@ -2703,7 +2676,6 @@ static struct omap_hwmod omap44xx_timer10_hwmod = {
+ 			.modulemode   = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
+ };
+ 
+ /* timer11 */
+@@ -2719,7 +2691,6 @@ static struct omap_hwmod omap44xx_timer11_hwmod = {
+ 			.modulemode   = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_pwm_dev_attr,
  };
  
  /*
 diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index 2275789854dc..f901b17bd73a 100644
+index 250524fed202..2275789854dc 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -23,7 +23,6 @@
- #include <linux/i2c-omap.h>
- 
+@@ -25,7 +25,6 @@
  #include <linux/omap-dma.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
  #include <linux/platform_data/asoc-ti-mcbsp.h>
+-#include <plat/dmtimer.h>
  
  #include "omap_hwmod.h"
-@@ -1123,15 +1122,9 @@ static struct omap_hwmod_class_sysconfig omap54xx_mcspi_sysc = {
- static struct omap_hwmod_class omap54xx_mcspi_hwmod_class = {
- 	.name	= "mcspi",
- 	.sysc	= &omap54xx_mcspi_sysc,
--	.rev	= OMAP4_MCSPI_REV,
- };
- 
- /* mcspi1 */
--/* mcspi1 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
--	.num_chipselect	= 4,
--};
--
- static struct omap_hwmod omap54xx_mcspi1_hwmod = {
- 	.name		= "mcspi1",
- 	.class		= &omap54xx_mcspi_hwmod_class,
-@@ -1144,15 +1137,9 @@ static struct omap_hwmod omap54xx_mcspi1_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi1_dev_attr,
- };
- 
- /* mcspi2 */
--/* mcspi2 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
--	.num_chipselect	= 2,
--};
--
- static struct omap_hwmod omap54xx_mcspi2_hwmod = {
- 	.name		= "mcspi2",
- 	.class		= &omap54xx_mcspi_hwmod_class,
-@@ -1165,15 +1152,9 @@ static struct omap_hwmod omap54xx_mcspi2_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi2_dev_attr,
- };
- 
- /* mcspi3 */
--/* mcspi3 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
--	.num_chipselect	= 2,
--};
--
- static struct omap_hwmod omap54xx_mcspi3_hwmod = {
- 	.name		= "mcspi3",
- 	.class		= &omap54xx_mcspi_hwmod_class,
-@@ -1186,15 +1167,9 @@ static struct omap_hwmod omap54xx_mcspi3_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi3_dev_attr,
- };
- 
- /* mcspi4 */
--/* mcspi4 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
--	.num_chipselect	= 1,
--};
--
- static struct omap_hwmod omap54xx_mcspi4_hwmod = {
- 	.name		= "mcspi4",
- 	.class		= &omap54xx_mcspi_hwmod_class,
-@@ -1207,7 +1182,6 @@ static struct omap_hwmod omap54xx_mcspi4_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi4_dev_attr,
- };
- 
- /*
+ #include "omap_hwmod_common_data.h"
 diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index d0f1fd65d01f..d66dc806425d 100644
+index a78f9285cbe8..d0f1fd65d01f 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -23,7 +23,6 @@
- #include <linux/i2c-omap.h>
- 
+@@ -25,7 +25,6 @@
  #include <linux/omap-dma.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
  #include <linux/platform_data/asoc-ti-mcbsp.h>
+-#include <plat/dmtimer.h>
  
  #include "omap_hwmod.h"
-@@ -1375,15 +1374,9 @@ static struct omap_hwmod_class_sysconfig dra7xx_mcspi_sysc = {
- static struct omap_hwmod_class dra7xx_mcspi_hwmod_class = {
- 	.name	= "mcspi",
- 	.sysc	= &dra7xx_mcspi_sysc,
--	.rev	= OMAP4_MCSPI_REV,
- };
- 
- /* mcspi1 */
--/* mcspi1 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
--	.num_chipselect	= 4,
--};
--
- static struct omap_hwmod dra7xx_mcspi1_hwmod = {
- 	.name		= "mcspi1",
- 	.class		= &dra7xx_mcspi_hwmod_class,
-@@ -1396,15 +1389,9 @@ static struct omap_hwmod dra7xx_mcspi1_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi1_dev_attr,
- };
- 
- /* mcspi2 */
--/* mcspi2 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
--	.num_chipselect	= 2,
--};
--
- static struct omap_hwmod dra7xx_mcspi2_hwmod = {
- 	.name		= "mcspi2",
- 	.class		= &dra7xx_mcspi_hwmod_class,
-@@ -1417,15 +1404,9 @@ static struct omap_hwmod dra7xx_mcspi2_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi2_dev_attr,
- };
- 
- /* mcspi3 */
--/* mcspi3 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
--	.num_chipselect	= 2,
--};
--
- static struct omap_hwmod dra7xx_mcspi3_hwmod = {
- 	.name		= "mcspi3",
- 	.class		= &dra7xx_mcspi_hwmod_class,
-@@ -1438,15 +1419,9 @@ static struct omap_hwmod dra7xx_mcspi3_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi3_dev_attr,
- };
- 
- /* mcspi4 */
--/* mcspi4 dev_attr */
--static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
--	.num_chipselect	= 1,
--};
--
- static struct omap_hwmod dra7xx_mcspi4_hwmod = {
- 	.name		= "mcspi4",
- 	.class		= &dra7xx_mcspi_hwmod_class,
-@@ -1459,7 +1434,6 @@ static struct omap_hwmod dra7xx_mcspi4_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &mcspi4_dev_attr,
- };
- 
- /*
+ #include "omap_hwmod_common_data.h"
 diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index 58ce27366d9e..0b290de13da1 100644
+index 90fd06682ef5..58ce27366d9e 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -16,7 +16,6 @@
-  */
+@@ -17,7 +17,6 @@
  
  #include <linux/platform_data/hsmmc-omap.h>
--#include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+-#include <plat/dmtimer.h>
  
  #include "omap_hwmod_common_data.h"
  #include "cm81xx.h"
-@@ -1116,11 +1115,6 @@ static struct omap_hwmod_class_sysconfig dm816x_mcspi_sysc = {
- static struct omap_hwmod_class dm816x_mcspi_class = {
- 	.name = "mcspi",
- 	.sysc = &dm816x_mcspi_sysc,
--	.rev = OMAP3_MCSPI_REV,
--};
--
--static struct omap2_mcspi_dev_attr dm816x_mcspi1_dev_attr = {
--	.num_chipselect = 4,
+@@ -646,15 +645,10 @@ static struct omap_hwmod_class dm816x_timer_hwmod_class = {
+ 	.sysc = &dm816x_timer_sysc,
  };
  
- static struct omap_hwmod dm81xx_mcspi1_hwmod = {
-@@ -1134,7 +1128,6 @@ static struct omap_hwmod dm81xx_mcspi1_hwmod = {
+-static struct omap_timer_capability_dev_attr capability_alwon_dev_attr = {
+-	.timer_capability	= OMAP_TIMER_ALWON,
+-};
+-
+ static struct omap_hwmod dm814x_timer1_hwmod = {
+ 	.name		= "timer1",
+ 	.clkdm_name	= "alwon_l3s_clkdm",
+ 	.main_clk	= "timer1_fck",
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ 	.flags		= HWMOD_NO_IDLEST,
+ };
+@@ -676,7 +670,6 @@ static struct omap_hwmod dm816x_timer1_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
  		},
  	},
- 	.class		= &dm816x_mcspi_class,
--	.dev_attr	= &dm816x_mcspi1_dev_attr,
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
  };
  
- static struct omap_hwmod_ocp_if dm81xx_l4_ls__mcspi1 = {
-diff --git a/include/linux/platform_data/spi-omap2-mcspi.h b/include/linux/platform_data/spi-omap2-mcspi.h
-index 13c83a25958a..0bf9fddb8306 100644
---- a/include/linux/platform_data/spi-omap2-mcspi.h
-+++ b/include/linux/platform_data/spi-omap2-mcspi.h
-@@ -2,10 +2,6 @@
- #ifndef _OMAP2_MCSPI_H
- #define _OMAP2_MCSPI_H
- 
--#define OMAP2_MCSPI_REV 0
--#define OMAP3_MCSPI_REV 1
--#define OMAP4_MCSPI_REV 2
--
- #define OMAP4_MCSPI_REG_OFFSET 0x100
- 
- #define MCSPI_PINDIR_D0_IN_D1_OUT	0
-@@ -17,10 +13,6 @@ struct omap2_mcspi_platform_config {
- 	unsigned int pin_dir:1;
+@@ -691,7 +684,6 @@ static struct omap_hwmod dm814x_timer2_hwmod = {
+ 	.name		= "timer2",
+ 	.clkdm_name	= "alwon_l3s_clkdm",
+ 	.main_clk	= "timer2_fck",
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ 	.flags		= HWMOD_NO_IDLEST,
+ };
+@@ -713,7 +705,6 @@ static struct omap_hwmod dm816x_timer2_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
  };
  
--struct omap2_mcspi_dev_attr {
--	unsigned short num_chipselect;
+@@ -734,7 +725,6 @@ static struct omap_hwmod dm816x_timer3_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ };
+ 
+@@ -755,7 +745,6 @@ static struct omap_hwmod dm816x_timer4_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ };
+ 
+@@ -776,7 +765,6 @@ static struct omap_hwmod dm816x_timer5_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ };
+ 
+@@ -797,7 +785,6 @@ static struct omap_hwmod dm816x_timer6_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ };
+ 
+@@ -818,7 +805,6 @@ static struct omap_hwmod dm816x_timer7_hwmod = {
+ 			.modulemode = MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-	.dev_attr	= &capability_alwon_dev_attr,
+ 	.class		= &dm816x_timer_hwmod_class,
+ };
+ 
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index dd79f3005cdf..8b7d8a6e02cc 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -75,10 +75,6 @@
+  */
+ #define OMAP_TIMER_ERRATA_I103_I767			0x80000000
+ 
+-struct omap_timer_capability_dev_attr {
+-	u32 timer_capability;
 -};
 -
- struct omap2_mcspi_device_config {
- 	unsigned turbo_mode:1;
- 
+ struct timer_regs {
+ 	u32 tidr;
+ 	u32 tier;
 -- 
 2.15.1
