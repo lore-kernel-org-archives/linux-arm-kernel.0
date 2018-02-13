@@ -1,81 +1,162 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 13 Feb 2018 21:28:05 +0800
-Subject: [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
-Message-ID: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
+Date: Tue, 13 Feb 2018 21:28:10 +0800
+Subject: [PATCH RESEND V3 5/9] clk: imx: add composite clk support
+In-Reply-To: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
+References: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1518528494-25723-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a resend patch series.
-See the original one from here:
-[PATCH V3 00/10] clk: add imx7ulp clk support
-https://lkml.org/lkml/2018/1/19/351
-No function changes but remove the last one which is used for the test.
-Rebased against clk-next branch.
+The imx composite clk is designed for Peripheral Clock Control (PCC)
+module observed in IMX ULP SoC series. e.g. i.MX7ULP.
 
-This patch series intends to add imx7ulp clk support.
+NOTE pcc can only be operated when clk is gated.
 
-i.MX7ULP Clock functions are under joint control of the System
-Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
-modules, and Core Mode Controller (CMC)1 blocks
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Anson Huang <Anson.Huang@nxp.com>
+Cc: Bai Ping <ping.bai@nxp.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-The clocking scheme provides clear separation between M4 domain
-and A7 domain. Except for a few clock sources shared between two
-domains, such as the System Oscillator clock, the Slow IRC (SIRC),
-and and the Fast IRC clock (FIRCLK), clock sources and clock
-management are separated and contained within each domain.
-
-M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
-A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
-
-Note: this series only adds A7 clock domain support as M4 clock
-domain will be handled by M4 seperately.
-
-Change Log:
+---
+ChangeLog:
 v2->v3:
- * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
-   Others no changes.
-
+ * no changes
 v1->v2:
- * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
- * use clk_hw apis to register clocks
- * use of_clk_add_hw_provider
- * split the clocks register process into two parts: early part for possible
-   timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
-   the left normal peripheral clocks registered by a platform driver.
-
-
-Dong Aisheng (9):
-  clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
-  clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
-  clk: imx: add pllv4 support
-  clk: imx: add pfdv2 support
-  clk: imx: add composite clk support
-  dt-bindings: clock: add imx7ulp clock binding doc
-  clk: imx: make mux parent strings const
-  clk: imx: implement new clk_hw based APIs
-  clk: imx: add imx7ulp clk driver
-
- .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++
- drivers/clk/clk-divider.c                          | 152 ++++++++++++++
- drivers/clk/clk-fractional-divider.c               |  10 +
- drivers/clk/imx/Makefile                           |   6 +-
- drivers/clk/imx/clk-busy.c                         |   2 +-
- drivers/clk/imx/clk-composite.c                    |  90 ++++++++
- drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
- drivers/clk/imx/clk-imx7ulp.c                      | 232 +++++++++++++++++++++
- drivers/clk/imx/clk-pfdv2.c                        | 207 ++++++++++++++++++
- drivers/clk/imx/clk-pllv4.c                        | 188 +++++++++++++++++
- drivers/clk/imx/clk.c                              |  22 ++
- drivers/clk/imx/clk.h                              |  92 +++++++-
- include/dt-bindings/clock/imx7ulp-clock.h          | 108 ++++++++++
- include/linux/clk-provider.h                       |  17 ++
- 14 files changed, 1180 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+ * remove an unneeded blank line change
+ * use clk_hw_register
+---
+ drivers/clk/imx/Makefile        |  1 +
+ drivers/clk/imx/clk-composite.c | 90 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h           |  6 +++
+ 3 files changed, 97 insertions(+)
  create mode 100644 drivers/clk/imx/clk-composite.c
- create mode 100644 drivers/clk/imx/clk-imx7ulp.c
- create mode 100644 drivers/clk/imx/clk-pfdv2.c
- create mode 100644 drivers/clk/imx/clk-pllv4.c
- create mode 100644 include/dt-bindings/clock/imx7ulp-clock.h
 
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index 9c04ae4..eab606c 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -4,6 +4,7 @@ obj-y += \
+ 	clk.o \
+ 	clk-busy.o \
+ 	clk-cpu.o \
++	clk-composite.o \
+ 	clk-fixup-div.o \
+ 	clk-fixup-mux.o \
+ 	clk-gate-exclusive.o \
+diff --git a/drivers/clk/imx/clk-composite.c b/drivers/clk/imx/clk-composite.c
+new file mode 100644
+index 0000000..78b891e
+--- /dev/null
++++ b/drivers/clk/imx/clk-composite.c
+@@ -0,0 +1,90 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/slab.h>
++
++#define PCG_PCS_SHIFT	24
++#define PCG_PCS_MASK	0x7
++#define PCG_CGC_SHIFT	30
++#define PCG_FRAC_SHIFT	3
++#define PCG_FRAC_WIDTH	1
++#define PCG_FRAC_MASK	BIT(3)
++#define PCG_PCD_SHIFT	0
++#define PCG_PCD_WIDTH	3
++#define PCG_PCD_MASK	0x7
++
++struct clk_hw *imx_clk_composite(const char *name,
++			      const char * const *parent_names,
++			      int num_parents, bool mux_present,
++			      bool rate_present, bool gate_present,
++			      void __iomem *reg)
++{
++	struct clk_hw *mux_hw = NULL, *fd_hw = NULL, *gate_hw = NULL;
++	struct clk_fractional_divider *fd = NULL;
++	struct clk_gate *gate = NULL;
++	struct clk_mux *mux = NULL;
++	struct clk_hw *hw;
++
++	if (mux_present) {
++		mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++		if (!mux)
++			return ERR_PTR(-ENOMEM);
++		mux_hw = &mux->hw;
++		mux->reg = reg;
++		mux->shift = PCG_PCS_SHIFT;
++		mux->mask = PCG_PCS_MASK;
++	}
++
++	if (rate_present) {
++		fd = kzalloc(sizeof(*fd), GFP_KERNEL);
++		if (!fd) {
++			kfree(mux);
++			return ERR_PTR(-ENOMEM);
++		}
++		fd_hw = &fd->hw;
++		fd->reg = reg;
++		fd->mshift = PCG_FRAC_SHIFT;
++		fd->mwidth = PCG_FRAC_WIDTH;
++		fd->mmask  = PCG_FRAC_MASK;
++		fd->nshift = PCG_PCD_SHIFT;
++		fd->nwidth = PCG_PCD_WIDTH;
++		fd->nmask = PCG_PCD_MASK;
++		fd->flags = CLK_FRAC_DIVIDER_ZERO_BASED;
++	}
++
++	if (gate_present) {
++		gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++		if (!gate) {
++			kfree(mux);
++			kfree(fd);
++			return ERR_PTR(-ENOMEM);
++		}
++		gate_hw = &gate->hw;
++		gate->reg = reg;
++		gate->bit_idx = PCG_CGC_SHIFT;
++	}
++
++	hw = clk_hw_register_composite(NULL, name, parent_names, num_parents,
++				       mux_hw, &clk_mux_ops, fd_hw,
++				       &clk_fractional_divider_ops, gate_hw,
++				       &clk_gate_ops, CLK_SET_RATE_GATE |
++				       CLK_SET_PARENT_GATE);
++	if (IS_ERR(hw)) {
++		kfree(mux);
++		kfree(fd);
++		kfree(gate);
++	}
++
++	return hw;
++}
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index ccd7181..fed7660 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -71,6 +71,12 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+ 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
+ 			     const char **parent_names, int num_parents);
+ 
++struct clk_hw *imx_clk_composite(const char *name,
++				 const char * const *parent_names,
++				 int num_parents, bool mux_present,
++				 bool rate_present, bool gate_present,
++				 void __iomem *reg);
++
+ struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
+ 				  void __iomem *reg, u8 shift, u8 width,
+ 				  void (*fixup)(u32 *val));
 -- 
 2.7.4
