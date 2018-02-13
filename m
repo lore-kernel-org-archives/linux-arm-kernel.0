@@ -1,380 +1,228 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 12 Feb 2018 19:32:38 -0600
-Subject: [PATCH 4/9] ARM: OMAP2+: Cleanup omap_i2c_dev_attr usage
+Date: Mon, 12 Feb 2018 19:32:41 -0600
+Subject: [PATCH 7/9] ARM: OMAP2+: Cleanup omap_mcbsp_dev_attr and other legacy
+ data
 In-Reply-To: <20180213013243.8378-1-s-anna@ti.com>
 References: <20180213013243.8378-1-s-anna@ti.com>
-Message-ID: <20180213013243.8378-5-s-anna@ti.com>
+Message-ID: <20180213013243.8378-8-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap_i2c_dev_attr data was used to supply instance-specific
-data for legacy non-DT devices. The I2C legacy device support has
-been cleaned up in commit 65fa3e719f36 ("ARM: OMAP2+: Remove legacy
-i2c.c platform init code") and this data is therefore no longer
-needed. So, cleanup the structure and all the associated data in
-various hwmod data files.
+The omap_mcbsp_dev_attr data was used to supply instance-specific
+data for legacy non-DT devices. The legacy McBSP device support
+including the usage of the hwmod class revision data has been
+dropped in commit 48f6693790aa ("ARM: OMAP2+: Remove unused legacy
+code for McBSP") and this data is therefore no longer needed.
+So, cleanup the structure and all the associated data in various
+hwmod data files.
 
-The i2c-omap.h header is still needed because of the need for
-various OMAP_I2C_IP_VERSION_x macros.
-
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/i2c.h                            | 13 -------------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c           |  9 ---------
- arch/arm/mach-omap2/omap_hwmod_2430_data.c           |  8 --------
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c   |  7 -------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c           | 20 --------------------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c           |  8 --------
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c           | 10 ----------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c            | 10 ----------
- 8 files changed, 85 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c  |  2 --
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 21 ---------------------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c  |  3 ---
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c  |  2 --
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c   |  1 -
+ include/linux/platform_data/asoc-ti-mcbsp.h | 12 ------------
+ 6 files changed, 41 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/i2c.h b/arch/arm/mach-omap2/i2c.h
-index 42b6f2e7d190..f76ff790b435 100644
---- a/arch/arm/mach-omap2/i2c.h
-+++ b/arch/arm/mach-omap2/i2c.h
-@@ -24,19 +24,6 @@
- #ifndef __MACH_OMAP2_I2C_H
- #define __MACH_OMAP2_I2C_H
- 
--/**
-- * i2c_dev_attr - OMAP I2C controller device attributes for omap_hwmod
-- * @fifo_depth: total controller FIFO size (in bytes)
-- * @flags: differences in hardware support capability
-- *
-- * @fifo_depth represents what exists on the hardware, not what is
-- * actually configured at runtime by the device driver.
-- */
--struct omap_i2c_dev_attr {
--	u8	fifo_depth;
--	u32	flags;
--};
--
- int omap_i2c_reset(struct omap_hwmod *oh);
- 
- #endif	/* __MACH_OMAP2_I2C_H */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index 0afb014b211f..1fdfd4568899 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -97,13 +97,6 @@ static struct omap_hwmod_class i2c_class = {
- 	.reset		= &omap_i2c_reset,
- };
- 
--static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags		= OMAP_I2C_FLAG_NO_FIFO |
--			  OMAP_I2C_FLAG_SIMPLE_CLOCK |
--			  OMAP_I2C_FLAG_16BIT_DATA_REG |
--			  OMAP_I2C_FLAG_BUS_SHIFT_2,
--};
--
- /* I2C1 */
- static struct omap_hwmod omap2420_i2c1_hwmod = {
- 	.name		= "i2c1",
-@@ -116,7 +109,6 @@ static struct omap_hwmod omap2420_i2c1_hwmod = {
- 		},
- 	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c_dev_attr,
- 	/*
- 	 * From mach-omap2/pm24xx.c: "Putting MPU into the WFI state
- 	 * while a transfer is active seems to cause the I2C block to
-@@ -137,7 +129,6 @@ static struct omap_hwmod omap2420_i2c2_hwmod = {
- 		},
- 	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c_dev_attr,
- 	.flags		= HWMOD_16BIT_REG,
- };
- 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 1f696bec9962..9b5a18b35ff6 100644
+index cdbd09b21168..74eefd30518c 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -75,12 +75,6 @@ static struct omap_hwmod_class i2c_class = {
- 	.reset		= &omap_i2c_reset,
+@@ -14,7 +14,6 @@
+  */
+ 
+ #include <linux/i2c-omap.h>
+-#include <linux/platform_data/asoc-ti-mcbsp.h>
+ #include <linux/platform_data/hsmmc-omap.h>
+ #include <linux/omap-dma.h>
+ 
+@@ -223,7 +222,6 @@ static struct omap_hwmod_class_sysconfig omap2430_mcbsp_sysc = {
+ static struct omap_hwmod_class omap2430_mcbsp_hwmod_class = {
+ 	.name = "mcbsp",
+ 	.sysc = &omap2430_mcbsp_sysc,
+-	.rev  = MCBSP_CONFIG_TYPE2,
  };
  
--static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.fifo_depth	= 8, /* bytes */
--	.flags		= OMAP_I2C_FLAG_BUS_SHIFT_2 |
--			  OMAP_I2C_FLAG_FORCE_19200_INT_CLK,
--};
--
- /* I2C1 */
- static struct omap_hwmod omap2430_i2c1_hwmod = {
- 	.name		= "i2c1",
-@@ -102,7 +96,6 @@ static struct omap_hwmod omap2430_i2c1_hwmod = {
- 		},
- 	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* I2C2 */
-@@ -118,7 +111,6 @@ static struct omap_hwmod omap2430_i2c2_hwmod = {
- 		},
- 	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* gpio5 */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index b710b6d984cc..641b94f8ddb4 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -645,10 +645,6 @@ static struct omap_hwmod_class i2c_class = {
- 	.reset		= &omap_i2c_reset,
- };
- 
--static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags = OMAP_I2C_FLAG_BUS_SHIFT_NONE,
--};
--
- /* i2c1 */
- struct omap_hwmod am33xx_i2c1_hwmod = {
- 	.name		= "i2c1",
-@@ -661,7 +657,6 @@ struct omap_hwmod am33xx_i2c1_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c1 */
-@@ -676,7 +671,6 @@ struct omap_hwmod am33xx_i2c2_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c3 */
-@@ -691,7 +685,6 @@ struct omap_hwmod am33xx_i2c3_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /*
+ static struct omap_hwmod_opt_clk mcbsp_opt_clks[] = {
 diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index c7ff7560f47a..1bb33d8bd2ac 100644
+index 23008cb35140..23336b6c7125 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -682,11 +682,6 @@ static struct omap_hwmod omap3xxx_dss_venc_hwmod = {
+@@ -22,7 +22,6 @@
+ #include <linux/omap-dma.h>
+ #include "l3_3xxx.h"
+ #include "l4_3xxx.h"
+-#include <linux/platform_data/asoc-ti-mcbsp.h>
+ 
+ #include "soc.h"
+ #include "omap_hwmod.h"
+@@ -896,7 +895,6 @@ static struct omap_hwmod_class_sysconfig omap3xxx_mcbsp_sysc = {
+ static struct omap_hwmod_class omap3xxx_mcbsp_hwmod_class = {
+ 	.name = "mcbsp",
+ 	.sysc = &omap3xxx_mcbsp_sysc,
+-	.rev  = MCBSP_CONFIG_TYPE3,
  };
  
- /* I2C1 */
--static struct omap_i2c_dev_attr i2c1_dev_attr = {
--	.fifo_depth	= 8, /* bytes */
--	.flags		= OMAP_I2C_FLAG_BUS_SHIFT_2,
+ /* McBSP functional clock mapping */
+@@ -911,7 +909,6 @@ static struct omap_hwmod_opt_clk mcbsp234_opt_clks[] = {
+ };
+ 
+ /* mcbsp1 */
+-
+ static struct omap_hwmod omap3xxx_mcbsp1_hwmod = {
+ 	.name		= "mcbsp1",
+ 	.class		= &omap3xxx_mcbsp_hwmod_class,
+@@ -928,11 +925,6 @@ static struct omap_hwmod omap3xxx_mcbsp1_hwmod = {
+ };
+ 
+ /* mcbsp2 */
+-
+-static struct omap_mcbsp_dev_attr omap34xx_mcbsp2_dev_attr = {
+-	.sidetone	= "mcbsp2_sidetone",
 -};
 -
- static struct omap_hwmod omap3xxx_i2c1_hwmod = {
- 	.name		= "i2c1",
- 	.flags		= HWMOD_16BIT_REG | HWMOD_SET_DEFAULT_CLOCKACT,
-@@ -699,15 +694,9 @@ static struct omap_hwmod omap3xxx_i2c1_hwmod = {
- 		},
+ static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
+ 	.name		= "mcbsp2",
+ 	.class		= &omap3xxx_mcbsp_hwmod_class,
+@@ -946,15 +938,9 @@ static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
  	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c1_dev_attr,
+ 	.opt_clks	= mcbsp234_opt_clks,
+ 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
+-	.dev_attr	= &omap34xx_mcbsp2_dev_attr,
  };
  
- /* I2C2 */
--static struct omap_i2c_dev_attr i2c2_dev_attr = {
--	.fifo_depth	= 8, /* bytes */
--	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2,
+ /* mcbsp3 */
+-
+-static struct omap_mcbsp_dev_attr omap34xx_mcbsp3_dev_attr = {
+-	.sidetone	= "mcbsp3_sidetone",
 -};
 -
- static struct omap_hwmod omap3xxx_i2c2_hwmod = {
- 	.name		= "i2c2",
- 	.flags		= HWMOD_16BIT_REG | HWMOD_SET_DEFAULT_CLOCKACT,
-@@ -720,17 +709,9 @@ static struct omap_hwmod omap3xxx_i2c2_hwmod = {
- 		},
+ static struct omap_hwmod omap3xxx_mcbsp3_hwmod = {
+ 	.name		= "mcbsp3",
+ 	.class		= &omap3xxx_mcbsp_hwmod_class,
+@@ -968,12 +954,9 @@ static struct omap_hwmod omap3xxx_mcbsp3_hwmod = {
  	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c2_dev_attr,
+ 	.opt_clks	= mcbsp234_opt_clks,
+ 	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
+-	.dev_attr	= &omap34xx_mcbsp3_dev_attr,
  };
  
- /* I2C3 */
--static struct omap_i2c_dev_attr i2c3_dev_attr = {
--	.fifo_depth	= 64, /* bytes */
--	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2,
--};
+ /* mcbsp4 */
 -
 -
--
- static struct omap_hwmod omap3xxx_i2c3_hwmod = {
- 	.name		= "i2c3",
- 	.flags		= HWMOD_16BIT_REG | HWMOD_SET_DEFAULT_CLOCKACT,
-@@ -743,7 +724,6 @@ static struct omap_hwmod omap3xxx_i2c3_hwmod = {
- 		},
- 	},
- 	.class		= &i2c_class,
--	.dev_attr	= &i2c3_dev_attr,
+ static struct omap_hwmod omap3xxx_mcbsp4_hwmod = {
+ 	.name		= "mcbsp4",
+ 	.class		= &omap3xxx_mcbsp_hwmod_class,
+@@ -990,8 +973,6 @@ static struct omap_hwmod omap3xxx_mcbsp4_hwmod = {
  };
  
- /*
+ /* mcbsp5 */
+-
+-
+ static struct omap_hwmod omap3xxx_mcbsp5_hwmod = {
+ 	.name		= "mcbsp5",
+ 	.class		= &omap3xxx_mcbsp_hwmod_class,
+@@ -1020,7 +1001,6 @@ static struct omap_hwmod_class omap3xxx_mcbsp_sidetone_hwmod_class = {
+ };
+ 
+ /* mcbsp2_sidetone */
+-
+ static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
+ 	.name		= "mcbsp2_sidetone",
+ 	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
+@@ -1029,7 +1009,6 @@ static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
+ };
+ 
+ /* mcbsp3_sidetone */
+-
+ static struct omap_hwmod omap3xxx_mcbsp3_sidetone_hwmod = {
+ 	.name		= "mcbsp3_sidetone",
+ 	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 3afb7333b800..cb39901d611b 100644
+index 5a313483b3b8..e4f8ae9cd637 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1381,10 +1381,6 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
- 	.reset	= &omap_i2c_reset,
- };
+@@ -27,8 +27,6 @@
  
--static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
--};
+ #include <linux/omap-dma.h>
+ 
+-#include <linux/platform_data/asoc-ti-mcbsp.h>
 -
- /* i2c1 */
- static struct omap_hwmod omap44xx_i2c1_hwmod = {
- 	.name		= "i2c1",
-@@ -1399,7 +1395,6 @@ static struct omap_hwmod omap44xx_i2c1_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
+ #include "omap_hwmod.h"
+ #include "omap_hwmod_common_data.h"
+ #include "cm1_44xx.h"
+@@ -1679,7 +1677,6 @@ static struct omap_hwmod_class_sysconfig omap44xx_mcbsp_sysc = {
+ static struct omap_hwmod_class omap44xx_mcbsp_hwmod_class = {
+ 	.name	= "mcbsp",
+ 	.sysc	= &omap44xx_mcbsp_sysc,
+-	.rev	= MCBSP_CONFIG_TYPE4,
  };
  
- /* i2c2 */
-@@ -1416,7 +1411,6 @@ static struct omap_hwmod omap44xx_i2c2_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c3 */
-@@ -1433,7 +1427,6 @@ static struct omap_hwmod omap44xx_i2c3_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c4 */
-@@ -1450,7 +1443,6 @@ static struct omap_hwmod omap44xx_i2c4_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /*
+ /* mcbsp1 */
 diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index 593b4bc92d99..250524fed202 100644
+index f901b17bd73a..c72cd84b07ec 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -824,11 +824,6 @@ static struct omap_hwmod_class omap54xx_i2c_hwmod_class = {
- 	.rev	= OMAP_I2C_IP_VERSION_2,
+@@ -23,7 +23,6 @@
+ #include <linux/i2c-omap.h>
+ 
+ #include <linux/omap-dma.h>
+-#include <linux/platform_data/asoc-ti-mcbsp.h>
+ 
+ #include "omap_hwmod.h"
+ #include "omap_hwmod_common_data.h"
+@@ -985,7 +984,6 @@ static struct omap_hwmod_class_sysconfig omap54xx_mcbsp_sysc = {
+ static struct omap_hwmod_class omap54xx_mcbsp_hwmod_class = {
+ 	.name	= "mcbsp",
+ 	.sysc	= &omap54xx_mcbsp_sysc,
+-	.rev	= MCBSP_CONFIG_TYPE4,
  };
  
--/* i2c dev_attr */
--static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
--};
--
- /* i2c1 */
- static struct omap_hwmod omap54xx_i2c1_hwmod = {
- 	.name		= "i2c1",
-@@ -843,7 +838,6 @@ static struct omap_hwmod omap54xx_i2c1_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c2 */
-@@ -860,7 +854,6 @@ static struct omap_hwmod omap54xx_i2c2_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c3 */
-@@ -877,7 +870,6 @@ static struct omap_hwmod omap54xx_i2c3_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c4 */
-@@ -894,7 +886,6 @@ static struct omap_hwmod omap54xx_i2c4_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c5 */
-@@ -911,7 +902,6 @@ static struct omap_hwmod omap54xx_i2c5_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /*
+ /* mcbsp1 */
 diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 523e89498fd3..a78f9285cbe8 100644
+index d66dc806425d..62352d1e6361 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1090,11 +1090,6 @@ static struct omap_hwmod_class dra7xx_i2c_hwmod_class = {
- 	.rev	= OMAP_I2C_IP_VERSION_2,
+@@ -23,7 +23,6 @@
+ #include <linux/i2c-omap.h>
+ 
+ #include <linux/omap-dma.h>
+-#include <linux/platform_data/asoc-ti-mcbsp.h>
+ 
+ #include "omap_hwmod.h"
+ #include "omap_hwmod_common_data.h"
+diff --git a/include/linux/platform_data/asoc-ti-mcbsp.h b/include/linux/platform_data/asoc-ti-mcbsp.h
+index e684543254f3..e319d0a2ec82 100644
+--- a/include/linux/platform_data/asoc-ti-mcbsp.h
++++ b/include/linux/platform_data/asoc-ti-mcbsp.h
+@@ -25,10 +25,6 @@
+ #include <linux/spinlock.h>
+ #include <linux/clk.h>
+ 
+-#define MCBSP_CONFIG_TYPE2	0x2
+-#define MCBSP_CONFIG_TYPE3	0x3
+-#define MCBSP_CONFIG_TYPE4	0x4
+-
+ /* Platform specific configuration */
+ struct omap_mcbsp_ops {
+ 	void (*request)(unsigned int);
+@@ -47,14 +43,6 @@ struct omap_mcbsp_platform_data {
+ 	int (*force_ick_on)(struct clk *clk, bool force_on);
  };
  
--/* i2c dev_attr */
--static struct omap_i2c_dev_attr i2c_dev_attr = {
--	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
+-/**
+- * omap_mcbsp_dev_attr - OMAP McBSP device attributes for omap_hwmod
+- * @sidetone: name of the sidetone device
+- */
+-struct omap_mcbsp_dev_attr {
+-	const char *sidetone;
 -};
 -
- /* i2c1 */
- static struct omap_hwmod dra7xx_i2c1_hwmod = {
- 	.name		= "i2c1",
-@@ -1109,7 +1104,6 @@ static struct omap_hwmod dra7xx_i2c1_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
+ void omap3_mcbsp_init_pdata_callback(struct omap_mcbsp_platform_data *pdata);
  
- /* i2c2 */
-@@ -1126,7 +1120,6 @@ static struct omap_hwmod dra7xx_i2c2_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c3 */
-@@ -1143,7 +1136,6 @@ static struct omap_hwmod dra7xx_i2c3_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c4 */
-@@ -1160,7 +1152,6 @@ static struct omap_hwmod dra7xx_i2c4_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /* i2c5 */
-@@ -1177,7 +1168,6 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
- 			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
--	.dev_attr	= &i2c_dev_attr,
- };
- 
- /*
+ #endif
 -- 
 2.15.1
