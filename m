@@ -1,23 +1,33 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 13 Feb 2018 09:58:20 -0500 (EST)
-Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
-In-Reply-To: <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
-References: <f697da2b2513e025688f6c48088536060575a249.1518397634.git.fthain@telegraphics.com.au>
- <20180212.103956.1262868827217051631.davem@davemloft.net>
- <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
-Message-ID: <20180213.095820.761578588685460710.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Feb 2018 07:09:00 -0800
+Subject: [PATCH v7 3/9] arm: omap: Move dmtimer.h out of plat-omap
+In-Reply-To: <1c9f5c72-f589-d7c7-399f-ef55ecb828a0@ti.com>
+References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
+ <1515478987-5786-4-git-send-email-j-keerthy@ti.com>
+ <1c9f5c72-f589-d7c7-399f-ef55ecb828a0@ti.com>
+Message-ID: <20180213150900.GD6364@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finn Thain <fthain@telegraphics.com.au>
-Date: Tue, 13 Feb 2018 16:03:09 +1100 (AEDT)
+* Suman Anna <s-anna@ti.com> [180213 02:07]:
+> On 01/09/2018 12:23 AM, J, KEERTHY wrote:
+> > The header file is currently under plat-omap directory
+> > under arch/omap. Move this out to an accessible place.
+> > @@ -18,7 +18,7 @@
+> >   #include <linux/platform_data/hsmmc-omap.h>
+> >   #include <linux/platform_data/spi-omap2-mcspi.h>
+> >   #include <linux/omap-dma.h>
+> > -#include <plat/dmtimer.h>
+> > +#include <clocksource/dmtimer.h>
+> 
+> These headers are actually not needed in the first-place since we no
+> longer create any non-DT timer devices. I have submitted a series to
+> cleanup the presence of this header file, as part of a larger hwmod data
+> cleanup series.
 
-> I think you have overlooked those modules which offer no way to set 
-> p->msg_enable, i.e. ax88796, axnet_cs, etherh, hydra, mac8390, mcf8390, 
-> pcnet_cs and zorro8390.
+OK great. Keerthy, care to take a look? Seems like it
+simplifies things a bit.
 
-Then that's a bug, we have a very simple easy to implement interface
-for setting this (ethtool).
+Regards,
 
-And by adding the simple hook, you will make these older drivers
-easier to debug for the few people still using them.
+Tony
