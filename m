@@ -1,334 +1,268 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Tue, 13 Feb 2018 16:58:26 +0000
-Subject: [PATCH v3 14/25] ASoC: qcom: qdsp6: Add support to q6afe dai driver
+Date: Tue, 13 Feb 2018 16:58:28 +0000
+Subject: [PATCH v3 16/25] ASoC: qcom: q6afe: add SLIMBus port Support
 In-Reply-To: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
 References: <20180213165837.1620-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180213165837.1620-15-srinivas.kandagatla@linaro.org>
+Message-ID: <20180213165837.1620-17-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to q6afe backend dais driver.
+This patch adds support to 6 SLIMBus AFE ports, which are used as
+backend dais.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/Makefile    |   2 +-
- sound/soc/qcom/qdsp6/q6afe-dai.c | 280 +++++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h     |   3 +
- 3 files changed, 284 insertions(+), 1 deletion(-)
- create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
+ include/dt-bindings/sound/qcom,q6afe.h |  14 ++++
+ sound/soc/qcom/qdsp6/q6afe.c           | 129 +++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h           |  16 +++-
+ 3 files changed, 158 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 660afcab98fd..c7833842b878 100644
---- a/sound/soc/qcom/qdsp6/Makefile
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -1,5 +1,5 @@
- obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
--obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
-+obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o q6afe-dai.o
- obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o q6routing.o
- obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
- obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
-diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
-new file mode 100644
-index 000000000000..f6a618e9db9e
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
-@@ -0,0 +1,280 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2011-2016, The Linux Foundation
-+ * Copyright (c) 2018, Linaro Limited
+diff --git a/include/dt-bindings/sound/qcom,q6afe.h b/include/dt-bindings/sound/qcom,q6afe.h
+index b4d82cccdc86..e9004ee39f72 100644
+--- a/include/dt-bindings/sound/qcom,q6afe.h
++++ b/include/dt-bindings/sound/qcom,q6afe.h
+@@ -4,6 +4,20 @@
+ 
+ /* Audio Front End (AFE) Ports */
+ #define AFE_PORT_HDMI_RX	8
++#define SLIMBUS_0_RX    15
++#define SLIMBUS_0_TX    16
++#define SLIMBUS_1_RX    17
++#define SLIMBUS_1_TX    18
++#define SLIMBUS_2_RX    19
++#define SLIMBUS_2_TX    20
++#define SLIMBUS_3_RX    21
++#define SLIMBUS_3_TX    22
++#define SLIMBUS_4_RX    23
++#define SLIMBUS_4_TX    24
++#define SLIMBUS_5_RX    25
++#define SLIMBUS_5_TX    26
++#define SLIMBUS_6_RX    45
++#define SLIMBUS_6_TX    46
+ 
+ #endif /* __DT_BINDINGS_Q6_AFE_H__ */
+ 
+diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
+index 0a5af06bb50e..637390f5421e 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.c
++++ b/sound/soc/qcom/qdsp6/q6afe.c
+@@ -25,9 +25,45 @@
+ #define AFE_PARAM_ID_HDMI_CONFIG	0x00010210
+ #define AFE_MODULE_AUDIO_DEV_INTERFACE	0x0001020C
+ 
++#define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
++
++#define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
++
+ /* Port IDs */
+ #define AFE_API_VERSION_HDMI_CONFIG	0x1
+ #define AFE_PORT_ID_MULTICHAN_HDMI_RX	0x100E
++
++#define AFE_API_VERSION_SLIMBUS_CONFIG 0x1
++
++/* SLIMbus Rx port on channel 0. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX      0x4000
++/* SLIMbus Tx port on channel 0. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_TX      0x4001
++/* SLIMbus Rx port on channel 1. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX      0x4002
++/* SLIMbus Tx port on channel 1. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_TX      0x4003
++/* SLIMbus Rx port on channel 2. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX      0x4004
++/* SLIMbus Tx port on channel 2. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_TX      0x4005
++/* SLIMbus Rx port on channel 3. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX      0x4006
++/* SLIMbus Tx port on channel 3. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_TX      0x4007
++/* SLIMbus Rx port on channel 4. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX      0x4008
++/* SLIMbus Tx port on channel 4. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_TX      0x4009
++/* SLIMbus Rx port on channel 5. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX      0x400a
++/* SLIMbus Tx port on channel 5. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_TX      0x400b
++/* SLIMbus Rx port on channel 6. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX      0x400c
++/* SLIMbus Tx port on channel 6. */
++#define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX      0x400d
++
+ #define TIMEOUT_MS 1000
+ #define AFE_CMD_RESP_AVAIL	0
+ #define AFE_CMD_RESP_NONE	1
+@@ -82,8 +118,53 @@ struct afe_param_id_hdmi_multi_chan_audio_cfg {
+ 	u16 reserved;
+ } __packed;
+ 
++struct afe_param_id_slimbus_cfg {
++	u32                  sb_cfg_minor_version;
++/* Minor version used for tracking the version of the SLIMBUS
++ * configuration interface.
++ * Supported values: #AFE_API_VERSION_SLIMBUS_CONFIG
 + */
 +
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <sound/pcm.h>
-+#include <sound/soc.h>
-+#include <sound/pcm_params.h>
-+#include "q6afe.h"
++	u16                  slimbus_dev_id;
++/* SLIMbus hardware device ID, which is required to handle
++ * multiple SLIMbus hardware blocks.
++ * Supported values: - #AFE_SLIMBUS_DEVICE_1 - #AFE_SLIMBUS_DEVICE_2
++ */
++	u16                  bit_width;
++/* Bit width of the sample.
++ * Supported values: 16, 24
++ */
++	u16                  data_format;
++/* Data format supported by the SLIMbus hardware. The default is
++ * 0 (#AFE_SB_DATA_FORMAT_NOT_INDICATED), which indicates the
++ * hardware does not perform any format conversions before the data
++ * transfer.
++ */
++	u16                  num_channels;
++/* Number of channels.
++ * Supported values: 1 to #AFE_PORT_MAX_AUDIO_CHAN_CNT
++ */
++	u8  shared_ch_mapping[AFE_PORT_MAX_AUDIO_CHAN_CNT];
++/* Mapping of shared channel IDs (128 to 255) to which the
++ * master port is to be connected.
++ * Shared_channel_mapping[i] represents the shared channel assigned
++ * for audio channel i in multichannel audio data.
++ */
++	u32              sample_rate;
++/* Sampling rate of the port.
++ * Supported values:
++ * - #AFE_PORT_SAMPLE_RATE_8K
++ * - #AFE_PORT_SAMPLE_RATE_16K
++ * - #AFE_PORT_SAMPLE_RATE_48K
++ * - #AFE_PORT_SAMPLE_RATE_96K
++ * - #AFE_PORT_SAMPLE_RATE_192K
++ */
++} __packed;
 +
-+struct q6afe_dai_data {
-+	struct q6afe_port *port[AFE_PORT_MAX];
-+	struct q6afe_port_config port_config[AFE_PORT_MAX];
-+	bool is_port_started[AFE_PORT_MAX];
-+};
 +
-+static int q6hdmi_format_put(struct snd_kcontrol *kcontrol,
-+				struct snd_ctl_elem_value *ucontrol)
+ union afe_port_config {
+ 	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
++	struct afe_param_id_slimbus_cfg           slim_cfg;
+ } __packed;
+ 
+ struct q6afe_port {
+@@ -114,6 +195,20 @@ struct afe_port_map {
+ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
+ 	[AFE_PORT_HDMI_RX] = { AFE_PORT_ID_MULTICHAN_HDMI_RX,
+ 				AFE_PORT_HDMI_RX, 1, 1},
++	[SLIMBUS_0_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX,
++				SLIMBUS_0_RX, 1, 1},
++	[SLIMBUS_1_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX,
++				SLIMBUS_1_RX, 1, 1},
++	[SLIMBUS_2_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX,
++				SLIMBUS_2_RX, 1, 1},
++	[SLIMBUS_3_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX,
++				SLIMBUS_3_RX, 1, 1},
++	[SLIMBUS_4_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX,
++				SLIMBUS_4_RX, 1, 1},
++	[SLIMBUS_5_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX,
++				SLIMBUS_5_RX, 1, 1},
++	[SLIMBUS_6_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX,
++				SLIMBUS_6_RX, 1, 1},
+ };
+ 
+ static struct q6afe_port *afe_find_port(struct q6afe *afe, int token)
+@@ -372,6 +467,31 @@ void *q6afe_get_dai_data(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(q6afe_get_dai_data);
+ 
++/**
++ * q6afe_slim_port_prepare() - Prepare slim afe port.
++ *
++ * @port: Instance of afe port
++ * @cfg: SLIM configuration for the afe port
++ *
++ */
++void q6afe_slim_port_prepare(struct q6afe_port *port,
++			     struct q6afe_slim_cfg *cfg)
 +{
-+	struct q6afe_dai_data *dai_data = kcontrol->private_data;
-+	int value = ucontrol->value.integer.value[0];
++	union afe_port_config *pcfg = &port->port_cfg;
 +
-+	dai_data->port_config[AFE_PORT_HDMI_RX].hdmi.datatype = value;
++	pcfg->slim_cfg.sb_cfg_minor_version = AFE_API_VERSION_SLIMBUS_CONFIG;
++	pcfg->slim_cfg.sample_rate = cfg->sample_rate;
++	pcfg->slim_cfg.bit_width = cfg->bit_width;
++	pcfg->slim_cfg.num_channels = cfg->num_channels;
++	pcfg->slim_cfg.data_format = cfg->data_format;
++	pcfg->slim_cfg.shared_ch_mapping[0] = cfg->ch_mapping[0];
++	pcfg->slim_cfg.shared_ch_mapping[1] = cfg->ch_mapping[1];
++	pcfg->slim_cfg.shared_ch_mapping[2] = cfg->ch_mapping[2];
++	pcfg->slim_cfg.shared_ch_mapping[3] = cfg->ch_mapping[3];
 +
-+	return 0;
 +}
++EXPORT_SYMBOL_GPL(q6afe_slim_port_prepare);
 +
-+static int q6hdmi_format_get(struct snd_kcontrol *kcontrol,
-+				struct snd_ctl_elem_value *ucontrol)
-+{
-+
-+	struct q6afe_dai_data *dai_data = kcontrol->private_data;
-+
-+	ucontrol->value.integer.value[0] =
-+		dai_data->port_config[AFE_PORT_HDMI_RX].hdmi.datatype;
-+
-+	return 0;
-+}
-+
-+static const char * const hdmi_format[] = {
-+	"LPCM",
-+	"Compr"
-+};
-+
-+static const struct soc_enum hdmi_config_enum[] = {
-+	SOC_ENUM_SINGLE_EXT(2, hdmi_format),
-+};
-+
-+static const struct snd_kcontrol_new q6afe_config_controls[] = {
-+	SOC_ENUM_EXT("HDMI RX Format", hdmi_config_enum[0],
-+				 q6hdmi_format_get,
-+				 q6hdmi_format_put),
-+};
-+
-+static int q6hdmi_hw_params(struct snd_pcm_substream *substream,
-+				struct snd_pcm_hw_params *params,
-+				struct snd_soc_dai *dai)
-+{
-+	struct q6afe_dai_data *dai_data = q6afe_get_dai_data(dai->dev);
-+	int channels = params_channels(params);
-+	struct q6afe_hdmi_cfg *hdmi = &dai_data->port_config[dai->id].hdmi;
-+
-+	hdmi->sample_rate = params_rate(params);
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+		hdmi->bit_width = 16;
+ /**
+  * q6afe_hdmi_port_prepare() - Prepare hdmi afe port.
+  *
+@@ -433,6 +553,15 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
+ 	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
+ 		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
+ 		break;
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX:
++	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX:
++		cfg_type = AFE_PARAM_ID_SLIMBUS_CONFIG;
 +		break;
-+	case SNDRV_PCM_FORMAT_S24_LE:
-+		hdmi->bit_width = 24;
-+		break;
-+	}
-+
-+	/*refer to HDMI spec CEA-861-E: Table 28 Audio InfoFrame Data Byte 4*/
-+	switch (channels) {
-+	case 2:
-+		hdmi->channel_allocation = 0;
-+		break;
-+	case 3:
-+		hdmi->channel_allocation = 0x02;
-+		break;
-+	case 4:
-+		hdmi->channel_allocation = 0x06;
-+		break;
-+	case 5:
-+		hdmi->channel_allocation = 0x0A;
-+		break;
-+	case 6:
-+		hdmi->channel_allocation = 0x0B;
-+		break;
-+	case 7:
-+		hdmi->channel_allocation = 0x12;
-+		break;
-+	case 8:
-+		hdmi->channel_allocation = 0x13;
-+		break;
-+	default:
-+		dev_err(dai->dev, "invalid Channels = %u\n", channels);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int q6afe_dai_startup(struct snd_pcm_substream *substream,
-+				struct snd_soc_dai *dai)
-+{
-+	struct q6afe_dai_data *dai_data = q6afe_get_dai_data(dai->dev);
-+
-+	dai_data->is_port_started[dai->id] = false;
-+
-+	return 0;
-+}
-+
-+static void q6afe_dai_shutdown(struct snd_pcm_substream *substream,
-+				struct snd_soc_dai *dai)
-+{
-+	struct q6afe_dai_data *dai_data = q6afe_get_dai_data(dai->dev);
-+	int rc;
-+
-+	rc = q6afe_port_stop(dai_data->port[dai->id]);
-+	if (rc < 0)
-+		dev_err(dai->dev, "fail to close AFE port\n");
-+
-+	dai_data->is_port_started[dai->id] = false;
-+
-+}
-+
-+static int q6afe_dai_prepare(struct snd_pcm_substream *substream,
-+		struct snd_soc_dai *dai)
-+{
-+	struct q6afe_dai_data *dai_data = q6afe_get_dai_data(dai->dev);
-+	int rc;
-+
-+	if (dai_data->is_port_started[dai->id]) {
-+		/* stop the port and restart with new port config */
-+		rc = q6afe_port_stop(dai_data->port[dai->id]);
-+		if (rc < 0) {
-+			dev_err(dai->dev, "fail to close AFE port\n");
-+			return rc;
-+		}
-+	}
-+
-+	if (dai->id == AFE_PORT_HDMI_RX)
-+		q6afe_hdmi_port_prepare(dai_data->port[dai->id],
-+					&dai_data->port_config[dai->id].hdmi);
-+
-+	rc = q6afe_port_start(dai_data->port[dai->id]);
-+	if (rc < 0) {
-+		dev_err(dai->dev, "fail to start AFE port %x\n", dai->id);
-+		return rc;
-+	}
-+	dai_data->is_port_started[dai->id] = true;
-+
-+	return 0;
-+}
-+
-+static const struct snd_soc_dapm_route q6afe_dapm_routes[] = {
-+	{"HDMI Playback", NULL, "HDMI_RX"},
-+};
-+
-+static struct snd_soc_dai_ops q6hdmi_ops = {
-+	.prepare	= q6afe_dai_prepare,
-+	.hw_params	= q6hdmi_hw_params,
-+	.shutdown	= q6afe_dai_shutdown,
-+	.startup	= q6afe_dai_startup,
-+};
-+
-+static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
-+{
-+	struct q6afe_dai_data *dai_data = q6afe_get_dai_data(dai->dev);
-+	struct snd_soc_dapm_context *dapm;
-+	struct q6afe_port *port;
-+
-+	dapm = snd_soc_component_get_dapm(dai->component);
-+
-+	port = q6afe_port_get_from_id(dai->dev, dai->id);
-+	if (IS_ERR(port)) {
-+		dev_err(dai->dev, "Unable to get afe port\n");
-+		return -EINVAL;
-+	}
-+	dai_data->port[dai->id] = port;
-+
-+	return 0;
-+}
-+
-+static int msm_dai_q6_dai_remove(struct snd_soc_dai *dai)
-+{
-+	struct q6afe_dai_data *dai_data = q6afe_get_dai_data(dai->dev);
-+
-+	q6afe_port_put(dai_data->port[dai->id]);
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_dai_driver q6afe_dais[] = {
-+	{
-+		.playback = {
-+			.stream_name = "HDMI Playback",
-+			.rates = SNDRV_PCM_RATE_48000 |
-+				 SNDRV_PCM_RATE_96000 |
-+			 SNDRV_PCM_RATE_192000,
-+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-+				   SNDRV_PCM_FMTBIT_S24_LE,
-+			.channels_min = 2,
-+			.channels_max = 8,
-+			.rate_max =     192000,
-+			.rate_min =	48000,
-+		},
-+		.ops = &q6hdmi_ops,
-+		.id = AFE_PORT_HDMI_RX,
-+		.name = "HDMI",
-+		.probe = msm_dai_q6_dai_probe,
-+		.remove = msm_dai_q6_dai_remove,
-+	},
-+};
-+
-+static int q6afe_of_xlate_dai_name(struct snd_soc_component *component,
-+				   struct of_phandle_args *args,
-+				   const char **dai_name)
-+{
-+	int id = args->args[0];
-+	int i, ret = -EINVAL;
-+
-+	for (i = 0; i  < ARRAY_SIZE(q6afe_dais); i++) {
-+		if (q6afe_dais[i].id == id) {
-+			*dai_name = q6afe_dais[i].name;
-+			ret = 0;
-+			break;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static const struct snd_soc_dapm_widget q6afe_dai_widgets[] = {
-+	SND_SOC_DAPM_AIF_OUT("HDMI_RX", "HDMI Playback", 0, 0, 0, 0),
-+};
-+
-+static const struct snd_soc_component_driver q6afe_dai_component = {
-+	.name		= "q6afe-dai-component",
-+	.dapm_widgets = q6afe_dai_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(q6afe_dai_widgets),
-+	.controls = q6afe_config_controls,
-+	.num_controls = ARRAY_SIZE(q6afe_config_controls),
-+	.dapm_routes = q6afe_dapm_routes,
-+	.num_dapm_routes = ARRAY_SIZE(q6afe_dapm_routes),
-+	.of_xlate_dai_name = q6afe_of_xlate_dai_name,
-+
-+};
-+
-+int q6afe_dai_dev_probe(struct device *dev)
-+{
-+	int rc = 0;
-+	struct q6afe_dai_data *dai_data;
-+
-+	dai_data = devm_kzalloc(dev, sizeof(*dai_data), GFP_KERNEL);
-+	if (!dai_data)
-+		rc = -ENOMEM;
-+
-+	q6afe_set_dai_data(dev, dai_data);
-+
-+	return  devm_snd_soc_register_component(dev, &q6afe_dai_component,
-+					  q6afe_dais, ARRAY_SIZE(q6afe_dais));
-+}
-+EXPORT_SYMBOL_GPL(q6afe_dai_dev_probe);
-+
-+int q6afe_dai_dev_remove(struct device *dev)
-+{
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(q6afe_dai_dev_remove);
-+MODULE_DESCRIPTION("Q6 Audio Fronend dai driver");
-+MODULE_LICENSE("GPL v2");
+ 	default:
+ 		dev_err(dev, "Invalid port id 0x%x\n", port_id);
+ 		return ERR_PTR(-EINVAL);
 diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
-index 43df524f01bb..647ed2d15545 100644
+index 647ed2d15545..aeacf1f2c9a9 100644
 --- a/sound/soc/qcom/qdsp6/q6afe.h
 +++ b/sound/soc/qcom/qdsp6/q6afe.h
-@@ -26,6 +26,9 @@ struct q6afe_port;
- void q6afe_set_dai_data(struct device *dev, void *data);
- void *q6afe_get_dai_data(struct device *dev);
+@@ -5,12 +5,15 @@
  
-+int q6afe_dai_dev_probe(struct device *dev);
-+int q6afe_dai_dev_remove(struct device *dev);
+ #include <dt-bindings/sound/qcom,q6afe.h>
+ 
+-#define AFE_PORT_MAX		9
++#define AFE_PORT_MAX		48
+ 
+ #define MSM_AFE_PORT_TYPE_RX 0
+ #define MSM_AFE_PORT_TYPE_TX 1
+ #define AFE_MAX_PORTS AFE_PORT_MAX
+ 
++#define AFE_MAX_CHAN_COUNT	8
++#define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
 +
- struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id);
- int q6afe_port_start(struct q6afe_port *port);
- int q6afe_port_stop(struct q6afe_port *port);
+ struct q6afe_hdmi_cfg {
+ 	u16                  datatype;
+ 	u16                  channel_allocation;
+@@ -18,8 +21,17 @@ struct q6afe_hdmi_cfg {
+ 	u16                  bit_width;
+ };
+ 
++struct q6afe_slim_cfg {
++	u32	sample_rate;
++	u16	bit_width;
++	u16	data_format;
++	u16	num_channels;
++	u8	ch_mapping[AFE_MAX_CHAN_COUNT];
++};
++
+ struct q6afe_port_config {
+ 	struct q6afe_hdmi_cfg hdmi;
++	struct q6afe_slim_cfg slim;
+ };
+ 
+ struct q6afe_port;
+@@ -36,5 +48,7 @@ void q6afe_port_put(struct q6afe_port *port);
+ int q6afe_get_port_id(int index);
+ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
+ 			    struct q6afe_hdmi_cfg *cfg);
++void q6afe_slim_port_prepare(struct q6afe_port *port,
++			  struct q6afe_slim_cfg *cfg);
+ 
+ #endif /* __Q6AFE_H__ */
 -- 
 2.15.1
