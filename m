@@ -1,35 +1,33 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 13 Feb 2018 13:29:49 +0100
-Subject: [RESEND PATCH v5 3/6] arm: dts: sun8i: a83t: Add the cir pin for the
- A83T
+Date: Tue, 13 Feb 2018 13:29:52 +0100
+Subject: [RESEND PATCH v5 6/6] arm: dts: sun8i: h3-h5: ir register size should
+ be the whole memory block
 In-Reply-To: <20180213122952.8420-1-embed3d@gmail.com>
 References: <20180213122952.8420-1-embed3d@gmail.com>
-Message-ID: <20180213122952.8420-4-embed3d@gmail.com>
+Message-ID: <20180213122952.8420-7-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CIR Pin of the A83T is located at PL12.
+The size of the register should be the size of the whole memory block,
+not just the registers, that are needed.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 7f4955a5fab7..f7f78a27e21d 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -716,6 +716,11 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 7a83b15225c7..22f6e126b8df 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -712,7 +712,7 @@
+ 			clock-names = "apb", "ir";
+ 			resets = <&r_ccu RST_APB0_IR>;
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+-			reg = <0x01f02000 0x40>;
++			reg = <0x01f02000 0x400>;
+ 			status = "disabled";
+ 		};
  
-+			r_cir_pin: r-cir-pin {
-+				pins = "PL12";
-+				function = "s_cir_rx";
-+			};
-+
- 			r_rsb_pins: r-rsb-pins {
- 				pins = "PL0", "PL1";
- 				function = "s_rsb";
 -- 
 2.11.0
