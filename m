@@ -1,39 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 13 Feb 2018 22:47:54 +0100
-Subject: [PATCH v3 05/41] KVM: arm64: Move HCR_INT_OVERRIDE to default
- HCR_EL2 guest flag
-In-Reply-To: <ffb7df11-b304-25f7-f3f4-b55cb106b747@arm.com>
-References: <20180112120747.27999-1-christoffer.dall@linaro.org>
- <20180112120747.27999-6-christoffer.dall@linaro.org>
- <ffb7df11-b304-25f7-f3f4-b55cb106b747@arm.com>
-Message-ID: <20180213214754.GJ23189@cbox>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 14 Feb 2018 00:02:03 +0200
+Subject: [PATCH v2 1/4] arm64: dts: renesas: r8a77995: add FCPV nodes
+In-Reply-To: <1518550237-16753-2-git-send-email-kbingham@kernel.org>
+References: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
+ <1518550237-16753-2-git-send-email-kbingham@kernel.org>
+Message-ID: <32333358.gV5bavL9ol@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 09, 2018 at 11:38:50AM +0000, Julien Grall wrote:
-> Hi,
-> 
-> On 01/12/2018 12:07 PM, Christoffer Dall wrote:
-> >From: Shih-Wei Li <shihwei@cs.columbia.edu>
-> >
-> >We always set the IMO and FMO bits in the HCR_EL2 when running the
-> >guest, regardless if we use the vgic or not.  By moving these flags to
-> >HCR_GUEST_FLAGS we can avoid one of the extra save/restore operations of
-> >HCR_EL2 in the world switch code, and we can also soon get rid of the
-> >other one.
-> >
-> >This is safe, because even though the IMO and FMO bits control both
-> >taking the interrupts to EL2 and remapping ICC_*_EL1 to ICV_*_EL1
-> >executed at EL1, as long as we ensure that these bits are clear when
-> >running the EL1 host, as defined in the HCR_HOST_[VHE_]FLAGS, we're OK.
-> 
-> NIT: I was a bit confused by the end of the sentence because HCR_HOST_FLAGS
-> define does not seem to exist.
-> 
+Hi Kieran,
 
-True, that was nonsense.
+Thank you for the patch.
 
-I have reworded it slightly.
+On Tuesday, 13 February 2018 21:30:34 EET Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> The FCPVB handles the interface between the VSPB and memory, while the
+> FCPVD handles the interface between the VSPD and memory.
+> 
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-Thanks,
--Christoffer
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> 
+>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
+> cd3c6a30fc47..196a917afea6 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> @@ -691,6 +691,33 @@
+>  			#phy-cells = <0>;
+>  			status = "disabled";
+>  		};
+> +
+> +		fcpvb0: fcp at fe96f000 {
+> +			compatible = "renesas,fcpv";
+> +			reg = <0 0xfe96f000 0 0x200>;
+> +			clocks = <&cpg CPG_MOD 607>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 607>;
+> +			iommus = <&ipmmu_vp0 5>;
+> +		};
+> +
+> +		fcpvd0: fcp at fea27000 {
+> +			compatible = "renesas,fcpv";
+> +			reg = <0 0xfea27000 0 0x200>;
+> +			clocks = <&cpg CPG_MOD 603>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 603>;
+> +			iommus = <&ipmmu_vi0 8>;
+> +		};
+> +
+> +		fcpvd1: fcp at fea2f000 {
+> +			compatible = "renesas,fcpv";
+> +			reg = <0 0xfea2f000 0 0x200>;
+> +			clocks = <&cpg CPG_MOD 602>;
+> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+> +			resets = <&cpg 602>;
+> +			iommus = <&ipmmu_vi0 9>;
+> +		};
+>  	};
+> 
+>  	timer {
+
+
+-- 
+Regards,
+
+Laurent Pinchart
