@@ -1,66 +1,42 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 14 Feb 2018 14:57:08 +0900
-Subject: [PATCH] drm: exynos: Use proper macro definition for
- HDMI_I2S_PIN_SEL_1
-In-Reply-To: <20180205174212.10791-1-s.nawrocki@samsung.com>
-References: <CGME20180205174229epcas1p1e15e6f8ef5248ee28fa2e649faa8a866@epcas1p1.samsung.com>
- <20180205174212.10791-1-s.nawrocki@samsung.com>
-Message-ID: <5A83CFB4.6000207@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 14 Feb 2018 06:58:00 +0100
+Subject: [PATCH] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
+In-Reply-To: <20180213232812.31408-1-marek.vasut+renesas@gmail.com>
+References: <20180213232812.31408-1-marek.vasut+renesas@gmail.com>
+Message-ID: <20180214055800.od5yhgo753522yah@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
 
-2018? 02? 06? 02:42? Sylwester Nawrocki ?(?) ? ?:
-> Bit field [2:0] of HDMI_I2S_PIN_SEL_1 corresponds to SDATA_0,
-> not SDATA_2. This patch removes redefinition of HDMI_I2S_SEL_DATA2
-> constant and adds missing HDMI_I2S_SEL_DATA0. There is no functional
-> change.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_hdmi.c | 7 +++++--
->  drivers/gpu/drm/exynos/regs-hdmi.h   | 2 +-
->  2 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> index a4b75a46f946..abd84cbcf1c2 100644
-> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> @@ -1068,10 +1068,13 @@ static void hdmi_audio_config(struct hdmi_context *hdata)
->  	/* Configuration I2S input ports. Configure I2S_PIN_SEL_0~4 */
->  	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_0, HDMI_I2S_SEL_SCLK(5)
->  			| HDMI_I2S_SEL_LRCK(6));
-> -	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(1)
-> -			| HDMI_I2S_SEL_SDATA2(4));
-> +
-> +	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(3)
+> - * The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
+> - * da9210 regulators.  Both regulators have their interrupt request lines tied
+> - * to the same interrupt pin (IRQ2) on the SoC.
+> + * The r8a7790/lager,stout and r8a7791/koelsch development boards have da9063
+> + * and da9210 regulators.  Both regulators have their interrupt request lines
+> + * tied to the same interrupt pin (IRQ2) on the SoC.
 
-Seems you fixed pin_sel_3 field value of I2S_PIN_SEL_1 register. According to datasheet, 0x3 should be set to this field to select SDATA_1 not 0x1.
-So could you update the description of this patch?
+I think listing the boards here doesn't scale well. Gose is already
+missing. How about rephrasing the paragraph to something like "Some Gen2
+development boards have..."?
 
-Thanks,
-Inki Dae
-
-> +			| HDMI_I2S_SEL_SDATA0(4));
-> +
->  	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_2, HDMI_I2S_SEL_SDATA3(1)
->  			| HDMI_I2S_SEL_SDATA2(2));
-> +
->  	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_3, HDMI_I2S_SEL_DSD(0));
+>   *
+>   * After cold boot or da9063-induced restart, both the da9063 and da9210 seem
+>   * to assert their interrupt request lines.  Hence as soon as one driver
+> @@ -118,6 +118,7 @@ static int __init rcar_gen2_regulator_quirk(void)
 >  
->  	/* I2S_CON_1 & 2 */
-> diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
-> index 04be0f7e8193..4420c203ac85 100644
-> --- a/drivers/gpu/drm/exynos/regs-hdmi.h
-> +++ b/drivers/gpu/drm/exynos/regs-hdmi.h
-> @@ -464,7 +464,7 @@
+>  	if (!of_machine_is_compatible("renesas,koelsch") &&
+>  	    !of_machine_is_compatible("renesas,lager") &&
+> +	    !of_machine_is_compatible("renesas,stout") &&
+>  	    !of_machine_is_compatible("renesas,gose"))
+>  		return -ENODEV;
 >  
->  /* I2S_PIN_SEL_1 */
->  #define HDMI_I2S_SEL_SDATA1(x)		(((x) & 0x7) << 4)
-> -#define HDMI_I2S_SEL_SDATA2(x)		((x) & 0x7)
-> +#define HDMI_I2S_SEL_SDATA0(x)		((x) & 0x7)
->  
->  /* I2S_PIN_SEL_2 */
->  #define HDMI_I2S_SEL_SDATA3(x)		(((x) & 0x7) << 4)
+> -- 
+> 2.15.1
 > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/5c6ad971/attachment.sig>
