@@ -1,24 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Feb 2018 18:55:30 +0000
-Subject: [PATCH] arm64: proc: Set PTE_NG for table entries to avoid
- traversing them twice
-In-Reply-To: <1518527649-18358-1-git-send-email-will.deacon@arm.com>
-References: <1518527649-18358-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180214185529.2ogkbjkid6q4u4p6@armageddon.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Feb 2018 10:59:24 -0800
+Subject: [PATCH v7 3/9] arm: omap: Move dmtimer.h out of plat-omap
+In-Reply-To: <37f28584-20c2-51c1-e476-75ef81f03af6@ti.com>
+References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
+ <1515478987-5786-4-git-send-email-j-keerthy@ti.com>
+ <1c9f5c72-f589-d7c7-399f-ef55ecb828a0@ti.com>
+ <37f28584-20c2-51c1-e476-75ef81f03af6@ti.com>
+Message-ID: <20180214185924.GR6364@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 01:14:09PM +0000, Will Deacon wrote:
-> When KASAN is enabled, the swapper page table contains many identical
-> mappings of the zero page, which can lead to a stall during boot whilst
-> the G -> nG code continually walks the same page table entries looking
-> for global mappings.
+* Keerthy <j-keerthy@ti.com> [180214 04:51]:
+> On Tuesday 13 February 2018 07:36 AM, Suman Anna wrote:
+> > These headers are actually not needed in the first-place since we no
+> > longer create any non-DT timer devices. I have submitted a series to
+> > cleanup the presence of this header file, as part of a larger hwmod data
+> > cleanup series.
 > 
-> This patch sets the nG bit (bit 11, which is IGNORED) in table entries
-> after processing the subtree so we can easily skip them if we see them
-> a second time.
-> 
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> I will rebase my series on top of your clean up series. Thanks for clean
+> ups.
 
-Queued for -rc2. Thanks.
+I've now pushed Suman's series into omap-for-v4.17/soc and
+merged it into my for-next. So please rebase your updated
+patches against omap-for-v4.17/soc.
+
+Thanks,
+
+Tony
