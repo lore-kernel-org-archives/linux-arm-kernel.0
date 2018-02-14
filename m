@@ -1,140 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Feb 2018 13:48:27 +0100
-Subject: [PATCH 03/15] soc: renesas: Add R-Car M3-N support
-In-Reply-To: <1518515162-23663-4-git-send-email-jacopo+renesas@jmondi.org>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-4-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdU-pYNwjrXSR7j2kNkJSYsKd=0Kf0Tzq5LHpwA7p4_9MA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Feb 2018 14:00:59 +0100
+Subject: [PATCH] drm/bridge: sii902x: Fall back to standard modes
+Message-ID: <20180214130059.19052-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+The following happens when connection a DVI output driven
+from the SiI9022 using a DVI-to-VGA adapter plug:
 
-Thanks for your patch!
+i2c i2c-0: sendbytes: NAK bailout.
+i2c i2c-0: sendbytes: NAK bailout.
 
-On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
-<jacopo+renesas@jmondi.org> wrote:
-> Add support for R-Car M3-N (r8a77965) power areas and reset.
-> M3-N power areas are identical to M3-W ones, so just copy and rename
-> them.
+Then no picture. Apparently the I2C engine inside the SiI9022
+is not smart enough to try to fall back to DDC I2C. Or the
+vendor have not integrated the electronics properly. I don't
+know which one it is.
 
-They are not identical:
-  - M3-N does not have the CA53-related areas,
-  - M3-W does not have A3VP,
-  - M3-N does not have A2VC0 (M3-W also doesn't, according to latest
-datasheet?).
+By using standard modes as fallback, the bridge probes nicely
+with a minor warning and we get picture.
 
-The datasheet also mentions A3SH, without further info about the register
-block. I think we need to bring this up with Renesas.
+This code is inspired by similar code in the dumb VGA bridge.
 
->  .../bindings/power/renesas,rcar-sysc.txt           |  1 +
->  .../devicetree/bindings/reset/renesas,rst.txt      |  1 +
->  drivers/soc/renesas/Kconfig                        |  9 ++++--
->  drivers/soc/renesas/Makefile                       |  1 +
->  drivers/soc/renesas/r8a77965-sysc.c                | 37 ++++++++++++++++++++++
->  drivers/soc/renesas/rcar-rst.c                     |  1 +
->  drivers/soc/renesas/rcar-sysc.c                    |  3 ++
->  drivers/soc/renesas/rcar-sysc.h                    |  1 +
->  drivers/soc/renesas/renesas-soc.c                  |  8 +++++
->  include/dt-bindings/power/r8a77965-sysc.h          | 31 ++++++++++++++++++
->  10 files changed, 91 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/soc/renesas/r8a77965-sysc.c
->  create mode 100644 include/dt-bindings/power/r8a77965-sysc.h
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpu/drm/bridge/sii902x.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-The maintainer may ask you to split this patch by functionality...
-
-> --- /dev/null
-> +++ b/drivers/soc/renesas/r8a77965-sysc.c
-> @@ -0,0 +1,37 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Renesas R-Car M3-N System Controller
-> + * Copyright (C) 2018 Jacopo Mondi <jacopo+renesas@jmondi.org>
-> + *
-> + * Based on Renesas R-Car M3-W System Controller
-> + * Copyright (C) 2016 Glider bvba
-> + */
-> +
-> +#include <linux/bug.h>
-> +#include <linux/kernel.h>
-> +
-> +#include <dt-bindings/power/r8a77965-sysc.h>
-> +
-> +#include "rcar-sysc.h"
-> +
-> +static const struct rcar_sysc_area r8a77965_areas[] __initconst = {
-> +       { "always-on",      0, 0, R8A77965_PD_ALWAYS_ON, -1, PD_ALWAYS_ON },
-> +       { "ca57-scu",   0x1c0, 0, R8A77965_PD_CA57_SCU, R8A77965_PD_ALWAYS_ON,
-> +         PD_SCU },
-> +       { "ca57-cpu0",   0x80, 0, R8A77965_PD_CA57_CPU0, R8A77965_PD_CA57_SCU,
-> +         PD_CPU_NOCR },
-> +       { "ca57-cpu1",   0x80, 1, R8A77965_PD_CA57_CPU1, R8A77965_PD_CA57_SCU,
-> +         PD_CPU_NOCR },
-> +       { "cr7",        0x240, 0, R8A77965_PD_CR7,      R8A77965_PD_ALWAYS_ON },
-> +       { "a3vc",       0x380, 0, R8A77965_PD_A3VC,     R8A77965_PD_ALWAYS_ON },
-> +       { "a2vc0",      0x3c0, 0, R8A77965_PD_A2VC0,    R8A77965_PD_A3VC },
-
-M3-N (and M3-W) does not have A2VC0?
-
-> +       { "a2vc1",      0x3c0, 1, R8A77965_PD_A2VC1,    R8A77965_PD_A3VC },
-> +       { "3dg-a",      0x100, 0, R8A77965_PD_3DG_A,    R8A77965_PD_ALWAYS_ON },
-> +       { "3dg-b",      0x100, 1, R8A77965_PD_3DG_B,    R8A77965_PD_3DG_A },
-> +       { "a3ir",       0x180, 0, R8A77965_PD_A3IR,     R8A77965_PD_ALWAYS_ON },
-
-A3VP is missing?
-
-> +};
-> +
-> +const struct rcar_sysc_info r8a77965_sysc_info __initconst = {
-> +       .areas = r8a77965_areas,
-> +       .num_areas = ARRAY_SIZE(r8a77965_areas),
-> +};
-
-> --- /dev/null
-> +++ b/include/dt-bindings/power/r8a77965-sysc.h
-> @@ -0,0 +1,31 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (C) 2018 Jacopo Mondi <jacopo+renesas@jmondi.org>
-> + * Copyright (C) 2016 Glider bvba
-> + */
-> +
-> +#ifndef __DT_BINDINGS_POWER_R8A77965_SYSC_H__
-> +#define __DT_BINDINGS_POWER_R8A77965_SYSC_H__
-> +
-> +/*
-> + * These power domain indices match the numbers of the interrupt bits
-> + * representing the power areas in the various Interrupt Registers
-> + * (e.g. SYSCISR, Interrupt Status Register)
-> + */
-> +
-> +#define R8A77965_PD_CA57_CPU0           0
-> +#define R8A77965_PD_CA57_CPU1           1
-> +#define R8A77965_PD_A3VP                9
-> +#define R8A77965_PD_CA57_SCU           12
-> +#define R8A77965_PD_CR7                        13
-> +#define R8A77965_PD_A3VC               14
-> +#define R8A77965_PD_3DG_A              17
-> +#define R8A77965_PD_3DG_B              18
-> +#define R8A77965_PD_A3IR               24
-> +#define R8A77965_PD_A2VC0              25
-
-M3-N (and M3-W) does not have A2VC0?
-
-> +#define R8A77965_PD_A2VC1              26
-> +
-> +/* Always-on power area */
-> +#define R8A77965_PD_ALWAYS_ON          32
-> +
-> +#endif /* __DT_BINDINGS_POWER_R8A77965_SYSC_H__ */
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/gpu/drm/bridge/sii902x.c b/drivers/gpu/drm/bridge/sii902x.c
+index b1ab4ab09532..4483095c4013 100644
+--- a/drivers/gpu/drm/bridge/sii902x.c
++++ b/drivers/gpu/drm/bridge/sii902x.c
+@@ -168,8 +168,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
+ 		return ret;
+ 
+ 	edid = drm_get_edid(connector, sii902x->i2c->adapter);
+-	drm_mode_connector_update_edid_property(connector, edid);
+-	if (edid) {
++	if (!edid) {
++		/*
++		 * This happens when using a simple DVI-to-VGA converter
++		 * dongle for example: the I2C lines are not bridged over
++		 * to VGA DDC.
++		 */
++		DRM_INFO("EDID readout failed, falling back to standard modes\n");
++		ret = drm_add_modes_noedid(connector, 1920, 1080);
++		/* Set some standard resolution most monitors can handle */
++		drm_set_preferred_mode(connector, 1024, 768);
++	} else {
++		/* Data from EDID readout */
++		drm_mode_connector_update_edid_property(connector, edid);
+ 		num = drm_add_edid_modes(connector, edid);
+ 		kfree(edid);
+ 	}
+-- 
+2.14.3
