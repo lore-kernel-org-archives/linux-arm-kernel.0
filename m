@@ -1,58 +1,40 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 14 Feb 2018 11:49:48 +0800
-Subject: [PATCH RESEND v5 0/3] Add support for Hi3660 mailbox driver
-Message-ID: <1518580191-26451-1-git-send-email-leo.yan@linaro.org>
+Date: Wed, 14 Feb 2018 11:49:51 +0800
+Subject: [PATCH RESEND v5 3/3] dts: arm64: Add mailbox binding for hi3660
+In-Reply-To: <1518580191-26451-1-git-send-email-leo.yan@linaro.org>
+References: <1518580191-26451-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1518580191-26451-4-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi3660 mailbox controller is used to send message within multiple
-processors, MCU, HIFI, etc. This patch series is to implement an
-initial version for Hi3660 mailbox driver with "automatic
-acknowledge" mode.
+From: Kaihua Zhong <zhongkaihua@huawei.com>
 
-The patch set have been verified with Hi3660 stub clock driver, so
-we can send message to MCU to execute CPU frequency scaling. This is
-tested on 96boards Hikey960.
+Add DT binding for mailbox driver.
 
-Changes from v4:
-* According to Jassi suggestion, refactored mailbox driver and removed
-  "inline" for function declaration;
+Signed-off-by: Ruyi Wang <wangruyi@huawei.com>
+Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Changes from v3:
-* According to Jassi suggestion, refined structure name to
-  "struct hi3660_chan_info";
-* According to Jassi suggestion, moved channel 'lock'+'acquire'
-  operations into .startup();
-
-Changes from v2:
-* According to Mark Rutland suggestions, removed sev()/wfe() from
-  driver, the system has no two masters sharing the same channel for
-  data transferring so we don't need these instructions;
-* Refined DT binding and doc according to Rob suggestions;
-* Refined driver according to Julien suggestions;
-
-Changes from v1:
-* Added cover letter to track the changelog;
-* Added document for DT binding;
-* Refactored and simplized mailbox driver with "automatic ack" mode;
-* Refined commit logs for patches;
-
-
-Kaihua Zhong (2):
-  mailbox: Add support for Hi3660 mailbox
-  dts: arm64: Add mailbox binding for hi3660
-
-Leo Yan (1):
-  dt-bindings: mailbox: Introduce Hi3660 controller binding
-
- .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  |  51 ++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   8 +
- drivers/mailbox/Kconfig                            |   8 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/hi3660-mailbox.c                   | 316 +++++++++++++++++++++
- 5 files changed, 385 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
- create mode 100644 drivers/mailbox/hi3660-mailbox.c
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index 22570c3..1ef7b94 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -286,6 +286,14 @@
+ 			#reset-cells = <2>;
+ 		};
+ 
++		mailbox: mailbox at e896b000 {
++			compatible = "hisilicon,hi3660-mbox";
++			reg = <0x0 0xe896b000 0x0 0x1000>;
++			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
++			#mbox-cells = <3>;
++		};
++
+ 		stub_clock: stub_clock at e896b500 {
+ 			compatible = "hisilicon,hi3660-stub-clk";
+ 			reg = <0x0 0xe896b500 0x0 0x0100>;
 -- 
 1.9.1
