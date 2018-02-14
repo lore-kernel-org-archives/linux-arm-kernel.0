@@ -1,56 +1,61 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 14 Feb 2018 16:38:15 +0100
-Subject: [PATCH v3 0/9] irqchip: stm32: add stm32h7 support
-In-Reply-To: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
-References: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <37eef294-12ef-e3a3-df93-10c0ed8b1a57@st.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 14 Feb 2018 16:40:33 +0100
+Subject: [GIT PULL] arm64 spectre and meltdown mitigations for v4.14-stable
+In-Reply-To: <CAKv+Gu-D6E02FE+zaqbksM_w-S_y8ueNGc=xPDAieJHjKp1=bg@mail.gmail.com>
+References: <20180212113801.2552-1-ard.biesheuvel@linaro.org>
+ <20180214135420.GB24189@kroah.com>
+ <CAKv+Gu_uqudgFU1_+cWZtvyQmZMxjCYuUr-2L59yEfoY8EyWQA@mail.gmail.com>
+ <CAKv+Gu-D6E02FE+zaqbksM_w-S_y8ueNGc=xPDAieJHjKp1=bg@mail.gmail.com>
+Message-ID: <20180214154033.GA2745@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Wed, Feb 14, 2018 at 02:34:01PM +0000, Ard Biesheuvel wrote:
+> On 14 February 2018 at 14:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 14 February 2018 at 13:54, Greg KH <gregkh@linuxfoundation.org> wrote:
+> >> On Mon, Feb 12, 2018 at 11:38:01AM +0000, Ard Biesheuvel wrote:
+> >>> Hi Greg,
+> >>>
+> >>> As mentioned by Will, I have created the v4.14 counterpart of his stable
+> >>> backport of the arm64/ARM Spectre/Meltdown mitigations that have been pulled
+> >>> into v4.16-rc1.
+> >>>
+> >>> Given that this is the v4.15 version backported to v4.14, I have removed any
+> >>> mention of 'conflicts' from the commit logs as they are now ambiguous. The
+> >>> patches applied surprisingly cleanly, I only needed to drop two patches that
+> >>> are already in (the same ones Will mentioned in his PR), and drop another one
+> >>> dealing with SPE, support for which did not exist yet in v4.14. I also included
+> >>> the patch
+> >>>
+> >>>   arm64: move TASK_* definitions to <asm/processor.h>
+> >>>
+> >>> from v4.15 to make Robin's Spectre v1 patches apply more cleanly.
+> >>
+> >> I've queued these up now, but if you could pull the whole quilt tree and
+> >> verify I got things right, that would be great.  There was some
+> >> conflicts with a few previous patches I had already queued up that
+> >> touched some "Falkor" errata code.
+> >>
+> >> Specifically 932b50c7c1c65e6f23002e075b97ee083c4a9e71 "arm64: Add
+> >> software workaround for Falkor erratum 1041" is the offending patch.  I
+> >> think I resolved the merge issues properly, but verifying this would be
+> >> wonderful.
+> >>
+> >
+> > No, the build is broken now. I will investigate.
+> 
+> Your patch 977c3d2cb684e143a18e1564fbf5ecf7576a1c98
+> 
+> arm64: Move post_ttbr_update_workaround to C code
+> 
+> removes the pre_disable_mmu_workaround macro from asm/assembler.h but
+> it should only remove post_ttbr_update_workaround
+> 
+> Once I add that back, things seem to build and run as expected.
 
-On 11/06/2017 06:03 PM, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This series adds:
-> -Management of multi-bank of external interrupts
-> stm32h7 has up to 96 inputs (3 banks of  32 inputs).
-> -Fix initial value after cold/hot boot (wakeup issue).
-> 
-> Changes v3:
-> -remove chip.name and handler, already done by
-> irq_alloc_domain_generic_chips
-> -add Rob ack in dt-bindings commit
-> 
-> Changes v2:
-> -Remove irq_mask and adds const on struct stm32_exti_bank
-> -Add wrapper functions pending and ack
-> -Replace BITS_PER_LONG by IRQS_PER_BANK
-> -Fill commit message on
-> "ARM: dts: stm32: add support of exti on stm32h743"
-> -Add system config bank for stm32h7
-> 
-> Ludovic Barre (9):
->    irqchip: stm32: select GENERIC_IRQ_CHIP
->    irqchip: stm32: add multi-bank management
->    dt-bindings: interrupt-controllers: add compatible string for stm32h7
->    irqchip: stm32: add stm32h7 support
->    irqchip: stm32: fix initial values
->    irqchip: stm32: move the wakeup on interrupt mask
->    ARM: dts: stm32: add exti support for stm32h743
->    ARM: dts: stm32: add system config bank node for stm32h743
->    ARM: dts: stm32: add support of exti on stm32h743 pinctrl
+Can you provide a "fixed" version of just this patch so I know to get it
+correct?
 
-patches 7/8/9 (DT part) applied on stm32-next.
+thanks,
 
-Thanks
-Alex
-
-> 
->   .../interrupt-controller/st,stm32-exti.txt         |   4 +-
->   arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  24 +++
->   arch/arm/boot/dts/stm32h743.dtsi                   |  13 ++
->   drivers/irqchip/Kconfig                            |   1 +
->   drivers/irqchip/irq-stm32-exti.c                   | 206 ++++++++++++++++-----
->   5 files changed, 198 insertions(+), 50 deletions(-)
-> 
+greg k-h
