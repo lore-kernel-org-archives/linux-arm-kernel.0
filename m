@@ -1,39 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Feb 2018 09:38:53 +0000
-Subject: [PATCH v2 0/8] Add support for PWM input capture on STM32
-In-Reply-To: <5ade7f05-f5cc-e272-842c-22effa78b716@st.com>
-References: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
- <5ade7f05-f5cc-e272-842c-22effa78b716@st.com>
-Message-ID: <20180214093853.4sskffpd5iasswen@dell>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 14 Feb 2018 09:38:54 +0000
+Subject: Support for Cortex R4
+In-Reply-To: <CAH9_wRNzj2=pYzhPkGo-cs+UBkgeKE_ieS6oKM_pt22dTxEy9g@mail.gmail.com>
+References: <CAH9_wRNzj2=pYzhPkGo-cs+UBkgeKE_ieS6oKM_pt22dTxEy9g@mail.gmail.com>
+Message-ID: <15aa2e42-6ef2-850c-2a77-966e3455e18f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Feb 2018, Fabrice Gasnier wrote:
+Hi,
 
-> On 01/26/2018 04:11 PM, Fabrice Gasnier wrote:
-> > This series adds support for capture to stm32-pwm driver.
-> > Capture is based on DMAs.
-> > - First two patches are precursor patches
-> > - Subsequent two patches add support for requesting DMAs to MFD core
-> > - Next three patches add support for capture to stm32-pwm driver
-> > - This has been tested on stm32429i-eval board.
-> > 
-> > ---
-> > Changes in v2:
-> > - Abstract DMA handling from child driver: move it to MFD core
-> > - Rework pwm capture routines to adopt this change
-> > - Comment on optional dma support, beautify DMAs probe
+On 12/02/18 09:37, Sriram V wrote:
+> Hello,
 > 
-> Hi all,
+> We are planning to use BCM43907 which has 320MHZ ARM Cortex R4.  This
+> is without MMU.
+
+Interesting...
+
 > 
-> Gentle ping for v2 driver review since DT Bindings has been reviewed by
-> Rob and the series by Benjamin.
+> I wanted to check the extent of support in Linux Kernel for Arm-Cortex R4?
+> 
+> Does the mainline kernel support boot on ARM-Cortex R4?
 
-Best thing to do is collect the Acks you have and send the set out as
-a [RESEND].
+I run Linux on Cortex-R7/R8 (SMP and UP configurations) models and I do not
+see reasons why it cannot be done for Cortex-R4.
 
--- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Just bear in mind that Cortex-R is ARMv7, so while defining your board config
+select CPU_V7.
+
+Cheers
+Vladimir
+
+> 
+> 
+> Thanks for your help.
+> 
+> Regards,
+> Sriram
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
