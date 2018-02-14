@@ -1,88 +1,86 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 14 Feb 2018 12:22:33 -0600
-Subject: [PATCH 1/9] dmaengine: omap-dma: include header for bool type
-In-Reply-To: <20180214180714.GQ6364@atomide.com>
-References: <20180213013243.8378-1-s-anna@ti.com>
- <20180213013243.8378-2-s-anna@ti.com> <20180214180714.GQ6364@atomide.com>
-Message-ID: <bd380317-6892-bf97-ac10-bc672e5ec685@ti.com>
+From: ebiggers@google.com (Eric Biggers)
+Date: Wed, 14 Feb 2018 10:42:18 -0800
+Subject: [PATCH v3 0/5] crypto: Speck support
+Message-ID: <20180214184223.254359-1-ebiggers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2018 12:07 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [180213 01:33]:
->> The omap-dmaengine.h header file uses a bool type, so include
->> the linux types.h header file so that it is self-contained.
->> The lack of this header caused some build errors while cleaning
->> up some header files from various omap_hwmod data files.
-> 
-> Let's rather include types.h directly. Here's a patch
-> that replaces your first two patches.
+Hello,
 
-Yeah, I am ok with this as well. I went with the other approach
-primarily because whoever includes those header files will need a
-similar fixing or rely on others bringing in the types.h.
+This series adds Speck support to the crypto API, including the Speck128
+and Speck64 variants.  Speck is a lightweight block cipher that can be
+much faster than AES on processors that don't have AES instructions.
 
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< --------------------
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 14 Feb 2018 09:35:20 -0800
-> Subject: [PATCH] ARM: OMAP2+: Include types.h directly for hwmod data
-> 
-> This is needed in preparation for dropping some unused
-> headers that indirectly include types.h.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+We are planning to offer Speck-XTS (probably Speck128/256-XTS) as an
+option for dm-crypt and fscrypt on Android, for low-end mobile devices
+with older CPUs such as ARMv7 which don't have the Cryptography
+Extensions.  Currently, such devices are unencrypted because AES is not
+fast enough, even when the NEON bit-sliced implementation of AES is
+used.  Other AES alternatives such as Twofish, Threefish, Camellia,
+CAST6, and Serpent aren't fast enough either; it seems that only a
+modern ARX cipher can provide sufficient performance on these devices.
 
-Tested-by: Suman Anna <s-anna@ti.com>
+This is a replacement for our original proposal
+(https://patchwork.kernel.org/patch/10101451/) which was to offer
+ChaCha20 for these devices.  However, the use of a stream cipher for
+disk/file encryption with no space to store nonces would have been much
+more insecure than we thought initially, given that it would be used on
+top of flash storage as well as potentially on top of F2FS, neither of
+which is guaranteed to overwrite data in-place.
 
-regards
-Suman
+Speck has been somewhat controversial due to its origin.  Nevertheless,
+it has a straightforward design (it's an ARX cipher), and it appears to
+be the leading software-optimized lightweight block cipher currently,
+with the most cryptanalysis.  It's also easy to implement without side
+channels, unlike AES.  Moreover, we only intend Speck to be used when
+the status quo is no encryption, due to AES not being fast enough.
 
-> ---
->  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 2 ++
->  arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 2 ++
->  arch/arm/mach-omap2/omap_hwmod_81xx_data.c              | 2 ++
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-> --- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-> @@ -9,6 +9,8 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#include <linux/types.h>
-> +
->  #include <linux/platform_data/gpio-omap.h>
->  #include <linux/omap-dma.h>
->  #include <plat/dmtimer.h>
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-> @@ -14,6 +14,8 @@
->   * GNU General Public License for more details.
->   */
->  
-> +#include <linux/types.h>
-> +
->  #include <linux/platform_data/gpio-omap.h>
->  #include <linux/platform_data/hsmmc-omap.h>
->  #include <linux/platform_data/spi-omap2-mcspi.h>
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-> @@ -15,6 +15,8 @@
->   *
->   */
->  
-> +#include <linux/types.h>
-> +
->  #include <linux/platform_data/gpio-omap.h>
->  #include <linux/platform_data/hsmmc-omap.h>
->  #include <linux/platform_data/spi-omap2-mcspi.h>
-> 
+We've also considered a novel length-preserving encryption mode based on
+ChaCha20 and Poly1305.  While theoretically attractive, such a mode
+would be a brand new crypto construction and would be more complicated
+and difficult to implement efficiently in comparison to Speck-XTS.
+
+Thus, patch 1 adds a generic implementation of Speck, and the following
+patches add a 32-bit ARM NEON implementation of Speck-XTS.  The
+NEON-accelerated implementation is much faster than the generic
+implementation and therefore is the implementation that would primarily
+be used in practice on the devices we are targeting.
+
+There is no AArch64 implementation included, since most such CPUs have
+the Cryptography Extensions, allowing the use of AES.  An AArch64
+implementation can be added later if there is interest though.
+
+Changed since v2:
+
+  - Fix __speck64_xts_crypt() to work on big endian CPUs.
+
+Changed since v1:
+
+  - Use the word order recommended by the Speck authors.  All test
+    vectors were updated.
+
+Eric Biggers (5):
+  crypto: add support for the Speck block cipher
+  crypto: speck - export common helpers
+  crypto: arm/speck - add NEON-accelerated implementation of Speck-XTS
+  crypto: speck - add test vectors for Speck128-XTS
+  crypto: speck - add test vectors for Speck64-XTS
+
+ arch/arm/crypto/Kconfig           |    6 +
+ arch/arm/crypto/Makefile          |    2 +
+ arch/arm/crypto/speck-neon-core.S |  432 +++++++++
+ arch/arm/crypto/speck-neon-glue.c |  288 ++++++
+ crypto/Kconfig                    |   14 +
+ crypto/Makefile                   |    1 +
+ crypto/speck.c                    |  307 ++++++
+ crypto/testmgr.c                  |   36 +
+ crypto/testmgr.h                  | 1486 +++++++++++++++++++++++++++++
+ include/crypto/speck.h            |   62 ++
+ 10 files changed, 2634 insertions(+)
+ create mode 100644 arch/arm/crypto/speck-neon-core.S
+ create mode 100644 arch/arm/crypto/speck-neon-glue.c
+ create mode 100644 crypto/speck.c
+ create mode 100644 include/crypto/speck.h
+
+-- 
+2.16.1.291.g4437f3f132-goog
