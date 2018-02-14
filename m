@@ -1,8 +1,8 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Feb 2018 11:29:21 -0800
+Date: Wed, 14 Feb 2018 11:35:54 -0800
 Subject: arm64 physmap (was Re: [kernel-hardening] [PATCH 4/6] Protectable
  Memory)
-In-Reply-To: <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
+In-Reply-To: <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
 References: <20180124175631.22925-1-igor.stoppa@huawei.com>
  <20180124175631.22925-5-igor.stoppa@huawei.com>
  <CAG48ez0JRU8Nmn7jLBVoy6SMMrcj46R0_R30Lcyouc4R9igi-g@mail.gmail.com>
@@ -21,52 +21,21 @@ References: <20180124175631.22925-1-igor.stoppa@huawei.com>
  <f4226a44-92fd-8ead-b458-7551ba82f96d@redhat.com>
  <CAGXu5j+zOCLerneUt2b-tvyLLg7fEbr9B0YYow-4DH6oV-nnCw@mail.gmail.com>
  <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
-Message-ID: <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
+ <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
+Message-ID: <CAGXu5jJ2XRt3RqPPXp+CN5fhT93BpCCNUHk88aSQUWS_NJ5oxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 11:06 AM, Laura Abbott <labbott@redhat.com> wrote:
-> On 02/13/2018 01:43 PM, Kees Cook wrote:
->>
->> On Tue, Feb 13, 2018 at 8:09 AM, Laura Abbott <labbott@redhat.com> wrote:
->>>
->>> No, arm64 doesn't fixup the aliases, mostly because arm64 uses larger
->>> page sizes which can't be broken down at runtime. CONFIG_PAGE_POISONING
->>> does use 4K pages which could be adjusted at runtime. So yes, you are
->>> right we would have physmap exposure on arm64 as well.
->>
->>
->> Errr, so that means even modules and kernel code are writable via the
->> arm64 physmap? That seems extraordinarily bad. :(
->>
->> -Kees
->>
->
-> (adding linux-arm-kernel and changing the subject)
->
-> Kernel code should be fine, if it isn't that is a bug that should be
-> fixed. Modules yes are not fully protected. The conclusion from past
+On Wed, Feb 14, 2018 at 11:29 AM, Kees Cook <keescook@chromium.org> wrote:
+> Why does using finer granularity on the physmap degrade performance? I
+> assume TLB pressure, but what is heavily using that area? (I must not
+> be understanding what physmap actually gets used for -- I thought it
+> was just a convenience to have a 1:1 virt/phys map for some lookups?)
 
-I think that's a pretty serious problem: we can't have aliases with
-mismatched permissions; this degrades a deterministic protection
-(read-only) to a probabilistic protection (knowing where the alias of
-a target is mapped). Having an attack be "needs some info leaks"
-instead of "need execution control to change perms" is a much lower
-bar, IMO.
-
-> experience has been that we cannot safely break down larger page sizes
-> at runtime like x86 does. We could theoretically
-> add support for fixing up the alias if PAGE_POISONING is enabled but
-> I don't know who would actually use that in production. Performance
-> is very poor at that point.
-
-Why does using finer granularity on the physmap degrade performance? I
-assume TLB pressure, but what is heavily using that area? (I must not
-be understanding what physmap actually gets used for -- I thought it
-was just a convenience to have a 1:1 virt/phys map for some lookups?)
+Jann has sorted me out: it's that physmap isn't an _alias_ for the
+buddy allocator memory areas; it's used directly.
 
 -Kees
-
 
 -- 
 Kees Cook
