@@ -1,304 +1,104 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Wed, 14 Feb 2018 15:59:51 +0200
-Subject: [PATCH v3 09/10] DT: QCOM: Add cpufreq-dt to msm8996
+Date: Wed, 14 Feb 2018 15:59:47 +0200
+Subject: [PATCH v3 05/10] clk: qcom: cpu-8996: Add support to switch to
+ alternate PLL
 In-Reply-To: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
 References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1518616792-29028-10-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1518616792-29028-6-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree frequency table for the MSM8996 to be
-used by the upstream cpufreq-dt driver with the clk-cpu-8996
-driver as infrastructure.
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
+Each of the CPU clusters on msm8996 and powered via a primary
+PLL and a secondary PLL. The primary PLL is what drivers the
+CPU clk, except for times when we are reprogramming the PLL
+itself, when we temporarily switch to an alternate PLL.
+Use clock rate change notifiers to support this.
+
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/apq8096-db820c.dts  |   4 +-
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi |   2 +-
- arch/arm64/boot/dts/qcom/msm8996.dtsi        | 188 ++++++++++++++++++++++++++-
- drivers/cpufreq/cpufreq-dt-platdev.c         |   3 +
- 4 files changed, 192 insertions(+), 5 deletions(-)
+ drivers/clk/qcom/clk-cpu-8996.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-index 230e9c8..632cb42 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2014-2016,2018 The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -17,5 +17,5 @@
- 
- / {
- 	model = "Qualcomm Technologies, Inc. DB820c";
--	compatible = "arrow,apq8096-db820c", "qcom,apq8096-sbc";
-+	compatible = "arrow,apq8096-db820c", "qcom,apq8096-sbc", "qcom,apq8096";
+diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
+index 42489f1..75bd014 100644
+--- a/drivers/clk/qcom/clk-cpu-8996.c
++++ b/drivers/clk/qcom/clk-cpu-8996.c
+@@ -140,10 +140,14 @@ struct clk_cpu_8996_mux {
+ 	u32	reg;
+ 	u32	shift;
+ 	u32	width;
++	struct notifier_block nb;
+ 	struct clk_hw	*pll;
+ 	struct clk_regmap clkr;
  };
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 492a011..930f68b 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2014-2016,2018 The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 4b2afcc..0359197 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -1,4 +1,4 @@
--/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
-+/* Copyright (c) 2014-2015,2018 The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -86,6 +86,8 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 0>;
-+			operating-points-v2 = <&cluster0_opp>;
- 			next-level-cache = <&L2_0>;
- 			L2_0: l2-cache {
- 			      compatible = "cache";
-@@ -98,6 +100,8 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 0>;
-+			operating-points-v2 = <&cluster0_opp>;
- 			next-level-cache = <&L2_0>;
- 		};
  
-@@ -106,6 +110,8 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 1>;
-+			operating-points-v2 = <&cluster1_opp>;
- 			next-level-cache = <&L2_1>;
- 			L2_1: l2-cache {
- 			      compatible = "cache";
-@@ -118,6 +124,8 @@
- 			compatible = "qcom,kryo";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			clocks = <&kryocc 1>;
-+			operating-points-v2 = <&cluster1_opp>;
- 			next-level-cache = <&L2_1>;
- 		};
++#define to_clk_cpu_8996_mux_nb(_nb) \
++	container_of(_nb, struct clk_cpu_8996_mux, nb)
++
+ static inline
+ struct clk_cpu_8996_mux *to_clk_cpu_8996_mux_hw(struct clk_hw *hw)
+ {
+@@ -194,6 +198,27 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	return 0;
+ }
  
-@@ -144,6 +152,182 @@
- 		};
- 	};
++int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
++			void *data)
++{
++	int ret;
++	struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_nb(nb);
++
++	switch (event) {
++	case PRE_RATE_CHANGE:
++		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
++		break;
++	case POST_RATE_CHANGE:
++		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, PLL_INDEX);
++		break;
++	default:
++		ret = 0;
++		break;
++	}
++
++	return notifier_from_errno(ret);
++};
++
+ const struct clk_ops clk_cpu_8996_mux_ops = {
+ 	.set_parent = clk_cpu_8996_mux_set_parent,
+ 	.get_parent = clk_cpu_8996_mux_get_parent,
+@@ -237,6 +262,7 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	.shift = 0,
+ 	.width = 2,
+ 	.pll = &pwrcl_pll.clkr.hw,
++	.nb.notifier_call = cpu_clk_notifier_cb,
+ 	.clkr.hw.init = &(struct clk_init_data) {
+ 		.name = "pwrcl_pmux",
+ 		.parent_names = (const char *[]){
+@@ -256,6 +282,7 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	.shift = 0,
+ 	.width = 2,
+ 	.pll = &perfcl_pll.clkr.hw,
++	.nb.notifier_call = cpu_clk_notifier_cb,
+ 	.clkr.hw.init = &(struct clk_init_data) {
+ 		.name = "perfcl_pmux",
+ 		.parent_names = (const char *[]){
+@@ -331,6 +358,14 @@ struct clk_hw_clks {
+ 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
+ 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
  
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
++	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
++	if (ret)
++		return ret;
 +
-+		opp at 307200000 {
-+			opp-hz = /bits/ 64 <  307200000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 422400000 {
-+			opp-hz = /bits/ 64 <  422400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 480000000 {
-+			opp-hz = /bits/ 64 <  480000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 556800000 {
-+			opp-hz = /bits/ 64 <  556800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 652800000 {
-+			opp-hz = /bits/ 64 <  652800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 729600000 {
-+			opp-hz = /bits/ 64 <  729600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 844800000 {
-+			opp-hz = /bits/ 64 <  844800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 960000000 {
-+			opp-hz = /bits/ 64 <  960000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1036800000 {
-+			opp-hz = /bits/ 64 < 1036800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1113600000 {
-+			opp-hz = /bits/ 64 < 1113600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1190400000 {
-+			opp-hz = /bits/ 64 < 1190400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1228800000 {
-+			opp-hz = /bits/ 64 < 1228800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1324800000 {
-+			opp-hz = /bits/ 64 < 1324800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1401600000 {
-+			opp-hz = /bits/ 64 < 1401600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1478400000 {
-+			opp-hz = /bits/ 64 < 1478400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1593600000 {
-+			opp-hz = /bits/ 64 < 1593600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+	};
++	ret = clk_notifier_register(perfcl_pmux.clkr.hw.clk, &perfcl_pmux.nb);
++	if (ret)
++		return ret;
 +
-+	cluster1_opp: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 307200000 {
-+			opp-hz = /bits/ 64 <  307200000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 403200000 {
-+			opp-hz = /bits/ 64 <  403200000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 480000000 {
-+			opp-hz = /bits/ 64 <  480000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 556800000 {
-+			opp-hz = /bits/ 64 <  556800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 652800000 {
-+			opp-hz = /bits/ 64 <  652800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 729600000 {
-+			opp-hz = /bits/ 64 <  729600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 806400000 {
-+			opp-hz = /bits/ 64 <  806400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 883200000 {
-+			opp-hz = /bits/ 64 <  883200000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 940800000 {
-+			opp-hz = /bits/ 64 <  940800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1036800000 {
-+			opp-hz = /bits/ 64 < 1036800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1113600000 {
-+			opp-hz = /bits/ 64 < 1113600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1190400000 {
-+			opp-hz = /bits/ 64 < 1190400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1248000000 {
-+			opp-hz = /bits/ 64 < 1248000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1324800000 {
-+			opp-hz = /bits/ 64 < 1324800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1401600000 {
-+			opp-hz = /bits/ 64 < 1401600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1478400000 {
-+			opp-hz = /bits/ 64 < 1478400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1552000000 {
-+			opp-hz = /bits/ 64 < 1552000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1632000000 {
-+			opp-hz = /bits/ 64 < 1632000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1708800000 {
-+			opp-hz = /bits/ 64 < 1708800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1785600000 {
-+			opp-hz = /bits/ 64 < 1785600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1824000000 {
-+			opp-hz = /bits/ 64 < 1824000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1920000000 {
-+			opp-hz = /bits/ 64 < 1920000000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 1996800000 {
-+			opp-hz = /bits/ 64 < 1996800000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 2073600000 {
-+			opp-hz = /bits/ 64 < 2073600000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+		opp at 2150400000 {
-+			opp-hz = /bits/ 64 < 2150400000 >;
-+			clock-latency-ns = <200000>;
-+		};
-+
-+	};
- 	thermal-zones {
- 		cpu-thermal0 {
- 			polling-delay-passive = <250>;
-@@ -403,7 +587,7 @@
- 		};
- 
- 		kryocc: clock-controller at 6400000 {
--			compatible = "qcom,apcc-msm8996";
-+			compatible = "qcom-msm8996-apcc";
- 			reg = <0x6400000 0x90000>;
- 			#clock-cells = <1>;
- 		};
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 3b585e4..b6cd0ae 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -95,6 +95,9 @@
- 	{ .compatible = "xlnx,zynq-7000", },
- 	{ .compatible = "xlnx,zynqmp", },
- 
-+	{ .compatible = "qcom,msm8996", },
-+	{ .compatible = "qcom,apq8096", },
-+
- 	{ }
- };
+ 	return ret;
+ }
  
 -- 
 1.9.1
