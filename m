@@ -1,48 +1,72 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 14 Feb 2018 12:08:56 +0200
-Subject: [PATCH v3 3/5] arm64: dts: renesas: r8a7795-es1: Fix register
- mappings on VSPs
-In-Reply-To: <1518602108-1724-4-git-send-email-kbingham@kernel.org>
-References: <1518602108-1724-1-git-send-email-kbingham@kernel.org>
- <1518602108-1724-4-git-send-email-kbingham@kernel.org>
-Message-ID: <2009459.7Q8ChOu4tJ@avalon>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 14 Feb 2018 11:04:37 +0100
+Subject: [RESEND PATCH v2 6/8] pwm: stm32: improve capture by tuning counter
+ prescaler
+In-Reply-To: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1518602679-3064-7-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
+Currently, capture is based on timeout window to configure prescaler.
+PWM capture framework provides 1s window at the time of writing.
 
-Thank you for the patch.
+There's place for improvement, after input signal has been captured once:
+- Finer tune counter clock prescaler, by using 1st capture result (with
+arbitrary margin).
+- Do a 2nd capture, with scaled capture window.
+This increases accuracy, especially at high rates.
 
-On Wednesday, 14 February 2018 11:55:06 EET Kieran Bingham wrote:
-> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> 
-> The VSPD includes a CLUT on RPF2. Ensure that the register space is
-> mapped correctly to support this.
-> 
-> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+Changes in v2:
+- Adopt DMA read from MFD core.
+---
+ drivers/pwm/pwm-stm32.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-> b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi index
-> ed553338b4d4..1adfe6cad268 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-> @@ -80,7 +80,7 @@
-> 
->  	vspd3: vsp at fea38000 {
->  		compatible = "renesas,vsp2";
-> -		reg = <0 0xfea38000 0 0x4000>;
-> +		reg = <0 0xfea38000 0 0x8000>;
->  		interrupts = <GIC_SPI 469 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&cpg CPG_MOD 620>;
->  		power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index f3a92fc..5dfb296 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -169,7 +169,7 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+ 	unsigned long long prd, div, dty;
+ 	unsigned long rate;
+-	unsigned int psc = 0;
++	unsigned int psc = 0, scale;
+ 	u32 raw_prd, raw_dty;
+ 	int ret = 0;
+ 
+@@ -220,6 +220,28 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	if (ret)
+ 		goto stop;
+ 
++	/*
++	 * Got a capture. Try to improve accuracy at high rates:
++	 * - decrease counter clock prescaler, scale up to max rate.
++	 */
++	if (raw_prd) {
++		u32 max_arr = priv->max_arr - 0x1000; /* arbitrary margin */
++
++		scale = max_arr / min(max_arr, raw_prd);
++	} else {
++		scale = priv->max_arr; /* bellow resolution, use max scale */
++	}
++
++	if (psc && scale > 1) {
++		/* 2nd measure with new scale */
++		psc /= scale;
++		regmap_write(priv->regmap, TIM_PSC, psc);
++		ret = stm32_pwm_raw_capture(priv, pwm, tmo_ms, &raw_prd,
++					    &raw_dty);
++		if (ret)
++			goto stop;
++	}
++
+ 	prd = (unsigned long long)raw_prd * (psc + 1) * NSEC_PER_SEC;
+ 	result->period = DIV_ROUND_UP_ULL(prd, rate);
+ 	dty = (unsigned long long)raw_dty * (psc + 1) * NSEC_PER_SEC;
 -- 
-Regards,
-
-Laurent Pinchart
+1.9.1
