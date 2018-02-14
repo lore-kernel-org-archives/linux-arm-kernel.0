@@ -1,104 +1,222 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Wed, 14 Feb 2018 15:59:47 +0200
-Subject: [PATCH v3 05/10] clk: qcom: cpu-8996: Add support to switch to
- alternate PLL
+Date: Wed, 14 Feb 2018 15:59:52 +0200
+Subject: [PATCH v3 10/10] DT: QCOM: Add thermal mitigation to msm8996
 In-Reply-To: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
 References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1518616792-29028-6-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1518616792-29028-11-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@codeaurora.org>
+Add thermal mitigation configuration to msm8996.
+With the cpufreq-dt OPP table the CPU frequency may be
+scaled and therefore throttled by the thermal config.
 
-Each of the CPU clusters on msm8996 and powered via a primary
-PLL and a secondary PLL. The primary PLL is what drivers the
-CPU clk, except for times when we are reprogramming the PLL
-itself, when we temporarily switch to an alternate PLL.
-Use clock rate change notifiers to support this.
-
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 ---
- drivers/clk/qcom/clk-cpu-8996.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 98 +++++++++++++++++++++++++++++++----
+ 1 file changed, 87 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index 42489f1..75bd014 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -140,10 +140,14 @@ struct clk_cpu_8996_mux {
- 	u32	reg;
- 	u32	shift;
- 	u32	width;
-+	struct notifier_block nb;
- 	struct clk_hw	*pll;
- 	struct clk_regmap clkr;
- };
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 0359197..1df5b6f 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/clock/qcom,gcc-msm8996.h>
+ #include <dt-bindings/clock/qcom,mmcc-msm8996.h>
+ #include <dt-bindings/clock/qcom,rpmcc.h>
++#include <dt-bindings/thermal/thermal.h>
  
-+#define to_clk_cpu_8996_mux_nb(_nb) \
-+	container_of(_nb, struct clk_cpu_8996_mux, nb)
-+
- static inline
- struct clk_cpu_8996_mux *to_clk_cpu_8996_mux_hw(struct clk_hw *hw)
- {
-@@ -194,6 +198,27 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
- 	return 0;
- }
+ / {
+ 	model = "Qualcomm Technologies, Inc. MSM8996";
+@@ -88,6 +89,10 @@
+ 			enable-method = "psci";
+ 			clocks = <&kryocc 0>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			/* cooling options */
++			cooling-min-level = <0>;
++			cooling-max-level = <15>;
++			#cooling-cells = <2>;
+ 			next-level-cache = <&L2_0>;
+ 			L2_0: l2-cache {
+ 			      compatible = "cache";
+@@ -102,6 +107,10 @@
+ 			enable-method = "psci";
+ 			clocks = <&kryocc 0>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			/* cooling options */
++			cooling-min-level = <0>;
++			cooling-max-level = <15>;
++			#cooling-cells = <2>;
+ 			next-level-cache = <&L2_0>;
+ 		};
  
-+int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
-+			void *data)
-+{
-+	int ret;
-+	struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_nb(nb);
-+
-+	switch (event) {
-+	case PRE_RATE_CHANGE:
-+		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
-+		break;
-+	case POST_RATE_CHANGE:
-+		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, PLL_INDEX);
-+		break;
-+	default:
-+		ret = 0;
-+		break;
-+	}
-+
-+	return notifier_from_errno(ret);
-+};
-+
- const struct clk_ops clk_cpu_8996_mux_ops = {
- 	.set_parent = clk_cpu_8996_mux_set_parent,
- 	.get_parent = clk_cpu_8996_mux_get_parent,
-@@ -237,6 +262,7 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &pwrcl_pll.clkr.hw,
-+	.nb.notifier_call = cpu_clk_notifier_cb,
- 	.clkr.hw.init = &(struct clk_init_data) {
- 		.name = "pwrcl_pmux",
- 		.parent_names = (const char *[]){
-@@ -256,6 +282,7 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &perfcl_pll.clkr.hw,
-+	.nb.notifier_call = cpu_clk_notifier_cb,
- 	.clkr.hw.init = &(struct clk_init_data) {
- 		.name = "perfcl_pmux",
- 		.parent_names = (const char *[]){
-@@ -331,6 +358,14 @@ struct clk_hw_clks {
- 	clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
- 	clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
+@@ -112,6 +121,10 @@
+ 			enable-method = "psci";
+ 			clocks = <&kryocc 1>;
+ 			operating-points-v2 = <&cluster1_opp>;
++			/* cooling options */
++			cooling-min-level = <0>;
++			cooling-max-level = <15>;
++			#cooling-cells = <2>;
+ 			next-level-cache = <&L2_1>;
+ 			L2_1: l2-cache {
+ 			      compatible = "cache";
+@@ -126,6 +139,10 @@
+ 			enable-method = "psci";
+ 			clocks = <&kryocc 1>;
+ 			operating-points-v2 = <&cluster1_opp>;
++			/* cooling options */
++			cooling-min-level = <0>;
++			cooling-max-level = <15>;
++			#cooling-cells = <2>;
+ 			next-level-cache = <&L2_1>;
+ 		};
  
-+	ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
-+	if (ret)
-+		return ret;
+@@ -336,18 +353,33 @@
+ 			thermal-sensors = <&tsens0 3>;
+ 
+ 			trips {
+-				cpu_alert0: trip0 {
++				cpu_alert0: cpu_alert0 {
+ 					temperature = <75000>;
+ 					hysteresis = <2000>;
++					type = "active";
++				};
++				cpu_warn0: cpu_warn0 {
++					temperature = <90000>;
++					hysteresis = <2000>;
+ 					type = "passive";
+ 				};
+-
+-				cpu_crit0: trip1 {
++				cpu_crit0: cpu_crit0 {
+ 					temperature = <110000>;
+ 					hysteresis = <2000>;
+ 					type = "critical";
+ 				};
+ 			};
 +
-+	ret = clk_notifier_register(perfcl_pmux.clkr.hw.clk, &perfcl_pmux.nb);
-+	if (ret)
-+		return ret;
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device = <&CPU0 THERMAL_NO_LIMIT 7>;
++				};
++				map1 {
++					trip = <&cpu_warn0>;
++					cooling-device = <&CPU0 8 THERMAL_NO_LIMIT>;
++				};
++			};
+ 		};
+ 
+ 		cpu-thermal1 {
+@@ -357,18 +389,33 @@
+ 			thermal-sensors = <&tsens0 5>;
+ 
+ 			trips {
+-				cpu_alert1: trip0 {
++				cpu_alert1: cpu_alert1 {
+ 					temperature = <75000>;
+ 					hysteresis = <2000>;
++					type = "active";
++				};
++				cpu_warn1: cpu_warn1 {
++					temperature = <90000>;
++					hysteresis = <2000>;
+ 					type = "passive";
+ 				};
+-
+-				cpu_crit1: trip1 {
++				cpu_crit1: cpu_crit1 {
+ 					temperature = <110000>;
+ 					hysteresis = <2000>;
+ 					type = "critical";
+ 				};
+ 			};
 +
- 	return ret;
- }
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert1>;
++					cooling-device = <&CPU0 THERMAL_NO_LIMIT 7>;
++				};
++				map1 {
++					trip = <&cpu_warn1>;
++					cooling-device = <&CPU0 8 THERMAL_NO_LIMIT>;
++				};
++			};
+ 		};
+ 
+ 		cpu-thermal2 {
+@@ -378,18 +425,32 @@
+ 			thermal-sensors = <&tsens0 8>;
+ 
+ 			trips {
+-				cpu_alert2: trip0 {
++				cpu_alert2: cpu_alert2 {
+ 					temperature = <75000>;
+ 					hysteresis = <2000>;
++					type = "active";
++				};
++				cpu_warn2: cpu_warn2 {
++					temperature = <90000>;
++					hysteresis = <2000>;
+ 					type = "passive";
+ 				};
+-
+-				cpu_crit2: trip1 {
++				cpu_crit2: cpu_crit2 {
+ 					temperature = <110000>;
+ 					hysteresis = <2000>;
+ 					type = "critical";
+ 				};
+ 			};
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert2>;
++					cooling-device = <&CPU2 THERMAL_NO_LIMIT 7>;
++				};
++				map1 {
++					trip = <&cpu_warn2>;
++					cooling-device = <&CPU2 8 THERMAL_NO_LIMIT>;
++				};
++			};
+ 		};
+ 
+ 		cpu-thermal3 {
+@@ -399,18 +460,33 @@
+ 			thermal-sensors = <&tsens0 10>;
+ 
+ 			trips {
+-				cpu_alert3: trip0 {
++				cpu_alert3: cpu_alert3 {
+ 					temperature = <75000>;
+ 					hysteresis = <2000>;
++					type = "active";
++				};
++				cpu_warn3: cpu_warn3 {
++					temperature = <90000>;
++					hysteresis = <2000>;
+ 					type = "passive";
+ 				};
+-
+ 				cpu_crit3: trip1 {
+ 					temperature = <110000>;
+ 					hysteresis = <2000>;
+ 					type = "critical";
+ 				};
+ 			};
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert3>;
++					cooling-device = <&CPU2 THERMAL_NO_LIMIT 7>;
++				};
++				map1 {
++					trip = <&cpu_warn3>;
++					cooling-device = <&CPU2 8 THERMAL_NO_LIMIT>;
++				};
++			};
+ 		};
+ 	};
  
 -- 
 1.9.1
