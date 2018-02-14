@@ -1,41 +1,36 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 14 Feb 2018 09:41:23 +0530
-Subject: [PATCH v7 3/9] arm: omap: Move dmtimer.h out of plat-omap
-In-Reply-To: <20180213150900.GD6364@atomide.com>
-References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
- <1515478987-5786-4-git-send-email-j-keerthy@ti.com>
- <1c9f5c72-f589-d7c7-399f-ef55ecb828a0@ti.com>
- <20180213150900.GD6364@atomide.com>
-Message-ID: <2f94e782-7925-e42d-d0e1-dbad92f69a83@ti.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 14 Feb 2018 12:31:48 +0800
+Subject: [nomadik:gemini-dir-685-rtl8366rb 2/7] ERROR: "of_irq_count"
+ [net/dsa/dsa_core.ko] undefined!
+Message-ID: <201802141246.IImDOB6W%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-rtl8366rb
+head:   7089cc0dd27d82e2ed9adaded66ffd8973017dd0
+commit: 8f6b1418ccd0f05ca0556a5bec68d05a4b638d7d [2/7] RFC: net/dsa: Allow DSA PHYs to define link IRQs
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        git checkout 8f6b1418ccd0f05ca0556a5bec68d05a4b638d7d
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All errors (new ones prefixed by >>):
 
-On Tuesday 13 February 2018 08:39 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [180213 02:07]:
->> On 01/09/2018 12:23 AM, J, KEERTHY wrote:
->>> The header file is currently under plat-omap directory
->>> under arch/omap. Move this out to an accessible place.
->>> @@ -18,7 +18,7 @@
->>>   #include <linux/platform_data/hsmmc-omap.h>
->>>   #include <linux/platform_data/spi-omap2-mcspi.h>
->>>   #include <linux/omap-dma.h>
->>> -#include <plat/dmtimer.h>
->>> +#include <clocksource/dmtimer.h>
->>
->> These headers are actually not needed in the first-place since we no
->> longer create any non-DT timer devices. I have submitted a series to
->> cleanup the presence of this header file, as part of a larger hwmod data
->> cleanup series.
-> 
-> OK great. Keerthy, care to take a look? Seems like it
-> simplifies things a bit.
+>> ERROR: "of_irq_count" [net/dsa/dsa_core.ko] undefined!
+   make[2]: *** [__modpost] Error 1
+   make[2]: Target '_modpost' not remade because of errors.
+   make[1]: *** [modules] Error 2
+   make[1]: Target '_all' not remade because of errors.
 
-Sure Tony. I will look into this.
-
-> 
-> Regards,
-> 
-> Tony
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63077 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/35875292/attachment-0001.gz>
