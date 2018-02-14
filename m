@@ -1,91 +1,94 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 14 Feb 2018 12:05:41 +0100
-Subject: [PATCH v5 0/7] ARM: stm32: add initial STM32MPU support
-In-Reply-To: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
-References: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <fa1d8118-6879-a984-4cd9-0e0da98c467b@st.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 14 Feb 2018 12:06:27 +0100
+Subject: [PATCH v2 2/2] arm64: dts: marvell: mcbin: enable uart headers
+In-Reply-To: <b4dc178abd765426e0d0e3aa3be9d8ac7d1301d6.1517381798.git.baruch@tkos.co.il>
+ (Baruch Siach's message of "Wed, 31 Jan 2018 08:56:38 +0200")
+References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
+ <b4dc178abd765426e0d0e3aa3be9d8ac7d1301d6.1517381798.git.baruch@tkos.co.il>
+Message-ID: <87k1vfomoc.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Baruch,
+ 
+ On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 
-On 01/16/2018 03:56 PM, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This patch series extends the existing STM32 microcontrollers (MCUs)
-> family to microprocessors (MPUs). The MPU platform (based on
-> Arm Cortex-A) is a continuation of the MCU one (based on Arm
-> Cortex-M) in that it shares a wide number of hardware blocks.
-> 
-> change v5:
-> -fix serial3 aliases by serial0
->   
-> change v4:
-> -Add all available uarts in stm32mp157c
-> -Move uart aliases to board files
-> 
-> change v3:
-> -Remove bootargs
-> -Remove armv7m_restart and Share stm32_compat for mcu/mpu
-> -Modify stm32 kconfig with Arnd template
-> -Remove patch below (Linus W: Patch applied)
->   devicetree: bindings: Document supported STM32 SoC family
->   pinctrl: stm32: Add STM32MP157 MPU support
-> 
-> change V2:
-> -Add stm32 documentation in this serie to avoid merge conflict
-> thread: "https://patchwork.kernel.org/patch/10102573/";
-> -Split bindings (stm32.txt) to separate patches.
-> -Remove ARCH_STM32_MCU/MPU flags
-> -Adopt rst format for Documentation/arm/stm32 files
-> -s/STMicrolectronics/STMicroelectronics/g
->  > Ludovic Barre (7):
->    Documentation: arm: stm32: move to rst format
->    ARM: stm32: prepare stm32 family to welcome armv7 architecture
->    dt-bindings: stm32: add support of STM32MP157
->    ARM: stm32: add initial support for STM32MP157
->    ARM: configs: multi_v7: add stm32 support
->    ARM: dts: stm32: add stm32mp157c initial support
->    ARM: dts: stm32: add initial support of stm32mp157c eval board
+> Add description of the J25 and J27 UART headers of the Macchiatobin. They use
+> uart peripherals that the CP0 (J25) and CP1 (J27) provide.
 >
-I will merge stm32 DT patches and mach-stm32 patches in my next pull 
-requests.
-What about Documentation patch and multi-v7 config patch ?
-(I could add Documentation patch in my DT pull request)
+> Even though J25 and J27 are labeled as UART header, the pins on these headers
+> can be muxed for other purposes. But the UART functionality is useful when the
+> board is mounted in an ATX style enclosure, since the console UART is not
+> accessible through the microUSB at CON9.
+>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-Regards
-Alex
+Applied on mvebu/dt64
 
->   Documentation/arm/stm32/overview.rst            |  34 +++++
->   Documentation/arm/stm32/overview.txt            |  33 ----
->   Documentation/arm/stm32/stm32f429-overview.rst  |  26 ++++
->   Documentation/arm/stm32/stm32f429-overview.txt  |  22 ---
->   Documentation/arm/stm32/stm32f746-overview.rst  |  33 ++++
->   Documentation/arm/stm32/stm32f746-overview.txt  |  34 -----
->   Documentation/arm/stm32/stm32h743-overview.rst  |  34 +++++
->   Documentation/arm/stm32/stm32h743-overview.txt  |  30 ----
->   Documentation/arm/stm32/stm32mp157-overview.rst |  19 +++
->   Documentation/devicetree/bindings/arm/stm32.txt |   1 +
->   arch/arm/boot/dts/Makefile                      |   6 +-
->   arch/arm/boot/dts/stm32mp157-pinctrl.dtsi       | 185 ++++++++++++++++++++++
->   arch/arm/boot/dts/stm32mp157c-ed1.dts           |  32 ++++
->   arch/arm/boot/dts/stm32mp157c-ev1.dts           |  21 +++
->   arch/arm/boot/dts/stm32mp157c.dtsi              | 194 ++++++++++++++++++++++++
->   arch/arm/configs/multi_v7_defconfig             |   3 +
->   arch/arm/mach-stm32/Kconfig                     |  38 +++--
->   arch/arm/mach-stm32/board-dt.c                  |   5 +-
->   18 files changed, 614 insertions(+), 136 deletions(-)
->   create mode 100644 Documentation/arm/stm32/overview.rst
->   delete mode 100644 Documentation/arm/stm32/overview.txt
->   create mode 100644 Documentation/arm/stm32/stm32f429-overview.rst
->   delete mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
->   create mode 100644 Documentation/arm/stm32/stm32f746-overview.rst
->   delete mode 100644 Documentation/arm/stm32/stm32f746-overview.txt
->   create mode 100644 Documentation/arm/stm32/stm32h743-overview.rst
->   delete mode 100644 Documentation/arm/stm32/stm32h743-overview.txt
->   create mode 100644 Documentation/arm/stm32/stm32mp157-overview.rst
->   create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
->   create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
->   create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
->   create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
-> 
+Thanks,
+
+Gregory
+
+> ---
+> v2:
+>   Add comments to indicate the headers board labels (Thomas)
+>   Explain in the commit log why we want the UART functionality (RMK)
+> ---
+>  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> index 626e9d0462c3..122d2257ebc4 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
+> @@ -163,6 +163,13 @@
+>  	};
+>  };
+>  
+> +/* J25 UART header */
+> +&cp0_uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&cp0_uart1_pins>;
+> +	status = "okay";
+> +};
+> +
+>  &cp0_mdio {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&cp0_ge_mdio_pins>;
+> @@ -195,6 +202,10 @@
+>  		marvell,pins = "mpp37", "mpp38";
+>  		marvell,function = "i2c0";
+>  	};
+> +	cp0_uart1_pins: uart1-pins {
+> +		marvell,pins = "mpp40", "mpp41";
+> +		marvell,function = "uart1";
+> +	};
+>  	cp0_xhci_vbus_pins: xhci0-vbus-pins {
+>  		marvell,pins = "mpp47";
+>  		marvell,function = "gpio";
+> @@ -290,6 +301,17 @@
+>  		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
+>  		marvell,function = "spi1";
+>  	};
+> +	cp1_uart0_pins: uart0-pins {
+> +		marvell,pins = "mpp6", "mpp7";
+> +		marvell,function = "uart0";
+> +	};
+> +};
+> +
+> +/* J27 UART header */
+> +&cp1_uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&cp1_uart0_pins>;
+> +	status = "okay";
+>  };
+>  
+>  &cp1_sata0 {
+> -- 
+> 2.15.1
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
