@@ -1,77 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Feb 2018 10:07:14 -0800
-Subject: [PATCH 1/9] dmaengine: omap-dma: include header for bool type
-In-Reply-To: <20180213013243.8378-2-s-anna@ti.com>
-References: <20180213013243.8378-1-s-anna@ti.com>
- <20180213013243.8378-2-s-anna@ti.com>
-Message-ID: <20180214180714.GQ6364@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Feb 2018 18:22:13 +0000
+Subject: [PATCHv2 7/8] arm_pmu: note IRQs and PMUs per-cpu
+In-Reply-To: <20180214132640.GG2992@arm.com>
+References: <20180205164202.26502-1-mark.rutland@arm.com>
+ <20180205164202.26502-8-mark.rutland@arm.com>
+ <20180214131141.GF2992@arm.com>
+ <20180214132416.hragqjcsrvzes5jp@lakrids.cambridge.arm.com>
+ <20180214132640.GG2992@arm.com>
+Message-ID: <20180214182146.3aqoaz4jvkenjbge@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [180213 01:33]:
-> The omap-dmaengine.h header file uses a bool type, so include
-> the linux types.h header file so that it is self-contained.
-> The lack of this header caused some build errors while cleaning
-> up some header files from various omap_hwmod data files.
+On Wed, Feb 14, 2018 at 01:26:41PM +0000, Will Deacon wrote:
+> On Wed, Feb 14, 2018 at 01:24:17PM +0000, Mark Rutland wrote:
+> > On Wed, Feb 14, 2018 at 01:11:41PM +0000, Will Deacon wrote:
+> > > On Mon, Feb 05, 2018 at 04:42:01PM +0000, Mark Rutland wrote:
+> > > > @@ -560,16 +577,16 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+> > > >  
+> > > >  		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+> > > >  		err = request_irq(irq, handler, irq_flags, "arm-pmu",
+> > > > -				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+> > > > -	} else if (cpumask_empty(&armpmu->active_irqs)) {
+> > > > +				  NULL);
+> > > > +	} else if (armpmu_count_irq_users(irq) == 0) {
+> > > >  		err = request_percpu_irq(irq, handler, "arm-pmu",
+> > > > -					 &hw_events->percpu_pmu);
+> > > > +					 cpu_armpmu);
+> > > 
+> > > This should be &cpu_armpmu.
+> > 
+> > I'm not sure that's the case, given the way we statically define
+> > cpu_armpmu, but I'll try to figure that out.
+> 
+> Well that's what you pass to free_percpu_irq :p
 
-Let's rather include types.h directly. Here's a patch
-that replaces your first two patches.
+Ugh; the mismatch is clearly a bug...
 
-Regards,
+> > > Would it be possible to pass &cpu_armpmu as the devid even in the normal
+> > > request_irq case and have the dispatcher just pass it through to the
+> > > underlying handler, rather than access cpu_armpmu directly?
+> > 
+> > Do you mean so that the dispatcher takes a struct arm_pmu ** in all
+> > cases?
+> 
+> Yes.
 
-Tony
+Done, and pushed out to my arm64/acpi-pmu-lockdep branch.
 
-8< --------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 14 Feb 2018 09:35:20 -0800
-Subject: [PATCH] ARM: OMAP2+: Include types.h directly for hwmod data
+Let me know if you want me to repost the series.
 
-This is needed in preparation for dropping some unused
-headers that indirectly include types.h.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 2 ++
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 2 ++
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c              | 2 ++
- 3 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -9,6 +9,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/types.h>
-+
- #include <linux/platform_data/gpio-omap.h>
- #include <linux/omap-dma.h>
- #include <plat/dmtimer.h>
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -14,6 +14,8 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/types.h>
-+
- #include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
-diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
---- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -15,6 +15,8 @@
-  *
-  */
- 
-+#include <linux/types.h>
-+
- #include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/hsmmc-omap.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
--- 
-2.16.1
+Mark.
