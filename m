@@ -1,21 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 14 Feb 2018 15:58:31 +0100
-Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
-In-Reply-To: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
-References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
-Message-ID: <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 14 Feb 2018 15:58:55 +0100
+Subject: [PATCH] amlogic: meson-gx-socinfo: Update soc ids
+Message-ID: <1518620335-17716-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Updates the Amlogic Meson SoCs IDs for the Armv8 based SoCs.
+It includes the new families and packages.
 
-Am 14.02.2018 um 15:38 schrieb Michal Suchanek:
-> The bcm2835 mmc host tends to lock up for unknown reason so reset it on
-> timeout. The upper mmc block layer tries retransimitting with single
-> blocks which tends to work out after a long wait.
->
-> This is better than giving up and leaving the machine broken for no
-> obvious reason.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/soc/amlogic/meson-gx-socinfo.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-could you please provide more information about this issue (affected
-hardware, kernel config, version, dmesg, reproducible scenario)?
+diff --git a/drivers/soc/amlogic/meson-gx-socinfo.c b/drivers/soc/amlogic/meson-gx-socinfo.c
+index f2d8c3c..a7efe30 100644
+--- a/drivers/soc/amlogic/meson-gx-socinfo.c
++++ b/drivers/soc/amlogic/meson-gx-socinfo.c
+@@ -33,6 +33,10 @@ static const struct meson_gx_soc_id {
+ 	{ "GXL", 0x21 },
+ 	{ "GXM", 0x22 },
+ 	{ "TXL", 0x23 },
++	{ "TXLX", 0x24 },
++	{ "AXG", 0x25 },
++	{ "GXLX", 0x26 },
++	{ "TXHD", 0x27 },
+ };
+ 
+ static const struct meson_gx_package_id {
+@@ -47,6 +51,10 @@ static const struct meson_gx_package_id {
+ 	{ "S905L", 0x21, 0xc0 },
+ 	{ "S905M2", 0x21, 0xe0 },
+ 	{ "S912", 0x22, 0 },
++	{ "962X", 0x24, 0x10 },
++	{ "962E", 0x24, 0x20 },
++	{ "A113X", 0x25, 0x37 },
++	{ "A113D", 0x25, 0xd0 },
+ };
+ 
+ static inline unsigned int socinfo_to_major(u32 socinfo)
+-- 
+2.7.4
