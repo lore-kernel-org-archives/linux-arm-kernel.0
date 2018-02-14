@@ -1,54 +1,44 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 14 Feb 2018 11:46:08 +0100
-Subject: [PATCH] arm64: dts: marvell: mcbin: fix board name typo
-In-Reply-To: <19520b813a8f8f9ac3d8cbd777a955c8cd6eccdf.1517382055.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Wed, 31 Jan 2018 09:00:55 +0200")
-References: <19520b813a8f8f9ac3d8cbd777a955c8cd6eccdf.1517382055.git.baruch@tkos.co.il>
-Message-ID: <87r2pnonm7.fsf@bootlin.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 14 Feb 2018 11:52:06 +0100
+Subject: [PATCHv2] arm64/kvm: Prohibit guest LOR accesses
+In-Reply-To: <20180213133923.40002-1-mark.rutland@arm.com>
+References: <20180213133923.40002-1-mark.rutland@arm.com>
+Message-ID: <20180214105206.GM23189@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
- 
- On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+On Tue, Feb 13, 2018 at 01:39:23PM +0000, Mark Rutland wrote:
+> We don't currently limit guest accesses to the LOR registers, which we
+> neither virtualize nor context-switch. As such, guests are provided with
+> unusable information/controls, and are not isolated from each other (or
+> the host).
+> 
+> To prevent these issues, we can trap register accesses and present the
+> illusion LORegions are unssupported by the CPU. To do this, we mask
+> ID_AA64MMFR1.LO, and set HCR_EL2.TLOR to trap accesses to the following
+> registers:
+> 
+> * LORC_EL1
+> * LOREA_EL1
+> * LORID_EL1
+> * LORN_EL1
+> * LORSA_EL1
+> 
+> ... when trapped, we inject an UNDEFINED exception to EL1, simulating
+> their non-existence.
+> 
+> As noted in D7.2.67, when no LORegions are implemented, LoadLOAcquire
+> and StoreLORelease must behave as LoadAcquire and StoreRelease
+> respectively. We can ensure this by clearing LORC_EL1.EN when a CPU's
+> EL2 is first initialized, as the host kernel will not modify this.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Vladimir Murzin <vladimir.murzin@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-
-Applied on mvebu/dt64, I also add the following commit log to avoid
-having an empty one:
-
-"A 'C' was missing in the model name, this patch fixes it."
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> index 122d2257ebc4..787bc6c44e2d 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> @@ -49,7 +49,7 @@
->  #include <dt-bindings/gpio/gpio.h>
->  
->  / {
-> -	model = "Marvell 8040 MACHIATOBin";
-> +	model = "Marvell 8040 MACCHIATOBin";
->  	compatible = "marvell,armada8040-mcbin", "marvell,armada8040",
->  			"marvell,armada-ap806-quad", "marvell,armada-ap806";
->  
-> -- 
-> 2.15.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Applied, thanks.
+-Christoffer
