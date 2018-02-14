@@ -1,31 +1,47 @@
-From: d.schultz@phytec.de (Daniel Schultz)
-Date: Wed, 14 Feb 2018 16:32:44 +0100
-Subject: [PATCH 1/3] ARM: dts: rockchip: phycore: Remove 1.8 GHz operation
- point
-In-Reply-To: <7871181.EPqc8gR4GV@diego>
-References: <1518515074-22526-1-git-send-email-d.schultz@phytec.de>
- <7871181.EPqc8gR4GV@diego>
-Message-ID: <a8de3d85-c4e6-eed6-d2e3-6d9b7318a9c2@phytec.de>
+From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
+Date: Wed, 14 Feb 2018 16:36:49 +0100
+Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
+In-Reply-To: <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
+References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
+Message-ID: <20180214163649.3a0c9476@kitsune.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 14 Feb 2018 15:58:31 +0100
+Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-On 02/14/2018 09:07 AM, Heiko St?bner wrote:
-> Am Dienstag, 13. Februar 2018, 10:44:32 CET schrieb Daniel Schultz:
->> Rockchip recommends to run the CPU cores only with operations points of
->> 1.6 GHz or lower.
->>
->> Removed the cpu0 node with too high operation points and use the default
->> values instead.
->>
->> Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
-> applied all 3 for 4.17
->
-Thanks! I think I should have mentioned this earlier, but can you please add
- ??? ARM: dts: rockchip: phycore: Remove 1.8 GHz operation point
-to the stable tree v4.14?
+> Hi Michal,
+> 
+> Am 14.02.2018 um 15:38 schrieb Michal Suchanek:
+> > The bcm2835 mmc host tends to lock up for unknown reason so reset
+> > it on timeout. The upper mmc block layer tries retransimitting with
+> > single blocks which tends to work out after a long wait.
+> >
+> > This is better than giving up and leaving the machine broken for no
+> > obvious reason.  
+> 
+> could you please provide more information about this issue (affected
+> hardware, kernel config, version, dmesg, reproducible scenario)?
+> 
 
--- 
-Mit freundlichen Gr??en,
-With best regards,
-   Daniel Schultz
+The RPi3 is known to not work with some SD cards. You can find some
+wiki pages with large tables of known-working and known-broken cards. I
+have a couple of RPi3 boards and a card that works and card that does
+not. I tried debugging the issue but did not find anything I can do
+about it - AFAICT the issue happens somewhere inside the MMC controller
+IP. 
+
+I have no inside knowledge of the controller in question but during
+testing I tried to reset the controller whenever the issue happens so I
+can continue running the test system for a longer time until it gets
+unusable. While I did not find any solution to the problem the
+workaround with resetting the controller works quite reliably for me.
+
+So I am posting it in the hope that people with the wrong combination
+of RPi3 and SD card will not get a blank screen but rather a system
+that boots but tends to lock up for half a minute occasionally.
+
+Thanks
+
+Michal
