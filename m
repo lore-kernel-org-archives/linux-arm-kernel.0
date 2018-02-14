@@ -1,77 +1,149 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Feb 2018 15:10:27 +0100
-Subject: [PATCH 12/15] ARM64: dts: r8a77965: Add GPIO nodes
-In-Reply-To: <1518515162-23663-13-git-send-email-jacopo+renesas@jmondi.org>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-13-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWptGc4hG4yufgbjnfu-4vyD8Hag-01FhWW_ubojXNHiQ@mail.gmail.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Wed, 14 Feb 2018 15:10:25 +0100
+Subject: [PATCH v2 2/2] arm: dts: sun6i: a31s: fix: bpi-m2: add missing
+ regulators
+In-Reply-To: <20180214141025.22171-1-embed3d@gmail.com>
+References: <20180214141025.22171-1-embed3d@gmail.com>
+Message-ID: <20180214141025.22171-3-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
-<jacopo+renesas@jmondi.org> wrote:
-> Add GPIO nodes to r8a77965 SoC device tree file.
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+This patch fixes a bootproblem with the Bananapi M2 board. Since there
+are some regulators missing we add them right now. Those values come
+from the schematic, below you can find a small overview:
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+* reg_aldo1:  3,3V, powers the wifi
+* reg_aldo2:  2,5V, powers the IO of the RTL8211E
+* reg_aldo3:  3,3V, powers the audio
 
-> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-> @@ -201,38 +201,6 @@
->                         #power-domain-cells = <1>;
->                 };
->
-> -               gpio0: gpio at e6050000 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio1: gpio at e6051000 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio2: gpio at e6052000 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio3: gpio at e6053000 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio4: gpio at e6054000 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio5: gpio at e6055000 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio6: gpio at e6055400 {
-> -                       /* placeholder */
-> -               };
-> -
-> -               gpio7: gpio at e6055800 {
-> -                       /* placeholder */
-> -               };
-> -
->                 intc_ex: interrupt-controller at e61c0000 {
->                         /* placeholder */
->                 };
-> @@ -339,6 +307,126 @@
->                         dma-channels = <16>;
->                 };
->
-> +               gpio0: gpio at e6050000 {
+* reg_dldo1:  3,0V, powers the RTL8211E
+* reg_dldo2:  2,8V, powers the analog part of the csi
+* reg_dldo3:  3,3V, powers misc
+* reg_eldo1:  1,8V, powers the csi
+* reg_ldo_io1:1,8V, powers the gpio
 
-Why have you moved them?
+* reg_dc5ldo: needs to be always on
 
-Gr{oetje,eeting}s,
+This patch updates also the vmmc-supply properties on the mmc0 and mmc2
+node to use the allready existent regulators.
+We can now remove the sunxi-common-regulators.dtsi include since we
+don't need it anymore.
 
-                        Geert
+Fixes: 7daa21370075 ("ARM: dts: sunxi: Add regulators for Sinovoip
+BPI-M2")
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 61 ++++++++++++++++++++++--
+ 1 file changed, 58 insertions(+), 3 deletions(-)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+index fb34f32502cf..b2758dd8ce43 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+@@ -42,7 +42,6 @@
+ 
+ /dts-v1/;
+ #include "sun6i-a31s.dtsi"
+-#include "sunxi-common-regulators.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+@@ -99,6 +98,7 @@
+ 	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
+ 	phy = <&phy1>;
+ 	phy-mode = "rgmii";
++	phy-supply = <&reg_dldo1>;
+ 	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
+ 	snps,reset-active-low;
+ 	snps,reset-delays-us = <0 10000 30000>;
+@@ -118,7 +118,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
+ 	cd-inverted;
+@@ -132,7 +132,7 @@
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins_a>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_aldo1>;
+ 	mmc-pwrseq = <&mmc2_pwrseq>;
+ 	bus-width = <4>;
+ 	non-removable;
+@@ -195,7 +195,28 @@
+ 
+ #include "axp22x.dtsi"
+ 
++&reg_aldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <2500000>;
++	regulator-max-microvolt = <2500000>;
++	regulator-name = "vcc-gmac";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
+ &reg_dc5ldo {
++	regulator-always-on;
+ 	regulator-min-microvolt = <700000>;
+ 	regulator-max-microvolt = <1320000>;
+ 	regulator-name = "vdd-cpus";
+@@ -235,6 +256,40 @@
+ 	regulator-name = "vcc-dram";
+ };
+ 
++&reg_dldo1 {
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-mac";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "avdd-csi";
++};
++
++&reg_dldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pb";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vdd-csi";
++	status = "okay";
++};
++
++&reg_ldo_io1 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-pm-cpus";
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.11.0
