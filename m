@@ -1,62 +1,48 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Wed, 14 Feb 2018 13:34:58 +0200
-Subject: [PATCH v2 6/7] arm64: tegra: Add Tegra194 chip device tree
-In-Reply-To: <458ba9f9-d703-9edf-8e7b-bc9d0f0ef0cc@arm.com>
-References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
- <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
- <458ba9f9-d703-9edf-8e7b-bc9d0f0ef0cc@arm.com>
-Message-ID: <d860ee1a-d69d-2d45-ce36-71f2b726ec3f@kapsi.fi>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Feb 2018 11:36:42 +0000
+Subject: [RFC PATCH v3 0/3] arm64/kernel: get rid of GCC large model code
+Message-ID: <20180214113645.16793-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.02.2018 12:21, Marc Zyngier wrote:
-> Hi Mikko,
->
-> On 06/02/18 07:22, Mikko Perttunen wrote:
->> Add the chip-level device tree, including binding headers, for the
->> NVIDIA Tegra194 "Xavier" system-on-chip. Only a small subset of devices
->> are initially available, enough to boot to UART console.
->>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->>  arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 342 +++++++++++++
->>  include/dt-bindings/clock/tegra194-clock.h     | 664 +++++++++++++++++++++++++
->>  include/dt-bindings/gpio/tegra194-gpio.h       |  59 +++
->>  include/dt-bindings/power/tegra194-powergate.h |  49 ++
->>  include/dt-bindings/reset/tegra194-reset.h     | 166 +++++++
->>  5 files changed, 1280 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
->>  create mode 100644 include/dt-bindings/clock/tegra194-clock.h
->>  create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
->>  create mode 100644 include/dt-bindings/power/tegra194-powergate.h
->>  create mode 100644 include/dt-bindings/reset/tegra194-reset.h
->>
->> diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
->> new file mode 100644
->> index 000000000000..dda28d758cab
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
->
-> [...]
->
->> +		gic: interrupt-controller at 3881000 {
->> +			compatible = "arm,gic-400";
->> +			#interrupt-cells = <3>;
->> +			interrupt-controller;
->> +			reg = <0x03881000 0x1000>,
->> +			      <0x03882000 0x2000>;
->
-> You're missing the GICH and GICV regions here.
->
->> +			interrupts = <GIC_PPI 9
->> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->> +			interrupt-parent = <&gic>;
->> +		};
-> Thanks,
->
-> 	M.
->
+Hi all,
 
-Thanks, fixed.
+I am resending this as an RFC, because I'd like to understand whether
+anyone else shares my concern, or whether I am being overly paranoid.
 
-Mikko
+v2 blurb:
+
+GCC's large model uses literal pools to emit cross object symbol
+references rather than movz/movk sequences, resulting in data items
+mixed in the with executable code in modules' .text segments, reducing
+cache utilization, but also potentially resulting in the creation of
+code gadgets that are exploitable under speculative execution.
+
+We are using GCC's large model for two separate reasons, both of which can
+be worked around rather easily:
+- KASLR uses it to move modules and the kernel very far apart, which is
+  not really needed,
+- the Cortex-A53 erratum code uses it to avoid ADRP instruction altogether,
+  which can be replaced by selective patching of only the ADRP instructions
+  that are affected by the erratum
+
+Ard Biesheuvel (3):
+  arm64/kernel: kaslr: reduce module randomization range to 4 GB
+  arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419
+  arm64/kernel: enable A53 erratum #8434319 handling at runtime
+
+ arch/arm64/Kconfig                  | 18 ++---
+ arch/arm64/Makefile                 |  5 --
+ arch/arm64/include/asm/cpucaps.h    |  3 +-
+ arch/arm64/include/asm/module.h     |  2 +
+ arch/arm64/kernel/cpu_errata.c      | 26 +++++++
+ arch/arm64/kernel/kaslr.c           | 20 +++--
+ arch/arm64/kernel/module-plts.c     | 77 +++++++++++++++++++-
+ arch/arm64/kernel/module.c          | 40 ++++++++--
+ arch/arm64/kernel/reloc_test_core.c |  4 +-
+ arch/arm64/kernel/reloc_test_syms.S | 12 ++-
+ include/linux/sizes.h               |  2 +
+ 11 files changed, 171 insertions(+), 38 deletions(-)
+
+-- 
+2.11.0
