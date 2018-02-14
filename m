@@ -1,108 +1,66 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 14 Feb 2018 10:51:01 +0530
-Subject: [PATCH v7 5/9] dmtimer: Add timer ops to the platform data
- structure
-In-Reply-To: <c7edf8b6-6b27-692a-813f-13c86f988831@ti.com>
-References: <1515478987-5786-1-git-send-email-j-keerthy@ti.com>
- <1515478987-5786-6-git-send-email-j-keerthy@ti.com>
- <c7edf8b6-6b27-692a-813f-13c86f988831@ti.com>
-Message-ID: <23a83979-e0d9-85b6-5a34-1c293362420e@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 14 Feb 2018 14:57:08 +0900
+Subject: [PATCH] drm: exynos: Use proper macro definition for
+ HDMI_I2S_PIN_SEL_1
+In-Reply-To: <20180205174212.10791-1-s.nawrocki@samsung.com>
+References: <CGME20180205174229epcas1p1e15e6f8ef5248ee28fa2e649faa8a866@epcas1p1.samsung.com>
+ <20180205174212.10791-1-s.nawrocki@samsung.com>
+Message-ID: <5A83CFB4.6000207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sylwester,
 
-
-On Tuesday 13 February 2018 08:16 AM, Suman Anna wrote:
-> On 01/09/2018 12:23 AM, J, KEERTHY wrote:
->> Add timer ops to the platform data structure
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->> Tested-by: Ladislav Michl <ladis@linux-mips.org>
->> ---
->>   include/linux/platform_data/dmtimer-omap.h | 38 ++++++++++++++++++++++++++++++
->>   1 file changed, 38 insertions(+)
->>
->> diff --git a/include/linux/platform_data/dmtimer-omap.h 
->> b/include/linux/platform_data/dmtimer-omap.h
->> index a19b78d..a3e1794 100644
->> --- a/include/linux/platform_data/dmtimer-omap.h
->> +++ b/include/linux/platform_data/dmtimer-omap.h
->> @@ -20,12 +20,50 @@
->>   #ifndef __PLATFORM_DATA_DMTIMER_OMAP_H__
->>   #define __PLATFORM_DATA_DMTIMER_OMAP_H__
->>
->> +struct omap_dm_timer_ops {
->> +       struct omap_dm_timer *(*request_by_node)(struct device_node *np);
->> +       struct omap_dm_timer *(*request_specific)(int timer_id);
->> +       struct omap_dm_timer *(*request)(void);
->> +
->> +       int     (*free)(struct omap_dm_timer *timer);
->> +
->> +       void    (*enable)(struct omap_dm_timer *timer);
->> +       void    (*disable)(struct omap_dm_timer *timer);
->> +
->> +       int     (*get_irq)(struct omap_dm_timer *timer);
->> +       int     (*set_int_enable)(struct omap_dm_timer *timer,
->> +                                 unsigned int value);
->> +       int     (*set_int_disable)(struct omap_dm_timer *timer, u32 mask);
->> +
->> +       struct clk *(*get_fclk)(struct omap_dm_timer *timer);
->> +
->> +       int     (*start)(struct omap_dm_timer *timer);
->> +       int     (*stop)(struct omap_dm_timer *timer);
->> +       int     (*set_source)(struct omap_dm_timer *timer, int source);
->> +
->> +       int     (*set_load)(struct omap_dm_timer *timer, int autoreload,
->> +                           unsigned int value);
->> +       int     (*set_match)(struct omap_dm_timer *timer, int enable,
->> +                            unsigned int match);
->> +       int     (*set_pwm)(struct omap_dm_timer *timer, int def_on,
->> +                          int toggle, int trigger);
->> +       int     (*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
->> +
->> +       unsigned int (*read_counter)(struct omap_dm_timer *timer);
->> +       int     (*write_counter)(struct omap_dm_timer *timer,
->> +                                unsigned int value);
->> +       unsigned int (*read_status)(struct omap_dm_timer *timer);
->> +       int     (*write_status)(struct omap_dm_timer *timer,
->> +                               unsigned int value);
->> +};
->> +
->>   struct dmtimer_platform_data {
->>           /* set_timer_src - Only used for OMAP1 devices */
->>           int (*set_timer_src)(struct platform_device *pdev, int source);
-> Have you looked into collapsing this into the set_source() option above
-> for OMAP1? Looks like the only reason the pdev is needed is for
-> retrieving the pdev id, which is also stored in the omap_dm_timer structure?
-
-I would prefer not to touch the mach-omap1 part as part of this
-migration series. I will revisit this once the migration is done.
-
+2018? 02? 06? 02:42? Sylwester Nawrocki ?(?) ? ?:
+> Bit field [2:0] of HDMI_I2S_PIN_SEL_1 corresponds to SDATA_0,
+> not SDATA_2. This patch removes redefinition of HDMI_I2S_SEL_DATA2
+> constant and adds missing HDMI_I2S_SEL_DATA0. There is no functional
+> change.
 > 
->>           u32 timer_capability;
->>           u32 timer_errata;
->>           int (*get_context_loss_count)(struct device *);
->> +       struct omap_dm_timer_ops *timer_ops;
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_hdmi.c | 7 +++++--
+>  drivers/gpu/drm/exynos/regs-hdmi.h   | 2 +-
+>  2 files changed, 6 insertions(+), 3 deletions(-)
 > 
-> Any reason why this is not a const? We don't expect this to change right.
+> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> index a4b75a46f946..abd84cbcf1c2 100644
+> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> @@ -1068,10 +1068,13 @@ static void hdmi_audio_config(struct hdmi_context *hdata)
+>  	/* Configuration I2S input ports. Configure I2S_PIN_SEL_0~4 */
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_0, HDMI_I2S_SEL_SCLK(5)
+>  			| HDMI_I2S_SEL_LRCK(6));
+> -	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(1)
+> -			| HDMI_I2S_SEL_SDATA2(4));
+> +
+> +	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(3)
 
-Yes this can be.
+Seems you fixed pin_sel_3 field value of I2S_PIN_SEL_1 register. According to datasheet, 0x3 should be set to this field to select SDATA_1 not 0x1.
+So could you update the description of this patch?
 
-> 
-> regards
-> Suman
-> 
->>   };
->>
->>   #endif /* __PLATFORM_DATA_DMTIMER_OMAP_H__ */
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+Thanks,
+Inki Dae
+
+> +			| HDMI_I2S_SEL_SDATA0(4));
+> +
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_2, HDMI_I2S_SEL_SDATA3(1)
+>  			| HDMI_I2S_SEL_SDATA2(2));
+> +
+>  	hdmi_reg_writeb(hdata, HDMI_I2S_PIN_SEL_3, HDMI_I2S_SEL_DSD(0));
+>  
+>  	/* I2S_CON_1 & 2 */
+> diff --git a/drivers/gpu/drm/exynos/regs-hdmi.h b/drivers/gpu/drm/exynos/regs-hdmi.h
+> index 04be0f7e8193..4420c203ac85 100644
+> --- a/drivers/gpu/drm/exynos/regs-hdmi.h
+> +++ b/drivers/gpu/drm/exynos/regs-hdmi.h
+> @@ -464,7 +464,7 @@
+>  
+>  /* I2S_PIN_SEL_1 */
+>  #define HDMI_I2S_SEL_SDATA1(x)		(((x) & 0x7) << 4)
+> -#define HDMI_I2S_SEL_SDATA2(x)		((x) & 0x7)
+> +#define HDMI_I2S_SEL_SDATA0(x)		((x) & 0x7)
+>  
+>  /* I2S_PIN_SEL_2 */
+>  #define HDMI_I2S_SEL_SDATA3(x)		(((x) & 0x7) << 4)
 > 
