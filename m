@@ -1,50 +1,120 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 14 Feb 2018 09:23:10 +0100
-Subject: [PATCH v2 0/8] Add support for PWM input capture on STM32
-In-Reply-To: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
-References: <1516979499-3665-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <5ade7f05-f5cc-e272-842c-22effa78b716@st.com>
+From: kieran.bingham@ideasonboard.com (Kieran Bingham)
+Date: Wed, 14 Feb 2018 08:39:19 +0000
+Subject: [PATCH v2 2/4] arm64: dts: renesas: r8a77995: add VSP instances
+In-Reply-To: <1667048.nVWrpUAVXQ@avalon>
+References: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
+ <1518550237-16753-3-git-send-email-kbingham@kernel.org>
+ <1667048.nVWrpUAVXQ@avalon>
+Message-ID: <10851181-b3b1-bb07-82e9-487ae51711ba@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2018 04:11 PM, Fabrice Gasnier wrote:
-> This series adds support for capture to stm32-pwm driver.
-> Capture is based on DMAs.
-> - First two patches are precursor patches
-> - Subsequent two patches add support for requesting DMAs to MFD core
-> - Next three patches add support for capture to stm32-pwm driver
-> - This has been tested on stm32429i-eval board.
+Hi Laurent,
+
+Thanks for the review,
+
+On 13/02/18 22:03, Laurent Pinchart wrote:
+> Hi Kieran,
 > 
-> ---
-> Changes in v2:
-> - Abstract DMA handling from child driver: move it to MFD core
-> - Rework pwm capture routines to adopt this change
-> - Comment on optional dma support, beautify DMAs probe
-
-Hi all,
-
-Gentle ping for v2 driver review since DT Bindings has been reviewed by
-Rob and the series by Benjamin.
-
-Many thanks in advance
-Regards
-Fabrice
-
+> Thank you for the patch.
 > 
-> Fabrice Gasnier (8):
->   pwm: stm32: fix, remove unused struct device
->   pwm: stm32: protect common prescaler for all channels
->   dt-bindings: mfd: stm32-timers: add support for dmas
->   mfd: stm32-timers: add support for dmas
->   pwm: stm32: add capture support
->   pwm: stm32: improve capture by tuning counter prescaler
->   pwm: stm32: use input prescaler to improve period capture
->   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> On Tuesday, 13 February 2018 21:30:35 EET Kieran Bingham wrote:
+>> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>>
+>> The r8a77995 has a VSPBS to support image processing such as blending of
+>> two input images, and has two VSPDs to handle display pipelines with a
+>> DU.
+>>
+>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>>
+>> ---
+>> v2:
+>>  - Fix VSPD register map size
+>>  - Squash VSPBS and VSPD patches together
+>>
+>>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 30 ++++++++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
+>> 196a917afea6..19bd8be9926a 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> @@ -692,6 +692,16 @@
+>>  			status = "disabled";
+>>  		};
+>>
+>> +		vspbs: vsp at fe960000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfe960000 0 0x4000>;
 > 
->  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
->  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
->  drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
->  drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
->  include/linux/mfd/stm32-timers.h                   |  39 +++
->  5 files changed, 547 insertions(+), 6 deletions(-)
+> The VSPBS also has OSD-CLUT support in its RPFs, so you need to extend the 
+> registers range too.
+> 
+
+Wait, but I already changed this ...
+
+</me checks tree>
+
+Yup - this change is already in my tree ... which means I must have made the
+change *after* calling git format-patch. Not helpful.
+
+Orz
+
+
+
+
+> Apart from that,
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+I'll collect the tag and repost, this time with the correctly updated version.
+
+(And I'll add in that missing vspd3 from the es1 tree too)
+
+
+>> +			interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 627>;
+>> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 627>;
+>> +			renesas,fcp = <&fcpvb0>;
+>> +		};
+>> +
+>>  		fcpvb0: fcp at fe96f000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfe96f000 0 0x200>;
+>> @@ -701,6 +711,16 @@
+>>  			iommus = <&ipmmu_vp0 5>;
+>>  		};
+>>
+>> +		vspd0: vsp at fea20000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfea20000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 623>;
+>> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 623>;
+>> +			renesas,fcp = <&fcpvd0>;
+>> +		};
+>> +
+>>  		fcpvd0: fcp at fea27000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfea27000 0 0x200>;
+>> @@ -710,6 +730,16 @@
+>>  			iommus = <&ipmmu_vi0 8>;
+>>  		};
+>>
+>> +		vspd1: vsp at fea80000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfea28000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 622>;
+>> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 622>;
+>> +			renesas,fcp = <&fcpvd1>;
+>> +		};
+>> +
+>>  		fcpvd1: fcp at fea2f000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfea2f000 0 0x200>;
 > 
