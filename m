@@ -1,63 +1,18 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Wed, 14 Feb 2018 17:54:47 +0100
-Subject: [PATCH v2 6/6] drm/rockchip: cdn-dp: remove the DP phy switch
-In-Reply-To: <20180214165447.12181-1-enric.balletbo@collabora.com>
-References: <20180214165447.12181-1-enric.balletbo@collabora.com>
-Message-ID: <20180214165447.12181-6-enric.balletbo@collabora.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Feb 2018 08:58:35 -0800
+Subject: [PATCHv2] nokia N9: Add support for magnetometer
+In-Reply-To: <20180103141248.GA18821@amd>
+References: <20180102131722.GA20706@amd>
+ <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
+ <20180103141248.GA18821@amd>
+Message-ID: <20180214165835.GJ6364@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Zhong <zyw@rock-chips.com>
+* Pavel Machek <pavel@ucw.cz> [180103 06:15]:
+> 
+> This adds dts support for magnetometer on Nokia N9.
 
-There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-only one PHY can connect to DP controller at one time, the other should
-be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-set this bit means enable PHY 1, clear this bit means enable PHY 0.
+Applying into omap-for-v4.17/dt thanks.
 
-If the board has 2 Type-C ports, the DP driver get the phy id from
-devm_of_phy_get_by_index, and then control this switch according to
-this id. But some others board only has one Type-C port, it may be PHY 0
-or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
-this switch to PHY driver, the PHY driver can distinguish between PHY 0
-and PHY 1, and then write the correct register bit.
-
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-Changes since v1:
-- This patch is new on these series and is related to [5/6] so I
-  included to this series. Like [5/6] the patch was send some time ago [1]
-  but got stuck, so it's also and attempt to revive it.
-
-[1] https://lkml.org/lkml/2017/2/10/74
-
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index ec999d9f15f6..c6fbdcd87c16 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -43,8 +43,6 @@
- #define GRF_SOC_CON9		0x6224
- #define DP_SEL_VOP_LIT		BIT(12)
- #define GRF_SOC_CON26		0x6268
--#define UPHY_SEL_BIT		3
--#define UPHY_SEL_MASK		BIT(19)
- #define DPTX_HPD_SEL		(3 << 12)
- #define DPTX_HPD_DEL		(2 << 12)
- #define DPTX_HPD_SEL_MASK	(3 << 28)
-@@ -394,11 +392,6 @@ static int cdn_dp_enable_phy(struct cdn_dp_device *dp, struct cdn_dp_port *port)
- 	union extcon_property_value property;
- 	int ret;
- 
--	ret = cdn_dp_grf_write(dp, GRF_SOC_CON26,
--			       (port->id << UPHY_SEL_BIT) | UPHY_SEL_MASK);
--	if (ret)
--		return ret;
--
- 	if (!port->phy_enabled) {
- 		ret = phy_power_on(port->phy);
- 		if (ret) {
--- 
-2.15.1
+Tony
