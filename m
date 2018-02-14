@@ -1,98 +1,63 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Wed, 14 Feb 2018 17:54:43 +0100
-Subject: [PATCH v2 2/6] dt-bindings: phy-rockchip-typec: deprecate some
- register properties.
+Date: Wed, 14 Feb 2018 17:54:47 +0100
+Subject: [PATCH v2 6/6] drm/rockchip: cdn-dp: remove the DP phy switch
 In-Reply-To: <20180214165447.12181-1-enric.balletbo@collabora.com>
 References: <20180214165447.12181-1-enric.balletbo@collabora.com>
-Message-ID: <20180214165447.12181-2-enric.balletbo@collabora.com>
+Message-ID: <20180214165447.12181-6-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As now the following register properties are in the driver, document as
-deprecated these properties and recommend to not use them on new bindings.
+From: Chris Zhong <zyw@rock-chips.com>
 
-The deprecated properties are:
+There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
+only one PHY can connect to DP controller at one time, the other should
+be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
+set this bit means enable PHY 1, clear this bit means enable PHY 0.
 
-- rockchip,typec-conn-dir : the register of type-c connector direction
-- rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2
-                           enable control.
-- rockchip,external-psm : the register of type-c phy external psm clock
-                          selection.
-- rockchip,pipe-status : the register of type-c phy pipe status.
+If the board has 2 Type-C ports, the DP driver get the phy id from
+devm_of_phy_get_by_index, and then control this switch according to
+this id. But some others board only has one Type-C port, it may be PHY 0
+or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
+this switch to PHY driver, the PHY driver can distinguish between PHY 0
+and PHY 1, and then write the correct register bit.
 
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 Changes since v1:
-- This patch is new on these series and is just a documentation update
-  due patch [1/6]
+- This patch is new on these series and is related to [5/6] so I
+  included to this series. Like [5/6] the patch was send some time ago [1]
+  but got stuck, so it's also and attempt to revive it.
 
- .../devicetree/bindings/phy/phy-rockchip-typec.txt | 33 +++++-----------------
- 1 file changed, 7 insertions(+), 26 deletions(-)
+[1] https://lkml.org/lkml/2017/2/10/74
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-index 6ea867e3176f..bc44d6abe283 100644
---- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-@@ -16,24 +16,6 @@ Required properties:
- 		 "uphy", "uphy-pipe", "uphy-tcphy"
-  - extcon : extcon specifier for the Power Delivery
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+index ec999d9f15f6..c6fbdcd87c16 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+@@ -43,8 +43,6 @@
+ #define GRF_SOC_CON9		0x6224
+ #define DP_SEL_VOP_LIT		BIT(12)
+ #define GRF_SOC_CON26		0x6268
+-#define UPHY_SEL_BIT		3
+-#define UPHY_SEL_MASK		BIT(19)
+ #define DPTX_HPD_SEL		(3 << 12)
+ #define DPTX_HPD_DEL		(2 << 12)
+ #define DPTX_HPD_SEL_MASK	(3 << 28)
+@@ -394,11 +392,6 @@ static int cdn_dp_enable_phy(struct cdn_dp_device *dp, struct cdn_dp_port *port)
+ 	union extcon_property_value property;
+ 	int ret;
  
--Note, there are 2 type-c phys for RK3399, and they are almost identical, except
--these registers(description below), every register node contains 3 sections:
--offset, enable bit, write mask bit.
-- - rockchip,typec-conn-dir : the register of type-c connector direction,
--   for type-c phy0, it must be <0xe580 0 16>;
--   for type-c phy1, it must be <0xe58c 0 16>;
-- - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
--   control.
--   for type-c phy0, it must be <0xe580 3 19>;
--   for type-c phy1, it must be <0xe58c 3 19>;
-- - rockchip,external-psm : the register of type-c phy external psm clock
--   selection.
--   for type-c phy0, it must be <0xe588 14 30>;
--   for type-c phy1, it must be <0xe594 14 30>;
-- - rockchip,pipe-status : the register of type-c phy pipe status.
--   for type-c phy0, it must be <0xe5c0 0 0>;
--   for type-c phy1, it must be <0xe5c0 16 16>;
+-	ret = cdn_dp_grf_write(dp, GRF_SOC_CON26,
+-			       (port->id << UPHY_SEL_BIT) | UPHY_SEL_MASK);
+-	if (ret)
+-		return ret;
 -
- Required nodes : a sub-node is required for each port the phy provides.
- 		 The sub-node name is used to identify dp or usb3 port,
- 		 and shall be the following entries:
-@@ -43,6 +25,13 @@ Required nodes : a sub-node is required for each port the phy provides.
- Required properties (port (child) node):
- - #phy-cells : must be 0, See ./phy-bindings.txt for details.
- 
-+Deprecated properties, do not use in new device tree sources, these
-+properties are now in the driver:
-+ - rockchip,typec-conn-dir
-+ - rockchip,usb3tousb2-en
-+ - rockchip,external-psm
-+ - rockchip,pipe-status
-+
- Example:
- 	tcphy0: phy at ff7c0000 {
- 		compatible = "rockchip,rk3399-typec-phy";
-@@ -58,10 +47,6 @@ Example:
- 			 <&cru SRST_UPHY0_PIPE_L00>,
- 			 <&cru SRST_P_UPHY0_TCPHY>;
- 		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
--		rockchip,typec-conn-dir = <0xe580 0 16>;
--		rockchip,usb3tousb2-en = <0xe580 3 19>;
--		rockchip,external-psm = <0xe588 14 30>;
--		rockchip,pipe-status = <0xe5c0 0 0>;
- 
- 		tcphy0_dp: dp-port {
- 			#phy-cells = <0>;
-@@ -86,10 +71,6 @@ Example:
- 			 <&cru SRST_UPHY1_PIPE_L00>,
- 			 <&cru SRST_P_UPHY1_TCPHY>;
- 		reset-names = "uphy", "uphy-pipe", "uphy-tcphy";
--		rockchip,typec-conn-dir = <0xe58c 0 16>;
--		rockchip,usb3tousb2-en = <0xe58c 3 19>;
--		rockchip,external-psm = <0xe594 14 30>;
--		rockchip,pipe-status = <0xe5c0 16 16>;
- 
- 		tcphy1_dp: dp-port {
- 			#phy-cells = <0>;
+ 	if (!port->phy_enabled) {
+ 		ret = phy_power_on(port->phy);
+ 		if (ret) {
 -- 
 2.15.1
