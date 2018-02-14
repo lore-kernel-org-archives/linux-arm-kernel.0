@@ -1,45 +1,35 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 14 Feb 2018 09:38:54 +0000
-Subject: Support for Cortex R4
-In-Reply-To: <CAH9_wRNzj2=pYzhPkGo-cs+UBkgeKE_ieS6oKM_pt22dTxEy9g@mail.gmail.com>
-References: <CAH9_wRNzj2=pYzhPkGo-cs+UBkgeKE_ieS6oKM_pt22dTxEy9g@mail.gmail.com>
-Message-ID: <15aa2e42-6ef2-850c-2a77-966e3455e18f@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 Feb 2018 10:53:14 +0100
+Subject: [PATCH v2 08/16] mmc: sdhci-omap: Add support to override f_max
+ and iodelay from pdata
+In-Reply-To: <20180205125029.21570-9-kishon@ti.com>
+References: <20180205125029.21570-1-kishon@ti.com>
+ <20180205125029.21570-9-kishon@ti.com>
+Message-ID: <CAPDyKFrhpry40TCjmQ_-WO-EWa2BCL0eNXLZB_UobGaYbsBiHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 5 February 2018 at 13:50, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> DRA74x EVM Rev H EVM comes with revision 2.0 silicon. However, earlier
+> versions of EVM can come with either revision 1.1 or revision 1.0 of
+> silicon.
+>
+> The device-tree file is written to support rev 2.0 of silicon.
+> pdata-quirks are used to then override the settings needed for
+> PG 1.1 silicon.
+>
+> PG 1.1 silicon has limitations w.r.t frequencies at which MMC1/2/3
+> can operate as well as different IOdelay numbers.
 
-On 12/02/18 09:37, Sriram V wrote:
-> Hello,
-> 
-> We are planning to use BCM43907 which has 320MHZ ARM Cortex R4.  This
-> is without MMU.
+I fail to understand the need for platform data. Why can't DT be used
+for the older revisions as well?
 
-Interesting...
+>
+> Add support in sdhci-omap driver to get platform data if available
+> (added using pdata quirks) and override the data (max-frequency and
+> iodelay data) obtained from device tree.
 
-> 
-> I wanted to check the extent of support in Linux Kernel for Arm-Cortex R4?
-> 
-> Does the mainline kernel support boot on ARM-Cortex R4?
+[...]
 
-I run Linux on Cortex-R7/R8 (SMP and UP configurations) models and I do not
-see reasons why it cannot be done for Cortex-R4.
-
-Just bear in mind that Cortex-R is ARMv7, so while defining your board config
-select CPU_V7.
-
-Cheers
-Vladimir
-
-> 
-> 
-> Thanks for your help.
-> 
-> Regards,
-> Sriram
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Kind regards
+Uffe
