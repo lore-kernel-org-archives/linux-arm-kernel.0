@@ -1,107 +1,48 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 14 Feb 2018 13:39:40 +0530
-Subject: [PATCH v3 2/3] arm64: dts: sdm845: Add minimal dts files for
- sdm845 SoC/MTP
-In-Reply-To: <CAD=FV=UQ4YD7M8pqReBwE2etUbhuewye0akp0P9SuTnjwLgL4w@mail.gmail.com>
-References: <20180212062832.2791-1-rnayak@codeaurora.org>
- <20180212062832.2791-3-rnayak@codeaurora.org>
- <CAD=FV=UQ4YD7M8pqReBwE2etUbhuewye0akp0P9SuTnjwLgL4w@mail.gmail.com>
-Message-ID: <2b726c57-3e7c-8406-bb49-3bd56193e009@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 14 Feb 2018 09:09:48 +0100
+Subject: [PATCH] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
+In-Reply-To: <20180214055800.od5yhgo753522yah@katana>
+References: <20180213232812.31408-1-marek.vasut+renesas@gmail.com>
+ <20180214055800.od5yhgo753522yah@katana>
+Message-ID: <CAMuHMdU3opUTcOY-UeH4ArB+50_drPhGSoxP-m85p9V36fvTHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]..
+On Wed, Feb 14, 2018 at 6:58 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> - * The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
+>> - * da9210 regulators.  Both regulators have their interrupt request lines tied
+>> - * to the same interrupt pin (IRQ2) on the SoC.
+>> + * The r8a7790/lager,stout and r8a7791/koelsch development boards have da9063
+>> + * and da9210 regulators.  Both regulators have their interrupt request lines
+>> + * tied to the same interrupt pin (IRQ2) on the SoC.
+>
+> I think listing the boards here doesn't scale well. Gose is already
+> missing. How about rephrasing the paragraph to something like "Some Gen2
+> development boards have..."?
 
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->> new file mode 100644
->> index 000000000000..617c7bb25fb1
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->> @@ -0,0 +1,13 @@
->> +// SPDX-License-Identifier: GPL-2.0
-> 
-> It would, of course, be up to Qualcomm.  ...but might I suggest instead:
-> 
-> // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> 
-> The device tree files really don't have any special secret sauce in
-> them and IIRC allowing them to have a more permissive MIT license _or_
-> a GPL allowed people to run other operating systems on these boards.
-> This kind of thing is better to fix now so we don't have to go and get
-> everyone's permission later on.
++1
 
-sure, sounds reasonable, but I am told I need to get this reviewed once
-by qualcomm legal before we go ahead and use the dual licensing copyright.
-I will update based on what I hear.
+>>   *
+>>   * After cold boot or da9063-induced restart, both the da9063 and da9210 seem
+>>   * to assert their interrupt request lines.  Hence as soon as one driver
+>> @@ -118,6 +118,7 @@ static int __init rcar_gen2_regulator_quirk(void)
+>>
+>>       if (!of_machine_is_compatible("renesas,koelsch") &&
+>>           !of_machine_is_compatible("renesas,lager") &&
+>> +         !of_machine_is_compatible("renesas,stout") &&
+>>           !of_machine_is_compatible("renesas,gose"))
+>>               return -ENODEV;
 
-[]..
-> 
->> +/*
->> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
->> + */
-> 
-> IMHO add an extra line to this comment with a description to avoid the
-> bike shedding of how we're supposed to do 1-line comments in device
-> tree files.  AKA:
-> 
-> /*
->  * SDM845 MTP board device tree source
->  *
->  * Copyright (c) 2018, The Linux Foundation. All rights reserved.
->  */
+Have we reached critical mass to start using array-based matching with
+of_device_compatible_match()?
 
-sure will update.
+Gr{oetje,eeting}s,
 
-> 
-> 
->> +
->> +/dts-v1/;
->> +
->> +#include "sdm845.dtsi"
->> +
->> +/ {
->> +       model = "Qualcomm Technologies, Inc. SDM845 MTP";
->> +       compatible = "qcom,sdm845-mtp";
-> 
-> For me checkpatch complains about this.  It looks like the file
-> "Documentation/devicetree/bindings/arm/qcom.txt" needs to be updated
-> with "sdm845".  I don't think that will make checkpatch be quiet
-> (since  that file doesn't have a full list of every board), but it
-> still should be the correct thing to do.
+                        Geert
 
-sure, I missed updating it, will fix.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> 
-> 
->> +};
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> new file mode 100644
->> index 000000000000..55a7e0b454e1
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> @@ -0,0 +1,275 @@
->> +// SPDX-License-Identifier: GPL-2.0
-> 
-> As per above, suggest dual licensed?
-> 
-> 
->> +/*
->> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> 
-> As per above, suggest adding an extra line to avoid the bikeshed.
-> 
-> SDM845 SoC device tree source
-> 
-> 
-> Besides those things, everything looks good as far as I can see.  I'm
-> not an expert on every one of the devices used in this file, but
-> reading through bindings docs and looking at other users of them, it
-> looks sane enough.  Thus, with the above nits fixed you can feel free
-> to add my Reviewed-by.
-
-Thanks, the only thing I need to wait for before I respin this is to
-get a go ahead from legal for the dual licensing copyright header.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
