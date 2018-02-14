@@ -1,84 +1,157 @@
-From: anders.roxell@linaro.org (Anders Roxell)
-Date: Wed, 14 Feb 2018 21:46:35 +0100
-Subject: [PATCHv2] arch/arm/Kconfig: default ARM_MODULE_PLTS to 'y'
-In-Reply-To: <20180131202506.GI9418@n2100.armlinux.org.uk>
-References: <20180129234900.11121-1-anders.roxell@linaro.org>
- <20180131201911.19253-1-anders.roxell@linaro.org>
- <20180131202506.GI9418@n2100.armlinux.org.uk>
-Message-ID: <CADYN=9L2-yaOvxp8j23O9Sp15mgFZrPUsEZBOWi=UngYyXNJpQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Feb 2018 21:08:19 +0000
+Subject: [PATCH v3 09/41] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20180214173811.GO23189@cbox>
+References: <20180112120747.27999-10-christoffer.dall@linaro.org>
+ <20180122173326.GO22781@e103592.cambridge.arm.com>
+ <20180125194653.GR21802@cbox>
+ <20180207164955.GT5862@e103592.cambridge.arm.com>
+ <20180207175644.GF29286@cbox>
+ <20180209155930.GD5862@e103592.cambridge.arm.com>
+ <20180213085130.GB23189@cbox>
+ <20180213140843.GN5862@e103592.cambridge.arm.com>
+ <20180214101554.GL23189@cbox>
+ <20180214144242.GA11748@e103592.cambridge.arm.com>
+ <20180214173811.GO23189@cbox>
+Message-ID: <86inaz5lfg.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2018 at 21:25, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jan 31, 2018 at 09:19:11PM +0100, Anders Roxell wrote:
->> While testing multi_v7_defconfig with LOCKDEP enabled, the kernel
->> fails to load simple modules, as reported by kselftest:
->>
->> [   34.107620] test_printf: section 4 reloc 2 sym 'memset': relocation
->> 28 out of range (0xbf046044 -> 0xc109f720)
->> selftests: printf.sh [FAIL]
->>
->> The problem that is seen when LOCKDEP is enabled without
->> ARM_MODULE_PLTS, is that LOCKDEP eats so much memory that the top of the
->> kernel gets out of reach from the bottom of the module area.
->
-> As I've said three times already (and clearly the message still hasn't
-> sunk in), it does _not_ follow that "enable lockdep" means "lots more
-> memory used".  We could say the same thing about several other kernel
-> options as well.  Please remove this from your commit message.
+On Wed, 14 Feb 2018 17:38:11 +0000,
+Christoffer Dall wrote:
+> 
+> On Wed, Feb 14, 2018 at 02:43:42PM +0000, Dave Martin wrote:
+> > [CC Ard, in case he has a view on how much we care about softirq NEON
+> > performance regressions ... and whether my suggestions make sense]
+> > 
+> > On Wed, Feb 14, 2018 at 11:15:54AM +0100, Christoffer Dall wrote:
+> > > On Tue, Feb 13, 2018 at 02:08:47PM +0000, Dave Martin wrote:
+> > > > On Tue, Feb 13, 2018 at 09:51:30AM +0100, Christoffer Dall wrote:
+> > > > > On Fri, Feb 09, 2018 at 03:59:30PM +0000, Dave Martin wrote:
+> 
+> [...]
+> 
+> > > > 
+> > > > kvm_fpsimd_flush_cpu_state() is just an invalidation.  No state is
+> > > > actually saved today because we explicitly don't care about preserving
+> > > > the SVE state, because the syscall ABI throws the SVE regs away as
+> > > > a side effect any syscall including ioctl(KVM_RUN); also (currently) KVM
+> > > > ensures that the non-SVE FPSIMD bits _are_ restored by itself.
+> > > > 
+> > > > I think my proposal is that this hook might take on the role of
+> > > > actually saving the state too, if we move that out of the KVM host
+> > > > context save/restore code.
+> > > > 
+> > > > Perhaps we could even replace
+> > > > 
+> > > > 	preempt_disable();
+> > > > 	kvm_fpsimd_flush_cpu_state();
+> > > > 	/* ... */
+> > > > 	preempt_enable();
+> > > > 
+> > > > with
+> > > > 
+> > > > 	kernel_neon_begin();
+> > > > 	/* ... */
+> > > > 	kernel_neon_end();
+> > > 
+> > > I'm not entirely sure where the begin and end points would be in the
+> > > context of KVM?
+> > 
+> > Hmmm, actually there's a bug in your VHE changes now I look more
+> > closely in this area:
+> > 
+> > You assume that the only way for the FPSIMD regs to get unexpectedly
+> > dirtied is through a context switch, but actually this is not the case:
+> > a softirq can use kernel-mode NEON any time that softirqs are enabled.
+> > 
+> > This means that in between kvm_arch_vcpu_load() and _put() (whether via
+> > preempt notification or not), the guest's FPSIMD state in the regs may
+> > be trashed by a softirq.
+> 
+> ouch.
+> 
+> > 
+> > The simplest fix is to disable softirqs and preemption for that whole
+> > region, but since we can stay in it indefinitely that's obviously not
+> > the right approach.  Putting kernel_neon_begin() in _load() and
+> > kernel_neon_end() in _put() achieves the same without disabling
+> > softirq, but preemption is still disabled throughout, which is bad.
+> > This effectively makes the run ioctl nonpreemptible...
+> > 
+> > A better fix would be to set the cpu's kernel_neon_busy flag, which
+> > makes softirq code use non-NEON fallback code.
+> > 
+> > We could expose an interface from fpsimd.c to support that.
+> > 
+> > It still comes at a cost though: due to the switching from NEON to
+> > fallback code in softirq handlers, we may get a big performance
+> > regression in setups that rely heavily on NEON in softirq for
+> > performance.
+> > 
+> 
+> I wasn't aware that softirqs would use fpsimd.
+> 
+> > 
+> > Alternatively we could do something like the following, but it's a
+> > rather gross abstraction violation:
+> > 
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index 2e43f9d..6a1ff3a 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -746,9 +746,24 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  		 * the effect of taking the interrupt again, in SVC
+> >  		 * mode this time.
+> >  		 */
+> > +		local_bh_disable();
+> >  		local_irq_enable();
+> >  
+> >  		/*
+> > +		 * If we exited due to one or mode pending interrupts, they
+> > +		 * have now been handled.  If such an interrupt pended a
+> > +		 * softirq, we shouldn't prevent that softirq from using
+> > +		 * kernel-mode NEON indefinitely: instead, give FPSIMD back to
+> > +		 * the host to manage as it likes.  We'll grab it again on the
+> > +		 * next FPSIMD trap from the guest (if any).
+> > +		 */
+> > +		if (local_softirq_pending() && FPSIMD untrapped for guest) {
+> > +			/* save vcpu FPSIMD context */
+> > +			/* enable FPSIMD trap for guest */
+> > +		}
+> > +		local_bh_enable();
+> > +
+> > +		/*
+> >  		 * We do local_irq_enable() before calling guest_exit() so
+> >  		 * that if a timer interrupt hits while running the guest we
+> >  		 * account that tick as being spent in the guest.  We enable
+> > 
+> > [...]
+> > 
+> 
+> I can't see this working, what if an IRQ comes in and a softirq gets
+> pending immediately after local_bh_enable() above?
+> 
+> And as you say, it's really not pretty.
+> 
+> This is really making me think that I'll drop this part of the
+> optimization and when we do optimize fpsimd handling, we do it properly
+> by integrating it with the kernel tracking.
+> 
+> What do you think?
 
-Sorry, I meant to show this as an example in v2, but forgot to update this part
-of the change log.
+[catching up with the discussion]
 
->
-> <exasperation@seemingly being ignored on this point>
->
-> Maybe you'd like to send your configuration file so we can see how much
-> is enabled in your kernel.  At that point I'll make a decision, but
-> until then, I'm not going to say that even what I suggested is an
-> acceptable way forward.
+I think it makes sense. I'd be worried if we'd merge something that we
+know to be sub-par, and that could introduce unexpected performance
+regressions. It looks like we have a slightly more long-term plan to
+address this in a way that integrates with the rest of the kernel
+infrastructure, so let's take this opportunity.
 
-Here's the config file[1] that is using.
+Thanks,
 
-I'm obviously ignorant here, but whats the disadvantages of enabling
-this option by default?
-My understanding is that the module size gets slightly larger by enabling
-this option but nothing else?
+	M.
 
-Obviously, if the default is changed to yes, the last part of this option's help
-message also need to change. To something like:
-"Say n if you know that you wont get out of memory errors while loading modules"
-
-Cheers,
-Anders
-[1] http://snapshots.linaro.org/openembedded/lkft/morty/am57xx-evm/rpb/linux-mainline/622/config
-
->
->>
->> Suggested-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
->> ---
->>  arch/arm/Kconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 51c8df561077..8014c8c322df 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1702,6 +1702,7 @@ config ARCH_WANT_GENERAL_HUGETLB
->>  config ARM_MODULE_PLTS
->>       bool "Use PLTs to allow module memory to spill over into vmalloc area"
->>       depends on MODULES
->> +     default y
->>       help
->>         Allocate PLTs when loading modules so that jumps and calls whose
->>         targets are too far away for their relative offsets to be encoded
->> --
->> 2.11.0
->>
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
+-- 
+Jazz is not dead, it just smell funny.
