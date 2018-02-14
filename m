@@ -1,124 +1,304 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Wed, 14 Feb 2018 15:59:48 +0200
-Subject: [PATCH v3 06/10] clk: qcom: cpu-8996: Add support to switch below
- 600Mhz
+Date: Wed, 14 Feb 2018 15:59:51 +0200
+Subject: [PATCH v3 09/10] DT: QCOM: Add cpufreq-dt to msm8996
 In-Reply-To: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
 References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <1518616792-29028-7-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1518616792-29028-10-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@codeaurora.org>
+Add device tree frequency table for the MSM8996 to be
+used by the upstream cpufreq-dt driver with the clk-cpu-8996
+driver as infrastructure.
 
-The CPU clock controllers primary PLL operates on a single VCO range,
-between 600Mhz and 3Ghz. However the CPUs do support OPPs with
-frequencies between 300Mhz and 600Mhz. In order to support running the
-CPUs at those frequencies we end up having to lock the PLL at twice the
-rate and drive the CPU clk via the PLL/2 output and SMUX.
-
-So for frequencies above 600Mhz we follow the following path
- Primary PLL --> PLL_EARLY --> PMUX(1) --> CPU clk
-and for frequencies between 300Mhz and 600Mhz we follow
- Primary PLL --> PLL/2 --> SMUX(1) --> PMUX(0) --> CPU clk
-
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
 ---
- drivers/clk/qcom/clk-cpu-8996.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dts  |   4 +-
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi |   2 +-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi        | 188 ++++++++++++++++++++++++++-
+ drivers/cpufreq/cpufreq-dt-platdev.c         |   3 +
+ 4 files changed, 192 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-index 75bd014..854f327 100644
---- a/drivers/clk/qcom/clk-cpu-8996.c
-+++ b/drivers/clk/qcom/clk-cpu-8996.c
-@@ -28,6 +28,7 @@
- #define PLL_INDEX		1
- #define ACD_INDEX		2
- #define ALT_INDEX		3
-+#define DIV_2_THRESHOLD		600000000
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+index 230e9c8..632cb42 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2014-2016,2018 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -17,5 +17,5 @@
  
- static const u8 prim_pll_regs[PLL_OFF_MAX_REGS] = {
-        [PLL_OFF_L_VAL] = 0x04,
-@@ -56,10 +57,11 @@
- 
- static const struct alpha_pll_config hfpll_config = {
- 	.l = 60,
--	.config_ctl_val = 0x200d4828,
-+	.config_ctl_val = 0x200D4AA8,
- 	.config_ctl_hi_val = 0x006,
- 	.pre_div_mask = BIT(12),
- 	.post_div_mask = 0x3 << 8,
-+	.post_div_val = 0x1 << 8,
- 	.main_output_mask = BIT(0),
- 	.early_output_mask = BIT(3),
+ / {
+ 	model = "Qualcomm Technologies, Inc. DB820c";
+-	compatible = "arrow,apq8096-db820c", "qcom,apq8096-sbc";
++	compatible = "arrow,apq8096-db820c", "qcom,apq8096-sbc", "qcom,apq8096";
  };
-@@ -101,7 +103,7 @@
- 	.vco_mask = 0x3 << 20,
- 	.config_ctl_val = 0x4001051b,
- 	.post_div_mask = 0x3 << 8,
--	.post_div_val = 0x1,
-+	.post_div_val = 0x1 << 8,
- 	.main_output_mask = BIT(0),
- 	.early_output_mask = BIT(3),
- };
-@@ -142,6 +144,7 @@ struct clk_cpu_8996_mux {
- 	u32	width;
- 	struct notifier_block nb;
- 	struct clk_hw	*pll;
-+	struct clk_hw	*pll_div_2;
- 	struct clk_regmap clkr;
- };
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 492a011..930f68b 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2014-2016,2018 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 4b2afcc..0359197 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++/* Copyright (c) 2014-2015,2018 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -86,6 +86,8 @@
+ 			compatible = "qcom,kryo";
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
++			clocks = <&kryocc 0>;
++			operating-points-v2 = <&cluster0_opp>;
+ 			next-level-cache = <&L2_0>;
+ 			L2_0: l2-cache {
+ 			      compatible = "cache";
+@@ -98,6 +100,8 @@
+ 			compatible = "qcom,kryo";
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
++			clocks = <&kryocc 0>;
++			operating-points-v2 = <&cluster0_opp>;
+ 			next-level-cache = <&L2_0>;
+ 		};
  
-@@ -192,6 +195,13 @@ static int clk_cpu_8996_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (!cpuclk->pll)
- 		return -EINVAL;
+@@ -106,6 +110,8 @@
+ 			compatible = "qcom,kryo";
+ 			reg = <0x0 0x100>;
+ 			enable-method = "psci";
++			clocks = <&kryocc 1>;
++			operating-points-v2 = <&cluster1_opp>;
+ 			next-level-cache = <&L2_1>;
+ 			L2_1: l2-cache {
+ 			      compatible = "cache";
+@@ -118,6 +124,8 @@
+ 			compatible = "qcom,kryo";
+ 			reg = <0x0 0x101>;
+ 			enable-method = "psci";
++			clocks = <&kryocc 1>;
++			operating-points-v2 = <&cluster1_opp>;
+ 			next-level-cache = <&L2_1>;
+ 		};
  
-+	if (cpuclk->pll_div_2 && req->rate < DIV_2_THRESHOLD) {
-+		if (req->rate < (DIV_2_THRESHOLD / 2))
-+			return -EINVAL;
+@@ -144,6 +152,182 @@
+ 		};
+ 	};
+ 
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
 +
-+		parent = cpuclk->pll_div_2;
-+	}
++		opp at 307200000 {
++			opp-hz = /bits/ 64 <  307200000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 422400000 {
++			opp-hz = /bits/ 64 <  422400000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 480000000 {
++			opp-hz = /bits/ 64 <  480000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 556800000 {
++			opp-hz = /bits/ 64 <  556800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 652800000 {
++			opp-hz = /bits/ 64 <  652800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 729600000 {
++			opp-hz = /bits/ 64 <  729600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 844800000 {
++			opp-hz = /bits/ 64 <  844800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 960000000 {
++			opp-hz = /bits/ 64 <  960000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1036800000 {
++			opp-hz = /bits/ 64 < 1036800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1113600000 {
++			opp-hz = /bits/ 64 < 1113600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1190400000 {
++			opp-hz = /bits/ 64 < 1190400000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1228800000 {
++			opp-hz = /bits/ 64 < 1228800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1324800000 {
++			opp-hz = /bits/ 64 < 1324800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1401600000 {
++			opp-hz = /bits/ 64 < 1401600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1478400000 {
++			opp-hz = /bits/ 64 < 1478400000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1593600000 {
++			opp-hz = /bits/ 64 < 1593600000 >;
++			clock-latency-ns = <200000>;
++		};
++	};
 +
- 	req->best_parent_rate = clk_hw_round_rate(parent, req->rate);
- 	req->best_parent_hw = parent;
++	cluster1_opp: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 307200000 {
++			opp-hz = /bits/ 64 <  307200000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 403200000 {
++			opp-hz = /bits/ 64 <  403200000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 480000000 {
++			opp-hz = /bits/ 64 <  480000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 556800000 {
++			opp-hz = /bits/ 64 <  556800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 652800000 {
++			opp-hz = /bits/ 64 <  652800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 729600000 {
++			opp-hz = /bits/ 64 <  729600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 806400000 {
++			opp-hz = /bits/ 64 <  806400000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 883200000 {
++			opp-hz = /bits/ 64 <  883200000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 940800000 {
++			opp-hz = /bits/ 64 <  940800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1036800000 {
++			opp-hz = /bits/ 64 < 1036800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1113600000 {
++			opp-hz = /bits/ 64 < 1113600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1190400000 {
++			opp-hz = /bits/ 64 < 1190400000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1248000000 {
++			opp-hz = /bits/ 64 < 1248000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1324800000 {
++			opp-hz = /bits/ 64 < 1324800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1401600000 {
++			opp-hz = /bits/ 64 < 1401600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1478400000 {
++			opp-hz = /bits/ 64 < 1478400000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1552000000 {
++			opp-hz = /bits/ 64 < 1552000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1632000000 {
++			opp-hz = /bits/ 64 < 1632000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1708800000 {
++			opp-hz = /bits/ 64 < 1708800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1785600000 {
++			opp-hz = /bits/ 64 < 1785600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1824000000 {
++			opp-hz = /bits/ 64 < 1824000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1920000000 {
++			opp-hz = /bits/ 64 < 1920000000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 1996800000 {
++			opp-hz = /bits/ 64 < 1996800000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 2073600000 {
++			opp-hz = /bits/ 64 < 2073600000 >;
++			clock-latency-ns = <200000>;
++		};
++		opp at 2150400000 {
++			opp-hz = /bits/ 64 < 2150400000 >;
++			clock-latency-ns = <200000>;
++		};
++
++	};
+ 	thermal-zones {
+ 		cpu-thermal0 {
+ 			polling-delay-passive = <250>;
+@@ -403,7 +587,7 @@
+ 		};
  
-@@ -203,13 +213,19 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- {
- 	int ret;
- 	struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_nb(nb);
-+	struct clk_notifier_data *cnd = data;
+ 		kryocc: clock-controller at 6400000 {
+-			compatible = "qcom,apcc-msm8996";
++			compatible = "qcom-msm8996-apcc";
+ 			reg = <0x6400000 0x90000>;
+ 			#clock-cells = <1>;
+ 		};
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 3b585e4..b6cd0ae 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -95,6 +95,9 @@
+ 	{ .compatible = "xlnx,zynq-7000", },
+ 	{ .compatible = "xlnx,zynqmp", },
  
- 	switch (event) {
- 	case PRE_RATE_CHANGE:
- 		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, ALT_INDEX);
- 		break;
- 	case POST_RATE_CHANGE:
--		ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw, PLL_INDEX);
-+		if (cnd->new_rate < DIV_2_THRESHOLD)
-+			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
-+							  DIV_2_INDEX);
-+		else
-+			ret = clk_cpu_8996_mux_set_parent(&cpuclk->clkr.hw,
-+							  PLL_INDEX);
- 		break;
- 	default:
- 		ret = 0;
-@@ -262,6 +278,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &pwrcl_pll.clkr.hw,
-+	.pll_div_2 = &pwrcl_smux.clkr.hw,
- 	.nb.notifier_call = cpu_clk_notifier_cb,
- 	.clkr.hw.init = &(struct clk_init_data) {
- 		.name = "pwrcl_pmux",
-@@ -282,6 +299,7 @@ int cpu_clk_notifier_cb(struct notifier_block *nb, unsigned long event,
- 	.shift = 0,
- 	.width = 2,
- 	.pll = &perfcl_pll.clkr.hw,
-+	.pll_div_2 = &perfcl_smux.clkr.hw,
- 	.nb.notifier_call = cpu_clk_notifier_cb,
- 	.clkr.hw.init = &(struct clk_init_data) {
- 		.name = "perfcl_pmux",
++	{ .compatible = "qcom,msm8996", },
++	{ .compatible = "qcom,apq8096", },
++
+ 	{ }
+ };
+ 
 -- 
 1.9.1
