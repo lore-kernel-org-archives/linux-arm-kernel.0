@@ -1,68 +1,85 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 14 Feb 2018 11:41:59 +0100
-Subject: [PATCH v2] ARM64: dts: marvell: armada-cp110: Add registers clock
- for I2C nodes
-In-Reply-To: <20180130141946.18890-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 30 Jan 2018 15:19:46 +0100")
-References: <20180130141946.18890-1-gregory.clement@free-electrons.com>
-Message-ID: <874lmjq2dk.fsf@bootlin.com>
+Date: Wed, 14 Feb 2018 11:42:35 +0100
+Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
+In-Reply-To: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
+ (Baruch Siach's message of "Wed, 31 Jan 2018 08:56:37 +0200")
+References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
+Message-ID: <87zi4bons4.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Baruch,
  
- On mar., janv. 30 2018, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+ On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 
-> This extra clock is needed to access the registers of the I2C controller
-> used on the Armada 7K/8K SoCs.
+> The CP110 component has 4 uart peripherals. All of them use the same clock
+> gate for slow peripherals that is shared with the i2c and spi peripherals.
 >
-> This follows the changes already made in the binding documentation (as
-> well as in the driver) in:
-> commit 1534156e999735fe0befad958e1447600c0c20e7 ("i2c: mv64xxx: Fix clock
-> resource by adding an optional bus clock")
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-Applied on mvebu/dt64 (with the email address modified to @bootlin.com)
+Applied on mvebu/dt64
+
+Thanks,
 
 Gregory
 
 > ---
-> Changelog:
->
-> v1 -> v2
-> Add comment about the commit modifying the driver in the commit log
->
->
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
+> v2: No change
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 40 +++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 >
 > diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> index 0ab921861a2f..c57bf6661622 100644
+> index a8af4136dbe7..a422cd981a0b 100644
 > --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
 > +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> @@ -280,7 +280,9 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			interrupts = <ICU_GRP_NSR 120 IRQ_TYPE_LEVEL_HIGH>;
-> -			clocks = <&CP110_LABEL(clk) 1 21>;
-> +			clock-names = "core", "reg";
-> +			clocks = <&CP110_LABEL(clk) 1 21>,
-> +				 <&CP110_LABEL(clk) 1 17>;
+> @@ -290,6 +290,46 @@
 >  			status = "disabled";
 >  		};
 >  
-> @@ -290,7 +292,9 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			interrupts = <ICU_GRP_NSR 121 IRQ_TYPE_LEVEL_HIGH>;
-> -			clocks = <&CP110_LABEL(clk) 1 21>;
-> +			clock-names = "core", "reg";
-> +			clocks = <&CP110_LABEL(clk) 1 21>,
-> +				 <&CP110_LABEL(clk) 1 17>;
->  			status = "disabled";
->  		};
->  
+> +		CP110_LABEL(uart0): serial at 702000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x702000 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-io-width = <1>;
+> +			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			status = "disabled";
+> +		};
+> +
+> +		CP110_LABEL(uart1): serial at 702100 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x702100 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-io-width = <1>;
+> +			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			status = "disabled";
+> +		};
+> +
+> +		CP110_LABEL(uart2): serial at 702200 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x702200 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <ICU_GRP_NSR 124 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-io-width = <1>;
+> +			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			status = "disabled";
+> +		};
+> +
+> +		CP110_LABEL(uart3): serial at 702300 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x702300 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <ICU_GRP_NSR 125 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-io-width = <1>;
+> +			clocks = <&CP110_LABEL(clk) 1 21>;
+> +			status = "disabled";
+> +		};
+> +
+>  		CP110_LABEL(nand): nand at 720000 {
+>  			/*
+>  			* Due to the limitation of the pins available
 > -- 
 > 2.15.1
 >
