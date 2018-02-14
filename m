@@ -1,29 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Feb 2018 14:59:30 +0100
-Subject: [PATCH 06/15] Documentation: devicetree: dma: Add r8a77965 dmac
-In-Reply-To: <1518515162-23663-7-git-send-email-jacopo+renesas@jmondi.org>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-7-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWSW8cBT5Y+ABtxinGqLO7eGeu48zTmzKQB2LgTg3qdpg@mail.gmail.com>
+From: ilialin@codeaurora.org (Ilia Lin)
+Date: Wed, 14 Feb 2018 15:59:44 +0200
+Subject: [PATCH v3 02/10] clk: qcom: Make clk_alpha_pll_configure available to
+ modules
+In-Reply-To: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
+References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1518616792-29028-3-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
-<jacopo+renesas@jmondi.org> wrote:
-> Add documentation for r8a77965 compatible string to rcar-dmac device
-> tree bindings documentation.
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Allow clk_alpha_pll_configure to be called from loadable
+kernel modules.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+---
+ drivers/clk/qcom/clk-alpha-pll.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
+index 6d04cd9..5c962af 100644
+--- a/drivers/clk/qcom/clk-alpha-pll.c
++++ b/drivers/clk/qcom/clk-alpha-pll.c
+@@ -208,6 +208,7 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
+ 	if (pll->flags & SUPPORTS_FSM_MODE)
+ 		qcom_pll_set_fsm_mode(regmap, PLL_MODE(pll), 6, 0);
+ }
++EXPORT_SYMBOL_GPL(clk_alpha_pll_configure);
+ 
+ static int clk_alpha_pll_hwfsm_enable(struct clk_hw *hw)
+ {
+-- 
+1.9.1
