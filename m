@@ -1,34 +1,34 @@
 From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Wed, 14 Feb 2018 22:22:42 +0100
-Subject: [PATCH 05/15] ARM64: dts: Add R-Car Salvator-x M3-N support
-In-Reply-To: <CAMuHMdW0SYdwNNWfzNttY8xdfnB-oLR4MvhWpO7Pks-WY76=3g@mail.gmail.com>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-6-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdW0SYdwNNWfzNttY8xdfnB-oLR4MvhWpO7Pks-WY76=3g@mail.gmail.com>
-Message-ID: <CAOFm3uH08oBUiJSs7sOrThqXjLP0Tp1ur2mV-xvxHgoAVMNpUg@mail.gmail.com>
+Date: Wed, 14 Feb 2018 22:42:00 +0100
+Subject: [PATCH v5 10/12] drm/sun4i: Implement A83T HDMI driver
+In-Reply-To: <20180214200906.31509-11-jernej.skrabec@siol.net>
+References: <20180214200906.31509-1-jernej.skrabec@siol.net>
+ <20180214200906.31509-11-jernej.skrabec@siol.net>
+Message-ID: <CAOFm3uFkkydWBT9N72ax1oeJs=J2A_s-VbaAW1P5WQopBjw_tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jacopo,
+On Wed, Feb 14, 2018 at 9:09 PM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> A83T has DW HDMI IP block with a custom PHY similar to Synopsys gen2
+> HDMI PHY.
+>
+> Only video output was tested, while HW also supports audio and CEC.
+> Support for them will be added later.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-On Wed, Feb 14, 2018 at 2:58 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
+...
 
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dts
->> @@ -0,0 +1,30 @@
->> +// SPDX-License-Identifier: GPL-2.
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+> @@ -0,0 +1,44 @@
+> +// SPDX-License-Identifier: GPL-2.0+
 
-This should be GPL-2.0
+This should be
 
-<snip>
+/* SPDX-License-Identifier: GPL-2.0+ /* in a .h per [1]
 
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
->> @@ -0,0 +1,495 @@
->> +// SPDX-License-Identifier: GPL-2.
-
-This should be GPL-2.0 too.
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
 -- 
 Cordially
 Philippe Ombredanne
