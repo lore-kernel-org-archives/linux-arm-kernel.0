@@ -1,120 +1,60 @@
-From: kieran.bingham@ideasonboard.com (Kieran Bingham)
-Date: Wed, 14 Feb 2018 08:39:19 +0000
-Subject: [PATCH v2 2/4] arm64: dts: renesas: r8a77995: add VSP instances
-In-Reply-To: <1667048.nVWrpUAVXQ@avalon>
-References: <1518550237-16753-1-git-send-email-kbingham@kernel.org>
- <1518550237-16753-3-git-send-email-kbingham@kernel.org>
- <1667048.nVWrpUAVXQ@avalon>
-Message-ID: <10851181-b3b1-bb07-82e9-487ae51711ba@ideasonboard.com>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Wed, 14 Feb 2018 09:49:15 +0100
+Subject: [net PATCH] Revert "net: thunderx: Add support for xdp redirect"
+In-Reply-To: <CA+sq2CfYosrbZUEb0hLZS1u6tiz+m4oxEXF3-43ZxyoHq=cAVg@mail.gmail.com>
+References: <151854116184.18303.13476104443853509134.stgit@firesoul>
+ <CA+sq2CfYosrbZUEb0hLZS1u6tiz+m4oxEXF3-43ZxyoHq=cAVg@mail.gmail.com>
+Message-ID: <20180214094915.10fc6c36@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Wed, 14 Feb 2018 01:05:16 +0530
+Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
 
-Thanks for the review,
-
-On 13/02/18 22:03, Laurent Pinchart wrote:
-> Hi Kieran,
+> On Tue, Feb 13, 2018 at 10:29 PM, Jesper Dangaard Brouer
+> <brouer@redhat.com> wrote:
+> > This reverts commit aa136d0c82fcd6af14535853c30e219e02b2692d.
+> >
+> > As I previously[1] pointed out this implementation of XDP_REDIRECT is
+> > wrong.  XDP_REDIRECT is a facility that must work between different
+> > NIC drivers.  Another NIC driver can call ndo_xdp_xmit/nicvf_xdp_xmit,
+> > but your driver patch assumes payload data (at top of page) will
+> > contain a queue index and a DMA addr, this is not true and worse will
+> > likely contain garbage.
+> >
+> > Given you have not fixed this in due time (just reached v4.16-rc1),
+> > the only option I see is a revert.  
 > 
-> Thank you for the patch.
+> Sorry that i missed your email ie didn't respond.
+>
+> This driver is not for a generic PCI endpoint NIC, it's an on-silicon
+> ethernet device found only on Cavium's ThunderX or OCTEONTX SOCs
+> which supports upto 16 ports. XDP_REDIRECT here is mainly aimed at
+> forwarding packets from one port to another
+> port of same type.
 > 
-> On Tuesday, 13 February 2018 21:30:35 EET Kieran Bingham wrote:
->> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
->>
->> The r8a77995 has a VSPBS to support image processing such as blending of
->> two input images, and has two VSPDs to handle display pipelines with a
->> DU.
->>
->> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
->>
->> ---
->> v2:
->>  - Fix VSPD register map size
->>  - Squash VSPBS and VSPD patches together
->>
->>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 30 ++++++++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
->> b/arch/arm64/boot/dts/renesas/r8a77995.dtsi index
->> 196a917afea6..19bd8be9926a 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
->> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
->> @@ -692,6 +692,16 @@
->>  			status = "disabled";
->>  		};
->>
->> +		vspbs: vsp at fe960000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfe960000 0 0x4000>;
-> 
-> The VSPBS also has OSD-CLUT support in its RPFs, so you need to extend the 
-> registers range too.
-> 
+> The only way I could have avoided the payload data is by unmapping
+> and remapping of DMA buffer which is quite expensive especially when
+> IOMMU is enabled. So I thought this small optimization should be
+> acceptable.
 
-Wait, but I already changed this ...
-
-</me checks tree>
-
-Yup - this change is already in my tree ... which means I must have made the
-change *after* calling git format-patch. Not helpful.
-
-Orz
+It is good that you bring up the need to avoid this DMA unmap+remap
+issue, but we need to solve this in a generic way, as all drivers
+would/should benefit from this optimization.
 
 
+> If you still think that this shouldn't be done this way then go ahead
+> and revert the patch,
+> I will try to redo this as and when i find time.
 
+Yes, please revert.
 
-> Apart from that,
-> 
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+In connection with AF_XDP we need to improve/adjust the ndo_xdp_xmit
+API.  We/I will try to incorporate the DMA mapping avoidance into the
+API design.  Then it should hopefully be easier to redo this patch later.
 
-I'll collect the tag and repost, this time with the correctly updated version.
-
-(And I'll add in that missing vspd3 from the es1 tree too)
-
-
->> +			interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 627>;
->> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
->> +			resets = <&cpg 627>;
->> +			renesas,fcp = <&fcpvb0>;
->> +		};
->> +
->>  		fcpvb0: fcp at fe96f000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfe96f000 0 0x200>;
->> @@ -701,6 +711,16 @@
->>  			iommus = <&ipmmu_vp0 5>;
->>  		};
->>
->> +		vspd0: vsp at fea20000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfea20000 0 0x8000>;
->> +			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 623>;
->> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
->> +			resets = <&cpg 623>;
->> +			renesas,fcp = <&fcpvd0>;
->> +		};
->> +
->>  		fcpvd0: fcp at fea27000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfea27000 0 0x200>;
->> @@ -710,6 +730,16 @@
->>  			iommus = <&ipmmu_vi0 8>;
->>  		};
->>
->> +		vspd1: vsp at fea80000 {
->> +			compatible = "renesas,vsp2";
->> +			reg = <0 0xfea28000 0 0x8000>;
->> +			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks = <&cpg CPG_MOD 622>;
->> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
->> +			resets = <&cpg 622>;
->> +			renesas,fcp = <&fcpvd1>;
->> +		};
->> +
->>  		fcpvd1: fcp at fea2f000 {
->>  			compatible = "renesas,fcpv";
->>  			reg = <0 0xfea2f000 0 0x200>;
-> 
+-- 
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  LinkedIn: http://www.linkedin.com/in/brouer
