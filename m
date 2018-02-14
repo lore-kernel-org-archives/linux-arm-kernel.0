@@ -1,26 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 14 Feb 2018 16:04:24 +0000
-Subject: [PATCH] spi: bcm2835aux: Avoid 64-bit arithmetic in xfer len calc
-In-Reply-To: <20180212193814.17644-1-tpiepho@impinj.com>
-References: <1518463905.25398.281.camel@impinj.com>
- <20180212193814.17644-1-tpiepho@impinj.com>
-Message-ID: <20180214160424.GF12658@sirena.org.uk>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 14 Feb 2018 16:10:36 +0000
+Subject: [PATCH][next] ASoC: uniphier: remove redundant check of blk_id
+Message-ID: <20180214161036.32446-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 12, 2018 at 11:38:14AM -0800, Trent Piepho wrote:
-> We want to check for xfers that are over 30 microseconds.  Rather than
-> find how many ?s a xfer will take, instead find how many bytes can be
-> transferred in 30 ?s.  The latter must be less than 32 bits (since our
-> clock speed is limited to 32 bits), while the former involves 64 bit
-> quantities and more arithmetic operations.
+From: Colin Ian King <colin.king@canonical.com>
 
-Please don't bury patches in the middle of existing threads, it makes it
-much harder to find them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/0cb94b3d/attachment-0001.sig>
+The check of blk_id == AUD_CLK_IO is redundant as it also being performed
+in the following switch statement with the same return of -ENOTSUPP. Fix
+this by removing the redundant comparison.
+
+Detected by CoverityScan, CID#1465227 ("Logically dead code")
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ sound/soc/uniphier/aio-cpu.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
+index 55f3248a31fd..7cf2316c69a2 100644
+--- a/sound/soc/uniphier/aio-cpu.c
++++ b/sound/soc/uniphier/aio-cpu.c
+@@ -134,9 +134,6 @@ static int uniphier_aio_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+ 	bool pll_auto = false;
+ 	int pll_id, div_id;
+ 
+-	if (clk_id == AUD_CLK_IO)
+-		return -ENOTSUPP;
+-
+ 	switch (clk_id) {
+ 	case AUD_CLK_IO:
+ 		return -ENOTSUPP;
+-- 
+2.15.1
