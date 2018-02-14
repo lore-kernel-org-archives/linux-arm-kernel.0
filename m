@@ -1,39 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 14 Feb 2018 12:07:13 +0000
-Subject: [PATCH 2/5] drivers/bus: Split Arm CCI driver
-In-Reply-To: <20180214115118.GD2992@arm.com>
-References: <cover.1517855839.git.robin.murphy@arm.com>
- <1660c838bafffb0b1a0d48823bc88c701adf01e4.1517855839.git.robin.murphy@arm.com>
- <87shadgfam.fsf@e105922-lin.cambridge.arm.com>
- <f62d3a76-9ee0-43a5-c585-fcebce52e800@arm.com>
- <20180214115118.GD2992@arm.com>
-Message-ID: <ffc51ed8-f99e-f2a5-bb2c-c9e8ce18dac8@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 14 Feb 2018 12:08:14 +0000
+Subject: [PATCH] irqchip/gic-v3: Support MSIs via aliases and distributor
+In-Reply-To: <20171127102408.6631-1-sboyd@codeaurora.org>
+References: <20171127102408.6631-1-sboyd@codeaurora.org>
+Message-ID: <bf71552e-6ea0-55f3-6b42-f4a1a3f65cb9@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/18 11:51, Will Deacon wrote:
-> On Wed, Feb 07, 2018 at 01:07:53PM +0000, Robin Murphy wrote:
->> Hi Punit,
->>
->> On 07/02/18 12:22, Punit Agrawal wrote:
->> [...]
->>>> -static void __iomem *cci_ctrl_base;
->>>> +void __iomem *cci_ctrl_base __ro_after_init;
->>>
->>> Initially I wondered if cci_ctrl_base gets used in the pmu driver before
->>> it's initialised. But as it gets set in early_initcall() that looks to
->>> be fine.
->>
->> In fact it's even more robust than initcall ordering, since the PMU device
->> will only be created at all via cci_platform_probe(), thus cci_init() is
->> guaranteed to have run successfully before the PMU driver probe can ever
->> touch anything.
+
+On 27/11/17 10:24, Stephen Boyd wrote:
+> Some GIC configurations don't have an accessible ITS, but they
+> want to support MSIs through the distributor's SETSPI registers
+> or through the IMPLEMENTATION DEFINED message-based interrupt
+> request register region. This mode of operation is similar to the
+> v2m support on gic-400, but we don't necessarily know what
+> particular SPIs are supported as MSIs so we need some help from
+> firmware to know what to do.
 > 
-> Could you hijack the platform data at this point by passing an of_dev_auxdata
-> to of_platform_populate and then use that to pass the __iomem address to the
-> PMU driver?
+> Introduce an "arm,spi-ranges" property for this, similar to the
+> "marvell,spi-ranges" property, that indicates the base and size
+> of each MSI range. This property applies equally to the
+> distributor and alias registers. In either case, we detect this
+> mode of operation by looking for a node with the "msi-controller"
+> property and then probe the v2m frame code on top of it. Assume
+> these nodes will have the "arm,spi-ranges" property in them so
+> that the v2m code works mostly unmodified.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>   .../bindings/interrupt-controller/arm,gic-v3.txt   |  48 +++++++++-
+>   drivers/irqchip/irq-gic-v2m.c                      | 102 ++++++++++++++++-----
+>   drivers/irqchip/irq-gic-v3.c                       |   4 +
+>   include/linux/irqchip/arm-gic-common.h             |   3 +
+>   4 files changed, 129 insertions(+), 28 deletions(-)
 
-Ooh, probably - auxdata looks a bit crufty, but it's still arguably 
-nicer than exporting a global. I'll look into it, thanks for the idea.
+What's the plan on this?
+I have not seen this patch in rc1 or in next.
 
-Robin.
+We have a dependency on this to get WLAN working on DragonBoard820c.
+
+
+thanks,
+Srini
