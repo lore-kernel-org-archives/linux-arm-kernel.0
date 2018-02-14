@@ -1,34 +1,77 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Feb 2018 09:50:29 -0800
-Subject: [PATCH 2/9] mmc: hsmmc_omap: include types.h and provide header
- inclusion guard
-In-Reply-To: <20180213013243.8378-3-s-anna@ti.com>
+Date: Wed, 14 Feb 2018 10:07:14 -0800
+Subject: [PATCH 1/9] dmaengine: omap-dma: include header for bool type
+In-Reply-To: <20180213013243.8378-2-s-anna@ti.com>
 References: <20180213013243.8378-1-s-anna@ti.com>
- <20180213013243.8378-3-s-anna@ti.com>
-Message-ID: <20180214175029.GP6364@atomide.com>
+ <20180213013243.8378-2-s-anna@ti.com>
+Message-ID: <20180214180714.GQ6364@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Suman Anna <s-anna@ti.com> [180213 01:33]:
-> The hsmmc-omap platform data header file uses some u8/u16/u32 types,
-> so include the linux types.h header file so that it is self-contained.
-> The lack of this header caused some build errors while cleaning up some
-> other header files from various omap_hwmod data files.
-> 
-> While at this, also add the missing header inclusion guard.
-> 
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
-> Hi Ulf,
-> 
-> This patch is part of a hwmod cleanup series, and is needed before I
-> can do the cleanup in those files. So prefer to have this patch go
-> through Tony as part of the series.
+> The omap-dmaengine.h header file uses a bool type, so include
+> the linux types.h header file so that it is self-contained.
+> The lack of this header caused some build errors while cleaning
+> up some header files from various omap_hwmod data files.
 
-No need for this, I'll post a patch that includes types.h
-directly in the calling code.
+Let's rather include types.h directly. Here's a patch
+that replaces your first two patches.
 
 Regards,
 
 Tony
+
+8< --------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 14 Feb 2018 09:35:20 -0800
+Subject: [PATCH] ARM: OMAP2+: Include types.h directly for hwmod data
+
+This is needed in preparation for dropping some unused
+headers that indirectly include types.h.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 2 ++
+ arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 2 ++
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c              | 2 ++
+ 3 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+@@ -9,6 +9,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/types.h>
++
+ #include <linux/platform_data/gpio-omap.h>
+ #include <linux/omap-dma.h>
+ #include <plat/dmtimer.h>
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+@@ -14,6 +14,8 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/types.h>
++
+ #include <linux/platform_data/gpio-omap.h>
+ #include <linux/platform_data/hsmmc-omap.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+--- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+@@ -15,6 +15,8 @@
+  *
+  */
+ 
++#include <linux/types.h>
++
+ #include <linux/platform_data/gpio-omap.h>
+ #include <linux/platform_data/hsmmc-omap.h>
+ #include <linux/platform_data/spi-omap2-mcspi.h>
+-- 
+2.16.1
