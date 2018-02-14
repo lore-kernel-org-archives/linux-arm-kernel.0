@@ -1,10 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 14 Feb 2018 11:42:35 +0100
+Date: Wed, 14 Feb 2018 11:42:52 +0100
 Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
 In-Reply-To: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
  (Baruch Siach's message of "Wed, 31 Jan 2018 08:56:37 +0200")
 References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
-Message-ID: <87zi4bons4.fsf@bootlin.com>
+Message-ID: <87vaezonrn.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
