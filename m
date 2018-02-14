@@ -1,76 +1,71 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 14 Feb 2018 21:08:56 +0100
-Subject: [PATCH v5 02/12] clk: sunxi-ng: Use u64 for calculation of nkmp rate
+Date: Wed, 14 Feb 2018 21:08:55 +0100
+Subject: [PATCH v5 01/12] clk: sunxi-ng: Mask nkmp factors when setting
+ register
 In-Reply-To: <20180214200906.31509-1-jernej.skrabec@siol.net>
 References: <20180214200906.31509-1-jernej.skrabec@siol.net>
-Message-ID: <20180214200906.31509-3-jernej.skrabec@siol.net>
+Message-ID: <20180214200906.31509-2-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When parent rate is 24MHz and multiplier N >= 180, intermediate clock
-rate doesn't fit in 32 bit variable anymore.
+Currently, if one of the factors isn't present, bit 0 gets always set to
+1. For example, A83T has NMP PLLs modelled as NKMP PLL without K. Since
+K is not specified, it's offset, width and shift is 0. Driver assumes
+that lowest value possible is 1, otherwise we would get division by 0.
+That situation causes that bit 0 is always set, which may change wanted
+clock rate.
 
-Because of that, introduce function for calculating clock rate which
-uses 64 bit variable for intermediate result.
+Fix that by masking every factor according to it's specified width.
+Factors with width set to 0 won't have any influence to final register
+value.
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nkmp.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index a99068a08315..c3f6fe7be565 100644
+index e58c95787f94..a99068a08315 100644
 --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
 +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -20,6 +20,18 @@ struct _ccu_nkmp {
- 	unsigned long	p, min_p, max_p;
- };
- 
-+static unsigned long ccu_nkmp_calc_rate(unsigned long parent,
-+					unsigned long n, unsigned long k,
-+					unsigned long m, unsigned long p)
-+{
-+	u64 rate = parent;
-+
-+	rate *= n * k;
-+	do_div(rate, m * p);
-+
-+	return rate;
-+}
-+
- static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
- 			       struct _ccu_nkmp *nkmp)
+@@ -134,6 +134,7 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			   unsigned long parent_rate)
  {
-@@ -33,7 +45,9 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
- 				for (_p = nkmp->min_p; _p <= nkmp->max_p; _p <<= 1) {
- 					unsigned long tmp_rate;
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
++	u32 n_mask, k_mask, m_mask, p_mask;
+ 	struct _ccu_nkmp _nkmp;
+ 	unsigned long flags;
+ 	u32 reg;
+@@ -149,18 +150,20 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
  
--					tmp_rate = parent * _n * _k / (_m * _p);
-+					tmp_rate = ccu_nkmp_calc_rate(parent,
-+								      _n, _k,
-+								      _m, _p);
+ 	ccu_nkmp_find_best(parent_rate, rate, &_nkmp);
  
- 					if (tmp_rate > rate)
- 						continue;
-@@ -107,7 +121,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
- 	p = reg >> nkmp->p.shift;
- 	p &= (1 << nkmp->p.width) - 1;
++	n_mask = GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
++	k_mask = GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
++	m_mask = GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
++	p_mask = GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
++
+ 	spin_lock_irqsave(nkmp->common.lock, flags);
  
--	return (parent_rate * n * k >> p) / m;
-+	return ccu_nkmp_calc_rate(parent_rate, n, k, m, 1 << p);
- }
+ 	reg = readl(nkmp->common.base + nkmp->common.reg);
+-	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
+-	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
+-	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
+-	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
+-
+-	reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
+-	reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
+-	reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
+-	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
++	reg &= ~(n_mask | k_mask | m_mask | p_mask);
++
++	reg |= ((_nkmp.n - nkmp->n.offset) << nkmp->n.shift) & n_mask;
++	reg |= ((_nkmp.k - nkmp->k.offset) << nkmp->k.shift) & k_mask;
++	reg |= ((_nkmp.m - nkmp->m.offset) << nkmp->m.shift) & m_mask;
++	reg |= (ilog2(_nkmp.p) << nkmp->p.shift) & p_mask;
  
- static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
-@@ -127,7 +141,8 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	writel(reg, nkmp->common.base + nkmp->common.reg);
  
- 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
- 
--	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
-+	return ccu_nkmp_calc_rate(*parent_rate, _nkmp.n, _nkmp.k,
-+				  _nkmp.m, _nkmp.p);
- }
- 
- static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
 2.16.1
