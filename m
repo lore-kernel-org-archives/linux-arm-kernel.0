@@ -1,42 +1,40 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Feb 2018 11:35:54 -0800
-Subject: arm64 physmap (was Re: [kernel-hardening] [PATCH 4/6] Protectable
- Memory)
-In-Reply-To: <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
-References: <20180124175631.22925-1-igor.stoppa@huawei.com>
- <20180124175631.22925-5-igor.stoppa@huawei.com>
- <CAG48ez0JRU8Nmn7jLBVoy6SMMrcj46R0_R30Lcyouc4R9igi-g@mail.gmail.com>
- <20180126053542.GA30189@bombadil.infradead.org>
- <alpine.DEB.2.20.1802021236510.31548@nuc-kabylake>
- <f2ddaed0-313e-8664-8a26-9d10b66ed0c5@huawei.com>
- <b75b5903-0177-8ad9-5c2b-fc63438fb5f2@huawei.com>
- <CAFUG7CfrCpcbwgf5ixMC5EZZgiVVVp1NXhDHK1UoJJcC08R2qQ@mail.gmail.com>
- <8818bfd4-dd9f-f279-0432-69b59531bd41@huawei.com>
- <CAFUG7CeUhFcvA82uZ2ZH1j_6PM=aBo4XmYDN85pf8G0gPU44dg@mail.gmail.com>
- <17e5b515-84c8-dca2-1695-cdf819834ea2@huawei.com>
- <CAGXu5j+LS1pgOOroi7Yxp2nh=DwtTnU3p-NZa6bQu_wkvvVkwg@mail.gmail.com>
- <414027d3-dd73-cf11-dc2a-e8c124591646@redhat.com>
- <CAGXu5j++igQD4tMh0J8nZ9jNji5mU16C7OygFJ5Td+Bq-KSMgw@mail.gmail.com>
- <CAG48ez1utN_vwHUwk=BU6zM4Wa_53TPu8rm9JuTtY-vGP0Shqw@mail.gmail.com>
- <f4226a44-92fd-8ead-b458-7551ba82f96d@redhat.com>
- <CAGXu5j+zOCLerneUt2b-tvyLLg7fEbr9B0YYow-4DH6oV-nnCw@mail.gmail.com>
- <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
- <CAGXu5j+RRiZtYfO-4Peh=FAHmUS4FThKHp-djoFgY80rebKTxQ@mail.gmail.com>
-Message-ID: <CAGXu5jJ2XRt3RqPPXp+CN5fhT93BpCCNUHk88aSQUWS_NJ5oxw@mail.gmail.com>
+From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
+Date: Wed, 14 Feb 2018 20:47:33 +0100
+Subject: [PATCH 2/2] mmc: bcm2835: print some informational messages
+ during reset
+In-Reply-To: <F404E9C8-AE64-4B36-AD1B-911BD3C33946@gmail.com>
+References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <57ff1e429a7fc12300a3cca0c5e9a637beed0d3a.1518619058.git.msuchanek@suse.de>
+ <F404E9C8-AE64-4B36-AD1B-911BD3C33946@gmail.com>
+Message-ID: <20180214204733.7987d16c@naga.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 11:29 AM, Kees Cook <keescook@chromium.org> wrote:
-> Why does using finer granularity on the physmap degrade performance? I
-> assume TLB pressure, but what is heavily using that area? (I must not
-> be understanding what physmap actually gets used for -- I thought it
-> was just a convenience to have a 1:1 virt/phys map for some lookups?)
+On Wed, 14 Feb 2018 08:50:16 -0800
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-Jann has sorted me out: it's that physmap isn't an _alias_ for the
-buddy allocator memory areas; it's used directly.
+> On February 14, 2018 6:38:58 AM PST, Michal Suchanek
+> <msuchanek@suse.de> wrote:
+> >The previous patch does reset during hardware error so make the reset
+> >progress more visible.  
+> 
+> Based on your previous email it looks like this can happen quite
+> frequently so we might be spamming the kernel log with such reset
+> messages. Turning this into a debug print would not be great either,
+> how about a custom sysfs attribute counting the number of times a
+> reset was done?
 
--Kees
+Since every such message happens when the system stalls for like half a
+minute I don't think there will be that many until somebody notices
+something is amiss. It might be also helpful in diagnosing if other
+cards lock up in different way - for me the DMA shutdown is short so I
+guess it's the mmc host that is locked up and the DMA engine is fine.
+It might look differently on different systems, though.
 
--- 
-Kees Cook
-Pixel Security
+I understand that adding messages it somewhat controversial so I added
+them in separate patch.
+
+Thanks
+
+Michal
