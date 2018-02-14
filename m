@@ -1,86 +1,91 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Feb 2018 12:03:40 +0100
-Subject: [PATCH 02/15] clk: renesas: cpg-msr: Add support for R-Car M3-N
-In-Reply-To: <1518515162-23663-3-git-send-email-jacopo+renesas@jmondi.org>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-3-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWzNky5zEPGBvgQi58NaxxptGfeybe5OF2w1V+S7SACmw@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 14 Feb 2018 12:05:41 +0100
+Subject: [PATCH v5 0/7] ARM: stm32: add initial STM32MPU support
+In-Reply-To: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
+References: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <fa1d8118-6879-a984-4cd9-0e0da98c467b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+Hi Arnd,
 
-On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
-<jacopo+renesas@jmondi.org> wrote:
-> Initial support for R-Car M3-N (r8a77965), including core and module
-> clocks.
+On 01/16/2018 03:56 PM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+> 
+> This patch series extends the existing STM32 microcontrollers (MCUs)
+> family to microprocessors (MPUs). The MPU platform (based on
+> Arm Cortex-A) is a continuation of the MCU one (based on Arm
+> Cortex-M) in that it shares a wide number of hardware blocks.
+> 
+> change v5:
+> -fix serial3 aliases by serial0
+>   
+> change v4:
+> -Add all available uarts in stm32mp157c
+> -Move uart aliases to board files
+> 
+> change v3:
+> -Remove bootargs
+> -Remove armv7m_restart and Share stm32_compat for mcu/mpu
+> -Modify stm32 kconfig with Arnd template
+> -Remove patch below (Linus W: Patch applied)
+>   devicetree: bindings: Document supported STM32 SoC family
+>   pinctrl: stm32: Add STM32MP157 MPU support
+> 
+> change V2:
+> -Add stm32 documentation in this serie to avoid merge conflict
+> thread: "https://patchwork.kernel.org/patch/10102573/";
+> -Split bindings (stm32.txt) to separate patches.
+> -Remove ARCH_STM32_MCU/MPU flags
+> -Adopt rst format for Documentation/arm/stm32 files
+> -s/STMicrolectronics/STMicroelectronics/g
+>  > Ludovic Barre (7):
+>    Documentation: arm: stm32: move to rst format
+>    ARM: stm32: prepare stm32 family to welcome armv7 architecture
+>    dt-bindings: stm32: add support of STM32MP157
+>    ARM: stm32: add initial support for STM32MP157
+>    ARM: configs: multi_v7: add stm32 support
+>    ARM: dts: stm32: add stm32mp157c initial support
+>    ARM: dts: stm32: add initial support of stm32mp157c eval board
 >
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+I will merge stm32 DT patches and mach-stm32 patches in my next pull 
+requests.
+What about Documentation patch and multi-v7 config patch ?
+(I could add Documentation patch in my DT pull request)
 
-Thanks for your patch!
+Regards
+Alex
 
-Please refer to Table 8.2d of R-Car Series, 3rd Generation User's Manual:
-Hardware (Rev. 0.80, Oct 31, 2017), so we know which exact version of
-the datasheet
-was used for the core clock definitions.
-
-> --- /dev/null
-> +++ b/drivers/clk/renesas/r8a77965-cpg-mssr.c
-> @@ -0,0 +1,333 @@
-
-> +static const struct mssr_mod_clk r8a77965_mod_clks[] __initconst = {
-> +       DEF_MOD("scif5",                202,    R8A77965_CLK_S3D4),
-> +       DEF_MOD("scif4",                203,    R8A77965_CLK_S3D4),
-> +       DEF_MOD("scif3",                204,    R8A77965_CLK_S3D4),
-> +       DEF_MOD("scif1",                206,    R8A77965_CLK_S3D4),
-> +       DEF_MOD("scif0",                207,    R8A77965_CLK_S3D4),
-> +       DEF_MOD("sys-dmac2",            217,    R8A77965_CLK_S0D3),
-> +       DEF_MOD("sys-dmac1",            218,    R8A77965_CLK_S0D3),
-> +       DEF_MOD("sys-dmac0",            219,    R8A77965_CLK_S0D3),
-> +
-> +       DEF_MOD("cmt3",                 300,    R8A77965_CLK_R),
-> +       DEF_MOD("cmt2",                 301,    R8A77965_CLK_R),
-> +       DEF_MOD("cmt1",                 302,    R8A77965_CLK_R),
-> +       DEF_MOD("cmt0",                 303,    R8A77965_CLK_R),
-> +       DEF_MOD("scif2",                310,    R8A77965_CLK_S3D4),
-> +       DEF_MOD("sdif3",                311,    R8A77965_CLK_SD3),
-> +       DEF_MOD("sdif2",                312,    R8A77965_CLK_SD2),
-> +       DEF_MOD("sdif1",                313,    R8A77965_CLK_SD1),
-> +       DEF_MOD("sdif0",                314,    R8A77965_CLK_SD0),
-> +       DEF_MOD("pcie1",                318,    R8A77965_CLK_S3D1),
-> +       DEF_MOD("pcie0",                319,    R8A77965_CLK_S3D1),
-> +       DEF_MOD("usb3-if0",             328,    R8A77965_CLK_S3D1),
-> +       DEF_MOD("usb-dmac0",            330,    R8A77965_CLK_S3D1),
-> +       DEF_MOD("usb-dmac1",            331,    R8A77965_CLK_S3D1),
-> +
-> +       DEF_MOD("rwdt",                 402,    R8A77965_CLK_R),
-> +       DEF_MOD("intc-ex",              407,    R8A77965_CLK_CP),
-> +       DEF_MOD("intc-ap",              408,    R8A77965_CLK_S3D1),
-
-According to Figure 12A.1 the parent clock is S0D3. See also commit
-6e7ddf89d67c2b0c ("clk: renesas: r8a7796: Correct parent clock of INTC-AP").
-
-> +static int __init r8a77965_cpg_mssr_init(struct device *dev)
-> +{
-
-[...]
-
-> +
-> +       return rcar_gen3_cpg_init(cpg_pll_config, CLK_EXTALR, cpg_mode);
-> +};
-
-Stray semicolon.
-
-With the above fixed:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>   Documentation/arm/stm32/overview.rst            |  34 +++++
+>   Documentation/arm/stm32/overview.txt            |  33 ----
+>   Documentation/arm/stm32/stm32f429-overview.rst  |  26 ++++
+>   Documentation/arm/stm32/stm32f429-overview.txt  |  22 ---
+>   Documentation/arm/stm32/stm32f746-overview.rst  |  33 ++++
+>   Documentation/arm/stm32/stm32f746-overview.txt  |  34 -----
+>   Documentation/arm/stm32/stm32h743-overview.rst  |  34 +++++
+>   Documentation/arm/stm32/stm32h743-overview.txt  |  30 ----
+>   Documentation/arm/stm32/stm32mp157-overview.rst |  19 +++
+>   Documentation/devicetree/bindings/arm/stm32.txt |   1 +
+>   arch/arm/boot/dts/Makefile                      |   6 +-
+>   arch/arm/boot/dts/stm32mp157-pinctrl.dtsi       | 185 ++++++++++++++++++++++
+>   arch/arm/boot/dts/stm32mp157c-ed1.dts           |  32 ++++
+>   arch/arm/boot/dts/stm32mp157c-ev1.dts           |  21 +++
+>   arch/arm/boot/dts/stm32mp157c.dtsi              | 194 ++++++++++++++++++++++++
+>   arch/arm/configs/multi_v7_defconfig             |   3 +
+>   arch/arm/mach-stm32/Kconfig                     |  38 +++--
+>   arch/arm/mach-stm32/board-dt.c                  |   5 +-
+>   18 files changed, 614 insertions(+), 136 deletions(-)
+>   create mode 100644 Documentation/arm/stm32/overview.rst
+>   delete mode 100644 Documentation/arm/stm32/overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32f429-overview.rst
+>   delete mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32f746-overview.rst
+>   delete mode 100644 Documentation/arm/stm32/stm32f746-overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32h743-overview.rst
+>   delete mode 100644 Documentation/arm/stm32/stm32h743-overview.txt
+>   create mode 100644 Documentation/arm/stm32/stm32mp157-overview.rst
+>   create mode 100644 arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+>   create mode 100644 arch/arm/boot/dts/stm32mp157c-ed1.dts
+>   create mode 100644 arch/arm/boot/dts/stm32mp157c-ev1.dts
+>   create mode 100644 arch/arm/boot/dts/stm32mp157c.dtsi
+> 
