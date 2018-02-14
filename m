@@ -1,60 +1,32 @@
-From: brouer@redhat.com (Jesper Dangaard Brouer)
-Date: Wed, 14 Feb 2018 09:49:15 +0100
-Subject: [net PATCH] Revert "net: thunderx: Add support for xdp redirect"
-In-Reply-To: <CA+sq2CfYosrbZUEb0hLZS1u6tiz+m4oxEXF3-43ZxyoHq=cAVg@mail.gmail.com>
-References: <151854116184.18303.13476104443853509134.stgit@firesoul>
- <CA+sq2CfYosrbZUEb0hLZS1u6tiz+m4oxEXF3-43ZxyoHq=cAVg@mail.gmail.com>
-Message-ID: <20180214094915.10fc6c36@redhat.com>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Wed, 14 Feb 2018 08:54:47 +0000
+Subject: [PATCH] ARM64: dts: allwinner: sun50i-h5-orangepi-zero-plus2: rename
+ mmc0_pins_a to mmc0_pins
+Message-ID: <1518598487-29201-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Feb 2018 01:05:16 +0530
-Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+mmc0_pins_a were renamed in arch/arm but not in arch/arm64 resulting in
+a build failure.
 
-> On Tue, Feb 13, 2018 at 10:29 PM, Jesper Dangaard Brouer
-> <brouer@redhat.com> wrote:
-> > This reverts commit aa136d0c82fcd6af14535853c30e219e02b2692d.
-> >
-> > As I previously[1] pointed out this implementation of XDP_REDIRECT is
-> > wrong.  XDP_REDIRECT is a facility that must work between different
-> > NIC drivers.  Another NIC driver can call ndo_xdp_xmit/nicvf_xdp_xmit,
-> > but your driver patch assumes payload data (at top of page) will
-> > contain a queue index and a DMA addr, this is not true and worse will
-> > likely contain garbage.
-> >
-> > Given you have not fixed this in due time (just reached v4.16-rc1),
-> > the only option I see is a revert.  
-> 
-> Sorry that i missed your email ie didn't respond.
->
-> This driver is not for a generic PCI endpoint NIC, it's an on-silicon
-> ethernet device found only on Cavium's ThunderX or OCTEONTX SOCs
-> which supports upto 16 ports. XDP_REDIRECT here is mainly aimed at
-> forwarding packets from one port to another
-> port of same type.
-> 
-> The only way I could have avoided the payload data is by unmapping
-> and remapping of DMA buffer which is quite expensive especially when
-> IOMMU is enabled. So I thought this small optimization should be
-> acceptable.
+Fixes: 813f2c8fa119 ("ARM: dts: sunxi: h3-h5: rename mmc0_pins_a and mmc1_pins_a")
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It is good that you bring up the need to avoid this DMA unmap+remap
-issue, but we need to solve this in a generic way, as all drivers
-would/should benefit from this optimization.
-
-
-> If you still think that this shouldn't be done this way then go ahead
-> and revert the patch,
-> I will try to redo this as and when i find time.
-
-Yes, please revert.
-
-In connection with AF_XDP we need to improve/adjust the ndo_xdp_xmit
-API.  We/I will try to incorporate the DMA mapping avoidance into the
-API design.  Then it should hopefully be easier to redo this patch later.
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+index feee125a4e9a..87c1a0dace5f 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+@@ -82,7 +82,7 @@
+ 
+ &mmc1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pins_a>;
++	pinctrl-0 = <&mmc1_pins>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+ 	vqmmc-supply = <&reg_vcc3v3>;
+ 	mmc-pwrseq = <&wifi_pwrseq>;
 -- 
-Best regards,
-  Jesper Dangaard Brouer
-  MSc.CS, Principal Kernel Engineer at Red Hat
-  LinkedIn: http://www.linkedin.com/in/brouer
+2.13.6
