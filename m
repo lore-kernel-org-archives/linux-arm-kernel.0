@@ -1,47 +1,69 @@
-From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
-Date: Wed, 14 Feb 2018 16:36:49 +0100
-Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
-In-Reply-To: <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
-References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
- <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
-Message-ID: <20180214163649.3a0c9476@kitsune.suse.cz>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 14 Feb 2018 16:37:02 +0100
+Subject: [PATCH 14/25] arm: stm32: dts: Remove leading 0x and 0s from
+ bindings notation
+In-Reply-To: <20171215124646.30591-1-malat@debian.org>
+References: <20171215124646.30591-1-malat@debian.org>
+Message-ID: <9c2375af-b175-4ca4-3e93-ae844e255425@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Feb 2018 15:58:31 +0100
-Stefan Wahren <stefan.wahren@i2se.com> wrote:
+Hi
 
-> Hi Michal,
+On 12/15/2017 01:46 PM, Mathieu Malaterre wrote:
+> Improve the DTS files by removing all the leading "0x" and zeros to fix the
+> following dtc warnings:
 > 
-> Am 14.02.2018 um 15:38 schrieb Michal Suchanek:
-> > The bcm2835 mmc host tends to lock up for unknown reason so reset
-> > it on timeout. The upper mmc block layer tries retransimitting with
-> > single blocks which tends to work out after a long wait.
-> >
-> > This is better than giving up and leaving the machine broken for no
-> > obvious reason.  
+> Warning (unit_address_format): Node /XXX unit name should not have leading "0x"
 > 
-> could you please provide more information about this issue (affected
-> hardware, kernel config, version, dmesg, reproducible scenario)?
+> and
 > 
+> Warning (unit_address_format): Node /XXX unit name should not have leading 0s
+> 
+> Converted using the following command:
+> 
+> find . -type f \( -iname *.dts -o -iname *.dtsi \) -exec sed -i -e "s/@\([0-9a-fA-FxX\.;:#]+\)\s*{/@\L\1 {/g" -e "s/@0x\(.*\) {/@\1 {/g" -e "s/@0+\(.*\) {/@\1 {/g" {} +^C
+> 
+> For simplicity, two sed expressions were used to solve each warnings separately.
+> 
+> To make the regex expression more robust a few other issues were resolved,
+> namely setting unit-address to lower case, and adding a whitespace before the
+> the opening curly brace:
+> 
+> https://elinux.org/Device_Tree_Linux#Linux_conventions
+> 
+> This will solve as a side effect warning:
+> 
+> Warning (simple_bus_reg): Node /XXX@<UPPER> simple-bus unit address format error, expected "<lower>"
+> 
+> This is a follow up to commit 4c9847b7375a ("dt-bindings: Remove leading 0x from bindings notation")
+> 
+> Reported-by: David Daney <ddaney@caviumnetworks.com>
+> Suggested-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Mathieu Malaterre <malat@debian.org>
 
-The RPi3 is known to not work with some SD cards. You can find some
-wiki pages with large tables of known-working and known-broken cards. I
-have a couple of RPi3 boards and a card that works and card that does
-not. I tried debugging the issue but did not find anything I can do
-about it - AFAICT the issue happens somewhere inside the MMC controller
-IP. 
+Applied on stm32-next.
 
-I have no inside knowledge of the controller in question but during
-testing I tried to reset the controller whenever the issue happens so I
-can continue running the test system for a longer time until it gets
-unusable. While I did not find any solution to the problem the
-workaround with resetting the controller works quite reliably for me.
+thanks
 
-So I am posting it in the hope that people with the wrong combination
-of RPi3 and SD card will not get a blank screen but rather a system
-that boots but tends to lock up for half a minute occasionally.
+Alex
 
-Thanks
 
-Michal
+> ---
+>   arch/arm/boot/dts/stm32h743.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+> index bbfcbaca0b36..a559d8b6a4a3 100644
+> --- a/arch/arm/boot/dts/stm32h743.dtsi
+> +++ b/arch/arm/boot/dts/stm32h743.dtsi
+> @@ -304,7 +304,7 @@
+>   			};
+>   		};
+>   
+> -		vrefbuf: regulator at 58003C00 {
+> +		vrefbuf: regulator at 58003c00 {
+>   			compatible = "st,stm32-vrefbuf";
+>   			reg = <0x58003C00 0x8>;
+>   			clocks = <&rcc VREF_CK>;
+> 
