@@ -1,42 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 14 Feb 2018 09:04:00 +0800
-Subject: [PATCH v2 3/5] [RFT] ARM: dts: wheat: Fix ADV7513 address usage
-In-Reply-To: <1518459117-16733-4-git-send-email-kbingham@kernel.org>
-References: <1518459117-16733-4-git-send-email-kbingham@kernel.org>
-Message-ID: <201802140855.gCf9wb3G%fengguang.wu@intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 14 Feb 2018 08:42:52 +0530
+Subject: [PATCH 04/10] ARM: dts: sun[4-7]i: Remove
+ "cooling-{min|max}-level" for CPU nodes
+In-Reply-To: <CAGb2v65Rq5UY_=Fspb_j79a36SK_f+dd2Yb2zAqfg7riiaEO7g@mail.gmail.com>
+References: <cover.1518166039.git.viresh.kumar@linaro.org>
+ <4d489d040ec1fc3821d8e4bf31ffcc2eebfa41e1.1518166039.git.viresh.kumar@linaro.org>
+ <20180213091333.rq4rtvvkwppn5ypu@flea.lan>
+ <CAGb2v65Rq5UY_=Fspb_j79a36SK_f+dd2Yb2zAqfg7riiaEO7g@mail.gmail.com>
+Message-ID: <20180214031252.GW28462@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kieran,
+On 13-02-18, 17:18, Chen-Yu Tsai wrote:
+> On Tue, Feb 13, 2018 at 5:13 PM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > On Fri, Feb 09, 2018 at 02:28:04PM +0530, Viresh Kumar wrote:
+> >> The "cooling-min-level" and "cooling-max-level" properties are not
+> >> parsed by any part of the kernel currently and the max cooling state of
+> >> a CPU cooling device is found by referring to the cpufreq table instead.
+> 
+> That doesn't mean that other systems aren't using it.
 
-I love your patch! Yet something to improve:
+Are you aware of any systems which are using them ?
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.16-rc1 next-20180213]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> It's still part of
+> the device tree binding. Last I checked, while they are optional, they
+> aren't deprecated.
 
-url:    https://github.com/0day-ci/linux/commits/Kieran-Bingham/dt-bindings-media-adv7604-Add-support-for-i2c_new_secondary_device/20180214-032943
-base:   git://linuxtv.org/media_tree.git master
-config: arm-allyesconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Yeah, it isn't deprecated yet. Though the last patches of this series
+tries to do something similar.
 
-All errors (new ones prefixed by >>):
+> Any comments from the device tree maintainers?
 
->> Error: arch/arm/boot/dts/r8a7792-wheat.dts:251.24-25 syntax error
-   FATAL ERROR: Unable to parse input tree
+None yet.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 63980 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/710eeca4/attachment-0001.gz>
+-- 
+viresh
