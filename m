@@ -1,17 +1,16 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Feb 2018 08:58:35 -0800
-Subject: [PATCHv2] nokia N9: Add support for magnetometer
-In-Reply-To: <20180103141248.GA18821@amd>
-References: <20180102131722.GA20706@amd>
- <20180102172720.ghtez4d3d2fgcmj6@earth.universe>
- <20180103141248.GA18821@amd>
-Message-ID: <20180214165835.GJ6364@atomide.com>
+Date: Wed, 14 Feb 2018 09:00:36 -0800
+Subject: [PATCH] ARM: dts: use 'atmel' as at24 manufacturer in
+ am335x-boneblue
+In-Reply-To: <20180124212213.3754-1-brgl@bgdev.pl>
+References: <20180124212213.3754-1-brgl@bgdev.pl>
+Message-ID: <20180214170036.GL6364@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180103 06:15]:
-> 
-> This adds dts support for magnetometer on Nokia N9.
+* Bartosz Golaszewski <brgl@bgdev.pl> [180124 13:22]:
+> Using 'at' as the <manufacturer> part of the compatible string is now
+> deprecated. Use a correct string: 'atmel,<model>'.
 
 Applying into omap-for-v4.17/dt thanks.
 
