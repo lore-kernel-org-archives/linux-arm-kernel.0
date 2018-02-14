@@ -1,33 +1,65 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 14 Feb 2018 14:24:03 -0500 (EST)
-Subject: [net PATCH] Revert "net: thunderx: Add support for xdp redirect"
-In-Reply-To: <151854116184.18303.13476104443853509134.stgit@firesoul>
-References: <151854116184.18303.13476104443853509134.stgit@firesoul>
-Message-ID: <20180214.142403.532212436685780119.davem@davemloft.net>
+From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
+Date: Wed, 14 Feb 2018 20:24:54 +0100
+Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
+In-Reply-To: <ecf8dd61-ab16-b298-d197-ea93ecf5982b@i2se.com>
+References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
+ <20180214163649.3a0c9476@kitsune.suse.cz>
+ <20180214165827.386b9bb1@kitsune.suse.cz>
+ <ecf8dd61-ab16-b298-d197-ea93ecf5982b@i2se.com>
+Message-ID: <20180214202454.6e7ebeaf@naga.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jesper Dangaard Brouer <brouer@redhat.com>
-Date: Tue, 13 Feb 2018 17:59:22 +0100
+On Wed, 14 Feb 2018 17:49:31 +0100
+Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-> This reverts commit aa136d0c82fcd6af14535853c30e219e02b2692d.
+> Hi Michal,
 > 
-> As I previously[1] pointed out this implementation of XDP_REDIRECT is
-> wrong.  XDP_REDIRECT is a facility that must work between different
-> NIC drivers.  Another NIC driver can call ndo_xdp_xmit/nicvf_xdp_xmit,
-> but your driver patch assumes payload data (at top of page) will
-> contain a queue index and a DMA addr, this is not true and worse will
-> likely contain garbage.
+> [add Phil]
 > 
-> Given you have not fixed this in due time (just reached v4.16-rc1),
-> the only option I see is a revert.
+> Am 14.02.2018 um 17:13 schrieb Michal Such?nek:
+> > On Wed, 14 Feb 2018 16:36:49 +0100
+> > Michal Such?nek <msuchanek@suse.de> wrote:
+> >  
+> >> On Wed, 14 Feb 2018 15:58:31 +0100
+> >> Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> >>  
+> >>> Hi Michal,
+> >>>
+> >>> Am 14.02.2018 um 15:38 schrieb Michal Suchanek:    
+> >>>> The bcm2835 mmc host tends to lock up for unknown reason so reset
+> >>>> it on timeout. The upper mmc block layer tries retransimitting
+> >>>> with single blocks which tends to work out after a long wait.
+> >>>>
+> >>>> This is better than giving up and leaving the machine broken for
+> >>>> no obvious reason.      
+> >>> could you please provide more information about this issue
+> >>> (affected hardware, kernel config, version, dmesg, reproducible
+> >>> scenario)? 
+> > It tends to reproduce when upgrading a few packages with zypper and
+> > otherwise at random during system operation. It seems that for my
+> > card it worsens with age to some degree so perhaps it depends on the
+> > fragmentation of the internal card flash.
+> >
+> > Attaching dmesg and kernel config.  
 > 
-> [1] http://lkml.kernel.org/r/20171211130902.482513d3 at redhat.com
-> 
-> Cc: Sunil Goutham <sgoutham@cavium.com>
-> Cc: Christina Jacob <cjacob@caviumnetworks.com>
-> Cc: Aleksey Makarov <aleksey.makarov@cavium.com>
-> Fixes: aa136d0c82fc ("net: thunderx: Add support for xdp redirect")
-> Signed-off-by: Jesper Dangaard Brouer <brouer@redhat.com>
+> do you noticed this issue before 4.15-rc4?
 
-Applied, thanks Jesper.
+I initially noticed it with 4.4 kernel with some backports to make it
+bootable on RPi.
+> 
+> Could you please test with 4.15 final again?
+
+Right, I can apply the patches on something more recent.
+
+> 
+> What kind of SD card (name) triggers the issue?
+
+Samsung EVO MB-MP16D
+
+Also see https://elinux.org/RPi_SD_cards#Which_SD_card.3F
+
+Thanks
+
+Michal
