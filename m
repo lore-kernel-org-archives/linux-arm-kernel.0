@@ -1,36 +1,53 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed, 14 Feb 2018 16:10:36 +0000
-Subject: [PATCH][next] ASoC: uniphier: remove redundant check of blk_id
-Message-ID: <20180214161036.32446-1-colin.king@canonical.com>
+From: msuchanek@suse.de (Michal =?UTF-8?B?U3VjaMOhbmVr?=)
+Date: Wed, 14 Feb 2018 17:13:08 +0100
+Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
+In-Reply-To: <20180214163649.3a0c9476@kitsune.suse.cz>
+References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+ <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
+ <20180214163649.3a0c9476@kitsune.suse.cz>
+Message-ID: <20180214165827.386b9bb1@kitsune.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Wed, 14 Feb 2018 16:36:49 +0100
+Michal Such?nek <msuchanek@suse.de> wrote:
 
-The check of blk_id == AUD_CLK_IO is redundant as it also being performed
-in the following switch statement with the same return of -ENOTSUPP. Fix
-this by removing the redundant comparison.
+> On Wed, 14 Feb 2018 15:58:31 +0100
+> Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> 
+> > Hi Michal,
+> > 
+> > Am 14.02.2018 um 15:38 schrieb Michal Suchanek:  
+> > > The bcm2835 mmc host tends to lock up for unknown reason so reset
+> > > it on timeout. The upper mmc block layer tries retransimitting
+> > > with single blocks which tends to work out after a long wait.
+> > >
+> > > This is better than giving up and leaving the machine broken for
+> > > no obvious reason.    
+> > 
+> > could you please provide more information about this issue (affected
+> > hardware, kernel config, version, dmesg, reproducible scenario)?
+> >   
+> 
 
-Detected by CoverityScan, CID#1465227 ("Logically dead code")
+It tends to reproduce when upgrading a few packages with zypper and
+otherwise at random during system operation. It seems that for my card
+it worsens with age to some degree so perhaps it depends on the
+fragmentation of the internal card flash.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- sound/soc/uniphier/aio-cpu.c | 3 ---
- 1 file changed, 3 deletions(-)
+Attaching dmesg and kernel config.
 
-diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
-index 55f3248a31fd..7cf2316c69a2 100644
---- a/sound/soc/uniphier/aio-cpu.c
-+++ b/sound/soc/uniphier/aio-cpu.c
-@@ -134,9 +134,6 @@ static int uniphier_aio_set_sysclk(struct snd_soc_dai *dai, int clk_id,
- 	bool pll_auto = false;
- 	int pll_id, div_id;
- 
--	if (clk_id == AUD_CLK_IO)
--		return -ENOTSUPP;
--
- 	switch (clk_id) {
- 	case AUD_CLK_IO:
- 		return -ENOTSUPP;
--- 
-2.15.1
+Thanks
+
+Michal
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: dmesg.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/73315328/attachment-0001.txt>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.txt.xz
+Type: application/x-xz
+Size: 45316 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/73315328/attachment-0001.xz>
