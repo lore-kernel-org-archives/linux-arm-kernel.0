@@ -1,77 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Feb 2018 11:25:19 +0100
-Subject: [PATCH 1/5] soc: renesas: Add symbols for R-Car Gen3 register
- offsets
-In-Reply-To: <20180212154422.13900-2-horms+renesas@verge.net.au>
-References: <20180212154422.13900-1-horms+renesas@verge.net.au>
- <20180212154422.13900-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVN6YhY5Qp1toDeAh8N44EayAQrsz-je96NVZgkz12=ug@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 14 Feb 2018 11:27:52 +0100
+Subject: v4.13 on nokia n900: oops during tethering
+In-Reply-To: <20180213222412.GA1116@mara.localdomain>
+References: <20180212201000.GA25608@amd>
+ <20180213222412.GA1116@mara.localdomain>
+Message-ID: <20180214102752.GA18007@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi!
 
-On Mon, Feb 12, 2018 at 4:44 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Add symbols for Gen3 register offsets.
-> These may be used to improve readability of users of these offsets.
->
-> This does not introduce any functional change.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > During tethering, I got oops in ssi_stop_tx(), followed by failure of
+> > GPRS. I used GPRS tethering a lot with some older kernel, and it was
+> > stable for hours.
+> > 
+> > It seems v4.12 has the same problem. In v4.15 usb networking does not
+> > work at all, so I can't test... v4.10 seems to have similar problem. (Testing is
+> > slighlty tricky, as my internet connection is ... tethering using
+> > N900.)
+> 
+> Based on a quick look ssi_stop_tx() is called too many times (i.e. once
+> more than ssi_start_tx()). This would appear to be an interal problem
+> with the SSI codebase (or whatever lies there; I don't know the current
+> codebase).
 
-Thanks for your patch!
+If you had ideas for debugging patch or maybe a workaround, that would
+be nice...
 
-> --- a/drivers/soc/renesas/rcar-sysc.h
-> +++ b/drivers/soc/renesas/rcar-sysc.h
-> @@ -24,6 +24,25 @@
->  #define PD_CPU_NOCR    PD_CPU | PD_NO_CR /* CPU area lacks CR (R-Car Gen2/3) */
->  #define PD_ALWAYS_ON   PD_NO_CR          /* Always-on area */
->
-> +/*
-> + * R-Car Gen3 register offsets
-> + */
-> +
-> +#define RCAR_GEN3_SYSCSR  0
+> Did this work in the past? When? There appear to have been changes in IRQ
+> handling some time in 2016...
 
-Please drop this. The "always-on" domains use 0 to indicate "no register
-block", not as a reference to the SYSCSR register.
+I could not find working version. It looks like it really depends on
+workload... tethering over USB triggers it quickly, but apparently
+only if I generate "right" ammount of network load.
 
-> +#define RCAR_GEN3_PWRSR0  0x80
-> +#define RCAR_GEN3_PWRSR2  0x100
-> +#define RCAR_GEN3_PWRSR3  0x140
-> +#define RCAR_GEN3_PWRSR4  0x180
-> +#define RCAR_GEN3_PWRSR5  0x1c0
-> +#define RCAR_GEN3_PWRSR6  0x200
-> +#define RCAR_GEN3_PWRSR7  0x240
-> +#define RCAR_GEN3_PWRSR8  0x340
-> +#define RCAR_GEN3_PWRSR9  0x380
-> +#define RCAR_GEN3_PWRSR10 0x3c0
-> +#define RCAR_GEN3_PWRSR11 0x400
-> +#define RCAR_GEN3_PWRSR12 0x2c0
-> +#define RCAR_GEN3_PWRSR13 0x300
-> +#define RCAR_GEN3_PWRSR14 0x280
+There were also some power management changes....
 
-What about
+GPRS traffic generated from N900 does not seem to trigger the problem,
+or not easily.
 
-    #define RCAR_GEN3_PWRSR(n) (0x80 + (n) * 0x40)
-
-instead?
-Bummer, they have a hole between 0x240 and 0x340, which they filled later :-(
-So I don't know how stable the PWRSRx indices are...
-
-For R-Car H1 and Gen2 you can use the following, though:
-
-    #define RCAR_H1_PWRSR(n) (0x40 + (n) * 0x40)
-    #define RCAR_GEN2_PWRSR(n) (0x40 + (n) * 0x40)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
