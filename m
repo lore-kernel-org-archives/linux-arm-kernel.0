@@ -1,34 +1,40 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Wed, 14 Feb 2018 22:42:00 +0100
-Subject: [PATCH v5 10/12] drm/sun4i: Implement A83T HDMI driver
-In-Reply-To: <20180214200906.31509-11-jernej.skrabec@siol.net>
-References: <20180214200906.31509-1-jernej.skrabec@siol.net>
- <20180214200906.31509-11-jernej.skrabec@siol.net>
-Message-ID: <CAOFm3uFkkydWBT9N72ax1oeJs=J2A_s-VbaAW1P5WQopBjw_tA@mail.gmail.com>
+From: tycho@tycho.ws (Tycho Andersen)
+Date: Wed, 14 Feb 2018 15:13:28 -0700
+Subject: arm64 physmap (was Re: [kernel-hardening] [PATCH 4/6]
+ Protectable Memory)
+In-Reply-To: <CAGXu5j+zkFx+1Dn908iqaTV-yP7Wk_rMXZRvXN32h+i_oAcy6w@mail.gmail.com>
+References: <CAFUG7CeUhFcvA82uZ2ZH1j_6PM=aBo4XmYDN85pf8G0gPU44dg@mail.gmail.com>
+ <17e5b515-84c8-dca2-1695-cdf819834ea2@huawei.com>
+ <CAGXu5j+LS1pgOOroi7Yxp2nh=DwtTnU3p-NZa6bQu_wkvvVkwg@mail.gmail.com>
+ <414027d3-dd73-cf11-dc2a-e8c124591646@redhat.com>
+ <CAGXu5j++igQD4tMh0J8nZ9jNji5mU16C7OygFJ5Td+Bq-KSMgw@mail.gmail.com>
+ <CAG48ez1utN_vwHUwk=BU6zM4Wa_53TPu8rm9JuTtY-vGP0Shqw@mail.gmail.com>
+ <f4226a44-92fd-8ead-b458-7551ba82f96d@redhat.com>
+ <CAGXu5j+zOCLerneUt2b-tvyLLg7fEbr9B0YYow-4DH6oV-nnCw@mail.gmail.com>
+ <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
+ <CAGXu5j+zkFx+1Dn908iqaTV-yP7Wk_rMXZRvXN32h+i_oAcy6w@mail.gmail.com>
+Message-ID: <20180214221328.glbrdib3wumve53z@cisco>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 9:09 PM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> A83T has DW HDMI IP block with a custom PHY similar to Synopsys gen2
-> HDMI PHY.
->
-> Only video output was tested, while HW also supports audio and CEC.
-> Support for them will be added later.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+On Wed, Feb 14, 2018 at 11:48:38AM -0800, Kees Cook wrote:
+> On Wed, Feb 14, 2018 at 11:06 AM, Laura Abbott <labbott@redhat.com> wrote:
+> > fixed. Modules yes are not fully protected. The conclusion from past
+> > experience has been that we cannot safely break down larger page sizes
+> > at runtime like x86 does. We could theoretically
+> > add support for fixing up the alias if PAGE_POISONING is enabled but
+> > I don't know who would actually use that in production. Performance
+> > is very poor at that point.
+> 
+> XPFO forces 4K pages on the physmap[1] for similar reasons. I have no
+> doubt about performance changes, but I'd be curious to see real
+> numbers. Did anyone do benchmarks on just the huge/4K change? (Without
+> also the XPFO overhead?)
+> 
+> If this, XPFO, and PAGE_POISONING all need it, I think we have to
+> start a closer investigation. :)
 
-...
+I haven't but it shouldn't be too hard. What benchmarks are you
+thinking?
 
-> --- /dev/null
-> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-> @@ -0,0 +1,44 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-
-This should be
-
-/* SPDX-License-Identifier: GPL-2.0+ /* in a .h per [1]
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst
--- 
-Cordially
-Philippe Ombredanne
+Tycho
