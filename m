@@ -1,28 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 14 Feb 2018 15:08:09 +0100
-Subject: [PATCH 07/15] ARM64: dts: r8a77965: Add dmac device nods
-In-Reply-To: <1518515162-23663-8-git-send-email-jacopo+renesas@jmondi.org>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-8-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWswgBrY5hOws0kx-WVShuh8Gv7+oDDA=qa-kpJi5B_cA@mail.gmail.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Wed, 14 Feb 2018 15:10:23 +0100
+Subject: [PATCH v2 0/2] Fix broken bananapi m2 devicetree/regulators
+Message-ID: <20180214141025.22171-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
-<jacopo+renesas@jmondi.org> wrote:
-> Add dmac[0-2] device nodes for R-Car M3-N (r8a77965) SoC.
->
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+This patchseries fixes the bananapi m1 devicetree, to be able to boot again.
+The first two patches update/improve the devicetree and the last patch adds
+all missing regulators.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Regards,
+Philipp
 
-Gr{oetje,eeting}s,
+Changes since v1:
+	* squashed commit 1 and 3
+	* fix wrong mmc regulator
 
-                        Geert
+Philipp Rossak (2):
+  arm: dts: sun6i: a31s: bpi-m2: improve pmic properties
+  arm: dts: sun6i: a31s: fix: bpi-m2: add missing regulators
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 63 ++++++++++++++++++++++--
+ 1 file changed, 60 insertions(+), 3 deletions(-)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.11.0
