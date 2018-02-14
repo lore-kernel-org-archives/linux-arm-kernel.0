@@ -1,39 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Feb 2018 11:38:39 +0100
-Subject: [PATCH] mmc: sdhci-iproc: Disable preset values for BCM2835
-In-Reply-To: <1518465764-30051-1-git-send-email-stefan.wahren@i2se.com>
-References: <1518465764-30051-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CAPDyKFov+8-t1awEQqB+vJxkbVvDKNae=JVUoyZsO3uRj=YeOA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 14 Feb 2018 12:08:56 +0200
+Subject: [PATCH v3 3/5] arm64: dts: renesas: r8a7795-es1: Fix register
+ mappings on VSPs
+In-Reply-To: <1518602108-1724-4-git-send-email-kbingham@kernel.org>
+References: <1518602108-1724-1-git-send-email-kbingham@kernel.org>
+ <1518602108-1724-4-git-send-email-kbingham@kernel.org>
+Message-ID: <2009459.7Q8ChOu4tJ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2018 at 21:02, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> According to the BCM2835 datasheet there are no preset value registers.
-> This wasn't an issue before, because we didn't propagate 1.8V support.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Hi Kieran,
 
-Thanks, applied for next!
+Thank you for the patch.
 
-Kind regards
-Uffe
+On Wednesday, 14 February 2018 11:55:06 EET Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> The VSPD includes a CLUT on RPF2. Ensure that the register space is
+> mapped correctly to support this.
+> 
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 > ---
->  drivers/mmc/host/sdhci-iproc.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
-> index 61666d2..0ef741b 100644
-> --- a/drivers/mmc/host/sdhci-iproc.c
-> +++ b/drivers/mmc/host/sdhci-iproc.c
-> @@ -214,6 +214,7 @@ static const struct sdhci_pltfm_data sdhci_bcm2835_pltfm_data = {
->                   SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
->                   SDHCI_QUIRK_MISSING_CAPS |
->                   SDHCI_QUIRK_NO_HISPD_BIT,
-> +       .quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
->         .ops = &sdhci_iproc_32only_ops,
->  };
->
-> --
-> 2.7.4
->
+>  arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+> b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi index
+> ed553338b4d4..1adfe6cad268 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+> @@ -80,7 +80,7 @@
+> 
+>  	vspd3: vsp at fea38000 {
+>  		compatible = "renesas,vsp2";
+> -		reg = <0 0xfea38000 0 0x4000>;
+> +		reg = <0 0xfea38000 0 0x8000>;
+>  		interrupts = <GIC_SPI 469 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cpg CPG_MOD 620>;
+>  		power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+
+-- 
+Regards,
+
+Laurent Pinchart
