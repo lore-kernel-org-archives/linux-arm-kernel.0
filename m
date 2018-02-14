@@ -1,60 +1,26 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 14 Feb 2018 17:58:30 +0200
-Subject: [PATCH] ARM: dts: Keystone: add ECC error handler support
-Message-ID: <1518623910-24700-1-git-send-email-t-kristo@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Feb 2018 16:04:24 +0000
+Subject: [PATCH] spi: bcm2835aux: Avoid 64-bit arithmetic in xfer len calc
+In-Reply-To: <20180212193814.17644-1-tpiepho@impinj.com>
+References: <1518463905.25398.281.camel@impinj.com>
+ <20180212193814.17644-1-tpiepho@impinj.com>
+Message-ID: <20180214160424.GF12658@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Murali Karicheri <m-karicheri2@ti.com>
+On Mon, Feb 12, 2018 at 11:38:14AM -0800, Trent Piepho wrote:
+> We want to check for xfers that are over 30 microseconds.  Rather than
+> find how many ?s a xfer will take, instead find how many bytes can be
+> transferred in 30 ?s.  The latter must be less than 32 bits (since our
+> clock speed is limited to 32 bits), while the former involves 64 bit
+> quantities and more arithmetic operations.
 
-Add emif node for keystone2 devices, which is used for ECC support.
-
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-[t-kristo at ti.com: made emif enabled by default for all keystone2 devices]
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
-Depends on the dt-binding, which has been posted here:
-- https://www.spinics.net/lists/devicetree/msg214633.html
-
- arch/arm/boot/dts/keystone-k2g.dtsi | 6 ++++++
- arch/arm/boot/dts/keystone.dtsi     | 7 +++++++
- 2 files changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index ca94221..9c50b76 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -590,5 +590,11 @@
- 			power-domains = <&k2g_pds 0x22>;
- 			clocks = <&k2g_clks 0x22 0>;
-                 };
-+
-+		emif: emif at 21010000 {
-+			compatible = "ti,emif-keystone";
-+			reg = <0x21010000 0x200>;
-+			interrupts = <GIC_SPI 123 IRQ_TYPE_EDGE_RISING>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 93ea5c6..41339bd 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -338,5 +338,12 @@
- 					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
- 			};
- 		};
-+
-+		emif: emif at 21010000 {
-+			compatible = "ti,emif-keystone";
-+			reg = <0x21010000 0x200>;
-+			interrupts = <GIC_SPI 448 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-parent = <&gic>;
-+		};
- 	};
- };
--- 
-1.9.1
-
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Please don't bury patches in the middle of existing threads, it makes it
+much harder to find them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180214/0cb94b3d/attachment-0001.sig>
