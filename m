@@ -1,118 +1,37 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 14 Feb 2018 17:51:59 +0200
-Subject: [PATCH v2 4/6] crypto: virtio: convert to new crypto engine API
-In-Reply-To: <20180126191534.17569-5-clabbe.montjoie@gmail.com>
-References: <20180126191534.17569-1-clabbe.montjoie@gmail.com>
- <20180126191534.17569-5-clabbe.montjoie@gmail.com>
-Message-ID: <20180214175137-mutt-send-email-mst@kernel.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 14 Feb 2018 17:55:03 +0200
+Subject: [PATCH] ARM: ds: keystone-k2g: add watchdog support
+Message-ID: <1518623703-24529-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 26, 2018 at 08:15:32PM +0100, Corentin Labbe wrote:
-> This patch convert the driver to the new crypto engine API.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Add a watchdog node for keystone-k2g, with the corresponding clock and
+power domain handles.
 
-Acked-by: Michael S. Tsirkin <mst@redhat.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2g.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Pls queue when/if rest of changes go in.
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index fd06171..ca94221 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -583,5 +583,12 @@
+ 			power-domains = <&k2g_pds 0x0013>;
+ 			clocks = <&k2g_clks 0x0013 0>;
+ 		};
++
++		wdt: wdt at 02250000 {
++			compatible = "ti,keystone-wdt", "ti,davinci-wdt";
++			reg = <0x02250000 0x80>;
++			power-domains = <&k2g_pds 0x22>;
++			clocks = <&k2g_clks 0x22 0>;
++		};
+ 	};
+ };
+-- 
+1.9.1
 
-> ---
->  drivers/crypto/virtio/virtio_crypto_algs.c   | 16 ++++++++++------
->  drivers/crypto/virtio/virtio_crypto_common.h |  3 +--
->  drivers/crypto/virtio/virtio_crypto_core.c   |  3 ---
->  3 files changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/crypto/virtio/virtio_crypto_algs.c b/drivers/crypto/virtio/virtio_crypto_algs.c
-> index abe8c15450df..ba190cfa7aa1 100644
-> --- a/drivers/crypto/virtio/virtio_crypto_algs.c
-> +++ b/drivers/crypto/virtio/virtio_crypto_algs.c
-> @@ -29,6 +29,7 @@
->  
->  
->  struct virtio_crypto_ablkcipher_ctx {
-> +	struct crypto_engine_ctx enginectx;
->  	struct virtio_crypto *vcrypto;
->  	struct crypto_tfm *tfm;
->  
-> @@ -491,7 +492,7 @@ static int virtio_crypto_ablkcipher_encrypt(struct ablkcipher_request *req)
->  	vc_sym_req->ablkcipher_req = req;
->  	vc_sym_req->encrypt = true;
->  
-> -	return crypto_transfer_cipher_request_to_engine(data_vq->engine, req);
-> +	return crypto_transfer_ablkcipher_request_to_engine(data_vq->engine, req);
->  }
->  
->  static int virtio_crypto_ablkcipher_decrypt(struct ablkcipher_request *req)
-> @@ -511,7 +512,7 @@ static int virtio_crypto_ablkcipher_decrypt(struct ablkcipher_request *req)
->  	vc_sym_req->ablkcipher_req = req;
->  	vc_sym_req->encrypt = false;
->  
-> -	return crypto_transfer_cipher_request_to_engine(data_vq->engine, req);
-> +	return crypto_transfer_ablkcipher_request_to_engine(data_vq->engine, req);
->  }
->  
->  static int virtio_crypto_ablkcipher_init(struct crypto_tfm *tfm)
-> @@ -521,6 +522,9 @@ static int virtio_crypto_ablkcipher_init(struct crypto_tfm *tfm)
->  	tfm->crt_ablkcipher.reqsize = sizeof(struct virtio_crypto_sym_request);
->  	ctx->tfm = tfm;
->  
-> +	ctx->enginectx.op.do_one_request = virtio_crypto_ablkcipher_crypt_req;
-> +	ctx->enginectx.op.prepare_request = NULL;
-> +	ctx->enginectx.op.unprepare_request = NULL;
->  	return 0;
->  }
->  
-> @@ -538,9 +542,9 @@ static void virtio_crypto_ablkcipher_exit(struct crypto_tfm *tfm)
->  }
->  
->  int virtio_crypto_ablkcipher_crypt_req(
-> -	struct crypto_engine *engine,
-> -	struct ablkcipher_request *req)
-> +	struct crypto_engine *engine, void *vreq)
->  {
-> +	struct ablkcipher_request *req = container_of(vreq, struct ablkcipher_request, base);
->  	struct virtio_crypto_sym_request *vc_sym_req =
->  				ablkcipher_request_ctx(req);
->  	struct virtio_crypto_request *vc_req = &vc_sym_req->base;
-> @@ -561,8 +565,8 @@ static void virtio_crypto_ablkcipher_finalize_req(
->  	struct ablkcipher_request *req,
->  	int err)
->  {
-> -	crypto_finalize_cipher_request(vc_sym_req->base.dataq->engine,
-> -					req, err);
-> +	crypto_finalize_ablkcipher_request(vc_sym_req->base.dataq->engine,
-> +					   req, err);
->  	kzfree(vc_sym_req->iv);
->  	virtcrypto_clear_request(&vc_sym_req->base);
->  }
-> diff --git a/drivers/crypto/virtio/virtio_crypto_common.h b/drivers/crypto/virtio/virtio_crypto_common.h
-> index e976539a05d9..72621bd67211 100644
-> --- a/drivers/crypto/virtio/virtio_crypto_common.h
-> +++ b/drivers/crypto/virtio/virtio_crypto_common.h
-> @@ -107,8 +107,7 @@ struct virtio_crypto *virtcrypto_get_dev_node(int node);
->  int virtcrypto_dev_start(struct virtio_crypto *vcrypto);
->  void virtcrypto_dev_stop(struct virtio_crypto *vcrypto);
->  int virtio_crypto_ablkcipher_crypt_req(
-> -	struct crypto_engine *engine,
-> -	struct ablkcipher_request *req);
-> +	struct crypto_engine *engine, void *vreq);
->  
->  void
->  virtcrypto_clear_request(struct virtio_crypto_request *vc_req);
-> diff --git a/drivers/crypto/virtio/virtio_crypto_core.c b/drivers/crypto/virtio/virtio_crypto_core.c
-> index ff1410a32c2b..83326986c113 100644
-> --- a/drivers/crypto/virtio/virtio_crypto_core.c
-> +++ b/drivers/crypto/virtio/virtio_crypto_core.c
-> @@ -111,9 +111,6 @@ static int virtcrypto_find_vqs(struct virtio_crypto *vi)
->  			ret = -ENOMEM;
->  			goto err_engine;
->  		}
-> -
-> -		vi->data_vq[i].engine->cipher_one_request =
-> -			virtio_crypto_ablkcipher_crypt_req;
->  	}
->  
->  	kfree(names);
-> -- 
-> 2.13.6
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
