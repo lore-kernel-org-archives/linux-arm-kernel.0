@@ -1,47 +1,105 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 14 Feb 2018 12:08:14 +0000
-Subject: [PATCH] irqchip/gic-v3: Support MSIs via aliases and distributor
-In-Reply-To: <20171127102408.6631-1-sboyd@codeaurora.org>
-References: <20171127102408.6631-1-sboyd@codeaurora.org>
-Message-ID: <bf71552e-6ea0-55f3-6b42-f4a1a3f65cb9@linaro.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 14 Feb 2018 13:14:34 +0100
+Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
+In-Reply-To: <20180214113045.GQ9418@n2100.armlinux.org.uk> (Russell King's
+ message of "Wed, 14 Feb 2018 11:30:45 +0000")
+References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
+ <87vaezonrn.fsf@bootlin.com>
+ <20180214105653.r4hcdxgbdmth3d7a@tarshish>
+ <20180214110750.GP9418@n2100.armlinux.org.uk>
+ <20180214111745.6lelfxrj5wutqzne@tarshish>
+ <20180214113045.GQ9418@n2100.armlinux.org.uk>
+Message-ID: <87bmgrojit.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+ 
+ On mer., f?vr. 14 2018, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-On 27/11/17 10:24, Stephen Boyd wrote:
-> Some GIC configurations don't have an accessible ITS, but they
-> want to support MSIs through the distributor's SETSPI registers
-> or through the IMPLEMENTATION DEFINED message-based interrupt
-> request register region. This mode of operation is similar to the
-> v2m support on gic-400, but we don't necessarily know what
-> particular SPIs are supported as MSIs so we need some help from
-> firmware to know what to do.
-> 
-> Introduce an "arm,spi-ranges" property for this, similar to the
-> "marvell,spi-ranges" property, that indicates the base and size
-> of each MSI range. This property applies equally to the
-> distributor and alias registers. In either case, we detect this
-> mode of operation by looking for a node with the "msi-controller"
-> property and then probe the v2m frame code on top of it. Assume
-> these nodes will have the "arm,spi-ranges" property in them so
-> that the v2m code works mostly unmodified.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->   .../bindings/interrupt-controller/arm,gic-v3.txt   |  48 +++++++++-
->   drivers/irqchip/irq-gic-v2m.c                      | 102 ++++++++++++++++-----
->   drivers/irqchip/irq-gic-v3.c                       |   4 +
->   include/linux/irqchip/arm-gic-common.h             |   3 +
->   4 files changed, 129 insertions(+), 28 deletions(-)
+> On Wed, Feb 14, 2018 at 01:17:45PM +0200, Baruch Siach wrote:
+>> Hi Ressell,
+>> 
+>> On Wed, Feb 14, 2018 at 11:07:51AM +0000, Russell King - ARM Linux wrote:
+>> > On Wed, Feb 14, 2018 at 12:56:53PM +0200, Baruch Siach wrote:
+>> > > On Wed, Feb 14, 2018 at 11:42:52AM +0100, Gregory CLEMENT wrote:
+>> > > >  On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+>> > > > 
+>> > > > > The CP110 component has 4 uart peripherals. All of them use the same clock
+>> > > > > gate for slow peripherals that is shared with the i2c and spi peripherals.
+>> > > > >
+>> > > > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>> > > > 
+>> > > > Applied on mvebu/dt64
+>> > > 
+>> > > Thanks.
+>> > > 
+>> > > What about patch 2/2 in this series?
+>> > 
+>> > I'm not entirely convinced that it's something that should be done.
+>> > I know that some people are already using the UART headers for other
+>> > purposes (other than UART) and the later revision boards have the
+>> > placement of the microUSB fixed so it is accessible.
+>> > 
+>> > While you can tell Linux to use the other UART headers with this
+>> > patch, uboot won't use them, which means you can't configure the
+>> > boot loader without (in your case) taking the board out of the case.
+>> > 
+>> > I've a similar problem (with the mcbin in a rackmount case), and my
+>> > solution to that has been to put a single washer under the mounting
+>> > post near the microUSB to lift the board sufficiently to allow a
+>> > connector to be plugged in.  Sometimes simple hardware fixes are
+>> > better than software fixes.
+>> > 
+>> > Others have used a dremel to modify the case to access the microUSB.
+>> 
+>> Just for the record, I'm fine with dropping 'status = "okay"' from the mcbin 
+>> CP{0,1} UART nodes. This would still allow anyone who needs this functionality 
+>> to enable it with a simple .dts modification, or a run-time dtb modification 
+>> from the bootloader.
+>
+> Talking more with Jon (who works for SolidRun, the board manufacturer),
+> the feeling there is:
+>
+> 1. Why enable both UART headers - it makes more sense (given your reason)
+>    to enable one as UART but keep the other as GPIO.  The labelling up of
+>    them being a UART is merely a historical artifact of the very early
+>    development of the board.
+>
+> 2. They are developer boards, not a final product.  Case modification is
+>    somewhat expected.
 
-What's the plan on this?
-I have not seen this patch in rc1 or in next.
+Just to let know that I applied the patch but I still can either ammend
+it or drop it as it is not yet part of an immutable tag.
 
-We have a dependency on this to get WLAN working on DragonBoard820c.
+Once you will have agreed I will do the change.
+
+Gregory
 
 
-thanks,
-Srini
+>
+> (2) is especially relevant when SFP support gets added - some of the
+> early revision boards have the SCL/SDA lines swapped on the I2C bus.
+> With that fixed, all boards have way too strong pull-ups on the I2C
+> bus which means some modules don't work - and worse than that, may
+> result in corrupted module EEPROMs.
+>
+> I ended up with corruption here, and although I've a rev 1.3 board now,
+> I'm still using my self-modified rev 1.1 in preference to it, because
+> I don't want to have to deal with another corrupted EEPROM.
+>
+> In order for SFP to be reliably functional, board modification is
+> required (either replacement of resistor packs, or in the case of the
+> early boards, cutting the I2C lines and rewiring them.)
+>
+> IOW, board modification will be required for SFP on most mcbins.
+>
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
