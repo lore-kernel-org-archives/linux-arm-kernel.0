@@ -1,149 +1,92 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Wed, 14 Feb 2018 15:10:25 +0100
-Subject: [PATCH v2 2/2] arm: dts: sun6i: a31s: fix: bpi-m2: add missing
- regulators
-In-Reply-To: <20180214141025.22171-1-embed3d@gmail.com>
-References: <20180214141025.22171-1-embed3d@gmail.com>
-Message-ID: <20180214141025.22171-3-embed3d@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 14 Feb 2018 15:13:47 +0100
+Subject: [PATCH 10/15] ARM64: dts: r8a77965: Add SCIF device nodes
+In-Reply-To: <1518515162-23663-11-git-send-email-jacopo+renesas@jmondi.org>
+References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1518515162-23663-11-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdUe1QJq8wFCbc4LoYKzn9roUoAj2iNGfEYfZM=RHtPgpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a bootproblem with the Bananapi M2 board. Since there
-are some regulators missing we add them right now. Those values come
-from the schematic, below you can find a small overview:
+On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
+<jacopo+renesas@jmondi.org> wrote:
+> Add SCIF[0-5] device nodes for M3-N (r8a77965) SoC.
+>
+> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-* reg_aldo1:  3,3V, powers the wifi
-* reg_aldo2:  2,5V, powers the IO of the RTL8211E
-* reg_aldo3:  3,3V, powers the audio
+> --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 
-* reg_dldo1:  3,0V, powers the RTL8211E
-* reg_dldo2:  2,8V, powers the analog part of the csi
-* reg_dldo3:  3,3V, powers misc
-* reg_eldo1:  1,8V, powers the csi
-* reg_ldo_io1:1,8V, powers the gpio
+>                 scif3: serial at e6c50000 {
+> -                       /* placeholder */
+> +                       compatible = "renesas,scif-r8a7796",
 
-* reg_dc5ldo: needs to be always on
+renesas,scif-r8a77965
 
-This patch updates also the vmmc-supply properties on the mmc0 and mmc2
-node to use the allready existent regulators.
-We can now remove the sunxi-common-regulators.dtsi include since we
-don't need it anymore.
+> +                                    "renesas,rcar-gen3-scif", "renesas,scif";
+> +                       reg = <0 0xe6c50000 0 64>;
+> +                       interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 204>,
+> +                                <&cpg CPG_CORE R8A77965_CLK_S3D1>,
+> +                                <&scif_clk>;
+> +                       clock-names = "fck", "brg_int", "scif_clk";
+> +                       dmas = <&dmac0 0x57>, <&dmac0 0x56>;
+> +                       dma-names = "tx", "rx";
+> +                       power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+> +                       resets = <&cpg 204>;
+> +                       status = "disabled";
+>                 };
+>
+>                 scif4: serial at e6c40000 {
+> -                       /* placeholder */
+> +                       compatible = "renesas,scif-r8a7796",
 
-Fixes: 7daa21370075 ("ARM: dts: sunxi: Add regulators for Sinovoip
-BPI-M2")
+renesas,scif-r8a77965
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
----
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 61 ++++++++++++++++++++++--
- 1 file changed, 58 insertions(+), 3 deletions(-)
+> +                                    "renesas,rcar-gen3-scif", "renesas,scif";
+> +                       reg = <0 0xe6c40000 0 64>;
+> +                       interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 203>,
+> +                                <&cpg CPG_CORE R8A77965_CLK_S3D1>,
+> +                                <&scif_clk>;
+> +                       clock-names = "fck", "brg_int", "scif_clk";
+> +                       dmas = <&dmac0 0x59>, <&dmac0 0x58>;
+> +                       dma-names = "tx", "rx";
+> +                       power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+> +                       resets = <&cpg 203>;
+> +                       status = "disabled";
+>                 };
+>
+>                 scif5: serial at e6f30000 {
+> -                       /* placeholder */
+> +                       compatible = "renesas,scif-r8a7796",
 
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-index fb34f32502cf..b2758dd8ce43 100644
---- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-@@ -42,7 +42,6 @@
- 
- /dts-v1/;
- #include "sun6i-a31s.dtsi"
--#include "sunxi-common-regulators.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
-@@ -99,6 +98,7 @@
- 	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
- 	phy = <&phy1>;
- 	phy-mode = "rgmii";
-+	phy-supply = <&reg_dldo1>;
- 	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
- 	snps,reset-active-low;
- 	snps,reset-delays-us = <0 10000 30000>;
-@@ -118,7 +118,7 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 0 4 GPIO_ACTIVE_HIGH>; /* PA4 */
- 	cd-inverted;
-@@ -132,7 +132,7 @@
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins_a>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_aldo1>;
- 	mmc-pwrseq = <&mmc2_pwrseq>;
- 	bus-width = <4>;
- 	non-removable;
-@@ -195,7 +195,28 @@
- 
- #include "axp22x.dtsi"
- 
-+&reg_aldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vcc-gmac";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
- &reg_dc5ldo {
-+	regulator-always-on;
- 	regulator-min-microvolt = <700000>;
- 	regulator-max-microvolt = <1320000>;
- 	regulator-name = "vdd-cpus";
-@@ -235,6 +256,40 @@
- 	regulator-name = "vcc-dram";
- };
- 
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-mac";
-+};
-+
-+&reg_dldo2 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "avdd-csi";
-+};
-+
-+&reg_dldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pb";
-+};
-+
-+&reg_eldo1 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "vdd-csi";
-+	status = "okay";
-+};
-+
-+&reg_ldo_io1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "vcc-pm-cpus";
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--- 
-2.11.0
+renesas,scif-r8a77965
+
+> +                                    "renesas,rcar-gen3-scif", "renesas,scif";
+> +                       reg = <0 0xe6f30000 0 64>;
+> +                       interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 202>,
+> +                                <&cpg CPG_CORE R8A77965_CLK_S3D1>,
+> +                                <&scif_clk>;
+> +                       clock-names = "fck", "brg_int", "scif_clk";
+> +                       dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
+> +                              <&dmac2 0x5b>, <&dmac2 0x5a>;
+> +                       dma-names = "tx", "rx", "tx", "rx";
+> +                       power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+> +                       resets = <&cpg 202>;
+> +                       status = "disabled";
+
+With the above fixed:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
