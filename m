@@ -1,92 +1,46 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 14 Feb 2018 12:06:27 +0100
-Subject: [PATCH v2 2/2] arm64: dts: marvell: mcbin: enable uart headers
-In-Reply-To: <b4dc178abd765426e0d0e3aa3be9d8ac7d1301d6.1517381798.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Wed, 31 Jan 2018 08:56:38 +0200")
+Date: Wed, 14 Feb 2018 12:07:11 +0100
+Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
+In-Reply-To: <20180214105653.r4hcdxgbdmth3d7a@tarshish> (Baruch Siach's
+ message of "Wed, 14 Feb 2018 12:56:53 +0200")
 References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
- <b4dc178abd765426e0d0e3aa3be9d8ac7d1301d6.1517381798.git.baruch@tkos.co.il>
-Message-ID: <87k1vfomoc.fsf@bootlin.com>
+ <87vaezonrn.fsf@bootlin.com>
+ <20180214105653.r4hcdxgbdmth3d7a@tarshish>
+Message-ID: <87fu63omn4.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Baruch,
  
- On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+ On mer., f?vr. 14 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 
-> Add description of the J25 and J27 UART headers of the Macchiatobin. They use
-> uart peripherals that the CP0 (J25) and CP1 (J27) provide.
+> Hi Gregory,
 >
-> Even though J25 and J27 are labeled as UART header, the pins on these headers
-> can be muxed for other purposes. But the UART functionality is useful when the
-> board is mounted in an ATX style enclosure, since the console UART is not
-> accessible through the microUSB at CON9.
+> On Wed, Feb 14, 2018 at 11:42:52AM +0100, Gregory CLEMENT wrote:
+>>  On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+>> 
+>> > The CP110 component has 4 uart peripherals. All of them use the same clock
+>> > gate for slow peripherals that is shared with the i2c and spi peripherals.
+>> >
+>> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+>> 
+>> Applied on mvebu/dt64
 >
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> Thanks.
+>
+> What about patch 2/2 in this series?
 
-Applied on mvebu/dt64
-
-Thanks,
+I thought I applied it, but now it's done.
 
 Gregory
 
-> ---
-> v2:
->   Add comments to indicate the headers board labels (Thomas)
->   Explain in the commit log why we want the UART functionality (RMK)
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> index 626e9d0462c3..122d2257ebc4 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> @@ -163,6 +163,13 @@
->  	};
->  };
->  
-> +/* J25 UART header */
-> +&cp0_uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&cp0_uart1_pins>;
-> +	status = "okay";
-> +};
-> +
->  &cp0_mdio {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&cp0_ge_mdio_pins>;
-> @@ -195,6 +202,10 @@
->  		marvell,pins = "mpp37", "mpp38";
->  		marvell,function = "i2c0";
->  	};
-> +	cp0_uart1_pins: uart1-pins {
-> +		marvell,pins = "mpp40", "mpp41";
-> +		marvell,function = "uart1";
-> +	};
->  	cp0_xhci_vbus_pins: xhci0-vbus-pins {
->  		marvell,pins = "mpp47";
->  		marvell,function = "gpio";
-> @@ -290,6 +301,17 @@
->  		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
->  		marvell,function = "spi1";
->  	};
-> +	cp1_uart0_pins: uart0-pins {
-> +		marvell,pins = "mpp6", "mpp7";
-> +		marvell,function = "uart0";
-> +	};
-> +};
-> +
-> +/* J27 UART header */
-> +&cp1_uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&cp1_uart0_pins>;
-> +	status = "okay";
->  };
->  
->  &cp1_sata0 {
+> baruch
+>
 > -- 
-> 2.15.1
->
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
 
 -- 
 Gregory Clement, Bootlin (formerly Free Electrons)
