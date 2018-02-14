@@ -1,43 +1,21 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 Feb 2018 15:52:50 +0100
-Subject: [PATCH 3/3] clk: exynos5433: Add CLK_IGNORE_UNUSED flag to
- sclk_ioclk_i2s1_bclk
-In-Reply-To: <5A792A2B.60603@samsung.com>
-References: <20180205142230.9755-1-s.nawrocki@samsung.com>
- <CGME20180205142314epcas1p2c9b9bdcba33290a9528a1b24fbc849eb@epcas1p2.samsung.com>
- <20180205142230.9755-3-s.nawrocki@samsung.com> <5A792A2B.60603@samsung.com>
-Message-ID: <847021bf-d8b0-2070-86b3-fa63ce5e0517@samsung.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 14 Feb 2018 15:58:31 +0100
+Subject: [PATCH 1/2] mmc: bcm2835: reset host on timeout
+In-Reply-To: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+References: <97593d6e1a41af1baff61f7d9e6e68a450fc9da6.1518619058.git.msuchanek@suse.de>
+Message-ID: <1fbf0d77-cb53-f0fa-b810-e9954138d907@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2018 05:08 AM, Chanwoo Choi wrote:
-> On 2018? 02? 05? 23:22, Sylwester Nawrocki wrote:
->> The sclk_ioclk_i2s1_bclk clock is not currently handled by any driver
->> and disabling this clock by the clk core prevents proper operation
->> of the I2S1 block. CLK_IGNORE_UNUSED flag is added as a temporary fix.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->>  drivers/clk/samsung/clk-exynos5433.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
->> index d74361736e64..15177f74e125 100644
->> --- a/drivers/clk/samsung/clk-exynos5433.c
->> +++ b/drivers/clk/samsung/clk-exynos5433.c
->> @@ -1680,7 +1680,7 @@ static const struct samsung_gate_clock peric_gate_clks[] __initconst = {
->>  			ENABLE_SCLK_PERIC, 11, CLK_SET_RATE_PARENT, 0),
->>  	GATE(CLK_SCLK_IOCLK_I2S1_BCLK, "sclk_ioclk_i2s1_bclk",
->>  			"ioclk_i2s1_bclk_in", ENABLE_SCLK_PERIC, 10,
->> -			CLK_SET_RATE_PARENT, 0),
->> +			CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED, 0),
->>  	GATE(CLK_SCLK_SPDIF, "sclk_spdif", "sclk_spdif_peric",
->>  			ENABLE_SCLK_PERIC, 8, CLK_SET_RATE_PARENT, 0),
->>  	GATE(CLK_SCLK_PCM1, "sclk_pcm1", "sclk_pcm1_peric",
->>
-> If any device driver handles the sclk_ioclk_i2s1_bclk on later,
-> CLK_IGNORE_UNUSED will be ignored. Looks good to me.
-> 
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Hi Michal,
 
-Thanks, I have applied the patch to clk/samsung tree.
+Am 14.02.2018 um 15:38 schrieb Michal Suchanek:
+> The bcm2835 mmc host tends to lock up for unknown reason so reset it on
+> timeout. The upper mmc block layer tries retransimitting with single
+> blocks which tends to work out after a long wait.
+>
+> This is better than giving up and leaving the machine broken for no
+> obvious reason.
+
+could you please provide more information about this issue (affected
+hardware, kernel config, version, dmesg, reproducible scenario)?
