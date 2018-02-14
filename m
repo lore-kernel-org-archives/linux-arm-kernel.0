@@ -1,63 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Feb 2018 15:23:17 +0100
-Subject: [PATCH v5 0/7] ARM: stm32: add initial STM32MPU support
-In-Reply-To: <fa1d8118-6879-a984-4cd9-0e0da98c467b@st.com>
-References: <1516114580-2424-1-git-send-email-ludovic.Barre@st.com>
- <fa1d8118-6879-a984-4cd9-0e0da98c467b@st.com>
-Message-ID: <CAK8P3a16=B9g1cBxOfecgkt2KWthGLJOhg1AkrGEnxjZ-euLQA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Feb 2018 14:24:28 +0000
+Subject: [GIT PULL] arm64 spectre and meltdown mitigations for v4.14-stable
+In-Reply-To: <20180214135420.GB24189@kroah.com>
+References: <20180212113801.2552-1-ard.biesheuvel@linaro.org>
+ <20180214135420.GB24189@kroah.com>
+Message-ID: <CAKv+Gu_uqudgFU1_+cWZtvyQmZMxjCYuUr-2L59yEfoY8EyWQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 12:05 PM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> Hi Arnd,
+On 14 February 2018 at 13:54, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Mon, Feb 12, 2018 at 11:38:01AM +0000, Ard Biesheuvel wrote:
+>> Hi Greg,
+>>
+>> As mentioned by Will, I have created the v4.14 counterpart of his stable
+>> backport of the arm64/ARM Spectre/Meltdown mitigations that have been pulled
+>> into v4.16-rc1.
+>>
+>> Given that this is the v4.15 version backported to v4.14, I have removed any
+>> mention of 'conflicts' from the commit logs as they are now ambiguous. The
+>> patches applied surprisingly cleanly, I only needed to drop two patches that
+>> are already in (the same ones Will mentioned in his PR), and drop another one
+>> dealing with SPE, support for which did not exist yet in v4.14. I also included
+>> the patch
+>>
+>>   arm64: move TASK_* definitions to <asm/processor.h>
+>>
+>> from v4.15 to make Robin's Spectre v1 patches apply more cleanly.
 >
-> On 01/16/2018 03:56 PM, Ludovic Barre wrote:
->>
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch series extends the existing STM32 microcontrollers (MCUs)
->> family to microprocessors (MPUs). The MPU platform (based on
->> Arm Cortex-A) is a continuation of the MCU one (based on Arm
->> Cortex-M) in that it shares a wide number of hardware blocks.
->>
->> change v5:
->> -fix serial3 aliases by serial0
->>   change v4:
->> -Add all available uarts in stm32mp157c
->> -Move uart aliases to board files
->>
->> change v3:
->> -Remove bootargs
->> -Remove armv7m_restart and Share stm32_compat for mcu/mpu
->> -Modify stm32 kconfig with Arnd template
->> -Remove patch below (Linus W: Patch applied)
->>   devicetree: bindings: Document supported STM32 SoC family
->>   pinctrl: stm32: Add STM32MP157 MPU support
->>
->> change V2:
->> -Add stm32 documentation in this serie to avoid merge conflict
->> thread: "https://patchwork.kernel.org/patch/10102573/";
->> -Split bindings (stm32.txt) to separate patches.
->> -Remove ARCH_STM32_MCU/MPU flags
->> -Adopt rst format for Documentation/arm/stm32 files
->> -s/STMicrolectronics/STMicroelectronics/g
->>  > Ludovic Barre (7):
->>    Documentation: arm: stm32: move to rst format
->>    ARM: stm32: prepare stm32 family to welcome armv7 architecture
->>    dt-bindings: stm32: add support of STM32MP157
->>    ARM: stm32: add initial support for STM32MP157
->>    ARM: configs: multi_v7: add stm32 support
->>    ARM: dts: stm32: add stm32mp157c initial support
->>    ARM: dts: stm32: add initial support of stm32mp157c eval board
->>
-> I will merge stm32 DT patches and mach-stm32 patches in my next pull
-> requests.
-> What about Documentation patch and multi-v7 config patch ?
-> (I could add Documentation patch in my DT pull request)
+> I've queued these up now, but if you could pull the whole quilt tree and
+> verify I got things right, that would be great.  There was some
+> conflicts with a few previous patches I had already queued up that
+> touched some "Falkor" errata code.
+>
+> Specifically 932b50c7c1c65e6f23002e075b97ee083c4a9e71 "arm64: Add
+> software workaround for Falkor erratum 1041" is the offending patch.  I
+> think I resolved the merge issues properly, but verifying this would be
+> wonderful.
+>
 
-Please make the DT pull request have only DT related changes including
-header files that are needed by DT and binding documentation, but
-have the rest in a separate pull request.
-
-       Arnd
+No, the build is broken now. I will investigate.
