@@ -1,11 +1,11 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 14 Feb 2018 15:43:34 +0100
-Subject: [PATCH -next] clk: samsung: exynos-audss: Remove redundant
- dev_err call in exynos_audss_clk_probe()
-In-Reply-To: <1516188378-144847-1-git-send-email-weiyongjun1@huawei.com>
-References: <1516188378-144847-1-git-send-email-weiyongjun1@huawei.com>
- <CGME20180214144350epcas1p1d66e605e6d68de23661f51ced410d72e@epcas1p1.samsung.com>
-Message-ID: <240b9be5-429c-ca34-63c6-bdd260970ca8@samsung.com>
+Date: Wed, 14 Feb 2018 15:45:05 +0100
+Subject: [PATCH -next] clk: samsung: exynos5433: Remove redundant
+ dev_err call in exynos5433_cmu_probe()
+In-Reply-To: <1516188387-144930-1-git-send-email-weiyongjun1@huawei.com>
+References: <1516188387-144930-1-git-send-email-weiyongjun1@huawei.com>
+ <CGME20180214144511epcas1p2d950632022f7fbc07151959fc6a43701@epcas1p2.samsung.com>
+Message-ID: <a819f423-a283-b30c-b088-b865cea3e6ec@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
