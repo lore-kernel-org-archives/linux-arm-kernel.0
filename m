@@ -1,97 +1,68 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Wed, 14 Feb 2018 21:08:54 +0100
-Subject: [PATCH v5 00/12] drm/sun4i: Add A83T HDMI support
-Message-ID: <20180214200906.31509-1-jernej.skrabec@siol.net>
+Date: Wed, 14 Feb 2018 21:09:06 +0100
+Subject: [PATCH v5 12/12] ARM: dts: sun8i: a83t: Enable HDMI on BananaPi M3
+In-Reply-To: <20180214200906.31509-1-jernej.skrabec@siol.net>
+References: <20180214200906.31509-1-jernej.skrabec@siol.net>
+Message-ID: <20180214200906.31509-13-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implements support for A83T DW HDMI and PHY. Contrary to
-v1 series, this one is based on latest linux-next, since all needed patches
-were merged.
+BananaPi M3 includes HDMI connector, so add support for it.
 
-While exactly this combination of HDMI controller and PHY is not common in
-Allwinner SoCs, this patch series nevertheless makes groundwork for other
-SoCs, which have same DW HDMI IP block, but different PHYs, like H3 and H5.
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-Please take a look.
-
-Best regards,
-Jernej
-
-Changes from v4:
-- Added Acked-by tag
-- DT patch doesn't add second example anymore
-- Removed unneeded properties from dtsi
-
-Changes from v3:
-- Collected tags
-- drop patch for changing NKMP formula
-- add patch to use 64 bit intermediate variable for calculating NKMP
-  clock rate and thus preventing overflow in some cases
-- rework DT bindings patch according Rob's suggestions
-- move TMDS clock from PHY to controller driver, since documentation
-  suggest such relationship
-
-Changes from v2:
-- Collected ACKs and Review-by tags
-- patch for deinit callback was replaced with the one which gives control
-  of drvdata to driver
-- fixed meson driver (renamed reset function)
-- prototypes for newly exported functions in dw_hdmi.h were reordered
-
-Changes from v1:
-- Collected ACKs
-- Separated bindings for controller and PHY
-- Split driver into two parts - controller and PHY
-- HDMI PHY driver now uses regmap for writes
-- added defines for PHY registers and bits
-- updated DT entries to accommodate new bindings
-- removed already merged clock patch
-- reworked first clock patch according to comments
-- added new clock patch which changes NKMP formula
-- split TCON patch in two, one for quirk and one for new compatible
-- reworked patch which exports DW HDMI PHY functions:
-  - remove "gen2" from some function names
-  - removed parameter from dw_hdmi_phy_reset()
-  - added address parameter to dw_hdmi_phy_i2c_set_addr()
-- updated most of commit messages
-
-Jernej Skrabec (12):
-  clk: sunxi-ng: Mask nkmp factors when setting register
-  clk: sunxi-ng: Use u64 for calculation of nkmp rate
-  drm/bridge/synopsys: dw-hdmi: Enable workaround for v1.32a
-  drm/bridge/synopsys: dw-hdmi: Export some PHY related functions
-  drm/bridge/synopsys: dw-hdmi: don't clobber drvdata
-  dt-bindings: display: sun4i-drm: Add A83T HDMI pipeline
-  drm/sun4i: Add has_channel_0 TCON quirk
-  drm/sun4i: Add support for A83T second TCON
-  drm/sun4i: Add support for A83T second DE2 mixer
-  drm/sun4i: Implement A83T HDMI driver
-  ARM: dts: sun8i: a83t: Add HDMI display pipeline
-  ARM: dts: sun8i: a83t: Enable HDMI on BananaPi M3
-
- .../bindings/display/sunxi/sun4i-drm.txt           |  61 ++++-
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts       |  25 ++
- arch/arm/boot/dts/sun8i-a83t.dtsi                  | 108 ++++++++-
- drivers/clk/sunxi-ng/ccu_nkmp.c                    |  42 +++-
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |  83 ++++---
- drivers/gpu/drm/imx/dw_hdmi-imx.c                  |  13 +-
- drivers/gpu/drm/meson/meson_dw_hdmi.c              |  22 +-
- drivers/gpu/drm/rcar-du/rcar_dw_hdmi.c             |  12 +-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |  13 +-
- drivers/gpu/drm/sun4i/Kconfig                      |   9 +
- drivers/gpu/drm/sun4i/Makefile                     |   4 +
- drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  46 +++-
- drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   1 +
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c              | 196 +++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h              |  44 ++++
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c             | 270 +++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.c                |  11 +
- include/drm/bridge/dw_hdmi.h                       |  24 +-
- 18 files changed, 896 insertions(+), 88 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 6550bf0e594b..00e47423cd07 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -60,6 +60,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	reg_usb1_vbus: reg-usb1-vbus {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "usb1-vbus";
+@@ -82,6 +93,10 @@
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
+ 	status = "okay";
+@@ -100,6 +115,16 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &mdio {
+ 	rgmii_phy: ethernet-phy at 1 {
+ 		compatible = "ethernet-phy-ieee802.3-c22";
 -- 
 2.16.1
