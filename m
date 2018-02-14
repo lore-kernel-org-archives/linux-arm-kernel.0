@@ -1,89 +1,100 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 14 Feb 2018 17:27:33 +0100
-Subject: [PATCH] dmaengine: mv_xor_v2: Fix clock resource by adding a register
- clock
-Message-ID: <20180214162733.4591-1-gregory.clement@bootlin.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Feb 2018 16:28:41 +0000
+Subject: Applied "spi: bcm2835aux: Avoid 64-bit arithmetic in xfer len calc"
+ to the spi tree
+In-Reply-To: <20180212193814.17644-1-tpiepho@impinj.com>
+Message-ID: <E1elzvF-0005oU-Pj@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the CP110 components whic are present on the Armada 7K/8K SoC we need
-to explicitly enable the registers clock. However it is not needed for
-the AP8xx componenet, that's why this clock is optional.
+The patch
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+   spi: bcm2835aux: Avoid 64-bit arithmetic in xfer len calc
+
+has been applied to the spi tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From d704afffe65c8fab424963c1ba4ec4364c2d6a82 Mon Sep 17 00:00:00 2001
+From: Trent Piepho <tpiepho@impinj.com>
+Date: Mon, 12 Feb 2018 11:38:14 -0800
+Subject: [PATCH] spi: bcm2835aux: Avoid 64-bit arithmetic in xfer len calc
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+We want to check for xfers that are over 30 microseconds.  Rather than
+find how many ??s a xfer will take, instead find how many bytes can be
+transferred in 30 ??s.  The latter must be less than 32 bits (since our
+clock speed is limited to 32 bits), while the former involves 64 bit
+quantities and more arithmetic operations.
+
+Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- .../devicetree/bindings/dma/mv-xor-v2.txt          |  6 +++++-
- drivers/dma/mv_xor_v2.c                            | 23 +++++++++++++++++-----
- 2 files changed, 23 insertions(+), 6 deletions(-)
+ drivers/spi/spi-bcm2835aux.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
-index 217a90eaabe7..9c38bbe7e6d7 100644
---- a/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
-+++ b/Documentation/devicetree/bindings/dma/mv-xor-v2.txt
-@@ -11,7 +11,11 @@ Required properties:
-   interrupts.
+diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+index 7428091d3f5b..1431cb98fe40 100644
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -321,7 +321,6 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
+ 	struct bcm2835aux_spi *bs = spi_master_get_devdata(master);
+ 	unsigned long spi_hz, clk_hz, speed;
+ 	unsigned long spi_used_hz;
+-	unsigned long long xfer_time_us;
  
- Optional properties:
--- clocks: Optional reference to the clock used by the XOR engine.
-+- clocks: Optional reference to the clocks used by the XOR engine.
-+- clock-names: mandatory if there is a second clock, in this case the
-+   name must be "core" for the first clock and "reg" for the second
-+   one
-+
+ 	/* calculate the registers to handle
+ 	 *
+@@ -358,20 +357,21 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
+ 	bs->rx_len = tfr->len;
+ 	bs->pending = 0;
  
- Example:
+-	/* calculate the estimated time in us the transfer runs
+-	 * note that there are are 2 idle clocks after each
+-	 * chunk getting transferred - in our case the chunk size
+-	 * is 3 bytes, so we approximate this by 9 bits/byte
++	/* Calculate the estimated time in us the transfer runs.  Note that
++	 * there are are 2 idle clocks cycles after each chunk getting
++	 * transferred - in our case the chunk size is 3 bytes, so we
++	 * approximate this by 9 cycles/byte.  This is used to find the number
++	 * of Hz per byte per polling limit.  E.g., we can transfer 1 byte in
++	 * 30 ??s per 300,000 Hz of bus clock.
+ 	 */
+-	xfer_time_us = tfr->len * 9 * 1000000;
+-	do_div(xfer_time_us, spi_used_hz);
+-
++#define HZ_PER_BYTE ((9 * 1000000) / BCM2835_AUX_SPI_POLLING_LIMIT_US)
+ 	/* run in polling mode for short transfers */
+-	if (xfer_time_us < BCM2835_AUX_SPI_POLLING_LIMIT_US)
++	if (tfr->len < spi_used_hz / HZ_PER_BYTE)
+ 		return bcm2835aux_spi_transfer_one_poll(master, spi, tfr);
  
-diff --git a/drivers/dma/mv_xor_v2.c b/drivers/dma/mv_xor_v2.c
-index f652a0e0f5a2..93b3d80ce701 100644
---- a/drivers/dma/mv_xor_v2.c
-+++ b/drivers/dma/mv_xor_v2.c
-@@ -163,6 +163,7 @@ struct mv_xor_v2_device {
- 	void __iomem *dma_base;
- 	void __iomem *glob_base;
- 	struct clk *clk;
-+	struct clk *reg_clk;
- 	struct tasklet_struct irq_tasklet;
- 	struct list_head free_sw_desc;
- 	struct dma_device dmadev;
-@@ -749,13 +750,24 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER)
-+	xor_dev->reg_clk = devm_clk_get(&pdev->dev, "reg");
-+	if (!IS_ERR(xor_dev->reg_clk)) {
-+		ret = clk_prepare_enable(xor_dev->reg_clk);
-+		if (ret)
-+			return ret;
-+	} else if (PTR_ERR(xor_dev->reg_clk) == -EPROBE_DEFER) {
- 		return -EPROBE_DEFER;
-+	}
-+
-+	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(xor_dev->clk) && PTR_ERR(xor_dev->clk) == -EPROBE_DEFER) {
-+		ret = EPROBE_DEFER;
-+		goto disable_reg_clk;
-+	}
- 	if (!IS_ERR(xor_dev->clk)) {
- 		ret = clk_prepare_enable(xor_dev->clk);
- 		if (ret)
--			return ret;
-+			goto disable_reg_clk;
- 	}
- 
- 	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
-@@ -866,8 +878,9 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
- free_msi_irqs:
- 	platform_msi_domain_free_irqs(&pdev->dev);
- disable_clk:
--	if (!IS_ERR(xor_dev->clk))
--		clk_disable_unprepare(xor_dev->clk);
-+	clk_disable_unprepare(xor_dev->clk);
-+disable_reg_clk:
-+	clk_disable_unprepare(xor_dev->reg_clk);
- 	return ret;
+ 	/* run in interrupt mode for all others */
+ 	return bcm2835aux_spi_transfer_one_irq(master, spi, tfr);
++#undef HZ_PER_BYTE
  }
  
+ static int bcm2835aux_spi_prepare_message(struct spi_master *master,
 -- 
-2.15.1
+2.16.1
