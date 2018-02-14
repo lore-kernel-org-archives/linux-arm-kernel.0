@@ -1,58 +1,53 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 14 Feb 2018 13:17:45 +0200
-Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
-In-Reply-To: <20180214110750.GP9418@n2100.armlinux.org.uk>
-References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
- <87vaezonrn.fsf@bootlin.com>
- <20180214105653.r4hcdxgbdmth3d7a@tarshish>
- <20180214110750.GP9418@n2100.armlinux.org.uk>
-Message-ID: <20180214111745.6lelfxrj5wutqzne@tarshish>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 14 Feb 2018 12:22:32 +0100
+Subject: [PATCH v3 18/41] KVM: arm64: Move userspace system registers
+ into separate function
+In-Reply-To: <a51ef563-df38-771a-0b54-5e77d4f34911@arm.com>
+References: <20180112120747.27999-1-christoffer.dall@linaro.org>
+ <20180112120747.27999-19-christoffer.dall@linaro.org>
+ <a51ef563-df38-771a-0b54-5e77d4f34911@arm.com>
+Message-ID: <20180214112232.GN23189@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ressell,
-
-On Wed, Feb 14, 2018 at 11:07:51AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 14, 2018 at 12:56:53PM +0200, Baruch Siach wrote:
-> > On Wed, Feb 14, 2018 at 11:42:52AM +0100, Gregory CLEMENT wrote:
-> > >  On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
-> > > 
-> > > > The CP110 component has 4 uart peripherals. All of them use the same clock
-> > > > gate for slow peripherals that is shared with the i2c and spi peripherals.
-> > > >
-> > > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > > 
-> > > Applied on mvebu/dt64
-> > 
-> > Thanks.
-> > 
-> > What about patch 2/2 in this series?
+On Fri, Feb 09, 2018 at 06:50:14PM +0000, Julien Grall wrote:
+> Hi Christoffer,
 > 
-> I'm not entirely convinced that it's something that should be done.
-> I know that some people are already using the UART headers for other
-> purposes (other than UART) and the later revision boards have the
-> placement of the microUSB fixed so it is accessible.
+> On 01/12/2018 12:07 PM, Christoffer Dall wrote:
+> >There's a semantic difference between the EL1 registers that control
+> >operation of a kernel running in EL1 and EL1 registers that only control
+> >userspace execution in EL0.  Since we can defer saving/restoring the
+> >latter, move them into their own function.
+> >
+> >We also take this chance to rename the function saving/restoring the
+> >remaining system register to make it clear this function deals with
+> >the EL1 system registers.
+> >
+> >No functional change.
+> >
+> >Reviewed-by: Andrew Jones <drjones@redhat.com>
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >  arch/arm64/kvm/hyp/sysreg-sr.c | 46 +++++++++++++++++++++++++++++++-----------
+> >  1 file changed, 34 insertions(+), 12 deletions(-)
+> >
+> >diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> >index 848a46eb33bf..99dd50ce483b 100644
+> >--- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> >+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> >@@ -34,18 +34,27 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+> >  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+> >  {
+> >-	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
 > 
-> While you can tell Linux to use the other UART headers with this
-> patch, uboot won't use them, which means you can't configure the
-> boot loader without (in your case) taking the board out of the case.
+> I am a bit confused, the comment on top of the function says the host must
+> save ACTLR_EL1 in the VHE case. But AFAICT, after this patch the register
+> will not get saved in the host context. Did I miss anything?
 > 
-> I've a similar problem (with the mcbin in a rackmount case), and my
-> solution to that has been to put a single washer under the mounting
-> post near the microUSB to lift the board sufficiently to allow a
-> connector to be plugged in.  Sometimes simple hardware fixes are
-> better than software fixes.
-> 
-> Others have used a dremel to modify the case to access the microUSB.
+You're right, there is indeed a functional change here, introduced in
+v2.
 
-Just for the record, I'm fine with dropping 'status = "okay"' from the mcbin 
-CP{0,1} UART nodes. This would still allow anyone who needs this functionality 
-to enable it with a simple .dts modification, or a run-time dtb modification 
-from the bootloader.
+I have adjusted the commentary and the patch description.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Thanks,
+-Christoffer
