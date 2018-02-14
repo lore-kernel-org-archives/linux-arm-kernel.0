@@ -1,152 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 14 Feb 2018 17:43:03 +0000
-Subject: [PATCH v3 09/41] KVM: arm64: Defer restoring host VFP state to
- vcpu_put
-In-Reply-To: <20180214173811.GO23189@cbox>
-References: <20180112120747.27999-10-christoffer.dall@linaro.org>
- <20180122173326.GO22781@e103592.cambridge.arm.com>
- <20180125194653.GR21802@cbox>
- <20180207164955.GT5862@e103592.cambridge.arm.com>
- <20180207175644.GF29286@cbox>
- <20180209155930.GD5862@e103592.cambridge.arm.com>
- <20180213085130.GB23189@cbox>
- <20180213140843.GN5862@e103592.cambridge.arm.com>
- <20180214101554.GL23189@cbox>
- <20180214144242.GA11748@e103592.cambridge.arm.com>
- <20180214173811.GO23189@cbox>
-Message-ID: <CAKv+Gu_r2G5i8QhjimCQWHvQfAj9oxdte2VUq72VUc+OvKPq8w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Feb 2018 09:50:29 -0800
+Subject: [PATCH 2/9] mmc: hsmmc_omap: include types.h and provide header
+ inclusion guard
+In-Reply-To: <20180213013243.8378-3-s-anna@ti.com>
+References: <20180213013243.8378-1-s-anna@ti.com>
+ <20180213013243.8378-3-s-anna@ti.com>
+Message-ID: <20180214175029.GP6364@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2018 at 17:38, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Wed, Feb 14, 2018 at 02:43:42PM +0000, Dave Martin wrote:
->> [CC Ard, in case he has a view on how much we care about softirq NEON
->> performance regressions ... and whether my suggestions make sense]
->>
->> On Wed, Feb 14, 2018 at 11:15:54AM +0100, Christoffer Dall wrote:
->> > On Tue, Feb 13, 2018 at 02:08:47PM +0000, Dave Martin wrote:
->> > > On Tue, Feb 13, 2018 at 09:51:30AM +0100, Christoffer Dall wrote:
->> > > > On Fri, Feb 09, 2018 at 03:59:30PM +0000, Dave Martin wrote:
->
-> [...]
->
->> > >
->> > > kvm_fpsimd_flush_cpu_state() is just an invalidation.  No state is
->> > > actually saved today because we explicitly don't care about preserving
->> > > the SVE state, because the syscall ABI throws the SVE regs away as
->> > > a side effect any syscall including ioctl(KVM_RUN); also (currently) KVM
->> > > ensures that the non-SVE FPSIMD bits _are_ restored by itself.
->> > >
->> > > I think my proposal is that this hook might take on the role of
->> > > actually saving the state too, if we move that out of the KVM host
->> > > context save/restore code.
->> > >
->> > > Perhaps we could even replace
->> > >
->> > >   preempt_disable();
->> > >   kvm_fpsimd_flush_cpu_state();
->> > >   /* ... */
->> > >   preempt_enable();
->> > >
->> > > with
->> > >
->> > >   kernel_neon_begin();
->> > >   /* ... */
->> > >   kernel_neon_end();
->> >
->> > I'm not entirely sure where the begin and end points would be in the
->> > context of KVM?
->>
->> Hmmm, actually there's a bug in your VHE changes now I look more
->> closely in this area:
->>
->> You assume that the only way for the FPSIMD regs to get unexpectedly
->> dirtied is through a context switch, but actually this is not the case:
->> a softirq can use kernel-mode NEON any time that softirqs are enabled.
->>
->> This means that in between kvm_arch_vcpu_load() and _put() (whether via
->> preempt notification or not), the guest's FPSIMD state in the regs may
->> be trashed by a softirq.
->
-> ouch.
->
->>
->> The simplest fix is to disable softirqs and preemption for that whole
->> region, but since we can stay in it indefinitely that's obviously not
->> the right approach.  Putting kernel_neon_begin() in _load() and
->> kernel_neon_end() in _put() achieves the same without disabling
->> softirq, but preemption is still disabled throughout, which is bad.
->> This effectively makes the run ioctl nonpreemptible...
->>
->> A better fix would be to set the cpu's kernel_neon_busy flag, which
->> makes softirq code use non-NEON fallback code.
->>
->> We could expose an interface from fpsimd.c to support that.
->>
->> It still comes at a cost though: due to the switching from NEON to
->> fallback code in softirq handlers, we may get a big performance
->> regression in setups that rely heavily on NEON in softirq for
->> performance.
->>
->
-> I wasn't aware that softirqs would use fpsimd.
->
+* Suman Anna <s-anna@ti.com> [180213 01:33]:
+> The hsmmc-omap platform data header file uses some u8/u16/u32 types,
+> so include the linux types.h header file so that it is self-contained.
+> The lack of this header caused some build errors while cleaning up some
+> other header files from various omap_hwmod data files.
+> 
+> While at this, also add the missing header inclusion guard.
+> 
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+> Hi Ulf,
+> 
+> This patch is part of a hwmod cleanup series, and is needed before I
+> can do the cleanup in those files. So prefer to have this patch go
+> through Tony as part of the series.
 
-It is not common but it is permitted by the API, and there is mac80211
-code and IPsec code that does this.
+No need for this, I'll post a patch that includes types.h
+directly in the calling code.
 
-Performance penalties incurred by switching from accelerated h/w
-instruction based crypto to scalar code can be as high as 20x, so we
-should really avoid this if we can.
+Regards,
 
->>
->> Alternatively we could do something like the following, but it's a
->> rather gross abstraction violation:
->>
->> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->> index 2e43f9d..6a1ff3a 100644
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -746,9 +746,24 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>                * the effect of taking the interrupt again, in SVC
->>                * mode this time.
->>                */
->> +             local_bh_disable();
->>               local_irq_enable();
->>
->>               /*
->> +              * If we exited due to one or mode pending interrupts, they
->> +              * have now been handled.  If such an interrupt pended a
->> +              * softirq, we shouldn't prevent that softirq from using
->> +              * kernel-mode NEON indefinitely: instead, give FPSIMD back to
->> +              * the host to manage as it likes.  We'll grab it again on the
->> +              * next FPSIMD trap from the guest (if any).
->> +              */
->> +             if (local_softirq_pending() && FPSIMD untrapped for guest) {
->> +                     /* save vcpu FPSIMD context */
->> +                     /* enable FPSIMD trap for guest */
->> +             }
->> +             local_bh_enable();
->> +
->> +             /*
->>                * We do local_irq_enable() before calling guest_exit() so
->>                * that if a timer interrupt hits while running the guest we
->>                * account that tick as being spent in the guest.  We enable
->>
->> [...]
->>
->
-> I can't see this working, what if an IRQ comes in and a softirq gets
-> pending immediately after local_bh_enable() above?
->
-> And as you say, it's really not pretty.
->
-> This is really making me think that I'll drop this part of the
-> optimization and when we do optimize fpsimd handling, we do it properly
-> by integrating it with the kernel tracking.
->
-> What do you think?
->
-> Thanks,
-> -Christoffer
+Tony
