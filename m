@@ -1,18 +1,133 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Feb 2018 09:04:24 -0800
-Subject: [PATCH] ARM: dts: am33xx: add PDU001 board
-In-Reply-To: <1517322494-6756-1-git-send-email-fb@ltec.ch>
-References: <1517322494-6756-1-git-send-email-fb@ltec.ch>
-Message-ID: <20180214170424.GM6364@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 Feb 2018 15:12:19 -0200
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Re-sync defconfig
+Message-ID: <1518628339-6337-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felix Brack <fb@ltec.ch> [180130 06:29]:
-> This patch adds support for the PDU001 board from EETS GmbH.
-> The board is built around the byteENGINE module AM335X from
-> bytes at work AG which in turn is built around a Sitara SoC
-> from TI.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applying into omap-for-v4.17/dt thanks.
+Re-sync the defconfig by doing:
 
-Tony
+make savedefconfig
+cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+
+Checked that all the removed options are still enabled by Kconfig logic.
+
+The exception is CONFIG_SOC_CAMERA_OV2640, which is only used by some
+mx31 machines. As the mx3_camera driver has been removed from the kernel
+tree, removing CONFIG_SOC_CAMERA_OV2640 is not an issue.
+
+So keep it in sync to help further changes in defconfig.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 18 +++++-------------
+ 1 file changed, 5 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index f32697d..9d9c729 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -48,9 +48,7 @@ CONFIG_PCI_IMX6=y
+ CONFIG_SMP=y
+ CONFIG_ARM_PSCI=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+-CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+-CONFIG_CMA=y
+ CONFIG_FORCE_MAX_ZONEORDER=14
+ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+ CONFIG_KEXEC=y
+@@ -82,7 +80,6 @@ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+ CONFIG_BT=y
+ CONFIG_BT_HCIUART=y
+-CONFIG_BT_HCIUART_SERDEV=y
+ CONFIG_BT_HCIUART_H4=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=y
+@@ -93,7 +90,6 @@ CONFIG_RFKILL_INPUT=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
+-CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_IMX_WEIM=y
+ CONFIG_CONNECTOR=y
+@@ -171,9 +167,9 @@ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ADS7846=y
+ CONFIG_TOUCHSCREEN_EGALAX=y
++CONFIG_TOUCHSCREEN_MAX11801=y
+ CONFIG_TOUCHSCREEN_IMX6UL_TSC=y
+ CONFIG_TOUCHSCREEN_EDT_FT5X06=y
+-CONFIG_TOUCHSCREEN_MAX11801=y
+ CONFIG_TOUCHSCREEN_MC13783=y
+ CONFIG_TOUCHSCREEN_TSC2004=y
+ CONFIG_TOUCHSCREEN_TSC2007=y
+@@ -182,7 +178,6 @@ CONFIG_TOUCHSCREEN_SX8654=y
+ CONFIG_TOUCHSCREEN_COLIBRI_VF50=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MMA8450=y
+-CONFIG_HID_MULTITOUCH=y
+ CONFIG_SERIO_SERPORT=m
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_IMX=y
+@@ -190,7 +185,6 @@ CONFIG_SERIAL_IMX_CONSOLE=y
+ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+ CONFIG_SERIAL_DEV_BUS=y
+-CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
+@@ -210,13 +204,11 @@ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_STMPE=y
+ CONFIG_GPIO_74X164=y
+ CONFIG_POWER_RESET=y
+-CONFIG_POWER_RESET_IMX=y
+ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_SENSORS_GPIO_FAN=y
+ CONFIG_SENSORS_IIO_HWMON=y
+-CONFIG_THERMAL=y
+ CONFIG_THERMAL_WRITABLE_TRIPS=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+@@ -237,13 +229,13 @@ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_REGULATOR_PFUZE100=y
++CONFIG_RC_CORE=y
++CONFIG_RC_DEVICES=y
++CONFIG_IR_GPIO_CIR=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+-CONFIG_RC_CORE=y
+ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+-CONFIG_RC_DEVICES=y
+-CONFIG_IR_GPIO_CIR=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+@@ -254,7 +246,6 @@ CONFIG_VIDEO_CODA=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+ CONFIG_VIDEO_ADV7180=m
+ CONFIG_VIDEO_OV5640=m
+-CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
+ CONFIG_DRM_PANEL_LVDS=y
+@@ -294,6 +285,7 @@ CONFIG_SND_SOC_CS42XX8_I2C=y
+ CONFIG_SND_SOC_TLV320AIC3X=y
+ CONFIG_SND_SOC_WM8960=y
+ CONFIG_SND_SIMPLE_CARD=y
++CONFIG_HID_MULTITOUCH=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MXC=y
+-- 
+2.7.4
