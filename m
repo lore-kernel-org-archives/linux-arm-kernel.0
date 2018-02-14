@@ -1,52 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Feb 2018 13:45:43 +0000
-Subject: [PATCHv2 7/8] arm_pmu: note IRQs and PMUs per-cpu
-In-Reply-To: <20180214132640.GG2992@arm.com>
-References: <20180205164202.26502-1-mark.rutland@arm.com>
- <20180205164202.26502-8-mark.rutland@arm.com>
- <20180214131141.GF2992@arm.com>
- <20180214132416.hragqjcsrvzes5jp@lakrids.cambridge.arm.com>
- <20180214132640.GG2992@arm.com>
-Message-ID: <20180214134542.qgjetawmurxn4kye@lakrids.cambridge.arm.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Wed, 14 Feb 2018 14:53:06 +0100
+Subject: [PATCH 04/15] pinctrl: sh-pfc: Initial R-Car M3-N support
+In-Reply-To: <CAMuHMdUpEjnNa4kru7mUnvhTu2YoofoopuCvUp=AGdRJqfaNEw@mail.gmail.com>
+References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
+ <1518515162-23663-5-git-send-email-jacopo+renesas@jmondi.org>
+ <CAMuHMdUpEjnNa4kru7mUnvhTu2YoofoopuCvUp=AGdRJqfaNEw@mail.gmail.com>
+Message-ID: <20180214135306.GA23932@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 01:26:41PM +0000, Will Deacon wrote:
-> On Wed, Feb 14, 2018 at 01:24:17PM +0000, Mark Rutland wrote:
-> > On Wed, Feb 14, 2018 at 01:11:41PM +0000, Will Deacon wrote:
-> > > On Mon, Feb 05, 2018 at 04:42:01PM +0000, Mark Rutland wrote:
-> > > > @@ -560,16 +577,16 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
-> > > >  
-> > > >  		irq_set_status_flags(irq, IRQ_NOAUTOEN);
-> > > >  		err = request_irq(irq, handler, irq_flags, "arm-pmu",
-> > > > -				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
-> > > > -	} else if (cpumask_empty(&armpmu->active_irqs)) {
-> > > > +				  NULL);
-> > > > +	} else if (armpmu_count_irq_users(irq) == 0) {
-> > > >  		err = request_percpu_irq(irq, handler, "arm-pmu",
-> > > > -					 &hw_events->percpu_pmu);
-> > > > +					 cpu_armpmu);
-> > > 
-> > > This should be &cpu_armpmu.
-> > 
-> > I'm not sure that's the case, given the way we statically define
-> > cpu_armpmu, but I'll try to figure that out.
-> 
-> Well that's what you pass to free_percpu_irq :p
+Hi Geert,
+   thanks for review
 
-Ugh. One of the two is clearly wrnog...
+On Wed, Feb 14, 2018 at 02:37:08PM +0100, Geert Uytterhoeven wrote:
+> Hi Jacopo,
+>
+> On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
+> <jacopo+renesas@jmondi.org> wrote:
+> > Add initial PFC support for R-Car M3-N (r8a77965) SoC.
+> > No groups or functions defined, just pin and registers enumeration.
+> >
+> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+>
+> Thanks for your patch!
+>
+> Looks mostly OK to me.
+> You do want to compare with pfc-r8a7796.c: all differences not related to
+> SATA_DEVSL, FSCLK, DU_DOTCLKIN2/3, and PRESET are issues that were fixed
+> recently in pfc-r8a7796.c, and should apply to pfc-r8a77965.c, too.
+>
 
-> > > Would it be possible to pass &cpu_armpmu as the devid even in the normal
-> > > request_irq case and have the dispatcher just pass it through to the
-> > > underlying handler, rather than access cpu_armpmu directly?
-> > 
-> > Do you mean so that the dispatcher takes a struct arm_pmu ** in all
-> > cases?
-> 
-> Yes.
+I have used the M3-W tables with the exception of the pins/groups you
+mentioned, that are clearly marked as different in the datasheet. At
+least, this was my intention :)
 
-Ok. I'll try to piece that together (which should allow us to revert
-some changes to the dispatcher).
+I used v4.15 M3-W PFC tables, should I look in v4.16-rc1 or in
+renesas-drivers for updates?
 
-Thanks,
-Mark.
+> That leaves us with very few differences only, but it won't be trivial to have
+> a combined M3-W/N PFC driver, I'm afraid.
+>
+
+Takes a certain degree of grep-foo to clearly highlight differences
+between the two version. Do you have any script/tools you use to
+compare PFC tables a bit more easily?
+
+Thanks
+  j
+
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
