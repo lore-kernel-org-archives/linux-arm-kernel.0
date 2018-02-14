@@ -1,50 +1,76 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Feb 2018 11:48:38 -0800
-Subject: arm64 physmap (was Re: [kernel-hardening] [PATCH 4/6] Protectable
- Memory)
-In-Reply-To: <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
-References: <20180124175631.22925-1-igor.stoppa@huawei.com>
- <20180124175631.22925-5-igor.stoppa@huawei.com>
- <CAG48ez0JRU8Nmn7jLBVoy6SMMrcj46R0_R30Lcyouc4R9igi-g@mail.gmail.com>
- <20180126053542.GA30189@bombadil.infradead.org>
- <alpine.DEB.2.20.1802021236510.31548@nuc-kabylake>
- <f2ddaed0-313e-8664-8a26-9d10b66ed0c5@huawei.com>
- <b75b5903-0177-8ad9-5c2b-fc63438fb5f2@huawei.com>
- <CAFUG7CfrCpcbwgf5ixMC5EZZgiVVVp1NXhDHK1UoJJcC08R2qQ@mail.gmail.com>
- <8818bfd4-dd9f-f279-0432-69b59531bd41@huawei.com>
- <CAFUG7CeUhFcvA82uZ2ZH1j_6PM=aBo4XmYDN85pf8G0gPU44dg@mail.gmail.com>
- <17e5b515-84c8-dca2-1695-cdf819834ea2@huawei.com>
- <CAGXu5j+LS1pgOOroi7Yxp2nh=DwtTnU3p-NZa6bQu_wkvvVkwg@mail.gmail.com>
- <414027d3-dd73-cf11-dc2a-e8c124591646@redhat.com>
- <CAGXu5j++igQD4tMh0J8nZ9jNji5mU16C7OygFJ5Td+Bq-KSMgw@mail.gmail.com>
- <CAG48ez1utN_vwHUwk=BU6zM4Wa_53TPu8rm9JuTtY-vGP0Shqw@mail.gmail.com>
- <f4226a44-92fd-8ead-b458-7551ba82f96d@redhat.com>
- <CAGXu5j+zOCLerneUt2b-tvyLLg7fEbr9B0YYow-4DH6oV-nnCw@mail.gmail.com>
- <2f23544a-bd24-1e71-967b-e8d1cf5a20a3@redhat.com>
-Message-ID: <CAGXu5j+zkFx+1Dn908iqaTV-yP7Wk_rMXZRvXN32h+i_oAcy6w@mail.gmail.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Wed, 14 Feb 2018 21:08:56 +0100
+Subject: [PATCH v5 02/12] clk: sunxi-ng: Use u64 for calculation of nkmp rate
+In-Reply-To: <20180214200906.31509-1-jernej.skrabec@siol.net>
+References: <20180214200906.31509-1-jernej.skrabec@siol.net>
+Message-ID: <20180214200906.31509-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 11:06 AM, Laura Abbott <labbott@redhat.com> wrote:
-> fixed. Modules yes are not fully protected. The conclusion from past
-> experience has been that we cannot safely break down larger page sizes
-> at runtime like x86 does. We could theoretically
-> add support for fixing up the alias if PAGE_POISONING is enabled but
-> I don't know who would actually use that in production. Performance
-> is very poor at that point.
+When parent rate is 24MHz and multiplier N >= 180, intermediate clock
+rate doesn't fit in 32 bit variable anymore.
 
-XPFO forces 4K pages on the physmap[1] for similar reasons. I have no
-doubt about performance changes, but I'd be curious to see real
-numbers. Did anyone do benchmarks on just the huge/4K change? (Without
-also the XPFO overhead?)
+Because of that, introduce function for calculating clock rate which
+uses 64 bit variable for intermediate result.
 
-If this, XPFO, and PAGE_POISONING all need it, I think we have to
-start a closer investigation. :)
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
 
--Kees
-
-[1] http://www.openwall.com/lists/kernel-hardening/2017/09/07/13
-
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index a99068a08315..c3f6fe7be565 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -20,6 +20,18 @@ struct _ccu_nkmp {
+ 	unsigned long	p, min_p, max_p;
+ };
+ 
++static unsigned long ccu_nkmp_calc_rate(unsigned long parent,
++					unsigned long n, unsigned long k,
++					unsigned long m, unsigned long p)
++{
++	u64 rate = parent;
++
++	rate *= n * k;
++	do_div(rate, m * p);
++
++	return rate;
++}
++
+ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+ 			       struct _ccu_nkmp *nkmp)
+ {
+@@ -33,7 +45,9 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+ 				for (_p = nkmp->min_p; _p <= nkmp->max_p; _p <<= 1) {
+ 					unsigned long tmp_rate;
+ 
+-					tmp_rate = parent * _n * _k / (_m * _p);
++					tmp_rate = ccu_nkmp_calc_rate(parent,
++								      _n, _k,
++								      _m, _p);
+ 
+ 					if (tmp_rate > rate)
+ 						continue;
+@@ -107,7 +121,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
+ 	p = reg >> nkmp->p.shift;
+ 	p &= (1 << nkmp->p.width) - 1;
+ 
+-	return (parent_rate * n * k >> p) / m;
++	return ccu_nkmp_calc_rate(parent_rate, n, k, m, 1 << p);
+ }
+ 
+ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+@@ -127,7 +141,8 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
+ 
+-	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
++	return ccu_nkmp_calc_rate(*parent_rate, _nkmp.n, _nkmp.k,
++				  _nkmp.m, _nkmp.p);
+ }
+ 
+ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
-Kees Cook
-Pixel Security
+2.16.1
