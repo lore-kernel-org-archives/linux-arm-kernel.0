@@ -1,99 +1,85 @@
-From: tfiga@google.com (Tomasz Figa)
-Date: Wed, 14 Feb 2018 20:27:28 +0900
-Subject: [PATCH v5 08/13] iommu/rockchip: Control clocks needed to access
- the IOMMU
-In-Reply-To: <edc5002d-c83f-cf11-ecfb-0c4400b10d07@codeaurora.org>
-References: <20180124103516.2571-1-jeffy.chen@rock-chips.com>
- <20180124103516.2571-9-jeffy.chen@rock-chips.com>
- <f06d2d9f-3869-ed02-43f4-f4ea4a104a57@arm.com>
- <edc5002d-c83f-cf11-ecfb-0c4400b10d07@codeaurora.org>
-Message-ID: <CAAFQd5DHYn2VK2GwSa0E_hX9Zh3BL5K0b1BnQqz+xzfmhPzhpg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Feb 2018 11:30:45 +0000
+Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
+In-Reply-To: <20180214111745.6lelfxrj5wutqzne@tarshish>
+References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
+ <87vaezonrn.fsf@bootlin.com>
+ <20180214105653.r4hcdxgbdmth3d7a@tarshish>
+ <20180214110750.GP9418@n2100.armlinux.org.uk>
+ <20180214111745.6lelfxrj5wutqzne@tarshish>
+Message-ID: <20180214113045.GQ9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 7:03 PM, Vivek Gautam
-<vivek.gautam@codeaurora.org> wrote:
->
->
-> On 1/24/2018 7:19 PM, Robin Murphy wrote:
->>
->> On 24/01/18 10:35, Jeffy Chen wrote:
->>>
->>> From: Tomasz Figa <tfiga@chromium.org>
->>>
->>> Current code relies on master driver enabling necessary clocks before
->>> IOMMU is accessed, however there are cases when the IOMMU should be
->>> accessed while the master is not running yet, for example allocating
->>> V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
->>> mapping API and doesn't engage the master driver at all.
->>>
->>> This patch fixes the problem by letting clocks needed for IOMMU
->>> operation to be listed in Device Tree and making the driver enable them
->>> for the time of accessing the hardware.
->>>
->>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
->>> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
->>> ---
->>>
->>> Changes in v5:
->>> Use clk_bulk APIs.
->>>
->>> Changes in v4: None
->>> Changes in v3: None
->>> Changes in v2: None
->
->
-> [snip]
->
->
->>>   +static int rk_iommu_of_get_clocks(struct rk_iommu *iommu)
->>> +{
->>> +    struct device_node *np = iommu->dev->of_node;
->>> +    int ret;
->>> +    int i;
->>> +
->>> +    ret = of_count_phandle_with_args(np, "clocks", "#clock-cells");
->>> +    if (ret == -ENOENT)
->>> +        return 0;
->>> +    else if (ret < 0)
->>> +        return ret;
->>> +
->>> +    iommu->num_clocks = ret;
->>> +    iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
->>> +                     sizeof(*iommu->clocks), GFP_KERNEL);
->>> +    if (!iommu->clocks)
->>> +        return -ENOMEM;
->>> +
->>> +    for (i = 0; i < iommu->num_clocks; ++i) {
->>> +        iommu->clocks[i].clk = of_clk_get(np, i);
->>> +        if (IS_ERR(iommu->clocks[i].clk)) {
->>> +            ret = PTR_ERR(iommu->clocks[i].clk);
->>> +            goto err_clk_put;
->>> +        }
->>> +    }
->>
->>
->> Just to confirm my understanding from a quick scan through the code, the
->> reason we can't use clk_bulk_get() here is that currently, clocks[i].id
->> being NULL means we'd end up just getting the first clock multiple times,
->> right?
->>
->> I guess there could be other users who also want "just get whatever clocks
->> I have" functionality, so it might be worth proposing that for the core API
->> as a separate/follow-up patch, but it definitely doesn't need to be part of
->> this series.
->
->
-> Just to understand. Is it okay to make the driver "just get whatever clocks
-> device node gives"?
-> Doesn't the driver need to be aware of which all clocks are supposed to be
-> obtained and enabled
->  It's should good for debug to let the world know which clock we failed to
-> get.
+On Wed, Feb 14, 2018 at 01:17:45PM +0200, Baruch Siach wrote:
+> Hi Ressell,
+> 
+> On Wed, Feb 14, 2018 at 11:07:51AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 14, 2018 at 12:56:53PM +0200, Baruch Siach wrote:
+> > > On Wed, Feb 14, 2018 at 11:42:52AM +0100, Gregory CLEMENT wrote:
+> > > >  On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+> > > > 
+> > > > > The CP110 component has 4 uart peripherals. All of them use the same clock
+> > > > > gate for slow peripherals that is shared with the i2c and spi peripherals.
+> > > > >
+> > > > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > > > 
+> > > > Applied on mvebu/dt64
+> > > 
+> > > Thanks.
+> > > 
+> > > What about patch 2/2 in this series?
+> > 
+> > I'm not entirely convinced that it's something that should be done.
+> > I know that some people are already using the UART headers for other
+> > purposes (other than UART) and the later revision boards have the
+> > placement of the microUSB fixed so it is accessible.
+> > 
+> > While you can tell Linux to use the other UART headers with this
+> > patch, uboot won't use them, which means you can't configure the
+> > boot loader without (in your case) taking the board out of the case.
+> > 
+> > I've a similar problem (with the mcbin in a rackmount case), and my
+> > solution to that has been to put a single washer under the mounting
+> > post near the microUSB to lift the board sufficiently to allow a
+> > connector to be plugged in.  Sometimes simple hardware fixes are
+> > better than software fixes.
+> > 
+> > Others have used a dremel to modify the case to access the microUSB.
+> 
+> Just for the record, I'm fine with dropping 'status = "okay"' from the mcbin 
+> CP{0,1} UART nodes. This would still allow anyone who needs this functionality 
+> to enable it with a simple .dts modification, or a run-time dtb modification 
+> from the bootloader.
 
-Yeah, in general that's desired. However, it is at least impractical
-to specify all the clocks in Rockchip case, because it's different for
-each block and depends on the master next to which it is located.
+Talking more with Jon (who works for SolidRun, the board manufacturer),
+the feeling there is:
 
-Best regards,
-Tomasz
+1. Why enable both UART headers - it makes more sense (given your reason)
+   to enable one as UART but keep the other as GPIO.  The labelling up of
+   them being a UART is merely a historical artifact of the very early
+   development of the board.
+
+2. They are developer boards, not a final product.  Case modification is
+   somewhat expected.
+
+(2) is especially relevant when SFP support gets added - some of the
+early revision boards have the SCL/SDA lines swapped on the I2C bus.
+With that fixed, all boards have way too strong pull-ups on the I2C
+bus which means some modules don't work - and worse than that, may
+result in corrupted module EEPROMs.
+
+I ended up with corruption here, and although I've a rev 1.3 board now,
+I'm still using my self-modified rev 1.1 in preference to it, because
+I don't want to have to deal with another corrupted EEPROM.
+
+In order for SFP to be reliably functional, board modification is
+required (either replacement of resistor packs, or in the case of the
+early boards, cutting the I2C lines and rewiring them.)
+
+IOW, board modification will be required for SFP on most mcbins.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
