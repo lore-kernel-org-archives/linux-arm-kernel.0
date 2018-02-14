@@ -1,85 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Feb 2018 11:30:45 +0000
-Subject: [PATCH v2 1/2] arm64: dts: marvell: add CP110 uart peripherals
-In-Reply-To: <20180214111745.6lelfxrj5wutqzne@tarshish>
-References: <03f1bec6e11c9f6fb9d5520c745eafca28597801.1517381798.git.baruch@tkos.co.il>
- <87vaezonrn.fsf@bootlin.com>
- <20180214105653.r4hcdxgbdmth3d7a@tarshish>
- <20180214110750.GP9418@n2100.armlinux.org.uk>
- <20180214111745.6lelfxrj5wutqzne@tarshish>
-Message-ID: <20180214113045.GQ9418@n2100.armlinux.org.uk>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Wed, 14 Feb 2018 13:34:58 +0200
+Subject: [PATCH v2 6/7] arm64: tegra: Add Tegra194 chip device tree
+In-Reply-To: <458ba9f9-d703-9edf-8e7b-bc9d0f0ef0cc@arm.com>
+References: <1517901757-15353-1-git-send-email-mperttunen@nvidia.com>
+ <1517901757-15353-7-git-send-email-mperttunen@nvidia.com>
+ <458ba9f9-d703-9edf-8e7b-bc9d0f0ef0cc@arm.com>
+Message-ID: <d860ee1a-d69d-2d45-ce36-71f2b726ec3f@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 01:17:45PM +0200, Baruch Siach wrote:
-> Hi Ressell,
-> 
-> On Wed, Feb 14, 2018 at 11:07:51AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 14, 2018 at 12:56:53PM +0200, Baruch Siach wrote:
-> > > On Wed, Feb 14, 2018 at 11:42:52AM +0100, Gregory CLEMENT wrote:
-> > > >  On mer., janv. 31 2018, Baruch Siach <baruch@tkos.co.il> wrote:
-> > > > 
-> > > > > The CP110 component has 4 uart peripherals. All of them use the same clock
-> > > > > gate for slow peripherals that is shared with the i2c and spi peripherals.
-> > > > >
-> > > > > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > > > 
-> > > > Applied on mvebu/dt64
-> > > 
-> > > Thanks.
-> > > 
-> > > What about patch 2/2 in this series?
-> > 
-> > I'm not entirely convinced that it's something that should be done.
-> > I know that some people are already using the UART headers for other
-> > purposes (other than UART) and the later revision boards have the
-> > placement of the microUSB fixed so it is accessible.
-> > 
-> > While you can tell Linux to use the other UART headers with this
-> > patch, uboot won't use them, which means you can't configure the
-> > boot loader without (in your case) taking the board out of the case.
-> > 
-> > I've a similar problem (with the mcbin in a rackmount case), and my
-> > solution to that has been to put a single washer under the mounting
-> > post near the microUSB to lift the board sufficiently to allow a
-> > connector to be plugged in.  Sometimes simple hardware fixes are
-> > better than software fixes.
-> > 
-> > Others have used a dremel to modify the case to access the microUSB.
-> 
-> Just for the record, I'm fine with dropping 'status = "okay"' from the mcbin 
-> CP{0,1} UART nodes. This would still allow anyone who needs this functionality 
-> to enable it with a simple .dts modification, or a run-time dtb modification 
-> from the bootloader.
+On 07.02.2018 12:21, Marc Zyngier wrote:
+> Hi Mikko,
+>
+> On 06/02/18 07:22, Mikko Perttunen wrote:
+>> Add the chip-level device tree, including binding headers, for the
+>> NVIDIA Tegra194 "Xavier" system-on-chip. Only a small subset of devices
+>> are initially available, enough to boot to UART console.
+>>
+>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>> ---
+>>  arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 342 +++++++++++++
+>>  include/dt-bindings/clock/tegra194-clock.h     | 664 +++++++++++++++++++++++++
+>>  include/dt-bindings/gpio/tegra194-gpio.h       |  59 +++
+>>  include/dt-bindings/power/tegra194-powergate.h |  49 ++
+>>  include/dt-bindings/reset/tegra194-reset.h     | 166 +++++++
+>>  5 files changed, 1280 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
+>>  create mode 100644 include/dt-bindings/clock/tegra194-clock.h
+>>  create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
+>>  create mode 100644 include/dt-bindings/power/tegra194-powergate.h
+>>  create mode 100644 include/dt-bindings/reset/tegra194-reset.h
+>>
+>> diff --git a/arch/arm64/boot/dts/nvidia/tegra194.dtsi b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+>> new file mode 100644
+>> index 000000000000..dda28d758cab
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/nvidia/tegra194.dtsi
+>
+> [...]
+>
+>> +		gic: interrupt-controller at 3881000 {
+>> +			compatible = "arm,gic-400";
+>> +			#interrupt-cells = <3>;
+>> +			interrupt-controller;
+>> +			reg = <0x03881000 0x1000>,
+>> +			      <0x03882000 0x2000>;
+>
+> You're missing the GICH and GICV regions here.
+>
+>> +			interrupts = <GIC_PPI 9
+>> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>> +			interrupt-parent = <&gic>;
+>> +		};
+> Thanks,
+>
+> 	M.
+>
 
-Talking more with Jon (who works for SolidRun, the board manufacturer),
-the feeling there is:
+Thanks, fixed.
 
-1. Why enable both UART headers - it makes more sense (given your reason)
-   to enable one as UART but keep the other as GPIO.  The labelling up of
-   them being a UART is merely a historical artifact of the very early
-   development of the board.
-
-2. They are developer boards, not a final product.  Case modification is
-   somewhat expected.
-
-(2) is especially relevant when SFP support gets added - some of the
-early revision boards have the SCL/SDA lines swapped on the I2C bus.
-With that fixed, all boards have way too strong pull-ups on the I2C
-bus which means some modules don't work - and worse than that, may
-result in corrupted module EEPROMs.
-
-I ended up with corruption here, and although I've a rev 1.3 board now,
-I'm still using my self-modified rev 1.1 in preference to it, because
-I don't want to have to deal with another corrupted EEPROM.
-
-In order for SFP to be reliably functional, board modification is
-required (either replacement of resistor packs, or in the case of the
-early boards, cutting the I2C lines and rewiring them.)
-
-IOW, board modification will be required for SFP on most mcbins.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Mikko
