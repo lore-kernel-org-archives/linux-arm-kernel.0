@@ -1,162 +1,36 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Feb 2018 18:56:04 +0000
-Subject: [PATCH 09/11] ACPI / APEI: Add support for the SDEI GHES Notification
- type
-In-Reply-To: <20180215185606.26736-1-james.morse@arm.com>
-References: <20180215185606.26736-1-james.morse@arm.com>
-Message-ID: <20180215185606.26736-10-james.morse@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Feb 2018 18:59:55 +0000
+Subject: [PATCH] arm64: mm: Use READ_ONCE/WRITE_ONCE when accessing page
+ tables
+In-Reply-To: <1518693296-7339-1-git-send-email-will.deacon@arm.com>
+References: <1518693296-7339-1-git-send-email-will.deacon@arm.com>
+Message-ID: <01defb0c-5cb5-83b3-8094-04fcc24ab75a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the GHES notification type is SDEI, register the provided event
-number and point the callback at ghes_sdei_callback().
+On 15/02/18 11:14, Will Deacon wrote:
+> In many cases, page tables can be accessed concurrently by either another
+> CPU (due to things like fast gup) or by the hardware page table walker
+> itself, which may set access/dirty bits. In such cases, it is important
+> to use READ_ONCE/WRITE_ONCE when accessing page table entries so that
+> entries cannot be torn, merged or subject to apparent loss of coherence
+> due to compiler transformations.
+> 
+> Whilst there are some scenarios where this cannot happen (e.g. pinned
+> kernel mappings for the linear region), the overhead of using READ_ONCE
+> /WRITE_ONCE everywhere is minimal and makes the code an awful lot easier
+> to reason about. This patch consistently uses these macros in the arch
+> code, as well as explicitly namespacing pointers to page table entries
+> from the entries themselves by using adopting a 'p' suffix for the former
+> (as is sometimes used elsewhere in the kernel source).
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-by: Yury Norov <ynorov@caviumnetworks.com>
+> Tested-by: Richard Ruigrok <rruigrok@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- drivers/acpi/apei/ghes.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++--
- include/linux/arm_sdei.h |  3 +++
- 2 files changed, 67 insertions(+), 2 deletions(-)
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 280c0a58c700..5eaf0a772be7 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -25,6 +25,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/arm_sdei.h>
- #include <linux/kernel.h>
- #include <linux/moduleparam.h>
- #include <linux/init.h>
-@@ -59,7 +60,7 @@
- 
- #define GHES_PFX	"GHES: "
- 
--#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA)
-+#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA) || defined(CONFIG_ARM_SDE_INTERFACE)
- #define WANT_NMI_ESTATUS_QUEUE	1
- #endif
- 
-@@ -753,7 +754,7 @@ static int _in_nmi_notify_one(struct ghes *ghes)
- 	return ret;
- }
- 
--static int ghes_estatus_queue_notified(struct list_head *rcu_list)
-+static int __maybe_unused ghes_estatus_queue_notified(struct list_head *rcu_list)
- {
- 	int ret = -ENOENT;
- 	struct ghes *ghes;
-@@ -1047,6 +1048,49 @@ static inline void ghes_nmi_add(struct ghes *ghes) { }
- static inline void ghes_nmi_remove(struct ghes *ghes) { }
- #endif /* CONFIG_HAVE_ACPI_APEI_NMI */
- 
-+static int ghes_sdei_callback(u32 event_num, struct pt_regs *regs, void *arg)
-+{
-+	struct ghes *ghes = arg;
-+
-+	if (!_in_nmi_notify_one(ghes)) {
-+		if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG))
-+			irq_work_queue(&ghes_proc_irq_work);
-+
-+		return 0;
-+	}
-+
-+	return -ENOENT;
-+}
-+
-+static int apei_sdei_register_ghes(struct ghes *ghes)
-+{
-+	int err = -EINVAL;
-+
-+	if (IS_ENABLED(CONFIG_ARM_SDE_INTERFACE)) {
-+		ghes_estatus_queue_grow_pool(ghes);
-+
-+		err = sdei_register_ghes(ghes, ghes_sdei_callback);
-+		if (err)
-+			ghes_estatus_queue_shrink_pool(ghes);
-+	}
-+
-+	return err;
-+}
-+
-+static int apei_sdei_unregister_ghes(struct ghes *ghes)
-+{
-+	int err = -EINVAL;
-+
-+	if (IS_ENABLED(CONFIG_ARM_SDE_INTERFACE)) {
-+		err = sdei_unregister_ghes(ghes);
-+
-+		if (!err)
-+			ghes_estatus_queue_shrink_pool(ghes);
-+	}
-+
-+	return err;
-+}
-+
- static int ghes_probe(struct platform_device *ghes_dev)
- {
- 	struct acpi_hest_generic *generic;
-@@ -1081,6 +1125,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
-+		if (!IS_ENABLED(CONFIG_ARM_SDE_INTERFACE)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SDE Interface is not supported!\n",
-+				generic->header.source_id);
-+			goto err;
-+		}
-+		break;
- 	case ACPI_HEST_NOTIFY_LOCAL:
- 		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
- 			   generic->header.source_id);
-@@ -1154,6 +1205,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
-+		rc = apei_sdei_register_ghes(ghes);
-+		if (rc)
-+			goto err_edac_unreg;
-+		break;
- 	default:
- 		BUG();
- 	}
-@@ -1175,6 +1231,7 @@ err:
- 
- static int ghes_remove(struct platform_device *ghes_dev)
- {
-+	int rc;
- 	struct ghes *ghes;
- 	struct acpi_hest_generic *generic;
- 
-@@ -1207,6 +1264,11 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
-+		rc = apei_sdei_unregister_ghes(ghes);
-+		if (rc)
-+			return rc;
-+		break;
- 	default:
- 		BUG();
- 		break;
-diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
-index 5fdf799be026..f49063ca206d 100644
---- a/include/linux/arm_sdei.h
-+++ b/include/linux/arm_sdei.h
-@@ -12,7 +12,10 @@ enum sdei_conduit_types {
- };
- 
- #include <acpi/ghes.h>
-+
-+#ifdef CONFIG_ARM_SDE_INTERFACE
- #include <asm/sdei.h>
-+#endif
- 
- /* Arch code should override this to set the entry point from firmware... */
- #ifndef sdei_arch_get_entry_point
+	M.
 -- 
-2.15.1
+Jazz is not dead. It just smells funny...
