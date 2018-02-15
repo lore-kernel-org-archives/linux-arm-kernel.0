@@ -1,167 +1,200 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Feb 2018 22:03:27 +0100
-Subject: [PATCH v4 35/40] KVM: arm/arm64: Get rid of vgic_elrsr
-In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
-Message-ID: <20180215210332.8648-36-christoffer.dall@linaro.org>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Thu, 15 Feb 2018 22:08:56 +0000 (UTC)
+Subject: arm64/v4.16-rc1: KASAN: use-after-free Read in finish_task_switch
+In-Reply-To: <20180215182154.GD15274@arm.com>
+References: <20180214120254.qq4w4s42ecxio7lu@lakrids.cambridge.arm.com>
+ <20180214150739.GH2992@arm.com>
+ <20180214165131.o25r3hhrtrjk3ejq@lakrids.cambridge.arm.com>
+ <254787533.21950.1518634424009.JavaMail.zimbra@efficios.com>
+ <20180215142239.GF16623@arm.com>
+ <20180215164754.GW25201@hirez.programming.kicks-ass.net>
+ <20180215182154.GD15274@arm.com>
+Message-ID: <1144433342.22716.1518732536600.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is really no need to store the vgic_elrsr on the VGIC data
-structures as the only need we have for the elrsr is to figure out if an
-LR is inactive when we save the VGIC state upon returning from the
-guest.  We can might as well store this in a temporary local variable.
+----- On Feb 15, 2018, at 1:21 PM, Will Deacon will.deacon at arm.com wrote:
 
-This also gets rid of the endianness conversion in the VGIC save
-function, which is completely unnecessary and would actually result in
-incorrect functionality on big-endian systems, because we are only using
-typed values here and not converting pointers and reading different
-types here.
+> On Thu, Feb 15, 2018 at 05:47:54PM +0100, Peter Zijlstra wrote:
+>> On Thu, Feb 15, 2018 at 02:22:39PM +0000, Will Deacon wrote:
+>> > Instead, we've come up with a more plausible sequence that can in theory
+>> > happen on a single CPU:
+>> > 
+>> > <task foo calls exit()>
+>> > 
+>> > do_exit
+>> > 	exit_mm
+>> 
+>> If this is the last task of the process, we would expect:
+>> 
+>>   mm_count == 1
+>>   mm_users == 1
+>> 
+>> at this point.
+>> 
+>> > 		mmgrab(mm);			// foo's mm has count +1
+>> > 		BUG_ON(mm != current->active_mm);
+>> > 		task_lock(current);
+>> > 		current->mm = NULL;
+>> > 		task_unlock(current);
+>> 
+>> So the whole active_mm is basically the last 'real' mm, and its purpose
+>> is to avoid switch_mm() between user tasks and kernel tasks.
+>> 
+>> A kernel task has !->mm. We do this by incrementing mm_count when
+>> switching from user to kernel task and decrementing when switching from
+>> kernel to user.
+>> 
+>> What exit_mm() does is change a user task into a 'kernel' task. So it
+>> should increment mm_count to mirror the context switch. I suspect this
+>> is what the mmgrab() in exit_mm() is for.
+>> 
+>> > <irq and ctxsw to kthread>
+>> > 
+>> > context_switch(prev=foo, next=kthread)
+>> > 	mm = next->mm;
+>> > 	oldmm = prev->active_mm;
+>> > 
+>> > 	if (!mm) {				// True for kthread
+>> > 		next->active_mm = oldmm;
+>> > 		mmgrab(oldmm);			// foo's mm has count +2
+>> > 	}
+>> > 
+>> > 	if (!prev->mm) {			// True for foo
+>> > 		rq->prev_mm = oldmm;
+>> > 	}
+>> > 
+>> > 	finish_task_switch
+>> > 		mm = rq->prev_mm;
+>> > 		if (mm) {			// True (foo's mm)
+>> > 			mmdrop(mm);		// foo's mm has count +1
+>> > 		}
+>> > 
+>> > 	[...]
+>> > 
+>> > <ctxsw to task bar>
+>> > 
+>> > context_switch(prev=kthread, next=bar)
+>> > 	mm = next->mm;
+>> > 	oldmm = prev->active_mm;		// foo's mm!
+>> > 
+>> > 	if (!prev->mm) {			// True for kthread
+>> > 		rq->prev_mm = oldmm;
+>> > 	}
+>> > 
+>> > 	finish_task_switch
+>> > 		mm = rq->prev_mm;
+>> > 		if (mm) {			// True (foo's mm)
+>> > 			mmdrop(mm);		// foo's mm has count +0
+>> 
+>> The context switch into the next user task will then decrement. At this
+>> point foo no longer has a reference to its mm, except on the stack.
+>> 
+>> > 		}
+>> > 
+>> > 	[...]
+>> > 
+>> > <ctxsw back to task foo>
+>> > 
+>> > context_switch(prev=bar, next=foo)
+>> > 	mm = next->mm;
+>> > 	oldmm = prev->active_mm;
+>> > 
+>> > 	if (!mm) {				// True for foo
+>> > 		next->active_mm = oldmm;	// This is bar's mm
+>> > 		mmgrab(oldmm);			// bar's mm has count +1
+>> > 	}
+>> > 
+>> > 
+>> > 	[return back to exit_mm]
+>> 
+>> Enter mm_users, this counts the number of tasks associated with the mm.
+>> We start with 1 in mm_init(), and when it drops to 0, we decrement
+>> mm_count. Since we also start with mm_count == 1, this would appear
+>> consistent.
+>> 
+>>   mmput() // --mm_users == 0, which then results in:
+>> 
+>> > mmdrop(mm);					// foo's mm has count -1
+>> 
+>> In the above case, that's the very last reference to the mm, and since
+>> we started out with mm_count == 1, this -1 makes 0 and we do the actual
+>> free.
+>> 
+>> > At this point, we've got an imbalanced count on the mm and could free it
+>> > prematurely as seen in the KASAN log.
+>> 
+>> I'm not sure I see premature. At this point mm_users==0, mm_count==0 and
+>> we freed mm and there is no further use of the on-stack mm pointer and
+>> foo no longer has a pointer to it in either ->mm or ->active_mm. It's
+>> well and proper dead.
+>> 
+>> > A subsequent context-switch away from foo would therefore result in a
+>> > use-after-free.
+>> 
+>> At the above point, foo no longer has a reference to mm, we cleared ->mm
+>> early, and the context switch to bar cleared ->active_mm. The switch
+>> back into foo then results with foo->active_mm == bar->mm, which is
+>> fine.
+> 
+> Bugger, you're right. When we switch off foo after freeing the mm, we'll
+> actually access it's active mm which points to bar's mm. So whilst this
+> can explain part of the kasan splat, it doesn't explain the actual
+> use-after-free.
+> 
+> More head-scratching required :(
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
+My current theory: do_exit() gets preempted after having set current->mm
+to NULL, and after having issued mmput(), which brings the mm_count down
+to 0. Unfortunately, if the scheduler switches from a userspace thread
+to a kernel thread, context_switch() loads prev->active_mm which still
+points to the now-freed mm, mmgrab the mm, and eventually does mmdrop
+in finish_task_switch().
 
-Notes:
-    Changes since v1:
-     - Moved patch up the queue before we start moving code around to avoid moving
-       potentially broken code.
+If my understanding is correct, the following patch should help. The idea
+is to keep a reference on the mm_count until after we are sure the scheduler
+cannot schedule the task anymore. What I'm not sure is where exactly in
+do_exit() are we sure the task cannot ever be preempted anymore ?
 
- include/kvm/arm_vgic.h        |  2 --
- virt/kvm/arm/hyp/vgic-v2-sr.c | 28 +++++++---------------------
- virt/kvm/arm/hyp/vgic-v3-sr.c |  6 +++---
- virt/kvm/arm/vgic/vgic-v2.c   |  1 -
- virt/kvm/arm/vgic/vgic-v3.c   |  1 -
- 5 files changed, 10 insertions(+), 28 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index cdbd142ca7f2..ac98ae46bfb7 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -263,7 +263,6 @@ struct vgic_dist {
- struct vgic_v2_cpu_if {
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
--	u64		vgic_elrsr;	/* Saved only */
- 	u32		vgic_apr;
- 	u32		vgic_lr[VGIC_V2_MAX_LRS];
- };
-@@ -272,7 +271,6 @@ struct vgic_v3_cpu_if {
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
- 	u32		vgic_sre;	/* Restored only, change ignored */
--	u32		vgic_elrsr;	/* Saved only */
- 	u32		vgic_ap0r[4];
- 	u32		vgic_ap1r[4];
- 	u64		vgic_lr[VGIC_V3_MAX_LRS];
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 4fe6e797e8b3..a91b0d2b9249 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -23,29 +23,19 @@
- #include <asm/kvm_hyp.h>
- #include <asm/kvm_mmu.h>
- 
--static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
--{
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
--	u32 elrsr0, elrsr1;
--
--	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
--	if (unlikely(nr_lr > 32))
--		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
--	else
--		elrsr1 = 0;
--
--	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
--}
--
- static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+diff --git a/kernel/exit.c b/kernel/exit.c
+index 995453d..fefba68 100644
+--- a/kernel/exit.c
++++ b/kernel/exit.c
+@@ -764,6 +764,7 @@ void __noreturn do_exit(long code)
  {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int i;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
-+	u64 elrsr;
-+	int i;
+        struct task_struct *tsk = current;
+        int group_dead;
++       struct mm_struct *mm;
+ 
+        profile_task_exit(tsk);
+        kcov_task_exit(tsk);
+@@ -849,6 +850,10 @@ void __noreturn do_exit(long code)
+        tsk->exit_code = code;
+        taskstats_exit(tsk, group_dead);
+ 
++       mm = current->mm;
++       if (mm)
++               mmgrab(mm);
 +
-+	elrsr = readl_relaxed(base + GICH_ELRSR0);
-+	if (unlikely(used_lrs > 32))
-+		elrsr |= ((u64)readl_relaxed(base + GICH_ELRSR1)) << 32;
+        exit_mm();
  
- 	for (i = 0; i < used_lrs; i++) {
--		if (cpu_if->vgic_elrsr & (1UL << i))
-+		if (elrsr & (1UL << i))
- 			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
- 		else
- 			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-@@ -68,13 +58,9 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+        if (group_dead)
+@@ -920,6 +925,9 @@ void __noreturn do_exit(long code)
  
- 	if (used_lrs) {
- 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
--
--		save_elrsr(vcpu, base);
- 		save_lrs(vcpu, base);
--
- 		writel_relaxed(0, base + GICH_HCR);
- 	} else {
--		cpu_if->vgic_elrsr = ~0UL;
- 		cpu_if->vgic_apr = 0;
- 	}
+        lockdep_free_task(tsk);
+        do_task_dead();
++
++       if (mm)
++               mmdrop(mm);
  }
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index f5c3d6d7019e..9abf2f3c12b5 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -222,15 +222,16 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	if (used_lrs) {
- 		int i;
- 		u32 nr_pre_bits;
-+		u32 elrsr;
+ EXPORT_SYMBOL_GPL(do_exit);
  
--		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
-+		elrsr = read_gicreg(ICH_ELSR_EL2);
- 
- 		write_gicreg(0, ICH_HCR_EL2);
- 		val = read_gicreg(ICH_VTR_EL2);
- 		nr_pre_bits = vtr_to_nr_pre_bits(val);
- 
- 		for (i = 0; i < used_lrs; i++) {
--			if (cpu_if->vgic_elrsr & (1 << i))
-+			if (elrsr & (1 << i))
- 				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
- 			else
- 				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
-@@ -262,7 +263,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(0, ICH_HCR_EL2);
- 
--		cpu_if->vgic_elrsr = 0xffff;
- 		cpu_if->vgic_ap0r[0] = 0;
- 		cpu_if->vgic_ap0r[1] = 0;
- 		cpu_if->vgic_ap0r[2] = 0;
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index c32d7b93ffd1..bb305d49cfdd 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -265,7 +265,6 @@ void vgic_v2_enable(struct kvm_vcpu *vcpu)
- 	 * anyway.
- 	 */
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
--	vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr = ~0;
- 
- 	/* Get the show on the road... */
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6b329414e57a..b76e21f3e6bd 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -267,7 +267,6 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	 * anyway.
- 	 */
- 	vgic_v3->vgic_vmcr = 0;
--	vgic_v3->vgic_elrsr = ~0;
- 
- 	/*
- 	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
+
+
+
+
 -- 
-2.14.2
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
