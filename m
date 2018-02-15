@@ -1,39 +1,54 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Thu, 15 Feb 2018 09:11:13 +1100 (AEDT)
-Subject: [PATCH net v4 02/13] net/8390: Fix msg_enable patch snafu
-In-Reply-To: <20180213.095820.761578588685460710.davem@davemloft.net>
-References: <f697da2b2513e025688f6c48088536060575a249.1518397634.git.fthain@telegraphics.com.au>
- <20180212.103956.1262868827217051631.davem@davemloft.net>
- <alpine.LNX.2.21.1802131419540.8@nippy.intranet>
- <20180213.095820.761578588685460710.davem@davemloft.net>
-Message-ID: <alpine.LNX.2.21.1802150857480.8@nippy.intranet>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Thu, 15 Feb 2018 00:09:49 +0000
+Subject: [PATCH v5 00/20][RESEND] firmware: ARM System Control and
+ Management Interface(SCMI) support
+In-Reply-To: <1518461124-17371-1-git-send-email-sudeep.holla@arm.com>
+References: <1518461124-17371-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CALW4P+LPiYSOCKW4iS6OwK9S=M3aCP+X6QNnDkycY5TYQsCb5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Feb 2018, David Miller wrote:
+On Mon, Feb 12, 2018 at 6:45 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Hi all,
+>
+> ARM System Control and Management Interface(SCMI) is more flexible and
+> easily extensible than any of the existing interfaces. Many vendors were
+> involved in the making of this formal specification and is now published[1].
+>
+> There is a strong trend in the industry to provide micro-controllers in
+> systems to abstract various power, or other system management tasks.
+> These controllers usually have similar interfaces, both in terms of the
+> functions that are provided by them, and in terms of how requests are
+> communicated to them.
+>
+> This specification is to standardise and avoid (any further)
+> fragmentation in the design of such interface by various vendors.
+>
+> This patch set is intended to get feedback on the design and structure
+> of the code. This is not complete and not fully tested due to
+> non-availability of firmware with full feature set at this time.
 
-> > I think you have overlooked those modules which offer no way to set 
-> > p->msg_enable, i.e. ax88796, axnet_cs, etherh, hydra, mac8390, 
-> > mcf8390, pcnet_cs and zorro8390.
-> 
-> Then that's a bug, we have a very simple easy to implement interface for 
-> setting this (ethtool).
-> 
-> And by adding the simple hook, you will make these older drivers easier 
-> to debug for the few people still using them.
+If it's not fully tested and not complete (I read as this patch set is
+not ready to be merged), then maybe it's better to mark it as RFC?
 
-Have you considered that implementing the ethtool hooks in the core driver 
-might allow removal of all 8390 driver 'msg_enable' module parameters and 
-msglevel ethtool hooks added by c45f812f0280, excepting those in the core 
-driver? But even if we did that, it seems to me that we still need this 
-patch.
 
-The missing set_msglevel ethtool hooks and the msg_enable bugs patched 
-here are separate issues inasmuchas the lib8390.c module parameter called 
-'msg_enable' presently controls only the version message whereas the 
-ethtool hooks cannot control the version message logging at all.
+> It currently doesn't support notification, asynchronous/delayed response,
+> perf/power statistics region and sensor register region to name a few.
+> I have borrowed some of the ideas of message allocation/management from
+> TI SCI.
+>
+> Changes:
+>
+> v4[6]->v5:
+>         - Rebased to v4.16-rc1
+>         - Updated all the gathered Ack/Reviewed-by tags(which includes
+>           all the drivers using SCMI protocol)
 
-I'm not against improving ethtool support. Would you please explain how 
-doing so (one way or another) would alter this patch?
+You still didn't comment on all questions to previous patchset.
 
--- 
+For example,
+https://www.spinics.net/lists/arm-kernel/msg626719.html
+
+
+Best regards,
+Alexey
