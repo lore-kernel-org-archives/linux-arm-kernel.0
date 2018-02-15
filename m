@@ -1,44 +1,42 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Thu, 15 Feb 2018 08:23:15 +0000
-Subject: [PATCH] drm/exynos: remove exynos_drm_rotator.h
-Message-ID: <1518682995-10319-1-git-send-email-clabbe@baylibre.com>
+From: kbingham@kernel.org (Kieran Bingham)
+Date: Thu, 15 Feb 2018 08:38:15 +0000
+Subject: [PATCH 0/8] r8a77995 D3 DU and LVDS support
+Message-ID: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since its inclusion in 2012 via commit bea8a429d91a ("drm/exynos: add rotator ipp driver")
-this header is not used by any source files and is empty.
-Lets just remove it.
+From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
----
- drivers/gpu/drm/exynos/exynos_drm_rotator.h | 19 -------------------
- 1 file changed, 19 deletions(-)
- delete mode 100644 drivers/gpu/drm/exynos/exynos_drm_rotator.h
+Provide the PFC groups for the DU pin controls, and update the bindings for
+both the DU and LVDS to cover the r8a77995.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.h b/drivers/gpu/drm/exynos/exynos_drm_rotator.h
-deleted file mode 100644
-index 71a0b4c0c1e8..000000000000
---- a/drivers/gpu/drm/exynos/exynos_drm_rotator.h
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-- *
-- * Authors:
-- *	YoungJun Cho <yj44.cho@samsung.com>
-- *	Eunchul Kim <chulspro.kim@samsung.com>
-- *
-- * This program is free software; you can redistribute  it and/or modify it
-- * under  the terms of  the GNU General  Public License as published by the
-- * Free Software Foundation;  either version 2 of the  License, or (at your
-- * option) any later version.
-- */
--
--#ifndef	_EXYNOS_DRM_ROTATOR_H_
--#define	_EXYNOS_DRM_ROTATOR_H_
--
--/* TODO */
--
--#endif
+Add dt nodes for the DU, and LVDS, and enable VGA on the Draak board.
+Provide support for HDMI out through the ADV7511 component, on the LVDS channel.
+
+Finally provide a 'proof-of-concept' patch for the ADV7612 device which shares
+the same bus and demonstrates setting the I2C slave maps such that they do not
+conflict with the ADV7511.
+
+This series is dependant upon the LVDS rework from Laurent which is not yet
+finalised, however the DU only patches are not blocked by this.
+
+
+Kieran Bingham (8):
+  pinctrl: sh-pfc: r8a77995: Add DU support
+  dt-bindings: display: renesas,du: Document r8a77995 bindings
+  dt-bindings: display: renesas,lvds: Add LVDS binding for D3
+  arm64: dts: renesas: r8a77995: add DU support
+  arm64: dts: renesas: r8a77995: Add LVDS support
+  arm64: dts: renesas: r8a77995-draak: Enable DU
+  arm64: dts: renesas: r8a77995-draak: Add HDMI Out through ADV7511
+  [PoC] arm64: dts: renesas: r8a77995-draak: Add ADV7612
+
+ .../bindings/display/bridge/renesas,lvds.txt       |   1 +
+ .../devicetree/bindings/display/renesas,du.txt     |   2 +
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 150 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi          |  87 ++++++++++++
+ drivers/pinctrl/sh-pfc/pfc-r8a77995.c              | 101 ++++++++++++++
+ 5 files changed, 341 insertions(+)
+
 -- 
-2.13.6
+2.7.4
