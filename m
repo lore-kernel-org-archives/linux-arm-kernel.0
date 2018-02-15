@@ -1,159 +1,232 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Feb 2018 18:56:03 +0000
-Subject: [PATCH 08/11] firmware: arm_sdei: Add ACPI GHES registration helper
+Date: Thu, 15 Feb 2018 18:56:01 +0000
+Subject: [PATCH 06/11] ACPI / APEI: Make the fixmap_idx per-ghes to allow
+ multiple in_nmi() users
 In-Reply-To: <20180215185606.26736-1-james.morse@arm.com>
 References: <20180215185606.26736-1-james.morse@arm.com>
-Message-ID: <20180215185606.26736-9-james.morse@arm.com>
+Message-ID: <20180215185606.26736-7-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APEI's Generic Hardware Error Source structures do not describe
-whether the SDEI event is shared or private, as this information is
-discoverable via the API.
+Arm64 has multiple NMI-like notifications, but GHES only has one
+in_nmi() path. The interactions between these multiple NMI-like
+notifications is, unclear.
 
-GHES needs to know whether an event is normal or critical to avoid
-sharing locks or fixmap entries.
+Split this single path up by moving the fixmap idx and lock into
+the struct ghes. Each notification's init function can consider
+which other notifications it masks and can share a fixmap_idx with.
+This lets us merge the two ghes_ioremap_pfn_* flavours.
 
-Add a helper to ask firmware for this information so it can initialise
-the struct ghes and register then enable the event.
+Two lock pointers are provided, but only one will be used by
+ghes_copy_tofrom_phys(), depending on in_nmi(). This means any
+notification that might arrive as an NMI must always be wrapped in
+nmi_enter()/nmi_exit().
+
+The double-underscore version of fix_to_virt() is used because
+the index to be mapped can't be tested against the end of the
+enum at compile time.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/fixmap.h |  4 +++
- drivers/firmware/arm_sdei.c     | 75 +++++++++++++++++++++++++++++++++++++++++
- include/linux/arm_sdei.h        |  5 +++
- 3 files changed, 84 insertions(+)
+ drivers/acpi/apei/ghes.c | 79 ++++++++++++++++++------------------------------
+ include/acpi/ghes.h      |  5 +++
+ 2 files changed, 35 insertions(+), 49 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index c3974517c2cb..e2b423a5feaf 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -58,6 +58,10 @@ enum fixed_addresses {
- #ifdef CONFIG_ACPI_APEI_SEA
- 	FIX_APEI_GHES_SEA,
- #endif
-+#ifdef CONFIG_ARM_SDE_INTERFACE
-+	FIX_APEI_GHES_SDEI_NORMAL,
-+	FIX_APEI_GHES_SDEI_CRITICAL,
-+#endif
- #endif /* CONFIG_ACPI_APEI_GHES */
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 7b2504aa23b1..70ccb309a9d8 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -118,12 +118,9 @@ static DEFINE_MUTEX(ghes_list_mutex);
+  * from BIOS to Linux can be determined only in NMI, IRQ or timer
+  * handler, but general ioremap can not be used in atomic context, so
+  * the fixmap is used instead.
+- *
+- * These 2 spinlocks are used to prevent the fixmap entries from being used
+- * simultaneously.
+  */
+-static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
+-static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
++static DEFINE_RAW_SPINLOCK(ghes_fixmap_lock_nmi);
++static DEFINE_SPINLOCK(ghes_fixmap_lock_irq);
  
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 1ea71640fdc2..9b6e140cf6cb 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -2,6 +2,7 @@
- // Copyright (C) 2017 Arm Ltd.
- #define pr_fmt(fmt) "sdei: " fmt
+ static struct gen_pool *ghes_estatus_pool;
+ static unsigned long ghes_estatus_pool_size_request;
+@@ -133,38 +130,16 @@ static atomic_t ghes_estatus_cache_alloced;
  
-+#include <acpi/ghes.h>
- #include <linux/acpi.h>
- #include <linux/arm_sdei.h>
- #include <linux/arm-smccc.h>
-@@ -887,6 +888,80 @@ static void sdei_smccc_hvc(unsigned long function_id,
- 	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
+ static int ghes_panic_timeout __read_mostly = 30;
+ 
+-static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
++static void __iomem *ghes_fixmap_pfn(int fixmap_idx, u64 pfn)
+ {
+ 	phys_addr_t paddr;
+ 	pgprot_t prot;
+ 
+ 	paddr = pfn << PAGE_SHIFT;
+ 	prot = arch_apei_get_mem_attribute(paddr);
+-	__set_fixmap(FIX_APEI_GHES_NMI, paddr, prot);
+-
+-	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_NMI);
+-}
+-
+-static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
+-{
+-	phys_addr_t paddr;
+-	pgprot_t prot;
+-
+-	paddr = pfn << PAGE_SHIFT;
+-	prot = arch_apei_get_mem_attribute(paddr);
+-	__set_fixmap(FIX_APEI_GHES_IRQ, paddr, prot);
+-
+-	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_IRQ);
+-}
+-
+-static void ghes_iounmap_nmi(void)
+-{
+-	clear_fixmap(FIX_APEI_GHES_NMI);
+-}
++	__set_fixmap(fixmap_idx, paddr, prot);
+ 
+-static void ghes_iounmap_irq(void)
+-{
+-	clear_fixmap(FIX_APEI_GHES_IRQ);
++	return (void __iomem *) __fix_to_virt(fixmap_idx);
  }
  
-+#ifdef CONFIG_ACPI
-+/* These stop private notifications using the fixmap entries simultaneously */
-+static DEFINE_RAW_SPINLOCK(sdei_ghes_fixmap_lock_normal);
-+static DEFINE_RAW_SPINLOCK(sdei_ghes_fixmap_lock_critical);
-+
-+int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *cb)
-+{
-+	int err;
-+	u32 event_num;
-+	u64 result;
-+
-+	if (acpi_disabled)
-+		return -EOPNOTSUPP;
-+
-+	event_num = ghes->generic->notify.vector;
-+	if (event_num == 0) {
-+		/*
-+		 * Event 0 is the reserved by the specification for
-+		 * SDEI_EVENT_SIGNAL.
-+		 */
-+		return -EINVAL;
-+	}
-+
-+	err = sdei_api_event_get_info(event_num, SDEI_EVENT_INFO_EV_PRIORITY,
-+				      &result);
-+	if (err)
-+		return err;
-+
-+	if (result == SDEI_EVENT_PRIORITY_CRITICAL) {
-+		ghes->nmi_fixmap_lock = &sdei_ghes_fixmap_lock_critical;
-+		ghes->fixmap_idx = FIX_APEI_GHES_SDEI_CRITICAL;
-+	} else {
-+		ghes->nmi_fixmap_lock = &sdei_ghes_fixmap_lock_normal;
-+		ghes->fixmap_idx = FIX_APEI_GHES_SDEI_NORMAL;
-+	}
-+
-+	err = sdei_event_register(event_num, cb, ghes);
-+	if (!err)
-+		err = sdei_event_enable(event_num);
-+
-+	return err;
-+}
-+
-+int sdei_unregister_ghes(struct ghes *ghes)
-+{
-+	int i;
-+	int err;
-+	u32 event_num = ghes->generic->notify.vector;
-+
-+	might_sleep();
-+
-+	if (acpi_disabled)
-+		return -EOPNOTSUPP;
-+
-+	/*
-+	 * The event may be running on another CPU. Disable it
-+	 * to stop new events, then try to unregister a few times.
-+	 */
-+	err = sdei_event_disable(event_num);
-+	if (err)
-+		return err;
-+
-+	for (i = 0; i < 3; i++) {
-+		err = sdei_event_unregister(event_num);
-+		if (err != -EINPROGRESS)
-+			break;
-+
-+		schedule();
-+	}
-+
-+	return err;
-+}
-+#endif /* CONFIG_ACPI */
-+
- static int sdei_get_conduit(struct platform_device *pdev)
+ static int ghes_estatus_pool_init(void)
+@@ -292,8 +267,8 @@ static inline int ghes_severity(int severity)
+ 	}
+ }
+ 
+-static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+-				  int from_phys)
++static void ghes_copy_tofrom_phys(struct ghes *ghes, void *buffer, u64 paddr,
++				  u32 len, int from_phys)
  {
- 	const char *method;
-diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
-index 942afbd544b7..5fdf799be026 100644
---- a/include/linux/arm_sdei.h
-+++ b/include/linux/arm_sdei.h
-@@ -11,6 +11,7 @@ enum sdei_conduit_types {
- 	CONDUIT_HVC,
+ 	void __iomem *vaddr;
+ 	unsigned long flags = 0;
+@@ -303,13 +278,11 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 
+ 	while (len > 0) {
+ 		offset = paddr - (paddr & PAGE_MASK);
+-		if (in_nmi) {
+-			raw_spin_lock(&ghes_ioremap_lock_nmi);
+-			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
+-		} else {
+-			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
+-			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
+-		}
++		if (in_nmi)
++			raw_spin_lock(ghes->nmi_fixmap_lock);
++		else
++			spin_lock_irqsave(ghes->fixmap_lock, flags);
++		vaddr = ghes_fixmap_pfn(ghes->fixmap_idx, paddr >> PAGE_SHIFT);
+ 		trunk = PAGE_SIZE - offset;
+ 		trunk = min(trunk, len);
+ 		if (from_phys)
+@@ -319,13 +292,11 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 		len -= trunk;
+ 		paddr += trunk;
+ 		buffer += trunk;
+-		if (in_nmi) {
+-			ghes_iounmap_nmi();
+-			raw_spin_unlock(&ghes_ioremap_lock_nmi);
+-		} else {
+-			ghes_iounmap_irq();
+-			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
+-		}
++		clear_fixmap(ghes->fixmap_idx);
++		if (in_nmi)
++			raw_spin_unlock(ghes->nmi_fixmap_lock);
++		else
++			spin_unlock_irqrestore(ghes->fixmap_lock, flags);
+ 	}
+ }
+ 
+@@ -347,7 +318,7 @@ static int ghes_read_estatus(struct ghes *ghes, int silent)
+ 	if (!buf_paddr)
+ 		return -ENOENT;
+ 
+-	ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
++	ghes_copy_tofrom_phys(ghes, ghes->estatus, buf_paddr,
+ 			      sizeof(*ghes->estatus), 1);
+ 	if (!ghes->estatus->block_status)
+ 		return -ENOENT;
+@@ -363,7 +334,7 @@ static int ghes_read_estatus(struct ghes *ghes, int silent)
+ 		goto err_read_block;
+ 	if (cper_estatus_check_header(ghes->estatus))
+ 		goto err_read_block;
+-	ghes_copy_tofrom_phys(ghes->estatus + 1,
++	ghes_copy_tofrom_phys(ghes, ghes->estatus + 1,
+ 			      buf_paddr + sizeof(*ghes->estatus),
+ 			      len - sizeof(*ghes->estatus), 1);
+ 	if (cper_estatus_check(ghes->estatus))
+@@ -382,7 +353,7 @@ static void ghes_clear_estatus(struct ghes *ghes)
+ 	ghes->estatus->block_status = 0;
+ 	if (!(ghes->flags & GHES_TO_CLEAR))
+ 		return;
+-	ghes_copy_tofrom_phys(ghes->estatus, ghes->buffer_paddr,
++	ghes_copy_tofrom_phys(ghes, ghes->estatus, ghes->buffer_paddr,
+ 			      sizeof(ghes->estatus->block_status), 0);
+ 	ghes->flags &= ~GHES_TO_CLEAR;
+ }
+@@ -995,6 +966,8 @@ int ghes_notify_sea(void)
+ 
+ static void ghes_sea_add(struct ghes *ghes)
+ {
++	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
++	ghes->fixmap_idx = FIX_APEI_GHES_NMI;
+ 	ghes_estatus_queue_grow_pool(ghes);
+ 
+ 	mutex_lock(&ghes_list_mutex);
+@@ -1041,6 +1014,8 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ 
+ static void ghes_nmi_add(struct ghes *ghes)
+ {
++	ghes->nmi_fixmap_lock = &ghes_fixmap_lock_nmi;
++	ghes->fixmap_idx = FIX_APEI_GHES_NMI;
+ 	ghes_estatus_queue_grow_pool(ghes);
+ 
+ 	mutex_lock(&ghes_list_mutex);
+@@ -1136,11 +1111,15 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 
+ 	switch (generic->notify.type) {
+ 	case ACPI_HEST_NOTIFY_POLLED:
++		ghes->fixmap_lock = &ghes_fixmap_lock_irq;
++		ghes->fixmap_idx = FIX_APEI_GHES_IRQ;
+ 		timer_setup(&ghes->timer, ghes_poll_func, TIMER_DEFERRABLE);
+ 		ghes_add_timer(ghes);
+ 		break;
+ 	case ACPI_HEST_NOTIFY_EXTERNAL:
+ 		/* External interrupt vector is GSI */
++		ghes->fixmap_lock = &ghes_fixmap_lock_irq;
++		ghes->fixmap_idx = FIX_APEI_GHES_IRQ;
+ 		rc = acpi_gsi_to_irq(generic->notify.vector, &ghes->irq);
+ 		if (rc) {
+ 			pr_err(GHES_PFX "Failed to map GSI to IRQ for generic hardware error source: %d\n",
+@@ -1159,6 +1138,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SCI:
+ 	case ACPI_HEST_NOTIFY_GSIV:
+ 	case ACPI_HEST_NOTIFY_GPIO:
++		ghes->fixmap_lock = &ghes_fixmap_lock_irq;
++		ghes->fixmap_idx = FIX_APEI_GHES_IRQ;
+ 		mutex_lock(&ghes_list_mutex);
+ 		if (list_empty(&ghes_hed))
+ 			register_acpi_hed_notifier(&ghes_notifier_hed);
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 8feb0c866ee0..74dbd164f3fe 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -29,6 +29,11 @@ struct ghes {
+ 		struct timer_list timer;
+ 		unsigned int irq;
+ 	};
++
++	spinlock_t *fixmap_lock;
++	raw_spinlock_t *nmi_fixmap_lock;
++
++	int fixmap_idx;
  };
  
-+#include <acpi/ghes.h>
- #include <asm/sdei.h>
- 
- /* Arch code should override this to set the entry point from firmware... */
-@@ -39,6 +40,10 @@ int sdei_event_unregister(u32 event_num);
- int sdei_event_enable(u32 event_num);
- int sdei_event_disable(u32 event_num);
- 
-+/* GHES register/unregister helpers */
-+int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *cb);
-+int sdei_unregister_ghes(struct ghes *ghes);
-+
- #ifdef CONFIG_ARM_SDE_INTERFACE
- /* For use by arch code when CPU hotplug notifiers are not appropriate. */
- int sdei_mask_local_cpu(void);
+ struct ghes_estatus_node {
 -- 
 2.15.1
