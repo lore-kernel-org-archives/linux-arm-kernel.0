@@ -1,103 +1,75 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 15 Feb 2018 17:06:03 +0100
-Subject: [PATCH v2 1/6] phy: rockchip-typec: deprecate some DT properties
- for various register fields.
-In-Reply-To: <20180214165447.12181-1-enric.balletbo@collabora.com>
+Date: Thu, 15 Feb 2018 17:10:28 +0100
+Subject: [PATCH v2 2/6] dt-bindings: phy-rockchip-typec: deprecate some
+ register properties.
+In-Reply-To: <20180214165447.12181-2-enric.balletbo@collabora.com>
 References: <20180214165447.12181-1-enric.balletbo@collabora.com>
-Message-ID: <2052597.3vIQ3VQ44p@phil>
+ <20180214165447.12181-2-enric.balletbo@collabora.com>
+Message-ID: <2023405.MLPHBTM0h1@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
-
-Am Mittwoch, 14. Februar 2018, 17:54:42 CET schrieb Enric Balletbo i Serra:
-> Adding properties for various register fields in the DT doesn't scale and
-> this information should be in the driver instead.
+Am Mittwoch, 14. Februar 2018, 17:54:43 CET schrieb Enric Balletbo i Serra:
+> As now the following register properties are in the driver, document as
+> deprecated these properties and recommend to not use them on new bindings.
 > 
-> Before this patch these registers (description below) were specified in
-> the DT, every register node contained 3 sections: offset, enable bit,
-> write mask bit.
+> The deprecated properties are:
 > 
->  - rockchip,typec-conn-dir : the register of type-c connector direction,
->    for type-c phy0, it must be <0xe580 0 16>;
->    for type-c phy1, it must be <0xe58c 0 16>;
->  - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
->    control.
->    for type-c phy0, it must be <0xe580 3 19>;
->    for type-c phy1, it must be <0xe58c 3 19>;
->  - rockchip,external-psm : the register of type-c phy external psm clock
->    selection.
->    for type-c phy0, it must be <0xe588 14 30>;
->    for type-c phy1, it must be <0xe594 14 30>;
->  - rockchip,pipe-status : the register of type-c phy pipe status.
->    for type-c phy0, it must be <0xe5c0 0 0>;
->    for type-c phy1, it must be <0xe5c0 16 16>;
-> 
-> After this patch these register definitions are in the driver. So can be
-> removed from the DT. Note that there are 2 type-c phys for RK3399 with
-> different offsets, the driver checks the phy base address of the running
-> instance and applies the right offsets.
+> - rockchip,typec-conn-dir : the register of type-c connector direction
+> - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2
+>                            enable control.
+> - rockchip,external-psm : the register of type-c phy external psm clock
+>                           selection.
+> - rockchip,pipe-status : the register of type-c phy pipe status.
 > 
 > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-
-Generally I really support moving that stuff back into the driver and
-judging by the recent mail conversations with Rob and Brian, this also
-seems to be a consensus of sorts.
-
-The one but I see here is, that the newly added things represent
-rk3399-specific values and should be prefixed accordingly and also
-already be flexible enough for the next soc using it.
-
-Examples below.
-
-
-> @@ -349,6 +349,9 @@
->  #define MODE_DFP_USB			BIT(1)
->  #define MODE_DFP_DP			BIT(2)
+> ---
+> Changes since v1:
+> - This patch is new on these series and is just a documentation update
+>   due patch [1/6]
+> 
+>  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 33 +++++-----------------
+>  1 file changed, 7 insertions(+), 26 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> index 6ea867e3176f..bc44d6abe283 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+> @@ -16,24 +16,6 @@ Required properties:
+>  		 "uphy", "uphy-pipe", "uphy-tcphy"
+>   - extcon : extcon specifier for the Power Delivery
 >  
-> +#define TYPEC_PHY0_BASE_ADDRESS		0xff7c0000
-> +#define TYPEC_PHY1_BASE_ADDRESS		0xff800000
-
-RK3399_TYPEC_PHY0_ADDRESS etc ?
-
-> @@ -362,6 +365,20 @@ struct rockchip_usb3phy_port_cfg {
->  	struct usb3phy_reg pipe_status;
->  };
+> -Note, there are 2 type-c phys for RK3399, and they are almost identical, except
+> -these registers(description below), every register node contains 3 sections:
+> -offset, enable bit, write mask bit.
+> - - rockchip,typec-conn-dir : the register of type-c connector direction,
+> -   for type-c phy0, it must be <0xe580 0 16>;
+> -   for type-c phy1, it must be <0xe58c 0 16>;
+> - - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
+> -   control.
+> -   for type-c phy0, it must be <0xe580 3 19>;
+> -   for type-c phy1, it must be <0xe58c 3 19>;
+> - - rockchip,external-psm : the register of type-c phy external psm clock
+> -   selection.
+> -   for type-c phy0, it must be <0xe588 14 30>;
+> -   for type-c phy1, it must be <0xe594 14 30>;
+> - - rockchip,pipe-status : the register of type-c phy pipe status.
+> -   for type-c phy0, it must be <0xe5c0 0 0>;
+> -   for type-c phy1, it must be <0xe5c0 16 16>;
+> -
+>  Required nodes : a sub-node is required for each port the phy provides.
+>  		 The sub-node name is used to identify dp or usb3 port,
+>  		 and shall be the following entries:
+> @@ -43,6 +25,13 @@ Required nodes : a sub-node is required for each port the phy provides.
+>  Required properties (port (child) node):
+>  - #phy-cells : must be 0, See ./phy-bindings.txt for details.
 >  
-> +static const struct rockchip_usb3phy_port_cfg tcphy0_port_cfg = {
-> +	.typec_conn_dir	= { 0xe580, 0, 16 },
-> +	.usb3tousb2_en	= { 0xe580, 3, 19 },
-> +	.external_psm	= { 0xe588, 14, 30 },
-> +	.pipe_status	= { 0xe5c0, 0, 0 },
-> +};
-> +
-> +static const struct rockchip_usb3phy_port_cfg tcphy1_port_cfg = {
-> +	.typec_conn_dir	= { 0xe58c, 0, 16 },
-> +	.usb3tousb2_en	= { 0xe58c, 3, 19 },
-> +	.external_psm	= { 0xe594, 14, 30 },
-> +	.pipe_status	= { 0xe5c0, 16, 16 },
-> +};
+> +Deprecated properties, do not use in new device tree sources, these
+> +properties are now in the driver:
 
-rk3399_tcphy1_port_cfg. Especially important as these are GRF-registers
-(general register files = a dumping ground for random settings bits)
-and nothing ever stays the same in the GRF between chips.
+nit: "[...] these properties are determined by the compatible value" ?
 
-
-> @@ -1103,6 +1078,13 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
->  	if (IS_ERR(tcphy->base))
->  		return PTR_ERR(tcphy->base);
->  
-> +	if (res->start == TYPEC_PHY0_BASE_ADDRESS)
-> +		tcphy->port_cfgs = &tcphy0_port_cfg;
-> +	else if (res->start == TYPEC_PHY1_BASE_ADDRESS)
-> +		tcphy->port_cfgs = &tcphy1_port_cfg;
-> +	else
-> +		return -EINVAL;
-
-should be selected according to the compatible.
-Like just create a struct similar to things like the inno-usb2-phy.
-That way you can also just write down the address itself in a reg
-property and do not need specific constants like the ones at the top.
+A dt-binding does not care about drivers ;-)
 
 
 Heiko
