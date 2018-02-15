@@ -1,37 +1,39 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 15 Feb 2018 12:55:35 +0100
-Subject: [PATCH] ARM64: dts: meson-axg: add sec_AO system controller
-In-Reply-To: <20180215101207.19186-1-jbrunet@baylibre.com>
-References: <20180215101207.19186-1-jbrunet@baylibre.com>
-Message-ID: <412132e7-904d-61c4-d09f-0239e07a92be@baylibre.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Thu, 15 Feb 2018 17:25:54 +0530
+Subject: [PATCH 2/2][v2][RESEND] ARM: dts: ls1021aqds: Add nand node for ifc
+ controller
+Message-ID: <20180215115554.23984-1-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/2018 11:12, Jerome Brunet wrote:
-> add the secure AO system controller with chipid enabled
-> 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 880e25b113c1..7f4c00216b82 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -836,6 +836,12 @@
->  				};
->  			};
->  
-> +			sec_AO: ao-secure at 140 {
-> +				compatible = "amlogic,meson-gx-ao-secure", "syscon";
-> +				reg = <0x0 0x140 0x0 0x140>;
-> +				amlogic,has-chip-id;
-> +			};
-> +
->  			pwm_AO_ab: pwm at 7000 {
->  				compatible = "amlogic,meson-axg-ao-pwm";
->  				reg = <0x0 0x07000 0x0 0x20>;
-> 
+LS1021AQDS support NAND flash on IFC chip-select 2.
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+So add NAND node in device tree for IFC controller.
+
+Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+---
+Due to patch series http://patchwork.ozlabs.org/project/linux-mtd/list/?series=28735
+this patch is now independent of flash propoerty. So resending.
+
+ arch/arm/boot/dts/ls1021a-qds.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+index 8a383d37884a..fe352ff60b35 100644
+--- a/arch/arm/boot/dts/ls1021a-qds.dts
++++ b/arch/arm/boot/dts/ls1021a-qds.dts
+@@ -240,6 +240,11 @@
+ 		big-endian;
+ 	};
+ 
++	nand at 2,0 {
++		compatible = "fsl,ifc-nand";
++		reg = <0x2 0x0 0x10000>;
++	};
++
+ 	fpga: board-control at 3,0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-- 
+2.14.1
