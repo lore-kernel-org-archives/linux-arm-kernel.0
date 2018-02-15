@@ -1,32 +1,19 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 17:50:01 +0100
-Subject: [PATCH 7/8] arm64: dts: renesas: r8a77995-draak: Add HDMI Out
- through ADV7511
-In-Reply-To: <2517305.jdPBFiRQEk@avalon>
+Date: Thu, 15 Feb 2018 17:51:22 +0100
+Subject: [PATCH 5/8] arm64: dts: renesas: r8a77995: Add LVDS support
+In-Reply-To: <1518683903-10681-6-git-send-email-kbingham@kernel.org>
 References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
- <1518683903-10681-8-git-send-email-kbingham@kernel.org>
- <2517305.jdPBFiRQEk@avalon>
-Message-ID: <20180215165000.j6szepze6tyfww7n@verge.net.au>
+ <1518683903-10681-6-git-send-email-kbingham@kernel.org>
+Message-ID: <20180215165122.jhcmfkxc2u33b4i2@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 04:16:00PM +0200, Laurent Pinchart wrote:
-> Hi Kieran,
+On Thu, Feb 15, 2018 at 08:38:20AM +0000, Kieran Bingham wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 > 
-> Thank you for the patch.
+> The r8a77995 D3 platform has 2 LVDS channels connected to the DU.
 > 
-> On Thursday, 15 February 2018 10:38:22 EET Kieran Bingham wrote:
-> > From: Kieran Bingham <kieran.bingham@ideasonboard.com>
-> > 
-> > Provide a device node for the ADV7511 as found on the Draak D3 platform.
-> > 
-> > The ADV7511 is connected to the DU through a parallel mux chip, and is
-> > configurable in hardware whether it is connected to LVDS0 or LVDS1.
-> > 
-> > Connect through to LVDS0 as a default implementation.
-> 
-> You need to model the LVDS decoder in DT too. I know that no driver and no DT 
-> bindings are available at the moment, and I'm aware that this patch enables 
-> the HDMI output on the Draak board, but I don't think it's upstreamable as-is.
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-Thanks, I've marked this as "Changes Requested".
+It looks like there has been some review of this patch that needs
+addressing, I've marked it as "Changes Requested".
