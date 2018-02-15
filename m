@@ -1,79 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 15 Feb 2018 13:14:52 +0100
-Subject: [RFC PATCH v2 4/6] arm64: dts: exynos: add OF graph between MHL
- and USB connector
-In-Reply-To: <20180215103920.32017-5-a.hajda@samsung.com>
-References: <CGME20180215103927eucas1p24785b56277ed6c9fa2fd70058096b944@eucas1p2.samsung.com>
- <20180215103920.32017-1-a.hajda@samsung.com>
- <20180215103920.32017-5-a.hajda@samsung.com>
-Message-ID: <CAJKOXPdg81LPOFmxtJmL7hMXGgB2USAOhCz2yjU9obX1jWjEWw@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 15 Feb 2018 13:19:59 +0100
+Subject: [PATCH v2] clk: Properly update prepare/enable count on orphan
+ clock reparent
+In-Reply-To: <20180127004917.GI28313@codeaurora.org>
+References: <CGME20180126091902eucas1p2b3ad9978e3ab09bd7a2bd9123c9eecaa@eucas1p2.samsung.com>
+ <20180126091845.11902-1-m.szyprowski@samsung.com>
+ <20180127004917.GI28313@codeaurora.org>
+Message-ID: <1518697199.2883.91.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 11:39 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
-> OF graph describes MHL data lanes between MHL and respective USB
-> connector.
->
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
->  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 31 +++++++++++++++++++---
->  1 file changed, 28 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> index 7e49fadee412..ef758f7337e9 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-> @@ -779,9 +779,22 @@
->                 clocks = <&pmu_system_controller 0>;
->                 clock-names = "xtal";
->
-> -               port {
-> -                       mhl_to_hdmi: endpoint {
-> -                               remote-endpoint = <&hdmi_to_mhl>;
-> +               ports {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       port at 0 {
-> +                               reg = <0>;
-> +                               mhl_to_hdmi: endpoint {
-> +                                       remote-endpoint = <&hdmi_to_mhl>;
-> +                               };
-> +                       };
-> +
-> +                       port at 1 {
-> +                               reg = <1>;
-> +                               mhl_to_musb_con: endpoint {
-> +                                       remote-endpoint = <&musb_con_to_mhl>;
-> +                               };
->                         };
->                 };
->         };
-> @@ -804,6 +817,18 @@
->                                              "usb-b-connector";
->                                 label = "micro-USB";
->                                 type = "micro";
-> +
-> +                               ports {
-> +                                       #address-cells = <1>;
-> +                                       #size-cells = <0>;
-> +
-> +                                       port at 3 {
+On Fri, 2018-01-26 at 16:49 -0800, Stephen Boyd wrote:
+> On 01/26, Marek Szyprowski wrote:
+> > If orphaned clock has been already prepared/enabled (for example if it or
+> > one of its children has CLK_IS_CRITICAL flag), then the prepare/enable
+> > counters of the newly assigned parent are not updated correctly. This
+> > might later cause warnings during changing clock parents.
+> 
+> This doesn't feel right. Perhaps we should delay enabling a clk
+> if it's CRITICAL until we adopt an orphaned clk.
 
-I think you might need here "reg = <3>". Doesn't it produce a warning now?
+It does not sounds right. A critical clock should be enabled as soon as
+possible, regardless of current knowledge of the clock tree.
 
-BR,
-Krzysztof
+How would you decide when is right time anyway ?
+The orphaned critical clock could be reparented to clock that is orphan itself,
+you would get into the same count issue again.
 
-> +                                               musb_con_to_mhl: endpoint {
-> +                                                       remote-endpoint = <&mhl_to_musb_con>;
-> +                                               };
-> +                                       };
-> +                               };
-> +                       };
->                         };
->                 };
->
-> --
-> 2.16.1
->
+> Good news is we
+> have orphan status tracking now so this should be pretty simple.
+> Otherwise migrating the count up is complicated and requires us
+> to call the prepare/enable ops on a critical clk and then keep
+> doing that each time it gets re-parented.
+
+What is the problem with this ? We are going to have call those enable ops
+anyway. Whether it is done one at a time or all at once, does it really matter ?
+
+> Do you have this case,
+> where some clk is marked as CRITICAL, and then we need to migrate
+> that enable/prepare count to the parent?
+
+yes.
+
+> 
+> Hopefully it isn't the worser case, where the clk is handed out
+> to some consumer but it's still orphaned at that point, and then
+> we have little control over the migration of state to the parent.
+> 
+
+This should not be a problem if the clock reparenting  and count migration is
+done properly. To do  this, the __clk_set_parent_before() and
+__clk_set_parent_after() function look good to me,  have I missed anything ? 
