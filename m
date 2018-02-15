@@ -1,23 +1,24 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 15 Feb 2018 23:53:02 +0800
-Subject: [PATCH 0/2] crypto: stm32/cryp - add AEAD cipher algorithms
-In-Reply-To: <1518008935-30428-1-git-send-email-fabien.dessenne@st.com>
-References: <1518008935-30428-1-git-send-email-fabien.dessenne@st.com>
-Message-ID: <20180215155302.GQ7352@gondor.apana.org.au>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 15 Feb 2018 16:54:37 +0100
+Subject: [PATCH 0/3] USB OTG on STM32F7 boards
+Message-ID: <1518710080-18164-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 07, 2018 at 02:08:53PM +0100, Fabien Dessenne wrote:
-> This patchset depends on "crypto: engine - Permit to enqueue all async requests"
-> proposed by Corentin Labbe [https://lkml.org/lkml/2018/1/26/608].
-> stm32-cryp uses this updated crpyto engine to handle AEAD cipher algortihms.
-> 
-> Fabien Dessenne (2):
->   crypto: stm32/cryp - add aes gcm / ccm support
->   crypto: stm32/cryp - add stm32mp1 support
+This patchset adds support for Peripheral mode on stm32f746 by adding
+dwc2 gadget fifo sizes and enables USB OTG HS in OTG (DRD) mode on
+stm32746g-eval and stm32f769-disco. It possible to use OTG HS in
+Peripheral or Host mode, depending on the USB connector.
 
-All applied.  Thanks.
+Amelie Delaunay (3):
+  ARM: dts: stm32: add gadget fifo sizes to usbotg_hs on stm32f746
+  ARM: dts: stm32: select otg mode for usbotg_hs on stm32746g_eval
+  ARM: dts: stm32: enable USB HS on stm32f769-disco
+
+ arch/arm/boot/dts/stm32746g-eval.dts  |  2 +-
+ arch/arm/boot/dts/stm32f746.dtsi      |  3 +++
+ arch/arm/boot/dts/stm32f769-disco.dts | 15 +++++++++++++++
+ 3 files changed, 19 insertions(+), 1 deletion(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.7.4
