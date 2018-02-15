@@ -1,51 +1,42 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Thu, 15 Feb 2018 11:21:13 +0100
-Subject: [PATCH 02/37] iommu/sva: Bind process address spaces to devices
-In-Reply-To: <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-3-jean-philippe.brucker@arm.com>
- <AADFC41AFE54684AB9EE6CBC0274A5D191002897@SHSMSX101.ccr.corp.intel.com>
- <b9eacb30-817f-9027-bc0a-1f01cf9f13f9@arm.com>
-Message-ID: <20180215102113.c7t7rrnyzgazmdli@8bytes.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 15 Feb 2018 11:26:17 +0100
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.16 (#1)
+Message-ID: <87wozemtva.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 12:57:23PM +0000, Jean-Philippe Brucker wrote:
-> * bind_device() fails if the device's group has more than one device,
-> otherwise calls __bind_device(). This prevents device drivers that are
-> oblivious to IOMMU groups from opening a backdoor.
-> 
-> * bind_group() calls __bind_device() for all devices in group. This way
-> users that are aware of IOMMU groups can still use them safely. Note that
-> at the moment bind_group() fails as soon as it finds a device that doesn't
-> support SVA. Having all devices support SVA in a given group is
-> unrealistic and this behavior ought to be improved.
+Hi,
 
-Yeah, so the problem on PCI is that all functions of a multi-function
-device are put into one group. For AMD-GPUs this means that the GPU
-(SVA-capable) will end up in the same group as the on-GPU sound
-device (not SVA-capable).
+Here is the first pull request for fixes for mvebu for v4.16.
 
-Before this causes us big headaches I suggest to only provide the
-bind_device() function. This should be fine because for SVA we don't
-need all types of isolation that iommu_groups provide.
+Gregory
 
-IOMMU-groups provide two types of isolation:
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-	1) They group devices together which the IOMMU can't distinguish
-	   from each other, like PCI devices behind a PCIe bridge.
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-	2) Devices that can't be isolated from each other are also put
-	   into the same group. This is the case for multi-function PCIe
-	   devices as well as all PCIe devices behind a non-ACS bridge.
-	   But all these devices cann still be distinguished by the
-	   IOMMU.
+are available in the Git repository at:
 
-These two types of protection are needed to safely assign devices to
-guests, but for bare-metal SVA all we need is type 1) isolation, and
-not even that if we can assume that all SVA-capable devices have an
-exclusive device-id (or stream-id).
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.16-1
 
+for you to fetch changes up to 8aa36a8dcde3183d84db7b0d622ffddcebb61077:
 
+  ARM: mvebu: Fix broken PL310_ERRATA_753970 selects (2018-02-13 16:39:51 +0100)
 
-	Joerg
+----------------------------------------------------------------
+mvebu fixes for 4.16 (part 1)
+
+- Updating my emails address (from free-electrons to bootlin)
+- Adding back the selection of the PL310 Errata fix for the Cortex A9
+  based Armada SoCs (Armada 375 and 38x)
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      MAINTAINERS: update email address for Gregory CLEMENT
+
+Ulf Magnusson (1):
+      ARM: mvebu: Fix broken PL310_ERRATA_753970 selects
+
+ MAINTAINERS                 | 4 ++--
+ arch/arm/mach-mvebu/Kconfig | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
