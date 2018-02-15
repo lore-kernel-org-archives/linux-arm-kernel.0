@@ -1,50 +1,111 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 15 Feb 2018 17:40:12 +0100
-Subject: [PATCH] cpufreq: s3c24xx: Delete an error message for a failed memory
- allocation in two functions
-Message-ID: <201722ce-019d-a5b4-fc00-74679d82b64f@users.sourceforge.net>
+From: kieran.bingham@ideasonboard.com (Kieran Bingham)
+Date: Thu, 15 Feb 2018 16:41:58 +0000
+Subject: [PATCH v3 2/5] arm64: dts: renesas: r8a77995: add VSP instances
+In-Reply-To: <20180215163342.4evihm3uts3lfu5c@verge.net.au>
+References: <1518602108-1724-1-git-send-email-kbingham@kernel.org>
+ <1518602108-1724-3-git-send-email-kbingham@kernel.org>
+ <20180215163342.4evihm3uts3lfu5c@verge.net.au>
+Message-ID: <7db13491-f4f6-4c7c-e9e3-c1e91b0054b6@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 15 Feb 2018 17:28:40 +0100
+Hi Simon,
 
-Omit an extra message for a memory allocation failure in these functions.
+On 15/02/18 16:33, Simon Horman wrote:
+> On Wed, Feb 14, 2018 at 09:55:05AM +0000, Kieran Bingham wrote:
+>> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>>
+>> The r8a77995 has a VSPBS to support image processing such as blending of
+>> two input images, and has two VSPDs to handle display pipelines with a
+>> DU.
+>>
+>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>>
+>> ---
+>> v2:
+>>  - Fix VSPD register map size
+>>  - Squash VSPBS and VSPD patches together
+>>
+>> v3:
+>>  - Fix VSPBS register map size too :-)
+>>
+>>  arch/arm64/boot/dts/renesas/r8a77995.dtsi | 30 ++++++++++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> index 196a917afea6..0db242114bc5 100644
+>> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+>> @@ -692,6 +692,16 @@
+>>  			status = "disabled";
+>>  		};
+>>  
+>> +		vspbs: vsp at fe960000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfe960000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 627>;
+>> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 627>;
+>> +			renesas,fcp = <&fcpvb0>;
+>> +		};
+>> +
+>>  		fcpvb0: fcp at fe96f000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfe96f000 0 0x200>;
+>> @@ -701,6 +711,16 @@
+>>  			iommus = <&ipmmu_vp0 5>;
+>>  		};
+>>  
+>> +		vspd0: vsp at fea20000 {
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfea20000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 623>;
+>> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 623>;
+>> +			renesas,fcp = <&fcpvd0>;
+>> +		};
+>> +
+>>  		fcpvd0: fcp at fea27000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfea27000 0 0x200>;
+>> @@ -710,6 +730,16 @@
+>>  			iommus = <&ipmmu_vi0 8>;
+>>  		};
+>>  
+>> +		vspd1: vsp at fea80000 {
+> 
+> The above should be:
+> 
+> 		vspd1: vsp at fea28000 {
 
-This issue was detected by using the Coccinelle software.
+Good spot.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/cpufreq/s3c24xx-cpufreq.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+</me looks to datasheet> That is correct.
 
-diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
-index 7b596fa38ad2..024afd0b9458 100644
---- a/drivers/cpufreq/s3c24xx-cpufreq.c
-+++ b/drivers/cpufreq/s3c24xx-cpufreq.c
-@@ -473,10 +473,8 @@ int __init s3c_cpufreq_setboard(struct s3c_cpufreq_board *board)
- 	 * initdata. */
- 
- 	ours = kzalloc(sizeof(*ours), GFP_KERNEL);
--	if (ours == NULL) {
--		pr_err("%s: no memory\n", __func__);
-+	if (!ours)
- 		return -ENOMEM;
--	}
- 
- 	*ours = *board;
- 	cpu_cur.board = ours;
-@@ -562,10 +560,8 @@ static int s3c_cpufreq_build_freq(void)
- 	size++;
- 
- 	ftab = kzalloc(sizeof(*ftab) * size, GFP_KERNEL);
--	if (!ftab) {
--		pr_err("%s: no memory for tables\n", __func__);
-+	if (!ftab)
- 		return -ENOMEM;
--	}
- 
- 	ftab_size = size;
- 
--- 
-2.16.1
+Would you like me to resubmit this patch ? Or will you fix this up locally?
+
+--
+Regards
+
+Kieran
+
+
+> 
+>> +			compatible = "renesas,vsp2";
+>> +			reg = <0 0xfea28000 0 0x8000>;
+>> +			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 622>;
+>> +			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 622>;
+>> +			renesas,fcp = <&fcpvd1>;
+>> +		};
+>> +
+>>  		fcpvd1: fcp at fea2f000 {
+>>  			compatible = "renesas,fcpv";
+>>  			reg = <0 0xfea2f000 0 0x200>;
+>> -- 
+>> 2.7.4
+>>
