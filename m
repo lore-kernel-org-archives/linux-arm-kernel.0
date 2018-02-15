@@ -1,75 +1,84 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 15 Feb 2018 17:10:28 +0100
-Subject: [PATCH v2 2/6] dt-bindings: phy-rockchip-typec: deprecate some
- register properties.
-In-Reply-To: <20180214165447.12181-2-enric.balletbo@collabora.com>
-References: <20180214165447.12181-1-enric.balletbo@collabora.com>
- <20180214165447.12181-2-enric.balletbo@collabora.com>
-Message-ID: <2023405.MLPHBTM0h1@phil>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 15 Feb 2018 17:14:05 +0100
+Subject: [PATCH 2/4] arm64: dts: renesas: r8a77995: add FCPVD nodes
+In-Reply-To: <1541765.WkmPmS7X3L@avalon>
+References: <1518474330-8713-1-git-send-email-kbingham@kernel.org>
+ <1518474330-8713-3-git-send-email-kbingham@kernel.org>
+ <1541765.WkmPmS7X3L@avalon>
+Message-ID: <20180215161404.pywzt7m3ccd7gygu@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 14. Februar 2018, 17:54:43 CET schrieb Enric Balletbo i Serra:
-> As now the following register properties are in the driver, document as
-> deprecated these properties and recommend to not use them on new bindings.
+On Tue, Feb 13, 2018 at 02:32:22PM +0200, Laurent Pinchart wrote:
+> Hi Kieran,
 > 
-> The deprecated properties are:
+> Thank you for the patch.
 > 
-> - rockchip,typec-conn-dir : the register of type-c connector direction
-> - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2
->                            enable control.
-> - rockchip,external-psm : the register of type-c phy external psm clock
->                           selection.
-> - rockchip,pipe-status : the register of type-c phy pipe status.
+> On Tuesday, 13 February 2018 00:25:27 EET Kieran Bingham wrote:
+> > From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> > 
+> > The FCPVD handles the interface between the VSPD and memory.
+> > 
+> > Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 > 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
-> Changes since v1:
-> - This patch is new on these series and is just a documentation update
->   due patch [1/6]
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > 
->  .../devicetree/bindings/phy/phy-rockchip-typec.txt | 33 +++++-----------------
->  1 file changed, 7 insertions(+), 26 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> index 6ea867e3176f..bc44d6abe283 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
-> @@ -16,24 +16,6 @@ Required properties:
->  		 "uphy", "uphy-pipe", "uphy-tcphy"
->   - extcon : extcon specifier for the Power Delivery
->  
-> -Note, there are 2 type-c phys for RK3399, and they are almost identical, except
-> -these registers(description below), every register node contains 3 sections:
-> -offset, enable bit, write mask bit.
-> - - rockchip,typec-conn-dir : the register of type-c connector direction,
-> -   for type-c phy0, it must be <0xe580 0 16>;
-> -   for type-c phy1, it must be <0xe58c 0 16>;
-> - - rockchip,usb3tousb2-en : the register of type-c force usb3 to usb2 enable
-> -   control.
-> -   for type-c phy0, it must be <0xe580 3 19>;
-> -   for type-c phy1, it must be <0xe58c 3 19>;
-> - - rockchip,external-psm : the register of type-c phy external psm clock
-> -   selection.
-> -   for type-c phy0, it must be <0xe588 14 30>;
-> -   for type-c phy1, it must be <0xe594 14 30>;
-> - - rockchip,pipe-status : the register of type-c phy pipe status.
-> -   for type-c phy0, it must be <0xe5c0 0 0>;
-> -   for type-c phy1, it must be <0xe5c0 16 16>;
-> -
->  Required nodes : a sub-node is required for each port the phy provides.
->  		 The sub-node name is used to identify dp or usb3 port,
->  		 and shall be the following entries:
-> @@ -43,6 +25,13 @@ Required nodes : a sub-node is required for each port the phy provides.
->  Required properties (port (child) node):
->  - #phy-cells : must be 0, See ./phy-bindings.txt for details.
->  
-> +Deprecated properties, do not use in new device tree sources, these
-> +properties are now in the driver:
+> I would however squash this with patch 1/4 from the same series.
 
-nit: "[...] these properties are determined by the compatible value" ?
+Thanks, I've taken the liberty of doing so when applying this patch.
+The result is as follows:
 
-A dt-binding does not care about drivers ;-)
+From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Subject: [PATCH] arm64: dts: renesas: r8a77995: add FCPV[BD] node
 
+The FCPVB handles the interface between the VSPB and memory.
+The FCPVD handles the interface between the VSPD and memory.
 
-Heiko
+Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+[simon: squahsed FCPVB and FCPVD patches]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index cd3c6a30fc47..196a917afea6 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -691,6 +691,33 @@
+ 			#phy-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		fcpvb0: fcp at fe96f000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfe96f000 0 0x200>;
++			clocks = <&cpg CPG_MOD 607>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 607>;
++			iommus = <&ipmmu_vp0 5>;
++		};
++
++		fcpvd0: fcp at fea27000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea27000 0 0x200>;
++			clocks = <&cpg CPG_MOD 603>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 603>;
++			iommus = <&ipmmu_vi0 8>;
++		};
++
++		fcpvd1: fcp at fea2f000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea2f000 0 0x200>;
++			clocks = <&cpg CPG_MOD 602>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 602>;
++			iommus = <&ipmmu_vi0 9>;
++		};
+ 	};
+ 
+ 	timer {
+-- 
+2.11.0
