@@ -1,42 +1,41 @@
 From: kbingham@kernel.org (Kieran Bingham)
-Date: Thu, 15 Feb 2018 08:38:15 +0000
-Subject: [PATCH 0/8] r8a77995 D3 DU and LVDS support
-Message-ID: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+Date: Thu, 15 Feb 2018 08:38:17 +0000
+Subject: [PATCH 2/8] dt-bindings: display: renesas,
+ du: Document r8a77995 bindings
+In-Reply-To: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+Message-ID: <1518683903-10681-3-git-send-email-kbingham@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
-Provide the PFC groups for the DU pin controls, and update the bindings for
-both the DU and LVDS to cover the r8a77995.
+Document the D3 (r8a77995) SoC in the R-Car DU bindings.
 
-Add dt nodes for the DU, and LVDS, and enable VGA on the Draak board.
-Provide support for HDMI out through the ADV7511 component, on the LVDS channel.
+Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+---
+ Documentation/devicetree/bindings/display/renesas,du.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Finally provide a 'proof-of-concept' patch for the ADV7612 device which shares
-the same bus and demonstrates setting the I2C slave maps such that they do not
-conflict with the ADV7511.
-
-This series is dependant upon the LVDS rework from Laurent which is not yet
-finalised, however the DU only patches are not blocked by this.
-
-
-Kieran Bingham (8):
-  pinctrl: sh-pfc: r8a77995: Add DU support
-  dt-bindings: display: renesas,du: Document r8a77995 bindings
-  dt-bindings: display: renesas,lvds: Add LVDS binding for D3
-  arm64: dts: renesas: r8a77995: add DU support
-  arm64: dts: renesas: r8a77995: Add LVDS support
-  arm64: dts: renesas: r8a77995-draak: Enable DU
-  arm64: dts: renesas: r8a77995-draak: Add HDMI Out through ADV7511
-  [PoC] arm64: dts: renesas: r8a77995-draak: Add ADV7612
-
- .../bindings/display/bridge/renesas,lvds.txt       |   1 +
- .../devicetree/bindings/display/renesas,du.txt     |   2 +
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 150 +++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77995.dtsi          |  87 ++++++++++++
- drivers/pinctrl/sh-pfc/pfc-r8a77995.c              | 101 ++++++++++++++
- 5 files changed, 341 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/display/renesas,du.txt b/Documentation/devicetree/bindings/display/renesas,du.txt
+index 8f6e0e118e3e..56f67453b9aa 100644
+--- a/Documentation/devicetree/bindings/display/renesas,du.txt
++++ b/Documentation/devicetree/bindings/display/renesas,du.txt
+@@ -13,6 +13,7 @@ Required Properties:
+     - "renesas,du-r8a7794" for R8A7794 (R-Car E2) compatible DU
+     - "renesas,du-r8a7795" for R8A7795 (R-Car H3) compatible DU
+     - "renesas,du-r8a7796" for R8A7796 (R-Car M3-W) compatible DU
++    - "renesas,du-r8a77995" for R8A77995 (R-Car D3) compatible DU
+ 
+   - reg: A list of base address and length of each memory resource, one for
+     each entry in the reg-names property.
+@@ -60,6 +61,7 @@ corresponding to each DU output.
+  R8A7794 (R-Car E2)   DPAD 0         DPAD 1         -              -
+  R8A7795 (R-Car H3)   DPAD 0         HDMI 0         HDMI 1         LVDS 0
+  R8A7796 (R-Car M3-W) DPAD 0         HDMI 0         LVDS 0         -
++ R8A77995 (R-Car D3)  DPAD 0         LVDS 0         LVDS 1         -
+ 
+ 
+ Example: R8A7795 (R-Car H3) ES2.0 DU
 -- 
 2.7.4
