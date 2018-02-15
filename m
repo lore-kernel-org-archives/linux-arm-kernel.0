@@ -1,84 +1,24 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 15 Feb 2018 11:19:36 +0100
-Subject: [PATCH] drm/meson: fix vsync buffer update
-Message-ID: <1518689976-23292-1-git-send-email-narmstrong@baylibre.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 15 Feb 2018 11:19:44 +0100
+Subject: [PATCH V2] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
+In-Reply-To: <CAMuHMdVO7sxRjj7h=ar+bA8B3Art=Yyyr66cRqC30pw3Zz+Vag@mail.gmail.com>
+References: <20180215100208.24646-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdVO7sxRjj7h=ar+bA8B3Art=Yyyr66cRqC30pw3Zz+Vag@mail.gmail.com>
+Message-ID: <20180215101944.qtiquqqhgmg3gbrt@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The plane buffer address/stride/height was incorrectly updated in the
-plane_atomic_update operation instead of the vsync irq.
-This patch delays this operation in the vsync irq along with the
-other plane delayed setup.
 
-This issue was masked using legacy framebuffer and X11 modesetting, but
-is clearly visible using gbm rendering when buffer is submitted late after
-vblank, like using software decoding and OpenGL rendering in Kodi.
-With this patch, tearing and other artifacts disappears completely.
+> As the code now always sends 3 i2c msgs to all 3 possible regulators, we
+> may accidentally talk to another device at 0x70 on other boards than Stout.
 
-Cc: Michal Lazo <michal.lazo@gmail.com>
-Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/gpu/drm/meson/meson_crtc.c  | 6 ++++++
- drivers/gpu/drm/meson/meson_drv.h   | 3 +++
- drivers/gpu/drm/meson/meson_plane.c | 7 +++----
- 3 files changed, 12 insertions(+), 4 deletions(-)
+It sends per device, so unless there is a device named "da9210" at
+addr 0x70, nothing will happen? Am I missing something?
 
-diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
-index 5155f01..0552020 100644
---- a/drivers/gpu/drm/meson/meson_crtc.c
-+++ b/drivers/gpu/drm/meson/meson_crtc.c
-@@ -36,6 +36,7 @@
- #include "meson_venc.h"
- #include "meson_vpp.h"
- #include "meson_viu.h"
-+#include "meson_canvas.h"
- #include "meson_registers.h"
- 
- /* CRTC definition */
-@@ -192,6 +193,11 @@ void meson_crtc_irq(struct meson_drm *priv)
- 		} else
- 			meson_vpp_disable_interlace_vscaler_osd1(priv);
- 
-+		meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
-+			   priv->viu.osd1_addr, priv->viu.osd1_stride,
-+			   priv->viu.osd1_height, MESON_CANVAS_WRAP_NONE,
-+			   MESON_CANVAS_BLKMODE_LINEAR);
-+
- 		/* Enable OSD1 */
- 		writel_bits_relaxed(VPP_OSD1_POSTBLEND, VPP_OSD1_POSTBLEND,
- 				    priv->io_base + _REG(VPP_MISC));
-diff --git a/drivers/gpu/drm/meson/meson_drv.h b/drivers/gpu/drm/meson/meson_drv.h
-index 5e8b392..8450d6ac 100644
---- a/drivers/gpu/drm/meson/meson_drv.h
-+++ b/drivers/gpu/drm/meson/meson_drv.h
-@@ -43,6 +43,9 @@ struct meson_drm {
- 		bool osd1_commit;
- 		uint32_t osd1_ctrl_stat;
- 		uint32_t osd1_blk0_cfg[5];
-+		uint32_t osd1_addr;
-+		uint32_t osd1_stride;
-+		uint32_t osd1_height;
- 	} viu;
- 
- 	struct {
-diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
-index d0a6ac8..27bd350 100644
---- a/drivers/gpu/drm/meson/meson_plane.c
-+++ b/drivers/gpu/drm/meson/meson_plane.c
-@@ -164,10 +164,9 @@ static void meson_plane_atomic_update(struct drm_plane *plane,
- 	/* Update Canvas with buffer address */
- 	gem = drm_fb_cma_get_gem_obj(fb, 0);
- 
--	meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
--			   gem->paddr, fb->pitches[0],
--			   fb->height, MESON_CANVAS_WRAP_NONE,
--			   MESON_CANVAS_BLKMODE_LINEAR);
-+	priv->viu.osd1_addr = gem->paddr;
-+	priv->viu.osd1_stride = fb->pitches[0];
-+	priv->viu.osd1_height = fb->height;
- 
- 	spin_unlock_irqrestore(&priv->drm->event_lock, flags);
- }
--- 
-2.7.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180215/37c9cc28/attachment-0001.sig>
