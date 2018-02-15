@@ -1,39 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 17:38:32 +0100
-Subject: [PATCH 2/4] arm64: dts: renesas: r8a77995: add FCPVD nodes
-In-Reply-To: <0d235657-3b2e-7fbe-f7ba-e33756b76532@ideasonboard.com>
-References: <1518474330-8713-1-git-send-email-kbingham@kernel.org>
- <1518474330-8713-3-git-send-email-kbingham@kernel.org>
- <1541765.WkmPmS7X3L@avalon>
- <20180215161404.pywzt7m3ccd7gygu@verge.net.au>
- <0d235657-3b2e-7fbe-f7ba-e33756b76532@ideasonboard.com>
-Message-ID: <20180215163832.abzsl4kcui55kgii@verge.net.au>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 15 Feb 2018 16:38:39 +0000
+Subject: [PATCH 2/5] drivers/bus: Split Arm CCI driver
+In-Reply-To: <20180215130103.GC16623@arm.com>
+References: <cover.1517855839.git.robin.murphy@arm.com>
+ <1660c838bafffb0b1a0d48823bc88c701adf01e4.1517855839.git.robin.murphy@arm.com>
+ <87shadgfam.fsf@e105922-lin.cambridge.arm.com>
+ <f62d3a76-9ee0-43a5-c585-fcebce52e800@arm.com>
+ <20180214115118.GD2992@arm.com>
+ <b95c7f25-89af-6a5c-993c-49720c36fd57@arm.com>
+ <20180215130103.GC16623@arm.com>
+Message-ID: <14ae8a33-afa3-2b91-0938-58bdd999c5db@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 04:20:42PM +0000, Kieran Bingham wrote:
-> Hi Simon,
+On 15/02/18 13:01, Will Deacon wrote:
+> On Wed, Feb 14, 2018 at 02:28:15PM +0000, Robin Murphy wrote:
+>> On 14/02/18 11:51, Will Deacon wrote:
+>>> On Wed, Feb 07, 2018 at 01:07:53PM +0000, Robin Murphy wrote:
+>>>> Hi Punit,
+>>>>
+>>>> On 07/02/18 12:22, Punit Agrawal wrote:
+>>>> [...]
+>>>>>> -static void __iomem *cci_ctrl_base;
+>>>>>> +void __iomem *cci_ctrl_base __ro_after_init;
+>>>>>
+>>>>> Initially I wondered if cci_ctrl_base gets used in the pmu driver before
+>>>>> it's initialised. But as it gets set in early_initcall() that looks to
+>>>>> be fine.
+>>>>
+>>>> In fact it's even more robust than initcall ordering, since the PMU device
+>>>> will only be created at all via cci_platform_probe(), thus cci_init() is
+>>>> guaranteed to have run successfully before the PMU driver probe can ever
+>>>> touch anything.
+>>>
+>>> Could you hijack the platform data at this point by passing an of_dev_auxdata
+>>> to of_platform_populate and then use that to pass the __iomem address to the
+>>> PMU driver?
+>>
+>> OK, I've cooked up the patch below (on top of this series), but I'm
+>> currently somewhat on the fence about how nice it really is :/
 > 
-> On 15/02/18 16:14, Simon Horman wrote:
-> > On Tue, Feb 13, 2018 at 02:32:22PM +0200, Laurent Pinchart wrote:
-> >> Hi Kieran,
-> >>
-> >> Thank you for the patch.
-> >>
-> >> On Tuesday, 13 February 2018 00:25:27 EET Kieran Bingham wrote:
-> >>> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> >>>
-> >>> The FCPVD handles the interface between the VSPD and memory.
-> >>>
-> >>> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-> >>
-> >> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >>
-> >> I would however squash this with patch 1/4 from the same series.
-> > 
-> > Thanks, I've taken the liberty of doing so when applying this patch.
-> > The result is as follows:
+> Yeah, the ugly part is:
 > 
-> That's probably fine, but there was a follow up series which already handles this.
+>> +const struct of_dev_auxdata arm_cci_auxdata[] = {
+>> +	OF_DEV_AUXDATA("arm,cci-400-pmu", 0, NULL, &cci_ctrl_base),
+>> +	OF_DEV_AUXDATA("arm,cci-400-pmu,r0", 0, NULL, &cci_ctrl_base),
+>> +	OF_DEV_AUXDATA("arm,cci-400-pmu,r1", 0, NULL, &cci_ctrl_base),
+>> +	OF_DEV_AUXDATA("arm,cci-500-pmu,r0", 0, NULL, &cci_ctrl_base),
+>> +	OF_DEV_AUXDATA("arm,cci-550-pmu,r0", 0, NULL, &cci_ctrl_base),
+>> +	{}
+>> +};
+> 
+> I suppose you could macro-ise this table to hide the redundancy, but it's up
+> to you.
 
-Thanks, I've dropped this and will use the follow-up series instead.
+I did ponder various alternatives, but whatever the approach we still 
+end up needing a copy of all the PMU compatible strings in this driver; 
+in that context, I think the auxdata table is probably in fact the least 
+invasive. And given that it's surrounded by MCPM code, trying to hide 
+things behind more macros just brings to mind cosmetics and swine ;)
+
+On reflection, I'm feeling a bit happier with this one now, so I'll add 
+it on the end and resubmit the lot to arm-soc as you suggested (ta for 
+the ack too).
+
+Robin.
