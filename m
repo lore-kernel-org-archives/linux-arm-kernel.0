@@ -1,93 +1,78 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 15 Feb 2018 16:22:28 +0100
-Subject: [RFC PATCH v2 4/6] arm64: dts: exynos: add OF graph between MHL
- and USB connector
-In-Reply-To: <CAJKOXPdg81LPOFmxtJmL7hMXGgB2USAOhCz2yjU9obX1jWjEWw@mail.gmail.com>
-References: <CGME20180215103927eucas1p24785b56277ed6c9fa2fd70058096b944@eucas1p2.samsung.com>
- <20180215103920.32017-1-a.hajda@samsung.com>
- <20180215103920.32017-5-a.hajda@samsung.com>
- <CAJKOXPdg81LPOFmxtJmL7hMXGgB2USAOhCz2yjU9obX1jWjEWw@mail.gmail.com>
-Message-ID: <a8472ef5-16ea-7a18-3ec4-85ab7bf610a6@samsung.com>
+From: robert.walker@arm.com (Robert Walker)
+Date: Thu, 15 Feb 2018 15:22:52 -0000
+Subject: [PATCH 2/2] perf inject: Emit instruction records on ETM trace
+ discontinuity
+In-Reply-To: <20180215145714.GE30974@kernel.org>
+References: <1518011845-24063-1-git-send-email-robert.walker@arm.com>
+ <1518011845-24063-3-git-send-email-robert.walker@arm.com>
+ <20180213222233.GA23553@xps15> <20180215145714.GE30974@kernel.org>
+Message-ID: <001901d3a670$da940cc0$8fbc2640$@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.02.2018 13:14, Krzysztof Kozlowski wrote:
-> On Thu, Feb 15, 2018 at 11:39 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
->> OF graph describes MHL data lanes between MHL and respective USB
->> connector.
->>
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> ---
->>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 31 +++++++++++++++++++---
->>  1 file changed, 28 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
->> index 7e49fadee412..ef758f7337e9 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
->> @@ -779,9 +779,22 @@
->>                 clocks = <&pmu_system_controller 0>;
->>                 clock-names = "xtal";
->>
->> -               port {
->> -                       mhl_to_hdmi: endpoint {
->> -                               remote-endpoint = <&hdmi_to_mhl>;
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               mhl_to_hdmi: endpoint {
->> +                                       remote-endpoint = <&hdmi_to_mhl>;
->> +                               };
->> +                       };
->> +
->> +                       port at 1 {
->> +                               reg = <1>;
->> +                               mhl_to_musb_con: endpoint {
->> +                                       remote-endpoint = <&musb_con_to_mhl>;
->> +                               };
->>                         };
->>                 };
->>         };
->> @@ -804,6 +817,18 @@
->>                                              "usb-b-connector";
->>                                 label = "micro-USB";
->>                                 type = "micro";
->> +
->> +                               ports {
->> +                                       #address-cells = <1>;
->> +                                       #size-cells = <0>;
->> +
->> +                                       port at 3 {
-> I think you might need here "reg = <3>". Doesn't it produce a warning now?
 
-You are right, I will fix it. Warning is produced only if compiled with W=1.
+
+> -----Original Message-----
+> From: Arnaldo Carvalho de Melo [mailto:acme at kernel.org]
+> Sent: 15 February 2018 14:57
+> To: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Robert Walker <Robert.Walker@arm.com>; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> coresight at lists.linaro.org
+> Subject: Re: [PATCH 2/2] perf inject: Emit instruction records on ETM
+trace
+> discontinuity
+> 
+> Em Tue, Feb 13, 2018 at 03:22:33PM -0700, Mathieu Poirier escreveu:
+> > On Wed, Feb 07, 2018 at 01:57:25PM +0000, Robert Walker wrote:
+> > > @@ -946,20 +982,19 @@ static int cs_etm__run_decoder(struct
+> cs_etm_queue *etmq)
+> > >  		/* Run trace decoder until buffer consumed or end of trace
+> */
+> > >  		do {
+> > >  			processed = 0;
+> > > -
+> >
+> > this...
+> >
+> > >  			err = cs_etm_decoder__process_data_block(
+> > >  				etmq->decoder,
+> > >  				etmq->offset,
+> > >  				&buffer.buf[buffer_used],
+> > >  				buffer.len - buffer_used,
+> > >  				&processed);
+> > > -
+> >
+> > and this should have gone in the first patch.
+> >
+> > >  			if (err)
+> > >  				return err;
+> > >
+> > >  			etmq->offset += processed;
+> > >  			buffer_used += processed;
+> > >
+> > > +			/* Process each packet in this chunk */
+> >
+> > And probably this too.
+> >
+> > With the above changes:
+> >
+> > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> 
+> Hi Robert,
+> 
+> 	Can you please address Mathieu's comments, and if you agree with
+> them, resubmit?
+> 
+> Thanks!
+> 
+> - Arnaldo
+
+Hi Arnaldo,
+
+I've addressed Mathieu's comments and resubmitted them yesterday
+(https://lkml.org/lkml/2018/2/14/185).
 
 Regards
-Andrzej
 
->
-> BR,
-> Krzysztof
->
->> +                                               musb_con_to_mhl: endpoint {
->> +                                                       remote-endpoint = <&mhl_to_musb_con>;
->> +                                               };
->> +                                       };
->> +                               };
->> +                       };
->>                         };
->>                 };
->>
->> --
->> 2.16.1
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
+Rob
