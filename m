@@ -1,25 +1,26 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 16:56:39 +0100
-Subject: [PATCH 06/15] Documentation: devicetree: dma: Add r8a77965 dmac
-In-Reply-To: <20180215153948.puwztivx3zwtqxet@verge.net.au>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-7-git-send-email-jacopo+renesas@jmondi.org>
- <20180215153948.puwztivx3zwtqxet@verge.net.au>
-Message-ID: <20180215155638.kh6hxxo4tmit3jj4@verge.net.au>
+Date: Thu, 15 Feb 2018 17:01:39 +0100
+Subject: [PATCH 1/4] arm64: dts: renesas: r8a77995: add FCPVB node
+In-Reply-To: <7882079.DMVypBKPF4@avalon>
+References: <1518474330-8713-1-git-send-email-kbingham@kernel.org>
+ <1518474330-8713-2-git-send-email-kbingham@kernel.org>
+ <7882079.DMVypBKPF4@avalon>
+Message-ID: <20180215160138.qwglhwtvzzugbh3o@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 15, 2018 at 04:39:49PM +0100, Simon Horman wrote:
-> On Tue, Feb 13, 2018 at 10:45:53AM +0100, Jacopo Mondi wrote:
-> > Add documentation for r8a77965 compatible string to rcar-dmac device
-> > tree bindings documentation.
-> > 
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+On Tue, Feb 13, 2018 at 02:31:48PM +0200, Laurent Pinchart wrote:
+> Hi Kieran,
 > 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> Thank you for the patch.
+> 
+> On Tuesday, 13 February 2018 00:25:26 EET Kieran Bingham wrote:
+> > From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> > 
+> > The FCPVB handles the interface between the VSPB and memory.
+> > 
+> > Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Sorry for not noticing this the first time around.
-
-I think a better subject would be:
-
-dt-bindings: dmaengine: rcar-dmac: document R8A77964 support
+Thanks, applied.
