@@ -1,51 +1,104 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Feb 2018 18:51:44 +0000
-Subject: [PATCH v2 4/6] bus/arm-cci: Streamline devicetree handling a bit
+Date: Thu, 15 Feb 2018 18:51:41 +0000
+Subject: [PATCH v2 1/6] drivers/bus: Move Arm CCN PMU driver
 In-Reply-To: <cover.1518717258.git.robin.murphy@arm.com>
 References: <cover.1518717258.git.robin.murphy@arm.com>
-Message-ID: <bf43fe45395e0bc704f8f8d0c4b694117c583374.1518717258.git.robin.murphy@arm.com>
+Message-ID: <6a67d4835622c146051e32381f856c67acc8ec93.1518717258.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than iterating over child nodes explicitly testing for
-availability, we can just use the other helper which already subsumes
-that check. Also, the availability check is already NULL-safe, so get
-rid of a redundant check in cci_probe(), too.
+The arm-ccn driver is purely a perf driver for the CCN PMU, not a bus
+driver in the sense of the other residents of drivers/bus/, so let's
+move it to the appropriate place for SoC PMU drivers. Not to mention
+moving the documentation accordingly as well.
 
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/bus/arm-cci.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt}         | 0
+ Documentation/{arm/CCN.txt => perf/arm-ccn.txt}                   | 0
+ drivers/bus/Kconfig                                               | 8 --------
+ drivers/bus/Makefile                                              | 2 --
+ drivers/perf/Kconfig                                              | 7 +++++++
+ drivers/perf/Makefile                                             | 1 +
+ drivers/{bus => perf}/arm-ccn.c                                   | 0
+ 7 files changed, 8 insertions(+), 10 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/ccn.txt => perf/arm-ccn.txt} (100%)
+ rename Documentation/{arm/CCN.txt => perf/arm-ccn.txt} (100%)
+ rename drivers/{bus => perf}/arm-ccn.c (100%)
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 503c1789dd02..23dc0b890d0c 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -448,13 +448,10 @@ static int cci_probe_ports(struct device_node *np)
- 	if (!ports)
- 		return -ENOMEM;
+diff --git a/Documentation/devicetree/bindings/arm/ccn.txt b/Documentation/devicetree/bindings/perf/arm-ccn.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/ccn.txt
+rename to Documentation/devicetree/bindings/perf/arm-ccn.txt
+diff --git a/Documentation/arm/CCN.txt b/Documentation/perf/arm-ccn.txt
+similarity index 100%
+rename from Documentation/arm/CCN.txt
+rename to Documentation/perf/arm-ccn.txt
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 57e011d36a79..116446c42c6b 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -48,14 +48,6 @@ config ARM_CCI5xx_PMU
  
--	for_each_child_of_node(np, cp) {
-+	for_each_available_child_of_node(np, cp) {
- 		if (!of_match_node(arm_cci_ctrl_if_matches, cp))
- 			continue;
+ 	  If unsure, say Y
  
--		if (!of_device_is_available(cp))
--			continue;
+-config ARM_CCN
+-	tristate "ARM CCN driver support"
+-	depends on ARM || ARM64
+-	depends on PERF_EVENTS
+-	help
+-	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
+-	  interconnect.
 -
- 		i = nb_ace + nb_ace_lite;
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+ 	depends on ARM || ARM64 || MIPS
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index 9bcd0bf3954b..19733afddd0a 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -5,8 +5,6 @@
  
- 		if (i >= nb_cci_ports)
-@@ -534,7 +531,7 @@ static int cci_probe(void)
- 	struct resource res;
+ # Interconnect bus drivers for ARM platforms
+ obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+-obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
+-
+ obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+ obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
+ obj-$(CONFIG_MIPS_CDMM)		+= mips_cdmm.o
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index da5724cd89cf..331b6d992b5a 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -5,6 +5,13 @@
+ menu "Performance monitor support"
+ 	depends on PERF_EVENTS
  
- 	np = of_find_matching_node(NULL, arm_cci_matches);
--	if(!np || !of_device_is_available(np))
-+	if (!of_device_is_available(np))
- 		return -ENODEV;
- 
- 	ret = of_address_to_resource(np, 0, &res);
++config ARM_CCN
++	tristate "ARM CCN driver support"
++	depends on ARM || ARM64
++	help
++	  PMU (perf) driver supporting the ARM CCN (Cache Coherent Network)
++	  interconnect.
++
+ config ARM_PMU
+ 	depends on ARM || ARM64
+ 	bool "ARM PMU framework"
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index c2f27419bdf0..5004abee0f3a 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_ARM_CCN) += arm-ccn.o
+ obj-$(CONFIG_ARM_DSU_PMU) += arm_dsu_pmu.o
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
+ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+diff --git a/drivers/bus/arm-ccn.c b/drivers/perf/arm-ccn.c
+similarity index 100%
+rename from drivers/bus/arm-ccn.c
+rename to drivers/perf/arm-ccn.c
 -- 
 2.16.1.dirty
