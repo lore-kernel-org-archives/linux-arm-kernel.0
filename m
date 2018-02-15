@@ -1,20 +1,55 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 15 Feb 2018 14:49:46 +0200
-Subject: [PATCH 0/5] clk: ti: add support for dra76x latched clocks
-Message-ID: <1518698991-10099-1-git-send-email-t-kristo@ti.com>
+Date: Thu, 15 Feb 2018 14:49:47 +0200
+Subject: [PATCH 1/5] dt-bindings: clock: ti: add latching support to mux and
+ divider clocks
+In-Reply-To: <1518698991-10099-1-git-send-email-t-kristo@ti.com>
+References: <1518698991-10099-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1518698991-10099-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Certain hardware configurations, like dra76x, have some of the clock
+registers partitioned in a funky manner that requires the clock
+control setup to be latched for PRCM to be notified of the change. This
+is accomplished with a separate control bit under the register. Add
+support for this clock latching support to divider and mux clocks.
 
-Certain clock settings on the dra76x SoC need to be latched for them
-to be properly programmed to the PRCM. For example, the setting for
-the dra76x GMAC DPLL H14 output is programmed via a register under
-the system control module, which doesn't get reflected automatically
-under the PRCM HW, and the latch bit is provided to synchronize the
-setting from SCM towards PRCM.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ Documentation/devicetree/bindings/clock/ti/divider.txt | 3 +++
+ Documentation/devicetree/bindings/clock/ti/mux.txt     | 3 +++
+ 2 files changed, 6 insertions(+)
 
--Tero
+diff --git a/Documentation/devicetree/bindings/clock/ti/divider.txt b/Documentation/devicetree/bindings/clock/ti/divider.txt
+index 35a6f5c..9b13b32 100644
+--- a/Documentation/devicetree/bindings/clock/ti/divider.txt
++++ b/Documentation/devicetree/bindings/clock/ti/divider.txt
+@@ -75,6 +75,9 @@ Optional properties:
+ - ti,invert-autoidle-bit : autoidle is enabled by setting the bit to 0,
+   see [2]
+ - ti,set-rate-parent : clk_set_rate is propagated to parent
++- ti,latch-bit : latch the divider value to HW, only needed if the register
++  access requires this. As an example dra76x DPLL_GMAC H14 divider implements
++  such behavior.
+ 
+ Examples:
+ dpll_usb_m2_ck: dpll_usb_m2_ck at 4a008190 {
+diff --git a/Documentation/devicetree/bindings/clock/ti/mux.txt b/Documentation/devicetree/bindings/clock/ti/mux.txt
+index 2d0d170..eec8994 100644
+--- a/Documentation/devicetree/bindings/clock/ti/mux.txt
++++ b/Documentation/devicetree/bindings/clock/ti/mux.txt
+@@ -48,6 +48,9 @@ Optional properties:
+   zero
+ - ti,set-rate-parent : clk_set_rate is propagated to parent clock,
+   not supported by the composite-mux-clock subtype
++- ti,latch-bit : latch the mux value to HW, only needed if the register
++  access requires this. As an example, dra7x DPLL_GMAC H14 muxing
++  implements such behavior.
+ 
+ Examples:
+ 
+-- 
+1.9.1
 
 --
 Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
