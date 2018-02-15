@@ -1,80 +1,139 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Thu, 15 Feb 2018 15:47:59 +0900
-Subject: [PATCH 1/2] arm64: kprobes: Remove unneeded address sanity check
-In-Reply-To: <5A84EB83.7070807@linaro.org>
-References: <20180201093459.20477-1-takahiro.akashi@linaro.org>
- <20180201093459.20477-2-takahiro.akashi@linaro.org>
- <5A84EB83.7070807@linaro.org>
-Message-ID: <20180215154759.47dd4cc8a64f0e99d9e8695f@kernel.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 15 Feb 2018 17:04:47 +0900
+Subject: [PATCH] arm64: acpi,efi: fix alignment fault in accessing ACPI
+ tables at kdump
+In-Reply-To: <5A7DC66C.10107@arm.com>
+References: <20180201090449.19514-1-takahiro.akashi@linaro.org>
+ <CAKv+Gu-2-cG3vse4briKPK0gpi5Zrg+pZHiiN7-4DSBPn0n_3A@mail.gmail.com>
+ <20180202043519.GD23847@linaro.org> <5A7DC66C.10107@arm.com>
+Message-ID: <20180215080445.GC11463@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+To be clear, I refer to my patches as patch#1 for [1] and patch#2 for [2],
+respectively, hereafter.
 
-On Wed, 14 Feb 2018 21:08:03 -0500
-David Long <dave.long@linaro.org> wrote:
+    [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/553098.html
+    [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/557248.html
 
-> On 02/01/2018 04:34 AM, AKASHI Takahiro wrote:
-> > From: Masami Hiramatsu <mhiramat@kernel.org>
-> >
-> > Remove unneeded address sanity check in arch_prepare_kprobe().
-> > Since do_debug_exception() is already blacklisted for kprobes, no need
-> > to reject all __exception functions. Also, since generic kprobe
-> > framework already ensures the address is in kernel text, no need to
-> > check it is in rodata again.
-> >
-> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > ---
-> >   arch/arm64/kernel/probes/kprobes.c | 8 --------
-> >   1 file changed, 8 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> > index d849d9804011..3c487a389252 100644
-> > --- a/arch/arm64/kernel/probes/kprobes.c
-> > +++ b/arch/arm64/kernel/probes/kprobes.c
-> > @@ -78,8 +78,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
-> >   int __kprobes arch_prepare_kprobe(struct kprobe *p)
-> >   {
-> >   	unsigned long probe_addr = (unsigned long)p->addr;
-> > -	extern char __start_rodata[];
-> > -	extern char __end_rodata[];
-> >
-> >   	if (probe_addr & 0x3)
-> >   		return -EINVAL;
-> > @@ -87,12 +85,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
-> >   	/* copy instruction */
-> >   	p->opcode = le32_to_cpu(*p->addr);
-> >
-> > -	if (in_exception_text(probe_addr))
-> > -		return -EINVAL;
-> > -	if (probe_addr >= (unsigned long) __start_rodata &&
-> > -	    probe_addr <= (unsigned long) __end_rodata)
-> > -		return -EINVAL;
-> > -
-> >   	/* decode instruction */
-> >   	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
-> >   	case INSN_REJECTED:	/* insn not supported */
-> >
+On Fri, Feb 09, 2018 at 04:03:56PM +0000, James Morse wrote:
+> Hi Akashi, Ard,
 > 
-> I have tested this change on v4.15 using kprobes events and I find it 
-> allows kprobes to be placed in exception text when they were previously 
-> rejected. Is there some other recent change I need to test this with for 
-> the previous behavior to be preserved?
+> On 02/02/18 04:35, AKASHI Takahiro wrote:
+> > On Thu, Feb 01, 2018 at 05:34:26PM +0000, Ard Biesheuvel wrote:
+> >> On 1 February 2018 at 09:04, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> >>> * Initial ACPI tables are normally stored in system ram and marked as
+> >>>   "ACPI Reclaim memory" by the firmware.
+> 
+> >>> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
+> >>>   memory as MEMBLOCK_NOMAP"), those regions are differently handled
+> >>>   as they are "memblock-reserved", without NOMAP bit.
+> 
+> I don't think I'd grasped the implications of this before... are we accessing
+> the acpi tables via the linear map now?
 
-Hmm, the latest change is to avoid retpoline thunk functions on x86. Since the
-retpoline may not be applied on aarch64, it can be ignored.
-However, I found there were still many "__kprobes" tags under arch/arm64. That
-was replaced with NOKPROBE_SYMBOL() (and nokprobe_inline for inline function).
-It should be done on arm/arm64 too because the functions marked with
-NOKPROBE_SYMBOL are listed in <debugfs>/kprobes/blacklist. 
-
-Thank you,
+Yes, on the current mainline
+yes, on crash dump kernel with patch#1
+no, on crash dump kernel with patch#2
 
 > 
-> -dl
+> >>> * So they are now excluded from device tree's "usable-memory-range"
+> >>>   which kexec-tools determines based on a current view of /proc/iomem.
 > 
+> >> So this patch does fix the fallout of how this issue affects ACPI boot
+> >> in particular, but is it correct in the first place for the kexec
+> >> tools to disregard memory that has been memblock_reserved()?
+> 
+> I don't think kexec should be allowed to accidentally overwrite these regions as
+> they contain data needed to boot the system.
+> The reason to allow this would be booting a non-acpi OS and removing all the
+> ACPI gubbins from the DTB, (but I don't care if kexec can't do this).
+> 
+> Overwriting these regions used to be prevented because these regions were nomap,
+> but now they are showing up as 'System RAM', so they could be accidentally
+> overwritten.
 
+No, please not be confused here.
+Usable memory for crash dump kernel will be carefully set aside so that
+it won't overlap any portion of currently used or reserved memory at the boot
+time of the first kernel. So kdump won't corrupt any data in those regions,
+including ACPI Reclaim region. The issue that I'm going to primarily address
+in patch#1 and patch#2 is a alignment fault, not data corruption.
 
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+In the meantime, the only bug that I've noticed regarding memory allocation
+so far is the one reported by Poonam[3].
+   [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/551731.html
+
+> It looks like /proc/iomem doesn't see memblock_reserve()d regions
+> as they are in both memblock.memory and memblock.reserved.
+> 
+> 
+> > My previous patch[1] is just for this. It would work not only for
+> > the case here but also for any "reserved" memory regions.
+> > The only noticeable drawback that I see in this approach is that
+> > the meaning of "usable-memory-range" is now a bit obscure.
+> 
+> usable-memory-range is only for kdump. The usable-memory-range is the reserved
+> crash region of the previous kernel, it can't overlap with anything that is
+> reserved by firmware.
+> 
+> Have I understood the problem correctly?:
+> 1. ACPI reserved regions may be accidentally overwritten by kexec,
+
+No as I said.
+
+> 2. Kdump-kernel can't access the ACPI reserved regions via its linear map.
+
+Yes and no.
+It doesn't matter whether we have linear mapping for ACPI reserved regions,
+but does matter whether we can access them with unalignment support, that is,
+cacheability.
+
+> 
+> 
+> > Alternatively we may want to modify /proc/iomem, adding a specific
+> > resource entry for "ACPI Reclaim regions," 
+> 
+> This covers 1, nicely. kexec-tool's arm64:iomem_range_callback() looks like it
+> ignores regions it doesn't know about.
+> 
+> 
+> > and in turn kexec-tool so as to put them into "usable-memory-range",
+> > but it is rather a stopgap
+> > measure in my opinion. I don't like kexec relying heavily on userspace
+> > tool as exporting the reserved regions in /proc/iomem is also useless
+> > for most users.
+> 
+> Describing all the iomem:reserved regions in dt:usable-memory-range? Yes, that
+> sounds fragile.
+
+Not all, but only the regions to be included in "usable-memory-range."
+
+> 
+> 
+> For 1:
+> Changing /proc/iomem to report memblock_reserved() regions as reserved would fix
+> 1. (I assume its harder to find the ACPI reserved regions again to describe them
+> separately). This stops kexec overwriting them.
+> 
+> 
+> For 2:
+> This patch solves the problem, but we access the acpi tables via the linear map
+> in the first kernel, but ioremap() them in the kdump kernel.
+> 
+> The only way to avoid this would be for the kernel's efi code to check that the
+> ACPI regions are mapped by the linear map, and add them if they aren't...
+
+Do you think so? IMO, my patch#1 manages this nicely.
+
+Thanks,
+-Takahiro AKASHI
+
+> which
+> is much scarier. So I prefer this patch for 2..
+> 
+> 
+> 
+> Thanks,
+> 
+> James
