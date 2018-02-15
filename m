@@ -1,41 +1,61 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 15 Feb 2018 16:52:04 +0200
-Subject: [PATCH v3 5/7] dt-bindings: tegra: Add documentation for nvidia,
- tegra194-pmc
+Date: Thu, 15 Feb 2018 16:52:03 +0200
+Subject: [PATCH v3 4/7] dt-bindings: tegra: Add missing chips and NVIDIA boards
 In-Reply-To: <20180215145206.24775-1-mperttunen@nvidia.com>
 References: <20180215145206.24775-1-mperttunen@nvidia.com>
-Message-ID: <20180215145206.24775-6-mperttunen@nvidia.com>
+Message-ID: <20180215145206.24775-5-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra194 power management controller has one additional register
-aperture to be specified in the device tree node.
+Add compatibility strings for supported but undocumented Tegra chips
+(Tegra114/124/132/210/186/194) and reference boards.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
-index 078a58b0302f..5a3bf7c5a7a0 100644
---- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
-@@ -3,6 +3,7 @@ NVIDIA Tegra Power Management Controller (PMC)
- Required properties:
- - compatible: Should contain one of the following:
-   - "nvidia,tegra186-pmc": for Tegra186
-+  - "nvidia,tegra194-pmc": for Tegra194
- - reg: Must contain an (offset, length) pair of the register set for each
-   entry in reg-names.
- - reg-names: Must include the following entries:
-@@ -10,6 +11,7 @@ Required properties:
-   - "wake"
-   - "aotag"
-   - "scratch"
-+  - "misc" (Only for Tegra194)
+Notes:
+    v2:
+    - add patch
+
+ Documentation/devicetree/bindings/arm/tegra.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index 7f1411bbabf7..32f62bb7006d 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -9,6 +9,12 @@ following compatible values:
  
- Optional properties:
- - nvidia,invert-interrupt: If present, inverts the PMU interrupt signal.
+   nvidia,tegra20
+   nvidia,tegra30
++  nvidia,tegra114
++  nvidia,tegra124
++  nvidia,tegra132
++  nvidia,tegra210
++  nvidia,tegra186
++  nvidia,tegra194
+ 
+ Boards
+ -------------------------------------------
+@@ -26,8 +32,18 @@ board-specific compatible values:
+   nvidia,cardhu
+   nvidia,cardhu-a02
+   nvidia,cardhu-a04
++  nvidia,dalmore
+   nvidia,harmony
++  nvidia,jetson-tk1
++  nvidia,norrin
++  nvidia,p2371-0000
++  nvidia,p2371-2180
++  nvidia,p2571
++  nvidia,p2771-0000
++  nvidia,p2972-0000
++  nvidia,roth
+   nvidia,seaboard
++  nvidia,tn7
+   nvidia,ventana
+   toradex,apalis_t30
+   toradex,apalis_t30-eval
 -- 
 2.16.1
