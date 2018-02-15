@@ -1,42 +1,93 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 16:16:44 +0100
-Subject: [PATCH v2 2/2] arm64: dts: renesas: eagle: specify EtherAVB PHY
- IRQ
-In-Reply-To: <0ccd631e-691a-2b15-7680-6e0c847a6ca2@cogentembedded.com>
-References: <038a791d-aa57-9c3d-eaea-09c5704ecb54@cogentembedded.com>
- <0ccd631e-691a-2b15-7680-6e0c847a6ca2@cogentembedded.com>
-Message-ID: <20180215151644.szxwehuu6b7w5uuv@verge.net.au>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 15 Feb 2018 16:22:28 +0100
+Subject: [RFC PATCH v2 4/6] arm64: dts: exynos: add OF graph between MHL
+ and USB connector
+In-Reply-To: <CAJKOXPdg81LPOFmxtJmL7hMXGgB2USAOhCz2yjU9obX1jWjEWw@mail.gmail.com>
+References: <CGME20180215103927eucas1p24785b56277ed6c9fa2fd70058096b944@eucas1p2.samsung.com>
+ <20180215103920.32017-1-a.hajda@samsung.com>
+ <20180215103920.32017-5-a.hajda@samsung.com>
+ <CAJKOXPdg81LPOFmxtJmL7hMXGgB2USAOhCz2yjU9obX1jWjEWw@mail.gmail.com>
+Message-ID: <a8472ef5-16ea-7a18-3ec4-85ab7bf610a6@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 13, 2018 at 02:24:14PM +0300, Sergei Shtylyov wrote:
-> Specify  EtherAVB PHY IRQ  in the Eagle board's device tree, now that we
-> have the GPIO support (previously phylib had to resort to polling).
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On 15.02.2018 13:14, Krzysztof Kozlowski wrote:
+> On Thu, Feb 15, 2018 at 11:39 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>> OF graph describes MHL data lanes between MHL and respective USB
+>> connector.
+>>
+>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>> ---
+>>  .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 31 +++++++++++++++++++---
+>>  1 file changed, 28 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+>> index 7e49fadee412..ef758f7337e9 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+>> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+>> @@ -779,9 +779,22 @@
+>>                 clocks = <&pmu_system_controller 0>;
+>>                 clock-names = "xtal";
+>>
+>> -               port {
+>> -                       mhl_to_hdmi: endpoint {
+>> -                               remote-endpoint = <&hdmi_to_mhl>;
+>> +               ports {
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +
+>> +                       port at 0 {
+>> +                               reg = <0>;
+>> +                               mhl_to_hdmi: endpoint {
+>> +                                       remote-endpoint = <&hdmi_to_mhl>;
+>> +                               };
+>> +                       };
+>> +
+>> +                       port at 1 {
+>> +                               reg = <1>;
+>> +                               mhl_to_musb_con: endpoint {
+>> +                                       remote-endpoint = <&musb_con_to_mhl>;
+>> +                               };
+>>                         };
+>>                 };
+>>         };
+>> @@ -804,6 +817,18 @@
+>>                                              "usb-b-connector";
+>>                                 label = "micro-USB";
+>>                                 type = "micro";
+>> +
+>> +                               ports {
+>> +                                       #address-cells = <1>;
+>> +                                       #size-cells = <0>;
+>> +
+>> +                                       port at 3 {
+> I think you might need here "reg = <3>". Doesn't it produce a warning now?
 
-Thanks, applied with Geert's tag.
+You are right, I will fix it. Warning is produced only if compiled with W=1.
 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77970-eagle.dts |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> ===================================================================
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-> @@ -44,6 +44,8 @@
->  	phy0: ethernet-phy at 0 {
->  		rxc-skew-ps = <1500>;
->  		reg = <0>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
+Regards
+Andrzej
 
-Could you consider following-up with a patch to add:
-
-		reset-gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-
->  	};
->  };
->  
-> 
+>
+> BR,
+> Krzysztof
+>
+>> +                                               musb_con_to_mhl: endpoint {
+>> +                                                       remote-endpoint = <&mhl_to_musb_con>;
+>> +                                               };
+>> +                                       };
+>> +                               };
+>> +                       };
+>>                         };
+>>                 };
+>>
+>> --
+>> 2.16.1
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
