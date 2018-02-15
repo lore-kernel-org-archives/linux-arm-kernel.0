@@ -1,104 +1,185 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 15 Feb 2018 17:56:23 +0000
-Subject: [PATCH v5 1/3] arm64/ras: support sea error recovery
-In-Reply-To: <7dacf375-4645-ba34-62d1-96d9f67dbcc2@huawei.com>
-References: <1516969885-150532-1-git-send-email-xiexiuqi@huawei.com>
- <1516969885-150532-2-git-send-email-xiexiuqi@huawei.com>
- <5A70C536.7040208@arm.com> <5A7B4D87.9020207@arm.com>
- <7dacf375-4645-ba34-62d1-96d9f67dbcc2@huawei.com>
-Message-ID: <5A85C9C7.9060701@arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Thu, 15 Feb 2018 19:05:56 +0100
+Subject: [PATCH 2/2] drm/sun4i: Handle DRM_MODE_FLAG_**SYNC_POSITIVE
+ correctly
+In-Reply-To: <20180208204043.mqryuqhx7a6z4v3b@flea>
+References: <1516474221-114596-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1516474221-114596-2-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180122085112.7xo2t3x5ag4k2kpl@flea.lan>
+ <aa724bd5-cfb1-128c-af32-db29253f32aa@micronovasrl.com>
+ <59f7b542-3b1d-ff62-e290-37c47f4075ff@micronovasrl.com>
+ <9929d894-53c3-a7e9-a328-a00cfc1ef546@micronovasrl.com>
+ <20180207103905.mtyzgu73mmifyvvj@flea>
+ <653f0438-c55a-02a5-dffb-2ee8e6d9ef4a@micronovasrl.com>
+ <20180208204043.mqryuqhx7a6z4v3b@flea>
+Message-ID: <e5d49c13-9b8f-d597-508c-10fed5300769@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xie XiuQi,
+Hi,
 
-On 08/02/18 08:35, Xie XiuQi wrote:
-> I am very glad that you are trying to solve the problem, which is very helpful.
-> I agree with your proposal, and I'll test it on by box latter.
+Il 08/02/2018 21:40, Maxime Ripard ha scritto:
+> On Wed, Feb 07, 2018 at 01:49:59PM +0100, Giulio Benetti wrote:
+>> Hi,
+>>
+>> Il 07/02/2018 11:39, Maxime Ripard ha scritto:
+>>> On Wed, Jan 24, 2018 at 08:37:28PM +0100, Giulio Benetti wrote:
+>>>>>>> Also, how was it tested? This seems quite weird that we haven't caught
+>>>>>>> that one sooner, and I'm a bit worried about the possible regressions
+>>>>>>> here.
+>>>>>>
+>>>>>> It sounds really strange to me too,
+>>>>>> because everybody under uboot use "sync:3"(HIGH).
+>>>>>> I will retry to measure,
+>>>>>> unfortunately at home I don't have a scope,
+>>>>>> but I think I'm going to have one soon, because of this. :)
+>>>>>
+>>>>> Here I am with scope captures and tcon0 registers dump:
+>>>>> tcon0_regs => https://pasteboard.co/H4r8Zcs.png
+>>>>> dclk_d0 => https://pasteboard.co/H4r8QRe.png
+>>>>> dclk_de => https://pasteboard.co/H4r8zh4R.png
+>>>>> dclk_vsnc => https://pasteboard.co/H4r8Hye.png
+>>>>>
+>>>>> As you can see circled in reg on registers,
+>>>>> TCON0_IO_POL_REG = 0x00000000.
+>>>>> But on all the waveforms you can see:
+>>>>> - dclk_d0: clock phase is 0, but it starts with falling edge, otherwise
+>>>>> the rising front overlaps dclk rising edge(not good), so to me this is
+>>>>> falling, then I mean it Negative.
+>>>>> - dclk_de: de pulse is clearly negative, even if register is 0 and its'
+>>>>> polarity bit is 0.
+>>>>> - dclk_vsnc: same as dclk_de
+>>>>> - dclk_hsync: I didn't take scope screenshot but I can assure you it's
+>>>>> negative.
+>>>>>
+>>>>> You can also check all the other registers about TCON0.
+>>>>>
+>>>>> Now I proceed testing it on A33, maybe the peripheral is slightly
+>>>>> different between Axx SoCs, if I find it that way,
+>>>>> it should be only a check about SoC or peripheral ID,
+>>>>> and treat polarity as it should be done.
+>>>>
+>>>> Here I am with A33 waveforms:
+>>>> tcon0_regs => https://pasteboard.co/H4rXfN0M.png
+>>>> dclk_d0 => https://pasteboard.co/H4rVXwy.png
+>>>> dclk_de => https://pasteboard.co/H4rWDt8.png
+>>>> dclk_vsnc => https://pasteboard.co/H4rWRACu.png
+>>>> dclk_hsync => https://pasteboard.co/H4rWK6I.png
+>>>>
+>>>> It behaves the same way as A20, so as I mean IO polarity,
+>>>> all signals(except D0-D23), are inverted.
+>>>> For A33 I've used A33-OLinuXino.
+>>>> For A20 our LiNova1.
+>>>
+>>> If you have an A33 handy, you probably want to read that mail:
+>>> https://lists.freedesktop.org/archives/dri-devel/2017-July/147951.html
+>>>
+>>> Especially the 90-phase part.
+>>
+>> Here is a summary of different SoCs TCON:
+>> With DCLK_Sel:
+>> 0x0 => normal phase
+>> 0x1 => 1/3 phase
+>> 0x2 => 2/3 phase
+>>
+>> A10, A20
 > 
-> Indeed, we're in precess context when we are in sea handler. I was thought we
-> can't call schedule() in the exception handler before.
+> Have you tested the option 4 and 5 there too?
+> 
+>> With DCLK_Sel:
+>> 0x0 => normal phase
+>> 0x1 => 1/3 phase
+>> 0x2 => 2/3 phase
+>> 0x5 => DCLK/2 phase 0
+>> 0x4 => DCLK/2 phase 90
+>>
+>> A31, A31s, A33, A80, A83T
+> 
+> Ok, great, so Chen-Yu was right :)
+> 
+> I guess the option 5 (DCLK/2 phase 0) is still to early, just like
+> you've shown in the previous captures?
 
-While testing this I've come to the conclusion that the
-memory_failure_queue_kick() approach I suggested makes arm64 behave slightly
-differently with APEI, and would need re-inventing if we support kernel-first
-too. The same race exists with memory-failure notifications signalled by SDEI,
-and to a lesser extent IRQ. So by fixing this in arch-code, we actually making
-our lives harder.
+Exactly, it is like this:
+https://pasteboard.co/H4r8QRe.png but with clock divided by 2.
 
-Instead, I have the patch below. This is smaller, and not arch specific. It also
-saves the arch code secretly knowing that APEI calls memory_failure_queue().
+> 
+>> Also I've found that TCON1 has not this feature,
+>> nor first, nor second case(at least is not described on user manuals).
+> 
+> At lot of things are not described, unfortunately...
+> 
+>> So I could handle differently according to SoC.
+>> Unfortunately there is not TCON register keeping IP version,
+>> so the only way I see is to create a long if-or statement to understand
+>> which kind of TCON we're using.
+> 
+> You can base that on the compatible, and add a field in the
+> sun4i_tcon_quirks structure, that will avoid the if statements you
+> mentionned.
+> 
+>> But what sounds not the best to me, is that DCLK is divided by 2 if
+>> using phase 90. So we need to reconsider also bitclock driver according
+>> to this.
+>> I don't know if it make sense.
+>>
+>> IMHO, I would keep only:
+>> - As normal => "0x1 => 1/3 phase"
+> 
+> So that would mean sampling at raising edge on this one??
 
-I will post this as part of that series shortly...
+Exactly rising edge.
+
+> 
+>> - As inverted => "0x0 => normal phase"
+> 
+> And falling edge?
+
+Yes.
+
+> 
+> If so, and if remember the captures properly, the sampling would occur
+> right before the rise, and not really around the fall.
+> 
+> Would 2/3 be better here?
+
+Yes, you're right, 2/3 phase is better:
+
+1/3 phase: https://pasteboard.co/H4VehON.png
+2/3 phase: https://pasteboard.co/H4Veq8a.png
+
+Take a look at the bit in middle(yellow) sampled by clock(blue).
+
+Rising edge is almost in the middle of D0 bit.
+
+> 
+>> According to scope captures above on both A20 and A33.
+>> Unfortunately I don't have other boards for the other SoCs to take captures.
+>>
+>> What do you think?
+> 
+> I guess we can make that part applicable to all SoCs, we haven't seen
+> any significant differences on those part.
+
+So let's keep:
+- As normal(rising edge) => IO_POL_REG "0x2 => 2/3 phase"
+- As inverted(falling edge) => IO_POL_REG "0x0 => normal phase"
+
+Ok?
+
+> 
+> Maxime
+> 
 
 
-Thanks,
+-- 
+Giulio Benetti
+CTO
 
-James
-
----------------%<---------------
-[PATCH] mm/memory-failure: increase queued recovery work's priority
-
-arm64 can take an NMI-like error notification when user-space steps in
-some corrupt memory. APEI's GHES code will call memory_failure_queue()
-to schedule the recovery work. We then return to user-space, possibly
-taking the fault again.
-
-Currently the arch code unconditionally signals user-space from this
-path, so we don't get stuck in this loop, but the affected process
-never benefits from memory_failure()s recovery work. To fix this we
-need to know the recovery work will run before we get back to user-space.
-
-Increase the priority of the recovery work by scheduling it on the
-system_highpri_wq, then try to bump the current task off this CPU
-so that the recover work starts immediately.
-
-Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
-Signed-off-by: James Morse <james.morse@arm.com>
-CC: Xie XiuQi <xiexiuqi@huawei.com>
-CC: gengdongjiu <gengdongjiu@huawei.com>
----
- mm/memory-failure.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/mm/memory-failure.c b/mm/memory-failure.c
-index 4b80ccee4535..14f44d841e8b 100644
---- a/mm/memory-failure.c
-+++ b/mm/memory-failure.c
-@@ -55,6 +55,7 @@
- #include <linux/hugetlb.h>
- #include <linux/memory_hotplug.h>
- #include <linux/mm_inline.h>
-+#include <linux/preempt.h>
- #include <linux/kfifo.h>
- #include <linux/ratelimit.h>
- #include "internal.h"
-@@ -1319,6 +1320,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu,
-memory_failure_cpu);
-  */
- void memory_failure_queue(unsigned long pfn, int flags)
- {
-+	int cpu = smp_processor_id();
- 	struct memory_failure_cpu *mf_cpu;
- 	unsigned long proc_flags;
- 	struct memory_failure_entry entry = {
-@@ -1328,11 +1330,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
-
-        mf_cpu = &get_cpu_var(memory_failure_cpu);
-        spin_lock_irqsave(&mf_cpu->lock, proc_flags);
--       if (kfifo_put(&mf_cpu->fifo, entry))
--               schedule_work_on(smp_processor_id(), &mf_cpu->work);
--       else
-+       if (kfifo_put(&mf_cpu->fifo, entry)) {
-+               queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
-+               set_tsk_need_resched(current);
-+               preempt_set_need_resched();
-+       } else {
-                pr_err("Memory failure: buffer overflow when queuing memory
-failure at %#lx\n",
-                       pfn);
-+       }
-        spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
-        put_cpu_var(memory_failure_cpu);
- }
----------------%<---------------
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
