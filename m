@@ -1,62 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 15 Feb 2018 11:08:09 +0100
-Subject: [PATCH] ARM: shmobile: stout: enable R-Car Gen2 regulator quirk
-In-Reply-To: <ae3206a3-4735-87c8-9688-3acdbf06cc36@gmail.com>
-References: <20180213232812.31408-1-marek.vasut+renesas@gmail.com>
- <20180214055800.od5yhgo753522yah@katana>
- <CAMuHMdU3opUTcOY-UeH4ArB+50_drPhGSoxP-m85p9V36fvTHg@mail.gmail.com>
- <ae3206a3-4735-87c8-9688-3acdbf06cc36@gmail.com>
-Message-ID: <CAMuHMdU4_wVcKwjB1ZQzfgp8vCDs92F1o+v4UyZ0bsRDfJD1vQ@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 15 Feb 2018 11:10:31 +0100
+Subject: [PATCH] ARM64: dts: meson-axg: fix pwm_AO_cd compatible
+Message-ID: <20180215101031.18934-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+The compatible in pwm_AO_cd is wrong and does not match anything.
+Correct this with the correct compatible string
 
-On Thu, Feb 15, 2018 at 10:44 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 02/14/2018 09:09 AM, Geert Uytterhoeven wrote:
->> On Wed, Feb 14, 2018 at 6:58 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
->>>> - * The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
->>>> - * da9210 regulators.  Both regulators have their interrupt request lines tied
->>>> - * to the same interrupt pin (IRQ2) on the SoC.
->>>> + * The r8a7790/lager,stout and r8a7791/koelsch development boards have da9063
->>>> + * and da9210 regulators.  Both regulators have their interrupt request lines
->>>> + * tied to the same interrupt pin (IRQ2) on the SoC.
->>>
->>> I think listing the boards here doesn't scale well. Gose is already
->>> missing. How about rephrasing the paragraph to something like "Some Gen2
->>> development boards have..."?
->>
->> +1
->>
->>>>   *
->>>>   * After cold boot or da9063-induced restart, both the da9063 and da9210 seem
->>>>   * to assert their interrupt request lines.  Hence as soon as one driver
->>>> @@ -118,6 +118,7 @@ static int __init rcar_gen2_regulator_quirk(void)
->>>>
->>>>       if (!of_machine_is_compatible("renesas,koelsch") &&
->>>>           !of_machine_is_compatible("renesas,lager") &&
->>>> +         !of_machine_is_compatible("renesas,stout") &&
->>>>           !of_machine_is_compatible("renesas,gose"))
->>>>               return -ENODEV;
->>
->> Have we reached critical mass to start using array-based matching with
->> of_device_compatible_match()?
->
-> We're matching on machine , not device , here . I guess our device node
-> would be / ?
+Fixes: 4a81e5ddfb43 ("ARM64: dts: meson-axg: add PWM DT info for Meson-Axg SoC")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Correct, cfr. the implementation of of_machine_is_compatible().
-
-BTW, several PPC platforms use of_device_compatible_match(of_root, ...),
-but I believe of_root is not guaranteed to be set up.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index a7cc9e401a92..880e25b113c1 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -844,7 +844,7 @@
+ 			};
+ 
+ 			pwm_AO_cd: pwm at 2000 {
+-				compatible = "amlogic,axg-ao-pwm";
++				compatible = "amlogic,meson-axg-ao-pwm";
+ 				reg = <0x0 0x02000  0x0 0x20>;
+ 				#pwm-cells = <3>;
+ 				status = "disabled";
+-- 
+2.14.3
