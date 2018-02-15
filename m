@@ -1,30 +1,20 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 15 Feb 2018 23:51:34 +0800
-Subject: [PATCH 0/3] crypto: stm32/hash: Correction to improve robustness
-In-Reply-To: <20180129142811.13273-1-lionel.Debieve@st.com>
-References: <20180129142811.13273-1-lionel.Debieve@st.com>
-Message-ID: <20180215155133.GL7352@gondor.apana.org.au>
+Date: Thu, 15 Feb 2018 23:53:02 +0800
+Subject: [PATCH 0/2] crypto: stm32/cryp - add AEAD cipher algorithms
+In-Reply-To: <1518008935-30428-1-git-send-email-fabien.dessenne@st.com>
+References: <1518008935-30428-1-git-send-email-fabien.dessenne@st.com>
+Message-ID: <20180215155302.GQ7352@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 03:28:08PM +0100, Lionel Debieve wrote:
-> From: Lionel Debieve <lionel.debieve@st.com>
+On Wed, Feb 07, 2018 at 02:08:53PM +0100, Fabien Dessenne wrote:
+> This patchset depends on "crypto: engine - Permit to enqueue all async requests"
+> proposed by Corentin Labbe [https://lkml.org/lkml/2018/1/26/608].
+> stm32-cryp uses this updated crpyto engine to handle AEAD cipher algortihms.
 > 
-> Hi,
-> 
-> This patch serie will improve global robustness for stm32-hash driver. 
-> 
-> Patch #1 is fixing dma-burst issue when configuration is not set.
-> Patch #2 solves issue that occurs when irq append during final req processing.
-> Patch #3 is fixing an issue that have been introduced while managing padding but
-> breaking the padding length calculation by hardware to generate correct hash.
-> 
-> Regards,
-> 
-> Lionel Debieve (3):
->   crypto: stm32/hash: avoid error if maxburst not defined
->   crypto: stm32/hash: fix performance issues
->   crypto: stm32/hash: rework padding length
+> Fabien Dessenne (2):
+>   crypto: stm32/cryp - add aes gcm / ccm support
+>   crypto: stm32/cryp - add stm32mp1 support
 
 All applied.  Thanks.
 -- 
