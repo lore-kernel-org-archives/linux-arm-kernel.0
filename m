@@ -1,31 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 15 Feb 2018 11:51:58 +0300
-Subject: [PATCH v2 2/2] arm64: dts: renesas: eagle: specify EtherAVB PHY
- IRQ
-In-Reply-To: <CAMuHMdX3XZSwvAT74fVhWw9GoxVmpdXoqR03=u0QC3FEB==X=w@mail.gmail.com>
-References: <038a791d-aa57-9c3d-eaea-09c5704ecb54@cogentembedded.com>
- <0ccd631e-691a-2b15-7680-6e0c847a6ca2@cogentembedded.com>
- <CAMuHMdX3XZSwvAT74fVhWw9GoxVmpdXoqR03=u0QC3FEB==X=w@mail.gmail.com>
-Message-ID: <9003179f-379d-0576-37bf-1b08700ebd41@cogentembedded.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 15 Feb 2018 10:07:14 +0100
+Subject: [PATCH 5/8] arm64: dts: renesas: r8a77995: Add LVDS support
+In-Reply-To: <1518683903-10681-6-git-send-email-kbingham@kernel.org>
+References: <1518683903-10681-1-git-send-email-kbingham@kernel.org>
+ <1518683903-10681-6-git-send-email-kbingham@kernel.org>
+Message-ID: <CAMuHMdVKczZpoXgSDOSEJZb59LAZtbWsopRaa8PtHDoZcFEMTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Hi Kieran,
 
-On 2/14/2018 1:02 PM, Geert Uytterhoeven wrote:
+On Thu, Feb 15, 2018 at 9:38 AM, Kieran Bingham <kbingham@kernel.org> wrote:
+> From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+>
+> The r8a77995 D3 platform has 2 LVDS channels connected to the DU.
+>
+> Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
 
->> Specify  EtherAVB PHY IRQ  in the Eagle board's device tree, now that we
->> have the GPIO support (previously phylib had to resort to polling).
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> You've dropped my:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I love your patch!
+Yet something to improve...
 
-    Sorry, I was too hasty to resubmit. :-/
+> --- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> @@ -773,18 +773,70 @@
+>                                 port at 1 {
+>                                         reg = <1>;
+>                                         du_out_lvds0: endpoint {
+> +                                               remote-endpoint = <&du_out_lvds0>;
+>                                         };
+>                                 };
+>
+>                                 port at 2 {
+>                                         reg = <2>;
+>                                         du_out_lvds1: endpoint {
+> +                                               remote-endpoint = <&du_out_lvds1>;
+>                                         };
+>                                 };
+>                         };
+>                 };
+>         };
+>
+> +       lvds0: lvds at feb90000 {
+> +               compatible = "renesas,lvds-r8a77995";
+> +               reg = <0 0xfeb90000 0 0x20>;
+> +               clocks = <&cpg CPG_MOD 727>;
+> +               status = "disabled";
 
-> Gr{oetje,eeting}s,
-> 
->                          Geert
+Missing resets, power-domains
 
-MBR, Sergei
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
