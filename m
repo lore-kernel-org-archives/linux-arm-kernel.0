@@ -1,127 +1,121 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 15 Feb 2018 11:39:15 +0100
-Subject: [RFC PATCH v2 1/6] dt-bindings: add bindings for USB physical
- connector
+Date: Thu, 15 Feb 2018 11:39:19 +0100
+Subject: [RFC PATCH v2 5/6] extcon: add possibility to get extcon device by
+ OF node
 In-Reply-To: <20180215103920.32017-1-a.hajda@samsung.com>
 References: <20180215103920.32017-1-a.hajda@samsung.com>
- <CGME20180215103925eucas1p1d82fd73ac6ea77c8b66de4ed26101a71@eucas1p1.samsung.com>
-Message-ID: <20180215103920.32017-2-a.hajda@samsung.com>
+ <CGME20180215103928eucas1p1b2ef8630cf86f2799b4689d6786bdf4e@eucas1p1.samsung.com>
+Message-ID: <20180215103920.32017-6-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These bindings allow to describe most known standard USB connectors
-and it should be possible to extend it if necessary.
-USB connectors, beside USB can be used to route other protocols,
-for example UART, Audio, MHL. In such case every device passing data
-through the connector should have appropriate graph bindings.
+Since extcon property is not allowed in DT, extcon subsystem requires
+another way to get extcon device. Lets try the simplest approach - get
+edev by of_node.
 
 Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
-v3:
-- removed MHL port (samsung connector will have separate bindings),
-- added 2nd example for USB-C,
-- improved formatting
-v2:
-- moved connector type(A,B,C) to compatible string (Rob),
-- renamed size property to type (Rob),
-- changed type description to be less confusing (Laurent),
-- removed vendor specific compatibles (implied by graph port number),
-- added requirement of connector being a child of IC (Rob),
-- removed max-mode (subtly suggested by Rob, it should be detected anyway
-  by USB Controller in runtime, downside is that device is not able to
-  report its real capabilities, maybe better would be to make it optional(?)),
-- assigned port numbers to data buses (Rob).
-
-Regards
-Andrzej
-
-Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-
-dt-bindings: add bindings for USB physical connector v3
+v2: changed label to follow local convention (Chanwoo)
 ---
- .../bindings/connector/usb-connector.txt           | 74 ++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+ drivers/extcon/extcon.c | 44 ++++++++++++++++++++++++++++++++++----------
+ include/linux/extcon.h  |  6 ++++++
+ 2 files changed, 40 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
-new file mode 100644
-index 000000000000..1efda92639da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
-@@ -0,0 +1,74 @@
-+USB Connector
-+=============
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+index cb38c2747684..c4972c4cb3bd 100644
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -1336,6 +1336,28 @@ void extcon_dev_unregister(struct extcon_dev *edev)
+ EXPORT_SYMBOL_GPL(extcon_dev_unregister);
+ 
+ #ifdef CONFIG_OF
 +
-+USB connector node represents physical USB connector. It should be
-+a child of USB interface controller.
++/*
++ * extcon_get_edev_by_of_node - Get the extcon device from devicetree.
++ * @node	: OF node identyfying edev
++ *
++ * Return the pointer of extcon device if success or ERR_PTR(err) if fail.
++ */
++struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
++{
++	struct extcon_dev *edev;
 +
-+Required properties:
-+- compatible: describes type of the connector, must be one of:
-+    "usb-a-connector",
-+    "usb-b-connector",
-+    "usb-c-connector".
++	mutex_lock(&extcon_dev_list_lock);
++	list_for_each_entry(edev, &extcon_dev_list, entry)
++		if (edev->dev.parent && edev->dev.parent->of_node == node)
++			goto out;
++	edev = ERR_PTR(-EPROBE_DEFER);
++out:
++	mutex_unlock(&extcon_dev_list_lock);
 +
-+Optional properties:
-+- label: symbolic name for the connector,
-+- type: size of the connector, should be specified in case of USB-A, USB-B
-+  non-standard (large) connector sizes: "mini", "micro".
++	return edev;
++}
 +
-+Required nodes:
-+- any data bus to the connector should be modeled using the OF graph bindings
-+  specified in bindings/graph.txt, unless the bus is between parent node and
-+  the connector. Since single connector can have multpile data buses every bus
-+  has assigned OF graph port number as follows:
-+    0: High Speed (HS), present in all connectors,
-+    1: Super Speed (SS), present in SS capable connectors,
-+    2: Sideband use (SBU), present in USB-C.
+ /*
+  * extcon_get_edev_by_phandle - Get the extcon device from devicetree.
+  * @dev		: the instance to the given device
+@@ -1363,25 +1385,27 @@ struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev, int index)
+ 		return ERR_PTR(-ENODEV);
+ 	}
+ 
+-	mutex_lock(&extcon_dev_list_lock);
+-	list_for_each_entry(edev, &extcon_dev_list, entry) {
+-		if (edev->dev.parent && edev->dev.parent->of_node == node) {
+-			mutex_unlock(&extcon_dev_list_lock);
+-			of_node_put(node);
+-			return edev;
+-		}
+-	}
+-	mutex_unlock(&extcon_dev_list_lock);
++	edev = extcon_get_edev_by_of_node(node);
+ 	of_node_put(node);
+ 
+-	return ERR_PTR(-EPROBE_DEFER);
++	return edev;
+ }
 +
-+Examples
-+--------
+ #else
 +
-+1. Micro-USB connector with HS lines routed via controller (MUIC):
++struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
++{
++	return ERR_PTR(-ENOSYS);
++}
 +
-+muic-max77843 at 66 {
-+	...
-+	usb_con: connector {
-+		compatible = "usb-b-connector";
-+		label = "micro-USB";
-+		type = "micro";
-+	};
-+};
+ struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev, int index)
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
 +
-+2. USB-C connector attached to CC controller (s2mm005), HS lines routed
-+to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort:
+ #endif /* CONFIG_OF */
 +
-+ccic: s2mm005 at 33 {
-+	...
-+	usb_con: connector {
-+		compatible = "usb-c-connector";
-+		label = "USB-C";
++EXPORT_SYMBOL_GPL(extcon_get_edev_by_of_node);
+ EXPORT_SYMBOL_GPL(extcon_get_edev_by_phandle);
+ 
+ /**
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+index 6d94e82c8ad9..b47e0c7f01fe 100644
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -230,6 +230,7 @@ extern void devm_extcon_unregister_notifier_all(struct device *dev,
+  * Following APIs get the extcon_dev from devicetree or by through extcon name.
+  */
+ extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
++extern struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node);
+ extern struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
+ 						     int index);
+ 
+@@ -283,6 +284,11 @@ static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static inline struct extcon_dev *extcon_get_edev_by_of_node(struct device_node *node)
++{
++	return ERR_PTR(-ENODEV);
++}
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				usb_con_hs: endpoint {
-+					remote-endpoint = <&max77865_usbc_hs>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				usb_con_ss: endpoint {
-+					remote-endpoint = <&usbdrd_phy_ss>;
-+				};
-+			};
-+			port at 2 {
-+				reg = <2>;
-+				usb_con_sbu: endpoint {
-+					remote-endpoint = <&dp_aux>;
-+				};
-+			};
-+		};
-+	};
-+};
+ static inline struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
+ 				int index)
+ {
 -- 
 2.16.1
