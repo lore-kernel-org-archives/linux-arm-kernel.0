@@ -1,75 +1,169 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 15 Feb 2018 13:51:34 +0000
-Subject: [PATCH 08/37] iommu/fault: Handle mm faults
-In-Reply-To: <20180214104621.7675579c@jacob-builder>
-References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
- <20180212183352.22730-9-jean-philippe.brucker@arm.com>
- <20180214104621.7675579c@jacob-builder>
-Message-ID: <800c2efe-10d7-5711-37d6-fb45df9b6e5c@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Feb 2018 13:52:05 +0000
+Subject: [PATCH v4 14/19] KVM: arm/arm64: Move HYP IO VAs to the "idmap"
+ range
+In-Reply-To: <20180118143953.GB21802@cbox>
+References: <20180104184334.16571-1-marc.zyngier@arm.com>
+ <20180104184334.16571-15-marc.zyngier@arm.com> <20180118143953.GB21802@cbox>
+Message-ID: <1015096b-f9e5-9389-a2d9-1bc511e27f6b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/18 18:46, Jacob Pan wrote:
-> On Mon, 12 Feb 2018 18:33:23 +0000
-> Jean-Philippe Brucker <jean-philippe.brucker@arm.com> wrote:
-[...]
->> +	if (!evt->pasid_valid)
->> +		return ret;
-> I guess for not we don't handle PRQ without PASID, right?
-
-No. I'm not sure how to implement it, though there have been some requests
-(see discussion on 1/37)
-
->> +	/*
->> +	 * Special case: PASID Stop Marker (LRW = 0b100) doesn't
->> expect a
->> +	 * response. A Stop Marker may be generated when disabling a
->> PASID
->> +	 * (issuing a PASID stop request) in some PCI devices.
->> +	 *
->> +	 * When the mm_exit() callback returns from the device
->> driver, no page
->> +	 * request is generated for this PASID anymore and
->> outstanding ones have
->> +	 * been pushed to the IOMMU (as per PCIe 4.0r1.0 - 6.20.1
->> and 10.4.1.2 -
->> +	 * Managing PASID TLP Prefix Usage). Some PCI devices will
->> wait for all
->> +	 * outstanding page requests to come back with a response
->> before
->> +	 * completing the PASID stop request. Others do not wait for
->> page
->> +	 * responses, and instead issue this Stop Marker that tells
->> us when the
->> +	 * PASID can be reallocated.
->> +	 *
->> +	 * We ignore the Stop Marker because:
->> +	 * a. Page requests, which are posted requests, have been
->> flushed to the
->> +	 *    IOMMU when mm_exit() returns,
->> +	 * b. We flush all fault queues after mm_exit() returns and
->> before
->> +	 *    freeing the PASID.
->> +	 *
->> +	 * So even though the Stop Marker might be issued by the
->> device *after*
->> +	 * the stop request completes, outstanding faults will have
->> been dealt
->> +	 * with by the time we free the PASID.
->> +	 */
->> +	if (evt->last_req &&
->> +	    !(evt->prot & (IOMMU_FAULT_READ | IOMMU_FAULT_WRITE)))
->> +		return IOMMU_PAGE_RESP_HANDLED;
+On 18/01/18 14:39, Christoffer Dall wrote:
+> On Thu, Jan 04, 2018 at 06:43:29PM +0000, Marc Zyngier wrote:
+>> We so far mapped our HYP IO (which is essencially the GICv2 control
+>> registers) using the same method as for memory. It recently appeared
+>> that is a bit unsafe:
+>>
+>> We compute the HYP VA using the kern_hyp_va helper, but that helper
+>> is only designed to deal with kernel VAs coming from the linear map,
+>> and not from the vmalloc region... This could in turn cause some bad
+>> aliasing between the two, amplified by the upcoming VA randomisation.
+>>
+>> A solution is to come up with our very own basic VA allocator for
+>> MMIO. Since half of the HYP address space only contains a single
+>> page (the idmap), we have plenty to borrow from. Let's use the idmap
+>> as a base, and allocate downwards from it. GICv2 now lives on the
+>> other side of the great VA barrier.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/mmu.c | 56 +++++++++++++++++++++++++++++++++++++++++-------------
+>>  1 file changed, 43 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 6192d45d1e1a..14c5e5534f2f 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
+>>  static unsigned long hyp_idmap_end;
+>>  static phys_addr_t hyp_idmap_vector;
+>>  
+>> +static DEFINE_MUTEX(io_map_lock);
+>> +static unsigned long io_map_base;
 >> +
-> If we don't expect a page response, shouldn't it be filtered by the
-> IOMMU vendor driver in the first place? i.e. in the vendor IOMMU driver
-> PRQ handler, it will sanitize the request anyway, for anything that
-> does not need response, it will not call iommu_report_device_fault().
+>>  #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+>>  #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+>>  
+>> @@ -502,27 +505,31 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+>>   *
+>>   * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
+>>   * therefore contains either mappings in the kernel memory area (above
+>> - * PAGE_OFFSET), or device mappings in the vmalloc range (from
+>> - * VMALLOC_START to VMALLOC_END).
+>> + * PAGE_OFFSET), or device mappings in the idmap range.
+>>   *
+>> - * boot_hyp_pgd should only map two pages for the init code.
+>> + * boot_hyp_pgd should only map the idmap range, and is only used in
+>> + * the extended idmap case.
+>>   */
+>>  void free_hyp_pgds(void)
+>>  {
+>> +	pgd_t *id_pgd;
+>> +
+>>  	mutex_lock(&kvm_hyp_pgd_mutex);
+>>  
+>> +	id_pgd = boot_hyp_pgd ? boot_hyp_pgd : hyp_pgd;
+>> +
+>> +	if (id_pgd)
+>> +		unmap_hyp_range(id_pgd, io_map_base,
+>> +				hyp_idmap_start + PAGE_SIZE - io_map_base);
+>> +
+>>  	if (boot_hyp_pgd) {
+>> -		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+>>  		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+>>  		boot_hyp_pgd = NULL;
+>>  	}
+>>  
+>>  	if (hyp_pgd) {
+>> -		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+>>  		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
+>>  				(uintptr_t)high_memory - PAGE_OFFSET);
+>> -		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
+>> -				VMALLOC_END - VMALLOC_START);
+>>  
+>>  		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+>>  		hyp_pgd = NULL;
+>> @@ -721,7 +728,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+>>  			   void __iomem **kaddr,
+>>  			   void __iomem **haddr)
+>>  {
+>> -	unsigned long start, end;
+>> +	pgd_t *pgd = hyp_pgd;
+>> +	unsigned long base;
+>>  	int ret;
+>>  
+>>  	*kaddr = ioremap(phys_addr, size);
+>> @@ -733,17 +741,38 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+>>  		return 0;
+>>  	}
+>>  
+>> +	mutex_lock(&io_map_lock);
+>> +
+>> +	base = io_map_base - size;
+> 
+> are we guaranteed that hyp_idmap_start (and therefore io_map_base) is
+> sufficiently greater than 0 ?  I suppose that even if RAM starts at 0,
+> and the kernel was loaded at 0, the idmap page for Hyp would be at some
+> reasonable offset from the start of the kernel image?
 
-Right, we're not doing anything with the stop marker anyway. This encoding
-is also specific to PCI PRI, and maybe in future architectures, LRW =
-0b100 will mean something else and will require a response. So filtering
-it in the IOMMU driver makes more sense.
+On my kernel image:
+ffff000008080000 t _head
+ffff000008cc6000 T __hyp_idmap_text_start
+ffff000009aaa000 B swapper_pg_end
+
+_hyp_idmap_text_start is about 12MB from the beginning of the image, and
+about 14MB from the end. Yes, it is a big kernel. But we're only mapping
+a few pages there, even with my upcoming crazy vector remapping crap. So
+the likeliness of this failing is close to zero.
+
+Now, close to zero is not necessarily close enough. What I could do is
+to switch the allocator around on failure, so that if we can't allocate
+on one side, we can at least try to allocate on the other side. I'm
+pretty sure we'll never trigger that code, but I can implement it if you
+think that's worth it.
+
+> 
+>> +	base &= ~(size - 1);
+> 
+> I'm not sure I understand this line.  Wouldn't it make more sense to use
+> PAGE_SIZE here?
+
+This is trying to align the base of the allocation to its natural size
+(8kB aligned on an 8kB boundary, for example), which is what other
+allocators in the kernel do. I've now added a roundup_pow_of_two(size)
+so that we're guaranteed to deal with those.
+
+> 
+>>  
+>> -	start = kern_hyp_va((unsigned long)*kaddr);
+>> -	end = kern_hyp_va((unsigned long)*kaddr + size);
+>> -	ret = __create_hyp_mappings(hyp_pgd, start, end,
+>> +	/*
+>> +	 * Verify that BIT(VA_BITS - 1) hasn't been flipped by
+>> +	 * allocating the new area, as it would indicate we've
+>> +	 * overflowed the idmap/IO address range.
+>> +	 */
+>> +	if ((base ^ io_map_base) & BIT(VA_BITS - 1)) {
+>> +		ret = -ENOMEM;
+>> +		goto out;
+>> +	}
+>> +
+>> +	if (__kvm_cpu_uses_extended_idmap())
+>> +		pgd = boot_hyp_pgd;
+>> +
+> 
+> I don't understand why you can change the pgd used for mappings here,
+> perhaps a patch splitting issue?
+
+No, that's absolutely required. If you use an extended idmap, you cannot
+reach the idmap from the main PGD. You can only reach it either from the
+merged_hyp_pgd (which is not usable because it has an extra level), or
+from the idmap_pgd itself. See for example how kvm_map_idmap_text() is
+used at boot time.
 
 Thanks,
-Jean
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
