@@ -1,145 +1,49 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Feb 2018 22:03:22 +0100
-Subject: [PATCH v4 30/40] KVM: arm64: Defer saving/restoring 32-bit sysregs to
- vcpu load/put
-In-Reply-To: <20180215210332.8648-1-christoffer.dall@linaro.org>
-References: <20180215210332.8648-1-christoffer.dall@linaro.org>
-Message-ID: <20180215210332.8648-31-christoffer.dall@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Feb 2018 21:28:28 +0000
+Subject: [PATCH v4 00/17] arm64: Add SMCCC v1.1 support and CVE-2017-5715
+ (Spectre variant 2) mitigation
+In-Reply-To: <e9df17e7-86ee-2f7a-b8e2-d78ac0358fc3@redhat.com>
+References: <20180206175621.929-1-marc.zyngier@arm.com>
+ <e9df17e7-86ee-2f7a-b8e2-d78ac0358fc3@redhat.com>
+Message-ID: <86fu6254eb.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running a 32-bit VM (EL1 in AArch32), the AArch32 system registers
-can be deferred to vcpu load/put on VHE systems because neither
-the host kernel nor host userspace uses these registers.
+On Thu, 15 Feb 2018 20:59:29 +0000,
+Jon Masters wrote:
+> 
+> Hi Marc, all,
+> 
+> On 02/06/2018 12:56 PM, Marc Zyngier wrote:
+> > ARM has recently published a SMC Calling Convention (SMCCC)
+> > specification update[1] that provides an optimised calling convention
+> > and optional, discoverable support for mitigating CVE-2017-5715. ARM
+> > Trusted Firmware (ATF) has already gained such an implementation[2].
+> 
+> I'm probably just missing something, but does this end up reported
+> somewhere conveniently user visible? In particular, if the new SMC is
+> *not* provided, does the user end up easily seeing this?
 
-Note that we can not defer saving DBGVCR32_EL2 conditionally based
-on the state of the debug dirty flag on VHE, but since we do the
-load/put pretty rarely, this comes out as a win anyway.
+What exactly do you want to make visible to userspace?
 
-We can also not defer saving FPEXC32_32 because this register only holds
-a guest-valid value for 32-bit guests during the exit path when the
-guest has used FPSIMD registers and restored the register in the early
-assembly handler from taking the EL2 fault, and therefore we have to
-check if fpsimd is enabled for the guest in the exit path and save the
-register then, for both VHE and non-VHE guests.
+If you want the SMC implementation of the CVE workaround to be
+reported, it wouldn't be very useful, as the SMC instruction is not
+available at EL0. It also only covers part of the mitigation spectrum
+(we have cores that implement the mitigation using different
+mechanisms).
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
+If what you're after is a userspace visible indication of a mitigation
+for this CVE (by whatever method available), then this is still a work
+in progress, and relies on this series[1] so that we can properly
+handle systems containing a combination of affected and non-affected
+CPUs. The plan is to expose the status as part of the sysfs interface,
+? la x86 and covering all 3 known vulnerabilities.
 
-Notes:
-    Changes since v3:
-     - Rework the FPEXC32 save/restore logic to no longer attempt to
-       save/restore this register lazily.
-    
-    Changes since v2:
-     - New patch (deferred register handling has been reworked)
+Thanks,
 
- arch/arm64/kvm/hyp/switch.c    | 17 +++++++++++------
- arch/arm64/kvm/hyp/sysreg-sr.c | 15 ++++++++++-----
- 2 files changed, 21 insertions(+), 11 deletions(-)
+	M.
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 22e77deb8e2e..909aa3fe9196 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -47,6 +47,15 @@ bool __hyp_text __fpsimd_enabled(void)
- 	return __fpsimd_is_enabled()();
- }
- 
-+/* Save the 32-bit only FPSIMD system register state */
-+static inline void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
-+{
-+	if (!vcpu_el1_is_32bit(vcpu))
-+		return;
-+
-+	vcpu->arch.ctxt.sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
-+}
-+
- static void __hyp_text __activate_traps_vhe(void)
- {
- 	u64 val;
-@@ -380,11 +389,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 
- 	__vgic_restore_state(vcpu);
- 
--	/*
--	 * We must restore the 32-bit state before the sysregs, thanks
--	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
--	 */
--	__sysreg32_restore_state(vcpu);
- 	sysreg_restore_guest_state_vhe(guest_ctxt);
- 	__debug_switch_to_guest(vcpu);
- 
-@@ -398,7 +402,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	fp_enabled = __fpsimd_enabled();
- 
- 	sysreg_save_guest_state_vhe(guest_ctxt);
--	__sysreg32_save_state(vcpu);
- 	__vgic_save_state(vcpu);
- 
- 	__deactivate_traps(vcpu);
-@@ -408,6 +411,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 	if (fp_enabled) {
- 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
- 		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
-+		__fpsimd_save_fpexc32(vcpu);
- 	}
- 
- 	__debug_switch_to_host(vcpu);
-@@ -475,6 +479,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	if (fp_enabled) {
- 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
- 		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
-+		__fpsimd_save_fpexc32(vcpu);
- 	}
- 
- 	/*
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 9c60b8062724..aacba4636871 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -196,10 +196,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
- 	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
- 	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
- 
--	if (__fpsimd_enabled())
--		sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
--
--	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-+	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
- 		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
- }
- 
-@@ -221,7 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
- 	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
- 	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
- 
--	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-+	if (has_vhe() || vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
- 		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
- }
- 
-@@ -246,6 +243,13 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
- 
- 	__sysreg_save_user_state(host_ctxt);
- 
-+	/*
-+	 * Load guest EL1 and user state
-+	 *
-+	 * We must restore the 32-bit state before the sysregs, thanks
-+	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
-+	 */
-+	__sysreg32_restore_state(vcpu);
- 	__sysreg_restore_user_state(guest_ctxt);
- 	__sysreg_restore_el1_state(guest_ctxt);
- 
-@@ -273,6 +277,7 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
- 
- 	__sysreg_save_el1_state(guest_ctxt);
- 	__sysreg_save_user_state(guest_ctxt);
-+	__sysreg32_save_state(vcpu);
- 
- 	/* Restore host user state */
- 	__sysreg_restore_user_state(host_ctxt);
+[1] https://lkml.org/lkml/2018/2/9/579
+
 -- 
-2.14.2
+Jazz is not dead, it just smell funny.
