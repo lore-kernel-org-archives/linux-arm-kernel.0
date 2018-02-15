@@ -1,54 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Feb 2018 13:46:50 +0000
-Subject: [PATCH] arm64: dts: rockchip: Fix RK3328 UART DMAs
-Message-ID: <564d3e93476ae7480f927b1137ec4d0301938f16.1518702332.git.robin.murphy@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 15 Feb 2018 13:49:41 +0000
+Subject: [PATCH 07/37] iommu: Add a page fault handler
+In-Reply-To: <20180213231821.5863ef99@jacob-builder>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-8-jean-philippe.brucker@arm.com>
+ <20180213231821.5863ef99@jacob-builder>
+Message-ID: <2be857f1-cde2-a448-2bca-045f068396e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using a serial console on RK3328 provokes an error from
-of_dma_request_slave_channel() since the UART nodes have a "dmas"
-property but are missing the mandatory "dma-names" to go with it.
+On 14/02/18 07:18, Jacob Pan wrote:
+[...]
+>> +/* Used to store incomplete fault groups */
+>> +static LIST_HEAD(iommu_partial_faults);
+>> +static DEFINE_SPINLOCK(iommu_partial_faults_lock);
+>> +
+> should partial fault list be per iommu?
 
-Replace the bogus "#dma-cells" - these UARTs are DMA channel consumers,
-not providers - with the appropriate names instead. DMA still doesn't
-actually work, since the PL330 driver doesn't quite implement everything
-the 8250 driver demands, but at least it makes the DT correct.
+That would be good, but I don't see an easy way to retrieve the iommu
+instance in report_device_fault(). Maybe the driver should pass it to
+report_device_fault(), and we can then store partial faults in struct
+iommu_device.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+[...]
+>> +/**
+>> + * iommu_report_device_fault() - Handle fault in device driver or mm
+>> + *
+>> + * If the device driver expressed interest in handling fault, report
+>> it through
+>> + * the callback. If the fault is recoverable, try to page in the
+>> address.
+>> + */
+>> +int iommu_report_device_fault(struct device *dev, struct
+>> iommu_fault_event *evt) +{
+>> +	int ret = -ENOSYS;
+>> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>> +
+>> +	if (!domain)
+>> +		return -ENODEV;
+>> +
+>> +	/*
+>> +	 * if upper layers showed interest and installed a fault
+>> handler,
+>> +	 * invoke it.
+>> +	 */
+>> +	if (iommu_has_device_fault_handler(dev)) {
+> I think Alex pointed out this is racy, so adding a mutex to the
+> iommu_fault_param and acquire it would help. Do we really
+> atomic handler?
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index a037ee56fead..822488bdf364 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -318,7 +318,7 @@
- 		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
- 		clock-names = "baudclk", "apb_pclk";
- 		dmas = <&dmac 2>, <&dmac 3>;
--		#dma-cells = <2>;
-+		dma-names = "tx", "rx";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
- 		reg-io-width = <4>;
-@@ -333,7 +333,7 @@
- 		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
- 		clock-names = "sclk_uart", "pclk_uart";
- 		dmas = <&dmac 4>, <&dmac 5>;
--		#dma-cells = <2>;
-+		dma-names = "tx", "rx";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart1_xfer &uart1_cts &uart1_rts>;
- 		reg-io-width = <4>;
-@@ -348,7 +348,7 @@
- 		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
- 		clock-names = "baudclk", "apb_pclk";
- 		dmas = <&dmac 6>, <&dmac 7>;
--		#dma-cells = <2>;
-+		dma-names = "tx", "rx";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart2m1_xfer>;
- 		reg-io-width = <4>;
--- 
-2.16.1.dirty
+Yes I think a few IOMMU drivers will call this function from IRQ context,
+so a spinlock might be better for acquiring iommu_fault_param.
+
+>> +		struct iommu_fault_param *param =
+>> dev->iommu_param->fault_param; +
+>> +		return param->handler(evt, param->data);
+> Even upper layer (VFIO) registered handler to propagate PRQ to a guest
+> to fault in the pages, we may still need to keep track of the page
+> requests that need page response later, i.e. last page in group or
+> stream request in vt-d. This will allow us sanitize the page response
+> come back from the guest/VFIO.
+> In my next round, I am adding a per device list under iommu_fault_param
+> for pending page request. This will also address the situation where
+> guest failed to send response. We can enforce time or credit limit of
+> pending requests based on this list.
+
+Sounds good
+
+Thanks,
+Jean
