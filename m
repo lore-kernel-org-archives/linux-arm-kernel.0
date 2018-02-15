@@ -1,23 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Feb 2018 13:00:58 +0000
-Subject: [PATCH 0/5] Arm interconnect PMU driver tidyup
-In-Reply-To: <cover.1517855839.git.robin.murphy@arm.com>
-References: <cover.1517855839.git.robin.murphy@arm.com>
-Message-ID: <20180215130057.GB16623@arm.com>
+From: lionel.debieve@st.com (Lionel Debieve)
+Date: Thu, 15 Feb 2018 14:03:07 +0100
+Subject: [PATCH Resend 0/5] hwrng: stm32 - Improvement for stm32-rng 
+Message-ID: <20180215130312.23612-1-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 05, 2018 at 06:39:41PM +0000, Robin Murphy wrote:
-> Since system PMUs now have a proper home in drivers/perf/, let's
-> collect together the Arm interconnect PMU drivers currently squatting
-> in drivers/bus/. Whilst elbow-deep in the CCI driver I spotted some
-> further opportunity for cleanup, so a few bonus patches are included
-> at the end. 
+This set of patches add extended functionalities for stm32 rng
+driver.
+Patch #1 includes a reset during probe to avoid any error status
+which can occur during bootup process and keep safe rng integrity.
 
-For patches 1, 3-5:
+Patch #3 adds a new property to manage the clock error detection
+feature which can be disabled on specific target.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Patch #5 rework the timeout calculation for read value that was
+previously defined based on loop operation and is now based on
+timer.
 
-I'm assuming you'll route this via arm-soc.
+Lionel Debieve (5):
+  hwrng: stm32 - add reset during probe
+  dt-bindings: rng: add reset node for stm32
+  hwrng: stm32 - allow disable clock error detection
+  dt-bindings: rng: add clock detection error for stm32
+  hwrng: stm32 - rework read timeout calculation
 
-Will
+ .../devicetree/bindings/rng/st,stm32-rng.txt       |  4 ++
+ drivers/char/hw_random/stm32-rng.c                 | 44 ++++++++++++++--------
+ 2 files changed, 32 insertions(+), 16 deletions(-)
+
+-- 
+2.15.1
