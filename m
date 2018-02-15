@@ -1,68 +1,23 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 17:18:54 +0100
-Subject: [PATCH 3/9] ARM: dts: kzm9d: Fix "debounce-interval" property
- misspelling
-In-Reply-To: <1518531335-5170-4-git-send-email-geert+renesas@glider.be>
-References: <1518531335-5170-1-git-send-email-geert+renesas@glider.be>
- <1518531335-5170-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180215161853.m5wqgj6myjla3aab@verge.net.au>
+Date: Thu, 15 Feb 2018 17:20:29 +0100
+Subject: [PATCH v6 09/26] soc: renesas: rcar-rst: Enable watchdog as
+ reset trigger for Gen2
+In-Reply-To: <1518526964-7400-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <20180213081910.x5llcsmwza44u4ow@verge.net.au>
+ <1518526964-7400-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180215162029.s7rus3f3zaru7spz@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc linux-renesas-soc]
-
-On Tue, Feb 13, 2018 at 03:15:29PM +0100, Geert Uytterhoeven wrote:
-> "debounce_interval" was never supported.
+On Tue, Feb 13, 2018 at 01:02:44PM +0000, Fabrizio Castro wrote:
+> This patch allows for platform specific quirks as some of the SoC need
+> further customization for the watchdog to work properly, like for R-Car
+> Gen2 and for RZ/G.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 > ---
-> Please apply to your tree when appropriate.
+> v5->v6:
+> * rebased on top of renesas-devel-20180213-v4.16-rc1
 
 Thanks, applied.
-
-> 
->  arch/arm/boot/dts/emev2-kzm9d.dts | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-> index 60d0a732833aaada..c238407133bfe2d7 100644
-> --- a/arch/arm/boot/dts/emev2-kzm9d.dts
-> +++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-> @@ -38,28 +38,28 @@
->  		#size-cells = <0>;
->  
->  		one {
-> -			debounce_interval = <50>;
-> +			debounce-interval = <50>;
->  			wakeup-source;
->  			label = "DSW2-1";
->  			linux,code = <KEY_1>;
->  			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
->  		};
->  		two {
-> -			debounce_interval = <50>;
-> +			debounce-interval = <50>;
->  			wakeup-source;
->  			label = "DSW2-2";
->  			linux,code = <KEY_2>;
->  			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
->  		};
->  		three {
-> -			debounce_interval = <50>;
-> +			debounce-interval = <50>;
->  			wakeup-source;
->  			label = "DSW2-3";
->  			linux,code = <KEY_3>;
->  			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
->  		};
->  		four {
-> -			debounce_interval = <50>;
-> +			debounce-interval = <50>;
->  			wakeup-source;
->  			label = "DSW2-4";
->  			linux,code = <KEY_4>;
-> -- 
-> 2.7.4
-> 
