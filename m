@@ -1,45 +1,40 @@
 From: philippe.cornu@st.com (Philippe Cornu)
-Date: Thu, 15 Feb 2018 09:20:13 +0100
-Subject: [PATCH 2/3] ARM: dts: stm32: Add new stm32f469 dtsi file with mipi dsi
+Date: Thu, 15 Feb 2018 09:20:12 +0100
+Subject: [PATCH 1/3] ARM: dts: stm32: Add dt-bindings gpio.h include on
+ stm32f469-disco
 In-Reply-To: <20180215082014.30383-1-philippe.cornu@st.com>
 References: <20180215082014.30383-1-philippe.cornu@st.com>
-Message-ID: <20180215082014.30383-3-philippe.cornu@st.com>
+Message-ID: <20180215082014.30383-2-philippe.cornu@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the stm32f4 family, mipi dsi is only supported on stm32f469.
-So add a new stm32f469 dtsi file & add mipi dsi support inside.
+Add dt-bindings/gpio/gpio.h include and use it on vcc5v_otg.
 
 Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
 ---
- arch/arm/boot/dts/stm32f469.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 arch/arm/boot/dts/stm32f469.dtsi
+ arch/arm/boot/dts/stm32f469-disco.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32f469.dtsi b/arch/arm/boot/dts/stm32f469.dtsi
-new file mode 100644
-index 000000000000..5ae5213f68cb
---- /dev/null
-+++ b/arch/arm/boot/dts/stm32f469.dtsi
-@@ -0,0 +1,19 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
-+/* Copyright (C) STMicroelectronics 2017 - All Rights Reserved */
-+
-+#include "stm32f429.dtsi"
-+
-+/ {
-+	soc {
-+		dsi: dsi at 40016c00 {
-+			compatible = "st,stm32-dsi";
-+			reg = <0x40016c00 0x800>;
-+			interrupts = <92>;
-+			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
-+			reset-names = "apb";
-+			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-+			clock-names = "pclk", "ref";
-+			status = "disabled";
-+		};
-+	};
-+};
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index bdd03ac7a4b5..7d53b794d27b 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -48,6 +48,7 @@
+ /dts-v1/;
+ #include "stm32f429.dtsi"
+ #include "stm32f469-pinctrl.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "STMicroelectronics STM32F469i-DISCO board";
+@@ -74,7 +75,7 @@
+ 	vcc5v_otg: vcc5v-otg-regulator {
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+-		gpio = <&gpiob 2 0>;
++		gpio = <&gpiob 2 GPIO_ACTIVE_HIGH>;
+ 		regulator-name = "vcc5_host1";
+ 		regulator-always-on;
+ 	};
 -- 
 2.15.1
