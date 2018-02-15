@@ -1,51 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Feb 2018 16:34:37 +0100
-Subject: [PATCH 03/15] soc: renesas: Add R-Car M3-N support
-In-Reply-To: <CAMuHMdU-pYNwjrXSR7j2kNkJSYsKd=0Kf0Tzq5LHpwA7p4_9MA@mail.gmail.com>
-References: <1518515162-23663-1-git-send-email-jacopo+renesas@jmondi.org>
- <1518515162-23663-4-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdU-pYNwjrXSR7j2kNkJSYsKd=0Kf0Tzq5LHpwA7p4_9MA@mail.gmail.com>
-Message-ID: <20180215153436.77h46poeswto53lm@verge.net.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 15 Feb 2018 15:34:15 +0000
+Subject: Applied "ASoC: uniphier: remove redundant check of blk_id" to the
+ asoc tree
+In-Reply-To: <20180214161036.32446-1-colin.king@canonical.com>
+Message-ID: <E1emLY7-0007KZ-Mh@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 14, 2018 at 01:48:27PM +0100, Geert Uytterhoeven wrote:
-> Hi Jacopo,
-> 
-> Thanks for your patch!
-> 
-> On Tue, Feb 13, 2018 at 10:45 AM, Jacopo Mondi
-> <jacopo+renesas@jmondi.org> wrote:
-> > Add support for R-Car M3-N (r8a77965) power areas and reset.
-> > M3-N power areas are identical to M3-W ones, so just copy and rename
-> > them.
-> 
-> They are not identical:
->   - M3-N does not have the CA53-related areas,
->   - M3-W does not have A3VP,
->   - M3-N does not have A2VC0 (M3-W also doesn't, according to latest
-> datasheet?).
-> 
-> The datasheet also mentions A3SH, without further info about the register
-> block. I think we need to bring this up with Renesas.
-> 
-> >  .../bindings/power/renesas,rcar-sysc.txt           |  1 +
-> >  .../devicetree/bindings/reset/renesas,rst.txt      |  1 +
-> >  drivers/soc/renesas/Kconfig                        |  9 ++++--
-> >  drivers/soc/renesas/Makefile                       |  1 +
-> >  drivers/soc/renesas/r8a77965-sysc.c                | 37 ++++++++++++++++++++++
-> >  drivers/soc/renesas/rcar-rst.c                     |  1 +
-> >  drivers/soc/renesas/rcar-sysc.c                    |  3 ++
-> >  drivers/soc/renesas/rcar-sysc.h                    |  1 +
-> >  drivers/soc/renesas/renesas-soc.c                  |  8 +++++
-> >  include/dt-bindings/power/r8a77965-sysc.h          | 31 ++++++++++++++++++
-> >  10 files changed, 91 insertions(+), 2 deletions(-)
-> >  create mode 100644 drivers/soc/renesas/r8a77965-sysc.c
-> >  create mode 100644 include/dt-bindings/power/r8a77965-sysc.h
-> 
-> The maintainer may ask you to split this patch by functionality...
+The patch
 
-Yes, I would like this split up.
+   ASoC: uniphier: remove redundant check of blk_id
 
-I think "[PATCH 00/11] Add R8A77980/Condor board support" provides
-a good example.
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 53b8e4504aaa7fc88fd18e6caac3a4d4367bd4a4 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Wed, 14 Feb 2018 16:10:36 +0000
+Subject: [PATCH] ASoC: uniphier: remove redundant check of blk_id
+
+The check of blk_id == AUD_CLK_IO is redundant as it also being performed
+in the following switch statement with the same return of -ENOTSUPP. Fix
+this by removing the redundant comparison.
+
+Detected by CoverityScan, CID#1465227 ("Logically dead code")
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/uniphier/aio-cpu.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/sound/soc/uniphier/aio-cpu.c b/sound/soc/uniphier/aio-cpu.c
+index 55f3248a31fd..7cf2316c69a2 100644
+--- a/sound/soc/uniphier/aio-cpu.c
++++ b/sound/soc/uniphier/aio-cpu.c
+@@ -134,9 +134,6 @@ static int uniphier_aio_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+ 	bool pll_auto = false;
+ 	int pll_id, div_id;
+ 
+-	if (clk_id == AUD_CLK_IO)
+-		return -ENOTSUPP;
+-
+ 	switch (clk_id) {
+ 	case AUD_CLK_IO:
+ 		return -ENOTSUPP;
+-- 
+2.16.1
